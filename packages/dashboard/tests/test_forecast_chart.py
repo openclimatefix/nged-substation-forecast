@@ -250,8 +250,9 @@ def test_a_realistic_ensemble_size_does_not_hit_altairs_row_limit() -> None:
 
     Every other test in this file uses 3 members, so a regression that dropped
     ``alt.data_transformers.disable_max_rows()`` in ``build_view_forecast_chart`` would go
-    unnoticed by them: Altair only counts rows at serialisation, so this has to call ``.to_dict()``
-    (as every other test here does) rather than just constructing the chart object.
+    unnoticed by them: Altair only counts rows at serialisation, so this has to call
+    ``.to_dict()`` (as every other test here does) rather than just constructing the chart
+    object.
     """
     spec = _build(members=tuple(range(51))).to_dict()
     ensemble_rows = spec["datasets"][spec["layer"][1]["data"]["name"]]
@@ -290,11 +291,11 @@ def _nwp(members: tuple[int, ...] = (0, 1, 2)) -> pl.LazyFrame:
 
 
 def _nwp_analysis(inits: Sequence[datetime]) -> pl.LazyFrame:
-    """The proxy-analysis frame the dashboard feeds ``build_nwp_ensemble_chart``, built exactly as
-    ``view_forecasts.py`` builds it: the first ``NWP_ANALYSIS_LEAD`` of one control-member run per
-    element of ``inits``, run through ``select_analysis_proxy`` so overlapping runs collapse to one
-    freshest-non-null row per valid time. The temperature encodes the run's index so tests can see
-    which run each plotted point came from.
+    """The proxy-analysis frame the dashboard feeds ``build_nwp_ensemble_chart``, built exactly
+    as ``view_forecasts.py`` builds it: the first ``NWP_ANALYSIS_LEAD`` of one control-member
+    run per element of ``inits``, run through ``select_analysis_proxy`` so overlapping runs
+    collapse to one freshest-non-null row per valid time. The temperature encodes the run's
+    index so tests can see which run each plotted point came from.
     """
     frames = []
     for index, run_init in enumerate(inits):
@@ -473,11 +474,11 @@ def test_nwp_rows_are_clipped_to_the_plotted_window() -> None:
 
 
 def test_chart_renders_to_html() -> None:
-    """``to_html()`` walks a different Altair code path from the ``.to_dict()`` calls elsewhere in
-    this module: it must produce a genuine, self-contained document that wires the spec up to
-    Vega-Embed, not merely a spec dict that happens to be well-formed. The spec's own field names
-    (e.g. ``"ensemble_member"``) are already pinned nineteen times over by those ``.to_dict()``
-    tests, so this one checks only what is specific to the HTML path.
+    """``to_html()`` walks a different Altair code path from the ``.to_dict()`` calls elsewhere
+    in this module: it must produce a genuine, self-contained document that wires the spec up
+    to Vega-Embed, not merely a spec dict that happens to be well-formed. The spec's own field
+    names (e.g. ``"ensemble_member"``) are already pinned nineteen times over by those
+    ``.to_dict()`` tests, so this one checks only what is specific to the HTML path.
     """
     html = _build().to_html()
     assert html.startswith("<!DOCTYPE html>")

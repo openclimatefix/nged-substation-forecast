@@ -280,10 +280,10 @@ class TimeSeriesCoverage(pt.Model):
     genuinely-new rows, and CV fold-eligibility (``eligible_time_series_ids``) reads both.
 
     The freshness check reads this on-disk recency rather than the asset's materialisation
-    timestamp because a materialisation-freshness policy would miss the failure that matters: when
-    NGED's telemetry stalls, the ingest asset keeps materialising successfully on schedule, and
-    writes nothing. The materialisation looks fresh; the newest observation on disk does not. Full
-    reasoning:
+    timestamp because a materialisation-freshness policy would miss the failure that matters:
+    when NGED's telemetry stalls, the ingest asset keeps materialising successfully on schedule,
+    and writes nothing. The materialisation looks fresh; the newest observation on disk does not.
+    Full reasoning:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#warn-on-stale-power-data-with-a-dagster-asset-check>.
     """
 
@@ -303,24 +303,23 @@ def time_series_coverage(
     the Polars 32-bit row-count wraparound even on a very large table (see
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/#data-handling>).
 
-    Cost: a full two-column scan-and-aggregate, O(rows in the table). Projection pushdown drops the
-    ``power`` column, but a group-wise ``min``/``max`` cannot be answered from Parquet row-group
-    statistics (no engine on our stack does aggregate-from-statistics), so every
+    Cost: a full two-column scan-and-aggregate, O(rows in the table). Projection pushdown drops
+    the ``power`` column, but a group-wise ``min``/``max`` cannot be answered from Parquet
+    row-group statistics (no engine on our stack does aggregate-from-statistics), so every
     ``time``/``time_series_id`` value is read; computing both bounds instead of one is ~20% more
-    wall-clock and no extra memory (the shared scan dominates). The ``collect`` uses the streaming
-    engine to keep peak memory bounded, because this scan runs hourly on a small control-plane VM
-    and runs twice per hour: once for the ``power_data_is_fresh`` asset check, and once inside the
-    ``select_new_rows`` call ``power_time_series_and_metadata`` makes on the file listing. The
-    second ``select_new_rows`` call, on the parsed rows, uses ``_existing_power_time_series_keys``
-    instead — a scan restricted to the reporting series' own history, not this function's
-    whole-table scan. Measured on a synthetic V2 table
-    (2,500 series, half-hourly, partitioned by ``time_series_id``) for a year of history (43.8M
-    rows): streaming ~0.21 s / ~190 MB peak, versus ~1.3 GB peak for the in-memory engine — same
-    result, ~7x less memory. Cost
-    scales linearly with accumulated history. If the scan ever becomes a problem, both bounds can
-    instead be read from the Delta add-action ``min.time``/``max.time`` file statistics —
-    metadata-only, O(files): ~0.02 s / <100 MB at the same scale — the same Delta-log-metadata trick
-    used to count whole-table rows without scanning.
+    wall-clock and no extra memory (the shared scan dominates). The ``collect`` uses the
+    streaming engine to keep peak memory bounded, because this scan runs hourly on a small
+    control-plane VM and runs twice per hour: once for the ``power_data_is_fresh`` asset check,
+    and once inside the ``select_new_rows`` call ``power_time_series_and_metadata`` makes on the
+    file listing. The second ``select_new_rows`` call, on the parsed rows, uses
+    ``_existing_power_time_series_keys`` instead — a scan restricted to the reporting series' own
+    history, not this function's whole-table scan. Measured on a synthetic V2 table (2,500
+    series, half-hourly, partitioned by ``time_series_id``) for a year of history (43.8M rows):
+    streaming ~0.21 s / ~190 MB peak, versus ~1.3 GB peak for the in-memory engine — same result,
+    ~7x less memory. Cost scales linearly with accumulated history. If the scan ever becomes a
+    problem, both bounds can instead be read from the Delta add-action ``min.time``/``max.time``
+    file statistics — metadata-only, O(files): ~0.02 s / <100 MB at the same scale — the same
+    Delta-log-metadata trick used to count whole-table rows without scanning.
 
     `delta_path` is a local path or remote URI for the ``power_time_series`` Delta table;
     `storage_options` carries the object-store credentials/endpoint for a remote `delta_path`.
@@ -369,24 +368,24 @@ def _existing_power_time_series_keys(
 ) -> pl.LazyFrame:
     """Return the `(time_series_id, time)` pairs already on disk for `time_series_ids`.
 
-    Restricting to `time_series_ids` — the series present in the candidate frame `select_new_rows`
-    is filtering — keeps the scan partition-pruned, reading just the reporting series' own history:
-    `power_time_series` is partitioned by `time_series_id` (see
-    `delta_store.power_time_series.write_power_time_series`). An unrestricted version of this scan
-    would instead materialise every row in the table to build the join's hash table, which is the
-    whole-table materialisation `time_series_coverage`'s streaming aggregate avoids. The only
-    caller, `select_new_rows`, already returns early via `delta_table_exists` before calling
-    `_existing_power_time_series_keys`, so — unlike `time_series_coverage` — this function does not
-    need its own empty-table branch.
+    Restricting to `time_series_ids` — the series present in the candidate frame
+    `select_new_rows` is filtering — keeps the scan partition-pruned, reading just the reporting
+    series' own history: `power_time_series` is partitioned by `time_series_id` (see
+    `delta_store.power_time_series.write_power_time_series`). An unrestricted version of this
+    scan would instead materialise every row in the table to build the join's hash table, which
+    is the whole-table materialisation `time_series_coverage`'s streaming aggregate avoids. The
+    only caller, `select_new_rows`, already returns early via `delta_table_exists` before calling
+    `_existing_power_time_series_keys`, so — unlike `time_series_coverage` — this function does
+    not need its own empty-table branch.
 
-    Measured on the same synthetic V2 table `time_series_coverage`'s docstring uses (2,500 series,
-    half-hourly, 1 year, 43.8M rows): ~0.04 s and negligible extra memory at 1-20 reporting series
-    (the expected case, since NGED's files land a few at a time), rising to ~110 MB at 100
-    reporting series, ~585 MB at 500 reporting series, and ~2.75 GB at all 2,500 series. An hour
-    where nearly every series reports at once (a bulk backfill or recovery from an extended NGED
-    outage) therefore costs more memory here than `time_series_coverage`'s own whole-table scan,
-    because an anti-join has to materialise the actual rows to hash-join against rather than
-    collapsing each series to two values the way an aggregate does.
+    Measured on the same synthetic V2 table `time_series_coverage`'s docstring uses (2,500
+    series, half-hourly, 1 year, 43.8M rows): ~0.04 s and negligible extra memory at 1-20
+    reporting series (the expected case, since NGED's files land a few at a time), rising to ~110
+    MB at 100 reporting series, ~585 MB at 500 reporting series, and ~2.75 GB at all 2,500
+    series. An hour where nearly every series reports at once (a bulk backfill or recovery from
+    an extended NGED outage) therefore costs more memory here than `time_series_coverage`'s own
+    whole-table scan, because an anti-join has to materialise the actual rows to hash-join
+    against rather than collapsing each series to two values the way an aggregate does.
     """
     return (
         pl.scan_delta(delta_path, storage_options=typeddict_to_dict(storage_options))
@@ -422,19 +421,19 @@ def select_new_rows(
 ) -> pt.DataFrame[PowerTimeSeries] | pt.DataFrame[_ProcessedFileListing]:
     """Return rows in `time_series` genuinely missing from the Delta table.
 
-    `time_series` is either `PowerTimeSeries` rows or the `_ProcessedFileListing` a raw S3 listing
-    parses into — the function tells the two apart by which of `time`/`end_time` is present, and
-    the two `@overload` declarations above tell a type checker which input type produces which
-    output type. `delta_path` is a local path or remote URI for the ``power_time_series`` Delta
-    table; `storage_options` carries the object-store credentials/endpoint for a remote
-    `delta_path`. A call against a Delta table that does not exist yet returns its input unchanged
-    and scans nothing.
+    `time_series` is either `PowerTimeSeries` rows or the `_ProcessedFileListing` a raw S3
+    listing parses into — the function tells the two apart by which of `time`/`end_time` is
+    present, and the two `@overload` declarations above tell a type checker which input type
+    produces which output type. `delta_path` is a local path or remote URI for the
+    ``power_time_series`` Delta table; `storage_options` carries the object-store
+    credentials/endpoint for a remote `delta_path`. A call against a Delta table that does not
+    exist yet returns its input unchanged and scans nothing.
 
     For `PowerTimeSeries` rows, the filter is a genuine existence check: an anti-join on
     `(time_series_id, time)` against `_existing_power_time_series_keys`. A late file, or a file
-    that fills a gap earlier in a series' history, is therefore ingested even when a later reading
-    for the same series is already on disk. See `_existing_power_time_series_keys`'s docstring for
-    the cost the existence check trades in return.
+    that fills a gap earlier in a series' history, is therefore ingested even when a later
+    reading for the same series is already on disk. See `_existing_power_time_series_keys`'s
+    docstring for the cost the existence check trades in return.
 
     For the file listing, there is no per-row `time` to check existence against before download —
     only the file's `start_time`/`end_time` window from its S3 key. The filter therefore compares
@@ -444,9 +443,9 @@ def select_new_rows(
     `last_time` is still dropped before download.
 
     Cost: the file-listing branch runs `time_series_coverage`, paying one full two-column scan of
-    `power_time_series` — see that function for the measured figures. The `PowerTimeSeries` branch
-    instead runs `_existing_power_time_series_keys`, restricted to the `time_series_id`s in
-    `time_series` — see that function's docstring for its own measured figures.
+    `power_time_series` — see that function for the measured figures. The `PowerTimeSeries`
+    branch instead runs `_existing_power_time_series_keys`, restricted to the `time_series_id`s
+    in `time_series` — see that function's docstring for its own measured figures.
     `power_time_series_and_metadata` calls this once on the file listing and then, only if that
     listing turned up files worth downloading, again on the parsed rows: an hour in which NGED
     published nothing new stops after the first call, because `download_and_parse_files` raises

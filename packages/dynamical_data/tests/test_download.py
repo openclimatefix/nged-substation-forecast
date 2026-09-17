@@ -1,8 +1,8 @@
 """Tests for ``dynamical_data.ecmwf_ens.download``.
 
-The only external dependency is ``dynamical_catalog.open`` (the Dynamical.org network call), which
-is patched with ``monkeypatch`` to return an in-memory synthetic dataset. Everything else runs
-offline.
+The only external dependency is ``dynamical_catalog.open`` (the Dynamical.org network call),
+which is patched with ``monkeypatch`` to return an in-memory synthetic dataset. Everything else
+runs offline.
 """
 
 from collections.abc import Callable

@@ -1,14 +1,14 @@
 """Small URI helpers for paths that may be local filesystem paths *or* remote URIs.
 
 Settings data-location fields are plain ``str`` so they can hold either a local path
-(``/home/.../data/NWP``) or a remote URI (``s3://bucket/NWP``). ``pathlib.Path`` mangles
-the latter (``Path("s3://b/a") / "c"`` drops the scheme), so joins route through here.
+(``/home/.../data/NWP``) or a remote URI (``s3://bucket/NWP``). ``pathlib.Path`` mangles the
+latter (``Path("s3://b/a") / "c"`` drops the scheme), so joins route through here.
 
-The existence/parent helpers below give the asset IO layer a single local-or-remote-aware
-call for the two things it does around every Delta/parquet write: make sure the parent
-directory exists (a no-op on object stores, which have no directories) and check whether a
-table/object is already there. Remote calls go through delta-rs / obstore with the caller's
-``storage_options`` so the same code path serves both a local data-path root and an ``s3://`` one.
+The existence/parent helpers below give the asset IO layer a single local-or-remote-aware call
+for the two things it does around every Delta/parquet write: make sure the parent directory
+exists (a no-op on object stores, which have no directories) and check whether a table/object is
+already there. Remote calls go through delta-rs / obstore with the caller's ``storage_options``
+so the same code path serves both a local data-path root and an ``s3://`` one.
 """
 
 import posixpath
@@ -30,10 +30,11 @@ class ObjectStoreOptions(TypedDict, total=False):
     These are the shared ``aws_*`` aliases understood by delta-rs, Polars, and obstore alike, so
     one value feeds every IO site.
 
-    Authored as a ``TypedDict`` (rather than a bare ``dict[str, str]``) so ``ty`` checks every key
-    where it is written — see ``Settings.storage_options``. Widen it to the plain ``dict`` the IO
-    libraries expect with ``typeddict_to_dict`` at each call boundary. Empty on AWS (object_store
-    auto-discovers the IAM-role credentials and region) and for a local data-path root.
+    Authored as a ``TypedDict`` (rather than a bare ``dict[str, str]``) so ``ty`` checks every
+    key where it is written — see ``Settings.storage_options``. Widen it to the plain ``dict``
+    the IO libraries expect with ``typeddict_to_dict`` at each call boundary. Empty on AWS
+    (object_store auto-discovers the IAM-role credentials and region) and for a local data-path
+    root.
     """
 
     aws_endpoint_url: str
@@ -63,9 +64,9 @@ def uri_join(base: str, *parts: str) -> str:
 def if_local_path_then_make_parent_dir(uri: str) -> None:
     """Create the parent directory of a *local* ``uri``; a no-op for a remote URI.
 
-    Local filesystems need a table/file's parent directory to exist before a write; object
-    stores (``s3://``) have no directories — a write creates the key's prefix implicitly — so
-    there is nothing to do and this returns immediately.
+    Local filesystems need a table/file's parent directory to exist before a write; object stores
+    (``s3://``) have no directories — a write creates the key's prefix implicitly — so there is
+    nothing to do and this returns immediately.
     """
     if is_remote_uri(uri):
         return
@@ -77,8 +78,8 @@ def delta_table_exists(uri: str, storage_options: ObjectStoreOptions | None = No
 
     Wraps ``DeltaTable.is_deltatable``, which inspects the ``_delta_log`` through delta-rs'
     object_store and so works identically for a local path and an ``s3://`` URI given the
-    matching ``storage_options``. Replaces ``Path(uri).exists()`` at the write-guard sites,
-    which would raise on a remote URI.
+    matching ``storage_options``. Replaces ``Path(uri).exists()`` at the write-guard sites, which
+    would raise on a remote URI.
     """
     return DeltaTable.is_deltatable(uri, storage_options=typeddict_to_dict(storage_options) or {})
 

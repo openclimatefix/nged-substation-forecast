@@ -1,18 +1,19 @@
 """Hermetic end-to-end test over a *cached real* ECMWF ENS slice (no network).
 
-This is the offline twin of ``test_ecmwf_ens_network.py``. It reads a tiny real slice committed at
-``data/ecmwf_ens_real_slice.nc`` (captured once by ``data/capture_ecmwf_ens_slice.py``) and runs it
-through ``convert``. Because the bytes are genuine Dynamical.org output, the slice carries the real
-conventions — descending latitude, longitude in [-180, 180], dimension order, dtypes, physical
-units — that the synthetic ``conftest.py`` fixtures merely assume. The value here is exercising
-``convert`` and the value↔(lat, lon) orientation on *genuine* bytes every PR, without the flakiness
-or credentials a live catalog call needs.
+This is the offline twin of ``test_ecmwf_ens_network.py``. It reads a tiny real slice committed
+at ``data/ecmwf_ens_real_slice.nc`` (captured once by ``data/capture_ecmwf_ens_slice.py``) and
+runs it through ``convert``. Because the bytes are genuine Dynamical.org output, the slice
+carries the real conventions — descending latitude, longitude in [-180, 180], dimension order,
+dtypes, physical units — that the synthetic ``conftest.py`` fixtures merely assume. The value
+here is exercising ``convert`` and the value↔(lat, lon) orientation on *genuine* bytes every PR,
+without the flakiness or credentials a live catalog call needs.
 
 What this test can and cannot catch. The convention assertions below (descending latitude, [-180,
-180] longitude, °C-not-Kelvin) run against the committed slice, whose bytes never change — so they
-*pin* and document what that fixture carries, not guard against Dynamical.org changing its output.
-Catching *future upstream drift* — a new latitude order, longitude range, or unit from the real
-catalog — is the job of ``test_ecmwf_ens_network.py`` alone, since only it re-reads live data.
+180] longitude, °C-not-Kelvin) run against the committed slice, whose bytes never change — so
+they *pin* and document what that fixture carries, not guard against Dynamical.org changing its
+output. Catching *future upstream drift* — a new latitude order, longitude range, or unit from
+the real catalog — is the job of ``test_ecmwf_ens_network.py`` alone, since only it re-reads live
+data.
 """
 
 from pathlib import Path
@@ -37,8 +38,8 @@ def _one_cell_per_grid_point(
 
     Mirrors the synthetic orientation test, but on real coordinates and values: the expected
     ``{h3_index: temperature_2m}`` mapping is read straight from the dataset with xarray's own
-    ``.sel``, independently of ``convert``, so a lat/lon swap or flip inside ``convert`` shows up as
-    a mismatch.
+    ``.sel``, independently of ``convert``, so a lat/lon swap or flip inside ``convert`` shows up
+    as a mismatch.
     """
     h3_index: list[int] = []
     nwp_lat: list[float] = []
@@ -70,9 +71,10 @@ def _one_cell_per_grid_point(
 def test_the_counted_variable_sets_name_variables_a_real_download_carries() -> None:
     """``assess_upstream_grid_point_nulls`` indexes the raw dataset, so it needs download names.
 
-    The ``Nwp`` contract's are not those: it carries ``wind_speed_10m``/``wind_direction_10m`` where
-    the download carries ``wind_u_10m``/``wind_v_10m``. A variable set drawn from the contract
-    raises ``KeyError`` here — on every run, inside a warning path, taking every NWP check with it.
+    The ``Nwp`` contract's are not those: it carries ``wind_speed_10m``/``wind_direction_10m``
+    where the download carries ``wind_u_10m``/``wind_v_10m``. A variable set drawn from the
+    contract raises ``KeyError`` here — on every run, inside a warning path, taking every NWP
+    check with it.
     """
     ds = xr.open_dataset(_SLICE)
 

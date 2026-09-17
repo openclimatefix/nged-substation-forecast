@@ -7,9 +7,9 @@ roster and a promoted-model ``meta.json`` — so the Settings plumbing, the Delt
 ``AssetCheckResult`` mapping are all exercised together.
 
 One case goes further and drives ``power_data_is_fresh`` through Dagster's executor rather than
-calling it: asserting that the *run* still succeeds when the check's internals blow up is the only
-way to pin the property the catch-all exists for, and a returned ``AssetCheckResult`` cannot show
-it.
+calling it: asserting that the *run* still succeeds when the check's internals blow up is the
+only way to pin the property the catch-all exists for, and a returned ``AssetCheckResult`` cannot
+show it.
 
 The one path not reachable from here is ``live_forecasts_are_healthy`` running *partitioned*:
 ``build_asset_check_context`` cannot carry a partition key, so that path is covered by
@@ -59,8 +59,8 @@ _THRESHOLD = timedelta(hours=24)
 
 def _coverage(rows: dict[int, datetime]) -> pl.DataFrame:
     """Build a coverage frame (``time_series_id``, ``first_time``, ``last_time``) like the Delta
-    scan returns. ``rows`` maps id -> last_time; first_time is irrelevant to freshness, so it is
-    set a day earlier just to populate the column realistically."""
+    scan returns. ``rows`` maps id -> last_time; first_time is irrelevant to freshness, so it
+    is set a day earlier just to populate the column realistically."""
     last = pl.Series("last_time", list(rows.values())).cast(UTC_DATETIME_DTYPE)
     return pl.DataFrame(
         {
@@ -109,8 +109,9 @@ def test_stale_series_flagged_most_stale_first() -> None:
 
 def test_the_production_staleness_threshold_is_twenty_four_hours() -> None:
     """Series 8 is a minute past the threshold and series 7 a minute short of it, so retuning
-    ``_POWER_DATA_STALENESS_THRESHOLD`` has to change this test too. Every other case passes its own
-    ``_THRESHOLD``, which pins the shape of the boundary but not the production number."""
+    ``_POWER_DATA_STALENESS_THRESHOLD`` has to change this test too. Every other case passes
+    its own ``_THRESHOLD``, which pins the shape of the boundary but not the production
+    number."""
     result = evaluate_power_freshness(
         coverage=_coverage(
             {7: _NOW - timedelta(hours=23, minutes=59), 8: _NOW - timedelta(hours=24, minutes=1)}
@@ -124,8 +125,9 @@ def test_the_production_staleness_threshold_is_twenty_four_hours() -> None:
 
 def test_the_live_forecast_horizon_is_fourteen_days() -> None:
     """Pins the literal, not a value derived from the constant. ``_MIN_HORIZON_HOURS`` is
-    computed *from* ``LIVE_FORECAST_HORIZON`` (``checks.py``), so the truncated-horizon threshold
-    moves with the constant and a test built the same way could never catch a wrong value."""
+    computed *from* ``LIVE_FORECAST_HORIZON`` (``checks.py``), so the truncated-horizon
+    threshold moves with the constant and a test built the same way could never catch a wrong
+    value."""
     assert timedelta(days=14) == LIVE_FORECAST_HORIZON
 
 
@@ -184,8 +186,8 @@ def test_result_threshold_hours_reflects_threshold() -> None:
 
 
 def test_late_series_table_is_capped_but_the_counts_are_not() -> None:
-    """A whole-feed stall lists only ``_MAX_LATE_SERIES_IN_TABLE`` series, most-stale first, while
-    the counts beside the table stay uncapped."""
+    """A whole-feed stall lists only ``_MAX_LATE_SERIES_IN_TABLE`` series, most-stale first,
+    while the counts beside the table stay uncapped."""
     cap = checks._MAX_LATE_SERIES_IN_TABLE
     n_late = cap + 10
     # Series `i` is `i` hours staler than series `i - 1`, so worst-first order is descending id.
@@ -212,16 +214,17 @@ def test_late_series_table_is_capped_but_the_counts_are_not() -> None:
 def test_the_table_never_holds_more_detail_than_the_sentry_event_context() -> None:
     """The durable listing may not be more detailed than the transient one.
 
-    Both cap the same worst-first ordering, and the table is the one written to the event log every
-    hour a stall lasts, so it is the table that must not outgrow the Sentry context. Pinning the
-    relationship rather than the number leaves the cap free to be retuned downwards.
+    Both cap the same worst-first ordering, and the table is the one written to the event log
+    every hour a stall lasts, so it is the table that must not outgrow the Sentry context.
+    Pinning the relationship rather than the number leaves the cap free to be retuned downwards.
     """
     assert checks._MAX_LATE_SERIES_IN_TABLE <= _sentry.MAX_LATE_SERIES_IN_CONTEXT
 
 
 def test_never_reported_series_crowd_stale_ones_out_of_a_truncated_table() -> None:
-    """Every never-reported series outranks every stale one, so at V2 cutover — a populated roster
-    before data flows — the table can hold no stale series at all, while the counts stay exact."""
+    """Every never-reported series outranks every stale one, so at V2 cutover — a populated
+    roster before data flows — the table can hold no stale series at all, while the counts
+    stay exact."""
     cap = checks._MAX_LATE_SERIES_IN_TABLE
     coverage = _coverage({i: _NOW - timedelta(hours=1000) for i in range(1, 11)})  # 10 very stale
     roster = _roster(list(range(1, 11)) + list(range(100, 100 + cap + 5)))  # + cap+5 never-reported
@@ -248,8 +251,8 @@ def test_silenced_series_are_withheld_and_others_still_warn() -> None:
 
     7 is stale and watched, 1 is fresh and watched, 23 is stale and silenced, 33 is in the roster
     with no data and silenced, and 404 is silenced but exists nowhere. ``n_series_total == 2`` is
-    the assertion that pins *where* the filtering happens: filtering the late frame instead of the
-    inputs would leave the silenced ids in the population and answer 4.
+    the assertion that pins *where* the filtering happens: filtering the late frame instead of
+    the inputs would leave the silenced ids in the population and answer 4.
     """
     coverage = _coverage(
         {7: _NOW - timedelta(hours=48), 1: _NOW - timedelta(hours=1), 23: _NOW - timedelta(days=30)}
@@ -282,9 +285,9 @@ def test_the_staleness_cutoff_is_exclusive(
 ) -> None:
     """The half of the cutoff that resurrection is the complement of.
 
-    Nothing about silencing here, but the test below relies on this boundary sitting exactly where
-    it does: were ``stale`` to use ``<=``, a series last seen on the cutoff would be stale *and*
-    resurrected at once.
+    Nothing about silencing here, but the test below relies on this boundary sitting exactly
+    where it does: were ``stale`` to use ``<=``, a series last seen on the cutoff would be stale
+    *and* resurrected at once.
     """
     result = evaluate_power_freshness(
         coverage=_coverage({7: _NOW - _THRESHOLD + last_seen_offset}),
@@ -305,8 +308,8 @@ def test_the_staleness_cutoff_is_exclusive(
 def test_a_silenced_series_that_reports_again_is_resurrected(
     last_seen_offset: timedelta, expected: tuple[int, ...]
 ) -> None:
-    """Resurrection is the exact complement of staleness at the cutoff, and is reported in id
-    order rather than in whatever order the coverage frame happens to hold — 33 is the fresher row
+    """Resurrection is the exact complement of staleness at the cutoff, and is reported in id order
+    rather than in whatever order the coverage frame happens to hold — 33 is the fresher row
     here, so an unsorted answer would come back as ``(33, 23)``.
 
     ``is_healthy`` stays true either way — a revived series is not a stale one — which is why a
@@ -340,8 +343,8 @@ def test_silencing_works_without_a_roster() -> None:
 def test_the_check_result_reports_silencing(stale_id: int | None) -> None:
     """The ignored ids are named on both description branches. The green one matters most: it is
     the state this feature creates, where the silencing is easiest to forget, and — since
-    ``report_power_freshness`` returns early on a healthy result — where the hourly Sentry warning
-    stops."""
+    ``report_power_freshness`` returns early on a healthy result — where the hourly Sentry
+    warning stops."""
     rows = {1: _NOW - timedelta(hours=1), 33: _NOW - timedelta(days=200)}
     if stale_id is not None:
         rows[stale_id] = _NOW - timedelta(hours=48)
@@ -380,9 +383,9 @@ def test_a_resurrection_fails_the_check_and_says_where_to_edit() -> None:
 
 
 def test_a_deployment_with_no_data_yet_still_says_so_while_silencing() -> None:
-    """The silenced list is never empty in production, so "watching nothing" must keep meaning "no
-    data yet" — the state every fresh deployment starts in — rather than being read as the list
-    having swallowed the roster."""
+    """The silenced list is never empty in production, so "watching nothing" must keep meaning
+    "no data yet" — the state every fresh deployment starts in — rather than being read as the
+    list having swallowed the roster."""
     result = checks._to_asset_check_result(
         evaluate_power_freshness(
             coverage=_coverage({}),
@@ -404,8 +407,8 @@ def test_a_deployment_with_no_data_yet_still_says_so_while_silencing() -> None:
 @pytest.fixture
 def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> Path:
     """Point ``Settings`` at a temp data root (mirrors ``tests/test_assets.py``), and empty the
-    silenced list so silencing is something a test opts into rather than inherits from whichever
-    ids have really stopped reporting today."""
+    silenced list so silencing is something a test opts into rather than inherits from
+    whichever ids have really stopped reporting today."""
     monkeypatch.setenv("DATA_PATH_INTERNAL", str(tmp_path))
     monkeypatch.setenv("DATA_PATH_DELIVERY", str(tmp_path))
     monkeypatch.setenv("LOCAL_ARTIFACTS_PATH", str(tmp_path))
@@ -574,11 +577,11 @@ def test_power_data_is_fresh_hands_evaluated_result_to_sentry(
     env: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
     """The check forwards the *exact* ``PowerFreshnessResult`` it evaluated to
-    ``report_power_freshness`` — reused, not recomputed. We patch ``evaluate_power_freshness`` to
-    return a sentinel and assert *object identity* on the reporter's argument: asserting counts
-    alone would not prove reuse, since the pure function is deterministic and a recompute would
-    yield equal counts and pass a weaker test. The reporter self-gates on health (tested in
-    ``test_sentry.py``), so the check calls it unconditionally."""
+    ``report_power_freshness`` — reused, not recomputed. We patch ``evaluate_power_freshness``
+    to return a sentinel and assert *object identity* on the reporter's argument: asserting
+    counts alone would not prove reuse, since the pure function is deterministic and a
+    recompute would yield equal counts and pass a weaker test. The reporter self-gates on
+    health (tested in ``test_sentry.py``), so the check calls it unconditionally."""
     sentinel = PowerFreshnessResult(
         n_series_total=8,
         n_stale=7,
@@ -636,8 +639,8 @@ class _FakePanic(BaseException):
     """Stands in for pyo3's ``PanicException``, which also derives from ``BaseException``.
 
     The real class cannot be imported: each compiled extension defines its own, and there is no
-    importable ``pyo3_runtime`` module to reach them through. What matters to the checks' guard is
-    only that a panic is *not* an ``Exception``, which this reproduces exactly.
+    importable ``pyo3_runtime`` module to reach them through. What matters to the checks' guard
+    is only that a panic is *not* an ``Exception``, which this reproduces exactly.
     """
 
 
@@ -695,8 +698,8 @@ def test_power_data_is_fresh_never_fails_the_run(
     assets, not whether an *erroring* one fails the run. Running the check through Dagster's
     executor is the only way to assert that; ``AssetSelection.checks`` runs the check step alone,
     so no asset materialises and nothing touches S3. No fixture data is needed either: with no
-    tables on disk ``time_series_coverage`` returns an empty frame and ``_read_roster_ids`` returns
-    ``None``, so the patched evaluator is still reached.
+    tables on disk ``time_series_coverage`` returns an empty frame and ``_read_roster_ids``
+    returns ``None``, so the patched evaluator is still reached.
     """
     monkeypatch.setattr(checks, "evaluate_power_freshness", _raise_inside_the_check)
     reported: list[tuple[str, BaseException]] = []
@@ -732,9 +735,9 @@ def test_power_data_is_fresh_degrades_on_a_rust_panic(
     A panic in any of the pyo3 extensions this check reads through — Polars, delta-rs (via
     ``delta_table_exists``) or obstore (via ``object_exists``) — is not an ``Exception``, so a
     narrower guard would let it through and fail the hourly run. This is the test that fails if
-    someone tidies the guard back down to ``except Exception``; the cancellation test below cannot
-    catch that, because ``DagsterExecutionInterruptedError`` is not an ``Exception`` either and so
-    propagates out of a narrow guard on its own.
+    someone tidies the guard back down to ``except Exception``; the cancellation test below
+    cannot catch that, because ``DagsterExecutionInterruptedError`` is not an ``Exception``
+    either and so propagates out of a narrow guard on its own.
     """
     monkeypatch.setattr(checks, "evaluate_power_freshness", _panic_inside_the_check)
     reported: list[tuple[str, BaseException]] = []
@@ -806,10 +809,10 @@ def _healthy_runs_at(slot: datetime) -> list[datetime]:
 def test_no_missed_runs_at_any_healthy_slot(slot_hour: int, healthy_age_hours: float) -> None:
     """Every one of the four daily slots reports zero missed runs when the feed is healthy.
 
-    This is the test that proves the check counts *runs* rather than hours: the same healthy
-    feed presents as 12, 18, 24 or 30-hour-old NWP depending on the slot, so no single absolute
-    age threshold could pass all four (one low enough to catch a genuine outage would fire on
-    two slots in four, every day).
+    This is the test that proves the check counts *runs* rather than hours: the same healthy feed
+    presents as 12, 18, 24 or 30-hour-old NWP depending on the slot, so no single absolute age
+    threshold could pass all four (one low enough to catch a genuine outage would fire on two
+    slots in four, every day).
     """
     slot = _TODAY.replace(hour=slot_hour)
     on_disk = _healthy_runs_at(slot)
@@ -1016,7 +1019,8 @@ def test_missed_nwp_runs_make_an_otherwise_good_slot_unhealthy() -> None:
 
 def test_missing_series_metadata_reports_how_many_ids_it_listed() -> None:
     """A whole missing population spells out only the first ``_MAX_MISSING_SERIES_LISTED`` ids,
-    while ``n_time_series_missing`` stays uncapped and a third field says how many were listed."""
+    while ``n_time_series_missing`` stays uncapped and a third field says how many were
+    listed."""
     cap = checks._MAX_MISSING_SERIES_LISTED
     n_missing = cap + 5
     result = checks._to_live_forecast_check_result(
@@ -1076,10 +1080,11 @@ def _write_live_forecasts(
     """Write a minimal ``power_forecasts`` Delta table partitioned the way production writes it.
 
     Only the columns the check reads are written: the genuine ``write_power_forecasts`` path is
-    exercised by ``tests/test_live_forecasts.py`` instead, and a full ``PowerForecast`` frame here
-    would obscure what each case is actually varying. ``mode="append"`` adds a second experiment's
-    rows to an existing table. ``with_nwp_init_time=False`` omits the column entirely, which is
-    what a model using no NWP writes — ``PowerForecast`` marks it ``allow_missing=True``.
+    exercised by ``tests/test_live_forecasts.py`` instead, and a full ``PowerForecast`` frame
+    here would obscure what each case is actually varying. ``mode="append"`` adds a second
+    experiment's rows to an existing table. ``with_nwp_init_time=False`` omits the column
+    entirely, which is what a model using no NWP writes — ``PowerForecast`` marks it
+    ``allow_missing=True``.
     """
     rows = [
         {
@@ -1331,8 +1336,8 @@ def test_live_forecasts_check_reports_on_a_model_that_writes_no_nwp_init_time(en
 def test_live_forecasts_check_degrades_when_meta_json_names_no_experiment(env: Path) -> None:
     """Both promoted-model facts degrade together, never one without the other.
 
-    Keeping ``trained_time_series_ids`` while losing ``experiment_name`` would gate the population
-    check on a count drawn from an *unfiltered* read of every live experiment's rows.
+    Keeping ``trained_time_series_ids`` while losing ``experiment_name`` would gate the
+    population check on a count drawn from an *unfiltered* read of every live experiment's rows.
     """
     settings = Settings()
     slot = _current_slot()
@@ -1490,7 +1495,8 @@ def test_live_forecasts_check_contains_an_internal_error(
     """Even a bug inside the check itself must surface as a warning, never as a raise.
 
     Parametrised over both sides of the guard's width: an ordinary ``Exception``, and a
-    ``BaseException`` standing in for the pyo3 panic that a plain ``except Exception`` would miss.
+    ``BaseException`` standing in for the pyo3 panic that a plain ``except Exception`` would
+    miss.
     """
 
     def _boom(*_args: object, **_kwargs: object) -> None:

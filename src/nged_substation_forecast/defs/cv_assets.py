@@ -116,21 +116,21 @@ def eligible_time_series(context: AssetExecutionContext) -> None:
     """Compute and persist the canonical eligible ``time_series_id``s for one CV fold.
 
     Reads observed-power coverage from the ``power_time_series_and_metadata`` Delta table. A time
-    series is eligible for a fold when its coverage has at least ``min_training_months`` of history
-    before the fold's ``val_start`` *and* reaches the fold's ``val_end``. Eligibility is derived
-    from data coverage alone (not from any model/config), so every experiment evaluates the fold on
-    the identical population — this is what keeps the leaderboard apples-to-apples. See
-    "Eligibility" in
+    series is eligible for a fold when its coverage has at least ``min_training_months`` of
+    history before the fold's ``val_start`` *and* reaches the fold's ``val_end``. Eligibility is
+    derived from data coverage alone (not from any model/config), so every experiment evaluates
+    the fold on the identical population — this is what keeps the leaderboard apples-to-apples.
+    See "Eligibility" in
     <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/cross-validation-folds/#eligibility>
     for the fold definitions this population is computed against.
 
     The result is written to the ``eligible_time_series`` Delta table as one partition per
-    ``fold_id`` via an idempotent partition overwrite, so re-materialising a fold replaces its rows
-    rather than duplicating them. ``trained_cv_model`` reads this fold's partition to select which
-    series to train on; ``cv_power_forecasts`` does not read it directly, but inherits the same
-    population through the trained model's ``trained_time_series_ids``. A stale or missing
-    partition here therefore shows up downstream as a fold trained on the wrong population, not as
-    a failure at either of those assets.
+    ``fold_id`` via an idempotent partition overwrite, so re-materialising a fold replaces its
+    rows rather than duplicating them. ``trained_cv_model`` reads this fold's partition to select
+    which series to train on; ``cv_power_forecasts`` does not read it directly, but inherits the
+    same population through the trained model's ``trained_time_series_ids``. A stale or missing
+    partition here therefore shows up downstream as a fold trained on the wrong population, not
+    as a failure at either of those assets.
     """
     settings = Settings()
     storage_options = settings.storage_options
@@ -178,17 +178,18 @@ def effective_capacity(context: AssetExecutionContext) -> None:
 
     Reads the full ``power_time_series`` Delta and writes one row per ``time_series_id`` to the
     ``effective_capacity`` Delta table (``Settings.effective_capacity_data_path``): the 99th
-    percentile of ``abs(power)`` over the series' entire observed history, with ``time`` set to the
-    latest observed timestep. This full-history capacity is the NMAE denominator used by the
-    ``metrics`` asset, replacing the validation-window P99 that would otherwise vary fold to fold.
+    percentile of ``abs(power)`` over the series' entire observed history, with ``time`` set to
+    the latest observed timestep. This full-history capacity is the NMAE denominator used by the
+    ``metrics`` asset, replacing the validation-window P99 that would otherwise vary fold to
+    fold.
 
     The whole (small — one row per series) table is overwritten on each materialisation. v0.1 is
     deliberately one scalar row per series, **not** the value repeated at every half-hour —
     densifying a constant buys nothing.
 
-    A future upgrade (v0.7) swaps the P99 for a time-varying capacity estimator,
-    emitting one row per ``(time_series_id, time)``; the ``EffectiveCapacity`` schema is unchanged,
-    but ``compute_metrics`` then joins capacity as a temporal as-of join rather than on
+    A future upgrade (v0.7) swaps the P99 for a time-varying capacity estimator, emitting one row
+    per ``(time_series_id, time)``; the ``EffectiveCapacity`` schema is unchanged, but
+    ``compute_metrics`` then joins capacity as a temporal as-of join rather than on
     ``time_series_id`` alone (same doc section).
     """
     settings = Settings()
@@ -298,19 +299,19 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
     """Train one forecaster for a single ``(experiment, fold)`` partition and save it to MLflow.
 
     Reads the experiment's resolved config from MLflow (the immutable record registered by
-    ``register_experiment_job``), the fold's canonical eligible ``time_series_id`` population from
-    the ``eligible_time_series`` asset, and the observed power + gridded NWP over the fold's
+    ``register_experiment_job``), the fold's canonical eligible ``time_series_id`` population
+    from the ``eligible_time_series`` asset, and the observed power + gridded NWP over the fold's
     **inclusive** training window. Features are engineered through the forecaster's own
-    ``FeatureEngineer`` (so the spatial NWP mapping and feature pipeline are a model concern), the
-    model is trained, and its artifacts are uploaded to the fold's MLflow run alongside a record of
-    the training window and population.
+    ``FeatureEngineer`` (so the spatial NWP mapping and feature pipeline are a model concern),
+    the model is trained, and its artifacts are uploaded to the fold's MLflow run alongside a
+    record of the training window and population.
 
     The fold run is resolved **by tag**, never by a handle passed between assets, so this is safe
     across processes and idempotent under Dagster retries — see "Cross-process run resolution:
     discover by tag, never pass handles" in
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#cross-process-run-resolution-discover-by-tag-never-pass-handles>.
-    Because that run is *reused* on every re-materialisation, the training window and population go
-    in tags rather than MLflow params (which are write-once and would reject a changed value).
+    Because that run is *reused* on every re-materialisation, the training window and population
+    go in tags rather than MLflow params (which are write-once and would reject a changed value).
     """
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
@@ -438,11 +439,11 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
     """Predict the validation window for one ``(experiment, fold)`` partition and persist forecasts.
 
     Loads the model ``trained_cv_model`` saved for this fold back from MLflow, then forecasts the
-    fold's **inclusive** validation window across **all** NWP ensemble members — the probabilistic
-    leaderboard metrics are meaningless on a single member. The scored
-    population is the model's own ``trained_time_series_ids`` (the train==predict invariant), so a
-    fold is always scored on exactly the population it was trained on even if power coverage has
-    drifted since training.
+    fold's **inclusive** validation window across **all** NWP ensemble members — the
+    probabilistic leaderboard metrics are meaningless on a single member. The scored population
+    is the model's own ``trained_time_series_ids`` (the train==predict invariant), so a fold is
+    always scored on exactly the population it was trained on even if power coverage has drifted
+    since training.
 
     To keep RAM bounded, prediction runs **one ``init_time`` window at a time**
     (``_PREDICT_INIT_CHUNK``). The full validation window fans every NWP run out across all ~51
@@ -452,14 +453,14 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
     "Bounding feature-engineering memory: prune the inputs, not the output" in
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
 
-    Forecasts are written to the ``power_forecasts`` Delta table keyed by
-    ``(experiment_name, fold_id)``: the **first** chunk overwrites the partition (clearing any prior
-    run) and the rest **append** to it, so a full re-materialisation replaces the fold's rows
-    without ever holding all forecasts in memory. Chunks are written through
+    Forecasts are written to the ``power_forecasts`` Delta table keyed by ``(experiment_name,
+    fold_id)``: the **first** chunk overwrites the partition (clearing any prior run) and the
+    rest **append** to it, so a full re-materialisation replaces the fold's rows without ever
+    holding all forecasts in memory. Chunks are written through
     ``delta_store.power_forecasts.write_power_forecasts``, which owns the table's compressed
-    storage format (sort order, ``power_fcst`` precision rounding, parquet encodings). The
-    fold's MLflow run is resolved **by tag** — never by a handle from ``trained_cv_model`` — so
-    this is safe across processes.
+    storage format (sort order, ``power_fcst`` precision rounding, parquet encodings). The fold's
+    MLflow run is resolved **by tag** — never by a handle from ``trained_cv_model`` — so this is
+    safe across processes.
     """
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)

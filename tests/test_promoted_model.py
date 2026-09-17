@@ -1,10 +1,10 @@
 """Integration test for the ``promoted_model`` asset (real file-based MLflow + Dagster).
 
 Trains a tiny real ``XGBoostForecaster`` directly (skipping the full CV pipeline — that's
-exercised elsewhere) and saves it to a genuine MLflow run, then materialises
-``promoted_model`` to promote it to local disk: the directory should be populated with
-``meta.json`` + ``promotion.json``, output metadata should be correct, and re-promoting with a
-second run id should replace the directory rather than merging into it.
+exercised elsewhere) and saves it to a genuine MLflow run, then materialises ``promoted_model``
+to promote it to local disk: the directory should be populated with ``meta.json`` +
+``promotion.json``, output metadata should be correct, and re-promoting with a second run id
+should replace the directory rather than merging into it.
 """
 
 import json
@@ -51,9 +51,9 @@ def _save_trained_model_to_mlflow(
     genuine trained booster + a real ``meta.json`` with ``model_class``, exercised through the
     same ``save_to_mlflow`` mechanism ``trained_cv_model`` uses.
 
-    Every requested feature gets a synthetic column to train against, so a caller can save a model
-    whose feature vocabulary the current code does not recognise. Trains one Booster per id in
-    ``time_series_ids``, so a caller can vary the trained population between two saved runs.
+    Every requested feature gets a synthetic column to train against, so a caller can save a
+    model whose feature vocabulary the current code does not recognise. Trains one Booster per id
+    in ``time_series_ids``, so a caller can vary the trained population between two saved runs.
     """
     features = selected_features or {"temperature_2m"}
     times = [datetime(2025, 1, 1, hour, tzinfo=UTC) for hour in (0, 1, 2)]
@@ -172,8 +172,8 @@ def test_promoted_model_refuses_a_model_with_an_unparseable_feature(
 ) -> None:
     """Promoting a model trained before a feature rename fails, leaving the champion untouched.
 
-    ``promotable_model_runs`` lists every fold run ever trained, so an operator picking by eye off
-    that table can reach a run this code no longer parses. The champion promoted before that
+    ``promotable_model_runs`` lists every fold run ever trained, so an operator picking by eye
+    off that table can reach a run this code no longer parses. The champion promoted before that
     attempt must still be servable afterwards: the refusal has to happen before the destination
     directory is touched, not merely before it is populated.
     """

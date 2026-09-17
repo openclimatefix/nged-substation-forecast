@@ -1,9 +1,9 @@
 """Unit tests for ``geo.h3`` grid-weight computation.
 
-These pin down the load-bearing invariant (every H3 parent's child proportions sum to 1), the core
-nearest-grid-centre snapping, the four documented ``ValueError`` guards on
-``compute_h3_grid_weights``, and the boundary wrapper's real cell generation plus its empty-boundary
-error path.
+These pin down the load-bearing invariant (every H3 parent's child proportions sum to 1), the
+core nearest-grid-centre snapping, the four documented ``ValueError`` guards on
+``compute_h3_grid_weights``, and the boundary wrapper's real cell generation plus its
+empty-boundary error path.
 """
 
 import logging
@@ -85,18 +85,18 @@ def test_grid_weights_snap_to_nearest_grid_centre() -> None:
 def test_grid_weights_preserve_geographic_orientation() -> None:
     """A known point maps to NWP grid cells at its own (lat, lon) — no lat/lon swap.
 
-    This is the geographic complement to the ``dynamical_data`` orientation test: that test proves
-    ``convert`` preserves the value↔(lat, lon) pairing through the join; *this* one proves the
-    (lat, lon) labels themselves are geographically right, i.e. that
+    This is the geographic complement to the ``dynamical_data`` orientation test: that test
+    proves ``convert`` preserves the value↔(lat, lon) pairing through the join; *this* one proves
+    the (lat, lon) labels themselves are geographically right, i.e. that
     ``compute_h3_grid_weights`` snaps each cell to grid points at the cell's true location.
 
-    Two well-separated Great Britain landmarks pin it down. Absolute check: Edinburgh (~56°N, ~3°W)
-    must map to ``nwp_lat`` near +56 and ``nwp_lon`` near -3 — a lat/lon swap would send it to
-    (lat -3, lon +56), in the Indian Ocean, and is caught here. ``compute_h3_grid_weights`` fills
-    ``nwp_lat`` from ``cell_to_lat`` and ``nwp_lon`` from ``cell_to_lng`` directly — it has no
-    axis-flip or transpose code path — so the bug this actually guards is that swap (verified by
-    mutation: exchanging the two ``cell_to_*`` calls fails this test). The relative check below
-    (north keeps the larger latitude, west the smaller longitude) is cheap defence-in-depth
+    Two well-separated Great Britain landmarks pin it down. Absolute check: Edinburgh (~56°N,
+    ~3°W) must map to ``nwp_lat`` near +56 and ``nwp_lon`` near -3 — a lat/lon swap would send it
+    to (lat -3, lon +56), in the Indian Ocean, and is caught here. ``compute_h3_grid_weights``
+    fills ``nwp_lat`` from ``cell_to_lat`` and ``nwp_lon`` from ``cell_to_lng`` directly — it has
+    no axis-flip or transpose code path — so the bug this actually guards is that swap (verified
+    by mutation: exchanging the two ``cell_to_*`` calls fails this test). The relative check
+    below (north keeps the larger latitude, west the smaller longitude) is cheap defence-in-depth
     against a future refactor that introduces axis handling.
 
     See the orientation-coverage table in

@@ -48,11 +48,11 @@ def _tokenise(text: str) -> list[str]:
     label across lines this way (`docs/index.md`'s "Requirements to Operating / model & handover"
     before #690), so this needs no special-casing.
 
-    A word that happens to start with `#`, `>`, a list marker or a fence marker is read as opening
-    that block wherever it lands at the start of a line, so it can never be the first word on a
-    wrapped line. Gluing it to its predecessor keeps the pair on one line together and lets `_wrap`
-    treat the pair as one token, rather than discovering the clash after the line is already full
-    and having to push the width past `WIDTH` to fix it.
+    A word that happens to start with `#`, `>`, a list marker or a fence marker is read as
+    opening that block wherever it lands at the start of a line, so it can never be the first
+    word on a wrapped line. Gluing it to its predecessor keeps the pair on one line together and
+    lets `_wrap` treat the pair as one token, rather than discovering the clash after the line is
+    already full and having to push the width past `WIDTH` to fix it.
     """
     words = text.split()
     glued: list[str] = []
@@ -86,16 +86,17 @@ def _reflow_unit(unit_lines: list[str]) -> list[str]:
     """Reflow one list item, blockquote or plain paragraph to `WIDTH`, preserving its prefix.
 
     A blockquote marker is stripped and reapplied to every output line uniformly, before the list
-    or plain-paragraph handling runs on what is left — which is what lets a list item nested inside
-    a blockquote (each source line prefixed `> - `) keep its own marker rather than being read as
-    ordinary quoted prose and merged with its siblings into one paragraph.
+    or plain-paragraph handling runs on what is left — which is what lets a list item nested
+    inside a blockquote (each source line prefixed `> - `) keep its own marker rather than being
+    read as ordinary quoted prose and merged with its siblings into one paragraph.
 
     A paragraph with no marker of its own can still be a list item's body: Python-Markdown treats
     any indent at or past the item's content column as part of that item, including a second
-    paragraph separated from the marker line by a blank line. Such a paragraph carries that indent
-    on its own first line, so preserving whatever indent the first de-quoted line already has —
-    rather than flattening every unmarked paragraph to column 0 — is what keeps it inside the list
-    item it belongs to instead of closing the list and starting a new top-level paragraph.
+    paragraph separated from the marker line by a blank line. Such a paragraph carries that
+    indent on its own first line, so preserving whatever indent the first de-quoted line already
+    has — rather than flattening every unmarked paragraph to column 0 — is what keeps it inside
+    the list item it belongs to instead of closing the list and starting a new top-level
+    paragraph.
     """
     quote_match = QUOTE_MARKER.match(unit_lines[0])
     quote_prefix = quote_match.group(1) if quote_match else ""
@@ -134,8 +135,9 @@ def _is_unwrappable(line: str) -> bool:
 
     There is no case here for a `$$...$$` display-math block: MathJax reads a newline inside one
     as ordinary whitespace, so reflowing it is safe, but only because every token in a formula is
-    whitespace-separated the same way a word is — the corpus carries no construct where that isn't
-    true. A LaTeX block relying on a significant literal newline would need its own case here.
+    whitespace-separated the same way a word is — the corpus carries no construct where that
+    isn't true. A LaTeX block relying on a significant literal newline would need its own case
+    here.
     """
     return bool(
         HEADING.match(line)
@@ -150,8 +152,8 @@ def _units(lines: list[str]) -> list[tuple[int, int]]:
     """The `(first_line, last_line + 1)` bounds of each wrapping unit in a flowable block.
 
     A unit is a run of lines starting at a list marker or a blockquote marker, or the whole block
-    where it carries neither — so a list written without blank lines between its items reflows one
-    item at a time rather than merging every sibling into one paragraph.
+    where it carries neither — so a list written without blank lines between its items reflows
+    one item at a time rather than merging every sibling into one paragraph.
     """
     starts = [
         0,
@@ -168,9 +170,9 @@ def _units(lines: list[str]) -> list[tuple[int, int]]:
 def _flatten(text: str) -> str:
     """`text` with its per-line blockquote markers dropped and all remaining whitespace collapsed.
 
-    A blockquote's `>` repeats once per line, so rewrapping to a different line count legitimately
-    changes how many appear. Comparing the flattened text is what lets `reflow_text`'s own
-    round-trip check tell a rewrap from a change to the words.
+    A blockquote's `>` repeats once per line, so rewrapping to a different line count
+    legitimately changes how many appear. Comparing the flattened text is what lets
+    `reflow_text`'s own round-trip check tell a rewrap from a change to the words.
     """
     lines = [QUOTE_MARKER.sub("", line) for line in text.split("\n")]
     return "".join("\n".join(lines).split())
@@ -183,8 +185,9 @@ def reflow_text(source: str) -> str:
     There is no exemption for a CommonMark *indented* code block (4+ spaces, no fence): the
     `code-style` skill requires every code sample in this repo to be fenced, and a 4-space indent
     with no marker is otherwise indistinguishable from a nested list item's continuation, which
-    does need rewrapping — `#690` found none of the former across the whole corpus, so this treats
-    an indented, unmarked line as prose rather than risk silently skipping list continuations.
+    does need rewrapping — `#690` found none of the former across the whole corpus, so this
+    treats an indented, unmarked line as prose rather than risk silently skipping list
+    continuations.
 
     `source` must end in a newline, as every file in this repo does.
     """

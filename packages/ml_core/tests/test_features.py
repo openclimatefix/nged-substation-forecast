@@ -95,9 +95,9 @@ def test_upsample_nwp_to_half_hourly_forward_fills_categorical_vars():
 def test_upsample_nwp_no_cross_group_interpolation():
     """interpolate().over() must not fill nulls across group boundaries.
 
-    precipitation_surface is legitimately null at lead time 0 in each NWP group.
-    After upsampling, those nulls must stay null — they must not be back-filled by
-    the preceding group's last known value via global interpolation.
+    precipitation_surface is legitimately null at lead time 0 in each NWP group. After
+    upsampling, those nulls must stay null — they must not be back-filled by the preceding
+    group's last known value via global interpolation.
     """
     df = pl.DataFrame(
         {
@@ -137,8 +137,8 @@ def test_upsample_nwp_no_cross_group_interpolation():
 def test_upsample_nwp_no_cross_group_forward_fill():
     """forward_fill().over() must not fill categorical nulls across group boundaries.
 
-    Group B starts with a null at lead time 0. After forward-filling, Group B's leading
-    null must NOT be filled with Group A's last known categorical value.
+    Group B starts with a null at lead time 0. After forward-filling, Group B's leading null must
+    NOT be filled with Group A's last known categorical value.
     """
     df = pl.DataFrame(
         {
@@ -310,10 +310,10 @@ def test_apply_local_time_features_non_london_timezone():
 def test_apply_local_time_features_dst_transitions():
     """Exercise the two UK DST transition instants themselves, not just GMT/BST in general.
 
-    ``valid_time`` is tz-aware UTC in production, so the inputs here are UTC too. UTC is
-    gap-free and monotonic, so the transition manifests only in the derived local-time
-    features: at spring-forward a local wall-clock hour is skipped, and at fall-back a local
-    hour repeats. See issue #84.
+    ``valid_time`` is tz-aware UTC in production, so the inputs here are UTC too. UTC is gap-free
+    and monotonic, so the transition manifests only in the derived local-time features: at
+    spring-forward a local wall-clock hour is skipped, and at fall-back a local hour repeats. See
+    issue #84.
     """
     df = pl.DataFrame(
         {
@@ -602,8 +602,8 @@ def test_parsed_features_raw_weather_features():
     """Verify that raw weather features are parsed correctly.
 
     This test ensures that raw weather variables (e.g., 'temperature_2m') are correctly
-    identified and parsed into the `weather_features` list, and that requesting them
-    correctly triggers the requirement for weather (NWP) data.
+    identified and parsed into the `weather_features` list, and that requesting them correctly
+    triggers the requirement for weather (NWP) data.
     """
     selected = {"temperature_2m", "wind_speed_10m"}
     parsed = ParsedFeatures.from_strings(selected)
@@ -615,10 +615,10 @@ def test_parsed_features_raw_weather_features():
 def test_parsed_features_safe_input_base_columns():
     """Verify that safe input base columns are parsed correctly.
 
-    This test ensures that base columns that are safe to use as direct input features
-    (e.g., 'nwp_lead_time_hours', 'time_series_type') are correctly identified and parsed
-    into the `base_features` list, allowing downstream models to use them without
-    triggering target leakage or index column errors.
+    This test ensures that base columns that are safe to use as direct input features (e.g.,
+    'nwp_lead_time_hours', 'time_series_type') are correctly identified and parsed into the
+    `base_features` list, allowing downstream models to use them without triggering target
+    leakage or index column errors.
     """
     selected = {"nwp_lead_time_hours", "time_series_type"}
     parsed = ParsedFeatures.from_strings(selected)
@@ -629,9 +629,9 @@ def test_parsed_features_safe_input_base_columns():
 def test_parsed_features_forbids_power_target_leakage():
     """Verify that requesting 'power' as an input feature raises a ValueError.
 
-    This test ensures that the target leakage prevention guardrail is active. Requesting
-    the raw target variable 'power' as an input feature must raise a clear, helpful
-    ValueError explaining target leakage and guiding the user to use lagged power features.
+    This test ensures that the target leakage prevention guardrail is active. Requesting the raw
+    target variable 'power' as an input feature must raise a clear, helpful ValueError explaining
+    target leakage and guiding the user to use lagged power features.
     """
     with pytest.raises(
         ValueError,
@@ -646,9 +646,9 @@ def test_parsed_features_forbids_power_target_leakage():
 def test_parsed_features_forbids_valid_time_index():
     """Verify that requesting 'valid_time' as an input feature raises a ValueError.
 
-    This test ensures that the index column guardrail is active. Requesting 'valid_time'
-    as an input feature must raise a clear, helpful ValueError explaining that it is an
-    index column and guiding the user to use local time features instead.
+    This test ensures that the index column guardrail is active. Requesting 'valid_time' as an
+    input feature must raise a clear, helpful ValueError explaining that it is an index column
+    and guiding the user to use local time features instead.
     """
     with pytest.raises(
         ValueError,
@@ -663,10 +663,9 @@ def test_engineer_features_multi_run_backtest_uses_bulk_mode():
     """Multi-run backtesting must use power_fcst_init_time=None (bulk training mode).
 
     Passing a scalar `power_fcst_init_time` with multi-run data stamps the same constant
-    nwp_init_time on every row, so the NWP join matches only one run and leaves everything
-    else null. This test verifies that bulk mode (power_fcst_init_time=None) correctly
-    generates one row per (nwp_init_time, valid_time) combination, which is what a
-    backtest needs.
+    nwp_init_time on every row, so the NWP join matches only one run and leaves everything else
+    null. This test verifies that bulk mode (power_fcst_init_time=None) correctly generates one
+    row per (nwp_init_time, valid_time) combination, which is what a backtest needs.
     """
     valid_time = datetime(2023, 1, 1, 12, 0)
     nwp_init_time_1 = datetime(2022, 12, 31, 0, 0)
@@ -715,11 +714,11 @@ def test_engineer_features_multi_run_backtest_uses_bulk_mode():
 def test_engineer_features_bulk_mode_drops_hindcast_rows():
     """Bulk mode emits only deliverable rows: valid_time strictly after power_fcst_init_time.
 
-    Each NWP run's valid times start at its own init_time, but the derived
-    power_fcst_init_time is init_time + nwp_publication_delay_hours — so the run's first
-    delay-hours of valid times are hindcast rows that a live forecast could never deliver.
-    They must not appear in the output; the earliest emitted valid_time is the first
-    half-hourly step strictly after power_fcst_init_time.
+    Each NWP run's valid times start at its own init_time, but the derived power_fcst_init_time
+    is init_time + nwp_publication_delay_hours — so the run's first delay-hours of valid times
+    are hindcast rows that a live forecast could never deliver. They must not appear in the
+    output; the earliest emitted valid_time is the first half-hourly step strictly after
+    power_fcst_init_time.
     """
     delay_hours = 6
     nwp_init_time = datetime(2023, 1, 1, 0, 0)
@@ -900,13 +899,14 @@ def test_engineer_features_single_run_proxy_ceiling_is_the_selected_run_not_the_
     """The single-run analysis proxy cuts at nwp_init_time, whatever the publication delay says.
 
     ``live_forecasts`` selects its NWP run in ``"live"`` availability mode, which accepts any run
-    genuinely present in the Delta table however fresh. The freshest-run join must accept that same
-    run. The ceiling is therefore the selected run rather than a modelled publication delay. Here
-    power_fcst_init_time is only 1 hour after the selected run while nwp_publication_delay_hours is
-    9, so a delay-based cut would exclude the selected run and null the lag.
+    genuinely present in the Delta table however fresh. The freshest-run join must accept that
+    same run. The ceiling is therefore the selected run rather than a modelled publication delay.
+    Here power_fcst_init_time is only 1 hour after the selected run while
+    nwp_publication_delay_hours is 9, so a delay-based cut would exclude the selected run and
+    null the lag.
 
-    Both halves of the ceiling are asserted together in one frame: the selected run answers (8.0),
-    and the later run's decoy (999.0) does not.
+    Both halves of the ceiling are asserted together in one frame: the selected run answers
+    (8.0), and the later run's decoy (999.0) does not.
     """
     nwp_init_time = datetime(2026, 6, 11, 0, 0)
     power_fcst_init_time = datetime(2026, 6, 11, 1, 0)
@@ -943,10 +943,10 @@ def test_engineer_features_single_run_proxy_ceiling_is_the_selected_run_not_the_
 def test_engineer_features_single_run_ceiling_uses_the_derived_run_when_none_is_given():
     """With nwp_init_time omitted, the ceiling is the run the delay derives, not a wider one.
 
-    Single-run mode lets a backfill caller omit nwp_init_time, in which case the run is derived as
-    power_fcst_init_time - nwp_publication_delay_hours. The analysis-proxy ceiling routes through
-    that same derivation, so a run initialised after the derived run must still be excluded, even
-    though that later run landed before power_fcst_init_time.
+    Single-run mode lets a backfill caller omit nwp_init_time, in which case the run is derived
+    as power_fcst_init_time - nwp_publication_delay_hours. The analysis-proxy ceiling routes
+    through that same derivation, so a run initialised after the derived run must still be
+    excluded, even though that later run landed before power_fcst_init_time.
     """
     power_fcst_init_time = datetime(2026, 6, 11, 9, 0)
     # Derived run: power_fcst_init_time - 9h. Not passed to _engineer_features.
@@ -1344,8 +1344,8 @@ def test_engineer_features_rolling_mean_collects_under_streaming_engine():
 def test_apply_rolling_mean_feature_window_is_time_not_rows():
     """The window is `window_hours` of wall-clock time, not that many rows.
 
-    NWP reaches this function upsampled to half-hourly, so a row-count window would silently be
-    a half-length one. Irregular spacing is what tells the two apart.
+    NWP reaches this function upsampled to half-hourly, so a row-count window would silently be a
+    half-length one. Irregular spacing is what tells the two apart.
     """
     t0 = datetime(2023, 1, 1, 0, 0)
     df = pl.DataFrame(

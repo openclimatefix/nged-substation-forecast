@@ -6,10 +6,10 @@ rounding — plus the write helpers that apply them. Dagster assets stay thin by
 this package rather than calling ``write_deltalake`` with ad-hoc settings.
 
 One module per table — ``power_forecasts``, ``nwp``, ``power_time_series``,
-``eligible_time_series``, ``effective_capacity``, ``forecast_metrics`` — plus the shared precision
-helper in ``precision``. Only ``power_forecasts`` and ``nwp`` carry writer-properties/sort-order/
-precision tuning today, each chosen from measurements on real data and landing on different
-choices — see
+``eligible_time_series``, ``effective_capacity``, ``forecast_metrics`` — plus the shared
+precision helper in ``precision``. Only ``power_forecasts`` and ``nwp`` carry
+writer-properties/sort-order/ precision tuning today, each chosen from measurements on real data
+and landing on different choices — see
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#storage-formats-measured-not-assumed>
 for the comparison. The other four modules exist so their writes go through ``delta_store`` like
 every other table. They carry no tuning because there is no measurement yet to back any.

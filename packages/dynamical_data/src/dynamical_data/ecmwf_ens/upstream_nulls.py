@@ -1,10 +1,10 @@
 """Measuring upstream corruption on the raw NWP grid, before the H3 aggregation sees it.
 
-The H3 aggregation renormalises each cell over the grid points that supplied a value, so a corrupt
-grid point costs only its own share of its cell. That is what makes the stored cells robust, and it
-is also why counting null *cells* is a poor proxy for how corrupt the feed was. This module counts
-the nulls where they arrive, before that renormalisation absorbs most of them. The aggregation
-mechanics and the measurements behind that claim are in
+The H3 aggregation renormalises each cell over the grid points that supplied a value, so a
+corrupt grid point costs only its own share of its cell. That is what makes the stored cells
+robust, and it is also why counting null *cells* is a poor proxy for how corrupt the feed was.
+This module counts the nulls where they arrive, before that renormalisation absorbs most of them.
+The aggregation mechanics and the measurements behind that claim are in
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#spatial-aggregation-is-where-a-grid-points-null-is-resolved>.
 """
 
@@ -44,8 +44,8 @@ class UpstreamNullRate:
     """How much of one ingested NWP run arrived null on the **raw grid**.
 
     This is the provider channel: the number to quote to Dynamical.org when asking whether their
-    feed is degrading. It counts grid points on the 0.25° lat/lon box we downloaded, before any H3
-    aggregation.
+    feed is degrading. It counts grid points on the 0.25° lat/lon box we downloaded, before any
+    H3 aggregation.
 
     Read it alongside, never instead of, `contracts.weather_schemas.NwpQualityReport`, which
     counts null H3 *cells* and answers the different question of how much the model lost. The two
@@ -84,8 +84,8 @@ class UpstreamNullRate:
         """The counted variables carrying at least one null grid point.
 
         In ``per_variable``'s row order, which is sorted by variable name because
-        `assess_upstream_grid_point_nulls` builds it that way — ``filter`` preserves row
-        order rather than imposing one.
+        `assess_upstream_grid_point_nulls` builds it that way — ``filter`` preserves row order
+        rather than imposing one.
         """
         return tuple(self.per_variable.filter(pl.col("n_null") > 0)["variable"])
 
@@ -94,8 +94,8 @@ class UpstreamNullRate:
         """Null grid points as a fraction of those counted; ``0.0`` when none were counted.
 
         A run with no step left to count has nothing to measure, and a warning path must not
-        raise
-        ([rule 7](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
+        raise ([rule
+        7](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
         """
         if self.n_total_nwp_grid_points == 0:
             return 0.0

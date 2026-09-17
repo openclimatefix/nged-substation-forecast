@@ -1,7 +1,7 @@
 """NWP processing and power/NWP join helpers.
 
-Handles temporal upsampling (3-hourly → 30-min), processing into a form the feature pipeline
-can consume, and the two NWP join modes (bulk training vs. single-run inference).
+Handles temporal upsampling (3-hourly → 30-min), processing into a form the feature pipeline can
+consume, and the two NWP join modes (bulk training vs. single-run inference).
 """
 
 from datetime import datetime, timedelta
@@ -45,11 +45,11 @@ def _join_nwp_bulk_mode(
     """NWP-centric join for bulk training / multi-run backtesting.
 
     Produces one row per (time_series_id, nwp_init_time, valid_time, ensemble_member) with
-    power_fcst_init_time derived per-row as nwp_init_time + nwp_publication_delay_hours.
-    Each NWP run's first nwp_publication_delay_hours of valid times therefore precede the
-    derived power_fcst_init_time; those hindcast rows are kept here so that window features
-    (e.g. weather rolling means) see the same predecessor rows as single-run mode, and are
-    dropped by ``_engineer_features`` after feature computation.
+    power_fcst_init_time derived per-row as nwp_init_time + nwp_publication_delay_hours. Each NWP
+    run's first nwp_publication_delay_hours of valid times therefore precede the derived
+    power_fcst_init_time; those hindcast rows are kept here so that window features (e.g. weather
+    rolling means) see the same predecessor rows as single-run mode, and are dropped by
+    ``_engineer_features`` after feature computation.
 
     ``power_lf`` carries no metadata: ``_engineer_features`` joins that onto the result, because
     a valid_time with no power observation would otherwise lose its metadata here.
@@ -95,8 +95,8 @@ def _join_nwp_single_run(
 ) -> pl.LazyFrame:
     """Power-centric join for single-run production inference or backfilling.
 
-    Stamps a constant power_fcst_init_time across all rows and joins exclusively the one NWP
-    run identified by nwp_init_time. If nwp_init_time is None, it is derived as
+    Stamps a constant power_fcst_init_time across all rows and joins exclusively the one NWP run
+    identified by nwp_init_time. If nwp_init_time is None, it is derived as
     power_fcst_init_time - nwp_publication_delay_hours.
 
     ``power_lf`` carries no metadata — see ``_join_nwp_bulk_mode``.
@@ -122,23 +122,23 @@ def _join_nwp_single_run(
 def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
     """Upsample NWP data to 30-minute resolution.
 
-    Assumes 'init_time' has already been renamed to 'nwp_init_time'. Continuous weather
-    variables are linearly interpolated within each group; categorical variables are
-    forward-filled within each group. All other columns (e.g. nwp_init_time,
-    ensemble_member) are used as group-by keys.
+    Assumes 'init_time' has already been renamed to 'nwp_init_time'. Continuous weather variables
+    are linearly interpolated within each group; categorical variables are forward-filled within
+    each group. All other columns (e.g. nwp_init_time, ensemble_member) are used as group-by
+    keys.
 
     The implementation stays fully lazy: a 30-min time grid is generated per group via
     datetime_ranges + explode, then the original NWP values are left-joined back in, and
     interpolate/forward_fill are applied with over() to stay within group boundaries.
 
     End-null propagation: Polars' interpolate() fills interior nulls but leaves both leading
-    nulls (before the first non-null value in a group) and trailing nulls (after the last one)
-    as null. Some ECMWF ENS variables (precipitation, radiation fluxes) are null at lead time 0
-    by convention. After upsampling from native 3-hourly steps, all interpolated 30-min rows
-    before the first non-null step remain null — typically a 3-hour window per NWP run. The
-    trailing case is rarer but real: a wholly-null slice at the last native step of the horizon
-    is not bridged either, so it too reaches the caller as null. Callers and downstream models
-    should treat all of these as genuinely missing values, not as a data quality issue.
+    nulls (before the first non-null value in a group) and trailing nulls (after the last one) as
+    null. Some ECMWF ENS variables (precipitation, radiation fluxes) are null at lead time 0 by
+    convention. After upsampling from native 3-hourly steps, all interpolated 30-min rows before
+    the first non-null step remain null — typically a 3-hour window per NWP run. The trailing
+    case is rarer but real: a wholly-null slice at the last native step of the horizon is not
+    bridged either, so it too reaches the caller as null. Callers and downstream models should
+    treat all of these as genuinely missing values, not as a data quality issue.
     """
     schema_names = nwp_lf.collect_schema().names()
     all_weather_vars = Nwp.all_weather_var_names()

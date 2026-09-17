@@ -61,7 +61,8 @@ def test_metrics_accepts_rows_differing_only_in_window_end():
 
 def test_metrics_validate_skips_uniqueness_check_when_key_columns_missing():
     """`compute_metrics()` validates before `experiment_name`/`evaluation_scope`/`window_start`/
-    `window_end` exist on the frame, on rows that would collide on every column that *is* present.
+    `window_end` exist on the frame, on rows that would collide on every column that *is*
+    present.
 
     Those four columns are `allow_missing`, so `validate()` must not try to select them — it
     would raise `ColumnNotFoundError` rather than validate, breaking `compute_metrics()` and

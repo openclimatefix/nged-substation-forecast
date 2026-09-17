@@ -3,12 +3,12 @@
 The script lives in `.claude/skills/prose-review/scripts/`, which pytest does not collect — the
 directory is hidden — so its tests live here, where CI runs them.
 
-Every test below is a regression. A docs sweep found the script writing a serial comma *inside* the
-code span it followed, `` `n_h3_cells,` `` for `` `n_h3_cells`, ``, in four places across four
-files; the same boundary wrote a comma inside a bold span, refused edits that landed on a
-`](url)`, and stripped the trailing newline off any file whose last paragraph was edited. All four
-came from one cause: an offset map that recorded where each stripped character sat and not where
-the markup around it ended.
+Every test below is a regression. A docs sweep found the script writing a serial comma *inside*
+the code span it followed, `` `n_h3_cells,` `` for `` `n_h3_cells`, ``, in four places across
+four files; the same boundary wrote a comma inside a bold span, refused edits that landed on a
+`](url)`, and stripped the trailing newline off any file whose last paragraph was edited. All
+four came from one cause: an offset map that recorded where each stripped character sat and not
+where the markup around it ended.
 """
 
 import importlib.util
@@ -298,10 +298,10 @@ def test_punctuation_inserted_at_any_point_lands_between_the_markup_and_nothing_
 ):
     """Sweep every insertion point in a paragraph carrying all four kinds of markup.
 
-    The reported defect was one insertion point out of hundreds writing a serial comma on the wrong
-    side of a closing backtick, so the guard that matters is the exhaustive one. A semicolon stands
-    in for the comma because the paragraph already carries commas, and the assertion needs to know
-    which character the splice wrote.
+    The reported defect was one insertion point out of hundreds writing a serial comma on the
+    wrong side of a closing backtick, so the guard that matters is the exhaustive one. A
+    semicolon stands in for the comma because the paragraph already carries commas, and the
+    assertion needs to know which character the splice wrote.
     """
     path = tmp_path / "page.md"
     raw = _write(path, EVERY_MARKUP)
@@ -458,8 +458,9 @@ def test_an_arrow_before_a_bold_span_is_not_read_as_a_list_marker(tmp_path: Path
 def test_an_inline_triple_backtick_span_does_not_open_a_fenced_block(tmp_path: Path):
     """A hard wrap can push such a span to the start of a line, where it looks like a fence.
 
-    Read as one, it opens a region no later line closes, and every finding in the rest of the file
-    is refused. CommonMark forbids a backtick in a fence's info string, which tells the two apart.
+    Read as one, it opens a region no later line closes, and every finding in the rest of the
+    file is refused. CommonMark forbids a backtick in a fence's info string, which tells the two
+    apart.
     """
     page = (
         "The retry header is spelled\n"

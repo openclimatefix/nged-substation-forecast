@@ -28,9 +28,9 @@ class NoOverlappingActualsError(ValueError):
     """Raised by ``compute_metrics`` when no forecast row joins to any observed actual.
 
     A distinct subclass so callers that score a fold in per-series batches can treat "this
-    batch's series have no overlapping actuals" as skippable — mirroring how such series
-    silently vanish from the inner join when the whole fold is scored in one call — while
-    every other ``ValueError`` (negative lead times, missing capacity) still propagates.
+    batch's series have no overlapping actuals" as skippable — mirroring how such series silently
+    vanish from the inner join when the whole fold is scored in one call — while every other
+    ``ValueError`` (negative lead times, missing capacity) still propagates.
     """
 
 
@@ -44,13 +44,14 @@ def compute_effective_capacity(
     all-null or all-zero power) are dropped, since ``EffectiveCapacity`` requires
     ``effective_capacity_mw > 0``.
 
-    ``time`` is set to that series' **latest** observed timestep (``time.max()``). The v0.1 capacity
-    is a single scalar per series, so ``time`` is really an "as of" marker — it stamps the estimate
-    as current to the end of the observed history — rather than a timestep the value varies over.
-    The v0.7 upgrade makes capacity genuinely time-varying (one row per ``(time_series_id, time)``),
-    and only then does ``time`` carry per-row meaning. v0.1 stays one scalar row per series rather
-    than the value repeated at every half-hour: densifying a constant adds rows without information,
-    and the metrics join is by ``time_series_id`` alone until capacity varies.
+    ``time`` is set to that series' **latest** observed timestep (``time.max()``). The v0.1
+    capacity is a single scalar per series, so ``time`` is really an "as of" marker — it stamps
+    the estimate as current to the end of the observed history — rather than a timestep the value
+    varies over. The v0.7 upgrade makes capacity genuinely time-varying (one row per
+    ``(time_series_id, time)``), and only then does ``time`` carry per-row meaning. v0.1 stays
+    one scalar row per series rather than the value repeated at every half-hour: densifying a
+    constant adds rows without information, and the metrics join is by ``time_series_id`` alone
+    until capacity varies.
 
     Kept as a pure helper (no Dagster, no IO) so the P99 logic is unit-testable in isolation.
     """
@@ -86,10 +87,10 @@ Lead times in [36 h, 168 h) — day 2 to day 7. Lead times of 168 h and beyond f
 def _horizon_slice_expr() -> pl.Expr:
     """Map each row's lead time onto the ``HORIZON_SLICES`` bands.
 
-    Lead time is ``valid_time − power_fcst_init_time``. Bands are left-closed:
-    ``"intraday"`` [0 h, 6 h), ``"day_ahead"`` [6 h, 36 h), ``"short_medium_range"``
-    [36 h, 168 h), ``"extended_range"`` [168 h, ∞) — matching the band definitions
-    documented on ``contracts.ml_schemas.HORIZON_SLICES``.
+    Lead time is ``valid_time − power_fcst_init_time``. Bands are left-closed: ``"intraday"`` [0
+    h, 6 h), ``"day_ahead"`` [6 h, 36 h), ``"short_medium_range"`` [36 h, 168 h),
+    ``"extended_range"`` [168 h, ∞) — matching the band definitions documented on
+    ``contracts.ml_schemas.HORIZON_SLICES``.
     """
     lead_time = pl.col("valid_time") - pl.col("power_fcst_init_time")
     return (
@@ -172,12 +173,12 @@ def _fair_crps_expr() -> pl.Expr:
 def _corrected_variance_expr() -> pl.Expr:
     """Per-timestamp Fortin-corrected ensemble variance, ``((m+1)/m)·Var(members)``.
 
-    Evaluated inside the per-run collapse ``group_by``. For a calibrated ensemble the RMSE of
-    the ensemble mean equals ``sqrt((m+1)/m)`` times the RMS ensemble spread (Fortin et
-    al. 2014), so folding the factor in here makes the spread-skill ratio's calibrated target
-    exactly 1.0 at any ensemble size. Uses the sample variance (``ddof=1``), guarded to 0 for
-    single-member groups where ``.var()`` would return null (``metric_value`` is
-    non-nullable, and zero spread is the honest description of a deterministic forecast).
+    Evaluated inside the per-run collapse ``group_by``. For a calibrated ensemble the RMSE of the
+    ensemble mean equals ``sqrt((m+1)/m)`` times the RMS ensemble spread (Fortin et al. 2014), so
+    folding the factor in here makes the spread-skill ratio's calibrated target exactly 1.0 at
+    any ensemble size. Uses the sample variance (``ddof=1``), guarded to 0 for single-member
+    groups where ``.var()`` would return null (``metric_value`` is non-nullable, and zero spread
+    is the honest description of a deterministic forecast).
     """
     m = pl.len()
     variance = pl.col("power_fcst").cast(pl.Float64).var()
@@ -203,9 +204,9 @@ def _wide_metrics(per_run: pl.LazyFrame, group_keys: list[str]) -> pl.LazyFrame:
     """Aggregate per-timestamp values into one wide row of metrics per ``group_keys`` group.
 
     ``per_run`` is the per-forecast-run frame built by ``compute_metrics``: one row per
-    ``(time_series_id, power_fcst_init_time, valid_time)`` carrying the ensemble-mean
-    ``error``, per-timestamp ``crps`` and ``corrected_var``, and the empirical
-    ``DELIVERY_QUANTILES`` columns. Emits the columns listed by ``_wide_metric_columns``.
+    ``(time_series_id, power_fcst_init_time, valid_time)`` carrying the ensemble-mean ``error``,
+    per-timestamp ``crps`` and ``corrected_var``, and the empirical ``DELIVERY_QUANTILES``
+    columns. Emits the columns listed by ``_wide_metric_columns``.
     """
     actual = pl.col("power_actual")
     aggs: dict[str, pl.Expr] = {
@@ -499,8 +500,8 @@ def _mlflow_logged_expr() -> pl.Expr:
 def _metric_key_token_expr() -> pl.Expr:
     """MLflow key token for a metric row: ``{metric_name}`` or ``{metric_name}_{metric_param}``.
 
-    ``metric_param="all"`` metrics keep the bare name (so the pre-probabilistic key formats
-    are unchanged); parametric metrics append the param, e.g. ``"pinball_loss_p10"``.
+    ``metric_param="all"`` metrics keep the bare name (so the pre-probabilistic key formats are
+    unchanged); parametric metrics append the param, e.g. ``"pinball_loss_p10"``.
     """
     name = pl.col("metric_name").cast(pl.String)
     return (

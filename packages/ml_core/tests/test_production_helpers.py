@@ -2,8 +2,8 @@
 
 ``select_nwp_init_time`` and ``build_live_power_frame`` take an injected clock and no wall-clock
 reads, so they are exercised directly with fixed datetimes. ``load_forecaster_from_dir`` is
-exercised against a real ``XGBoostForecaster`` save/load round-trip (no MLflow involved — it
-only reads a plain disk directory).
+exercised against a real ``XGBoostForecaster`` save/load round-trip (no MLflow involved — it only
+reads a plain disk directory).
 """
 
 import json
@@ -74,10 +74,10 @@ def test_replay_reconstructs_the_run_that_had_genuinely_landed(
 ) -> None:
     """Replay must pick the run that was really on disk, at every one of the four slots.
 
-    Ground truth: we ingest one 00Z run a day and ``ecmwf_ens_schedule`` downloads it at 08:30 UTC,
-    so day D's run is ours from 08:30. The 00:00 and 06:00 slots therefore still see D-1's run; the
-    12:00 and 18:00 slots see D's. The 06:00 case is the one a too-small delay gets wrong, by
-    handing the slot a run that had not landed yet.
+    Ground truth: we ingest one 00Z run a day and ``ecmwf_ens_schedule`` downloads it at 08:30
+    UTC, so day D's run is ours from 08:30. The 00:00 and 06:00 slots therefore still see D-1's
+    run; the 12:00 and 18:00 slots see D's. The 06:00 case is the one a too-small delay gets
+    wrong, by handing the slot a run that had not landed yet.
     """
     day = datetime(2026, 7, 4, tzinfo=UTC)
     available = [day + timedelta(days=offset) for offset in (-2, -1, 0)]
@@ -92,9 +92,8 @@ def test_replay_reconstructs_the_run_that_had_genuinely_landed(
 
 
 def test_live_and_replay_diverge_when_a_fresher_run_exists_within_the_delay_window() -> None:
-    """The whole point of the two modes: a run inside
-    ``(power_fcst_init_time - NWP_PUBLICATION_DELAY_HOURS, power_fcst_init_time]`` is
-    live-only visible."""
+    """The whole point of the two modes: a run inside ``(power_fcst_init_time -
+    NWP_PUBLICATION_DELAY_HOURS, power_fcst_init_time]`` is live-only visible."""
     available = [
         _POWER_FCST_INIT_TIME - timedelta(hours=24),
         _POWER_FCST_INIT_TIME - timedelta(hours=1),
@@ -215,7 +214,8 @@ def test_load_forecaster_from_dir_rejects_an_unparseable_feature(
     """A model naming a feature this code no longer recognises fails at load, naming the feature.
 
     ``local_utc_offset`` is the real name a rename retired, so this doubles as a regression pin.
-    No training is needed: an untrained forecaster still saves a ``meta.json`` carrying the config.
+    No training is needed: an untrained forecaster still saves a ``meta.json`` carrying the
+    config.
     """
     XGBoostForecaster(XGBoostConfig(selected_features={"local_utc_offset", companion})).save(
         tmp_path
@@ -304,8 +304,8 @@ class _NarrowerConfig(XGBoostConfig):
 class _NarrowerConfigForecaster(XGBoostForecaster):
     """Overrides ``CONFIG_CLASS`` and nothing else, so ``load`` alone decides which config is built.
 
-    Module level, not nested in the test: ``save`` stamps ``class_target(self)`` into ``meta.json``,
-    which a class defined inside a function has no importable path for.
+    Module level, not nested in the test: ``save`` stamps ``class_target(self)`` into
+    ``meta.json``, which a class defined inside a function has no importable path for.
     """
 
     CONFIG_CLASS: ClassVar[type[XGBoostConfig]] = _NarrowerConfig
@@ -315,8 +315,8 @@ def test_load_builds_its_config_through_config_class(tmp_path: Path) -> None:
     """``load`` must reach its config class through ``CONFIG_CLASS``, not by naming one again.
 
     That identity is what makes the guard's verdict binding: the guard validates a saved
-    ``model_params`` against ``CONFIG_CLASS``, so a ``load`` that used some other class could still
-    reject a model the guard had passed — after promotion had replaced the champion.
+    ``model_params`` against ``CONFIG_CLASS``, so a ``load`` that used some other class could
+    still reject a model the guard had passed — after promotion had replaced the champion.
     """
     _NarrowerConfigForecaster(XGBoostConfig(selected_features={"temperature_2m"})).save(tmp_path)
 
@@ -388,9 +388,9 @@ def test_weather_lags_lack_their_control_member(
     """The probe fires only when a weather lag is selected and the control member is missing.
 
     The last two cases matter as much as the first two: a model that selects no weather lag loses
-    nothing to a missing control member, because the same-run weather join reads whichever members
-    are present. Reporting a degradation there would be a false alarm, and ``power_lag_24h`` is
-    the lag that most easily gets miscounted as a weather lag.
+    nothing to a missing control member, because the same-run weather join reads whichever
+    members are present. Reporting a degradation there would be a false alarm, and
+    ``power_lag_24h`` is the lag that most easily gets miscounted as a weather lag.
     """
     assert (
         weather_lags_lack_their_control_member(

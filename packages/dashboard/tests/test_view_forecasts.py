@@ -5,8 +5,8 @@ one cell every Delta read descends from. That statement is what this test protec
 move the definition into the same cell, and the button still renders and still clicks while
 nothing is re-read.
 
-Parsing a notebook without running it is not public marimo API; `scripts/check_marimo_notebooks.py`
-documents the same dependency and why the repo takes it.
+Parsing a notebook without running it is not public marimo API;
+`scripts/check_marimo_notebooks.py` documents the same dependency and why the repo takes it.
 """
 
 from pathlib import Path

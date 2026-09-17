@@ -220,8 +220,8 @@ class Settings(BaseSettings):
         the ``data_store_*`` settings only for a dev/MinIO/S3-compatible endpoint. The ``aws_*``
         keys are the shared object_store aliases understood by delta-rs, polars cloud IO, and
         obstore alike, so one value feeds every IO site. Returned as an ``ObjectStoreOptions``
-        ``TypedDict`` so ``ty`` checks each key here, where they are authored; widen it to a plain
-        ``dict`` at each IO boundary with ``typeddict_to_dict``.
+        ``TypedDict`` so ``ty`` checks each key here, where they are authored; widen it to a
+        plain ``dict`` at each IO boundary with ``typeddict_to_dict``.
         """
         options: ObjectStoreOptions = {}
         if self.data_store_endpoint_url:
@@ -331,8 +331,8 @@ class Settings(BaseSettings):
     def _derive_unset_paths(self) -> Self:
         """Fill any unset ("") path from its root, so callers always see a concrete path.
 
-        The default layout lives here and nowhere else. A field set explicitly (e.g. via its
-        env var) keeps its value; only the "" sentinels are derived.
+        The default layout lives here and nowhere else. A field set explicitly (e.g. via its env
+        var) keeps its value; only the "" sentinels are derived.
         """
         self.nged_data_path = self.nged_data_path or uri_join(self.data_path_internal, "NGED")
         self.nwp_data_path = self.nwp_data_path or uri_join(self.data_path_internal, "NWP")
@@ -400,7 +400,7 @@ def get_settings() -> Settings:
     environment before the first read.
 
     Cached with ``lru_cache`` so every caller shares one instance (matching the previous
-    module-level singletons). Call ``get_settings.cache_clear()`` in a test that needs to
-    re-read the environment after changing it.
+    module-level singletons). Call ``get_settings.cache_clear()`` in a test that needs to re-read
+    the environment after changing it.
     """
     return Settings()

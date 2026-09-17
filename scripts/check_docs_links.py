@@ -263,9 +263,9 @@ def _check_link(
 ) -> tuple[LinkStatusType, str]:
     """Check `url`, accepting the first candidate spelling of it that resolves.
 
-    A candidate that resolves wins outright. When none does, a `bad_anchor` outcome is reported in
-    preference to a `bad_page` one, because a resolving page with a wrong anchor tells the author
-    more — and comes with the closest real anchors attached.
+    A candidate that resolves wins outright. When none does, a `bad_anchor` outcome is reported
+    in preference to a `bad_page` one, because a resolving page with a wrong anchor tells the
+    author more — and comes with the closest real anchors attached.
     """
     worst: tuple[LinkStatusType, str] = ("bad_page", "")
     for candidate in _candidate_urls(url):

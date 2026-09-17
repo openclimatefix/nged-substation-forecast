@@ -2,8 +2,8 @@
 
 These call ``_resolve_forecaster_config`` (against the real ``conf/model/xgboost.yaml``),
 ``_fold_ids_for_run_mode`` (against a synthetic CV config) and the identity helpers directly — no
-MLflow, Dagster, or Settings — so they stay in the fast, unmarked unit tier. The job wiring itself
-is covered by the integration test in ``test_register_experiment_job.py``.
+MLflow, Dagster, or Settings — so they stay in the fast, unmarked unit tier. The job wiring
+itself is covered by the integration test in ``test_register_experiment_job.py``.
 """
 
 import json
@@ -99,8 +99,8 @@ def test_resolve_names_the_file_and_the_expected_shape_for_a_bad_config(
     """``base_model_config`` is free text on the launchpad, so every typo must say what is wrong.
 
     Without these checks the shapes below surface as a bare ``KeyError`` or ``TypeError`` that
-    names neither the file nor the key at fault. The last gets further still — a ``_target_`` that
-    is present but not a string reaches ``import_class`` and dies on ``None.rpartition``.
+    names neither the file nor the key at fault. The last gets further still — a ``_target_``
+    that is present but not a string reaches ``import_class`` and dies on ``None.rpartition``.
     """
     (tmp_path / "bad.yaml").write_text(yaml_body)
     monkeypatch.setattr("nged_substation_forecast.defs.jobs.PROJECT_ROOT", tmp_path)
@@ -204,11 +204,11 @@ def _as_stored(tags: IdentityTagsType, **extra: str) -> dict[str, str]:
 def test_identity_tags_serialise_the_feature_set_sorted() -> None:
     """The ``config`` tag must not depend on the feature set's iteration order.
 
-    ``selected_features`` is a ``set``, and a set of strings iterates in a different order in every
-    process (hash randomisation). Since Dagster launches each job run in its own process, an
-    order-sensitive dump would make a re-registration of an *unchanged* config look changed —
-    rejected by the identity check, and by MLflow's write-once params before that. Sorted output is
-    the canonical form that makes the comparison mean what it says. Asserted against the base
+    ``selected_features`` is a ``set``, and a set of strings iterates in a different order in
+    every process (hash randomisation). Since Dagster launches each job run in its own process,
+    an order-sensitive dump would make a re-registration of an *unchanged* config look changed —
+    rejected by the identity check, and by MLflow's write-once params before that. Sorted output
+    is the canonical form that makes the comparison mean what it says. Asserted against the base
     YAML's whole feature set (two dozen features), so the assertion cannot pass by an accident of
     hash ordering.
     """
@@ -234,8 +234,8 @@ def test_the_override_lists_order_does_not_change_the_identity() -> None:
 def test_unchanged_identity_is_accepted() -> None:
     """A re-registration of the same config passes, and tags outside the identity may differ.
 
-    ``config_target`` is one of those: experiments already in MLflow carry it, it is not part of an
-    experiment's identity, and its value must not decide a re-registration either way.
+    ``config_target`` is one of those: experiments already in MLflow carry it, it is not part of
+    an experiment's identity, and its value must not decide a re-registration either way.
     """
     tags = _identity_of(n_estimators=7)
 

@@ -1,8 +1,8 @@
 """Shared fixtures for the ``dynamical_data`` tests.
 
 These build in-memory ``xarray`` datasets that mimic the ECMWF ENS structure the code consumes,
-plus small `H3GridWeights` frames, so every test runs fully offline (no Dynamical.org
-network access).
+plus small `H3GridWeights` frames, so every test runs fully offline (no Dynamical.org network
+access).
 """
 
 from collections.abc import Callable, Sequence

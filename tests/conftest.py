@@ -1,16 +1,16 @@
 """Shared fixtures for the root integration tests.
 
-The repo-root ``conftest.py`` (one level up) owns the ``--run-network`` gate; this one scopes
-its fixtures to the ``tests/`` directory only, so nothing here touches the ``packages/*/tests``
-unit suites.
+The repo-root ``conftest.py`` (one level up) owns the ``--run-network`` gate; this one scopes its
+fixtures to the ``tests/`` directory only, so nothing here touches the ``packages/*/tests`` unit
+suites.
 
-Shared helpers live here as *fixtures*, not as plain functions a test module imports by name.
-A test module can import ``tests/_nwp_test_data.py`` (a normal, uniquely-named module) by bare
-name via the ``pythonpath = ["tests"]`` pytest setting, but ``conftest`` is not a unique name —
-this repo also has a root-level ``conftest.py`` — so ``from conftest import ...`` is ambiguous
-outside pytest's own module loading: ``ty`` resolves it to the *root* ``conftest.py`` and reports
-an unresolved import. Fixture injection sidesteps the ambiguity entirely, since a test module
-never has to import ``conftest`` by name to use one.
+Shared helpers live here as *fixtures*, not as plain functions a test module imports by name. A
+test module can import ``tests/_nwp_test_data.py`` (a normal, uniquely-named module) by bare name
+via the ``pythonpath = ["tests"]`` pytest setting, but ``conftest`` is not a unique name — this
+repo also has a root-level ``conftest.py`` — so ``from conftest import ...`` is ambiguous outside
+pytest's own module loading: ``ty`` resolves it to the *root* ``conftest.py`` and reports an
+unresolved import. Fixture injection sidesteps the ambiguity entirely, since a test module never
+has to import ``conftest`` by name to use one.
 """
 
 from collections.abc import Callable, Iterator
@@ -33,19 +33,18 @@ def dagster_instance() -> Iterator[DagsterInstance]:
 
     Every test here should take this fixture rather than calling ``DagsterInstance.ephemeral()``
     itself; outside the test suite the equivalent is to use the instance as a context manager. An
-    ephemeral
-    instance's in-memory run storage and event-log storage each open one SQLAlchemy connection
-    against an in-memory SQLite database and hold it for the life of the instance. Nothing closes
-    those two connections unless ``dispose()`` is called, and ``DagsterInstance`` has no
-    finaliser — so an instance handed to the garbage collector can survive to interpreter
+    ephemeral instance's in-memory run storage and event-log storage each open one SQLAlchemy
+    connection against an in-memory SQLite database and hold it for the life of the instance.
+    Nothing closes those two connections unless ``dispose()`` is called, and ``DagsterInstance``
+    has no finaliser — so an instance handed to the garbage collector can survive to interpreter
     shutdown, where SQLAlchemy's connection-pool finaliser may run *after* SQLite has closed the
-    underlying database. That prints a bare ``Exception during reset or similar`` traceback ending
-    in ``sqlite3.ProgrammingError: Cannot operate on a closed database`` — two of them, one per
-    held connection — after pytest's own summary line, where no test owns it.
+    underlying database. That prints a bare ``Exception during reset or similar`` traceback
+    ending in ``sqlite3.ProgrammingError: Cannot operate on a closed database`` — two of them,
+    one per held connection — after pytest's own summary line, where no test owns it.
 
-    Entering the instance as a context manager makes ``__exit__`` call ``dispose()``, which closes
-    both connections and removes the instance's temporary artifact directory, at the end of the
-    test that created it.
+    Entering the instance as a context manager makes ``__exit__`` call ``dispose()``, which
+    closes both connections and removes the instance's temporary artifact directory, at the end
+    of the test that created it.
     """
     with DagsterInstance.ephemeral() as instance:
         yield instance
@@ -93,8 +92,8 @@ def register_experiment() -> Callable[[DagsterInstance, str], None]:
 def spy_power_lookback(
     monkeypatch: pytest.MonkeyPatch,
 ) -> Callable[[], list[timedelta]]:
-    """Return a callable that patches ``cv_assets.load_engineering_inputs`` and returns the list
-    of ``power_lookback`` values every subsequent call passes it.
+    """Return a callable that patches ``cv_assets.load_engineering_inputs`` and returns the list of
+    ``power_lookback`` values every subsequent call passes it.
 
     Installed by the returned callable rather than by the fixture itself, so a test can
     materialise its own set-up assets first and keep their calls out of the returned list —
@@ -124,13 +123,13 @@ def spy_power_lookback(
 def _fail_on_an_undisposed_dagster_instance(monkeypatch: pytest.MonkeyPatch) -> Iterator[None]:
     """Fail the test that leaves a ``DagsterInstance.ephemeral()`` instance for the collector.
 
-    Being autouse, this fixture is set up before the ones a test asks for by name and so torn down
-    after them, which is what lets it see ``dagster_instance`` dispose.
+    Being autouse, this fixture is set up before the ones a test asks for by name and so torn
+    down after them, which is what lets it see ``dagster_instance`` dispose.
 
     It catches an instance that *survives* the test, not a call that forgot to own one: CPython
     frees an unreferenced context as soon as the invoking helper returns, so a missing
-    ``instance=`` still passes green until something — a captured traceback, most often — pins the
-    frame holding it. Instances made by any route other than ``ephemeral()``, such as
+    ``instance=`` still passes green until something — a captured traceback, most often — pins
+    the frame holding it. Instances made by any route other than ``ephemeral()``, such as
     ``local_temp()``, are invisible to it.
     """
     undisposed: set[DagsterInstance] = set()

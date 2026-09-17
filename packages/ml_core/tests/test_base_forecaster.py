@@ -233,10 +233,10 @@ def test_re_saving_to_the_same_run_is_reflected_on_the_next_load(saved_run: str)
     """Re-saving into a reused run must be what the next load returns (issue #197).
 
     CV fold runs are reused across re-materialisations, so the same ``run_id`` can hold a
-    different model after re-training. ``load_from_mlflow`` has no local cache (issue #469 removed
-    it — see ``load_from_mlflow``'s docstring), so this is really a round-trip test, but it is
-    worth keeping explicit: a future re-introduction of caching must not silently reintroduce the
-    staleness bug this guards against.
+    different model after re-training. ``load_from_mlflow`` has no local cache (issue #469
+    removed it — see ``load_from_mlflow``'s docstring), so this is really a round-trip test, but
+    it is worth keeping explicit: a future re-introduction of caching must not silently
+    reintroduce the staleness bug this guards against.
     """
     assert _FakeForecaster.load_from_mlflow(saved_run).payload == "hello-model"
 
@@ -281,8 +281,8 @@ def test_loading_a_run_with_no_archive_says_what_to_do_about_it(saved_run: str) 
     """A run holding no model archive fails with an actionable message, not MLflow's raw one.
 
     MLflow's own error says only that the path was not found, which gives an operator
-    re-materialising a fold nothing to act on. (``saved_run`` is depended on for the
-    tracking URI it sets up, not for the model it holds.)
+    re-materialising a fold nothing to act on. (``saved_run`` is depended on for the tracking URI
+    it sets up, not for the model it holds.)
     """
     with mlflow.start_run(experiment_id=mlflow.create_experiment("empty_run")) as run:
         empty_run_id = run.info.run_id
@@ -429,11 +429,11 @@ def test_fetch_model_artifacts_keeps_the_previous_model_when_the_new_one_is_unse
 ) -> None:
     """A promotion this code could not serve must not displace the champion already in place.
 
-    The check runs before the atomic swap, so ``dest`` is untouched and the outgoing champion keeps
-    serving instead of the service breaking at its next tick. The cases are the ways a saved record
-    outlives the code that wrote it: a retired feature name, a hyper-parameter this code no longer
-    declares, no config at all, no record at all, and frozen metadata that is missing or
-    unreadable.
+    The check runs before the atomic swap, so ``dest`` is untouched and the outgoing champion
+    keeps serving instead of the service breaking at its next tick. The cases are the ways a
+    saved record outlives the code that wrote it: a retired feature name, a hyper-parameter this
+    code no longer declares, no config at all, no record at all, and frozen metadata that is
+    missing or unreadable.
     """
     dest = tmp_path / "production_model"
     fetch_model_artifacts(run_id=saved_run, dest=dest)

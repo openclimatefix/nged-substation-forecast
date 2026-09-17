@@ -190,9 +190,9 @@ IdentityTagsType = dict[IdentityTagType, str]
 class ExperimentIdentityChangedError(ValueError):
     """Raised when re-registering an existing experiment under a changed config.
 
-    A distinct subclass so a caller (or a test) can tell "this experiment name is already taken by
-    a different config" apart from the ordinary ``ValueError``s raised while resolving the config
-    itself.
+    A distinct subclass so a caller (or a test) can tell "this experiment name is already taken
+    by a different config" apart from the ordinary ``ValueError``s raised while resolving the
+    config itself.
     """
 
 
@@ -415,21 +415,22 @@ def register_experiment_job() -> None:
     Manually launched from the Dagster UI launchpad with a ``RegisterExperimentConfig`` —
     ``experiment_name``, a ``base_model_config`` YAML path, optional ``config_overrides``, and a
     ``run_mode``. Resolves the forecaster class and config from the YAML, creates the MLflow
-    experiment and its parent run if they do not already exist, and adds this experiment's CV fold
-    partition keys to the ``cv_experiment_folds`` dynamic partition set: ``run_mode="smoke_test"``
-    (the default) adds the non-leaderboard dev folds, and ``"full_cv"`` / ``"register_only"`` add
-    the leaderboard folds from ``conf/cv/default.yaml``. Materialises no assets itself.
+    experiment and its parent run if they do not already exist, and adds this experiment's CV
+    fold partition keys to the ``cv_experiment_folds`` dynamic partition set:
+    ``run_mode="smoke_test"`` (the default) adds the non-leaderboard dev folds, and ``"full_cv"``
+    / ``"register_only"`` add the leaderboard folds from ``conf/cv/default.yaml``. Materialises
+    no assets itself.
 
     Idempotent for the *same* config: re-running with the same ``experiment_name`` resolves the
     existing experiment, parent run, and partition keys rather than duplicating them, and may
-    freely update the ``description`` and add the other run mode's folds on top. Re-running with a
-    **changed** config is rejected outright, before any MLflow write — an experiment's identity is
-    its config; see
+    freely update the ``description`` and add the other run mode's folds on top. Re-running with
+    a **changed** config is rejected outright, before any MLflow write — an experiment's identity
+    is its config; see
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#re-registering-an-experiment-under-a-changed-config-is-rejected>.
     Register the changed config under a new ``experiment_name`` instead.
 
-    Next manual step: materialise ``trained_cv_model`` for the partition keys this run added, then
-    ``cv_power_forecasts``, then ``metrics`` to populate the leaderboard. See
+    Next manual step: materialise ``trained_cv_model`` for the partition keys this run added,
+    then ``cv_power_forecasts``, then ``metrics`` to populate the leaderboard. See
     <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/dagster-workflow/#step-6-launch-register_experiment_job>
     for the full walkthrough.
     """

@@ -5,3 +5,8 @@
 # CLAUDE.md and the skill files, which would otherwise attribute every line it touches to this
 # commit instead of whoever wrote the words.
 08c23ff4c89d52af32a5df256062d1638c0398ae
+
+# Hard-wrap docstring and comment prose in .py files at 100 characters — rewraps most of the
+# repo's docstrings and comments, which would otherwise attribute every line it touches to this
+# commit instead of whoever wrote the words.
+180bbaa144be72b91c8a617d0c041ac4459eadca

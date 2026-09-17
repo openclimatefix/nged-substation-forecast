@@ -7,9 +7,8 @@ Tests at two tiers:
 
 2. **Full-stack cross-process** (real ``mlflow server`` subprocess + temp Delta): the one test
    that proves the by-tag cross-process run resolution and the artifact upload/download
-   round-trip. Runs against a real HTTP tracking server so each
-   ``materialize()`` call — like a separate Dagster process — uses a fresh MlflowClient
-   connection to resolve runs by tag.
+   round-trip. Runs against a real HTTP tracking server so each ``materialize()`` call — like a
+   separate Dagster process — uses a fresh MlflowClient connection to resolve runs by tag.
 """
 
 import os
@@ -65,8 +64,8 @@ _VAL_MEMBERS = (0, 1, 2)
 def _write_power_with_actuals(path: str) -> None:
     """Power for ts1 in both the training window and the validation window.
 
-    The metrics asset joins forecasts to observed power, so we need actuals for the
-    validation window (the forecast valid times) as well as training-window data.
+    The metrics asset joins forecasts to observed power, so we need actuals for the validation
+    window (the forecast valid times) as well as training-window data.
     """
     rows = []
     for i, t in enumerate(half_hours(_TRAIN_DAY)):
@@ -192,8 +191,9 @@ def _run_cv_pipeline(
 ) -> None:
     """Register, train, and predict for the leaderboard fold.
 
-    Also materialises ``effective_capacity`` (the NMAE denominator ``metrics`` now requires) unless
-    ``materialise_capacity`` is False — used by the test that asserts ``metrics`` fails without it.
+    Also materialises ``effective_capacity`` (the NMAE denominator ``metrics`` now requires)
+    unless ``materialise_capacity`` is False — used by the test that asserts ``metrics`` fails
+    without it.
     """
     register_experiment(instance, EXPERIMENT_NAME)
     assert materialize([trained_cv_model], partition_key=PARTITION_KEY, instance=instance).success
@@ -319,9 +319,9 @@ def test_metrics_nmae_denominator_is_effective_capacity(
 ) -> None:
     """NMAE is MAE divided by the series' full-history effective_capacity_mw.
 
-    Unlike the unit test test_compute_metrics_nmae_uses_supplied_capacity (which passes a capacity
-    frame directly), this proves the *asset* reads the materialised effective_capacity Delta table
-    and uses that table's value as the denominator.
+    Unlike the unit test test_compute_metrics_nmae_uses_supplied_capacity (which passes a
+    capacity frame directly), this proves the *asset* reads the materialised effective_capacity
+    Delta table and uses that table's value as the denominator.
     """
     _run_cv_pipeline(dagster_instance, register_experiment)
     assert materialize(
@@ -368,8 +368,8 @@ def test_score_forecast_group_per_series_batches(
 ) -> None:
     """Per-series batching writes exactly the rows a whole-group call would.
 
-    With the batch size forced to 1, three series exercise the multi-batch path; the series
-    with no overlapping actuals is skipped (as it silently vanishes from the inner join in a
+    With the batch size forced to 1, three series exercise the multi-batch path; the series with
+    no overlapping actuals is skipped (as it silently vanishes from the inner join in a
     whole-group call) and the written Delta rows match ``compute_metrics`` on the overlapping
     series.
     """
@@ -668,13 +668,12 @@ def test_metrics_leaderboard_skips_smoke_test_fold(
 ) -> None:
     """Leaderboard scope skips ``smoke_test`` even though the CV config defines that fold.
 
-    This is the case that discriminates the fix from the bug it replaces:
-    ``smoke_test`` *is* present in ``CvConfig.fold_ids`` (every fold), so a check against that
-    property lets it through to the parent-run average. It is absent from
-    ``CvConfig.leaderboard_fold_ids`` (leaderboard folds only, since ``smoke_test`` is declared
-    ``leaderboard: false``), so a check against that property correctly skips it — unlike
-    ``fold_id="live"``, which both properties skip identically, since the CV config has no entry
-    for ``"live"`` at all.
+    This is the case that discriminates the fix from the bug it replaces: ``smoke_test`` *is*
+    present in ``CvConfig.fold_ids`` (every fold), so a check against that property lets it
+    through to the parent-run average. It is absent from ``CvConfig.leaderboard_fold_ids``
+    (leaderboard folds only, since ``smoke_test`` is declared ``leaderboard: false``), so a check
+    against that property correctly skips it — unlike ``fold_id="live"``, which both properties
+    skip identically, since the CV config has no entry for ``"live"`` at all.
     """
     _run_cv_pipeline(dagster_instance, register_experiment)
     _append_smoke_test_fold_rows(str(file_mlflow_env["forecasts"]))
@@ -762,12 +761,12 @@ def test_full_stack_real_mlflow_server(
 ) -> None:
     """Full-stack test: real HTTP MLflow server + artifact round-trip + tag resolution.
 
-    Proves cross-call tag resolution and the artifact upload/download round-trip.
-    Each ``materialize()`` call starts with a fresh ``mlflow.set_tracking_uri`` inside
-    the asset body — simulating what happens when assets run in separate Dagster processes.
-    The artifact round-trip is proved by ``cv_power_forecasts`` downloading the model
-    ``trained_cv_model`` uploaded to the real server — ``load_from_mlflow`` has no local
-    cache (issue #469), so every load is a genuine download.
+    Proves cross-call tag resolution and the artifact upload/download round-trip. Each
+    ``materialize()`` call starts with a fresh ``mlflow.set_tracking_uri`` inside the asset body
+    — simulating what happens when assets run in separate Dagster processes. The artifact
+    round-trip is proved by ``cv_power_forecasts`` downloading the model ``trained_cv_model``
+    uploaded to the real server — ``load_from_mlflow`` has no local cache (issue #469), so every
+    load is a genuine download.
     """
     # The real MLflow HTTP server needs the server runtime stack (full ``mlflow``, in the dev
     # group); a ``mlflow-skinny``-only environment cannot start it, so skip rather than fail.

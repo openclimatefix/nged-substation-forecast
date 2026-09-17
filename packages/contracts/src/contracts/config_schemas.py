@@ -88,11 +88,12 @@ class CvFoldConfig(BaseModel):
 
     ``leaderboard`` distinguishes the epoch-pinned leaderboard folds (the apples-to-apples
     evaluation protocol) from optional non-leaderboard dev folds such as ``smoke_test``: a
-    ``leaderboard=False`` fold runs through the identical pipeline but never feeds the leaderboard.
+    ``leaderboard=False`` fold runs through the identical pipeline but never feeds the
+    leaderboard.
 
-    ``min_training_months`` overrides ``CvConfig.min_training_months`` for this fold alone (``None``
-    falls back to the config-level value). A short dev fold sets it to its train length so
-    eligibility does not demand the leaderboard's longer history.
+    ``min_training_months`` overrides ``CvConfig.min_training_months`` for this fold alone
+    (``None`` falls back to the config-level value). A short dev fold sets it to its train length
+    so eligibility does not demand the leaderboard's longer history.
     """
 
     fold_id: FoldId
@@ -107,13 +108,12 @@ class CvFoldConfig(BaseModel):
 class CvConfig(BaseModel):
     """Configuration for expanding-window cross-validation.
 
-    The folds list defines the evaluation protocol shared by all experiments on the
-    leaderboard. All models must be evaluated against the same folds to ensure
-    apples-to-apples comparison.
+    The folds list defines the evaluation protocol shared by all experiments on the leaderboard.
+    All models must be evaluated against the same folds to ensure apples-to-apples comparison.
 
-    min_training_months controls which time series are eligible for each fold: a time
-    series is only included if it has at least this many months of data before val_start
-    (and data through val_end).
+    min_training_months controls which time series are eligible for each fold: a time series is
+    only included if it has at least this many months of data before val_start (and data through
+    val_end).
     """
 
     folds: list[CvFoldConfig]

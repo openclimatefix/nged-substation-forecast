@@ -121,9 +121,9 @@ def compute_h3_grid_weights(
         """Snap a latitude or longitude to the closest NWP grid line.
 
         The half-grid offset binning below ensures that points are snapped to the *closest* grid
-        center rather than the bottom-left corner of the grid cell. Adding `half_grid_size` before
-        flooring shifts the bin boundaries so that the grid points (0, 0.25, 0.5, etc.) are at the
-        center of each bin.
+        center rather than the bottom-left corner of the grid cell. Adding `half_grid_size`
+        before flooring shifts the bin boundaries so that the grid points (0, 0.25, 0.5, etc.)
+        are at the center of each bin.
         """
         return (
             (lat_or_lon + half_grid_size) / nwp_grid_size_degrees

@@ -47,21 +47,20 @@ SafeInputBaseColumn = Literal[
 class AllFeatures(pt.Model):
     """Final joined dataset ready for the ML model.
 
-    Weather features are kept in their physical units (e.g., degrees Celsius, m/s)
-    to ensure precision during interpolation and feature engineering.
+    Weather features are kept in their physical units (e.g., degrees Celsius, m/s) to ensure
+    precision during interpolation and feature engineering.
 
-    DYNAMIC FEATURES:
-    In addition to the explicitly defined columns below, the pipeline supports
+    DYNAMIC FEATURES: In addition to the explicitly defined columns below, the pipeline supports
     dynamically generated features. You can request these in your model config:
 
     * `power_lag_{hours}h`: The power value shifted by X hours (e.g., `power_lag_24h`).
     * `temperature_2m_rolling_mean_{hours}h`: Rolling average of temperature over X hours (e.g.,
       `temperature_2m_rolling_mean_6h`).
 
-    Note: Dynamic features are not explicitly typed as Patito fields below.
-    This is intentional to allow infinite parameterization (e.g., any lag hour)
-    without the overhead of metaprogramming or defining hundreds of static fields.
-    The pipeline dynamically asserts their presence during feature engineering.
+    Note: Dynamic features are not explicitly typed as Patito fields below. This is intentional
+    to allow infinite parameterization (e.g., any lag hour) without the overhead of
+    metaprogramming or defining hundreds of static fields. The pipeline dynamically asserts their
+    presence during feature engineering.
     """
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
@@ -425,11 +424,12 @@ class Metrics(pt.Model):
         <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/>.
 
         Unlike `PowerForecast`, four `PRIMARY_KEY` columns (`experiment_name`,
-        `evaluation_scope`, `window_start`, `window_end`) are `allow_missing`: `compute_metrics()`
-        validates its output before the `metrics` Dagster asset's `enrich_metrics_rows()` adds
-        them. The uniqueness check below is skipped, not run against a partial key, whenever any
-        of those columns is absent — the check that matters runs inside `enrich_metrics_rows()`,
-        on the fully-enriched frame that is actually written to `forecast_metrics`.
+        `evaluation_scope`, `window_start`, `window_end`) are `allow_missing`:
+        `compute_metrics()` validates its output before the `metrics` Dagster asset's
+        `enrich_metrics_rows()` adds them. The uniqueness check below is skipped, not run against
+        a partial key, whenever any of those columns is absent — the check that matters runs
+        inside `enrich_metrics_rows()`, on the fully-enriched frame that is actually written to
+        `forecast_metrics`.
         """
         validated_df = super().validate(
             dataframe=dataframe,

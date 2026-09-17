@@ -106,8 +106,8 @@ def _raise_if_outside_plausible_range(
 ) -> None:
     """Raise ``ValueError`` if ``earliest`` or ``latest`` falls outside the plausible range.
 
-    ``earliest`` and ``latest`` are the column's min and max; both are ``None`` when the column is
-    empty or entirely null, in which case there is nothing to reject.
+    ``earliest`` and ``latest`` are the column's min and max; both are ``None`` when the column
+    is empty or entirely null, in which case there is nothing to reject.
     """
     if earliest is not None and earliest < MIN_PLAUSIBLE_DATETIME:
         raise ValueError(
@@ -151,8 +151,8 @@ representations (Representations 2 and 3) when those land in v0.5.
 def quantile_label(quantile: float) -> str:
     """Return the canonical ``p{level}`` label for a quantile, e.g. ``0.05`` → ``"p5"``.
 
-    The label format matches the percentile column names agreed with NGED for the delivery
-    tables (see ``DELIVERY_QUANTILES``).
+    The label format matches the percentile column names agreed with NGED for the delivery tables
+    (see ``DELIVERY_QUANTILES``).
     """
     return f"p{round(quantile * 100)}"
 
@@ -173,8 +173,8 @@ def _get_time_series_id_dtype(**kwargs: Any) -> Any:
 def validate_schema(model: type[pt.Model], df: pl.DataFrame | pl.LazyFrame) -> None:
     """Validate a Polars DataFrame's or LazyFrame's schema against a Patito model.
 
-    Raises `DataFrameValidationError` on failure. On LazyFrames this materializes no data; it just
-    calls `collect_schema()`.
+    Raises `DataFrameValidationError` on failure. On LazyFrames this materializes no data; it
+    just calls `collect_schema()`.
     """
     # Get actual schema
     actual_schema = dict(df.collect_schema()) if isinstance(df, pl.LazyFrame) else dict(df.schema)

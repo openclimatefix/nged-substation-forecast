@@ -6,8 +6,8 @@ Rounding each value to a small number of significand bits zeroes those low bits,
 general-purpose codec has repetition to find, at the cost of a strictly bounded *relative* error.
 Which codec then wins is table-dependent and measured per table: ``delta_store.power_forecasts``
 adds a ``BYTE_STREAM_SPLIT`` encoding on top of zstd (see it for measured numbers), while
-``delta_store.nwp`` measured ``BYTE_STREAM_SPLIT`` as *worse* on NWP data and uses zstd alone. The
-rounding is what both have in common.
+``delta_store.nwp`` measured ``BYTE_STREAM_SPLIT`` as *worse* on NWP data and uses zstd alone.
+The rounding is what both have in common.
 
 The rounding here is pure Polars arithmetic (no bit-twiddling, no numpy round-trip), which works
 because of a classical floating-point identity — Veltkamp splitting — documented in detail on

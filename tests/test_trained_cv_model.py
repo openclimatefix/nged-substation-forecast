@@ -81,13 +81,13 @@ def _write_nwp(path: str) -> None:
     Each (cell, valid_time) carries all of ``_NWP_ENSEMBLE_MEMBERS`` so tests can assert that
     training narrows NWP to the control member while prediction would keep every member.
 
-    Three (cell, day) combinations, so each of ``load_engineering_inputs``'s scan predicates is the
-    *only* thing that can remove one of them:
+    Three (cell, day) combinations, so each of ``load_engineering_inputs``'s scan predicates is
+    the *only* thing that can remove one of them:
 
     - ts1's cell, in-window — the rows every test expects to survive.
     - ts2's cell, in-window on the same ``init_time`` and ``valid_time``s as ts1's. Only the
-      ``h3_index`` predicate can drop these, so a test that requests ts1 alone and still sees ts2's
-      cell has caught the cell prune going missing.
+      ``h3_index`` predicate can drop these, so a test that requests ts1 alone and still sees
+      ts2's cell has caught the cell prune going missing.
     - ts1's cell again, initialised at ``_EARLY_INIT_TIME`` — before the training window — and
       forecasting into its first day. Only the ``MAX_NWP_LEAD`` lookback keeps these, so their
       absence means the lookback has gone.
@@ -113,8 +113,8 @@ def _write_metadata(path: Path) -> None:
 def _write_eligible(path: str, time_series_ids: tuple[int, ...] = (1, 2)) -> None:
     """Write the fold's eligible population, replacing any existing table (default: ts1 and ts2).
 
-    The asset must still train only the in-window ts1. ``time_series_ids`` is a parameter, and the
-    write replaces the table, so a test can shrink or grow the eligible set between
+    The asset must still train only the in-window ts1. ``time_series_ids`` is a parameter, and
+    the write replaces the table, so a test can shrink or grow the eligible set between
     materialisations of the same fold.
     """
     eligible = EligibleTimeSeries.validate(
@@ -154,8 +154,8 @@ def env(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
 def test_load_engineering_inputs_filters_ensemble_members(env: None) -> None:
     """``ensemble_members`` narrows NWP at the scan; ``None`` keeps every member.
 
-    This is the lever that keeps training (control member only) from fanning every forecast row out
-    across all ~51 members against the same power target — the source of the training OOM.
+    This is the lever that keeps training (control member only) from fanning every forecast row
+    out across all ~51 members against the same power target — the source of the training OOM.
     """
     settings = Settings()
     train_start = datetime(2024, 4, 1, tzinfo=UTC)
@@ -278,8 +278,8 @@ def test_load_engineering_inputs_power_lookback_widens_only_the_power_scan(env: 
 def test_power_lag_near_window_start_is_non_null_with_lookback(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """A power lag near a fold's start is null without ``power_lookback`` and a real value with
-    it, exercised end-to-end through the public ``TabularFeatureEngineer`` entry point.
+    """A power lag near a fold's start is null without ``power_lookback`` and a real value with it,
+    exercised end-to-end through the public ``TabularFeatureEngineer`` entry point.
 
     Uses ``_EARLY_INIT_TIME`` (an NWP run initialised before the training window) so the target
     row's lead time stays under the 336h lag length even with the lookback applied — a lag that
@@ -376,12 +376,12 @@ def test_trained_cv_model_derives_power_lookback_from_selected_features(
     """``trained_cv_model`` derives ``power_lookback`` from the experiment's own
     ``selected_features`` and passes it through to ``load_engineering_inputs``.
 
-    The two tests above prove ``load_engineering_inputs`` and
-    ``ParsedFeatures.max_power_lag()`` are each correct in isolation; this proves the asset's own
-    wiring — computing ``power_lookback`` and passing it to the loader — is correct too. The
-    shared ``register_experiment`` fixture defaults to a ``selected_features`` set with no power
-    lag, so every other test in this module cannot catch a hardcoded ``power_lookback=timedelta(0)``
-    or a derivation from the wrong config field; this test passes ``power_lag_24h`` explicitly to
+    The two tests above prove ``load_engineering_inputs`` and ``ParsedFeatures.max_power_lag()``
+    are each correct in isolation; this proves the asset's own wiring — computing
+    ``power_lookback`` and passing it to the loader — is correct too. The shared
+    ``register_experiment`` fixture defaults to a ``selected_features`` set with no power lag, so
+    every other test in this module cannot catch a hardcoded ``power_lookback=timedelta(0)`` or a
+    derivation from the wrong config field; this test passes ``power_lag_24h`` explicitly to
     exercise that derivation.
     """
     register_experiment(dagster_instance, EXPERIMENT_NAME, ["temperature_2m", "power_lag_24h"])

@@ -2,8 +2,8 @@
 
 Both marimo apps (``map_and_timeseries.py``, ``view_forecasts.py``) show a "Data source" radio
 and re-instantiate `contracts.settings.Settings` from the selected source via
-`settings_for_source`, so production S3 data can be viewed without restarting marimo.
-See the dashboard README for how to set up ``packages/dashboard/.env.s3``.
+`settings_for_source`, so production S3 data can be viewed without restarting marimo. See the
+dashboard README for how to set up ``packages/dashboard/.env.s3``.
 """
 
 from pathlib import Path
@@ -24,16 +24,16 @@ DASHBOARD_S3_ENV: Final[Path] = PROJECT_ROOT / "packages" / "dashboard" / ".env.
 def settings_for_source(source: DataSourceType) -> Settings:
     """Instantiate Settings for the dashboard's selected data source.
 
-    "local" reads only the root .env (the local pipeline, same as the rest of the app).
-    "s3" layers packages/dashboard/.env.s3 on top of the root .env, overriding the
-    data-path roots and object-store credentials to point at the real S3 buckets, so
-    production data can be viewed without restarting marimo.
+    "local" reads only the root .env (the local pipeline, same as the rest of the app). "s3"
+    layers packages/dashboard/.env.s3 on top of the root .env, overriding the data-path roots and
+    object-store credentials to point at the real S3 buckets, so production data can be viewed
+    without restarting marimo.
 
-    Only the data tables follow the toggle: .env.s3 sets DATA_PATH_INTERNAL,
-    DATA_PATH_DELIVERY and the DATA_STORE_* credentials. It deliberately does not set
-    LOCAL_ARTIFACTS_PATH, so the production model stays laptop-local in both modes. A
-    missing .env.s3 is silently skipped by pydantic-settings, so "s3" then falls back to
-    the root .env's local paths (see `source_status_message`).
+    Only the data tables follow the toggle: .env.s3 sets DATA_PATH_INTERNAL, DATA_PATH_DELIVERY
+    and the DATA_STORE_* credentials. It deliberately does not set LOCAL_ARTIFACTS_PATH, so the
+    production model stays laptop-local in both modes. A missing .env.s3 is silently skipped by
+    pydantic-settings, so "s3" then falls back to the root .env's local paths (see
+    `source_status_message`).
     """
     if source == "s3":
         # _env_file is a pydantic-settings builtin kwarg; the list layers .env.s3 over the
@@ -46,8 +46,8 @@ def source_status_message(source: DataSourceType, settings: Settings) -> tuple[s
     """Build the status line shown under the "Data source" radio.
 
     Returns ``(markdown_message, is_warning)``. The warning case is a selected "s3" source with
-    no ``.env.s3`` file to read credentials from, in which case the app silently fell back to
-    the root .env's local paths and the user should be told.
+    no ``.env.s3`` file to read credentials from, in which case the app silently fell back to the
+    root .env's local paths and the user should be told.
     """
     if source == "s3" and not DASHBOARD_S3_ENV.exists():
         return (
