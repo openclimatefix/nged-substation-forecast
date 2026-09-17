@@ -121,7 +121,7 @@ class CvConfig(BaseModel):
 
     @property
     def fold_ids(self) -> list[str]:
-        """The fold ids in declaration order (e.g. ``["2022", "2023", ...]``).
+        """The fold ids in declaration order (e.g. ``["mid_2025_to_mid_2026", "smoke_test"]``).
 
         Used to build the ``cv_experiment_folds`` partitions and to expand experiment
         registration into per-fold partition keys — always read from config, never hard-coded.
@@ -141,7 +141,7 @@ class CvConfig(BaseModel):
         """Return the fold with the given ``fold_id``.
 
         Args:
-            fold_id: The fold identifier to look up (e.g. ``"2022"``).
+            fold_id: The fold identifier to look up (e.g. ``"mid_2025_to_mid_2026"``).
 
         Returns:
             The ``CvFoldConfig`` whose ``fold_id`` matches, carrying that fold's train and

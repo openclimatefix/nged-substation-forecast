@@ -1,7 +1,9 @@
 """Shared building blocks for the Patito schemas.
 
-The canonical UTC dtype, the plausible-datetime bounds and the checks that enforce them, and the
-delivery quantile levels.
+The canonical UTC dtype, the plausible-datetime bounds and the checks that enforce them, the
+delivery quantile levels and their ``p{level}`` labels, the shared ``time_series_id`` field
+factory, and ``validate_schema`` for checking a frame's columns and dtypes against a model without
+materialising it.
 """
 
 from datetime import UTC, datetime

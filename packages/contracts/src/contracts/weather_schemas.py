@@ -85,8 +85,11 @@ class NwpVariableWhollyMissing(ValueError):
     A distinct exception type rather than a bare `ValueError` because the `ecmwf_ens` asset
     retries it. An upstream publication still in progress can present this way — a variable's
     chunks read as fill-value null until the worker writing them commits — so waiting is a better
-    first response than failing the partition. Note the limit of that: it only reaches this check
-    when the unwritten variables are the de-accumulated ones. The nine instantaneous variables
+    first response than failing the partition.
+
+    The retry covers only the de-accumulated variables: an incomplete publication reaches this
+    check only when the variables still unwritten are the de-accumulated ones. The nine
+    instantaneous variables
     are non-nullable, so a frame missing one of those is rejected by base Patito validation
     first, with no retry — as is an all-null `categorical_precipitation_type_surface`, which is
     nullable but carries its own historical invariant. See
@@ -101,9 +104,10 @@ class Nwp(pt.Model):
     ensemble_member, h3_index).
 
     Stored on disk as plain Float32, rounded to a significand-bit budget by
-    `delta_store.nwp.write_nwp` — see
-    <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/> for the
-    physical format and measured numbers.
+    `delta_store.nwp.write_nwp` — see the `delta_store.nwp` module docstring for the physical
+    format, and
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/> for the
+    measured table size and row counts.
 
     `validate` is the fatal ingest gate; `assess_nwp_quality` reports the tolerated nulls in the
     de-accumulated variables (the known upstream ECMWF ENS corruption) and
@@ -303,6 +307,8 @@ class Nwp(pt.Model):
         description=(
             "This field is always null for init_times on and before 2024-11-12, and populated from"
             " the 2024-11-13 00Z run onwards (confirmed by direct inspection of the source data)."
+            " ECMWF's NaNs are converted to nulls at the ingest boundary, so the check tests for"
+            " null rather than for NaN, and an Int16 column could not carry a NaN in any case."
             " Derived from ECMWF's `ptype` field. See https://codes.ecmwf.int/grib/param-db/260015"
             " 0=No precipitation; 1=Rain; 2=Thunderstorm; 3=Freezing rain; 4=Mixed/ice;"
             " 5=Snow; 6=Wet snow; 7=Mixture of rain and snow; 8=Ice pellets; 9=Graupel;"
@@ -533,8 +539,9 @@ def _deaccumulated_null_breakdown(dataframe: pl.DataFrame) -> pl.DataFrame:
     check and the non-fatal `assess_nwp_quality`, so both agree on what a "null" is, and so the
     fatal case is exactly the extreme of what the warning reports. ``init_time`` is in the group
     key so the counts stay correct even on a multi-run frame (each grid cell is one row, so
-    ``n_total`` is the slice's cell count). Operates on a single NWP run in practice (~1M rows),
-    far below Polars' 2**32 row-count ceiling, so the counts are exact.
+    ``n_total`` is the slice's cell count). Operates on a single NWP run in practice (at V1 scale
+    1671 H3 cells x 51 ensemble members x 85 native steps, about 7.24M rows), far below Polars'
+    2**32 row-count ceiling, so the counts are exact.
     """
     deaccumulated = sorted(Nwp.deaccumulated_var_names)
     beyond_lead0 = dataframe.filter(pl.col("valid_time") > pl.col("init_time"))
@@ -785,8 +792,8 @@ def assess_nwp_run_completeness(
     guarantees, and the sole production caller validates before calling.
 
     Row counting is safe here despite Polars' 32-bit row index: this runs on a single in-memory run
-    (at V1 scale 1671 cells x 51 members x 85 steps ~ 7.24M rows), four orders of magnitude below
-    the 2**32 ceiling that the whole ~5.9B-row NWP Delta table would hit.
+    (at V1 scale 1671 cells x 51 members x 85 steps ~ 7.24M rows), nearly three orders of magnitude
+    below the 2**32 ceiling that the whole ~5.9B-row NWP Delta table would hit.
 
     Args:
         dataframe: One whole ingested NWP run, already through `Nwp.validate`.

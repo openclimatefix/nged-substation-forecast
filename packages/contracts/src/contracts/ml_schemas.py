@@ -147,7 +147,8 @@ HORIZON_SLICES: Final[tuple[str, ...]] = (
     "short_medium_range",
     "extended_range",
 )
-"""Horizon slice labels matching the four forecast ranges from the project report.
+"""Horizon slice labels: the four forecast ranges from the project report, plus `"all"` for the
+aggregate across every horizon.
 
 Bands are left-closed intervals of lead time (`valid_time − power_fcst_init_time`), as
 implemented by `ml_core.metrics`:
@@ -260,12 +261,12 @@ class Metrics(pt.Model):
 
     | time_series_id | fold_id | horizon_slice | metric_name       | metric_param | metric_value |
     |----------------|---------|---------------|-------------------|--------------|--------------|
-    | 1              | 1       | all           | mae               | all          | 5.2          |
-    | 1              | 1       | day_ahead     | rmse              | all          | 7.1          |
-    | 1              | 1       | day_ahead     | pinball_loss      | p10          | 2.1          |
-    | 1              | 1       | day_ahead     | pinball_loss      | p50          | 3.4          |
-    | 1              | 1       | day_ahead     | mean_pinball_loss | all          | 2.4          |
-    | 1              | 1       | day_ahead     | picp              | p10_p90      | 0.78         |
+    | 1              | live    | all           | mae               | all          | 5.2          |
+    | 1              | live    | day_ahead     | rmse              | all          | 7.1          |
+    | 1              | live    | day_ahead     | pinball_loss      | p10          | 2.1          |
+    | 1              | live    | day_ahead     | pinball_loss      | p50          | 3.4          |
+    | 1              | live    | day_ahead     | mean_pinball_loss | all          | 2.4          |
+    | 1              | live    | day_ahead     | picp              | p10_p90      | 0.78         |
 
     Primary key: `(time_series_id, power_fcst_model_name, experiment_name, fold_id,
     evaluation_scope, horizon_slice, metric_name, metric_param, window_start, window_end)`. At
@@ -288,8 +289,8 @@ class Metrics(pt.Model):
     fold_id: str = pt.Field(
         dtype=pl.String,
         description=(
-            "CV fold year (e.g. '2022'), or 'live' for production forecasts. Matches "
-            "PowerForecast.fold_id."
+            "The CV fold's label from conf/cv/default.yaml (e.g. 'mid_2025_to_mid_2026'), or "
+            "'live' for production forecasts. Matches PowerForecast.fold_id."
         ),
     )
 
@@ -326,10 +327,12 @@ class Metrics(pt.Model):
             "one-off metrics coexist in one table and stay separable."
         ),
     )
-    """The columns from `evaluation_scope` and below are populated by the ``metrics`` Dagster asset.
-    They are ``allow_missing`` so that the pure ``compute_metrics()`` helper can emit the core
-    metric rows and have the asset enrich them with scope/window provenance before the frame is
-    written to the ``forecast_metrics`` Delta table."""
+    """`evaluation_scope` and the columns below it, `time_series_type` excepted, are populated by
+    the ``metrics`` Dagster asset through ``enrich_metrics_rows()``. They are ``allow_missing`` so
+    that the pure ``compute_metrics()`` helper can emit the core metric rows and have the asset
+    enrich them with scope/window provenance before the frame is written to the
+    ``forecast_metrics`` Delta table. ``compute_metrics()`` populates `time_series_type` itself, by
+    joining it on from the metadata."""
 
     time_series_type: str = pt.Field(
         dtype=pl.Enum(TIME_SERIES_TYPE_SLICES),
@@ -459,7 +462,9 @@ class EligibleTimeSeries(pt.Model):
     """The canonical per-fold population of eligible ``time_series_id``s.
 
     Written by the ``eligible_time_series`` Dagster asset (one Delta partition per ``fold_id``)
-    and read by ``trained_cv_model`` and ``cv_power_forecasts``. Eligibility is a function of
+    and read by ``trained_cv_model``. ``cv_power_forecasts`` does not read this table; it inherits
+    the same population through the trained model's ``trained_time_series_ids``. Eligibility is a
+    function of
     data coverage and the fold dates **only** — never the model or experiment config — so every
     experiment trains and scores a fold on the identical population, which is what makes
     leaderboard comparisons apples-to-apples.

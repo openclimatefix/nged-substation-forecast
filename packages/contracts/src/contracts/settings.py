@@ -53,7 +53,16 @@ and the caveat for wheels installed outside a workspace checkout.
 
 
 class Settings(BaseSettings):
-    """Configuration settings for the NGED substation forecast project."""
+    """Every data path, object-store credential and Sentry setting the pipeline reads.
+
+    Each field takes its value from an environment variable of the same name, from the workspace
+    ``.env``, or from the default declared here, in that order of precedence. The managed
+    data-table paths default to ``""``, a sentinel meaning "derive me": a path left unset is filled
+    in from ``data_path_internal``, ``data_path_delivery`` or ``local_artifacts_path`` after
+    validation, so a caller always reads a concrete path, while a path set explicitly keeps the
+    value it was given. Build one through ``get_settings()`` rather than by calling ``Settings()``
+    directly.
+    """
 
     mlflow_tracking_uri: str = Field(
         default="sqlite:///mlflow.db",
@@ -261,8 +270,9 @@ class Settings(BaseSettings):
         description=(
             "Delta table of the canonical per-fold eligible time_series_id population, written"
             " by the eligible_time_series asset (partitioned by fold_id) and read by"
-            " trained_cv_model and cv_power_forecasts so every experiment scores a fold on the"
-            " identical, experiment-independent population."
+            " trained_cv_model, so every experiment trains a fold on the identical,"
+            " experiment-independent population. cv_power_forecasts inherits that same population"
+            " from the trained model's trained_time_series_ids rather than reading this table."
         ),
     )
     effective_capacity_data_path: str = Field(
@@ -348,9 +358,10 @@ class Settings(BaseSettings):
         # NGED-facing delivery tables derive from data_path_delivery instead, so a new delivery
         # table can't silently land in the internal bucket by inheriting the default derivation.
         # `power_forecast` and `effective_capacity` are two of the five tables in NGED's stable
-        # delivery contract; see
-        # <https://openclimatefix.github.io/nged-substation-forecast/architecture/forecast-delivery/#securing-it>
-        # for the rest and why they live in a separate bucket.
+        # delivery contract. The other three, and what each one holds, are listed at
+        # <https://openclimatefix.github.io/nged-substation-forecast/roadmap/delivery-tables/>; why
+        # the delivery tables live in a bucket of their own is at
+        # <https://openclimatefix.github.io/nged-substation-forecast/architecture/forecast-delivery/#securing-it>.
         self.power_forecasts_data_path = self.power_forecasts_data_path or uri_join(
             self.data_path_delivery, "power_forecasts"
         )

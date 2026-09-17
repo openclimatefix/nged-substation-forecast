@@ -1,4 +1,9 @@
-"""Data schemas for the NGED substation forecast project."""
+"""Contracts for NGED's power telemetry and for the forecasts we make from it.
+
+The half-hourly ``PowerTimeSeries`` observations as they arrive from NGED, the
+``TimeSeriesMetadata`` roster describing each series, the ``PowerForecast`` schema every model
+emits, and the ``EffectiveCapacity`` estimate the metrics pipeline divides by.
+"""
 
 from collections.abc import Sequence
 from datetime import datetime
@@ -107,13 +112,16 @@ class PowerTimeSeries(pt.Model):
         stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/)
         an ingestion boundary should degrade the batch rather than abort it entirely.
 
-        This exists alongside ``validate``, which stays strict and raises on the same two rules:
-        ``validate`` is also used as a hard assertion in tests and R&D code, where a
-        raise-on-violation contract must not silently change. Call this method BEFORE
-        ``validate``, and only at a boundary that receives data from outside our system (e.g.
-        NGED's raw JSON feed) — the uniqueness and sortedness checks in ``validate`` are NOT
-        relaxed here, because those indicate a bug in OUR pipeline, not malformed external data,
-        and should keep raising.
+        This exists alongside ``validate``, which stays strict. ``validate`` raises on two of the
+        three conditions above — a ``time`` outside the plausible range, and a ``time`` that is not
+        on the top or bottom of the hour; a null ``time`` is rejected earlier still, by the
+        non-nullable field. ``validate`` is also used as a hard assertion in tests and R&D code,
+        where a raise-on-violation contract must not silently change.
+
+        Call this method BEFORE ``validate``, and only at a boundary that receives data from
+        outside our system (e.g. NGED's raw JSON feed). The uniqueness and sortedness checks in
+        ``validate`` are NOT relaxed here, because those indicate a bug in OUR pipeline rather than
+        malformed external data, and should keep raising.
 
         Args:
             dataframe: An already-cast frame with a ``time`` column; need not yet be validated.
@@ -497,8 +505,9 @@ class EffectiveCapacity(pt.Model):
             "For generators: absorbs PV panel degradation, partial inverter trips, etc., "
             "but ignores ANM curtailment — a wind farm ANM-capped at 5 MW with 10 MW physical "
             "capability has effective_capacity_mw = 10. "
-            "For substations: the 99th percentile of observed load over a rolling time window, "
-            "under normal running arrangement only. 'Switched' power (Table 5) should be "
+            "For substations: the 99th percentile of observed absolute power flow, under normal "
+            "running arrangement only. In v0.1 that percentile is taken over the full observed "
+            "history, giving one static scalar per series. 'Switched' power (Table 5) should be "
             "added or subtracted when a switching event is in effect."
         ),
     )

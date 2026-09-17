@@ -7,19 +7,28 @@ It also owns the thin configuration layer that sits beside those schemas: the CV
 the `class_target`/`import_class` pair that turns a class into a `_target_` string and back. Both
 are model-agnostic and need nothing heavier than pydantic and PyYAML.
 
-## Dependency Isolation
+Two further modules sit here for the same reason — every package needs them, and none of them is
+ML-specific. `contracts.settings` holds `Settings`, the single source of every data path and
+object-store credential the pipeline reads, resolved from the environment and the workspace `.env`
+and reached through the cached `get_settings()`. `contracts.uri` holds the local-or-remote path
+helpers those settings fields need, because a data-location field may be a local path or an
+`s3://` URI, and `pathlib` mangles a URI.
 
-This package is designed to be extremely lightweight. It defines the *shape* of the data using
-Patito and Polars, but it does **not** contain any ML-specific logic or heavy dependencies like
-MLflow. This ensures that any component in the system (e.g., a data ingestion script or a dashboard)
-can import these schemas without bringing in the entire ML stack.
+## Light enough for any component to import
 
-## Key Data Contracts
+This package is designed to be lightweight. It defines the *shape* of the data using Patito and
+Polars, plus the settings and object-store path helpers those shapes are read and written through
+(`deltalake` and `obstore`), but it contains **no** ML-specific logic and no ML dependency such as
+MLflow, XGBoost or Dagster. This ensures that any component in the system (e.g., a data
+ingestion script or a dashboard) can import these schemas without bringing in the entire ML stack.
+
+## Key data contracts
 
 - **`PowerTimeSeries`**: Half-hourly power observations (MW or MVA) per `time_series_id`, as
   received from NGED.
-- **`TimeSeriesMetadata`**: Substation and customer meter metadata, including lat/lon, H3 index, and
-  asset type (primary substation, GSP, BSP, solar PV, wind, BESS, etc.).
+- **`TimeSeriesMetadata`**: Substation and customer meter metadata, including lat/lon, H3 index,
+  `substation_type` (Primary, BSP, GSP, EHV Customer, or HV Customer), and `time_series_type` (PV,
+  Wind, BESS, Disaggregated Demand, and 18 others).
 - **`Nwp`**: ECMWF ENS NWP weather data in physical units (`Float32`), on disk and in memory alike.
   The on-disk copy is rounded to a 13-bit significand and laid out for compression and row-group
   pruning by `delta_store.nwp`.
@@ -48,7 +57,7 @@ behavioural cases:
 
 <!-- sign-convention:end -->
 
-## Design Principles
+## Design principles
 
 - **The contract is the authoritative account of what the data means.** It says what the data
   *should* be, not what some current code path happens to produce. So when code and contract
@@ -70,8 +79,8 @@ behavioural cases:
   lives in each model's `validate` override via `check_datetime_bounds`, because Patito silently
   ignores `ge`/`le` on a datetime field — it derives its bounds checks from the JSON schema's
   `minimum`/`maximum`, which JSON Schema defines for numbers only. Columns on our own *output*
-  schemas (`PowerForecast`, `EffectiveCapacity`, `AllFeatures`) have not opted in: they are computed
-  from already-bounded inputs rather than received from outside.
+  schemas (`PowerForecast`, `EffectiveCapacity`, `AllFeatures`, `Metrics`) have not opted in:
+  they are computed from already-bounded inputs rather than received from outside.
 - **Degrade, don't abort, at an ingestion boundary**: `validate()` stays strict everywhere — it is
   also used as a hard assertion in tests and R&D code, where a raise-on-violation contract must not
   silently change. But a single malformed row from an external feed should not abort ingestion of
@@ -82,4 +91,4 @@ behavioural cases:
   relaxed, because those indicate a bug in our own pipeline rather than malformed external data.
 - **No lookahead bias**: `AllFeatures` carries `power_fcst_init_time` (when we make the forecast) as
   a distinct field from `nwp_init_time` (when the NWP model ran). Power lag features are nullified
-  by `nullify_leaky_lags()` when the lag is shorter than or equal to the forecast lead time.
+  by `_nullify_leaky_lags()` when the lag is shorter than or equal to the forecast lead time.

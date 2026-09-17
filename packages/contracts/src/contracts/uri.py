@@ -2,7 +2,8 @@
 
 Settings data-location fields are plain ``str`` so they can hold either a local path
 (``/home/.../data/NWP``) or a remote URI (``s3://bucket/NWP``). ``pathlib.Path`` mangles a
-remote URI (``Path("s3://b/a") / "c"`` drops the scheme), so joins route through here.
+remote URI (``Path("s3://b/a") / "c"`` collapses the double slash after the scheme and yields
+``"s3:/b/a/c"``), so joins route through here.
 
 The existence/parent helpers below give the asset IO layer a single local-or-remote-aware call
 for the two things it does around every Delta/parquet write: make sure the parent directory
@@ -78,8 +79,9 @@ def delta_table_exists(uri: str, storage_options: ObjectStoreOptions | None = No
 
     Wraps ``DeltaTable.is_deltatable``, which inspects the ``_delta_log`` through delta-rs'
     object_store and so works identically for a local path and an ``s3://`` URI given the
-    matching ``storage_options``. Replaces ``Path(uri).exists()`` at the write-guard sites, which
-    would raise on a remote URI.
+    matching ``storage_options``. Replaces ``Path(uri).exists()`` at the write-guard sites, where
+    ``pathlib`` reads ``s3://bucket/key`` as a relative local path that happens not to exist and
+    so returns ``False`` without raising — leaving the guard to conclude the table is absent.
     """
     return DeltaTable.is_deltatable(uri, storage_options=typeddict_to_dict(storage_options) or {})
 
