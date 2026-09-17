@@ -55,6 +55,9 @@ from collections.abc import Sequence
 from pathlib import Path
 from typing import Final, Literal, TypedDict
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
+from scripts.markdown_wrap import WIDTH, _is_unwrappable, _tokenise, _wrap
+
 REFLOW: Final[Path] = Path("scripts/reflow_python_prose.py")
 """The repo's own Python prose re-wrapper, re-run over every file this script edits."""
 
@@ -63,6 +66,17 @@ LINK: Final[re.Pattern[str]] = re.compile(r"\[([^\]]*)\]\([^)]*\)", re.DOTALL)
 
 BLANK_LINE: Final[re.Pattern[str]] = re.compile(r"\n[ \t]*#?[ \t]*\n")
 """A paragraph break inside a docstring or a comment block, which no splice may cross."""
+
+NOT_PROSE: Final[re.Pattern[str]] = re.compile(r"#|  ")
+"""A `#` or an interior run of two or more spaces in a comment's text — not plain prose.
+
+Both mean the line is carrying something a re-wrap would destroy, and `reflow_python_prose.py`
+declines the same two for the same reason. A `#` after the marker is a second, embedded
+directive: `storage.py`'s sample-key comment ends `# noqa: E501`, and wrapping the line moves
+that directive off the line it was suppressing, so the suppression stops applying. An interior
+double space is hand alignment — that same comment's arrow diagram points at three substrings of
+a sample key, and collapsing the padding to single spaces makes the arrows point at nothing.
+"""
 
 MissType = Literal["no match", "ambiguous"]
 """Why a quote could not be located in exactly one place."""
@@ -129,6 +143,7 @@ def prose_units(source: str) -> list[_Unit]:
 
     run: tuple[int, int] | None = None
     run_indent = -1
+    run_line = -2
     for token in tokenize.generate_tokens(io.StringIO(source).readline):
         if token.type != tokenize.COMMENT:
             continue
@@ -137,14 +152,24 @@ def prose_units(source: str) -> list[_Unit]:
         start = line_start + token.start[1] + len(token.string) - len(token.string.lstrip("#"))
         end = line_start + token.end[1]
         whole_line = before.strip() == ""
-        if whole_line and run is not None and token.start[1] == run_indent:
+        # A run continues only onto the very next line at the same indent. Without the line test,
+        # two comment blocks separated by a docstring or by code merge into one span, and a quote
+        # can then match the code between them.
+        continues_run = (
+            whole_line
+            and run is not None
+            and token.start[1] == run_indent
+            and token.start[0] == run_line + 1
+        )
+        if continues_run and run is not None:
             run = (run[0], end)
+            run_line = token.start[0]
             continue
         if run is not None:
             units.append({"start": run[0], "end": run[1], "is_comment": True})
             run = None
         if whole_line:
-            run, run_indent = (start, end), token.start[1]
+            run, run_indent, run_line = (start, end), token.start[1], token.start[0]
         else:
             units.append({"start": start, "end": end, "is_comment": True})
     if run is not None:
@@ -338,6 +363,118 @@ def apply_one(*, raw: str, finding: Finding, merge_base: str | None) -> tuple[st
     return raw[:raw_start] + middle + raw[raw_stop:], "applied"
 
 
+def wrappable_lines(source: str) -> set[int]:
+    """Return the zero-based index of every line of `source` that is prose end to end.
+
+    A line qualifies when re-wrapping it can move only prose: every line strictly inside a
+    docstring, and every whole-line `#` comment. The line carrying a docstring's opening quotes and
+    the line carrying its closing quotes are both excluded, because each carries something that is
+    not prose.
+
+    Testing an offset range instead gets both ends wrong, and both failures are silent. A
+    docstring's closing-quote line *starts* inside the span, so a range test accepts it and the
+    re-wrap then pulls the closing quotes up into the paragraph and the code below into the string.
+    A comment block's first line starts *before* its span, so a range test rejects it and no
+    comment block is ever wrapped.
+
+    Args:
+        source: The full text of a Python file.
+
+    Returns:
+        The zero-based indices of the lines a re-wrap may touch.
+    """
+    wrappable: set[int] = set()
+    for node in ast.walk(ast.parse(source)):
+        is_string = isinstance(node, ast.Expr) and isinstance(node.value, ast.Constant)
+        if not (is_string and isinstance(node.value.value, str)):
+            continue
+        if node.end_lineno is None:
+            continue
+        wrappable.update(range(node.lineno, node.end_lineno - 1))
+    for token in tokenize.generate_tokens(io.StringIO(source).readline):
+        if token.type == tokenize.COMMENT and token.line[: token.start[1]].strip() == "":
+            wrappable.add(token.start[0] - 1)
+    return wrappable
+
+
+def wrap_overlong(path: Path) -> int:
+    """Re-wrap every prose line left over `markdown_wrap.WIDTH` in `path`, and return how many.
+
+    `scripts/reflow_python_prose.py` hands each docstring to `markdown_wrap.reflow_text`, which
+    reads a Google-style ``Args:`` or ``Returns:`` body as an indented code block and therefore
+    never re-flows it. A splice landing in one of those sections leaves a single long line that no
+    other tool will wrap and that `ruff`'s `E501` then rejects. Wrapping runs forward from the long
+    line to the end of its paragraph, so the lines above the splice keep the wrapping they had.
+
+    A line whose overflow is one unbreakable token — a bare URL, which this repo writes in full —
+    is left alone, because `E501` does not flag it either.
+
+    Args:
+        path: The Python file to wrap.
+
+    Returns:
+        How many lines were re-wrapped.
+    """
+    source = path.read_text(encoding="utf-8")
+    lines = source.splitlines()
+    prose_lines = wrappable_lines(source)
+
+    def in_prose(index: int) -> bool:
+        return index in prose_lines
+
+    wrapped = 0
+    index = 0
+    while index < len(lines):
+        line = lines[index]
+        if len(line) <= WIDTH or not in_prose(index):
+            index += 1
+            continue
+        indent = line[: len(line) - len(line.lstrip())]
+        marker = "# " if line.lstrip().startswith("#") else ""
+        prefix = f"{indent}{marker}"
+        # `_is_unwrappable` has to see the text without its prefix. A docstring or a comment inside
+        # a function body is indented four spaces or more, which markdown reads as a code block, so
+        # testing the raw line marks every deeply-indented line unwrappable and nothing gets fixed.
+        if _is_unwrappable(line[len(prefix) :]):
+            index += 1
+            continue
+        if marker and NOT_PROSE.search(line[len(prefix) :]):
+            index += 1
+            continue
+        block = [line]
+        while index + len(block) < len(lines):
+            nxt_index = index + len(block)
+            nxt = lines[nxt_index]
+            # `in_prose` has to be re-tested on every line the paragraph grows onto. Testing only
+            # the first line lets the paragraph run off the end of a docstring, and the re-wrap
+            # then pulls the closing quotes up into the prose and the code below into the string.
+            if not nxt.strip() or not nxt.startswith(prefix):
+                break
+            if _is_unwrappable(nxt[len(prefix) :]):
+                break
+            if not in_prose(nxt_index):
+                break
+            block.append(nxt)
+        words = _tokenise(" ".join(item[len(prefix) :] for item in block))
+        # A paragraph carrying a bare URL is re-wrapped like any other: `_wrap` puts a word longer
+        # than the width on a line of its own, which is where this repo already writes its URLs,
+        # and `E501` does not flag a line whose overflow is one unbreakable token. Re-wrapping a
+        # paragraph that was already correct reproduces it exactly, so the count below tracks the
+        # paragraphs that really changed rather than the ones that were merely looked at.
+        rewrapped = _wrap(words, initial_indent=prefix, subsequent_indent=prefix)
+        if rewrapped != block:
+            wrapped += 1
+        lines[index : index + len(block)] = rewrapped
+        index += len(rewrapped)
+
+    rewritten = "\n".join(lines) + "\n"
+    # A re-wrap that welds the closing quotes into a paragraph leaves a file that still looks
+    # plausible and no longer parses, so the write is gated on the result parsing.
+    ast.parse(rewritten)
+    path.write_text(rewritten, encoding="utf-8")
+    return wrapped
+
+
 def reflow(paths: Sequence[Path]) -> None:
     """Re-wrap the prose of every path given, using the repo's own re-wrapper.
 
@@ -351,6 +488,10 @@ def reflow(paths: Sequence[Path]) -> None:
         check=True,
         env={"PYTHONPATH": "scripts"},
     )
+    for path in paths:
+        wrapped = wrap_overlong(path)
+        if wrapped:
+            print(f"{path}: wrapped {wrapped} over-long line(s) the reflow could not reach")
 
 
 def main() -> None:
