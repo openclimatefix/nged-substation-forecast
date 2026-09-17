@@ -8,7 +8,8 @@ kinds of text are in scope:
   way `lint_docstring_markdown.py` finds them. `mkdocstrings` renders these as markdown, so they
   reflow with `markdown_wrap.reflow_text`, the same engine that reflows a `.md` file.
 - **Prose comment blocks** — a run of two or more consecutive whole-line `#` comments at the same
-  indent, wrapped with the same greedy word-wrap `markdown_wrap._wrap` uses. A comment carrying a
+  indent, at least one of which runs past `WIDTH`, wrapped with the same greedy word-wrap
+  `markdown_wrap._wrap` uses. A comment carrying a
   linter directive (`noqa`, `type:`, `ty:`), a shebang, or a single trailing inline comment is left
   alone, since none of those is prose.
 
@@ -296,13 +297,26 @@ def _comment_blocks(source: str) -> list[tuple[int, int, int]]:
 
 
 def _reflow_comment_block(lines: list[str], indent: int) -> list[str] | None:
-    """Reflow one comment block's text, or `None` if any line in it is not prose.
+    """Reflow one comment block's text, or `None` if the block must be left as written.
 
     `lines` are the raw source lines (with their `#` marker and indent still attached) making up
     the block. Every line must carry a `#` followed by either nothing or exactly one space before
     its text, which is the convention `ruff format` already enforces on every comment in this
     repo.
+
+    A block whose every line already fits `WIDTH` is left alone, even though packing it greedily
+    would fit the same words onto fewer lines. This script hard-wraps prose that overflows;
+    repacking a block that does not overflow changes a layout the author chose — a note kept as
+    two short lines, an enumeration written one item per line — and nothing in a `#` comment
+    distinguishes a deliberate line break from a break the wrapper happened to put there.
+    `ruff`'s `E501` already keeps an ordinary comment inside `WIDTH`, and every comment line past
+    `WIDTH` in this repo is a bare URL, which `URL_ONLY_COMMENT` refuses anyway — so the
+    restriction skips no reflow this repo wants, and leaves the script ready for the first
+    comment that does overflow.
     """
+    if all(len(line.rstrip("\n")) <= WIDTH for line in lines):
+        return None
+
     texts: list[str] = []
     for line in lines:
         stripped = line.rstrip("\n")[indent:]

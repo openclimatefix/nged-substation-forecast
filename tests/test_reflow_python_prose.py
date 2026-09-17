@@ -69,18 +69,16 @@ def test_overlong_prose_comment_block_is_reflowed() -> None:
     assert "x = 1" in result
 
 
-def test_short_comment_block_is_repacked_onto_fewer_lines() -> None:
-    """Two short comment lines that fit on one are joined, because this is a reflow, not a fixer.
+def test_comment_block_inside_the_limit_is_left_alone() -> None:
+    """Two short comment lines stay on two lines, because neither of them overflows.
 
-    Worth pinning, because it is why fixing the leading-`#` bug rewrites comment blocks that were
-    never over the limit: the script packs each block greedily to `WIDTH` rather than only
-    breaking the lines that overflow.
+    The words would fit on one line, and a greedy repack would put them there. The script
+    deliberately does not: its job is wrapping prose that runs past `WIDTH`, and where nothing
+    runs past `WIDTH` the line break belongs to whoever wrote the comment.
     """
     source = "# A short comment line.\n# And a second short line under it.\nx = 1\n"
 
-    result = reflow_python_prose.reflow_python_prose(source)
-
-    assert result == "# A short comment line. And a second short line under it.\nx = 1\n"
+    assert reflow_python_prose.reflow_python_prose(source) == source
 
 
 def test_reflowing_is_idempotent() -> None:
