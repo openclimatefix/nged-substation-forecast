@@ -9,9 +9,9 @@ kinds of text are in scope:
   reflow with `markdown_wrap.reflow_text`, the same engine that reflows a `.md` file.
 - **Prose comment blocks** — a run of two or more consecutive whole-line `#` comments at the same
   indent, at least one of which runs past `WIDTH`, wrapped with the same greedy word-wrap
-  `markdown_wrap._wrap` uses. A comment carrying a
-  linter directive (`noqa`, `fmt: off`, `type:`), a shebang, a blockquote or doctest `>`, a banner
-  rule of dashes, or a single trailing inline comment is left alone, since none of those is prose.
+  `markdown_wrap._wrap` uses. A comment carrying a linter directive (`noqa`, `fmt: off`,
+  `type:`), a shebang, a blockquote or doctest `>`, a banner rule of dashes, or a single trailing
+  inline comment is left alone, since none of those is prose.
 
 Neither kind of text is touched by `ruff format`, which reformats code but leaves comments and
 string literals as the author wrote them (see the `E5` entry in `pyproject.toml`'s `select` list) —
@@ -52,11 +52,10 @@ DIRECTIVE_COMMENT: Final[re.Pattern[str]] = re.compile(
 
 Every tool that reads a directive reads it as a whole comment line, so merging the line below it
 into the directive switches the directive off silently. `# fmt: off` is the sharpest case: a
-repacked `# fmt: off This table is hand aligned...` stops `ruff format` recognising the marker,
-and the block the author was protecting is reformatted with nothing reported. `ruff:`, `pylint:`
-and the rest are listed because an editor, a reviewer or another repository's CI may run the tool
-that reads them over a file copied out of here, even though `pyproject.toml` configures none of
-them.
+repacked `# fmt: off This table is hand aligned...` stops `ruff format` recognising the marker, and
+the block the author was protecting is reformatted with nothing reported. `ruff:`, `pylint:` and
+the rest are listed because an editor, a reviewer or another repository's CI may run the tool that
+reads them over a file copied out of here, even though `pyproject.toml` configures none of them.
 """
 
 QUOTED_COMMENT: Final[re.Pattern[str]] = re.compile(r"^#\s*>")
@@ -64,11 +63,11 @@ QUOTED_COMMENT: Final[re.Pattern[str]] = re.compile(r"^#\s*>")
 
 `reflow_text` reads such a line as a blockquote and repeats the `>` marker on every line it wraps
 onto, while `_flatten` strips only the `#` marker, so each added `>` counts as a new word and the
-round-trip assertion in `reflow_python_prose` fires. That assertion aborts the whole run, after
-the files already processed have been written, and this script is run over a batch of files at a
-time. Stripping `>` in `_flatten` the way `markdown_wrap._flatten` does would silence the
-assertion and leave the block rewrapped — wrong for a doctest, whose line breaks are part of the
-example — so the block is refused instead.
+round-trip assertion in `reflow_python_prose` fires. That assertion aborts the whole run, after the
+files already processed have been written, and this script is run over a batch of files at a time.
+Stripping `>` in `_flatten` the way `markdown_wrap._flatten` does would silence the assertion and
+leave the block rewrapped — wrong for a doctest, whose line breaks are part of the example — so the
+block is refused instead.
 """
 
 BANNER_COMMENT: Final[re.Pattern[str]] = re.compile(r"^#\s*[-=*_~]{3,}\s*$")
@@ -280,10 +279,10 @@ def _reflow_docstrings_in(source: str, tree: ast.Module) -> str:
 def _is_prose_comment(text: str) -> bool:
     """Whether a standalone `#` comment line is prose, rather than a directive or non-prose line.
 
-    `text` still carries its own leading `#`, which `DIRECTIVE_COMMENT`/`URL_ONLY_COMMENT` need
-    anchored there. `NOT_PROSE` is checked against `text[1:]` instead, because it also matches a
-    bare `#` — searching the full `text` would match that leading marker on every single-`#`
-    comment line and always report `False`, which is exactly the bug this slice fixes.
+    `text` still carries its own leading `#`, which every pattern matched at the start of the
+    line needs anchored there. `NOT_PROSE` is checked against `text[1:]` instead, because
+    `NOT_PROSE` also matches a bare `#`: searching the whole of `text` matches the line's own
+    marker and reports every single-`#` comment line as non-prose.
     """
     if (
         DIRECTIVE_COMMENT.match(text)

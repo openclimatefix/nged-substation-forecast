@@ -1,16 +1,17 @@
-"""Tests for `scripts/lint/check_docs_links.py`'s sibling, `scripts/lint/reflow_python_prose.py`.
+"""Tests for `scripts/lint/reflow_python_prose.py`.
 
-The comment half of this script shipped broken and stayed broken silently. `_is_prose_comment` was
-handed each line with the line's own `#` still attached, and `NOT_PROSE` matches a bare `#`, so
-every comment line matched the "this is not prose" pattern on its own marker and
-`_reflow_comment_block` bailed for every block in the repository. Nothing failed, because the
-script's only safety net compares the words before and against the words after, and a block that
-was never touched trivially passes that comparison. `test_overlong_prose_comment_block_is_reflowed`
-is the regression: it fails on the version that shipped and passes on the fixed one.
+The comment half of this script shipped broken and stayed broken silently: `_is_prose_comment`
+was handed each line with the line's own `#` still attached, and `NOT_PROSE` matches a bare `#`,
+so every comment line matched the "this is not prose" pattern on its own marker and
+`_reflow_comment_block` bailed for every block in the repository.
+`test_overlong_prose_comment_block_is_reflowed` is the regression: it fails on the version that
+shipped and passes on the fixed one.
 
-The tests either side of it pin the lines that must *not* be reflowed, because the fix widens what
-the script is willing to rewrite and a too-eager version would destroy the hand-aligned comments
-`NOT_PROSE` was written to protect.
+Every other comment test pins a block the script must leave exactly as written — some refused by
+`_is_prose_comment`, some never collected as a block in the first place — because the fix widens
+what the script is willing to rewrite. Each of those fixtures carries a line past `WIDTH`, so
+what refuses the block is the block's own content rather than the width gate
+`_reflow_comment_block` applies before anything else.
 """
 
 import importlib.util
@@ -36,12 +37,15 @@ def _load_script() -> ModuleType:
     there itself.
     """
     sys.path.insert(0, str(SCRIPT_PATH.parent))
-    spec = importlib.util.spec_from_file_location("reflow_python_prose", SCRIPT_PATH)
-    assert spec is not None
-    assert spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    sys.modules[spec.name] = module
-    spec.loader.exec_module(module)
+    try:
+        spec = importlib.util.spec_from_file_location("reflow_python_prose", SCRIPT_PATH)
+        assert spec is not None
+        assert spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        sys.modules[spec.name] = module
+        spec.loader.exec_module(module)
+    finally:
+        sys.path.remove(str(SCRIPT_PATH.parent))
     return module
 
 
@@ -145,7 +149,10 @@ def test_directive_comment_at_the_start_of_a_line_is_not_reflowed() -> None:
 def test_url_only_comment_is_not_reflowed() -> None:
     """A comment holding nothing but a URL keeps its block whole, because a split URL is dead."""
     source = (
-        "# https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/\n"
+        # The `\n` is a separate piece so that `check_docs_links.py`, which reads this file as
+        # text, does not read the escape as part of the URL and report the page as missing.
+        "# https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/"
+        "\n"
         "# This second line is deliberately long enough that the block as a whole runs past the"
         " hundred character limit.\n"
     )
