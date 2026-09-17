@@ -68,7 +68,7 @@ def run(cwd: Path, *arguments: str) -> subprocess.CompletedProcess[str]:
 
     Args:
         cwd: The directory to run in.
-        arguments: The git sub-command and its arguments.
+        *arguments: The git sub-command and its arguments.
 
     Returns:
         The completed process, with its output captured as text.
