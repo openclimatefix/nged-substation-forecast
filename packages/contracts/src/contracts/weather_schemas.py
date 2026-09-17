@@ -87,12 +87,11 @@ class NwpVariableWhollyMissing(ValueError):
     chunks read as fill-value null until the worker writing them commits — so waiting is a better
     first response than failing the partition.
 
-    The retry covers only the de-accumulated variables: an incomplete publication reaches this
-    check only when the variables still unwritten are the de-accumulated ones. The nine
-    instantaneous variables
-    are non-nullable, so a frame missing one of those is rejected by base Patito validation
-    first, with no retry — as is an all-null `categorical_precipitation_type_surface`, which is
-    nullable but carries its own historical invariant. See
+    The retry covers only the de-accumulated variables: an incomplete publication reaches this check
+    only when the variables still unwritten are the de-accumulated ones. The nine instantaneous
+    variables are non-nullable, so a frame missing one of those is rejected by base Patito
+    validation first, with no retry — as is an all-null `categorical_precipitation_type_surface`,
+    which is nullable but carries its own historical invariant. See
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
     """
 
