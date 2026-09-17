@@ -141,7 +141,7 @@ DELIVERY_QUANTILES: Final[tuple[float, ...]] = (
     0.98,
     0.99,
 )
-"""The thirteen quantile levels agreed with NGED for the delivery tables.
+"""The 13 quantile levels agreed with NGED for the delivery tables.
 
 Deliberately tail-heavy: NGED is far more interested in the tails than the shoulders. This
 tuple is the single source of truth for every quantile-indexed artefact — the pinball-loss

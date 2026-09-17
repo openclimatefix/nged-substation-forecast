@@ -1,7 +1,8 @@
-"""Contracts for numerical weather prediction data.
+"""Contracts for numerical weather prediction (NWP) data.
 
 The `Nwp` frame as stored and read, plus the run-completeness and data-quality reports that
-assess an ingested ECMWF ENS run.
+assess an ingested run of the European Centre for Medium-Range Weather Forecasts' ensemble
+forecast (ECMWF ENS).
 """
 
 from collections.abc import Iterator, Sequence
@@ -44,13 +45,14 @@ class NwpModelId(StrEnum):
 
 
 ECMWF_ENS_ENSEMBLE_MEMBERS: Final[frozenset[int]] = frozenset(range(51))
-"""The ensemble members every ECMWF IFS ENS run carries: the control member plus 50 perturbed
-members, indexed 0-50 by Dynamical.org (matching `Nwp.ensemble_member`, which is 0-based).
+"""The ensemble members every run of the ECMWF Integrated Forecasting System (IFS) ensemble carries:
+the control member plus 50 perturbed members, indexed 0-50 by Dynamical.org (matching
+`Nwp.ensemble_member`, which is 0-based).
 
 The count is a fixed property of the ECMWF IFS ENS configuration, corroborated by our own data: the
 2026-07-14 incident described in
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>
-lost a forecast step for "50 of 51 ensemble members", and the per-partition row arithmetic in
+lost a forecast step for "50 of 51 ensemble members". The per-partition row arithmetic in
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/> is
 1671 H3 cells x 51 ensemble members x 85 native steps.
 """
@@ -70,7 +72,7 @@ ECMWF_ENS_H3_RESOLUTION: Final[int] = 5
 """The H3 spatial resolution the `ecmwf_ens` ingest pipeline grids ECMWF ENS data to, and the
 resolution `power_time_series_and_metadata` computes for every time series so the two line up on
 one grid. Every NWP model shares this one resolution today; per-model resolution (so a future NWP
-source can use a different one) is tracked in
+source can use a different resolution) is tracked in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/114>.
 """
 
@@ -83,15 +85,16 @@ class NwpVariableWhollyMissing(ValueError):
     full 15-day horizon, which is worse than falling back on the previous run.
 
     A distinct exception type rather than a bare `ValueError` because the `ecmwf_ens` asset
-    retries it. An upstream publication still in progress can present this way — a variable's
-    chunks read as fill-value null until the worker writing them commits — so waiting is a better
-    first response than failing the partition.
+    retries it. An upstream publication still in progress can present this way: a variable's
+    chunks read as fill-value null until the worker writing them commits. Waiting is therefore a
+    better first response than failing the partition.
 
-    The retry covers only the de-accumulated variables: an incomplete publication reaches this check
-    only when the variables still unwritten are the de-accumulated ones. The nine instantaneous
-    variables are non-nullable, so a frame missing one of those is rejected by base Patito
-    validation first, with no retry — as is an all-null `categorical_precipitation_type_surface`,
-    which is nullable but carries its own historical invariant. See
+    The retry covers only the de-accumulated variables: an incomplete publication reaches this
+    check only when the variables still unwritten are the de-accumulated ones. The nine
+    instantaneous variables are non-nullable, so a frame missing one of those is rejected by base
+    Patito validation first, with no retry — as is an all-null
+    `categorical_precipitation_type_surface`, which is nullable but carries its own historical
+    invariant. See
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
     """
 
@@ -121,7 +124,7 @@ class Nwp(pt.Model):
     # hold any string at construction time, with no error. The `constraints=` check below is now
     # the *only* defence, and it fires at `Nwp.validate()`, not at construction: a frame built and
     # never validated can carry an unrecognised `nwp_model_id` all the way through. Every current
-    # caller validates, so this is latent rather than live today.
+    # caller validates, so the hole is latent rather than live today.
     nwp_model_id: str = pt.Field(
         dtype=pl.String,
         constraints=pl.col("nwp_model_id").is_in([model.name for model in NwpModelId]),
@@ -145,7 +148,7 @@ class Nwp(pt.Model):
             "ECMWF's raw cumulative fields before we receive them. Resampling must honour that "
             "distinction — the step interval is 3 h out to lead 144 h and 6 h beyond it, so "
             "treating a period-ending value as instantaneous shifts it by up to 3 h. Conventions "
-            "for every variable, and what the shift costs: "
+            "for every variable, and how much error the shift introduces: "
             "<https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/>"
         ),
     )
@@ -156,8 +159,8 @@ class Nwp(pt.Model):
     )
 
     # `Int64`, not `UInt64`, because Delta has no unsigned integer types: the column is stored as
-    # `int64` whatever we declare, and declaring `UInt64` only bought a cast in `scan_delta` that
-    # stopped Polars pushing `h3_index` filters into the Parquet scan.
+    # `int64` whatever we declare. Declaring `UInt64` only added a cast in `scan_delta`, and that
+    # cast stopped Polars pushing `h3_index` filters into the Parquet scan.
     #
     # Signed is safe for the whole H3 index space, not just the values we happen to store. H3
     # reserves bit 63 of its 64-bit index as always zero — it is not a value bit in any index mode
@@ -200,7 +203,8 @@ class Nwp(pt.Model):
         ge=0,
         # The 200 m/s ceiling is a corrupt-feed guard, not a meteorological limit. The highest
         # surface wind gust ever recorded is 113.2 m/s, on Barrow Island during Tropical Cyclone
-        # Olivia on 10 April 1996, ratified by the WMO World Weather and Climate Extremes Archive:
+        # Olivia on 10 April 1996, ratified by the World Meteorological Organisation (WMO) in its
+        # World Weather and Climate Extremes Archive:
         # <https://wmo.int/asu-map?map=Wind_028>. That record is a 3-second gust at a single
         # anemometer, whereas this column holds an instantaneous wind averaged as a vector over a
         # whole H3 cell, which is lower again. Only a unit error or a corrupt value can reach 200.
@@ -224,9 +228,10 @@ class Nwp(pt.Model):
     wind_speed_100m: float = pt.Field(
         dtype=pl.Float32,
         description=(
-            "Wind speed at 100 m. Unit: metres per second. This is a vector mean, with the same"
-            " caveat as `wind_speed_10m`. It is the height that matters most for wind generation,"
-            " because a turbine power curve responds to the scalar speed at each grid point. See"
+            "Wind speed at 100 m. Unit: metres per second. The stored value is a vector mean,"
+            " with the same caveat as `wind_speed_10m`: a turbine power curve responds to the"
+            " scalar speed at each grid point, not to the cell's vector mean. 100 m is the height"
+            " that matters most for wind generation, being near a modern turbine's hub. See"
             " <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#wind-is-stored-as-speed-and-direction-and-why>"
         ),
         ge=0,
@@ -268,7 +273,7 @@ class Nwp(pt.Model):
     # Precipitation and radiation variables are null for the first forecast step (lead time 0) in
     # ECMWF ENS. Also note that, whilst these variables accumulate over forecast steps in ECMWF's
     # raw forecasts, we get ECMWF ENS from Dynamical.org, and Dynamical.org de-accumulates these
-    # values before we receive them. So these are true _rates_.
+    # values before we receive them. So the values stored in these three columns are true _rates_.
     downward_long_wave_radiation_flux_surface: float | None = pt.Field(
         dtype=pl.Float32,
         description=(
@@ -392,13 +397,13 @@ class Nwp(pt.Model):
         a run.
 
         Every smaller null pattern is *tolerated* and reported by `assess_nwp_quality` instead,
-        so this is a cliff rather than a slope: a run one slice short of empty lands with a
+        so the check is a cliff rather than a slope: a run one slice short of empty lands with a
         warning. There is no tunable fraction — the test is that *nothing* survives.
 
-        Why an absent column is the one case worth discarding a run over:
+        Why an absent column is worth discarding a run over:
         <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#a-wholly-missing-variable-and-instantaneous-nulls-fatal>.
-        Why every smaller pattern is not — the slice arithmetic, and the interpolation argument
-        that makes a tolerated slice survivable:
+        Why every smaller pattern is not — the slice arithmetic, and the interpolation argument that
+        makes a tolerated slice survivable:
         <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#nulls-in-the-de-accumulated-variables-tolerated>.
 
         Two assumptions a caller must not make:
@@ -407,8 +412,9 @@ class Nwp(pt.Model):
           inside a frame holding other, healthy runs — but by the same token, a frame filtered
           down to nothing *but* a wholly-null slice is indistinguishable from an empty column and
           does raise, even though that same slice was deliberately landed when the whole run was
-          validated. Latent rather than live today: the only production caller validates one
-          whole run, and reads go through `scan_delta`/`set_model`, which do not validate.
+          validated. Latent rather than live today: the production caller,
+          `dynamical_data.ecmwf_ens.convert_to_polars`, validates one whole run, and reads go
+          through `scan_delta`/`set_model`, which do not validate.
         - Raising is not the end of the partition. `NwpVariableWhollyMissing` is a distinct type
           because the `ecmwf_ens` asset retries it rather than failing outright.
         """
@@ -467,7 +473,8 @@ class Nwp(pt.Model):
         """
         threshold_date = datetime(2024, 11, 12, tzinfo=UTC)
 
-        # Partition the dataframe based on the threshold date
+        # Split the frame at the threshold date, so each half can be checked against the opposite
+        # expectation: all-null before, never-null after.
         partition_col = "is_before_or_on_threshold"
         partitioned_df = dataframe.with_columns(
             (pl.col("init_time") <= threshold_date).alias(partition_col)
@@ -562,18 +569,18 @@ class NwpQualityReport:
     """Non-fatal data-quality summary for one NWP run.
 
     Carries the *tolerated* nulls that the de-accumulated variables still hold after the H3
-    spatial aggregation, beyond lead-0. Usually that means whole (ensemble_member, valid_time)
-    slices that arrived empty, plus the cells where upstream scatter happened to take out every
-    contributing grid point. The empty slices and the scattered cells are counted separately,
-    because each warrants a different response. Neither fails the run. Only a variable that is
-    null in *every* slice is fatal, and `Nwp.validate` rejects that variable before this report
-    runs.
+    spatial aggregation, beyond lead-0. Those tolerated nulls are usually whole (ensemble_member,
+    valid_time) slices that arrived empty, plus the cells where upstream scatter happened to take
+    out every contributing grid point. The empty slices and the scattered cells are counted
+    separately, because each warrants a different response. Neither fails the run. Only a
+    variable that is null in *every* slice is fatal, and `Nwp.validate` rejects that variable
+    before this report runs.
 
-    Read this as "how much did we lose", not as "how corrupt was the feed". The aggregation
-    absorbs most per-pixel upstream corruption before it reaches a cell, so this is a poor proxy
-    for the upstream null rate. That rate is measured where it lives, on the raw grid, by
-    `dynamical_data.ecmwf_ens.upstream_nulls.UpstreamNullRate`; the ``ecmwf_ens`` asset publishes
-    both on one check, and they are not comparable as rates.
+    Read this report as "how much did we lose", not as "how corrupt was the feed". The
+    aggregation absorbs most per-pixel upstream corruption before it reaches a cell, so this
+    report is a poor proxy for the upstream null rate. That rate is measured where it lives, on
+    the raw grid, by `dynamical_data.ecmwf_ens.upstream_nulls.UpstreamNullRate`; the
+    ``ecmwf_ens`` asset publishes both on one check, and they are not comparable as rates.
     """
 
     affected: pl.DataFrame
@@ -594,11 +601,11 @@ class NwpQualityReport:
     def n_whole_null_slices(self) -> int:
         """Affected slices that arrived *entirely* null.
 
-        The field is missing altogether for that one (variable, member, valid_time).
+        The field is missing altogether for that one (variable, member, valid_time) slice.
 
         Worth watching separately from the scattered case below: a rising count is the shape a
-        partial upstream publication takes, and it is the number this report is best at, because
-        a wholly-null slice reaches the cells intact however they are aggregated.
+        partial upstream publication takes. The count is also accurate, because a wholly-null
+        slice reaches the cells intact however the grid points are aggregated.
         """
         if not self.affected.height:
             return 0
@@ -608,8 +615,8 @@ class NwpQualityReport:
     def n_scattered_slices(self) -> int:
         """Affected slices carrying only *some* null cells.
 
-        Expect this count to be small. Scattered upstream corruption is mostly absorbed by the
-        H3 aggregation, so a slice reaches this count only where the scatter took out every grid
+        Expect this count to be small. Scattered upstream corruption is mostly absorbed by the H3
+        aggregation, so a slice reaches this count only where the scatter took out every grid
         point of some cell. The count is *not* a measure of the upstream per-pixel null rate.
         """
         return self.n_affected_slices - self.n_whole_null_slices
@@ -647,7 +654,7 @@ class NwpRunCompletenessReport:
     Answers a single question: is the whole (member x step x cell) grid there?
 
     Deliberately a *report* rather than an exception. A short run is the upstream provider
-    misbehaving, not a contract violation, and the [never-raise-on-absent-input
+    misbehaving, not a contract violation. The [never-raise-on-absent-input
     rule](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)
     says we land what arrived and warn, rather than throwing away an otherwise-good run. The
     `ecmwf_ens` asset wraps this into a WARN, non-blocking `AssetCheckResult` and publishes the
@@ -698,13 +705,13 @@ class NwpRunCompletenessReport:
     def is_complete(self) -> bool:
         """True when the run carries the shape we expect.
 
-        That is, when the frame is one run whose member set, forecast-step set, H3 cell *count*
+        That is, when the frame is one run whose member set, forecast-step set, H3 cell *count*,
         and row count all match the expectation.
 
         Cells are compared by count, not by set: the report never receives the expected
         `h3_index` values, only how many there should be. Substituting one cell for another would
-        therefore pass. That is not a live gap, because the asset derives the expected count from
-        the very H3 grid weights the converter joins against — see
+        therefore pass. The substitution is not a live gap, because the asset derives the
+        expected count from the very H3 grid weights the converter joins against — see
         <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
         """
         return (
@@ -758,7 +765,8 @@ class NwpRunCompletenessReport:
 _MAX_GAP_ITEMS_IN_DESCRIPTION: Final[int] = 10
 """Cap on how many missing members/steps `NwpRunCompletenessReport.describe` spells out.
 
-A wholesale upstream outage can miss hundreds of steps; the exact counts stay in the report's
+A wholesale upstream outage can miss hundreds of forecast steps. The exact counts stay in the
+report's
 fields and the Dagster metadata, so the sentence only needs enough to start debugging.
 """
 
@@ -786,9 +794,10 @@ def assess_nwp_run_completeness(
     Never raises on a validated `Nwp` frame — not on an empty one, not on a multi-`init_time` one,
     not on one whose `valid_time`s are off-grid — so it cannot turn the warning path into a failure
     path (rule 7 of
-    [Inherent Stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
+    [Inherent
+    Stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
     The qualifier matters: the key columns being non-null and present is exactly what `Nwp.validate`
-    guarantees, and the sole production caller validates before calling.
+    guarantees, and the production caller, the `ecmwf_ens` asset, validates before calling.
 
     Row counting is safe here despite Polars' 32-bit row index: this runs on a single in-memory run
     (at V1 scale 1671 cells x 51 members x 85 steps ~ 7.24M rows), nearly three orders of magnitude

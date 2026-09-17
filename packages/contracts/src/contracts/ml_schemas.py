@@ -1,4 +1,4 @@
-"""Contracts for the ML pipeline.
+"""Contracts for the machine-learning (ML) pipeline.
 
 The feature vocabulary, the joined `AllFeatures` frame handed to models, the eligible-time-series
 population, and the metrics schema.
@@ -51,16 +51,17 @@ class AllFeatures(pt.Model):
     precision during interpolation and feature engineering.
 
     DYNAMIC FEATURES: In addition to the explicitly defined columns below, the pipeline supports
-    dynamically generated features. You can request these in your model config:
+    dynamically generated features. You can request these dynamic features in your model config:
 
     * `power_lag_{hours}h`: The power value shifted by X hours (e.g., `power_lag_24h`).
     * `temperature_2m_rolling_mean_{hours}h`: Rolling average of temperature over X hours (e.g.,
       `temperature_2m_rolling_mean_6h`).
 
-    Note: Dynamic features are not explicitly typed as Patito fields below. This is intentional
-    to allow infinite parameterisation (e.g., any lag hour) without the overhead of
-    metaprogramming or defining hundreds of static fields. The pipeline dynamically asserts their
-    presence during feature engineering.
+    Dynamic features are not explicitly typed as Patito fields below. Omitting the dynamic
+    features from the field list is intentional, to allow infinite parameterisation (e.g., any
+    lag hour) without the overhead of metaprogramming or defining hundreds of static fields.
+    During feature engineering, the pipeline asserts that every requested dynamic feature is
+    present.
     """
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
@@ -187,10 +188,11 @@ Deterministic (scored on the per-run ensemble mean):
 
 Probabilistic (scored on the ensemble members before the mean collapse):
 
-- `"crps"`: fair (finite-ensemble-unbiased) continuous ranked probability score (MW). The only
-  metric here that is comparable across models with different ensemble sizes.
-- `"spread_skill_ratio"`: Fortin-corrected RMS ensemble spread ÷ RMSE of the ensemble mean
-  (dimensionless; 1.0 = well-calibrated, < 1 = underdispersed/overconfident).
+- `"crps"`: fair (finite-ensemble-unbiased) continuous ranked probability score (MW). The fair form
+  removes the finite-ensemble bias, so scores stay comparable across models with different ensemble
+  sizes.
+- `"spread_skill_ratio"`: Fortin-corrected root-mean-square (RMS) ensemble spread ÷ RMSE of the
+  ensemble mean (dimensionless; 1.0 = well-calibrated, < 1 = underdispersed/overconfident).
 - `"pinball_loss"`: quantile loss (MW) at the quantile named by `metric_param`.
 - `"mean_pinball_loss"`: unweighted mean of `"pinball_loss"` over the thirteen
   `DELIVERY_QUANTILES` (MW). Tail-heavy by construction, matching NGED's priorities.
@@ -217,7 +219,7 @@ BAND_METRIC_PARAMS: Final[tuple[str, ...]] = tuple(
 """`metric_param` labels for the symmetric prediction-interval bands (PICP, interval width).
 
 One band per symmetric pair of `DELIVERY_QUANTILES`: `"p1_p99"`, `"p2_p98"`, `"p5_p95"`,
-`"p10_p90"`, `"p20_p80"`, `"p35_p65"`. Together they trace a coverage curve from the 30%
+`"p10_p90"`, `"p20_p80"`, `"p35_p65"`. Together the six bands trace a coverage curve from the 30%
 band to the 98% band.
 """
 
@@ -271,15 +273,16 @@ class Metrics(pt.Model):
     Primary key: `(time_series_id, power_fcst_model_name, experiment_name, fold_id,
     evaluation_scope, horizon_slice, metric_name, metric_param, window_start, window_end)`. At
     most one metric value per series, model, experiment, fold, evaluation scope, horizon slice,
-    metric, parameter and window — recomputing an existing key replaces that row rather than
+    metric, parameter, and window — recomputing an existing key replaces that row rather than
     duplicating it.
     """
 
     time_series_id: int = _get_time_series_id_dtype()
 
-    # String (not Categorical): fold_id/experiment_name are Delta partition columns and delta-rs
-    # stores dictionary-encoded columns as String anyway; String keeps them cast-free and lets
-    # predicate pushdown work. See the "Delta Lake dictionary-encoded columns" section of the
+    # String (not Categorical): fold_id/experiment_name are Delta partition columns, and delta-rs
+    # stores dictionary-encoded columns as String anyway. String keeps those two columns cast-free
+    # and lets predicate pushdown work. See the "Delta Lake dictionary-encoded columns" section of
+    # the
     # `polars-patito-gotchas` skill.
     power_fcst_model_name: str = pt.Field(
         dtype=pl.String,
@@ -421,8 +424,8 @@ class Metrics(pt.Model):
         """Validate the given dataframe, ensuring the primary key is unique where it is present.
 
         A duplicated primary key means either a join fanned out on the way here or the same rows
-        were written twice, and both corrupt the leaderboard or monitoring chart built from them.
-        It is our own bug rather than the outside world misbehaving, so this raises rather than
+        were written twice. Both corrupt the leaderboard or monitoring chart built from them. It
+        is our own bug rather than the outside world misbehaving, so this raises rather than
         degrading — see
         <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/>.
 
@@ -446,7 +449,8 @@ class Metrics(pt.Model):
         if not set(pk_cols).issubset(validated_df.columns):
             return validated_df
 
-        # `n_unique`, not `is_duplicated().any()`: the two are equivalent here (every primary-key
+        # `n_unique`, not `is_duplicated().any()`: the two expressions are equivalent here (every
+        # primary-key
         # column is non-nullable once present) but `is_duplicated` materialises a per-row mask,
         # costing ~5x the peak memory on a predict-sized frame.
         if validated_df.select(pk_cols).n_unique() != validated_df.height:
@@ -462,12 +466,11 @@ class EligibleTimeSeries(pt.Model):
     """The canonical per-fold population of eligible ``time_series_id``s.
 
     Written by the ``eligible_time_series`` Dagster asset (one Delta partition per ``fold_id``)
-    and read by ``trained_cv_model``. ``cv_power_forecasts`` does not read this table; it inherits
-    the same population through the trained model's ``trained_time_series_ids``. Eligibility is a
-    function of
-    data coverage and the fold dates **only** — never the model or experiment config — so every
-    experiment trains and scores a fold on the identical population, which is what makes
-    leaderboard comparisons apples-to-apples.
+    and read by ``trained_cv_model``. ``cv_power_forecasts`` does not read this table; it
+    inherits the same population through the trained model's ``trained_time_series_ids``.
+    Eligibility is a function of data coverage and the fold dates **only** — never the model or
+    experiment config — so every experiment trains and scores a fold on the identical population,
+    which is what makes leaderboard comparisons apples-to-apples.
 
     One row per eligible ``(fold_id, time_series_id)``.
     """

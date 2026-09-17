@@ -25,7 +25,8 @@ def _find_project_root(start: Path) -> Path:
     non-editable install (``uv sync --no-editable``) walks up from
     ``<repo>/.venv/lib/python*/site-packages/`` past the venv to the same root. The
     production Docker image copies ``uv.lock`` to ``/app``, so there the root resolves to
-    ``/app``, where the image's ``COPY conf/`` places the resource files.
+    ``/app``, where the image's ``COPY conf/`` places the cross-validation fold definitions and
+    the model config.
 
     When no ancestor holds a ``uv.lock`` — a wheel installed into a venv outside any
     workspace checkout — fall back to the current working directory. Such a deployment must
@@ -57,11 +58,11 @@ class Settings(BaseSettings):
 
     Each field takes its value from an environment variable of the same name, from the workspace
     ``.env``, or from the default declared here, in that order of precedence. The managed
-    data-table paths default to ``""``, a sentinel meaning "derive me": a path left unset is filled
-    in from ``data_path_internal``, ``data_path_delivery`` or ``local_artifacts_path`` after
-    validation, so a caller always reads a concrete path, while a path set explicitly keeps the
-    value it was given. Build one through ``get_settings()`` rather than by calling ``Settings()``
-    directly.
+    data-table paths default to ``""``, a sentinel meaning "derive me": a path left unset is
+    filled in from ``data_path_internal``, ``data_path_delivery`` or ``local_artifacts_path``
+    after validation, so a caller always reads a concrete path, while a path set explicitly keeps
+    the value it was given. Build one through ``get_settings()`` rather than by calling
+    ``Settings()`` directly.
     """
 
     mlflow_tracking_uri: str = Field(
@@ -110,7 +111,8 @@ class Settings(BaseSettings):
 
         Do *not* call it from process start-up or module import to fail a deployment fast: inference
         needs none of these credentials, so that would stop the forecast over a missing ingest
-        secret. See the [AWS runbook](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-8-store-secrets-in-parameter-store).
+        secret. See the [AWS
+        runbook](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-8-store-secrets-in-parameter-store).
 
         Raises:
             ValueError: Naming exactly which of the three environment variables are unset.
@@ -197,9 +199,10 @@ class Settings(BaseSettings):
 
     # --- Object-store credentials for the data tables (used only when a data-path root is remote)
     #
-    # All empty by default; unset on AWS (object_store auto-discovers the IAM-role credentials),
-    # set only for a dev/MinIO endpoint. The AWS/dev split, and how these differ from the
-    # nged_s3_bucket_* source-bucket creds above:
+    # All empty by default; unset on AWS, where object_store auto-discovers the credentials of the
+    # AWS Identity and Access Management (IAM) role, and set only for a dev/MinIO endpoint. The
+    # AWS/dev split, and how these four data-store settings differ from the nged_s3_bucket_*
+    # source-bucket credentials above:
     # https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/
 
     data_store_endpoint_url: str = Field(
@@ -225,12 +228,12 @@ class Settings(BaseSettings):
         """delta-rs / polars / obstore ``storage_options`` for the managed data tables.
 
         Empty on AWS — object_store auto-discovers the Fargate task's IAM-role credentials and
-        region — and empty for a local data-path root (delta-rs ignores it there). Populated from
-        the ``data_store_*`` settings only for a dev/MinIO/S3-compatible endpoint. The ``aws_*``
-        keys are the shared object_store aliases understood by delta-rs, polars cloud IO, and
-        obstore alike, so one value feeds every IO site. Returned as an ``ObjectStoreOptions``
-        ``TypedDict`` so ``ty`` checks each key here, where they are authored; widen it to a
-        plain ``dict`` at each IO boundary with ``typeddict_to_dict``.
+        region — and empty for a local data-path root (delta-rs ignores storage_options there).
+        Populated from the ``data_store_*`` settings only for a dev/MinIO/S3-compatible endpoint.
+        The ``aws_*`` keys are the shared object_store aliases understood by delta-rs, polars
+        cloud IO, and obstore alike, so one value feeds every IO site. Returned as an
+        ``ObjectStoreOptions`` ``TypedDict`` so ``ty`` checks each key here, where they are
+        authored; widen it to a plain ``dict`` at each IO boundary with ``typeddict_to_dict``.
         """
         options: ObjectStoreOptions = {}
         if self.data_store_endpoint_url:
@@ -299,7 +302,8 @@ class Settings(BaseSettings):
         ),
     )
 
-    # --- Sentry observability (all optional; an empty DSN disables Sentry entirely) ---
+    # --- Sentry observability: all optional, and an empty data source name (DSN) disables
+    # Sentry entirely ---
 
     sentry_dsn: str = Field(
         default="",

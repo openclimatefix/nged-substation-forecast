@@ -107,7 +107,7 @@ class PowerTimeSeries(pt.Model):
 
         A row is dropped when its ``time`` lies outside the plausible datetime range, is null (the
         schema declares ``time`` non-nullable, so a null this early is already malformed), or does
-        not fall on the top or bottom of the hour (minute 00 or 30). All three indicate a
+        not fall on the top or bottom of the hour (minute 00 or 30). All three conditions indicate a
         malformed upstream reading — not a bug in our own pipeline — so under [inherent
         stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/)
         an ingestion boundary should degrade the batch rather than abort it entirely.
@@ -120,8 +120,8 @@ class PowerTimeSeries(pt.Model):
 
         Call this method BEFORE ``validate``, and only at a boundary that receives data from
         outside our system (e.g. NGED's raw JSON feed). The uniqueness and sortedness checks in
-        ``validate`` are NOT relaxed here, because those indicate a bug in OUR pipeline rather than
-        malformed external data, and should keep raising.
+        ``validate`` are NOT relaxed here, because a duplicate row or an unsorted column indicates a
+        bug in OUR pipeline rather than malformed external data, and should keep raising.
 
         Args:
             dataframe: An already-cast frame with a ``time`` column; need not yet be validated.
@@ -137,7 +137,7 @@ class PowerTimeSeries(pt.Model):
         # a filter does with a null predicate, every row that left is counted exactly once.
         return DropImplausibleRowsResult(survivors, dataframe.height - survivors.height)
 
-    # Define it as a ClassVar so Patito/Pydantic knows it's not a data field
+    # Define columns_to_sort_by as a ClassVar so Patito/Pydantic knows it is not a data field
     columns_to_sort_by: ClassVar[tuple[str, str]] = ("time_series_id", "time")
 
 
@@ -176,7 +176,8 @@ Notes:
 - Disaggregated Demand: In the trial area, exclusively associated with "Primary" substations. All
   "Primary" substations in the trial area have their TimeSeriesType set to "Disaggregated Demand".
   Indicates that NGED have already removed metered generation connected to that primary.
-- Raw Flow: Used for BSP and GSP substations.
+- PV: Photovoltaic (solar). - Raw Flow: Used for bulk supply point (BSP) and grid supply point (GSP)
+  substations.
 """
 
 
@@ -304,7 +305,9 @@ the reserved sentinel for a production forecast that belongs to no CV fold.
 
 
 class PowerForecast(pt.Model):
-    """Forecast data schema for deterministic ensemble forecasts.
+    """Forecast data schema for an ensemble of deterministic forecasts.
+
+    One row per ensemble member per target time.
 
     Internal vs delivered schema (Milestone 1 report Table 1, p.28): the columns
     ``experiment_name``, ``fold_id``, and ``ml_flow_experiment_id`` are INTERNAL-ONLY — they
@@ -329,7 +332,11 @@ class PowerForecast(pt.Model):
     time_series_id: int = _get_time_series_id_dtype()
 
     ensemble_member: int = pt.Field(
-        dtype=pl.Int8, description="Ensemble member index. 0 is the control NWP ensemble member."
+        dtype=pl.Int8,
+        description=(
+            "Ensemble member index. Member 0 is the control numerical weather prediction (NWP)"
+            " ensemble member."
+        ),
     )
 
     ml_flow_experiment_id: int | None = pt.Field(
@@ -357,9 +364,10 @@ class PowerForecast(pt.Model):
         ),
     )
 
-    # String (not Categorical): experiment_name/fold_id are the Delta partition columns and delta-rs
-    # stores dictionary-encoded columns as String anyway; String keeps them cast-free and lets
-    # predicate pushdown work. See the "Delta Lake dictionary-encoded columns" section of the
+    # String (not Categorical): experiment_name/fold_id are the Delta partition columns, and
+    # delta-rs stores dictionary-encoded columns as String anyway. String keeps those two columns
+    # cast-free and lets predicate pushdown work. See the "Delta Lake dictionary-encoded columns"
+    # section of the
     # `polars-patito-gotchas` skill.
     experiment_name: str = pt.Field(
         dtype=pl.String,
@@ -452,7 +460,8 @@ class PowerForecast(pt.Model):
             drop_superfluous_columns=drop_superfluous_columns,
         )
 
-        # `n_unique`, not `is_duplicated().any()`: the two are equivalent here (every primary-key
+        # `n_unique`, not `is_duplicated().any()`: the two expressions are equivalent here (every
+        # primary-key
         # column is non-nullable) but `is_duplicated` materialises a per-row mask, costing ~5x the
         # peak memory on a predict-sized frame.
         pk_cols = list(cls.PRIMARY_KEY)
@@ -473,7 +482,7 @@ class EffectiveCapacity(pt.Model):
 
     **v0.1 implementation:** one row per ``time_series_id``, ``time`` set to the end of the
     available observation history, ``effective_capacity_mw`` = P99 of ``abs(power)`` over the
-    full observed history. This is a static scalar per series.
+    full observed history. The v0.1 estimate is a static scalar per series.
 
     **Planned upgrade (v0.7):** replace the P99 scalar with a time-varying capacity estimate (see
     <https://openclimatefix.github.io/nged-substation-forecast/techniques/convex-optimisation/>
@@ -483,7 +492,7 @@ class EffectiveCapacity(pt.Model):
     half-hourly timestep. This schema is unchanged; the ``effective_capacity`` asset body changes
     and the ``metrics`` pipeline swaps its ``time_series_id``-only NMAE-denominator join for a
     temporal as-of join. Do **not** pre-densify the v0.1 scalar into one row per half-hour —
-    densifying a constant buys nothing, and the as-of join handles sparse capacity rows
+    densifying a constant adds no information, and the as-of join handles sparse capacity rows
     naturally.
     """
 
@@ -502,7 +511,8 @@ class EffectiveCapacity(pt.Model):
         gt=0,
         description=(
             "OCF's estimate of the effective capacity (MW) of this asset at this timestep. "
-            "For generators: absorbs PV panel degradation, partial inverter trips, etc., "
+            "For generators: absorbs any persistent loss of capability — photovoltaic (PV)"
+            " panel degradation and partial inverter trips among them — "
             "but ignores ANM curtailment — a wind farm ANM-capped at 5 MW with 10 MW physical "
             "capability has effective_capacity_mw = 10. "
             "For substations: the 99th percentile of observed absolute power flow, under normal "
