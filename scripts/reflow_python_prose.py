@@ -50,6 +50,16 @@ DIRECTIVE_COMMENT: Final[re.Pattern[str]] = re.compile(
 URL_ONLY_COMMENT: Final[re.Pattern[str]] = re.compile(r"^#\s*\S+://\S+\s*$")
 """A comment whose entire content is one URL — nothing to wrap, and wrapping would break it."""
 
+INTERIOR_DOUBLE_SPACE: Final[re.Pattern[str]] = re.compile(r"\S {2,}\S")
+"""A run of 2+ spaces between two non-space characters — hand alignment, not prose.
+
+`test_features.py`'s `NWP run A: ... 06:00  (init 00:00 + 6h delay)` pads before a parenthetical to
+line up with the sibling `NWP run B:` line below it; collapsing that padding to a single space the
+way ordinary prose is collapsed destroys the alignment. Requiring a non-space character on both
+sides excludes a line's own leading indent, which is real structure (a nested list item, a
+blockquote) that `reflow_text` already understands and must still be free to reflow.
+"""
+
 NOT_PROSE: Final[re.Pattern[str]] = re.compile(r"#|  ")
 """A `#` or an interior run of 2+ spaces inside a comment's text, neither of which plain prose has.
 
@@ -75,8 +85,8 @@ def _dedent_lines(lines: list[str]) -> tuple[list[str], int]:
     """Dedent every line in `lines` by their common leading-whitespace margin.
 
     `lines[0]` is assumed already unindented (the text right after an opening `\"\"\"`, or the
-    first line of a comment block after its `#` marker is stripped) and is excluded from the margin
-    calculation, mirroring `lint_docstring_markdown._dedent_docstring`.
+    first line of a comment block after its `#` marker is stripped) and is excluded from the
+    margin calculation, mirroring `lint_docstring_markdown._dedent_docstring`.
     """
     margin = sys.maxsize
     for line in lines[1:]:
@@ -91,11 +101,11 @@ def _dedent_lines(lines: list[str]) -> tuple[list[str], int]:
 def _reflow_indented(body_lines: list[str], margin: int, *, extra_indent: int = 0) -> list[str]:
     """Reflow `body_lines` (already dedented by `margin`) at `WIDTH - margin - extra_indent`.
 
-    Temporarily narrows `markdown_wrap.WIDTH` for the call, since `reflow_text` always wraps to the
-    module-level `WIDTH` and has no width parameter of its own — the indent this function re-adds
-    afterwards, plus any further prefix the caller re-adds itself (`extra_indent` — a comment's `#
-    ` marker and its own indent, which `_reflow_comment_block` adds after this returns), has to fit
-    inside the same 100-character budget as the text.
+    Temporarily narrows `markdown_wrap.WIDTH` for the call, since `reflow_text` always wraps to
+    the module-level `WIDTH` and has no width parameter of its own — the indent this function
+    re-adds afterwards, plus any further prefix the caller re-adds itself (`extra_indent` — a
+    comment's `#` marker, the space after it, and its own indent, which `_reflow_comment_block`
+    adds after this returns), has to fit inside the same 100-character budget as the text.
     """
     original_width = markdown_wrap.WIDTH
     markdown_wrap.WIDTH = WIDTH - margin - extra_indent
@@ -113,9 +123,9 @@ def _reflow_docstring(content: str, quote_width: int) -> str:
     """Reflow one docstring's raw (unevaluated) text between its quotes, preserving its style.
 
     `content` is the exact source text between the opening and closing triple quotes — not the
-    escaped-and-evaluated string value, since this is a text edit to the source, not to the string
-    the source produces. Preserves whether the closing quotes sit on their own line or trail the
-    last word, matching whichever style the docstring already used.
+    escaped-and-evaluated string value, since this is a text edit to the source, not to the
+    string the source produces. Preserves whether the closing quotes sit on their own line or
+    trail the last word, matching whichever style the docstring already used.
 
     `quote_width` (`len(prefix) + len(quote)`, 3 for a plain triple-double-quote) is spent as
     `extra_indent`, to hold the opening quote's own budget for whichever line the first paragraph
@@ -126,12 +136,12 @@ def _reflow_docstring(content: str, quote_width: int) -> str:
     A docstring with no blank line anywhere in its body — the same `D205`-exempt case, since a
     D205-compliant docstring always has one after the summary — reserves `quote_width` *twice*
     instead: its whole body is one paragraph, short enough that `ruff format` may later collapse
-    it onto a single physical line carrying both quotes, independently of how this function packed
-    the text, and the closing quote's width has to be held for that line too or the collapsed line
-    overflows `WIDTH`. Reserving it on every docstring, not only this one, would push a `D205`-
-    compliant summary that already fits `WIDTH - margin - quote_width` over the narrower budget and
-    wrap it onto two lines — which `pydocstyle` then reads as a missing blank line, because `D205`
-    requires the summary to be the entire first physical line.
+    it onto a single physical line carrying both quotes, independently of how this function
+    packed the text, and the closing quote's width has to be held for that line too or the
+    collapsed line overflows `WIDTH`. Reserving it on every docstring, not only this one, would
+    push a `D205`-compliant summary that already fits `WIDTH - margin - quote_width` over the
+    narrower budget and wrap it onto two lines — which `pydocstyle` then reads as a missing blank
+    line, because `D205` requires the summary to be the entire first physical line.
 
     Leaves the docstring untouched if its dedented body carries a line indented 4 or more columns
     (beyond the first line, which is never indented): `markdown_wrap.reflow_text` understands a
@@ -143,6 +153,9 @@ def _reflow_docstring(content: str, quote_width: int) -> str:
     `reflow_text` has no fenced-code exemption for either. A plain paragraph that happens to
     carry 1-3 columns of leftover indentation from a previous hand-wrap is common and harmless to
     reflow normally, which is why the threshold is 4, not 1.
+
+    Also leaves the docstring untouched if any line carries an `INTERIOR_DOUBLE_SPACE` — the same
+    hand-alignment signal `_is_prose_comment` already exempts a comment block for.
     """
     if "\n" not in content:
         return content  # single-line docstring: already one paragraph, nothing to reflow
@@ -151,6 +164,8 @@ def _reflow_docstring(content: str, quote_width: int) -> str:
     dedented, margin = _dedent_lines([lines[0].lstrip(), *lines[1:]])
 
     if any(len(line) - len(line.lstrip()) >= 4 for line in dedented[1:] if line.strip()):
+        return content
+    if any(INTERIOR_DOUBLE_SPACE.search(line) for line in dedented):
         return content
 
     own_line_close = dedented[-1].strip() == ""
@@ -168,13 +183,13 @@ def _reflow_docstring(content: str, quote_width: int) -> str:
 def _char_col(line: str, byte_col: int) -> int:
     """Convert a UTF-8 *byte* column offset into a character index into `line`.
 
-    `ast` reports a byte offset for `col_offset`/`end_col_offset` on a line with non-ASCII text, so
-    this is what `line[byte_col:]`-style slicing needs to land on the right character instead.
-    `ast.col_offset`/`end_col_offset` are documented as UTF-8 byte offsets, not character offsets;
-    this repo's prose deliberately keeps en-dashes and typographic quotes (`RUF001`-`RUF003` are
-    disabled for exactly that reason), so a docstring spanning a line with one of those needs this
-    conversion or its splice point lands mid-character, or short by however many extra bytes those
-    characters cost.
+    `ast` reports a byte offset for `col_offset`/`end_col_offset` on a line with non-ASCII text,
+    so this is what `line[byte_col:]`-style slicing needs to land on the right character instead.
+    `ast.col_offset`/`end_col_offset` are documented as UTF-8 byte offsets, not character
+    offsets; this repo's prose deliberately keeps en-dashes and typographic quotes
+    (`RUF001`-`RUF003` are disabled for exactly that reason), so a docstring spanning a line with
+    one of those needs this conversion or its splice point lands mid-character, or short by
+    however many extra bytes those characters cost.
     """
     return len(line.encode("utf-8")[:byte_col].decode("utf-8"))
 
@@ -183,9 +198,9 @@ def _reflow_docstrings_in(source: str, tree: ast.Module) -> str:
     """Reflow every module/class/function/async-function docstring in `source`.
 
     Collects each docstring's absolute character span from the original `source` before rewriting
-    any of them, then splices in reverse order (highest offset first) so an earlier edit's offsets
-    stay valid while a later one is applied — the same reason `implement-issue`-style multi-edit
-    scripts always work back to front.
+    any of them, then splices in reverse order (highest offset first) so an earlier edit's
+    offsets stay valid while a later one is applied — the same reason `implement-issue`-style
+    multi-edit scripts always work back to front.
     """
     lines = source.splitlines(keepends=True)
     line_starts = [0]
@@ -279,7 +294,8 @@ def _reflow_comment_block(lines: list[str], indent: int) -> list[str] | None:
 
     `lines` are the raw source lines (with their `#` marker and indent still attached) making up
     the block. Every line must carry a `#` followed by either nothing or exactly one space before
-    its text, which is the convention `ruff format` already enforces on every comment in this repo.
+    its text, which is the convention `ruff format` already enforces on every comment in this
+    repo.
     """
     texts: list[str] = []
     for line in lines:
@@ -312,9 +328,10 @@ def _reflow_comments_in(source: str) -> str:
 def _flatten(text: str) -> str:
     """`text` with every whole-line `#` marker and all remaining whitespace stripped.
 
-    Mirrors `markdown_wrap._flatten`'s treatment of a blockquote's `>`: stripping the marker as well
-    as whitespace is what lets `reflow_python_prose`'s round-trip check tell a legitimate rewrap
-    (which changes how many `#` markers a block prints) from a change to the words themselves.
+    Mirrors `markdown_wrap._flatten`'s treatment of a blockquote's `>`: stripping the marker as
+    well as whitespace is what lets `reflow_python_prose`'s round-trip check tell a legitimate
+    rewrap (which changes how many `#` markers a block prints) from a change to the words
+    themselves.
     """
     lines = [COMMENT_MARKER.sub("", line) for line in text.split("\n")]
     return "".join("\n".join(lines).split())
@@ -323,9 +340,10 @@ def _flatten(text: str) -> str:
 def reflow_python_prose(source: str) -> str:
     """Reflow every docstring and prose comment block in `source` to `WIDTH`, leaving code as-is.
 
-    Safety net: `source` and the result must carry the same words once every `#` comment marker and
-    all whitespace is stripped from both — the same round-trip check `markdown_wrap.reflow_text`
-    makes on a whole `.md` file, so a bug in this script can't silently drop or duplicate a word.
+    Safety net: `source` and the result must carry the same words once every `#` comment marker
+    and all whitespace is stripped from both — the same round-trip check
+    `markdown_wrap.reflow_text` makes on a whole `.md` file, so a bug in this script can't
+    silently drop or duplicate a word.
     """
     tree = ast.parse(source)
     with_docstrings = _reflow_docstrings_in(source, tree)

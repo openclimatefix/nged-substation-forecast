@@ -477,9 +477,10 @@ def compute_metrics(
 def _type_slug(type_str: str) -> str:
     """Convert a ``time_series_type`` label to an MLflow metric key slug.
 
-    Lowercases, replaces any run of non-alphanumeric characters with a single underscore, and
-    strips leading/trailing underscores. Examples: ``"Disaggregated Demand"`` →
-    ``"disaggregated_demand"``, ``"Other (Demand)"`` → ``"other_demand"``, ``"PV"`` → ``"pv"``.
+    Lowercases, replaces any run of non-alphanumeric characters with a single underscore,
+    and strips leading/trailing underscores.  Examples:
+    ``"Disaggregated Demand"`` → ``"disaggregated_demand"``,
+    ``"Other (Demand)"`` → ``"other_demand"``, ``"PV"`` → ``"pv"``.
     """
     return re.sub(r"[^a-z0-9]+", "_", type_str.lower()).strip("_")
 

@@ -1073,13 +1073,12 @@ def test_engineer_features_power_lag_nullification_end_to_end():
 def test_engineer_features_bulk_mode_weather_lag_uses_correct_nwp_run():
     """In bulk mode, weather lag boundary differs per row because power_fcst_init_time varies.
 
-    NWP run A: power_fcst_init_time = 2023-01-01 06:00 (init 00:00 + 6h delay) NWP run B:
-    power_fcst_init_time = 2023-01-02 06:00 (init 00:00 + 6h delay) valid_time = 2023-01-02
-    12:00, lag = 12h → target_time = 2023-01-02 00:00
+    NWP run A: power_fcst_init_time = 2023-01-01 06:00  (init 00:00 + 6h delay)
+    NWP run B: power_fcst_init_time = 2023-01-02 06:00  (init 00:00 + 6h delay)
+    valid_time = 2023-01-02 12:00, lag = 12h → target_time = 2023-01-02 00:00
 
-    Run A: target_time (Jan-02 00:00) > power_fcst_init_time (Jan-01 06:00) → same-run join →
-    10.0 Run B: target_time (Jan-02 00:00) < power_fcst_init_time (Jan-02 06:00) → freshest join
-    → 20.0
+    Run A: target_time (Jan-02 00:00) > power_fcst_init_time (Jan-01 06:00) → same-run join → 10.0
+    Run B: target_time (Jan-02 00:00) < power_fcst_init_time (Jan-02 06:00) → freshest join → 20.0
     """
     nwp_df = pl.DataFrame(
         {
