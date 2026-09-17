@@ -767,8 +767,10 @@ class NwpRunCompletenessReport:
 _MAX_GAP_ITEMS_IN_DESCRIPTION: Final[int] = 10
 """Cap on how many missing members/steps `NwpRunCompletenessReport.describe` spells out.
 
-A wholesale upstream outage can miss hundreds of forecast steps. The exact counts stay in the
-report's fields and the Dagster metadata, so the sentence only needs enough to start debugging.
+A wholesale upstream outage can miss every one of the 51 expected ensemble members, or all 85
+expected forecast steps, and a run published on the wrong time grid can carry an unexpected
+`valid_time` for every step it did publish. The exact counts stay in the report's fields and the
+Dagster metadata, so the sentence only needs enough to start debugging.
 """
 
 
@@ -798,7 +800,8 @@ def assess_nwp_run_completeness(
     [Inherent
     Stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
     The qualifier matters: the key columns being non-null and present is exactly what `Nwp.validate`
-    guarantees, and the production caller, the `ecmwf_ens` asset, validates before calling.
+    guarantees, and the production caller, the `ecmwf_ens` asset, only ever passes a frame that
+    `dynamical_data.ecmwf_ens.convert_to_polars` has already validated.
 
     Row counting is safe here despite Polars' 32-bit row index: this runs on a single in-memory run
     (at V1 scale 1671 cells x 51 members x 85 steps ~ 7.24M rows), nearly three orders of magnitude
