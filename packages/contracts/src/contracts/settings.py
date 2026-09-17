@@ -58,7 +58,7 @@ class Settings(BaseSettings):
     mlflow_tracking_uri: str = Field(
         default="sqlite:///mlflow.db",
         description=(
-            "MLflow tracking URI. Centralized here for environment-specific configuration"
+            "MLflow tracking URI. Centralised here for environment-specific configuration"
             " (e.g., local SQLite for development, remote server for production)."
             " The application entrypoint should read this setting and set the"
             " MLFLOW_TRACKING_URI environment variable accordingly, which MLflow will"
@@ -125,7 +125,7 @@ class Settings(BaseSettings):
             )
 
     def get_nged_s3_store(self) -> obstore.store.S3Store:
-        """Returns an initialized obstore.store.S3Store instance for the NGED bucket.
+        """Returns an initialised obstore.store.S3Store instance for the NGED bucket.
 
         Returns:
             An ``S3Store`` bound to ``nged_s3_bucket_url`` and authenticated with the
@@ -153,9 +153,9 @@ class Settings(BaseSettings):
     )
     # --- Storage roots -------------------------------------------------------------------
     #
-    # data_path_internal and data_path_delivery hold the (S3-capable) data tables; local_
-    # artifacts_path holds the always-local production model. Why they are split, and
-    # what belongs in each:
+    # data_path_internal and data_path_delivery hold the (S3-capable) data tables;
+    # local_artifacts_path holds the always-local production model. Why the three roots are
+    # split, and what belongs in each:
     # https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/
 
     data_path_internal: str = Field(
@@ -399,8 +399,8 @@ def get_settings() -> Settings:
     ``contracts`` schemas) importable whatever the environment holds, and lets a test change the
     environment before the first read.
 
-    Cached with ``lru_cache`` so every caller shares one instance (matching the previous
-    module-level singletons). Call ``get_settings.cache_clear()`` in a test that needs to re-read
-    the environment after changing it.
+    Cached with ``lru_cache`` so every caller shares one instance. Call
+    ``get_settings.cache_clear()`` in a test that needs to re-read the environment after changing
+    it.
     """
     return Settings()

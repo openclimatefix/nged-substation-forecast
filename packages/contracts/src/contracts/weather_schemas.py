@@ -190,12 +190,18 @@ class Nwp(pt.Model):
     wind_speed_10m: float = pt.Field(
         dtype=pl.Float32,
         description=(
-            "Wind speed at 10 m. Unit: meters per second. This is the magnitude of the cell's"
+            "Wind speed at 10 m. Unit: metres per second. This is the magnitude of the cell's"
             " *vector* mean wind, not the mean of its grid points' scalar speeds. See"
             " <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#wind-is-stored-as-speed-and-direction-and-why>"
         ),
         ge=0,
-        le=200,  # Gemini says the highest non-tornadic surface wind speed recorded was 113 m/s
+        # The 200 m/s ceiling is a corrupt-feed guard, not a meteorological limit. The highest
+        # surface wind gust ever recorded is 113.2 m/s, on Barrow Island during Tropical Cyclone
+        # Olivia on 10 April 1996, ratified by the WMO World Weather and Climate Extremes Archive:
+        # <https://wmo.int/asu-map?map=Wind_028>. That record is a 3-second gust at a single
+        # anemometer, whereas this column holds an instantaneous wind averaged as a vector over a
+        # whole H3 cell, which is lower again. Only a unit error or a corrupt value can reach 200.
+        le=200,
     )
 
     wind_direction_10m: float = pt.Field(
@@ -215,13 +221,13 @@ class Nwp(pt.Model):
     wind_speed_100m: float = pt.Field(
         dtype=pl.Float32,
         description=(
-            "Wind speed at 100 m. Unit: meters per second. This is a vector mean, with the same"
+            "Wind speed at 100 m. Unit: metres per second. This is a vector mean, with the same"
             " caveat as `wind_speed_10m`. It is the height that matters most for wind generation,"
             " because a turbine power curve responds to the scalar speed at each grid point. See"
             " <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#wind-is-stored-as-speed-and-direction-and-why>"
         ),
         ge=0,
-        le=200,  # Gemini says the highest non-tornadic surface wind speed recorded was 113 m/s
+        le=200,  # The same corrupt-feed ceiling as `wind_speed_10m`; see the comment there.
     )
 
     wind_direction_100m: float = pt.Field(
@@ -295,7 +301,7 @@ class Nwp(pt.Model):
         ge=0,
         le=255,
         description=(
-            "This field is always NaN for init_times on and before 2024-11-12, and populated from"
+            "This field is always null for init_times on and before 2024-11-12, and populated from"
             " the 2024-11-13 00Z run onwards (confirmed by direct inspection of the source data)."
             " Derived from ECMWF's `ptype` field. See https://codes.ecmwf.int/grib/param-db/260015"
             " 0=No precipitation; 1=Rain; 2=Thunderstorm; 3=Freezing rain; 4=Mixed/ice;"
@@ -390,7 +396,7 @@ class Nwp(pt.Model):
         that makes a tolerated slice survivable:
         <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#nulls-in-the-de-accumulated-variables-tolerated>.
 
-        Two things a caller must not assume:
+        Two assumptions a caller must not make:
 
         - The judgement is made per `init_time`, so a run whose column is empty is caught even
           inside a frame holding other, healthy runs — but by the same token, a frame filtered
@@ -552,9 +558,10 @@ class NwpQualityReport:
     Carries the *tolerated* nulls that the de-accumulated variables still hold after the H3
     spatial aggregation, beyond lead-0. Usually that means whole (ensemble_member, valid_time)
     slices that arrived empty, plus the cells where upstream scatter happened to take out every
-    contributing grid point; the two are counted separately because they warrant different
-    responses, but neither fails the run. Only a variable that is null in *every* slice is fatal,
-    and `Nwp.validate` rejects that before this runs.
+    contributing grid point. The empty slices and the scattered cells are counted separately,
+    because each warrants a different response. Neither fails the run. Only a variable that is
+    null in *every* slice is fatal, and `Nwp.validate` rejects that variable before this report
+    runs.
 
     Read this as "how much did we lose", not as "how corrupt was the feed". The aggregation
     absorbs most per-pixel upstream corruption before it reaches a cell, so this is a poor proxy
@@ -595,9 +602,9 @@ class NwpQualityReport:
     def n_scattered_slices(self) -> int:
         """Affected slices carrying only *some* null cells.
 
-        Expect this to be small. Scattered upstream corruption is mostly absorbed by the H3
-        aggregation, so a slice reaches this count only where the scatter took out every grid
-        point of some cell. It is *not* a measure of the upstream per-pixel null rate.
+        Expect this count to be small. Scattered upstream corruption is mostly absorbed by the
+        H3 aggregation, so a slice reaches this count only where the scatter took out every grid
+        point of some cell. The count is *not* a measure of the upstream per-pixel null rate.
         """
         return self.n_affected_slices - self.n_whole_null_slices
 
@@ -795,8 +802,9 @@ def assess_nwp_run_completeness(
         A `NwpRunCompletenessReport` giving the observed row count against the expected
         complete-grid row count, the observed versus expected ensemble members and H3 cell
         count, the earliest and latest `valid_time` (`None` for an empty frame), and which
-        expected lead times are missing or which observed `valid_time`s are unexpected — the
-        latter two both empty when the frame does not hold exactly one `init_time`.
+        expected lead times are missing or which observed `valid_time`s are unexpected —
+        `missing_lead_time_hours` and `unexpected_valid_times` are both empty when the frame does
+        not hold exactly one `init_time`.
     """
     init_times = tuple(sorted(dataframe["init_time"].unique().to_list()))
     observed_members = set(dataframe["ensemble_member"].unique().to_list())

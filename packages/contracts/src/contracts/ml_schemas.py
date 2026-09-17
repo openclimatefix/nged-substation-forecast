@@ -58,7 +58,7 @@ class AllFeatures(pt.Model):
       `temperature_2m_rolling_mean_6h`).
 
     Note: Dynamic features are not explicitly typed as Patito fields below. This is intentional
-    to allow infinite parameterization (e.g., any lag hour) without the overhead of
+    to allow infinite parameterisation (e.g., any lag hour) without the overhead of
     metaprogramming or defining hundreds of static fields. The pipeline dynamically asserts their
     presence during feature engineering.
     """

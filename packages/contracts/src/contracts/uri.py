@@ -1,8 +1,8 @@
 """Small URI helpers for paths that may be local filesystem paths *or* remote URIs.
 
 Settings data-location fields are plain ``str`` so they can hold either a local path
-(``/home/.../data/NWP``) or a remote URI (``s3://bucket/NWP``). ``pathlib.Path`` mangles the
-latter (``Path("s3://b/a") / "c"`` drops the scheme), so joins route through here.
+(``/home/.../data/NWP``) or a remote URI (``s3://bucket/NWP``). ``pathlib.Path`` mangles a
+remote URI (``Path("s3://b/a") / "c"`` drops the scheme), so joins route through here.
 
 The existence/parent helpers below give the asset IO layer a single local-or-remote-aware call
 for the two things it does around every Delta/parquet write: make sure the parent directory
