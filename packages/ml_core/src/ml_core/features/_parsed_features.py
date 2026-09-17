@@ -148,13 +148,13 @@ class ParsedFeatures:
 
     @classmethod
     def from_strings(cls, selected_features: set[str]) -> Self:
-        """Parse a list of selected features into a ParsedFeatures object.
+        """Parse a set of selected feature names into a ``ParsedFeatures`` object.
 
         Rationale:
             Parsing upfront allows us to fail fast on invalid requests and cleanly separates the
-            parsing logic from the execution logic. It specifically identifies lags on the target
-            variable (`power`) and flags them in the `get_leaky_features` method, ensuring the
-            execution phase knows exactly which features require lags to be nullified.
+            parsing logic from the execution logic. Parsing also separates out the lags on the
+            target variable (`power`), which `get_leaky_features` later selects, so the execution
+            phase knows exactly which features require lags to be nullified.
 
             Furthermore, this parser enforces strict architectural guardrails to prevent target
             leakage and index column misuse. For example, requesting the raw target variable 'power'
@@ -165,12 +165,17 @@ class ParsedFeatures:
             patterns.
 
         Args:
-            selected_features: A set of raw feature name strings requested for engineering. Valid
-                values include all TIME_FEATURES, and all StaticFeatures, and feature names like
-                'power_lag_24h' and 'temperature_2m_rolling_mean_6h'.
+            selected_features: A set of raw feature name strings requested for engineering. Six
+                kinds of name are accepted: every member of `contracts.ml_schemas.TimeFeature`;
+                every key of `STATIC_FEATURE_REGISTRY`, which today holds `windchill` alone; every
+                member of `contracts.weather_schemas.WeatherFeature`; every member of
+                `contracts.ml_schemas.SafeInputBaseColumn`; a lag name such as `power_lag_24h`;
+                and a rolling-mean name such as `temperature_2m_rolling_mean_6h`. Every other
+                string raises `ValueError`, including the two guarded names above.
 
         Returns:
-            A ParsedFeatures configuration object containing structured instructions.
+            A `ParsedFeatures` configuration object containing structured instructions, with one
+            list per accepted kind of name.
         """
         lags: list[LagFeature] = []
         rolling_means: list[RollingFeature] = []

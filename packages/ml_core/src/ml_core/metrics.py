@@ -1,4 +1,21 @@
-"""Metric computation for cross-validation results."""
+"""Scoring forecasts against the power that was actually observed.
+
+Four public functions, in the order the cross-validation assets call them.
+``compute_effective_capacity`` derives the per-series denominator that normalised mean absolute
+error (NMAE) divides by. ``compute_metrics`` joins predictions to observed power and returns the
+tall ``Metrics`` frame. ``enrich_metrics_rows`` stamps the evaluation window and scope onto that
+frame once the calling asset knows them. ``build_mlflow_aggregate_metrics`` reduces the frame to
+the flat key/value dictionary the MLflow leaderboard displays.
+
+Every function here is pure — no Dagster, no MLflow, and no IO — so each one is unit-testable on
+an in-memory frame, and the asset that calls it owns every read and write.
+
+The equations, and the argument for choosing each metric over the alternatives, are on
+<https://openclimatefix.github.io/nged-substation-forecast/techniques/evaluation-metrics/>. The
+docstrings below say what this implementation does with those equations, and record the corners
+where a degenerate input — a single-member ensemble, or a forecast with zero error — needed a
+defined answer rather than a NaN.
+"""
 
 import re
 from datetime import datetime

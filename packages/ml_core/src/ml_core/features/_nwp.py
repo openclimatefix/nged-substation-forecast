@@ -1,7 +1,13 @@
 """NWP processing and power/NWP join helpers.
 
-Handles temporal upsampling (3-hourly → 30-min), processing into a form the feature pipeline can
-consume, and the two NWP join modes (bulk training vs. single-run inference).
+Handles temporal upsampling from the NWP model's native step width onto the half-hourly grid the
+power observations sit on, processing into a form the feature pipeline can consume, and the two
+NWP join modes (bulk training against single-run inference).
+
+Also the home of ``NWP_PUBLICATION_DELAY_HOURS``, the one constant that ties the two modes
+together: bulk mode derives each row's ``power_fcst_init_time`` from it, and single-run mode
+derives ``nwp_init_time`` from it when the caller names no run. The constant is re-exported from
+``ml_core.features``, and its value is argued for on the constant itself.
 """
 
 from datetime import datetime, timedelta
@@ -133,12 +139,14 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
 
     End-null propagation: Polars' interpolate() fills interior nulls but leaves both leading
     nulls (before the first non-null value in a group) and trailing nulls (after the last one) as
-    null. Some ECMWF ENS variables (precipitation, radiation fluxes) are null at lead time 0 by
-    convention. After upsampling from native 3-hourly steps, all interpolated 30-min rows before
-    the first non-null step remain null — typically a 3-hour window per NWP run. The trailing
-    case is rarer but real: a wholly-null slice at the last native step of the horizon is not
-    bridged either, so it too reaches the caller as null. Callers and downstream models should
-    treat all of these as genuinely missing values, not as a data quality issue.
+    null. Some ECMWF ENS variables (precipitation, and the radiation fluxes) are null at lead time
+    0 by convention. Every interpolated 30-min row before a group's first non-null native step
+    therefore remains null — typically a 3-hour window per NWP run, because ECMWF ENS runs at a
+    3-hour native step width out to 144 hours before coarsening to a 6-hour step width for the
+    rest of its 360-hour horizon. The trailing case is rarer but real: a wholly-null slice at the
+    last native step of the horizon is not bridged either, so that slice too reaches the caller as
+    null. Callers and downstream models should treat every one of these nulls as a genuinely
+    missing value rather than as a defect in the download.
     """
     schema_names = nwp_lf.collect_schema().names()
     all_weather_vars = Nwp.all_weather_var_names()

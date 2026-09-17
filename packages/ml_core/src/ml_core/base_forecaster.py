@@ -51,11 +51,12 @@ the merge problem ``_MLFLOW_MODEL_ARTIFACT`` documents.
 _UNPERSISTED_METADATA_COLUMN: Final[str] = "area_wkt"
 """The one ``TimeSeriesMetadata`` column ``write_trained_metadata`` drops.
 
-Measured on the V1 roster (32 series, 12 columns): the frame is 129,582 bytes and ``area_wkt``
-holds 127,635 of them — 98.5%, against under 2 KB for everything else. Nothing in the feature
-pipeline reads it, and at V2 scale (~2,500 series) it would put megabytes of polygon text into
-every fold's archive. It is ``allow_missing``, so the frame still validates against
-``TimeSeriesMetadata`` without it.
+Measured on the V1 metadata roster (33 rows, 14 columns): the frame is 129,916 bytes in memory
+and ``area_wkt`` holds 127,635 of those bytes — 98.2%, against 2,281 bytes for the other 13
+columns put together. Nothing in the feature pipeline reads the well-known-text polygon
+``area_wkt`` carries, and at V2 scale (~2,500 series) that polygon text would put megabytes into
+every fold's archive. The column is ``allow_missing``, so the frame still validates against
+``TimeSeriesMetadata`` once ``write_trained_metadata`` has dropped the column.
 """
 
 _ARCHIVE_COMPRESSLEVEL: Final[int] = 1
