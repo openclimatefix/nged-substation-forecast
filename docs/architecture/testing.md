@@ -103,7 +103,7 @@ Scale](performance.md#the-other-hard-ceiling-polars-32-bit-row-index).
   `dynamic_partitions_store`), so it reaches interpreter shutdown with both connections open even on
   a completely successful run. The context manager also covers the failure path, where an unhandled
   exception's traceback pins the raising frame. Worked example:
-  `scripts/run_baseline_experiment.py`. Measured with an `atexit` probe after one real
+  `scripts/forecasting/run_baseline_experiment.py`. Measured with an `atexit` probe after one real
   `materialize`: 2 connections still open with a bare call, 0 with the context manager, on both
   paths.
 - **`build_asset_context()` (and the other `build_*_context()` helpers) needs the same treatment
@@ -258,9 +258,9 @@ Two GitHub workflows in `.github/workflows/` run the checks described on this pa
   upstream catalog's conventions, not a defect in whatever PR happens to be open.
 
 **Two steps validate links, because neither sees what the other does.** `mkdocs build --strict`
-fails on a broken link *within* `docs/`. `scripts/check_docs_links.py` fails on a link *into* the
-published site — the form CLAUDE.md requires from a docstring, a comment or a GitHub issue body —
-whose page a rename moved or whose anchor a heading rewrite killed.
+fails on a broken link *within* `docs/`. `scripts/lint/check_docs_links.py` fails on a link *into*
+the published site — the form CLAUDE.md requires from a docstring, a comment or a GitHub issue body
+— whose page a rename moved or whose anchor a heading rewrite killed.
 
 `check_docs_links.py` resolves each anchor by running the real `markdown.Markdown()` converter over
 the target page rather than guessing a slug, because Python-Markdown's `toc` extension preserves
@@ -371,8 +371,8 @@ that shape from a working notebook — `ruff check --fix`, which writes an impor
 into the top-level import block, and `marimo check --fix`, which deletes such an import and rewrites
 the cell that used the name as `def _(name)`, leaving a cell input nothing defines.
 
-`scripts/check_marimo_notebooks.py` reads each cell's `refs` and `defs` and reports any name a cell
-references that no cell binds. It runs as a pre-commit hook over changed notebooks, and
+`scripts/lint/check_marimo_notebooks.py` reads each cell's `refs` and `defs` and reports any name a
+cell references that no cell binds. It runs as a pre-commit hook over changed notebooks, and
 `tests/test_marimo_notebooks.py` runs it over every notebook in `packages/notebooks/` and
 `packages/dashboard/`. Three properties are worth knowing:
 

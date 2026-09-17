@@ -6,7 +6,7 @@ its label contains spaces, so a line break can never fall inside `[label](target
 
 Usage::
 
-    python3 scripts/reflow_docs.py docs/index.md README.md ...
+    python3 scripts/lint/reflow_docs.py docs/index.md README.md ...
 """
 
 import sys

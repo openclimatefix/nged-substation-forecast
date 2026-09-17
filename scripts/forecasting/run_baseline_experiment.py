@@ -20,7 +20,7 @@ base config's list minus the four ``power_lag_*h`` entries.
 
 Run from the repo root, or a worktree where ``.env`` (and ``data``) are symlinked:
 
-    uv run python scripts/run_baseline_experiment.py
+    uv run python scripts/forecasting/run_baseline_experiment.py
 """
 
 from __future__ import annotations
@@ -168,7 +168,7 @@ def main() -> None:
         _run_pipeline(instance)
 
     _report_metrics()
-    print("\nDone. Now run: uv run python scripts/export_baseline_forecasts.py")
+    print("\nDone. Now run: uv run python scripts/forecasting/export_baseline_forecasts.py")
 
 
 if __name__ == "__main__":

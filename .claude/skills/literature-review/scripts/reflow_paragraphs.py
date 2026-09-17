@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Final
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
-from scripts.markdown_wrap import WIDTH
+from scripts.lint.markdown_wrap import WIDTH
 
 SKIP_PREFIXES: Final[tuple[str, ...]] = ("#", "|", "```", "- ", "* ", ">", "    ")
 """Block openings whose line breaks carry meaning, so they must never be rewrapped."""

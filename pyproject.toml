@@ -454,7 +454,7 @@ plugins.md060.enabled = false
 # reproduce Python-Markdown's slug algorithm for a heading containing an em dash, so it flags
 # every anchor link to a heading like "### 10 — Every write is atomic..." as broken even though
 # the anchor is exactly what MkDocs generates and renders correctly — confirmed against
-# scripts/check_docs_links.py, which parses MkDocs' actual output and passes on the same links.
+# scripts/lint/check_docs_links.py, which parses MkDocs' actual output and passes on the same links.
 plugins.md051.enabled = false
 # Emphasis style: pymarkdownlnt 0.9.40 also newly implements this rule, and it doesn't know that
 # an underscore inside `$...$`/`$$...$$` math is a LaTeX subscript, not markdown emphasis — e.g.

@@ -1,4 +1,4 @@
-"""Tests for `scripts/check_docs_links.py`.
+"""Tests for `scripts/lint/check_docs_links.py`.
 
 The script resolves an anchor by converting the page with the real `markdown.Markdown` converter
 rather than a hand-rolled slugify, because Python-Markdown's `toc` extension preserves
@@ -23,7 +23,7 @@ import pytest
 REPO_ROOT: Final[Path] = Path(__file__).parent.parent
 """The repo root, one level above this `tests/` directory."""
 
-SCRIPT_PATH: Final[Path] = REPO_ROOT / "scripts" / "check_docs_links.py"
+SCRIPT_PATH: Final[Path] = REPO_ROOT / "scripts" / "lint" / "check_docs_links.py"
 """The script under test, imported by path because `scripts/` is not an importable package."""
 
 
