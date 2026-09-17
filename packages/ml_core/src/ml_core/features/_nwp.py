@@ -1,12 +1,12 @@
 """NWP processing and power/NWP join helpers.
 
 Handles temporal upsampling from the NWP model's native step width onto the half-hourly grid the
-power observations sit on, processing into a form the feature pipeline can consume, and the two
-NWP join modes (bulk training against single-run inference).
+power observations sit on, processing into a form the feature pipeline can consume, and the two NWP
+join modes: bulk training, and single-run inference.
 
-Also the home of ``NWP_PUBLICATION_DELAY_HOURS``, the one constant that ties the two modes
-together: bulk mode derives each row's ``power_fcst_init_time`` from it, and single-run mode
-derives ``nwp_init_time`` from it when the caller names no run. The constant is re-exported from
+Also the home of ``NWP_PUBLICATION_DELAY_HOURS``, the one constant that ties the two modes together:
+bulk mode derives each row's ``power_fcst_init_time`` from the delay, and single-run mode derives
+``nwp_init_time`` from the delay when the caller names no run. The constant is re-exported from
 ``ml_core.features``, and its value is argued for on the constant itself.
 """
 
@@ -20,9 +20,10 @@ from contracts.weather_schemas import Nwp
 NWP_PUBLICATION_DELAY_HOURS: Final[int] = 9
 """Hours after an NWP run's ``init_time`` before we treat that run as usable.
 
-This models when a run reaches *our* disk, not when Dynamical publish it. Dynamical publish each
-00Z run between 08:05 and 08:20 UTC, and ``ecmwf_ens_schedule`` downloads it at 08:30 UTC, so a 00Z
-run is ours from roughly 08:30 — 8.5 hours. Nine is the nearest whole hour at or after that.
+The delay models when a run reaches *our* disk, not when Dynamical publish that run. Dynamical
+publish each 00Z run between 08:05 and 08:20 UTC, and ``ecmwf_ens_schedule`` downloads it at 08:30
+UTC. A 00Z run is therefore ours from roughly 08:30, which is 8.5 hours after that run's
+``init_time``. Nine is the nearest whole hour at or after 8.5.
 
 The feature pipeline uses the delay to derive ``power_fcst_init_time`` from ``nwp_init_time`` in
 bulk mode, and to derive ``nwp_init_time`` when a single-run caller omits ``nwp_init_time``.
@@ -53,12 +54,12 @@ def _join_nwp_bulk_mode(
     Produces one row per (time_series_id, nwp_init_time, valid_time, ensemble_member) with
     power_fcst_init_time derived per-row as nwp_init_time + nwp_publication_delay_hours. Each NWP
     run's first nwp_publication_delay_hours of valid times therefore precede the derived
-    power_fcst_init_time; those hindcast rows are kept here so that window features (e.g. weather
+    power_fcst_init_time. Those hindcast rows are kept here so that window features (e.g. weather
     rolling means) see the same predecessor rows as single-run mode, and are dropped by
     ``_engineer_features`` after feature computation.
 
-    ``power_lf`` carries no metadata: ``_engineer_features`` joins that onto the result, because
-    a valid_time with no power observation would otherwise lose its metadata here.
+    ``power_lf`` carries no metadata: ``_engineer_features`` joins the metadata onto the result,
+    because a valid_time with no power observation would otherwise lose its metadata here.
     """
     if processed_nwp is None:
         result = power_lf.with_columns(
@@ -138,11 +139,11 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
     interpolate/forward_fill are applied with over() to stay within group boundaries.
 
     End-null propagation: Polars' interpolate() fills interior nulls but leaves both leading nulls
-    (before the first non-null value in a group) and trailing nulls (after the last one) as null.
-    Some ECMWF ENS variables (precipitation, and the radiation fluxes) are null at lead time 0 by
-    convention. Every interpolated 30-min row before a group's first non-null native step therefore
-    remains null — typically a 3-hour window per NWP run, because ECMWF ENS runs at a 3-hour native
-    step width out to 144 hours before coarsening to a 6-hour step width for the rest of its
+    (before the first non-null value in a group) and trailing nulls (after the last non-null value)
+    as null. Some ECMWF ENS variables (precipitation and the radiation fluxes) are null at lead time
+    0 by convention. Every interpolated 30-min row before a group's first non-null native step
+    therefore remains null — typically a 3-hour window per NWP run. ECMWF ENS runs at a 3-hour
+    native step width out to 144 hours, then coarsens to a 6-hour step width for the rest of its
     360-hour horizon. The trailing case is rarer but real: a wholly-null slice at the last native
     step of the horizon is not bridged either, so that slice too reaches the caller as null. Callers
     and downstream models should treat every one of these nulls as a genuinely missing value rather

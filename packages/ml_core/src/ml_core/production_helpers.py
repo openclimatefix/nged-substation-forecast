@@ -2,14 +2,15 @@
 
 Every function here is unit-testable in isolation. The two data-shaping helpers
 (``select_nwp_init_time``, ``build_live_power_frame``) take ``power_fcst_init_time`` as an explicit
-parameter rather than calling ``datetime.now()`` internally, so a test can pass any fixed time and
-get a deterministic result. The two disk/MLflow helpers (``load_forecaster_from_dir``,
-``fetch_model_artifacts``) do the IO and check that the saved model is one this code can still build
-a config for and parse the features of. Of the five helpers this module exports,
-``weather_lags_lack_their_control_member`` is the only helper that reads a data table rather than a
-saved model. The read is a bounded probe against the slot's NWP scan, and the scan is an argument,
-so a test can pass an in-memory frame. The ``live_forecasts`` and ``promoted_model`` Dagster assets
-(``src/nged_substation_forecast/defs/production_assets.py``) stay thin shells over these.
+parameter rather than calling ``datetime.now()`` internally. A test can therefore pass any fixed
+time and get a deterministic result. The two disk/MLflow helpers (``load_forecaster_from_dir``,
+``fetch_model_artifacts``) do the IO and check that the saved model is a model this code can still
+build a config for and parse the features of. Of the five helpers this module exports,
+``weather_lags_lack_their_control_member`` is the only helper that executes a read against a data
+table rather than against a saved model. The read is a bounded probe against the slot's NWP scan,
+and the scan is an argument, so a test can pass an in-memory frame. The ``live_forecasts`` and
+``promoted_model`` Dagster assets (``src/nged_substation_forecast/defs/production_assets.py``) stay
+thin shells over these helpers.
 """
 
 import json
@@ -97,16 +98,16 @@ def weather_lags_lack_their_control_member(
 ) -> bool:
     """Whether this slot asks for weather lags that its NWP run cannot fully supply.
 
-    A weather lag reaching back before ``power_fcst_init_time`` is answered by the analysis
-    proxy, which reads the control member (``ensemble_member == 0``) alone. A run carrying no
-    control-member rows — a partial or malformed ECMWF ENS download — therefore nulls each
-    weather lag over the first ``lag_hours`` of the horizon, where the lag still points into the
-    past. The rest of the horizon is answered by the same-run join, which reads whichever
-    ensemble members the run does carry. ``_engineer_features`` already degrades rather than
-    failing there and logs a warning naming the run. This function exists so ``live_forecasts``
-    can *also* report the degradation on the Sentry channel, which
-    [rule 4](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)
-    requires alongside the log rather than as a substitute for it. Reading the logs is not a
+    A weather lag reaching back before ``power_fcst_init_time`` is answered by the analysis proxy,
+    which reads the control member (``ensemble_member == 0``) alone. A run carrying no
+    control-member rows — a partial or malformed ECMWF ENS download — therefore nulls each weather
+    lag over the first ``lag_hours`` of the horizon, where the lag still points into the past. The
+    rest of the horizon is answered by the same-run join, which reads whichever ensemble members the
+    run does carry. ``_engineer_features`` already degrades rather than failing there and logs a
+    warning naming the run. This function exists so ``live_forecasts`` can *also* report the
+    degradation on the Sentry channel, which [rule
+    4](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)
+    requires alongside the log rather than as a substitute for the log. Reading the logs is not a
     monitoring strategy: the operator reads the alert.
 
     Returns ``False`` when the model selects no weather lag, because a model with no weather lags
@@ -114,8 +115,8 @@ def weather_lags_lack_their_control_member(
     run does carry.
 
     ``live_forecasts`` probes the NWP scan *before* the H3 spatial join, while
-    ``_engineer_features`` probes the scan after. That makes the frame here a superset of the
-    frame the pipeline sees, so the alert can in principle miss a degradation the pipeline hits,
+    ``_engineer_features`` probes the scan after. That makes the frame here a superset of the frame
+    the pipeline sees. The alert can therefore in principle miss a degradation the pipeline hits,
     but can never fire on a degradation the pipeline does not hit. In practice
     ``load_engineering_inputs`` has already pruned the scan to the model's own frozen H3 cells, so
     the two frames hold the same cells today.
@@ -152,10 +153,10 @@ def build_live_power_frame(
 ) -> pt.LazyFrame[PowerTimeSeries]:
     """Build a dense half-hourly ``(time_series_id, time)`` spine for live inference.
 
-    Needed because ``ml_core.features._nwp._join_nwp_single_run`` is power-centric — with no
-    future power rows a live run would emit zero forecast rows. Left-joins observed power onto
-    a spine covering ``(power_fcst_init_time - history, power_fcst_init_time + horizon]`` for
-    every requested ``time_series_id``, so rows beyond the last observation are present with
+    Needed because ``ml_core.features._nwp._join_nwp_single_run`` is power-centric — with no future
+    power rows a live run would emit zero forecast rows. Left-joins observed power onto a spine
+    covering ``(power_fcst_init_time - history, power_fcst_init_time + horizon]`` for every
+    requested ``time_series_id``. Rows beyond the last observation are therefore present with
     ``power = null``. Also harmless for replay (future observations already exist there;
     ``_nullify_leaky_lags`` prevents lag leakage regardless).
 
@@ -194,11 +195,11 @@ def build_live_power_frame(
 def _check_meta_is_servable(meta: dict[str, Any], source: str) -> type[BaseForecaster]:
     """Raise if this code cannot serve the model that ``meta.json`` describes; return its class.
 
-    A saved model names its class, its hyper-parameters and its features as strings, so renaming or
-    removing any of them in code leaves every model saved before the change unservable. The whole
-    of ``model_params`` is validated against the concrete ``CONFIG_CLASS`` reached from
-    ``model_class``, which is the same object the subclass's ``load`` builds its config from — so a
-    model that passes here is one ``load`` will accept. See
+    A saved model names its class, its hyper-parameters, and its features as strings, so renaming or
+    removing any of those names in code leaves every model saved before the change unservable. The
+    whole of ``model_params`` is validated against the concrete ``CONFIG_CLASS`` reached from
+    ``model_class``, which is the same object the subclass's ``load`` builds its config from. A
+    model that passes here is therefore a model ``load`` will accept. See
     <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>
     for why this raises rather than degrading.
 
@@ -255,9 +256,9 @@ def _check_meta_is_servable(meta: dict[str, Any], source: str) -> type[BaseForec
 def _check_trained_metadata_is_readable(model_dir: Path, run_id: str) -> None:
     """Raise if a staged model carries no readable frozen metadata to locate its series by.
 
-    Production inference reads each series' H3 cell from this file, so a model without a usable one
-    would forecast nothing at its next 6-hourly slot. Checking here refuses the promotion instead,
-    before the swap, leaving the outgoing champion serving.
+    Production inference reads each series' H3 cell from this file, so a model without a usable copy
+    of that file would forecast nothing at its next 6-hourly slot. Checking here refuses the
+    promotion instead, before the swap, leaving the outgoing champion serving.
 
     Whether the file *covers* the trained population is not checked: ``save_to_mlflow`` is the only
     function in this repo that writes the file, and its caller has already passed
@@ -287,9 +288,9 @@ def load_forecaster_from_dir(path: Path) -> BaseForecaster:
     (the same mechanism ``ml_core.mlflow_runs.load_experiment_forecaster`` uses), then calls the
     concrete subclass's ``load(path)``.
 
-    The forecaster returned is one this code can actually serve, not merely one it could
-    deserialise: a config it cannot rebuild, or a feature vocabulary it cannot parse, is rejected
-    here rather than partway through a live tick's feature engineering.
+    The forecaster returned is a model this code can actually serve, not merely a model it could
+    deserialise: a config this code cannot rebuild, or a feature vocabulary it cannot parse, is
+    rejected here rather than partway through a live tick's feature engineering.
 
     Args:
         path: Directory previously populated by ``fetch_model_artifacts`` (the
@@ -324,22 +325,23 @@ def fetch_model_artifacts(run_id: str, dest: Path) -> None:
     Downloads and unpacks into a temporary directory first, so a failed or interrupted download
     never touches ``dest`` — only a fully-downloaded model is moved into place (via ``rmtree`` +
     ``move``). ``dest`` is local disk by convention — ``Settings.production_model_path`` derives
-    from ``local_artifacts_path``, though nothing enforces that — so unlike the Delta tables this is
-    a directory of many files with no commit protocol over it, and a part-written one would be
+    from ``local_artifacts_path``, though nothing enforces that. Unlike a Delta table, ``dest`` is a
+    directory of many files with no commit protocol over it, and a part-written directory would be
     served. The run holds the model as a single archive artifact
-    (``ml_core.base_forecaster._MLFLOW_MODEL_ARTIFACT``), so ``dest`` gets exactly the files the
-    last ``save_to_mlflow`` wrote and can never inherit a stale file from an earlier, larger model.
+    (``ml_core.base_forecaster._MLFLOW_MODEL_ARTIFACT``). ``dest`` therefore gets exactly the files
+    the last ``save_to_mlflow`` wrote, and can never inherit a stale file from an earlier, larger
+    model.
 
     The downloaded model's saved config is checked against the running code *before* the swap,
-    reading the staged ``meta.json`` rather than loading the model, so a model this code cannot
-    serve is refused while the previous champion stays in ``dest`` and keeps serving. Reading the
-    JSON is deliberate: it applies the same validation the subclass's ``load`` would, without
-    pulling every booster into memory to do it.
+    reading the staged ``meta.json`` rather than loading the model. A model this code cannot serve
+    is therefore refused while the previous champion stays in ``dest`` and keeps serving. Reading
+    the JSON is deliberate: it applies the same validation the subclass's ``load`` would apply,
+    without pulling every booster into memory first.
 
     Also writes a ``promotion.json`` (``{"mlflow_run_id", "promoted_at"}``) into ``dest`` for
-    provenance; a ``BaseForecaster.load`` implementation reads its own population from its saved
-    record (e.g. ``XGBoostForecaster`` from ``meta.json``'s ``trained_time_series_ids``), never
-    from a directory listing, so this extra file is harmless.
+    provenance. That extra file is harmless, because a ``BaseForecaster.load`` implementation reads
+    its own population from its saved record (e.g. ``XGBoostForecaster`` from ``meta.json``'s
+    ``trained_time_series_ids``), never from a directory listing.
 
     The caller is responsible for setting the tracking URI (``mlflow.set_tracking_uri``)
     beforehand.

@@ -25,7 +25,7 @@ def date_to_utc_datetime(d: date, *, end_of_day: bool = False) -> datetime:
     Used to turn a fold's ``[start, end]`` calendar dates into the ``[start 00:00:00, end
     23:59:59]`` UTC window that the training and validation data loads filter on (and that
     eligibility uses for ``val_end``). That window is closed rather than half-open: both ends are
-    inclusive, so a filter written against it needs no ``<`` where the caller meant ``<=``.
+    inclusive, so a filter written against the window needs no ``<`` where the caller meant ``<=``.
 
     Args:
         d: The calendar date.
@@ -63,9 +63,9 @@ def eligible_time_series_ids(
     A time series is eligible when it has at least ``min_training_months`` of observations
     before the fold's ``val_start`` **and** observations through the fold's ``val_end``.
 
-    Eligibility is a function of the **data only** — it does not depend on any model or
-    experiment config — so every experiment evaluates a fold on the identical population,
-    which is what makes leaderboard comparisons fair.
+    Eligibility is a function of the **data only** — it does not depend on any model or experiment
+    config — so every experiment evaluates a fold on the identical population. That identical
+    population is what makes leaderboard comparisons fair.
 
     Args:
         coverage: One row per time series with the columns ``time_series_id``, ``first_time``,

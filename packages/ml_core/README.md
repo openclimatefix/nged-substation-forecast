@@ -12,14 +12,14 @@ property — and inherits the rest from this package: the feature pipeline that 
 MLflow wiring that gives its run an identity, the archive format its weights are shipped in, the
 checks that decide whether a saved model can still be served, and the scoring that puts it on the
 leaderboard. `XGBoostForecaster` in `xgboost_forecaster` is the only subclass in the repo today, so
-the second model family is the real test of that split: writing it should mean writing five members,
-not a second pipeline.
+the second model family is the real test of that split. Writing that second family should mean
+writing five members, not a second pipeline.
 
 **The Dagster assets delegate here rather than implementing anything themselves.** The
 cross-validation, metrics, and live-inference assets in `src/nged_substation_forecast/defs/` are
-thin shells over the functions below, which keeps every one of those functions unit-testable without
-a Dagster instance, an MLflow server, or an object store. The assets hold the orchestration —
-partitions, schedules, retries, and asset checks — and nothing else.
+thin shells over the functions below. That thinness keeps every one of those functions unit-testable
+without a Dagster instance, an MLflow server, or an object store. The assets hold the orchestration
+— partitions, schedules, retries, and asset checks — and nothing else.
 
 **Every neighbouring package owns a piece of the data; `ml_core` owns what is done with it.**
 `contracts` owns what every frame means, and `ml_core` consumes those Patito schemas without
@@ -37,8 +37,8 @@ leaderboard row — is this package.
 this package is built to prevent.** `power_fcst_init_time` is the first of those two moments and
 `nwp_init_time` is the second, and the pipeline carries both as separate columns from end to end.
 The two columns differ by the publication delay — the hours between a numerical weather prediction
-(NWP) run's `init_time` and the moment that run reaches our own disk — so a feature is legitimate
-only if it was knowable at `power_fcst_init_time`, never if it was merely knowable at
+(NWP) run's `init_time` and the moment that run reaches our own disk. A feature is therefore
+legitimate only if it was knowable at `power_fcst_init_time`, never if it was merely knowable at
 `nwp_init_time`. Every power lag shorter than or equal to the forecast lead time is nullified
 against `power_fcst_init_time`, in `_nullify_leaky_lags`. Weather lags reaching back before
 `power_fcst_init_time` are answered from an earlier NWP run rather than the current one, which is
@@ -47,7 +47,7 @@ the dual-strategy join in `_apply_weather_lag`.
 **The train==predict population invariant keeps the leaderboard comparable.** A model scores exactly
 the `time_series_id` population it trained on, whatever the eligibility rules would admit today, and
 `BaseForecaster.trained_time_series_ids` is that frozen record. Power coverage changes over time, so
-a series can newly qualify or newly drop out between a training run and a scoring run; letting the
+a series can newly qualify or newly drop out between a training run and a scoring run. Letting the
 scored population drift with the coverage would silently compare two experiments over two different
 populations. The same invariant stops the live service forecasting a series the promoted model never
 saw.
@@ -59,7 +59,7 @@ cross-validation, training, and metrics paths fail fast, because a quietly degra
 poisons every comparison built on it. The live path degrades instead: an absent input routes into
 the always-output branch, the degradation is logged and reported to Sentry, and the forecast still
 comes out with wider uncertainty. `_engineer_features` carries both policies in one function,
-choosing between them on whether the caller supplied a `power_fcst_init_time`, and the reasoning for
+choosing between them on whether the caller supplied a `power_fcst_init_time`. The reasoning for
 that asymmetry is on [Inherent
 stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/)
 and [design principle
@@ -75,7 +75,7 @@ and [design principle
 - `base_forecaster` — `BaseForecaster`, the abstract interface every model implements, and
   `BaseForecasterConfig`, the serialisable config carrying a trained model's experiment identity.
   Also holds the MLflow round-trip that both research and production read a saved model through,
-  which ships a model as one replaceable archive rather than as a directory of files; the constant
+  which ships a model as one replaceable archive rather than as a directory of files. The constant
   `_MLFLOW_MODEL_ARTIFACT` documents why that distinction matters.
 - `metrics` — the scoring pipeline: effective capacity, the ensemble-aware metrics (fair continuous
   ranked probability score, Fortin-corrected spread, pinball loss, prediction-interval coverage

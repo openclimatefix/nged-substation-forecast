@@ -5,26 +5,26 @@ to the nearest time series (``_attach_nearest_nwp_cell``), then runs the declara
 pipeline (``_engineer_features``).
 
 Architecture/Flow:
-    ``_engineer_features`` is the main orchestrator. It takes raw string requests, compiles them
-    into structured instructions using ``ParsedFeatures.from_strings``, joins the necessary base
-    data (power, weather, metadata), then executes the instructions.
+    ``_engineer_features`` is the main orchestrator. The function takes raw string requests,
+    compiles them into structured instructions using ``ParsedFeatures.from_strings``, joins the
+    necessary base data (power, weather, metadata), then executes the instructions.
 
 Lazy Evaluation:
     The pipeline stays lazy from input to output: ``_engineer_features`` returns a
     ``pt.LazyFrame[AllFeatures]`` without collecting the result. Two eager operations are the
     exceptions, and neither reads the full table. ``collect_schema()`` inspects the query plan's
-    column names and dtypes without executing it. The NWP control-member check calls
-    ``.collect()`` on a frame already cut to ``.limit(1)``, so the eager read is bounded to at
-    most one row rather than the table — that bound is what makes collecting here acceptable. In
-    bulk mode (training/backtesting), a missing control member raises immediately. In single-run
-    mode (production inference, replay), a missing control member is absent input, not a contract
-    violation: it is logged and left to degrade past-target-time weather lags to null through the
-    ordinary join-miss path.
+    column names and dtypes without executing it. The NWP control-member check calls ``.collect()``
+    on a frame already cut to ``.limit(1)``, so the eager read is bounded to at most one row rather
+    than the whole table. That bound is what makes collecting here acceptable. In bulk mode
+    (training/backtesting), a missing control member raises immediately. In single-run mode
+    (production inference, replay), a missing control member is absent input, not a contract
+    violation: the absence is logged and left to degrade past-target-time weather lags to null
+    through the ordinary join-miss path.
 
 Nullify Leaky Lags Rationale:
     ``_nullify_leaky_lags`` (in ``_lags.py``) is called at the end of the pipeline to enforce
-    physical forecasting constraints: you cannot use a 24-hour lag when forecasting 48 hours
-    ahead. It nullifies any lag shorter than or equal to the forecast lead time.
+    physical forecasting constraints: you cannot use a 24-hour lag when forecasting 48 hours ahead.
+    ``_nullify_leaky_lags`` nullifies any lag shorter than or equal to the forecast lead time.
 """
 
 import logging
@@ -58,11 +58,11 @@ def _attach_nearest_nwp_cell(
 ) -> pl.LazyFrame:
     """Map each gridded-NWP H3 cell to the time series that sits in it (nearest-cell join).
 
-    NWP is stored per H3 cell at resolution 5; each time series carries its own resolution-5 cell
-    in ``h3_res_5``. Joining ``h3_index == h3_res_5`` gives every time series the weather of its
-    containing cell. The inner join drops NWP cells with no time series and replicates a cell
-    shared by several series across each of them — both correct. The result is keyed by
-    ``time_series_id`` (not ``h3_index``), which is what ``_engineer_features`` expects.
+    NWP is stored per H3 cell at resolution 5; each time series carries its own resolution-5 cell in
+    ``h3_res_5``. Joining ``h3_index == h3_res_5`` gives every time series the weather of its
+    containing cell. The inner join drops NWP cells with no time series, and replicates a cell
+    shared by several series across each of those series. Both behaviours are correct. The result is
+    keyed by ``time_series_id`` (not ``h3_index``), which is what ``_engineer_features`` expects.
     """
     # Strip the Patito subclasses so Polars' cross-subclass join type check doesn't reject the
     # join (see the `polars-patito-gotchas` skill). Zero-copy: same underlying Rust LazyFrames.
@@ -117,8 +117,8 @@ def _check_or_warn_on_missing_control_member(
     nwp_init_time: datetime | None,
     nwp_publication_delay_hours: int,
 ) -> None:
-    """Fail fast in bulk mode, degrade and log in single-run mode, when no control member exists."""
-    # Probes the raw frame, not the upsampled one: `SLICE` cannot push through the upsample's
+    """When no control member exists: fail fast in bulk mode, degrade and log in single-run mode."""
+    # Probes the raw frame, not the upsampled frame: `SLICE` cannot push through the upsample's
     # window functions, so probing post-upsample would run the whole upsample before answering.
     control_member_missing = (
         nwp_lf is not None
@@ -177,30 +177,29 @@ def _engineer_features(
             ``Nwp`` minus ``h3_index`` plus ``time_series_id``, so no existing contract fits.
         power_fcst_init_time: Controls the operating mode of the function.
 
-            **None — bulk training and multi-run backtesting (recommended for most callers):**
-            The function is NWP-centric. It produces one row per
-            (time_series_id, nwp_init_time, valid_time, ensemble_member), and derives
-            power_fcst_init_time = nwp_init_time + nwp_publication_delay_hours per-row.
-            Hindcast rows (valid_time at or before the derived power_fcst_init_time — each
-            NWP run's first nwp_publication_delay_hours of valid times) are dropped, so both
-            training and backtesting see only rows the live service could deliver
-            (valid_time > power_fcst_init_time, strictly). Leaky power lags are nullified
-            relative to each row's power_fcst_init_time, so the resulting dataset is safe
+            **None — bulk training and multi-run backtesting (recommended for most callers):** The
+            function is NWP-centric. It produces one row per (time_series_id, nwp_init_time,
+            valid_time, ensemble_member), and derives power_fcst_init_time = nwp_init_time +
+            nwp_publication_delay_hours per-row. Hindcast rows (valid_time at or before the derived
+            power_fcst_init_time — each NWP run's first nwp_publication_delay_hours of valid times)
+            are dropped. Both training and backtesting therefore see only rows the live service
+            could deliver (valid_time > power_fcst_init_time, strictly). Leaky power lags are
+            nullified relative to each row's power_fcst_init_time, so the resulting dataset is safe
             for training.
 
-            **Single datetime — real-time production inference or backfilling:**
-            A constant power_fcst_init_time is stamped onto every row, and the NWP join
-            matches exclusively the one NWP run identified by nwp_init_time (see below).
-            This branch is only appropriate when power_time_series contains observations
-            for a single forecast run. Passing a multi-run dataset (e.g., a full year of
-            data) will silently produce null weather features for every row except those
-            belonging to the matching NWP run.
+            **Single datetime — real-time production inference or backfilling:** A constant
+            power_fcst_init_time is stamped onto every row, and the NWP join matches exclusively the
+            one NWP run identified by nwp_init_time (see below). This branch is only appropriate
+            when power_time_series contains observations for a single forecast run. Passing a
+            multi-run dataset (e.g., a full year of data) will silently produce null weather
+            features for every row except the rows belonging to the matching NWP run.
 
         nwp_init_time: The NWP run to join in single-run mode (when power_fcst_init_time
             is not None).
 
-            **Live production:** pass the init_time of the NWP run you actually downloaded.
-            This is the preferred path because it is exact regardless of publication delays.
+            **Live production:** pass the init_time of the NWP run you actually downloaded. Passing
+            the downloaded run's init_time is the preferred path, because the run identity is then
+            exact regardless of publication delays.
 
             **Backfilling / None:** if omitted, nwp_init_time is derived as
             power_fcst_init_time - nwp_publication_delay_hours (useful when replaying
@@ -215,8 +214,8 @@ def _engineer_features(
             ``power_fcst_init_time`` from ``nwp_init_time`` in bulk mode, and to derive
             ``nwp_init_time`` when a single-run caller omits ``nwp_init_time``. Single-run mode
             consumes the delay nowhere else.
-        local_timezone: IANA zone the local-time features (time of day, day of week, UTC
-            offset) are computed in. Defaults to ``DEFAULT_LOCAL_TIMEZONE``.
+        local_timezone: IANA zone the local-time features (time of day, time of year, day of week,
+            offset from UTC) are computed in. Defaults to ``DEFAULT_LOCAL_TIMEZONE``.
 
     Returns:
         A ``pt.LazyFrame[AllFeatures]``, still lazy. Bulk mode returns one row per
@@ -237,12 +236,12 @@ def _engineer_features(
     power_lf = pl.LazyFrame._from_pyldf(power_time_series._ldf).rename({"time": "valid_time"})
     metadata_lf = pl.LazyFrame._from_pyldf(time_series_metadata.lazy()._ldf)
     # The metadata is the registry of what we forecast, so a series with power observations but no
-    # metadata row is dropped here rather than carried to the model. Bulk mode drops it regardless
-    # — `_attach_nearest_nwp_cell` inner-joins on `h3_res_5` — but single-run mode is power-centric
-    # and would otherwise keep it with every weather feature null and predict on that, a garbage
-    # forecast that reads as healthy because the series is present. Dropping it instead makes
-    # `live_forecasts_are_healthy` report it, via `missing_time_series_ids`. Unconditional, so the
-    # output row set never depends on which features were requested.
+    # metadata row is dropped here rather than carried to the model. Bulk mode drops such a series
+    # regardless, because `_attach_nearest_nwp_cell` inner-joins on `h3_res_5`. Single-run mode is
+    # power-centric and would otherwise keep the series with every weather feature null and predict
+    # on it, a garbage forecast that reads as healthy because the series is present. Dropping it
+    # instead makes `live_forecasts_are_healthy` report it, via `missing_time_series_ids`.
+    # Unconditional, so the output row set never depends on which features were requested.
     power_lf = power_lf.join(metadata_lf.select("time_series_id"), on="time_series_id", how="semi")
     nwp_lf: pl.LazyFrame | None = nwp
 
@@ -297,18 +296,18 @@ def _engineer_features(
             init_time_col="nwp_init_time",
         )
     else:
-        # Bulk mode: no ceiling, deliberately. historical_weather is built once, globally,
-        # here — before every row gets its own derived power_fcst_init_time — so there is no single
-        # scalar cutoff to give it. None is needed either: for a hindcast target (valid_time <=
+        # Bulk mode: no ceiling, deliberately. historical_weather is built once, globally, here —
+        # before every row gets its own derived power_fcst_init_time — so there is no single scalar
+        # cutoff to give the selection. None is needed either: for a hindcast target (valid_time <=
         # that row's own power_fcst_init_time), the only causally-eligible runs are the row's own
-        # run or an earlier one, because an NWP run's earliest valid_time is its own init_time — a
-        # later run can never hold a valid_time that early. That alone rules out a later run
-        # holding an earlier target, but not a run initialised between the row's own run and its
-        # derived power_fcst_init_time (= nwp_init_time + nwp_publication_delay_hours): closing
-        # that gap needs the run cadence to exceed the delay. We ingest exactly one ECMWF ENS run
-        # per day, and NWP_PUBLICATION_DELAY_HOURS is 9, so no run falls strictly between a row's
-        # own run and its power_fcst_init_time. This is the invariant to re-check if this ever
-        # needs to become row-aware, or if a second daily run or a delay past 24 hours is
+        # run or an earlier run, because an NWP run's earliest valid_time is its own init_time. A
+        # later run can never hold a valid_time that early. That alone rules out a later run holding
+        # an earlier target, but not a run initialised between the row's own run and its derived
+        # power_fcst_init_time (= nwp_init_time + nwp_publication_delay_hours): closing that gap
+        # needs the run cadence to exceed the delay. We ingest exactly one ECMWF ENS run per day,
+        # and NWP_PUBLICATION_DELAY_HOURS is 9, so no run falls strictly between a row's own run and
+        # its power_fcst_init_time. This is the invariant to re-check if the freshest-run selection
+        # ever needs to become row-aware, or if a second daily run or a delay past 24 hours is
         # introduced.
         historical_weather = select_analysis_proxy(
             processed_nwp, group_key="time_series_id", init_time_col="nwp_init_time"
@@ -331,9 +330,9 @@ def _engineer_features(
 
     # Metadata joins *after* the NWP join, not before: bulk mode left-joins power onto NWP, so a row
     # whose valid_time has no power observation would lose time_series_type even though its
-    # time_series_id is known. Conditional because Polars keeps a left join whose right-hand columns
-    # are all projected away, so an unconditional join here would run the join for every caller that
-    # never asked for the column.
+    # time_series_id is known. The join is conditional because Polars keeps a left join whose
+    # right-hand columns are all projected away, so an unconditional join here would run the join
+    # for every caller that never asked for the column.
     if "time_series_type" in selected_features:
         raw_data = raw_data.join(metadata_lf, on="time_series_id", how="left")
 
@@ -346,16 +345,15 @@ def _engineer_features(
         local_timezone=local_timezone,
     )
     if power_fcst_init_time is None and nwp_lf is not None:
-        # Bulk mode with NWP: drop hindcast rows (each NWP run's first
-        # nwp_publication_delay_hours of valid times, which precede the derived
-        # power_fcst_init_time). Filtering *after* feature computation keeps window features
-        # (e.g. weather rolling means) identical to single-run mode, which likewise computes
-        # on the full frame and lets the caller filter before predicting. The strict `>`
-        # mirrors what the live service delivers. The no-NWP bulk branch is exempt: it sets
-        # power_fcst_init_time = valid_time (lead 0 by construction), so this filter would
-        # drop every row. That exemption makes the no-NWP branch training-only: predict
-        # output built from it is all-lead-0 and always fails PowerForecast.validate, so a
-        # power-only forecaster (e.g. a persistence baseline) must synthesise genuine
+        # Bulk mode with NWP: drop hindcast rows (each NWP run's first nwp_publication_delay_hours
+        # of valid times, which precede the derived power_fcst_init_time). Filtering *after* feature
+        # computation keeps window features (e.g. weather rolling means) identical to single-run
+        # mode, which likewise computes on the full frame and lets the caller filter before
+        # predicting. The strict `>` mirrors what the live service delivers. The no-NWP bulk branch
+        # is exempt: it sets power_fcst_init_time = valid_time (lead 0 by construction), so this
+        # filter would drop every row. That exemption makes the no-NWP branch training-only: predict
+        # output built from that branch is all-lead-0 and always fails PowerForecast.validate. A
+        # power-only forecaster (e.g. a persistence baseline) must therefore synthesise genuine
         # power_fcst_init_times for inference rather than predict through this branch.
         engineered_lf = engineered_lf.filter(pl.col("valid_time") > pl.col("power_fcst_init_time"))
     final_lf = _select_output_columns(engineered_lf, selected_features)
@@ -457,15 +455,15 @@ def _apply_rolling_mean_feature(lf: pl.LazyFrame, base_col: str, window_hours: i
     """Applies a rolling mean feature, grouped by (time_series_id, nwp_init_time, ensemble_member).
 
     Grouping by nwp_init_time prevents the rolling window from mixing values across different NWP
-    runs, which would contaminate the feature with data from other forecast initializations.
+    runs, which would contaminate the feature with data from other forecast initialisations.
 
     Cross-mode invariant: the rolling aggregation MUST be null-skipping over the value column
     (mean/min/max/std/median/sum) and MUST NOT be row-count-dependent (e.g. ``.len()``). The two
-    modes present different numbers of rows to a group — single-run mode stamps a constant
-    nwp_init_time, and rows the NWP join missed carry a null ensemble_member and so form a group
-    of their own — so a null-skipping aggregation matches across modes where a row count would
-    not, silently skewing the feature between training and serving. This is locked by
-    test_cross_mode_equivalence.py.
+    modes present different numbers of rows to a group: single-run mode stamps a constant
+    nwp_init_time, and rows the NWP join missed carry a null ensemble_member and so form a group of
+    their own. A null-skipping aggregation therefore matches across modes, where a
+    row-count-dependent aggregation would not, and would silently skew the feature between training
+    and serving. The cross-mode invariant is locked by test_cross_mode_equivalence.py.
 
     ``rolling_mean_by`` inside ``over(..., order_by=)`` rather than ``lf.rolling().agg()``: the
     window form sorts only within each group and emits one value per input row, so it needs
@@ -489,10 +487,11 @@ def _local_utc_offset_minutes(local_time: pl.Expr) -> pl.Expr:
     real extremes are ``Etc/GMT+12`` (−720) and ``Pacific/Kiritimati`` (+840).
 
     Whole minutes depend on the era bound that issue #466 puts on ``PowerTimeSeries.time``. A
-    handful of IANA offsets are not whole minutes — mean solar time before a zone standardised,
-    such as ``Europe/London`` at UTC−0:01:15 until 1847, and Liberia's UTC−0:44:30, which stood as
-    legal time until 1972 — and this truncates them. A timestamp from that era is malformed input,
-    which belongs at the contract boundary rather than being defended against here.
+    handful of IANA offsets are not whole minutes: mean solar time before a zone standardised, such
+    as ``Europe/London`` at UTC−0:01:15 until 1847, and Liberia's UTC−0:44:30, which stood as legal
+    time until 1972. ``_local_utc_offset_minutes`` truncates those offsets. A timestamp from that
+    era is malformed input, which belongs at the contract boundary rather than being defended
+    against here.
 
     Args:
         local_time: An expression yielding a time-zone-aware datetime in the local time zone.
@@ -507,11 +506,14 @@ def _local_utc_offset_minutes(local_time: pl.Expr) -> pl.Expr:
 def _apply_local_time_features(
     lf: pl.LazyFrame, local_timezone: str = DEFAULT_LOCAL_TIMEZONE
 ) -> pl.LazyFrame:
-    """Applies local time features (time of day, day of week, time of year) to the LazyFrame.
+    """Applies the local-time features to the LazyFrame.
 
-    Why local time? Energy consumption patterns are driven by human behavior, which follows
-    local time (including Daylight Saving Time), not UTC. A 9 AM peak in winter (UTC) is
-    different from a 9 AM peak in summer (UTC+1).
+    The features are the time of day, the time of year, the day of week, and the offset from UTC,
+    each derived from ``valid_time`` converted into ``local_timezone``.
+
+    Why local time? Energy consumption patterns are driven by human behaviour, which follows local
+    time (including daylight saving time), not UTC. A 9 AM peak in winter (UTC) is different from a
+    9 AM peak in summer (UTC+1).
 
     Args:
         lf: The LazyFrame containing a 'valid_time' column in UTC.

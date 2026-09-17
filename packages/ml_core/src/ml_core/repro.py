@@ -1,22 +1,25 @@
 """Reproducibility provenance: the git SHA and Delta-table versions behind an MLflow run.
 
-Answers "exactly which code and which data produced this?" for any MLflow run. The git SHA pins
-the code — stamped **explicitly** because MLflow's ``mlflow.source.git.commit`` auto-detection
-needs gitpython installed *and* the working directory inside the repo, neither of which holds in
-a production container. Each Delta table's ``version()`` pins the data: Delta Lake time travel
-makes data versioning one integer per table, so a run can later be replayed with
+Answers "exactly which code and which data produced this?" for any MLflow run. The git SHA pins the
+code. The SHA is stamped **explicitly** because MLflow's ``mlflow.source.git.commit`` auto-detection
+needs gitpython installed *and* the working directory inside the repo, neither of which holds in a
+production container. Each Delta table's ``version()`` pins the data: Delta Lake time travel makes
+data versioning one integer per table. A run can therefore later be replayed with
 ``pl.scan_delta(path, version=N)`` after ``git checkout {sha}``.
 
 Every function here is deliberately **non-raising**: the git SHA, the dirty flag, and each Delta
-table's version are a record *about* a run rather than an input to it, and a missing ``.git``
+table's version are a record *about* a run rather than an input to that run. A missing ``.git``
 directory (containers) or an absent Delta table must never fail the surrounding training or
-forecasting run. Such failures degrade to the sentinels ``"unknown"`` / ``"absent"``.
+forecasting run; each degrades to the sentinels ``"unknown"`` / ``"absent"`` instead.
 
 ``provenance_tags`` **stage-prefixes** its keys (``register_``, ``train_``, ``predict_``,
-``metrics_``) because a single MLflow fold run is written by three separate assets —
-``trained_cv_model``, ``cv_power_forecasts`` and ``metrics`` — each potentially on a different code
-revision and at a different set of Delta table versions. Un-prefixed keys would clobber one another;
-the prefix preserves all three provenance snapshots side by side.
+``metrics_``) because four separate writers stamp provenance onto the same MLflow runs. Three are
+Dagster assets writing one fold run — ``trained_cv_model``, ``cv_power_forecasts``, and
+``metrics`` — each potentially on a different code revision and at a different set of Delta table
+versions. The fourth is the ``register_experiment`` op inside ``register_experiment_job``, which
+stamps the experiment's parent run; the ``metrics`` asset stamps that parent run too. Un-prefixed
+keys would clobber one another, and the prefix preserves every writer's provenance snapshot side
+by side.
 """
 
 import logging
@@ -34,8 +37,10 @@ MlflowTags = dict[str, str]
 """A ``{tag_key: tag_value}`` mapping ready to hand to ``mlflow.set_tags``."""
 
 StageType = Literal["register", "train", "predict", "metrics"]
-"""The assets that stamp provenance; each value becomes a tag-key prefix (see ``provenance_tags``).
-Add a new ``StageType`` value when a new asset starts stamping."""
+"""The four stages that stamp provenance; each value becomes a tag-key prefix (see
+``provenance_tags``). ``"train"``, ``"predict"`` and ``"metrics"`` are Dagster assets, and
+``"register"`` is the ``register_experiment`` op. Add a new ``StageType`` value when a new asset or
+op starts stamping."""
 
 TableNameType = Literal[
     "power_time_series",
@@ -59,17 +64,17 @@ _GIT_CWD: Final[Path] = Path(__file__).resolve().parent
 SHA is captured independently of the process's working directory; outside any repo for a wheel
 install in a container, where the commands fail and ``get_git_info`` returns ``UNKNOWN``.
 
-Caveat: ``git rev-parse`` walks *upward* for a ``.git`` directory, so if an install location that
-is not this project nonetheless sits inside some *other* git repo (e.g. a Docker build context that
+Caveat: ``git rev-parse`` walks *upward* for a ``.git`` directory. If an install location that is
+not this project nonetheless sits inside some *other* git repo (e.g. a Docker build context that
 copied the project's ``.git``, or a rogue ``.git`` above ``site-packages``), the returned SHA is
-that repo's HEAD, not this project's. In this workspace-install project that does not arise, but a
-confidently-wrong SHA is worse than ``UNKNOWN``; treat the SHA as trustworthy only for
-editable/workspace installs."""
+that repo's HEAD, not this project's. In this workspace-install project that does not arise. A
+confidently-wrong SHA is nonetheless worse than ``UNKNOWN``, so treat the SHA as trustworthy only
+for editable and workspace installs."""
 
 _GIT_TIMEOUT_S: Final[float] = 5.0
-"""Hard cap on each git subprocess so a stalled ``.git`` (NFS, a stale lock) can never hang the
-surrounding Dagster asset — the git SHA and the Delta table versions are best-effort records, not a
-blocking dependency."""
+"""Hard cap on each git subprocess so a stalled ``.git`` (a network file system, a stale lock) can
+never hang the surrounding Dagster asset — the git SHA and the Delta table versions are best-effort
+records, not a blocking dependency."""
 
 
 def get_git_info(cwd: Path | None = None) -> MlflowTags:
@@ -77,8 +82,8 @@ def get_git_info(cwd: Path | None = None) -> MlflowTags:
 
     ``git_dirty`` is ``"true"`` when the working tree has uncommitted changes, ``"false"`` when
     clean. When the SHA cannot be read (no ``.git``, no ``git`` binary, a timeout) both values are
-    ``UNKNOWN``; when the SHA is read but the dirty check fails, the SHA is kept and only
-    ``git_dirty`` degrades to ``UNKNOWN`` — a good SHA is never discarded.
+    ``UNKNOWN``. When the SHA is read but the dirty check fails, the SHA is kept and only
+    ``git_dirty`` degrades to ``UNKNOWN``, because a good SHA is never discarded.
 
     Args:
         cwd: Directory the ``git`` commands run from. Defaults to this module's directory
@@ -153,8 +158,8 @@ def provenance_tags(
     """Build stage-prefixed MLflow tags stamping code (git) and data (Delta version) provenance.
 
     Args:
-        stage: Prefix identifying the writing asset. Keeps the tags of assets that share one MLflow
-            run from clobbering.
+        stage: Prefix identifying the writing asset or op. Keeps the tags of the assets and ops that
+            share one MLflow run from clobbering.
         delta_paths: ``{logical_name: table_uri}`` for the Delta tables this stage reads; omit for
             a stage that reads no data (registration).
         storage_options: object-store options for remote table URIs; ``None``/empty for local.

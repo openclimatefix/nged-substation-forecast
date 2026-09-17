@@ -1,10 +1,10 @@
 """Abstract base for pluggable feature-engineering strategies.
 
-A ``FeatureEngineer`` turns the raw inputs (observed power, gridded NWP, time-series metadata)
-into the model-ready frame a forecaster consumes. It is a strategy object **referenced** by a
-forecaster (composition), not a method **implemented** on it — so the forecaster keeps its single
-responsibility (train/predict) and a new model can swap the whole feature pipeline by pointing at
-a different ``FeatureEngineer``.
+A ``FeatureEngineer`` turns the raw inputs (observed power, gridded NWP, time-series metadata) into
+the model-ready frame a forecaster consumes. A ``FeatureEngineer`` is a strategy object
+**referenced** by a forecaster (composition), not a method **implemented** on the forecaster. The
+forecaster therefore keeps its single responsibility (train/predict), and a new model can swap the
+whole feature pipeline by pointing at a different ``FeatureEngineer``.
 """
 
 from abc import ABC, abstractmethod
@@ -19,10 +19,11 @@ from contracts.weather_schemas import Nwp
 from ml_core.features._nwp import NWP_PUBLICATION_DELAY_HOURS
 
 DEFAULT_LOCAL_TIMEZONE: Final[str] = "Europe/London"
-"""IANA zone the local-time features (time of day, day of week, UTC offset) are computed in.
+"""IANA zone the local-time features are computed in.
 
+Those features are the time of day, the time of year, the day of week, and the offset from UTC.
 Defined here, on the interface, rather than inside ``TabularFeatureEngineer``, so a future
-``FeatureEngineer`` forecasting another region can override it through the same ``engineer()``
+``FeatureEngineer`` forecasting another region can override the zone through the same ``engineer()``
 call every production call site already uses — not just through the one implementation.
 """
 

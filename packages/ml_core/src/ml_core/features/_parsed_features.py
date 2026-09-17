@@ -35,7 +35,7 @@ Hours = Annotated[int, Field(gt=0, le=365 * 24 * 2)]
 class BaseLookbackFeature(BaseModel):
     """Base class for lookback features like lags and rolling means.
 
-    Its main job is to parse strings like 'power_lag_24h'.
+    The class's main job is to parse strings like 'power_lag_24h'.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -89,8 +89,8 @@ class LagFeature(BaseLookbackFeature):
 class RollingFeature(BaseLookbackFeature):
     """Represents a parsed rolling mean feature.
 
-    Note that computing the rolling mean of 'power' is currently forbidden to prevent lookahead
-    bias.
+    Computing the rolling mean of 'power' is currently forbidden, because a rolling window over
+    observed power would reach past the forecast-issue time and leak it.
     """
 
     # TODO: Generalise to support more weather summary stats over the rolling window, i.e.
@@ -118,9 +118,8 @@ class RollingFeature(BaseLookbackFeature):
 class ParsedFeatures:
     """Compiled configuration object for feature engineering.
 
-    This class acts as a compiled configuration object. It translates raw string requests
-    (e.g., `"power_lag_24h"`) into structured, typed instructions so downstream execution
-    functions don't have to parse strings.
+    ``ParsedFeatures`` translates raw string requests, such as `"power_lag_24h"`, into structured,
+    typed instructions, so that no downstream execution function has to parse a string.
 
     Attributes:
         lags: List of `LagFeature` definitions. Dictates which base columns to
@@ -131,8 +130,8 @@ class ParsedFeatures:
         static_features: List of static features. Identifies simple row-wise transformations (like
             windchill) that require no time-shifting or complex aggregations.
         time_features: List of time-based features. Triggers timezone conversions. Energy
-            consumption is driven by human behavior, which follows local time (including DST),
-            not UTC.
+            consumption is driven by human behaviour, which follows local time (including daylight
+            saving time), not UTC.
         weather_features: List of raw weather features. Identifies raw weather variables
             requested directly as input features.
         base_features: List of safe input base columns. Identifies base columns
@@ -153,16 +152,16 @@ class ParsedFeatures:
         Rationale:
             Parsing upfront allows us to fail fast on invalid requests and cleanly separates the
             parsing logic from the execution logic. Parsing also separates out the lags on the
-            target variable (`power`), which `get_leaky_features` later selects, so the execution
-            phase knows exactly which features require lags to be nullified.
+            target variable (`power`), which `get_leaky_features` later selects. The execution phase
+            therefore knows exactly which features require lags to be nullified.
 
             Furthermore, this parser enforces strict architectural guardrails to prevent target
             leakage and index column misuse. For example, requesting the raw target variable 'power'
-            as an input feature is forbidden because it would allow downstream models to learn a
-            trivial identity function, rendering them useless at inference time when the actual
-            power is unknown. Similarly, 'valid_time' is an index column and should not be used
-            directly as a feature; instead, local time features should be used to capture behavioral
-            patterns.
+            as an input feature is forbidden, because it would let a downstream model learn a
+            trivial identity function. That identity function is useless at inference time, when the
+            actual power is unknown. Similarly, 'valid_time' is an index column and should not be
+            used directly as a feature. The local time features capture the behavioural patterns a
+            caller reaching for 'valid_time' is after.
 
         Args:
             selected_features: A set of raw feature name strings requested for engineering. Six
@@ -239,12 +238,13 @@ class ParsedFeatures:
     def get_leaky_features(self) -> list[LagFeature | RollingFeature]:
         """List the features that could cause lookahead bias, such as lagged power.
 
-        The pipeline uses this list to selectively nullify them based on the forecast lead time.
+        The pipeline uses this list to nullify those features selectively, based on the forecast
+        lead time.
         """
         return [feature for feature in self._get_all_lookback_features() if feature.is_leaky()]
 
     def max_power_lag(self) -> timedelta:
-        """The longest power lag these features request, or zero when none of them request power.
+        """The longest power lag these features request, or zero when none of them is a power lag.
 
         Sizes ``load_engineering_inputs``'s ``power_lookback``: a caller needs power history
         reaching back at least the returned duration before its window to keep every requested
@@ -257,7 +257,7 @@ class ParsedFeatures:
     def requires_weather_data(self) -> bool:
         """Determine if the requested features require weather (NWP) data.
 
-        This checks:
+        Any one of three conditions makes weather data necessary:
 
         1. If any lookback features (lags or rolling means) are based on weather variables.
         2. If any static features (like windchill) require weather variables.
