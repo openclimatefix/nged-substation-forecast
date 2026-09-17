@@ -209,8 +209,8 @@ def test_tabular_feature_engineer_threads_local_timezone() -> None:
         .collect()
     )
 
-    # Bulk mode is NWP-centric, so both cells' time series appear even though only ts1 has a
-    # power observation; every row shares the same valid_time, so every offset is 330.
+    # Bulk mode is NWP-centric, so both cells' time series appear even though only ts1 has a power
+    # observation; every row shares the same valid_time, so every offset is 330.
     assert set(result["local_utc_offset_minutes"].to_list()) == {330}
     assert result.height == 2
 

@@ -307,8 +307,8 @@ def test_punctuation_inserted_at_any_point_lands_between_the_markup_and_nothing_
     raw = _write(path, EVERY_MARKUP)
     assert ";" not in raw
     projected, spans = apply_findings.project(raw)
-    # The projection's trailing space comes from the file's final newline, and no quote ever
-    # carries it: `locate` matches a stripped needle.
+    # The projection's trailing space comes from the file's final newline, and no quote ever carries
+    # it: `locate` matches a stripped needle.
     limit = len(projected.rstrip())
     for point in range(1, limit):
         spliced = apply_findings.splice(

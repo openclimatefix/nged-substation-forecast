@@ -94,8 +94,8 @@ def _unaligned_partitions(table_uri: str, storage_options: ObjectStoreOptions) -
                 f"{root.rstrip('/')}/{unquote(row['path'])}", filesystem=filesystem
             )
         except (OSError, pa.ArrowInvalid) as error:
-            # A truncated or empty footer is what an interrupted write leaves behind, and
-            # pyarrow raises ArrowInvalid (a ValueError) rather than an OSError for it.
+            # A truncated or empty footer is what an interrupted write leaves behind, and pyarrow
+            # raises ArrowInvalid (a ValueError) rather than an OSError for it.
             _LOGGER.warning("could not read %s, rewriting its partition: %s", row["path"], error)
             unreadable.add(init_time)
             continue

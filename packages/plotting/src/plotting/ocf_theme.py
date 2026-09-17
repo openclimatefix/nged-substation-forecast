@@ -10,8 +10,8 @@ from typing import Final, LiteralString
 import altair as alt
 
 # The colour constants below are typed ``LiteralString`` rather than ``str`` because Altair's
-# ``ThemeConfig`` declares every colour field as ``LiteralString``, which a plain ``str`` does
-# not satisfy — see ``_ocf_theme``.
+# ``ThemeConfig`` declares every colour field as ``LiteralString``, which a plain ``str`` does not
+# satisfy — see ``_ocf_theme``.
 PALETTE: Final[tuple[LiteralString, ...]] = (
     "#FF4901",  # Orange-Red
     "#306BFF",  # Blue
@@ -90,10 +90,10 @@ def _ocf_theme() -> alt.theme.ThemeConfig:
             "legend": {
                 "labelColor": _TEXT,
                 "titleColor": _TEXT,
-                # Legend swatches must stay fully opaque whatever opacity the marks draw at.
-                # In a layered chart Vega-Lite derives swatch opacity from the layers' marks
-                # (washing the swatches out) and ignores a per-legend ``symbolOpacity`` — only
-                # this config-level setting wins.
+                # Legend swatches must stay fully opaque whatever opacity the marks draw at. In a
+                # layered chart Vega-Lite derives swatch opacity from the layers' marks (washing the
+                # swatches out) and ignores a per-legend ``symbolOpacity`` — only this config-level
+                # setting wins.
                 "symbolOpacity": 1,
             },
         }

@@ -16,8 +16,8 @@ from contracts.weather_schemas import ECMWF_ENS_H3_RESOLUTION
 
 log = logging.getLogger(__name__)
 
-# TODO: When we move to using multiple NWPs (at different resolutions), we should use a high
-# H3 resolution for TimeSeriesMetadata, say res 9, and then use `polars_h3.cell_to_parent` to
+# TODO: When we move to using multiple NWPs (at different resolutions), we should use a high H3
+# resolution for TimeSeriesMetadata, say res 9, and then use `polars_h3.cell_to_parent` to
 # dynamically convert `TimeSeriesMetadata.h3_res_9` to each NWP model's own resolution before
 # joining. See https://github.com/openclimatefix/nged-substation-forecast/issues/114
 #
@@ -68,19 +68,19 @@ def _extract_power_time_series(df: pl.DataFrame, time_series_id: int) -> Extract
         polars.exceptions.InvalidOperationError: invalid dtype: expected 'Struct', got 'Null' for
         'data'
     """
-    # Extract time series data: explode the 'data' column and unnest the struct.
-    # 'explode' expands the list of structs into individual rows.
-    # 'unnest' expands the struct fields into individual columns.
+    # Extract time series data: explode the 'data' column and unnest the struct. 'explode' expands
+    # the list of structs into individual rows. 'unnest' expands the struct fields into individual
+    # columns.
     #
     # empty_as_null=False matches the Polars 2.0 default and silences the deprecation warning; it
-    # has no effect on output here. An empty 'data: []' array is read by pl.read_json as
-    # List(Null) -- a single file can't infer the struct fields of an empty array -- so after
-    # explode, under *both* settings, the .unnest("data") below raises the same
-    # InvalidOperationError ("expected 'Struct', got 'Null' for 'data'") that a Null 'data' field
-    # raises. storage.py's download_and_parse_files catches that exact message, logs a warning,
-    # and skips the file, so an empty-data file is handled identically to the documented null-data
-    # case regardless of empty_as_null. (The only case where the two settings differ -- an empty
-    # List(Struct) with a known schema -- can't arise from pl.read_json of a single file.)
+    # has no effect on output here. An empty 'data: []' array is read by pl.read_json as List(Null)
+    # -- a single file can't infer the struct fields of an empty array -- so after explode, under
+    # *both* settings, the .unnest("data") below raises the same InvalidOperationError ("expected
+    # 'Struct', got 'Null' for 'data'") that a Null 'data' field raises. storage.py's
+    # download_and_parse_files catches that exact message, logs a warning, and skips the file, so an
+    # empty-data file is handled identically to the documented null-data case regardless of
+    # empty_as_null. (The only case where the two settings differ -- an empty List(Struct) with a
+    # known schema -- can't arise from pl.read_json of a single file.)
     time_series_df = df.select("data").explode("data", empty_as_null=False).unnest("data")
 
     time_series_df = time_series_df.rename({"endTime": "time", "value": "power"})

@@ -189,11 +189,10 @@ def write_nwp(
         }
     ).sort(*NWP_SORT_COLS)
 
-    # One Arrow chunk, not 32. delta-rs consumes a multi-chunk table out of order when
-    # partitioning the write, which scatters the member-sorted rows across row groups and widens
-    # every row group's ensemble_member min/max range. Measured on a real partition, a
-    # single-member read went from 1.96% of rows to 33% purely from the chunking. Combining costs
-    # one copy of the frame.
+    # One Arrow chunk, not 32. delta-rs consumes a multi-chunk table out of order when partitioning
+    # the write, which scatters the member-sorted rows across row groups and widens every row
+    # group's ensemble_member min/max range. Measured on a real partition, a single-member read went
+    # from 1.96% of rows to 33% purely from the chunking. Combining costs one copy of the frame.
     prepared = rounded.to_arrow().combine_chunks()
 
     write_deltalake(

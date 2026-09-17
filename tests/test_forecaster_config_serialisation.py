@@ -42,8 +42,8 @@ def test_every_config_class_forbids_extra_keys(config_cls: type[BaseForecasterCo
     Asserted on the behaviour rather than on the ``model_config`` flag, so a subclass that keeps
     ``extra="forbid"`` but strips unknown keys in a ``model_validator(mode="before")`` fails too.
     """
-    # Splatted from a named mapping: a literal keyword is a static error (no such parameter), and
-    # a literal dict trips PIE804. This is the one spelling both linters accept.
+    # Splatted from a named mapping: a literal keyword is a static error (no such parameter), and a
+    # literal dict trips PIE804. This is the one spelling both linters accept.
     unknown_key = {"not_a_declared_field": "x"}
 
     with pytest.raises(ValidationError, match="not_a_declared_field"):

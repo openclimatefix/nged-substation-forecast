@@ -36,15 +36,15 @@ from nged_substation_forecast.defs.production_assets import LiveForecastsConfig,
 
 pytestmark = pytest.mark.integration
 
-# power_fcst_init_time = the partition's forecast init time (window end); the partition *key* is
-# the window start, 6 hours earlier (live_forecast_partitions ticks every 6h) — see
-# live_forecasts's docstring.
+# power_fcst_init_time = the partition's forecast init time (window end); the partition *key* is the
+# window start, 6 hours earlier (live_forecast_partitions ticks every 6h) — see live_forecasts's
+# docstring.
 _POWER_FCST_INIT_TIME = datetime(2026, 7, 4, 0, 0, tzinfo=UTC)
 _PARTITION_KEY = "2026-07-03-18:00"
 
 # The tick 6h before _POWER_FCST_INIT_TIME: still after _DAY_EARLIER_RUN, still before
-# _SAME_DAY_RUN, so "live" mode picks _DAY_EARLIER_RUN here too — used by the accumulation test
-# as a second, distinct partition.
+# _SAME_DAY_RUN, so "live" mode picks _DAY_EARLIER_RUN here too — used by the accumulation test as a
+# second, distinct partition.
 _EARLIER_TICK_POWER_FCST_INIT_TIME = _POWER_FCST_INIT_TIME - timedelta(hours=6)
 _EARLIER_TICK_PARTITION_KEY = "2026-07-03-12:00"
 
@@ -394,9 +394,9 @@ def test_the_roster_cannot_thin_or_fail_a_live_slot(
     assert _materialize(dagster_instance, "live").success
     assert set(_read_forecasts(env)["time_series_id"].unique().to_list()) == {1, 3}
 
-    # Then the file itself becomes unreadable. Kept separate from the absent case because the
-    # repo's other roster reader guards with `object_exists` (`defs/checks.py`), a shape that
-    # tolerates absence and still raises on corruption.
+    # Then the file itself becomes unreadable. Kept separate from the absent case because the repo's
+    # other roster reader guards with `object_exists` (`defs/checks.py`), a shape that tolerates
+    # absence and still raises on corruption.
     roster.write_bytes(b"not a parquet file")
     assert _materialize(dagster_instance, "live").success
     assert set(_read_forecasts(env)["time_series_id"].unique().to_list()) == {1, 3}
@@ -633,8 +633,8 @@ def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
         assert nwp_init.isoformat() in str(exc)
         assert power_fcst_init_time.isoformat() in str(exc)
         # A synthesised exception carries no stack trace, so only the fingerprint stops each
-        # degraded slot opening its own Sentry issue.
-        # The environment is the second element, so production and a laptop never share an issue.
+        # degraded slot opening its own Sentry issue. The environment is the second element, so
+        # production and a laptop never share an issue.
         assert fingerprint == [NWP_CONTROL_MEMBER_MISSING_FINGERPRINT, "test-env"]
 
 

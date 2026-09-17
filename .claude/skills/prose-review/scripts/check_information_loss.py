@@ -26,13 +26,13 @@ import sys
 from pathlib import Path
 from typing import Final
 
-# A comma only continues a number when it groups thousands; otherwise "27," would tokenise with
-# its trailing comma and stop matching the same 27 once the following word changes.
+# A comma only continues a number when it groups thousands; otherwise "27," would tokenise with its
+# trailing comma and stop matching the same 27 once the following word changes.
 NUMBER: Final[str] = r"(?<![\w.])\d+(?:,\d{3})*(?:\.\d+)?%?(?![\w.])"
 LINK_URL: Final[str] = r"\]\((https?://[^)\s]+)\)"
 # Curly marks say which end they are, so a regex pairs them safely. Straight marks do not, so they
-# must be paired positionally: a regex with a length floor silently skips a short quotation and
-# then pairs every later mark with the wrong partner, capturing the prose between two quotations.
+# must be paired positionally: a regex with a length floor silently skips a short quotation and then
+# pairs every later mark with the wrong partner, capturing the prose between two quotations.
 CURLY_QUOTE: Final[str] = r"“([^“”]{25,}?)”"
 MIN_QUOTE_LEN: Final[int] = 25
 BOLD_TERM: Final[str] = r"\*\*([^*]{3,80})\*\*"

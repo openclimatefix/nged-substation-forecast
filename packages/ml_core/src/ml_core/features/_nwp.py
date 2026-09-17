@@ -148,8 +148,8 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
     continuous_cols = [col for col in schema_names if col in Nwp.continuous_var_names()]
     categorical_cols = [col for col in schema_names if col in Nwp.categorical_var_names]
 
-    # Build 30-min time grid per group: aggregate min/max valid_time per group,
-    # expand each row into a list of half-hourly datetimes, then explode to rows.
+    # Build 30-min time grid per group: aggregate min/max valid_time per group, expand each row into
+    # a list of half-hourly datetimes, then explode to rows.
     time_grid = (
         nwp_lf.group_by(group_cols)
         .agg(
@@ -166,9 +166,9 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
         .drop("_start", "_end")
         # empty_as_null=False matches the Polars 2.0 default and silences the deprecation warning.
         # It has no effect on output today: _start/_end are the min/max valid_time of a non-empty
-        # group, so start <= end and datetime_ranges returns at least the single-point list
-        # [_start] -- the empty-list branch the two settings disagree on is unreachable. valid_time
-        # is a non-nullable datetime, so _start/_end are never null either (and a null range would
+        # group, so start <= end and datetime_ranges returns at least the single-point list [_start]
+        # -- the empty-list branch the two settings disagree on is unreachable. valid_time is a
+        # non-nullable datetime, so _start/_end are never null either (and a null range would
         # explode to a single null row identically under both settings regardless).
         .explode("valid_time", empty_as_null=False)
     )
@@ -176,8 +176,8 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
     # Left-join original NWP onto the grid; new 30-min rows come in as nulls.
     upsampled = time_grid.join(nwp_lf, on=[*group_cols, "valid_time"], how="left")
 
-    # Fill nulls within each group, never crossing group boundaries.
-    # order_by="valid_time" ensures correct temporal ordering within each group window.
+    # Fill nulls within each group, never crossing group boundaries. order_by="valid_time" ensures
+    # correct temporal ordering within each group window.
     if continuous_cols:
         upsampled = upsampled.with_columns(
             pl.col(col).interpolate().over(group_cols, order_by="valid_time")

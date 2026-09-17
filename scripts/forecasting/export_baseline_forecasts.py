@@ -37,8 +37,8 @@ import polars as pl
 from contracts.settings import PROJECT_ROOT, Settings
 from contracts.typing_utils import typeddict_to_dict
 
-# Columns carried through to the full-ensemble file (internal-only partition columns
-# experiment_name / fold_id / ml_flow_experiment_id are intentionally dropped).
+# Columns carried through to the full-ensemble file (internal-only partition columns experiment_name
+# / fold_id / ml_flow_experiment_id are intentionally dropped).
 _FORECAST_COLUMNS: tuple[str, ...] = (
     "time_series_id",
     "valid_time",

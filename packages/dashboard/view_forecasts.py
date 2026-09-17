@@ -67,8 +67,8 @@ def _(settings):
             settings.metadata_path, storage_options=typeddict_to_dict(settings.storage_options)
         )
     )
-    # Sorting by type first clusters e.g. all the PV sites / all the primaries together, so one
-    # kind of series is easy to find in the dropdown.
+    # Sorting by type first clusters e.g. all the PV sites / all the primaries together, so one kind
+    # of series is easy to find in the dropdown.
     series_options = {
         (
             f"{row['time_series_type']} · {row['time_series_name']}"
@@ -96,9 +96,9 @@ def _(reload, settings):
     # referencing `reload` here is what makes the button re-read them all. The metadata cell above
     # is left out on purpose — re-running it would reset the time-series dropdown to its default.
     reload
-    # Delta partition metadata (no data scan) lists the available (experiment_name, fold_id)
-    # pairs. If the table is missing entirely (e.g. a fresh local checkout), stop here — the
-    # data-source radio above stays usable so the user can switch to S3.
+    # Delta partition metadata (no data scan) lists the available (experiment_name, fold_id) pairs.
+    # If the table is missing entirely (e.g. a fresh local checkout), stop here — the data-source
+    # radio above stays usable so the user can switch to S3.
     try:
         forecast_partitions = DeltaTable(
             settings.power_forecasts_data_path,
@@ -135,8 +135,8 @@ def _(fold_picker, forecast_partitions):
     experiment_names = sorted(
         {p["experiment_name"] for p in forecast_partitions if p["fold_id"] == fold_picker.value}
     )
-    # Auto-pick when the fold has a single experiment; the dropdown is only *shown* (in the
-    # controls cell below) when there is a genuine choice to make.
+    # Auto-pick when the fold has a single experiment; the dropdown is only *shown* (in the controls
+    # cell below) when there is a genuine choice to make.
     experiment_picker = mo.ui.dropdown(
         options=experiment_names,
         value=experiment_names[-1],
@@ -206,8 +206,8 @@ def _(available_dates, available_init_times, date_picker):
 def _():
     show_forecast = mo.ui.checkbox(value=True, label="Forecast power")
     show_actuals = mo.ui.checkbox(value=True, label="Actual power")
-    # One checkbox per LAG_OPTIONS entry — explicit globals rather than a comprehension,
-    # because marimo only makes UI elements reactive when they are bound to top-level names.
+    # One checkbox per LAG_OPTIONS entry — explicit globals rather than a comprehension, because
+    # marimo only makes UI elements reactive when they are bound to top-level names.
     show_lag_7d = mo.ui.checkbox(label="7-day lagged power")
     show_lag_14d = mo.ui.checkbox(label="14-day lagged power")
     weekend_shading = mo.ui.checkbox(value=True, label="Shade weekends")
@@ -244,9 +244,9 @@ def _(
     show_lag_7d,
     weekend_shading,
 ):
-    # The run selectors (which forecast to look at) stack vertically as one visual unit;
-    # the display toggles (how to draw it) sit beside them. The NWP controls live with the
-    # NWP panel itself (see the NWP chart cell), not here.
+    # The run selectors (which forecast to look at) stack vertically as one visual unit; the display
+    # toggles (how to draw it) sit beside them. The NWP controls live with the NWP panel itself (see
+    # the NWP chart cell), not here.
     _run_selectors = [series_picker, fold_picker]
     if len(experiment_names) > 1:
         _run_selectors.append(experiment_picker)
@@ -284,14 +284,14 @@ def _(experiment_picker, fold_picker, run_picker, series_picker, settings):
             pl.col("power_fcst_init_time") == init_time,
             pl.col("valid_time") <= init_time + PLOT_HORIZON,
         )
-        # nwp_init_time identifies the NWP run for the panel below the power chart; the power
-        # chart cell drops it again so it isn't serialised into the 34k-row chart data.
+        # nwp_init_time identifies the NWP run for the panel below the power chart; the power chart
+        # cell drops it again so it isn't serialised into the 34k-row chart data.
         .select("valid_time", "power_fcst", "ensemble_member", "nwp_init_time")
         .collect()
     )
-    # History extends max(LAG_OPTIONS) past the plotted window so the lagged-power lines are
-    # loaded whatever the lag picker says — toggling lags then re-runs only the chart cell,
-    # never this Delta query. The extra rows are trivial (one series, 14 more days).
+    # History extends max(LAG_OPTIONS) past the plotted window so the lagged-power lines are loaded
+    # whatever the lag picker says — toggling lags then re-runs only the chart cell, never this
+    # Delta query. The extra rows are trivial (one series, 14 more days).
     actuals = (
         pl.scan_delta(settings.power_time_series_data_path, storage_options=_storage)
         .filter(
@@ -355,9 +355,9 @@ def _(
             if box.value
         ],
     )
-    # mo.ui.altair_chart serves the ~34k data rows as a virtual file instead of inlining them in
-    # the cell output, which would blow marimo's max-output-size guard. Selections are disabled —
-    # the chart's own scale-bound zoom/pan is the intended interaction.
+    # mo.ui.altair_chart serves the ~34k data rows as a virtual file instead of inlining them in the
+    # cell output, which would blow marimo's max-output-size guard. Selections are disabled — the
+    # chart's own scale-bound zoom/pan is the intended interaction.
     mo.ui.altair_chart(chart, chart_selection=False, legend_selection=False)
     return
 
@@ -379,10 +379,10 @@ def _(forecasts, init_time, metadata_df, series_picker, settings):
     # experiment ever grows the ensemble with lagged NWP runs.
     nwp_init_time = _nwp_init_times.max()
 
-    # All 51 members × ~85 steps × all variables is only ~4k rows, so load every variable for
-    # the run once — switching the NWP-variable dropdown then re-runs only the chart cell,
-    # never this Delta query. init_time is a partition column, so the filter prunes to one
-    # partition; h3_index selects the (resolution 5) cell containing this series.
+    # All 51 members × ~85 steps × all variables is only ~4k rows, so load every variable for the
+    # run once — switching the NWP-variable dropdown then re-runs only the chart cell, never this
+    # Delta query. init_time is a partition column, so the filter prunes to one partition; h3_index
+    # selects the (resolution 5) cell containing this series.
     _series_h3 = metadata_df.filter(pl.col("time_series_id") == series_picker.value)[
         "h3_res_5"
     ].item()
@@ -399,15 +399,14 @@ def _(forecasts, init_time, metadata_df, series_picker, settings):
             .drop("nwp_model_id", "init_time", "h3_index")
             .collect()
         )
-        # The proxy-analysis line stitches the first NWP_ANALYSIS_LEAD of every run overlapping
-        # the plotted window (control member only). select_analysis_proxy applies the member
-        # filter, the max_lead stitch, and the freshest-run-per-valid_time reduction; the cheap
-        # partition/row-group filters (init_time range, h3_index) stay on the scan above it so
-        # Delta partition pruning survives. Loading it here, unconditionally, keeps the "NWP proxy
+        # The proxy-analysis line stitches the first NWP_ANALYSIS_LEAD of every run overlapping the
+        # plotted window (control member only). select_analysis_proxy applies the member filter, the
+        # max_lead stitch, and the freshest-run-per-valid_time reduction; the cheap
+        # partition/row-group filters (init_time range, h3_index) stay on the scan above it so Delta
+        # partition pruning survives. Loading it here, unconditionally, keeps the "NWP proxy
         # analysis" checkbox instant: toggling it re-runs only the chart cell, never this Delta
-        # query (~0.2 s across the ~17 pruned init_time partitions). Runs older than
-        # window_start − NWP_ANALYSIS_LEAD cannot reach the window, so the init_time filter starts
-        # there.
+        # query (~0.2 s across the ~17 pruned init_time partitions). Runs older than window_start −
+        # NWP_ANALYSIS_LEAD cannot reach the window, so the init_time filter starts there.
         nwp_analysis = (
             select_analysis_proxy(
                 pl.scan_delta(

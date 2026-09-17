@@ -130,8 +130,8 @@ def test_empty_replace_chunk_clears_partition(tmp_path: Path) -> None:
     partition = ("exp_storage_test", "smoke_test")
     write_power_forecasts(_make_forecasts([1.0, 2.0]), table, replace_partition=partition)
 
-    # An empty first chunk must still clear the partition (cv_power_forecasts relies on this
-    # so a re-materialisation that produces no forecasts never leaves stale rows behind).
+    # An empty first chunk must still clear the partition (cv_power_forecasts relies on this so a
+    # re-materialisation that produces no forecasts never leaves stale rows behind).
     write_power_forecasts(_make_forecasts([]), table, replace_partition=partition)
     assert pl.read_delta(str(table)).height == 0
 

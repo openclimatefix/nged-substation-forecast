@@ -15,9 +15,9 @@ from nged_substation_forecast.defs import (
 
 all_assets = load_assets_from_modules([assets, cv_assets, production_assets])
 
-# Initialise Sentry once per process. This module is imported by every Dagster process — the
-# daemon, the webserver, and each run worker — so error telemetry and the live_forecasts
-# heartbeat are active wherever code runs. A no-op unless a Sentry DSN is configured.
+# Initialise Sentry once per process. This module is imported by every Dagster process — the daemon,
+# the webserver, and each run worker — so error telemetry and the live_forecasts heartbeat are
+# active wherever code runs. A no-op unless a Sentry DSN is configured.
 init_sentry(get_settings())
 
 defs = Definitions(

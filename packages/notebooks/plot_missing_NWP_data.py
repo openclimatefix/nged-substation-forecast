@@ -62,9 +62,9 @@ def plot_null_distribution(df, target_init_time, target_h3_index, nwp_vars):
         value_name="value",
     )
 
-    # 3. Create a boolean flag for missing data and a combined label for the Y-axis. Altair
-    # only accepts materialised data, so collect once the filter has cut the scan down to a
-    # single NWP run and a single H3 cell.
+    # 3. Create a boolean flag for missing data and a combined label for the Y-axis. Altair only
+    #    accepts materialised data, so collect once the filter has cut the scan down to a single NWP
+    #    run and a single H3 cell.
     plot_df = melted.with_columns(
         # Check for both database Nulls and float NaNs
         is_missing=pl.col("value").is_null() | pl.col("value").is_nan(),

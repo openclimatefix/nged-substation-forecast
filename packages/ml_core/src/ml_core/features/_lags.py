@@ -154,8 +154,8 @@ def _nullify_leaky_lags(
 
     for feature in leaky_features:
         # >= rather than > is intentionally conservative: when lead_time == lag_hours the
-        # lagged observation falls at exactly power_fcst_init_time, which may not yet be
-        # published (half-hourly readings arrive with a small comms delay).
+        # lagged observation falls at exactly power_fcst_init_time, which may not yet be published
+        # (half-hourly readings arrive with a small comms delay).
         lf = lf.with_columns(
             pl.when(pl.col("power_lead_time_hours") >= feature.hours)
             .then(pl.lit(None))

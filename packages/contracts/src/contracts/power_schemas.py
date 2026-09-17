@@ -125,8 +125,8 @@ class PowerTimeSeries(pt.Model):
         # `dt.minute()` is null for a null `time` and `.filter()` drops a row on a null predicate,
         # so this also drops the null `time`s the non-nullable schema forbids.
         survivors = survivors.filter(pl.col("time").dt.minute().is_in([0, 30]))
-        # Counted as a height difference rather than by summing the rejected partitions: whatever
-        # a filter does with a null predicate, every row that left is counted exactly once.
+        # Counted as a height difference rather than by summing the rejected partitions: whatever a
+        # filter does with a null predicate, every row that left is counted exactly once.
         return DropImplausibleRowsResult(survivors, dataframe.height - survivors.height)
 
     # Define it as a ClassVar so Patito/Pydantic knows it's not a data field
@@ -391,12 +391,12 @@ class PowerForecast(pt.Model):
             " precision: values are rounded to a 13-bit significand at write time"
             " (max relative error 2^-13 ≈ 1.2e-4, far below forecast error) to aid compression;"
             " see `delta_store.power_forecasts`."
-            # PLANNED: We intend to change `power_fcst` to a normalised value in the range
-            # [-1, +1] (which NGED multiplies by a capacity to recover MW/MVA), per the
-            # delivery-contract design agreed with NGED in the Milestone 1 report. The switch is
-            # planned for v0.5, using the static P99 `effective_capacity` estimate that already
-            # exists — the same scalar the `metrics` pipeline already divides by for NMAE — so it
-            # no longer needs to wait for a time-varying capacity estimate.
+            # PLANNED: We intend to change `power_fcst` to a normalised value in the range [-1, +1]
+            # (which NGED multiplies by a capacity to recover MW/MVA), per the delivery-contract
+            # design agreed with NGED in the Milestone 1 report. The switch is planned for v0.5,
+            # using the static P99 `effective_capacity` estimate that already exists — the same
+            # scalar the `metrics` pipeline already divides by for NMAE — so it no longer needs to
+            # wait for a time-varying capacity estimate.
         ),
     )
 

@@ -102,9 +102,9 @@ live_forecasts_job = define_asset_job(
     ),
 )
 
-# `name` is explicit because `build_schedule_from_partitioned_job` otherwise derives the
-# registered name from the job's — `live_forecasts_job_schedule` — which is not the name this
-# variable, the runbook, and the operator's Dagster UI all use.
+# `name` is explicit because `build_schedule_from_partitioned_job` otherwise derives the registered
+# name from the job's — `live_forecasts_job_schedule` — which is not the name this variable, the
+# runbook, and the operator's Dagster UI all use.
 live_forecasts_schedule = build_schedule_from_partitioned_job(
     live_forecasts_job,
     name="live_forecasts_schedule",

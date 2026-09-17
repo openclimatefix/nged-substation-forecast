@@ -120,8 +120,8 @@ def _build_fixtures() -> tuple[
     ]
     nwp_df = pl.DataFrame(nwp_rows)
 
-    # Power observations span each run's full window plus the pre-NWP-window history, so a
-    # power lag on an in-window row resolves to a genuine observed value.
+    # Power observations span each run's full window plus the pre-NWP-window history, so a power lag
+    # on an in-window row resolves to a genuine observed value.
     power_times = sorted({vt for run in _NWP_RUNS for vt in _power_observation_times(run)})
     power_df = pl.DataFrame(
         {
@@ -167,11 +167,10 @@ def test_bulk_and_single_run_features_are_identical() -> None:
             # No nwp_publication_delay_hours: with nwp_init_time passed explicitly, single-run mode
             # consumes the delay nowhere — the analysis-proxy ceiling is that run itself.
         ).collect()
-        # Keep only rows the NWP run actually covers (single-run mode is power-centric and
-        # emits null-weather rows for valid_times outside this run's window), and only
-        # deliverable rows (valid_time strictly after power_fcst_init_time) — single-run mode
-        # keeps history rows for the production caller to filter before predicting, whereas
-        # bulk mode drops them at source.
+        # Keep only rows the NWP run actually covers (single-run mode is power-centric and emits
+        # null-weather rows for valid_times outside this run's window), and only deliverable rows
+        # (valid_time strictly after power_fcst_init_time) — single-run mode keeps history rows for
+        # the production caller to filter before predicting, whereas bulk mode drops them at source.
         single_run_parts.append(
             replay.filter(
                 pl.col("nwp_lead_time_hours").is_not_null()
@@ -186,19 +185,18 @@ def test_bulk_and_single_run_features_are_identical() -> None:
     hindcast_steps_per_run = _DELAY_HOURS * 2 + 1
     deliverable_steps_per_run = len(_run_valid_times(_NWP_RUNS[0])) - hindcast_steps_per_run
     assert len(bulk) == len(_NWP_RUNS) * len(_MEMBERS) * deliverable_steps_per_run
-    # Guard: no fan-out. The row count above already catches one, but only because it is pinned
-    # to an exact expected value; state the invariant directly so that loosening the count later
-    # cannot quietly take the fan-out guard with it.
+    # Guard: no fan-out. The row count above already catches one, but only because it is pinned to
+    # an exact expected value; state the invariant directly so that loosening the count later cannot
+    # quietly take the fan-out guard with it.
     pk_cols = ["time_series_id", "power_fcst_init_time", "valid_time", "ensemble_member"]
     assert bulk.select(pk_cols).n_unique() == len(bulk)
     # Guard: the power lag must actually resolve to non-null observed values for some rows,
     # otherwise "identical" would be a vacuous all-null match on both sides.
     assert bulk["power_lag_3h"].is_not_null().any()
-    # Guard: at the first deliverable step (init + 6.5 h) the 3 h rolling window reaches back
-    # into the dropped hindcast steps. If bulk mode filtered *before* computing window
-    # features, the window would hold only the row itself and the mean would collapse to the
-    # row's own temperature — so equality with single-run alone would not catch a matched
-    # regression on both sides.
+    # Guard: at the first deliverable step (init + 6.5 h) the 3 h rolling window reaches back into
+    # the dropped hindcast steps. If bulk mode filtered *before* computing window features, the
+    # window would hold only the row itself and the mean would collapse to the row's own temperature
+    # — so equality with single-run alone would not catch a matched regression on both sides.
     first_deliverable = bulk.filter(
         (pl.col("valid_time") == _NWP_RUNS[0] + timedelta(hours=_DELAY_HOURS, minutes=30))
         & (pl.col("ensemble_member") == 0)

@@ -350,8 +350,8 @@ def test_power_lag_near_window_start_is_non_null_with_lookback(
         )
         .collect()
     )
-    # One row, not two: the widened power scan adds no spine rows, because power is left-joined
-    # onto the NWP-derived spine rather than being the spine.
+    # One row, not two: the widened power scan adds no spine rows, because power is left-joined onto
+    # the NWP-derived spine rather than being the spine.
     assert features_with_lookback["power_lag_336h"].to_list() == [historical_power]
 
 
@@ -457,10 +457,10 @@ def test_re_materialising_a_fold_with_a_changed_eligible_count_succeeds(
     first_run_id = _fold_run(client).info.run_id
     assert XGBoostForecaster.load_from_mlflow(first_run_id).trained_time_series_ids == [1]
 
-    # Second pass: coverage has extended, so ts2 is now eligible too — the exact input change
-    # that used to be rejected. ts2's data is still all past train_end (see the module
-    # docstring), so it stays excluded by the training-window filter and the trained population
-    # is unchanged; only the *eligible* count grows, which is what this test needs to change.
+    # Second pass: coverage has extended, so ts2 is now eligible too — the exact input change that
+    # used to be rejected. ts2's data is still all past train_end (see the module docstring), so it
+    # stays excluded by the training-window filter and the trained population is unchanged; only the
+    # *eligible* count grows, which is what this test needs to change.
     _write_eligible(eligible_path, (1, 2))
     assert materialize(
         [trained_cv_model], partition_key=PARTITION_KEY, instance=dagster_instance

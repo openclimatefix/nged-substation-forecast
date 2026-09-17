@@ -225,8 +225,8 @@ def _anchors_for_page(
                 extensions=list(extensions), extension_configs=extension_configs
             )
             converter.convert(path.read_text(encoding="utf-8"))
-            # `toc_tokens` is added to the instance by the `toc` extension at convert() time, so
-            # it isn't part of markdown's own (unstubbed) `Markdown` class.
+            # `toc_tokens` is added to the instance by the `toc` extension at convert() time, so it
+            # isn't part of markdown's own (unstubbed) `Markdown` class.
             cache[path] = set(_walk_toc_ids(converter.toc_tokens))  # ty: ignore[unresolved-attribute]
     return cache[path]
 

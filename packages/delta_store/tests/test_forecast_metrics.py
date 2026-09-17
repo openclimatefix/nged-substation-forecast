@@ -60,8 +60,8 @@ def test_overwrite_is_partition_scoped_by_experiment_and_fold(tmp_path: Path) ->
     write_forecast_metrics(
         _make_metrics("exp_a", "fold_b", [3]), table, experiment_name="exp_a", fold_id="fold_b"
     )
-    # Same fold_id as the first write, but a different experiment_name — the predicate must key
-    # on both columns, or this overwrite would also wipe "exp_a"'s "fold_a" rows.
+    # Same fold_id as the first write, but a different experiment_name — the predicate must key on
+    # both columns, or this overwrite would also wipe "exp_a"'s "fold_a" rows.
     write_forecast_metrics(
         _make_metrics("exp_b", "fold_a", [7]), table, experiment_name="exp_b", fold_id="fold_a"
     )

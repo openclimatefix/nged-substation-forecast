@@ -222,14 +222,14 @@ class LiveForecastsConfig(Config):
             "ecmwf_ens",
             # Dagster expresses a TimeWindowPartitionMapping offset in units of the *downstream*
             # partitions_def when upstream and downstream differ — here, live_forecast_partitions'
-            # 6-hourly ticks, not ecmwf_ens_partitions' daily ones. So start_offset=-16 reaches
-            # back 16 * 6h = 4 days, not 16 days. This is a lineage-only safety margin (it decides
-            # what the Dagster UI graph and a `--with upstream` materialisation consider a parent,
-            # not what live_forecasts actually reads): comfortably more than the ~30h a healthy
-            # NWP run is ever stale — the 00Z run lands around 08:30 UTC (see
-            # schedules.ecmwf_ens_schedule), so the 06:00 slot still uses the previous day's run, a
-            # worst case of 30h — so it still covers several consecutive missed daily runs before
-            # live_forecasts_are_healthy's missed-run check would already have alarmed.
+            # 6-hourly ticks, not ecmwf_ens_partitions' daily ones. So start_offset=-16 reaches back
+            # 16 * 6h = 4 days, not 16 days. This is a lineage-only safety margin (it decides what
+            # the Dagster UI graph and a `--with upstream` materialisation consider a parent, not
+            # what live_forecasts actually reads): comfortably more than the ~30h a healthy NWP run
+            # is ever stale — the 00Z run lands around 08:30 UTC (see schedules.ecmwf_ens_schedule),
+            # so the 06:00 slot still uses the previous day's run, a worst case of 30h — so it still
+            # covers several consecutive missed daily runs before live_forecasts_are_healthy's
+            # missed-run check would already have alarmed.
             partition_mapping=TimeWindowPartitionMapping(start_offset=-16, end_offset=0),
         ),
         "power_time_series_and_metadata",
@@ -357,8 +357,8 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
         # `checks.py::power_data_is_fresh` for why `BaseException` and what it costs in tests.
         if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
             raise  # A cancelled run must cancel.
-        # No fingerprint: this exception was caught rather than synthesised, so it carries the
-        # stack trace Sentry groups on.
+        # No fingerprint: this exception was caught rather than synthesised, so it carries the stack
+        # trace Sentry groups on.
         context.log.exception("Could not probe the NWP run for its control member")
         report_asset_degradation(asset_name="live_forecasts", exc=exc)
 

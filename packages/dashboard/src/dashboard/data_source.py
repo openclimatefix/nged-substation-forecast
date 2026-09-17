@@ -36,8 +36,8 @@ def settings_for_source(source: DataSourceType) -> Settings:
     `source_status_message`).
     """
     if source == "s3":
-        # _env_file is a pydantic-settings builtin kwarg; the list layers .env.s3 over the
-        # root .env (later file wins).
+        # _env_file is a pydantic-settings builtin kwarg; the list layers .env.s3 over the root .env
+        # (later file wins).
         return Settings(_env_file=[ROOT_ENV, DASHBOARD_S3_ENV])
     return Settings()
 

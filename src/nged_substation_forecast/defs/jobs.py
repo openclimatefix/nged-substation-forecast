@@ -346,9 +346,9 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
         forecaster_cls=forecaster_cls, forecaster_config=forecaster_config
     )
 
-    # get_or_create_experiment writes nothing when the name already exists, so the check below
-    # still runs before this registration's first write. On a brand-new name it creates the
-    # (untagged) experiment, which has no stored identity to conflict with.
+    # get_or_create_experiment writes nothing when the name already exists, so the check below still
+    # runs before this registration's first write. On a brand-new name it creates the (untagged)
+    # experiment, which has no stored identity to conflict with.
     experiment_id = get_or_create_experiment(config.experiment_name)
     client = MlflowClient()
     _reject_changed_identity(
@@ -359,8 +359,8 @@ def register_experiment(context: OpExecutionContext, config: RegisterExperimentC
 
     # Log the params before the experiment tags. MLflow params are write-once, so this is the one
     # write the tracking store can reject; doing it first means a rejection can never leave the
-    # experiment tagged with a config that its params contradict. The check above should make such
-    # a rejection unreachable, but an experiment registered before that check existed may already
+    # experiment tagged with a config that its params contradict. The check above should make such a
+    # rejection unreachable, but an experiment registered before that check existed may already
     # carry params that disagree with its tag, and the ordering keeps even that case one-sided.
     # log_params is not itself atomic — a batch containing one conflicting key still writes the
     # batch's other keys before raising — so this bounds the damage to the params rather than

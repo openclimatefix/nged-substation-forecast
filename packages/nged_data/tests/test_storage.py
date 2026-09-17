@@ -525,8 +525,8 @@ def test_parse_file_listing_invalid():
         }
     ]
 
-    # The function uses `_TimeSeriesJsonFileListing.validate(paths_df)`
-    # If the regex fails, the columns will be null, and validation should fail.
+    # The function uses `_TimeSeriesJsonFileListing.validate(paths_df)` If the regex fails, the
+    # columns will be null, and validation should fail.
     with pytest.raises(pt.exceptions.DataFrameValidationError):
         _process_file_listing(raw_file_listing)
 

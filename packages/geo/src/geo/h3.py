@@ -83,8 +83,8 @@ def compute_h3_grid_weights(
     if len(h3_index) == 0:
         raise ValueError("h3_index is empty.")
 
-    # Ensure nwp_grid_size_degrees is strictly positive to avoid division by zero or
-    # nonsensical snapping.
+    # Ensure nwp_grid_size_degrees is strictly positive to avoid division by zero or nonsensical
+    # snapping.
     if nwp_grid_size_degrees <= 0:
         raise ValueError(
             f"nwp_grid_size_degrees must be strictly positive, not {nwp_grid_size_degrees}."

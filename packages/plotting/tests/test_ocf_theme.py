@@ -10,6 +10,6 @@ def test_hex_to_rgb() -> None:
 
 
 def test_legend_swatches_are_fully_opaque() -> None:
-    # Guards against legend swatches washing out: in layered charts Vega-Lite derives swatch
-    # opacity from the layers' marks unless the config pins it.
+    # Guards against legend swatches washing out: in layered charts Vega-Lite derives swatch opacity
+    # from the layers' marks unless the config pins it.
     assert _ocf_theme()["config"]["legend"]["symbolOpacity"] == 1

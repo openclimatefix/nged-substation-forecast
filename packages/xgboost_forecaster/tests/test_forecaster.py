@@ -78,9 +78,9 @@ def test_train_creates_one_booster_per_ts_id() -> None:
 def test_predict_output_schema() -> None:
     df = _make_df()
     lf = pt.LazyFrame.from_existing(df.lazy())
-    # experiment_name is deliberately distinct from XGBoostForecaster.MODEL_NAME ("xgboost"), so
-    # an implementation that sourced the two model-family columns from the config instead of the
-    # class constants would fail here.
+    # experiment_name is deliberately distinct from XGBoostForecaster.MODEL_NAME ("xgboost"), so an
+    # implementation that sourced the two model-family columns from the config instead of the class
+    # constants would fail here.
     experiment_name = "distinct_experiment"
     result = _trained(df, experiment_name=experiment_name).predict(lf)
 
@@ -222,8 +222,8 @@ def test_load_ignores_ubj_files_not_in_meta_json(tmp_path: Path) -> None:
     """
     save_dir = tmp_path / "m"
     _trained(_make_df(ts_ids=[10, 20])).save(save_dir)
-    # A real trained booster for a series absent from this directory's meta.json, written
-    # directly rather than through save.
+    # A real trained booster for a series absent from this directory's meta.json, written directly
+    # rather than through save.
     stale_booster = _trained(_make_df(ts_ids=[30]))._models[30]
     stale_booster.save_model(str(save_dir / "30.ubj"))
 

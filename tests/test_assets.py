@@ -68,9 +68,9 @@ _NGED_FILES: dict[str, bytes] = {
 path-parsing regex in ``list_timeseries_json_files`` extracts a valid listing."""
 
 
-# Aliases used in the fake-store annotations below: the ``.bytes()`` and ``.list()`` methods
-# (named to match obstore's API) shadow the ``bytes``/``list`` builtins inside their own class
-# scope, so the annotations reference these module-level names instead.
+# Aliases used in the fake-store annotations below: the ``.bytes()`` and ``.list()`` methods (named
+# to match obstore's API) shadow the ``bytes``/``list`` builtins inside their own class scope, so
+# the annotations reference these module-level names instead.
 _JsonBytes = bytes
 _StoreListing = list[list[dict[str, object]]]
 
@@ -212,16 +212,16 @@ def test_power_time_series_and_metadata_ingests_and_writes(
     TimeSeriesMetadata.validate(metadata)
     assert set(metadata["time_series_id"].to_list()) == {10, 11}
 
-    # Reading a time_series_id-partitioned Delta table doesn't guarantee global sort order, so
-    # sort before validating against the (sortedness-checking) PowerTimeSeries contract.
+    # Reading a time_series_id-partitioned Delta table doesn't guarantee global sort order, so sort
+    # before validating against the (sortedness-checking) PowerTimeSeries contract.
     power = pl.read_delta(str(env / "NGED" / "power_time_series.delta")).sort(
         PowerTimeSeries.columns_to_sort_by
     )
     PowerTimeSeries.validate(power)
     assert set(power["time_series_id"].unique().to_list()) == {10, 11}
 
-    # The asset wires both summary tables into its Dagster output metadata (the summary classes'
-    # own logic is unit-tested below; this covers the asset → add_output_metadata glue).
+    # The asset wires both summary tables into its Dagster output metadata (the summary classes' own
+    # logic is unit-tested below; this covers the asset → add_output_metadata glue).
     materialisations = result.asset_materializations_for_node("power_time_series_and_metadata")
     metadata_keys = set().union(*(mat.metadata.keys() for mat in materialisations))
     assert {"nged_s3_paths", "PowerTimeSeries"} <= metadata_keys
@@ -611,8 +611,8 @@ def test_ecmwf_ens_materialises_and_writes_nwp(
     assert _check_evaluations(result)["nwp_has_no_unexpected_nulls"].passed
     # The run's observed shape is published on the materialisation itself, not only on the
     # completeness check, so drift stays visible in the Dagster UI timeline on a passing run too.
-    # (The tiny stub frame is not a full ECMWF ENS run, so nwp_run_is_complete does WARN here —
-    # that path is asserted in test_ecmwf_ens_warns_on_incomplete_run_but_still_materialises.)
+    # (The tiny stub frame is not a full ECMWF ENS run, so nwp_run_is_complete does WARN here — that
+    # path is asserted in test_ecmwf_ens_warns_on_incomplete_run_but_still_materialises.)
     (materialisation,) = result.asset_materializations_for_node("ecmwf_ens")
     assert {
         "n_rows",
@@ -646,8 +646,8 @@ def test_ecmwf_ens_warns_on_scattered_nulls_but_still_materialises(
         ensemble_member=pl.lit(0, dtype=pl.Int8),
         precipitation_surface=pl.Series([0.001, None, 0.001], dtype=pl.Float32),
     )
-    # `object` cannot be inlined in place of this stub: the real function is called with
-    # keyword arguments, which `object()` rejects.
+    # `object` cannot be inlined in place of this stub: the real function is called with keyword
+    # arguments, which `object()` rejects.
     monkeypatch.setattr(
         target=assets,
         name="open_ecmwf_ens_run",
@@ -698,8 +698,8 @@ def test_ecmwf_ens_reports_whole_null_slices_in_its_quality_check(
     one_slice_missing = _make_nwp(init_time, n=3).with_columns(
         precipitation_surface=pl.Series([None, 0.001, 0.001], dtype=pl.Float32)
     )
-    # `object` cannot be inlined in place of this stub: the real function is called with
-    # keyword arguments, which `object()` rejects.
+    # `object` cannot be inlined in place of this stub: the real function is called with keyword
+    # arguments, which `object()` rejects.
     monkeypatch.setattr(
         target=assets,
         name="open_ecmwf_ens_run",
@@ -743,8 +743,8 @@ def test_ecmwf_ens_retries_when_a_variable_is_wholly_missing(
 
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
-    # A run whose radiation column carries no weather at all, exactly as the converter would hand
-    # it over: `_make_nwp` gives each row its own (member, valid_time), so nulling every row empties
+    # A run whose radiation column carries no weather at all, exactly as the converter would hand it
+    # over: `_make_nwp` gives each row its own (member, valid_time), so nulling every row empties
     # the column across every slice beyond lead-0.
     wholly_missing = _make_nwp(init_time, n=3).with_columns(
         downward_short_wave_radiation_flux_surface=pl.Series([None] * 3, dtype=pl.Float32)
@@ -753,8 +753,8 @@ def test_ecmwf_ens_retries_when_a_variable_is_wholly_missing(
     def _convert_via_real_validation(ds: object, h3_grid: object) -> pt.DataFrame[Nwp]:
         return Nwp.validate(wholly_missing)
 
-    # `object` cannot be inlined in place of this stub: the real function is called with
-    # keyword arguments, which `object()` rejects.
+    # `object` cannot be inlined in place of this stub: the real function is called with keyword
+    # arguments, which `object()` rejects.
     monkeypatch.setattr(
         target=assets,
         name="open_ecmwf_ens_run",
@@ -1015,8 +1015,8 @@ def test_ecmwf_ens_flags_instantaneous_nulls_the_aggregation_absorbed(
     # The per-variable table separates one bad variable from nine, which the totals cannot.
     per_variable = evaluation.metadata["per_nwp_variable"].value
     assert isinstance(per_variable, TableMetadataValue)  # narrows before reading `.records`
-    # The declared schema is what names the columns in the Dagster UI, and is what makes a clean
-    # run render an empty table rather than nothing at all.
+    # The declared schema is what names the columns in the Dagster UI, and is what makes a clean run
+    # render an empty table rather than nothing at all.
     assert [column.name for column in per_variable.schema.columns] == [
         "variable",
         "n_null_grid_points",
@@ -1174,10 +1174,10 @@ def test_ecmwf_ens_retries_when_run_not_yet_available(
 
     # `build_asset_context()` defaults to its own `DagsterInstance.ephemeral()`
     # (<https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/>) and is
-    # used as a context manager here for the same reason
-    # `dagster_instance` is a fixture: entering it makes disposal happen deterministically at
-    # `__exit__`, rather than depending on `__del__` running via garbage collection, which the
-    # traceback captured by `pytest.raises` delays past this test — see the fixture's docstring.
+    # used as a context manager here for the same reason `dagster_instance` is a fixture: entering
+    # it makes disposal happen deterministically at `__exit__`, rather than depending on `__del__`
+    # running via garbage collection, which the traceback captured by `pytest.raises` delays past
+    # this test — see the fixture's docstring.
     with (
         build_asset_context(partition_key="2024-05-01") as context,
         pytest.raises(RetryRequested) as exc_info,
@@ -1230,8 +1230,8 @@ def test_definitions_resolve(env: Path) -> None:
     assert "nwp_run_is_complete" in check_keys
     assert "live_forecasts_are_healthy" in check_keys
 
-    # ...and the 6-hourly scheduled job actually runs the live check: an AssetSelection includes
-    # its assets' checks, so this is what makes the check evaluate on every production tick.
+    # ...and the 6-hourly scheduled job actually runs the live check: an AssetSelection includes its
+    # assets' checks, so this is what makes the check evaluate on every production tick.
     live_job_checks = {
         key.name
         for key in repo.get_job("live_forecasts_job").asset_layer.asset_graph.asset_check_keys

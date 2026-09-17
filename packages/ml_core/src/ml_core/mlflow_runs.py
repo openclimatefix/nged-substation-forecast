@@ -132,8 +132,8 @@ def get_or_create_fold_run(experiment_id: str, parent_run_id: str, fold_id: str)
     if runs:
         return runs[0].info.run_id
     # Resume the parent so the new run nests beneath it (MLflow nests under the active run).
-    # experiment_id must be passed explicitly: resuming a run does not switch the active
-    # experiment, so without it the child would land in the default experiment ("0").
+    # experiment_id must be passed explicitly: resuming a run does not switch the active experiment,
+    # so without it the child would land in the default experiment ("0").
     with (
         mlflow.start_run(run_id=parent_run_id),
         mlflow.start_run(

@@ -237,9 +237,9 @@ class Settings(BaseSettings):
 
     # --- Managed data tables (derive from a root unless explicitly set) --------------------
     #
-    # Each defaults to "" — a sentinel meaning "derive from data_path_internal or
-    # data_path_delivery in _derive_unset_paths". The derive-from-root convention and per-table
-    # overrides: https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/
+    # Each defaults to "" — a sentinel meaning "derive from data_path_internal or data_path_delivery
+    # in _derive_unset_paths". The derive-from-root convention and per-table overrides:
+    # https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/
 
     nged_data_path: str = ""
     """Directory holding the NGED power_time_series Delta table and metadata parquet."""

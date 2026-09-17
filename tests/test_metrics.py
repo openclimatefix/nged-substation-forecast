@@ -171,8 +171,8 @@ def _metrics_run_config(scope: str = "leaderboard") -> RunConfig:
     )
 
 
-# ---------------------------------------------------------------------------
-# In-process integration tests (file-based MLflow)
+# --------------------------------------------------------------------------- In-process integration
+# tests (file-based MLflow)
 # ---------------------------------------------------------------------------
 
 
@@ -346,8 +346,8 @@ def _batch_forecast_frame(
         {
             "time_series_id": pl.Series([time_series_id] * n, dtype=pl.Int32),
             "valid_time": pl.Series(times, dtype=pl.Datetime("us", "UTC")),
-            # 30 min before the earliest valid_time: the PowerForecast contract requires
-            # valid_time strictly after power_fcst_init_time.
+            # 30 min before the earliest valid_time: the PowerForecast contract requires valid_time
+            # strictly after power_fcst_init_time.
             "power_fcst_init_time": pl.Series(
                 [min(times) - timedelta(minutes=30)] * n, dtype=pl.Datetime("us", "UTC")
             ),
@@ -434,8 +434,8 @@ def test_score_forecast_group_per_series_batches(
     )
 
     monkeypatch.setattr(cv_assets, "_METRICS_SERIES_BATCH_SIZE", 1)
-    # Spy on the batch loader so the test fails loudly if a refactor ever defeats the
-    # batch-size monkeypatch (which would silently collapse this back to one batch).
+    # Spy on the batch loader so the test fails loudly if a refactor ever defeats the batch-size
+    # monkeypatch (which would silently collapse this back to one batch).
     batch_calls: list[list[int]] = []
     real_load_series_batch = cv_assets._load_series_batch
 
@@ -482,9 +482,9 @@ def test_score_forecast_group_per_series_batches(
     assert n_rows == expected.height
 
     # The unit test test_compute_metrics_per_series_batching_is_equivalent proves compute_metrics
-    # gives the same values batched or whole-group, but only this asset-layer test covers the
-    # write path: the per-batch pl.concat, enrich_metrics_rows, the Enum->String cast, and the
-    # Delta round-trip. So compare the values read back off disk against a whole-group compute.
+    # gives the same values batched or whole-group, but only this asset-layer test covers the write
+    # path: the per-batch pl.concat, enrich_metrics_rows, the Enum->String cast, and the Delta
+    # round-trip. So compare the values read back off disk against a whole-group compute.
     # metric_param must be in both the sort keys and the compared columns: each group has 13
     # pinball_loss rows (one per quantile), so without it tied metric_name rows sort
     # non-deterministically and a p10 value could be compared against a p90 row.
@@ -496,8 +496,8 @@ def test_score_forecast_group_per_series_batches(
         "metric_value",
     ]
     sort_keys = ["time_series_id", "horizon_slice", "metric_name", "metric_param"]
-    # Delta stores the Enum columns as String, so compare in String space. Expression casts
-    # (not a {column: dtype} dict-cast) because `expected` is a model-bearing Patito frame.
+    # Delta stores the Enum columns as String, so compare in String space. Expression casts (not a
+    # {column: dtype} dict-cast) because `expected` is a model-bearing Patito frame.
     expected_str = expected.select(compare_cols).with_columns(
         pl.col("horizon_slice").cast(pl.String),
         pl.col("metric_name").cast(pl.String),
@@ -715,8 +715,8 @@ def test_metrics_ad_hoc_scores_fold_ids_the_cv_config_does_not_define(
     assert set(fm["fold_id"].unique().to_list()) == {FOLD_ID, "live"}
 
 
-# ---------------------------------------------------------------------------
-# Full-stack cross-process test (real mlflow server)
+# --------------------------------------------------------------------------- Full-stack
+# cross-process test (real mlflow server)
 # ---------------------------------------------------------------------------
 
 
@@ -769,14 +769,14 @@ def test_full_stack_real_mlflow_server(
     load is a genuine download.
     """
     # The real MLflow HTTP server needs the server runtime stack (full ``mlflow``, in the dev
-    # group); a ``mlflow-skinny``-only environment cannot start it, so skip rather than fail.
-    # This test runs the Flask app under gunicorn (see ``--gunicorn-opts`` below).
+    # group); a ``mlflow-skinny``-only environment cannot start it, so skip rather than fail. This
+    # test runs the Flask app under gunicorn (see ``--gunicorn-opts`` below).
     pytest.importorskip("flask")
     pytest.importorskip("gunicorn")
 
     port = _find_free_port()
-    # Capture server output to a file (not DEVNULL) so an early-dying server is diagnosable, and
-    # not a PIPE, which the long-running server could otherwise fill and block on.
+    # Capture server output to a file (not DEVNULL) so an early-dying server is diagnosable, and not
+    # a PIPE, which the long-running server could otherwise fill and block on.
     server_log = tmp_path / "mlflow_server.log"
     log_file = server_log.open("wb")
     mlflow_proc = subprocess.Popen(
@@ -823,8 +823,8 @@ def test_full_stack_real_mlflow_server(
         # The NMAE denominator table that metrics requires.
         assert materialize([effective_capacity], instance=dagster_instance).success
 
-        # Score — proves tag-based run resolution: the asset calls get_or_create_fold_run()
-        # with a fresh MlflowClient connection and finds the same run that trained_cv_model used.
+        # Score — proves tag-based run resolution: the asset calls get_or_create_fold_run() with a
+        # fresh MlflowClient connection and finds the same run that trained_cv_model used.
         assert materialize(
             [metrics],
             run_config=_metrics_run_config("leaderboard"),

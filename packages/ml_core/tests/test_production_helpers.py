@@ -31,8 +31,7 @@ from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 _POWER_FCST_INIT_TIME = datetime(2026, 7, 4, 6, 0, tzinfo=UTC)
 
 
-# ---------------------------------------------------------------------------
-# select_nwp_init_time
+# --------------------------------------------------------------------------- select_nwp_init_time
 # ---------------------------------------------------------------------------
 
 
@@ -51,8 +50,8 @@ def test_live_picks_freshest_run_at_or_before_power_fcst_init_time() -> None:
 
 
 def test_replay_picks_freshest_run_at_or_before_delayed_cutoff() -> None:
-    # Derived from the constant rather than hard-coded, so changing the delay cannot leave this
-    # test asserting a superseded cutoff.
+    # Derived from the constant rather than hard-coded, so changing the delay cannot leave this test
+    # asserting a superseded cutoff.
     cutoff = _POWER_FCST_INIT_TIME - timedelta(hours=NWP_PUBLICATION_DELAY_HOURS)
     available = [cutoff - timedelta(hours=24), cutoff, _POWER_FCST_INIT_TIME]
     # The run exactly at the cutoff qualifies; the run at power_fcst_init_time itself does not.
@@ -119,8 +118,7 @@ def test_raises_when_no_run_qualifies() -> None:
         )
 
 
-# ---------------------------------------------------------------------------
-# build_live_power_frame
+# --------------------------------------------------------------------------- build_live_power_frame
 # ---------------------------------------------------------------------------
 
 
@@ -148,8 +146,8 @@ def test_build_live_power_frame_grid_bounds_join_and_nulls() -> None:
         horizon=horizon,
     ).collect()
 
-    # Grid is (power_fcst_init_time-history, power_fcst_init_time+horizon] on a half-hourly step:
-    # 4 slots here.
+    # Grid is (power_fcst_init_time-history, power_fcst_init_time+horizon] on a half-hourly step: 4
+    # slots here.
     expected_times = [
         _POWER_FCST_INIT_TIME - timedelta(minutes=30),
         _POWER_FCST_INIT_TIME,

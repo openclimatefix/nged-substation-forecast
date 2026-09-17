@@ -102,8 +102,7 @@ def open_ecmwf_ens_run(
     if ds.longitude.size == 0 or ds.latitude.size == 0:
         raise ValueError("Dataset has empty longitude or latitude coordinates.")
 
-    # Validate longitude range.
-    # NOTE: Dynamical.org converts the longitude range to [-180, 180].
+    # Validate longitude range. NOTE: Dynamical.org converts the longitude range to [-180, 180].
     if ds.longitude.min() < -180 or ds.longitude.max() > 180:
         raise ValueError("Dataset longitude must be in the range [-180, 180]")
 
@@ -117,12 +116,12 @@ def open_ecmwf_ens_run(
     lat_slice = _calc_slice_for_lat_or_lng("latitude", ds, min_lat, max_lat)
     lon_slice = _calc_slice_for_lat_or_lng("longitude", ds, min_lon, max_lon)
 
-    # NOTE: The slice below fails if the requested region crosses the anti-meridian. The GB
-    # service area never does, so that case is not handled.
+    # NOTE: The slice below fails if the requested region crosses the anti-meridian. The GB service
+    # area never does, so that case is not handled.
     ds_sliced = ds.sel(latitude=lat_slice, longitude=lon_slice, init_time=utc_nwp_init_time)
 
-    # An empty spatial intersection here would otherwise surface much later as a confusing
-    # KeyError during DataFrame conversion, so it is checked and named explicitly now.
+    # An empty spatial intersection here would otherwise surface much later as a confusing KeyError
+    # during DataFrame conversion, so it is checked and named explicitly now.
     if ds_sliced.longitude.size == 0 or ds_sliced.latitude.size == 0:
         raise ValueError("No spatial overlap found between H3 grid and NWP dataset.")
 

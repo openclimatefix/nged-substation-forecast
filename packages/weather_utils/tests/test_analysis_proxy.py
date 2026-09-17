@@ -30,10 +30,9 @@ BASE = datetime(2026, 1, 1, 0, 0)
 
 def test_freshest_run_wins_per_group_and_valid_time() -> None:
     valid = BASE + timedelta(hours=30)
-    # The freshest run is listed *first*, so input order and init_time order disagree: the
-    # reduction has to sort rather than take the last row it happens to see. `pl.scan_delta`
-    # guarantees no row order, and the dashboard passes a `pl.scan_delta` frame straight into
-    # this function.
+    # The freshest run is listed *first*, so input order and init_time order disagree: the reduction
+    # has to sort rather than take the last row it happens to see. `pl.scan_delta` guarantees no row
+    # order, and the dashboard passes a `pl.scan_delta` frame straight into this function.
     lf = _nwp(
         [
             _row(1, BASE + timedelta(hours=24), valid, 0, 11.0),  # 6 h lead — freshest, wins
@@ -48,9 +47,9 @@ def test_freshest_run_wins_per_group_and_valid_time() -> None:
 
 
 def test_null_in_the_freshest_run_falls_back_to_the_next_freshest_run() -> None:
-    # The freshest run is null for a column (as accumulated variables are at lead 0); that cell
-    # must be filled from the next-freshest run that has a value, while a column the freshest run
-    # *does* have keeps the freshest value. This is the accumulated-variable gap fill.
+    # The freshest run is null for a column (as accumulated variables are at lead 0); that cell must
+    # be filled from the next-freshest run that has a value, while a column the freshest run *does*
+    # have keeps the freshest value. This is the accumulated-variable gap fill.
     valid = BASE + timedelta(hours=24)
     lf = _nwp(
         [

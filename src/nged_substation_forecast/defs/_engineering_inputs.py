@@ -135,8 +135,8 @@ def load_engineering_inputs(
     cells = metadata["h3_res_5"].unique().to_list()
 
     nwp_scan = Nwp.scan_delta(settings.nwp_data_path, storage_options=storage_options).filter(
-        # init_time is one of the two partition columns — this prunes whole partitions, not
-        # just row groups.
+        # init_time is one of the two partition columns — this prunes whole partitions, not just row
+        # groups.
         pl.col("init_time") >= init_time_start,
         pl.col("init_time") <= init_time_end,
         pl.col("valid_time") >= window_start,

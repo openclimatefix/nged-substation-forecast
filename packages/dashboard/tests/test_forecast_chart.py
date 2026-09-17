@@ -92,15 +92,15 @@ def test_chart_layers_weekends_ensemble_actuals_and_init_rule() -> None:
     assert weekends["mark"]["type"] == "rect"  # drawn first, so every line sits on top of it
     assert weekends["encoding"]["x2"]["field"] == "end"
     # Layers share the x scale, so Vega-Lite merges their axis definitions — one deviating
-    # definition (e.g. axis=None) suppresses labels, ticks, and gridlines for the whole chart.
-    # Guard that every layer carries the identical axis definition.
+    # definition (e.g. axis=None) suppresses labels, ticks, and gridlines for the whole chart. Guard
+    # that every layer carries the identical axis definition.
     axes = [layer["encoding"]["x"].get("axis") for layer in spec["layer"]]
     assert all(axis == axes[0] for axis in axes)
     assert axes[0] is not None
     assert ensemble["encoding"]["detail"]["field"] == "ensemble_member"
     assert ensemble["encoding"]["y"]["title"] == "Power (MW)"
-    # Single-colour layers take their colour from the shared scale via a datum encoding, so
-    # they participate in the always-shown legend without a constant column in their data.
+    # Single-colour layers take their colour from the shared scale via a datum encoding, so they
+    # participate in the always-shown legend without a constant column in their data.
     assert ensemble["encoding"]["color"]["datum"] == "Forecast power"
     assert actuals["encoding"]["y"]["field"] == "power"
     assert actuals["encoding"]["color"]["datum"] == "Actual power"
@@ -127,8 +127,8 @@ def test_shade_weekends_true_adds_subtitle_note() -> None:
 def test_weekend_bands_sit_at_wall_midnights_clipped_to_window() -> None:
     spec = _build().to_dict()
     bands = spec["datasets"][spec["layer"][0]["data"]["name"]]
-    # Window is Fri 03 Jul 07:00 → Sat 18 Jul 07:00 wall time: two full weekends plus the
-    # opening hours of a third, clipped at the window's end.
+    # Window is Fri 03 Jul 07:00 → Sat 18 Jul 07:00 wall time: two full weekends plus the opening
+    # hours of a third, clipped at the window's end.
     assert [(b["start"], b["end"]) for b in bands] == [
         ("2026-07-04T00:00:00", "2026-07-06T00:00:00"),
         ("2026-07-11T00:00:00", "2026-07-13T00:00:00"),
@@ -163,14 +163,14 @@ def test_x_axis_has_3_hourly_ticks_labelled_at_midnight_only() -> None:
 def test_lag_lines_end_at_init_plus_lag_and_use_only_pre_init_power() -> None:
     lag = timedelta(days=7)
     spec = _build(lags=(lag,), history=PLOT_HISTORY + max(LAG_OPTIONS.values())).to_dict()
-    # Layer order: weekend bands, ensemble, lags, actuals, init rule — inputs must not obscure
-    # the observations.
+    # Layer order: weekend bands, ensemble, lags, actuals, init rule — inputs must not obscure the
+    # observations.
     assert len(spec["layer"]) == 5
     lag_rows = spec["datasets"][spec["layer"][2]["data"]["name"]]
     times = sorted(row["valid_time"] for row in lag_rows)
-    # Wall-time window starts Fri 03 Jul 07:00; only pre-init observations are shifted, so the
-    # line ends exactly at init + lag (Sat 04 Jul 07:00 wall + 7 d) — where feature engineering
-    # nullifies the lag as leaky.
+    # Wall-time window starts Fri 03 Jul 07:00; only pre-init observations are shifted, so the line
+    # ends exactly at init + lag (Sat 04 Jul 07:00 wall + 7 d) — where feature engineering nullifies
+    # the lag as leaky.
     assert times[0] == "2026-07-03T07:00:00"
     assert times[-1] == "2026-07-11T07:00:00"
     # Shifted values equal the observation lag earlier: both frames index power by row order.
@@ -181,8 +181,8 @@ def test_lag_lines_end_at_init_plus_lag_and_use_only_pre_init_power() -> None:
 
 
 def test_legend_always_lists_every_line() -> None:
-    # The always-drawn init-rule layer carries the shared colour scale, whose explicit domain
-    # drives the legend — so the legend is identical whichever lines are toggled on.
+    # The always-drawn init-rule layer carries the shared colour scale, whose explicit domain drives
+    # the legend — so the legend is identical whichever lines are toggled on.
     for spec in (
         _build().to_dict(),
         _build(show_forecast=False, show_actuals=False).to_dict(),
@@ -211,8 +211,8 @@ def test_lag_lines_share_the_legend_colour_scale() -> None:
     spec = _build(lags=tuple(LAG_OPTIONS.values())).to_dict()
     colour = spec["layer"][2]["encoding"]["color"]
     assert colour["field"] == "lag"
-    # Identical scale to the rule layer's, so Vega-Lite merges them without conflict and the
-    # lag lines pick up their (ascending-lag-ordered) colours from the shared domain.
+    # Identical scale to the rule layer's, so Vega-Lite merges them without conflict and the lag
+    # lines pick up their (ascending-lag-ordered) colours from the shared domain.
     assert colour["scale"] == spec["layer"][-1]["encoding"]["color"]["scale"]
     lag_rows = spec["datasets"][spec["layer"][2]["data"]["name"]]
     assert {row["lag"] for row in lag_rows} == {"7-day lagged power", "14-day lagged power"}
@@ -221,8 +221,8 @@ def test_lag_lines_share_the_legend_colour_scale() -> None:
 def test_actuals_line_ignores_the_deep_history_loaded_for_lags() -> None:
     spec = _build(history=PLOT_HISTORY + max(LAG_OPTIONS.values())).to_dict()
     actuals_rows = spec["datasets"][spec["layer"][2]["data"]["name"]]
-    # No lags requested → 4 layers, and the blue line still starts at the window, not at the
-    # start of the deeper history the dashboard now always loads.
+    # No lags requested → 4 layers, and the blue line still starts at the window, not at the start
+    # of the deeper history the dashboard now always loads.
     assert len(spec["layer"]) == 4
     assert min(row["valid_time"] for row in actuals_rows) == "2026-07-03T07:00:00"
 
@@ -350,8 +350,8 @@ def test_nwp_chart_horizontal_geometry_matches_the_power_chart() -> None:
     power = _build().to_dict()
     nwp = _build_nwp().to_dict()
     assert len(nwp["layer"]) == 3  # weekend bands, ensemble members, init rule
-    # The two charts are stacked in the dashboard, so their x-axes must align: identical x
-    # encoding (same pinned domain, ticks, and labels) and identical pinned y-axis extents.
+    # The two charts are stacked in the dashboard, so their x-axes must align: identical x encoding
+    # (same pinned domain, ticks, and labels) and identical pinned y-axis extents.
     power_x = power["layer"][1]["encoding"]["x"]
     nwp_x = nwp["layer"][1]["encoding"]["x"]
     assert nwp_x["axis"] == power_x["axis"]
@@ -359,8 +359,8 @@ def test_nwp_chart_horizontal_geometry_matches_the_power_chart() -> None:
     for spec in (power, nwp):
         y_axis = spec["layer"][1]["encoding"]["y"]["axis"]
         assert y_axis["minExtent"] == y_axis["maxExtent"] == Y_AXIS_EXTENT
-        # Both legends must sit above their plot — a right-side legend would eat horizontal
-        # plot space and break the vertical alignment of the two stacked x-axes.
+        # Both legends must sit above their plot — a right-side legend would eat horizontal plot
+        # space and break the vertical alignment of the two stacked x-axes.
         assert spec["layer"][-1]["encoding"]["color"]["legend"]["orient"] == "top"
 
 
@@ -383,8 +383,8 @@ def test_nwp_chart_plots_each_member_with_the_units_on_the_y_axis() -> None:
     assert ensemble["encoding"]["detail"]["field"] == "ensemble_member"
     # The grey takes its colour from the shared scale via a datum encoding, joining the legend.
     assert ensemble["encoding"]["color"]["datum"] == "NWP ensemble"
-    # Weather variables have no meaningful zero baseline — a zero-based axis would squash
-    # e.g. surface pressure (~101,000 Pa) into a flat sliver.
+    # Weather variables have no meaningful zero baseline — a zero-based axis would squash e.g.
+    # surface pressure (~101,000 Pa) into a flat sliver.
     assert ensemble["encoding"]["y"]["scale"]["zero"] is False
     rows = spec["datasets"][ensemble["data"]["name"]]
     assert {row["ensemble_member"] for row in rows} == {0, 1, 2}
@@ -410,8 +410,8 @@ def test_nwp_analysis_is_a_single_blue_line_over_the_ensemble() -> None:
     ).to_dict()
     assert len(spec["layer"]) == 4  # weekend bands, ensemble members, analysis line, init rule
     analysis = spec["layer"][2]
-    # Thick, and blue via the shared scale — deliberately matching the power panel's
-    # observed-truth line.
+    # Thick, and blue via the shared scale — deliberately matching the power panel's observed-truth
+    # line.
     assert analysis["encoding"]["color"]["datum"] == "NWP proxy analysis"
     assert analysis["mark"]["strokeWidth"] == 2.5
     # Identical y encoding to the ensemble layer's, so the axis definitions merge cleanly.
@@ -422,8 +422,8 @@ def test_nwp_analysis_is_a_single_blue_line_over_the_ensemble() -> None:
 
 def test_nwp_analysis_line_is_omitted_when_absent_or_outside_the_window() -> None:
     assert len(_build_nwp().to_dict()["layer"]) == 3  # no analysis passed
-    # A run whose whole first 24 h predate the window contributes no rows, so the layer and
-    # the subtitle note both vanish rather than advertising a line that isn't drawn.
+    # A run whose whole first 24 h predate the window contributes no rows, so the layer and the
+    # subtitle note both vanish rather than advertising a line that isn't drawn.
     stale = _build_nwp(
         analysis=_nwp_analysis([INIT_TIME - PLOT_HISTORY - timedelta(days=2)])
     ).to_dict()
@@ -441,9 +441,9 @@ def test_nwp_analysis_uses_the_same_display_units_as_the_ensemble() -> None:
 
 
 def test_nwp_legend_always_lists_every_line() -> None:
-    # Same construction as the power chart's legend: the always-drawn init-rule layer carries
-    # the shared colour scale, whose explicit domain drives the legend — so the legend is
-    # identical whether or not the analysis line is currently drawn.
+    # Same construction as the power chart's legend: the always-drawn init-rule layer carries the
+    # shared colour scale, whose explicit domain drives the legend — so the legend is identical
+    # whether or not the analysis line is currently drawn.
     for spec in (
         _build_nwp().to_dict(),
         _build_nwp(analysis=_nwp_analysis([NWP_INIT_TIME])).to_dict(),
@@ -467,8 +467,8 @@ def test_nwp_rows_are_clipped_to_the_plotted_window() -> None:
     spec = _build_nwp().to_dict()
     rows = spec["datasets"][spec["layer"][1]["data"]["name"]]
     times = sorted(row["valid_time"] for row in rows)
-    # The run starts 6 h before the power init (01:00 wall time) — the panel is empty before
-    # that — and the run's final day (out to +15 d) is clipped at the window end.
+    # The run starts 6 h before the power init (01:00 wall time) — the panel is empty before that —
+    # and the run's final day (out to +15 d) is clipped at the window end.
     assert times[0] == "2026-07-04T01:00:00"
     assert times[-1] == "2026-07-18T07:00:00"
 

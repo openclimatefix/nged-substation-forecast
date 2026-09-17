@@ -74,9 +74,9 @@ def import_class(target: str) -> type:
     except AttributeError as error:
         raise ValueError(f"Module {module_path!r} has no attribute {class_name!r}.") from error
     if not isinstance(resolved, type):
-        # TRY004 wants a TypeError, but the isinstance check is on what `target` *resolved to*,
-        # not on `target` itself, which is a perfectly well-typed str. What is wrong is its value,
-        # so every failure here is one ValueError and a caller needs to catch only that.
+        # TRY004 wants a TypeError, but the isinstance check is on what `target` *resolved to*, not
+        # on `target` itself, which is a perfectly well-typed str. What is wrong is its value, so
+        # every failure here is one ValueError and a caller needs to catch only that.
         raise ValueError(  # noqa: TRY004
             f"Target {target!r} resolved to {resolved!r}, which is not a class."
         )

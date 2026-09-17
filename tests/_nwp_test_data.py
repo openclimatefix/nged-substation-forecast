@@ -141,8 +141,8 @@ def write_test_nwp(path: str, records: list[dict]) -> None:
     df = pl.DataFrame(records)
     df = cast_to_nwp_dtypes(df, *df.columns)
     validated = Nwp.validate(df)
-    # `partition_by` hand-copies `delta_store.nwp.write_nwp`'s layout — see the docstring above
-    # for why this can't just call `write_nwp`, and `test_nwp_test_data.py` for the drift guard.
+    # `partition_by` hand-copies `delta_store.nwp.write_nwp`'s layout — see the docstring above for
+    # why this can't just call `write_nwp`, and `test_nwp_test_data.py` for the drift guard.
     write_deltalake(
         table_or_uri=path, data=validated.to_arrow(), partition_by=["nwp_model_id", "init_time"]
     )

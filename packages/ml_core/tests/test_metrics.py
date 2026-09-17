@@ -165,8 +165,7 @@ def test_compute_effective_capacity_is_the_99th_percentile_not_the_mean():
     assert result["effective_capacity_mw"].to_list() == pytest.approx([50.0])
 
 
-# ---------------------------------------------------------------------------
-# compute_metrics tests
+# --------------------------------------------------------------------------- compute_metrics tests
 # ---------------------------------------------------------------------------
 
 
@@ -311,8 +310,8 @@ def test_compute_metrics_per_series_batching_is_equivalent():
         ]
     )
 
-    # metric_param must be a sort key: each group has 13 pinball_loss rows (one per
-    # quantile), so sorting by metric_name alone leaves ties in non-deterministic order.
+    # metric_param must be a sort key: each group has 13 pinball_loss rows (one per quantile), so
+    # sorting by metric_name alone leaves ties in non-deterministic order.
     sort_keys = ["time_series_id", "horizon_slice", "metric_name", "metric_param"]
     assert whole.sort(sort_keys).equals(batched.sort(sort_keys))
 
@@ -344,8 +343,7 @@ def test_compute_metrics_raises_for_series_with_no_metadata_row():
         compute_metrics(forecasts, actuals, _make_metadata([99]), _make_capacity([1], [10.0]))
 
 
-# ---------------------------------------------------------------------------
-# horizon-slice tests
+# --------------------------------------------------------------------------- horizon-slice tests
 # ---------------------------------------------------------------------------
 
 
@@ -446,9 +444,8 @@ def test_power_forecast_contract_rejects_hindcast_rows():
         _make_cv_forecasts(1, [valid_time], [10.0], init_times=[_utc(2022, 1, 2)])
 
 
-# ---------------------------------------------------------------------------
-# probabilistic-metric tests
-# ---------------------------------------------------------------------------
+# --------------------------------------------------------------------------- probabilistic-metric
+# tests ---------------------------------------------------------------------------
 
 
 def _make_ensemble_forecasts(

@@ -241,8 +241,8 @@ def test_never_reported_series_crowd_stale_ones_out_of_a_truncated_table() -> No
     assert result.metadata["n_late"].value == cap + 15
 
 
-# ---------------------------------------------------------------------------
-# Silencing series that have already stopped reporting.
+# --------------------------------------------------------------------------- Silencing series that
+# have already stopped reporting.
 # ---------------------------------------------------------------------------
 
 
@@ -399,8 +399,8 @@ def test_a_deployment_with_no_data_yet_still_says_so_while_silencing() -> None:
     assert not result.passed
 
 
-# ---------------------------------------------------------------------------
-# End-to-end: the real asset check against a temp Delta table + metadata roster.
+# --------------------------------------------------------------------------- End-to-end: the real
+# asset check against a temp Delta table + metadata roster.
 # ---------------------------------------------------------------------------
 
 
@@ -774,8 +774,8 @@ def test_power_data_is_fresh_re_raises_a_cancelled_run(
         _run_freshness_check()
 
 
-# ---------------------------------------------------------------------------
-# count_missed_nwp_runs: the pure missed-daily-run arithmetic.
+# --------------------------------------------------------------------------- count_missed_nwp_runs:
+# the pure missed-daily-run arithmetic.
 # ---------------------------------------------------------------------------
 
 _TODAY = datetime(2026, 7, 20, tzinfo=UTC)
@@ -829,10 +829,10 @@ def test_no_missed_runs_at_any_healthy_slot(slot_hour: int, healthy_age_hours: f
     [
         (0, 1, 1),
         (6, 1, 1),
-        # The 12:00 slot is deliberately lenient by one run. The day's run is due on disk at
-        # 08:30, but the deadline has to survive `ecmwf_ens`'s 4-hour retry window, so it only
-        # demands the run by 14:00 — a download that failed today is therefore first reported at
-        # the 18:00 slot rather than raising a false alarm on every slow-but-healthy morning.
+        # The 12:00 slot is deliberately lenient by one run. The day's run is due on disk at 08:30,
+        # but the deadline has to survive `ecmwf_ens`'s 4-hour retry window, so it only demands the
+        # run by 14:00 — a download that failed today is therefore first reported at the 18:00 slot
+        # rather than raising a false alarm on every slow-but-healthy morning.
         (12, 1, 0),
         (18, 1, 1),
         (0, 3, 3),
@@ -869,8 +869,8 @@ def test_one_missed_run_persists_across_the_day_boundary() -> None:
         assert result.expected_latest_init_time == failed_day
 
     # ...and it clears as soon as a fresher run lands: the count measures the gap to the freshest
-    # run that ought to exist, not holes left behind in history, because a fresher run is what
-    # the next forecast will actually use.
+    # run that ought to exist, not holes left behind in history, because a fresher run is what the
+    # next forecast will actually use.
     recovered = count_missed_nwp_runs(
         [*_daily_runs(latest_on_disk), failed_day + timedelta(days=1)],
         as_of=failed_day + timedelta(days=1, hours=12),
@@ -1046,8 +1046,8 @@ def test_check_result_is_a_non_blocking_warning() -> None:
     assert spec.asset_key.to_user_string() == "live_forecasts"
 
 
-# ---------------------------------------------------------------------------
-# End-to-end: the real live-forecast check against temp Delta tables.
+# --------------------------------------------------------------------------- End-to-end: the real
+# live-forecast check against temp Delta tables.
 # ---------------------------------------------------------------------------
 
 
@@ -1422,8 +1422,8 @@ def test_live_forecasts_check_does_not_raise_with_no_tables_at_all(env: Path) ->
     # one type across runs and stays plottable; the description carries the explanation instead.
     assert "n_missed_nwp_runs" not in result.metadata
     assert "n_time_series_expected" not in result.metadata
-    # An unreadable meta.json makes "how many are missing" as unknown as "how many are expected" —
-    # 0 here would be indistinguishable from a verified-complete population.
+    # An unreadable meta.json makes "how many are missing" as unknown as "how many are expected" — 0
+    # here would be indistinguishable from a verified-complete population.
     assert "n_time_series_missing" not in result.metadata
     assert "n_time_series_missing_listed" not in result.metadata
     assert "missing_time_series_ids" not in result.metadata

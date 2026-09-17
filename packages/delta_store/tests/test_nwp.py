@@ -64,8 +64,8 @@ def _make_nwp(
         "h3_index": [100 + i for i in range(n)],
         "categorical_precipitation_type_surface": [1] * n,
         **{
-            # Cycle the scaling so a large frame stays inside each variable's contract range;
-            # for the small frames the other tests build this is identical to scaling by i.
+            # Cycle the scaling so a large frame stays inside each variable's contract range; for
+            # the small frames the other tests build this is identical to scaling by i.
             var: [base * (1 + 0.003 * (i % 100)) for i in range(n)]
             for var, base in _CONTINUOUS_BASE_VALUES.items()
         },

@@ -23,8 +23,8 @@ from nged_substation_forecast.defs.cv_assets import (
     eligible_time_series,
 )
 
-# The leaderboard fold (conf/cv/default.yaml): train 2024-04-01..2025-06-30,
-# validate 2025-07-01..2026-06-30, min_training_months=6.
+# The leaderboard fold (conf/cv/default.yaml): train 2024-04-01..2025-06-30, validate
+# 2025-07-01..2026-06-30, min_training_months=6.
 FOLD_ID = "mid_2025_to_mid_2026"
 
 # The non-leaderboard dev fold (conf/cv/default.yaml): validate 2025-02-01..2025-02-28 with the

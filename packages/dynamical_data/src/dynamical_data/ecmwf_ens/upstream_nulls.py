@@ -138,9 +138,9 @@ def assess_upstream_grid_point_nulls(
         count of (ensemble_member, lead_time) slices holding at least one null
         (`n_affected_slices`), and the total grid-point count counted (`n_total`).
     """
-    # Selected per variable rather than once on `ds`: this runs inside `ecmwf_ens` while the
-    # whole downloaded run is still held in memory, and slicing the whole dataset would copy all
-    # thirteen downloaded variables to read three.
+    # Selected per variable rather than once on `ds`: this runs inside `ecmwf_ens` while the whole
+    # downloaded run is still held in memory, and slicing the whole dataset would copy all thirteen
+    # downloaded variables to read three.
     beyond_lead_0 = ds.lead_time > _LEAD_0
     rows = []
     for name in sorted(variables):

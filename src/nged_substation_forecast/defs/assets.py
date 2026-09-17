@@ -113,9 +113,9 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     metadata_path = settings.metadata_path
     storage_options = settings.storage_options
 
-    # Fetch new data from S3, using the existing delta table to determine what's new.
-    # We are deliberately keeping the code simple for now, but may move the S3 store
-    # to a Dagster ConfigurableResource in the future.
+    # Fetch new data from S3, using the existing delta table to determine what's new. We are
+    # deliberately keeping the code simple for now, but may move the S3 store to a Dagster
+    # ConfigurableResource in the future.
     #
     # Everything that talks to NGED's bucket sits under one retry guard, so a transient object-store
     # error costs a short wait instead of a Sentry event for a fault that has already fixed itself.
@@ -502,13 +502,13 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
         upstream_metadata = _upstream_null_metadata(upstream)
     except BaseException as exc:
         # The same guard as `power_data_is_fresh` — see the comment there for why it catches
-        # `BaseException`, what that costs when writing tests, and rule 7 for why a warning path
-        # may never raise.
+        # `BaseException`, what that costs when writing tests, and rule 7 for why a warning path may
+        # never raise.
         if isinstance(exc, KeyboardInterrupt | SystemExit | DagsterExecutionInterruptedError):
             raise  # A cancelled run must cancel.
         context.log.exception("Could not assess the ingested NWP run")
-        # One event for one fault: all three checks share this guard, so they degrade together.
-        # The tag names the quality check whichever one raised; the runbook says to expect that.
+        # One event for one fault: all three checks share this guard, so they degrade together. The
+        # tag names the quality check whichever one raised; the runbook says to expect that.
         report_check_degradation(check_name=_NWP_QUALITY_CHECK_NAME, exc=exc)
         check_results = [
             _degraded_nwp_check_result(check_name=_NWP_QUALITY_CHECK_NAME, exc=exc),
@@ -624,8 +624,8 @@ def _nwp_quality_check_result(
             # The split of `n_affected_h3_slices`, broken out because the two halves mean different
             # things and only one of them is measured well: a wholly-null slice reaches the cells
             # intact however they are aggregated, whereas the scattered remainder is only whatever
-            # upstream corruption happened to take out every grid point of a cell. Both are
-            # emitted so the operations runbook can name either as a number to read off this check.
+            # upstream corruption happened to take out every grid point of a cell. Both are emitted
+            # so the operations runbook can name either as a number to read off this check.
             "n_whole_null_h3_slices": report.n_whole_null_slices,
             "n_scattered_h3_slices": report.n_scattered_slices,
             "affected_h3_variables": list(report.affected_variables),

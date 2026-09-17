@@ -271,16 +271,14 @@ def test_apply_local_time_features():
     assert "local_utc_offset_minutes" in result.columns
     assert result["local_utc_offset_minutes"].to_list() == [0, 60]
 
-    # In winter, 12:00 UTC is 12:00 local.
-    # In summer, 12:00 UTC is 13:00 local.
-    # local_time_of_day_sin for 12:00 is sin(pi) = 0
-    # local_time_of_day_sin for 13:00 is sin(13/24 * 2pi) = -0.2588
+    # In winter, 12:00 UTC is 12:00 local. In summer, 12:00 UTC is 13:00 local.
+    # local_time_of_day_sin for 12:00 is sin(pi) = 0 local_time_of_day_sin for 13:00 is sin(13/24 *
+    # 2pi) = -0.2588
     assert result["local_time_of_day_sin"][0] == pytest.approx(0.0, abs=1e-5)
     assert result["local_time_of_day_sin"][1] == pytest.approx(-0.258819, abs=1e-5)
 
     assert "local_day_of_week" in result.columns
-    # 2023-01-10 is a Tuesday (2)
-    # 2023-07-10 is a Monday (1)
+    # 2023-01-10 is a Tuesday (2) 2023-07-10 is a Monday (1)
     assert result["local_day_of_week"].to_list() == ["Tuesday", "Monday"]
 
     # The offset is in minutes, matching the AllFeatures Int16 dtype.
@@ -337,8 +335,8 @@ def test_apply_local_time_features_dst_transitions():
     # The cyclical time-of-day feature reflects the *local* wall clock, including the jump.
     # Spring-forward: 01:00 UTC -> 02:00 BST, so local_time_of_day_sin = sin(2/24 * 2pi) = 0.5.
     assert result["local_time_of_day_sin"][1] == pytest.approx(0.5, abs=1e-5)
-    # Fall-back: 00:30 UTC (01:30 BST) and 01:30 UTC (01:30 GMT) are the *same* local wall
-    # clock (01:30), the repeated hour, so their time-of-day features are identical.
+    # Fall-back: 00:30 UTC (01:30 BST) and 01:30 UTC (01:30 GMT) are the *same* local wall clock
+    # (01:30), the repeated hour, so their time-of-day features are identical.
     assert result["local_time_of_day_sin"][2] == pytest.approx(result["local_time_of_day_sin"][4])
     assert result["local_time_of_day_cos"][2] == pytest.approx(result["local_time_of_day_cos"][4])
 
@@ -462,11 +460,8 @@ def test_apply_rolling_mean_feature_orders_by_valid_time_itself():
         }
     )
     df = df.reverse()
-    # Rolling mean with window of 2 hours
-    # For 0:00: mean([10.0]) = 10.0
-    # For 1:00: mean([10.0, 20.0]) = 15.0
-    # For 2:00: mean([20.0, 30.0]) = 25.0
-    # For 3:00: mean([30.0, 40.0]) = 35.0
+    # Rolling mean with window of 2 hours For 0:00: mean([10.0]) = 10.0 For 1:00: mean([10.0, 20.0])
+    # = 15.0 For 2:00: mean([20.0, 30.0]) = 25.0 For 3:00: mean([30.0, 40.0]) = 35.0
     result = _apply_rolling_mean_feature(
         lf=df.lazy(), base_col="temperature_2m", window_hours=2
     ).collect()
@@ -505,8 +500,8 @@ def test_apply_rolling_mean_feature_partitions_by_group(
         pl.DataFrame(columns).lazy(), "temperature_2m", 2
     ).collect()
     sorted_result = result.sort([partition_col, "valid_time"])
-    # Group A: mean([10]) = 10, mean([10, 20]) = 15.
-    # Group B: mean([100]) = 100, mean([100, 200]) = 150.
+    # Group A: mean([10]) = 10, mean([10, 20]) = 15. Group B: mean([100]) = 100, mean([100, 200])
+    # = 150.
     assert sorted_result["temperature_2m_rolling_mean_2h"].to_list() == [10.0, 15.0, 100.0, 150.0]
 
 
@@ -519,9 +514,9 @@ def test_engineer_features_no_nwp():
             "power": [100.0],
         }
     )
-    # _engineer_features left-joins metadata and only emits time_series_type from it, so the
-    # minimal two-column frame is sufficient (the full TimeSeriesMetadata schema is validated
-    # by the contracts tests, not here).
+    # _engineer_features left-joins metadata and only emits time_series_type from it, so the minimal
+    # two-column frame is sufficient (the full TimeSeriesMetadata schema is validated by the
+    # contracts tests, not here).
     metadata_df = pl.DataFrame({"time_series_id": [123], "time_series_type": ["BESS"]})
 
     # Run engineer_features with nwp=None
@@ -844,8 +839,8 @@ def test_engineer_features_weather_lag_leakage_prevention():
         nwp_init_time=nwp_init_time,
     ).collect()
 
-    # Verify that temperature_2m_lag_2h is 10.0 (from run 1), NOT 12.0 (from run 2)
-    # This proves that the same-run join was used for target_time > power_fcst_init_time
+    # Verify that temperature_2m_lag_2h is 10.0 (from run 1), NOT 12.0 (from run 2) This proves that
+    # the same-run join was used for target_time > power_fcst_init_time
     assert engineered["temperature_2m_lag_2h"][0] == 10.0
 
     # Verify that temperature_2m_lag_36h is 8.0 (from freshest run)
@@ -867,8 +862,8 @@ def test_engineer_features_single_run_freshest_run_excludes_later_nwp_run():
     older_run_init_time = datetime(2026, 6, 10, 0, 0)  # T0: legitimately available
     too_fresh_init_time = datetime(2026, 6, 11, 3, 0)  # T2: initialised after T1
     valid_time = datetime(2026, 6, 11, 12, 0)
-    # lag=24h -> target_time = 2026-06-10 12:00: before power_fcst_init_time (freshest-run
-    # branch), and T1 carries no row there at all, so only T0 or T2 can answer it.
+    # lag=24h -> target_time = 2026-06-10 12:00: before power_fcst_init_time (freshest-run branch),
+    # and T1 carries no row there at all, so only T0 or T2 can answer it.
     target_time = valid_time - timedelta(hours=24)
 
     nwp_df = pl.DataFrame(
@@ -951,10 +946,10 @@ def test_engineer_features_single_run_ceiling_uses_the_derived_run_when_none_is_
     power_fcst_init_time = datetime(2026, 6, 11, 9, 0)
     # Derived run: power_fcst_init_time - 9h. Not passed to _engineer_features.
     valid_time = datetime(2026, 6, 11, 10, 0)
-    # lag=8h -> target_time = 02:00, before power_fcst_init_time, so the freshest-run branch
-    # answers it. The decoy run sits between the derived run and power_fcst_init_time, so a
-    # ceiling of power_fcst_init_time — or a ceiling derived by adding the delay rather than
-    # subtracting the delay — would wrongly admit the decoy.
+    # lag=8h -> target_time = 02:00, before power_fcst_init_time, so the freshest-run branch answers
+    # it. The decoy run sits between the derived run and power_fcst_init_time, so a ceiling of
+    # power_fcst_init_time — or a ceiling derived by adding the delay rather than subtracting the
+    # delay — would wrongly admit the decoy.
     target_time = valid_time - timedelta(hours=8)
     decoy_init_time = datetime(2026, 6, 11, 1, 0)
 
@@ -1036,8 +1031,8 @@ def test_apply_weather_lag_boundary_uses_same_run_at_exact_lead():
 def test_engineer_features_power_lag_nullification_end_to_end():
     """Power lags are null when lead_time >= lag_hours, including the exact boundary case."""
     power_fcst_init_time = datetime(2023, 1, 3, 0, 0)
-    # Power data spans both the lag source times and the forecast valid times so we confirm
-    # that the lag VALUE exists before nullification (it's not null due to missing data).
+    # Power data spans both the lag source times and the forecast valid times so we confirm that the
+    # lag VALUE exists before nullification (it's not null due to missing data).
     power_df = pl.DataFrame(
         {
             "time_series_id": ["ts1"] * 6,
@@ -1119,8 +1114,8 @@ def test_engineer_features_bulk_mode_weather_lag_uses_correct_nwp_run():
         nwp_publication_delay_hours=6,
     ).collect()
 
-    # Bulk mode is NWP-centric: it fans out over all NWP (valid_time, init_time) pairs.
-    # Filter to only the forecast valid_time rows (the lag-target rows also appear with power=null).
+    # Bulk mode is NWP-centric: it fans out over all NWP (valid_time, init_time) pairs. Filter to
+    # only the forecast valid_time rows (the lag-target rows also appear with power=null).
     result = all_rows.filter(pl.col("valid_time") == datetime(2023, 1, 2, 12, 0)).sort(
         "nwp_init_time"
     )
@@ -1169,8 +1164,8 @@ def test_engineer_features_nulls_weather_lag_in_single_run_mode_when_no_control_
     nwp_init_time = datetime(2023, 1, 1, 0, 0)
     power_fcst_init_time = nwp_init_time + timedelta(hours=NWP_PUBLICATION_DELAY_HOURS)
     # target_time (valid_time - 6h) must land strictly before power_fcst_init_time so
-    # _apply_weather_lag's >= boundary (_lags.py) routes to the freshest-run join, which depends
-    # on the control member — the same-run join wouldn't exercise this path.
+    # _apply_weather_lag's >= boundary (_lags.py) routes to the freshest-run join, which depends on
+    # the control member — the same-run join wouldn't exercise this path.
     valid_time = power_fcst_init_time + timedelta(hours=3)
     target_time = valid_time - timedelta(hours=6)
 
@@ -1260,9 +1255,9 @@ def _bulk_features_with_nwp_past_last_observation(selected_features: set[str]) -
             "power": [100.0] * len(observed_times),
         }
     )
-    # A real LIST_OF_TIME_SERIES_TYPES value in the Enum dtype the metadata parquet actually
-    # holds, so the assertions see what production sees. `set_model` does not cast, so a plain
-    # string here would travel through the pipeline as a plain string.
+    # A real LIST_OF_TIME_SERIES_TYPES value in the Enum dtype the metadata parquet actually holds,
+    # so the assertions see what production sees. `set_model` does not cast, so a plain string here
+    # would travel through the pipeline as a plain string.
     metadata_df = pl.DataFrame({"time_series_id": ["ts1"], "time_series_type": ["BESS"]}).cast(
         {"time_series_type": pl.Enum(LIST_OF_TIME_SERIES_TYPES)}
     )
@@ -1367,8 +1362,8 @@ def test_apply_rolling_mean_feature_window_is_time_not_rows():
         .collect()
         .sort("valid_time")
     )
-    # The window is (t - 2h, t]: [10] / [10, 20] / [10, 20, 30] / [40] — the last row's
-    # predecessors all fall outside it, which a 2-row window would not notice.
+    # The window is (t - 2h, t]: [10] / [10, 20] / [10, 20, 30] / [40] — the last row's predecessors
+    # all fall outside it, which a 2-row window would not notice.
     assert result["temperature_2m_rolling_mean_2h"].to_list() == [10.0, 15.0, 20.0, 40.0]
 
 

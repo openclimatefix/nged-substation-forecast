@@ -32,8 +32,8 @@ def test_reload_button_re_reads_every_delta_table():
     assert notebook is not None, f"marimo could not parse {NOTEBOOK}"
     graph = InternalApp(load_notebook_ir(notebook)).graph
 
-    # marimo's own rule for what changing a UI element re-runs, from `marimo._runtime.runtime`:
-    # the cells referencing the name, minus the cells defining it, then their descendants.
+    # marimo's own rule for what changing a UI element re-runs, from `marimo._runtime.runtime`: the
+    # cells referencing the name, minus the cells defining it, then their descendants.
     roots = graph.get_referring_cells("reload", language="python") - graph.get_defining_cells(
         "reload"
     )

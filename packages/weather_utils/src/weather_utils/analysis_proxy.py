@@ -70,10 +70,10 @@ def select_analysis_proxy(
     lf = nwp.filter(pl.col("ensemble_member") == member).drop("ensemble_member")
     if max_lead is not None:
         lf = lf.filter(pl.col("valid_time") < pl.col(init_time_col) + max_lead)
-    # Freshest run wins per (location, valid_time), per column: sort each column by init_time,
-    # drop its nulls, then take the last (freshest non-null) value — so a null in the freshest run
-    # falls back to the next-freshest run that has a value. group_by(...).agg(...) guarantees
-    # exactly one row per group, so the result never fans out on a tie — see the docstring.
+    # Freshest run wins per (location, valid_time), per column: sort each column by init_time, drop
+    # its nulls, then take the last (freshest non-null) value — so a null in the freshest run falls
+    # back to the next-freshest run that has a value. group_by(...).agg(...) guarantees exactly one
+    # row per group, so the result never fans out on a tie — see the docstring.
     return lf.group_by([group_key, "valid_time"]).agg(
         pl.all().sort_by(init_time_col).drop_nulls().last()
     )

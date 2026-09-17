@@ -229,10 +229,9 @@ def test_cv_power_forecasts_storage_format(
         assert sort_key.is_sorted()
 
     # power_fcst is rounded to POWER_FCST_SIGNIFICAND_BITS: the low fraction bits of every finite
-    # value are zero, yet the values were not destroyed outright. (The synthetic fixture's
-    # constant NWP features make every prediction near-identical, so don't assert on value
-    # diversity — the fixture trains on power ≈ 100, so surviving values must be in that
-    # ballpark.)
+    # value are zero, yet the values were not destroyed outright. (The synthetic fixture's constant
+    # NWP features make every prediction near-identical, so don't assert on value diversity — the
+    # fixture trains on power ≈ 100, so surviving values must be in that ballpark.)
     zeroed_low_bits = FLOAT32_SIGNIFICAND_BITS - POWER_FCST_SIGNIFICAND_BITS
     stored = _read_forecasts(env)["power_fcst"].to_numpy()
     assert np.isfinite(stored).all()

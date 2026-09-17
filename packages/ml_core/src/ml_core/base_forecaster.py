@@ -96,8 +96,8 @@ def write_trained_metadata(
         time_series_metadata: The roster rows the model was engineered against.
             ``_UNPERSISTED_METADATA_COLUMN`` is dropped; everything else is kept.
     """
-    # `pl.exclude` rather than `drop`: Patito overrides `DataFrame.drop` with a signature that
-    # takes no `strict=False`, and the column is `allow_missing`, so it may not be there to drop.
+    # `pl.exclude` rather than `drop`: Patito overrides `DataFrame.drop` with a signature that takes
+    # no `strict=False`, and the column is `allow_missing`, so it may not be there to drop.
     time_series_metadata.select(pl.exclude(_UNPERSISTED_METADATA_COLUMN)).write_parquet(
         model_dir / TRAINED_METADATA_FILENAME
     )

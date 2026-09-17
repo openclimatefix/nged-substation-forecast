@@ -114,11 +114,11 @@ class Nwp(pt.Model):
     """
 
     # `dtype=pl.String` (not `Enum`, which Delta cannot store) means an out-of-vocabulary value is
-    # no longer physically inexpressible the way it was under `Enum` — a plain `str` column can
-    # hold any string at construction time, with no error. The `constraints=` check below is now
-    # the *only* defence, and it fires at `Nwp.validate()`, not at construction: a frame built and
-    # never validated can carry an unrecognised `nwp_model_id` all the way through. Every current
-    # caller validates, so this is latent rather than live today.
+    # no longer physically inexpressible the way it was under `Enum` — a plain `str` column can hold
+    # any string at construction time, with no error. The `constraints=` check below is now the
+    # *only* defence, and it fires at `Nwp.validate()`, not at construction: a frame built and never
+    # validated can carry an unrecognised `nwp_model_id` all the way through. Every current caller
+    # validates, so this is latent rather than live today.
     nwp_model_id: str = pt.Field(
         dtype=pl.String,
         constraints=pl.col("nwp_model_id").is_in([model.name for model in NwpModelId]),
@@ -164,8 +164,8 @@ class Nwp(pt.Model):
     # seen is ~6.5e17 against `Int64`'s ~9.2e18 ceiling, and bit 63 is never set.
     #
     # The guarantee does not depend on the resolution, so raising or lowering
-    # `ECMWF_ENS_H3_RESOLUTION`, or giving a future NWP model its own resolution (issue 114),
-    # cannot overflow this column. Resolution lives in bits 52-55 and leaves bit 63 alone.
+    # `ECMWF_ENS_H3_RESOLUTION`, or giving a future NWP model its own resolution (issue 114), cannot
+    # overflow this column. Resolution lives in bits 52-55 and leaves bit 63 alone.
     h3_index: int = pt.Field(
         dtype=pl.Int64,
         description=(

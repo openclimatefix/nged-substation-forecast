@@ -256,11 +256,11 @@ def evaluate_power_freshness(
     #
     # NOTE: this is deliberately not restricted to `roster_ids`. A series that NGED has
     # decommissioned but that still has old rows on disk will keep being flagged stale — which is
-    # what we want for now: we would rather be told about a series that has gone quiet than
-    # silently stop watching it. Restricting to `roster_ids` would not silence one anyway:
-    # `upsert_metadata` never drops a series, so a retired series stays in the roster for good.
-    # Silencing one takes the explicit record of silenced ids above, which serves a retired series
-    # and a broken sensor alike — the check cannot tell them apart, and does not need to.
+    # what we want for now: we would rather be told about a series that has gone quiet than silently
+    # stop watching it. Restricting to `roster_ids` would not silence one anyway: `upsert_metadata`
+    # never drops a series, so a retired series stays in the roster for good. Silencing one takes
+    # the explicit record of silenced ids above, which serves a retired series and a broken sensor
+    # alike — the check cannot tell them apart, and does not need to.
     stale = coverage.filter(pl.col("last_time") < cutoff).select(
         "time_series_id",
         last_seen=pl.col("last_time"),
@@ -370,8 +370,8 @@ def _to_asset_check_result(result: PowerFreshnessResult) -> AssetCheckResult:
     listed = result.late.head(_MAX_LATE_SERIES_IN_TABLE)
     return AssetCheckResult(
         # A stalled feed is expected to self-heal via back-fill, so warn — never fail the run and
-        # block downstream assets. Absent data is not "healthy" either, hence the count guard.
-        # A resurrection is the one yellow nothing else can raise: the series is healthy, so
+        # block downstream assets. Absent data is not "healthy" either, hence the count guard. A
+        # resurrection is the one yellow nothing else can raise: the series is healthy, so
         # `is_healthy` stays true, and only an edit to the silenced list clears it.
         passed=result.is_healthy and result.n_series_total > 0 and not result.resurrected_ids,
         severity=AssetCheckSeverity.WARN,
@@ -408,8 +408,8 @@ def _check_power_data_freshness() -> AssetCheckResult:
         silenced_ids=_SILENCED_TIME_SERIES_IDS,
     )
     # Forward per-series staleness to Sentry (a no-op unless a DSN is set and some series is late).
-    # Best-effort: report_power_freshness never raises, so a telemetry hiccup costs no more than
-    # its own event — were it to raise, the caller's catch-all would discard this whole evaluation.
+    # Best-effort: report_power_freshness never raises, so a telemetry hiccup costs no more than its
+    # own event — were it to raise, the caller's catch-all would discard this whole evaluation.
     report_power_freshness(settings, result)
     return _to_asset_check_result(result)
 
@@ -788,14 +788,14 @@ def _read_live_forecast_rows(
     if experiment_name is not None:
         slot = slot.filter(pl.col("experiment_name") == experiment_name)
 
-    # A null `power_fcst` makes the left operand true, so under Kleene logic the row is counted
-    # once and `is_finite()`'s own null on that row never leaks into the sum.
+    # A null `power_fcst` makes the left operand true, so under Kleene logic the row is counted once
+    # and `is_finite()`'s own null on that row never leaks into the sum.
     nonfinite_power = pl.col("power_fcst").is_null() | ~pl.col("power_fcst").is_finite()
     hindcast = pl.col("valid_time") <= pl.lit(power_fcst_init_time)
     # `nwp_init_time` is `allow_missing=True` on `PowerForecast` — a model that uses no NWP (a
-    # persistence baseline) never writes the column at all. Selecting it unconditionally would
-    # raise `ColumnNotFoundError` into the check's catch-all, costing the whole report — every
-    # other field, all of them computable — for one cosmetic one.
+    # persistence baseline) never writes the column at all. Selecting it unconditionally would raise
+    # `ColumnNotFoundError` into the check's catch-all, costing the whole report — every other
+    # field, all of them computable — for one cosmetic one.
     nwp_init_time = (
         pl.max("nwp_init_time")
         if "nwp_init_time" in slot.collect_schema().names()
@@ -852,10 +852,10 @@ def _read_promoted_model_facts(production_model_path: str) -> PromotedModelFacts
         meta = json.loads(meta_path.read_text())
         ids = meta.get("trained_time_series_ids")
         if ids is not None and not isinstance(ids, list):
-            # A JSON string, int, etc. here is malformed, not merely a different shape: iterating
-            # a str with int() would silently mis-parse it (e.g. "12" -> (1, 2)) instead of
-            # degrading, which is the "strict about malformed input" rule from CLAUDE.md
-            # ("Inherent stability").
+            # A JSON string, int, etc. here is malformed, not merely a different shape: iterating a
+            # str with int() would silently mis-parse it (e.g. "12" -> (1, 2)) instead of degrading,
+            # which is the "strict about malformed input" rule from CLAUDE.md ("Inherent
+            # stability").
             raise TypeError(  # noqa: TRY301 — raised to reach this function's own degrade handler.
                 f"trained_time_series_ids must be a list, got {type(ids).__name__}: {ids!r}"
             )
@@ -864,8 +864,8 @@ def _read_promoted_model_facts(production_model_path: str) -> PromotedModelFacts
             # `BaseForecaster.save` always writes `model_params.experiment_name`, so its absence
             # means this file is not one we wrote. Degrade both facts together rather than half of
             # them: keeping the trained population while losing the name to scope the read to would
-            # let an unfiltered union of two experiments' rows pass for one complete population,
-            # and would blame this slot for an outgoing champion's rows.
+            # let an unfiltered union of two experiments' rows pass for one complete population, and
+            # would blame this slot for an outgoing champion's rows.
             return _UNKNOWN_PROMOTED_MODEL
         return PromotedModelFacts(
             experiment_name=experiment_name,
@@ -940,9 +940,9 @@ def _live_forecast_check_metadata(result: LiveForecastHealthResult) -> dict[str,
         "nwp_init_time_on_rows": str(rows.nwp_init_time),
     }
     if result.n_expected_time_series is not None:
-        # Gated on the same condition as n_time_series_expected below: an unreadable meta.json
-        # makes "how many are missing" as unknown as "how many are expected", so 0 must not be
-        # reported here — it would be indistinguishable from a verified-complete population.
+        # Gated on the same condition as n_time_series_expected below: an unreadable meta.json makes
+        # "how many are missing" as unknown as "how many are expected", so 0 must not be reported
+        # here — it would be indistinguishable from a verified-complete population.
         listed_ids = result.missing_time_series_ids[:_MAX_MISSING_SERIES_LISTED]
         metadata["n_time_series_missing"] = len(result.missing_time_series_ids)
         metadata["missing_time_series_ids"] = str(list(listed_ids))
@@ -961,8 +961,8 @@ def _to_live_forecast_check_result(result: LiveForecastHealthResult) -> AssetChe
     """Turn a ``LiveForecastHealthResult`` into a WARN-severity Dagster check result."""
     return AssetCheckResult(
         # WARN, never ERROR, and non-blocking: a degraded slot is still the best forecast we have,
-        # and blocking here would contradict the principle that a partition fails only when there
-        # is genuinely no useful data.
+        # and blocking here would contradict the principle that a partition fails only when there is
+        # genuinely no useful data.
         passed=result.is_healthy,
         severity=AssetCheckSeverity.WARN,
         description=_describe_live_forecast_health(result),

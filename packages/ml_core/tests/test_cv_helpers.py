@@ -22,8 +22,7 @@ def _utc(
     return datetime(year, month, day, hour, minute, second, tzinfo=UTC)
 
 
-# ---------------------------------------------------------------------------
-# date_to_utc_datetime
+# --------------------------------------------------------------------------- date_to_utc_datetime
 # ---------------------------------------------------------------------------
 
 
@@ -37,8 +36,7 @@ def test_date_to_utc_datetime_inclusive_end_of_day() -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# _subtract_months
+# --------------------------------------------------------------------------- _subtract_months
 # ---------------------------------------------------------------------------
 
 
@@ -112,8 +110,8 @@ def test_eligible_time_series_ids_is_data_only() -> None:
 
 
 def test_eligible_time_series_ids_respects_min_training_months() -> None:
-    # Loosening the requirement to 1 month lets ts2 (first_time 2024-10-01) still fail, but a
-    # series starting just before val_start would now pass. Verify the threshold moves.
+    # Loosening the requirement to 1 month lets ts2 (first_time 2024-10-01) still fail, but a series
+    # starting just before val_start would now pass. Verify the threshold moves.
     coverage = pl.DataFrame(
         {
             "time_series_id": pl.Series([5], dtype=pl.Int32),
@@ -126,8 +124,8 @@ def test_eligible_time_series_ids_respects_min_training_months() -> None:
     assert eligible_time_series_ids(coverage, fold, min_training_months=1) == [5]
 
 
-# ---------------------------------------------------------------------------
-# parse_cv_partition_key — round trips, including names containing "__"
+# --------------------------------------------------------------------------- parse_cv_partition_key
+# — round trips, including names containing "__"
 # ---------------------------------------------------------------------------
 
 
@@ -139,8 +137,7 @@ def test_parse_cv_partition_key_experiment_name_with_double_underscore() -> None
     assert parse_cv_partition_key("my__weird__exp__2022") == ("my__weird__exp", "2022")
 
 
-# ---------------------------------------------------------------------------
-# flatten_config
+# --------------------------------------------------------------------------- flatten_config
 # ---------------------------------------------------------------------------
 
 

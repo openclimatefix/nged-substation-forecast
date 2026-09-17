@@ -67,12 +67,12 @@ from nged_substation_forecast.defs._engineering_inputs import (
 )
 from nged_substation_forecast.defs._tags import RESEARCH_LAYER_TAGS
 
-# The CV folds are the shared leaderboard evaluation protocol, read from conf/cv/default.yaml
-# (never hard-coded) so every experiment and asset agrees on the same folds. Loaded at import so
-# the partition keys are available when Dagster builds the asset graph. The raw CV_CONFIG_PATH
-# env var is read directly here (rather than instantiating Settings, which needs the .env
-# secrets) so the partition set can be built without any credentials — while still respecting
-# the same env var Settings' cv_config_path field would use, unlike reading
+# The CV folds are the shared leaderboard evaluation protocol, read from conf/cv/default.yaml (never
+# hard-coded) so every experiment and asset agrees on the same folds. Loaded at import so the
+# partition keys are available when Dagster builds the asset graph. The raw CV_CONFIG_PATH env var
+# is read directly here (rather than instantiating Settings, which needs the .env secrets) so the
+# partition set can be built without any credentials — while still respecting the same env var
+# Settings' cv_config_path field would use, unlike reading
 # Settings.model_fields["cv_config_path"].default directly, which silently ignores it.
 _cv_config = load_cv_config(
     Path(os.environ.get("CV_CONFIG_PATH", Settings.model_fields["cv_config_path"].default))
@@ -253,8 +253,8 @@ def _require_metadata_coverage(
     """
     missing = _time_series_ids_missing_metadata(metadata, time_series_ids)
     if missing:
-        # Capped for the same reason `checks._MAX_MISSING_SERIES_LISTED` caps its list: at V2
-        # scale an empty metadata parquet would otherwise spell out ~2,500 ids.
+        # Capped for the same reason `checks._MAX_MISSING_SERIES_LISTED` caps its list: at V2 scale
+        # an empty metadata parquet would otherwise spell out ~2,500 ids.
         listed = ", ".join(str(ts_id) for ts_id in missing[:20])
         suffix = "" if len(missing) <= 20 else ", …"
         raise ValueError(
@@ -385,14 +385,14 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
         # `fold_id` is already set as a tag at run creation (get_or_create_fold_run, which is also
         # what resolves the run) — no need to duplicate it here as a param too.
         #
-        # The training window comes from the CV config, which is edited between materialisations
-        # as the archive grows (a fold's train_end is extended). The eligible/trained counters are
-        # outputs of *this* materialisation, not identifying inputs — the eligible population
-        # grows as power coverage extends, and can also shrink. All four are tags rather than
-        # metrics: MLflow resolves a metric's "latest" value as the max over
-        # (step, timestamp, value), not the newest write, so a metric would under-report a
-        # genuinely *shrunk* count if two materialisations ever landed the same timestamp/step.
-        # Tags are last-write-wins, which is the semantic actually wanted here.
+        # The training window comes from the CV config, which is edited between materialisations as
+        # the archive grows (a fold's train_end is extended). The eligible/trained counters are
+        # outputs of *this* materialisation, not identifying inputs — the eligible population grows
+        # as power coverage extends, and can also shrink. All four are tags rather than metrics:
+        # MLflow resolves a metric's "latest" value as the max over (step, timestamp, value), not
+        # the newest write, so a metric would under-report a genuinely *shrunk* count if two
+        # materialisations ever landed the same timestamp/step. Tags are last-write-wins, which is
+        # the semantic actually wanted here.
         mlflow.set_tags(
             {
                 "train_start": train_start.isoformat(),
@@ -403,8 +403,8 @@ def trained_cv_model(context: AssetExecutionContext) -> None:
         )
         # Provenance: the code + data versions that produced this fold's model — the load-bearing
         # stamp, since a fold can be trained days after registration on a different SHA. Tags (not
-        # params) because provenance overwrites cleanly on re-materialise; these are the three
-        # Delta tables the training path reads above.
+        # params) because provenance overwrites cleanly on re-materialise; these are the three Delta
+        # tables the training path reads above.
         mlflow.set_tags(
             provenance_tags(
                 "train",
@@ -489,15 +489,15 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
     time_series_seen: set[int] = set()
     ensemble_members_seen: set[int] = set()
 
-    # Before the loop, not inside it: the metadata does not vary by init_time window, and raising
-    # on a later chunk would leave the partition holding a partial fold.
+    # Before the loop, not inside it: the metadata does not vary by init_time window, and raising on
+    # a later chunk would leave the partition holding a partial fold.
     metadata_df = _load_roster(settings, trained_ids)
     _require_metadata_coverage(metadata_df, trained_ids, population="trained")
 
     power_lookback = ParsedFeatures.from_strings(config.selected_features).max_power_lag()
 
-    # Walk disjoint init_time chunks covering every run that can forecast into the window:
-    # init_time in [val_start - MAX_NWP_LEAD, val_end].
+    # Walk disjoint init_time chunks covering every run that can forecast into the window: init_time
+    # in [val_start - MAX_NWP_LEAD, val_end].
     chunk_start = val_start - MAX_NWP_LEAD
     is_first = True
     while chunk_start <= val_end:
@@ -529,8 +529,8 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
         if forecasts.height == 0 and not is_first:
             continue
 
-        # The first chunk overwrites the (experiment, fold) partition, clearing any prior run;
-        # later chunks append into the partition the first chunk established.
+        # The first chunk overwrites the (experiment, fold) partition, clearing any prior run; later
+        # chunks append into the partition the first chunk established.
         write_power_forecasts(
             forecasts,
             settings.power_forecasts_data_path,
@@ -539,19 +539,18 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
         )
         is_first = False
         n_rows += forecasts.height
-        # `.unique()` before `.to_list()`: only the distinct values reach the set, so this builds
-        # a ~30-element Python list per chunk rather than a ~14M-element one. Measured on a
-        # 14M-row Int32 column: 2.78 s and 560 MB peak, against 0.05 s and no measurable
-        # allocation. The 560 MB landed inside the loop whose whole job is holding the frame at
-        # 2-3 GB.
+        # `.unique()` before `.to_list()`: only the distinct values reach the set, so this builds a
+        # ~30-element Python list per chunk rather than a ~14M-element one. Measured on a 14M-row
+        # Int32 column: 2.78 s and 560 MB peak, against 0.05 s and no measurable allocation. The 560
+        # MB landed inside the loop whose whole job is holding the frame at 2-3 GB.
         time_series_seen.update(forecasts["time_series_id"].unique().to_list())
         ensemble_members_seen.update(forecasts["ensemble_member"].unique().to_list())
 
     n_time_series = len(time_series_seen)
     n_ensemble_members = len(ensemble_members_seen)
     with mlflow.start_run(run_id=fold_run_id):
-        # Use set_tag (not log_params) so re-materialising with an extended val_end doesn't
-        # raise "Changing param values is not allowed" — the covered window is mutable metadata.
+        # Use set_tag (not log_params) so re-materialising with an extended val_end doesn't raise
+        # "Changing param values is not allowed" — the covered window is mutable metadata.
         mlflow.set_tag("val_start", val_start.isoformat())
         mlflow.set_tag("val_end", val_end.isoformat())
         # Provenance: prediction may run on yet another SHA / data state than training. Stamps the
@@ -595,8 +594,7 @@ def cv_power_forecasts(context: AssetExecutionContext) -> None:
     )
 
 
-# ---------------------------------------------------------------------------
-# metrics asset
+# --------------------------------------------------------------------------- metrics asset
 # ---------------------------------------------------------------------------
 
 
@@ -930,8 +928,8 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
 
     # Apply the population filter to the scan so its predicates push into the Delta scan
     # (experiment_name / fold_id are the on-disk partition columns → partition pruning). These
-    # columns are String in PowerForecast, matching how delta-rs stores them, so no dtype cast
-    # sits between scan_delta and the filter to defeat pushdown. See PopulationFilter.apply.
+    # columns are String in PowerForecast, matching how delta-rs stores them, so no dtype cast sits
+    # between scan_delta and the filter to defeat pushdown. See PopulationFilter.apply.
     scan = pt.LazyFrame.from_existing(
         pl.scan_delta(
             settings.power_forecasts_data_path, storage_options=typeddict_to_dict(storage_options)
@@ -953,15 +951,15 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
         .collect(engine="streaming")
         .rows()
     )
-    # `live_forecasts` writes its output to this same table under `fold_id="live"`, so an
-    # unfiltered leaderboard run — which the operator guide tells you to launch, leaving
-    # `fold_id` null to score every fold — discovers a group the CV config has never heard of.
-    # The same table also holds any non-leaderboard dev fold (e.g. `smoke_test`), which the CV
-    # config does define but which is not part of the leaderboard's evaluation protocol. Either
-    # way, leaderboard scope dates its window from the config's leaderboard folds, so those rows
-    # have no window to be scored against; skip them rather than fail the whole run on the first
-    # one. Ad-hoc scope takes its window from the rows themselves and is the supported way to
-    # score live output or dev folds.
+    # `live_forecasts` writes its output to this same table under `fold_id="live"`, so an unfiltered
+    # leaderboard run — which the operator guide tells you to launch, leaving `fold_id` null to
+    # score every fold — discovers a group the CV config has never heard of. The same table also
+    # holds any non-leaderboard dev fold (e.g. `smoke_test`), which the CV config does define but
+    # which is not part of the leaderboard's evaluation protocol. Either way, leaderboard scope
+    # dates its window from the config's leaderboard folds, so those rows have no window to be
+    # scored against; skip them rather than fail the whole run on the first one. Ad-hoc scope takes
+    # its window from the rows themselves and is the supported way to score live output or dev
+    # folds.
     skipped_fold_ids: list[str] = []
     if config.evaluation_scope == "leaderboard":
         configured_fold_ids = set(_cv_config.leaderboard_fold_ids)
@@ -1009,8 +1007,8 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     if_local_path_then_make_parent_dir(settings.forecast_metrics_data_path)
     now = datetime.now(UTC)
     # Provenance for every fold + parent run this materialisation touches: the code SHA and the
-    # versions of the three Delta tables scoring reads (forecasts, actuals, capacity). Built once
-    # — all groups are scored in this one process, so they share a single code + data snapshot.
+    # versions of the three Delta tables scoring reads (forecasts, actuals, capacity). Built once —
+    # all groups are scored in this one process, so they share a single code + data snapshot.
     metrics_provenance = provenance_tags(
         "metrics",
         {
@@ -1022,9 +1020,9 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
     )
     total_rows = 0
     # Accumulates per-fold metric values for parent-run aggregation (leaderboard scope only).
-    # Structure: {experiment_name: {mlflow_metric_key: [value_per_fold, ...]}}
-    # e.g. {"xgboost_baseline": {"rmse__all": [0.42, 0.39], "rmse__pv": [0.31, 0.28]}}
-    # After the loop, each list is averaged and logged to the experiment's MLflow parent run.
+    # Structure: {experiment_name: {mlflow_metric_key: [value_per_fold, ...]}} e.g.
+    # {"xgboost_baseline": {"rmse__all": [0.42, 0.39], "rmse__pv": [0.31, 0.28]}} After the loop,
+    # each list is averaged and logged to the experiment's MLflow parent run.
     experiment_fold_metrics: dict[str, dict[str, list[float]]] = {}
 
     for exp_name, fold_id in groups:

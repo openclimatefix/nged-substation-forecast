@@ -28,8 +28,8 @@ from patito.exceptions import DataFrameValidationError
 _INIT_TIME = datetime(2025, 1, 1, tzinfo=UTC)
 
 # On or before 2024-11-12, where categorical_precipitation_type_surface is legitimately all-null —
-# the only era in which a wholly-uncovered H3 cell reaches the numeric columns without that
-# column's own historical invariant rejecting the frame first.
+# the only era in which a wholly-uncovered H3 cell reaches the numeric columns without that column's
+# own historical invariant rejecting the frame first.
 _INIT_TIME_BEFORE_PTYPE = datetime(2024, 1, 1, tzinfo=UTC)
 
 
@@ -493,8 +493,8 @@ def test_convert_categorical_precipitation_type(
     make_h3_grid: Callable[..., pt.DataFrame[H3GridWeights]],
 ) -> None:
     # One H3 cell fed by five equally-weighted grid points whose categories are [null, 1, 2, 2, 3].
-    # The area-weighted mode must return the dominant category 2 — which is neither the min (1),
-    # the max (3), nor a value the null could corrupt. A NaN input becomes a null category that is
+    # The area-weighted mode must return the dominant category 2 — which is neither the min (1), the
+    # max (3), nor a value the null could corrupt. A NaN input becomes a null category that is
     # excluded from the ranking, not counted and not forbidden by validation.
     ds = make_ens_dataset(
         latitudes=(52.0,),

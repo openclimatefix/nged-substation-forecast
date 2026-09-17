@@ -89,8 +89,8 @@ NWP_PLOT_VARIABLES: Final[dict[str, NwpPlotVariable]] = {
     "downward_short_wave_radiation_flux_surface": NwpPlotVariable(
         "Downward short-wave (solar) radiation", "W/m²"
     ),
-    # Stored as kg/m²/s (numerically mm/s); ×3600 displays as mm/h, which forecasters expect
-    # and which survives _prepare_for_plot's 3-decimal-place display rounding.
+    # Stored as kg/m²/s (numerically mm/s); ×3600 displays as mm/h, which forecasters expect and
+    # which survives _prepare_for_plot's 3-decimal-place display rounding.
     "precipitation_surface": NwpPlotVariable("Precipitation rate", "mm/h", scale=3600.0),
 }
 """The NWP variables the dashboard offers, keyed by ``contracts.weather_schemas.Nwp`` column.
@@ -207,8 +207,8 @@ def _weekend_bands(window_start: datetime, window_end: datetime) -> pl.DataFrame
         window (possibly zero rows). Bands sit at wall-clock midnights, matching the labelled
         midnight gridlines.
     """
-    # Scan from two days before the window so a window that opens mid-weekend still picks up
-    # the enclosing band's Saturday.
+    # Scan from two days before the window so a window that opens mid-weekend still picks up the
+    # enclosing band's Saturday.
     day = (window_start - timedelta(days=2)).replace(hour=0, minute=0, second=0, microsecond=0)
     bands: list[tuple[datetime, datetime]] = []
     while day < window_end:
@@ -359,25 +359,24 @@ def build_view_forecast_chart(
     window_end = init_wall + PLOT_HORIZON
     x = _x_encoding(window_start, window_end)
 
-    # All power layers share the y title (and the pinned _y_axis) so Vega-Lite merges them into
-    # one clean y-axis whichever subset of lines is toggled on.
+    # All power layers share the y title (and the pinned _y_axis) so Vega-Lite merges them into one
+    # clean y-axis whichever subset of lines is toggled on.
     y_title = f"Power ({units})"
 
-    # The shared colour scale's explicit domain drives the legend, so the legend always lists
-    # every line — even ones currently toggled off — and colours never reshuffle. The scale and
-    # legend definitions ride on the field-encoded layers (lags and the always-present init-time
-    # rule); the single-colour layers reference the same scale via datum encodings.
-    # orient="top" keeps the legend out of the plot's horizontal space, so the x-axis aligns
-    # with the NWP panel stacked below, whose legend sits on top for the same reason (see the
-    # module docstring).
-    # (Swatch opacity is pinned to 1 in the OCF theme's legend config — a per-legend
-    # ``symbolOpacity`` here would lose to the opacity Vega-Lite derives from the marks.)
+    # The shared colour scale's explicit domain drives the legend, so the legend always lists every
+    # line — even ones currently toggled off — and colours never reshuffle. The scale and legend
+    # definitions ride on the field-encoded layers (lags and the always-present init-time rule); the
+    # single-colour layers reference the same scale via datum encodings. orient="top" keeps the
+    # legend out of the plot's horizontal space, so the x-axis aligns with the NWP panel stacked
+    # below, whose legend sits on top for the same reason (see the module docstring). (Swatch
+    # opacity is pinned to 1 in the OCF theme's legend config — a per-legend ``symbolOpacity`` here
+    # would lose to the opacity Vega-Lite derives from the marks.)
     line_color_scale = alt.Scale(domain=list(_LINE_COLORS), range=list(_LINE_COLORS.values()))
     line_legend = alt.Legend(title=None, orient="top", symbolType="stroke", symbolStrokeWidth=2)
 
-    # Layers are appended in draw order: weekend bands at the back, then the forecast
-    # ensemble, then lagged power (model *inputs*, which must not obscure observations), then
-    # observed power, with the init-time rule on top of everything.
+    # Layers are appended in draw order: weekend bands at the back, then the forecast ensemble, then
+    # lagged power (model *inputs*, which must not obscure observations), then observed power, with
+    # the init-time rule on top of everything.
     layers: list[alt.Chart] = []
     subtitle_notes: list[str] = []
     if shade_weekends:
@@ -451,8 +450,8 @@ def build_view_forecast_chart(
         width="container",
         height=400,
     )
-    # .interactive() on a LayerChart returns a LayerChart; the FacetChart half of the union in
-    # its annotation only arises for faceted charts.
+    # .interactive() on a LayerChart returns a LayerChart; the FacetChart half of the union in its
+    # annotation only arises for faceted charts.
     return cast(alt.LayerChart, chart.interactive())
 
 
@@ -500,9 +499,9 @@ def build_nwp_ensemble_chart(
     plot_window = pl.col("valid_time").is_between(
         power_fcst_init_time - PLOT_HISTORY, power_fcst_init_time + PLOT_HORIZON
     )
-    # zero=False: weather variables have no meaningful zero baseline, and Vega-Lite's zero
-    # default would squash e.g. surface pressure (~101,000 Pa) into a flat sliver at the top of
-    # a zero-based axis. Shared by every value-carrying layer so the axis definitions merge.
+    # zero=False: weather variables have no meaningful zero baseline, and Vega-Lite's zero default
+    # would squash e.g. surface pressure (~101,000 Pa) into a flat sliver at the top of a zero-based
+    # axis. Shared by every value-carrying layer so the axis definitions merge.
     y = alt.Y(
         f"{variable}:Q",
         title=f"{var.label} ({var.unit})",
@@ -510,8 +509,8 @@ def build_nwp_ensemble_chart(
         scale=alt.Scale(zero=False),
     )
 
-    # The display scale is applied before _prepare_for_plot so its 3-decimal-place rounding
-    # happens in display units (raw precipitation ~1e-4 kg/m²/s would round to zero).
+    # The display scale is applied before _prepare_for_plot so its 3-decimal-place rounding happens
+    # in display units (raw precipitation ~1e-4 kg/m²/s would round to zero).
     data = _prepare_for_plot(
         nwp.filter(plot_window)
         .select("valid_time", "ensemble_member", variable)
@@ -532,9 +531,9 @@ def build_nwp_ensemble_chart(
     )
 
     # The same always-shown-legend construction as the power chart: the shared colour scale's
-    # explicit domain drives the legend (so it lists every entry whatever is toggled on), the
-    # scale and legend ride on the always-drawn init-time rule, and the single-colour layers
-    # join via datum encodings. orient="top" keeps both charts' plot areas the same width.
+    # explicit domain drives the legend (so it lists every entry whatever is toggled on), the scale
+    # and legend ride on the always-drawn init-time rule, and the single-colour layers join via
+    # datum encodings. orient="top" keeps both charts' plot areas the same width.
     nwp_color_scale = alt.Scale(
         domain=list(_NWP_LINE_COLORS), range=list(_NWP_LINE_COLORS.values())
     )
@@ -556,8 +555,8 @@ def build_nwp_ensemble_chart(
         )
     )
     if analysis_data is not None and analysis_data.height > 0:
-        # BLUE (via the shared scale) deliberately matches the power panel's observed-truth
-        # colour; the stroke width matches the actual-power line's for the same reason.
+        # BLUE (via the shared scale) deliberately matches the power panel's observed-truth colour;
+        # the stroke width matches the actual-power line's for the same reason.
         layers.append(
             alt.Chart(analysis_data)
             .mark_line(strokeWidth=2.5)

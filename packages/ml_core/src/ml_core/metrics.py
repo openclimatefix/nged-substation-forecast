@@ -214,9 +214,9 @@ def _wide_metrics(per_run: pl.LazyFrame, group_keys: list[str]) -> pl.LazyFrame:
         "rmse": (pl.col("error").pow(2).mean()).sqrt(),
         "mbe": pl.col("error").mean(),
         "crps": pl.col("crps").mean(),
-        # RMS spread, not mean-of-std: Jensen's inequality drags mean-of-std well below the
-        # RMS form whenever spread varies across timestamps, which would fake underdispersion
-        # for a calibrated ensemble. The (m+1)/m factor is already folded into corrected_var.
+        # RMS spread, not mean-of-std: Jensen's inequality drags mean-of-std well below the RMS form
+        # whenever spread varies across timestamps, which would fake underdispersion for a
+        # calibrated ensemble. The (m+1)/m factor is already folded into corrected_var.
         "_rms_spread": pl.col("corrected_var").mean().sqrt(),
     }
     for q in DELIVERY_QUANTILES:
@@ -229,11 +229,11 @@ def _wide_metrics(per_run: pl.LazyFrame, group_keys: list[str]) -> pl.LazyFrame:
         high_col = pl.col(_quantile_column(1 - lower))
         aggs[f"picp:{_band_label(lower)}"] = actual.is_between(low_col, high_col).mean()
         aggs[f"interval_width:{_band_label(lower)}"] = (high_col - low_col).mean()
-    # A perfect forecast group (rmse == 0) with zero spread would score 0/0 = NaN — which is
-    # not null, so it would sail through Metrics.validate and poison every downstream MLflow
-    # mean. Define that corner as 0.0 (consistent with "a deterministic forecast's
-    # spread-skill ratio is 0"). Zero rmse with *positive* spread divides to +inf, which the
-    # finiteness check in compute_metrics turns into a loud error.
+    # A perfect forecast group (rmse == 0) with zero spread would score 0/0 = NaN — which is not
+    # null, so it would sail through Metrics.validate and poison every downstream MLflow mean.
+    # Define that corner as 0.0 (consistent with "a deterministic forecast's spread-skill ratio is
+    # 0"). Zero rmse with *positive* spread divides to +inf, which the finiteness check in
+    # compute_metrics turns into a loud error.
     rmse = pl.col("rmse")
     rms_spread = pl.col("_rms_spread")
     return (
@@ -331,14 +331,13 @@ def compute_metrics(
             "scored — regenerate the forecasts without them (see issue #346)."
         )
 
-    # Join forecasts to actuals; rename power → power_actual to avoid shadowing.
-    # Strip the Patito model subclass from actuals so that Polars' cross-subclass
-    # type check (assert_same_type) doesn't reject a join between two differently-typed
-    # pt.LazyFrame objects.
-    # Dedupe actuals on the join key: a duplicated (time_series_id, time) row would double
-    # every ensemble member through the join, silently corrupting the member-aware metrics
-    # (CRPS, spread, quantiles) while leaving the deterministic ones — which only see the
-    # mean — untouched. Nothing enforces this uniqueness upstream, so guard it here.
+    # Join forecasts to actuals; rename power → power_actual to avoid shadowing. Strip the Patito
+    # model subclass from actuals so that Polars' cross-subclass type check (assert_same_type)
+    # doesn't reject a join between two differently-typed pt.LazyFrame objects. Dedupe actuals on
+    # the join key: a duplicated (time_series_id, time) row would double every ensemble member
+    # through the join, silently corrupting the member-aware metrics (CRPS, spread, quantiles) while
+    # leaving the deterministic ones — which only see the mean — untouched. Nothing enforces this
+    # uniqueness upstream, so guard it here.
     actuals_plain = pl.LazyFrame._from_pyldf(actuals._ldf)
     joined = cv_forecasts.lazy().join(
         actuals_plain.select(["time_series_id", "time", "power"])
@@ -351,10 +350,10 @@ def compute_metrics(
 
     # Collapse the ensemble members of each forecast run into per-timestamp quantities: the
     # deterministic ensemble mean plus the member-aware values (fair CRPS, Fortin-corrected
-    # variance, empirical delivery quantiles). power_fcst_init_time is a group key so that
-    # runs covering the same valid_time at different lead times are scored independently,
-    # never pooled into a lagged-ensemble blend. horizon_slice is constant within a
-    # (power_fcst_init_time, valid_time) group.
+    # variance, empirical delivery quantiles). power_fcst_init_time is a group key so that runs
+    # covering the same valid_time at different lead times are scored independently, never pooled
+    # into a lagged-ensemble blend. horizon_slice is constant within a (power_fcst_init_time,
+    # valid_time) group.
     quantile_aggs = {
         _quantile_column(q): pl.col("power_fcst").cast(pl.Float64).quantile(q, "linear")
         for q in DELIVERY_QUANTILES
@@ -384,8 +383,8 @@ def compute_metrics(
     with_error = per_run.with_columns(error=pl.col("power_fcst") - pl.col("power_actual"))
 
     # Wide metrics: one row per (time_series_id, fold_id, power_fcst_model_name, horizon_slice),
-    # where horizon_slice covers the four lead-time bands plus the "all" aggregate over every
-    # lead time.
+    # where horizon_slice covers the four lead-time bands plus the "all" aggregate over every lead
+    # time.
     base_keys = ["time_series_id", "fold_id", "power_fcst_model_name"]
     wide_columns = [*base_keys, "horizon_slice", *_wide_metric_columns()]
     per_slice = _wide_metrics(with_error, [*base_keys, "horizon_slice"])
@@ -394,15 +393,15 @@ def compute_metrics(
     )
     metrics_wide = pl.concat([per_slice.select(wide_columns), all_slice.select(wide_columns)])
 
-    # Join the pre-computed full-history effective capacity — the NMAE denominator. Strip the
-    # Patito model so Polars' cross-subclass join type check doesn't reject the join.
+    # Join the pre-computed full-history effective capacity — the NMAE denominator. Strip the Patito
+    # model so Polars' cross-subclass join type check doesn't reject the join.
     capacity_denom = pl.LazyFrame._from_pyldf(capacity.lazy()._ldf).select(
         ["time_series_id", "effective_capacity_mw"]
     )
     wide = metrics_wide.join(capacity_denom, on="time_series_id", how="left").collect()
 
-    # Every scored series must have a capacity row; fail loudly rather than silently emitting a
-    # null NMAE (which Metrics.metric_value, a non-nullable Float32, would reject anyway).
+    # Every scored series must have a capacity row; fail loudly rather than silently emitting a null
+    # NMAE (which Metrics.metric_value, a non-nullable Float32, would reject anyway).
     missing = wide.filter(pl.col("effective_capacity_mw").is_null())["time_series_id"]
     if missing.len() > 0:
         raise ValueError(
@@ -411,10 +410,9 @@ def compute_metrics(
         )
     wide = wide.with_columns(nmae=pl.col("mae") / pl.col("effective_capacity_mw"))
 
-    # Pivot to tall format, then split the "name:param" encoding of the parametric wide
-    # columns into (metric_name, metric_param); scalar metrics have no separator, so their
-    # split field_1 is null and fills to "all". The leftover effective_capacity_mw column is
-    # dropped by the unpivot.
+    # Pivot to tall format, then split the "name:param" encoding of the parametric wide columns into
+    # (metric_name, metric_param); scalar metrics have no separator, so their split field_1 is null
+    # and fills to "all". The leftover effective_capacity_mw column is dropped by the unpivot.
     name_parts = pl.col("metric_name").str.split_exact(":", 1)
     metrics_tall = (
         wide.unpivot(
@@ -442,8 +440,8 @@ def compute_metrics(
             "Check that cv_forecasts and actuals overlap in time."
         )
 
-    # NaN/inf are not null, so Metrics.validate would accept them — and a single non-finite
-    # value poisons every downstream MLflow mean. Fail loudly instead, naming the offenders.
+    # NaN/inf are not null, so Metrics.validate would accept them — and a single non-finite value
+    # poisons every downstream MLflow mean. Fail loudly instead, naming the offenders.
     non_finite = metrics_tall.filter(~pl.col("metric_value").is_finite())
     if not non_finite.is_empty():
         offenders = non_finite.select(
@@ -454,8 +452,8 @@ def compute_metrics(
             f"silently poison the MLflow aggregate means. First offenders:\n{offenders.head(10)}"
         )
 
-    # Join time_series_type from metadata. Left, so a series with no metadata row surfaces as a
-    # null to be named below rather than vanishing from the leaderboard.
+    # Join time_series_type from metadata. Left, so a series with no metadata row surfaces as a null
+    # to be named below rather than vanishing from the leaderboard.
     type_map = metadata.select(["time_series_id", "time_series_type"])
     metrics_tall = metrics_tall.join(type_map, on="time_series_id", how="left").with_columns(
         time_series_type=pl.col("time_series_type").cast(pl.Enum(TIME_SERIES_TYPE_SLICES))
@@ -542,8 +540,8 @@ def build_mlflow_aggregate_metrics(
 
     result: dict[str, float] = {}
 
-    # Per-type aggregates. The column is `allow_missing` on `Metrics`, so guard its presence —
-    # but never its nullability: `compute_metrics` raises rather than emit a null type.
+    # Per-type aggregates. The column is `allow_missing` on `Metrics`, so guard its presence — but
+    # never its nullability: `compute_metrics` raises rather than emit a null type.
     if "time_series_type" in base.columns:
         per_type = base.group_by(["metric_key", "time_series_type"]).agg(
             mean_value=pl.col("metric_value").mean()

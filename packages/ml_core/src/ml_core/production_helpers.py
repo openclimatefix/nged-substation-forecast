@@ -216,9 +216,9 @@ def _check_meta_is_servable(meta: dict[str, Any], source: str) -> type[BaseForec
             that class's ``CONFIG_CLASS``, because a key it declared has since been removed or
             renamed; or one of its features is a name this code cannot parse.
     """
-    # Every message here can reach the container log that
-    # scripts/deploy/build_and_verify_image.sh greps case-insensitively for "mlflow" to prove the
-    # runtime is hermetic, so none may contain that word.
+    # Every message here can reach the container log that scripts/deploy/build_and_verify_image.sh
+    # greps case-insensitively for "mlflow" to prove the runtime is hermetic, so none may contain
+    # that word.
     remedy = (
         "Re-train against the current code and promote that run. Never hand-edit meta.json: that "
         "changes what the model claims, not what it was trained with."

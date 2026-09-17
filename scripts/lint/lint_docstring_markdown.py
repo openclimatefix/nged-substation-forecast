@@ -72,8 +72,8 @@ def _scan_docstring(text: str) -> tuple[str, str, int]:
         input=text,
         capture_output=True,
         text=True,
-        # A non-zero return code means pymarkdown found violations, which is the whole point of
-        # this call: the caller inspects `returncode` itself, so raising here would be wrong.
+        # A non-zero return code means pymarkdown found violations, which is the whole point of this
+        # call: the caller inspects `returncode` itself, so raising here would be wrong.
         check=False,
     )
     return result.stdout, result.stderr, result.returncode

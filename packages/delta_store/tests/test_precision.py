@@ -40,8 +40,8 @@ def test_low_fraction_bits_are_zero(keep_bits: int) -> None:
 
 def test_rounds_to_nearest_not_toward_zero() -> None:
     # 1 + 2^-12 + 2^-13 lies strictly above the midpoint between the two neighbouring
-    # 13-significand-bit values 1 + 2^-12 and 1 + 2^-11, once the +2^-23-ish representation
-    # error is included — round-to-nearest must go *up* in magnitude, truncation would go down.
+    # 13-significand-bit values 1 + 2^-12 and 1 + 2^-11, once the +2^-23-ish representation error is
+    # included — round-to-nearest must go *up* in magnitude, truncation would go down.
     x = 1.0 + 2.0**-12 + 2.0**-13 + 2.0**-14
     result = _round([x], keep_bits=13)[0]
     assert result == pytest.approx(1.0 + 2.0**-11, abs=0.0)

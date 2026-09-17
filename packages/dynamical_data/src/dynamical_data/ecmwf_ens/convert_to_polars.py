@@ -93,8 +93,8 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
             # Parquet-backed, so it never had Delta's no-unsigned-integer constraint — but
             # Nwp.h3_index is Int64, so it needs an explicit cast here rather than at
             # H3GridWeights's boundary. The narrowing loses nothing at any resolution: H3 reserves
-            # bit 63 of every index as zero, so no H3 value reaches the bit a signed Int64 gives
-            # up. See Nwp.h3_index in contracts.weather_schemas for the full argument.
+            # bit 63 of every index as zero, so no H3 value reaches the bit a signed Int64 gives up.
+            # See Nwp.h3_index in contracts.weather_schemas for the full argument.
             h3_index=pl.col("h3_index").cast(pl.Int64),
             # Computed here, after the H3 aggregation above, which is the order that matters:
             # wind_u_*/wind_v_* are aggregated as ordinary numeric variables first, and speed and
@@ -122,11 +122,11 @@ def _calc_wind_speed(height: Literal["10m", "100m"]) -> pl.Expr:
 def _calc_wind_direction(height: Literal["10m", "100m"]) -> pl.Expr:
     """Compute wind direction (meteorological convention: the angle the wind is coming *from*)."""
     RAD_TO_DEG = 180 / np.pi
-    # The arctan2 order: standard math usually writes atan2(y, x), and Polars' pl.arctan2("y",
-    # "x") follows that convention. Passing u as y and v as x aligns the 0-degree angle with the
-    # North (v) axis. The +180 offset: u and v describe where the wind is going, so arctan2 gives
-    # the direction of travel; adding 180 degrees flips the vector to the direction the wind is
-    # coming from, which is the meteorological convention this function's name promises.
+    # The arctan2 order: standard math usually writes atan2(y, x), and Polars' pl.arctan2("y", "x")
+    # follows that convention. Passing u as y and v as x aligns the 0-degree angle with the North
+    # (v) axis. The +180 offset: u and v describe where the wind is going, so arctan2 gives the
+    # direction of travel; adding 180 degrees flips the vector to the direction the wind is coming
+    # from, which is the meteorological convention this function's name promises.
     return (pl.arctan2(f"wind_u_{height}", f"wind_v_{height}") * RAD_TO_DEG + 180) % 360
 
 
@@ -261,8 +261,8 @@ def _aggregate_grid_points_to_h3_cells(
             *contributing_weights,
             *weighted_modes,
         )
-        # The `> 0` guard is load-bearing, not defensive: Polars sums an all-null group to `0.0`,
-        # so without it a cell that lost every point would divide 0.0 by 0.0.
+        # The `> 0` guard is load-bearing, not defensive: Polars sums an all-null group to `0.0`, so
+        # without it a cell that lost every point would divide 0.0 by 0.0.
         .with_columns(
             **{
                 var: pl.when(pl.col(var + _CONTRIBUTING_WEIGHT_SUFFIX) > 0)
