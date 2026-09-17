@@ -7,7 +7,7 @@
 #
 # Build (always linux/arm64 — ARM Fargate is ~20% cheaper and the control-plane box is
 # Graviton, so an amd64 image cannot run anywhere in the deployment; on an x86 host this
-# needs QEMU registered, which scripts/build_and_verify_image.sh checks for):
+# needs QEMU registered, which scripts/deploy/build_and_verify_image.sh checks for):
 #   docker build --platform linux/arm64 \
 #     --build-arg MODEL_RUN_ID=<id> --build-arg GIT_SHA=$(git rev-parse HEAD) \
 #     -t nged-forecast:<id-short> .

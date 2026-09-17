@@ -1,6 +1,6 @@
 """Every marimo notebook binds every name its cells reference.
 
-The check itself lives in `scripts/check_marimo_notebooks.py`, which is also a pre-commit hook;
+The check itself lives in `scripts/lint/check_marimo_notebooks.py`, which is also a pre-commit hook;
 its module docstring explains what the failure looks like and which tools produce it. These tests
 run it over every notebook in the repo, and — because it rides on private marimo API — keep hand-
 written notebooks either side of the line: three that it must flag, so a marimo release cannot
@@ -20,7 +20,7 @@ from typing import Final
 REPO_ROOT: Final[Path] = Path(__file__).parent.parent
 """The repo root, one level above this `tests/` directory."""
 
-CHECKER_PATH: Final[Path] = REPO_ROOT / "scripts" / "check_marimo_notebooks.py"
+CHECKER_PATH: Final[Path] = REPO_ROOT / "scripts" / "lint" / "check_marimo_notebooks.py"
 """The checker, run as a subprocess below because `scripts/` is not an importable package."""
 
 NOTEBOOK_DIRS: Final[tuple[str, ...]] = ("packages/notebooks", "packages/dashboard")

@@ -7,7 +7,7 @@
 # is the source of truth for *why* each choice below is made.
 #
 # Usage:
-#   scripts/build_and_verify_image.sh          # no arguments — everything is derived
+#   scripts/deploy/build_and_verify_image.sh          # no arguments — everything is derived
 #
 # The image is built for linux/arm64 REGARDLESS of the host architecture: the ECS task
 # definition declares ARM64 (ARM Fargate is ~20% cheaper) and the control-plane box is a
@@ -134,4 +134,4 @@ echo "    - missing NWP data (no DATA_PATH_INTERNAL mounted) as the sole cause �
 echo "  A non-zero container exit (${RUN_EXIT}) is EXPECTED here; a zero exit would be suspicious."
 echo
 echo "==> ${IMAGE} passed the automated hermeticity check."
-echo "    Push + deploy it with scripts/push_and_deploy_image.sh (aws.md Step 6)."
+echo "    Push + deploy it with scripts/deploy/push_and_deploy_image.sh (aws.md Step 6)."
