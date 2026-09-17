@@ -32,6 +32,9 @@ import sys
 from pathlib import Path
 from typing import Final
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+from prose_splice import CODE_SPAN
+
 COUNTS: Final[dict[str, str]] = {
     "markdown links": r"\]\(",
     "link openers": r"(?<!\!)\[",
@@ -85,8 +88,15 @@ def _body(text: str) -> str:
 
 
 def _unbalanced_paragraphs(text: str, pattern: str) -> int:
-    """How many blank-line-separated paragraphs carry an odd number of `pattern`."""
-    return sum(1 for para in text.split("\n\n") if len(re.findall(pattern, para)) % 2)
+    """How many blank-line-separated paragraphs carry an odd number of `pattern`.
+
+    Code spans come out first. A page that documents markdown writes its markers inside backticks
+    — this skill's own prose names the bold marker that way — and counting those as prose markers
+    reports an unpaired span in a paragraph that renders perfectly. Removing a span takes an even
+    number of backticks with it, so the backtick count this same function checks is unaffected.
+    """
+    stripped = CODE_SPAN.sub("", text)
+    return sum(1 for para in stripped.split("\n\n") if len(re.findall(pattern, para)) % 2)
 
 
 def _report_counts(*, raw_before: str, raw_after: str, path: str) -> bool:

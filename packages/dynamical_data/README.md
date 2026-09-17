@@ -18,10 +18,11 @@ The storage format itself lives in `delta_store.nwp` (writer properties, sort or
 this section records the measurements behind it. Full before/after detail is in
 [PR #271](https://github.com/openclimatefix/nged-substation-forecast/pull/271); earlier experiments
 (UInt8/Int16 affine quantisation, codec and sort-order sweeps) are in this file's git history. The
-same measure-before-you-optimise approach, and the NWP and `power_forecasts` storage numbers side by
-side, are summarised in [Performance and
-Scale](https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#storage-formats-measured-not-assumed),
-which frames both tables' storage choices as an instance of [design principle 12, measure; do not
+same measure-before-you-optimise approach, and the storage numbers for the NWP table and the
+`power_forecasts` table side by side, are summarised in [Performance and
+Scale](https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#storage-formats-measured-not-assumed).
+That page frames both tables' storage choices as an instance of [design principle 12, measure; do
+not
 assume](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#12-measure-do-not-assume).
 
 **Current scheme:** physical-unit `Float32`, every continuous variable rounded to a 13-bit
@@ -29,16 +30,27 @@ significand (max relative error 2⁻¹³ ≈ 1.2×10⁻⁴ — measured ≤ 0.00
 MSL pressure), rows sorted `init_time → ensemble_member → valid_time → h3_index`, plain ZSTD
 level 3.
 
+**Why round at all, when Dynamical.org already rounds?** Dynamical stores ECMWF ENS with 6–11
+mantissa bits per variable (their
+[`binary_rounding.py`](https://github.com/dynamical-org/reformatters/blob/main/src/reformatters/common/binary_rounding.py)).
+But trailing zeros do not survive arithmetic: our H3 aggregation is a weighted mean over grid
+points, and wind speed/direction are derived from their u/v via `sqrt`/`arctan2`, so by the time
+values reach our writer their mantissas are full entropy again (measured: 100% of Dynamical-style
+rounded values have zeroed low bits; after a weighted mean, 0.07% do). Our 13-significand-bit
+rounding restores compressibility while being 1–6 bits *finer* than the upstream precision, so it
+discards almost nothing beyond what Dynamical already dropped.
+
 **How much space does GB-wide ECMWF ENS take?** One daily run (1,671 H3 cells × 51 members × 85 lead
 times, up to ~7.24M rows) averages ~158 MB, so a year is **~58 GB**. The full local development
 table — 899 daily runs (Apr 2024 → Sep 2026, ~6.5 billion rows) — is **142 GB**.
 
-**Storage** (nine real partitions spread across every season). **The table compares the writer
-configurations against each other; its absolute figures are older than the table on disk today.**
-Every row was measured at parquet's default row-group size, against a partition set averaging 112.9
-MB, where a partition now averages ~158 MB. The member-aligned row-group size `delta_store.nwp`
-writes accounts for 8.6% of that difference, measured across the rewrite of all 899 partitions; the
-rest predates it and is not accounted for here:
+**Storage** — the table below compares the writer configurations against each other, on nine real
+partitions spread across every season. **The table's absolute figures are older than the NWP table
+on disk today.** Every row was measured at parquet's default row-group size, against a partition set
+averaging 112.9 MB, where a partition now averages ~158 MB. The member-aligned row-group size that
+`delta_store.nwp` writes accounts for 8.6% of that difference, measured across the rewrite of all
+899 partitions; the remaining 91.4% predates the member-aligned row-group size and is not accounted
+for here:
 
 | Config | avg MB/partition | extrapolated GB/yr |
 |---|---:|---:|
@@ -53,24 +65,26 @@ directly, and `BYTE_STREAM_SPLIT` scatters that repetition across four byte plan
 properties are data-dependent — measure per table.
 
 **Read path** — the member-early sort puts each ensemble member's rows in one contiguous block, and
-`delta_store.nwp` sizes each parquet row group to hold exactly one member, so a single-member read
-(every training run reads just the control member) matches one row group's min/max range and skips
-the other 50. Measured against a `valid_time`-first sort of the same 29 daily partitions, reading 9
-H3 cells and the control member alone — two tables written freshly through `write_nwp`, differing
-only in the sort order, each figure the warm-cache median of five timed repetitions: **5.7× faster
-and 5.5× less peak memory** (170 ms / 2,200 MB → 30 ms / 400 MB), for **3.7% more stored bytes**
-(4.35 GB → 4.51 GB across the 29 partitions). Both tables used the member-aligned row-group size, so
-the comparison isolates the row order.
+`delta_store.nwp` sizes each parquet row group to hold exactly one member. A single-member read
+(every training run reads just the control member) therefore matches one row group's min/max range
+and skips the other 50 row groups.
 
-**The read decodes 1.96% of each partition — one row group in 51 — and that holds for every
-member.** A census of partitions from 2024, 2025, and 2026 found 51 row groups in each, every one
-spanning a single member and the 51 together covering members 0 to 50, so no member decodes extra
-rows for sitting in the middle of the range. Under the `valid_time`-first sort the same read decodes
-100%.
+Measured against a `valid_time`-first sort of the same 29 daily partitions, reading nine H3 cells
+and the control member alone: **5.7× faster and 5.5× less peak memory** (170 ms / 2,200 MB → 30 ms /
+400 MB), for **3.7% more stored bytes** (4.35 GB → 4.51 GB across the 29 partitions). Both tables
+were written freshly through `write_nwp`, differ only in the sort order, and use the member-aligned
+row-group size, so the comparison isolates the row order. Each figure is the warm-cache median of
+five timed repetitions.
+
+**The read decodes 1.96% of each partition censused — one row group in 51 — and that 1.96% holds for
+every member.** A census of partitions from 2024, 2025, and 2026 found 51 row groups in each. Every
+row group spanned a single member, and the 51 together covered members 0 to 50, so no member decodes
+extra rows for sitting in the middle of the range. Under the `valid_time`-first sort the same read
+decodes 100%.
 
 **The timing and the peak-memory figures were both measured on local disk.** On S3 a skipped row
-group also skips an HTTP range request over the network, so both figures are a floor: the same read
-from S3 stands to gain more from row-group skipping, not less.
+group also skips an HTTP range request over the internet, so both figures are a floor: the same read
+from S3 stands to gain more from row-group skipping.
 
 ```python
 # Two arms, one partition window, differing only in NWP_SORT_COLS; the second monkeypatches
@@ -102,18 +116,11 @@ power impact is ~3× its relative error because the speed-to-power curve is roug
 | Uniform 10 | −15.6% | 34.7 | 0.10% | 0.29% | 0.016 °C | 64 Pa |
 | Wind-protected (wind speed stays 13, rest squeezed) | −13.0% | 35.7 | 0 | 0 | 0.06 °C | 16 Pa |
 
+These figures share the Storage table's older ~41 GB/yr basis, so the percentage columns are
+comparable against each other but the absolute GB/yr sit below today's ~58 GB/yr.
+
 The full squeeze adds ~2.3% power-equivalent wind error — not tolerable. The wind-safe ceiling is
 −13% ≈ 5.4 GB/yr, and the NWP table is GB-wide so it does **not** grow with the V2 scale-up to
 ~2,500 time series: a fixed ~5 GB/yr saving doesn't justify maintaining a dict of per-variable
 precision budgets. If disk ever becomes a real constraint, the wind-protected config is the one to
 reach for.
-
-**Why round at all, when Dynamical.org already rounds?** Dynamical stores ECMWF ENS with 6–11
-mantissa bits per variable (their
-[`binary_rounding.py`](https://github.com/dynamical-org/reformatters/blob/main/src/reformatters/common/binary_rounding.py)).
-But trailing zeros do not survive arithmetic: our H3 aggregation is a weighted mean over grid
-points, and wind speed/direction are derived from their u/v via `sqrt`/`arctan2`, so by the time
-values reach our writer their mantissas are full entropy again (measured: 100% of Dynamical-style
-rounded values have zeroed low bits; after a weighted mean, 0.07% do). Our 13-significand-bit
-rounding restores compressibility while being 1–6 bits *finer* than the upstream precision, so it
-discards almost nothing beyond what Dynamical already dropped.

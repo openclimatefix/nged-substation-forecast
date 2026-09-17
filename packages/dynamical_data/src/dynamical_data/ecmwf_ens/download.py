@@ -14,7 +14,10 @@ from contracts.weather_schemas import Nwp
 
 
 class NwpRunNotYetAvailable(Exception):
-    """Raised when ``nwp_init_time`` is not yet in the catalog (Dynamical has not published it)."""
+    """Raised when ``nwp_init_time`` is not yet in the catalog.
+
+    Dynamical.org has not yet published that run.
+    """
 
 
 _ECMWF_ENS_VARS_TO_DOWNLOAD: Final[tuple[str, ...]] = (
@@ -86,8 +89,8 @@ def open_ecmwf_ens_run(
     if nwp_init_time.utcoffset() is None:
         raise ValueError(f"nwp_init_time must be timezone aware. {nwp_init_time.tzinfo=}")
 
-    # The xarray selection needs nwp_init_time timezone-naive, so it is converted to UTC and then
-    # stripped of tzinfo here.
+    # The xarray selection needs nwp_init_time timezone-naive, so nwp_init_time is converted to UTC
+    # and then stripped of tzinfo here.
     utc_nwp_init_time = np.datetime64(nwp_init_time.astimezone(UTC).replace(tzinfo=None))
 
     ds = dynamical_catalog.open("ecmwf-ifs-ens-forecast-15-day-0-25-degree", chunks=None)
@@ -122,7 +125,7 @@ def open_ecmwf_ens_run(
     ds_sliced = ds.sel(latitude=lat_slice, longitude=lon_slice, init_time=utc_nwp_init_time)
 
     # An empty spatial intersection here would otherwise surface much later as a confusing
-    # KeyError during DataFrame conversion, so it is checked and named explicitly now.
+    # KeyError during DataFrame conversion, so the intersection is checked and named explicitly now.
     if ds_sliced.longitude.size == 0 or ds_sliced.latitude.size == 0:
         raise ValueError("No spatial overlap found between H3 grid and NWP dataset.")
 
@@ -137,7 +140,7 @@ def download_ecmwf_ens_data(ds_sliced: xr.Dataset) -> xr.Dataset:
 
     Returns:
         The same variables and coordinates as `ds_sliced`, each variable now backed by an
-        in-memory `xr.DataArray` rather than a lazy Dask/Zarr array, fetched with up to 4
+        in-memory `xr.DataArray` rather than a lazy Dask/Zarr array, fetched with up to four
         variables downloaded concurrently.
     """
 
@@ -183,10 +186,10 @@ def _calc_slice_for_lat_or_lng(
     """Build a `slice` in whichever direction the coordinate is stored, ascending or descending.
 
     `xarray`'s `.sel(dim=slice(a, b))` is sensitive to coordinate direction: passing `(min, max)`
-    against a descending coordinate returns an empty selection rather than raising, so the
-    direction has to be checked rather than assumed. In the ECMWF ENS catalog on Dynamical.org,
-    latitude runs from +90 to -90 (descending) and longitude runs from -180 to 179.75 (ascending,
-    at the catalog's native 0.25-degree grid spacing).
+    against a descending coordinate returns an empty selection rather than raising. The direction
+    therefore has to be checked rather than assumed. In the ECMWF ENS catalog on Dynamical.org,
+    latitude runs from +90 to -90 (descending) and longitude runs from -180 to 179.75 (ascending, at
+    the catalog's native 0.25-degree grid spacing).
 
     Args:
         coord_name: Which coordinate this slice is for. Names the coordinate read from `ds` to
