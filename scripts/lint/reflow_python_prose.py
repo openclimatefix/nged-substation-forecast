@@ -247,10 +247,16 @@ def _reflow_docstrings_in(source: str, tree: ast.Module) -> str:
 
 
 def _is_prose_comment(text: str) -> bool:
-    """Whether a standalone `#` comment line is prose, rather than a directive or non-prose line."""
-    return not (
-        DIRECTIVE_COMMENT.match(text) or URL_ONLY_COMMENT.match(text) or NOT_PROSE.search(text)
-    )
+    """Whether a standalone `#` comment line is prose, rather than a directive or non-prose line.
+
+    `text` still carries its own leading `#`, which `DIRECTIVE_COMMENT`/`URL_ONLY_COMMENT` need
+    anchored there. `NOT_PROSE` is checked against `text[1:]` instead, because it also matches a
+    bare `#` — searching the full `text` would match that leading marker on every single-`#`
+    comment line and always report `False`, which is exactly the bug this slice fixes.
+    """
+    if DIRECTIVE_COMMENT.match(text) or URL_ONLY_COMMENT.match(text):
+        return False
+    return not NOT_PROSE.search(text[1:])
 
 
 def _comment_blocks(source: str) -> list[tuple[int, int, int]]:
