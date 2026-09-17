@@ -10,8 +10,8 @@ kinds of text are in scope:
 - **Prose comment blocks** — a run of two or more consecutive whole-line `#` comments at the same
   indent, at least one of which runs past `WIDTH`, wrapped with the same greedy word-wrap
   `markdown_wrap._wrap` uses. A comment carrying a
-  linter directive (`noqa`, `type:`, `ty:`), a shebang, or a single trailing inline comment is left
-  alone, since none of those is prose.
+  linter directive (`noqa`, `fmt: off`, `type:`), a shebang, a blockquote or doctest `>`, a banner
+  rule of dashes, or a single trailing inline comment is left alone, since none of those is prose.
 
 Neither kind of text is touched by `ruff format`, which reformats code but leaves comments and
 string literals as the author wrote them (see the `E5` entry in `pyproject.toml`'s `select` list) —
@@ -44,9 +44,39 @@ DOCSTRING_OPEN: Final[re.Pattern[str]] = re.compile(r'^(?P<prefix>[a-zA-Z]*)(?P<
 """The prefix (`r`, `f`, ... or none) and triple-quote a docstring literal opens with."""
 
 DIRECTIVE_COMMENT: Final[re.Pattern[str]] = re.compile(
-    r"^#!|^#\s*(noqa\b|type:|ty:|-\*-)", re.IGNORECASE
+    r"^#!|^#\s*(noqa\b|type:|ty:|-\*-|fmt:\s*(on|off|skip)\b|ruff:|pylint:|mypy:|pyright:"
+    r"|isort:|flake8:|coverage:|nosec\b|pragma:)",
+    re.IGNORECASE,
 )
-"""A comment that is a directive, not prose, and so must be left exactly as written."""
+"""A comment that is a directive, not prose, and so must be left exactly as written.
+
+Every tool that reads a directive reads it as a whole comment line, so merging the line below it
+into the directive switches the directive off silently. `# fmt: off` is the sharpest case: a
+repacked `# fmt: off This table is hand aligned...` stops `ruff format` recognising the marker,
+and the block the author was protecting is reformatted with nothing reported. `ruff:`, `pylint:`
+and the rest are listed because an editor, a reviewer or another repository's CI may run the tool
+that reads them over a file copied out of here, even though `pyproject.toml` configures none of
+them.
+"""
+
+QUOTED_COMMENT: Final[re.Pattern[str]] = re.compile(r"^#\s*>")
+"""A comment whose text opens with `>` — a blockquote, or a `>>>` doctest example.
+
+`reflow_text` reads such a line as a blockquote and repeats the `>` marker on every line it wraps
+onto, while `_flatten` strips only the `#` marker, so each added `>` counts as a new word and the
+round-trip assertion in `reflow_python_prose` fires. That assertion aborts the whole run, after
+the files already processed have been written, and this script is run over a batch of files at a
+time. Stripping `>` in `_flatten` the way `markdown_wrap._flatten` does would silence the
+assertion and leave the block rewrapped — wrong for a doctest, whose line breaks are part of the
+example — so the block is refused instead.
+"""
+
+BANNER_COMMENT: Final[re.Pattern[str]] = re.compile(r"^#\s*[-=*_~]{3,}\s*$")
+"""A comment that is a rule drawn across the block, e.g. the `# ------` above a section title.
+
+The rule and the title beneath it are a two-line comment block, so repacking merges the rule into
+the title and leaves the title trailing off the end of a line of dashes.
+"""
 
 URL_ONLY_COMMENT: Final[re.Pattern[str]] = re.compile(r"^#\s*\S+://\S+\s*$")
 """A comment whose entire content is one URL — nothing to wrap, and wrapping would break it."""
@@ -255,7 +285,12 @@ def _is_prose_comment(text: str) -> bool:
     bare `#` — searching the full `text` would match that leading marker on every single-`#`
     comment line and always report `False`, which is exactly the bug this slice fixes.
     """
-    if DIRECTIVE_COMMENT.match(text) or URL_ONLY_COMMENT.match(text):
+    if (
+        DIRECTIVE_COMMENT.match(text)
+        or URL_ONLY_COMMENT.match(text)
+        or QUOTED_COMMENT.match(text)
+        or BANNER_COMMENT.match(text)
+    ):
         return False
     return not NOT_PROSE.search(text[1:])
 
@@ -315,6 +350,10 @@ def _reflow_comment_block(lines: list[str], indent: int) -> list[str] | None:
     comment that does overflow.
     """
     if all(len(line.rstrip("\n")) <= WIDTH for line in lines):
+        return None
+    # A tab is either hand alignment, which `NOT_PROSE`'s two-space test cannot see, or an indent
+    # this function would re-emit as spaces: leave a block carrying one exactly as written.
+    if any("\t" in line for line in lines):
         return None
 
     texts: list[str] = []

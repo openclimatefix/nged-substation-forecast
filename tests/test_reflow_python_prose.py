@@ -19,6 +19,8 @@ from pathlib import Path
 from types import ModuleType
 from typing import Final
 
+import pytest
+
 REPO_ROOT: Final[Path] = Path(__file__).parent.parent
 """The repo root, one level above this `tests/` directory."""
 
@@ -47,6 +49,12 @@ reflow_python_prose = _load_script()
 
 WIDTH: Final[int] = reflow_python_prose.WIDTH
 """The column the script wraps at, so a fixture can be built just over the limit."""
+
+OVERLONG_PROSE_LINE: Final[str] = (
+    "# This ordinary prose comment is long enough on its own that the block around it runs past the"
+    " hundred character limit this repository wraps at.\n"
+)
+"""One overlong prose line, so a refusal fixture is not refused by the width gate instead."""
 
 
 def test_overlong_prose_comment_block_is_reflowed() -> None:
@@ -163,6 +171,125 @@ def test_trailing_inline_comment_is_not_reflowed() -> None:
         " character limit the repo wraps at.\n"
         "y = 2  # And so is this one, on the physical line directly under it, to make a run.\n"
     )
+
+    assert reflow_python_prose.reflow_python_prose(source) == source
+
+
+def test_blockquote_comment_is_not_reflowed() -> None:
+    """A `>` line inside a comment keeps its block whole, rather than aborting the run.
+
+    Wrapping a blockquote adds a `>` marker to each line it wraps onto, and `_flatten` strips
+    only the `#` marker, so the added markers read as new words and the round-trip assertion in
+    `reflow_python_prose` fires — which would end a batch run part-way, after the files already
+    processed had been written.
+    """
+    source = OVERLONG_PROSE_LINE + (
+        "# > In production, never raise because an input is absent or stale: degrade, widen the"
+        " uncertainty bands, and record the degradation on the row.\n"
+    )
+
+    assert reflow_python_prose.reflow_python_prose(source) == source
+
+
+def test_doctest_comment_is_not_reflowed() -> None:
+    """A `>>>` example inside a comment survives, because its line breaks are part of it."""
+    source = OVERLONG_PROSE_LINE + "# >>> reflow_python_prose(source)\n"
+
+    assert reflow_python_prose.reflow_python_prose(source) == source
+
+
+def test_formatter_directive_is_not_merged_into_the_prose_beside_it() -> None:
+    """`# fmt: off` keeps its own line, because text merged onto it stops ruff reading it.
+
+    A merged directive is the quietest failure this script can cause: the formatter goes on to
+    reformat the block the directive was switched off to protect, and reports nothing.
+    """
+    source = "# fmt: off\n" + OVERLONG_PROSE_LINE
+
+    assert reflow_python_prose.reflow_python_prose(source) == source
+
+
+@pytest.mark.parametrize(
+    "directive",
+    [
+        "# ruff: noqa: E501",
+        "# pylint: disable=invalid-name",
+        "# mypy: ignore-errors",
+        "# pyright: strict",
+        "# isort: skip_file",
+        "# flake8: noqa",
+        "# coverage: ignore",
+        "# nosec",
+        "# pragma: no cover",
+    ],
+)
+def test_a_tool_directive_keeps_its_block_untouched(directive: str) -> None:
+    """Each tool's own directive line stays on its own line, so that tool still reads it."""
+    source = f"{directive}\n{OVERLONG_PROSE_LINE}"
+
+    assert reflow_python_prose.reflow_python_prose(source) == source
+
+
+def test_prose_opening_with_a_directive_word_is_still_reflowed() -> None:
+    """A sentence opening with a word a directive also opens with is prose, and is wrapped."""
+    source = (
+        "# Typescript is not a language this repository uses, and this sentence is long enough to"
+        " push the block past the hundred character limit.\n"
+        "# A second prose line follows it.\n"
+    )
+
+    result = reflow_python_prose.reflow_python_prose(source)
+
+    assert result != source
+    assert all(len(line) <= WIDTH for line in result.splitlines())
+
+
+def test_banner_rule_is_not_merged_into_its_title() -> None:
+    """A rule of dashes above a section title keeps its own line, so the banner survives."""
+    source = (
+        "# ---------------------------------------------------------------------------\n"
+        "# In-process integration tests (file-based MLflow)\n" + OVERLONG_PROSE_LINE
+    )
+
+    assert reflow_python_prose.reflow_python_prose(source) == source
+
+
+def test_double_hash_comment_block_is_not_reflowed() -> None:
+    """A `##` block is left alone, because its second `#` is a marker rather than a word.
+
+    Pins that `_is_prose_comment` drops exactly one leading `#` before testing `NOT_PROSE`:
+    dropping two would read a `##` line as prose and repack the block into `# # ...`.
+    """
+    source = (
+        "## This commented-out line is long enough that the block runs past the hundred character"
+        " limit the repository wraps at.\n"
+        "## A second line follows it.\n"
+    )
+
+    assert reflow_python_prose.reflow_python_prose(source) == source
+
+
+def test_embedded_hash_without_padding_is_not_reflowed() -> None:
+    """An embedded `#` refuses the block even where no hand alignment accompanies it.
+
+    `NOT_PROSE` tests for an embedded `#` and for an interior run of spaces separately, so a
+    fixture carrying both would be refused whichever of the two the code actually applied.
+    """
+    source = OVERLONG_PROSE_LINE + "# key/2024-01-01.json -> date # noqa: E501\n"
+
+    assert reflow_python_prose.reflow_python_prose(source) == source
+
+
+def test_commented_out_code_is_not_reflowed() -> None:
+    """A commented-out function keeps its line breaks, which are what make it readable."""
+    source = OVERLONG_PROSE_LINE + "# def f(x: int) -> int:\n#     return x + 1\n"
+
+    assert reflow_python_prose.reflow_python_prose(source) == source
+
+
+def test_tab_inside_a_comment_block_is_not_reflowed() -> None:
+    """A tab is alignment or indentation this script cannot reproduce, so its block is skipped."""
+    source = OVERLONG_PROSE_LINE + "#\tTabbed alignment column\n"
 
     assert reflow_python_prose.reflow_python_prose(source) == source
 
