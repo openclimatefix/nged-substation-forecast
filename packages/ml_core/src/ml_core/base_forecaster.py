@@ -247,10 +247,10 @@ class BaseForecaster(ABC):
 
     Subclasses must define ``MODEL_NAME``, ``MODEL_VERSION``, and ``CONFIG_CLASS`` as class-level
     constants. ``MODEL_NAME`` and ``MODEL_VERSION`` are stamped onto every ``PowerForecast`` row at
-    predict time, and ``MODEL_NAME`` is stamped on the experiment as its ``model_family`` tag. The
-    MLflow experiment name comes from neither constant: it is the ``experiment_name`` the launcher
-    hands to ``register_experiment``. Bumping ``MODEL_VERSION`` requires a code change
-    (intentional), not a config edit.
+    predict time, and ``MODEL_NAME`` is stamped on the experiment's parent MLflow run as that run's
+    ``model_family`` tag. The MLflow experiment name comes from neither constant: the name is the
+    ``experiment_name`` the launcher hands to ``register_experiment``. Bumping ``MODEL_VERSION``
+    requires a code change (intentional), not a config edit.
 
     Lazy evaluation contract: `train` and `predict` both accept a `pt.LazyFrame[AllFeatures]`.
     Callers must not collect before passing data in. Collecting early wastes memory and prevents

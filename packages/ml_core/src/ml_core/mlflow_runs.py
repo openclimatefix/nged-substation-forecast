@@ -160,12 +160,12 @@ def list_promotable_runs() -> list[PromotableRun]:
     """List up to 1000 fold runs (``cv_role=fold``) per MLflow experiment, newest first.
 
     A read-only convenience for the ``promotable_model_runs`` asset (``defs/production_assets.py``),
-    which logs the returned list as a metadata table in the Dagster UI. Every MLflow experiment is
-    searched, and at most 1000 fold runs are returned from each experiment. A ``promoted_model``
-    promotion candidate's run id can then be copy-pasted into that asset's launchpad rather than
-    retyped from memory. The champion is still picked by eye off the MLflow leaderboard;
-    ``list_promotable_runs`` only lists the candidates. The caller is responsible for setting the
-    tracking URI (``mlflow.set_tracking_uri``) beforehand.
+    which logs the returned list as a metadata table in the Dagster UI. Both searches take MLflow's
+    default page size of 1000, so the listing covers the first 1000 active experiments and returns
+    at most 1000 fold runs from each. A ``promoted_model`` promotion candidate's run id can then be
+    copy-pasted into that asset's launchpad rather than retyped from memory. The champion is still
+    picked by eye off the MLflow leaderboard; ``list_promotable_runs`` only lists the candidates.
+    The caller is responsible for setting the tracking URI (``mlflow.set_tracking_uri``) beforehand.
     """
     client = MlflowClient()
     runs = [
