@@ -473,7 +473,26 @@ uv run python .claude/skills/prose-review/scripts/apply_findings.py findings.jso
 uv run python .claude/skills/prose-review/scripts/apply_findings.py findings.json --apply --merge-base REF
 ```
 
-The paragraphs below say what the script is defending against. Read them before hand-editing
+**A Python file takes `scripts/apply_findings_py.py` instead, because `apply_findings.py` is a
+markdown tool throughout.** The markdown script re-wraps in markdown units, which strips the
+indentation a docstring depends on, and its projection has no way to see the `#` that opens every
+continuation line of a comment block. The Python sibling takes the same JSON, the same `--apply` and
+the same `--merge-base`; searches only the docstrings and comments that `ast` and `tokenize` find,
+so a quote whose words also appear in an identifier or a runtime string cannot reach them; splices
+only the run that differs between the quote and the replacement, so the backticks the sub-agent
+dropped survive; and hands each edited file to `scripts/reflow_python_prose.py` to re-wrap.
+
+```bash
+uv run python .claude/skills/prose-review/scripts/apply_findings_py.py findings.json --merge-base REF
+uv run python .claude/skills/prose-review/scripts/apply_findings_py.py findings.json --apply --merge-base REF
+```
+
+**Both scripts refuse rather than guess, and a refusal is a finding about the finding.** A quote
+matching twice, a quote matching nowhere, and a span reaching across a paragraph break are each
+reported and left for a hand edit. A quote matching twice is usually a sentence the file carries in
+two places, and both copies need the same fix.
+
+The paragraphs below say what the markdown script is defending against. Read them before hand-editing
 anything the script refused, because what the refusal was for decides how the edit has to be made
 instead. Every defect named below was written by an earlier apply script and then passed `pymarkdown
 scan`, `mkdocs build --strict` and `check_information_loss.py` unnoticed.
@@ -665,7 +684,9 @@ Moving an S3 key format out of `list_timeseries_json_files` and into the private
 **Say what a word is before quoting a word count.** A count nobody can reproduce cannot be compared
 against the next package's, and these sweeps run one package at a time over months. What the waves
 so far counted: for a Python file, the text of every docstring and every comment and nothing else;
-for a markdown file, the whole file. Report the before and the after on that definition.
+for a markdown file, the whole file. `scripts/count_prose_words.py` is that definition written
+down as code, and its `--rev` flag reads each file at a git revision, so one command produces the
+before figure and the after figure. Report both in the pull-request body.
 
 **Verify which worktree you are in before reading a single file, and give sub-agents the absolute
 path.** This repo keeps a worktree per branch under `.claude/worktrees/`, and a session's primary
@@ -685,10 +706,13 @@ change reaches outside its stated scope.
 
 Four checks, none of which a `docs/` sweep needs:
 
-- **The abstract-syntax-tree guard**, which proves a prose-only change really was prose-only: parse
-  each file before and after, blank every string constant, and compare `ast.dump()`. Anything that
-  survives is a behavioural change, and belongs in the pull-request body as a list a reviewer can
-  reject as a unit — or in its own pull request.
+- **The abstract-syntax-tree guard**, `scripts/check_prose_only.py`, which proves a prose-only
+  change really was prose-only: parse each file at a git revision and again in the working tree,
+  blank every string constant, and compare `ast.dump()`. Blanking the strings is what makes the
+  comparison a prose test rather than a diff, and a comment cannot reach the tree at all, so comment
+  edits are invisible to the guard by construction. Anything that survives is a behavioural change,
+  and belongs in the pull-request body as a list a reviewer can reject as a unit — or in its own
+  pull request. Run it as `check_prose_only.py <merge-base> <path> ...`.
 - **`pydoclint`**, for a docstring whose `Args:` or `Returns:` section disagrees with the signature.
   Ruff's `D417` sees only an `Args:` section that is present and incomplete, so it is silent on the
   two failures a rename actually produces. `pydoclint` runs as a pre-commit hook and as a CI step,
