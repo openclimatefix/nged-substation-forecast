@@ -480,7 +480,7 @@ continuation line of a comment block. The Python sibling takes the same JSON, th
 the same `--merge-base`; searches only the docstrings and comments that `ast` and `tokenize` find,
 so a quote whose words also appear in an identifier or a runtime string cannot reach them; splices
 only the run that differs between the quote and the replacement, so the backticks the sub-agent
-dropped survive; and hands each edited file to `scripts/reflow_python_prose.py` to re-wrap.
+dropped survive; and hands each edited file to `scripts/lint/reflow_python_prose.py` to re-wrap.
 
 ```bash
 uv run python .claude/skills/prose-review/scripts/apply_findings_py.py findings.json --merge-base REF

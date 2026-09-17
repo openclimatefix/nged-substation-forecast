@@ -26,7 +26,8 @@ Every guard below exists because the alternative silently damages a file that th
   found by `ast` and `tokenize` are searched, so a quote whose words also appear in a runtime string
   or an identifier cannot reach them.
 - **The splice leaves a line far over the 100-character limit**, so every edited file is re-wrapped
-  by `scripts/reflow_python_prose.py`, which is the same engine that wrapped the file originally.
+  by `scripts/lint/reflow_python_prose.py`, which is the same engine that wrapped the file
+  originally.
 - **A splice can close a string early or comment out a line of code**, so each edited file is parsed
   afterwards and its syntax tree compared, with the string constants blanked, against the tree
   before the edit. `check_prose_only.py` holds that comparison and runs it again over the branch.
@@ -56,9 +57,9 @@ from pathlib import Path
 from typing import Final, Literal, TypedDict
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[4]))
-from scripts.markdown_wrap import WIDTH, _is_unwrappable, _tokenise, _wrap
+from scripts.lint.markdown_wrap import WIDTH, _is_unwrappable, _tokenise, _wrap
 
-REFLOW: Final[Path] = Path("scripts/reflow_python_prose.py")
+REFLOW: Final[Path] = Path("scripts/lint/reflow_python_prose.py")
 """The repo's own Python prose re-wrapper, re-run over every file this script edits."""
 
 LINK: Final[re.Pattern[str]] = re.compile(r"\[([^\]]*)\]\([^)]*\)", re.DOTALL)
@@ -400,7 +401,7 @@ def wrappable_lines(source: str) -> set[int]:
 def wrap_overlong(path: Path) -> int:
     """Re-wrap every prose line left over `markdown_wrap.WIDTH` in `path`, and return how many.
 
-    `scripts/reflow_python_prose.py` hands each docstring to `markdown_wrap.reflow_text`, which
+    `scripts/lint/reflow_python_prose.py` hands each docstring to `markdown_wrap.reflow_text`, which
     reads a Google-style ``Args:`` or ``Returns:`` body as an indented code block and therefore
     never re-flows it. A splice landing in one of those sections leaves a single long line that no
     other tool will wrap and that `ruff`'s `E501` then rejects. Wrapping runs forward from the long
