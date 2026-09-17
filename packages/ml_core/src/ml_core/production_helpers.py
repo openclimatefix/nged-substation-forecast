@@ -260,10 +260,10 @@ def _check_trained_metadata_is_readable(model_dir: Path, run_id: str) -> None:
     of that file would forecast nothing at its next 6-hourly slot. Checking here refuses the
     promotion instead, before the swap, leaving the outgoing champion serving.
 
-    Whether the file *covers* the trained population is not checked: ``save_to_mlflow`` is the only
-    production caller of ``write_trained_metadata``, the one function that writes the file, and
-    ``save_to_mlflow``'s caller has already passed ``_require_metadata_coverage`` over a population
-    the trained population is a subset of.
+    Whether the file *covers* the trained population is not checked. ``write_trained_metadata`` is
+    the one function in this repo that writes the file, and ``save_to_mlflow`` is that function's
+    only production caller. ``save_to_mlflow``'s caller has already passed
+    ``_require_metadata_coverage`` over a population the trained population is a subset of.
 
     Args:
         model_dir: The staged, unpacked model directory (not yet moved into place).

@@ -132,8 +132,8 @@ def get_or_create_fold_run(experiment_id: str, parent_run_id: str, fold_id: str)
     if runs:
         return runs[0].info.run_id
     # Resume the parent so the new run nests beneath it (MLflow nests under the active run).
-    # experiment_id must be passed explicitly: resuming a run does not switch the active
-    # experiment, so without it the child would land in the default experiment ("0").
+    # experiment_id must be passed explicitly: resuming a run does not switch the active experiment,
+    # so without the explicit experiment_id the child would land in the default experiment ("0").
     with (
         mlflow.start_run(run_id=parent_run_id),
         mlflow.start_run(
@@ -160,9 +160,10 @@ def list_promotable_runs() -> list[PromotableRun]:
     """List up to 1000 fold runs (``cv_role=fold``) per MLflow experiment, newest first.
 
     A read-only convenience for the ``promotable_model_runs`` asset (``defs/production_assets.py``),
-    which logs the returned list as a metadata table in the Dagster UI. Both searches take MLflow's
-    default page size of 1000, so the listing covers the first 1000 active experiments and returns
-    at most 1000 fold runs from each. A ``promoted_model`` promotion candidate's run id can then be
+    which logs the returned list as a metadata table in the Dagster UI. The experiment listing takes
+    MLflow's default page size of 1000, and the per-experiment fold-run search passes the same 1000
+    explicitly, so the listing covers the first 1000 active experiments and returns at most 1000
+    fold runs from each experiment. A ``promoted_model`` promotion candidate's run id can then be
     copy-pasted into that asset's launchpad rather than retyped from memory. The champion is still
     picked by eye off the MLflow leaderboard; ``list_promotable_runs`` only lists the candidates.
     The caller is responsible for setting the tracking URI (``mlflow.set_tracking_uri``) beforehand.

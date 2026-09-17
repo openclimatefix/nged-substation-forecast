@@ -37,7 +37,7 @@ MlflowTags = dict[str, str]
 
 StageType = Literal["register", "train", "predict", "metrics"]
 """The four stages that stamp provenance; each value becomes a tag-key prefix (see
-``provenance_tags``). ``"train"``, ``"predict"`` and ``"metrics"`` are Dagster assets, and
+``provenance_tags``). ``"train"``, ``"predict"``, and ``"metrics"`` are Dagster assets, and
 ``"register"`` is the ``register_experiment`` op. Add a new ``StageType`` value when a new asset or
 op starts stamping."""
 

@@ -45,8 +45,8 @@ Being the model's own frozen copy of what it trained against also keeps a series
 feature values identical between training and serving. See
 <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>.
 
-Logging it as a second MLflow artifact instead of putting it in the model directory would reopen
-the merge problem ``_MLFLOW_MODEL_ARTIFACT`` documents.
+Logging the frozen metadata copy as a second MLflow artifact rather than putting the copy in the
+model directory would reopen the merge problem ``_MLFLOW_MODEL_ARTIFACT`` documents.
 """
 
 _UNPERSISTED_METADATA_COLUMN: Final[str] = "area_wkt"
@@ -119,7 +119,7 @@ def load_trained_metadata(model_dir: Path) -> pt.DataFrame[TimeSeriesMetadata]:
 
     Returns:
         One row per series in ``trained_time_series_ids`` — the population the model will serve a
-        ``predict`` for, not the wider one it was engineered over — without
+        ``predict`` for, not the wider population it was engineered over — without
         ``_UNPERSISTED_METADATA_COLUMN``.
 
     Raises:
@@ -255,10 +255,10 @@ class BaseForecaster(ABC):
     Lazy evaluation contract: `train` and `predict` both accept a `pt.LazyFrame[AllFeatures]`.
     Callers must not collect before passing data in. Collecting early wastes memory and prevents
     Polars from optimising the full query plan. A subclass materialises the data at the model
-    boundary (typically a single `.collect()`, streamed). Keeping that bounded is the *caller's*
-    responsibility: the caller prunes the inputs (NWP control member, the relevant H3 cells, the
-    window's `init_time` partitions) and, where the full ensemble is needed, processes one
-    `init_time` chunk at a time. Filtering the engineered output cannot prune the upstream
+    boundary (typically a single `.collect()`, streamed). Keeping that collect bounded is the
+    *caller's* responsibility: the caller prunes the inputs (NWP control member, the relevant H3
+    cells, the window's `init_time` partitions) and, where the full ensemble is needed, processes
+    one `init_time` chunk at a time. Filtering the engineered output cannot prune the upstream
     join/upsample. See the NWP scan-pruning notes in
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>.
 

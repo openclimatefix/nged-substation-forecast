@@ -4,9 +4,9 @@ Four public functions, in the order the cross-validation assets call them.
 ``compute_effective_capacity`` derives the per-series denominator that normalised mean absolute
 error (NMAE) divides by. ``compute_metrics`` joins predictions to observed power and returns the
 tall ``Metrics`` frame. ``enrich_metrics_rows`` stamps the evaluation window and scope onto that
-frame once the calling asset knows them, and the enriched frame is what the asset writes to Delta.
-``build_mlflow_aggregate_metrics`` reduces the un-enriched frame ``compute_metrics`` returned to the
-flat key/value dictionary the MLflow leaderboard displays.
+frame once the calling asset knows the window and the scope. The enriched frame is what the asset
+writes to Delta. ``build_mlflow_aggregate_metrics`` reduces the un-enriched frame
+``compute_metrics`` returned to the flat key/value dictionary the MLflow leaderboard displays.
 
 Every function here is pure — no Dagster, no MLflow, and no IO — so each function is
 unit-testable on an in-memory frame, and the asset that calls it owns every read and write.
