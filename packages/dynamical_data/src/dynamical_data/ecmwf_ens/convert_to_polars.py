@@ -39,14 +39,32 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
     points onto `h3_grid`'s H3 cells, derives wind speed and direction from the downloaded u/v
     components, and returns the concatenated result validated against the `Nwp` contract.
 
+    Guarantees, per cell:
+
+    - A **numeric** variable is the area-weighted mean of the points that supplied a value:
+      `sum(v * p)`, where the `proportion` weights `p` sum to 1 over the whole cell by construction
+      (see `geo.h3.compute_h3_grid_weights`), divided by the *contributing* weight rather than by
+      that 1.0, so a missing point costs only its own share instead of biasing the cell low.
+    - A **categorical** variable is the category covering most of the cell's area, with an exact
+      tie resolved to the lowest category code. Points that supplied no category are excluded from
+      the ranking rather than competing in it.
+    - Either kind yields **null**, never `0.0` or a spurious category, when *no* point contributed.
+
+    Each variable is renormalised over its *own* denominator, which is what keeps one variable's
+    corruption from nulling the others. The cost a caller must know about: two variables in one
+    cell can then be averaged over different sub-areas of the hexagon, so if `wind_u_*` and
+    `wind_v_*` ever have different null footprints, the wind vector that `_calc_wind_speed` and
+    `_calc_wind_direction` derive mixes two sub-areas. Upstream corruption has always been
+    co-located across variables, so that is theoretical today.
+
     Args:
         ds: One downloaded ECMWF ENS run, as returned by
             `dynamical_data.ecmwf_ens.download.download_ecmwf_ens_data` — dimensions
             `(lead_time, ensemble_member, latitude, longitude)`, with `init_time` a scalar
             coordinate, and carrying the 13 downloaded ECMWF ENS variables.
         h3_grid: The H3 grid weights to aggregate onto — one row per (H3 cell, NWP grid point)
-            pair that overlaps, with `proportion` the fraction of that cell's area the point
-            covers.
+            pair whose cell and grid point overlap, with `proportion` the fraction of that cell's
+            area the point covers.
 
     Returns:
         One row per `(init_time, valid_time, ensemble_member, h3_index)`, validated against
@@ -100,7 +118,7 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
             # wind_u_*/wind_v_* are aggregated as ordinary numeric variables first, and speed and
             # direction are derived from the already-aggregated components. Averaging *direction*
             # over grid points instead would hit the same 0/360 wrap defect that a naive time
-            # resample has — two points either side of North would average to due South. See
+            # resample has. Two points either side of North would average to due South. See
             # <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#wind-is-stored-as-speed-and-direction-and-why>.
             wind_speed_10m=_calc_wind_speed(height="10m"),
             wind_speed_100m=_calc_wind_speed(height="100m"),
@@ -125,7 +143,7 @@ def _calc_wind_direction(height: Literal["10m", "100m"]) -> pl.Expr:
     # The arctan2 order: standard math usually writes atan2(y, x), and Polars' pl.arctan2("y",
     # "x") follows that convention. Passing u as y and v as x aligns the 0-degree angle with the
     # North (v) axis. The +180 offset: u and v describe where the wind is going, so arctan2 gives
-    # the direction of travel; adding 180 degrees flips the vector to the direction the wind is
+    # the direction of travel. Adding 180 degrees flips the vector to the direction the wind is
     # coming from, which is the meteorological convention this function's name promises.
     return (pl.arctan2(f"wind_u_{height}", f"wind_v_{height}") * RAD_TO_DEG + 180) % 360
 
@@ -152,8 +170,8 @@ def _process_chunk_for_1_lead_time_and_1_ens_member(
 
     Returns:
         One row per `h3_index`, as returned by `_aggregate_grid_points_to_h3_cells` — this
-        slice's numeric variables as their area-weighted mean and its categorical variable as its
-        area-weighted mode.
+        slice's numeric variables as their area-weighted mean and this slice's categorical variable
+        as that variable's area-weighted mode.
     """
     # Prepare data dictionary
     data_dict: dict[str, np.ndarray] = {"latitude": lat_grid, "longitude": lon_grid}
@@ -190,23 +208,9 @@ def _aggregate_grid_points_to_h3_cells(
 ) -> pl.DataFrame:
     """Reduce one H3 cell's overlapping NWP grid points to a single row per cell.
 
-    Guarantees, per cell:
-
-    - A **numeric** variable is the area-weighted mean of the points that supplied a value:
-      `sum(v * p)`, where the `proportion` weights `p` sum to 1 over the whole cell by construction
-      (see `geo.h3.compute_h3_grid_weights`), divided by the *contributing* weight rather than by
-      that 1.0, so a missing point costs only its own share instead of biasing the cell low.
-    - A **categorical** variable is the category covering most of the cell's area, with an exact
-      tie resolved to the lowest category code. Points that supplied no category are excluded from
-      the ranking rather than competing in it.
-    - Either kind yields **null**, never `0.0` or a spurious category, when *no* point contributed.
-
-    Each variable is renormalised over its *own* denominator, which is what keeps one variable's
-    corruption from nulling the others. The cost a caller must know about: two variables in one
-    cell can then be averaged over different sub-areas of the hexagon, so if `wind_u_*` and
-    `wind_v_*` ever have different null footprints, the wind vector that `_calc_wind_speed` and
-    `_calc_wind_direction` derive mixes two sub-areas. Upstream corruption has always been
-    co-located across variables, so that is theoretical today.
+    The per-cell guarantees this aggregation gives are documented on
+    `convert_nwp_xarray_dataset_to_polars_dataframe`, which reaches this function through
+    `_process_chunk_for_1_lead_time_and_1_ens_member`.
 
     Why it is done this way, with the measurements and the tie-break's dry bias:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#spatial-aggregation-is-where-a-grid-points-null-is-resolved>.

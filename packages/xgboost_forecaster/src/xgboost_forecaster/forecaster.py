@@ -73,7 +73,8 @@ class XGBoostForecaster(BaseForecaster):
     Booster).
 
     Save layout: a directory containing one ``{time_series_id}.ubj`` file per trained Booster
-    plus a ``meta.json`` that stores the full XGBoostConfig so that load() is self-contained.
+    plus a ``meta.json`` that stores the full XGBoostConfig, the trained ``time_series_id``
+    population and the model class, so that load() is self-contained.
     """
 
     MODEL_NAME = "xgboost"
@@ -96,10 +97,10 @@ class XGBoostForecaster(BaseForecaster):
         """The sorted ``time_series_id``s this forecaster will serve a ``predict`` for.
 
         For ``XGBoostForecaster`` this is exactly the set of series it holds a trained Booster
-        for (one Booster per ``time_series_id``), so ``predict`` raises ``KeyError`` if asked for
-        any other series. ``save()`` records this set in ``meta.json``, which is what ``load()``
-        reads it back from. See ``BaseForecaster.trained_time_series_ids`` for the model-agnostic
-        contract this implements (the train==predict population invariant).
+        for (one Booster per ``time_series_id``), so ``predict`` ignores rows for any other
+        series. ``save()`` records this set in ``meta.json``, which is what ``load()`` reads it
+        back from. See ``BaseForecaster.trained_time_series_ids`` for the model-agnostic contract
+        this implements (the train==predict population invariant).
         """
         return sorted(self._models.keys())
 
@@ -155,9 +156,9 @@ class XGBoostForecaster(BaseForecaster):
         the caller's job: at validation the full ~51-member NWP ensemble is present, so the
         caller predicts one ``init_time`` chunk at a time, appending to Delta as it goes.
         ``init_time`` is one of the NWP table's two partition columns and the axis that fans the
-        output out across runs, so chunking on it bounds each iteration's forecast frame while
-        every partition is still read exactly once; looping per H3 cell instead runs out of
-        memory on the busiest cell. See ``cv_power_forecasts`` and
+        output out across runs, so chunking on ``init_time`` bounds each iteration's forecast
+        frame while every partition is still read exactly once. Looping per H3 cell instead runs
+        out of memory on the busiest cell. See ``cv_power_forecasts`` and
         <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
 
         ``fold_id`` is stamped onto every output row (the model has no inherent fold; the caller
