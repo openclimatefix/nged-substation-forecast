@@ -14,7 +14,7 @@ description: >-
   reordered or simplified — a docs/ page, a README, a SKILL.md, a docstring, a literature review —
   and whenever a reviewer asked to check prose has reported little or nothing. Sweeping the
   docstrings and comments in Python files has its own section: the word-count rule reverses, the
-  README collides with the module docstrings on the API page, and there are three guards to run
+  README collides with the module docstrings on the API page, and there are five guards to run
   that a docs/ page never needs.
 ---
 
@@ -713,7 +713,7 @@ change reaches outside its stated scope.
 
 ### Guards to run on a code prose sweep
 
-Four checks, none of which a `docs/` sweep needs:
+Five checks, none of which a `docs/` sweep needs:
 
 - **The abstract-syntax-tree guard**, `scripts/check_prose_only.py`, which proves that the sweep
   changed the *structure* of no file: parse each file at a git revision and again in the working
@@ -730,6 +730,17 @@ Four checks, none of which a `docs/` sweep needs:
     a decorator's string argument. A comment never reaches the tree at all, so a deleted `# noqa`, a
     changed `# type:` pragma and a removed coding line are invisible too. `pytest` catches an edited
     runtime string and `ruff` catches a deleted `# noqa`; nothing but a reader catches the rest.
+- **The comment-wrap guard**, `scripts/check_comment_wrap.py`, which finds the half-empty line a
+  splice leaves in the middle of a comment block. An apply script rewrites one line of a block and
+  re-wraps it, but `reflow_python_prose.py` declines any block whose lines already fit inside the
+  width, so on those blocks the re-wrap never runs and the spliced line keeps whatever break the
+  splice gave it. Three commits on one contracts branch each shipped a stranded line of between 9
+  and 35 characters, and a fourth survived review and merged. Neither `ruff` nor `ruff format`
+  reformats comment text, so nothing else reports one. Run it as `check_comment_wrap.py
+  <merge-base> <path> ...`. The gate is the count *rising*, because prose written before the guard
+  existed holds short lines that are nobody's defect, and those cancel. The guard reads `#` comments
+  only: a docstring's list items and `Args:` entries are legitimately short and all move when the
+  prose around them is rewritten, so the same counting there reports mostly noise.
 - **`pydoclint`**, for a docstring whose `Args:` or `Returns:` section disagrees with the signature.
   Ruff's `D417` sees only an `Args:` section that is present and incomplete, so it is silent on the
   two failures a rename actually produces. `pydoclint` runs as a pre-commit hook and as a CI step,
