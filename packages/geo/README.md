@@ -16,9 +16,9 @@ perform a spatial transformation — mapping a latitude/longitude grid to H3 hex
 without depending on heavy or unrelated packages.
 
 `compute_h3_grid_weights_for_boundary` accepts any boundary polygon, not only the Great Britain
-shape this package ships. Accepting any boundary polygon takes no extra code here and means a new
-region plugs into the same H3 gridding rather than forking the gridding code. Accepting any boundary
-is [design principle
+shape this package ships. Accepting any boundary polygon adds no complexity here and means a new
+region plugs into the same H3 gridding rather than forking the gridding code. Keeping the function
+boundary-agnostic is [design principle
 5](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#5-everything-around-the-model-is-general-purpose)
 applied to this package.
 

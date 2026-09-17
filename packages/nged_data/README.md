@@ -35,8 +35,8 @@ list_timeseries_json_files`, etc.).
   `TimeSeriesMetadata` snapshot into the stored metadata Parquet file, keeping the newest values per
   `time_series_id` and rewriting the file only if the incoming metadata differs from what is stored.
 
-`nged_data.read_nged_json` parses one downloaded JSON file into the two schemas. Every function in
-`nged_data.read_nged_json` is private, and the two that parse a whole file are called only by
+`nged_data.read_nged_json` parses one downloaded JSON file into the two schemas. All three of its
+functions are private, and the two that parse a whole file are called only by
 `download_and_parse_files`, so the module appears on the API page below carrying just its
 `ExtractedPowerTimeSeries` result type.
 

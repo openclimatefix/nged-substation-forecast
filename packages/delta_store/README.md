@@ -18,10 +18,10 @@ for the comparison between those two tables, and [design principle
 for why measuring rather than assuming matters project-wide. The other four tables below carry no
 writer-properties tuning, because no measurement has yet been made to justify any tuning.
 
-**The flagship tuned table is the internal `power_forecasts` table, which the format shrank from
-6.33 GB to 0.73 GB.** ZSTD + `DELTA_BINARY_PACKED` timestamps + `BYTE_STREAM_SPLIT` floats +
-member-adjacent sorting + rounding `power_fcst` to a 13-bit significand applied that shrink to the
-403.6M-row development table. `POWER_FORECASTS_WRITER_PROPERTIES`, below on this page, gives the
+**The flagship tuned table is the internal `power_forecasts` table, whose storage format shrank the
+403.6M-row development table from 6.33 GB to 0.73 GB.** The levers are ZSTD, `DELTA_BINARY_PACKED`
+timestamps, `BYTE_STREAM_SPLIT` floats, member-adjacent sorting, and rounding `power_fcst` to a
+13-bit significand. `POWER_FORECASTS_WRITER_PROPERTIES`, below on this page, gives the
 lever-by-lever breakdown, measured on the table's least compressible single file rather than on the
 full table.
 

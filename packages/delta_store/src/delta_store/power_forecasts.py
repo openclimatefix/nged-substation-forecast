@@ -96,7 +96,7 @@ def write_power_forecasts(
 
     **Every row of ``forecasts`` must satisfy the predicate the overwrite path builds.** delta-rs
     checks each row against that predicate and rejects the whole write — ``DeltaError``, nothing
-    committed — if any row falls outside that predicate, rather than writing the rows that do match.
+    committed — if any row falls outside, rather than writing the rows that do match.
     So a frame spanning two ``(experiment_name, fold_id)`` pairs fails under a single
     ``replace_partition``, and a frame spanning two ``power_fcst_init_time`` values fails under a
     narrowing ``replace_predicate_extra``. Confirmed empirically against ``deltalake`` 1.6.3: a
@@ -114,10 +114,10 @@ def write_power_forecasts(
 
     **What stops a retry double-counting is the caller's chunking discipline, not anything in this
     function.** ``cv_power_forecasts`` restarts its chunk loop from the first chunk
-    on every materialisation, and that first chunk always passes ``replace_partition``. The
-    overwriting first chunk clears whatever an interrupted run left in the ``(experiment_name,
-    fold_id)`` partition before the later chunks append into that partition. A caller that appended
-    without an overwriting first chunk would silently double the partition's rows instead — see
+    on every materialisation, and that first chunk always passes ``replace_partition``, clearing
+    whatever an interrupted run left in the ``(experiment_name, fold_id)`` partition before the
+    later chunks append. A caller that appended without an overwriting first chunk would silently
+    double the partition's rows instead — see
     [principle 10, every write is atomic and
     idempotent](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition).
 

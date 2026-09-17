@@ -209,8 +209,8 @@ def _aggregate_grid_points_to_h3_cells(
     """Reduce one H3 cell's overlapping NWP grid points to a single row per cell.
 
     The per-cell guarantees this aggregation gives are documented on
-    `convert_nwp_xarray_dataset_to_polars_dataframe`, the only public function that calls into this
-    one.
+    `convert_nwp_xarray_dataset_to_polars_dataframe`, which reaches this function through
+    `_process_chunk_for_1_lead_time_and_1_ens_member`.
 
     Why it is done this way, with the measurements and the tie-break's dry bias:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#spatial-aggregation-is-where-a-grid-points-null-is-resolved>.

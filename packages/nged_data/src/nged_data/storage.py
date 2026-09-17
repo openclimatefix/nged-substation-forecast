@@ -151,11 +151,11 @@ def remove_small_files_from_listing(
 
     That 68-byte gap comes from V1's 32 series ([phased
     rollout](https://openclimatefix.github.io/nged-substation-forecast/background/requirements/#phased-rollout)),
-    and it is narrow enough that V2's ~2,500 series want re-measuring before this default is trusted
-    there. Two changes would close it: a populated `information` field, which `TimeSeriesMetadata`
-    records as always null in the V1 trial area, would push a zero-reading file above 520; and a
-    substation name shorter than any in V1 would pull a one-reading file below it. Re-run the
-    measurement rather than assume the gap survives.
+    and it is narrow enough that V2's ~2,500 series want re-measuring before this default is
+    trusted there. Two changes would close it: a populated `information` field, which
+    `TimeSeriesMetadata` records as always null in the V1 trial area, would push a zero-reading
+    file above 520; and a substation name shorter than any in V1 would pull a one-reading file
+    below it. Re-run the measurement rather than assume the gap survives.
     """
     n_files_before_filter = file_listing.height
     filtered = file_listing.filter(pl.col("filesize_bytes") > size_threshold_bytes)
@@ -537,9 +537,10 @@ def upsert_metadata(
     write-to-temporary-file-and-rename, so the roster does not get the all-or-nothing commit that
     Delta gives the tables around it — see [principle 10, every write is atomic and
     idempotent](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition).
-    A crash or an out-of-memory kill part-way through a local write leaves a partial file. It is
-    `pl.read_parquet` below that rejects that partial file on the next run — `ComputeError: parquet:
-    File out of specification: The file must end with PAR1` — before `TimeSeriesMetadata.validate`
+    A crash or an out-of-memory kill part-way through a local write leaves a partial file.
+    `pl.read_parquet` below is what rejects that partial file on the next run —
+    `ComputeError: parquet: File out of specification: The file must end with PAR1` — before
+    `TimeSeriesMetadata.validate`
     ever sees it. `validate` is the guard for the other case: a roster that reads back cleanly but
     is off-contract, from an older writer or a hand-edit. Either way the asset records
     `metadata_upsert_failed` and the roster stays broken until an operator acts, because a corrupt

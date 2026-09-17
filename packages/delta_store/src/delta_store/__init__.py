@@ -12,8 +12,8 @@ properties, sort order, and precision policy today. Each module's tuning was cho
 measurements on real data, and the two modules landed on different choices — see
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#storage-formats-measured-not-assumed>
 for the comparison. The other four modules exist so their writes go through ``delta_store`` like
-every other table. Those four modules carry no tuning because there is no measurement yet to back
-any tuning.
+every other table. Those four modules carry no tuning because no one has yet measured those four
+tables.
 """
 
 from delta_store.effective_capacity import write_effective_capacity

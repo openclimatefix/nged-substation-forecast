@@ -352,8 +352,7 @@ present; n/a = the test does not exercise the code that mutation changes):
   tests delegate.
 - ⁴ `geo/tests/test_h3.py::test_grid_weights_snap_to_nearest_grid_centre` — builds the expected grid
   points geographically and compares them against what `compute_h3_grid_weights` produced, so it
-  catches the `cell_to_lat`/`cell_to_lng` swap as well. Both geo tests live in the same file and
-  both were re-confirmed by mutation.
+  catches the `cell_to_lat`/`cell_to_lng` swap as well.
 
 `test_ecmwf_ens_network.py` (network-gated, above) runs the full open → download → convert pipeline
 against the live catalog, but only re-checks *orientation and bounds*: descending latitude,

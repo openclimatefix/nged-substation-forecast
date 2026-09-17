@@ -44,14 +44,13 @@ discards almost nothing beyond what Dynamical already dropped.
 times, up to ~7.24M rows) averages ~158 MB, so a year is **~58 GB**. The full local development
 table — 899 daily runs (Apr 2024 → Sep 2026, ~6.5 billion rows) — is **142 GB**.
 
-**Storage** — nine real partitions spread across every season.
-
-**The table below compares the writer configurations against each other; the table's absolute
-figures are older than the NWP table on disk today.** Every row of the table below was measured at
-parquet's default row-group size, against a partition set averaging 112.9 MB, where a partition now
-averages ~158 MB. The member-aligned row-group size that `delta_store.nwp` writes accounts for 8.6%
-of that difference, measured across the rewrite of all 899 partitions; the rest of the difference
-predates the member-aligned row-group size and is not accounted for here:
+**Storage** — the table below compares the writer configurations against each other, on nine real
+partitions spread across every season. **The table's absolute figures are older than the NWP table
+on disk today.** Every row was measured at parquet's default row-group size, against a partition set
+averaging 112.9 MB, where a partition now averages ~158 MB. The member-aligned row-group size that
+`delta_store.nwp` writes accounts for 8.6% of that difference, measured across the rewrite of all
+899 partitions; the remaining 91.4% predates the member-aligned row-group size and is not accounted
+for here:
 
 | Config | avg MB/partition | extrapolated GB/yr |
 |---|---:|---:|
@@ -78,10 +77,10 @@ row-group size, so the comparison isolates the row order. Each figure is the war
 five timed repetitions.
 
 **The read decodes 1.96% of each partition censused — one row group in 51 — and that 1.96% holds for
-every member.** A census of three daily partitions, one each from 2024, 2025, and 2026, found 51 row
-groups in each, every row group spanning a single member and the 51 together covering members 0 to
-50. No member therefore decodes extra rows for sitting in the middle of the range. Under the
-    `valid_time`-first sort the same read decodes 100%.
+every member.** A census of partitions from 2024, 2025, and 2026 found 51 row groups in each. Every
+row group spanned a single member, and the 51 together covered members 0 to 50, so no member decodes
+extra rows for sitting in the middle of the range. Under the `valid_time`-first sort the same read
+decodes 100%.
 
 **The timing and the peak-memory figures were both measured on local disk.** On S3 a skipped row
 group also skips an HTTP range request over the internet, so both figures are a floor: the same read
