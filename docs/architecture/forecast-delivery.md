@@ -474,14 +474,15 @@ format we already rely on internally — and it is a good internal choice for re
   [ECMWF ENS NWP](../api/dynamical_data/index.md): a full daily run (~7.24 million rows across
   1,671 H3 cells × 51 members × 85 lead times) averages ~158 MB, and our entire local development
   table — 899 daily runs, ~6.5 billion rows, April 2024 to September 2026 — is **~142 GB**.
-- **It's fast to query, even on a laptop.** The table stores one ensemble member per Parquet row
-  group, so a single-member read (the common case for training) decodes one row group in 51 —
-  1.96% of each daily run — instead of the whole file. On a real 29-day, 9-cell, control-member
-  read that is 30 milliseconds and 400 MB of RAM, against 170 milliseconds and 2,200 MB for the
-  same read of a `valid_time`-sorted table. **That speed is what lets us run cross-validation
-  across every ensemble member, for every fold, on a laptop, in a few minutes** — no cluster
-  required for day-to-day model development. The 1.96% holds for every member, not only the
-  control member: every partition sampled holds 51 row groups, each spanning a single member.
+- **It's fast to query, even on a laptop.** The NWP table stores one ensemble member per Parquet
+  row group, so a single-member read (the common case for training) decodes one row group in 51 —
+  1.96% of each daily run — instead of the whole file. That 1.96% holds for every member, not only
+  the control member: every partition the census sampled held 51 row groups, each spanning a single
+  member, and the 51 together covered members 0 to 50. Reading 29 daily runs for 9 H3 cells and the
+  control member alone takes 30 milliseconds and 400 MB of RAM, against 170 milliseconds and
+  2,200 MB for the same read of a `valid_time`-sorted table. **That speed is what lets us run
+  cross-validation across every ensemble member, for every fold, on a laptop, in a few minutes** —
+  no cluster required for day-to-day model development.
 - **It scales to parallel cloud training too.** S3 is built for very high aggregate throughput to
   many concurrent readers, so when V2 needs multiple ML training runs in parallel, each worker can
   read directly from the same S3-hosted Delta tables at full bandwidth — no shared filesystem, no

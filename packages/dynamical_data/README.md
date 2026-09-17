@@ -32,10 +32,12 @@ ZSTD level 3.
 85 lead times, up to ~7.24M rows) averages ~158 MB, so a year is **~58 GB**. The full local
 development table — 899 daily runs (Apr 2024 → Sep 2026, ~6.5 billion rows) — is **142 GB**.
 
-**Storage** (nine real partitions spread across every season). **The table compares writer
-configurations, not row-group layouts** — every row was measured at parquet's default row-group
-size, and `delta_store.nwp` now sizes each row group to one ensemble member, which is what the
-~158 MB average above reflects:
+**Storage** (nine real partitions spread across every season). **The table compares the writer
+configurations against each other; its absolute figures are older than the table on disk today.**
+Every row was measured at parquet's default row-group size, against a partition set averaging
+112.9 MB, where a partition now averages ~158 MB. The member-aligned row-group size
+`delta_store.nwp` writes accounts for 8.6% of that difference, measured across the rewrite of all
+899 partitions; the rest predates it and is not accounted for here:
 
 | Config | avg MB/partition | extrapolated GB/yr |
 |---|---:|---:|
@@ -52,18 +54,22 @@ planes. Writer properties are data-dependent — measure per table.
 **Read path** — the member-early sort puts each ensemble member's rows in one contiguous block,
 and `delta_store.nwp` sizes each parquet row group to hold exactly one member, so a single-member
 read (every training run reads just the control member) matches one row group's min/max range and
-skips the other 50. Measured against a `valid_time`-first sort on a real 29-day, 9-cell,
-control-member collect, both arms freshly written through `write_nwp` and timed warm-cache as the
-median of five runs: **5.7× faster and 5.5× less peak memory** (170 ms / 2,200 MB → 30 ms /
-400 MB), for a **3.7% storage cost** (4.35 GB → 4.51 GB across the 29 partitions).
+skips the other 50. Measured against a `valid_time`-first sort of the same 29 daily partitions,
+reading 9 H3 cells and the control member alone — two tables written freshly through `write_nwp`,
+differing only in the sort order, each figure the warm-cache median of five timed repetitions:
+**5.7× faster and 5.5× less peak memory** (170 ms / 2,200 MB → 30 ms / 400 MB), for **3.7% more
+stored bytes** (4.35 GB → 4.51 GB across the 29 partitions). Both tables used the member-aligned
+row-group size, so the comparison isolates the row order.
 
 **The read decodes 1.96% of each partition — one row group in 51 — and that holds for every
 member.** A census of partitions from 2024, 2025, and 2026 found 51 row groups in each, every one
-spanning a single member and the 51 together covering members 0 to 50, so no member pays for being
-in the middle of the range. Under the `valid_time`-first sort the same read decodes 100%.
+spanning a single member and the 51 together covering members 0 to 50, so no member decodes extra
+rows for sitting in the middle of the range. Under the `valid_time`-first sort the same read
+decodes 100%.
 
-Both figures are local-disk measurements. On S3 a skipped row group also skips a network range
-request, so they are a floor rather than a transfer.
+**The timing and the peak-memory figures were both measured on local disk.** On S3 a skipped row
+group also skips an HTTP range request over the network, so both figures are a floor: the same
+read from S3 stands to gain more from row-group skipping, not less.
 
 ```python
 # Two arms, one partition window, differing only in NWP_SORT_COLS; the second monkeypatches

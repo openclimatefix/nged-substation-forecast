@@ -52,11 +52,12 @@ is not enough, because row groups that straddle member boundaries advertise the 
 their extremes.
 
 Measured on the stored table, a single-member read decodes 1.96% of a partition — one row group in
-51 — for every member: each partition censused held 51 row groups, each spanning a single member.
-Against a ``valid_time``-first
-sort of the same 29 partitions, a 9-cell control-member collect runs in 30 ms and 400 MB of peak
-resident memory rather than 170 ms and 2,200 MB, for 3.7% more stored bytes. The method and the
-full figures live beside the storage measurements in
+51 — for every member: every partition the census sampled held 51 row groups, each spanning a
+single member, and the 51 together covered members 0 to 50. Reading 29 daily partitions, 9 H3
+cells, and the control member alone runs in 30 ms and 400 MB of peak resident memory, against
+170 ms and 2,200 MB for the same read of a table sorted ``valid_time``-first, and the member-early
+sort holds 3.7% more stored bytes. The method and the full figures live beside the storage
+measurements in
 <https://openclimatefix.github.io/nged-substation-forecast/api/dynamical_data/>.
 
 Two conditions have to hold for the predicate to reach the Parquet scan at all. It must survive
