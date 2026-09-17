@@ -456,15 +456,15 @@ def _apply_post_join_features(
 def _apply_rolling_mean_feature(lf: pl.LazyFrame, base_col: str, window_hours: int) -> pl.LazyFrame:
     """Applies a rolling mean feature, grouped by (time_series_id, nwp_init_time, ensemble_member).
 
-    Grouping by nwp_init_time prevents the rolling window from mixing values across different
-    NWP runs, which would contaminate the feature with data from other forecast initializations.
+    Grouping by nwp_init_time prevents the rolling window from mixing values across different NWP
+    runs, which would contaminate the feature with data from other forecast initializations.
 
     Cross-mode invariant: the rolling aggregation MUST be null-skipping over the value column
     (mean/min/max/std/median/sum) and MUST NOT be row-count-dependent (e.g. ``.len()``). The two
     modes present different numbers of rows to a group — single-run mode stamps a constant
-    nwp_init_time, and rows the NWP join missed carry a null ensemble_member and so form a group of
-    their own — so a null-skipping aggregation matches across modes where a row count would not,
-    silently skewing the feature between training and serving. This is locked by
+    nwp_init_time, and rows the NWP join missed carry a null ensemble_member and so form a group
+    of their own — so a null-skipping aggregation matches across modes where a row count would
+    not, silently skewing the feature between training and serving. This is locked by
     test_cross_mode_equivalence.py.
 
     ``rolling_mean_by`` inside ``over(..., order_by=)`` rather than ``lf.rolling().agg()``: the

@@ -1,14 +1,14 @@
 """Check that every name a marimo notebook's cells reference is bound inside the notebook.
 
 Marimo never executes a notebook's module-level statements, so a name bound there is invisible to
-every cell and the notebook dies with a `NameError` the next time it is opened — while ruff, ty and
-pytest all pass, because the file they were handed is valid Python. `ruff check --fix` and
-`marimo check --fix` each produce that shape from a working notebook. Full rationale, and what this
-check can and cannot catch:
+every cell and the notebook dies with a `NameError` the next time it is opened — while ruff, ty
+and pytest all pass, because the file they were handed is valid Python. `ruff check --fix` and
+`marimo check --fix` each produce that shape from a working notebook. Full rationale, and what
+this check can and cannot catch:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#marimo-notebooks-bind-every-name-their-cells-reference>
 
-`Cell.refs` and `Cell.defs` are public marimo API; parsing a notebook without running it is not, so
-this reads `marimo._ast`. The serialized form carries the line numbers and the compiled form
+`Cell.refs` and `Cell.defs` are public marimo API; parsing a notebook without running it is not,
+so this reads `marimo._ast`. The serialized form carries the line numbers and the compiled form
 carries the names, so both are needed.
 """
 

@@ -7,8 +7,8 @@ the *same* ``_engineer_features()``, differing only in operating mode:
   window, one forecast per NWP run, ``power_fcst_init_time = nwp_init_time + delay`` per row.
 - **Single-run / production** (explicit ``power_fcst_init_time``): one NWP run, stamped with it.
 
-This test takes a fixture spanning several **daily** NWP runs (real ECMWF ENS is issued once
-per day at 00 UTC), runs bulk mode, then *replays* each NWP run in single-run mode with
+This test takes a fixture spanning several **daily** NWP runs (real ECMWF ENS is issued once per
+day at 00 UTC), runs bulk mode, then *replays* each NWP run in single-run mode with
 ``power_fcst_init_time = nwp_init_time + delay`` and asserts the rows match exactly on the
 primary key and on every requested feature column. The comparison is over **deliverable** rows
 (``valid_time > power_fcst_init_time``): bulk mode drops hindcast rows at source, while
@@ -16,20 +16,20 @@ single-run mode keeps them for its caller to filter before predicting (as ``live
 does), so the replay side applies that same filter here. If a future change diverges the two
 modes, this fails.
 
-Scope note: this test exercises the **weather, time, power-lag, weather-lag, and weather-rolling**
-features. Weather/time features depend on the bulk-vs-single-run NWP join; power lags are included
-because both modes now source them from the same dense observed-power series (Phase 1.5 / Option
-B), so they are identical too. A weather rolling mean is included to lock the cross-mode invariant
-for rolling aggregations: single-run mode pads each ``(ts, nwp_init_time, member)`` group with
-out-of-window null-weather rows, which a *null-skipping* aggregation (mean/min/max/std/median/sum)
-ignores — so values match bulk. This test guards against a future switch to a row-count-dependent
-aggregation (``.len()``) that would silently diverge. A weather lag is included, over
-**overlapping** NWP windows, so the dual-strategy join's freshest-run (analysis-proxy) selection
-sees genuine multi-run candidates rather than a single one by construction — a non-overlapping
-fixture can't tell a real freshest-run selection apart from a degenerate one that only ever has
-one choice. The fixture's power series extends back before each NWP window (the pre-window
-history) so that an in-window power lag resolves to a genuine observed value rather than being
-nullified or reaching off the edge of the data.
+Scope note: this test exercises the **weather, time, power-lag, weather-lag, and
+weather-rolling** features. Weather/time features depend on the bulk-vs-single-run NWP join;
+power lags are included because both modes now source them from the same dense observed-power
+series (Phase 1.5 / Option B), so they are identical too. A weather rolling mean is included to
+lock the cross-mode invariant for rolling aggregations: single-run mode pads each ``(ts,
+nwp_init_time, member)`` group with out-of-window null-weather rows, which a *null-skipping*
+aggregation (mean/min/max/std/median/sum) ignores — so values match bulk. This test guards
+against a future switch to a row-count-dependent aggregation (``.len()``) that would silently
+diverge. A weather lag is included, over **overlapping** NWP windows, so the dual-strategy join's
+freshest-run (analysis-proxy) selection sees genuine multi-run candidates rather than a single
+one by construction — a non-overlapping fixture can't tell a real freshest-run selection apart
+from a degenerate one that only ever has one choice. The fixture's power series extends back
+before each NWP window (the pre-window history) so that an in-window power lag resolves to a
+genuine observed value rather than being nullified or reaching off the edge of the data.
 """
 
 from datetime import datetime, timedelta
@@ -82,12 +82,12 @@ def _run_valid_times(run_init: datetime) -> list[datetime]:
     """A half-hourly window for each daily run, deliberately overlapping the next run's start.
 
     Starting at the run's own init_time (like real ECMWF ENS) gives every run a full
-    ``_DELAY_HOURS`` of hindcast valid times before its derived power_fcst_init_time. Those
-    rows must feed window features (weather rolling means) as predecessors on both sides even
-    though they are dropped from the compared output. ``_WINDOW_HOURS`` exceeds the 24h gap
-    between daily runs, so a (time_series_id, valid_time) in the overlap can appear in two runs —
-    this is what makes the weather-lag freshest-run selection choose between genuine multi-run
-    candidates rather than a single one by construction.
+    ``_DELAY_HOURS`` of hindcast valid times before its derived power_fcst_init_time. Those rows
+    must feed window features (weather rolling means) as predecessors on both sides even though
+    they are dropped from the compared output. ``_WINDOW_HOURS`` exceeds the 24h gap between
+    daily runs, so a (time_series_id, valid_time) in the overlap can appear in two runs — this is
+    what makes the weather-lag freshest-run selection choose between genuine multi-run candidates
+    rather than a single one by construction.
     """
     steps = int(_WINDOW_HOURS * 2) + 1  # half-hourly steps, 00:00 .. _WINDOW_HOURS:00 inclusive
     return [run_init + timedelta(minutes=30 * i) for i in range(steps)]

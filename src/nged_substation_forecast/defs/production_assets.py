@@ -90,8 +90,8 @@ def promotable_model_runs(context: AssetExecutionContext) -> None:
     Purely informational: materialise this on demand (it has no dependents and writes nothing to
     disk) to refresh the candidate list as a metadata table in the Dagster UI, then copy the
     champion's ``run_id`` into ``promoted_model``'s launchpad. The champion is still picked by
-    eye off the MLflow leaderboard (metrics vary per experiment, so there is no single sort key to
-    automate the pick) — this just saves retyping/misremembering the run id.
+    eye off the MLflow leaderboard (metrics vary per experiment, so there is no single sort key
+    to automate the pick) — this just saves retyping/misremembering the run id.
     """
     settings = Settings()
     mlflow.set_tracking_uri(settings.mlflow_tracking_uri)
@@ -139,8 +139,8 @@ def promoted_model(context: AssetExecutionContext, config: PromotedModelConfig) 
     Every such refusal reaches the operator as a failed materialisation: this asset catches
     nothing, unlike the rest of ``defs/``. Degrading is what the production *serving* path does,
     because a late or partial forecast beats none; promotion has no such fallback, since the
-    outgoing champion keeps serving whatever happens here. A promotion that half-succeeded quietly
-    would be strictly worse than one that stopped and said so. The rules this follows:
+    outgoing champion keeps serving whatever happens here. A promotion that half-succeeded
+    quietly would be strictly worse than one that stopped and said so. The rules this follows:
     <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>.
 
     Promotion as a Dagster materialisation gives an audit trail and lineage for free, rather than
@@ -192,10 +192,10 @@ def _available_nwp_init_times(settings: Settings) -> list[datetime]:
     outside system misbehaved, and the inherent-stability rule reserves raising for exactly that
     case. It is also consistent with ``select_nwp_init_time``, which already raises when no
     available run qualifies. Nothing here needs a fail-open path of its own: ``live_forecasts``
-    calls this directly and is meant to fail loudly, and the one caller that must stay
-    fail-open — ``live_forecasts_are_healthy`` — already wraps the whole evaluation in
-    ``except BaseException``, so a corrupt key degrades that check to a warning instead of turning
-    a warning into a hard failure.
+    calls this directly and is meant to fail loudly, and the one caller that must stay fail-open
+    — ``live_forecasts_are_healthy`` — already wraps the whole evaluation in ``except
+    BaseException``, so a corrupt key degrades that check to a warning instead of turning a
+    warning into a hard failure.
     """
     delta_table = DeltaTable(
         settings.nwp_data_path, storage_options=typeddict_to_dict(settings.storage_options)
@@ -262,23 +262,23 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     key, not the midnight the key names.
 
     Loads the production model from a plain disk directory (``load_forecaster_from_dir`` against
-    ``Settings.production_model_path``, populated out-of-band by the ``promoted_model``
-    asset) — **no MLflow import or call anywhere in this asset**; live performance is tracked by
+    ``Settings.production_model_path``, populated out-of-band by the ``promoted_model`` asset) —
+    **no MLflow import or call anywhere in this asset**; live performance is tracked by
     production monitoring, never logged here. A model whose saved config this code cannot rebuild
-    fails at that load rather than partway through feature engineering; promotion applies the same
-    check, so this only bites when the code changed after the champion was promoted. Forecasts
-    exactly ``forecaster.trained_time_series_ids`` (never today's eligibility set — the
-    train==predict population invariant) across every NWP ensemble member, using single-run feature
-    engineering stamped with this partition's ``power_fcst_init_time``.
+    fails at that load rather than partway through feature engineering; promotion applies the
+    same check, so this only bites when the code changed after the champion was promoted.
+    Forecasts exactly ``forecaster.trained_time_series_ids`` (never today's eligibility set — the
+    train==predict population invariant) across every NWP ensemble member, using single-run
+    feature engineering stamped with this partition's ``power_fcst_init_time``.
 
     Each series' location comes from the model's own frozen metadata copy
-    (``load_trained_metadata``), never from the ``TimeSeriesMetadata`` roster, so a roster that is
-    unreadable or has lost rows can neither fail a slot nor silently drop a series from it. The H3
-    cells the NWP scan is pruned to are therefore the cells the model trained against rather than
-    whatever the roster says today.
+    (``load_trained_metadata``), never from the ``TimeSeriesMetadata`` roster, so a roster that
+    is unreadable or has lost rows can neither fail a slot nor silently drop a series from it.
+    The H3 cells the NWP scan is pruned to are therefore the cells the model trained against
+    rather than whatever the roster says today.
 
-    NWP availability is resolved via ``config.availability_mode``: the scheduled tick always
-    uses ``"live"`` (freshest run actually present, no modelled delay); manual backfills of past
+    NWP availability is resolved via ``config.availability_mode``: the scheduled tick always uses
+    ``"live"`` (freshest run actually present, no modelled delay); manual backfills of past
     partitions pass ``"replay"`` (reconstructs what was available ``nwp_publication_delay_hours``
     before ``power_fcst_init_time``). See ``select_nwp_init_time``.
 
@@ -292,12 +292,12 @@ def live_forecasts(context: AssetExecutionContext, config: LiveForecastsConfig) 
     lags at the run selected above rather than at a modelled publication delay. When that run
     carries no control-member rows (``ensemble_member == 0``) — a partial or malformed ECMWF ENS
     download — the weather lags reaching back before ``power_fcst_init_time`` come back null.
-    Those are the lags the control-member analysis proxy answers, and each of them loses the first
-    ``lag_hours`` of the horizon. The rest of the horizon is answered by the same-run join, which
-    reads whichever ensemble members the run does carry. That slot degrades rather than
-    failing: ``_engineer_features`` logs a warning naming the run, and this asset reports the same
-    degradation to Sentry tagged ``degraded_asset=live_forecasts``, so an operator is alerted
-    without having to read the logs. See
+    Those are the lags the control-member analysis proxy answers, and each of them loses the
+    first ``lag_hours`` of the horizon. The rest of the horizon is answered by the same-run join,
+    which reads whichever ensemble members the run does carry. That slot degrades rather than
+    failing: ``_engineer_features`` logs a warning naming the run, and this asset reports the
+    same degradation to Sentry tagged ``degraded_asset=live_forecasts``, so an operator is
+    alerted without having to read the logs. See
     ``test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay``. None of the
     current champion config's features are weather lags, so the missing-control-member path does
     not fire today, but a future feature change touching weather lags should trip over this

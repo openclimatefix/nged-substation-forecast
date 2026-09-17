@@ -6,8 +6,8 @@ run it over every notebook in the repo, and — because it rides on private mari
 written notebooks either side of the line: three that it must flag, so a marimo release cannot
 quietly turn it into a no-op, and one correct notebook that it must not.
 
-Every test drives the checker as a subprocess, which is how pre-commit drives it, so its exit code
-is covered as well as its findings.
+Every test drives the checker as a subprocess, which is how pre-commit drives it, so its exit
+code is covered as well as its findings.
 """
 
 import ast

@@ -193,9 +193,9 @@ def test_convert_maps_each_grid_point_to_its_own_lat_lon(
     into the wrong hexagon on its own: the geographic truth of which hexagon owns a given (lat,
     lon) lives entirely in the ``H3GridWeights`` table built upstream by the ``h3_grid_weights``
     asset. The only orientation bug ``convert`` itself can introduce is a ravel misalignment —
-    pairing a data value with the wrong (lat, lon) before the join — and that is exactly what this
-    test pins down. End-to-end geographic correctness (a real ECMWF cell landing in the correct
-    real-world hexagon) depends on that upstream asset and is out of scope here.
+    pairing a data value with the wrong (lat, lon) before the join — and that is exactly what
+    this test pins down. End-to-end geographic correctness (a real ECMWF cell landing in the
+    correct real-world hexagon) depends on that upstream asset and is out of scope here.
 
     See the orientation-coverage table in
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#nwp-grid-h3-orientation-coverage>
@@ -248,10 +248,10 @@ def test_convert_renormalises_weights_over_a_corrupt_grid_point(
 ) -> None:
     """One NaN grid point costs its own contribution to the cell, not the whole cell.
 
-    The cell's surviving point carries full information about it, so the renormalised value is that
-    point's own value rather than 0.75 of it. Without the renormalisation the cell would be NaN
-    (NaN propagates through the weighted ``sum``), which is fatal for a non-nullable instantaneous
-    variable.
+    The cell's surviving point carries full information about it, so the renormalised value is
+    that point's own value rather than 0.75 of it. Without the renormalisation the cell would be
+    NaN (NaN propagates through the weighted ``sum``), which is fatal for a non-nullable
+    instantaneous variable.
     """
     ds = make_ens_dataset(
         latitudes=(52.0,),
@@ -313,9 +313,10 @@ def test_convert_renormalises_over_a_grid_point_missing_from_the_dataset(
 ) -> None:
     """A grid point the weights name but the dataset lacks is excluded, not counted as zero.
 
-    The H3 weights expect (52.0, -0.75); the dataset carries only (52.0, -1.0), so the join misses.
-    Without renormalisation the absent point is silently worth 0, and the cell reports 0.75 * 10.0
-    = 7.5 degC forever — a plausible-looking value that nothing downstream can detect.
+    The H3 weights expect (52.0, -0.75); the dataset carries only (52.0, -1.0), so the join
+    misses. Without renormalisation the absent point is silently worth 0, and the cell reports
+    0.75 * 10.0 = 7.5 degC forever — a plausible-looking value that nothing downstream can
+    detect.
     """
     ds = make_ens_dataset(
         latitudes=(52.0,),
@@ -344,8 +345,8 @@ def test_convert_renormalises_each_variable_independently(
     """A null in one variable must not disturb another variable in the same cell.
 
     The contributing weight is per (cell, variable), never per cell. A single shared denominator
-    would be wrong in both directions here: it would either drag ``temperature_2m`` off its correct
-    15.0, or leave ``precipitation_surface`` un-renormalised at half its true value. That
+    would be wrong in both directions here: it would either drag ``temperature_2m`` off its
+    correct 15.0, or leave ``precipitation_surface`` un-renormalised at half its true value. That
     distinction matters far beyond this test, because the three de-accumulated variables are
     legitimately null at lead-0 in every single run.
     """
@@ -379,10 +380,10 @@ def test_aggregation_of_a_wholly_uncovered_cell_is_null_not_zero(
 ) -> None:
     """A cell whose every grid point is absent yields null, never a physically-plausible zero.
 
-    Asserted on the aggregation itself rather than through ``convert``, because this is the defect:
-    Polars sums an all-null group to 0.0, so the cell would otherwise land as 0 degC / 0 Pa —
-    inside every bound the ``Nwp`` contract declares. ``convert``'s own rejection of that frame is
-    the downstream symptom, covered by the test below.
+    Asserted on the aggregation itself rather than through ``convert``, because this is the
+    defect: Polars sums an all-null group to 0.0, so the cell would otherwise land as 0 degC / 0
+    Pa — inside every bound the ``Nwp`` contract declares. ``convert``'s own rejection of that
+    frame is the downstream symptom, covered by the test below.
     """
     ds = make_ens_dataset(
         latitudes=(52.0,), longitudes=(-1.0,), lead_time_hours=(0,), ensemble_members=(0,)
@@ -422,9 +423,9 @@ def test_convert_rejects_a_run_with_a_wholly_uncovered_cell(
 ) -> None:
     """A wholly-uncovered cell fails ingest, rather than landing as a plausible all-zero cell.
 
-    The instantaneous variables are non-nullable, so the null from the aggregation above becomes a
-    validation failure and the whole partition is missed. That is deliberately blunt — a missed run
-    is rung 1 of the degradation ladder, whereas a silently-zeroed cell would train and serve
+    The instantaneous variables are non-nullable, so the null from the aggregation above becomes
+    a validation failure and the whole partition is missed. That is deliberately blunt — a missed
+    run is rung 1 of the degradation ladder, whereas a silently-zeroed cell would train and serve
     forever — and it is temporary; see
     <https://github.com/openclimatefix/nged-substation-forecast/issues/478>.
 
@@ -463,8 +464,9 @@ def test_convert_nulls_a_multi_point_cell_whose_every_point_is_corrupt(
 
     ``test_convert_preserves_nulls_after_aggregation`` covers the single-point case; this is its
     multi-point sibling, and it is the one that would break if NaN were normalised to null before
-    the aggregation without a contributing-weight denominator to catch the empty group. It is also
-    the shape every lead-0 row of the three de-accumulated variables takes in every real run.
+    the aggregation without a contributing-weight denominator to catch the empty group. It is
+    also the shape every lead-0 row of the three de-accumulated variables takes in every real
+    run.
     """
     ds = make_ens_dataset(
         latitudes=(52.0,),
@@ -557,9 +559,9 @@ def test_convert_weights_the_categorical_variable_within_each_cell_separately(
 
     The per-category weight is a window over ``(h3_index, variable)``. Dropping ``h3_index`` from
     those keys turns it into a grid-wide total, so every cell reports whichever category covers
-    most of GB — and no single-cell test can see the difference. Here cell 10 is 0.6 category 1 to
-    0.4 category 5, so it must report 1, while cell 20 is wholly category 5. A grid-wide weight
-    would give category 5 a total of 1.4 against category 1's 0.6 and flip cell 10.
+    most of GB — and no single-cell test can see the difference. Here cell 10 is 0.6 category 1
+    to 0.4 category 5, so it must report 1, while cell 20 is wholly category 5. A grid-wide
+    weight would give category 5 a total of 1.4 against category 1's 0.6 and flip cell 10.
     """
     ds = make_ens_dataset(
         latitudes=(52.0,),
@@ -625,9 +627,9 @@ def test_convert_breaks_a_categorical_tie_deterministically(
 
     An evenly-split cell is ordinary geometry, and an unweighted ``mode().first()`` returns
     whichever value Polars happens to emit first — unspecified, and not necessarily stable across
-    versions. This is a **regression guard, not a proof**: the old implementation cannot be made to
-    fail it reliably, precisely because its answer was unspecified rather than wrong. What this
-    pins is that the documented tie-break is the one actually implemented.
+    versions. This is a **regression guard, not a proof**: the old implementation cannot be made
+    to fail it reliably, precisely because its answer was unspecified rather than wrong. What
+    this pins is that the documented tie-break is the one actually implemented.
     """
     ds = make_ens_dataset(
         latitudes=(52.0,),
@@ -658,10 +660,10 @@ def test_aggregation_nulls_the_categorical_variable_only_when_no_point_supplied_
     """A cell whose every point lacks a category is null, matching the numeric rule.
 
     Asserted on the aggregation, because ``convert`` would reject this frame at the ``Nwp``
-    boundary for an ``init_time`` after 2024-11-12 rather than returning it. This is a **regression
-    guard**: the old implementation nulled this cell too, for the wrong reason. It is here because
-    excluding missing points from the ranking must not go so far that a cell with nothing behind it
-    acquires a category.
+    boundary for an ``init_time`` after 2024-11-12 rather than returning it. This is a
+    **regression guard**: the old implementation nulled this cell too, for the wrong reason. It
+    is here because excluding missing points from the ranking must not go so far that a cell with
+    nothing behind it acquires a category.
     """
     ds = make_ens_dataset(
         latitudes=(52.0,),

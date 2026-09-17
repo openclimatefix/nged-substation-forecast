@@ -10,8 +10,8 @@ def test_weather_feature_literal_matches_model_fields():
     """WeatherFeature Literal must contain exactly the variables in Nwp.all_weather_var_names().
 
     This test catches any divergence between the static type annotation and the runtime
-    model-field derivation — e.g. a new NWP variable added to Nwp but not to
-    WeatherFeature, or vice versa.
+    model-field derivation — e.g. a new NWP variable added to Nwp but not to WeatherFeature, or
+    vice versa.
     """
     assert frozenset(get_args(WeatherFeature)) == Nwp.all_weather_var_names()
 

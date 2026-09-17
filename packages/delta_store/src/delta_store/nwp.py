@@ -1,20 +1,20 @@
 """Storage policy for the ``nwp`` Delta table.
 
 Owns everything about how ``Nwp`` rows are laid out on disk: the parquet writer properties, the
-compression-friendly row order, and the significand-precision reduction of the continuous
-weather variables. Callers write through `write_nwp` so it is impossible to land rows in
-the table without this format applied.
+compression-friendly row order, and the significand-precision reduction of the continuous weather
+variables. Callers write through `write_nwp` so it is impossible to land rows in the table
+without this format applied.
 
 Stores plain ``Float32`` + ``delta_store.precision.round_to_significand_bits`` — the technique
-used by ``delta_store.power_forecasts``, but with *different* writer properties. Measured on
-real NWP data (9 partitions spread across two years of history): ``BYTE_STREAM_SPLIT`` made every
-continuous column *larger*, not smaller — the opposite of the ``power_forecasts`` result.
-Working hypothesis: significand rounding collapses NWP values into a small set of repeats (many
-H3 cells / ensemble members round to the same value), which Parquet's *default* dictionary+RLE
-encoding captures directly; ``BYTE_STREAM_SPLIT`` scatters that repetition across four separate
-byte planes and loses more than it gains. ``power_forecasts``'s target values have no such
-repetition (near-continuous ML output), so ``BYTE_STREAM_SPLIT`` wins there instead — the two
-tables need different writer properties. See
+used by ``delta_store.power_forecasts``, but with *different* writer properties. Measured on real
+NWP data (9 partitions spread across two years of history): ``BYTE_STREAM_SPLIT`` made every
+continuous column *larger*, not smaller — the opposite of the ``power_forecasts`` result. Working
+hypothesis: significand rounding collapses NWP values into a small set of repeats (many H3 cells
+/ ensemble members round to the same value), which Parquet's *default* dictionary+RLE encoding
+captures directly; ``BYTE_STREAM_SPLIT`` scatters that repetition across four separate byte
+planes and loses more than it gains. ``power_forecasts``'s target values have no such repetition
+(near-continuous ML output), so ``BYTE_STREAM_SPLIT`` wins there instead — the two tables need
+different writer properties. See
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#storage-formats-measured-not-assumed>
 for the measured GB/yr numbers, and
 <https://openclimatefix.github.io/nged-substation-forecast/api/dynamical_data/> for the

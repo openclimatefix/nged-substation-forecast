@@ -2,9 +2,9 @@
 
 Exercises the real wiring end-to-end against a file-based MLflow + temp Delta tables: register an
 experiment, train a fold model with ``trained_cv_model``, then materialise ``cv_power_forecasts``
-and assert the forecasts land in the ``power_forecasts`` Delta table — stamped with the fold label
-(not ``"live"``), restricted to the model's trained population, covering every NWP ensemble member,
-and written idempotently so a re-materialisation does not duplicate rows.
+and assert the forecasts land in the ``power_forecasts`` Delta table — stamped with the fold
+label (not ``"live"``), restricted to the model's trained population, covering every NWP ensemble
+member, and written idempotently so a re-materialisation does not duplicate rows.
 """
 
 from collections.abc import Callable

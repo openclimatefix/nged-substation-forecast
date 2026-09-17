@@ -2,20 +2,20 @@
 
 Answers "exactly which code and which data produced this?" for any MLflow run. The git SHA pins
 the code — stamped **explicitly** because MLflow's ``mlflow.source.git.commit`` auto-detection
-needs gitpython installed *and* the working directory inside the repo, neither of which holds in a
-production container. Each Delta table's ``version()`` pins the data: Delta Lake time travel makes
-data versioning one integer per table, so a run can later be replayed with
+needs gitpython installed *and* the working directory inside the repo, neither of which holds in
+a production container. Each Delta table's ``version()`` pins the data: Delta Lake time travel
+makes data versioning one integer per table, so a run can later be replayed with
 ``pl.scan_delta(path, version=N)`` after ``git checkout {sha}``.
 
-Every function here is deliberately **non-raising**: provenance is metadata, and a missing ``.git``
-directory (containers) or an absent Delta table must never fail the surrounding training or
-forecasting run. Such failures degrade to the sentinels ``"unknown"`` / ``"absent"``.
+Every function here is deliberately **non-raising**: provenance is metadata, and a missing
+``.git`` directory (containers) or an absent Delta table must never fail the surrounding training
+or forecasting run. Such failures degrade to the sentinels ``"unknown"`` / ``"absent"``.
 
 ``provenance_tags`` **stage-prefixes** its keys (``register_``, ``train_``, ``predict_``,
 ``metrics_``) because a single MLflow fold run is written by three separate assets —
-``trained_cv_model``, ``cv_power_forecasts`` and ``metrics`` — each potentially on a different code
-revision and data state. Un-prefixed keys would clobber one another; the prefix preserves all
-three provenance snapshots side by side.
+``trained_cv_model``, ``cv_power_forecasts`` and ``metrics`` — each potentially on a different
+code revision and data state. Un-prefixed keys would clobber one another; the prefix preserves
+all three provenance snapshots side by side.
 """
 
 import logging

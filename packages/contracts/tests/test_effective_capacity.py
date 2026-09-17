@@ -21,8 +21,8 @@ def test_effective_capacity_validation() -> None:
 
 @pytest.mark.parametrize("bad_value", [0.0, -5.0])
 def test_effective_capacity_rejects_non_positive_value(bad_value: float) -> None:
-    """`effective_capacity_mw` must be strictly positive — it is the NMAE denominator, and a
-    zero or negative capacity would divide every error by a value that can't happen physically.
+    """`effective_capacity_mw` must be strictly positive — it is the NMAE denominator, and a zero
+    or negative capacity would divide every error by a value that can't happen physically.
     ``compute_effective_capacity`` relies on this: it drops non-positive P99s before they ever
     reach this contract, and this pins the boundary it drops them at."""
     with pytest.raises(Exception, match="effective_capacity_mw"):

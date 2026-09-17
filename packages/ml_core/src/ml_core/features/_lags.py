@@ -1,7 +1,7 @@
 """Lag and lookahead-bias nullification helpers.
 
-Contains the three functions that implement power lags, weather lags (dual-strategy join),
-and post-hoc nullification of leaky lag values.
+Contains the three functions that implement power lags, weather lags (dual-strategy join), and
+post-hoc nullification of leaky lag values.
 """
 
 from collections.abc import Sequence
@@ -139,10 +139,9 @@ def _nullify_leaky_lags(
 ) -> pl.LazyFrame:
     """Nullifies lagged features that would cause lookahead bias.
 
-    During training, we must ensure that the model cannot access actual data that
-    would not be available at inference time. If a requested lag is shorter than
-    or equal to the forecast lead time, the feature is effectively a "future"
-    value and must be nullified.
+    During training, we must ensure that the model cannot access actual data that would not be
+    available at inference time. If a requested lag is shorter than or equal to the forecast lead
+    time, the feature is effectively a "future" value and must be nullified.
 
     To prevent over-nullification, we calculate power_lead_time_hours relative to
     power_fcst_init_time, not nwp_init_time.

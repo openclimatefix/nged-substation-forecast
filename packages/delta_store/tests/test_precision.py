@@ -1,8 +1,8 @@
 """Unit tests for ``round_to_significand_bits`` (Veltkamp splitting).
 
 These pin down the numeric contract the docstring promises: bounded round-to-nearest relative
-error, all-zero low fraction bits (the property compression relies on), passthrough of
-non-finite and product-overflowing inputs, and the load-bearing ``Float32`` dtype.
+error, all-zero low fraction bits (the property compression relies on), passthrough of non-finite
+and product-overflowing inputs, and the load-bearing ``Float32`` dtype.
 """
 
 import math

@@ -1,7 +1,7 @@
 """Pure, data-only helpers for the cross-validation Dagster assets.
 
-Every function here is deliberately free of I/O (no Delta, MLflow, or Dagster imports) so it
-can be unit-tested in isolation. The CV asset bodies stay thin by delegating their logic here.
+Every function here is deliberately free of I/O (no Delta, MLflow, or Dagster imports) so it can
+be unit-tested in isolation. The CV asset bodies stay thin by delegating their logic here.
 """
 
 import calendar
@@ -43,8 +43,8 @@ def date_to_utc_datetime(d: date, *, end_of_day: bool = False) -> datetime:
 def _subtract_months(d: date, months: int) -> date:
     """Return the date ``months`` calendar months before ``d``, clamping the day-of-month.
 
-    Clamping handles the case where the source day does not exist in the target month
-    (e.g. subtracting one month from 31 March yields 28/29 February).
+    Clamping handles the case where the source day does not exist in the target month (e.g.
+    subtracting one month from 31 March yields 28/29 February).
     """
     month_index = d.year * 12 + (d.month - 1) - months
     year, month_zero_based = divmod(month_index, 12)

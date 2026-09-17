@@ -8,8 +8,8 @@ but int found``. Dagster itself only requires ``<4.14``, so the lower bound is o
 backstop that says what a violation actually costs.
 
 The failure it guards against is not subtle but it is easy to not notice, because only two things
-parse a selection string: the CLI (``dg launch --assets``, ``dagster asset materialize --select``)
-and the Dagster UI's asset-selection box.
+parse a selection string: the CLI (``dg launch --assets``, ``dagster asset materialize
+--select``) and the Dagster UI's asset-selection box.
 """
 
 from dagster import AssetSelection

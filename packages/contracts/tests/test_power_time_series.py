@@ -91,8 +91,9 @@ def test_power_time_series_invalid_data(data: dict[str, list[Any]], expected_err
 def _one_row(time: datetime) -> pt.DataFrame[PowerTimeSeries]:
     """A single PowerTimeSeries row at the given time, valid in every respect except `time`.
 
-    Every `time` passed in below is on :00 or :30, so the only rule an out-of-range case can break
-    is the range rule — the assertion cannot be satisfied by the alignment check firing instead.
+    Every `time` passed in below is on :00 or :30, so the only rule an out-of-range case can
+    break is the range rule — the assertion cannot be satisfied by the alignment check firing
+    instead.
     """
     return pt.DataFrame({"time_series_id": [123], "time": [time], "power": [10.0]}).set_model(
         PowerTimeSeries
@@ -204,8 +205,8 @@ def test_drop_implausible_rows(
     """Malformed `time`s are dropped and counted; well-formed rows survive, in order.
 
     `n_dropped` is asserted against the case's own arithmetic on every case, so a row cannot go
-    missing without being reported. (Asserting `survivors.height + n_dropped == df.height` instead
-    would be a tautology: that difference is how `n_dropped` is computed.)
+    missing without being reported. (Asserting `survivors.height + n_dropped == df.height`
+    instead would be a tautology: that difference is how `n_dropped` is computed.)
     """
     df = _frame(times)
 

@@ -1,5 +1,4 @@
-"""Tests for ``write_effective_capacity`` — the ``effective_capacity`` storage format
-end-to-end.
+"""Tests for ``write_effective_capacity`` — the ``effective_capacity`` storage format end-to-end.
 
 Writes real (tiny) ``EffectiveCapacity`` frames into a temp Delta table and asserts the
 whole-table overwrite semantics.

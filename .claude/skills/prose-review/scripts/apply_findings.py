@@ -141,9 +141,9 @@ class CharSpan(NamedTuple):
 class _Projection:
     """The markup-stripped text built so far, and where in the raw text each character came from.
 
-    Markup is dropped from the text but not forgotten: `open_at` and `close_at` widen the bounds of
-    the character beside it, which is what keeps a spliced comma outside the code span, link or
-    bold span it follows.
+    Markup is dropped from the text but not forgotten: `open_at` and `close_at` widen the bounds
+    of the character beside it, which is what keeps a spliced comma outside the code span, link
+    or bold span it follows.
     """
 
     def __init__(self) -> None:
@@ -205,8 +205,8 @@ class _Projection:
         """Bind the run of asterisks at `index` to the character it closes, or the one it opens.
 
         A run closing an open span of the same width binds to the character before it, so a comma
-        spliced at that boundary lands outside the markers. A run followed by text opens a span and
-        binds to the character after it. A run doing neither — the `*` starting a bullet — is
+        spliced at that boundary lands outside the markers. A run followed by text opens a span
+        and binds to the character after it. A run doing neither — the `*` starting a bullet — is
         dropped and bound to nothing, which leaves any splice across it to be refused.
         """
         end = index
@@ -264,8 +264,8 @@ def _push_underscores(*, raw: str, index: int, projection: _Projection) -> int:
 
     `mid_2025_to_mid_2026` and `mae__all` are names, and dropping their underscores makes the
     projection unmatchable against a quote that spells them correctly. A dropped run is bound to
-    nothing, so a splice across an underscore-emphasised span is refused rather than written — the
-    docs use `**` for emphasis, so the case has not come up.
+    nothing, so a splice across an underscore-emphasised span is refused rather than written —
+    the docs use `**` for emphasis, so the case has not come up.
     """
     end = index
     while end < len(raw) and raw[end] == "_":
@@ -333,13 +333,13 @@ def splice(*, raw: str, start: int, end: int, replacement: str) -> str:
     Unchanged runs keep whatever markup the raw text carries there, so the links and bold markers
     the agent's replacement omits survive. Only the runs that genuinely differ take the
     replacement's own characters, and a rewritten run keeps the brackets around it: an identifier
-    renamed inside a code span comes back still spanned, and a comma inserted after one comes back
-    after the closing backtick.
+    renamed inside a code span comes back still spanned, and a comma inserted after one comes
+    back after the closing backtick.
 
     A deleted run keeps the brackets around it too, so cutting the last word of a bolded lead
-    leaves the lead bolded. The exception is a run that is exactly one span's whole content, where
-    keeping the brackets would leave `[](url)` or an empty pair of backticks behind: there the
-    brackets go with the words, and `markup_intact` refuses the edit when that unbalances the
+    leaves the lead bolded. The exception is a run that is exactly one span's whole content,
+    where keeping the brackets would leave `[](url)` or an empty pair of backticks behind: there
+    the brackets go with the words, and `markup_intact` refuses the edit when that unbalances the
     paragraph.
     """
     projected, spans = project(raw)
@@ -389,13 +389,13 @@ def _append_replacement(*, out: list[str], text: str, raw: str, written_to: int)
 def _lead_marker(*, raw: str, at: int) -> str:
     """The emphasis run ending at `at` when it closes a span opening its own block, else `""`.
 
-    A bolded lead's full stop belongs inside its markers and every other span's punctuation belongs
-    outside. Counted over the 78 markdown files under `docs/`, in the repository root and in
-    `.claude/skills/`: a lead opening a paragraph carries the stop inside its `**` 451 times
-    against 6 that do not, a lead on a list item 404 times against 1, and a lead in a blockquote 38
-    times against 1. A bold span in the middle of a sentence goes the other way — 144 commas and 70
-    full stops sit after its closing `**`, against no comma and 2 full stops inside one. A lead is
-    therefore recognised through a blockquote's `>` and a list item's bullet alike.
+    A bolded lead's full stop belongs inside its markers and every other span's punctuation
+    belongs outside. Counted over the 78 markdown files under `docs/`, in the repository root and
+    in `.claude/skills/`: a lead opening a paragraph carries the stop inside its `**` 451 times
+    against 6 that do not, a lead on a list item 404 times against 1, and a lead in a blockquote
+    38 times against 1. A bold span in the middle of a sentence goes the other way — 144 commas
+    and 70 full stops sit after its closing `**`, against no comma and 2 full stops inside one. A
+    lead is therefore recognised through a blockquote's `>` and a list item's bullet alike.
 
     Only `**` moves a stop. Single-asterisk emphasis was never counted, so the script leaves the
     stop where the reviewer's replacement put it.
@@ -420,10 +420,10 @@ def _lead_marker(*, raw: str, at: int) -> str:
 def fenced_regions(raw: str) -> tuple[tuple[int, int], ...]:
     """The raw `[start, end)` bounds of every fenced code block in `raw`.
 
-    A reviewer quotes prose, but the quote can still match a comment inside a shell snippet: "create
-    the virtualenv and install all workspace packages" is a comment inside a fenced block on the
-    getting-started page, and a serial comma spliced into it rewrites the command. A block left
-    unclosed runs to the end of the file, which is how the renderer reads it too.
+    A reviewer quotes prose, but the quote can still match a comment inside a shell snippet:
+    "create the virtualenv and install all workspace packages" is a comment inside a fenced block
+    on the getting-started page, and a serial comma spliced into it rewrites the command. A block
+    left unclosed runs to the end of the file, which is how the renderer reads it too.
     """
     regions: list[tuple[int, int]] = []
     opener, opened_at, offset = "", 0, 0
@@ -444,8 +444,8 @@ def fenced_regions(raw: str) -> tuple[tuple[int, int], ...]:
 def markup_intact(*, before: str, after: str) -> bool:
     """True when the splice left every link, bold span and code span in `before` whole.
 
-    A split whose full stop lands inside a link label or between two bold markers breaks the markup
-    silently: the page still lints, still builds, and the link simply stops being a link.
+    A split whose full stop lands inside a link label or between two bold markers breaks the
+    markup silently: the page still lints, still builds, and the link simply stops being a link.
     """
     if after.count("**") % 2 or after.count("`") % 2:
         return False
@@ -455,9 +455,9 @@ def markup_intact(*, before: str, after: str) -> bool:
 def units(block: str) -> list[tuple[int, int]]:
     """The `(first_line, last_line + 1)` bounds of each wrapping unit in `block`.
 
-    A bullet list written without blank lines between its items is one block, so re-wrapping whole
-    blocks would reflow every sibling of the item that changed. A unit is finer: a run of lines
-    starting at a list marker, or the whole block where it carries no markers.
+    A bullet list written without blank lines between its items is one block, so re-wrapping
+    whole blocks would reflow every sibling of the item that changed. A unit is finer: a run of
+    lines starting at a list marker, or the whole block where it carries no markers.
     """
     lines = block.split("\n")
     starts = [0, *(index for index in range(1, len(lines)) if MARKER.match(lines[index]))]
@@ -510,8 +510,8 @@ def _unit_at(text: str, offset: int) -> tuple[int, str, int, int, int]:
 def _trailing_blanks(unit_lines: list[str]) -> tuple[list[str], list[str]]:
     """Split a unit into the lines carrying text and the empty lines after them.
 
-    Blocks are separated by blank lines, so the only unit that can end in one is the last of a file
-    that ends with a newline: splitting that block on newlines leaves an empty final line.
+    Blocks are separated by blank lines, so the only unit that can end in one is the last of a
+    file that ends with a newline: splitting that block on newlines leaves an empty final line.
     Re-flowing the empty line away strips the file's trailing newline, and stops the unit's own
     width from solving.
     """

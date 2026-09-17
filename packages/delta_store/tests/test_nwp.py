@@ -1,10 +1,10 @@
 """Tests for ``write_nwp`` — the ``nwp`` storage format end-to-end.
 
-Writes real (tiny) ``Nwp`` frames into a temp Delta table and asserts the on-disk format:
-ZSTD with parquet's *default* encodings (measured better than ``BYTE_STREAM_SPLIT`` /
-``DELTA_BINARY_PACKED`` for this table — see ``delta_store.nwp``), member-early sort within
-each file, every continuous variable rounded to ``NWP_SIGNIFICAND_BITS``, successive runs landing
-as separate ``(nwp_model_id, init_time)`` Hive partitions, and a re-written run replacing its own
+Writes real (tiny) ``Nwp`` frames into a temp Delta table and asserts the on-disk format: ZSTD
+with parquet's *default* encodings (measured better than ``BYTE_STREAM_SPLIT`` /
+``DELTA_BINARY_PACKED`` for this table — see ``delta_store.nwp``), member-early sort within each
+file, every continuous variable rounded to ``NWP_SIGNIFICAND_BITS``, successive runs landing as
+separate ``(nwp_model_id, init_time)`` Hive partitions, and a re-written run replacing its own
 partition and no other.
 """
 
@@ -132,9 +132,10 @@ def test_row_groups_stay_member_aligned_when_the_frame_arrives_in_many_chunks(
     """A multi-chunk Arrow table still lands one ensemble member per row group.
 
     delta-rs consumes a multi-chunk table out of order while partitioning a write, which is what
-    scatters members across row groups. Polars only leaves a frame multi-chunk after the sort when
-    it has many threads to sort with, and ``conftest.py`` pins ``POLARS_MAX_THREADS`` to 4, so the
-    chunking is reproduced here by slicing the sorted table exactly as a higher thread count would.
+    scatters members across row groups. Polars only leaves a frame multi-chunk after the sort
+    when it has many threads to sort with, and ``conftest.py`` pins ``POLARS_MAX_THREADS`` to 4,
+    so the chunking is reproduced here by slicing the sorted table exactly as a higher thread
+    count would.
     """
     chunks = 8
     unchunked = pl.DataFrame.to_arrow
@@ -205,7 +206,8 @@ def test_the_nwp_significand_bits_is_thirteen() -> None:
     ``test_continuous_vars_rounded_to_significand_bits`` above computes its tolerance *from*
     ``NWP_SIGNIFICAND_BITS``, so it stays green no matter what the constant is set to. The
     ``power_forecasts`` sibling significand constant carries a matching relative-error claim in
-    ``PowerForecast.power_fcst``'s description that a changed constant would leave silently wrong.
+    ``PowerForecast.power_fcst``'s description that a changed constant would leave silently
+    wrong.
     """
     assert NWP_SIGNIFICAND_BITS == 13
 
@@ -252,14 +254,14 @@ def test_rewriting_a_run_replaces_only_its_own_partition(tmp_path: Path) -> None
 
 
 def test_scan_pushes_filters_into_the_parquet_scan(tmp_path: Path) -> None:
-    """A filter on ``ensemble_member``, ``h3_index`` or ``nwp_model_id`` through the production
-    read path (``Nwp.scan_delta(...).filter(...)``) must push all the way into the Parquet scan —
-    it should appear inside a ``SELECTION`` line in ``.explain()``, not as a ``FILTER`` node sitting
+    """A filter on ``ensemble_member``, ``h3_index`` or ``nwp_model_id`` through the production read
+    path (``Nwp.scan_delta(...).filter(...)``) must push all the way into the Parquet scan — it
+    should appear inside a ``SELECTION`` line in ``.explain()``, not as a ``FILTER`` node sitting
     above a ``WITH_COLUMNS`` cast. The latter shape means every row is decoded before the filter
     ever runs, defeating row-group pruning.
 
-    Fails on `main` today: reproduced directly — today's `explain()` shows no `SELECTION` line for
-    any of these three columns, because ``Nwp``'s then-declared dtypes (``UInt8``/``UInt64``/
+    Fails on `main` today: reproduced directly — today's `explain()` shows no `SELECTION` line
+    for any of these three columns, because ``Nwp``'s then-declared dtypes (``UInt8``/``UInt64``/
     ``Enum``) don't match what's physically on disk, so ``Nwp.scan_delta``'s cast is not a no-op
     and sits between the scan and the filter.
     """
@@ -277,9 +279,9 @@ def test_scan_pushes_filters_into_the_parquet_scan(tmp_path: Path) -> None:
 
 def test_categorical_ptype_missing_sentinel_round_trips(tmp_path: Path) -> None:
     """``categorical_precipitation_type_surface``'s own field description names ``255``
-    ("Missing") as a legitimate value, but the pre-fix ``UInt8``-declared column couldn't survive
-    it: ``write_deltalake`` raised ``Cast error: Can't cast value 255 to type Int8`` for any value
-    ``>= 128``. Fails on `main` today for the identical reason."""
+    ("Missing") as a legitimate value, but the pre-fix ``UInt8``-declared column couldn't
+    survive it: ``write_deltalake`` raised ``Cast error: Can't cast value 255 to type Int8``
+    for any value ``>= 128``. Fails on `main` today for the identical reason."""
     table = tmp_path / "nwp"
     n = 3
     nwp = _make_nwp(n).with_columns(

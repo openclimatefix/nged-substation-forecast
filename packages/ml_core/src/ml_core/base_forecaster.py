@@ -185,8 +185,8 @@ class BaseForecasterConfig(BaseModel):
     """Universal configuration for all forecasting models.
 
     Subclasses add model-specific hyperparameters. Having a shared base ensures that every
-    forecaster carries its own feature list and optional MLflow experiment id in one
-    serialisable object, simplifying save/load and the ``conf/model/*.yaml`` config wiring.
+    forecaster carries its own feature list and optional MLflow experiment id in one serialisable
+    object, simplifying save/load and the ``conf/model/*.yaml`` config wiring.
 
     The tag fields (weather_source, training_strategy) are stamped onto MLflow runs for
     leaderboard grouping. They live here so that constructing the config from a model YAML's
@@ -194,29 +194,29 @@ class BaseForecasterConfig(BaseModel):
     ``conf/model/*.yaml`` file under ``model_params``.
 
     ``experiment_name`` is the per-experiment key (set to the MLflow experiment name at
-    registration and stored in the saved config); it is stamped onto every ``PowerForecast``
-    row, distinct from the model-family ``MODEL_NAME``. ``random_seed`` is threaded into each
-    model's training so that re-training a fold reproduces the same model — keeping retries
-    and the leaderboard stable.
+    registration and stored in the saved config); it is stamped onto every ``PowerForecast`` row,
+    distinct from the model-family ``MODEL_NAME``. ``random_seed`` is threaded into each model's
+    training so that re-training a fold reproduces the same model — keeping retries and the
+    leaderboard stable.
 
     Model identity (name and version) lives on the ``BaseForecaster`` class itself as
-    ``MODEL_NAME`` and ``MODEL_VERSION`` — those are properties of the implementation, not
-    the experiment config.
+    ``MODEL_NAME`` and ``MODEL_VERSION`` — those are properties of the implementation, not the
+    experiment config.
 
     **Serialisation must be canonical.** A config is compared and stored as its serialised form:
     ``register_experiment`` stamps ``model_dump_json()`` onto the MLflow experiment as the
     ``config`` tag and compares a re-registration against it, and logs ``flatten_config(...)`` as
     write-once MLflow params. Python's per-process string hash randomisation means a ``set``
     iterates in a different order in every process, so a set dumped straight to a list would make
-    two dumps of the *same* config differ — a re-registration would then look like a config change
-    and its param write would be rejected. ``selected_features`` is therefore serialised sorted. A
-    subclass that adds a set-valued (or otherwise unordered) field must do the same.
+    two dumps of the *same* config differ — a re-registration would then look like a config
+    change and its param write would be rejected. ``selected_features`` is therefore serialised
+    sorted. A subclass that adds a set-valued (or otherwise unordered) field must do the same.
 
-    **Unknown keys are rejected, not ignored** (``extra="forbid"``). A key no field declares raises
-    ``ValidationError``, so a misspelled hyperparameter in a run's ``config_overrides`` fails at
-    registration, and a *stored* config carrying a key the current code no longer declares is
-    refused rather than silently losing it — the recovery is to re-train, never to hand-edit.
-    Why this is worth failing over:
+    **Unknown keys are rejected, not ignored** (``extra="forbid"``). A key no field declares
+    raises ``ValidationError``, so a misspelled hyperparameter in a run's ``config_overrides``
+    fails at registration, and a *stored* config carrying a key the current code no longer
+    declares is refused rather than silently losing it — the recovery is to re-train, never to
+    hand-edit. Why this is worth failing over:
     <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/model-configuration/#tweaking-a-config-for-an-experiment>.
     """
 
@@ -242,24 +242,25 @@ class BaseForecaster(ABC):
     evaluation code to remain completely agnostic to the underlying model implementation.
 
     Subclasses must define ``MODEL_NAME``, ``MODEL_VERSION`` and ``CONFIG_CLASS`` as class-level
-    constants. ``MODEL_NAME`` and ``MODEL_VERSION`` are stamped onto every ``PowerForecast`` row at
-    predict time and used as the MLflow experiment name. Bumping ``MODEL_VERSION`` requires a code
-    change (intentional), not a config edit.
+    constants. ``MODEL_NAME`` and ``MODEL_VERSION`` are stamped onto every ``PowerForecast`` row
+    at predict time and used as the MLflow experiment name. Bumping ``MODEL_VERSION`` requires a
+    code change (intentional), not a config edit.
 
     Lazy evaluation contract: `train` and `predict` both accept a `pt.LazyFrame[AllFeatures]`.
     Callers must not collect before passing data in; doing so wastes memory and prevents Polars
     from optimising the full query plan. A subclass materialises the data at the model boundary
     (typically a single `.collect()`, streamed). Keeping that bounded is the *caller's*
     responsibility: it prunes the inputs (NWP control member, the relevant H3 cells, the window's
-    `init_time` partitions) and, where the full ensemble is needed, processes one `init_time` chunk
-    at a time — filtering the engineered output cannot prune the upstream join/upsample. See the NWP
-    scan-pruning notes in
+    `init_time` partitions) and, where the full ensemble is needed, processes one `init_time`
+    chunk at a time — filtering the engineered output cannot prune the upstream join/upsample.
+    See the NWP scan-pruning notes in
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>.
 
     Persistence has two layers. Subclasses implement ``save``/``load`` for their own on-disk
-    format and need know nothing about MLflow. The concrete ``save_to_mlflow``/``load_from_mlflow``
-    methods, shared by all subclasses, wrap that disk format with MLflow's artifact store, so the
-    same trained model can be shared across machines by round-tripping through a run.
+    format and need know nothing about MLflow. The concrete
+    ``save_to_mlflow``/``load_from_mlflow`` methods, shared by all subclasses, wrap that disk
+    format with MLflow's artifact store, so the same trained model can be shared across machines
+    by round-tripping through a run.
     """
 
     MODEL_NAME: ClassVar[str]
@@ -296,13 +297,13 @@ class BaseForecaster(ABC):
         model spanning many series, or anything in between; the contract is only about which
         ``time_series_id``s it will score.
 
-        **Why this is load-bearing.** The **train==predict population invariant**: the
-        population a model is scored on must equal the population it was trained on, *even if* the
-        live eligibility set has drifted since training (power coverage changes, so a series may
-        newly qualify or drop out). Consumers (``cv_power_forecasts``, ``live_forecasts``) filter
-        their inputs to this set, so a model scores exactly the population it learned — never
-        whatever eligibility says *today*. That is what keeps the leaderboard apples-to-apples and
-        stops production forecasting a series the model never saw.
+        **Why this is load-bearing.** The **train==predict population invariant**: the population
+        a model is scored on must equal the population it was trained on, *even if* the live
+        eligibility set has drifted since training (power coverage changes, so a series may newly
+        qualify or drop out). Consumers (``cv_power_forecasts``, ``live_forecasts``) filter their
+        inputs to this set, so a model scores exactly the population it learned — never whatever
+        eligibility says *today*. That is what keeps the leaderboard apples-to-apples and stops
+        production forecasting a series the model never saw.
 
         Subclasses persist and reconstruct this set through their own ``save``/``load`` (e.g. in
         ``meta.json``), so it survives a round-trip through MLflow.
@@ -326,8 +327,9 @@ class BaseForecaster(ABC):
           with ``shutil.rmtree(path, ignore_errors=True)``.
 
         The clearing requirement makes ``path`` the model's to own while it saves, so anything a
-        caller left there is gone afterwards. (Depositing a file *after* a save is fine, and is how
-        ``production_helpers.fetch_model_artifacts`` puts ``promotion.json`` beside the model.)
+        caller left there is gone afterwards. (Depositing a file *after* a save is fine, and is
+        how ``production_helpers.fetch_model_artifacts`` puts ``promotion.json`` beside the
+        model.)
         """
 
     @classmethod

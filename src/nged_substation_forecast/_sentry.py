@@ -4,38 +4,36 @@ Three independent mechanisms, all no-ops when Sentry is unconfigured, so laptops
 Sentry configuration:
 
 - **Error telemetry** — `init_sentry` initialises the SDK once per process (a no-op unless
-  ``Settings.sentry_dsn`` is set), and the `sentry_capture_failure` Dagster failure hook
-  reports the real exception (with traceback) from inside the run worker, tagged
-  `FAULT_CATEGORY_TAG` so an alert rule can tell a failed run from the degradation events
-  below. It reports neither a cancelled run nor the bare ``RetryRequested`` wrapper around an
-  exhausted in-band retry.
-  `report_check_degradation` and `report_asset_degradation` cover the production faults
-  the hook cannot see, because they never fail a run: a check, or an asset, that caught its own
-  exception instead of raising. The hook is used
-  rather than Sentry's ``LoggingIntegration`` log-to-event capture — which `init_sentry`
-  explicitly disables — because Dagster logs a step failure without ``exc_info``, so the log-based
-  path would yield a message-only event with no stack trace, *and* would fire for every ``ERROR``
-  log anywhere in the process (Dagster's own startup/step logs, ad-hoc materialisations, even a
-  swallowed telemetry error), swamping Sentry with events the design never intended to send. The
-  hook is attached to the *scheduled* asset jobs only, so it covers the unattended production
-  workload; manual/backfill/experiment runs are watched by the operator at the Dagster UI, not
-  Sentry.
-- **The missed-check-in alarm** — `send_forecast_checkin` sends a *success-only* heartbeat to
-  a Sentry cron monitor after each live ``live_forecasts`` run. It is gated on
-  ``Settings.sentry_monitor_forecasts`` (not the DSN), so a laptop with a DSN set for error testing
-  never heartbeats the production monitor. Sentry fires the alarm on the *absence* of a heartbeat
-  past the margin (a dead daemon cannot report itself); in-band run errors are handled by the
-  failure hook above, never by this heartbeat.
+  ``Settings.sentry_dsn`` is set), and the `sentry_capture_failure` Dagster failure hook reports
+  the real exception (with traceback) from inside the run worker, tagged `FAULT_CATEGORY_TAG` so
+  an alert rule can tell a failed run from the degradation events below. It reports neither a
+  cancelled run nor the bare ``RetryRequested`` wrapper around an exhausted in-band retry.
+  `report_check_degradation` and `report_asset_degradation` cover the production faults the hook
+  cannot see, because they never fail a run: a check, or an asset, that caught its own exception
+  instead of raising. The hook is used rather than Sentry's ``LoggingIntegration`` log-to-event
+  capture — which `init_sentry` explicitly disables — because Dagster logs a step failure without
+  ``exc_info``, so the log-based path would yield a message-only event with no stack trace, *and*
+  would fire for every ``ERROR`` log anywhere in the process (Dagster's own startup/step logs,
+  ad-hoc materialisations, even a swallowed telemetry error), swamping Sentry with events the
+  design never intended to send. The hook is attached to the *scheduled* asset jobs only, so it
+  covers the unattended production workload; manual/backfill/experiment runs are watched by the
+  operator at the Dagster UI, not Sentry.
+- **The missed-check-in alarm** — `send_forecast_checkin` sends a *success-only* heartbeat to a
+  Sentry cron monitor after each live ``live_forecasts`` run. It is gated on
+  ``Settings.sentry_monitor_forecasts`` (not the DSN), so a laptop with a DSN set for error
+  testing never heartbeats the production monitor. Sentry fires the alarm on the *absence* of a
+  heartbeat past the margin (a dead daemon cannot report itself); in-band run errors are handled
+  by the failure hook above, never by this heartbeat.
 - **Freshness warnings** — `report_power_freshness` forwards the ``power_data_is_fresh`` asset
-  check's per-series staleness to Sentry as a *warning*-level event when any series is late. Gated
-  on the DSN like error telemetry (not the heartbeat flag), and fingerprinted per environment so
-  each deployment gets its own ongoing issue. Because a warning event models only one direction of
-  a two-way state (stale vs recovered), recovery is signalled by the events *stopping* and is
-  resolved by the operator — see the design page's freshness section.
+  check's per-series staleness to Sentry as a *warning*-level event when any series is late.
+  Gated on the DSN like error telemetry (not the heartbeat flag), and fingerprinted per
+  environment so each deployment gets its own ongoing issue. Because a warning event models only
+  one direction of a two-way state (stale vs recovered), recovery is signalled by the events
+  *stopping* and is resolved by the operator — see the design page's freshness section.
 
-The ``environment`` tag (``Settings.sentry_environment``) separates deployments: ``production`` on
-the always-on box, ``<name>-laptop`` on each developer's machine. The alarm's alert rule is scoped
-to ``environment:production`` so intermittently-run laptops never page.
+The ``environment`` tag (``Settings.sentry_environment``) separates deployments: ``production``
+on the always-on box, ``<name>-laptop`` on each developer's machine. The alarm's alert rule is
+scoped to ``environment:production`` so intermittently-run laptops never page.
 
 Further reading:
 
@@ -410,8 +408,8 @@ def _capture_power_freshness_warning(
     """Build and send the freshness warning event on an isolated Sentry scope.
 
     Split from `report_power_freshness` so the latter's ``try``/``except`` wraps the whole
-    payload build (iterating ``result.late``), not only the network send — a bug in the payload is
-    the likelier raiser than ``capture_message`` itself.
+    payload build (iterating ``result.late``), not only the network send — a bug in the payload
+    is the likelier raiser than ``capture_message`` itself.
     """
     late_preview = result.late.head(MAX_LATE_SERIES_IN_CONTEXT)
     late_series: list[_LateSeriesEntry] = [
@@ -452,8 +450,8 @@ def _freshness_message(
     The message is a one-line summary (Sentry's issue title) followed by the leading late series
     and how late each one is.
 
-    The per-series lines are capped at `MAX_LATE_SERIES_IN_MESSAGE`; if more series are late,
-    a trailing ``…and N more`` line reports the remainder (with the fuller list in the event's
+    The per-series lines are capped at `MAX_LATE_SERIES_IN_MESSAGE`; if more series are late, a
+    trailing ``…and N more`` line reports the remainder (with the fuller list in the event's
     ``power_freshness`` context). ``late_series`` is already ordered never-reported first, then
     most-stale first, so the message leads with the worst offenders.
     """

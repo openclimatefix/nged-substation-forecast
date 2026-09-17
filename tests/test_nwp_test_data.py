@@ -58,8 +58,8 @@ def test_rejects_contract_invalid_records(tmp_path: Path) -> None:
     """``write_test_nwp`` calls ``Nwp.validate`` before writing, so a bad fixture raises here.
 
     Guards against a repeat of the earlier fixture that wrote contract-invalid NWP that no test
-    noticed: an out-of-range ``wind_direction_10m`` (``Nwp`` declares ``ge=0, le=360``) must raise,
-    not write.
+    noticed: an out-of-range ``wind_direction_10m`` (``Nwp`` declares ``ge=0, le=360``) must
+    raise, not write.
     """
     records = nwp_records(cell=1, day=_INIT_TIME, members=(0,))
     records[0]["wind_direction_10m"] = 400.0

@@ -159,10 +159,10 @@ def test_importing_contracts_constructs_no_settings():
     test (or an entry point) could set it. Run in a fresh interpreter because this process has
     already imported (and used) these modules. See contracts.settings.get_settings.
 
-    The guard patches ``Settings.__init__`` to raise, so it catches *any* import-time construction —
-    a direct module-level ``Settings()`` as well as one routed through ``get_settings()`` — not just
-    a populated cache. ``contracts/__init__.py`` imports nothing, so the patch lands before any
-    schema module loads.
+    The guard patches ``Settings.__init__`` to raise, so it catches *any* import-time
+    construction — a direct module-level ``Settings()`` as well as one routed through
+    ``get_settings()`` — not just a populated cache. ``contracts/__init__.py`` imports nothing,
+    so the patch lands before any schema module loads.
     """
     probe = (
         "import contracts.settings as s\n"

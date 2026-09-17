@@ -1,10 +1,10 @@
 """Regression tests for PROJECT_ROOT resolution under different install layouts.
 
 PROJECT_ROOT used to be ``Path(__file__).parents[4]`` — a hard-coded directory depth that only
-held for an editable install, and silently resolved to the venv root under a non-editable
-(``uv sync --no-editable``) install (issue #287). These tests pin the marker-based replacement:
-walk up to the nearest ancestor holding ``uv.lock``, falling back to the current working
-directory when no ancestor qualifies.
+held for an editable install, and silently resolved to the venv root under a non-editable (``uv
+sync --no-editable``) install (issue #287). These tests pin the marker-based replacement: walk up
+to the nearest ancestor holding ``uv.lock``, falling back to the current working directory when
+no ancestor qualifies.
 """
 
 from pathlib import Path
@@ -52,9 +52,9 @@ def test_find_project_root_outside_any_workspace_falls_back_to_cwd(
 ):
     """With no ``uv.lock`` in any ancestor, resolution falls back to the working directory.
 
-    This is the wheel-installed-outside-a-checkout case: such a deployment must either run
-    with its cwd at a directory laid out like the repo root, or set every path setting
-    explicitly via env vars (as documented on ``_find_project_root``).
+    This is the wheel-installed-outside-a-checkout case: such a deployment must either run with
+    its cwd at a directory laid out like the repo root, or set every path setting explicitly via
+    env vars (as documented on ``_find_project_root``).
     """
     installed_pkg = tmp_path / "venv" / "lib" / "python3.14" / "site-packages" / "contracts"
     installed_pkg.mkdir(parents=True)

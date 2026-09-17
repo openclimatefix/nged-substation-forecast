@@ -143,8 +143,8 @@ def test_re_registration_with_a_changed_config_leaves_no_half_written_state(
 
     The experiment's ``config`` tag is what ``load_experiment_forecaster`` reconstructs the
     forecaster from, so a failed registration that had already rewritten it would leave the
-    experiment describing a config its parent run's params contradict — and every later fold would
-    train on the config of a registration that *failed*.
+    experiment describing a config its parent run's params contradict — and every later fold
+    would train on the config of a registration that *failed*.
     """
     _run(dagster_instance, "exp_changed", run_mode="full_cv", config_overrides={"n_estimators": 7})
 

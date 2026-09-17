@@ -2,8 +2,8 @@
 ``nwp_run_is_complete`` asset check.
 
 The synthetic "complete" run is built against the *real* ``ECMWF_ENS_ENSEMBLE_MEMBERS`` and
-``ECMWF_ENS_LEAD_TIME_HOURS`` defaults (51 x 85 x 2 cells = 8,670 rows), so these tests would fail
-if either constant drifted away from the shape the asset actually expects.
+``ECMWF_ENS_LEAD_TIME_HOURS`` defaults (51 x 85 x 2 cells = 8,670 rows), so these tests would
+fail if either constant drifted away from the shape the asset actually expects.
 """
 
 import itertools
@@ -234,9 +234,9 @@ def test_empty_frame_is_incomplete_and_does_not_raise() -> None:
 def test_validate_does_not_run_the_completeness_check() -> None:
     """``Nwp.validate`` must stay usable on arbitrary filtered subsets.
 
-    Completeness is deliberately *not* wired into ``validate``: a single-member, single-step slice
-    is a perfectly legal ``Nwp`` frame (it is what a pruned training scan returns), and validating
-    it must not fail.
+    Completeness is deliberately *not* wired into ``validate``: a single-member, single-step
+    slice is a perfectly legal ``Nwp`` frame (it is what a pruned training scan returns), and
+    validating it must not fail.
     """
     one_slice = _complete_run().filter(
         (pl.col("ensemble_member") == 0) & (pl.col("valid_time") == _INIT_TIME)

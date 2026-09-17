@@ -39,10 +39,11 @@ def test_a_node_id_target_stays_serial(pytester: pytest.Pytester) -> None:
 
 
 def test_explicit_numprocesses_is_respected(pytester: pytest.Pytester) -> None:
-    """`-n 1`, not `-n 2`: on a runner where physical-core auto-detection also resolves to 2 (this
-    repo's CI), a broken injection that appends `-n auto` after an explicit `-n 2` instead of
-    prepending it would still show `2/2 workers` by coincidence. `-n 1` can't coincide with `auto`
-    on any multi-core runner, so it actually catches append-instead-of-prepend."""
+    """`-n 1`, not `-n 2`: on a runner where physical-core auto-detection also resolves to 2
+    (this repo's CI), a broken injection that appends `-n auto` after an explicit `-n 2`
+    instead of prepending it would still show `2/2 workers` by coincidence. `-n 1` can't
+    coincide with `auto` on any multi-core runner, so it actually catches
+    append-instead-of-prepend."""
     _install_autoinject_plugin(pytester)
     result = pytester.runpytest_subprocess("-n", "1")
     result.stdout.fnmatch_lines(["created: 1/1 worker*"])
@@ -63,10 +64,11 @@ def test_no_xdist_falls_back_to_serial_without_erroring(pytester: pytest.Pyteste
 
 @pytest.mark.parametrize("capture_flag", ["-s", "--capture=no"])
 def test_capture_no_stays_serial(pytester: pytest.Pytester, capture_flag: str) -> None:
-    """Neither spelling of "capture off" may be parallelised: a worker's captured-off stdout never
-    reaches the controller, so injecting `-n auto` here would silently swallow the output the flag
-    exists to show. Both spellings are covered, not just `-s`, because a hand-scan for the literal
-    `-s` token would also pass this test while leaving `--capture=no` parallelised."""
+    """Neither spelling of "capture off" may be parallelised: a worker's captured-off stdout
+    never reaches the controller, so injecting `-n auto` here would silently swallow the
+    output the flag exists to show. Both spellings are covered, not just `-s`, because a
+    hand-scan for the literal `-s` token would also pass this test while leaving
+    `--capture=no` parallelised."""
     _install_autoinject_plugin(pytester)
     pytester.makepyfile(test_verbose="def test_prints():\n    print('CAPTURE_NO_MARKER')\n")
     result = pytester.runpytest_subprocess(capture_flag, "-k", "test_prints")
@@ -77,7 +79,8 @@ def test_capture_no_stays_serial(pytester: pytest.Pytester, capture_flag: str) -
 
 def test_plugin_registered(pytestconfig: pytest.Config) -> None:
     """Guards the wiring itself: `pyproject.toml`'s `addopts` has to actually load this plugin by
-    name (`-p _pytest_autoinject`), or every invocation in this repo silently goes serial exactly
-    like the bug this file otherwise guards against, with every test above still green — they build
-    their own throwaway project with their own `addopts`, so none of them exercises this repo's."""
+    name (`-p _pytest_autoinject`), or every invocation in this repo silently goes serial
+    exactly like the bug this file otherwise guards against, with every test above still green
+    — they build their own throwaway project with their own `addopts`, so none of them
+    exercises this repo's."""
     assert pytestconfig.pluginmanager.hasplugin("_pytest_autoinject")

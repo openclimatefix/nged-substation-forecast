@@ -28,8 +28,9 @@ log = logging.getLogger(__name__)
 class ExtractedPowerTimeSeries(NamedTuple):
     """Result of parsing ``PowerTimeSeries`` rows out of one NGED JSON file.
 
-    ``n_dropped`` counts rows dropped by ``PowerTimeSeries.drop_implausible_rows`` for a malformed
-    ``time`` — see that method's docstring for why ingestion degrades rather than raising.
+    ``n_dropped`` counts rows dropped by ``PowerTimeSeries.drop_implausible_rows`` for a
+    malformed ``time`` — see that method's docstring for why ingestion degrades rather than
+    raising.
     """
 
     dataframe: pt.DataFrame[PowerTimeSeries]

@@ -1,9 +1,9 @@
 """Integration tests for the CV Dagster assets.
 
 These materialise ``eligible_time_series`` in-process against synthetic power data written to a
-temporary Delta table, exercising the real asset wiring (Dagster + Delta) for the leaderboard fold
-and the non-leaderboard ``smoke_test`` fold in ``conf/cv/default.yaml``. The pure, fold-specific
-eligibility logic is unit-tested in ``packages/ml_core/tests/test_cv_helpers.py``.
+temporary Delta table, exercising the real asset wiring (Dagster + Delta) for the leaderboard
+fold and the non-leaderboard ``smoke_test`` fold in ``conf/cv/default.yaml``. The pure,
+fold-specific eligibility logic is unit-tested in ``packages/ml_core/tests/test_cv_helpers.py``.
 """
 
 from datetime import UTC, datetime
@@ -47,10 +47,11 @@ def _write_synthetic_power(power_delta_path: str) -> None:
     - ts1: 2024-06-01 .. 2026-07-01 -> eligible (enough history, reaches val_end).
     - ts2: 2024-06-01 .. 2026-03-01 -> not eligible (stops before val_end).
     - ts3: 2025-03-01 .. 2026-07-01 -> not eligible (< 6 months history before val_start).
-    - ts4: 2024-12-01 .. 2025-03-01 -> not eligible for the leaderboard fold (stops before val_end),
-      but eligible for the smoke fold *only because* its per-fold min_training_months=1 override is
-      honoured: smoke val_start 2025-02-01 needs first obs ≤ 2025-01-01 (met by 2024-12-01), whereas
-      the default 6 months would require ≤ 2024-08-01 (not met). So ts4 is the override's witness.
+    - ts4: 2024-12-01 .. 2025-03-01 -> not eligible for the leaderboard fold (stops before
+      val_end), but eligible for the smoke fold *only because* its per-fold min_training_months=1
+      override is honoured: smoke val_start 2025-02-01 needs first obs ≤ 2025-01-01 (met by
+      2024-12-01), whereas the default 6 months would require ≤ 2024-08-01 (not met). So ts4 is
+      the override's witness.
     """
     coverage = {
         1: (_utc(2024, 6, 1), _utc(2026, 7, 1)),
@@ -120,8 +121,9 @@ def test_eligible_time_series_honours_per_fold_min_training_months_override(
 ) -> None:
     """The smoke fold's min_training_months=1 override widens eligibility to include ts4.
 
-    ts4 (first obs 2024-12-01) would be excluded under the config-level default of 6 months but is
-    eligible here because the fold's own override of 1 month is applied (see ts4 in the fixture).
+    ts4 (first obs 2024-12-01) would be excluded under the config-level default of 6 months but
+    is eligible here because the fold's own override of 1 month is applied (see ts4 in the
+    fixture).
     """
     assert materialize([eligible_time_series], partition_key=SMOKE_FOLD_ID).success
     assert _read_eligible(cv_paths["eligible"], SMOKE_FOLD_ID) == [1, 2, 4]
@@ -130,8 +132,8 @@ def test_eligible_time_series_honours_per_fold_min_training_months_override(
 def test_eligible_time_series_overwrite_is_partition_scoped(cv_paths: dict[str, str]) -> None:
     """The partition overwrite touches only its own fold, leaving sibling folds intact.
 
-    Pre-seed the eligible table with a row for an unrelated fold (e.g. a prior leaderboard epoch),
-    then materialise the canonical fold and assert the sibling partition survives.
+    Pre-seed the eligible table with a row for an unrelated fold (e.g. a prior leaderboard
+    epoch), then materialise the canonical fold and assert the sibling partition survives.
     """
     seeded = EligibleTimeSeries.validate(
         pl.DataFrame(
@@ -157,8 +159,8 @@ def test_eligible_time_series_overwrite_is_partition_scoped(cv_paths: dict[str, 
 def test_effective_capacity_materialises_one_row_per_series(cv_paths: dict[str, str]) -> None:
     """The asset writes one full-history P99 row per time series with a plausible capacity.
 
-    The synthetic power fixture has ``power == 1.0`` for every observation, so P99(|power|) == 1.0
-    for all four series, and ``time`` is each series' latest observation.
+    The synthetic power fixture has ``power == 1.0`` for every observation, so P99(|power|) ==
+    1.0 for all four series, and ``time`` is each series' latest observation.
     """
     assert materialize([effective_capacity]).success
 

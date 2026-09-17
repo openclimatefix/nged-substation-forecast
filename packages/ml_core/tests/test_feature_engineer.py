@@ -103,7 +103,8 @@ def test_tabular_feature_engineer_drops_series_with_no_metadata_row() -> None:
     Single-run mode is power-centric, so without the semi-join in ``_engineer_features`` the
     series would survive with every weather feature null and be predicted on regardless — a
     garbage forecast that reads as healthy to ``live_forecasts_are_healthy`` because the series
-    is present. ``AllFeatures.time_series_type`` is declared non-nullable on the strength of this.
+    is present. ``AllFeatures.time_series_type`` is declared non-nullable on the strength of
+    this.
     """
     power_fcst_init_time = datetime(2024, 6, 1, 12, 0)
     # ts1 has a metadata row; ts3 does not.
@@ -184,8 +185,8 @@ def test_tabular_feature_engineer_threads_local_timezone() -> None:
     """``local_timezone`` reaches the local-time features through the public ``engineer()`` call.
 
     Unlike ``test_apply_local_time_features_non_london_timezone`` in ``test_features.py``, which
-    calls the bottom-most helper directly, this goes through ``TabularFeatureEngineer.engineer()``
-    — the composition point every production call site uses
+    calls the bottom-most helper directly, this goes through
+    ``TabularFeatureEngineer.engineer()`` — the composition point every production call site uses
     (``forecaster.feature_engineer.engineer(...)``). ``local_timezone`` passes through two
     intermediate layers (``_engineer_features``, then ``_apply_post_join_features``) before
     reaching ``_apply_local_time_features``; a dropped passthrough at either layer would silently
@@ -249,12 +250,12 @@ def test_feature_engineer_abc_declares_local_timezone_parameter() -> None:
     """``local_timezone`` is part of the ``FeatureEngineer`` interface, not just the one subclass.
 
     Inspects the *abstract* method's own signature, deliberately not a concrete instance assigned
-    to a ``FeatureEngineer``-typed variable: ``ty`` narrows a declared-``FeatureEngineer`` receiver
-    back to the concrete ``TabularFeatureEngineer`` on assignment, so a test written that way would
-    still type-check even if ``local_timezone`` were deleted from the ABC — silently passing both
-    pytest and ``ty``. Reading ``FeatureEngineer.engineer``'s signature directly has no such
-    loophole: a future ``FeatureEngineer`` implementation for another region can only be relied on
-    to accept ``local_timezone`` if the interface itself declares it.
+    to a ``FeatureEngineer``-typed variable: ``ty`` narrows a declared-``FeatureEngineer``
+    receiver back to the concrete ``TabularFeatureEngineer`` on assignment, so a test written
+    that way would still type-check even if ``local_timezone`` were deleted from the ABC —
+    silently passing both pytest and ``ty``. Reading ``FeatureEngineer.engineer``'s signature
+    directly has no such loophole: a future ``FeatureEngineer`` implementation for another region
+    can only be relied on to accept ``local_timezone`` if the interface itself declares it.
     """
     parameters = inspect.signature(FeatureEngineer.engineer).parameters
     assert "local_timezone" in parameters

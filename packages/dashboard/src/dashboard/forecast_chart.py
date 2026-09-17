@@ -16,9 +16,9 @@ geometry: they share the same pinned x encoding, both pin the y-axis region to `
 pixels, and both charts' legends sit *above* the plot (``orient="top"``) so neither consumes
 horizontal plot space.
 
-The x-axis deliberately overrides Altair's adaptive datetime ticks: labels sit at
-local midnight only (day-of-week first — crucial for demand forecasting), with unlabelled minor
-ticks every 3 hours, all in Europe/London wall time.
+The x-axis deliberately overrides Altair's adaptive datetime ticks: labels sit at local midnight
+only (day-of-week first — crucial for demand forecasting), with unlabelled minor ticks every 3
+hours, all in Europe/London wall time.
 """
 
 import calendar
@@ -179,10 +179,10 @@ def _prepare_for_plot(lf: pl.LazyFrame, time_column: str, value_column: str) -> 
 
     Naive (zone-stripped) values render identically in any viewer's browser — Vega would
     otherwise re-localise tz-aware timestamps to the viewer's zone. Values are rounded to 3
-    decimal places *as Float64*: a raw ``Float32`` serialises to JSON with ~17 significant
-    digits (e.g. ``10.300000190734863``), which roughly triples the inline-data size and pushes
-    the ~34k-row ensemble past marimo's max-output-size guard. 3 d.p. display precision is far
-    below forecast error (the stored values are already rounded to a 13-bit significand).
+    decimal places *as Float64*: a raw ``Float32`` serialises to JSON with ~17 significant digits
+    (e.g. ``10.300000190734863``), which roughly triples the inline-data size and pushes the
+    ~34k-row ensemble past marimo's max-output-size guard. 3 d.p. display precision is far below
+    forecast error (the stored values are already rounded to a 13-bit significand).
     """
     return lf.with_columns(
         pl.col(time_column).dt.convert_time_zone(DISPLAY_TIME_ZONE).dt.replace_time_zone(None),
@@ -271,8 +271,8 @@ def _weekend_layer(window_start: datetime, window_end: datetime) -> alt.Chart:
 def _y_axis() -> alt.Axis:
     """A y-axis with its pixel extent pinned so stacked charts align — see ``Y_AXIS_EXTENT``.
 
-    Like the x encoding, the y-axis definition must be identical on every layer that carries a
-    y encoding, or Vega-Lite's axis merge can drop the deviating properties.
+    Like the x encoding, the y-axis definition must be identical on every layer that carries a y
+    encoding, or Vega-Lite's axis merge can drop the deviating properties.
     """
     return alt.Axis(minExtent=Y_AXIS_EXTENT, maxExtent=Y_AXIS_EXTENT)
 
@@ -290,13 +290,13 @@ def _x_encoding(window_start: datetime, window_end: datetime, field: str = "vali
 
     Altair's adaptive datetime ticks are hard to read; instead every property is pinned. Labelled
     major ticks (with gridlines) sit at each local midnight, formatted ``Mon 06 Jul``; shorter
-    minor ticks every 3 hours carry no label and no gridline. The conditional-axis-property
-    dicts are Vega-Lite's native encoding for "major vs minor tick" styling.
+    minor ticks every 3 hours carry no label and no gridline. The conditional-axis-property dicts
+    are Vega-Lite's native encoding for "major vs minor tick" styling.
 
     Every layer must use this same encoding (via ``field`` when its time column isn't
     ``valid_time``): the x scale is shared across layers, so Vega-Lite merges the layers' axis
-    definitions, and one deviating definition (e.g. ``axis=None``) can suppress the merged axis
-    — labels, ticks, and gridlines — for the whole chart.
+    definitions, and one deviating definition (e.g. ``axis=None``) can suppress the merged axis —
+    labels, ticks, and gridlines — for the whole chart.
     """
     tick_size: dict[str, Any] = {"condition": {"test": _MIDNIGHT_TEST, "value": 7}, "value": 3}
     grid_opacity: dict[str, Any] = {"condition": {"test": _MIDNIGHT_TEST, "value": 1}, "value": 0}

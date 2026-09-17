@@ -1,9 +1,9 @@
 """Reflow the paragraphs of a markdown file that contain a given anchor phrase.
 
-A wrap-tolerant substitution leaves a paragraph's line breaks where they were, so the edited lines
-overrun the file's width while the rest of the document stays put. Reflowing the whole file instead
-buries the real edit in a diff nobody can review, so this script rewraps only the paragraphs an
-anchor phrase identifies, and asserts that nothing but the wrapping changed.
+A wrap-tolerant substitution leaves a paragraph's line breaks where they were, so the edited
+lines overrun the file's width while the rest of the document stays put. Reflowing the whole file
+instead buries the real edit in a diff nobody can review, so this script rewraps only the
+paragraphs an anchor phrase identifies, and asserts that nothing but the wrapping changed.
 """
 
 import re
@@ -28,9 +28,9 @@ def _tokenise(text: str) -> list[str]:
     """Split `text` on whitespace, but keep each markdown link whole.
 
     `check_citations.py` matches a citation and its link on one line, so a line break between
-    `[Author (year)]` and `(url)` reads to that check as a citation nobody hyperlinked. Each link is
-    replaced by a placeholder before splitting and restored afterwards, so the link survives as one
-    token and the punctuation touching either side of the link stays welded to it.
+    `[Author (year)]` and `(url)` reads to that check as a citation nobody hyperlinked. Each link
+    is replaced by a placeholder before splitting and restored afterwards, so the link survives
+    as one token and the punctuation touching either side of the link stays welded to it.
     """
     links: list[str] = []
 

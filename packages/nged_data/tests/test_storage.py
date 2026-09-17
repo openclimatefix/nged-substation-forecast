@@ -291,10 +291,10 @@ def _roster(ids: list[int], name: str = "ID", **extra: object) -> pt.DataFrame[T
 
 
 def test_upsert_metadata_adds_a_new_id_when_the_stored_roster_is_thinner(tmp_path: Path):
-    """The diff is derived by slicing the concatenated frame, so it must split back into exactly the
-    snapshot's rows and the stored roster's rows. Getting that boundary wrong loses a whole time
-    series silently: it never enters the roster, the stats claim nothing was new, and
-    `select_new_rows` never re-offers the file, so it never arrives at all."""
+    """The diff is derived by slicing the concatenated frame, so it must split back into exactly
+    the snapshot's rows and the stored roster's rows. Getting that boundary wrong loses a
+    whole time series silently: it never enters the roster, the stats claim nothing was new,
+    and `select_new_rows` never re-offers the file, so it never arrives at all."""
     metadata_path = tmp_path / "metadata.parquet"
     _roster([1]).write_parquet(metadata_path)
 
@@ -306,10 +306,10 @@ def test_upsert_metadata_adds_a_new_id_when_the_stored_roster_is_thinner(tmp_pat
 
 
 def test_upsert_metadata_merges_a_snapshot_missing_the_optional_columns(tmp_path: Path):
-    """`TimeSeriesMetadata` has four `allow_missing` fields, so a snapshot can be narrower than the
-    stored roster and still validate. Merging the two must not raise: a field the snapshot no
-    longer carries is *cleared* for the series the snapshot covers, while a series the snapshot
-    omits keeps every value it already had."""
+    """`TimeSeriesMetadata` has four `allow_missing` fields, so a snapshot can be narrower than
+    the stored roster and still validate. Merging the two must not raise: a field the snapshot
+    no longer carries is *cleared* for the series the snapshot covers, while a series the
+    snapshot omits keeps every value it already had."""
     metadata_path = tmp_path / "metadata.parquet"
     _roster([1, 2], information="note").write_parquet(metadata_path)
 
@@ -386,11 +386,11 @@ def test_parse_file_listing_valid(object_key: str, expected_time_series_id: int)
 def test_select_new_rows_file_listing(tmp_path: Path):
     """Regression: trailing comma made filtered_df a tuple, causing superfluous column_0 error.
 
-    Also covers the lookback margin: a file sitting exactly at a series' on-disk `last_time` falls
-    inside the margin and is kept, because the margin extends the cutoff to `_LATE_FILE_LOOKBACK`
-    before `last_time`, while a file whose `end_time` falls further before the watermark than
-    `_LATE_FILE_LOOKBACK` is still dropped — the margin bounds re-download cost rather than
-    removing the cutoff outright.
+    Also covers the lookback margin: a file sitting exactly at a series' on-disk `last_time`
+    falls inside the margin and is kept, because the margin extends the cutoff to
+    `_LATE_FILE_LOOKBACK` before `last_time`, while a file whose `end_time` falls further before
+    the watermark than `_LATE_FILE_LOOKBACK` is still dropped — the margin bounds re-download
+    cost rather than removing the cutoff outright.
     """
     delta_path = tmp_path / "power.delta"
 
@@ -437,9 +437,9 @@ def test_select_new_rows_file_listing(tmp_path: Path):
 
 def test_select_new_rows_power_time_series_keeps_only_genuinely_missing_readings(tmp_path: Path):
     """A reading missing from a series' own history is kept even when a later reading for that
-    series is already on disk, and existence is checked per series, not across the whole table —
-    the anti-join must not match a candidate row against another series' on-disk reading that
-    happens to share the same `time`."""
+    series is already on disk, and existence is checked per series, not across the whole table
+    — the anti-join must not match a candidate row against another series' on-disk reading
+    that happens to share the same `time`."""
     delta_path = tmp_path / "power.delta"
     T = datetime(2026, 1, 1, 12, 0, tzinfo=UTC)
 

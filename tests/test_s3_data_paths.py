@@ -1,8 +1,8 @@
 """S3 integration tests for the managed data tables (issue #121).
 
 Exercises the data-table IO layer against a real S3 endpoint — an in-process ``moto`` server, so
-no Docker or network — driven entirely through ``Settings`` pointed at an ``s3://`` data-path root.
-Proves the two things the S3 migration must guarantee and that the local test suite cannot:
+no Docker or network — driven entirely through ``Settings`` pointed at an ``s3://`` data-path
+root. Proves the two things the S3 migration must guarantee and that the local test suite cannot:
 
 1. Delta and parquet tables round-trip over ``s3://`` through the production write/read helpers
    (``write_power_forecasts`` / ``write_nwp`` / ``Nwp.scan_delta`` / ``upsert_metadata``) using
@@ -12,11 +12,11 @@ Proves the two things the S3 migration must guarantee and that the local test su
    memory-bounding design (single fold in RAM) depends on this holding on the object store too.
 
 The coverage here goes through the functional ``write_deltalake`` + polars
-``scan_delta``/``read_delta`` + obstore paths that production uses for the hot IO. It deliberately
-does **not** drive the ``deltalake.DeltaTable`` *class* client (``delta_table_exists`` /
-``DeltaTable(...).partitions()``): that client's connection handling hangs against moto's in-process
-dev server (an emulator limitation — it is the standard API and works on real S3/MinIO), so
-exercising it here would only add a 3-minute stall, not real signal.
+``scan_delta``/``read_delta`` + obstore paths that production uses for the hot IO. It
+deliberately does **not** drive the ``deltalake.DeltaTable`` *class* client
+(``delta_table_exists`` / ``DeltaTable(...).partitions()``): that client's connection handling
+hangs against moto's in-process dev server (an emulator limitation — it is the standard API and
+works on real S3/MinIO), so exercising it here would only add a 3-minute stall, not real signal.
 
 Marked ``integration``; skipped automatically if ``moto`` is not installed.
 """
@@ -68,8 +68,8 @@ def _moto_server() -> Iterator[str]:
 
     Bound to loopback only, on ``port=0``: the OS assigns a free ephemeral port at the moment the
     server itself binds it, so a concurrent caller of this fixture — another ``pytest-xdist``
-    worker, most plausibly — can never be handed that same port. ``get_host_and_port()`` reads back
-    the port the server actually bound after ``start()``.
+    worker, most plausibly — can never be handed that same port. ``get_host_and_port()`` reads
+    back the port the server actually bound after ``start()``.
     """
     server = ThreadedMotoServer(ip_address="127.0.0.1", port=0, verbose=False)
     server.start()
@@ -84,11 +84,11 @@ def _moto_server() -> Iterator[str]:
 def s3_endpoint(_moto_server: str) -> str:
     """Reset moto to a pristine state and (re)create the test bucket for each test.
 
-    moto's S3 backend is process-global and outlives the server object, so it is *not* reset
-    when the module-scoped server is reused across tests. Without a per-test reset, any test
-    whose write path runs a second time — a re-run, or state left by an earlier test — would
-    read leftover objects (a doubled Delta table, a pre-existing metadata parquet) and fail.
-    Resetting before every test makes each test independent of execution order and prior state.
+    moto's S3 backend is process-global and outlives the server object, so it is *not* reset when
+    the module-scoped server is reused across tests. Without a per-test reset, any test whose
+    write path runs a second time — a re-run, or state left by an earlier test — would read
+    leftover objects (a doubled Delta table, a pre-existing metadata parquet) and fail. Resetting
+    before every test makes each test independent of execution order and prior state.
     """
     urllib.request.urlopen(
         urllib.request.Request(f"{_moto_server}/moto-api/reset", method="POST")
@@ -104,9 +104,9 @@ def _s3_settings(endpoint: str, prefix: str) -> Settings:
     """A ``Settings`` whose data tables live under ``s3://{_BUCKET}/{prefix}`` on the moto server.
 
     Only ``data_path_internal``/``data_path_delivery`` and the ``data_store_*`` credentials are
-    set (both roots point at the same prefix, as in local dev); every ``*_data_path`` derives from
-    one of the two roots through the normal validator, so the test drives the real derivation +
-    ``storage_options`` chain rather than hand-built URIs.
+    set (both roots point at the same prefix, as in local dev); every ``*_data_path`` derives
+    from one of the two roots through the normal validator, so the test drives the real
+    derivation + ``storage_options`` chain rather than hand-built URIs.
     """
     return Settings(
         data_path_internal=f"s3://{_BUCKET}/{prefix}",

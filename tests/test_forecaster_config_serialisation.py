@@ -1,10 +1,10 @@
 """The invariants every ``BaseForecasterConfig`` subclass must satisfy, whatever it declares.
 
 Both are stated on ``BaseForecasterConfig`` and neither is enforceable by the type checker:
-serialisation must be canonical, and unknown keys must be rejected. This module is what makes them
-enforceable rather than merely documented. It lives in the app tier, not in ``packages/ml_core``,
-because enforcing them means importing every concrete forecaster — a dependency ``ml_core`` itself
-must not take on.
+serialisation must be canonical, and unknown keys must be rejected. This module is what makes
+them enforceable rather than merely documented. It lives in the app tier, not in
+``packages/ml_core``, because enforcing them means importing every concrete forecaster — a
+dependency ``ml_core`` itself must not take on.
 """
 
 from typing import get_origin

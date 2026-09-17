@@ -12,8 +12,8 @@ _LOG = logging.getLogger(__name__)
 def load_gb_boundary() -> BaseGeometry:
     """Loads the boundary geometry for Great Britain from a local GeoJSON file.
 
-    The boundary is buffered to ensure that coastal substations and nearby islands
-    are included in the resulting H3 grid without spatial distortion.
+    The boundary is buffered to ensure that coastal substations and nearby islands are included
+    in the resulting H3 grid without spatial distortion.
     """
     geojson_path = Path(__file__).parent / "england_scotland_wales.geojson"
     _LOG.info(f"Loading GB boundary from {geojson_path}")

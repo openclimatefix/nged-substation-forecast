@@ -1,12 +1,12 @@
 """Tests for `scripts/check_docs_links.py`.
 
-The script resolves an anchor by converting the page with the real `markdown.Markdown`
-converter rather than a hand-rolled slugify, because Python-Markdown's `toc` extension preserves
+The script resolves an anchor by converting the page with the real `markdown.Markdown` converter
+rather than a hand-rolled slugify, because Python-Markdown's `toc` extension preserves
 underscores — a guessed `_` -> `-` rule produced 15 false failures the first time this was tried.
 `test_underscore_anchor_resolves` is the regression for that guessed slug rule.
 
-Each test builds a throwaway `mkdocs.yml` + `docs/` tree under `tmp_path` rather than depending on
-the real docs staying put. Most call `main()` with explicit file arguments;
+Each test builds a throwaway `mkdocs.yml` + `docs/` tree under `tmp_path` rather than depending
+on the real docs staying put. Most call `main()` with explicit file arguments;
 `test_whole_repo_scan_finds_a_bad_link` covers the no-argument path CI uses, which needs a real
 git repository to list.
 """
@@ -46,10 +46,10 @@ SITE_PREFIX: Final[str] = check_docs_links.DOCS_SITE_PREFIX
 def _make_docs_site(tmp_path: Path) -> None:
     """Write a minimal `mkdocs.yml` + `docs/` tree, exercising both the file and folder URL forms.
 
-    `docs/architecture/performance.md` is the `<path>.md` form and carries a plain heading plus one
-    whose id contains an underscore. `docs/guide/index.md` is the `<path>/index.md` form, which most
-    of the real `docs/` tree uses, and its heading slugifies to an id *ending* in an underscore.
-    `docs/api/contracts.md` mimics a real mkdocstrings page.
+    `docs/architecture/performance.md` is the `<path>.md` form and carries a plain heading plus
+    one whose id contains an underscore. `docs/guide/index.md` is the `<path>/index.md` form,
+    which most of the real `docs/` tree uses, and its heading slugifies to an id *ending* in an
+    underscore. `docs/api/contracts.md` mimics a real mkdocstrings page.
     """
     (tmp_path / "mkdocs.yml").write_text("markdown_extensions: []\n", encoding="utf-8")
     docs = tmp_path / "docs"
@@ -207,10 +207,10 @@ def test_site_root_resolves(docs_site: Path) -> None:
 def test_anchor_ending_in_underscore_resolves(docs_site: Path) -> None:
     """Regression: peeling trailing punctuation up front breaks a real anchor.
 
-    Python-Markdown's slugify drops the `*` from a heading like ``Storage roots (`DATA_STORE_*`)``
-    and leaves the underscore before it, so the anchor genuinely ends in `_`. The live docs carry
-    one of these on the AWS setup page. Trying the URL exactly as written before peeling anything
-    is what keeps it working.
+    Python-Markdown's slugify drops the `*` from a heading like ``Storage roots
+    (`DATA_STORE_*`)`` and leaves the underscore before it, so the anchor genuinely ends in `_`.
+    The live docs carry one of these on the AWS setup page. Trying the URL exactly as written
+    before peeling anything is what keeps it working.
     """
     consumer = _write_consumer(docs_site, f"{SITE_PREFIX}guide/#storage-roots-data_store_\n")
     assert check_docs_links.main([str(consumer)]) == 0
@@ -259,8 +259,8 @@ def test_bad_anchor_names_the_closest_real_anchor(
 def test_mkdocs_yml_extension_entries_are_parsed(tmp_path: Path) -> None:
     """`markdown_extensions` mixes bare names with single-key `{name: config}` mappings.
 
-    Reading both forms is what keeps this script's anchors identical to the built site's, so it is
-    worth a test that does not go through the `markdown_extensions: []` fixture.
+    Reading both forms is what keeps this script's anchors identical to the built site's, so it
+    is worth a test that does not go through the `markdown_extensions: []` fixture.
     """
     names, configs = check_docs_links._markdown_extensions_from_mkdocs_yml(
         {"markdown_extensions": ["pymdownx.highlight", {"pymdownx.arithmatex": {"generic": True}}]}

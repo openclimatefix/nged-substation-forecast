@@ -1,8 +1,8 @@
 """OCF brand Altair theme.
 
-Import this module to register and enable the OCF theme for Altair charts.
-The ``@alt.theme.register`` decorator fires at import time, so a bare
-``import plotting.ocf_theme`` is sufficient to activate it.
+Import this module to register and enable the OCF theme for Altair charts. The
+``@alt.theme.register`` decorator fires at import time, so a bare ``import plotting.ocf_theme``
+is sufficient to activate it.
 """
 
 from typing import Final, LiteralString
@@ -58,8 +58,8 @@ def hex_to_rgb(hex_color: str) -> list[int]:
     The leading ``#`` is optional: ``hex_to_rgb("FFFFFF")`` and ``hex_to_rgb("#FFFFFF")`` both
     return ``[255, 255, 255]``.
 
-    Lets non-Altair plotting libraries (e.g. lonboard, which styles map layers with RGB
-    lists) use the theme palette rather than hardcoding near-miss colours.
+    Lets non-Altair plotting libraries (e.g. lonboard, which styles map layers with RGB lists)
+    use the theme palette rather than hardcoding near-miss colours.
     """
     value = hex_color.removeprefix("#")
     return [int(value[i : i + 2], 16) for i in (0, 2, 4)]

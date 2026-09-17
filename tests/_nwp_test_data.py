@@ -2,12 +2,12 @@
 
 The several ``live_forecasts`` / CV / metrics integration tests each build a synthetic ``Nwp``
 frame. ``half_hours``, ``NWP_CONTINUOUS_COL_VALUES``, ``nwp_records`` and ``write_test_nwp`` live
-here because they were byte-identical, or identical but for one parameter, across the test modules
-that used to define them locally. What genuinely differs per test file is *which* cells, days,
-member sets and (for a run initialised before the day it forecasts into) explicit ``init_time``
-values get combined into one fixture — that selection is what stays local to each test file, as a
-thin ``_write_nwp(path)`` wrapper around ``nwp_records`` and ``write_test_nwp``. Importable by bare
-name via the ``pythonpath = ["tests"]`` pytest setting.
+here because they were byte-identical, or identical but for one parameter, across the test
+modules that used to define them locally. What genuinely differs per test file is *which* cells,
+days, member sets and (for a run initialised before the day it forecasts into) explicit
+``init_time`` values get combined into one fixture — that selection is what stays local to each
+test file, as a thin ``_write_nwp(path)`` wrapper around ``nwp_records`` and ``write_test_nwp``.
+Importable by bare name via the ``pythonpath = ["tests"]`` pytest setting.
 
 ``cast_to_nwp_dtypes`` serves a second set of callers: the package test suites, whose fixtures
 build a *partial* NWP frame that ``Nwp.validate`` cannot check.
@@ -94,8 +94,8 @@ def nwp_records(
     One row per (member, valid_time), all sharing ``init_time``. ``valid_times`` defaults to
     ``half_hours(day)``; pass it explicitly for a fixture whose valid times need to span multiple
     days, e.g. to give a forecast a realistic multi-day horizon rather than the couple of hours
-    ``half_hours`` produces. ``init_time`` defaults to ``day`` at 00Z; pass it explicitly for a run
-    that was initialised on an earlier day and forecasts into ``day`` (e.g. to exercise an
+    ``half_hours`` produces. ``init_time`` defaults to ``day`` at 00Z; pass it explicitly for a
+    run that was initialised on an earlier day and forecasts into ``day`` (e.g. to exercise an
     NWP-lookback window).
     """
     resolved_init_time = init_time if init_time is not None else day.replace(hour=0)
@@ -132,8 +132,8 @@ def write_test_nwp(path: str, records: list[dict]) -> None:
     ``pressure_reduced_to_mean_sea_level`` 101500.0 -> 101504.0, ``precipitation_surface`` rounds
     too), and applies writer properties (compression level, encoding) that exist to optimise the
     real table's on-disk size, not to serve a test fixture. Those two are deliberately *not*
-    shared. What *is* shared with ``write_nwp`` — the ``(nwp_model_id, init_time)`` partitioning —
-    is hand-copied below because ``write_nwp`` doesn't expose it as an importable constant. A
+    shared. What *is* shared with ``write_nwp`` — the ``(nwp_model_id, init_time)`` partitioning
+    — is hand-copied below because ``write_nwp`` doesn't expose it as an importable constant. A
     change to the partition *column names* going stale here is caught by
     ``tests/test_nwp_test_data.py::test_partition_layout_matches_write_nwp``, which compares only
     ``partition_columns``.

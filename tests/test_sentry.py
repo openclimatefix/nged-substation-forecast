@@ -1,9 +1,9 @@
 """Unit tests for the Sentry telemetry helpers (``nged_substation_forecast._sentry``).
 
 These tests never touch the network — every Sentry side effect is monkeypatched, bar the one test
-that needs a real client to build a real event, which drops it in ``before_send`` — and they assert
-the two invariants that matter: everything is a no-op unless explicitly enabled, and when enabled
-the right Sentry call is made with the right arguments.
+that needs a real client to build a real event, which drops it in ``before_send`` — and they
+assert the two invariants that matter: everything is a no-op unless explicitly enabled, and when
+enabled the right Sentry call is made with the right arguments.
 """
 
 import logging
@@ -78,11 +78,11 @@ def _build_one_event(send: Callable[[], None]) -> Event:
     ``capture_exception``: a tag set on the wrong scope, or not set at all, still reaches
     ``capture_exception`` intact and would slip past an argument-level check. Building an event
     needs a real client, which is confined to a temporary isolation scope, and ``before_send``
-    returns ``None`` so the event is dropped rather than transmitted. Both integration sets are off
-    because ``setup_once`` is *irreversible* and process-global — it monkeypatches
-    ``sys.excepthook``, ``threading.Thread.run``, ``logging.Logger.callHandlers`` and more, none of
-    which leaving the scope would undo, and this suite uses threads (moto), logging (``caplog``)
-    and sqlalchemy (the Dagster instance).
+    returns ``None`` so the event is dropped rather than transmitted. Both integration sets are
+    off because ``setup_once`` is *irreversible* and process-global — it monkeypatches
+    ``sys.excepthook``, ``threading.Thread.run``, ``logging.Logger.callHandlers`` and more, none
+    of which leaving the scope would undo, and this suite uses threads (moto), logging
+    (``caplog``) and sqlalchemy (the Dagster instance).
     """
     events: list[Event] = []
 
@@ -107,8 +107,8 @@ def _build_one_event(send: Callable[[], None]) -> Event:
 
 
 def _assert_no_tags_leaked() -> None:
-    """The tag lived on a scope forked for the one event, so it cannot leak into a later unrelated
-    one — including via the isolation scope this whole Dagster process shares."""
+    """The tag lived on a scope forked for the one event, so it cannot leak into a later
+    unrelated one — including via the isolation scope this whole Dagster process shares."""
     assert sentry_sdk.get_current_scope()._tags == {}
     assert sentry_sdk.get_isolation_scope()._tags == {}
 
@@ -117,8 +117,8 @@ def _capture_message_recorder(monkeypatch: pytest.MonkeyPatch) -> list[dict[str,
     """Patch ``capture_message`` to snapshot the *current scope* at call time.
 
     ``report_power_freshness`` sends inside ``with sentry_sdk.new_scope()``, so the current scope
-    when ``capture_message`` fires is the forked scope carrying the fingerprint/tags/context we want
-    to assert on (verified: ``get_current_scope()`` is that same object inside the block)."""
+    when ``capture_message`` fires is the forked scope carrying the fingerprint/tags/context we
+    want to assert on (verified: ``get_current_scope()`` is that same object inside the block)."""
     calls: list[dict[str, Any]] = []
 
     def fake(message: str, level: str | None = None, **_: Any) -> None:
@@ -165,8 +165,9 @@ def test_init_sentry_disables_log_to_event_capture(monkeypatch: pytest.MonkeyPat
     startup/step logs, ad-hoc materialisations, the swallowed telemetry error in
     ``report_power_freshness`` — from becoming Sentry events. Only the four explicit senders (the
     failure hook, the freshness ``capture_message``, ``report_check_degradation`` and
-    ``report_asset_degradation``) should ever send. If someone drops the ``integrations`` argument,
-    the SDK's default ``LoggingIntegration`` (``event_level=ERROR``) comes back and this fails.
+    ``report_asset_degradation``) should ever send. If someone drops the ``integrations``
+    argument, the SDK's default ``LoggingIntegration`` (``event_level=ERROR``) comes back and
+    this fails.
     """
     calls: list[dict[str, Any]] = []
     monkeypatch.setattr(_sentry.sentry_sdk, "init", lambda **kw: calls.append(kw))
@@ -189,8 +190,8 @@ def test_init_sentry_survives_a_malformed_dsn(caplog: pytest.LogCaptureFixture) 
     with Sentry itself unreachable so the only signal is the missed-check-in alarm hours later.
 
     Uses a real DSN string that genuinely makes ``sentry_sdk.init`` raise ``BadDsn``, rather than
-    monkeypatching ``init`` to raise, so this pins the actual failure mode instead of passing even
-    if real DSN parsing were fine.
+    monkeypatching ``init`` to raise, so this pins the actual failure mode instead of passing
+    even if real DSN parsing were fine.
     """
     with caplog.at_level(logging.ERROR, logger="nged_substation_forecast._sentry"):
         _sentry.init_sentry(_settings(sentry_dsn="not-a-dsn"))
@@ -236,9 +237,10 @@ def test_send_forecast_checkin_swallows_and_logs_on_send_error(
     monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture
 ) -> None:
     """This runs after ``live_forecasts`` has already committed its Delta write, so a raise here
-    would leave the run reported as failed on a run that in fact produced everything. There is no
-    input that reliably makes the real ``capture_checkin`` call fail offline, so the sender is
-    monkeypatched to raise instead (unlike the DSN test above, which needs a real failure mode)."""
+    would leave the run reported as failed on a run that in fact produced everything. There is
+    no input that reliably makes the real ``capture_checkin`` call fail offline, so the sender
+    is monkeypatched to raise instead (unlike the DSN test above, which needs a real failure
+    mode)."""
 
     def boom(*_: Any, **__: Any) -> None:
         raise RuntimeError("sentry down")
@@ -279,9 +281,9 @@ def test_failure_hook_reports_the_cause_of_a_retry_requested(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """An exhausted in-band retry must reach Sentry titled and grouped by the fault that actually
-    happened, not by the ``RetryRequested`` wrapper Dagster hands the hook. Dagster unwraps only its
-    own ``RetryRequestedFromPolicy``, so without this an ``ecmwf_ens`` run that never publishes
-    would group as ``RetryRequested`` rather than ``NwpRunNotYetAvailable``."""
+    happened, not by the ``RetryRequested`` wrapper Dagster hands the hook. Dagster unwraps
+    only its own ``RetryRequestedFromPolicy``, so without this an ``ecmwf_ens`` run that never
+    publishes would group as ``RetryRequested`` rather than ``NwpRunNotYetAvailable``."""
     captured: list[BaseException] = []
     monkeypatch.setattr(_sentry.sentry_sdk, "capture_exception", captured.append)
     hook_fn = _sentry.sentry_capture_failure.decorated_fn
@@ -294,8 +296,8 @@ def test_failure_hook_reports_the_cause_of_a_retry_requested(
 def test_failure_hook_captures_a_retry_requested_with_no_cause(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    """A ``RetryRequested`` raised without ``from exc`` has no cause to unwrap to, so it is reported
-    as itself rather than dereferencing ``None``."""
+    """A ``RetryRequested`` raised without ``from exc`` has no cause to unwrap to, so it is
+    reported as itself rather than dereferencing ``None``."""
     captured: list[BaseException] = []
     monkeypatch.setattr(_sentry.sentry_sdk, "capture_exception", captured.append)
     hook_fn = _sentry.sentry_capture_failure.decorated_fn
@@ -322,9 +324,9 @@ def test_failure_hook_ignores_a_deliberate_exit(
 
     ``SystemExit`` is the only shape that reaches the hook as things stand: it is neither a
     ``DagsterError`` nor an ``Exception``, so Dagster's interrupt handling does not re-raise it
-    ahead of the hook the way it does for the other two. The remaining cases pin the guard's stated
-    contract rather than a reachable state — and the wrapped one also pins the *ordering*, since
-    reversing the unwrap and this check is the one mutation that only it catches."""
+    ahead of the hook the way it does for the other two. The remaining cases pin the guard's
+    stated contract rather than a reachable state — and the wrapped one also pins the *ordering*,
+    since reversing the unwrap and this check is the one mutation that only it catches."""
     captured: list[BaseException] = []
     monkeypatch.setattr(_sentry.sentry_sdk, "capture_exception", captured.append)
     hook_fn = _sentry.sentry_capture_failure.decorated_fn
@@ -370,11 +372,11 @@ def test_degradation_reporters_capture_the_exception_and_tag_the_name(
 ) -> None:
     """A degraded check or asset sends the same exception the failure hook would have, tagged so the
     event is filterable per check or asset (``operations.md`` documents
-    ``asset_check:power_data_is_fresh`` as the operator's Sentry filter). Without the capture, one
-    that caught its own exception would reach nobody, log-to-event capture being disabled.
+    ``asset_check:power_data_is_fresh`` as the operator's Sentry filter). Without the capture,
+    one that caught its own exception would reach nobody, log-to-event capture being disabled.
 
-    The assertion is on the built event rather than on the arguments to ``capture_exception`` — see
-    ``_build_one_event`` for why.
+    The assertion is on the built event rather than on the arguments to ``capture_exception`` —
+    see ``_build_one_event`` for why.
     """
     event = _build_one_event(lambda: report(name, ValueError("boom")))
     assert event["tags"] == {tag: name}
@@ -389,9 +391,9 @@ def test_report_asset_degradation_fingerprints_a_synthesised_exception() -> None
     """A synthesised exception reaches Sentry carrying the caller's whole fingerprint.
 
     ``live_forecasts`` reports a missing NWP control member by building a ``ValueError`` to carry
-    the message rather than catching one, so the event has no stack trace and Sentry would group it
-    by message — and the message names the run and the slot, so every degraded slot would open its
-    own issue. The environment is the second element for the reason
+    the message rather than catching one, so the event has no stack trace and Sentry would group
+    it by message — and the message names the run and the slot, so every degraded slot would open
+    its own issue. The environment is the second element for the reason
     ``POWER_DATA_STALE_FINGERPRINT`` gives: without it, production and a laptop share one issue.
 
     Asserted on the built event rather than on the arguments to ``capture_exception``, so a
@@ -444,9 +446,10 @@ def test_failure_hook_is_attached_to_the_scheduled_jobs() -> None:
 
 def test_monitor_config_schedule_matches_live_partitions() -> None:
     """Drift guard: the Sentry monitor's crontab is a hand-kept copy of the live_forecasts
-    partition schedule (the two can't share an import — it would be circular; see the comment on
-    ``LIVE_FORECAST_MONITOR_CONFIG``). If someone changes one crontab and not the other, the alarm
-    would expect heartbeats on a different cadence than the asset runs; this catches that."""
+    partition schedule (the two can't share an import — it would be circular; see the comment
+    on ``LIVE_FORECAST_MONITOR_CONFIG``). If someone changes one crontab and not the other,
+    the alarm would expect heartbeats on a different cadence than the asset runs; this catches
+    that."""
     from nged_substation_forecast.defs.production_assets import live_forecast_partitions
 
     assert (
@@ -507,7 +510,8 @@ def test_report_power_freshness_caps_context_but_keeps_true_total(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     """A whole-feed stall (more late series than the cap) ⇒ the listed rows are capped, but the
-    true late count still surfaces via the tag and count field, so a big stall never looks small."""
+    true late count still surfaces via the tag and count field, so a big stall never looks
+    small."""
     calls = _capture_message_recorder(monkeypatch)
     n_stale = _sentry.MAX_LATE_SERIES_IN_CONTEXT + 10
     _sentry.report_power_freshness(

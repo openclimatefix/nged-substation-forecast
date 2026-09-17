@@ -2,9 +2,9 @@
 
 We hold no weather observations, so the closest available proxy for the *true* weather over
 historical times is the control ensemble member at the shortest available lead: for each location
-and valid time, the freshest NWP run that had been produced. ``select_analysis_proxy`` centralises
-that selection so the dashboard (which exists to show what a model sees) and the feature pipeline
-(which builds weather-lag features) compute it identically.
+and valid time, the freshest NWP run that had been produced. ``select_analysis_proxy``
+centralises that selection so the dashboard (which exists to show what a model sees) and the
+feature pipeline (which builds weather-lag features) compute it identically.
 """
 
 from datetime import timedelta

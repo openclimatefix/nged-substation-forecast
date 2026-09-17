@@ -299,10 +299,10 @@ class PowerForecast(pt.Model):
     """Forecast data schema for deterministic ensemble forecasts.
 
     Internal vs delivered schema (Milestone 1 report Table 1, p.28): the columns
-    ``experiment_name``, ``fold_id``, and ``ml_flow_experiment_id`` are INTERNAL-ONLY —
-    they exist on this schema and the internal ``power_forecasts`` Delta table to support
-    cross-validation and the leaderboard, but they are NOT part of the ``power_forecast``
-    table delivered to NGED.
+    ``experiment_name``, ``fold_id``, and ``ml_flow_experiment_id`` are INTERNAL-ONLY — they
+    exist on this schema and the internal ``power_forecasts`` Delta table to support
+    cross-validation and the leaderboard, but they are NOT part of the ``power_forecast`` table
+    delivered to NGED.
     """
 
     valid_time: datetime = pt.Field(
@@ -463,20 +463,20 @@ class EffectiveCapacity(pt.Model):
     Delivered to NGED as ``effective_capacity`` Delta table (Table 4 in the Milestone 1 report).
     This table is backward-looking only — it does not cover the forecast period.
 
-    **v0.1 implementation:** one row per ``time_series_id``, ``time`` set to the end of
-    the available observation history, ``effective_capacity_mw`` = P99 of ``abs(power)`` over
-    the full observed history. This is a static scalar per series.
+    **v0.1 implementation:** one row per ``time_series_id``, ``time`` set to the end of the
+    available observation history, ``effective_capacity_mw`` = P99 of ``abs(power)`` over the
+    full observed history. This is a static scalar per series.
 
-    **Planned upgrade (v0.7):** replace the P99 scalar with a time-varying capacity estimate
-    (see
-    <https://openclimatefix.github.io/nged-substation-forecast/techniques/convex-optimisation/> and
+    **Planned upgrade (v0.7):** replace the P99 scalar with a time-varying capacity estimate (see
+    <https://openclimatefix.github.io/nged-substation-forecast/techniques/convex-optimisation/>
+    and
     <https://openclimatefix.github.io/nged-substation-forecast/techniques/differentiable-physics/>
-    for the candidate estimation methods),
-    giving one row per ``(time_series_id, time)`` half-hourly timestep. This schema is unchanged;
-    the ``effective_capacity`` asset body changes and the ``metrics`` pipeline swaps its
-    ``time_series_id``-only NMAE-denominator join for a temporal as-of join. Do **not** pre-densify
-    the v0.1 scalar into one row per half-hour — densifying a constant buys nothing, and the as-of
-    join handles sparse capacity rows naturally.
+    for the candidate estimation methods), giving one row per ``(time_series_id, time)``
+    half-hourly timestep. This schema is unchanged; the ``effective_capacity`` asset body changes
+    and the ``metrics`` pipeline swaps its ``time_series_id``-only NMAE-denominator join for a
+    temporal as-of join. Do **not** pre-densify the v0.1 scalar into one row per half-hour —
+    densifying a constant buys nothing, and the as-of join handles sparse capacity rows
+    naturally.
     """
 
     time_series_id: int = _get_time_series_id_dtype()

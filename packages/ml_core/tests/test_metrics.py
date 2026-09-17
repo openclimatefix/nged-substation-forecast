@@ -173,9 +173,9 @@ def test_compute_effective_capacity_is_the_99th_percentile_not_the_mean():
 def test_compute_metrics_mae_correctness():
     """MAE, RMSE and MBE are mutually distinguishable, so this test cannot pass by accident.
 
-    Errors +3, −1 give mae = 2.0, rmse = sqrt(5) ≈ 2.236, mbe = 1.0 — three different values,
-    so a metric mixed up with one of the others (RMSE swapped for MAE, say) fails here even
-    though errors of equal magnitude (as in a symmetric +2/−2 fixture) would not reveal it.
+    Errors +3, −1 give mae = 2.0, rmse = sqrt(5) ≈ 2.236, mbe = 1.0 — three different values, so
+    a metric mixed up with one of the others (RMSE swapped for MAE, say) fails here even though
+    errors of equal magnitude (as in a symmetric +2/−2 fixture) would not reveal it.
     """
     times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
     actuals = _make_actuals(1, times, [10.0, 10.0])
@@ -246,9 +246,9 @@ def test_compute_metrics_ensemble_averaging():
     """Ensemble mean should be taken before computing the deterministic metrics.
 
     Members 8 and 12 against an actual of 11: the ensemble mean is 10, so MAE = 1 — whereas
-    scoring the members individually would give (3 + 1)/2 = 2. (The actual deliberately
-    differs from the ensemble mean: an exact hit with positive spread is the contradictory
-    zero-RMSE corner that ``compute_metrics`` rejects as non-finite.)
+    scoring the members individually would give (3 + 1)/2 = 2. (The actual deliberately differs
+    from the ensemble mean: an exact hit with positive spread is the contradictory zero-RMSE
+    corner that ``compute_metrics`` rejects as non-finite.)
     """
     time = _utc(2022, 1, 1, 0, 0)
     forecasts = _make_ensemble_forecasts(1, [time], [[8.0, 12.0]])
@@ -285,8 +285,8 @@ def test_compute_metrics_raises_on_no_join():
 def test_compute_metrics_per_series_batching_is_equivalent():
     """Scoring series separately and concatenating equals scoring them in one call.
 
-    This property is what lets the metrics asset score a fold in per-series batches
-    (bounded memory) without changing any metric value.
+    This property is what lets the metrics asset score a fold in per-series batches (bounded
+    memory) without changing any metric value.
     """
     times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
     actuals = pt.LazyFrame.from_existing(
@@ -362,10 +362,10 @@ def test_compute_metrics_horizon_slice_band_boundaries():
     """Lead times land in the correct left-closed bands, including exact boundary values.
 
     One forecast run (single init time) with valid_times at lead times 0.5 h and 5.5 h
-    (intraday), 6 h and 35.5 h (day_ahead), 36 h and 167.5 h (short_medium_range), and
-    168 h and 336 h (extended_range). Distinct errors per band make per-slice MAE reveal
-    band membership. 0.5 h is the shortest deliverable lead: the PowerForecast contract
-    requires valid_time strictly after power_fcst_init_time, so lead 0 cannot occur.
+    (intraday), 6 h and 35.5 h (day_ahead), 36 h and 167.5 h (short_medium_range), and 168 h and
+    336 h (extended_range). Distinct errors per band make per-slice MAE reveal band membership.
+    0.5 h is the shortest deliverable lead: the PowerForecast contract requires valid_time
+    strictly after power_fcst_init_time, so lead 0 cannot occur.
     """
     init_time = _utc(2022, 1, 1)
     leads_hours = [0.5, 5.5, 6.0, 35.5, 36.0, 167.5, 168.0, 336.0]
@@ -403,9 +403,9 @@ def test_compute_metrics_all_slice_is_row_weighted():
 def test_compute_metrics_collapses_ensemble_per_forecast_run():
     """Runs covering the same valid_time at different lead times are scored independently.
 
-    Two runs forecast the same valid_time: one predicts 8, the other 12, actual is 10.
-    Per-run scoring gives errors −2 and +2 → MAE 2. Pooling the runs into one lagged-ensemble
-    mean would give a single forecast of 10 → MAE 0.
+    Two runs forecast the same valid_time: one predicts 8, the other 12, actual is 10. Per-run
+    scoring gives errors −2 and +2 → MAE 2. Pooling the runs into one lagged-ensemble mean would
+    give a single forecast of 10 → MAE 0.
     """
     valid_time = _utc(2022, 1, 2)
     init_times = [_utc(2022, 1, 1, 0), _utc(2022, 1, 1, 6)]  # leads 24 h and 18 h: day_ahead
@@ -459,9 +459,9 @@ def _make_ensemble_forecasts(
 ) -> pt.DataFrame[PowerForecast]:
     """Build forecasts with one row per (valid_time, ensemble_member).
 
-    ``member_values[i]`` lists the ensemble-member forecasts for ``times[i]``. Two rows with
-    the same ``valid_time`` but different ``init_times`` entries form two separate forecast
-    runs, each with its own members.
+    ``member_values[i]`` lists the ensemble-member forecasts for ``times[i]``. Two rows with the
+    same ``valid_time`` but different ``init_times`` entries form two separate forecast runs,
+    each with its own members.
     """
     if init_times is None:
         init_times = [_utc(2021, 12, 31, 23, 30)] * len(times)
@@ -515,15 +515,15 @@ def test_compute_metrics_probabilistic_three_member_toy():
 
     Members [1, 2, 4] forecast an actual of 2.5 (one timestamp, one run, m = 3):
 
-    - Fair CRPS = mean|xᵢ − y| − Σᵢ<ⱼ|xᵢ − xⱼ| / (m(m−1))
-      = (1.5 + 0.5 + 1.5)/3 − (1 + 3 + 2)/6 = 7/6 − 1 = 1/6.
-    - Ensemble mean = 7/3 → error = 7/3 − 2.5 = −1/6, so RMSE = 1/6. Sample variance
-      (ddof=1) = 7/3; Fortin-corrected variance = (m+1)/m · 7/3 = 28/9;
-      spread_skill_ratio = √(28/9) / (1/6) = 6·√(28/9).
-    - Linear empirical quantiles interpolate at position (m−1)·τ: p10 → 1.2, p50 → 2,
-      p90 → 3.6, p99 → 3.96.
-    - Pinball loss (y = 2.5): p10 → 0.1·1.3 = 0.13; p50 → 0.5·0.5 = 0.25;
-      p90 → 0.1·1.1 = 0.11; p99 → 0.01·1.46 = 0.0146.
+    - Fair CRPS = mean|xᵢ − y| − Σᵢ<ⱼ|xᵢ − xⱼ| / (m(m−1)) = (1.5 + 0.5 + 1.5)/3 − (1 + 3 + 2)/6 =
+      7/6 − 1 = 1/6.
+    - Ensemble mean = 7/3 → error = 7/3 − 2.5 = −1/6, so RMSE = 1/6. Sample variance (ddof=1) =
+      7/3; Fortin-corrected variance = (m+1)/m · 7/3 = 28/9; spread_skill_ratio = √(28/9) / (1/6)
+      = 6·√(28/9).
+    - Linear empirical quantiles interpolate at position (m−1)·τ: p10 → 1.2, p50 → 2, p90 → 3.6,
+      p99 → 3.96.
+    - Pinball loss (y = 2.5): p10 → 0.1·1.3 = 0.13; p50 → 0.5·0.5 = 0.25; p90 → 0.1·1.1 = 0.11;
+      p99 → 0.01·1.46 = 0.0146.
     - p10–p90 band = [1.2, 3.6] contains 2.5 → PICP = 1.0, interval width = 2.4.
     """
     times = [_utc(2022, 1, 1, 0, 0)]
@@ -568,10 +568,10 @@ def test_compute_metrics_probabilistic_three_member_toy():
 def test_compute_metrics_single_member_ensemble_degenerates_gracefully():
     """A deterministic (single-member) forecast is scored honestly, with no null values.
 
-    Fair CRPS reduces to MAE (the pairwise term is defined as 0 at m = 1), the spread-skill
-    ratio is 0 (zero spread, not null — ``.var(ddof=1)`` alone would return null), every
-    quantile coincides with the forecast so interval widths are 0, and PICP is 0 whenever the
-    actual differs from the forecast.
+    Fair CRPS reduces to MAE (the pairwise term is defined as 0 at m = 1), the spread-skill ratio
+    is 0 (zero spread, not null — ``.var(ddof=1)`` alone would return null), every quantile
+    coincides with the forecast so interval widths are 0, and PICP is 0 whenever the actual
+    differs from the forecast.
     """
     times = [_utc(2022, 1, 1, 0, 0), _utc(2022, 1, 1, 0, 30)]
     actuals = _make_actuals(1, times, [10.0, 10.0])
@@ -588,10 +588,10 @@ def test_compute_metrics_single_member_ensemble_degenerates_gracefully():
 def test_compute_metrics_picp_boundary_is_inclusive():
     """PICP counts the actual as covered when it exactly equals a band bound.
 
-    A single-member forecast that exactly matches the actual makes every empirical quantile —
-    and so both p10-p90 band bounds — coincide with the actual value. Whether that boundary
-    counts as covered is a modelling choice (``pl.Expr.is_between`` defaults to
-    ``closed="both"``), not free-floating behaviour, so pin it here: PICP must be 1.0, not 0.0.
+    A single-member forecast that exactly matches the actual makes every empirical quantile — and
+    so both p10-p90 band bounds — coincide with the actual value. Whether that boundary counts as
+    covered is a modelling choice (``pl.Expr.is_between`` defaults to ``closed="both"``), not
+    free-floating behaviour, so pin it here: PICP must be 1.0, not 0.0.
     """
     times = [_utc(2022, 1, 1, 0, 0)]
     actuals = _make_actuals(1, times, [10.0])
@@ -606,12 +606,12 @@ def test_compute_metrics_picp_distinguishes_bands():
 
     101 members evenly spaced 0..100 give every ``DELIVERY_QUANTILES`` level ``q`` an exact
     empirical quantile of ``100*q`` (linear interpolation lands on an integer member for every
-    level in that tuple), so each band's bounds are exactly its own p-labels: ``p35_p65`` =
-    [35, 65], ``p20_p80`` = [20, 80]. An actual of 30 sits inside ``p20_p80`` but outside
-    ``p35_p65``. Every other PICP assertion in this file uses only ``p10_p90``, with an actual
-    that is inside every band, outside every band, or on every bound — so a mutation that scored
-    every band's PICP off one shared pair (e.g. always the widest, ``p1_p99``) would still pass
-    them all. This is the one case that catches that: it requires two bands' PICPs to differ.
+    level in that tuple), so each band's bounds are exactly its own p-labels: ``p35_p65`` = [35,
+    65], ``p20_p80`` = [20, 80]. An actual of 30 sits inside ``p20_p80`` but outside ``p35_p65``.
+    Every other PICP assertion in this file uses only ``p10_p90``, with an actual that is inside
+    every band, outside every band, or on every bound — so a mutation that scored every band's
+    PICP off one shared pair (e.g. always the widest, ``p1_p99``) would still pass them all. This
+    is the one case that catches that: it requires two bands' PICPs to differ.
     """
     times = [_utc(2022, 1, 1, 0, 0)]
     actuals = _make_actuals(1, times, [30.0])
@@ -647,9 +647,9 @@ def test_compute_metrics_perfect_forecast_scores_finite_zero_spread_skill():
 def test_compute_metrics_zero_rmse_with_positive_spread_raises():
     """Positive spread around an error-free ensemble mean fails loudly, not as inf.
 
-    Members [8, 12] against an actual of 10: the ensemble mean is exact (RMSE = 0) but the
-    spread is positive, so the spread-skill ratio divides to infinity — the finiteness check
-    must refuse to emit it.
+    Members [8, 12] against an actual of 10: the ensemble mean is exact (RMSE = 0) but the spread
+    is positive, so the spread-skill ratio divides to infinity — the finiteness check must refuse
+    to emit it.
     """
     times = [_utc(2022, 1, 1, 0, 0)]
     actuals = _make_actuals(1, times, [10.0])
@@ -662,8 +662,8 @@ def test_compute_metrics_deduplicates_actuals():
     """A duplicated (time_series_id, time) actuals row leaves every metric unchanged.
 
     Without the dedupe, the join would double the ensemble members — doubling m and silently
-    corrupting the member-aware metrics (CRPS, spread, quantiles) while the deterministic
-    ones, which only see the mean, stay untouched.
+    corrupting the member-aware metrics (CRPS, spread, quantiles) while the deterministic ones,
+    which only see the mean, stay untouched.
     """
     times = [_utc(2022, 1, 1, 0, 0)]
     forecasts = _make_ensemble_forecasts(1, times, [[1.0, 2.0, 4.0]])
@@ -693,10 +693,10 @@ def test_compute_metrics_fair_crps_handles_duplicate_members():
 def test_compute_metrics_crps_scored_per_forecast_run():
     """CRPS pools members within a run, never across runs covering the same valid_time.
 
-    Two 2-member runs forecast the same valid_time (actual 10): members [7, 9] give
-    CRPS = (3 + 1)/2 − 2/2 = 1, and members [11, 13] likewise give 1, so per-run scoring
-    averages to 1. Pooling all four members into one lagged ensemble would instead give
-    (3 + 1 + 1 + 3)/4 − 20/12 = 1/3.
+    Two 2-member runs forecast the same valid_time (actual 10): members [7, 9] give CRPS = (3 +
+    1)/2 − 2/2 = 1, and members [11, 13] likewise give 1, so per-run scoring averages to 1.
+    Pooling all four members into one lagged ensemble would instead give (3 + 1 + 1 + 3)/4 −
+    20/12 = 1/3.
     """
     valid_time = _utc(2022, 1, 2)
     init_times = [_utc(2022, 1, 1, 0), _utc(2022, 1, 1, 6)]  # leads 24 h and 18 h: day_ahead
@@ -711,8 +711,8 @@ def test_compute_metrics_crps_scored_per_forecast_run():
 def test_compute_metrics_probabilistic_metrics_per_slice():
     """Probabilistic metrics are aggregated per horizon slice, with "all" as the row mean.
 
-    One run: an intraday timestamp with members [7, 9] (CRPS 1) and a day_ahead timestamp
-    with members [4, 8] (CRPS = (6 + 2)/2 − 4/2 = 2), both against an actual of 10.
+    One run: an intraday timestamp with members [7, 9] (CRPS 1) and a day_ahead timestamp with
+    members [4, 8] (CRPS = (6 + 2)/2 − 4/2 = 2), both against an actual of 10.
     """
     init_time = _utc(2022, 1, 1)
     times = [init_time + timedelta(hours=0.5), init_time + timedelta(hours=24)]
@@ -871,8 +871,8 @@ def test_build_mlflow_aggregate_metrics_parametric_key_tokens():
     """Parametric metrics use {name}_{param} key tokens, restricted to the headline allowlist.
 
     metric_param="all" metrics keep the bare-name token (existing key formats unchanged);
-    pinball_loss is logged at p10/p50/p90 only and picp/interval_width at p10_p90 only —
-    the full 13-quantile / 6-band detail stays in the Delta table.
+    pinball_loss is logged at p10/p50/p90 only and picp/interval_width at p10_p90 only — the full
+    13-quantile / 6-band detail stays in the Delta table.
     """
     rows = [
         _parametric_metrics_row("crps", "all", 1.5),

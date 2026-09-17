@@ -1,8 +1,8 @@
 """Feature name parsing and typed feature descriptors.
 
 Translates raw string requests (e.g. ``"power_lag_24h"``) into structured, typed objects so the
-rest of the pipeline never parses strings. ``ParsedFeatures.from_strings`` is the entry point;
-it also enforces architectural guardrails (no raw target, no index columns as features).
+rest of the pipeline never parses strings. ``ParsedFeatures.from_strings`` is the entry point; it
+also enforces architectural guardrails (no raw target, no index columns as features).
 """
 
 import re

@@ -1,25 +1,26 @@
 """Network-gated end-to-end test against the *real* Dynamical.org ECMWF ENS catalog.
 
 Every test here is marked ``network`` and is therefore **skipped by default** (the root
-``conftest.py`` skips ``network``-marked tests unless ``--run-network`` is passed); a plain
-``uv run pytest`` — local dev and the per-PR CI — never touches the network. Run these explicitly
-with ``uv run pytest --run-network -m network`` (nightly CI only).
+``conftest.py`` skips ``network``-marked tests unless ``--run-network`` is passed); a plain ``uv
+run pytest`` — local dev and the per-PR CI — never touches the network. Run these explicitly with
+``uv run pytest --run-network -m network`` (nightly CI only).
 
 Why this exists — the "shared-convention blind spot". Every other ``dynamical_data`` test runs on
 the synthetic ``xr.Dataset`` built by ``conftest.py``, which *encodes our assumptions* about the
 real catalog: dimension order, descending latitude, longitude in [-180, 180], coordinate names,
 dtypes, and physical units. If Dynamical ever delivers latitude ascending, longitude in [0, 360],
 or temperature in Kelvin, the offline tests stay green because the fixture and the code share the
-same (now-wrong) assumption. Only a run against real data can catch that — which is what this does.
+same (now-wrong) assumption. Only a run against real data can catch that — which is what this
+does.
 
-This test re-checks orientation and bounds on real data (descending latitude, longitude range, the
-slice landing on the requested box, variable names, and a physical-range sanity check on
+This test re-checks orientation and bounds on real data (descending latitude, longitude range,
+the slice landing on the requested box, variable names, and a physical-range sanity check on
 temperature). It does not re-check the value↔(lat, lon) mapping — that is value-agnostic index
 alignment, already fully proven offline by
 ``test_convert_to_polars.py::test_convert_maps_each_grid_point_to_its_own_lat_lon`` (``convert``
 preserves the value↔lat/lon pairing) and
-``geo/tests/test_h3.py::test_grid_weights_preserve_geographic_orientation`` (the H3→lat/lon labels
-are geographically right).
+``geo/tests/test_h3.py::test_grid_weights_preserve_geographic_orientation`` (the H3→lat/lon
+labels are geographically right).
 """
 
 from datetime import UTC, datetime, timedelta

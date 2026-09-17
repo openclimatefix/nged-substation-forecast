@@ -71,17 +71,17 @@ ecmwf_ens_job = define_asset_job(
 def ecmwf_ens_schedule(context: ScheduleEvaluationContext) -> RunRequest:
     """Materialise today's ``ecmwf_ens`` partition daily at 08:30 UTC.
 
-    08:30 UTC is a safety margin past the 00Z run's expected publication time (roughly 08:00
-    UTC / 9am BST); ``ecmwf_ens_partitions``' ``end_offset=1`` means today's partition key
-    already exists by this point. If the run isn't usable yet — absent from the catalog, or
-    present with a weather variable still wholesale empty — ``ecmwf_ens`` retries every 30
-    minutes, up to 8 times (``NwpRunNotYetAvailable`` / ``NwpVariableWhollyMissing`` →
-    ``RetryRequested`` in ``defs/assets.py``) rather than failing outright; any other error still
-    fails immediately. Retrying is right because Dynamical.org publishes each run as roughly 40
-    separate commits over about 15 minutes, so a run can be readable while a variable whose commit
-    has not landed yet still reads as empty — that is a run mid-publication, not a broken one.
-    Live inference (``live_forecasts``) always uses the freshest run genuinely present
-    regardless of this schedule's exact timing.
+    08:30 UTC is a safety margin past the 00Z run's expected publication time (roughly 08:00 UTC
+    / 9am BST); ``ecmwf_ens_partitions``' ``end_offset=1`` means today's partition key already
+    exists by this point. If the run isn't usable yet — absent from the catalog, or present with
+    a weather variable still wholesale empty — ``ecmwf_ens`` retries every 30 minutes, up to 8
+    times (``NwpRunNotYetAvailable`` / ``NwpVariableWhollyMissing`` → ``RetryRequested`` in
+    ``defs/assets.py``) rather than failing outright; any other error still fails immediately.
+    Retrying is right because Dynamical.org publishes each run as roughly 40 separate commits
+    over about 15 minutes, so a run can be readable while a variable whose commit has not landed
+    yet still reads as empty — that is a run mid-publication, not a broken one. Live inference
+    (``live_forecasts``) always uses the freshest run genuinely present regardless of this
+    schedule's exact timing.
 
     Further reading:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#a-wholly-missing-variable-is-retried-not-failed-outright>

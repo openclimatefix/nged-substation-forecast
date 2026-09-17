@@ -92,10 +92,10 @@ def test_a_slice_is_one_variable_member_and_step(
 ) -> None:
     """Both slice keys are pinned independently, and neither is the grid.
 
-    Each case fixes one index and varies the other, so a count grouped by the wrong dimension gives
-    a different answer to at least one of them. ``n_affected_nwp_slices`` exists to separate one bad
-    slice from a hundred, which a grouping that silently drops ``ensemble_member`` or ``lead_time``
-    would not do.
+    Each case fixes one index and varies the other, so a count grouped by the wrong dimension
+    gives a different answer to at least one of them. ``n_affected_nwp_slices`` exists to
+    separate one bad slice from a hundred, which a grouping that silently drops
+    ``ensemble_member`` or ``lead_time`` would not do.
     """
     precipitation = np.full(_DEFAULT_SHAPE, 0.0001, dtype=np.float32)
     precipitation[first] = np.nan
@@ -241,8 +241,8 @@ def test_every_downloaded_variable_belongs_to_exactly_one_population() -> None:
     """A variable missed by all three sets would go uncounted by both checks, silently.
 
     ``ECMWF_ENS_INSTANTANEOUS_VARS`` is what the download list has left after subtracting the two
-    ``Nwp`` classvars, so this is the assertion that the subtraction means anything: it fails if a
-    contract name is spelled differently in the download list, which is exactly how the winds
+    ``Nwp`` classvars, so this is the assertion that the subtraction means anything: it fails if
+    a contract name is spelled differently in the download list, which is exactly how the winds
     differ.
     """
     assert (ECMWF_ENS_INSTANTANEOUS_VARS | _DEACCUMULATED | Nwp.categorical_var_names) == set(
@@ -255,9 +255,9 @@ def test_counting_no_variables_at_all_reports_zero_rather_than_raising(
 ) -> None:
     """An empty variable set must not take the warning path down with it.
 
-    No caller in this repo passes one, but the properties read named columns, and an inferred empty
-    frame has none — so the schema is declared rather than inferred
-    ([rule 7](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
+    No caller in this repo passes one, but the properties read named columns, and an inferred
+    empty frame has none — so the schema is declared rather than inferred ([rule
+    7](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
     """
     rate = assess_upstream_grid_point_nulls(
         ds=make_ens_dataset(), variables=frozenset(), exclude_lead_0=True

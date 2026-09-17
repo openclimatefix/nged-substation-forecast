@@ -1,11 +1,11 @@
 """Integration test for the ``live_forecasts`` asset.
 
-Exercises the real wiring end-to-end against temp Delta tables and a plain-disk production
-model (no MLflow — ``live_forecasts`` never touches it): a tiny trained ``XGBoostForecaster`` is
-saved directly to ``PRODUCTION_MODEL_PATH``, then ``live_forecasts`` is materialised for one
-6-hourly partition against two NWP runs — a same-day run and a day-earlier run, both covering
-valid times just after ``power_fcst_init_time`` — so ``live`` and ``replay`` availability modes
-are forced to pick different runs.
+Exercises the real wiring end-to-end against temp Delta tables and a plain-disk production model
+(no MLflow — ``live_forecasts`` never touches it): a tiny trained ``XGBoostForecaster`` is saved
+directly to ``PRODUCTION_MODEL_PATH``, then ``live_forecasts`` is materialised for one 6-hourly
+partition against two NWP runs — a same-day run and a day-earlier run, both covering valid times
+just after ``power_fcst_init_time`` — so ``live`` and ``replay`` availability modes are forced to
+pick different runs.
 """
 
 from datetime import UTC, datetime, timedelta
@@ -190,9 +190,9 @@ def test_only_trained_time_series_are_forecast(
 
     ``_write_power`` writes history for both series 1 and 2, but only series 1 has a trained
     booster. Spies on ``load_engineering_inputs`` to pin that ``live_forecasts`` passes it
-    ``forecaster.trained_time_series_ids`` rather than every series with power data — checking the
-    final output alone would pass even without that filter, because ``XGBoostForecaster.predict``
-    also skips any series its own booster dict has nothing for.
+    ``forecaster.trained_time_series_ids`` rather than every series with power data — checking
+    the final output alone would pass even without that filter, because
+    ``XGBoostForecaster.predict`` also skips any series its own booster dict has nothing for.
     """
     captured: list[list[int]] = []
     real_load_engineering_inputs = production_assets.load_engineering_inputs
@@ -273,9 +273,9 @@ def test_check_passes_after_a_real_live_materialisation(
     """``live_forecasts_are_healthy`` passes against a genuinely produced forecast.
 
     This is the only test that exercises the check *partitioned*: ``build_asset_check_context``
-    (used by ``tests/test_checks.py``) cannot carry a partition key, so only a real materialisation
-    proves the check reports on its partition's ``power_fcst_init_time`` — the window's end — and
-    not on whatever slot the wall clock happens to be in.
+    (used by ``tests/test_checks.py``) cannot carry a partition key, so only a real
+    materialisation proves the check reports on its partition's ``power_fcst_init_time`` — the
+    window's end — and not on whatever slot the wall clock happens to be in.
     """
     result = materialize(
         [live_forecasts, live_forecasts_are_healthy],
@@ -374,11 +374,11 @@ def test_the_roster_cannot_thin_or_fail_a_live_slot(
 ) -> None:
     """A roster fault costs the live service nothing, because it does not read the roster.
 
-    Each series' H3 cell comes from the model's own frozen copy, so a roster that has lost rows, or
-    cannot be read at all, leaves the forecast identical. Losing a row used to drop that series
-    silently and an unreadable file used to fail the slot outright — both off the degradation
-    ladder entirely (issue #528). The *absent* roster needs no step here: the ``env`` fixture
-    writes none, so every other test in this file is that case.
+    Each series' H3 cell comes from the model's own frozen copy, so a roster that has lost rows,
+    or cannot be read at all, leaves the forecast identical. Losing a row used to drop that
+    series silently and an unreadable file used to fail the slot outright — both off the
+    degradation ladder entirely (issue #528). The *absent* roster needs no step here: the ``env``
+    fixture writes none, so every other test in this file is that case.
     """
     roster = tmp_path / "NGED" / "metadata.parquet"
     # ts3 shares ts1's NWP cell, so both are genuinely forecastable to begin with.
@@ -462,10 +462,10 @@ def test_live_power_history_covers_the_longest_selected_power_lag(
     shrinking the window from 15 days to 1 hour leaves every other test in this file green. This
     test hard-codes that same lag rather than reading the YAML, trains a fixture model on it
     directly, and spies on ``XGBoostForecaster.predict`` to capture the exact frame
-    ``live_forecasts`` hands it — the frame *after* production's own
-    ``valid_time > power_fcst_init_time`` / ``ensemble_member is not null`` filter runs, so this
-    test observes that filter's real output rather than re-deriving it — and pins that the
-    captured frame carries no nulls in that column.
+    ``live_forecasts`` hands it — the frame *after* production's own ``valid_time >
+    power_fcst_init_time`` / ``ensemble_member is not null`` filter runs, so this test observes
+    that filter's real output rather than re-deriving it — and pins that the captured frame
+    carries no nulls in that column.
     """
     captured: list[pt.LazyFrame[AllFeatures]] = []
     real_predict = XGBoostForecaster.predict
@@ -538,24 +538,24 @@ def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
     ``live_forecasts`` selects its one NWP run in ``"live"`` availability mode, which applies no
     modelled delay — any run genuinely present in the Delta table qualifies. The single-run
     analysis proxy inside ``_engineer_features`` caps its freshest-run join at that same selected
-    run. Run selection and the analysis proxy therefore agree, and the gap between the selected run
-    and ``power_fcst_init_time`` does not matter. The first case puts the run 6 hours back, well
-    inside the 9-hour publication delay: the shape of the 06:00 slot, when only that morning's run
-    has landed. The lag is populated.
+    run. Run selection and the analysis proxy therefore agree, and the gap between the selected
+    run and ``power_fcst_init_time`` does not matter. The first case puts the run 6 hours back,
+    well inside the 9-hour publication delay: the shape of the 06:00 slot, when only that
+    morning's run has landed. The lag is populated.
 
     The second case (``members=(1,)``) pins a cause of a null weather lag this change leaves
     standing: a run with no control-member rows at all, which is a partial or malformed ECMWF ENS
     download. The delivered row's lag points back before ``power_fcst_init_time``, so of the two
     joins ``_apply_weather_lag`` makes, only the control-member analysis proxy could answer that
     lag. The lag therefore comes back null. A run with no control member degrades the forecast
-    rather than failing the slot, so ``materialize`` succeeding at all is itself part of what that
-    case checks.
+    rather than failing the slot, so ``materialize`` succeeding at all is itself part of what
+    that case checks.
 
     The third case runs the same slot in ``"replay"`` mode, where the cutoff *is* the publication
     delay, with the run sitting exactly on that inclusive cutoff. Run selection and the ceiling
-    both still admit the run, so the lag is populated. That the ceiling cannot admit a *later* run
-    is pinned at value level by ``_engineer_features``' own decoy tests; what this case adds is
-    that the two agree end to end in the mode where a loosened ceiling would leak.
+    both still admit the run, so the lag is populated. That the ceiling cannot admit a *later*
+    run is pinned at value level by ``_engineer_features``' own decoy tests; what this case adds
+    is that the two agree end to end in the mode where a loosened ceiling would leak.
     """
     gap = timedelta(hours=gap_hours)
     power_fcst_init_time = datetime(2026, 7, 4, 6, 0, tzinfo=UTC)
@@ -652,8 +652,8 @@ def test_a_failing_control_member_probe_degrades_the_slot_instead_of_failing_it(
 
     The probe collects against the NWP scan, so an object-store fault can raise there even when
     the forecast itself would have been fine. Rule 7 of inherent-stability forbids a warning path
-    from failing the asset it warns about, because Dagster fails the run and the failure hook then
-    pages over telemetry rather than over a bad forecast. The forecast still lands, and the
+    from failing the asset it warns about, because Dagster fails the run and the failure hook
+    then pages over telemetry rather than over a bad forecast. The forecast still lands, and the
     swallowed fault reaches Sentry — with no fingerprint, because a caught exception carries the
     stack trace Sentry groups on.
     """

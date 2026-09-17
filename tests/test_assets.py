@@ -3,8 +3,8 @@
 Fires up Dagster for each ingest asset — ``power_time_series_and_metadata``, ``h3_grid_weights``,
 ``ecmwf_ens`` — against temp Delta/parquet tables, and asserts the whole asset graph (assets +
 jobs + schedules) resolves. The three leaf data pipelines (NGED JSON parsing, H3 weighting, ECMWF
-download/convert) are unit-tested in their own packages; here we exercise only the asset *bodies* —
-the wiring, branching, and metadata each asset owns — stubbing the S3/network boundary and the
+download/convert) are unit-tested in their own packages; here we exercise only the asset *bodies*
+— the wiring, branching, and metadata each asset owns — stubbing the S3/network boundary and the
 ~30-second GB-boundary buffer so the tests stay fast and offline.
 """
 
@@ -139,9 +139,9 @@ def _make_downloaded_ds(
     nulls placed beyond it are counted rather than filtered out as the by-design lead-0 ones.
 
     Carries all thirteen downloaded variables, under their *download* names, because the two null
-    populations are counted over sets drawn from that list rather than from whatever ``ds`` happens
-    to hold — a fixture holding only the variables a test cares about would let a counter reading
-    the wrong namespace pass. ``temperature_2m`` is the corrupt instantaneous one and
+    populations are counted over sets drawn from that list rather than from whatever ``ds``
+    happens to hold — a fixture holding only the variables a test cares about would let a counter
+    reading the wrong namespace pass. ``temperature_2m`` is the corrupt instantaneous one and
     ``precipitation_surface`` the corrupt de-accumulated one, so a count that pooled the two, or
     attributed one to the other, disagrees with these tests.
     """
@@ -238,10 +238,10 @@ def test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fail
     must not stall the power stream until an operator intervenes.
 
     Also asserts the degradation is *reported*, since a step that no longer fails no longer fires
-    ``sentry_capture_failure``. The ``rust_panic`` case is why the guard catches ``BaseException``:
-    a pyo3 ``PanicException`` from Polars or obstore is not an ``Exception``, and the cancellation
-    test below cannot catch a narrowed guard, because ``DagsterExecutionInterruptedError`` escapes
-    one on its own.
+    ``sentry_capture_failure``. The ``rust_panic`` case is why the guard catches
+    ``BaseException``: a pyo3 ``PanicException`` from Polars or obstore is not an ``Exception``,
+    and the cancellation test below cannot catch a narrowed guard, because
+    ``DagsterExecutionInterruptedError`` escapes one on its own.
     """
     monkeypatch.setattr(
         target=assets.Settings,
@@ -282,9 +282,9 @@ def test_power_time_series_and_metadata_writes_power_when_the_roster_upsert_fail
 def test_power_time_series_and_metadata_re_raises_a_cancelled_run(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
-    """The one thing the guard must *not* swallow. Cancellation lands in the same ``BaseException``
-    net as a panic, so the handler re-raises it explicitly: a run the operator cancelled has to
-    stop, not finish green having quietly skipped the roster."""
+    """The one thing the guard must *not* swallow. Cancellation lands in the same
+    ``BaseException`` net as a panic, so the handler re-raises it explicitly: a run the
+    operator cancelled has to stop, not finish green having quietly skipped the roster."""
     monkeypatch.setattr(
         target=assets.Settings,
         name="get_nged_s3_store",
@@ -476,8 +476,8 @@ def test_power_time_series_and_metadata_does_not_retry_a_cancelled_run(
     dagster_instance: DagsterInstance,
 ) -> None:
     """The retry guard wraps everything that reads NGED's bucket, so it is also the place a
-    cancellation would be swallowed. It re-raises instead: a run the operator cancelled has to stop
-    at once, not read the bucket twice more first.
+    cancellation would be swallowed. It re-raises instead: a run the operator cancelled has to
+    stop at once, not read the bucket twice more first.
 
     ``DagsterExecutionInterruptedError`` is what a production termination actually delivers; the
     other two cover a Ctrl-C at a local ``dg dev``."""
@@ -507,9 +507,10 @@ def test_power_time_series_and_metadata_does_not_retry_a_failure_after_the_write
 ) -> None:
     """The guard stops before the writes deliberately, and this is what that buys.
 
-    Were it extended over them, a bug after the Delta append would be retried; the second attempt's
-    ``select_new_rows`` would dedupe the already-written rows to nothing, the body would run to the
-    end, and a real failure would land as a green run — every hour, with nothing sent to Sentry.
+    Were it extended over them, a bug after the Delta append would be retried; the second
+    attempt's ``select_new_rows`` would dedupe the already-written rows to nothing, the body
+    would run to the end, and a real failure would land as a green run — every hour, with nothing
+    sent to Sentry.
     """
     monkeypatch.setattr(
         target=assets.Settings,
@@ -542,8 +543,8 @@ def test_power_time_series_and_metadata_does_not_retry_a_failure_after_the_write
 def test_h3_grid_weights_materialises_and_writes_parquet(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
-    """Materialise ``h3_grid_weights`` against a small stand-in boundary, and assert a valid
-    parquet lands on disk.
+    """Materialise ``h3_grid_weights`` against a small stand-in boundary, and assert a valid parquet
+    lands on disk.
 
     The real GB boundary buffers for ~30 s, and is exercised in ``packages/geo`` instead.
     """
@@ -578,8 +579,8 @@ def test_ecmwf_ens_materialises_and_writes_nwp(
     env: Path, monkeypatch: pytest.MonkeyPatch, dagster_instance: DagsterInstance
 ) -> None:
     """Happy path with the download/convert pipeline stubbed: the partition key parses into
-    ``nwp_init_time`` (passed to ``open_ecmwf_ens_run``) and the converted frame is written to the
-    NWP Delta table via ``write_nwp``."""
+    ``nwp_init_time`` (passed to ``open_ecmwf_ens_run``) and the converted frame is written to
+    the NWP Delta table via ``write_nwp``."""
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     # After 2024-11-12, when categorical_precipitation_type_surface became a non-null Nwp variable.
     init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
@@ -686,8 +687,8 @@ def test_ecmwf_ens_reports_whole_null_slices_in_its_quality_check(
     Scoped to the *reporting* half deliberately: the converter is stubbed here, so `Nwp.validate`
     never sees this frame, and that it no longer rejects such a slice is pinned by
     ``test_whole_slice_deaccumulated_null_beyond_lead0_is_tolerated`` in the contracts package.
-    What fails on ``main`` is the count: ``assess_nwp_quality`` filtered wholly-null slices out of
-    its report entirely, so the check passed and the missing field was surfaced nowhere.
+    What fails on ``main`` is the count: ``assess_nwp_quality`` filtered wholly-null slices out
+    of its report entirely, so the check passed and the missing field was surfaced nowhere.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
@@ -734,9 +735,9 @@ def test_ecmwf_ens_retries_when_a_variable_is_wholly_missing(
     republishes a defective one — the 2026-08-09 repair landed 3h25m later, inside this budget.
 
     The stub calls the *real* ``Nwp.validate``, so this pins the whole chain the widened ``try``
-    exists for: an empty column raises from validation, which the converter calls, which sits past
-    where ``main``'s ``try`` block ended. It fails on ``main``, where the exception escaped as a
-    hard failure.
+    exists for: an empty column raises from validation, which the converter calls, which sits
+    past where ``main``'s ``try`` block ended. It fails on ``main``, where the exception escaped
+    as a hard failure.
     """
     from dagster import RetryRequested
 
@@ -786,8 +787,8 @@ def test_ecmwf_ens_warns_on_incomplete_run_but_still_materialises(
     """A short run is landed anyway and surfaced as a WARN — an incomplete upstream run is absent
     input, so we keep the rows that arrived rather than discarding the whole partition.
 
-    ``_make_nwp`` builds 4 rows carrying 4 distinct members, valid_times and cells (a diagonal, not
-    a cross-product), which is nothing like a complete 51 x 85 x 1 ECMWF ENS run.
+    ``_make_nwp`` builds 4 rows carrying 4 distinct members, valid_times and cells (a diagonal,
+    not a cross-product), which is nothing like a complete 51 x 85 x 1 ECMWF ENS run.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
@@ -897,9 +898,10 @@ def test_ecmwf_ens_publishes_both_null_populations(
 ) -> None:
     """A run whose stored cells are clean still reports the corruption the feed sent.
 
-    That combination — every H3 key zero, the grid-point keys non-zero — is the state this measure
-    exists for, and the one that was indistinguishable from a perfect run before it. The converter
-    is stubbed, so this pins the plumbing and the description, not the aggregation itself.
+    That combination — every H3 key zero, the grid-point keys non-zero — is the state this
+    measure exists for, and the one that was indistinguishable from a perfect run before it. The
+    converter is stubbed, so this pins the plumbing and the description, not the aggregation
+    itself.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
@@ -981,8 +983,9 @@ def test_ecmwf_ens_flags_instantaneous_nulls_the_aggregation_absorbed(
 
     This is the whole reason the two populations get separate checks: the corrupt run below is a
     *pass* for the de-accumulated nulls, which are tolerated, and a *fail* for the instantaneous
-    one, which is not. A single check over both would have to pick one of those answers. The clean
-    case is here because a zero threshold that always failed would satisfy the corrupt case alone.
+    one, which is not. A single check over both would have to pick one of those answers. The
+    clean case is here because a zero threshold that always failed would satisfy the corrupt case
+    alone.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
@@ -1058,14 +1061,14 @@ def test_ecmwf_ens_lands_the_run_when_an_assessment_fails(
 ) -> None:
     """A bug in any per-run assessment degrades to failed WARN results; the run still lands.
 
-    Every assessment is covered, because the guard only protects the calls *inside* it: one lifted
-    above the ``try`` would fail the partition, and that is reachable — a download missing one
-    de-accumulated variable makes the grid-point counter raise ``KeyError``.
+    Every assessment is covered, because the guard only protects the calls *inside* it: one
+    lifted above the ``try`` would fail the partition, and that is reachable — a download missing
+    one de-accumulated variable makes the grid-point counter raise ``KeyError``.
 
     All three declared checks must still be emitted — Dagster fails the step for a missing result
     *or* for one carrying no ``check_name``. ``_FakePanic`` is the case that fails if someone
-    narrows the guard to ``except Exception``: the assessments run Polars sorts and group-bys, and
-    a pyo3 panic from one derives from ``BaseException``.
+    narrows the guard to ``except Exception``: the assessments run Polars sorts and group-bys,
+    and a pyo3 panic from one derives from ``BaseException``.
     """
     _write_h3_grid_weights(Settings().h3_grid_weights_path)
     init_time = datetime(year=2024, month=12, day=1, tzinfo=UTC)
@@ -1192,15 +1195,15 @@ def test_definitions_resolve(env: Path) -> None:
     """The whole asset graph resolves into a repository, the three ingest assets are present, the
     ``ecmwf_ens`` dependency edge is wired, and each asset job's selection resolves to its asset.
 
-    Resolution alone (constructing ``Definitions`` + ``get_repository_def()``) catches import-time
-    errors and duplicate asset keys, but *not* a broken ``deps=[…]`` string (Dagster silently treats
-    an unknown key as an external asset) or a job ``AssetSelection`` pointing at a missing asset
-    (resolved lazily) — so those are asserted explicitly below.
+    Resolution alone (constructing ``Definitions`` + ``get_repository_def()``) catches
+    import-time errors and duplicate asset keys, but *not* a broken ``deps=[…]`` string (Dagster
+    silently treats an unknown key as an external asset) or a job ``AssetSelection`` pointing at
+    a missing asset (resolved lazily) — so those are asserted explicitly below.
 
     Uses ``get_repository_def()`` rather than the stricter ``Definitions.validate_loadable``: the
     latter also runs ``validate_partitions``, which rejects the CV pipeline's deliberate
-    static-fold-upstream / dynamic-experiment-fold-downstream ``deps`` mapping that ``dg dev`` and
-    the CV asset tests run against happily.
+    static-fold-upstream / dynamic-experiment-fold-downstream ``deps`` mapping that ``dg dev``
+    and the CV asset tests run against happily.
     """
     from dagster import AssetKey
 
