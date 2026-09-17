@@ -206,8 +206,7 @@ class Nwp(pt.Model):
         # The 200 m/s ceiling is a corrupt-feed guard, not a meteorological limit. The highest
         # non-tornadic surface wind gust ever recorded is 113.2 m/s, on Barrow Island during
         # Tropical Cyclone Olivia on 10 April 1996, ratified by the World Meteorological
-        # Organisation (WMO) in its
-        # World Weather and Climate Extremes Archive:
+        # Organisation (WMO) in its World Weather and Climate Extremes Archive:
         # <https://wmo.int/asu-map?map=Wind_028>. That record is a 3-second gust at a single
         # anemometer, whereas this column holds an instantaneous wind averaged as a vector over a
         # whole H3 cell, which is lower again. Only a unit error or a corrupt value can reach 200.
@@ -607,8 +606,8 @@ class NwpQualityReport:
         The field is missing altogether for that one (variable, member, valid_time) slice.
 
         Worth watching separately from the scattered case below: a rising count is the shape a
-        partial upstream publication takes. The count is also accurate, because a wholly-null
-        slice reaches the cells intact however the grid points are aggregated.
+        partial upstream publication takes. The count is exact, because a wholly-null slice
+        reaches the cells intact however the grid points are aggregated.
         """
         if not self.affected.height:
             return 0

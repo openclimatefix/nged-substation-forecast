@@ -1,19 +1,19 @@
 # Contracts
 
 Defines the "data contracts": the schemas defining the precise shape of each data source, the units
-each column carries, and the sign convention its values follow.
+each column carries, and the sign convention each column's values follow.
 
 The contracts package also owns the thin configuration layer that sits beside those schemas: the
 cross-validation (CV) fold config and the `class_target`/`import_class` pair that turns a class into
 a `_target_` string and back. Both the fold config and the class-path pair are model-agnostic and
 need nothing heavier than pydantic and PyYAML.
 
-Two further modules sit here for the same reason — every package needs them, and none of them is
-specific to machine learning (ML). `contracts.settings` holds `Settings`, the single source of every
-data path and object-store credential the pipeline reads, resolved from the environment and the
-workspace `.env` and reached through the cached `get_settings()`. `contracts.uri` holds the
-local-or-remote path helpers those settings fields need, because a data-location field may be a
-local path or an `s3://` URI, and `pathlib` mangles a URI.
+Two further modules sit here because every package needs them and neither is specific to machine
+learning (ML). `contracts.settings` holds `Settings`, the single source of every data path and
+object-store credential the pipeline reads, resolved from the environment and the workspace `.env`
+and reached through the cached `get_settings()`. `contracts.uri` holds the local-or-remote path
+helpers those settings fields need, because a data-location field may be a local path or an `s3://`
+URI, and `pathlib` mangles a URI.
 
 ## Light enough for any component to import
 

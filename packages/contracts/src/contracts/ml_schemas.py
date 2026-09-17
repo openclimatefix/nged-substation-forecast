@@ -450,8 +450,7 @@ class Metrics(pt.Model):
 
         # `n_unique`, not `is_duplicated().any()`: the two expressions are equivalent here (every
         # primary-key column is non-nullable once present) but `is_duplicated` materialises a
-        # per-row mask,
-        # costing ~5x the peak memory on a predict-sized frame.
+        # per-row mask, costing ~5x the peak memory on a predict-sized frame.
         if validated_df.select(pk_cols).n_unique() != validated_df.height:
             raise ValueError(
                 f"Duplicate entries found for primary key columns: {pk_cols}. "

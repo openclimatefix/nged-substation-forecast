@@ -1,7 +1,10 @@
-"""`Settings`: every setting the pipeline reads from its environment.
+"""The pipeline's environment-resolved configuration, and the cached accessor that reaches it.
 
-The fields cover the data paths, the object-store credentials, the MLflow tracking URI, and the
-four Sentry settings. Values are resolved from the environment and the workspace `.env`.
+`Settings` is the configuration class itself, and `get_settings()` is the accessor every caller
+should use rather than constructing `Settings` directly. `PROJECT_ROOT` resolves the workspace
+root that the `.env` file and the repo-relative path defaults are anchored to, which is what lets
+one set of defaults serve an editable install, a non-editable install, and the Docker image
+alike.
 """
 
 from functools import lru_cache
@@ -63,10 +66,11 @@ class Settings(BaseSettings):
     Each field takes its value from an environment variable of the same name, from the workspace
     ``.env``, or from the default declared here, in that order of precedence. The managed
     data-table paths default to ``""``, a sentinel meaning "derive me": a path left unset is
-    filled in from ``data_path_internal``, ``data_path_delivery``, or ``local_artifacts_path``
-    after validation, so a caller always reads a concrete path, while a path set explicitly keeps
-    the value it was given. Build one through ``get_settings()`` rather than by calling
-    ``Settings()`` directly.
+    filled in from ``data_path_internal``, ``data_path_delivery``, or ``local_artifacts_path`` by
+    the ``after``-mode model validator ``_derive_unset_paths``, so a caller never observes the
+    sentinel and always reads a concrete path, while a path set explicitly keeps the value it was
+    given. Build a ``Settings`` through ``get_settings()`` rather than by calling ``Settings()``
+    directly.
     """
 
     mlflow_tracking_uri: str = Field(
@@ -306,8 +310,7 @@ class Settings(BaseSettings):
         ),
     )
 
-    # --- Sentry observability: all optional, and an empty data source name (DSN) disables
-    # Sentry entirely ---
+    # --- Sentry observability (all optional; an empty data source name (DSN) disables Sentry) ---
 
     sentry_dsn: str = Field(
         default="",
