@@ -89,12 +89,11 @@ class NwpVariableWhollyMissing(ValueError):
     chunks read as fill-value null until the worker writing them commits. Waiting is therefore a
     better first response than failing the partition.
 
-    The retry covers only the de-accumulated variables: an incomplete publication reaches this
-    check only when the variables still unwritten are the de-accumulated ones. The nine
-    instantaneous variables are non-nullable, so a frame missing one of those is rejected by base
-    Patito validation first, with no retry. An all-null
-    `categorical_precipitation_type_surface` passes base validation, because that column is
-    nullable; it is rejected instead by
+    The retry covers only the de-accumulated variables: an incomplete publication reaches this check
+    only when the variables still unwritten are the de-accumulated ones. The nine instantaneous
+    variables are non-nullable, so a frame missing one of those is rejected by base Patito
+    validation first, with no retry. An all-null `categorical_precipitation_type_surface` passes
+    base validation, because that column is nullable. The all-null column is rejected instead by
     `_check_variables_that_were_introduced_after_start_of_dataset`, and only for an `init_time`
     after 2024-11-12, because the column does not exist in the runs before then. See
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
@@ -768,9 +767,9 @@ _MAX_GAP_ITEMS_IN_DESCRIPTION: Final[int] = 10
 """Cap on how many missing members/steps `NwpRunCompletenessReport.describe` spells out.
 
 A wholesale upstream outage can miss every one of the 51 expected ensemble members, or all 85
-expected forecast steps, and a run published on the wrong time grid can carry an unexpected
-`valid_time` for every step it did publish. The exact counts stay in the report's fields and the
-Dagster metadata, so the sentence only needs enough to start debugging.
+expected forecast steps. A run published on the wrong time grid can carry an unexpected `valid_time`
+for every step that run did publish. The exact counts stay in the report's fields and the Dagster
+metadata, so the sentence only needs enough to start debugging.
 """
 
 

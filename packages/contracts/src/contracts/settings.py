@@ -1,13 +1,14 @@
 """The pipeline's environment-resolved configuration, and the cached accessor that reaches it.
 
-`Settings` is the configuration class itself, and `get_settings()` is the cached accessor that
-keeps one shared instance. Prefer the accessor wherever a `Settings` would otherwise be built while
-a module is still being imported: building one is what reads `.env` and the environment, so an
-import-time build couples a pure schema module to the environment and freezes the values before a
-test can change them. A function that builds its own `Settings` when it runs is unaffected, and
-most of this repo's Dagster assets do exactly that. `PROJECT_ROOT` resolves the workspace root that
-the `.env` file and the repo-relative path defaults are anchored to, which is what lets one set of
-defaults serve an editable install, a non-editable install, and the Docker image alike.
+`Settings` is the configuration class itself, and `get_settings()` is the cached accessor that keeps
+one shared instance. Prefer the accessor wherever a `Settings` would otherwise be built while a
+module is still being imported. Building a `Settings` is what reads `.env` and the environment, so
+an import-time build couples a pure schema module to the environment and freezes the values before a
+test can change them. A function that builds its own `Settings` when it runs is unaffected, and most
+of this repo's Dagster assets build their `Settings` when they run. `PROJECT_ROOT` resolves the
+workspace root that the `.env` file and the repo-relative path defaults are anchored to, which is
+what lets one set of defaults serve an editable install, a non-editable install, and the Docker
+image alike.
 """
 
 from functools import lru_cache
@@ -67,14 +68,14 @@ class Settings(BaseSettings):
     the four Sentry settings.
 
     Each field takes its value from an environment variable of the same name, from the workspace
-    ``.env``, or from the default declared here, in that order of precedence. The managed
-    data-table paths default to ``""``, a sentinel meaning "derive me": a path left unset is
-    filled in from ``data_path_internal``, ``data_path_delivery``, or ``local_artifacts_path`` by
-    the ``after``-mode model validator ``_derive_unset_paths``, so a caller never observes the
+    ``.env``, or from the default declared here, in that order of precedence. The managed data-table
+    paths default to ``""``, a sentinel meaning "derive me": a path left unset is filled in from
+    ``data_path_internal``, ``data_path_delivery``, or ``local_artifacts_path`` by the
+    ``after``-mode model validator ``_derive_unset_paths``. A caller therefore never observes the
     sentinel and always reads a concrete path, while a path set explicitly keeps the value it was
-    given. Every value is read when the ``Settings`` is built, so a test that changes the
-    environment afterwards has to build a fresh one — and call ``get_settings.cache_clear()``
-    first if it reads through the cached accessor.
+    given. Every value is read when the ``Settings`` is built. A test that changes the environment
+    afterwards therefore has to build a fresh ``Settings``, and call ``get_settings.cache_clear()``
+    first if the test reads through the cached accessor.
     """
 
     mlflow_tracking_uri: str = Field(
