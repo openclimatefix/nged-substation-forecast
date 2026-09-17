@@ -3,12 +3,12 @@
 # Push the already-built production image to ECR and point the ECS task definition at it.
 #
 # This is Step 6 of the AWS setup runbook (docs/live_service/aws.md) as one command, and —
-# together with scripts/build_and_verify_image.sh — the whole recurring champion-redeploy loop
-# (aws.md "Redeploying a new champion model"). This header is the source of truth for *why*
+# together with scripts/deploy/build_and_verify_image.sh — the whole recurring champion-redeploy
+# loop (aws.md "Redeploying a new champion model"). This header is the source of truth for *why*
 # each choice below is made.
 #
 # Usage:
-#   scripts/push_and_deploy_image.sh          # no arguments — everything is derived
+#   scripts/deploy/push_and_deploy_image.sh          # no arguments — everything is derived
 #
 # Zero arguments by design, so nothing can be mistyped or drift:
 #   - The image tag is derived from data/production_model/promotion.json exactly as
@@ -60,8 +60,9 @@ RUN_ID="$(jq -r .mlflow_run_id "$PROMOTION_JSON")"
 LOCAL_IMAGE="${REPO}:${RUN_ID:0:12}"
 
 if ! docker image inspect "$LOCAL_IMAGE" >/dev/null 2>&1; then
-  echo "error: local image ${LOCAL_IMAGE} not found — run scripts/build_and_verify_image.sh" >&2
-  echo "       first (aws.md Step 4), so only a built-and-verified image can be pushed." >&2
+  echo "error: local image ${LOCAL_IMAGE} not found — run" >&2
+  echo "       scripts/deploy/build_and_verify_image.sh first (aws.md Step 4), so only a" >&2
+  echo "       built-and-verified image can be pushed." >&2
   exit 2
 fi
 

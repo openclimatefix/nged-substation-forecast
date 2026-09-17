@@ -178,7 +178,7 @@ network access** — the test that matters, since the entire point of baking the
 production inference has no MLflow dependency at runtime:
 
 ```bash
-scripts/build_and_verify_image.sh    # no arguments — everything is derived
+scripts/deploy/build_and_verify_image.sh    # no arguments — everything is derived
 ```
 
 The script always builds for **linux/arm64**, whatever the host is, because the deployment is ARM
@@ -212,7 +212,7 @@ console](https://eu-west-2.console.aws.amazon.com) →
 `eu-west-2` region as the S3 buckets in [Step 1](#step-1-create-the-s3-buckets)):
 
 - **Repository name**: `nged-forecast`, with **no namespace prefix**. The scripts hard-code this
-  exact flat name — `scripts/push_and_deploy_image.sh` derives the remote URI as
+  exact flat name — `scripts/deploy/push_and_deploy_image.sh` derives the remote URI as
   `<account-id>.dkr.ecr.eu-west-2.amazonaws.com/nged-forecast:<tag>` — and it matches the local
   image tag `nged-forecast:<tag>` from [Step 4](#step-4-build-and-verify-the-image). A namespace is
   only an optional `prefix/` for grouping many repositories; adding a namespace would break that
@@ -242,7 +242,7 @@ One script pushes the image built in [Step 4](#step-4-build-and-verify-the-image
 redeploys — points the ECS (Elastic Container Service) task definition at it:
 
 ```bash
-scripts/push_and_deploy_image.sh    # no arguments — everything is derived
+scripts/deploy/push_and_deploy_image.sh    # no arguments — everything is derived
 ```
 
 The script takes no arguments by design, so mistyping is not possible: the tag is derived from
@@ -453,7 +453,7 @@ capacity and costs nothing, so a single `nged-forecast` cluster is all this depl
     - **Task definition family**: `nged-forecast` — not a free choice: it's the `--task-definition`
       in [Step 10](#step-10-verify-run-a-forecast-task-manually)'s manual run, the
       `task_definition:` in [Step 14](#step-14-configure-dagster-on-the-box)'s launcher config, and
-      the family `scripts/push_and_deploy_image.sh` registers new revisions into.
+      the family `scripts/deploy/push_and_deploy_image.sh` registers new revisions into.
     - **Launch type**: keep **AWS Fargate**, the pre-ticked default.
     - **Operating system/Architecture**: **Linux/ARM64** — the console defaults to `Linux/X86_64`,
       but [Step 4](#step-4-build-and-verify-the-image)'s script always builds the image for ARM, and
@@ -522,7 +522,7 @@ capacity and costs nothing, so a single `nged-forecast` cluster is all this depl
     **Monitoring**, **Tags** — stays at its default. Then click **Create**.
 
 Creating the task definition in the console is one-time. Later image changes never repeat it —
-`scripts/push_and_deploy_image.sh` registers new revisions of this family automatically (see
+`scripts/deploy/push_and_deploy_image.sh` registers new revisions of this family automatically (see
 [Redeploying a new champion model](#redeploying-a-new-champion-model)).
 
 ## Step 10 — Verify: run a forecast task manually
@@ -1258,10 +1258,10 @@ Once the service is live, shipping a better model is a repeat of a slice of this
    1–2](operations.md#step-1-pick-a-champion-model).
 2. Build and verify the new image ([Step 4](#step-4-build-and-verify-the-image)) — it gets a new tag
    (the new model's run id).
-3. `scripts/push_and_deploy_image.sh` ([Step 6](#step-6-push-the-image-to-ecr)) — one command that
-   pushes the new tag and registers a new task-definition revision pointing at it. The run launcher
-   resolves the family's latest revision at launch time, so the next scheduled run picks it up with
-   no restart on the box.
+3. `scripts/deploy/push_and_deploy_image.sh` ([Step 6](#step-6-push-the-image-to-ecr)) — one command
+   that pushes the new tag and registers a new task-definition revision pointing at it. The run
+   launcher resolves the family's latest revision at launch time, so the next scheduled run picks it
+   up with no restart on the box.
 4. The control-plane containers can keep running the old image — the baked-in model is dead weight
    to them, so a *model* change doesn't affect them. When the *code* changes (assets, schedules, a
    Dagster upgrade), also update the box: `docker login` + `docker pull` the new tag ([Step

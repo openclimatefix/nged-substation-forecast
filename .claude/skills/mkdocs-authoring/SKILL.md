@@ -13,8 +13,8 @@ description: >-
 # Authoring markdown that MkDocs renders correctly
 
 This applies to everything Python-Markdown renders, not just `docs/` pages: README files, the
-`SKILL.md` files, and Python docstrings (linted by `scripts/lint_docstring_markdown.py` and rendered
-by mkdocstrings) all go through the same renderer.
+`SKILL.md` files, and Python docstrings (linted by `scripts/lint/lint_docstring_markdown.py` and
+rendered by mkdocstrings) all go through the same renderer.
 
 Python-Markdown is stricter and weirder than CommonMark in ways this repo's linters do not catch.
 The standing rule that follows: **any docs change that touches links or non-trivial lists should run

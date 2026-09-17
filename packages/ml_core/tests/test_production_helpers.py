@@ -254,7 +254,8 @@ def _drop_the_model_class(meta: dict[str, Any]) -> None:
 def test_the_rejection_message_never_mentions_the_experiment_tracker(
     tmp_path: Path, break_meta: Callable[[dict[str, Any]], None], expected: str
 ) -> None:
-    """``scripts/build_and_verify_image.sh`` fails the image build on that word in the runtime log.
+    """``scripts/deploy/build_and_verify_image.sh`` fails the image build on that word in the
+    runtime log.
 
     Its one automated gate greps the smoke-test container's log case-insensitively to prove
     production inference has no experiment-tracker dependency, and these rejections are raised on

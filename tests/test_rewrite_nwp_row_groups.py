@@ -1,4 +1,4 @@
-"""Tests for `scripts/rewrite_nwp_row_groups.py`.
+"""Tests for `scripts/forecasting/rewrite_nwp_row_groups.py`.
 
 The script is a one-shot migration that will be pointed at the whole ``nwp`` table with no
 rehearsal, so the part worth testing is the part that decides what *not* to touch. Two ways of
@@ -20,7 +20,7 @@ from delta_store.nwp import NWP_SORT_COLS, write_nwp
 from deltalake import WriterProperties, write_deltalake
 
 REPO_ROOT: Final[Path] = Path(__file__).parent.parent
-SCRIPT_PATH: Final[Path] = REPO_ROOT / "scripts" / "rewrite_nwp_row_groups.py"
+SCRIPT_PATH: Final[Path] = REPO_ROOT / "scripts" / "forecasting" / "rewrite_nwp_row_groups.py"
 """The script under test, imported by path because `scripts/` is not an importable package."""
 
 

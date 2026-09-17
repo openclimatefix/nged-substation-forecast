@@ -50,7 +50,7 @@ repos:
       # — see the script's docstring. `tests/test_marimo_notebooks.py` runs the same check in CI.
       - id: check-marimo-notebooks
         name: marimo notebooks (no unbound names)
-        entry: uv run python scripts/check_marimo_notebooks.py
+        entry: uv run python scripts/lint/check_marimo_notebooks.py
         language: system
         types: [python]
         files: *marimo_notebooks
@@ -76,7 +76,7 @@ repos:
         exclude: ^plans/
       - id: lint-docstring-markdown
         name: pymarkdown (Python docstrings)
-        entry: uv run python scripts/lint_docstring_markdown.py
+        entry: uv run python scripts/lint/lint_docstring_markdown.py
         language: system
         types: [python]
       # `mkdocs build --strict` only validates links *inside* docs/, so a link to the published
@@ -117,7 +117,7 @@ repos:
         exclude: ^docs/architecture/code-style\.md$
       - id: check-docs-links
         name: docs links (check_docs_links)
-        entry: uv run python scripts/check_docs_links.py
+        entry: uv run python scripts/lint/check_docs_links.py
         language: system
         pass_filenames: false
         always_run: true

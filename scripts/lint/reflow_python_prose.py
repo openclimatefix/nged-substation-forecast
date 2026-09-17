@@ -25,7 +25,7 @@ preserved.
 
 Usage::
 
-    python3 scripts/reflow_python_prose.py <file.py> [<file.py> ...]
+    python3 scripts/lint/reflow_python_prose.py <file.py> [<file.py> ...]
 """
 
 import ast

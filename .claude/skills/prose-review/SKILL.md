@@ -586,13 +586,13 @@ stops closing. A count that *rises* is reported and not gated, because naming th
 stood for legitimately adds a code span — writing `file` or `prose-review` where the sentence said
 "it" — while no sweep can legitimately lose one.
 
-**Renaming a heading breaks every absolute link to its old anchor, and `scripts/check_docs_links.py`
-is what tells you.** `mkdocs build --strict` validates relative links only, so a link from a
-docstring or a comment to the published site survives a heading rewrite with nothing to catch it.
-Run `uv run python scripts/check_docs_links.py` after any heading change; it reports the file, the
-line and the closest real anchors on the target page. A heading whose text contains an em dash
-generates a single separator, not two: `## H2 — a hundred experiments` becomes
-`#h2-a-hundred-experiments`.
+**Renaming a heading breaks every absolute link to its old anchor, and
+`scripts/lint/check_docs_links.py` is what tells you.** `mkdocs build --strict` validates relative
+links only, so a link from a docstring or a comment to the published site survives a heading rewrite
+with nothing to catch it. Run `uv run python scripts/lint/check_docs_links.py` after any heading
+change; it reports the file, the line and the closest real anchors on the target page. A heading
+whose text contains an em dash generates a single separator, not two: `## H2 — a hundred
+experiments` becomes `#h2-a-hundred-experiments`.
 
 **Neither command catches content dropped at render time either.** Python-Markdown treats any line
 starting with `#` as a heading even without the space CommonMark requires, and it silently discards
@@ -724,8 +724,8 @@ Four checks, none of which a `docs/` sweep needs:
   empty section heading, a nested list that flattens, and prose in a private function that
   mkdocstrings never renders at all.
 - **Link resolution against the *built* site**, not a guessed slug: `uv run mkdocs build` and then
-  check each URL's page and `#anchor` against the generated HTML. `scripts/check_docs_links.py` does
-  this repo-wide and is also a hook.
+  check each URL's page and `#anchor` against the generated HTML. `scripts/lint/check_docs_links.py`
+  does this repo-wide and is also a hook.
 
 Then the ordinary green-before-push set — `ruff check`, `ruff format`, `ty check`, `pytest`,
 `pymarkdown scan`, `mkdocs build --strict`.

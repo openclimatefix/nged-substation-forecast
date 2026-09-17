@@ -54,10 +54,10 @@ that landed above `import marimo` and move it into `app.setup`.
 import and rewrites the cell that used the name as `def _(name)`, which leaves the name as a cell
 input nothing defines — broken in a second way.
 
-Both shapes are caught by `scripts/check_marimo_notebooks.py`, which runs as a pre-commit hook over
-changed notebooks and over every notebook from `tests/test_marimo_notebooks.py`. So a mistake here
-fails the commit or CI rather than surviving to whoever next opens the notebook. What it catches and
-what it cannot:
+Both shapes are caught by `scripts/lint/check_marimo_notebooks.py`, which runs as a pre-commit hook
+over changed notebooks and over every notebook from `tests/test_marimo_notebooks.py`. So a mistake
+here fails the commit or CI rather than surviving to whoever next opens the notebook. What it
+catches and what it cannot:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#marimo-notebooks-bind-every-name-their-cells-reference>
 
 ## Let `marimo check --fix` settle a notebook's shape before committing

@@ -26,8 +26,8 @@ migrating a 123 GB table needs about 250 GB free. Reclaim with ``vacuum(full=Tru
 
 Usage::
 
-    uv run python scripts/rewrite_nwp_row_groups.py --table-uri data/NWP --dry-run
-    uv run python scripts/rewrite_nwp_row_groups.py --table-uri data/NWP
+    uv run python scripts/forecasting/rewrite_nwp_row_groups.py --table-uri data/NWP --dry-run
+    uv run python scripts/forecasting/rewrite_nwp_row_groups.py --table-uri data/NWP
 """
 
 import argparse
