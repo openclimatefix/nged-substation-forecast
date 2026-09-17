@@ -540,12 +540,13 @@ def build_mlflow_aggregate_metrics(
     (e.g. ``pinball_loss_p10``, ``picp_p10_p90``); parametric metrics are restricted to the
     ``_MLFLOW_LOGGED_PARAMETRIC`` headline subset. Key formats:
 
-    - ``"{token}__all"`` — overall aggregate (``horizon_slice="all"``). - ``"{token}__{type_slug}"``
-    — per-type aggregates (``horizon_slice="all"``). - ``"{token}__all__{horizon_slice}"`` — overall
-    aggregate per lead-time band (e.g. ``"nmae__all__day_ahead"``). Per-type sliced aggregates are
-    deliberately not logged — the per-type mean for each lead-time band stays queryable in the
-    ``forecast_metrics`` Delta table, as do the pinball loss at all 13 delivery quantiles and the
-    PICP and interval width of all 6 bands.
+    - ``"{token}__all"`` — overall aggregate (``horizon_slice="all"``).
+    - ``"{token}__{type_slug}"`` — per-type aggregates (``horizon_slice="all"``).
+    - ``"{token}__all__{horizon_slice}"`` — overall aggregate per lead-time band
+      (e.g. ``"nmae__all__day_ahead"``). Per-type sliced aggregates are deliberately not
+      logged — the per-type mean for each lead-time band stays queryable in the
+      ``forecast_metrics`` Delta table, as do the pinball loss at all 13 delivery quantiles
+      and the PICP and interval width of all 6 bands.
 
     Args:
         metrics_df: Per-series ``Metrics`` rows with ``time_series_type`` populated.

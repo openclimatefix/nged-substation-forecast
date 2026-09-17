@@ -322,11 +322,12 @@ class BaseForecaster(ABC):
           fully-qualified ``{module}.{qualname}`` of the concrete subclass (e.g.
           ``"xgboost_forecaster.forecaster.XGBoostForecaster"``) — so that production inference
           (``ml_core.production_helpers.load_forecaster_from_dir``) can reconstruct the correct
-          class from a plain model directory — no caller-supplied class name, no class registry, and
-          no MLflow run (issue #221). - ``path`` must be cleared first, so that saving over a
-          directory holding a *larger* model's files leaves none of them behind. Merging instead of
-          replacing is how a dropped time series' weights survive a re-train (issue #197);
-          ``XGBoostForecaster.save`` clears with ``shutil.rmtree(path, ignore_errors=True)``.
+          class from a plain model directory — no caller-supplied class name, no class registry,
+          and no MLflow run (issue #221).
+        - ``path`` must be cleared first, so that saving over a directory holding a *larger*
+          model's files leaves none of them behind. Merging instead of replacing is how a dropped
+          time series' weights survive a re-train (issue #197); ``XGBoostForecaster.save`` clears
+          with ``shutil.rmtree(path, ignore_errors=True)``.
 
         The clearing requirement makes ``path`` the model's to own while it saves, so any file a
         caller left there is gone afterwards. (Depositing a file *after* a save is fine, and is how
