@@ -5,7 +5,7 @@ Marimo notebooks for exploratory data analysis and ad-hoc experimentation.
 ## Why this package exists
 
 **A notebook here answers one question about the data, and is allowed to be rough.** What the NWP
-archive holds for one H3 cell, where a weather variable goes missing, whether a baseline export
+archive holds for one H3 cell, where a weather variable goes missing, and whether a baseline export
 looks the way its author expected: each question is worth a chart, and worth no more engineering
 than a chart. Nothing in `src/`, and no other package under `packages/`, imports this package, so a
 notebook that stops working stops working alone.

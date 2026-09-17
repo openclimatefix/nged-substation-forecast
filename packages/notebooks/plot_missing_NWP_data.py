@@ -44,7 +44,7 @@ def plot_null_distribution(df, target_init_time, target_h3_index, nwp_vars):
     """Chart where `nwp_vars` is missing, with one row per ensemble member.
 
     A missing weather value reaches the archive as either a Polars null or a float NaN, so both
-    are flagged, and both draw the same red tick.
+    kinds are flagged, and both draw the same red tick.
 
     Args:
         df: Lazy scan of the NWP Delta table.
@@ -123,8 +123,9 @@ def plot_null_distribution(df, target_init_time, target_h3_index, nwp_vars):
 
 @app.cell
 def _(df, nwp_vars):
-    # 599148110664433663 is an H3 resolution-5 cell in Shetland, at roughly 60.6 N, 0.7 W — the
-    # far north of the boundary `h3_grid_weights` covers, and so a cell worth checking for gaps.
+    # The plotted cell, 599148110664433663, is an H3 resolution-5 cell in Shetland, at roughly
+    # 60.6 N, 0.7 W — the far north of the boundary `h3_grid_weights` covers, and so a cell worth
+    # checking for gaps.
     chart = plot_null_distribution(
         df,
         target_init_time=datetime(2026, 5, 1, tzinfo=UTC),

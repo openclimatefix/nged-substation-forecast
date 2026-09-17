@@ -65,8 +65,8 @@ def source_status_message(source: DataSourceType, settings: Settings) -> tuple[s
             ``nged_data_path`` the non-warning message quotes back to the reader.
 
     Returns:
-        ``(markdown_message, is_warning)`` — the markdown to render, and whether to render it as a
-        warning callout rather than as plain text.
+        ``(markdown_message, is_warning)`` — the markdown to render, and whether to render that
+        markdown as a warning callout rather than as plain text.
     """
     if source == "s3" and not DASHBOARD_S3_ENV.exists():
         return (

@@ -32,8 +32,9 @@ def _():
     the forecast init time to 14 days after it. The lagged-power lines overlay observed power
     shifted forward by 7 and by 14 days, which is the raw material of the models' power-lag
     features. A second panel below shows the NWP ensemble that fed the forecast — pick the
-    weather variable to plot — on the same time axis, at the H3 cell containing the series,
-    with a stitched proxy-analysis line standing in for the weather that actually happened.
+    weather variable to plot — on the same time axis, at the H3 cell containing the series. A
+    stitched proxy-analysis line on that second panel stands in for the weather that actually
+    happened.
     """)
     return
 
@@ -383,11 +384,11 @@ def _(forecasts, init_time, metadata_df, series_picker, settings):
     # experiment ever grows the ensemble with lagged NWP runs.
     nwp_init_time = _nwp_init_times.max()
 
-    # One run at one H3 cell is 51 members × 85 forecast steps ≈ 4k rows, because `Nwp` carries
-    # one *column* per weather variable rather than one row, so load every variable for the run
-    # at once — switching the NWP-variable dropdown then re-runs only the chart cell, never this
-    # Delta query. init_time is a partition column, so the filter prunes to one partition;
-    # h3_index selects the (resolution 5) cell containing this series.
+    # One run at one H3 cell is 51 members × 85 forecast steps ≈ 4k rows, because `Nwp` carries one
+    # *column* per weather variable rather than one row. Every variable for the run is therefore
+    # loaded at once, and switching the NWP-variable dropdown then re-runs only the chart cell,
+    # never this Delta query. init_time is a partition column, so the filter prunes to one
+    # partition; h3_index selects the (resolution 5) cell containing this series.
     _series_h3 = metadata_df.filter(pl.col("time_series_id") == series_picker.value)[
         "h3_res_5"
     ].item()

@@ -97,10 +97,11 @@ NWP_PLOT_VARIABLES: Final[dict[str, NwpPlotVariable]] = {
 }
 """The NWP variables the dashboard offers, keyed by ``contracts.weather_schemas.Nwp`` column.
 
-Exactly the *continuous* ``Nwp`` variables. ``Nwp.continuous_var_names()`` is the authority, and
-``test_nwp_plot_variables_cover_exactly_the_continuous_nwp_vars`` fails if this dict drifts from
-that set. ``categorical_precipitation_type_surface`` is the one ``Nwp`` weather column left out,
-because its values are category codes, which a line chart would render as meaningless slopes.
+The dict holds exactly the *continuous* ``Nwp`` variables. ``Nwp.continuous_var_names()`` is the
+authority, and ``test_nwp_plot_variables_cover_exactly_the_continuous_nwp_vars`` fails if this dict
+drifts from that set. ``categorical_precipitation_type_surface`` is the one ``Nwp`` weather column
+left out, because its values are category codes, which a line chart would render as meaningless
+slopes.
 """
 
 NWP_ANALYSIS_LEAD: Final[timedelta] = timedelta(hours=27)
@@ -348,8 +349,8 @@ def build_view_forecast_chart(
             deeper history (which callers must include when requesting ``lags``) feed only the
             lagged-power lines.
         power_fcst_init_time: The forecast init time (tz-aware UTC). Sets the plotted window —
-            from ``PLOT_HISTORY`` before that init time to ``PLOT_HORIZON`` after it — and the
-            vertical rule.
+            from ``PLOT_HISTORY`` before that init time to ``PLOT_HORIZON`` after that init time —
+            and the vertical rule.
         units: ``"MW"`` or ``"MVA"``, from this series' ``TimeSeriesMetadata``.
         title: Chart title (the series name / type / id line).
         subtitle: Chart subtitle (the init time / experiment line).

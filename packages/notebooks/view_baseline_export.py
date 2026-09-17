@@ -26,8 +26,8 @@ with app.setup:
 
     DEFAULT_EXPORT_DIR = PROJECT_ROOT / "data" / "exports"
 
-    # A single series spans ~17k half-hourly rows — the leaderboard fold validates on 12 months —
-    # and mo.ui.altair_chart serves those rows as a virtual file rather than inlining the rows,
+    # A single series spans ~17k half-hourly rows, because the leaderboard fold validates on 12
+    # months. mo.ui.altair_chart serves those rows as a virtual file rather than inlining the rows,
     # so lift altair's default 5,000-row guard the way the dashboard does.
     alt.data_transformers.disable_max_rows()
 

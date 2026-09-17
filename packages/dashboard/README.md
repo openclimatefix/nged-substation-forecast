@@ -1,7 +1,7 @@
 # Dashboard
 
 Marimo web apps for visualising power forecasts, telemetry, and evaluation metrics. The apps live at
-the package root; their shared, unit-testable logic (the data-source toggle, the forecast chart
+the package root; their shared, unit-testable logic (the data-source toggle and the forecast chart
 builder) lives in the importable `dashboard` package under `src/`.
 
 ## Why the logic sits under `src/` rather than in the notebooks
@@ -20,6 +20,8 @@ where the table lives, `weather_utils` owns the analysis-proxy query the dashboa
 feature pipeline, and `plotting` owns the OCF Altair theme and its colour constants. A change to
 what a chart *means* therefore usually belongs in one of those packages; a change to what the reader
 *sees* belongs here.
+
+## Rules the two apps have to obey
 
 **The marimo authoring rules apply to the two apps at the package root, and each rule reverses an
 ordinary Python habit.** A leading underscore makes a name cell-local rather than private, every
@@ -40,8 +42,8 @@ block.
   coloured lines overlay observed power shifted forward by 7 and by 14 days — the raw material of
   the models' power-lag features. A second panel below the power chart, on the same time axis, plots
   the NWP ensemble that fed the forecast at the H3 cell containing the series, for whichever weather
-  variable is picked, against a stitched proxy-analysis line standing in for the weather that
-  actually happened. **Reload data** re-reads the forecast, power, and NWP tables.
+  variable is picked. A stitched proxy-analysis line on that second panel stands in for the weather
+  that actually happened. **Reload data** re-reads the forecast, power, and NWP tables.
 - **`map_and_timeseries.py`** — a map of every time series in the trial area; click a dot to see its
   observed power. The power query is capped to recent observations, because the chart inlines its
   rows and Altair refuses more than 5,000 rows by default.
@@ -90,9 +92,9 @@ guide](https://openclimatefix.github.io/nged-substation-forecast/live_service/aw
 ## Invariants worth knowing before editing a chart
 
 **Every plotted time is naive Europe/London wall time.** Demand shape follows the local clock, so
-midnight ticks and day-of-week labels have to be local rather than UTC, and stripping the zone makes
-a chart render identically in any viewer's browser — Vega would otherwise re-localise a tz-aware
-timestamp to whatever zone the viewer sits in.
+midnight ticks and day-of-week labels have to be local rather than UTC. Stripping the zone then
+makes a chart render identically in any viewer's browser, because Vega would otherwise re-localise a
+tz-aware timestamp to whatever zone the viewer sits in.
 
 **The power chart and the NWP panel are separate Altair specs whose x-axes align only by
 construction.** Both charts pin the same x encoding, both pin the y-axis region to the same pixel
