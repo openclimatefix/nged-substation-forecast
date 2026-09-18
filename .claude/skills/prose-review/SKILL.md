@@ -14,7 +14,7 @@ description: >-
   reordered or simplified — a docs/ page, a README, a SKILL.md, a docstring, a literature review —
   and whenever a reviewer asked to check prose has reported little or nothing. Sweeping the
   docstrings and comments in Python files has its own section: the word-count rule reverses, the
-  README collides with the module docstrings on the API page, and there are three guards to run
+  README collides with the module docstrings on the API page, and there are five guards to run
   that a docs/ page never needs.
 ---
 
@@ -23,6 +23,14 @@ description: >-
 **The rules live in [`CLAUDE.md`](../../../CLAUDE.md) under "Prose style" and are not repeated
 here.** Two copies of a style guide drift apart and then nobody knows which copy is binding. This
 skill owns the *procedure*; the rules themselves stay in one place.
+
+**Five words below carry a specific meaning, and a reader meeting them cold will guess wrong.** A
+**sweep** is one reading of a text against the style rules, and a **finding** is one thing that
+reading reports: the sentence as it stands, and the sentence it should be instead. A **pass** is one
+stage of a review — the structural passes A to F below, then the sentence sweep. A **wave** is one
+batch of packages or pages swept together, and a whole programme of sweeps runs wave by wave over
+months. A **sub-agent** is a separate Claude instance this procedure dispatches, with its own
+context, to do one pass or to read one range.
 
 ## Size the review to the text
 
@@ -138,8 +146,9 @@ Two tests per heading, per CLAUDE.md's heading rule:
 A heading failing either test is rewritten as a plain descriptor of its subject, and the conclusion
 moves into the section's bolded lead. A heading passing both tests is left alone, however long it
 is. Often only one phrase is failing, and replacing that phrase keeps the conclusion: "the field"
-became "MLOps research" because a bare "the field" is the referent fault Rule 1 already forbids. The
-rewritten phrase lands in the one sentence a skim-reader is guaranteed to read.
+became "machine-learning operations (MLOps) research" because a bare "the field" is the referent
+fault the pronoun rule forbids — rule 3 of the sweep order below. The rewritten phrase lands in the
+one sentence a skim-reader is guaranteed to read.
 
 **The two tests apply to a navigation entry with more force than to a heading.** A published site's
 navigation is where a reader arrives, so a section or page name that only makes sense once the page
@@ -162,13 +171,14 @@ than the heading itself, so only the anchor needs changing.
 conversation.** Paste the document into the prompt, or point the sub-agent at a single scratchpad
 file, and instruct it to read nothing else. Left unconstrained, a sub-agent in this repo auto-loads
 `CLAUDE.md` and can read any file in it, which defeats the isolation. Give it a stated knowledge
-boundary too: a persona matched to the document's actual audience, such as "an NGED engineer who has
-never trained a machine-learning model" or "a funder reading this for the first time." Ask it to
-read from the top and stop at the first sentence it cannot follow, and to name the earlier sentence
-that would have had to exist for that sentence to work. Forbid it from rewriting anything — its job
-is to report where a reader stalls, not to fix the prose. Run it with two or three personas that
-cover the page's real readers. A stop point one persona reports and another doesn't is a gap
-specific to that persona's background, not a fault in the document as a whole.
+boundary too: a persona matched to the document's actual audience, such as "an engineer at National
+Grid Electricity Distribution (NGED), the network operator this project forecasts for, who has never
+trained a machine-learning model" or "a funder reading this for the first time." Ask it to read from
+the top and stop at the first sentence it cannot follow, and to name the earlier sentence that would
+have had to exist for that sentence to work. Forbid it from rewriting anything — its job is to
+report where a reader stalls, not to fix the prose. Run it with two or three personas that cover the
+page's real readers. A stop point one persona reports and another doesn't is a gap specific to that
+persona's background, not a fault in the document as a whole.
 
 The output is a list of stop points: an ordering-bug report, not a style critique.
 
@@ -184,12 +194,13 @@ there.** Durable explanation belongs on a permanent page; a plan belongs with th
 step-by-step procedure belongs with the procedure. An idea that currently exists only inside a page
 scheduled for deletion has to be promoted to a permanent page before that page goes.
 
-**A cross-reference must carry a few words saying what is on the other end.** A bare `H2`, a bare
-"see the design principles", or a link whose visible text is only a label leaves the reader unable
-to tell whether they need to follow it, so they either break off and read the other page or skip a
-claim they should have checked. Write "the model must beat the manual heuristic at day-ahead (H2)"
-with the link on the words, not "see H2". A label is an address, not a description, and a link whose
-text is only the address is as opaque as no link at all.
+**A cross-reference must carry a few words saying what is on the other end.** A bare `H2` — this
+project labels its engineering hypotheses `H1`, `H2` and so on — a bare "see the design principles",
+or a link whose visible text is only a label leaves the reader unable to tell whether they need to
+follow it, so they either break off and read the other page or skip a claim they should have
+checked. Write "the model must beat the manual heuristic at day-ahead (H2)" with the link on the
+words, not "see H2". A label is an address, not a description, and a link whose text is only the
+address is as opaque as no link at all.
 
 **Find the candidates with `scripts/find_duplication.py`, then find the real duplication by
 reading.** The script counts the 8-word runs each pair of pages shares, which is a cheap way to
@@ -233,11 +244,12 @@ purpose.
 **A reviewer asked to check every rule at once finds the loudest fault in each paragraph and moves
 on, so the quieter faults survive.** The evidence is direct rather than theoretical. A combined
 sweep of one section of the literature review reported **zero** findings. A one-rule-at-a-time sweep
-of the same text, by the same model, found **30** — 26 pronouns, 2 unscoped superlatives, 2 umbrella
-nouns, and a money metaphor. Extended across the whole review, 6 sub-agents working one rule per
-pass returned 469 findings on a file that had already passed several reviews.
+of the same text, by the same model, found **30**. Pronouns accounted for 26 of them, and unscoped
+superlatives, umbrella nouns and a money metaphor for the rest. Extended across the whole review, 6
+sub-agents working one rule per pass returned 469 findings on a file that had already passed several
+reviews.
 
-**Say "one pass per rule" explicitly in the brief.** A brief that lists all eleven rules together
+**Say "one pass per rule" explicitly in the brief.** A brief that lists all thirteen rules together
 gets a sweep that honours none of them, because listing the rules is not the same instruction as
 sequencing them.
 
@@ -300,24 +312,25 @@ below sees every sentence at its shortest. Set the threshold lower than the 160 
 worked when splitting ran last, and treat the grep as a way in rather than as the pass: the finding
 is two claims, not a character count.
 
-**Rule 1 has a cheap way in: find the long sentences.** `grep -oE '[^.]{130,}\.'` over a
-whitespace-normalised copy returns the sentences worth reading, and the finding is real where the
-sentence carries two claims that read better apart. The joins to look for are "and" and "but", a
-semicolon, an em dash, a "so", a "which", and a trailing participle — the last three are the ones a
-sweep briefed on conjunctions alone will miss. A conjunction joining two verbs that share one
-subject is not a finding, and neither is a split that would leave a fragment.
+**Rule 2, long sentences carrying two claims, has a cheap way in: find the long sentences.** `grep
+-oE '[^.]{130,}\.'` over a whitespace-normalised copy returns the sentences worth reading, and the
+finding is real where the sentence carries two claims that read better apart. The joins to look for
+are "and" and "but", a semicolon, an em dash, a "so", a "which", and a trailing participle — the
+last three are the ones a sweep briefed on conjunctions alone will miss. A conjunction joining two
+verbs that share one subject is not a finding, and neither is a split that would leave a fragment.
 
-**Rule 5 has a cheap way in too: find the sentences carrying two or more numerals.** A count chain
-is where the fault lives, and a methods sentence reporting a screening funnel is where a count chain
-lives. `grep -oE '[^.]*[0-9]+[^.]*[0-9]+[^.]*\.'` over a whitespace-normalised copy finds them, and
-most will be fine. The ones that are not hand the reader a different unit at each number and define
-none of them.
+**Rule 6, counting nouns that never say what was counted, has a cheap way in too: find the sentences
+carrying two or more numerals.** A count chain is where the fault lives, and a methods sentence
+reporting a screening funnel is where a count chain lives. `grep -oE
+'[^.]*[0-9]+[^.]*[0-9]+[^.]*\.'` over a whitespace-normalised copy finds them, and most will be
+fine. The ones that are not hand the reader a different unit at each number and define none of them.
 
-**Rule 13 has a cheap way in too: grep for the throat-clearing openers themselves.** `grep -inE "it
-(is|would be) (worth|important|useful|interesting) (noting|saying|pointing out|mentioning)|let us
-(consider|turn to)|we now turn to|there are (several|many) reasons why|this raises the question of"`
-over a whitespace-normalised copy finds most instances directly, because the phrase itself is the
-fault rather than a symptom of it. The finding is real wherever the sentence could instead state its
+**Rule 13, sentences that announce content instead of stating it, has a cheap way in too: grep for
+the throat-clearing openers themselves.** `grep -inE "it (is|would be)
+(worth|important|useful|interesting) (noting|saying|pointing out|mentioning)|let us (consider|turn
+to)|we now turn to|there are (several|many) reasons why|this raises the question of"` over a
+whitespace-normalised copy finds most instances directly, because the phrase itself is the fault
+rather than a symptom of it. The finding is real wherever the sentence could instead state its
 content and skip the announcement — which is nearly always; the rare exception is a genuine
 transition sentence that a reader needs to see coming (a change of topic mid-page), which stays.
 
@@ -551,9 +564,9 @@ packages` inside a fenced block, and a serial-comma finding quoting those words 
 command. Nothing downstream notices: the page still lints, still builds, and `check_structure.py`
 sees no marker move. The script reports such a finding as `code block` and writes nothing, the way
 it already refuses one landing in a skill file's YAML frontmatter. Reword the finding to quote the
-prose it meant, or leave the block alone. A fence indented under a list item counts, because that is
-where most of this repo's fenced blocks sit — every one on the code-style page, and two of the six
-on the getting-started page.
+prose it meant, or leave the block alone. A fence indented under a list item counts too. Only 16 of
+the 120 fenced blocks across this repo's markdown are indented, but they cluster where a sweep runs:
+both blocks on the code-style page are indented, and 2 of the 7 on the getting-started page.
 
 **A replacement spanning a different number of lines from the text it replaced invalidates every
 line index taken before the splice.** A three-line span rewritten as one line moves every following
@@ -659,7 +672,7 @@ review comments asking for `main`'s fuller wording back. Losing information from
 worse than a little duplication with `docs/`. **Say this at the top of every sub-agent brief**,
 because a reviewer asked to improve prose will otherwise recommend tightening, and every one of
 those findings has to be thrown away. The rules themselves — the duplication bar, worked examples,
-load-bearing links, Dagster docstrings, the README collision — are on [the code-style
+load-bearing links, docstrings on Dagster assets, the README collision — are on [the code-style
 page](https://openclimatefix.github.io/nged-substation-forecast/architecture/code-style/) and are
 not repeated here.
 
@@ -691,29 +704,29 @@ Moving an S3 key format out of `list_timeseries_json_files` and into the private
 **Say what a word is before quoting a word count.** A count nobody can reproduce cannot be compared
 against the next package's, and these sweeps run one package at a time over months. What the waves
 so far counted: for a Python file, the text of every docstring and every comment and nothing else;
-for a markdown file, the whole file. `scripts/count_prose_words.py` is that definition written
-down as code, and its `--rev` flag reads each file at a git revision, so one command produces the
-before figure and the after figure. Report both in the pull-request body. The script refuses a path
-whose suffix is neither `.py` nor `.md`, and a directory named where a file was meant, because
-either would make the before figure a different measurement from the after figure.
+for a markdown file, the whole file. `scripts/count_prose_words.py` is that definition written down
+as code, and its `--rev` flag reads each file at a git revision, so one command produces the before
+figure and the after figure. Report both in the pull-request body. The script refuses a path whose
+suffix is neither `.py` nor `.md`, and a directory named where a file was meant, because either
+would make the before figure a different measurement from the after figure.
 
 **Verify which worktree you are in before reading a single file, and give sub-agents the absolute
 path.** This repo keeps a worktree per branch under `.claude/worktrees/`, and a session's primary
-directory is often a bridge worktree on `main` rather than the branch under review. The failure is
-silent and *inverts* your conclusion: `main` legitimately contains the text the branch removed, so a
-correct finding reads as false. Triaging one audit against the wrong worktree nearly rejected 10
-valid findings. Run `git rev-parse --abbrev-ref HEAD` first, and tell every sub-agent not to `cd` to
-the repository root.
+directory is often a bridge worktree — the scratch worktree a session starts in — sitting on `main`
+rather than on the branch under review. The failure is silent and *inverts* your conclusion: `main`
+legitimately contains the text the branch removed, so a correct finding reads as false. Triaging one
+audit against the wrong worktree nearly rejected 10 valid findings. Run `git rev-parse --abbrev-ref
+HEAD` first, and tell every sub-agent not to `cd` to the repository root.
 
 **Fix obviously-wrong prose you meet outside the nominal scope.** A prose sweep is the one time
 anybody reads these files closely, so filing a defect for later wastes the pass that found it. When
-a claim is checkably wrong — six passages called `init_time` "the NWP partition key" when
-`delta_store` partitions on two columns — correct it, and say in the pull-request body why the
-change reaches outside its stated scope.
+a claim is checkably wrong — six passages called `init_time` "the numerical weather prediction (NWP)
+partition key" when `delta_store` partitions on two columns — correct it, and say in the
+pull-request body why the change reaches outside its stated scope.
 
 ### Guards to run on a code prose sweep
 
-Four checks, none of which a `docs/` sweep needs:
+Five checks, none of which a `docs/` sweep needs:
 
 - **The abstract-syntax-tree guard**, `scripts/check_prose_only.py`, which proves that the sweep
   changed the *structure* of no file: parse each file at a git revision and again in the working
@@ -730,16 +743,27 @@ Four checks, none of which a `docs/` sweep needs:
     a decorator's string argument. A comment never reaches the tree at all, so a deleted `# noqa`, a
     changed `# type:` pragma and a removed coding line are invisible too. `pytest` catches an edited
     runtime string and `ruff` catches a deleted `# noqa`; nothing but a reader catches the rest.
+- **The comment-wrap guard**, `scripts/check_comment_wrap.py`, which finds the half-empty line a
+  splice leaves in the middle of a comment block. An apply script rewrites one line of a block and
+  re-wraps it, but `reflow_python_prose.py` declines any block whose lines already fit inside the
+  width, so on those blocks the re-wrap never runs and the spliced line keeps whatever break the
+  splice gave it. Three commits on one contracts branch each shipped a stranded line of between 9
+  and 35 characters, and a fourth survived review and merged. Neither `ruff` nor `ruff format`
+  reformats comment text, so nothing else reports one. Run it as `check_comment_wrap.py <merge-base>
+  <path> ...`. The gate is the count *rising*, because prose written before the guard existed holds
+  short lines that are nobody's defect, and those cancel. The guard reads `#` comments only: a
+  docstring's list items and `Args:` entries are legitimately short and all move when the prose
+  around them is rewritten, so the same counting there reports mostly noise.
 - **`pydoclint`**, for a docstring whose `Args:` or `Returns:` section disagrees with the signature.
   Ruff's `D417` sees only an `Args:` section that is present and incomplete, so it is silent on the
   two failures a rename actually produces. `pydoclint` runs as a pre-commit hook and as a CI step,
   so a sweep only has to read its output.
 - **A grep for reStructuredText cross-reference roles**, which reach the API pages as literal markup
-  because nothing interprets them. A `pygrep` pre-commit hook rejects them now, so a sweep inherits
-  the guard rather than running the grep itself. The lesson generalises past the one hook: **a sweep
-  that changes how a docstring renders has to read the rendered page.** The same blindness hides an
-  empty section heading, a nested list that flattens, and prose in a private function that
-  mkdocstrings never renders at all.
+  because nothing interprets them. A `pygrep` hook — pre-commit's regular-expression matcher —
+  rejects them now, so a sweep inherits the guard rather than running the grep itself. The lesson
+  generalises past the one hook: **a sweep that changes how a docstring renders has to read the
+  rendered page.** The same blindness hides an empty section heading, a nested list that flattens,
+  and prose in a private function that mkdocstrings never renders at all.
 - **Link resolution against the *built* site**, not a guessed slug: `uv run mkdocs build` and then
   check each URL's page and `#anchor` against the generated HTML. `scripts/lint/check_docs_links.py`
   does this repo-wide and is also a hook.

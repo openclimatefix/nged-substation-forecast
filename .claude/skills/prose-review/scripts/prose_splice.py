@@ -1,30 +1,32 @@
 """Project markdown to plain text, splice a sweep's replacement back in, and refuse the rest.
 
 `apply_findings.py` edits markdown files and `apply_findings_py.py` edits the docstrings and
-comments of Python files, but a docstring *is* markdown — mkdocstrings renders it onto an API page
-— so the ways a splice corrupts one are the ways it corrupts the other. This module holds
-everything both appliers need for that, and each keeps only what differs: how it finds the prose to
-search (markdown blocks against `ast` and `tokenize`), and how it re-wraps what it wrote.
+comments of Python files, but a docstring *is* markdown — mkdocstrings renders it onto an API
+page — so the ways a splice corrupts one are the ways it corrupts the other. This module holds
+everything both appliers need for that, and each keeps only what differs: how it finds the prose
+to search (markdown blocks against `ast` and `tokenize`), and how it re-wraps what it wrote.
 
 Three guards live here, and each exists because a splice without it silently damaged a file that
 then passed every linter in the repo:
 
-- **The offset map records where each character's markup ends, not only where the character sits.**
-  A map of bare character positions resumes the raw text before a closing backtick, so a serial
-  comma inserted after `n_h3_cells` is written as `` `n_h3_cells,` `` — the comma inside the code
-  span, the backtick count unchanged, and every count-based check satisfied. `CharSpan` widens each
-  projected character to the markup glued to it, and `splice` writes between those bounds.
+- **The offset map records where each character's markup ends, not only where the character
+  sits.** A map of bare character positions resumes the raw text before a closing backtick, so a
+  serial comma inserted after `n_h3_cells` is written as `` `n_h3_cells,` `` — the comma inside
+  the code span, the backtick count unchanged, and every count-based check satisfied. `CharSpan`
+  widens each projected character to the markup glued to it, and `splice` writes between those
+  bounds.
 - **A splice crossing a markup boundary deletes the closing marker.** Replacing `` `write_nwp`
-  helper `` with `the writer` leaves one unbalanced backtick, and the rest of the paragraph renders
-  as code. `markup_intact` counts the markers either side and refuses an edit that changes a count.
+  helper `` with `the writer` leaves one unbalanced backtick, and the rest of the paragraph
+  renders as code. `markup_intact` counts the markers either side and refuses an edit that
+  changes a count.
 - **A quote can match inside a code sample, where the words are a command rather than prose.**
   Splicing there rewrites a command a reader is meant to copy and run. `fenced_regions` gives the
   bounds of every fenced block so the caller can refuse a match that reaches one.
 
 A comment block opens every continuation line with a `#`, which a quote never carries. `project`
 takes a `continuation` pattern for that: whitespace containing a newline swallows whatever the
-pattern matches after it, so a sentence wrapped across three comment lines projects to one line and
-the offset map still points at real characters.
+pattern matches after it, so a sentence wrapped across three comment lines projects to one line
+and the offset map still points at real characters.
 """
 
 import difflib
@@ -59,7 +61,7 @@ FENCE: Final[re.Pattern[str]] = re.compile(r"^[ \t]*(?P<fence>`{3,}|~{3,})[^`\n]
 
 The indent is unbounded rather than CommonMark's three characters, because a fence inside a list
 item is indented to that item's content column: every fenced block on the code-style page is, and
-two of the six on the getting-started page are. A line that deep which is not a fence is inside an
+2 of the 7 on the getting-started page are. A line that deep which is not a fence is inside an
 indented code block anyway, where an edit is no more welcome.
 
 Nothing may follow the marker except an info string carrying no backtick, which is CommonMark's own
@@ -84,8 +86,9 @@ class CharSpan(NamedTuple):
     `text` is the character itself. `left` and `right` widen that to include the markup that must
     stay outside anything the splice writes: the opening backtick, `[` or `**` before the
     character, and the closing backtick, `](url)` or `**` after it. A comma inserted at that
-    boundary therefore lands after the closing marker, which is where this repo's prose puts it —
-    215 commas sit after a closing `**` across the docs and none inside one.
+    boundary therefore lands after the closing marker, which is where this repo's prose puts it.
+    `_lead_marker` below carries the counts, and the one exception they record: the bolded lead
+    that opens a block keeps its full stop inside its own markers.
     """
 
     left: int
@@ -417,9 +420,10 @@ def _lead_marker(*, raw: str, at: int) -> str:
     if opener == -1:
         return ""
     # A blockquote's markers are not text, so drop the leading run of them before asking what
-    # precedes the lead: what is left is either nothing or the one list marker `MARKER` describes.
-    # Only the leading run — a `>` later in the prefix is an arrow or a comparison, and `-> ` read
-    # as a bullet would pull the stop inside a bold span that opens nothing.
+    # precedes the lead: what is left is either nothing or a single list marker — the bullet or
+    # number `MARKER` matches. Only the leading run — a `>` later in the prefix is an arrow or a
+    # comparison, and `-> ` read as a bullet would pull the stop inside a bold span that opens
+    # nothing.
     before_opener = block[: opener - block_start]
     quoted = QUOTE_MARKERS.match(before_opener)
     before_opener = before_opener[quoted.end() :] if quoted else before_opener

@@ -1,7 +1,9 @@
 """Apply a sentence sweep's findings to hard-wrapped markdown, refusing the edits that corrupt it.
 
-A sub-agent reports a finding as the sentence it wants changed and the sentence it wants instead.
-Turning that into an edit is harder than it looks, and every guard below exists because its absence
+A sweep is one reading of a text against CLAUDE.md's prose rules, run by a sub-agent — a separate
+Claude instance with its own context. The sweep reports each fault as a finding: the sentence it
+wants changed, and the sentence it wants instead. Turning a finding into an edit is harder than it
+looks, and every guard below exists because its absence
 silently damaged a page that then passed `pymarkdown scan`, `mkdocs build --strict` and
 `check_information_loss.py`:
 
@@ -14,15 +16,18 @@ silently damaged a page that then passed `pymarkdown scan`, `mkdocs build --stri
 - The offset map has to record where each character's markup *ends*, not only where the character
   itself sits. A map of bare character positions resumes the raw text before a closing backtick, so
   a serial comma inserted after `n_h3_cells` is written as `` `n_h3_cells,` `` — the comma inside
-  the code span, the backtick count unchanged, and every markup check below satisfied.
+  the code span, the backtick count unchanged, and every count of the markers either side of the
+  edit unmoved.
 - A split whose full stop lands on a closing marker used to delete that marker. The markup counts
   either side of the splice must agree, or the edit is refused rather than written.
-- A bolded lead is the one span whose full stop belongs *inside* its markers, and the splice pulls
-  it there. The docs carry 371 leads written `**Lead.**` against 6 written `**Lead**.`, while every
-  span that does not open its block takes its punctuation outside.
+- A bolded lead — the sentence CLAUDE.md asks each paragraph to open with, written in `**` — is the
+  one span whose full stop belongs *inside* its markers, and the splice pulls it there. Every span
+  that does not open its block takes its punctuation outside instead. `prose_splice._lead_marker`
+  carries the counts both halves of that rule rest on.
 - A quote can match inside a fenced code block, where the words are a command rather than prose.
   Splicing there rewrites the command, and every check downstream passes. A finding whose span
-  reaches into a fence is refused, as one landing in YAML frontmatter already is.
+  reaches into a fence is refused. So is a finding landing in a file's YAML frontmatter, where the
+  text is configuration rather than prose.
 - Re-wrapping the whole file buries the change, so only the unit the splice landed in is
   re-wrapped, at `markdown_wrap.WIDTH`.
 - A replacement that spans a different number of lines from the text it replaced invalidates any
@@ -138,9 +143,10 @@ def locate(*, raw: str, quote: str) -> tuple[tuple[int, int] | None, int]:
 def units(block: str) -> list[tuple[int, int]]:
     """The `(first_line, last_line + 1)` bounds of each wrapping unit in `block`.
 
-    A bullet list written without blank lines between its items is one block, so re-wrapping
-    whole blocks would reflow every sibling of the item that changed. A unit is finer: a run of
-    lines starting at a list marker, or the whole block where it carries no markers.
+    A block is a run of lines with no blank line in it. A bullet list written without blank lines
+    between its items is therefore one block, so re-wrapping whole blocks would reflow every
+    sibling of the item that changed. A unit is finer: a run of lines starting at a list marker,
+    or the whole block where it carries no markers.
     """
     lines = block.split("\n")
     starts = [0, *(index for index in range(1, len(lines)) if MARKER.match(lines[index]))]
@@ -185,8 +191,9 @@ def _trailing_blanks(unit_lines: list[str]) -> tuple[list[str], list[str]]:
 
     Blocks are separated by blank lines, so the only unit that can end in one is the last of a
     file that ends with a newline: splitting that block on newlines leaves an empty final line.
-    Re-flowing the empty line away strips the file's trailing newline, and stops the unit's own
-    width from solving.
+    Re-flowing the empty line away strips the file's trailing newline. It also leaves the wrapper
+    measuring an empty line as part of the paragraph, so the width it computes for the unit is
+    the width of a paragraph that is not there.
     """
     end = len(unit_lines)
     while end and not unit_lines[end - 1].strip():

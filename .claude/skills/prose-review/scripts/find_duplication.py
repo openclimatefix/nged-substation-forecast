@@ -1,14 +1,16 @@
-"""Find prose that more than one page carries, as a starting hint for a cross-page pass.
+"""Find prose that more than one page carries, as a starting hint for Pass F of a prose review.
 
 An idea should live on the one page a reader would look for it on, and every other page should
 link to that page rather than explaining the idea again. This script finds the pages that repeat
-each other *verbatim*, by counting the overlapping word runs they share.
+each other *verbatim*, by counting the shingles they share. A shingle is one overlapping run of
+nine words: a 12-word sentence contributes four of them, each starting one word later than the
+last.
 
 **Read the output as a hint, never as the work list.** Verbatim overlap is the small half of the
 problem: across this repo's docs it accounts for only 3% to 15% of any page, while the redundancy
 that actually costs a reader is the same idea written out twice in different words, which no
-shingle count can see. Use the pairs below to choose which pages to read side by side, then find
-the real duplication by reading them.
+count of shared shingles can see. Use the pairs below to choose which pages to read side by side,
+then find the real duplication by reading them.
 
 Usage::
 

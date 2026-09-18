@@ -1,8 +1,8 @@
 """Apply a sentence sweep's findings to the docstrings and comments of hard-wrapped Python files.
 
 A docstring is markdown — mkdocstrings renders it onto an API page — so the ways a splice corrupts
-one are the ways it corrupts a `.md` page. The projection, the splice and the two markup guards
-therefore live in `prose_splice.py` and are shared with `apply_findings.py`, the markdown sibling.
+one are the ways it corrupts a `.md` page. The projection, the splice and the three guards therefore
+live in `prose_splice.py` and are shared with `apply_findings.py`, the markdown sibling.
 What is left here is everything a Python file needs and a markdown file does not:
 
 - **`ast` and `tokenize` find the prose, rather than markdown blocks.** A docstring contributes the
@@ -14,8 +14,9 @@ What is left here is everything a Python file needs and a markdown file does not
   carries. `prose_splice.project` takes the marker as its `continuation` pattern and swallows it
   into the whitespace it follows.
 - **A span reaching across a blank line would weld two paragraphs together**, because the
-  replacement is a single line. Only the run that really changes is tested, since every unchanged
-  run is copied from the file character for character.
+  replacement is a single line. Only the run that really changes is tested for that, since every
+  unchanged run is copied from the file character for character, and a changed run crossing a
+  blank line is refused.
 - **A quote can match inside a code sample.** A fenced block and a reStructuredText `::` literal
   block both carry commands a reader is meant to copy and run, and a splice there rewrites the
   command while every check downstream passes. A match reaching one is refused.
@@ -428,7 +429,7 @@ def _changed_raw(*, raw: str, found: Match, bounds: tuple[int, int]) -> str:
         bounds: The changed run's bounds within the matched quote.
 
     Returns:
-        The raw text of that run, which is empty-ish for a pure insertion.
+        The raw text of that run, which is empty or a single space for a pure insertion.
     """
     low, high = bounds
     last = len(found.spans) - 1
@@ -556,9 +557,12 @@ def comment_lines(source: str) -> frozenset[int]:
 def _is_prose_comment(text: str) -> bool:
     """Whether one whole-line comment is prose, rather than a directive or hand-aligned text.
 
-    `text` carries its own leading `#`, which `DIRECTIVE_COMMENT` and `URL_ONLY_COMMENT` are
-    anchored on. `NOT_PROSE` is searched in what follows the marker instead, because it matches a
-    bare `#` too and would otherwise match the marker on every comment line ever written.
+    Three patterns decide it: `DIRECTIVE_COMMENT` matches a `noqa` or `type:` instruction to a
+    tool, `URL_ONLY_COMMENT` matches a line holding nothing but a link, and `NOT_PROSE` matches
+    the code and markup a comment can carry. `text` keeps its own leading `#`, which the first
+    two are anchored on, and `NOT_PROSE` is searched in what follows the marker instead, because
+    it matches a bare `#` too and would otherwise match the marker on every comment line ever
+    written.
 
     Args:
         text: The comment line with its indent stripped, `#` included.
@@ -579,7 +583,7 @@ def _prefix_of(*, line: str, is_comment: bool) -> str:
         is_comment: True when `tokenize` says the line is a whole-line comment.
 
     Returns:
-        The prefix `_wrap` re-adds to each output line.
+        The prefix `markdown_wrap._wrap` re-adds to each output line.
     """
     marker = COMMENT_MARKER.match(line) if is_comment else None
     return marker.group(1) if marker else line[: len(line) - len(line.lstrip())]
@@ -595,7 +599,7 @@ def _is_wrappable_prose(*, line: str, prefix: str, is_comment: bool) -> bool:
 
     Args:
         line: The line to test.
-        prefix: The block's prefix, which `_is_unwrappable` must not see.
+        prefix: The block's prefix, which `markdown_wrap._is_unwrappable` must not see.
         is_comment: True when `tokenize` says the line is a whole-line comment.
 
     Returns:
