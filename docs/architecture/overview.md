@@ -80,7 +80,7 @@ implementation. Each subclass of `BaseForecaster` is responsible for defining:
 * _Feature engineering_: Each subclass carries a `feature_engineer: ClassVar[FeatureEngineer]`
   strategy (composition, not inheritance) that owns the full preparation pipeline — from raw inputs
   (observed power, gridded NWP, time-series metadata) to an `AllFeatures` frame. The default
-  `TabularFeatureEngineer` does the nearest-cell NWP spatial join then runs the tabular feature
+  `TabularFeatureEngineer` does the containing-cell NWP spatial join then runs the tabular feature
   pipeline. A future model that needs a different data view (e.g. a CNN wanting a spatial NWP crop
   per time series) overrides `feature_engineer` with a different `FeatureEngineer` subclass without
   touching `BaseForecaster` or any other model. `FeatureEngineer` and `TabularFeatureEngineer` live
