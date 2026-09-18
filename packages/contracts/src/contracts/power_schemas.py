@@ -236,7 +236,8 @@ class TimeSeriesMetadata(pt.Model):
         dtype=pl.Enum(["BSP", "EHV Customer", "GSP", "HV Customer", "Primary"]),
         description=(
             "Substation voltage level / role: BSP, EHV Customer, GSP, HV Customer, or Primary."
-            " HV = high voltage. EHV = extra high voltage."
+            " BSP = bulk supply point. GSP = grid supply point. HV = high voltage."
+            " EHV = extra high voltage."
         ),
     )
 
