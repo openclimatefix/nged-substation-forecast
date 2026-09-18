@@ -1,17 +1,20 @@
 """Rewrap docstring and prose-comment text in Python source files to `markdown_wrap.WIDTH`.
 
-`#690`/`#762` hard-wrapped every `.md` file's prose to `markdown_wrap.WIDTH`; this script applies
-the same wrapping to the prose inside `.py` files, which the markdown reflow never touched. Two
-kinds of text are in scope:
+Every `.md` file's prose is hard-wrapped to `markdown_wrap.WIDTH`; this script applies the same
+wrapping to the prose inside `.py` files, which the markdown reflow does not reach. Two kinds of
+text are in scope:
 
-- **Docstrings** — a module, class, function or async-function docstring, found via `ast` the same
-  way `lint_docstring_markdown.py` finds them. `mkdocstrings` renders these as markdown, so they
-  reflow with `markdown_wrap.reflow_text`, the same engine that reflows a `.md` file.
+- **Docstrings** — a module, class, function, or async-function docstring, found via `ast` the same
+  way `lint_docstring_markdown.py` finds them. `mkdocstrings` renders these docstrings as markdown,
+  so they reflow with `markdown_wrap.reflow_text`, the same engine that reflows a `.md` file.
 - **Prose comment blocks** — a run of two or more consecutive whole-line `#` comments at the same
   indent, at least one of which runs past `WIDTH`, wrapped with the same greedy word-wrap
-  `markdown_wrap._wrap` uses. A comment carrying a linter directive (`noqa`, `fmt: off`,
-  `type:`), a shebang, a blockquote or doctest `>`, a banner rule of dashes, or a single trailing
-  inline comment is left alone, since none of those is prose.
+  `markdown_wrap._wrap` uses. A block is refused outright wherever repacking it would destroy what
+  the lines already carry: a linter directive (`noqa`, `fmt: off`, `type:`), a shebang, a
+  blockquote or doctest `>`, a banner rule of dashes, a line whose whole content is one URL, an
+  embedded second `#`, a run of hand-aligning spaces, or a tab. A single trailing inline comment
+  needs no rule of its own, because a trailing inline comment is never part of a run of two
+  whole-line comments.
 
 Neither kind of text is touched by `ruff format`, which reformats code but leaves comments and
 string literals as the author wrote them (see the `E5` entry in `pyproject.toml`'s `select` list) —
@@ -61,13 +64,13 @@ reads them over a file copied out of here, even though `pyproject.toml` configur
 QUOTED_COMMENT: Final[re.Pattern[str]] = re.compile(r"^#\s*>")
 """A comment whose text opens with `>` — a blockquote, or a `>>>` doctest example.
 
-`reflow_text` reads such a line as a blockquote and repeats the `>` marker on every line it wraps
-onto, while `_flatten` strips only the `#` marker, so each added `>` counts as a new word and the
-round-trip assertion in `reflow_python_prose` fires. That assertion aborts the whole run, after the
-files already processed have been written, and this script is run over a batch of files at a time.
-Stripping `>` in `_flatten` the way `markdown_wrap._flatten` does would silence the assertion and
-leave the block rewrapped — wrong for a doctest, whose line breaks are part of the example — so the
-block is refused instead.
+`reflow_text` reads a `>` comment line as a blockquote and repeats the `>` marker on every line it
+wraps onto, while `_flatten` strips only the `#` marker. Each added `>` therefore counts as a new
+word, and the round-trip assertion in `reflow_python_prose` fires. That assertion aborts the whole
+run, after the files already processed have been written, and this script is run over a batch of
+files at a time. Stripping `>` in `_flatten` the way `markdown_wrap._flatten` does would silence the
+assertion and leave the block rewrapped — wrong for a doctest, whose line breaks are part of the
+example — so the block is refused instead.
 """
 
 BANNER_COMMENT: Final[re.Pattern[str]] = re.compile(r"^#\s*[-=*_~]{3,}\s*$")
@@ -95,10 +98,10 @@ NOT_PROSE: Final[re.Pattern[str]] = re.compile(r"#|  ")
 
 A `#` here is a second, embedded directive — `storage.py`'s aligned-key comment carries a `# noqa:
 E501` after two spaces of padding, not at the line's own start, so `DIRECTIVE_COMMENT` alone (which
-only matches at the start of the text) does not catch it. An interior double space is the same
-comment's arrow diagram, hand-aligned to point at three substrings of a sample key — the alignment
-is the content, and collapsing it to a single space the way ordinary prose is collapsed would
-destroy it.
+only matches at the start of the text) does not catch the directive. An interior double space is the
+same comment's arrow diagram, hand-aligned to point at three substrings of a sample key. The
+alignment is the content, and collapsing the padding to a single space the way ordinary prose is
+collapsed would destroy the diagram.
 """
 
 COMMENT_MARKER: Final[re.Pattern[str]] = re.compile(r"^[ \t]*#[ \t]?")
@@ -176,13 +179,13 @@ def _reflow_docstring(content: str, quote_width: int) -> str:
     Leaves the docstring untouched if its dedented body carries a line indented 4 or more columns
     (beyond the first line, which is never indented): `markdown_wrap.reflow_text` understands a
     CommonMark list item or blockquote, but a Google-convention `Args:`/`Returns:`/`Raises:`
-    section — 44 files in this repo have one — is neither; its `name: description` entries carry
-    no marker `reflow_text` recognises, so it reads the whole section as one paragraph and merges
-    every parameter into a single run-on line. The same threshold also catches a reST `::`
-    literal block (an indented shell command in a docstring elsewhere in this repo), which
-    `reflow_text` has no fenced-code exemption for either. A plain paragraph that happens to
-    carry 1-3 columns of leftover indentation from a previous hand-wrap is common and harmless to
-    reflow normally, which is why the threshold is 4, not 1.
+    section — 49 files in this repo have one — is neither. Its `name: description` entries carry
+    no marker `reflow_text` recognises, so `reflow_text` reads the whole section as one paragraph
+    and merges every parameter into a single run-on line. The same threshold also catches a
+    reStructuredText `::` literal block (an indented shell command in a docstring elsewhere in
+    this repo), which `reflow_text` has no fenced-code exemption for either. A plain paragraph
+    that happens to carry 1-3 columns of leftover indentation from a previous hand-wrap is common
+    and harmless to reflow normally, which is why the threshold is 4, not 1.
 
     Also leaves the docstring untouched if any line carries an `INTERIOR_DOUBLE_SPACE` — the same
     hand-alignment signal `_is_prose_comment` already exempts a comment block for.
@@ -344,9 +347,10 @@ def _reflow_comment_block(lines: list[str], indent: int) -> list[str] | None:
     two short lines, an enumeration written one item per line — and nothing in a `#` comment
     distinguishes a deliberate line break from a break the wrapper happened to put there.
     `ruff`'s `E501` already keeps an ordinary comment inside `WIDTH`, and every comment line past
-    `WIDTH` in this repo is a bare URL, which `URL_ONLY_COMMENT` refuses anyway — so the
-    restriction skips no reflow this repo wants, and leaves the script ready for the first
-    comment that does overflow.
+    `WIDTH` in this repo is refused on some other ground anyway: a bare URL (`URL_ONLY_COMMENT`),
+    `storage.py`'s hand-aligned sample key (`NOT_PROSE`), or a trailing inline comment, which can
+    never be part of a run of two. So the restriction skips no reflow this repo wants, and leaves
+    the script ready for the first comment that does overflow.
     """
     if all(len(line.rstrip("\n")) <= WIDTH for line in lines):
         return None

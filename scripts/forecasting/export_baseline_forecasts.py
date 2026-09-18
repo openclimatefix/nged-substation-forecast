@@ -1,4 +1,4 @@
-"""Export a CV experiment's forecasts to three parquet files for offline analysis.
+"""Export one cross-validation experiment's forecasts to three parquet files for offline analysis.
 
 Written for issue #179: hand the weather/calendar-only baseline forecasts (the switching-event
 "shared baseline") to a colleague for switching-event detection work. The forecasts are read from
@@ -6,10 +6,10 @@ the internal ``power_forecasts`` Delta table and written as three self-contained
 all in physical MW/MVA units (``power_fcst`` is already stored in MW/MVA on disk — see
 ``PowerForecast.power_fcst``; the per-series unit lives in ``TimeSeriesMetadata.units``).
 
-For each ``(time_series_id, valid_time)`` we keep only the **freshest** forecast run — the one
-whose ``power_fcst_init_time`` is largest (i.e. the most recent run that still precedes the target
-time). ``PowerForecast`` guarantees ``valid_time > power_fcst_init_time``, so this is an
-analysis-proxy view: the shortest-lead hindcast of expected power, which is the natural baseline
+For each ``(time_series_id, valid_time)`` we keep only the **freshest** forecast run — the run
+whose ``power_fcst_init_time`` is largest, which is the most recent run that still precedes the
+target time. ``PowerForecast`` guarantees ``valid_time > power_fcst_init_time``, so the export is
+an analysis-proxy view: the shortest-lead hindcast of expected power, which is the natural baseline
 for an observed-minus-expected residual.
 
 Three files are written:

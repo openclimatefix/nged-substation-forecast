@@ -1,15 +1,15 @@
 """Check that every name a marimo notebook's cells reference is bound inside the notebook.
 
 Marimo never executes a notebook's module-level statements, so a name bound there is invisible to
-every cell and the notebook dies with a `NameError` the next time it is opened — while ruff, ty
-and pytest all pass, because the file they were handed is valid Python. `ruff check --fix` and
-`marimo check --fix` each produce that shape from a working notebook. Full rationale, and what
-this check can and cannot catch:
+every cell and the notebook dies with a `NameError` the next time it is opened. Ruff, ty, and
+pytest all pass meanwhile, because the file they were handed is valid Python. `ruff check --fix`
+and `marimo check --fix` each produce that shape from a working notebook. Full rationale, and
+what this check can and cannot catch:
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#marimo-notebooks-bind-every-name-their-cells-reference>
 
 `Cell.refs` and `Cell.defs` are public marimo API; parsing a notebook without running it is not,
-so this reads `marimo._ast`. The serialized form carries the line numbers and the compiled form
-carries the names, so both are needed.
+so this script reads `marimo._ast`. The serialized form carries the line numbers and the compiled
+form carries the names, so both forms are needed.
 """
 
 import builtins
@@ -80,8 +80,8 @@ def unbound_cells(path: Path) -> list[UnboundCell]:
     compiled = InternalApp(load_notebook_ir(notebook)).cell_manager.cell_data()
     cells: list[tuple[int, Cell]] = []
     # `load_notebook_ir` registers one compiled cell per serialized cell, so `strict` never fires
-    # unless that stops being true — in which case the line numbers below would be attached to the
-    # wrong cells, and a loud failure beats a misleading report.
+    # unless that one-to-one correspondence stops holding — in which case the line numbers below
+    # would be attached to the wrong cells, and a loud failure beats a misleading report.
     for data, source in zip(compiled, notebook.cells, strict=True):
         if data.cell is None:
             raise ValueError(f"marimo cannot compile the cell at line {source.lineno}")
@@ -98,7 +98,7 @@ def _check_file(path: Path) -> list[str]:
     """Return one human-readable finding per unbound-name cell in the notebook at `path`.
 
     A file that cannot be checked at all is itself a finding, rather than a raised exception, so
-    that one bad path cannot hide the findings for the others the hook was given.
+    that one bad path cannot hide the findings for the other paths the hook was given.
     """
     try:
         unbound = unbound_cells(path)

@@ -1,7 +1,7 @@
 """Rewrap every markdown file given on the command line to `markdown_wrap.WIDTH`.
 
 Headings, tables, fenced and indented code blocks, and YAML frontmatter are left untouched: only
-prose paragraphs, list items and blockquotes are re-flowed. A markdown link is kept whole even when
+prose paragraphs, list items, and blockquotes are re-flowed. A markdown link is kept whole even when
 its label contains spaces, so a line break can never fall inside `[label](target)`.
 
 Usage::

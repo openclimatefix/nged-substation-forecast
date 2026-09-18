@@ -1,16 +1,16 @@
 """The one wrap width every docs-reflow script in this repo targets, and a whole-file reflow.
 
-Before #690, this repo's pages were wrapped anywhere between 94 and 100 characters, so a script
-touching one had to solve which width it was already at before it could reflow a line without
-rewrapping the whole unit. The corpus is now uniformly wrapped at `WIDTH`, so every such script
-imports it from here instead of assuming or solving its own answer.
+This repository's markdown prose is hard-wrapped at `WIDTH`, and `pymarkdown`'s `MD013` rule
+holds it there. A script that rewraps one line of a page therefore does not have to solve which
+width that page is already at before it can match the lines around the edit, and every reflow
+script imports `WIDTH` from here rather than assuming a width or solving for one.
 """
 
 import re
 from typing import Final
 
 WIDTH: Final[int] = 100
-"""Column at which prose in `docs/`, the READMEs and the skill files is wrapped."""
+"""Column at which prose in `docs/`, the READMEs, and the skill files is wrapped."""
 
 FRONTMATTER: Final[re.Pattern[str]] = re.compile(r"\A---\n.*?\n---\n", re.DOTALL)
 """A skill file's YAML block, left untouched: its indented lines would otherwise read as a list."""
@@ -31,12 +31,13 @@ QUOTE_MARKER: Final[re.Pattern[str]] = re.compile(r"^(\s*(?:>\s?)+)")
 BLOCK_OPENER: Final[re.Pattern[str]] = re.compile(r"^(#|>|`{3,}|~{3,})|^[-*+]\Z|^\d+[.)]\Z")
 """A whitespace-split token that opens a new block wherever it starts a line, wrapping or not.
 
-A wrapped continuation line landing on one of these is read as a heading, a blockquote, a list
-item or a fence rather than as the rest of the sentence it belongs to — the same class of bug
-`mkdocs-authoring` documents for `#`, generalised to every other token CommonMark treats the same
-way. `#` and `>` open their block with no space required after the marker, so a token merely
-*starting* with one is risky; `-`, `*`, `+` and an ordered marker need the following space that
-`_tokenise` has already split off, so only a token that *is* the bare marker is risky.
+A wrapped continuation line landing on one of these tokens is read as a heading, a blockquote, a
+list item, or a fence rather than as the rest of the sentence it belongs to — the same class of
+bug `mkdocs-authoring` documents for `#`, generalised to every other token CommonMark treats the
+same way. `#` and `>` open their block with no space required after the marker, so a token merely
+*starting* with `#` or `>` is risky. The markers `-`, `*`, `+`, and an ordered marker each need
+the following space that `_tokenise` has already split off, so only a token that *is* the bare
+marker is risky.
 """
 
 
@@ -44,15 +45,16 @@ def _tokenise(text: str) -> list[str]:
     """Split `text` on whitespace, gluing a `BLOCK_OPENER` word to the word before it.
 
     A link's destination is never split from the label word before it, because nothing in
-    `[label](destination)` puts whitespace between `]` and `(` — the repo already wraps a link's
-    label across lines this way (`docs/index.md`'s "Requirements to Operating / model & handover"
-    before #690), so this needs no special-casing.
+    `[label](destination)` puts whitespace between `]` and `(`. The label itself does wrap across
+    lines, and renders correctly when it does: `packages/delta_store/README.md` carries a link
+    whose label breaks after "Storage formats: measured, not". So the label needs no
+    special-casing.
 
-    A word that happens to start with `#`, `>`, a list marker or a fence marker is read as
+    A word that happens to start with `#`, `>`, a list marker, or a fence marker is read as
     opening that block wherever it lands at the start of a line, so it can never be the first
-    word on a wrapped line. Gluing it to its predecessor keeps the pair on one line together and
-    lets `_wrap` treat the pair as one token, rather than discovering the clash after the line is
-    already full and having to push the width past `WIDTH` to fix it.
+    word on a wrapped line. Gluing that word to its predecessor keeps the pair on one line
+    together and lets `_wrap` treat the pair as one token, rather than discovering the clash
+    after the line is already full and having to push the width past `WIDTH` to fix the clash.
     """
     words = text.split()
     glued: list[str] = []
@@ -83,20 +85,21 @@ def _wrap(words: list[str], *, initial_indent: str, subsequent_indent: str) -> l
 
 
 def _reflow_unit(unit_lines: list[str]) -> list[str]:
-    """Reflow one list item, blockquote or plain paragraph to `WIDTH`, preserving its prefix.
+    """Reflow one list item, blockquote, or plain paragraph to `WIDTH`, preserving its prefix.
 
     A blockquote marker is stripped and reapplied to every output line uniformly, before the list
-    or plain-paragraph handling runs on what is left — which is what lets a list item nested
-    inside a blockquote (each source line prefixed `> - `) keep its own marker rather than being
-    read as ordinary quoted prose and merged with its siblings into one paragraph.
+    or plain-paragraph handling runs on what is left. Stripping the marker first is what lets a
+    list item nested inside a blockquote (each source line prefixed `> - `) keep its own marker
+    rather than being read as ordinary quoted prose and merged with its siblings into one
+    paragraph.
 
     A paragraph with no marker of its own can still be a list item's body: Python-Markdown treats
     any indent at or past the item's content column as part of that item, including a second
-    paragraph separated from the marker line by a blank line. Such a paragraph carries that
+    paragraph separated from the marker line by a blank line. An unmarked paragraph carries that
     indent on its own first line, so preserving whatever indent the first de-quoted line already
-    has — rather than flattening every unmarked paragraph to column 0 — is what keeps it inside
-    the list item it belongs to instead of closing the list and starting a new top-level
-    paragraph.
+    has — rather than flattening every unmarked paragraph to column 0 — is what keeps the
+    paragraph inside the list item it belongs to instead of closing the list and starting a new
+    top-level paragraph.
     """
     quote_match = QUOTE_MARKER.match(unit_lines[0])
     quote_prefix = quote_match.group(1) if quote_match else ""
@@ -179,15 +182,15 @@ def _flatten(text: str) -> str:
 
 
 def reflow_text(source: str) -> str:
-    """Rewrap every prose paragraph, list item and blockquote in `source` to `WIDTH`.
+    """Rewrap every prose paragraph, list item, and blockquote in `source` to `WIDTH`.
 
-    Headings, tables, fenced code blocks and a leading YAML frontmatter block are left untouched.
-    There is no exemption for a CommonMark *indented* code block (4+ spaces, no fence): the
-    `code-style` skill requires every code sample in this repo to be fenced, and a 4-space indent
-    with no marker is otherwise indistinguishable from a nested list item's continuation, which
-    does need rewrapping — `#690` found none of the former across the whole corpus, so this
-    treats an indented, unmarked line as prose rather than risk silently skipping list
-    continuations.
+    Headings, tables, fenced code blocks, and a leading YAML frontmatter block are left
+    untouched. There is no exemption for a CommonMark *indented* code block (4+ spaces, no
+    fence): the `code-style` skill requires every code sample in this repo to be fenced, and a
+    4-space indent with no marker is otherwise indistinguishable from a nested list item's
+    continuation, which does need rewrapping. A scan of all 96 markdown files in the repository
+    found no unfenced indented code block outside a list, so an indented, unmarked line is
+    treated as prose rather than risk silently skipping list continuations.
 
     `source` must end in a newline, as every file in this repo does.
     """

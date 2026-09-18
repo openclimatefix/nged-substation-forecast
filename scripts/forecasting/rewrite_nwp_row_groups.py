@@ -2,18 +2,20 @@
 
 `delta_store.nwp.write_nwp` lands one ensemble member per Parquet row group, which is what lets a
 single-member read skip the rest of a partition. Partitions written before that layout existed hold
-row groups spanning many members, and because an NWP partition is written once and never revisited,
-they stay that way until a migration rewrites them. This script is that migration.
+row groups spanning many members, and because a numerical-weather-prediction (NWP) partition is
+written once and never revisited, those partitions stay that way until a migration rewrites them.
+This script is that migration.
 
-**Run this against the local table.** What this layout speeds up is a single-member read that
-spans many stored runs, and the read spanning the most runs by far is the control-member read the
-cross-validation assets do at training time, against the local table. Nothing running on AWS reads
-the back catalogue: the live forecast pins ``init_time`` to the one freshest run, which every write
-from now on lays out correctly anyway. The ``view_forecasts`` dashboard does read about 17 stored
+**Run this script against the local table.** The member-aligned layout speeds up a single-member
+read that spans many stored runs, and the read spanning the most runs by far is the control-member
+read the cross-validation assets do at training time, against the local table. Nothing running on
+AWS reads the back catalogue: the live forecast pins ``init_time`` to the one freshest run, which
+every write lays out correctly anyway. The ``view_forecasts`` dashboard does read about 17 stored
 runs from S3 with a single-member filter, but an ``h3_index`` filter already cuts that query to one
-H3 cell in 1,671 and it returns in about 0.2 s, so the S3 table is not worth rewriting for it. Run
-this against the S3 table if training ever moves to AWS: the script rewrites only the partitions it
-measures as unaligned, so running it later costs exactly what running it now would.
+H3 cell in 1,671, and the query returns in about 0.2 s, so the S3 table is not worth rewriting for
+the dashboard. Run this script against the S3 table if training ever moves to AWS: the script
+rewrites only the partitions it measures as unaligned, so running it later costs exactly what
+running it now would.
 
 Each partition is read back through the contract, re-validated, and written through ``write_nwp``,
 which replaces that ``(nwp_model_id, init_time)`` partition and nothing else. A partition whose row

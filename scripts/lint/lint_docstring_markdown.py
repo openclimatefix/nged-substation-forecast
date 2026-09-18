@@ -16,8 +16,8 @@ from typing import Final
 PYMARKDOWN_CONFIG: Final[str] = ".pymarkdown-docstrings.json"
 """Config overrides layered on top of `pyproject.toml`'s `[tool.pymarkdown]` for docstring text.
 
-Disables rules that only make sense for a whole document (e.g. requiring the first line to be a
-heading), since a docstring is a prose fragment, not a document.
+Disables the two rules that only make sense for a whole document — requiring the first line to be a
+heading, and requiring a trailing newline — since a docstring is a prose fragment, not a document.
 """
 
 
