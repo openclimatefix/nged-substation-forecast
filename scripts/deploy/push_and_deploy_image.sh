@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 #
-# Push the already-built production image to ECR and point the ECS task definition at it.
+# Push the already-built production image to the Elastic Container Registry (ECR) and point the
+# Elastic Container Service (ECS) task definition at it.
 #
 # The script is Step 6 of the AWS setup runbook as one command and, together with
 # scripts/deploy/build_and_verify_image.sh, the whole recurring champion-redeploy loop (aws.md
@@ -18,12 +19,12 @@
 #   - The AWS account id comes from `aws sts get-caller-identity` — never typed by hand.
 #   - Region, repository, task-definition family, and container name are the fixed names the
 #     runbook establishes (eu-west-2 / nged-forecast everywhere). Region is passed explicitly on
-#     every AWS call because the command-line interface falls back to the configured default region
-#     when `--region` is omitted, which aws.md Step 10 warns about by name.
+#     every AWS call because the AWS command-line interface falls back to the configured default
+#     region when `--region` is omitted, which aws.md Step 10 warns about by name.
 #
 # What the script does:
-#   1. Push: Elastic Container Registry (ECR) login — the instance or user credentials come from
-#      your AWS config or role, and no static keys are handled here — then tag, then push.
+#   1. Push: ECR login — the instance or user credentials come from your AWS config or role, and no
+#      static keys are handled here — then tag, then push.
 #   2. Deploy: if the `nged-forecast` task-definition family exists, register a NEW REVISION that
 #      is a copy of the latest revision with only the container image URI changed. The
 #      EcsRunLauncher on the control-plane box resolves the family's latest revision at launch
@@ -41,8 +42,8 @@
 #
 # Deliberately NOT here: creating any infrastructure (buckets, Identity and Access Management
 # roles, the cluster, the first task definition). One-time infrastructure stays in the console, per
-# the runbook, until the AWS infrastructure is codified as infrastructure-as-code — ad-hoc bash
-# that mutates infrastructure would be unreviewable.
+# the runbook, until infrastructure-as-code replaces those console steps — ad-hoc bash that mutates
+# infrastructure would be unreviewable.
 
 set -euo pipefail
 

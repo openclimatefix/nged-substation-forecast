@@ -179,7 +179,7 @@ def _reflow_docstring(content: str, quote_width: int) -> str:
     Leaves the docstring untouched if its dedented body carries a line indented 4 or more columns
     (beyond the first line, which is never indented): `markdown_wrap.reflow_text` understands a
     CommonMark list item or blockquote, but a Google-convention `Args:`/`Returns:`/`Raises:`
-    section — 49 files in this repo have one — is neither. Its `name: description` entries carry
+    section, which 49 files in this repo carry, is neither. Its `name: description` entries carry
     no marker `reflow_text` recognises, so `reflow_text` reads the whole section as one paragraph
     and merges every parameter into a single run-on line. The same threshold also catches a
     reStructuredText `::` literal block (an indented shell command in a docstring elsewhere in

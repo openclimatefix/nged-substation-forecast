@@ -1,9 +1,9 @@
 """The one wrap width every docs-reflow script in this repo targets, and a whole-file reflow.
 
 This repository's markdown prose is hard-wrapped at `WIDTH`, and `pymarkdown`'s `MD013` rule
-holds it there. A script that rewraps one line of a page therefore does not have to solve which
-width that page is already at before it can match the lines around the edit, and every reflow
-script imports `WIDTH` from here rather than assuming a width or solving for one.
+holds the prose there. A script that rewraps one line of a page therefore does not have to solve
+which width that page is already at before it can match the lines around the edit. Every reflow
+script imports `WIDTH` from here rather than assuming a width or solving for each page's width.
 """
 
 import re
