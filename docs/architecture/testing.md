@@ -1,9 +1,11 @@
 # Testing
 
 How the test suite is wired up, the house style for writing tests, and the notable test suites that
-guard tricky invariants. One testing gotcha lives elsewhere because it is not really about tests:
-Polars row counts wrapping past 2³² rows, in [Performance and
-Scale](performance.md#the-other-hard-ceiling-polars-32-bit-row-index).
+guard tricky invariants. This repository is a uv workspace monorepo: one root application, plus the
+member packages under `packages/`, all sharing one lockfile and one environment. Its tabular data is
+handled by Polars, the dataframe library, and its pipeline is orchestrated by Dagster. One testing
+gotcha lives elsewhere because it is not really about tests: Polars row counts wrapping past 2³²
+rows, in [Performance and Scale](performance.md#the-other-hard-ceiling-polars-32-bit-row-index).
 
 ## Where tests and their dependencies live
 
@@ -43,28 +45,32 @@ Scale](performance.md#the-other-hard-ceiling-polars-32-bit-row-index).
   is shared across more than one test module *within a single package*, put it in a package-level
   `tests/conftest.py`. `packages/dynamical_data/tests/conftest.py` is the example: it builds
   synthetic Xarray datasets that two test modules share. The only repo-root `conftest.py` holds
-  cross-package pytest plumbing, not fixtures — the network-test gate below, Sentry DSN
-  neutralisation, and the `OMP_NUM_THREADS`/`POLARS_MAX_THREADS` caps described in [Running the
-  suite in parallel](#running-the-suite-in-parallel).
+  cross-package pytest plumbing, not fixtures — the network-test gate below, Sentry data source name
+  (DSN) neutralisation, and the `OMP_NUM_THREADS`/`POLARS_MAX_THREADS` caps described in [Running
+  the suite in parallel](#running-the-suite-in-parallel). Production code reports its errors to
+  Sentry, and the DSN is the address those reports go to, so the root `conftest.py` blanks it and a
+  test run sends Sentry nothing.
 - **A factory shared *across* packages goes in the root `tests/` directory, not in any one package's
   `tests/`.** The root `pyproject.toml` sets `pythonpath = ["tests"]` for the whole `uv run pytest`
-  session, so every module placed at the top level of `tests/` is importable by bare name from any
-  test suite in the repo — `packages/delta_store/tests`, `packages/ml_core/tests`, and the root
-  `tests/` alike — the same mechanism `tests/_nwp_test_data.py` already relies on for its
-  synthetic-`Nwp` writer and its `cast_to_nwp_dtypes` dtype helper, and the mechanism
-  `tests/_pytest_autoinject.py` (see [Running the suite in
-  parallel](#running-the-suite-in-parallel)) relies on to be loadable as a pytest plugin by bare
-  name. Putting a cross-package factory inside one specific package's `tests/` and importing it from
-  another package's suite would work by accident of that package being installed, but it reads as a
-  dependency of the *package under test* on another package's test code, which is backwards; the
-  root `tests/` directory carries no such implication because it is not itself a workspace member. A
-  factory production code needs (not just tests) still belongs in `contracts` or another library
-  package, never here.
+  session. Every module placed at the top level of `tests/` is therefore importable by bare name
+  from any test suite in the repo — `packages/delta_store/tests`, `packages/ml_core/tests`, and the
+  root `tests/` alike. Two modules already rely on that mechanism. `tests/_nwp_test_data.py` relies
+  on it for its synthetic numerical weather prediction (NWP) writer, which builds frames matching
+  the `Nwp` schema, and for its `cast_to_nwp_dtypes` dtype helper. `tests/_pytest_autoinject.py`
+  (see [Running the suite in parallel](#running-the-suite-in-parallel)) relies on it to be loadable
+  as a pytest plugin by bare name. Putting a cross-package factory inside one specific package's
+  `tests/` and importing it from another package's suite would work by accident of that package
+  being installed, but it reads as a dependency of the *package under test* on another package's
+  test code, which is backwards; the root `tests/` directory carries no such implication because it
+  is not itself a workspace member. A factory production code needs (not just tests) still belongs
+  in `contracts` or another library package, never here.
 - **Mock with pytest's `monkeypatch` fixture, not `unittest.mock`.** Patch environment variables
   (`monkeypatch.setenv`), object attributes, and module-level functions
   (`monkeypatch.setattr(some_module, "open", fake_open)`) through the built-in fixture. For S3,
   drive the in-process `moto` server instead of mocking — `tests/test_s3_data_paths.py` is the
-  canonical pattern.
+  canonical pattern. `moto` can run as a real local HTTP server implementing the S3 API, so the code
+  under test makes genuine S3 calls against a fake bucket rather than having its S3 client patched
+  out.
 - **Reset the moto S3 backend per test.** The in-process `moto` server keeps its bucket contents in
   a **process-global backend that outlives the `ThreadedMotoServer` object**, so a module-scoped
   server does not hand each test a clean slate. A test whose write path runs twice against that
@@ -132,9 +138,11 @@ Scale](performance.md#the-other-hard-ceiling-polars-32-bit-row-index).
 - **An autouse fixture fails whichever test leaks one.** `_fail_on_an_undisposed_dagster_instance`
   in `tests/conftest.py` wraps `DagsterInstance.ephemeral` and `DagsterInstance.dispose` for the
   duration of each test, then asserts at teardown that every instance created was disposed — so the
-  fault is reported by name instead of against an unrelated test. It catches a leak, not an
-  omission: an unreferenced context is freed as soon as the helper that built it returns, so a
-  missing `instance=` can still pass green until something pins the frame holding it.
+  fault is reported by name instead of against an unrelated test. The fixture measures instances
+  created against instances disposed at teardown, which is not the same as the coding mistake that
+  usually causes an undisposed instance. It therefore catches a leak, not an omission. An
+  unreferenced context is freed as soon as the helper that built it returns, so a missing
+  `instance=` can still pass green until something pins the frame holding it.
 
 ## Running the suite in parallel
 
@@ -196,11 +204,12 @@ code. Later entries take precedence, so `error` stays first.
 **`pytest.fail()` and `pytest.skip()` raise from `BaseException`, so a broad `except BaseException`
 in the code under test swallows them along with every real error.** `defs/checks.py` and
 `defs/assets.py` each guard an asset check's body with `except BaseException`, because a Rust panic
-from a compiled dependency does not derive from `Exception` — see [Warn on stale power data with a
-Dagster asset check](production-deployment.md#warn-on-stale-power-data-with-a-dagster-asset-check)
-for the full reasoning. Calling `pytest.fail()` or `pytest.skip()` *inside* such a guarded body, as
-a "this branch must not run" sentinel, is caught by the same guard instead of failing the test.
-Assert after the call returns instead of relying on either one inside it.
+from a compiled dependency — Polars and the Delta Lake bindings are both compiled Rust extensions —
+does not derive from `Exception` — see [Warn on stale power data with a Dagster asset
+check](production-deployment.md#warn-on-stale-power-data-with-a-dagster-asset-check) for the full
+reasoning. Calling `pytest.fail()` or `pytest.skip()` *inside* such a guarded body, as a "this
+branch must not run" sentinel, is caught by the same guard instead of failing the test. Assert after
+the call returns instead of relying on either one inside it.
 
 ## Network-gated tests
 
@@ -226,7 +235,9 @@ single-test selection (see [Running the suite in parallel](#running-the-suite-in
 
 `packages/dynamical_data/tests/test_ecmwf_ens_network.py` is the canonical example: it drives the
 real `open → download → convert` pipeline against the Dynamical.org ECMWF ENS catalog and asserts
-the conventions the offline fixtures merely assume.
+the conventions the offline fixtures merely assume. Dynamical.org publishes the European Centre for
+Medium-Range Weather Forecasts' ensemble forecast (ECMWF ENS) as a public cloud-hosted catalog, and
+that forecast is this project's weather input.
 
 The gate is a collection hook, **not** an `addopts = "... -m 'not network'"`. pytest keeps only the
 *last* `-m` it is given, so any caller-supplied marker expression (e.g. `-m "not integration"`)
@@ -246,10 +257,13 @@ Two GitHub workflows in `.github/workflows/` run the checks described on this pa
   member, including leaf packages that a plain sync would omit, and `--locked` so the build fails
   loudly when `uv.lock` is stale. Every subsequent step passes `uv run --no-sync`, because a bare
   `uv run` re-syncs to the root environment and would silently uninstall those extra workspace
-  members. The job also sets dummy values for the three required `NGED_S3_*` `Settings` fields: most
-  tests monkeypatch them, but a few construct `Settings()` directly and locally rely on the
-  developer's `.env`, which CI doesn't have. The `ci` job is a required status check on `main`
-  (configured in a GitHub repository ruleset, not in the workflow file).
+  members. The job also sets dummy values for the three required `NGED_S3_*` `Settings` fields, a
+  `Settings` object being what carries the S3 credentials and bucket names that production reads
+  from the environment; NGED is National Grid Electricity Distribution, the network operator whose
+  telemetry this project forecasts. Most tests monkeypatch those fields, but a few construct
+  `Settings()` directly and locally rely on the developer's `.env`, which CI doesn't have. The `ci`
+  job is a required status check on `main` (configured in a GitHub repository ruleset, not in the
+  workflow file).
 - **`nightly_network_tests.yml` — the nightly network job.** Runs *only* the network-gated tests
   (`uv run pytest --run-network -m network`) on a daily schedule, plus `workflow_dispatch` for
   on-demand runs. This is the only CI that touches the real Dynamical.org catalog, and it needs no
@@ -259,12 +273,16 @@ Two GitHub workflows in `.github/workflows/` run the checks described on this pa
 
 **Two steps validate links, because neither sees what the other does.** `mkdocs build --strict`
 fails on a broken link *within* `docs/`. `scripts/lint/check_docs_links.py` fails on a link *into*
-the published site — the form CLAUDE.md requires from a docstring, a comment or a GitHub issue body
-— whose page a rename moved or whose anchor a heading rewrite killed.
+the published site — the form CLAUDE.md requires from a docstring, a comment or a GitHub issue body.
+`docs/` is rendered to a public website, and a link from outside `docs/` must name that site's URL
+rather than a repository path. Renaming a page moves the URL such a link points at, and rewriting a
+heading kills the anchor it points at.
 
-`check_docs_links.py` resolves each anchor by running the real `markdown.Markdown()` converter over
-the target page rather than guessing a slug, because Python-Markdown's `toc` extension preserves
-underscores. An extension the script cannot load fails the run rather than being skipped: dropping
+A script guessing an anchor slug would strip or hyphenate the underscores in a heading, as the
+common slug convention does. Python-Markdown's `toc` extension instead preserves underscores, so a
+guessed slug and the real one differ. `check_docs_links.py` therefore resolves each anchor by
+running the real `markdown.Markdown()` converter over the target page rather than guessing a slug.
+An extension the script cannot load fails the run rather than being skipped: dropping
 `pymdownx.superfences` makes a `#` comment inside an indented fenced code block parse as a heading,
 which would invent anchors the real site does not have and pass links that are broken. The script
 also reports a URL that has been reflowed across two lines, because the anchor left stranded on the
@@ -275,7 +293,8 @@ link can sit in any text file.
 
 ### Why a bespoke workflow rather than OCF's template
 
-OCF's organisation template ([`openclimatefix/.github` →
+Open Climate Fix (OCF) is the organisation whose GitHub account holds this repository. OCF's
+organisation template ([`openclimatefix/.github` →
 `workflow-templates/branch_ci.yml`](https://github.com/openclimatefix/.github/blob/main/workflow-templates/branch_ci.yml))
 is a thin caller of the org-wide reusable workflow
 [`branch_ci.yml`](https://github.com/openclimatefix/.github/blob/main/.github/workflows/branch_ci.yml).
@@ -323,12 +342,13 @@ this repo relies on — pyarrow, polars, deltalake — publish wheels for it.
 
 ## NWP grid → H3 orientation coverage
 
-The NWP-grid-to-H3 mapping is the classic place for a silent orientation bug — a vertically or
-horizontally flipped weather grid, a transpose (`np.meshgrid` `indexing="ij"` vs `"xy"`), or a
-lat/lon swap. Four tests guard it in layers, from cheap-and-synthetic to real-and-networked. Each
-was checked by *mutation*: introducing the bug into the production code and confirming the test goes
-red. The table records which mutation each layer catches (✓ = the test fails when that bug is
-present; n/a = the test does not exercise the code that mutation changes):
+H3 is a hexagonal spatial index that tiles the globe, and the project aggregates gridded weather
+values onto those hexagons. The NWP-grid-to-H3 mapping is the classic place for a silent orientation
+bug — a vertically or horizontally flipped weather grid, a transpose (`np.meshgrid` `indexing="ij"`
+vs `"xy"`), or a lat/lon swap. Four tests guard it in layers, from cheap-and-synthetic to
+real-and-networked. Each was checked by *mutation*: introducing the bug into the production code and
+confirming the test goes red. The table records which mutation each layer catches (✓ = the test
+fails when that bug is present; n/a = the test does not exercise the code that mutation changes):
 
 | Mutation in production code | synthetic `convert` test¹ | cached real-slice test² | geo landmark test³ | geo snapping test⁴ |
 | --- | :---: | :---: | :---: | :---: |
@@ -339,17 +359,20 @@ present; n/a = the test does not exercise the code that mutation changes):
 
 - ¹
   `dynamical_data/tests/test_convert_to_polars.py::test_convert_maps_each_grid_point_to_its_own_lat_lon`
-  — a 2×2 synthetic grid with a distinct value at every corner. Guards the ravel-alignment step
-  *inside* `convert`; the value-join itself is positional-agnostic, so which hexagon owns a given
-  (lat, lon) is delegated to the upstream `h3_grid_weights` asset (the geo test below).
+  — a 2×2 synthetic grid with a distinct value at every corner. `convert` flattens the
+  latitude/longitude grid into a column of values that must stay aligned with a column of
+  coordinates, and then joins those rows to the H3 weights on coordinate value. This test guards
+  that ravel-alignment step *inside* `convert`. The value-join itself does not depend on row
+  position, so which hexagon owns a given (lat, lon) is delegated to the upstream `h3_grid_weights`
+  asset (the geo test below).
 - ²
   `dynamical_data/tests/test_ecmwf_ens_cached.py::test_cached_real_slice_conventions_and_orientation`
   — the same orientation check on a committed real ECMWF ENS slice, so the conventions the synthetic
   fixture only *assumes* (descending latitude, °C, dimension order) are exercised on genuine bytes.
 - ³ `geo/tests/test_h3.py::test_grid_weights_preserve_geographic_orientation` — proves
   `compute_h3_grid_weights` labels each H3 cell with grid points at the cell's own (lat, lon), using
-  two well-separated GB landmarks. This is what fixes the hexagon↔(lat, lon) geography the `convert`
-  tests delegate.
+  two well-separated landmarks in Great Britain. This is what fixes the hexagon↔(lat, lon) geography
+  the `convert` tests delegate.
 - ⁴ `geo/tests/test_h3.py::test_grid_weights_snap_to_nearest_grid_centre` — builds the expected grid
   points geographically and compares them against what `compute_h3_grid_weights` produced, so it
   catches the `cell_to_lat`/`cell_to_lng` swap as well.
@@ -359,10 +382,10 @@ against the live catalog, but only re-checks *orientation and bounds*: descendin
 longitude in [-180, 180], the slice landing on the requested box, the expected variable names, and a
 physical-range sanity check on temperature. It does not re-check the value↔(lat, lon) mapping —
 neither the ravel-alignment mutation the synthetic `convert` test guards nor the hexagon↔(lat, lon)
-geography the geo landmark test guards, since both are value-agnostic (index alignment, not a value
-comparison) and so are already fully proven offline. What only this test can catch is *future
-upstream drift* — a change in Dynamical.org's own conventions that the committed slice, frozen at
-capture time, cannot.
+geography the geo landmark test guards. Both of those bugs misalign indices rather than depending on
+the actual numbers, so any values at all reproduce them, and both are therefore already fully proven
+offline. What only this test can catch is *future upstream drift* — a change in Dynamical.org's own
+conventions that the committed slice, frozen at capture time, cannot.
 
 ## Marimo notebooks bind every name their cells reference
 
@@ -401,7 +424,9 @@ what makes a plain `uv run pytest` collect it. The authoring rules for writing o
 
 ## Assertion style for Patito frames
 
-Build a frame, attach the model, cast, and validate for the happy path:
+Every dataframe's shape is declared as a Patito model: a schema class naming the frame's columns and
+their dtypes. Bind a frame to its model with `set_model`, coerce the columns to the model's dtypes
+with `cast`, and validate for the happy path:
 
 ```python
 df = pt.DataFrame({...}).set_model(MySchema).cast()

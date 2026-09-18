@@ -15,15 +15,16 @@ assumed — see [Storage formats: measured, not
 assumed](https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#storage-formats-measured-not-assumed)
 for the comparison between those two tables, and [design principle
 12](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#12-measure-do-not-assume)
-for why measuring rather than assuming matters project-wide. The other four tables below carry no
-writer-properties tuning, because no measurement has yet been made to justify any tuning.
+for why measuring rather than assuming matters project-wide. This package covers six tables. The
+other four carry no writer-properties tuning, because no measurement has yet been made to justify
+any tuning.
 
-**The flagship tuned table is the internal `power_forecasts` table, whose storage format shrank the
-403.6M-row development table from 6.33 GB to 0.73 GB.** The levers are ZSTD, `DELTA_BINARY_PACKED`
-timestamps, `BYTE_STREAM_SPLIT` floats, member-adjacent sorting, and rounding `power_fcst` to a
-13-bit significand. `POWER_FORECASTS_WRITER_PROPERTIES`, below on this page, gives the
-lever-by-lever breakdown, measured on the table's least compressible single file rather than on the
-full table.
+**The flagship tuned table is the internal `power_forecasts` table, whose storage format shrank a
+403.6M-row development copy of that table from 6.33 GB to 0.73 GB.** The levers are ZSTD,
+`DELTA_BINARY_PACKED` timestamps, `BYTE_STREAM_SPLIT` floats, member-adjacent sorting (every row of
+one ensemble member stored together), and rounding `power_fcst` to a 13-bit significand.
+`POWER_FORECASTS_WRITER_PROPERTIES`, below on this page, gives the lever-by-lever breakdown,
+measured on the table's least compressible single file rather than on the full table.
 
 ## Contents
 
@@ -35,7 +36,7 @@ full table.
   and `write_power_forecasts()`.
 - `nwp` — the `nwp` table's writer properties, sort order, precision policy, and `write_nwp()`; its
   writer properties are deliberately *different* from `power_forecasts`'s, because the same
-  encodings measured worse on NWP data.
+  encodings measured worse on numerical weather prediction (NWP) data.
 - `power_time_series` — `write_power_time_series()`, an append-only write to the `power_time_series`
   table.
 - `eligible_time_series` — `write_eligible_time_series()`, a per-`fold_id`-partition overwrite to
