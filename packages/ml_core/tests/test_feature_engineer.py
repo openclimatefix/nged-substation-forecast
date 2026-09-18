@@ -1,4 +1,4 @@
-"""Unit tests for the FeatureEngineer strategy and its nearest-cell NWP spatial join."""
+"""Unit tests for the FeatureEngineer strategy and its containing-cell NWP spatial join."""
 
 import inspect
 from datetime import datetime
@@ -11,7 +11,7 @@ from contracts.weather_schemas import Nwp
 from ml_core.features.feature_engineer import DEFAULT_LOCAL_TIMEZONE, FeatureEngineer
 from ml_core.features.tabular_feature_engineer import (
     TabularFeatureEngineer,
-    _attach_nearest_nwp_cell,
+    _attach_containing_nwp_cell,
     _engineer_features,
 )
 from polars.testing import assert_frame_equal
@@ -45,9 +45,9 @@ def _metadata_two_series() -> pt.DataFrame[TimeSeriesMetadata]:
     return pt.DataFrame(df).set_model(TimeSeriesMetadata)
 
 
-def test_attach_nearest_nwp_cell_maps_cells_to_series() -> None:
+def test_attach_containing_nwp_cell_maps_cells_to_series() -> None:
     """Each NWP cell becomes the time series in it; the unmatched cell is dropped."""
-    result = _attach_nearest_nwp_cell(_nwp_two_cells(), _metadata_two_series()).collect()
+    result = _attach_containing_nwp_cell(_nwp_two_cells(), _metadata_two_series()).collect()
 
     assert "h3_index" not in result.columns
     assert "time_series_id" in result.columns
@@ -57,7 +57,7 @@ def test_attach_nearest_nwp_cell_maps_cells_to_series() -> None:
     assert temp_by_ts == {1: 10.0, 2: 12.0}
 
 
-def test_attach_nearest_nwp_cell_replicates_shared_cell() -> None:
+def test_attach_containing_nwp_cell_replicates_shared_cell() -> None:
     """Two time series in the same cell both receive that cell's weather."""
     metadata = pt.DataFrame(
         pl.DataFrame(
@@ -69,7 +69,7 @@ def test_attach_nearest_nwp_cell_replicates_shared_cell() -> None:
         )
     ).set_model(TimeSeriesMetadata)
 
-    result = _attach_nearest_nwp_cell(_nwp_two_cells(), metadata).collect()
+    result = _attach_containing_nwp_cell(_nwp_two_cells(), metadata).collect()
 
     cell_10_rows = result.filter(pl.col("temperature_2m") == 10.0)
     assert sorted(cell_10_rows["time_series_id"].to_list()) == [1, 2]
@@ -166,7 +166,7 @@ def test_tabular_feature_engineer_single_run_params_reach_engineer_features() ->
         .collect()
     )
 
-    nwp_per_time_series = _attach_nearest_nwp_cell(nwp, metadata)
+    nwp_per_time_series = _attach_containing_nwp_cell(nwp, metadata)
     direct = _engineer_features(
         {"temperature_2m"},
         power,
