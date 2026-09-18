@@ -1,9 +1,10 @@
 """Shared building blocks for the Patito schemas.
 
-The canonical UTC dtype, the plausible-datetime bounds and the checks that enforce them, the
-delivery quantile levels and their ``p{level}`` labels, the shared ``time_series_id`` field
-factory, and ``validate_schema`` for checking a frame's columns and dtypes against a model
-without materialising it.
+This module holds the canonical UTC dtype, the plausible-datetime bounds and the checks that
+enforce them, the quantile levels agreed with NGED for the delivery tables and their ``p{level}``
+labels, the shared ``time_series_id`` field factory, and ``validate_schema``. ``validate_schema``
+checks a frame's columns and dtypes against a model without materialising it, that is, without
+reading any of the frame's rows.
 """
 
 from datetime import UTC, datetime
@@ -52,11 +53,12 @@ def check_datetime_bounds(dataframe: pl.DataFrame, column: str, *more_columns: s
     """Raise ``ValueError`` if any timestamp lies outside the plausible-datetime range.
 
     Call this from a Patito model's ``validate`` override, after ``super().validate()``. It exists
-    because Patito **silently ignores** ``ge``/``le`` on a datetime field: Patito derives its bounds
-    checks from the Pydantic JSON schema's ``minimum``/``maximum`` keywords, which JSON Schema
-    defines for numbers only, so a datetime field's ``Ge``/``Le`` metadata never reaches the JSON
-    schema and no check is ever generated. (``ge``/``le`` on a *numeric* field works normally, which
-    is why ``PowerTimeSeries.power`` can state its bounds on the field itself.)
+    because Patito **silently ignores** ``ge``/``le`` on a datetime field. Patito derives its bounds
+    checks from the Pydantic JSON schema's ``minimum``/``maximum`` keywords, and JSON Schema defines
+    those two keywords for numbers only. The ``Ge``/``Le`` annotations Pydantic builds from a
+    datetime field's ``ge``/``le`` arguments therefore never reach the JSON schema, and no check is
+    ever generated. (``ge``/``le`` on a *numeric* field works normally, which is why
+    ``PowerTimeSeries.power`` can state its bounds on the field itself.)
 
     Args:
         dataframe: An already-validated frame. Every named column must be a datetime column.
@@ -86,9 +88,9 @@ def split_by_datetime_plausibility(
     after `MAX_PLAUSIBLE_DATETIME` — the same bounds `check_datetime_bounds` enforces.
     Nulls are always plausible (absence is not malformedness).
 
-    Use this at an ingestion boundary to drop-and-report malformed external rows instead of
-    aborting the whole batch; use `check_datetime_bounds` where a hard assertion is
-    appropriate instead (e.g. inside a Patito model's ``validate``).
+    Use this at an ingestion boundary, to drop-and-report malformed external rows rather than
+    abort the whole batch. Where a hard assertion is wanted instead — inside a Patito model's
+    ``validate``, for example — use `check_datetime_bounds`.
 
     Args:
         dataframe: Any frame; ``column`` must be a datetime column.

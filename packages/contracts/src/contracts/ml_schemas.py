@@ -1,7 +1,7 @@
 """Contracts for the machine-learning (ML) pipeline.
 
-The feature vocabulary, the joined `AllFeatures` frame handed to models, the eligible-time-series
-population, and the metrics schema.
+The feature names a model config may request, the joined `AllFeatures` frame handed to models,
+the eligible-time-series population, and the metrics schema.
 """
 
 from collections.abc import Sequence
@@ -59,9 +59,9 @@ class AllFeatures(pt.Model):
 
     Dynamic features are not explicitly typed as Patito fields below. Omitting the dynamic
     features from the field list is intentional, to allow infinite parameterisation (e.g., any
-    lag hour) without the overhead of metaprogramming or defining hundreds of static fields.
-    During feature engineering, the pipeline asserts that every requested dynamic feature is
-    present.
+    lag hour). The two alternatives both cost more: generating the field definitions in code at
+    import time (metaprogramming), or defining hundreds of static fields by hand. During feature
+    engineering, the pipeline asserts that every requested dynamic feature is present.
     """
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
@@ -256,7 +256,9 @@ Every time_series_type plus the sentinel `"all"` for the across-everything aggre
 
 
 class Metrics(pt.Model):
-    """Evaluation metrics for power forecasts — tall format.
+    """Evaluation metrics for power forecasts, in tall format.
+
+    Tall format means one row per metric value, rather than one column per metric.
 
     `metric_param` encodes the extra parameter dimension for metrics that have one, or `"all"`
     for scalar metrics with no extra dimension. Examples:
@@ -273,7 +275,7 @@ class Metrics(pt.Model):
     Primary key: `(time_series_id, power_fcst_model_name, experiment_name, fold_id,
     evaluation_scope, horizon_slice, metric_name, metric_param, window_start, window_end)`. At
     most one metric value per series, model, experiment, fold, evaluation scope, horizon slice,
-    metric, parameter, and window — recomputing an existing key replaces that row rather than
+    metric, parameter, and window. Recomputing an existing key replaces that row rather than
     duplicating it.
     """
 
@@ -329,12 +331,13 @@ class Metrics(pt.Model):
             "one-off metrics coexist in one table and stay separable."
         ),
     )
-    """`evaluation_scope` and the columns below it, `time_series_type` excepted, are populated by
-    the ``metrics`` Dagster asset through ``enrich_metrics_rows()``. They are ``allow_missing`` so
-    that the pure ``compute_metrics()`` helper can emit the core metric rows and have the asset
-    enrich them with scope/window provenance before the frame is written to the
-    ``forecast_metrics`` Delta table. ``compute_metrics()`` populates `time_series_type` itself, by
-    joining it on from the metadata."""
+    """`evaluation_scope` and the columns below it are populated by the ``metrics`` Dagster asset
+    through ``enrich_metrics_rows()``. Those columns are ``allow_missing`` so that the pure
+    ``compute_metrics()`` helper can emit the core metric rows on its own. The asset then enriches
+    those rows with scope/window provenance, before the frame is written to the
+    ``forecast_metrics`` Delta table. The one exception is `time_series_type`:
+    ``compute_metrics()`` populates `time_series_type` itself, by joining it on from the
+    metadata."""
 
     time_series_type: str = pt.Field(
         dtype=pl.Enum(TIME_SERIES_TYPE_SLICES),
@@ -431,10 +434,10 @@ class Metrics(pt.Model):
         Unlike `PowerForecast`, four `PRIMARY_KEY` columns (`experiment_name`,
         `evaluation_scope`, `window_start`, `window_end`) are `allow_missing`:
         `compute_metrics()` validates its output before the `metrics` Dagster asset's
-        `enrich_metrics_rows()` adds them. The uniqueness check below is skipped, not run against
-        a partial key, whenever any of those columns is absent — the check that matters runs
-        inside `enrich_metrics_rows()`, on the fully-enriched frame that is actually written to
-        `forecast_metrics`.
+        `enrich_metrics_rows()` adds them. Whenever any of those four columns is absent, the
+        uniqueness check below is skipped entirely, rather than run against a partial key. The
+        check that matters runs inside `enrich_metrics_rows()`, on the fully-enriched frame that
+        is actually written to `forecast_metrics`.
         """
         validated_df = super().validate(
             dataframe=dataframe,
@@ -466,9 +469,9 @@ class EligibleTimeSeries(pt.Model):
     Written by the ``eligible_time_series`` Dagster asset (one Delta partition per ``fold_id``)
     and read by ``trained_cv_model``. ``cv_power_forecasts`` does not read this table; it
     inherits the same population through the trained model's ``trained_time_series_ids``.
-    Eligibility is a function of data coverage and the fold dates **only** — never the model or
-    experiment config — so every experiment trains and scores a fold on the identical population,
-    which is what makes leaderboard comparisons apples-to-apples.
+    Eligibility depends on data coverage and the fold dates **only**, never on the model or
+    experiment config. Every experiment therefore trains and scores a fold on the identical
+    population, which is what makes leaderboard comparisons apples-to-apples.
 
     One row per eligible ``(fold_id, time_series_id)``.
     """

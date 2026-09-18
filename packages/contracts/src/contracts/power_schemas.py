@@ -2,7 +2,8 @@
 
 The half-hourly ``PowerTimeSeries`` observations as they arrive from NGED, the
 ``TimeSeriesMetadata`` roster describing each series, the ``PowerForecast`` schema every model
-emits, and the ``EffectiveCapacity`` estimate the metrics pipeline divides by.
+emits, and the ``EffectiveCapacity`` estimate the metrics pipeline divides the mean absolute
+error by, to express that error as a fraction of the series' capacity.
 """
 
 from collections.abc import Sequence
@@ -105,23 +106,24 @@ class PowerTimeSeries(pt.Model):
     def drop_implausible_rows(cls, dataframe: pl.DataFrame) -> DropImplausibleRowsResult:
         """Drop rows with a malformed ``time``, returning ``(survivors, n_dropped)``.
 
-        A row is dropped when its ``time`` lies outside the plausible datetime range, is null (the
-        schema declares ``time`` non-nullable, so a null this early is already malformed), or does
-        not fall on the top or bottom of the hour (minute 00 or 30). All three conditions indicate a
-        malformed upstream reading — not a bug in our own pipeline — so under [inherent
+        A row is dropped when its ``time`` lies outside the plausible datetime range, is null, or
+        does not fall on the top or bottom of the hour (minute 00 or 30). The schema declares
+        ``time`` non-nullable, so a null this early is already malformed. All three conditions
+        indicate a malformed upstream reading — not a bug in our own pipeline — so under [inherent
         stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/)
         an ingestion boundary should degrade the batch rather than abort it entirely.
 
         Dropping rows exists alongside ``validate``, which stays strict. ``validate`` raises on
-        two of the three conditions above — a ``time`` outside the plausible range, and a ``time``
-        that is not on the top or bottom of the hour; a null ``time`` is rejected earlier still,
-        by the non-nullable field. ``validate`` is also used as a hard assertion in tests and R&D
-        code, where a raise-on-violation contract must not silently change.
+        two of the three conditions above: a ``time`` outside the plausible range, and a ``time``
+        that is not on the top or bottom of the hour. The third condition, a null ``time``, is
+        rejected earlier still, by the non-nullable field. ``validate`` is also used as a hard
+        assertion in tests and R&D code, where a raise-on-violation contract must not silently
+        change.
 
         Call this method BEFORE ``validate``, and only at a boundary that receives data from
         outside our system (e.g. NGED's raw JSON feed). The uniqueness and sortedness checks in
-        ``validate`` are NOT relaxed here, because a duplicate row or an unsorted column indicates a
-        bug in OUR pipeline rather than malformed external data, and should keep raising.
+        ``validate`` are NOT relaxed here, and should keep raising. A duplicate row or an unsorted
+        column indicates a bug in OUR pipeline rather than malformed external data.
 
         Args:
             dataframe: An already-cast frame with a ``time`` column; need not yet be validated.
@@ -133,8 +135,9 @@ class PowerTimeSeries(pt.Model):
         # `dt.minute()` is null for a null `time` and `.filter()` drops a row on a null predicate,
         # so this also drops the null `time`s the non-nullable schema forbids.
         survivors = survivors.filter(pl.col("time").dt.minute().is_in([0, 30]))
-        # Counted as a height difference rather than by summing the rejected partitions: whatever
-        # a filter does with a null predicate, every row that left is counted exactly once.
+        # The dropped-row count is computed as a difference in `height` (a frame's row count),
+        # rather than by summing the rejected partitions. Whatever a filter does with a null
+        # predicate, a height difference counts every row that left exactly once.
         return DropImplausibleRowsResult(survivors, dataframe.height - survivors.height)
 
     # Define columns_to_sort_by as a ClassVar so Patito/Pydantic knows it is not a data field
@@ -182,7 +185,10 @@ Notes:
 
 
 class TimeSeriesMetadata(pt.Model):
-    """One row per substation or asset: its name, location, H3 index, and substation type."""
+    """One row per time series — a substation or a customer meter.
+
+    Carries the series' name, location, H3 index, and substation type.
+    """
 
     time_series_id: int = _get_time_series_id_dtype(unique=True)
 
@@ -263,11 +269,12 @@ class TimeSeriesMetadata(pt.Model):
     area_wkt: str | None = pt.Field(
         dtype=pl.String,
         allow_missing=True,
-        # Maps to the nested Area.WKT field in the JSON data.
+        # Maps to the nested Area.WKT field in NGED's source JSON.
         description=(
-            "WKT polygon for the asset’s area. In the trial, only Primary substations have this."
-            " No customer site has a polygon yet. Where a customer site does have a polygon, the"
-            " polygon refers to the area covered by the generator itself."
+            "Well-known text (WKT) polygon for the asset’s area. In the trial, only Primary"
+            " substations have this. No customer site has a polygon yet. Where a customer site"
+            " does have a polygon, the polygon refers to the area covered by the generator"
+            " itself."
         ),
     )
 
@@ -307,13 +314,17 @@ the reserved sentinel for a production forecast that belongs to no CV fold.
 class PowerForecast(pt.Model):
     """Forecast data schema for an ensemble of deterministic forecasts.
 
-    One row per time series, per forecast run, per target time, per ensemble member —
-    the four columns of ``PRIMARY_KEY``.
+    Each ensemble member carries its own single-valued, or deterministic, forecast. The spread
+    across the members is what expresses the forecast's uncertainty.
 
-    Internal vs delivered schema (Milestone 1 report Table 1, p.28): the columns
-    ``experiment_name``, ``fold_id``, and ``ml_flow_experiment_id`` are INTERNAL-ONLY — they
-    exist on this schema and the internal ``power_forecasts`` Delta table to support
-    cross-validation and the leaderboard, but they are NOT part of the ``power_forecast`` table
+    One row per time series, per forecast run, per target time, per ensemble member — the four
+    columns of ``PRIMARY_KEY``: ``time_series_id``, ``power_fcst_init_time``, ``valid_time``, and
+    ``ensemble_member``.
+
+    Internal vs delivered schema (Milestone 1 report Table 1, p.28): three columns are
+    INTERNAL-ONLY — ``experiment_name``, ``fold_id``, and ``ml_flow_experiment_id``. They exist
+    on this schema and on the internal ``power_forecasts`` Delta table, to support
+    cross-validation and the leaderboard. They are NOT part of the ``power_forecast`` table
     delivered to NGED.
     """
 
@@ -408,11 +419,12 @@ class PowerForecast(pt.Model):
             " (max relative error 2^-13 ≈ 1.2e-4, far below forecast error) to aid compression;"
             " see `delta_store.power_forecasts`."
             # PLANNED: We intend to change `power_fcst` to a normalised value in the range
-            # [-1, +1] (which NGED multiplies by a capacity to recover MW/MVA), per the
-            # delivery-contract design agreed with NGED in the Milestone 1 report. The switch is
-            # planned for v0.5, using the static P99 `effective_capacity` estimate that already
-            # exists — the same scalar the `metrics` pipeline already divides by for NMAE — so it
-            # no longer needs to wait for a time-varying capacity estimate.
+            # [-1, +1], which NGED multiplies by a capacity to recover MW/MVA. That change follows
+            # the delivery-contract design agreed with NGED in the Milestone 1 report. The switch
+            # is planned for v0.5. It will use the static P99 `effective_capacity` estimate that
+            # already exists — the same scalar the `metrics` pipeline already divides by for
+            # normalised mean absolute error (NMAE). The switch therefore no longer waits for a
+            # time-varying capacity estimate.
         ),
     )
 
@@ -474,7 +486,10 @@ class PowerForecast(pt.Model):
 
 
 class EffectiveCapacity(pt.Model):
-    """Effective capacity of each time series at each half-hourly timestep.
+    """Effective capacity of each time series, at one or more half-hourly timesteps.
+
+    Effective capacity is an estimate of the power a site actually reaches, derived from its own
+    observed history. It is not a nameplate, firm or connection-agreement rating.
 
     Delivered to NGED as ``effective_capacity`` Delta table (Table 4 in the Milestone 1 report).
     This table is backward-looking only — it does not cover the forecast period.
@@ -483,14 +498,16 @@ class EffectiveCapacity(pt.Model):
     available observation history, ``effective_capacity_mw`` = P99 of ``abs(power)`` over the
     full observed history. The v0.1 estimate is a static scalar per series.
 
-    **Planned upgrade (v0.7):** replace the P99 scalar with a time-varying capacity estimate (see
+    **Planned upgrade (v0.7):** replace the P99 scalar with a time-varying capacity estimate,
+    giving one row per ``(time_series_id, time)`` half-hourly timestep. The candidate estimation
+    methods are described at
     <https://openclimatefix.github.io/nged-substation-forecast/techniques/convex-optimisation/>
     and
-    <https://openclimatefix.github.io/nged-substation-forecast/techniques/differentiable-physics/>
-    for the candidate estimation methods), giving one row per ``(time_series_id, time)``
-    half-hourly timestep. This schema is unchanged; the ``effective_capacity`` asset body changes
-    and the ``metrics`` pipeline swaps its ``time_series_id``-only NMAE-denominator join for a
-    temporal as-of join. Do **not** pre-densify the v0.1 scalar into one row per half-hour —
+    <https://openclimatefix.github.io/nged-substation-forecast/techniques/differentiable-physics/>.
+    This schema is unchanged. The ``effective_capacity`` asset body changes, and the ``metrics``
+    pipeline swaps its ``time_series_id``-only normalised-mean-absolute-error-denominator join
+    for a temporal as-of join, which matches each forecast row to the most recent capacity row at
+    or before its timestamp. Do **not** pre-densify the v0.1 scalar into one row per half-hour —
     densifying a constant adds no information, and the as-of join handles sparse capacity rows
     naturally.
     """

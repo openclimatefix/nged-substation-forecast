@@ -1,4 +1,7 @@
-"""Configuration schemas, and the class-path round-trip that ``_target_`` strings ride on."""
+"""Configuration schemas, and the class-path round-trip behind a ``_target_`` string.
+
+A ``_target_`` string is the key a YAML config file uses to name the Python class to build.
+"""
 
 import importlib
 from datetime import date
@@ -13,9 +16,10 @@ from contracts.power_schemas import FoldId
 def class_target(obj: type | object) -> str:
     """Return the fully-qualified import path of a class (or of an instance's class).
 
-    The inverse of ``import_class``. Together they are how a config file, an MLflow experiment tag
-    and a saved model's ``meta.json`` all name a Python class: a ``module.ClassName`` string that
-    survives being written to disk and read back in another process.
+    The inverse of ``import_class``. ``class_target`` and ``import_class`` together are how a
+    config file, an MLflow experiment tag, and a saved model's ``meta.json`` all name a Python
+    class: by a ``module.ClassName`` string. That string survives being written to disk and read
+    back in another process.
 
     Args:
         obj: The class to name, or an instance whose class should be named.
@@ -87,10 +91,11 @@ def import_class(target: str) -> type:
 class CvFoldConfig(BaseModel):
     """Configuration for a single expanding-window cross-validation (CV) fold.
 
-    ``leaderboard`` distinguishes the epoch-pinned leaderboard folds (the apples-to-apples
-    evaluation protocol) from optional non-leaderboard dev folds such as ``smoke_test``: a
-    ``leaderboard=False`` fold runs through the identical pipeline but never feeds the
-    leaderboard.
+    ``leaderboard`` distinguishes two kinds of fold. The leaderboard folds are the
+    apples-to-apples evaluation protocol, and they are epoch-pinned: their dates are fixed for
+    the life of a leaderboard epoch, and changing them founds a new epoch. Optional dev folds,
+    such as ``smoke_test``, are non-leaderboard folds. A ``leaderboard=False`` fold runs through
+    the identical pipeline but never feeds the leaderboard.
 
     ``min_training_months`` overrides ``CvConfig.min_training_months`` for this fold alone
     (``None`` falls back to the config-level value). A short dev fold sets it to its train length
@@ -109,12 +114,16 @@ class CvFoldConfig(BaseModel):
 class CvConfig(BaseModel):
     """Configuration for expanding-window cross-validation.
 
+    Each fold trains on the history from its train_start to its train_end, and is scored on the
+    val_start-to-val_end span that follows. The window expands because each later fold keeps the
+    earlier folds' training history and adds more to it.
+
     The folds list defines the evaluation protocol shared by all experiments on the leaderboard.
     All models must be evaluated against the same folds to ensure apples-to-apples comparison.
 
-    min_training_months controls which time series are eligible for each fold: a time series is
-    included only if it has at least min_training_months months of data before val_start (and
-    data through val_end).
+    min_training_months controls which time series are eligible for each fold. A time series is
+    included only if it has at least min_training_months months of data before val_start, and
+    data through val_end.
     """
 
     folds: list[CvFoldConfig]
