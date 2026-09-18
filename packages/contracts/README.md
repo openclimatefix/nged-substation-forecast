@@ -12,9 +12,9 @@ config and the class-path pair are model-agnostic and need nothing heavier than 
 Two further modules sit here because every package needs them and neither is specific to machine
 learning (ML). `contracts.settings` holds `Settings`, the single source of every setting the
 pipeline reads: the data paths, the object-store credentials, the MLflow tracking URI, and the four
-settings for Sentry, the error-reporting service (`sentry_dsn`, `sentry_environment`,
-`sentry_traces_sample_rate`, and `sentry_monitor_forecasts`), resolved from the environment and the
-workspace `.env` and reached through the cached `get_settings()`. `contracts.uri` holds the
+settings for Sentry, the error-reporting service, all resolved from the environment and the
+workspace `.env` and reached through the cached `get_settings()`. The `Settings` docstring names
+the four Sentry settings. `contracts.uri` holds the
 local-or-remote path helpers those settings fields need, because a data-location field may be a
 local path or an `s3://` URI, and `pathlib` mangles a URI.
 
@@ -37,18 +37,19 @@ The five schemas below are the ones most callers touch. The package defines four
   distribution network operator whose network this project forecasts.
 - **`TimeSeriesMetadata`**: Substation and customer meter metadata, including lat/lon, H3 index
   (the identifier of one cell of the H3 hexagonal grid the weather is aggregated onto),
-  `substation_type` (`Primary`, `BSP` for bulk supply point, `GSP` for grid supply point,
-  `EHV Customer` for an extra-high-voltage customer, or `HV Customer` for a high-voltage customer),
-  and `time_series_type` (`PV` for solar photovoltaic, `Wind`, `BESS` for battery energy storage
-  system, `Disaggregated Demand`, and 18 others — `LIST_OF_TIME_SERIES_TYPES` holds all 22).
+  `substation_type` (`Primary`, `BSP`, `GSP`, `EHV Customer`, or `HV Customer` — the field's own
+  description expands the voltage acronyms), and `time_series_type` (`PV`, `Wind`, `BESS`,
+  `Disaggregated Demand`, and 18 others — `LIST_OF_TIME_SERIES_TYPES` holds all 22 and expands
+  each abbreviated one).
 - **`Nwp`**: Numerical weather prediction (NWP) data from the European Centre for Medium-Range
   Weather Forecasts (ECMWF) ensemble (ENS), in physical units (`Float32`), on disk and in memory
-  alike. An ensemble forecast runs the weather model 51 times — one control run plus 50 runs from
-  slightly perturbed starting conditions — and each run is one ensemble member, so the spread
-  across the 51 members is what expresses the forecast's uncertainty. The on-disk copy is rounded
-  to a 13-bit significand (a relative error of at most 2^-13 ≈ 1.2e-4, far below the forecast's own
-  error) and laid out so that compression works well and a query can skip whole Parquet row groups,
-  both by `delta_store.nwp`.
+  alike. An ensemble forecast runs the weather model many times over, and each run is one ensemble
+  member, so the spread across the members is what expresses the forecast's uncertainty;
+  `ECMWF_ENS_ENSEMBLE_MEMBERS` gives the count and the control/perturbed split. The on-disk copy
+  is rounded to a 13-bit significand, which keeps a fixed number of significant figures rather
+  than a fixed number of decimal places, and is laid out so that compression works well and a
+  query can skip whole Parquet row groups — both by `delta_store.nwp`, which states the resulting
+  error bound.
 - **`AllFeatures`**: The final joined dataset passed to ML models. Primary key is `(time_series_id,
   power_fcst_init_time, valid_time[, ensemble_member])`, where the square brackets mark
   `ensemble_member` as a key column only when the frame carries one row per ensemble member.

@@ -4,22 +4,18 @@ The `Nwp` frame as stored and read, plus the run-completeness and data-quality r
 assess an ingested run of the European Centre for Medium-Range Weather Forecasts' ensemble
 forecast (ECMWF ENS).
 
-The vocabulary the rest of this module uses. A *run* is one execution of the weather model,
-labelled by the `init_time` it was initialised at. A `valid_time` is the moment a row's weather
-describes. An *ensemble member* is one of the 51 runs ECMWF ENS makes from each `init_time`: one
-control run, plus 50 runs from slightly perturbed starting conditions, so the spread across the
-51 members expresses the forecast's uncertainty. A *slice* is one (`ensemble_member`,
-`valid_time`) combination, which holds one value per H3 cell. *Lead-0* is the forecast step at
-the `init_time` itself.
+Two words this module uses throughout and defines nowhere else. A *run* is one execution of the
+weather model, and every row of one run shares an `init_time`. A *slice* is one
+(`ensemble_member`, `valid_time`) combination within a run, holding one value per H3 cell.
 
-ECMWF publishes precipitation and radiation as running totals accumulated since the start of the
-run. We download ECMWF ENS from Dynamical.org, who *de-accumulate* those three fields into rates
-before we receive them, which is why the three are legitimately null at lead-0. The three
-de-accumulated variables are `precipitation_surface`,
-`downward_short_wave_radiation_flux_surface` and `downward_long_wave_radiation_flux_surface`.
-Nine further weather variables are *instantaneous*, describing conditions at `valid_time`, and
-are non-nullable. The thirteenth, `categorical_precipitation_type_surface`, is a category code
-and is nullable.
+*De-accumulation* is the third. ECMWF publishes precipitation and radiation as running totals
+accumulated since the start of the run, and Dynamical.org, who we download ECMWF ENS from,
+de-accumulates those fields into rates before we receive them. `Nwp.deaccumulated_var_names`
+names the three fields this applies to and says why they are legitimately null at lead-0.
+
+The rest of the vocabulary is defined where it is declared: the ensemble and its size on
+`ECMWF_ENS_ENSEMBLE_MEMBERS`, the forecast steps and lead-0 on `ECMWF_ENS_LEAD_TIME_HOURS`, and
+`init_time` and `valid_time` on the `Nwp` fields of those names.
 """
 
 from collections.abc import Iterator, Sequence
@@ -278,21 +274,21 @@ class Nwp(pt.Model):
         dtype=pl.Float32,
         description="Surface pressure. Unit: Pa.",
         ge=0,
-        le=200_000,  # Max surface pressure seen in 2 years of ECMWF ENS = 105_760 Pa
+        le=200_000,  # Max in 2 years of ECMWF ENS = 105_760 Pa
     )
 
     pressure_reduced_to_mean_sea_level: float = pt.Field(
         dtype=pl.Float32,
         description="Mean sea-level pressure. Unit: Pa.",
         ge=0,
-        le=200_000,  # Max mean sea-level pressure seen in 2 years of ECMWF ENS = 105_727 Pa
+        le=200_000,  # Max in 2 years of ECMWF ENS = 105_727 Pa
     )
 
     geopotential_height_500hpa: float = pt.Field(
         dtype=pl.Float32,
         description="Geopotential height of the 500 hPa pressure surface. Unit: m.",
         ge=0,
-        le=10_000,  # Max 500 hPa geopotential height seen in 2 years of ECMWF ENS = 6_030 m
+        le=10_000,  # Max in 2 years of ECMWF ENS = 6_030 m
     )
 
     # Precipitation and radiation variables are null for the first forecast step (lead time 0) in
@@ -306,7 +302,7 @@ class Nwp(pt.Model):
             "lead time 0. Unit: W m-2."
         ),
         ge=0,
-        le=1500,  # Max downward long-wave flux seen in 2 years of ECMWF ENS = 445 W m-2
+        le=1500,  # Max in 2 years of ECMWF ENS = 445 W m-2
     )
 
     downward_short_wave_radiation_flux_surface: float | None = pt.Field(
@@ -316,7 +312,7 @@ class Nwp(pt.Model):
             " all-null for lead time 0. Unit: W m-2."
         ),
         ge=0,
-        le=1500,  # Max downward short-wave flux seen in 2 years of ECMWF ENS = 892 W m-2
+        le=1500,  # Max in 2 years of ECMWF ENS = 892 W m-2
     )
 
     precipitation_surface: float | None = pt.Field(
@@ -326,7 +322,7 @@ class Nwp(pt.Model):
             "variable is all-null for lead time 0. Unit: kg m-2 s-1."
         ),
         ge=0,
-        le=0.01,  # Max precipitation rate seen in 2 years of ECMWF ENS = 0.006 kg m-2 s-1
+        le=0.01,  # Max in 2 years of ECMWF ENS = 0.006 kg m-2 s-1
     )
 
     categorical_precipitation_type_surface: int | None = pt.Field(
@@ -398,8 +394,8 @@ class Nwp(pt.Model):
         Bounds `init_time`/`valid_time` to the plausible datetime range. Rejects a de-accumulated
         variable that is wholly missing, tolerating every smaller null pattern. Enforces
         uniqueness. Enforces the introduction-date rule for
-        `categorical_precipitation_type_surface`, the column derived from ECMWF's `ptype` field:
-        all-null before the date the column was introduced, never null after it.
+        `categorical_precipitation_type_surface` — the column derived from ECMWF's `ptype` field,
+        whose own description states the rule and the date.
         """
         validated_df = super().validate(
             dataframe=dataframe,
@@ -718,8 +714,8 @@ class NwpRunCompletenessReport:
     expected_n_h3_cells: int
     """Distinct `h3_index` values the H3 grid weights say this run should cover.
 
-    The H3 grid weights are the `H3GridWeights` table, which records what fraction of each H3 cell
-    overlaps each NWP grid box. Every cell with any overlap is a cell the run must cover."""
+    The H3 grid weights are the `contracts.geo_schemas.H3GridWeights` table; every cell it gives
+    any overlap is a cell the run must cover."""
 
     valid_time_min: datetime | None
     """Earliest `valid_time`, or `None` for an empty frame."""

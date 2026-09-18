@@ -318,8 +318,7 @@ class PowerForecast(pt.Model):
     across the members is what expresses the forecast's uncertainty.
 
     One row per time series, per forecast run, per target time, per ensemble member — the four
-    columns of ``PRIMARY_KEY``: ``time_series_id``, ``power_fcst_init_time``, ``valid_time``, and
-    ``ensemble_member``.
+    columns of ``PRIMARY_KEY``, declared below in that order.
 
     Internal vs delivered schema (Milestone 1 report Table 1, p.28): three columns are
     INTERNAL-ONLY — ``experiment_name``, ``fold_id``, and ``ml_flow_experiment_id``. They exist
