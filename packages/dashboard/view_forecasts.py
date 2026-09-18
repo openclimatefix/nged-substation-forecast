@@ -418,15 +418,15 @@ def _(forecasts, init_time, metadata_df, series_picker, settings):
             .collect()
         )
         # The proxy-analysis line stitches the first NWP_ANALYSIS_LEAD (27 hours) of every run
-        # overlapping the plotted window. It uses the control member — member 0, the one
-        # unperturbed run in the ensemble — only. select_analysis_proxy applies the member filter,
-        # the max_lead stitch, and the freshest-run-per-valid_time reduction. The cheap partition
-        # and row-group filters (init_time range, h3_index) stay on the scan handed to that call,
-        # so Delta partition pruning survives. Loading the line here, unconditionally, keeps the
-        # "NWP proxy analysis" checkbox instant. The box starts ticked, and clearing or re-ticking
-        # the box re-runs only the chart cell, never this Delta query. That Delta query takes
-        # ~0.2 s across the ~17 pruned init_time partitions. A run older than window_start −
-        # NWP_ANALYSIS_LEAD cannot reach the window, so the init_time filter starts there.
+        # overlapping the plotted window. It uses the control member only, which NWP_ANALYSIS_LEAD's
+        # docstring names. select_analysis_proxy applies the member filter, the max_lead stitch, and
+        # the freshest-run-per-valid_time reduction. The cheap partition and row-group filters
+        # (init_time range, h3_index) stay on the scan handed to that call, so Delta partition
+        # pruning survives. Loading the line here, unconditionally, keeps the "NWP proxy analysis"
+        # checkbox instant. The box starts ticked, and clearing or re-ticking the box re-runs only
+        # the chart cell, never this Delta query. That Delta query takes ~0.2 s across the ~17
+        # pruned init_time partitions. A run older than window_start − NWP_ANALYSIS_LEAD cannot
+        # reach the window, so the init_time filter starts there.
         nwp_analysis = (
             select_analysis_proxy(
                 pl.scan_delta(

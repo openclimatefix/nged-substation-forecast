@@ -183,9 +183,9 @@ _NWP_LINE_COLORS: Final[dict[str, str]] = {
 }
 """Legend label → line colour for the NWP panel — the counterpart of ``_LINE_COLORS``.
 
-Each colour carries the same meaning as on the power chart: grey for the model's view (the
-ensemble), blue for the closest-to-truth line, and orange-red for the shared init-time rule.
-"""
+Each colour deliberately carries the same meaning as on the power chart: grey for the model's
+view (the ensemble), blue for the closest-to-truth line, and orange-red for the shared init-time
+rule. """
 
 _MIDNIGHT_TEST: Final[str] = "hours(datum.value) == 0"
 """Vega expression: is this tick at (wall-clock) midnight?
