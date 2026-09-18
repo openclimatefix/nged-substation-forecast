@@ -27,12 +27,12 @@ def write_forecast_metrics(
 
     Casts the ``Enum`` columns (e.g. ``metric_name``, ``horizon_slice``) to ``String`` before
     writing. Without the cast, delta-rs writes the column as a dictionary-typed parquet column but
-    records it as ``Utf8`` in the Delta log. The write itself succeeds; a later ``pl.read_delta``
+    records it as ``Utf8`` in the Delta log. The write itself succeeds. A later ``pl.read_delta``
     then raises ``SchemaError: data type mismatch for column ...: incoming: Enum([...]) != target:
-    String`` (verified against deltalake 1.6.3 / polars 1.44.2). Casting before the write keeps
-    the file's physical type and the log's logical type in step. Performs
-    an idempotent overwrite of the ``(experiment_name, fold_id)`` partition so re-materialising the
-    asset replaces rows rather than duplicating them.
+    String`` (verified against deltalake 1.6.3 / polars 1.44.2). Casting before the write keeps the
+    file's physical type and the log's logical type in step. Performs an idempotent overwrite of the
+    ``(experiment_name, fold_id)`` partition so re-materialising the asset replaces rows rather than
+    duplicating them.
 
     Args:
         metrics: Fully populated ``Metrics`` rows, with all provenance columns set by

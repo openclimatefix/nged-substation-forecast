@@ -23,8 +23,8 @@ def write_eligible_time_series(
 
     The table is partitioned by ``fold_id``; the write **replaces** that partition, so
     re-materialising a fold leaves one copy of its eligible population. ``fold_id`` is an explicit
-    parameter rather than read off ``eligible`` because a fold with zero eligible series must
-    still clear its own partition, and an empty frame has no row to read a fold id from.
+    parameter rather than read off ``eligible``. A fold with zero eligible series must still clear
+    its own partition, and an empty frame has no row to read a fold id from.
 
     Args:
         eligible: Validated eligible-series rows for the fold named by ``fold_id``. May be empty.

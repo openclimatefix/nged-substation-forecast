@@ -34,10 +34,10 @@ def compute_h3_grid_weights_for_boundary(
             it defaults to h3_res + 2.
 
     Returns:
-        One row per (H3 cell, NWP grid point) pair that overlap within `boundary`, with
-        `proportion` holding the fraction of that H3 cell's child cells falling inside the grid
-        point's box — see `compute_h3_grid_weights`, which this function delegates to once the
-        boundary has been resolved to its covering `h3_index` list.
+        One row per (H3 cell, NWP grid point) pair that overlap within `boundary`. `proportion`
+        holds the fraction of that H3 cell's child cells falling inside the grid point's box. This
+        function resolves `boundary` to its covering `h3_index` list and then delegates to
+        `compute_h3_grid_weights` — see that function for the rest.
     """
     _LOG.info(f"Generating H3 cells at resolution {h3_res}...")
 
@@ -58,9 +58,10 @@ def compute_h3_grid_weights(
 ) -> pt.DataFrame[H3GridWeights]:
     """Computes the proportion mapping for H3 grid cells to a regular lat/lng grid.
 
-    This function takes a list of H3 indices and calculates how many child H3 cells at a finer
-    resolution (`child_h3_res`) fall into each cell of a regular lat/lng grid of size
-    `nwp_grid_size_degrees`.
+    This function takes a list of H3 indices. Each H3 resolution subdivides the one above it, so a
+    cell at resolution *n* contains a set of smaller child cells at resolution *n+1*. For each
+    index, this function counts how many of its child H3 cells at the finer resolution
+    `child_h3_res` fall into each cell of a regular lat/lng grid of size `nwp_grid_size_degrees`.
 
     The regular grid is assumed to be perfectly aligned to 0.0 (e.g., 0.0,
     `nwp_grid_size_degrees`, `nwp_grid_size_degrees * 2`).
@@ -98,10 +99,12 @@ def compute_h3_grid_weights(
         raise ValueError(f"All H3 indices must have the same resolution. {h3_res_unique=}")
     h3_res = h3_res_unique.item()
 
-    # The `+2` heuristic provides ~49 sample points per H3 cell (7^2), which is a sufficient balance
-    # between spatial precision (for area-weighting against a 0.25-degree grid) and computation
-    # time/memory overhead. Increasing the resolution gap further could cause an exponential
-    # explosion in the number of child cells and potentially trigger OOM errors.
+    # One H3 cell has about seven children at the next finer resolution, so stepping the resolution
+    # up by two gives roughly 7^2 children. The `+2` heuristic therefore provides ~49 sample points
+    # per H3 cell. That sample count balances spatial precision, for area-weighting against a
+    # 0.25-degree grid, against computation time and memory overhead. Increasing the resolution gap
+    # further could cause an exponential explosion in the number of child cells and potentially
+    # trigger OOM errors.
     child_h3_res = h3_res + 2 if child_h3_res is None else child_h3_res
 
     if child_h3_res <= h3_res:
@@ -130,22 +133,25 @@ def compute_h3_grid_weights(
 
     weights_df = (
         df.with_columns(child_h3=plh3.cell_to_children("h3_index", child_h3_res))
-        # empty_as_null=False matches the Polars 2.0 default and silences the deprecation warning.
-        # It has no effect on output today: cell_to_children always returns a non-empty list here
-        # (child_h3_res > h3_res is enforced above, and every H3 cell -- hexagon or pentagon -- has
-        # children at any finer resolution), so the empty-list branch the two settings disagree on
-        # is unreachable. (An *invalid* index yields a null list, not an empty one, and a null list
-        # explodes to a single null row under both settings -- which H3GridWeights.validate() below
-        # rejects regardless -- so there is no silent-data-loss risk from the choice either way.)
+        # empty_as_null=False on the .explode("child_h3") below matches the Polars 2.0 default and
+        # silences the deprecation warning. The setting has no effect on output today.
+        # cell_to_children always returns a non-empty list here: child_h3_res > h3_res is enforced
+        # above, and every H3 cell has children at any finer resolution. That holds for a pentagon
+        # as well as a hexagon, and an H3 grid holds 12 pentagons because a sphere cannot be tiled
+        # by hexagons alone. The empty-list branch the two settings disagree on is therefore
+        # unreachable. An *invalid* index yields a null list, not an empty list. A null list
+        # explodes to a single null row under both settings, and H3GridWeights.validate() below
+        # rejects that row regardless. Neither setting therefore risks silent data loss.
         .explode("child_h3", empty_as_null=False)
         # nwp_lat takes cell_to_lat and nwp_lon takes cell_to_lng: swapping the two column
         # assignments below is the one orientation bug this expression can introduce. The swap
         # survives the row-count and weight-sum assertions in `test_grid_weights_invariant`, because
         # the output stays well-formed and only its geography is wrong. Two tests in
-        # `geo/tests/test_h3.py` do catch the swap, both verified by mutation:
-        # `test_grid_weights_snap_to_nearest_grid_centre`, whose oracle builds the expected points
-        # geographically, and `test_grid_weights_preserve_geographic_orientation`, which pins two
-        # well-separated landmarks in Great Britain. The orientation-coverage table covers the wider
+        # `geo/tests/test_h3.py` do catch the swap, and mutation testing verified both: the swap was
+        # written into the code deliberately, and each test was watched failing.
+        # `test_grid_weights_snap_to_nearest_grid_centre` builds its expected points geographically,
+        # in its oracle. `test_grid_weights_preserve_geographic_orientation` pins two well-separated
+        # landmarks in Great Britain. The orientation-coverage table covers the wider
         # set of orientation bugs this mapping can carry, and which test catches each:
         # <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#nwp-grid-h3-orientation-coverage>
         .with_columns(

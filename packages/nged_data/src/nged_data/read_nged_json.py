@@ -1,7 +1,7 @@
 """Extracts metadata and time series from NGED JSON data.
 
-The JSON is expected to have a structure where metadata fields are at the top level, and a `data`
-field contains an array of time series data points.
+The parser expects two things of each JSON file. Metadata fields sit at the top level. A `data`
+field holds an array of time series data points.
 """
 
 import logging
@@ -62,25 +62,24 @@ def _extract_time_series_metadata(df: pl.DataFrame) -> pt.DataFrame[TimeSeriesMe
 def _extract_power_time_series(df: pl.DataFrame, time_series_id: int) -> ExtractedPowerTimeSeries:
     """Extract PowerTimeSeries from NGED's JSON data converted to DataFrame.
 
-    If NGED's meter reported no values, then the `data` field in the JSON will be Null (or, less
-    commonly, an empty array `[]`, which `pl.read_json` infers as `List(Null)`), and this function
-    will raise the following exception:
-        polars.exceptions.InvalidOperationError: invalid dtype: expected 'Struct', got 'Null' for
-        'data'
+    If NGED's meter reported no values, the `data` field in the JSON will be Null. Less commonly
+    the field is an empty array `[]`, which `pl.read_json` infers as `List(Null)`. In both cases
+    this function raises the following exception: polars.exceptions.InvalidOperationError:
+    invalid dtype: expected 'Struct', got 'Null' for 'data'
     """
-    # Extract time series data: explode the 'data' column and unnest the struct.
-    # 'explode' expands the list of structs into individual rows.
-    # 'unnest' expands the struct fields into individual columns.
+    # Extract time series data: explode the 'data' column and unnest the struct. 'explode' expands
+    # the list of structs into individual rows. 'unnest' expands the struct fields into individual
+    # columns.
     #
     # empty_as_null=False matches the Polars 2.0 default and silences the deprecation warning; it
-    # has no effect on output here. An empty 'data: []' array is read by pl.read_json as
-    # List(Null) -- a single file can't infer the struct fields of an empty array -- so after
-    # explode, under *both* settings, the .unnest("data") below raises the same
-    # InvalidOperationError ("expected 'Struct', got 'Null' for 'data'") that a Null 'data' field
-    # raises. storage.py's download_and_parse_files catches that exact message, logs a warning,
-    # and skips the file, so an empty-data file is handled identically to the documented null-data
-    # case regardless of empty_as_null. (The only case where the two settings differ -- an empty
-    # List(Struct) with a known schema -- can't arise from pl.read_json of a single file.)
+    # has no effect on output here. An empty 'data: []' array is read by pl.read_json as List(Null),
+    # because a single file can't infer the struct fields of an empty array. After explode, under
+    # *both* settings, the .unnest("data") below then raises the same InvalidOperationError that a
+    # Null 'data' field raises: "expected 'Struct', got 'Null' for 'data'". storage.py's
+    # download_and_parse_files catches that exact message, logs a warning, and skips the file. An
+    # empty-data file is therefore handled identically to the documented null-data case, whichever
+    # way empty_as_null is set. The two settings differ on one case only: an empty List(Struct) with
+    # a known schema. That case can't arise from pl.read_json of a single file.
     time_series_df = df.select("data").explode("data", empty_as_null=False).unnest("data")
 
     time_series_df = time_series_df.rename({"endTime": "time", "value": "power"})

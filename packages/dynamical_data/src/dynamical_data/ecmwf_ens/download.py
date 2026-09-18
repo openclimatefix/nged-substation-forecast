@@ -41,13 +41,13 @@ ECMWF_ENS_INSTANTANEOUS_VARS: Final[frozenset[str]] = (
 )
 """The downloaded variables describing conditions at one instant, under their *download* names.
 
-None of these is ever legitimately null, anywhere in a run, which is why
-`dynamical_data.ecmwf_ens.upstream_nulls.assess_upstream_grid_point_nulls` counts them
-separately from the de-accumulated ones and the ``ecmwf_ens`` asset gates a check on that count
-being zero.
+None of these is ever legitimately null, anywhere in a run. That is why
+`dynamical_data.ecmwf_ens.upstream_nulls.assess_upstream_grid_point_nulls` counts them separately
+from the de-accumulated variables. It is also why the ``ecmwf_ens`` asset gates a check on that
+count being zero.
 
-Derived from the download list rather than from ``Nwp``'s fields, because the two namespaces differ:
-we download ``wind_u_10m``/``wind_v_10m`` (and the 100 m pair), and
+Derived from the download list rather than from ``Nwp``'s fields, because the two namespaces differ.
+We download ``wind_u_10m``/``wind_v_10m`` (and the 100 m pair), and
 `dynamical_data.ecmwf_ens.convert_to_polars.convert_nwp_xarray_dataset_to_polars_dataframe`
 derives ``wind_speed_*``/``wind_direction_*`` from them. A set taken from the contract would name
 four variables the downloaded dataset does not carry, and indexing it would raise ``KeyError``.
@@ -74,15 +74,15 @@ def open_ecmwf_ens_run(
     """
     # Convention-sensitive to the *real* Dynamical.org catalog: this function bakes in assumptions
     # about its shape (longitude in [-180, 180], descending latitude, coordinate/dimension names).
-    # The offline tests share those assumptions and cannot catch a mismatch with the live
-    # catalog, so after changing this function run the network-gated test manually:
+    # The offline tests share those assumptions, so they cannot catch a mismatch with the live
+    # catalog. After changing this function, run the network-gated test manually:
     #     uv run pytest --run-network -m network
     # See
     # <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#network-gated-tests>.
 
-    # Reusable-package input validation, not a reachable production state: the `ecmwf_ens` asset
+    # Reusable-package input validation, not a reachable production state. The `ecmwf_ens` asset
     # always sources `h3_grid` from `h3_grid_weights`, which raises on an empty cell list before
-    # writing anything, so the file it reads can never hold zero rows.
+    # writing anything. So the file that asset reads can never hold zero rows.
     if h3_grid.is_empty():
         raise ValueError("h3_grid is empty. Cannot download ECMWF data for an empty grid.")
 
@@ -139,9 +139,9 @@ def download_ecmwf_ens_data(ds_sliced: xr.Dataset) -> xr.Dataset:
         ds_sliced: A lazy dataset as returned by `open_ecmwf_ens_run`.
 
     Returns:
-        The same variables and coordinates as `ds_sliced`, each variable now backed by an
-        in-memory `xr.DataArray` rather than a lazy Dask/Zarr array, fetched with up to four
-        variables downloaded concurrently.
+        The same variables and coordinates as `ds_sliced`. Each variable is now backed by an
+        in-memory `xr.DataArray` rather than a lazy Dask/Zarr array. Up to four variables are
+        downloaded concurrently.
     """
 
     def download_array(var_name: str) -> dict[str, xr.DataArray]:
@@ -153,21 +153,21 @@ def download_ecmwf_ens_data(ds_sliced: xr.Dataset) -> xr.Dataset:
     #
     # max_workers is capped rather than left at the default (one thread per variable, i.e. 13).
     # Investigation of issue #276 found that 13 concurrent chunked-zarr fetches self-contend badly
-    # (S3 rate limiting or connection-pool starvation): most variables finish in 5-20s, but a few
-    # straggle for minutes, making the whole download 600s+. Capping at 4 removed the stragglers
-    # entirely and cut a real download from 645s to 22.5s.
+    # (S3 rate limiting or connection-pool starvation). Most variables finish in 5-20s, but a few
+    # straggle for minutes, which makes the whole download 600s+. Capping at 4 removed the
+    # stragglers entirely and cut a real download from 645s to 22.5s.
     #
-    # 4 is the cap *per partition*, not per machine: `ecmwf_ens` runs up to its `ECMWF` pool limit
+    # 4 is the cap *per partition*, not per machine. `ecmwf_ens` runs up to its `ECMWF` pool limit
     # of partitions at once (4, set in `dagster.yaml`), so the fetches in flight against
     # Dynamical.org are the product of the two. Lower this cap before raising that limit.
     #
-    # The slowdown is a recent regression, not a pre-existing property of the download: Dagster's
+    # The slowdown is a recent regression, not a pre-existing property of the download. Dagster's
     # run history shows per-partition downloads holding a steady ~48-54s right up to 2026-06-30
-    # 12:26 UTC, then every run afterwards (2026-07-01 onwards) taking 3-12 min. That boundary
+    # 12:26 UTC. Every run afterwards (2026-07-01 onwards) took 3-12 min. That boundary
     # lines up exactly with an `icechunk` 2.0.6 -> 2.1.0 bump in the same `uv.lock` update
-    # (commit b46d145, 2026-06-30 12:26:50 UTC) — the leading theory is a change in icechunk's
-    # underlying S3 client (connection pooling/concurrency handling) between those two versions,
-    # though that has not been confirmed by pinning back to 2.0.6 and re-testing.
+    # (commit b46d145, 2026-06-30 12:26:50 UTC). The leading theory is a change in icechunk's
+    # underlying S3 client (connection pooling/concurrency handling) between those two versions.
+    # That theory has not been confirmed by pinning back to 2.0.6 and re-testing.
     data_arrays: dict[str, xr.DataArray] = {}
     with concurrent.futures.ThreadPoolExecutor(max_workers=4) as executor:
         futures = [executor.submit(download_array, str(name)) for name in ds_sliced.data_vars]

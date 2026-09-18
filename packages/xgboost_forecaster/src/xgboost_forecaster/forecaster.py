@@ -69,12 +69,12 @@ class XGBoostForecaster(BaseForecaster):
     All lead times for a given time_series_id are handled by a single Booster. The model is
     deterministic; ensemble forecasts arise because each NWP ensemble member's weather is a
     separate row through the relevant Booster. ``predict`` scores every ensemble member present
-    in its input in one call (it groups by ``time_series_id`` and dispatches each group to its
-    Booster).
+    in its input in one call. ``predict`` groups by ``time_series_id`` and dispatches each group
+    to its Booster.
 
-    Save layout: a directory containing one ``{time_series_id}.ubj`` file per trained Booster
-    plus a ``meta.json`` that stores the full XGBoostConfig, the trained ``time_series_id``
-    population and the model class, so that load() is self-contained.
+    Save layout: a directory holding one ``{time_series_id}.ubj`` file per trained Booster, plus
+    a ``meta.json``. ``meta.json`` stores the full XGBoostConfig, the trained ``time_series_id``
+    population, and the model class, so that load() is self-contained.
     """
 
     MODEL_NAME = "xgboost"
@@ -96,38 +96,44 @@ class XGBoostForecaster(BaseForecaster):
     def trained_time_series_ids(self) -> list[int]:
         """The sorted ``time_series_id``s this forecaster will serve a ``predict`` for.
 
-        For ``XGBoostForecaster`` this is exactly the set of series it holds a trained Booster
-        for (one Booster per ``time_series_id``), so ``predict`` ignores rows for any other
+        For ``XGBoostForecaster``, the population is exactly the set of series it holds a trained
+        Booster for, one Booster per ``time_series_id``. ``predict`` ignores rows for any other
         series. ``save()`` records this set in ``meta.json``, which is what ``load()`` reads it
-        back from. See ``BaseForecaster.trained_time_series_ids`` for the model-agnostic contract
-        this implements (the train==predict population invariant).
+        back from. A model scores exactly the series it was trained on, no more and no fewer:
+        that rule is the train==predict population invariant. See
+        ``BaseForecaster.trained_time_series_ids`` for the model-agnostic contract this
+        implements.
         """
         return sorted(self._models.keys())
 
     def train(self, data: pt.LazyFrame[AllFeatures], time_series_ids: list[int]) -> None:
         """Fit one Booster per ``time_series_id`` in ``time_series_ids``.
 
-        ``data`` is collected once and grouped in memory by ``time_series_id``; each group's rows
-        feed an ``xgb.QuantileDMatrix`` (compressed to 8-bit quantile bins, not an uncompressed
-        Float32 copy). Keeping this bounded is the *caller's* job — the NWP scan must be pruned
-        at the inputs (control member, the relevant H3 cells, the window's ``init_time``
-        partitions), because filtering the engineered output cannot prune the upstream
-        join/upsample. See ``load_engineering_inputs`` and "Bounding feature-engineering memory:
-        prune the inputs, not the output" in
+        ``data`` is collected once and grouped in memory by ``time_series_id``. Each group's rows
+        feed an ``xgb.QuantileDMatrix``, which compresses them to 8-bit quantile bins rather than
+        holding an uncompressed Float32 copy. Keeping the collect bounded is the *caller's* job.
+        The NWP scan must be pruned at the inputs: the control member, the relevant H3 cells, and
+        the window's ``init_time`` partitions. An ECMWF ensemble run holds one unperturbed
+        control member plus ~50 perturbed members, and training uses the control member alone.
+        Filtering the engineered output cannot prune the upstream join/upsample. See
+        ``load_engineering_inputs`` and "Bounding feature-engineering memory: prune the inputs,
+        not the output" in
         <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
 
-        Only the requested ``time_series_ids`` are trained; a requested series with no non-null
-        ``power`` rows (e.g. none in the training window) simply does not appear and gets no
-        Booster.
+        Only the requested ``time_series_ids`` are trained. A requested series with no non-null
+        ``power`` rows does not appear, and gets no Booster. A series can lack those rows because
+        none fall in the training window.
         """
         feature_cols = self._feature_cols
         requested = set(time_series_ids)
-        # Stream the collect. init_time prunes whole NWP partitions, and the member-early sort
-        # (delta_store.nwp.NWP_SORT_COLS) lets row-group stats skip most of each partition for the
-        # control-member read — but h3_index is not a sort-early column, so cell filtering is still
-        # decode-then-filter within the surviving row groups. The streaming engine applies those
-        # predicates per morsel, holding peak memory to a few GB where the in-memory engine would
-        # materialise every surviving row first. See
+        # Stream the collect. init_time prunes whole NWP partitions. Rows are written sorted by a
+        # fixed column order, and a filter on a column early in that order can be answered from each
+        # row group's recorded minimum and maximum. The member-early sort
+        # (delta_store.nwp.NWP_SORT_COLS) therefore lets row-group stats skip most of each partition
+        # for the control-member read. h3_index is not a sort-early column, so cell filtering is
+        # still decode-then-filter within the surviving row groups. The streaming engine applies
+        # those predicates per morsel, holding peak memory to a few GB where the in-memory engine
+        # would materialise every surviving row first. See
         # <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
         df = data.drop_nulls(subset=["power"]).collect(engine="streaming")
         for group_key, group in df.group_by(["time_series_id"]):
@@ -153,12 +159,13 @@ class XGBoostForecaster(BaseForecaster):
         ``data`` is collected once and grouped in memory by ``time_series_id``. Rows for a
         ``time_series_id`` this model was not trained on are ignored (the model only scores its
         own trained population — see ``trained_time_series_ids``). Keeping the collect bounded is
-        the caller's job: at validation the full ~51-member NWP ensemble is present, so the
-        caller predicts one ``init_time`` chunk at a time, appending to Delta as it goes.
-        ``init_time`` is one of the NWP table's two partition columns and the axis that fans the
-        output out across runs, so chunking on ``init_time`` bounds each iteration's forecast
-        frame while every partition is still read exactly once. Looping per H3 cell instead runs
-        out of memory on the busiest cell. See ``cv_power_forecasts`` and
+        the caller's job. Training reads the control member alone, but at validation the full
+        ~51-member NWP ensemble is present, so the caller predicts one ``init_time`` chunk at a
+        time. The caller appends each chunk to Delta as it goes. ``init_time`` is one of the NWP
+        table's two partition columns, and it is the axis that fans the output out across runs.
+        Chunking on ``init_time`` therefore bounds each iteration's forecast frame, and still
+        reads every partition exactly once. Looping per H3 cell instead runs out of memory on the
+        busiest cell. See ``cv_power_forecasts`` and
         <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
 
         ``fold_id`` is stamped onto every output row (the model has no inherent fold; the caller
@@ -205,17 +212,18 @@ class XGBoostForecaster(BaseForecaster):
             parts.append(_build_part(empty, np.empty(0, dtype=np.float32)))
 
         # The identity columns (power_fcst_model_name / experiment_name / fold_id) are built as
-        # ``pl.lit(str)`` above, so they are already ``String`` — the dtype PowerForecast declares —
-        # and need no cast before validation.
+        # ``pl.lit(str)`` above, so they are already ``String``. ``String`` is the dtype
+        # PowerForecast declares, so these columns need no cast before validation.
         return PowerForecast.validate(pl.concat(parts))
 
     def save(self, path: Path) -> None:
         """Save all Boosters as .ubj files plus a meta.json with the full config.
 
-        Clears ``path`` first, so re-saving a smaller model over a directory that already holds a
-        bigger one's ``.ubj`` files can never leave the dropped series' boosters behind on disk
-        (issue #197). The same replace-don't-merge property holds through MLflow, because
-        ``BaseForecaster.save_to_mlflow`` uploads this directory as a single archive artifact.
+        Clears ``path`` first. Re-saving a model trained on fewer series, over a directory that
+        already holds the ``.ubj`` files of a model trained on more, can then never leave the
+        dropped series' boosters behind on disk (issue #197). The same replace-don't-merge
+        property holds through MLflow, because ``BaseForecaster.save_to_mlflow`` uploads this
+        directory as a single archive artifact.
         """
         shutil.rmtree(path, ignore_errors=True)
         path.mkdir(parents=True, exist_ok=True)
@@ -235,14 +243,14 @@ class XGBoostForecaster(BaseForecaster):
     def load(cls, path: Path) -> Self:
         """Reconstruct an XGBoostForecaster from a saved directory.
 
-        ``meta.json``'s ``trained_time_series_ids`` — not whatever ``.ubj`` files happen to be in
-        the directory — decides the population, because a model's population is the model's own
-        frozen record and not a directory listing (issue #197). A directory can hold files this
-        model did not write: ``ml_core.base_forecaster.save_to_mlflow`` adds a
-        ``time_series_metadata.parquet`` and ``ml_core.production_helpers.fetch_model_artifacts``
-        a ``promotion.json``, and a hand-assembled directory can hold anything. Globbing would
-        let such a file enlarge the population, silently scoring a series with a model that was
-        never trained for it and breaking the train==predict invariant (see
+        ``meta.json``'s ``trained_time_series_ids`` decides the population, not whatever ``.ubj``
+        files happen to be in the directory. A model's population is the model's own frozen
+        record, not a directory listing (issue #197). A directory can hold files this model did
+        not write. ``ml_core.base_forecaster.save_to_mlflow`` adds a
+        ``time_series_metadata.parquet``. ``ml_core.production_helpers.fetch_model_artifacts``
+        adds a ``promotion.json``. A hand-assembled directory can hold any file at all. Globbing
+        would let one of those files enlarge the population. The model would then silently score
+        a series it was never trained for, breaking the train==predict invariant (see
         ``BaseForecaster.trained_time_series_ids``).
         """
         meta = json.loads((path / "meta.json").read_text())

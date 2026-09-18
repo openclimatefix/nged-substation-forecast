@@ -8,15 +8,19 @@ defined in `ml_core`.
 
 One `xgb.Booster` is trained per `time_series_id`, so each substation's model can learn its own
 relationship between weather and power. Features are passed via the `AllFeatures` schema (see
-`contracts`), which joins NWP variables, power lag/rolling features, and static metadata.
-Categorical and string columns are encoded as integer codes before being handed to XGBoost; all
-features are cast to `Float32`, and missing values are left as `NaN` so XGBoost handles them
-natively. The model is deterministic, and an ensemble forecast still comes out of that deterministic
-model — the `XGBoostForecaster` class below says how.
+`contracts`), which joins NWP variables, power lag and rolling features, and static metadata. A
+feature is one input column offered to the model: a lag feature is the power measured a fixed
+interval before the target time, and a rolling feature is a statistic over a recent window of that
+power. Categorical and string columns are encoded as integer codes before being handed to XGBoost;
+all features are cast to `Float32`, and missing values are left as `NaN` so XGBoost handles them
+natively. ECMWF publishes ~51 separately perturbed members of the same weather forecast, and an
+ensemble forecast is one power prediction per member. The model is deterministic, and an ensemble
+forecast still comes out of that deterministic model — the `XGBoostForecaster` class below says how.
 
 Both `train()` and `predict()` collect their input once, so keeping that collect bounded is the
 **caller's** job. The dominant cost is the multi-tens-of-GB NWP scan, which has to be pruned at the
-*inputs* and streamed, because filtering the engineered *output* cannot prune the NWP scan. The
+*inputs* and streamed. Feature engineering joins and upsamples the raw inputs into `AllFeatures`,
+and plans that work lazily, so filtering the engineered *output* cannot prune the NWP scan. The
 `train` and `predict` docstrings below give the mechanics. For the dataset sizes and the table of
 which predicates actually prune the NWP scan, see [Bounding feature-engineering
 memory](https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output).
@@ -35,10 +39,10 @@ memory](https://openclimatefix.github.io/nged-substation-forecast/architecture/p
 `learning_rate`, `max_depth`, etc.). `BaseForecasterConfig` contributes `selected_features`,
 `random_seed` (threaded into XGBoost's own `seed` parameter for deterministic training), the
 experiment-identity fields `experiment_name` and `ml_flow_experiment_id`, and the leaderboard tag
-fields `weather_source` and `training_strategy`. Model-family identity — `MODEL_NAME` ("xgboost")
-and `MODEL_VERSION` — lives on the `XGBoostForecaster` class itself, not in the config; both a
-config's experiment identity and the class's model-family identity are stamped onto every row of the
-`PowerForecast` output, so the Delta Lake table is self-describing. `XGBoostConfig` inherits
-`extra="forbid"` from `BaseForecasterConfig`, so a key that names neither an `XGBoostConfig` field
-nor an inherited `BaseForecasterConfig` field raises `ValidationError` rather than being silently
-ignored.
+fields `weather_source` and `training_strategy`, which are the columns the leaderboard comparing
+trained models groups by. Model-family identity — `MODEL_NAME` ("xgboost") and `MODEL_VERSION` —
+lives on the `XGBoostForecaster` class itself, not in the config; both a config's experiment
+identity and the class's model-family identity are stamped onto every row of the `PowerForecast`
+output, so the Delta Lake table is self-describing. `XGBoostConfig` inherits `extra="forbid"` from
+`BaseForecasterConfig`, so a key that names neither an `XGBoostConfig` field nor an inherited
+`BaseForecasterConfig` field raises `ValidationError` rather than being silently ignored.
