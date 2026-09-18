@@ -18,7 +18,7 @@ Only ``selected_features`` (and an honest ``training_strategy`` tag) are overrid
 hyperparameter is inherited from ``conf/model/xgboost.yaml``. The 20 features below are exactly the
 base config's list minus the four ``power_lag_*h`` entries.
 
-Run from the repo root, or a worktree where ``.env`` (and ``data``) are symlinked:
+Run from the repo root or a worktree where ``.env`` (and ``data``) are symlinked:
 
     uv run python scripts/forecasting/run_baseline_experiment.py
 """

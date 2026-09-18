@@ -63,7 +63,7 @@ though `pyproject.toml` configures none of those tools.
 """
 
 QUOTED_COMMENT: Final[re.Pattern[str]] = re.compile(r"^#\s*>")
-"""A comment whose text opens with `>` — a blockquote, or a `>>>` doctest example.
+"""A comment whose text opens with `>` — a blockquote or a `>>>` doctest example.
 
 `reflow_text` reads a `>` comment line as a blockquote and repeats the `>` marker on every line it
 wraps onto, while `_flatten` strips only the `#` marker. Each added `>` therefore counts as a new

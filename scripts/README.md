@@ -5,7 +5,7 @@ the two deployment commands, and a handful of ad-hoc forecasting and maintenance
 
 Each script's own module docstring (or, for the two shell scripts, the comment header above the
 code) is the source of truth for how the script works and why each choice in the script was made.
-The lines below say only what each script is for and who runs it.
+The per-script lines below say only what each script is for and who runs it.
 
 ## Why nothing here is a Dagster asset
 
@@ -14,18 +14,18 @@ forecasting pipeline — scheduled, materialised, with lineage and retries — s
 right home for work that repeats on a schedule and depends on other tracked outputs. The scripts in
 this directory do not fit that shape: a pre-commit hook runs once per commit and exits, a deployment
 is a person running a command by hand during a release, and a baseline export or a one-off Delta
-maintenance job runs whenever someone needs it, not on a schedule. Each is run directly, not through
-Dagster: `uv run python <script>` for the Python scripts, or the shell script itself for the two
-under `deploy/`.
+maintenance job runs whenever someone needs it, not on a schedule. Each script is run directly, not
+through Dagster: `uv run python <script>` for the Python scripts, or the shell script itself for the
+two under `deploy/`.
 
 ## `lint/` — the quality gates, and the helpers that fix what they flag
 
 Three of these six modules are automated gates, wired into `.pre-commit-config.yaml`, so a commit
 cannot land without passing them. Two of the three gates are scoped to the files they cover — a
-Python file, or a marimo notebook — and `check_docs_links.py` runs on every commit whatever that
+Python file or a marimo notebook — and `check_docs_links.py` runs on every commit whatever that
 commit touched. Two more modules are helpers a person runs by hand, to rewrap the prose that
-`pymarkdown`'s `MD013` and ruff's `E501` report as over-long. The sixth is a library with no command
-line of its own.
+`pymarkdown`'s `MD013` and ruff's `E501` report as over-long. The sixth module is a library with no
+command line of its own.
 
 - `check_docs_links.py` — **gate.** Resolves every link to the published docs site against the
   markdown sources, so a docstring cannot go on pointing at a page a rename moved or an anchor a
@@ -57,7 +57,7 @@ Both scripts are run by hand by a person doing a release, in the order given. Ne
 any arguments, so that nothing can be mistyped or drift. The two scripts together are the recurring
 half of the runbook at [Setting up the live service on
 AWS](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/): the one-time
-infrastructure steps around those two commands stay in the AWS console.
+infrastructure steps around those two scripts stay in the AWS console.
 
 - `build_and_verify_image.sh` — builds the production image with the champion model baked in, then
   smoke-tests it with no network access and no credentials, failing hard if MLflow appears anywhere

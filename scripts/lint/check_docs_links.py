@@ -8,7 +8,7 @@ killed, and nothing notices. This script does.
 
 A naive implementation hits two traps. First, **never hand-roll a slugify**: Python-Markdown's
 `toc` extension preserves underscores, so a guessed `_` → `-` rule reports a good link as broken.
-A hand-rolled slugify tried in this script misreported 15 good links that way.
+A hand-rolled slugify tried in this script guessed `_` → `-` and misreported 15 good links.
 `#step-6-launch-register_experiment_job` is a real anchor in this repo's own docs, and
 `src/nged_substation_forecast/defs/jobs.py` links to it. This script instead converts each page
 with the real `markdown.Markdown()` converter, using the extensions `mkdocs.yml` configures plus

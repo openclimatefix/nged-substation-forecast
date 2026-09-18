@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 #
 # Push the already-built production image to the Elastic Container Registry (ECR) and point the
-# Elastic Container Service (ECS) task definition at it.
+# Elastic Container Service (ECS) task definition at the pushed image.
 #
 # The script is Step 6 of the AWS setup runbook as one command and, together with
 # scripts/deploy/build_and_verify_image.sh, the whole recurring champion-redeploy loop (aws.md
