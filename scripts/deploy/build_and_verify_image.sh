@@ -4,61 +4,68 @@
 #
 # The script is Step 4 of the AWS setup runbook as one command: build the image with the champion
 # model baked in, then prove the image runs hermetically. This header is the source of truth for
-# *why* each choice below is made. The runbook is at
+# *why* each choice below is made. The runbook is the file `docs/live_service/aws.md`, cited below
+# as aws.md and published at
 # <https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/>.
 #
 # Usage:
 #   scripts/deploy/build_and_verify_image.sh          # no arguments — everything is derived
 #
-# The image is built for linux/arm64 REGARDLESS of the host architecture: the Elastic Container
-# Service (ECS) task definition declares ARM64 (ARM Fargate is ~20% cheaper) and the control-plane
-# box is a Graviton instance, so an amd64 image cannot run anywhere in the deployment. A native x86
-# build pushes fine, but every task launch then dies with "image Manifest does not contain
-# descriptor matching platform 'linux/arm64 v8'" (aws.md Steps 9-11). On an x86 host both the build
-# and the smoke test therefore run under QEMU user-mode emulation, which is slower than native but
-# correct. The script checks the emulator is registered and prints the fix if it is not.
+# The image is built for linux/arm64 REGARDLESS of the host architecture. The Elastic Container
+# Service (ECS) task definition declares ARM64, and the control-plane box is a Graviton instance.
+# The control-plane box is the always-on EC2 instance that runs Dagster, set up in aws.md Step 11.
+# So an amd64 image cannot run anywhere in the deployment. ARM64 is declared because ARM Fargate is
+# ~20% cheaper. A native x86 build pushes fine, but every task launch then dies with "image Manifest
+# does not contain descriptor matching platform 'linux/arm64 v8'" (aws.md Steps 9-11). On an x86
+# host both the build and the smoke test therefore run under QEMU user-mode emulation, which is
+# slower than native but correct. The script checks the emulator is registered and prints the fix if
+# it is not.
 #
-# The smoke test's partition key is HARD-CODED and arbitrary. The key only has to parse as
-# YYYY-MM-DD-HH:MM: the offline run dies at the numerical-weather-prediction (NWP) lookup long
-# before the slot's validity could matter, so no real partition is needed and there is no decision
-# worth pushing onto the user. Real slots matter only for genuine runs against real data tables —
-# see the partition-semantics note at
+# The smoke test's partition key is HARD-CODED and arbitrary. In production the service forecasts
+# once per 6-hourly slot, and the partition key names the slot. The key only has to parse as
+# YYYY-MM-DD-HH:MM. The offline run dies at the numerical-weather-prediction (NWP) lookup, long
+# before the slot's validity could matter. So no real partition is needed, and no decision is worth
+# pushing onto the user. Real slots matter only for genuine runs against real data tables — see the
+# partition-semantics note at
 # <https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/>.
 #
-# The build never contacts MLflow — it only COPYs data/production_model/ (populated by Step 3's
-# `promoted_model` asset) into the image, so the build stays hermetic. The MODEL_RUN_ID and
-# GIT_SHA build args become Open Container Initiative (OCI) labels purely for traceability
-# (inspect with `docker inspect`).
+# The build never contacts MLflow. The build only COPYs data/production_model/ into the image, so
+# the build stays hermetic. Step 3's `promoted_model` asset populates that directory. The
+# MODEL_RUN_ID and GIT_SHA build args become Open Container Initiative (OCI) labels purely for
+# traceability (inspect with `docker inspect`).
 #
 # The smoke test choices:
 #   - No credentials at all: inference reads the model baked into the image, so the smoke test
-#     passes with an empty environment. The deployed task still gets the NGED source-bucket
-#     values as secrets (runbook Step 8), because the hourly ingest schedule needs them.
-#   - --network=none: proves runtime inference needs no network at all — the whole point of
-#     baking the model in.
+#     passes with an empty environment. The deployed task still gets the NGED source-bucket values
+#     as secrets (runbook Step 8), because the hourly ingest schedule needs them. NGED is National
+#     Grid Electricity Distribution, the electricity network operator whose telemetry this project
+#     forecasts.
+#   - --network=none: proves runtime inference needs no network at all — the whole point of baking
+#     the model in.
 #   - Job selected with `-j live_forecasts_job`, not `--partition`: `dagster job execute` has no
-#     --partition flag. Selecting by job name and passing the partition via --tags exercises
-#     exactly the entry point the EcsRunLauncher invokes in production.
+#     --partition flag. Selecting by job name and passing the partition via --tags exercises exactly
+#     the entry point Dagster's EcsRunLauncher invokes in production.
 #
 # What the script gates on, and what it does not:
 #   - HARD FAIL (exit 1) if the runtime touches MLflow. Baking the model in exists precisely so
-#     production inference has no MLflow dependency at runtime; a single "mlflow" mention in the
-#     log means that guarantee has regressed. The MLflow grep is the one check worth automating,
-#     because a reintroduced runtime MLflow call is easy to miss by eye.
+#     production inference has no MLflow dependency at runtime. A single "mlflow" mention in the log
+#     means that guarantee has regressed. The MLflow grep is the one check worth automating, because
+#     a reintroduced runtime MLflow call is easy to miss by eye.
 #   - NOT gated: "the model loaded" and "the only failure was missing NWP data". The container is
-#     EXPECTED to exit non-zero here — no NWP table is mounted for this isolated test, so the
-#     container fails at the NWP-availability lookup, which runs *after* the model has already
+#     EXPECTED to exit non-zero here. No NWP table is mounted for this isolated test, so the
+#     container fails at the NWP-availability lookup. That lookup runs *after* the model has already
 #     loaded. That ordering is the proof the model loaded; there is no reliable log string to grep
 #     for the load itself. Read the printed log and confirm by eye.
 #
-# One failure to read for by name: a traceback naming a feature the code cannot parse means the
-# model baked into this image predates a rename of that feature. Re-promote a newer model —
+# Read for one failure by name: a traceback that names a feature the code cannot parse. A feature
+# here is one named input to the model, not a piece of functionality. That traceback means the model
+# baked into this image predates a rename of that feature. Re-promote a newer model —
 # <https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/#step-2-materialise-promoted_model>.
 
 set -euo pipefail
 
-# Arbitrary but well-formed (YYYY-MM-DD-HH:MM) — see the header: the offline smoke test never
-# reaches the point where the slot's validity could matter.
+# Arbitrary but well-formed (YYYY-MM-DD-HH:MM). See the header: the offline smoke test never reaches
+# the point where the slot's validity could matter.
 PARTITION_KEY="2026-01-01-00:00"
 
 PROMOTION_JSON="data/production_model/promotion.json"
@@ -68,9 +75,9 @@ if [[ ! -f "$PROMOTION_JSON" ]]; then
   exit 2
 fi
 
-# The bake COPYs the promoted directory wholesale and never re-runs promotion, so a directory
+# The bake COPYs the promoted directory wholesale and never re-runs promotion. So a directory
 # promoted by code that does not write time_series_metadata.parquet would build and pass the smoke
-# test, then fail every 6-hourly slot in production.
+# test. The same directory would then fail every 6-hourly slot in production.
 TRAINED_METADATA="data/production_model/time_series_metadata.parquet"
 if [[ ! -f "$TRAINED_METADATA" ]]; then
   echo "error: $TRAINED_METADATA not found — live inference locates its time series from" >&2
@@ -78,15 +85,15 @@ if [[ ! -f "$TRAINED_METADATA" ]]; then
   exit 2
 fi
 
-# The run id is read from the directory the build COPYs from, so the OCI label can never drift
-# from the model actually baked in. The image tag is its first 12 hex chars — unique per promoted
-# model and human-readable.
+# The MLflow run id is read from the directory the build COPYs from, so the OCI label can never
+# drift from the model actually baked in. The image tag is that run id's first 12 hex chars — unique
+# per promoted model and human-readable.
 RUN_ID="$(jq -r .mlflow_run_id "$PROMOTION_JSON")"
 IMAGE="nged-forecast:${RUN_ID:0:12}"
 
-# See the header: the deployment is ARM end-to-end, so the build always targets linux/arm64.
-# On a non-ARM host the build needs a QEMU binfmt handler registered with the kernel, so fail
-# fast with the fix rather than letting the build die mid-way with "exec format error".
+# See the header: the deployment is ARM end-to-end, so the build always targets linux/arm64. On a
+# non-ARM host the build needs a QEMU binfmt handler registered with the kernel. So fail fast with
+# the fix, rather than letting the build die mid-way with "exec format error".
 if [[ "$(uname -m)" != "aarch64" && ! -e /proc/sys/fs/binfmt_misc/qemu-aarch64 ]]; then
   echo "error: this host is $(uname -m) and no arm64 emulator is registered, so the required" >&2
   echo "       linux/arm64 build cannot run. Register QEMU (once per boot) with:" >&2

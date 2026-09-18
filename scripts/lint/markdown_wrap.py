@@ -1,9 +1,10 @@
 """The one wrap width every docs-reflow script in this repo targets, and a whole-file reflow.
 
 This repository's markdown prose is hard-wrapped at `WIDTH`, and `pymarkdown`'s `MD013` rule
-holds the prose there. A script that rewraps one line of a page therefore does not have to solve
-which width that page is already at before it can match the lines around the edit. Every reflow
-script imports `WIDTH` from here rather than assuming a width or solving for each page's width.
+holds the prose there. A script that rewraps one line of a page has to match the lines around the
+edit. Because every page is already at `WIDTH`, the script does not have to solve which width
+that page is at. Every reflow script imports `WIDTH` from here rather than assuming a width or
+solving for each page's width.
 """
 
 import re
@@ -50,11 +51,12 @@ def _tokenise(text: str) -> list[str]:
     whose label breaks after "Storage formats: measured, not". So the label needs no
     special-casing.
 
-    A word that happens to start with `#`, `>`, a list marker, or a fence marker is read as
-    opening that block wherever it lands at the start of a line, so it can never be the first
+    A word can start with `#`, `>`, a list marker, or a fence marker. Wherever that word lands at
+    the start of a line, it is read as opening that block. So the word can never be the first
     word on a wrapped line. Gluing that word to its predecessor keeps the pair on one line
-    together and lets `_wrap` treat the pair as one token, rather than discovering the clash
-    after the line is already full and having to push the width past `WIDTH` to fix the clash.
+    together, and lets `_wrap` treat the pair as one token. The alternative is to discover the
+    clash after the line is already full, and then to push the width past `WIDTH` to fix the
+    clash.
     """
     words = text.split()
     glued: list[str] = []
@@ -88,18 +90,18 @@ def _reflow_unit(unit_lines: list[str]) -> list[str]:
     """Reflow one list item, blockquote, or plain paragraph to `WIDTH`, preserving its prefix.
 
     A blockquote marker is stripped and reapplied to every output line uniformly, before the list
-    or plain-paragraph handling runs on what is left. Stripping the marker first is what lets a
-    list item nested inside a blockquote (each source line prefixed `> - `) keep its own marker
-    rather than being read as ordinary quoted prose and merged with its siblings into one
-    paragraph.
+    or plain-paragraph handling runs on what is left. A list item nested inside a blockquote
+    carries `> - ` on each of its source lines. Stripping the marker first is what lets that item
+    keep its own marker, rather than being read as ordinary quoted prose and merged with its
+    siblings into one paragraph.
 
-    A paragraph with no marker of its own can still be a list item's body: Python-Markdown treats
-    any indent at or past the item's content column as part of that item, including a second
-    paragraph separated from the marker line by a blank line. An unmarked paragraph carries that
-    indent on its own first line, so preserving whatever indent the first de-quoted line already
-    has — rather than flattening every unmarked paragraph to column 0 — is what keeps the
-    paragraph inside the list item it belongs to instead of closing the list and starting a new
-    top-level paragraph.
+    A paragraph with no marker of its own can still be a list item's body. Python-Markdown treats
+    any indent at or past the item's content column as part of that item. The rule includes a
+    second paragraph separated from the marker line by a blank line. An unmarked paragraph
+    carries that indent on its own first line. So this function preserves whatever indent the
+    first de-quoted line already has, rather than flattening every unmarked paragraph to
+    column 0. Preserving the indent is what keeps the paragraph inside the list item it belongs
+    to, instead of closing the list and starting a new top-level paragraph.
     """
     quote_match = QUOTE_MARKER.match(unit_lines[0])
     quote_prefix = quote_match.group(1) if quote_match else ""
@@ -125,9 +127,10 @@ def _reflow_unit(unit_lines: list[str]) -> list[str]:
 def _is_blank_quote_line(line: str) -> bool:
     """Whether `line` is a blockquote line carrying no content — e.g. a bare `>`.
 
-    CommonMark reads this the way it reads a blank line at the top level: it separates two
-    paragraphs while keeping both inside the same `<blockquote>`. Folding it into a wrapping unit
-    like ordinary quote content would erase the paragraph break and merge the two into one.
+    CommonMark reads a blank blockquote line the way it reads a blank line at the top level. The
+    blank quote line separates two paragraphs while keeping both inside the same `<blockquote>`.
+    Folding the blank quote line into a wrapping unit like ordinary quote content would erase the
+    paragraph break and merge the two paragraphs into one.
     """
     quote_match = QUOTE_MARKER.match(line)
     return bool(quote_match) and not line[quote_match.end() :].strip()
@@ -136,11 +139,11 @@ def _is_blank_quote_line(line: str) -> bool:
 def _is_unwrappable(line: str) -> bool:
     """Whether `line` opens a block whose line breaks carry meaning and must survive untouched.
 
-    There is no case here for a `$$...$$` display-math block: MathJax reads a newline inside one
-    as ordinary whitespace, so reflowing it is safe, but only because every token in a formula is
-    whitespace-separated the same way a word is — the corpus carries no construct where that
-    isn't true. A LaTeX block relying on a significant literal newline would need its own case
-    here.
+    There is no case here for a `$$...$$` display-math block. MathJax reads a newline inside a
+    display-math block as ordinary whitespace, so reflowing the block is safe. Reflowing is safe
+    only because every token in a formula is whitespace-separated the same way a word is. The
+    corpus carries no construct where that whitespace separation fails. A LaTeX block relying on
+    a significant literal newline would need its own case here.
     """
     return bool(
         HEADING.match(line)
@@ -154,9 +157,10 @@ def _is_unwrappable(line: str) -> bool:
 def _units(lines: list[str]) -> list[tuple[int, int]]:
     """The `(first_line, last_line + 1)` bounds of each wrapping unit in a flowable block.
 
-    A unit is a run of lines starting at a list marker or a blockquote marker, or the whole block
-    where it carries neither — so a list written without blank lines between its items reflows
-    one item at a time rather than merging every sibling into one paragraph.
+    A unit is a run of lines starting at a list marker or a blockquote marker. Where the block
+    carries neither marker, the whole block is one unit. So a list written without blank lines
+    between its items reflows one item at a time, rather than merging every sibling into one
+    paragraph.
     """
     starts = [
         0,
@@ -186,11 +190,12 @@ def reflow_text(source: str) -> str:
 
     Headings, tables, fenced code blocks, and a leading YAML frontmatter block are left
     untouched. There is no exemption for a CommonMark *indented* code block (4+ spaces, no
-    fence): the `code-style` skill requires every code sample in this repo to be fenced, and a
+    fence). The `code-style` skill requires every code sample in this repo to be fenced, and a
     4-space indent with no marker is otherwise indistinguishable from a nested list item's
     continuation, which does need rewrapping. A scan of all 96 markdown files in the repository
-    found no unfenced indented code block outside a list, so an indented, unmarked line is
-    treated as prose rather than risk silently skipping list continuations.
+    found no unfenced indented code block outside a list. So an indented, unmarked line is
+    treated as prose. Treating such a line as code instead would risk silently skipping list
+    continuations.
 
     `source` must end in a newline, as every file in this repo does.
     """

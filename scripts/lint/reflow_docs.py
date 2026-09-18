@@ -2,9 +2,9 @@
 
 Headings, tables, fenced code blocks, and YAML frontmatter are left untouched: only prose
 paragraphs, list items, and blockquotes are re-flowed. A CommonMark *indented* code block — 4 or
-more spaces with no fence — is not exempt: `markdown_wrap.reflow_text` rewraps an indented code
-block as prose, because a 4-space indent carrying no marker cannot be told apart from a nested
-list item's continuation, which does need rewrapping. A markdown link is kept whole even when its
+more spaces with no fence — is not exempt. `markdown_wrap.reflow_text` rewraps an indented code
+block as prose. A 4-space indent carrying no marker cannot be told apart from a nested list
+item's continuation, which does need rewrapping. A markdown link is kept whole even when its
 label contains spaces, so a line break can never fall inside `[label](target)`.
 
 Usage::
