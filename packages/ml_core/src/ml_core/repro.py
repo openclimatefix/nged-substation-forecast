@@ -1,24 +1,25 @@
 """Reproducibility provenance: the git SHA and Delta-table versions behind an MLflow run.
 
-Answers "exactly which code and which data produced this?" for any MLflow run. The git SHA pins the
-code. The SHA is stamped **explicitly** because MLflow's ``mlflow.source.git.commit`` auto-detection
-needs gitpython installed *and* the working directory inside the repo, neither of which holds in a
-production container. Each Delta table's ``version()`` pins the data: Delta Lake time travel makes
-data versioning one integer per table. A run can therefore later be replayed with
-``pl.scan_delta(path, version=N)`` after ``git checkout {sha}``.
+Answers "exactly which code and which data produced this?" for any MLflow run. The git SHA pins
+the code. The SHA is stamped **explicitly** because MLflow's ``mlflow.source.git.commit``
+auto-detection needs gitpython installed *and* the working directory inside the repo. Neither
+condition holds in a production container. Each Delta table's ``version()`` pins the data: Delta
+Lake time travel makes data versioning one integer per table. A run can therefore later be
+replayed with ``pl.scan_delta(path, version=N)`` after ``git checkout {sha}``.
 
 Every function here is deliberately **non-raising**: the git SHA, the dirty flag, and each Delta
 table's version are a record *about* a run rather than an input to that run. A missing ``.git``
 directory (containers) or an absent Delta table must never fail the surrounding training or
-forecasting run; each absence degrades to the sentinels ``"unknown"`` / ``"absent"`` instead.
+forecasting run. Each absence degrades to the sentinels ``"unknown"`` / ``"absent"`` instead.
 
 ``provenance_tags`` **stage-prefixes** its keys (``register_``, ``train_``, ``predict_``,
 ``metrics_``) because four separate writers stamp provenance onto the same MLflow runs. Three are
-Dagster assets writing one fold run — ``trained_cv_model``, ``cv_power_forecasts``, and ``metrics``
-— each potentially on a different code revision and at a different set of Delta table versions. The
-fourth is the ``register_experiment`` op inside ``register_experiment_job``, which stamps the
-experiment's parent run; the ``metrics`` asset stamps that parent run too. Un-prefixed keys would
-clobber one another, and the prefix preserves every writer's provenance snapshot side by side.
+Dagster assets writing one fold run: ``trained_cv_model``, ``cv_power_forecasts``, and
+``metrics``. Each of the three can be on a different code revision and at a different set of
+Delta table versions. The fourth is the ``register_experiment`` op inside
+``register_experiment_job``, which stamps the experiment's parent run; the ``metrics`` asset
+stamps that parent run too. Un-prefixed keys would clobber one another, and the prefix preserves
+every writer's provenance snapshot side by side.
 """
 
 import logging
@@ -86,13 +87,14 @@ def get_git_info(cwd: Path | None = None) -> MlflowTags:
 
     Args:
         cwd: Directory the ``git`` commands run from. Defaults to this module's directory
-            (``_GIT_CWD``) — inside the repo for an editable/workspace install, so the SHA is
-            captured regardless of the process's working directory. Overridable for testing.
+            (``_GIT_CWD``). That directory is inside the repo for an editable or workspace install,
+            so the SHA is captured regardless of the process's working directory. Overridable for
+            testing.
 
     Returns:
-        ``{"git_sha": sha, "git_dirty": dirty}``, both plain strings — ``sha`` the 40-character
-        commit hash and ``dirty`` either ``"true"`` or ``"false"`` — or ``UNKNOWN`` in place of
-        either value, per the degradation described above.
+        ``{"git_sha": sha, "git_dirty": dirty}``, both plain strings. ``sha`` is the 40-character
+        commit hash, and ``dirty`` is either ``"true"`` or ``"false"``. Either value may instead be
+        ``UNKNOWN``, per the degradation described above.
     """
     run_from = cwd if cwd is not None else _GIT_CWD
 
@@ -127,8 +129,10 @@ def get_delta_versions(
 
     Args:
         paths: ``{logical_name: table_uri}``. The URI may be local or a remote object-store URI.
-        storage_options: object-store options for a remote URI; ``None``/empty for local. Widened
-            to the plain dict delta-rs expects at the call boundary.
+        storage_options: object-store options for a remote URI; ``None``/empty for local. Delta
+            Lake access runs through the delta-rs library, whose signature takes a plain ``dict``,
+            so this function widens the narrower ``ObjectStoreOptions`` mapping to that ``dict``
+            at the call boundary.
 
     Returns:
         One entry per input path. A table that does not exist (or cannot be read) maps to

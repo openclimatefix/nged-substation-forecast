@@ -1,8 +1,10 @@
 """Feature name parsing and typed feature descriptors.
 
 Translates raw string requests (e.g. ``"power_lag_24h"``) into structured, typed objects so the
-rest of the pipeline never parses strings. ``ParsedFeatures.from_strings`` is the entry point; it
-also enforces architectural guardrails (no raw target, no index columns as features).
+rest of the pipeline never parses strings. ``ParsedFeatures.from_strings`` is the entry point. It
+also enforces two architectural guardrails. The raw target — the ``power`` column the models
+predict — may not be requested as a feature. Nor may an identifying column that merely labels a
+row, such as ``time_series_id`` or ``valid_time``.
 """
 
 import re
@@ -95,21 +97,25 @@ class RollingFeature(BaseLookbackFeature):
 
     # TODO: Generalise to support more weather summary stats over the rolling window, i.e.
     # rolling_{mean,min,max,std,median,sum} (add an `agg` field here + dispatch in
-    # _apply_rolling_mean_feature). All of these are null-skipping, so they preserve the
-    # cross-mode invariant documented on that function; a row-count-based agg (.len()) would not.
+    # _apply_rolling_mean_feature). The cross-mode invariant is that a feature must come out the
+    # same in bulk mode and in single-run mode, even though the two modes present different numbers
+    # of rows to a group. All of the aggregations listed above are null-skipping, so all of them
+    # preserve that invariant; a row-count-based agg (.len()) would not.
+    # `_apply_rolling_mean_feature` documents the invariant in full.
     #
-    # TODO: (separate concern) Implement "Latest Available Rolling Mean anchored to T_init" to
-    # allow non-leaky rolling *power* features (e.g. mean of the most recent 24h of observed power,
-    # broadcast to every forecast horizon). Power rolling stays forbidden until then.
+    # TODO: (separate concern) Implement a latest-available rolling mean anchored to
+    # power_fcst_init_time, to allow non-leaky rolling *power* features (e.g. mean of the most
+    # recent 24h of observed power, broadcast to every forecast horizon). Power rolling stays
+    # forbidden until then.
 
     SUFFIX: ClassVar[str] = "rolling_mean"
 
     def is_leaky(self) -> bool:
         """Weather rolling means are never leaky.
 
-        NWP forecasts are available for future valid_times, so a weather rolling mean (e.g. the
-        mean temperature over the 6h window ending at valid_time) is always known at inference
-        time.
+        NWP forecasts are available for future valid_times. A weather rolling mean is therefore
+        always known at inference time — for example, the mean temperature over the 6h window
+        ending at valid_time.
         """
         return False
 
@@ -134,8 +140,11 @@ class ParsedFeatures:
             saving time), not UTC.
         weather_features: List of raw weather features. Identifies raw weather variables
             requested directly as input features.
-        base_features: List of safe input base columns. Identifies base columns
-            requested directly as input features.
+        base_features: List of ``SafeInputBaseColumn`` values requested directly as input features.
+            These are the raw columns already on the frame that a model is allowed to consume as-is:
+            ``time_series_id``, ``time_series_type``, ``nwp_lead_time_hours``, ``ensemble_member``,
+            ``power_fcst_init_time``, and ``nwp_init_time``. Every other raw column is either the
+            target or an identifier, and is refused.
     """
 
     lags: list[LagFeature]
@@ -246,8 +255,9 @@ class ParsedFeatures:
     def max_power_lag(self) -> timedelta:
         """The longest power lag these features request, or zero when none of them is a power lag.
 
-        Sizes ``load_engineering_inputs``'s ``power_lookback``: a caller needs power history
-        reaching back at least the returned duration before its window to keep every requested
+        Sizes ``load_engineering_inputs``'s ``power_lookback``. A caller loads power for a
+        bounded time window. That caller's power history must reach back at least the returned
+        duration before the start of that window. Reaching back that far keeps every requested
         power lag non-null near the window's start.
         """
         return timedelta(

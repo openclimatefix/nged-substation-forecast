@@ -1,13 +1,14 @@
 """NWP processing and power/NWP join helpers.
 
-Handles temporal upsampling from the NWP model's native step width onto the half-hourly grid the
-power observations sit on, processing into a form the feature pipeline can consume, and the two NWP
-join modes: bulk training, and single-run inference.
+This module handles three jobs. The first is temporal upsampling from the numerical weather
+prediction (NWP) model's native step width onto the half-hourly grid the power observations sit
+on. The second is processing the NWP into a form the feature pipeline can consume. The third is
+the two NWP join modes: bulk training, and single-run inference.
 
-Also the home of ``NWP_PUBLICATION_DELAY_HOURS``, the one constant that ties the two modes together:
-bulk mode derives each row's ``power_fcst_init_time`` from the delay, and single-run mode derives
-``nwp_init_time`` from the delay when the caller names no run. The constant is re-exported from
-``ml_core.features``, and its value is argued for on the constant itself.
+Also the home of ``NWP_PUBLICATION_DELAY_HOURS``, the one constant that ties the two modes
+together. Bulk mode derives each row's ``power_fcst_init_time`` from the delay. Single-run mode
+derives ``nwp_init_time`` from the delay when the caller names no run. The constant is
+re-exported from ``ml_core.features``, and its value is argued for on the constant itself.
 """
 
 from datetime import datetime, timedelta
@@ -55,8 +56,8 @@ def _join_nwp_bulk_mode(
     power_fcst_init_time derived per-row as nwp_init_time + nwp_publication_delay_hours. Each NWP
     run's first nwp_publication_delay_hours of valid times therefore precede the derived
     power_fcst_init_time. Those hindcast rows are kept here so that window features (e.g. weather
-    rolling means) see the same predecessor rows as single-run mode, and are dropped by
-    ``_engineer_features`` after feature computation.
+    rolling means) see the same predecessor rows as single-run mode. ``_engineer_features`` drops
+    the hindcast rows after feature computation.
 
     ``power_lf`` carries no metadata: ``_engineer_features`` joins the metadata onto the result,
     because a valid_time with no power observation would otherwise lose its metadata here.
@@ -82,9 +83,10 @@ def _resolve_nwp_init_time(
 ) -> datetime:
     """The single-run NWP run identity: the caller's own value, or the derived fallback.
 
-    Shared by ``_join_nwp_single_run`` (the join itself) and
-    ``tabular_feature_engineer._check_or_warn_on_missing_control_member`` (naming the run in a
-    degradation warning), so the two never drift on what "the selected run" means.
+    Two callers share this function. ``_join_nwp_single_run`` does the join itself, and
+    ``tabular_feature_engineer._check_or_warn_on_missing_control_member`` names the run in a
+    degradation warning. Sharing keeps the two callers from drifting on what "the selected run"
+    means.
     """
     return (
         nwp_init_time
@@ -134,20 +136,23 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
     each group. All other columns (e.g. nwp_init_time, ensemble_member) are used as group-by
     keys.
 
-    The implementation stays fully lazy: a 30-min time grid is generated per group via
-    datetime_ranges + explode, then the original NWP values are left-joined back in, and
+    The implementation stays fully lazy. A 30-min time grid is generated per group via
+    datetime_ranges + explode. The original NWP values are then left-joined back in. Finally,
     interpolate/forward_fill are applied with over() to stay within group boundaries.
 
-    End-null propagation: Polars' interpolate() fills interior nulls but leaves both leading nulls
-    (before the first non-null value in a group) and trailing nulls (after the last non-null value)
-    as null. Some ECMWF ENS variables (precipitation and the radiation fluxes) are null at lead time
-    0 by convention. Every interpolated 30-min row before a group's first non-null native step
-    therefore remains null — typically a 3-hour window per NWP run. ECMWF ENS runs at a 3-hour
-    native step width out to 144 hours, then coarsens to a 6-hour step width for the rest of its
-    360-hour horizon. The trailing case is rarer but real: a wholly-null slice at the last native
-    step of the horizon is not bridged either, so that slice too reaches the caller as null. Callers
-    and downstream models should treat every one of these nulls as a genuinely missing value rather
-    than as a corrupted download to be repaired or imputed.
+    End-null propagation: Polars' interpolate() fills interior nulls. Leading nulls and trailing
+    nulls are both left as null. A leading null sits before the group's first non-null value, and
+    a trailing null sits after the group's last non-null value. The weather model this pipeline
+    consumes is the European Centre for Medium-Range Weather Forecasts ensemble (ECMWF ENS). Some
+    ECMWF ENS variables — precipitation and the radiation fluxes — are accumulated over the step,
+    so they have nothing to accumulate at lead time 0 and are null there by convention. Every
+    interpolated 30-min row before a group's first non-null native step therefore remains null —
+    typically a 3-hour window per NWP run. ECMWF ENS runs at a 3-hour native step width out to
+    144 hours, then coarsens to a 6-hour step width for the rest of its 360-hour horizon. The
+    trailing case is rarer but real: a wholly-null slice at the last native step of the horizon
+    is not bridged either, so that slice too reaches the caller as null. Callers and downstream
+    models should treat every one of these nulls as a genuinely missing value rather than as a
+    corrupted download to be repaired or imputed.
     """
     schema_names = nwp_lf.collect_schema().names()
     all_weather_vars = Nwp.all_weather_var_names()
@@ -174,11 +179,13 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
         )
         .drop("_start", "_end")
         # empty_as_null=False matches the Polars 2.0 default and silences the deprecation warning.
-        # It has no effect on output today: _start/_end are the min/max valid_time of a non-empty
-        # group, so start <= end and datetime_ranges returns at least the single-point list
-        # [_start] -- the empty-list branch the two settings disagree on is unreachable. valid_time
-        # is a non-nullable datetime, so _start/_end are never null either (and a null range would
-        # explode to a single null row identically under both settings regardless).
+        # The two settings, empty_as_null=True and empty_as_null=False, differ only when the range
+        # comes out empty: True yields a null, False yields an empty list. The setting has no effect
+        # on output today. _start/_end are the min/max valid_time of a non-empty group, so start <=
+        # end and datetime_ranges returns at least the single-point list [_start]. The empty-list
+        # branch the two settings disagree on is therefore unreachable. valid_time is a non-nullable
+        # datetime, so _start/_end are never null either. Even a null range would explode to a
+        # single null row identically under both settings.
         .explode("valid_time", empty_as_null=False)
     )
 

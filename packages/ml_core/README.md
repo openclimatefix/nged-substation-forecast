@@ -4,6 +4,44 @@ The model-agnostic half of the forecasting stack: the interface every model impl
 pipeline that feeds it, the metrics that score it, and the helpers that train, promote, and serve
 it.
 
+## The vocabulary the rest of this page assumes
+
+**The rest of this page leans on vocabulary from four fields at once — Dagster orchestration, the
+Polars and Patito data stack, MLflow experiment tracking, and operational weather forecasting — so
+the nouns come first.** Each noun is defined only to the depth this package needs, and the pages
+linked from the sections below go deeper.
+
+- **A Dagster asset** is a named, schedulable unit of computation producing one stored output.
+  Dagster is the orchestrator the pipeline runs in. **An asset check** runs after an asset and
+  reports a warning without blocking. **A partition** is one slice of an asset — one day, or one
+  cross-validation fold — materialised and re-runnable on its own, and **re-materialising** a
+  partition means running that slice again.
+- **A frame** is a Polars dataframe, the type every function here passes around. **Patito** is the
+  library that declares a schema class for a frame, attaches that class to the frame, and validates
+  the frame against the class. **Delta Lake** is the on-disk table format the pipeline reads and
+  writes.
+- **An MLflow run** is one recorded training job, holding parameters, metrics, tags, and stored
+  artifact files under a run id. MLflow is the experiment tracker, and **the leaderboard** is
+  MLflow's ranked comparison of those runs' scores. **Promoting** a model means choosing one run's
+  saved model to be the model the live service forecasts with, and `promotion.json` records that
+  choice.
+- **The roster** is the `TimeSeriesMetadata` table of every time series this project forecasts, one
+  row per `time_series_id`, carrying that series' location and its static attributes. **H3** is a
+  hexagonal grid covering the globe at numbered resolutions. Gridded weather is stored one row per
+  resolution-5 cell, and each roster row records the resolution-5 cell its series sits in, so the
+  weather table and the roster join on that cell.
+- **A numerical weather prediction (NWP) run** is one execution of a weather model, initialised at
+  `nwp_init_time` and predicting many future `valid_time`s. Each run carries several **ensemble
+  members** — alternative weather futures for the same times — of which **member 0 is the control
+  member**, the single unperturbed one. **The analysis proxy** answers a target time already in the
+  past from the control member of the freshest run, standing in for the weather that actually
+  happened.
+- **A cross-validation (CV) fold** is one train-and-validate split of the history, fixed by a pair
+  of date ranges and identified by a `fold_id`. **A slot** is one scheduled time at which the live
+  service issues a forecast. **A lag feature** is a value observed a fixed number of hours before
+  the time being forecast, and **the forecast lead time** is the gap between the moment a forecast
+  is issued and the time that forecast is for.
+
 ## Why this package exists
 
 **`ml_core` owns everything about forecasting that is not specific to one model family.** A concrete
@@ -37,13 +75,14 @@ leaderboard row — is this package.
 **Confusing the moment a forecast is issued with the moment the weather model ran is the failure
 this package is built to prevent.** `power_fcst_init_time` is the first of those two moments and
 `nwp_init_time` is the second. The pipeline carries both moments as separate columns from end to
-end. The two columns differ by the publication delay — the hours between a numerical weather
-prediction (NWP) run's `init_time` and the moment that run reaches our own disk. A feature is
-therefore legitimate only if it was knowable at `power_fcst_init_time`, never if it was merely
-knowable at `nwp_init_time`. Every power lag shorter than or equal to the forecast lead time is
-nullified against `power_fcst_init_time`, in `_nullify_leaky_lags`. Weather lags reaching back
-before `power_fcst_init_time` are answered from an earlier NWP run rather than from the current run.
-Answering a past target time from the earlier run is the dual-strategy join in `_apply_weather_lag`.
+end. The two columns differ by the publication delay — the hours between an NWP run's `init_time` and
+the moment that run reaches our own disk. A feature is therefore legitimate only if it was knowable
+at `power_fcst_init_time`, never if it was merely knowable at `nwp_init_time`. A power lag shorter
+than or equal to the forecast lead time would read an observation from at or after
+`power_fcst_init_time`, which nobody had yet when the forecast was issued. Every such lag is set to
+null, in `_nullify_leaky_lags`. Weather lags reaching back before `power_fcst_init_time` are
+answered from an earlier NWP run rather than from the current run. Answering a past target time
+from the earlier run is the dual-strategy join in `_apply_weather_lag`.
 
 **The train==predict population invariant keeps the leaderboard comparable.** A model scores exactly
 the `time_series_id` population it trained on, whatever the eligibility rules would admit today, and
@@ -60,7 +99,11 @@ cross-validation, training, and metrics paths fail fast, because a quietly degra
 poisons every comparison built on it. The live path degrades instead: an absent input routes into
 the always-output branch, the degradation is logged and reported to Sentry, and the forecast still
 comes out with wider uncertainty. `_engineer_features` carries both policies in one function,
-choosing between them on whether the caller supplied a `power_fcst_init_time`. The reasoning for
+choosing between them on whether the caller supplied a `power_fcst_init_time`. A live forecast is
+issued at one known moment, so the live caller passes that moment as `power_fcst_init_time`. Bulk
+training and backtesting leave the argument unset and let every row derive its own moment from the
+NWP run it sits on. Whether the argument is present is therefore exactly whether the call is a live
+forecast. The reasoning for
 that asymmetry is on [Inherent
 stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/)
 and [design principle
@@ -80,7 +123,11 @@ and [design principle
   `_MLFLOW_MODEL_ARTIFACT` documents why that distinction matters.
 - `metrics` — the scoring pipeline: effective capacity, the ensemble-aware metrics (fair continuous
   ranked probability score, Fortin-corrected spread, pinball loss, prediction-interval coverage
-  probability, and interval width), the horizon-slice bands, and the MLflow aggregate keys. The
+  probability, and interval width), the horizon-slice bands, and the MLflow aggregate keys.
+  Effective capacity is the per-series denominator the normalised errors divide by, taken as the
+  99th percentile of observed `|power|`. A horizon-slice band is a group of forecast lead times the
+  scores are reported over separately, so that a day-ahead score never hides behind an intraday
+  one. The
   equations and the argument for each choice are on [Evaluation
   metrics](https://openclimatefix.github.io/nged-substation-forecast/techniques/evaluation-metrics/);
   the docstrings below say what this implementation does with those equations.
@@ -93,7 +140,10 @@ and [design principle
   retries converge on the same run.
 - `production_helpers` — the live-inference helpers: picking the NWP run a slot may legitimately
   use, building the dense forecast spine the power-centric join needs, and refusing to promote a
-  saved model this code can no longer serve.
+  saved model this code can no longer serve. The join is power-centric, meaning it keeps one output
+  row per power row. No power observation exists for a time still in the future, so a live slot has
+  to construct its future rows itself. The spine is that construction: a complete half-hourly grid
+  of target times, one row per series, with the observed power joined in where any exists.
 - `repro` — the git commit and the Delta-table versions stamped onto an MLflow run, so a result can
   be traced back to the exact code and data that produced it. Every function here is non-raising,
   because provenance must never fail the run it describes.

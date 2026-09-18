@@ -1,21 +1,28 @@
 """Scoring forecasts against the power that was actually observed.
 
-Four public functions, in the order the cross-validation assets call them.
+A forecast here is an *ensemble*: for one time series and one forecast run, the model emits many
+member predictions of the same future half-hour, and those members are what the probabilistic
+scores below measure. A cross-validation (CV) fold is one train-and-validate split of the
+history, identified by a ``fold_id``. MLflow is the experiment tracker the scores are logged to,
+and its leaderboard is the ranked comparison of one run's scores against another's.
+
+Four public functions, in the order the cross-validation Dagster assets call them.
 ``compute_effective_capacity`` derives the per-series denominator that normalised mean absolute
 error (NMAE) divides by. ``compute_metrics`` joins predictions to observed power and returns the
 tall ``Metrics`` frame. ``enrich_metrics_rows`` stamps the evaluation window and scope onto that
 frame once the calling asset knows the window and the scope. The enriched frame is what the asset
-writes to Delta. ``build_mlflow_aggregate_metrics`` reduces the un-enriched frame
-``compute_metrics`` returned to the flat key/value dictionary the MLflow leaderboard displays.
+writes to Delta. ``build_mlflow_aggregate_metrics`` takes the un-enriched frame that
+``compute_metrics`` returned. That function reduces the frame to the flat key/value dictionary
+the MLflow leaderboard displays.
 
-Every function here is pure — no Dagster, no MLflow, and no IO — so each function is
-unit-testable on an in-memory frame, and the asset that calls it owns every read and write.
+Every function here is pure: no Dagster, no MLflow, and no IO. Each function is therefore
+unit-testable on an in-memory frame. The asset that calls the function owns every read and write.
 
 The equations, and the argument for choosing each metric over the alternatives, are on
 <https://openclimatefix.github.io/nged-substation-forecast/techniques/evaluation-metrics/>. The
-docstrings below say what this implementation does with those equations, and record the corners
-where a degenerate input — a single-member ensemble, or a forecast with zero error — needed a
-defined answer rather than a NaN.
+docstrings below say what this implementation does with those equations. Those docstrings also
+record the corners where a degenerate input needed a defined answer rather than a NaN. The two
+degenerate inputs are a single-member ensemble and a forecast with zero error.
 """
 
 import re
@@ -45,17 +52,19 @@ from contracts.power_schemas import (
 class NoOverlappingActualsError(ValueError):
     """Raised by ``compute_metrics`` when no forecast row joins to any observed actual.
 
-    A distinct subclass so callers that score a fold in per-series batches can treat "this batch's
-    series have no overlapping actuals" as skippable, mirroring how those series silently vanish
-    from the inner join when the whole fold is scored in one call. Every other ``ValueError`` — a
-    negative lead time, a missing capacity row — still propagates.
+    A distinct subclass, so that a caller scoring a fold in per-series batches can treat "this
+    batch's series have no overlapping actuals" as skippable. Skipping mirrors what happens when
+    the whole fold is scored in one call: those series silently vanish from the inner join. Every
+    other ``ValueError`` — a negative lead time, a missing capacity row — still propagates.
     """
 
 
 def compute_effective_capacity(
     power_lf: pt.LazyFrame[PowerTimeSeries],
 ) -> pt.DataFrame[EffectiveCapacity]:
-    """Compute the v0.1 effective capacity (full-history P99 of ``|power|``) per time series.
+    """Compute version 0.1 of the effective capacity, per time series.
+
+    Version 0.1 of the capacity definition is the full-history P99 of ``|power|``.
 
     One row per ``time_series_id``: ``effective_capacity_mw`` is the 99th percentile of
     ``abs(power)`` over all non-null observations. Series whose P99 is null or non-positive (e.g.
@@ -63,13 +72,14 @@ def compute_effective_capacity(
     ``effective_capacity_mw > 0``.
 
     ``time`` is set to that series' **latest timestep carrying a non-null power** (``time.max()``
-    over the same filtered rows the percentile is taken over). The v0.1 capacity is a single scalar
-    per series, so ``time`` is really an "as of" marker rather than a timestep the value varies
-    over. The marker stamps the estimate as current to the end of the observed history. The v0.7
-    upgrade makes capacity genuinely time-varying (one row per ``(time_series_id, time)``), and only
-    then does ``time`` carry per-row meaning. v0.1 stays one scalar row per series rather than the
-    value repeated at every half-hour: densifying a constant adds rows without information, and the
-    metrics join is by ``time_series_id`` alone until capacity varies.
+    over the same filtered rows the percentile is taken over). The v0.1 capacity is a single
+    scalar per series, so ``time`` is really an "as of" marker rather than a timestep the value
+    varies over. The marker stamps the estimate as current to the end of the observed history.
+    Version 0.7 of the capacity definition makes capacity genuinely time-varying (one row per
+    ``(time_series_id, time)``), and only then does ``time`` carry per-row meaning. Version 0.1
+    stays one scalar row per series, rather than the value repeated at every half-hour.
+    Densifying a constant adds rows without information. The metrics join is by
+    ``time_series_id`` alone until capacity varies.
 
     Kept as a pure helper (no Dagster, no IO) so the P99 logic is unit-testable in isolation.
     """
@@ -107,7 +117,7 @@ def _horizon_slice_expr() -> pl.Expr:
 
     Lead time is ``valid_time − power_fcst_init_time``. Bands are left-closed: ``"intraday"`` [0
     h, 6 h), ``"day_ahead"`` [6 h, 36 h), ``"short_medium_range"`` [36 h, 168 h),
-    ``"extended_range"`` [168 h, ∞) — matching the band definitions documented on
+    ``"extended_range"`` [168 h, ∞). Those four bands match the definitions documented on
     ``contracts.ml_schemas.HORIZON_SLICES``.
     """
     lead_time = pl.col("valid_time") - pl.col("power_fcst_init_time")
@@ -153,7 +163,14 @@ delivery quantiles, and the PICP and interval width of all 6 bands, stay queryab
 
 
 def _band_label(lower_quantile: float) -> str:
-    """Return the band ``metric_param`` label for a lower quantile, e.g. ``0.1`` → ``"p10_p90"``."""
+    """Return the quantile-band label for a lower quantile, e.g. ``0.1`` → ``"p10_p90"``.
+
+    A quantile band is a symmetric pair of delivery quantiles, such as p10 and p90, whose
+    interval the forecast is scored for coverage and width. The label returned here is what the
+    tall ``Metrics`` frame stores in its ``metric_param`` column, which says which quantile or
+    band a metric row belongs to. Note that ``metric_param`` also carries the *lead-time* bands
+    named by ``HORIZON_SLICES``; the two senses of "band" are distinguished by the metric.
+    """
     return f"{quantile_label(lower_quantile)}_{quantile_label(1 - lower_quantile)}"
 
 
@@ -165,18 +182,21 @@ def _quantile_column(quantile: float) -> str:
 def _fair_crps_expr() -> pl.Expr:
     """Per-timestamp fair continuous ranked probability score over one forecast run's members.
 
-    The continuous ranked probability score (CRPS) is evaluated inside the per-run collapse
-    ``group_by``, where each group holds the ``m`` members forecasting one ``(time_series_id,
-    power_fcst_init_time, valid_time)``. The fair (finite-ensemble-unbiased, [Ferro
-    2014](https://doi.org/10.1002/qj.2270)) form is::
+    ``compute_metrics`` first collapses each forecast run's ensemble members down to one row per
+    timestamp; step 3 of that function describes the collapse. The continuous ranked probability
+    score (CRPS) is evaluated inside that per-run collapse ``group_by``, where each group holds the
+    ``m`` members forecasting one ``(time_series_id, power_fcst_init_time, valid_time)``. The fair
+    (finite-ensemble-unbiased, [Ferro 2014](https://doi.org/10.1002/qj.2270)) form is::
 
         CRPS = mean_i |x_i − y|  −  Σ_{i<j} |x_i − x_j| / (m(m−1))
 
-    with the pairwise term defined as 0 when ``m = 1`` (so a single-member "ensemble" scores its
-    absolute error, and group means reduce to MAE). The pairwise sum uses the sorted-member identity
-    ``Σ_{i<j}(x_(j) − x_(i)) = Σ_k (2k − m − 1)·x_(k)``, which is O(m log m) instead of a member
-    self-join. The sum is evaluated in Float64, because the identity's large cancelling terms (up to
-    ±m·|power|) lose percent-level accuracy in Float32 when members are near-identical.
+    Here ``x_i`` is member ``i``'s forecast, ``y`` is the observed power, and ``m`` is the member
+    count. The pairwise term is defined as 0 when ``m = 1``. A single-member "ensemble" therefore
+    scores its absolute error, and group means reduce to mean absolute error (MAE). The pairwise sum
+    uses the sorted-member identity ``Σ_{i<j}(x_(j) − x_(i)) = Σ_k (2k − m − 1)·x_(k)``. The
+    identity costs O(m log m) and avoids a member self-join. The sum is evaluated in Float64. The
+    identity's terms are large and cancel, reaching up to ±m·|power|. In Float32 those terms lose
+    percent-level accuracy when members are near-identical.
 
     See
     <https://openclimatefix.github.io/nged-substation-forecast/techniques/evaluation-metrics/>
@@ -194,13 +214,19 @@ def _fair_crps_expr() -> pl.Expr:
 def _corrected_variance_expr() -> pl.Expr:
     """Per-timestamp Fortin-corrected ensemble variance, ``((m+1)/m)·Var(members)``.
 
-    Evaluated inside the per-run collapse ``group_by``. For a calibrated ensemble the RMSE of the
-    ensemble mean equals ``sqrt((m+1)/m)`` times the root-mean-square (RMS) ensemble spread ([Fortin
-    et al. 2014](https://doi.org/10.1175/JHM-D-14-0008.1)). Folding the factor in here makes the
-    spread-skill ratio's calibrated target exactly 1.0 at any ensemble size. Uses the sample
-    variance (``ddof=1``), guarded to 0 for single-member groups where ``.var()`` would return null
-    (``metric_value`` is non-nullable, and zero spread is the honest description of a deterministic
-    forecast).
+    Evaluated inside the per-run collapse ``group_by``. The spread-skill ratio divides the
+    root-mean-square (RMS) ensemble spread by the root-mean-square error (RMSE) of the ensemble
+    mean. An ensemble is *calibrated* when its spread matches its error on average, so a
+    calibrated ensemble should score 1.0.
+
+    For a calibrated ensemble the RMSE of the ensemble mean equals ``sqrt((m+1)/m)`` times the
+    RMS ensemble spread ([Fortin et al. 2014](https://doi.org/10.1175/JHM-D-14-0008.1)). Folding
+    that factor in here makes the spread-skill ratio's calibrated target exactly 1.0 at any
+    ensemble size.
+
+    Uses the sample variance (``ddof=1``). For a single-member group ``.var()`` would return
+    null, so the result is guarded to 0. ``metric_value`` is non-nullable, and zero spread is the
+    honest description of a deterministic forecast.
     """
     m = pl.len()
     variance = pl.col("power_fcst").cast(pl.Float64).var()
@@ -210,9 +236,11 @@ def _corrected_variance_expr() -> pl.Expr:
 def _wide_metric_columns() -> list[str]:
     """Ordered names of the wide metric columns produced by ``_wide_metrics``.
 
+    A *parametric* metric takes a parameter — a delivery quantile, or a quantile band — and so
+    appears once per value of that parameter. Every other metric is *scalar* and appears once.
     Parametric metrics encode their ``metric_param`` after a ``":"`` separator, as in
-    ``"pinball_loss:p10"``. ``compute_metrics`` splits the encoding apart again after the unpivot to
-    tall format. ``"nmae"`` is absent — it is derived from ``"mae"`` after the capacity join.
+    ``"pinball_loss:p10"``. ``compute_metrics`` splits the encoding apart again after the unpivot
+    to tall format. ``"nmae"`` is absent — it is derived from ``"mae"`` after the capacity join.
     """
     columns = ["mae", "rmse", "mbe", "crps", "spread_skill_ratio", "mean_pinball_loss"]
     columns += [f"pinball_loss:{quantile_label(q)}" for q in DELIVERY_QUANTILES]
@@ -224,10 +252,11 @@ def _wide_metric_columns() -> list[str]:
 def _wide_metrics(per_run: pl.LazyFrame, group_keys: list[str]) -> pl.LazyFrame:
     """Aggregate per-timestamp values into one wide row of metrics per ``group_keys`` group.
 
-    ``per_run`` is the per-forecast-run frame built by ``compute_metrics``: one row per
-    ``(time_series_id, fold_id, power_fcst_model_name, power_fcst_init_time, valid_time)`` carrying
-    the ensemble-mean ``error``, per-timestamp ``crps`` and ``corrected_var``, and the empirical
-    ``DELIVERY_QUANTILES`` columns. Emits the columns listed by ``_wide_metric_columns``.
+    ``per_run`` is the per-forecast-run frame built by ``compute_metrics``. That frame holds one
+    row per ``(time_series_id, fold_id, power_fcst_model_name, power_fcst_init_time,
+    valid_time)``. Each row carries the ensemble-mean ``error``, the per-timestamp ``crps`` and
+    ``corrected_var``, and the empirical ``DELIVERY_QUANTILES`` columns. Emits the columns listed
+    by ``_wide_metric_columns``.
     """
     actual = pl.col("power_actual")
     aggs: dict[str, pl.Expr] = {
@@ -236,9 +265,10 @@ def _wide_metrics(per_run: pl.LazyFrame, group_keys: list[str]) -> pl.LazyFrame:
         "mbe": pl.col("error").mean(),
         "crps": pl.col("crps").mean(),
         # RMS spread, not mean-of-std: Jensen's inequality drags mean-of-std well below the RMS form
-        # whenever spread varies across timestamps. The mean-of-std form would therefore fake
-        # underdispersion for a calibrated ensemble. The (m+1)/m factor is already folded into
-        # corrected_var.
+        # whenever spread varies across timestamps. An ensemble is underdispersed when its spread is
+        # smaller than its actual error, which the spread-skill ratio reports as a value below 1.
+        # The mean-of-std form would therefore fake underdispersion for a calibrated ensemble. The
+        # (m+1)/m factor is already folded into corrected_var.
         "_rms_spread": pl.col("corrected_var").mean().sqrt(),
     }
     for q in DELIVERY_QUANTILES:
@@ -294,30 +324,33 @@ def compute_metrics(
        Fortin-corrected ensemble variance, and the empirical ``DELIVERY_QUANTILES``. Each run
        covering a ``valid_time`` is scored independently, exactly as a production consumer would
        experience that run. Runs at different lead times are never pooled.
-    4. Aggregates per ``horizon_slice``, plus the ``"all"`` aggregate over every lead time:
-       MAE, NMAE, RMSE, and MBE on the ensemble mean; CRPS and the spread-skill ratio from
-       the member-aware quantities; pinball loss at each delivery quantile (plus their
-       mean); and PICP and interval width for each symmetric quantile band.
-    5. Joins ``time_series_type`` from ``metadata`` onto each row.
-    6. Returns one row per ``(time_series_id, fold_id, power_fcst_model_name,
+    4. Aggregates per ``horizon_slice``, plus the ``"all"`` aggregate over every lead time. The
+    delivery quantiles are the quantiles the forecast is published at, listed by
+    ``DELIVERY_QUANTILES``. The ensemble mean gives MAE, NMAE, RMSE, and mean bias error (MBE). The
+    member-aware quantities give CRPS and the spread-skill ratio. Each delivery quantile gives a
+    pinball loss, and the pinball losses also get a mean. Each symmetric quantile band gives a
+    prediction-interval coverage probability (PICP) and an interval width. 5. Joins
+    ``time_series_type`` from ``metadata`` onto each row. 6. Returns one row per ``(time_series_id,
+    fold_id, power_fcst_model_name,
        horizon_slice, metric_name, metric_param)`` in the tall ``Metrics`` format.
 
-    NMAE is normalised by the pre-computed full-history ``effective_capacity_mw`` (joined per
-    ``time_series_id`` from ``capacity``) — a capacity-like denominator, computed over the full
-    history so it stays stable across folds. This ``time_series_id``-only join is correct while
-    ``capacity`` is one scalar row per series (the v0.1 shape). When the v0.7
-    upgrade makes capacity time-varying (one row per ``(time_series_id,
-    time)``), this join must become a temporal as-of join on ``(time_series_id, valid_time)``.
+    NMAE is normalised by the pre-computed ``effective_capacity_mw``, joined per ``time_series_id``
+    from ``capacity``. That denominator is capacity-like, and is computed over the full history so
+    that the denominator stays stable across folds. This ``time_series_id``-only join is correct
+    while ``capacity`` is one scalar row per series, the shape at version 0.1 of the capacity
+    definition. Version 0.7 makes capacity time-varying, at one row per ``(time_series_id, time)``.
+    This join must then become a temporal as-of join on ``(time_series_id, valid_time)``.
 
-    Single-member "ensembles" (e.g. a deterministic baseline forecaster) are scored unconditionally:
-    their fair CRPS equals their MAE, their spread-skill ratio is 0, and their quantile bands are
-    degenerate (all quantiles coincide, so PICP ≈ 0 and interval width = 0). Those values are honest
-    descriptions of a deterministic forecast, not errors.
+    Single-member "ensembles" — a deterministic baseline forecaster, for example — are scored
+    unconditionally. Their fair CRPS equals their MAE, and their spread-skill ratio is 0. Their
+    quantile bands are degenerate: all quantiles coincide, so PICP ≈ 0 and interval width = 0. Those
+    values are honest descriptions of a deterministic forecast, not errors.
 
     Args:
-        cv_forecasts: CV predictions to evaluate.
-            Currently only CV fold rows are handled; ``fold_id="live"`` support will
-            be added with the ``production_monitoring`` scope in Phase 8.
+        cv_forecasts: CV predictions to evaluate. Currently only CV fold rows are handled. Support
+            for ``fold_id="live"`` arrives with the ``production_monitoring`` scope, in roadmap
+            phase 8 — see [production
+            monitoring](https://openclimatefix.github.io/nged-substation-forecast/roadmap/live-service/#production-monitoring).
         actuals: Observed half-hourly power (lazy — only the joined subset is collected).
             Deduplicated on ``(time_series_id, time)`` before the join — a duplicated actual
             would otherwise double the ensemble members and corrupt the member-aware metrics.
@@ -332,18 +365,20 @@ def compute_metrics(
     Raises:
         NoOverlappingActualsError: If no rows survive the inner join (forecasts cover a
             period with no observed data).
-        ValueError: If any forecast row has a negative lead time (``valid_time`` before
-            ``power_fcst_init_time`` — an undeliverable hindcast row; see issue #346), if
-            any scored series has no row in ``capacity`` or in ``metadata``, or if any
-            computed metric value is
-            non-finite (NaN/inf — which ``Metrics.validate`` would otherwise accept, since
-            NaN is not null, and which would poison the MLflow aggregate means).
+        ValueError: If any forecast row has a negative lead time, meaning ``valid_time`` before
+            ``power_fcst_init_time``. Such a row is an undeliverable hindcast row; see issue #346.
+            Also raised if any scored series has no row in ``capacity`` or in ``metadata``. Also
+            raised if any computed metric value is non-finite (NaN or inf). ``Metrics.validate``
+            would otherwise accept a NaN, because NaN is not null, and that NaN would poison the
+            MLflow aggregate means.
     """
     # A negative lead time means hindcast rows — valid times already in the past at
     # power_fcst_init_time, which a live forecast could never deliver. Scoring those rows would
     # silently flatter the model, because they would land in "intraday" via the left-closed bands.
-    # Fail loudly instead. The CV inference pass currently emits such rows for valid times inside
-    # the NWP publication-delay window; issue #346 tracks removing them at the source.
+    # Fail loudly instead. A numerical weather prediction (NWP) run reaches our disk some hours
+    # after the time it was initialised at, and that gap is the publication delay. The CV inference
+    # pass currently emits hindcast rows for valid times inside that NWP publication-delay window;
+    # issue #346 tracks removing them at the source.
     n_negative = cv_forecasts.filter(pl.col("valid_time") < pl.col("power_fcst_init_time")).height
     if n_negative > 0:
         raise ValueError(
@@ -352,12 +387,14 @@ def compute_metrics(
             "scored — regenerate the forecasts without them (see issue #346)."
         )
 
-    # Join forecasts to actuals; rename power → power_actual to avoid shadowing. Strip the Patito
-    # model subclass from actuals so that Polars' cross-subclass type check (assert_same_type)
-    # doesn't reject a join between two differently-typed pt.LazyFrame objects. Dedupe actuals on
-    # the join key: a duplicated (time_series_id, time) row would double every ensemble member
-    # through the join, silently corrupting the member-aware metrics (CRPS, spread, quantiles) while
-    # leaving the deterministic metrics — which only see the mean — untouched. Nothing enforces this
+    # Join forecasts to actuals; rename power → power_actual to avoid shadowing. Patito wraps a
+    # Polars frame in a schema class, and that class is a Python subclass carried in the frame's own
+    # type. Strip the Patito model subclass from actuals so that Polars' cross-subclass type check
+    # (assert_same_type) doesn't reject a join between two differently-typed pt.LazyFrame objects.
+    # Dedupe actuals on the join key. A duplicated (time_series_id, time) row would double every
+    # ensemble member through the join. Doubling silently corrupts the member-aware metrics — CRPS,
+    # spread, quantiles — and leaves the deterministic metrics untouched, because the deterministic
+    # metrics only see the mean. Nothing enforces this
     # uniqueness upstream, so guard it here.
     actuals_plain = pl.LazyFrame._from_pyldf(actuals._ldf)
     joined = cv_forecasts.lazy().join(
@@ -421,8 +458,8 @@ def compute_metrics(
     )
     wide = metrics_wide.join(capacity_denom, on="time_series_id", how="left").collect()
 
-    # Every scored series must have a capacity row. Fail loudly rather than silently emitting a null
-    # NMAE (which Metrics.metric_value, a non-nullable Float32, would reject anyway).
+    # Fail loudly rather than silently emitting a null NMAE. Metrics.metric_value is a non-nullable
+    # Float32, so it would reject a null NMAE anyway.
     missing = wide.filter(pl.col("effective_capacity_mw").is_null())["time_series_id"]
     if missing.len() > 0:
         raise ValueError(
@@ -431,9 +468,11 @@ def compute_metrics(
         )
     wide = wide.with_columns(nmae=pl.col("mae") / pl.col("effective_capacity_mw"))
 
-    # Pivot to tall format, then split the "name:param" encoding of the parametric wide columns into
-    # (metric_name, metric_param). Scalar metrics have no separator, so their split field_1 is null
-    # and fills to "all". The leftover effective_capacity_mw column is dropped by the unpivot.
+    # Unpivot to tall format, then split the "name:param" encoding of the parametric wide columns
+    # into (metric_name, metric_param). Splitting a string column in Polars yields positionally
+    # named struct fields, field_0 and field_1. Scalar metrics have no separator, so their field_1
+    # is null and fills to "all". The leftover effective_capacity_mw column is dropped by the
+    # unpivot.
     name_parts = pl.col("metric_name").str.split_exact(":", 1)
     metrics_tall = (
         wide.unpivot(
@@ -519,8 +558,8 @@ def _mlflow_logged_expr() -> pl.Expr:
 def _metric_key_token_expr() -> pl.Expr:
     """MLflow key token for a metric row: ``{metric_name}`` or ``{metric_name}_{metric_param}``.
 
-    ``metric_param="all"`` metrics keep the bare name (so the pre-probabilistic key formats are
-    unchanged); parametric metrics append the param, e.g. ``"pinball_loss_p10"``.
+    A ``metric_param="all"`` metric keeps the bare name as its key token. A parametric metric
+    appends its param, as in ``"pinball_loss_p10"``.
     """
     name = pl.col("metric_name").cast(pl.String)
     return (
@@ -537,9 +576,9 @@ def build_mlflow_aggregate_metrics(
 
     Computes mean ``metric_value`` across all series (``"all"`` aggregate), per
     ``time_series_type``, and per ``horizon_slice``. The key token is ``{metric_name}`` for
-    ``metric_param="all"`` metrics and ``{metric_name}_{metric_param}`` for parametric metrics (e.g.
-    ``pinball_loss_p10``, ``picp_p10_p90``); parametric metrics are restricted to the
-    ``_MLFLOW_LOGGED_PARAMETRIC`` headline subset. Key formats:
+    ``metric_param="all"`` metrics. For parametric metrics the key token is
+    ``{metric_name}_{metric_param}``, as in ``pinball_loss_p10`` and ``picp_p10_p90``. Parametric
+    metrics are restricted to the ``_MLFLOW_LOGGED_PARAMETRIC`` headline subset. Key formats:
 
     - ``"{token}__all"`` — overall aggregate (``horizon_slice="all"``).
     - ``"{token}__{type_slug}"`` — per-type aggregates (``horizon_slice="all"``).
@@ -562,8 +601,9 @@ def build_mlflow_aggregate_metrics(
 
     result: dict[str, float] = {}
 
-    # Per-type aggregates. The column is `allow_missing` on `Metrics`, so guard its presence —
-    # but never its nullability: `compute_metrics` raises rather than emit a null type.
+    # Per-type aggregates. The time_series_type column is `allow_missing` on `Metrics`, so guard
+    # that column's presence. Never guard its nullability: `compute_metrics` raises rather than emit
+    # a null type.
     if "time_series_type" in base.columns:
         per_type = base.group_by(["metric_key", "time_series_type"]).agg(
             mean_value=pl.col("metric_value").mean()
