@@ -20,10 +20,12 @@ under `deploy/`.
 
 ## `lint/` — the quality gates, and the helpers that fix what they flag
 
-Three of these six modules are automated gates, wired into `.pre-commit-config.yaml` so that they
-run on every commit touching a file they cover. Two more are helpers a person runs by hand, to
-rewrap the prose that `pymarkdown`'s `MD013` and ruff's `E501` report as over-long. The sixth is a
-library with no command line of its own.
+Three of these six modules are automated gates, wired into `.pre-commit-config.yaml`, so a commit
+cannot land without passing them. Two of the three gates are scoped to the files they cover — a
+Python file, or a marimo notebook — and `check_docs_links.py` runs on every commit whatever that
+commit touched. Two more modules are helpers a person runs by hand, to rewrap the prose that
+`pymarkdown`'s `MD013` and ruff's `E501` report as over-long. The sixth is a library with no command
+line of its own.
 
 - `check_docs_links.py` — **gate.** Resolves every link to the published docs site against the
   markdown sources, so a docstring cannot go on pointing at a page a rename moved or an anchor a
@@ -72,8 +74,9 @@ rebuilt. `rewrite_nwp_row_groups.py` is a migration that is run once per Delta t
 alone.
 
 - `run_baseline_experiment.py` — runs the weather-and-calendar-only baseline experiment end to end
-  in one process: register the experiment, train the fold, forecast, then compute the leaderboard
-  metrics. Takes no arguments.
+  in one process, in five steps: register the experiment, train the fold, forecast, materialise
+  `effective_capacity` (the denominator of the normalised mean absolute error), then compute the
+  leaderboard metrics. Takes no arguments.
 - `export_baseline_forecasts.py` — exports one cross-validation experiment's forecasts to three
   self-contained parquet files (full ensemble, ensemble mean, and quantiles) for offline analysis,
   each carrying the observed power beside the forecast so residuals can be computed directly.

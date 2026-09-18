@@ -40,10 +40,10 @@
 # registeredAt, and more — that register rejects. The list is an allowlist rather than a denylist,
 # so a read-only field added to the describe output later cannot break this script.
 #
-# Deliberately NOT here: creating any infrastructure (buckets, Identity and Access Management
-# roles, the cluster, the first task definition). One-time infrastructure stays in the console, per
-# the runbook, until infrastructure-as-code replaces those console steps — ad-hoc bash that mutates
-# infrastructure would be unreviewable.
+# Deliberately NOT here: creating any infrastructure (buckets, Identity and Access Management roles,
+# the cluster, the first task definition). One-time infrastructure stays in the console, per the
+# runbook, until Stage 2 of the access-phasing plan replaces those console steps with
+# infrastructure-as-code — ad-hoc bash that mutates infrastructure would be unreviewable.
 
 set -euo pipefail
 

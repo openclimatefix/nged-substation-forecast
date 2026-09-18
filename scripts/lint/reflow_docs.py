@@ -1,8 +1,10 @@
 """Rewrap every markdown file given on the command line to `markdown_wrap.WIDTH`.
 
-Headings, tables, fenced and indented code blocks, and YAML frontmatter are left untouched: only
-prose paragraphs, list items, and blockquotes are re-flowed. A markdown link is kept whole even when
-its label contains spaces, so a line break can never fall inside `[label](target)`.
+Headings, tables, fenced code blocks, and YAML frontmatter are left untouched: only prose
+paragraphs, list items, and blockquotes are re-flowed. A CommonMark *indented* code block — 4 or
+more spaces with no fence — is not exempt: `markdown_wrap.reflow_text` rewraps an indented code
+block as prose, for the reason that function's own docstring gives. A markdown link is kept whole
+even when its label contains spaces, so a line break can never fall inside `[label](target)`.
 
 Usage::
 

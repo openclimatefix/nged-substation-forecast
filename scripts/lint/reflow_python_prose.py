@@ -56,9 +56,10 @@ DIRECTIVE_COMMENT: Final[re.Pattern[str]] = re.compile(
 Every tool that reads a directive reads it as a whole comment line, so merging the line below it
 into the directive switches the directive off silently. `# fmt: off` is the sharpest case: a
 repacked `# fmt: off This table is hand aligned...` stops `ruff format` recognising the marker, and
-the block the author was protecting is reformatted with nothing reported. `ruff:`, `pylint:` and
-the rest are listed because an editor, a reviewer or another repository's CI may run the tool that
-reads them over a file copied out of here, even though `pyproject.toml` configures none of them.
+the block the author was protecting is reformatted with nothing reported. `pylint:`, `mypy:`,
+`pyright:`, `flake8:`, `coverage:`, `nosec`, and `pragma:` are listed because an editor, a reviewer,
+or another repository's CI may run the tool that reads them over a file copied out of here, even
+though `pyproject.toml` configures none of those tools.
 """
 
 QUOTED_COMMENT: Final[re.Pattern[str]] = re.compile(r"^#\s*>")
