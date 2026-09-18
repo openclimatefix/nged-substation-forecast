@@ -25,19 +25,18 @@ FLOAT32_SIGNIFICAND_BITS: Final[int] = 24
 def round_to_significand_bits(expr: pl.Expr, *, keep_bits: int) -> pl.Expr:
     """Round a ``Float32`` expression to ``keep_bits`` significand bits (round-to-nearest).
 
-    ``Float32`` carries 24 significand bits: 23 explicit fraction bits plus the implicit leading
-    1. The result is exactly representable with a ``keep_bits``-bit significand. The low ``24 -
-       keep_bits`` explicit fraction bits of every finite output are therefore zero, which is what
-       gives the compression codec repetition to find. The relative error is bounded by the unit
-       roundoff of a ``keep_bits``-bit format:
+    The result is exactly representable with a ``keep_bits``-bit significand. Write ``p`` for the
+    format's significand width, which `FLOAT32_SIGNIFICAND_BITS` above sets to 24. The low ``24 -
+    keep_bits`` explicit fraction bits of every finite output are therefore zero, which is what
+    gives the compression codec repetition to find. The relative error is bounded by the unit
+    roundoff of a ``keep_bits``-bit format:
 
         |result - x| <= 2**-keep_bits * |x|
 
     (e.g. ``keep_bits=13`` -> max relative error 2^-13 ~= 1.2e-4). Rounding is to nearest, so
     unlike truncation it introduces no systematic bias toward zero.
 
-    **How it works — Veltkamp splitting.** Write ``p`` for the format's significand width, which
-    is 24 for ``Float32``. With ``s = 24 - keep_bits`` and the constant
+    **How it works — Veltkamp splitting.** With ``s = 24 - keep_bits`` and the constant
     ``C = 2**s + 1``, the expression computes, entirely in ``Float32`` round-to-nearest
     arithmetic (``RN``)::
 

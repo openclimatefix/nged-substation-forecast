@@ -320,10 +320,11 @@ def time_series_coverage(
     ``power_data_is_fresh`` asset check runs it once. ``power_time_series_and_metadata`` runs it
     again, inside the ``select_new_rows`` call that asset makes on the file listing. The second
     ``select_new_rows`` call, on the parsed rows, uses ``_existing_power_time_series_keys``
-    instead — a scan restricted to the reporting series' own history. The measurement used a
-    synthetic V2 table: 2,500 series, half-hourly, partitioned by ``time_series_id``, holding a
-    year of history (43.8M rows). The streaming engine took ~0.21 s at ~190 MB peak. The
-    in-memory engine peaked at ~1.3 GB for the same result, so streaming uses ~7x less memory.
+    instead — a scan restricted to the reporting series' own history, not the whole-table scan
+    this function runs. The measurement used a synthetic V2 table: 2,500 series, half-hourly,
+    partitioned by ``time_series_id``, holding a year of history (43.8M rows). The streaming
+    engine took ~0.21 s at ~190 MB peak. The in-memory engine peaked at ~1.3 GB for the same
+    result, so streaming uses ~7x less memory.
 
     Cost scales linearly with accumulated history. If the scan ever becomes a problem, both
     bounds can instead be read from the Delta add-action ``min.time``/``max.time`` file
@@ -543,19 +544,18 @@ def upsert_metadata(
     This function assumes it is called by one thread at a time, so no explicit locking is required,
     and it is therefore not safe under concurrent callers.
 
-    The rewrite is not atomic either. The rewrite is not atomic either. `write_parquet` overwrites
-    the roster in place, with no write-to-temporary-file-and-rename. The roster therefore does not
-    get the all-or-nothing commit that Delta gives the tables around it. See [principle 10, every
-    write is atomic and
+    The rewrite is not atomic either. `write_parquet` overwrites the roster in place, with no
+    write-to-temporary-file-and-rename. The roster therefore does not get the all-or-nothing
+    commit that Delta gives the tables around it. See [principle 10, every write is atomic and
     idempotent](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition).
     A crash or an out-of-memory kill part-way through a local write leaves a partial file.
     `pl.read_parquet` below is what rejects that partial file on the next run, before
-    `TimeSeriesMetadata.validate` ever sees it. The error reads `ComputeError: parquet: File out of
-    specification: The file must end with PAR1`. `validate` is the guard for the other case: a
-    roster that reads back cleanly but is off-contract, from an older writer or a hand-edit. Either
-    way the asset records `metadata_upsert_failed`, and the roster stays broken until an operator
-    acts. A corrupt file is not a missing file, so the create branch below never runs again by
-    itself.
+    `TimeSeriesMetadata.validate` ever sees it. The error reads `ComputeError: parquet: File out
+    of specification: The file must end with PAR1`. `validate` is the guard for the other case: a
+    roster that reads back cleanly but is off-contract, from an older writer or a hand-edit.
+    Either way the asset records `metadata_upsert_failed`, and the roster stays broken until an
+    operator acts. A corrupt file is not a missing file, so the create branch below never runs
+    again by itself.
 
     Deleting the file is not on its own a fix. `power_time_series_and_metadata` extracts metadata
     only from the files `select_new_rows` judged new. The next hourly run would therefore rebuild

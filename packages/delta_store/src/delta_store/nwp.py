@@ -54,15 +54,15 @@ alone is not enough: row groups that straddle member boundaries advertise the wh
 their extremes.
 
 Measured on the stored table, a single-member read decodes 1.96% of a partition's rows — one row
-group in 51 — and it does so for every member. Every partition we sampled held 51 row groups, each
-spanning a single member, and those 51 row groups together covered members 0 to 50. Reading 29 daily
-partitions, nine H3 cells, and the control member alone runs in 30 ms and 400 MB of peak resident
-memory. The same read of a table sorted ``valid_time``-first takes 170 ms and 2,200 MB. The
-member-early sort holds 3.7% more stored bytes than the ``valid_time``-first sort. One measurement
-took a real partition and removed half its rows at random members, so that the member-to-row-group
-alignment degrades rather than holding exactly. Under that degraded alignment the worst member still
-reads 5.88% of the partition's rows, against the 1.96% floor above. The method and the full figures
-live beside the storage measurements in
+group in 51 — and it does so for every member. Every partition the census sampled held 51 row
+groups, each spanning a single member, and those 51 row groups together covered members 0 to 50.
+Reading 29 daily partitions, nine H3 cells, and the control member alone runs in 30 ms and 400 MB of
+peak resident memory. The same read of a table sorted ``valid_time``-first takes 170 ms and 2,200
+MB. The member-early sort holds 3.7% more stored bytes than the ``valid_time``-first sort. One
+measurement took a real partition and removed half its rows at random members, so that the
+member-to-row-group alignment degrades rather than holding exactly. Under that degraded alignment
+the worst member still reads 5.88% of the partition's rows, against the 1.96% floor above. The
+method and the full figures live beside the storage measurements in
 <https://openclimatefix.github.io/nged-substation-forecast/api/dynamical_data/>.
 
 Two conditions have to hold for the predicate to reach the Parquet scan at all. The predicate must

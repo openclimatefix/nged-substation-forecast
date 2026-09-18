@@ -21,10 +21,10 @@ any tuning.
 
 **The flagship tuned table is the internal `power_forecasts` table, whose storage format shrank a
 403.6M-row development copy of that table from 6.33 GB to 0.73 GB.** The levers are ZSTD,
-`DELTA_BINARY_PACKED` timestamps, `BYTE_STREAM_SPLIT` floats, member-adjacent sorting (every row of
-one ensemble member stored together), and rounding `power_fcst` to a 13-bit significand.
-`POWER_FORECASTS_WRITER_PROPERTIES`, below on this page, gives the lever-by-lever breakdown,
-measured on the table's least compressible single file rather than on the full table.
+`DELTA_BINARY_PACKED` timestamps, `BYTE_STREAM_SPLIT` floats, member-adjacent sorting (the ~51
+ensemble members of one forecast target on adjacent rows), and rounding `power_fcst` to a 13-bit
+significand. `POWER_FORECASTS_WRITER_PROPERTIES`, below on this page, gives the lever-by-lever
+breakdown, measured on the table's least compressible single file rather than on the full table.
 
 ## Contents
 
