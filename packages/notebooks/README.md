@@ -21,7 +21,7 @@ implementation, reviewed and tested.
 
 **`dashboard` owns the marimo apps that somebody other than the author opens.** The apps at
 `packages/dashboard/` are meant to be re-opened by whoever is watching the forecast, so each app
-keeps its unit-testable logic in an importable package under `packages/dashboard/src/`, that package
+keeps its unit-testable logic in an importable package under `packages/dashboard/src/`. That package
 carries a test suite of its own, and both apps are expected to keep working. A notebook here keeps
 its logic inline, hard-codes the run and the H3 cell the author happened to be looking at, and may
 stop working the day the data moves.

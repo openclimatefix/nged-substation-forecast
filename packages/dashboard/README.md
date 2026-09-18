@@ -89,8 +89,8 @@ guide](https://openclimatefix.github.io/nged-substation-forecast/live_service/aw
   that `s3` was selected with no `.env.s3` to read credentials from.
 - `forecast_chart` — the two Altair chart builders `view_forecasts.py` calls, plus the constants
   fixing the plotted window, the display time zone, the NWP variables offered, and the power lags
-  offered. Every constant's docstring says what that constant fixes, and most say why the value is
-  what it is; the module docstring says how the two charts fit together.
+  offered. Every constant's docstring says what that constant fixes, and most of those docstrings
+  say why the value is what it is. The module docstring says how the two charts fit together.
 
 ## Invariants worth knowing before editing a chart
 
@@ -108,7 +108,7 @@ visibly misaligns the pair.
 **A chart's data is rounded and served out of line, because the ensemble is large.** One forecast
 run for one series is 51 members × 14 days × 48 half-hours ≈ 34,000 rows, which is past both
 Altair's 5,000-row default guard and marimo's maximum output size. `build_view_forecast_chart` calls
-`alt.data_transformers.disable_max_rows()` to lift the first guard. For the second, the builders
-round values to 3 decimal places as `Float64` before serialising, and the apps hand the result to
-`mo.ui.altair_chart`, which serves the rows as a virtual file instead of inlining the rows in the
-cell output.
+`alt.data_transformers.disable_max_rows()` to lift Altair's guard. To stay inside marimo's maximum
+output size, the builders round values to 3 decimal places as `Float64` before serialising, and the
+apps hand the result to `mo.ui.altair_chart`, which serves the rows as a virtual file instead of
+inlining the rows in the cell output.
