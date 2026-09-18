@@ -309,10 +309,11 @@ def _is_prose_comment(text: str) -> bool:
 def _comment_blocks(source: str) -> list[tuple[int, int, int]]:
     """The `(first_line, last_line, indent)` of every run of 2+ consecutive whole-line `#` comments.
 
-    A whole-line comment is one where nothing but whitespace precedes the `#` on its physical line
-    — a trailing inline comment (`x = 1  # units: MW`) is a single line by construction and so is
-    never part of a 2+-line run, and is left untouched without needing a separate check for it.
-    Line numbers are 1-indexed, matching `tokenize`.
+    A whole-line comment is a comment where nothing but whitespace precedes the `#` on its
+    physical line. A trailing inline comment (`x = 1  # units: MW`) is a single line by
+    construction, so a trailing inline comment is never part of a 2+-line run. Trailing inline
+    comments are therefore left untouched, without needing a separate check for them. Line
+    numbers are 1-indexed, matching `tokenize`.
     """
     try:
         tokens = list(tokenize.generate_tokens(io.StringIO(source).readline))
