@@ -576,10 +576,10 @@ identity into `power_fcst_model_name`.
 Each `BaseForecaster` also carries a `feature_engineer: ClassVar[FeatureEngineer]` — a strategy
 object (composition, not inheritance) that owns the full data-preparation pipeline from raw inputs
 to an `AllFeatures` frame, including the NWP spatial join. The default `TabularFeatureEngineer` maps
-each gridded NWP H3 cell to the nearest time series then runs the tabular `_engineer_features`
-pipeline. A future model needing a different view of the data (e.g. a CNN wanting a spatial NWP
-crop) overrides `feature_engineer` with a different `FeatureEngineer` subclass — it does not change
-`_engineer_features` or `BaseForecaster`. Both classes live in
+each gridded NWP H3 cell to the time series that sits inside it, then runs the tabular
+`_engineer_features` pipeline. A future model needing a different view of the data (e.g. a CNN
+wanting a spatial NWP crop) overrides `feature_engineer` with a different `FeatureEngineer` subclass
+— it does not change `_engineer_features` or `BaseForecaster`. Both classes live in
 `packages/ml_core/src/ml_core/features/`.
 
 ## Code Style

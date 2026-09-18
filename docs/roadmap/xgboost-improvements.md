@@ -675,7 +675,7 @@ the spirit of the existing `_nullify_leaky_lags` tests before it's trusted.
 
 ### Neighbouring-H3-cell weather context
 
-Each series currently gets its nearest NWP cell only. Add the mean and gradient across the
+Each series currently gets only the NWP cell it sits inside. Add the mean and gradient across the
 neighbouring ring (~9 extra columns) for frontal-timing and wind-ramp information. Modest expected
 gain, low effort given the `geo` H3 machinery exists.
 
