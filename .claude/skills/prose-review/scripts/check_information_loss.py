@@ -10,8 +10,10 @@ Usage::
     python3 check_information_loss.py HEAD docs/background/energy-forecasting-review.md
     python3 check_information_loss.py 34a8164a docs/roadmap/capacity-estimation.md
 
-Exits non-zero when anything in the first three categories went missing, so it can go in a
-verification set. Shingles are advisory and never fail the run: a deliberate rewording drops
+Exits non-zero when a number, a link or a quotation went missing, so it can go in a verification
+set. Bolded terms are reported without failing the run, because a restructure legitimately
+re-bolds a passage. Shingles — the overlapping 9-word runs the last section lists — are advisory
+for the same reason and never fail the run: a deliberate rewording drops
 shingles by design, so that section is a list to read rather than a gate to pass.
 
 The file is assumed to be hard-wrapped, so every comparison runs against a whitespace-normalised

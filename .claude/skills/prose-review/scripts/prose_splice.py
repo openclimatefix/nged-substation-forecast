@@ -84,8 +84,9 @@ class CharSpan(NamedTuple):
     `text` is the character itself. `left` and `right` widen that to include the markup that must
     stay outside anything the splice writes: the opening backtick, `[` or `**` before the
     character, and the closing backtick, `](url)` or `**` after it. A comma inserted at that
-    boundary therefore lands after the closing marker, which is where this repo's prose puts it —
-    215 commas sit after a closing `**` across the docs and none inside one.
+    boundary therefore lands after the closing marker, which is where this repo's prose puts it.
+    `_lead_marker` below carries the counts, and the one exception they record: the bolded lead
+    that opens a block keeps its full stop inside its own markers.
     """
 
     left: int
@@ -417,9 +418,10 @@ def _lead_marker(*, raw: str, at: int) -> str:
     if opener == -1:
         return ""
     # A blockquote's markers are not text, so drop the leading run of them before asking what
-    # precedes the lead: what is left is either nothing or the one list marker `MARKER` describes.
-    # Only the leading run — a `>` later in the prefix is an arrow or a comparison, and `-> ` read
-    # as a bullet would pull the stop inside a bold span that opens nothing.
+    # precedes the lead: what is left is either nothing or a single list marker — the bullet or
+    # number `MARKER` matches. Only the leading run — a `>` later in the prefix is an arrow or a
+    # comparison, and `-> ` read as a bullet would pull the stop inside a bold span that opens
+    # nothing.
     before_opener = block[: opener - block_start]
     quoted = QUOTE_MARKERS.match(before_opener)
     before_opener = before_opener[quoted.end() :] if quoted else before_opener

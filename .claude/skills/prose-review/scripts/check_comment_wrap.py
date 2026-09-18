@@ -10,8 +10,10 @@ dozen characters sits in the middle of an otherwise full block::
     # World Weather and Climate Extremes Archive:
 
 Three separate commits on one branch each left a line like that, and neither `ruff`, `ruff format`
-nor `reflow_python_prose.py` reports one: ruff does not reformat a comment's text, and the reflow
-declines the block before it looks. Only a reader notices, which is why this check exists.
+nor `reflow_python_prose.py` reports one. Ruff does not reformat a comment's text at all, and the
+reflow decides whether to run on a block by asking only whether its lines fit the width, so it
+never reaches the question of where the breaks fall. Only a reader notices, which is why this
+check exists.
 
 Usage::
 
@@ -22,8 +24,9 @@ Usage::
 Exits non-zero when a file carries more short mid-block lines than it did at the ref. The gate is
 the change rather than the total, because prose written before this check existed holds short lines
 that are nobody's defect — a worked example whose lines are deliberately parallel, a comment ending
-a paragraph early. Those are stable across a sweep, so they cancel, and a line the sweep itself
-stranded does not.
+a paragraph early. A short line that predates the sweep appears in both counts and cancels out.
+A line the sweep itself stranded appears only in the later count, so it raises the total and the
+check fails.
 
 The check covers `#` comments only. A docstring's prose has list items, `Args:` entries and indented
 examples whose short lines are all legitimate and all move when the prose around them is rewritten,
@@ -109,11 +112,12 @@ def _body(line: str) -> str:
 
 
 def _short_lines(text: str) -> list[str]:
-    """Every comment line under `SHORT` characters that is not the last line of its block.
+    """Every comment line under `SHORT` characters (55) that is not the last line of its block.
 
-    A block is skipped whole in three cases, each one a reason its author chose the line breaks:
-    a directive or banner line anywhere in it, two consecutive spaces somewhere in its text (the
-    mark of a hand-aligned table), and — per line — a following line holding a URL or starting with
+    Two of the exemptions skip a whole block, each one a reason its author chose the line breaks:
+    a directive or banner line anywhere in the block, and two consecutive spaces somewhere in its
+    text, which is the mark of a hand-aligned table. The third exemption skips a single line
+    rather than its block: a line is left alone when the line after it holds a URL or starts with
     its own indentation, because a wrapper cannot pull either of those up.
     """
     found: list[str] = []

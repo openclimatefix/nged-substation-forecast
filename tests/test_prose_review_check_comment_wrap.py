@@ -1,10 +1,10 @@
 """`check_comment_wrap.py` finds the half-empty line a splice leaves inside a comment block.
 
 The defect is invisible to every other guard in this repo: `ruff` does not reformat comment text,
-and `reflow_python_prose.py` declines a block whose lines already fit. Three commits on one branch
-each shipped one. The tests below fix both halves of the design — which lines count as stranded,
-and the rule that the gate is the count rising rather than the count being non-zero, because prose
-written before the guard existed holds short lines that are nobody's defect.
+and `reflow_python_prose.py` declines a block whose lines already fit. Three commits on one
+branch each shipped one. The tests below pin down both halves of the design — which lines count
+as stranded, and the rule that the gate is the count rising rather than the count being non-zero,
+because prose written before the guard existed holds short lines that are nobody's defect.
 """
 
 from pathlib import Path
