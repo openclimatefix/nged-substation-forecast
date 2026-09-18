@@ -3,7 +3,7 @@
 Public interface:
 
 - ``FeatureEngineer`` — abstract base; implement to swap the full feature pipeline.
-- ``TabularFeatureEngineer`` — default implementation: nearest-cell NWP spatial join followed by
+- ``TabularFeatureEngineer`` — default implementation: containing-cell NWP spatial join followed by
   the declarative tabular pipeline.
 - ``NWP_PUBLICATION_DELAY_HOURS`` — hours after an NWP run's ``init_time`` before we treat that
   run as usable. Public because the constant is the default of three public signatures:
