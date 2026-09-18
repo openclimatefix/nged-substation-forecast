@@ -23,7 +23,7 @@ with app.setup:
     from plotting.ocf_theme import BLUE, hex_to_rgb
 
     RECENT_WINDOW: Final[timedelta] = timedelta(days=21)
-    """How far back the substation power chart looks.
+    """How far back the power chart looks, measured from the selected series' newest row.
 
     NGED telemetry is half-hourly, 48 rows a day, and Altair's default row-count guard rejects a
     frame over 5,000 rows — so the window has to stay well under about 104 days. 21 days is
@@ -122,19 +122,6 @@ def _(settings):
         settings.power_time_series_data_path,
         storage_options=typeddict_to_dict(settings.storage_options),
     )
-
-    # Anchor the rolling window on the table's own newest row, rather than on wall-clock time, so
-    # the chart still shows the latest telemetry on disk during a telemetry outage instead of
-    # going blank. The window bound is computed here in Python, once, and passed to the filter
-    # below as a plain literal, so the filter itself stays a single comparison that Delta/Parquet
-    # can push down.
-    newest_time: datetime | None = delta_df.select(pl.col("time").max()).collect().item()
-    window_start = (newest_time if newest_time is not None else datetime.now(UTC)) - RECENT_WINDOW
-
-    delta_df = delta_df.filter(
-        # Filter to only show recent data. Altair crashes if you try to show too much data.
-        pl.col("time") > pl.lit(window_start).cast(UTC_DATETIME_DTYPE)
-    )
     return (delta_df,)
 
 
@@ -152,9 +139,29 @@ def _(delta_df, df, layer_widget, map):
         time_series_id = selected_df["time_series_id"].item()
 
         try:
+            # Both reads below are scoped to the selected series first. `power_time_series` is
+            # partitioned by `time_series_id`, so scoping first leaves Delta reading one
+            # partition instead of all of them, and it defers both reads until a chart is
+            # actually about to be drawn.
+            series_lf = delta_df.filter(pl.col("time_series_id") == time_series_id)
+
+            # Anchor the rolling window on this series' own newest row, rather than on
+            # wall-clock time, so a series that stopped reporting still shows its last
+            # RECENT_WINDOW of telemetry instead of an empty chart. No engine on this stack
+            # answers a `max` from Parquet statistics, so this reads the series' `time` column
+            # in full; the streaming engine keeps the peak memory of that read bounded.
+            newest_time: datetime | None = (
+                series_lf.select(pl.col("time").max()).collect(engine="streaming").item()
+            )
+            anchor = newest_time if newest_time is not None else datetime.now(UTC)
+
+            # `anchor - RECENT_WINDOW` is a plain Python datetime, so the filter stays a single
+            # comparison against a literal, which Delta and Parquet can push down to the scan.
             filtered_demand = cast(
                 pt.DataFrame[PowerTimeSeries],
-                delta_df.filter(pl.col("time_series_id") == time_series_id).collect(),
+                series_lf.filter(
+                    pl.col("time") > pl.lit(anchor - RECENT_WINDOW).cast(UTC_DATETIME_DTYPE)
+                ).collect(),
             )
         except Exception as e:  # noqa: BLE001 — surface any read failure in the pane, never crash.
             right_pane = mo.md(f"{e}")
