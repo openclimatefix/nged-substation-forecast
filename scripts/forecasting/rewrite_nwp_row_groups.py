@@ -1,27 +1,35 @@
 """Rewrite every ``nwp`` Delta partition so its row groups are member-aligned.
 
 `delta_store.nwp.write_nwp` lands one ensemble member per Parquet row group, which is what lets a
-single-member read skip the rest of a partition. Partitions written before that layout existed hold
-row groups spanning many members, and because an NWP partition is written once and never revisited,
-they stay that way until a migration rewrites them. This script is that migration.
+single-member read skip the rest of a partition. Partitions written before that layout existed
+hold row groups spanning many members. A numerical-weather-prediction (NWP) partition is written
+once and never revisited, so those partitions stay that way until a migration rewrites them. This
+script is that migration.
 
-**Run this against the local table.** What this layout speeds up is a single-member read that
-spans many stored runs, and the read spanning the most runs by far is the control-member read the
-cross-validation assets do at training time, against the local table. Nothing running on AWS reads
-the back catalogue: the live forecast pins ``init_time`` to the one freshest run, which every write
-from now on lays out correctly anyway. The ``view_forecasts`` dashboard does read about 17 stored
-runs from S3 with a single-member filter, but an ``h3_index`` filter already cuts that query to one
-H3 cell in 1,671 and it returns in about 0.2 s, so the S3 table is not worth rewriting for it. Run
-this against the S3 table if training ever moves to AWS: the script rewrites only the partitions it
-measures as unaligned, so running it later costs exactly what running it now would.
+**Run this script against the local table.** The member-aligned layout speeds up a single-member
+read that spans many stored runs. The read spanning the most runs by far is the control-member
+read the cross-validation assets do at training time, against the local table. The control member
+is ``ensemble_member == 0``, the one unperturbed member of the ensemble. Nothing running on AWS
+reads the back catalogue: the live forecast pins ``init_time`` to the one freshest run, which
+every write lays out correctly anyway.
 
-Each partition is read back through the contract, re-validated, and written through ``write_nwp``,
-which replaces that ``(nwp_model_id, init_time)`` partition and nothing else. A partition whose row
-groups are already member-aligned is skipped, so an interrupted run resumes where it stopped.
+The ``view_forecasts`` dashboard does read about 17 stored runs from S3 with a single-member
+filter. But an ``h3_index`` filter already cuts that query to one H3 cell in 1,671, and the query
+returns in about 0.2 s. H3 is the hexagonal grid the gridded NWP is aggregated onto, and
+``h3_index`` names one cell of that grid. So the S3 table is not worth rewriting for the
+dashboard. Run this script against the S3 table if training ever moves to AWS. The script
+rewrites only the partitions it measures as unaligned, so running the script later costs exactly
+what running it now would.
+
+Each partition is read back through its data contract, re-validated, and written through
+``write_nwp``, which replaces that ``(nwp_model_id, init_time)`` partition and nothing else. The
+contract is the Patito schema ``contracts.weather_schemas.Nwp``, which fixes every column of the
+``nwp`` table and its type. A partition whose row groups are already member-aligned is skipped,
+so an interrupted run resumes where it stopped.
 
 **The rewrite roughly doubles the table on disk** until the superseded files are reclaimed, so
-migrating a 123 GB table needs about 250 GB free. Reclaim with ``vacuum(full=True)``; plain
-``vacuum()`` reports deleting the files and does not, for the reason recorded on
+migrating a 123 GB table needs about 250 GB free. Reclaim with ``vacuum(full=True)``. Plain
+``vacuum()`` reports deleting the files but does not delete them. The reason is recorded on
 <https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/>.
 
 Usage::
@@ -54,19 +62,19 @@ _LOGGER: Final[logging.Logger] = logging.getLogger(__name__)
 def _unaligned_partitions(table_uri: str, storage_options: ObjectStoreOptions) -> list[datetime]:
     """Partitions holding a row group that spans more than one ``ensemble_member``.
 
-    Reads each active file's Parquet footer, which is the only sound way to tell: the Delta log's
-    own per-file statistics give a file's *overall* member range, which spans the whole ensemble
-    whether the row groups inside are aligned or not. A file-count heuristic is not sound either —
-    an incomplete ECMWF run is small enough to land in one file under either layout, and an
-    incomplete run is the case that prunes worst.
+    Reads each active file's Parquet footer, which is the only sound way to tell. The Delta log's
+    own per-file statistics give a file's *overall* member range. That range spans the whole
+    ensemble whether the row groups inside are aligned or not. A file-count heuristic is not
+    sound either. An incomplete ECMWF run is small enough to land in one file under either
+    layout, and an incomplete run is the case where a single-member read skips the least data.
 
     A partition counts as aligned when it holds at least as many row groups as the ensemble
-    members its statistics span, counted across the whole partition rather than within one file:
-    a partition split across files has no member range of its own until every file's range is
-    folded together. **Demanding that every row group hold exactly one member would not
-    converge.** Where the row count does not divide evenly by the member count, the aligned layout
-    still straddles one boundary by design, so a ragged partition would be rewritten on every
-    pass, each time writing another full copy of its data.
+    members its statistics span. Both counts are taken across the whole partition rather than
+    within one file. A partition split across files has no member range of its own until every
+    file's range is folded together. **Demanding that every row group hold exactly one member
+    would not converge.** Where the row count does not divide evenly by the member count, the
+    aligned layout still straddles one boundary by design. A ragged partition would therefore be
+    rewritten on every pass, each pass writing another full copy of its data.
 
     A file whose footer cannot be read is reported as unaligned, so the migration rewrites it
     rather than skipping it. Rewriting an already-aligned partition is wasted work; skipping an
@@ -133,7 +141,7 @@ def _rewrite_partition(
         storage_options: delta-rs object-store options; empty for a local path.
     """
     # Filtered on init_time alone although the partition key is (nwp_model_id, init_time):
-    # NwpModelId has one member today, so an init_time identifies a partition. A second NWP model
+    # NwpModelId has one variant today, so an init_time identifies a partition. A second NWP model
     # would need this predicate widened, and would be a reason to revisit this script rather than
     # delete it.
     rows = (

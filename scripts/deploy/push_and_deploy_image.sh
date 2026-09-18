@@ -1,46 +1,52 @@
 #!/usr/bin/env bash
 #
-# Push the already-built production image to ECR and point the ECS task definition at it.
+# Push the already-built production image to the Elastic Container Registry (ECR) and point the
+# Elastic Container Service (ECS) task definition at the pushed image.
 #
-# This is Step 6 of the AWS setup runbook (docs/live_service/aws.md) as one command, and —
-# together with scripts/deploy/build_and_verify_image.sh — the whole recurring champion-redeploy
+# The script is Step 6 of the AWS setup runbook as one command. Together with
+# scripts/deploy/build_and_verify_image.sh, the script is also the whole recurring champion-redeploy
 # loop (aws.md "Redeploying a new champion model"). This header is the source of truth for *why*
-# each choice below is made.
+# each choice below is made. The runbook is the file `docs/live_service/aws.md`, cited below as
+# aws.md and published at
+# <https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/>.
 #
 # Usage:
 #   scripts/deploy/push_and_deploy_image.sh          # no arguments — everything is derived
 #
 # Zero arguments by design, so nothing can be mistyped or drift:
-#   - The image tag is derived from data/production_model/promotion.json exactly as
-#     build_and_verify_image.sh derives it (first 12 hex chars of the promoted run id), so this
-#     script can only ever push the image that script built and verified.
+#   - The image tag is the first 12 hex chars of the promoted MLflow run id, read from
+#     data/production_model/promotion.json. build_and_verify_image.sh derives the tag exactly the
+#     same way. So this script can only ever push the image that script built and verified.
 #   - The AWS account id comes from `aws sts get-caller-identity` — never typed by hand.
 #   - Region, repository, task-definition family, and container name are the fixed names the
 #     runbook establishes (eu-west-2 / nged-forecast everywhere). Region is passed explicitly on
-#     every AWS call because the CLI's fall-back-to-configured-default behaviour is a documented
-#     footgun (aws.md Step 10's region warning).
+#     every AWS call. Without `--region`, the AWS command-line interface falls back to the
+#     configured default region. aws.md Step 10 warns about that fallback by name.
 #
-# What it does:
-#   1. Push: ECR login (the instance/user credentials come from your AWS config or role — no
-#      static keys handled here), tag, push.
-#   2. Deploy: if the `nged-forecast` task-definition family exists, register a NEW REVISION
-#      that is a copy of the latest one with only the container image URI changed. The
+# What the script does:
+#   1. Push: ECR login, then tag, then push. The instance or user credentials come from your AWS
+#      config or role, and no static keys are handled here.
+#   2. Deploy: if the `nged-forecast` task-definition family exists, register a NEW REVISION that
+#      is a copy of the latest revision with only the container image URI changed. The
 #      EcsRunLauncher on the control-plane box resolves the family's latest revision at launch
 #      time, so the next scheduled run picks the new image up with no restart on the box.
 #
-# First-time setup: the task-definition family does not exist until aws.md Step 9 creates it in
-# the console, so on a fresh account the deploy half reports that and exits 0 — the push half is
-# all Step 6 needs. Re-running after the family exists (or when the latest revision already
+# First-time setup: the task-definition family does not exist until aws.md Step 9 creates it in the
+# console. So on a fresh account the deploy half reports the missing family and exits 0. The push
+# half is all Step 6 needs. Re-running after the family exists (or when the latest revision already
 # points at this image) is safe and idempotent.
 #
 # The revision is built by ALLOWLISTING the fields `register-task-definition` accepts from the
-# `describe-task-definition` output (describe returns extra read-only fields — revision, status,
-# registeredAt, … — that register rejects). An allowlist rather than a denylist so a future new
-# read-only field in the describe output can't break this script.
+# `describe-task-definition` output. Describe returns extra read-only fields that register rejects:
+# revision, status, registeredAt, and more. The list is an allowlist rather than a denylist, so a
+# read-only field added to the describe output later cannot break this script.
 #
-# Deliberately NOT here: creating any infrastructure (buckets, IAM roles, the cluster, the
-# first task definition). One-time infrastructure stays in the console per the runbook until
-# Stage 2's infra-as-code — ad-hoc bash that mutates infrastructure would be unreviewable.
+# Deliberately NOT here: creating any infrastructure (buckets, Identity and Access Management roles,
+# the cluster, the first task definition). One-time infrastructure stays in the console, per the
+# runbook, until Stage 2 of the access-phasing plan replaces those console steps with
+# infrastructure-as-code. Ad-hoc bash that mutates infrastructure would be unreviewable. The
+# access-phasing plan is at
+# <https://openclimatefix.github.io/nged-substation-forecast/roadmap/live-service/#access-phasing>.
 
 set -euo pipefail
 
@@ -94,8 +100,9 @@ if [[ "$CURRENT_IMAGE" == "$REMOTE_IMAGE" ]]; then
   exit 0
 fi
 
-# Allowlist the register-accepted fields, drop nulls (register rejects explicit nulls for
-# fields that describe reports as absent), and swap the image on the named container only.
+# Allowlist the register-accepted fields, drop nulls, and swap the image on the named container
+# only. Nulls are dropped because register rejects explicit nulls for fields that describe reports
+# as absent.
 NEW_TASK_DEF="$(echo "$CURRENT_TASK_DEF" | jq \
   --arg name "$CONTAINER_NAME" --arg image "$REMOTE_IMAGE" '
   .taskDefinition
