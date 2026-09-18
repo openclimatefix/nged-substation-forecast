@@ -34,8 +34,10 @@ def _(df):
 def _(df):
     # The chart below draws one run at one H3 cell, as a line per ensemble member. The plotted cell,
     # 599148110664433663, is a resolution-5 cell in Shetland, at roughly 60.6 N, 0.7 W. init_time is
-    # a Delta partition column, so the scan prunes to a single daily partition; h3_index sorts last,
-    # so the h3_index filter prunes little further.
+    # a Delta partition column, so the scan prunes to a single daily partition. The table is
+    # written sorted by (init_time, ensemble_member, valid_time, h3_index), so h3_index sorts
+    # last, and a filter on a late sort key skips few row groups: the h3_index filter prunes
+    # little further.
     NWP_INIT_TIME = datetime(2026, 5, 15, tzinfo=UTC)
     NWP_VAR_TO_PLOT = "temperature_2m"
 

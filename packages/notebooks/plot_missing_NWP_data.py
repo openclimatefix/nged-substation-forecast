@@ -70,7 +70,7 @@ def plot_null_distribution(df, target_init_time, target_h3_index, nwp_vars):
     )
 
     # 3. Flag the missing values, and label each y-axis row with its ensemble member. Altair
-    # only accepts materialised data, so collect once the filter has cut the scan down to a
+    # only accepts materialised data. Collect once the filter has cut the scan down to a
     # single NWP run and a single H3 cell.
     plot_df = melted.with_columns(
         # Check for both Polars nulls and float NaNs
@@ -124,8 +124,8 @@ def plot_null_distribution(df, target_init_time, target_h3_index, nwp_vars):
 @app.cell
 def _(df, nwp_vars):
     # The plotted cell, 599148110664433663, is an H3 resolution-5 cell in Shetland, at roughly
-    # 60.6 N, 0.7 W — the far north of the boundary `h3_grid_weights` covers, and so a cell worth
-    # checking for gaps.
+    # 60.6 N, 0.7 W. That cell sits at the far north of the boundary the `h3_grid_weights` asset
+    # covers, and so is worth checking for gaps.
     chart = plot_null_distribution(
         df,
         target_init_time=datetime(2026, 5, 1, tzinfo=UTC),
@@ -142,8 +142,8 @@ def test_plot_null_distribution_flags_nulls_and_nans():
     other_init_time = datetime(2026, 5, 2, tzinfo=UTC)
     h3_index = 599148110664433663
     other_h3_index = 599148110664433662
-    # The last two readings are missing too, but belong to another NWP run and another H3 cell, so
-    # the filter must drop them rather than plot them.
+    # The last two rows of the `readings` frame below are missing too, but belong to another NWP
+    # run and another H3 cell, so the filter must drop those rows rather than plot them.
     readings = pl.LazyFrame(
         {
             "init_time": [init_time] * 4 + [other_init_time, init_time],

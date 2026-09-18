@@ -4,8 +4,10 @@ Marimo notebooks for exploratory data analysis and ad-hoc experimentation.
 
 ## Why this package exists
 
-**A notebook here answers one question about the data, and is allowed to be rough.** What the NWP
-archive holds for one H3 cell, where a weather variable goes missing, and whether a baseline export
+**A notebook here answers one question about the data, and is allowed to be rough.** What the
+numerical weather prediction (NWP) archive holds for one H3 cell — H3 being the grid of hexagons
+this project aggregates weather onto — where a weather variable goes missing, and whether a baseline
+export
 looks the way its author expected: each question is worth a chart, and worth no more engineering
 than a chart. Nothing in `src/`, and no other package under `packages/`, imports this package, so a
 notebook that stops working stops working alone.
@@ -15,9 +17,11 @@ principle 3 — one execution path from research to
 production](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#3-one-execution-path-from-research-to-production)
 holds that an idea becomes an experiment — a candidate that can enter the leaderboard, and therefore
 be promoted to production — only once the idea is implemented in the pipeline's own code, behind the
-same data contracts and tests as everything else. Exploring in a notebook first is expected. Lifting
-a notebook's code into the pipeline afterwards is not, because the pipeline gets its own
-implementation, reviewed and tested.
+same data contracts and tests as everything else. The leaderboard is the ranked table candidate
+models are scored against each other on, and the winner is what the live service serves. A data
+contract is a written, enforced definition of what a table's columns mean. Exploring in a notebook
+first is expected. Lifting a notebook's code into the pipeline afterwards is not expected, because
+the pipeline gets its own implementation, reviewed and tested.
 
 **`dashboard` owns the marimo apps that somebody other than the author opens.** The apps at
 `packages/dashboard/` are meant to be re-opened by whoever is watching the forecast, so each app
@@ -30,9 +34,10 @@ stop working the day the data moves.
 
 **Marimo reverses two ordinary Python habits, and both failures are silent.** A leading underscore
 makes a name cell-local rather than private, so a helper that more than one cell calls has to carry
-a public name. And every import belongs in the `with app.setup:` block, because an import marimo
-threads through a cell signature arrives as a function parameter, which ruff treats as always
-defined — a genuinely missing import then fails only at runtime. **Never run `ruff check --fix` over
+a public name. And every import belongs in the `with app.setup:` block. An import marimo threads
+through a cell signature instead arrives as a function parameter, and ruff treats a parameter as
+always defined. A genuinely missing import then fails only at runtime. **Never run `ruff check
+--fix` over
 a notebook:** an autofix that needs a new import writes that import into the file's top-level import
 block, where no cell can see the import, and reports success. The full set of authoring rules is the
 `marimo-notebooks` skill.
@@ -82,4 +87,6 @@ root `.env` points at.
 - `view_baseline_export.py` — inspects the parquets
   `scripts/forecasting/export_baseline_forecasts.py` writes: observed power against the forecast,
   the observed-minus-ensemble-mean residual that switching-event detection consumes, and the raw
-  ensemble members over a chosen window. The notebook's module docstring says what each chart shows.
+  ensemble members over a chosen window. Switching-event detection reads that residual because a
+  sudden step in the gap between measured and forecast power is the signature of a feeder being
+  switched onto or off the substation. The notebook's module docstring says what each chart shows.

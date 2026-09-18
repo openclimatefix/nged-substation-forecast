@@ -1,12 +1,12 @@
 """The dashboard apps' local/S3 data-source toggle.
 
-Both marimo apps (``map_and_timeseries.py``, ``view_forecasts.py``) show a "Data source" radio
+Both marimo apps (``map_and_timeseries.py``, ``view_forecasts.py``) show a "Data source" radio,
 and re-instantiate `contracts.settings.Settings` from the selected source via
-`settings_for_source`, so production S3 data can be viewed without restarting marimo. Swapping
-the whole `Settings` object is what keeps the toggle to two functions: no reader downstream of
-`Settings` has to know, or ask, which source the paths and credentials came from. See the
-dashboard README for how to set up ``packages/dashboard/.env.s3``, and which read-only credentials
-belong in that file.
+`settings_for_source`. Production S3 data can therefore be viewed without restarting marimo.
+Swapping the whole `Settings` object is what keeps the toggle to two functions: no reader
+downstream of `Settings` has to know, or ask, which source the paths and credentials came from.
+See the dashboard README for how to set up ``packages/dashboard/.env.s3``, and which read-only
+credentials belong in that file.
 """
 
 from pathlib import Path
@@ -29,14 +29,14 @@ def settings_for_source(source: DataSourceType) -> Settings:
 
     "local" reads only the root .env (the local pipeline, same as the rest of the app). "s3"
     layers packages/dashboard/.env.s3 on top of the root .env, overriding the data-path roots and
-    object-store credentials to point at the real S3 buckets, so production data can be viewed
+    object-store credentials to point at the real S3 buckets. Production data can then be viewed
     without restarting marimo.
 
     Only the data tables follow the toggle: .env.s3 sets DATA_PATH_INTERNAL, DATA_PATH_DELIVERY,
     and the DATA_STORE_* credentials. The file deliberately does not set LOCAL_ARTIFACTS_PATH, so
     the production model stays laptop-local in both modes. A missing .env.s3 is silently skipped by
-    pydantic-settings, so "s3" then falls back to the root .env's local paths — which is the case
-    `source_status_message` warns about.
+    pydantic-settings, so "s3" then falls back to the root .env's local paths. That fallback to
+    local paths is the case `source_status_message` warns about.
 
     Args:
         source: Which data source the app's "Data source" radio currently selects.
@@ -61,8 +61,8 @@ def source_status_message(source: DataSourceType, settings: Settings) -> tuple[s
 
     Args:
         source: Which data source the app's "Data source" radio currently selects.
-        settings: The `Settings` `settings_for_source` built for that source, whose
-            ``nged_data_path`` the non-warning message quotes back to the reader.
+        settings: The `Settings` that `settings_for_source` built for that source. The
+            non-warning message quotes that object's ``nged_data_path`` back to the reader.
 
     Returns:
         ``(markdown_message, is_warning)`` — the markdown to render, and whether to render that

@@ -21,10 +21,12 @@ def _():
 
 @app.cell
 def _(boundary):
-    # The positional arguments are a 0.25-degree regular latitude/longitude grid (ECMWF ENS's
-    # spacing), H3 resolution 5 for the cells themselves, and resolution 7 children to sample each
-    # cell's overlap with the grid. The result holds one row per (H3 cell, grid point) pair that
-    # overlaps the boundary.
+    # The positional arguments are a 0.25-degree regular latitude/longitude grid (the spacing of
+    # the European Centre for Medium-Range Weather Forecasts ensemble, ECMWF ENS), H3 resolution 5
+    # for the cells themselves, and resolution 7 children to sample each cell's overlap with the
+    # grid. An H3 cell subdivides into smaller cells at each higher resolution, so the
+    # resolution-7 children are what give the overlap its area sample. The result holds one row
+    # per (H3 cell, grid point) pair that overlaps the boundary.
     h3_grid_weights = compute_h3_grid_weights_for_boundary(boundary, 0.25, 5, 7)
     h3_grid_weights
     return (h3_grid_weights,)
