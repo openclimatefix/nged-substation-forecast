@@ -528,9 +528,9 @@ class EffectiveCapacity(pt.Model):
         description=(
             "OCF's estimate of the effective capacity (MW) of this asset at this timestep. "
             "For generators: absorbs any persistent loss of capability, such as photovoltaic "
-            "(PV) panel degradation or a partial inverter trip. The estimate ignores ANM "
-            "curtailment — a wind farm ANM-capped at 5 MW with 10 MW physical capability has "
-            "effective_capacity_mw = 10. "
+            "(PV) panel degradation or a partial inverter trip. The estimate ignores Active "
+            "Network Management (ANM) curtailment — a wind farm ANM-capped at 5 MW with 10 MW "
+            "physical capability has effective_capacity_mw = 10. "
             "For substations: the 99th percentile of observed absolute power flow, under normal "
             "running arrangement only. In v0.1 that percentile is taken over the full observed "
             "history, giving one static scalar per series. 'Switched' power (Table 5) should be "
