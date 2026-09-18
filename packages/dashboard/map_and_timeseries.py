@@ -113,9 +113,11 @@ def _(settings):
         settings.power_time_series_data_path,
         storage_options=typeddict_to_dict(settings.storage_options),
     ).filter(
-        # Filter to recent observations only. This app inlines a selected series' rows in the
-        # chart spec and never lifts Altair's default guard, so a query reaching further back
-        # would fail with Altair's 5,000-row MaxRowsError.
+        # Filter to recent observations only. This app inlines a selected series' rows in the chart
+        # spec and never lifts Altair's default guard, so a query reaching further back would fail
+        # with Altair's 5,000-row MaxRowsError. The cutoff is a fixed date rather than a rolling
+        # window, so the query widens by 48 rows per series per day and crosses that guard once the
+        # cutoff is more than about 104 days past.
         pl.col("time") > pl.lit(datetime(2026, 5, 1, tzinfo=UTC)).cast(UTC_DATETIME_DTYPE)
     )
     return (delta_df,)

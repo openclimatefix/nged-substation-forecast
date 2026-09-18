@@ -28,13 +28,13 @@ def _():
     # View forecasts
 
     Pick a time series and a forecast run; the plot shows every forecast ensemble member
-    (thin grey lines) against the observed power (thick blue line), from 24 hours before
-    the forecast init time to 14 days after it. The lagged-power lines overlay observed power
-    shifted forward by 7 and by 14 days, which is the raw material of the models' power-lag
-    features. A second panel below shows the NWP ensemble that fed the forecast — pick the
-    weather variable to plot — on the same time axis, at the H3 cell containing the series. A
-    stitched proxy-analysis line on that second panel stands in for the weather that actually
-    happened.
+    (thin grey lines) against the observed power (thick blue line), from 24 hours before the
+    forecast init time to 14 days after it. Two optional lagged-power lines overlay observed
+    power shifted forward by 7 and by 14 days, which is the raw material of the models'
+    power-lag features. A second panel below shows the NWP ensemble that fed the forecast —
+    pick the weather variable to plot — on the same time axis, at the H3 cell containing the
+    series. A stitched proxy-analysis line on that second panel stands in for the weather
+    that actually happened.
     """)
     return
 
@@ -410,10 +410,10 @@ def _(forecasts, init_time, metadata_df, series_picker, settings):
         # max_lead stitch, and the freshest-run-per-valid_time reduction; the cheap
         # partition/row-group filters (init_time range, h3_index) stay on the scan handed to that
         # call, so Delta partition pruning survives. Loading the line here, unconditionally, keeps
-        # the "NWP proxy analysis" checkbox instant: ticking the box re-runs only the chart cell,
-        # never this Delta query (~0.2 s across the ~17 pruned init_time partitions). A run older
-        # than window_start − NWP_ANALYSIS_LEAD cannot reach the window, so the init_time filter
-        # starts there.
+        # the "NWP proxy analysis" checkbox instant: the box starts ticked, and clearing or
+        # re-ticking the box re-runs only the chart cell, never this Delta query (~0.2 s across the
+        # ~17 pruned init_time partitions). A run older than window_start − NWP_ANALYSIS_LEAD cannot
+        # reach the window, so the init_time filter starts there.
         nwp_analysis = (
             select_analysis_proxy(
                 pl.scan_delta(

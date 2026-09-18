@@ -21,10 +21,10 @@ implementation, reviewed and tested.
 
 **`dashboard` owns the marimo apps that somebody other than the author opens.** The apps at
 `packages/dashboard/` are meant to be re-opened by whoever is watching the forecast, so each app
-keeps its unit-testable logic in an importable package under `packages/dashboard/src/`, carries a
-test suite, and is expected to keep working. A notebook here keeps its logic inline, hard-codes the
-run and the H3 cell the author happened to be looking at, and may stop working the day the data
-moves.
+keeps its unit-testable logic in an importable package under `packages/dashboard/src/`, that package
+carries a test suite of its own, and both apps are expected to keep working. A notebook here keeps
+its logic inline, hard-codes the run and the H3 cell the author happened to be looking at, and may
+stop working the day the data moves.
 
 ## Rules every notebook here has to obey
 
@@ -67,8 +67,9 @@ root `.env` points at.
 
 - `plot_gb_map.py` — draws the H3 cells the NWP pipeline aggregates weather onto. Loads the Great
   Britain boundary bundled in `geo`, computes the resolution-5 cells covering that boundary against
-  a 0.25° regular latitude/longitude grid, and maps the hexagons. Reads no Delta table, so
-  `plot_gb_map.py` is the one notebook here that runs without an `.env`.
+  a 0.25° regular latitude/longitude grid, and maps the hexagons. The loader buffers the boundary
+  outwards by 0.25° first, so coastal substations and nearby islands fall inside the cells drawn.
+  Reads no Delta table, so `plot_gb_map.py` is the one notebook here that runs without an `.env`.
 - `plot_nwp_map.py` — two views of one ECMWF ENS run from the `nwp` Delta table: every ensemble
   member's chosen variable over time at one H3 cell, and that same variable across every H3 cell at
   one valid time, shaded by a continuous colour map.

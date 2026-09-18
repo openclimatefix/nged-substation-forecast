@@ -6,14 +6,17 @@ builder) lives in the importable `dashboard` package under `src/`.
 
 ## Why the logic sits under `src/` rather than in the notebooks
 
-**A marimo cell cannot be unit tested, so everything worth a test is pushed out of the notebook and
-into `src/dashboard/`.** A cell is a `def _(...)` function whose parameters are the names other
+**A marimo cell cannot be unit tested, so everything worth a unit test is pushed out of the notebook
+and into `src/dashboard/`.** A cell is a `def _(...)` function whose parameters are the names other
 cells export, and marimo rebuilds the notebook from its cells rather than running the module, so no
 test can call a cell the way a caller calls a function. What is left in a notebook is the
-arrangement — which controls exist, which Delta queries run, and how the pieces stack on the page —
-and that arrangement is covered only by `scripts/lint/check_marimo_notebooks.py`, which proves each
-cell's names are bound and nothing more. The two modules under `src/` are ordinary library code,
-with their tests in `packages/dashboard/tests/`.
+arrangement — which controls exist, which Delta queries run, and how the pieces stack on the page.
+Two checks cover that arrangement, and both parse the notebook rather than running it:
+`scripts/lint/check_marimo_notebooks.py` proves each cell's names are bound and nothing more, and
+`packages/dashboard/tests/test_view_forecasts.py` proves that every cell holding a Delta read
+descends from the cell referencing the Reload button. Of the two modules under `src/`,
+`forecast_chart` is ordinary library code with its tests in `packages/dashboard/tests/`;
+`data_source` has no tests today.
 
 **This package owns the arrangement and nothing else.** `contracts` owns what each table means and
 where the table lives, `weather_utils` owns the analysis-proxy query the dashboard shares with the
@@ -86,8 +89,8 @@ guide](https://openclimatefix.github.io/nged-substation-forecast/live_service/aw
   that `s3` was selected with no `.env.s3` to read credentials from.
 - `forecast_chart` — the two Altair chart builders `view_forecasts.py` calls, plus the constants
   fixing the plotted window, the display time zone, the NWP variables offered, and the power lags
-  offered. Each constant carries its own reasoning, and the module docstring says how the two charts
-  fit together.
+  offered. Every constant's docstring says what that constant fixes, and most say why the value is
+  what it is; the module docstring says how the two charts fit together.
 
 ## Invariants worth knowing before editing a chart
 
@@ -104,7 +107,8 @@ visibly misaligns the pair.
 
 **A chart's data is rounded and served out of line, because the ensemble is large.** One forecast
 run for one series is 51 members × 14 days × 48 half-hours ≈ 34,000 rows, which is past both
-Altair's 5,000-row default guard and marimo's maximum output size. The builders round values to 3
-decimal places as `Float64` before serialising, and the apps hand the result to
+Altair's 5,000-row default guard and marimo's maximum output size. `build_view_forecast_chart` calls
+`alt.data_transformers.disable_max_rows()` to lift the first guard. For the second, the builders
+round values to 3 decimal places as `Float64` before serialising, and the apps hand the result to
 `mo.ui.altair_chart`, which serves the rows as a virtual file instead of inlining the rows in the
 cell output.
