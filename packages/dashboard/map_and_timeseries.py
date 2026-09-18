@@ -113,7 +113,11 @@ def _(settings):
         settings.power_time_series_data_path,
         storage_options=typeddict_to_dict(settings.storage_options),
     ).filter(
-        # Filter to only show recent data. Altair crashes if you try to show too much data.
+        # Filter to recent observations only. This app inlines a selected series' rows in the chart
+        # spec, and never lifts Altair's default guard. A query reaching further back would
+        # therefore fail with Altair's 5,000-row MaxRowsError. The cutoff is a fixed date rather
+        # than a rolling window. The query therefore widens by 48 rows per series per day. The
+        # query crosses that guard once the cutoff lies more than about 104 days in the past.
         pl.col("time") > pl.lit(datetime(2026, 5, 1, tzinfo=UTC)).cast(UTC_DATETIME_DTYPE)
     )
     return (delta_df,)
@@ -124,8 +128,10 @@ def _(delta_df, df, layer_widget, map):
     if layer_widget.selected_index is None:
         right_pane = mo.md(
             """
-            ### Select a Substation
-            *Click a dot on the map to view the demand profile.*
+            ### Select a site
+            *Click a dot on the map to view that site's power time series. The map shows
+            substations, generation sites, and storage sites together, so the line is not
+            always demand.*
             """
         )
     else:
