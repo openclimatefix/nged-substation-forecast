@@ -1,18 +1,25 @@
-"""Idempotent MLflow run-resolution helpers, used by every CV/registration code path.
+"""Idempotent MLflow run-resolution helpers for every cross-validation and registration path.
 
-Single concern: resolving MLflow runs **by tag**. The CV assets (``trained_cv_model``,
-``cv_power_forecasts``, ``metrics``) and ``register_experiment_job`` run in separate processes
-(and, on retries, at separate times), so a live ``Run`` handle cannot be passed between them.
+Single concern: resolving MLflow runs **by tag**. MLflow's own objects are the vocabulary here.
+An experiment holds runs. One run is one recorded job, holding params, metrics, tags, and
+artifact files under a run id. A tag is a rewritable label on a run or on an experiment, and a
+run can be reopened later by its id. A Dagster asset is one named, schedulable unit of
+computation producing one stored output, and a partition is one slice of an asset that is
+materialised and re-run on its own.
+
+The cross-validation (CV) assets are ``trained_cv_model``, ``cv_power_forecasts``, and
+``metrics``. Those assets and ``register_experiment_job`` run in separate processes, and on
+retries at separate times. A live ``Run`` handle therefore cannot be passed between them.
 Instead, every code path discovers or creates the run it needs by tag and resumes it by ID.
 
 Each helper returns an **ID string**, never an open run handle. The caller wraps the returned ID
 in ``with mlflow.start_run(run_id=...)`` to log and close the run within its own process. Because
-lookup is by tag, every helper is safe to call from any process and idempotent under Dagster
-retries (a re-run resumes the same run rather than duplicating it).
+lookup is by tag, every helper is safe to call from any process, and idempotent under Dagster
+retries. A re-run resumes the same run rather than duplicating the run.
 
-The tracking URI is set by the caller (``mlflow.set_tracking_uri(...)``); these helpers simply
-use ``mlflow`` / ``MlflowClient``, which honour whatever URI is in effect. This is what lets the
-helpers run against a file-based MLflow in tests with no server.
+The tracking URI is set by the caller (``mlflow.set_tracking_uri(...)``). These helpers simply
+use ``mlflow`` / ``MlflowClient``, which honour whatever URI is in effect. Honouring the ambient
+URI is what lets the helpers run against a file-based MLflow in tests with no server.
 """
 
 from dataclasses import dataclass
@@ -34,14 +41,17 @@ def load_experiment_forecaster(
 ) -> tuple[type[BaseForecaster], BaseForecasterConfig]:
     """Reconstruct the forecaster class + resolved config from an experiment's MLflow tags.
 
-    ``register_experiment`` stamps the config JSON and the forecaster class's fully-qualified
-    import path (``forecaster_target``) on the experiment. The config JSON carries no class
-    identity of its own, so the ``BaseForecasterConfig`` subclass to deserialise it into is reached
-    through the forecaster's ``CONFIG_CLASS`` — the same class its ``load`` uses. The caller is
-    responsible for setting the tracking URI (``mlflow.set_tracking_uri``) beforehand.
+    ``register_experiment`` is the function ``register_experiment_job`` runs. That function stamps
+    the config JSON and the forecaster class's fully-qualified import path (``forecaster_target``)
+    on the experiment. The config JSON carries no class identity of its own. That JSON is therefore
+    deserialised into the ``BaseForecasterConfig`` subclass reached through the forecaster's
+    ``CONFIG_CLASS``. ``CONFIG_CLASS`` is the same class the forecaster's ``load`` uses. The caller
+    is responsible for setting the tracking URI (``mlflow.set_tracking_uri``) beforehand.
 
     Args:
-        experiment_name: The MLflow experiment name (also the partition-key prefix).
+        experiment_name: The MLflow experiment name. The CV assets are partitioned per experiment
+            and fold, and each partition key is the experiment name followed by the fold id, so the
+            experiment name is also that key's prefix.
 
     Returns:
         A ``(forecaster_cls, forecaster_config)`` tuple — the same pair
@@ -59,10 +69,11 @@ def load_experiment_forecaster(
 def get_or_create_experiment(experiment_name: str) -> str:
     """Return the MLflow experiment id for ``experiment_name``, creating it if absent.
 
-    This is the self-healing fallback path; the canonical creator is
-    ``register_experiment_job``, which also stamps the experiment's ``config``/``description``
-    tags. Created here untagged so a stray asset call cannot race the job into a tagless,
-    half-registered experiment.
+    ``get_or_create_experiment`` is the self-healing fallback path. The canonical creator is
+    ``register_experiment_job``, which also stamps the experiment's ``config``/``description`` tags.
+    Created here untagged. Were the experiment created with tags here instead, a stray asset call
+    running alongside ``register_experiment_job`` could leave an experiment that exists but carries
+    none of the job's tags — half-registered.
 
     Args:
         experiment_name: Human-readable, unique experiment name.
@@ -107,13 +118,13 @@ def get_or_create_parent_run(experiment_id: str) -> str:
 def get_or_create_fold_run(experiment_id: str, parent_run_id: str, fold_id: str) -> str:
     """Return the fold's child run id (tags ``cv_role=fold, fold_id=...``), creating it if absent.
 
-    The fold run holds that fold's per-fold tags and metrics (never MLflow params — a fold run is
-    reused across every re-materialisation of its partition, and params are write-once, so
-    nothing that can legitimately change between materialisations may be logged as one; see
-    ``trained_cv_model`` in ``defs/cv_assets.py``). It is created **nested** under the
-    experiment's parent run, so the MLflow UI groups folds beneath ``cv_summary``. Resolved by
-    ``(cv_role, fold_id)`` so any process — and any Dagster retry of the fold — finds the same
-    run.
+    The fold run holds that fold's per-fold tags and metrics, and never MLflow params. A fold run is
+    reused across every re-materialisation of its partition, and MLflow params are write-once.
+    Nothing that can legitimately change between materialisations may therefore be logged as a
+    param; see ``trained_cv_model`` in ``defs/cv_assets.py``. The fold run is created **nested**
+    under the experiment's parent run, so the MLflow UI groups folds beneath that parent run's name,
+    ``cv_summary``. Resolved by ``(cv_role, fold_id)`` so any process — and any Dagster retry of the
+    fold — finds the same run.
 
     Args:
         experiment_id: The MLflow experiment id.
@@ -132,8 +143,8 @@ def get_or_create_fold_run(experiment_id: str, parent_run_id: str, fold_id: str)
     if runs:
         return runs[0].info.run_id
     # Resume the parent so the new run nests beneath it (MLflow nests under the active run).
-    # experiment_id must be passed explicitly: resuming a run does not switch the active
-    # experiment, so without it the child would land in the default experiment ("0").
+    # experiment_id must be passed explicitly: resuming a run does not switch the active experiment,
+    # so without the explicit experiment_id the child would land in the default experiment ("0").
     with (
         mlflow.start_run(run_id=parent_run_id),
         mlflow.start_run(
@@ -157,14 +168,19 @@ class PromotableRun:
 
 
 def list_promotable_runs() -> list[PromotableRun]:
-    """List every fold run (``cv_role=fold``) across all MLflow experiments, newest first.
+    """List up to 1000 fold runs (``cv_role=fold``) per MLflow experiment, newest first.
 
     A read-only convenience for the ``promotable_model_runs`` asset
-    (``defs/production_assets.py``), which logs this as a metadata table in the Dagster UI so a
-    ``promoted_model`` promotion candidate's run id can be copy-pasted into that asset's
-    launchpad rather than retyped from memory. The champion is still picked by eye off the MLflow
-    leaderboard; this only lists candidates. The caller is responsible for setting the tracking
-    URI (``mlflow.set_tracking_uri``) beforehand.
+    (``defs/production_assets.py``), which logs the returned list as a metadata table in the
+    Dagster UI. The experiment listing takes MLflow's default page size of 1000. The
+    per-experiment fold-run search passes the same 1000 explicitly. The listing therefore covers
+    the first 1000 active experiments, and returns at most 1000 fold runs from each experiment. A
+    ``promoted_model`` promotion candidate's run id can then be copy-pasted into that asset's
+    launchpad rather than retyped from memory. The launchpad is the form in Dagster's user
+    interface where an asset's run-time configuration is entered before that asset is
+    materialised. The champion is still picked by eye off the MLflow leaderboard;
+    ``list_promotable_runs`` only lists the candidates. The caller is responsible for setting the
+    tracking URI (``mlflow.set_tracking_uri``) beforehand.
     """
     client = MlflowClient()
     runs = [

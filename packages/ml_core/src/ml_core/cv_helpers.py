@@ -2,6 +2,10 @@
 
 Every function here is deliberately free of I/O (no Delta, MLflow, or Dagster imports) so it can
 be unit-tested in isolation. The CV asset bodies stay thin by delegating their logic here.
+
+A fold is one train-and-validate split of the history. Each fold is a ``CvFoldConfig`` carrying a
+``fold_id`` plus the calendar dates ``val_start`` and ``val_end`` that bound its validation
+window. Cross-validation scores one model over several such folds.
 """
 
 import calendar
@@ -23,14 +27,16 @@ def date_to_utc_datetime(d: date, *, end_of_day: bool = False) -> datetime:
     """Return a tz-aware UTC datetime at the start (or inclusive end) of the given date.
 
     Used to turn a fold's ``[start, end]`` calendar dates into the ``[start 00:00:00, end
-    23:59:59]`` UTC window that the training and validation data loads filter on (and that
-    eligibility uses for ``val_end``). That window is closed rather than half-open: both ends are
-    inclusive, so a filter written against it needs no ``<`` where the caller meant ``<=``.
+    23:59:59]`` UTC window. The training and validation data loads filter on that window, and
+    eligibility uses the same conversion for ``val_end``. That window is closed rather than
+    half-open: both ends are inclusive, so a filter written against the window needs no ``<`` where
+    the caller meant ``<=``.
 
     Args:
         d: The calendar date.
-        end_of_day: If True, return ``d`` at ``23:59:59`` (the inclusive end-of-day used by both
-            the training/validation windows and ``val_end``); otherwise ``00:00:00``.
+        end_of_day: If True, return ``d`` at ``23:59:59``, the inclusive end-of-day used by both
+            the training/validation windows and ``val_end``. If False, return ``d`` at
+            ``00:00:00``.
 
     Returns:
         ``d`` at ``00:00:00`` UTC when ``end_of_day`` is False, or at ``23:59:59`` UTC when True.
@@ -63,9 +69,9 @@ def eligible_time_series_ids(
     A time series is eligible when it has at least ``min_training_months`` of observations
     before the fold's ``val_start`` **and** observations through the fold's ``val_end``.
 
-    Eligibility is a function of the **data only** — it does not depend on any model or
-    experiment config — so every experiment evaluates a fold on the identical population,
-    which is what makes leaderboard comparisons fair.
+    Eligibility is a function of the **data only**: eligibility depends on neither the model nor the
+    experiment config. Every experiment therefore evaluates a fold on the identical population. That
+    identical population is what makes leaderboard comparisons fair.
 
     Args:
         coverage: One row per time series with the columns ``time_series_id``, ``first_time``,
