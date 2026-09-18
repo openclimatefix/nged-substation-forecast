@@ -4,8 +4,8 @@ __generated_with = "0.23.14"
 app = marimo.App(width="full")
 
 with app.setup:
-    from datetime import UTC, datetime
-    from typing import cast
+    from datetime import UTC, datetime, timedelta
+    from typing import Final, cast
 
     import altair as alt
     import geoarrow.pyarrow as geo_pyarrow
@@ -21,6 +21,15 @@ with app.setup:
     from contracts.typing_utils import typeddict_to_dict
     from dashboard.data_source import settings_for_source, source_status_message
     from plotting.ocf_theme import BLUE, hex_to_rgb
+
+    RECENT_WINDOW: Final[timedelta] = timedelta(days=21)
+    """How far back the substation power chart looks.
+
+    NGED telemetry is half-hourly, 48 rows a day, and Altair's default row-count guard rejects a
+    frame over 5,000 rows — so the window has to stay well under about 104 days. 21 days is
+    roughly 1,000 rows, comfortably inside that limit, and covers the most recent few weeks the
+    chart is meant to show.
+    """
 
 
 @app.cell
@@ -112,9 +121,19 @@ def _(settings):
     delta_df = pl.scan_delta(
         settings.power_time_series_data_path,
         storage_options=typeddict_to_dict(settings.storage_options),
-    ).filter(
+    )
+
+    # Anchor the rolling window on the table's own newest row, rather than on wall-clock time, so
+    # the chart still shows the latest telemetry on disk during a telemetry outage instead of
+    # going blank. The window bound is computed here in Python, once, and passed to the filter
+    # below as a plain literal, so the filter itself stays a single comparison that Delta/Parquet
+    # can push down.
+    newest_time: datetime | None = delta_df.select(pl.col("time").max()).collect().item()
+    window_start = (newest_time if newest_time is not None else datetime.now(UTC)) - RECENT_WINDOW
+
+    delta_df = delta_df.filter(
         # Filter to only show recent data. Altair crashes if you try to show too much data.
-        pl.col("time") > pl.lit(datetime(2026, 5, 1, tzinfo=UTC)).cast(UTC_DATETIME_DTYPE)
+        pl.col("time") > pl.lit(window_start).cast(UTC_DATETIME_DTYPE)
     )
     return (delta_df,)
 
