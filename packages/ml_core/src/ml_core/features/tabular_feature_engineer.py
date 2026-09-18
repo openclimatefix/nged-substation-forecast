@@ -1,8 +1,8 @@
 """Tabular feature-engineering implementation.
 
 ``TabularFeatureEngineer`` is the default ``FeatureEngineer``: it maps each gridded-NWP H3 cell
-to the nearest time series (``_attach_nearest_nwp_cell``), then runs the declarative tabular
-pipeline (``_engineer_features``).
+to the time series that sits inside it (``_attach_containing_nwp_cell``), then runs the declarative
+tabular pipeline (``_engineer_features``).
 
 Architecture/Flow:
     ``_engineer_features`` is the main orchestrator. It takes raw string requests, compiles them
@@ -52,11 +52,11 @@ from ml_core.features.feature_engineer import DEFAULT_LOCAL_TIMEZONE, FeatureEng
 logger = logging.getLogger(__name__)
 
 
-def _attach_nearest_nwp_cell(
+def _attach_containing_nwp_cell(
     nwp: pt.LazyFrame[Nwp],
     time_series_metadata: pt.DataFrame[TimeSeriesMetadata],
 ) -> pl.LazyFrame:
-    """Map each gridded-NWP H3 cell to the time series that sits in it (nearest-cell join).
+    """Map each gridded-NWP H3 cell to the time series that sits in it (containing-cell join).
 
     NWP is stored per H3 cell at resolution 5; each time series carries its own resolution-5 cell
     in ``h3_res_5``. Joining ``h3_index == h3_res_5`` gives every time series the weather of its
@@ -76,7 +76,7 @@ def _attach_nearest_nwp_cell(
 
 
 class TabularFeatureEngineer(FeatureEngineer):
-    """Nearest res-5 NWP cell per time series, then the declarative tabular pipeline."""
+    """Containing res-5 NWP cell per time series, then the declarative tabular pipeline."""
 
     def engineer(
         self,
@@ -90,13 +90,13 @@ class TabularFeatureEngineer(FeatureEngineer):
         nwp_publication_delay_hours: int = NWP_PUBLICATION_DELAY_HOURS,
         local_timezone: str = DEFAULT_LOCAL_TIMEZONE,
     ) -> pt.LazyFrame[AllFeatures]:
-        """Map each NWP cell to its nearest time series, then run the tabular feature pipeline.
+        """Map each NWP cell to the time series inside it, then run the tabular feature pipeline.
 
         See `FeatureEngineer.engineer` for the argument and operating-mode contract, and
         ``_engineer_features`` in this module for the pipeline itself — including
         ``local_timezone``, the IANA zone the local-time features are computed in.
         """
-        nwp_per_time_series = _attach_nearest_nwp_cell(nwp, time_series_metadata)
+        nwp_per_time_series = _attach_containing_nwp_cell(nwp, time_series_metadata)
         return _engineer_features(
             selected_features,
             power_time_series,
@@ -172,7 +172,7 @@ def _engineer_features(
         nwp: NWP weather forecast data in physical units, already mapped to
             **per-time-series** rows — it is joined on `time_series_id`, so it must carry a
             `time_series_id` column rather than the raw `h3_index` spatial key. Callers attach
-            `time_series_id` first (e.g. via ``_attach_nearest_nwp_cell``, which is lazy and
+            `time_series_id` first (e.g. via ``_attach_containing_nwp_cell``, which is lazy and
             does not trigger a collect). Deliberately a plain ``pl.LazyFrame``: the frame is
             ``Nwp`` minus ``h3_index`` plus ``time_series_id``, so no existing contract fits.
         power_fcst_init_time: Controls the operating mode of the function.
@@ -237,8 +237,8 @@ def _engineer_features(
     power_lf = pl.LazyFrame._from_pyldf(power_time_series._ldf).rename({"time": "valid_time"})
     metadata_lf = pl.LazyFrame._from_pyldf(time_series_metadata.lazy()._ldf)
     # The metadata is the registry of what we forecast, so a series with power observations but no
-    # metadata row is dropped here rather than carried to the model. Bulk mode drops it regardless
-    # — `_attach_nearest_nwp_cell` inner-joins on `h3_res_5` — but single-run mode is power-centric
+    # metadata row is dropped here rather than carried to the model. Bulk mode drops it regardless —
+    # `_attach_containing_nwp_cell` inner-joins on `h3_res_5` — but single-run mode is power-centric
     # and would otherwise keep it with every weather feature null and predict on that, a garbage
     # forecast that reads as healthy because the series is present. Dropping it instead makes
     # `live_forecasts_are_healthy` report it, via `missing_time_series_ids`. Unconditional, so the
