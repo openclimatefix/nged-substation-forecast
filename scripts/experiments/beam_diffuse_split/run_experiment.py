@@ -16,6 +16,8 @@ arm is handed a different encoding of the same quantity:
 - **C — the model's own split**: `ssrd`, ERA5's own `fdir` beam flux, and the diffuse remainder.
 - **D — direct fraction**: `ssrd` and `fdir / ssrd`.
 - **B-DISC — separation-model sensitivity**: arm B with the DISC separation model instead of Erbs.
+- **B-LEARNED — the discriminator**: arm B with a fitted separation model instead of Erbs, so that
+  arm C's advantage can be read as information rather than as a better-published correlation.
 
 **The headline is arm C minus arm B, and arm B is a negative control the experiment gets for
 free.** Erbs reads global irradiance and solar geometry and nothing else, all of which arm A already
@@ -51,8 +53,12 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _LOG: Final[logging.Logger] = logging.getLogger("run_experiment")
 
 REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
-DEFAULT_SOURCE: Final[str] = "cds"
-"""The Copernicus download is the headline; `open-meteo` reruns everything on the mirror."""
+DEFAULT_SOURCE: Final[str] = "open-meteo"
+"""The reanalysis route every run uses, the Copernicus archive being too slow to iterate on.
+
+`verify_era5_sources.py` is what establishes that the mirror carries ERA5's own fields, and `cams`
+is the other instrument rather than another route to this one.
+"""
 
 
 def dataset_path_for(*, source: str, alignment: str) -> Path:
@@ -122,16 +128,32 @@ CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
 )
 """Every (treatment, reference) pairing an interval is computed for."""
 
-SENSITIVITY_ARMS: Final[tuple[str, ...]] = ("A_global_only", "B_erbs", "C_era5_split")
+SENSITIVITY_ARMS: Final[tuple[str, ...]] = (
+    "A_global_only",
+    "B_erbs",
+    "C_era5_split",
+    "B_learned",
+)
 """The arms the second hyperparameter setting is run on.
 
-The second setting exists to check that the arm ordering is a property of the features rather than
-of the settings, and only the arms in the headline contrast and its reference can change that
-verdict.
+The second setting exists to check that an arm ordering is a property of the features rather than
+of the settings. That check is worth having for the two contrasts a decision rests on, so it covers
+the headline contrast, its reference, and the learned separation model the headline is read
+against.
 """
 
-CONTROL_ARMS: Final[tuple[str, ...]] = ("A_global_only", "B_erbs", "C_era5_split")
-"""The arms run against the synthetic target that the split is guaranteed to help predict."""
+CONTROL_ARMS: Final[tuple[str, ...]] = (
+    "A_global_only",
+    "B_erbs",
+    "C_era5_split",
+    "B_learned",
+)
+"""The arms run against the synthetic target that the split is guaranteed to help predict.
+
+The learned separation model belongs here too: on a target built from the true split, an instrument
+that could not separate a derived split from the real one would have no business reporting that it
+can on the meters.
+"""
 
 
 class HyperParameters(TypedDict):
@@ -613,49 +635,87 @@ def _add_learned_split(*, dataset: pl.DataFrame) -> pl.DataFrame:
     for nothing. Erbs alone cannot tell those apart, because Erbs is one fixed correlation rather
     than the best available one.
 
-    This arm is the discriminator. Its beam is an out-of-fold prediction of the product's own direct
-    fraction from exactly arm A's feature set, so it is the strongest separation model this data
-    supports and it provably carries no information arm A lacks. If arm C still beats it, the
-    advantage is information rather than representation.
+    This arm is the discriminator. Its beam is a prediction of the product's own direct fraction
+    from exactly arm A's feature set, so every value it carries is a function of what arm A already
+    holds. It is a far more faithful separation model than Erbs, which makes it the demanding
+    reference Erbs cannot be. If arm C still beats it, the advantage is information rather than
+    representation.
 
-    **One separation model is fitted per scored fold, and it never sees that fold.** A single
-    out-of-fold column would not do: the prediction for a row in fold *j* would come from a model
-    trained on every other fold, the test fold among them, so the beam on the training rows would
-    carry the test fold's irradiance back into the arm. Fitting one model per scored fold and
-    applying it to every row costs five fits and closes that path.
+    **Every value is withheld from the model that produced it, and the withholding is by timestamp
+    rather than by fold label.** Folds are cut inside each site's own span, so one fold number is a
+    different calendar period at each site, and a model that merely dropped the rows labelled with
+    that fold number would still train on other sites' rows at the scored fold's own hours — on the
+    reanalysis those other sites are the same grid cell, so the leak would be exact. Excluding the
+    calendar months themselves closes that path.
+
+    **Training rows are held out too, not only the scored fold.** A column that is sharper on the
+    rows the arm trains on than on the rows it is scored on gets over-trusted by the power model,
+    which penalises this arm for a reason that has nothing to do with the split. So for each scored
+    fold the training rows are filled in by an inner cross-validation that also withholds their own
+    months. Excluding two folds' months is symmetric in the two, so the fits are cached and the
+    count comes to ninety rather than a hundred and fifty.
 
     Args:
-        dataset: The full frame, already carrying `fold`.
+        dataset: The full frame, already carrying `fold` and `month`.
 
     Returns:
         The frame with a beam and a diffuse column for each fold that can be scored.
     """
     features = [*SHARED_FEATURES, *ARM_FEATURES["A_global_only"]]
-    predictors = dataset.select(features).to_numpy()
+    predictors = xgb.DMatrix(dataset.select(features).to_numpy())
+    global_irradiance = dataset["ghi_w_m2"].to_numpy()
+    fitted: dict[tuple[str, frozenset[int]], np.ndarray] = {}
+
+    def _prediction_without(*, site: str, withheld: frozenset[int]) -> np.ndarray:
+        """Predict every row from a model trained without the months in one site's named folds."""
+        key = (site, withheld)
+        if key not in fitted:
+            excluded = (
+                dataset.filter((pl.col("site") == site) & pl.col("fold").is_in(list(withheld)))[
+                    "month"
+                ]
+                .unique()
+                .to_list()
+            )
+            train = dataset.filter(~pl.col("month").is_in(excluded))
+            model = xgb.train(
+                {
+                    **_booster_parameters(hyper_parameters=PRIMARY_HYPER_PARAMETERS, seed=0),
+                    "objective": "reg:squarederror",
+                },
+                xgb.DMatrix(
+                    train.select(features).to_numpy(), label=train["direct_fraction"].to_numpy()
+                ),
+                num_boost_round=PRIMARY_HYPER_PARAMETERS["num_boost_round"],
+            )
+            fitted[key] = model.predict(predictors)
+        return fitted[key]
+
+    sites = sorted(dataset["site"].unique().to_list())
+    site_labels = dataset["site"].to_numpy()
+    fold_labels = dataset["fold"].to_numpy()
     columns: dict[str, pl.Series] = {}
-    for fold in range(N_FOLDS):
-        train = dataset.filter(pl.col("fold") != fold)
-        if train.is_empty() or dataset.filter(pl.col("fold") == fold).is_empty():
+    for scored in range(N_FOLDS):
+        if dataset.filter(pl.col("fold") == scored).is_empty():
             continue
-        model = xgb.train(
-            {
-                **_booster_parameters(hyper_parameters=PRIMARY_HYPER_PARAMETERS, seed=0),
-                "objective": "reg:squarederror",
-            },
-            xgb.DMatrix(
-                train.select(features).to_numpy(), label=train["direct_fraction"].to_numpy()
-            ),
-            num_boost_round=PRIMARY_HYPER_PARAMETERS["num_boost_round"],
-        )
+        fraction = np.full(dataset.height, np.nan)
+        for site in sites:
+            for fold in range(N_FOLDS):
+                rows = (site_labels == site) & (fold_labels == fold)
+                if not rows.any():
+                    continue
+                withheld = frozenset({scored} if fold == scored else {scored, fold})
+                fraction[rows] = _prediction_without(site=site, withheld=withheld)[rows]
         # Clipping to a fraction keeps the pair a genuine split of this arm's own global
         # irradiance, so no arm differs from another in what its two components sum to.
-        fraction = np.clip(model.predict(xgb.DMatrix(predictors)), 0.0, 1.0)
-        beam = fraction * dataset["ghi_w_m2"].to_numpy()
-        columns[LEARNED_BEAM_TEMPLATE.format(fold=fold)] = pl.Series(beam, dtype=pl.Float64)
-        columns[LEARNED_DIFFUSE_TEMPLATE.format(fold=fold)] = pl.Series(
-            dataset["ghi_w_m2"].to_numpy() - beam, dtype=pl.Float64
+        beam = np.clip(fraction, 0.0, 1.0) * global_irradiance
+        columns[LEARNED_BEAM_TEMPLATE.format(fold=scored)] = pl.Series(beam, dtype=pl.Float64)
+        columns[LEARNED_DIFFUSE_TEMPLATE.format(fold=scored)] = pl.Series(
+            global_irradiance - beam, dtype=pl.Float64
         )
-        _LOG.info("learned separation fitted for fold %d", fold)
+        _LOG.info(
+            "learned separation built for scored fold %d (%d fits so far)", scored, len(fitted)
+        )
     return dataset.with_columns(**columns)
 
 

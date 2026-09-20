@@ -78,9 +78,11 @@ here.
 SourceType = Literal["cds", "open-meteo", "cams"]
 """Which irradiance download to build from.
 
-`cds` is the Copernicus Climate Data Store's ERA5 archive and the source of the headline result;
-`open-meteo` is a mirror of the same reanalysis, reported beside it as a replication, and
-`verify_era5_sources.py` is what establishes that the two carry the same fields.
+`open-meteo` is the reanalysis route the experiment runs on, because it serves the same fields in
+about a minute where the Copernicus archive takes most of a night. `cds` is that Copernicus archive,
+and it is the reference the mirror is checked against rather than a second result:
+`verify_era5_sources.py` compares the two over every hour both cover, and a run of it is what
+licenses reading an `open-meteo` result as an ERA5 result.
 
 `cams` is a different instrument rather than a second route to the same one. The CAMS radiation
 service infers cloud from Meteosat at around 5 km and publishes the global, beam and diffuse
@@ -690,7 +692,7 @@ def _add_synthetic_control_target(*, frame: pl.DataFrame) -> pl.DataFrame:
 def main() -> int:
     """Build the joined frame for the irradiance source named on the command line."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cds")
+    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="open-meteo")
     parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="as-labelled")
     parser.add_argument(
         "--min-cams-reliability",

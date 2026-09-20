@@ -72,11 +72,26 @@ published beam may hold information no function of global irradiance and solar g
 recover, and that field is worth asking a supplier for. Or the product may merely publish a better
 separation model than Erbs, and then the same gain is available locally for nothing. Erbs alone
 cannot tell those apart, because Erbs is one fixed correlation from 1982 rather than the best
-correlation this data supports. Arm B-LEARNED is that best correlation, and it provably carries no
-information arm A lacks, so arm C beating it is evidence of information rather than of
-representation. One separation model is fitted per scored fold and never sees that fold, because a
-single out-of-fold column would carry the test fold's irradiance back into the arm through the
-training rows.
+correlation this data supports. Arm B-LEARNED is a much more faithful one — on the satellite source
+it leaves 0.04 of the published direct fraction's variance unexplained against Erbs's 0.09 — and
+every value it carries is a function of what arm A already holds, so arm C beating it is evidence
+of information rather than of representation.
+
+**The withholding is by calendar month rather than by fold label, and it covers the training rows
+as well as the scored fold.** Folds are cut inside each site's own span, so one fold number is a
+different calendar period at each site; a model that dropped only the rows carrying that fold
+number would still train on other sites' rows at the scored fold's own hours, and on the reanalysis
+those other sites are the same grid cell. Training rows are withheld too, by an inner
+cross-validation, because a column that is sharper where the arm trains than where it is scored
+gets over-trusted by the power model and the arm is then penalised for a reason unrelated to the
+split.
+
+Two limits on what this arm settles. It is one XGBoost at the power model's own settings rather
+than a tuned separation model, so a better-tuned one would shrink the contrast — what makes that
+unlikely to matter is that B-LEARNED is 2.4 times more faithful to the published fraction than Erbs
+and buys almost nothing in power error, so power accuracy is close to flat in split fidelity over a
+wide range. And "the same gain is available locally" presumes an archive of the published beam to
+fit a separation model on, which the forecast feed this decision concerns does not carry.
 
 The physical instrument runs the same arms under the names `P-A` to `P-C`, plus `P-E`, which is
 handed all three beam estimates at once and fits the weights of a convex combination over them. Arm

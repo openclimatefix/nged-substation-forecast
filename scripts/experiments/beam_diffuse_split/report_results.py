@@ -269,7 +269,7 @@ def _blend_weight_table(*, results_dir: Path) -> list[str]:
 def main() -> int:
     """Write every table to `report.md` and to standard output."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cds")
+    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="open-meteo")
     parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="as-labelled")
     parser.add_argument("--instrument", choices=("xgboost", "physics"), default="xgboost")
     arguments = parser.parse_args()
