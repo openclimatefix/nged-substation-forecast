@@ -272,11 +272,18 @@ def main() -> int:
     parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="open-meteo")
     parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="as-labelled")
     parser.add_argument("--instrument", choices=("xgboost", "physics"), default="xgboost")
+    parser.add_argument(
+        "--suffix",
+        default="",
+        help="Selects a variant build of the same source.",
+    )
     arguments = parser.parse_args()
     instrument: InstrumentType = arguments.instrument
     stem = "results" if instrument == "xgboost" else "physics"
     results_dir = (
-        REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{arguments.source}_{arguments.alignment}"
+        REPO_DATA_DIR
+        / "ERA5"
+        / f"beam_diffuse_{stem}_{arguments.source}{arguments.suffix}_{arguments.alignment}"
     )
 
     intervals = pl.read_parquet(results_dir / "bootstrap_intervals.parquet")

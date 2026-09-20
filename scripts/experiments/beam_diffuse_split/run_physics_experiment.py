@@ -466,15 +466,19 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
     parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="shifted")
+    parser.add_argument(
+        "--suffix",
+        default="",
+        help="Selects a variant build of the same source, and keeps its results beside the main.",
+    )
     arguments = parser.parse_args()
-    results_dir = results_dir_for(source=arguments.source, alignment=arguments.alignment)
+    source = f"{arguments.source}{arguments.suffix}"
+    results_dir = results_dir_for(source=source, alignment=arguments.alignment)
     results_dir.mkdir(parents=True, exist_ok=True)
 
     dataset = _assign_folds(
         dataset=_add_time_features(
-            dataset=pl.read_parquet(
-                dataset_path_for(source=arguments.source, alignment=arguments.alignment)
-            )
+            dataset=pl.read_parquet(dataset_path_for(source=source, alignment=arguments.alignment))
         )
     )
     sites = sorted(dataset["site"].unique().to_list())
