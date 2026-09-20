@@ -151,7 +151,7 @@ def _read_one(*, path: Path, site: str) -> pl.DataFrame:
         time=pl.col("observation_period")
         .str.split("/")
         .list.last()
-        .str.to_datetime("%Y-%m-%dT%H:%M:%S%.1f")
+        .str.to_datetime("%Y-%m-%dT%H:%M:%S%.f")
         .dt.replace_time_zone("UTC"),
         ghi_w_m2=pl.col("ghi_wh_m2"),
         bhi_w_m2=pl.col("bhi_wh_m2"),
