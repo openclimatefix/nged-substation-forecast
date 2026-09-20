@@ -165,11 +165,27 @@ rows no arm can get wrong. Raising the threshold would sharpen the contrast and 
 choice made with the answer in view, which is the worse trade.
 """
 
-CONTROL_TILT_DEGREES: Final[float] = 30.0
-"""Tilt of the notional array the synthetic control target is built from."""
+CONTROL_TILT_DEGREES_BY_SITE: Final[tuple[float, ...]] = (15.0, 22.0, 28.0, 35.0, 41.0, 47.0)
+"""Tilt of each site's notional array in the synthetic control target, in `SITE_LABELS` order.
 
-CONTROL_AZIMUTH_DEGREES: Final[float] = 180.0
-"""Azimuth of that notional array: due south, the usual choice for a GB fixed-tilt farm."""
+**Every value is deliberately away from the 30 degrees the physical instrument's optimiser starts
+at**, so a fit that never moved would score badly rather than well. A control whose answer is the
+starting point measures nothing.
+"""
+
+CONTROL_AZIMUTH_DEGREES_BY_SITE: Final[tuple[float, ...]] = (
+    148.0,
+    163.0,
+    172.0,
+    191.0,
+    205.0,
+    219.0,
+)
+"""Azimuth of each site's notional array, in `SITE_LABELS` order.
+
+Spread either side of due south, and for the same reason as the tilts: 180 degrees is where the
+physical instrument's optimiser starts.
+"""
 
 GROUND_ALBEDO: Final[float] = 0.2
 """Ground reflectance for the synthetic control target's transposition."""
@@ -177,15 +193,23 @@ GROUND_ALBEDO: Final[float] = 0.2
 REFERENCE_PLANE_OF_ARRAY_W_M2: Final[float] = 1000.0
 """Plane-of-array irradiance at which the synthetic array is taken to produce its full capacity."""
 
-CONTROL_NOISE_FRACTION_OF_CAPACITY: Final[float] = 0.05
+CONTROL_NOISE_FRACTION_OF_CAPACITY: Final[float] = 0.02
 """Noise added to the synthetic control target, as a fraction of the site's capacity.
 
-A noise-free target would only show that the pipeline can detect an enormous effect. Five per cent
-of capacity is the order of a competent irradiance-driven PV forecast's error, so clearing the bar
-on this target says the pipeline can find a split effect at a realistic signal-to-noise ratio.
+A noise-free target would only show that the pipeline can detect an enormous effect, and too much
+noise makes the control's own arm-to-arm difference smaller than the differences it is meant to
+certify. Two per cent of capacity leaves the control's difference comfortably larger than anything
+the real meters produce, which is what makes it usable as a detection threshold.
 """
 
 CONTROL_NOISE_SEED: Final[int] = 5150
+
+MIN_CONTROL_COS_ZENITH: Final[float] = 0.05
+"""The floor on the cosine of the solar zenith angle when the control's beam is transposed.
+
+The same floor `physics_model.MIN_COS_ZENITH` applies, for the same reason: near the horizon the
+ratio of two vanishing quantities is numerical noise.
+"""
 
 JOULES_PER_HOUR_TO_WATTS: Final[float] = 3600.0
 KELVIN_TO_CELSIUS_OFFSET: Final[float] = 273.15
@@ -201,10 +225,12 @@ ever sees a `time_series_id`, a site name or a coordinate.
 LABEL_PERMUTATION_SEED: Final[int] = 784
 """Seed for the shuffle that assigns `SITE_LABELS` to sites.
 
-Assigning labels in `time_series_id` order would not anonymise anything: `time_series_id` comes
-from NGED's own feed, so anyone holding the same roster could sort it and read the mapping straight
-off a published per-site table. Shuffling breaks that. The seed is fixed so a re-run reproduces the
-same labels.
+Assigning labels in `time_series_id` order would put the mapping one sort away for anyone who
+holds NGED's own roster and reads a published per-site table. The shuffle removes that sort, and
+nothing more: the seed and the shuffle both sit in this public file, so a roster-holder who runs
+`_pv_sites` reproduces the mapping exactly. **What protects the mapping is that the roster is
+private, not that the labels are shuffled.** The seed is fixed so a re-run reproduces the same
+labels.
 """
 
 
@@ -581,11 +607,17 @@ def _add_synthetic_control_target(*, frame: pl.DataFrame) -> pl.DataFrame:
     **This is the experiment's positive control, and without it a null result would be
     uninterpretable.** Finding no arm-to-arm difference on the real meters says "we did not detect
     an effect", which only becomes "there is no effect to detect" once the instrument has been shown
-    to detect one. The synthetic target is the plane-of-array irradiance a south-facing array tilted
-    at `CONTROL_TILT_DEGREES` would see, scaled to the site's capacity and buried in noise:
-    transposition needs the beam and the diffuse separately, so the split *must* help here. An arm
-    that cannot beat the global-only arm on this target cannot be trusted to have looked properly at
-    the real one.
+    to detect one. The synthetic target is the plane-of-array irradiance a tilted array would see,
+    scaled to the site's capacity and buried in noise: transposition needs the beam and the diffuse
+    separately, so the split *must* help here. An arm that cannot beat the global-only arm on this
+    target cannot be trusted to have looked properly at the real one.
+
+    **Two choices stop the control flattering the physical instrument.** Each site gets its own
+    tilt and azimuth, none of them the values that instrument's optimiser starts from, so a fit that
+    never moved would score badly. And the sky diffuse is transposed by the Hay-Davies model, which
+    puts part of the diffuse in a circumsolar band around the sun, while the physical instrument
+    assumes an isotropic sky. The instrument's hypothesis class therefore does not contain the
+    target, which is the situation a real meter puts it in.
 
     Beam on the tilted plane is the beam's horizontal flux times the ratio of the cosine of the
     angle of incidence to the cosine of the solar zenith. The cosine of the zenith is floored,
@@ -593,25 +625,44 @@ def _add_synthetic_control_target(*, frame: pl.DataFrame) -> pl.DataFrame:
     of two vanishing quantities is numerical noise.
 
     Args:
-        frame: Rows carrying the true split, solar geometry and `effective_capacity_mw`.
+        frame: Rows carrying the true split, solar geometry, `site` and `effective_capacity_mw`.
 
     Returns:
         `frame` with `synthetic_power_mw` added.
     """
+    site_index = np.array(
+        [SITE_LABELS.index(label) for label in frame["site"].to_list()], dtype=np.int64
+    )
+    tilt = np.radians(np.asarray(CONTROL_TILT_DEGREES_BY_SITE)[site_index])
+    surface_azimuth = np.radians(np.asarray(CONTROL_AZIMUTH_DEGREES_BY_SITE)[site_index])
+
     zenith = np.radians(frame["solar_zenith_deg"].to_numpy().astype(np.float64))
     azimuth = np.radians(frame["solar_azimuth_deg"].to_numpy().astype(np.float64))
-    tilt = np.radians(CONTROL_TILT_DEGREES)
-    surface_azimuth = np.radians(CONTROL_AZIMUTH_DEGREES)
-
     cos_incidence = np.clip(
         np.cos(zenith) * np.cos(tilt)
         + np.sin(zenith) * np.sin(tilt) * np.cos(azimuth - surface_azimuth),
         0.0,
         None,
     )
-    beam_on_plane = frame["bhi_w_m2"].to_numpy() * cos_incidence / np.maximum(np.cos(zenith), 0.05)
-    sky_diffuse = frame["dhi_w_m2"].to_numpy() * (1.0 + np.cos(tilt)) / 2.0
-    ground_reflected = frame["ghi_w_m2"].to_numpy() * GROUND_ALBEDO * (1.0 - np.cos(tilt)) / 2.0
+    beam_ratio = cos_incidence / np.maximum(np.cos(zenith), MIN_CONTROL_COS_ZENITH)
+
+    beam_horizontal = frame["bhi_w_m2"].to_numpy().astype(np.float64)
+    diffuse_horizontal = frame["dhi_w_m2"].to_numpy().astype(np.float64)
+    global_horizontal = frame["ghi_w_m2"].to_numpy().astype(np.float64)
+    extraterrestrial = frame["extraterrestrial_horizontal_w_m2"].to_numpy().astype(np.float64)
+
+    # Hay-Davies weights the circumsolar part of the diffuse by how much beam survived the
+    # atmosphere, which on a horizontal plane is the beam's share of the top-of-atmosphere flux.
+    anisotropy = np.where(
+        extraterrestrial > 1.0,
+        np.clip(beam_horizontal / np.maximum(extraterrestrial, 1e-9), 0.0, 1.0),
+        0.0,
+    )
+    sky_diffuse = diffuse_horizontal * (
+        anisotropy * beam_ratio + (1.0 - anisotropy) * (1.0 + np.cos(tilt)) / 2.0
+    )
+    beam_on_plane = beam_horizontal * beam_ratio
+    ground_reflected = global_horizontal * GROUND_ALBEDO * (1.0 - np.cos(tilt)) / 2.0
     plane_of_array = beam_on_plane + sky_diffuse + ground_reflected
 
     capacity = frame["effective_capacity_mw"].to_numpy().astype(np.float64)

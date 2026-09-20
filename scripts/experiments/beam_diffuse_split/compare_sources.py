@@ -4,12 +4,17 @@ One-off throwaway script for the experiment in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/784>.
 
 **Which source predicts power better is a different question from whether its split helps, and the
-arm-to-arm tables cannot answer it**, because each source's run is scored on its own rows: the CAMS
+per-source tables cannot answer it**, because each source's run is scored on its own rows: the CAMS
 reliability flag removes hours ERA5 keeps, so the two runs' pooled errors are not measured on the
-same weather. This script restricts both runs to the hours and sites they share and reports the
-global-irradiance-only arm on those rows alone, which is the comparison the write-up can make.
+same weather. This script restricts both runs to the hours and sites they share and reports, on
+those rows alone, each arm's mean absolute error and each contrast's bootstrap interval.
 
-Run it with `uv run --no-project --with polars python
+**Restricting the scoring does not restrict the training.** Each source's models were fitted on that
+source's own rows, so a difference that survives here is still a difference between two pipelines
+rather than between two grids alone. That confound cannot be removed without refitting one source on
+the other's rows, which is not what any of the arms are for.
+
+Run it with `uv run --no-project --with polars --with numpy --with xgboost python
 scripts/experiments/beam_diffuse_split/compare_sources.py --alignment shifted`.
 """
 
@@ -19,6 +24,7 @@ from pathlib import Path
 from typing import Final
 
 import polars as pl
+from run_experiment import _bootstrap_difference
 
 REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
 
@@ -29,6 +35,12 @@ COMPARED_ARMS: Final[dict[str, tuple[str, ...]]] = {
     "physics": ("P_A_global_only", "P_B_erbs", "P_C_source_split"),
 }
 """The arms reported for each instrument, in the order the table prints them."""
+
+COMPARED_CONTRASTS: Final[dict[str, tuple[tuple[str, str], ...]]] = {
+    "xgboost": (("C_era5_split", "B_erbs"), ("C_era5_split", "A_global_only")),
+    "physics": (("P_C_source_split", "P_B_erbs"), ("P_C_source_split", "P_A_global_only")),
+}
+"""The contrasts recomputed on the shared rows, headline first."""
 
 
 def _scalar(value: object) -> float:
@@ -41,7 +53,19 @@ def _scalar(value: object) -> float:
 
 
 def _losses_for(*, instrument: str, source: str, alignment: str) -> pl.DataFrame:
-    """Read one run's per-row losses, restricted to the primary setting."""
+    """Read one run's per-row losses, restricted to the primary setting.
+
+    Args:
+        instrument: `xgboost` or `physics`.
+        source: The irradiance source the run used.
+        alignment: The stamp alignment the run used.
+
+    Returns:
+        The primary setting's per-row losses.
+
+    Raises:
+        FileNotFoundError: If that run has not been produced.
+    """
     stem = "results" if instrument == "xgboost" else "physics"
     path = (
         REPO_DATA_DIR
@@ -49,6 +73,9 @@ def _losses_for(*, instrument: str, source: str, alignment: str) -> pl.DataFrame
         / f"beam_diffuse_{stem}_{source}_{alignment}"
         / "per_row_losses.parquet"
     )
+    if not path.exists():
+        msg = f"{path} missing; run the {instrument} instrument on {source} first"
+        raise FileNotFoundError(msg)
     return pl.read_parquet(path).filter(pl.col("setting") == "primary")
 
 
@@ -59,43 +86,70 @@ def main() -> int:
     parser.add_argument("--first-source", default="cams")
     parser.add_argument("--second-source", default="open-meteo")
     arguments = parser.parse_args()
+    sources = (arguments.first_source, arguments.second_source)
 
     lines: list[str] = []
     for instrument, arms in COMPARED_ARMS.items():
-        first = _losses_for(
-            instrument=instrument, source=arguments.first_source, alignment=arguments.alignment
-        )
-        second = _losses_for(
-            instrument=instrument, source=arguments.second_source, alignment=arguments.alignment
-        )
+        runs = {
+            source: _losses_for(instrument=instrument, source=source, alignment=arguments.alignment)
+            for source in sources
+        }
         shared = (
-            first.select("site", "time")
+            runs[sources[0]]
+            .select("site", "time")
             .unique()
-            .join(second.select("site", "time").unique(), on=["site", "time"], how="inner")
+            .join(
+                runs[sources[1]].select("site", "time").unique(), on=["site", "time"], how="inner"
+            )
         )
+        restricted = {
+            source: losses.join(shared, on=["site", "time"], how="semi")
+            for source, losses in runs.items()
+        }
+
         lines += [
             f"### {instrument}, {arguments.alignment} stamps",
             "",
             f"{shared.height:,} hours shared by both sources.",
             "",
-            (
-                "| Arm | "
-                f"{arguments.first_source} MAE (% of capacity) | "
-                f"{arguments.second_source} MAE (% of capacity) |"
-            ),
+            f"| Arm | {sources[0]} MAE (% of capacity) | {sources[1]} MAE (% of capacity) |",
             "|---|---|---|",
         ]
         for arm in arms:
+            cells = [
+                _scalar(
+                    restricted[source]
+                    .filter(pl.col("arm") == arm)["absolute_error_fraction_of_capacity"]
+                    .mean()
+                )
+                * PERCENTAGE_POINTS
+                for source in sources
+            ]
+            lines.append(f"| {arm} | {cells[0]:.3f} | {cells[1]:.3f} |")
+
+        lines += [
+            "",
+            (
+                f"| Contrast | {sources[0]} ΔMAE (pp) | 95% interval "
+                f"| {sources[1]} ΔMAE (pp) | 95% interval |"
+            ),
+            "|---|---|---|---|---|",
+        ]
+        for treatment, reference in COMPARED_CONTRASTS[instrument]:
             cells = []
-            for losses in (first, second):
-                scoped = losses.filter(pl.col("arm") == arm).join(
-                    shared, on=["site", "time"], how="semi"
+            for source in sources:
+                interval = _bootstrap_difference(
+                    losses=restricted[source],
+                    treatment=treatment,
+                    reference=reference,
+                    metric="absolute_error_fraction_of_capacity",
                 )
                 cells.append(
-                    _scalar(scoped["absolute_error_fraction_of_capacity"].mean())
-                    * PERCENTAGE_POINTS
+                    f"{interval['difference'] * PERCENTAGE_POINTS:+.4f} | "
+                    f"[{interval['lower_95'] * PERCENTAGE_POINTS:+.4f}, "
+                    f"{interval['upper_95'] * PERCENTAGE_POINTS:+.4f}]"
                 )
-            lines.append(f"| {arm} | {cells[0]:.3f} | {cells[1]:.3f} |")
+            lines.append(f"| {treatment} − {reference} | {cells[0]} | {cells[1]} |")
         lines.append("")
 
     sys.stdout.write("\n".join(lines) + "\n")

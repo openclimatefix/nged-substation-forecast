@@ -82,10 +82,12 @@ real effect has to clear.
 
 **A second control runs the arms against a synthetic target built by transposing the true split onto
 a tilted plane**, where the split must help by construction. A null result on the real meters means
-nothing until the instrument has been shown to detect an effect it should detect. For the physical
-instrument that control is weaker than it looks, because the synthetic target is built by the same
-transposition the model implements: a pass there says the five free parameters can be recovered from
-a held-out fold, not that the physics is right.
+nothing until the instrument has been shown to detect an effect it should detect, and what the
+control reports is the size of the difference each instrument produces when the split genuinely
+matters — the threshold below which a difference on the real meters says nothing. The target is
+built outside the physical model's hypothesis class on purpose: each site gets its own tilt and
+azimuth, none of them the values the optimiser starts from, and the sky diffuse is transposed by the
+Hay-Davies model where the instrument assumes an isotropic sky.
 
 ## Anonymisation
 
@@ -101,7 +103,10 @@ time from the private roster, and writes only the anonymised label.
 Six sites inside a 34 km box share their weather, so the effective sample size is the number of
 independent weather episodes rather than the number of site-hours. The bar for a result is a
 monthly block bootstrap interval on the arm-to-arm difference that excludes zero. A point estimate
-on its own is not a result, and neither is a difference smaller than the seed-to-seed spread that
-the runners report alongside it.
+on its own is not a result, and neither is a difference smaller than the positive control's own
+arm-to-arm difference. The seed-to-seed spread the runners report means different things for the
+two instruments: for XGBoost it measures how much of a difference is fitting noise, and for the
+physical model it only measures how far the optimiser's restarts wander, which is a few parts in a
+million.
 
 Whatever the answer, it is about one micro-region of Lincolnshire over 2019 to 2026.

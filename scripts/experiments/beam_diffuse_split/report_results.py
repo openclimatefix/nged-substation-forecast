@@ -67,13 +67,6 @@ HEADLINE_CONTRASTS: Final[dict[str, tuple[str, str]]] = {
 
 PERCENTAGE_POINTS: Final[float] = 100.0
 
-SEEDS_IN_RESULTS: Final[tuple[int, ...]] = (0, 1, 2)
-"""The seeds `run_experiment.py` fitted, so an hour count can be recovered from the row count.
-
-The per-row losses hold one row per (test row, seed), so the number of distinct hours behind an
-interval is the row count divided by however many seeds were run.
-"""
-
 
 def _pooled_mean(*, summary: pl.DataFrame, setting: str, arm: str, column: str) -> float:
     """Return one arm's row-weighted mean of `column` across every site.
@@ -128,7 +121,7 @@ def _contrast_table(*, intervals: pl.DataFrame, summary: pl.DataFrame, setting: 
     lines = [
         (
             "| Contrast | ΔMAE (pp of capacity) | 95% interval | Relative | Excludes zero? |"
-            " Folds agreeing in sign |"
+            " Folds with the same sign |"
         ),
         "|---|---|---|---|---|---|",
     ]
@@ -186,7 +179,7 @@ def _per_site_table(
         f"| {row['scope']} | {row['difference'] * PERCENTAGE_POINTS:+.4f} | "
         f"[{row['lower_95'] * PERCENTAGE_POINTS:+.4f}, "
         f"{row['upper_95'] * PERCENTAGE_POINTS:+.4f}] | "
-        f"{row['n_rows'] // len(SEEDS_IN_RESULTS):,} |"
+        f"{row['n_rows']:,} |"
         for row in rows.iter_rows(named=True)
     )
     return lines

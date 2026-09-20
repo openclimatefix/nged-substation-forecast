@@ -19,8 +19,9 @@ The service publishes irradiation in Wh m⁻² summed over each step, so at a 1-
 also the mean flux in W m⁻², and no conversion is needed. Each row's `Observation period` names the
 interval's start and end; the end is kept, which is the period-ending convention ERA5 uses.
 
-Run it with `uv run --no-project --with polars --with cdsapi python
-scripts/experiments/beam_diffuse_split/fetch_cams.py`.
+Run it with `uv run --no-project --with polars --with cdsapi --with numpy --with deltalake --with
+pvlib --with pandas python scripts/experiments/beam_diffuse_split/fetch_cams.py`. The extra
+dependencies are `build_dataset`'s, which this script imports the site roster from.
 """
 
 import concurrent.futures
@@ -136,9 +137,38 @@ def _fetch_one(*, job: SiteYear) -> Path:
         },
         str(partial),
     )
+    _strip_coordinates(path=partial)
     partial.rename(destination)
     _LOG.info("site %s %d downloaded", job.site, job.year)
     return destination
+
+
+COORDINATE_HEADER_PREFIXES: Final[tuple[str, ...]] = (
+    "# Latitude",
+    "# Longitude",
+    "# Altitude",
+)
+"""Header lines the service writes that name where the request was made."""
+
+
+def _strip_coordinates(*, path: Path) -> None:
+    """Remove the header lines that pair a site's anonymised label with its coordinates.
+
+    **The downloaded file is the one artefact in this experiment that would carry both halves of the
+    mapping at once**, because its name holds the published label and the service writes the
+    requested latitude and longitude into its header. Nothing under the data directory is committed,
+    but a file a human might paste into an issue to show what the service returned should not carry
+    a metered generator's location.
+
+    Args:
+        path: The downloaded CSV, rewritten in place.
+    """
+    kept = [
+        line
+        for line in path.read_text().splitlines(keepends=True)
+        if not line.startswith(COORDINATE_HEADER_PREFIXES)
+    ]
+    path.write_text("".join(kept))
 
 
 def _read_one(*, path: Path, site: str) -> pl.DataFrame:
