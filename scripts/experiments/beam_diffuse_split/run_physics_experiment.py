@@ -30,7 +30,7 @@ import concurrent.futures
 import logging
 import sys
 from pathlib import Path
-from typing import Final
+from typing import Final, NamedTuple
 
 import numpy as np
 import polars as pl
@@ -168,7 +168,28 @@ def _geometry_for(*, rows: pl.DataFrame, arm: str, weights: np.ndarray | None) -
     )
 
 
-def _unpack(*, parameters: np.ndarray, arm: str, capacity_guess: float) -> dict[str, object]:
+class FittedParameters(NamedTuple):
+    """The physical parameters one fit settles on.
+
+    Attributes:
+        tilt_rad: Panel tilt from horizontal, in radians.
+        azimuth_rad: Panel azimuth, clockwise from north, in radians.
+        capacity_mw: Output at standard test conditions.
+        temperature_coefficient: Fractional change in output per degree above reference.
+        clip_mw: The inverter's own ceiling.
+        weights: The convex weights over the arm's splits, or a single one for an arm with at most
+            one split.
+    """
+
+    tilt_rad: float
+    azimuth_rad: float
+    capacity_mw: float
+    temperature_coefficient: float
+    clip_mw: float
+    weights: np.ndarray
+
+
+def _unpack(*, parameters: np.ndarray, arm: str, capacity_guess: float) -> FittedParameters:
     """Map the optimiser's unbounded vector onto the model's physical parameters.
 
     Every bounded quantity is reached through a `tanh`, and every positive one through an
@@ -182,14 +203,6 @@ def _unpack(*, parameters: np.ndarray, arm: str, capacity_guess: float) -> dict[
     Returns:
         The physical parameters, and the convex weights over the arm's splits.
     """
-    tilt_rad = np.radians(TILT_CEILING_DEGREES * (1.0 + np.tanh(parameters[0])) / 2.0)
-    azimuth_rad = np.radians(180.0 + AZIMUTH_HALF_RANGE_DEGREES * np.tanh(parameters[1]))
-    capacity = capacity_guess * np.exp(parameters[2])
-    coefficient = TEMPERATURE_COEFFICIENT_CENTRE + TEMPERATURE_COEFFICIENT_HALF_RANGE * np.tanh(
-        parameters[3]
-    )
-    clip = capacity_guess * np.exp(parameters[4])
-
     n_splits = len(ARM_SPLITS[arm])
     if n_splits <= 1:
         weights = np.ones(max(n_splits, 1))
@@ -197,14 +210,17 @@ def _unpack(*, parameters: np.ndarray, arm: str, capacity_guess: float) -> dict[
         logits = np.concatenate([[0.0], parameters[5 : 5 + n_splits - 1]])
         weights = np.exp(logits - logits.max())
         weights = weights / weights.sum()
-    return {
-        "tilt_rad": float(tilt_rad),
-        "azimuth_rad": float(azimuth_rad),
-        "capacity_mw": float(capacity),
-        "temperature_coefficient": float(coefficient),
-        "clip_mw": float(clip),
-        "weights": weights,
-    }
+    return FittedParameters(
+        tilt_rad=float(np.radians(TILT_CEILING_DEGREES * (1.0 + np.tanh(parameters[0])) / 2.0)),
+        azimuth_rad=float(np.radians(180.0 + AZIMUTH_HALF_RANGE_DEGREES * np.tanh(parameters[1]))),
+        capacity_mw=float(capacity_guess * np.exp(parameters[2])),
+        temperature_coefficient=float(
+            TEMPERATURE_COEFFICIENT_CENTRE
+            + TEMPERATURE_COEFFICIENT_HALF_RANGE * np.tanh(parameters[3])
+        ),
+        clip_mw=float(capacity_guess * np.exp(parameters[4])),
+        weights=weights,
+    )
 
 
 def _n_parameters(*, arm: str) -> int:
@@ -216,15 +232,15 @@ def _predict(
     *, rows: pl.DataFrame, parameters: np.ndarray, arm: str, capacity_guess: float
 ) -> np.ndarray:
     """Run the physical model over one set of rows at one parameter vector."""
-    unpacked = _unpack(parameters=parameters, arm=arm, capacity_guess=capacity_guess)
-    geometry = _geometry_for(rows=rows, arm=arm, weights=unpacked["weights"])
+    fitted = _unpack(parameters=parameters, arm=arm, capacity_guess=capacity_guess)
+    geometry = _geometry_for(rows=rows, arm=arm, weights=fitted.weights)
     return power_mw(
         geometry=geometry,
-        tilt_rad=unpacked["tilt_rad"],  # ty: ignore[invalid-argument-type]
-        azimuth_rad=unpacked["azimuth_rad"],  # ty: ignore[invalid-argument-type]
-        capacity_mw=unpacked["capacity_mw"],  # ty: ignore[invalid-argument-type]
-        temperature_coefficient=unpacked["temperature_coefficient"],  # ty: ignore[invalid-argument-type]
-        clip_mw=unpacked["clip_mw"],  # ty: ignore[invalid-argument-type]
+        tilt_rad=fitted.tilt_rad,
+        azimuth_rad=fitted.azimuth_rad,
+        capacity_mw=fitted.capacity_mw,
+        temperature_coefficient=fitted.temperature_coefficient,
+        clip_mw=fitted.clip_mw,
     )
 
 
@@ -336,17 +352,16 @@ def _fitted_parameters(*, dataset: pl.DataFrame) -> pl.DataFrame:
             parameters = _fit(
                 train=rows, arm=arm, target="power_mw", capacity_guess=capacity_guess, seed=0
             )
-            unpacked = _unpack(parameters=parameters, arm=arm, capacity_guess=capacity_guess)
+            fitted = _unpack(parameters=parameters, arm=arm, capacity_guess=capacity_guess)
             records.append(
                 {
                     "arm": arm,
                     "site": site,
-                    "tilt_degrees": np.degrees(float(unpacked["tilt_rad"])),  # ty: ignore[invalid-argument-type]
-                    "azimuth_degrees": np.degrees(float(unpacked["azimuth_rad"])),  # ty: ignore[invalid-argument-type]
-                    "capacity_fraction_of_registered": float(unpacked["capacity_mw"])  # ty: ignore[invalid-argument-type]
-                    / capacity_guess,
-                    "clip_fraction_of_registered": float(unpacked["clip_mw"]) / capacity_guess,  # ty: ignore[invalid-argument-type]
-                    "weights": [float(weight) for weight in unpacked["weights"]],  # ty: ignore[not-iterable]
+                    "tilt_degrees": float(np.degrees(fitted.tilt_rad)),
+                    "azimuth_degrees": float(np.degrees(fitted.azimuth_rad)),
+                    "capacity_fraction_of_registered": fitted.capacity_mw / capacity_guess,
+                    "clip_fraction_of_registered": fitted.clip_mw / capacity_guess,
+                    "weights": [float(weight) for weight in fitted.weights],
                 }
             )
     return pl.DataFrame(records)

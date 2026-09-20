@@ -31,6 +31,15 @@ COMPARED_ARMS: Final[dict[str, tuple[str, ...]]] = {
 """The arms reported for each instrument, in the order the table prints them."""
 
 
+def _scalar(value: object) -> float:
+    """Narrow a Polars aggregate to a plain float.
+
+    `Series.mean()` is typed as a union covering every dtype a Series could hold, so a checker
+    cannot know this column is a float.
+    """
+    return float(value)  # ty: ignore[invalid-argument-type]
+
+
 def _losses_for(*, instrument: str, source: str, alignment: str) -> pl.DataFrame:
     """Read one run's per-row losses, restricted to the primary setting."""
     stem = "results" if instrument == "xgboost" else "physics"
@@ -83,7 +92,8 @@ def main() -> int:
                     shared, on=["site", "time"], how="semi"
                 )
                 cells.append(
-                    float(scoped["absolute_error_fraction_of_capacity"].mean()) * PERCENTAGE_POINTS
+                    _scalar(scoped["absolute_error_fraction_of_capacity"].mean())
+                    * PERCENTAGE_POINTS
                 )
             lines.append(f"| {arm} | {cells[0]:.3f} | {cells[1]:.3f} |")
         lines.append("")

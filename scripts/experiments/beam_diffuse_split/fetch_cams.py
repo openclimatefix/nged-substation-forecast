@@ -27,7 +27,7 @@ import concurrent.futures
 import logging
 import sys
 from pathlib import Path
-from typing import Final
+from typing import Final, NamedTuple
 
 import cdsapi  # ty: ignore[unresolved-import]
 import polars as pl
@@ -73,6 +73,22 @@ COLUMN_NAMES: Final[tuple[str, ...]] = (
 """The 11 columns the service writes, in order, under its commented header."""
 
 
+class SiteYear(NamedTuple):
+    """One download: a site's coordinates and the year to request for it.
+
+    Attributes:
+        site: The anonymised site label, which is all that reaches a written file.
+        latitude: The meter's latitude, sent to the service and not recorded.
+        longitude: The meter's longitude, sent to the service and not recorded.
+        year: The year to request.
+    """
+
+    site: str
+    latitude: float
+    longitude: float
+    year: int
+
+
 def _api_key() -> str:
     """Read the Copernicus API key, which both data stores accept."""
     for line in Path.home().joinpath(".cdsapirc").read_text().splitlines():
@@ -92,19 +108,16 @@ def _csv_path(*, site: str, year: int) -> Path:
     return CAMS_DIR / f"cams_site_{site}_{year}.csv"
 
 
-def _fetch_one(*, site: str, latitude: float, longitude: float, year: int) -> Path:
+def _fetch_one(*, job: SiteYear) -> Path:
     """Download one site-year, skipping the request if the file is already there.
 
     Args:
-        site: The anonymised site label, used in the file name.
-        latitude: The meter's latitude, sent to the service and not recorded.
-        longitude: The meter's longitude, sent to the service and not recorded.
-        year: The year to request.
+        job: Which site and year to fetch.
 
     Returns:
         The path the CSV landed at.
     """
-    destination = _csv_path(site=site, year=year)
+    destination = _csv_path(site=job.site, year=job.year)
     if destination.exists() and destination.stat().st_size > 0:
         return destination
 
@@ -114,9 +127,9 @@ def _fetch_one(*, site: str, latitude: float, longitude: float, year: int) -> Pa
         DATASET,
         {
             "sky_type": "observed_cloud",
-            "location": {"latitude": latitude, "longitude": longitude},
+            "location": {"latitude": job.latitude, "longitude": job.longitude},
             "altitude": UNKNOWN_ALTITUDE,
-            "date": [f"{first_date_of(year=year)}/{_last_date_of(year=year)}"],
+            "date": [f"{first_date_of(year=job.year)}/{_last_date_of(year=job.year)}"],
             "time_step": "1hour",
             "time_reference": "universal_time",
             "data_format": "csv",
@@ -124,7 +137,7 @@ def _fetch_one(*, site: str, latitude: float, longitude: float, year: int) -> Pa
         str(partial),
     )
     partial.rename(destination)
-    _LOG.info("site %s %d downloaded", site, year)
+    _LOG.info("site %s %d downloaded", job.site, job.year)
     return destination
 
 
@@ -166,29 +179,26 @@ def main() -> int:
     CAMS_DIR.mkdir(parents=True, exist_ok=True)
     sites = _pv_sites()
     jobs = [
-        {
-            "site": row["site"],
-            "latitude": float(row["latitude"]),
-            "longitude": float(row["longitude"]),
-            "year": year,
-        }
+        SiteYear(
+            site=str(row["site"]),
+            latitude=float(row["latitude"]),
+            longitude=float(row["longitude"]),
+            year=year,
+        )
         for row in sites.to_dicts()
         for year in range(FIRST_YEAR, LAST_YEAR + 1)
     ]
     _LOG.info("%d site-years to fetch for %d sites", len(jobs), sites.height)
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT_REQUESTS) as pool:
-        futures = [pool.submit(lambda job=job: _fetch_one(**job)) for job in jobs]
+        futures = [pool.submit(_fetch_one, job=job) for job in jobs]
         for done, future in enumerate(concurrent.futures.as_completed(futures), start=1):
             future.result()
             _LOG.info("%d of %d site-years ready", done, len(jobs))
 
     cams = (
         pl.concat(
-            [
-                _read_one(path=_csv_path(site=j["site"], year=j["year"]), site=j["site"])
-                for j in jobs
-            ]
+            [_read_one(path=_csv_path(site=job.site, year=job.year), site=job.site) for job in jobs]
         )
         .drop_nulls()
         .unique(subset=["site", "time"], keep="first")
