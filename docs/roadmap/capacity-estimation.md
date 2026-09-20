@@ -546,8 +546,8 @@ covered by the weather ingests: the **CAMS Radiation Service** as the primary in
 ERA5T stream for the capacity estimate's freshness — see [Data sources → Weather
 data](data-sources.md#weather-data) for both specs, why CAMS is preferred to CM SAF SARAH-3, and why
 ERA5 beats CERRA here. The live **ECMWF ENS** feed carries only GHI — fine for v0.7, but v2 physics
-*forecasting* of PV needs a differentiable GHI → DNI/DHI decomposition model (or `fdir` added to the
-upstream dataset).
+*forecasting* of PV needs a differentiable GHI → DNI/DHI decomposition model (or `fdir` from
+another source).
 
 **The shared irradiance-bias term has an expected sign, which gives it a prior.** The CAMS Radiation
 Service reads high in clear conditions and low in cloudy ones ([Lezaca Galeano et al.

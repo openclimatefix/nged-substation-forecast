@@ -1226,7 +1226,9 @@ member *n*, so the two members share one row. Before relying on the pairing, che
 Dynamical.org keeps ECMWF's member numbering in both datasets. ICON-EU is a single deterministic
 run, so its values repeat on every member's row and are absent beyond its 120-hour horizon. Train
 with whole sources randomly blanked, so that a failed feed degrades the forecast rather than
-breaking it.
+breaking it. [Rasp et al. (2026)](https://arxiv.org/abs/2609.03582) train WeatherNext 3 that way,
+masking each input modality with probability 0.9 on a training step so that one model copes with
+whichever inputs arrived, rather than needing a variant per combination of sources.
 
 **Each step of the experiment has to beat the step before on out-of-sample CRPS per horizon slice,
 with a block-bootstrap confidence interval that excludes zero:**

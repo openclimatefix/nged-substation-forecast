@@ -166,6 +166,15 @@ over-confident predictions during a real outage — the worst possible moment. U
 outage-shaped** dropout drawn from the same failure-scenario vocabulary the rest of the project
 scores against.
 
+**Masking whole sources is the cheap half of the same idea, and operational weather models already
+do it.** [Rasp et al. (2026)](https://arxiv.org/abs/2609.03582) train WeatherNext 3 with each input
+modality masked at a fixed probability — the satellite imagery, the two precipitation products,
+and the cumulative analysis variables — so that one model forecasts skilfully from whichever
+inputs arrived, with no separate handling at initialisation time. Masking at source granularity is
+closer to how a feed actually fails than element-wise dropout is. What source-level masking still
+misses is the correlation between an outage and the weather that caused the outage, which is what
+outage-shaped dropout adds.
+
 See [Inherent Stability](../design-philosophy/inherent-stability.md) for the whole principle.
 
 ## What the encoders do *not* need to learn
