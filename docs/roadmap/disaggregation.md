@@ -428,6 +428,17 @@ measurements. Voltage at primary substations is not part of this project's data 
 resolution, tap-changer movements would blur any topology signal in voltage anyway. Tap-changer
 movements _could_ themselves reveal topology, but only in data sampled at around 1 Hz.
 
+**Evaluating one candidate switch configuration is cheap in the methods reviewed here; searching
+over configurations is not what those methods address.** [Nguyen et al.
+(2026)](https://doi.org/10.48550/arXiv.2608.25095) refresh the inverse admittance matrix across
+switch configurations with a Sherman-Morrison-Woodbury update, dropping the cost of evaluating one
+configuration from cubic in the number of nodes to quadratic, as long as only a few switches move
+between configurations. Scoring many candidate configurations against observed power is what an
+inverse topology problem needs. Nguyen et al. take the switch positions as a known input rather than
+inferring them, so the update speeds up the inner loop and leaves the search itself untouched. A
+Sherman-Morrison-Woodbury update also needs per-branch impedances, which this project does not hold,
+so the technique is noted here as a candidate primitive rather than a plan.
+
 ## Where this work is novel
 
 The novelty lies in the **combination and problem framing**, not in any single component:

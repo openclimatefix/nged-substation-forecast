@@ -205,6 +205,25 @@ computed and can rank models without Tier 3. What they cannot yet do is be valid
 curtailment event, because no existing site maps a curtailment case to a specific series or a single
 hierarchy node — see [case studies](#case-studies) below.
 
+**Solving the power flow is not what gates Tier 3; assembling an electricity-network model is.**
+[Nguyen et al. (2026)](https://doi.org/10.48550/arXiv.2608.25095) train a self-supervised surrogate
+for multiphase AC optimal power flow, reporting optimality gaps under 0.2% on IEEE test feeders from
+13 to 906 nodes and 1.5% at 8,500 nodes, with speedups of 780 to 1121 times over the IPOPT nonlinear
+solver. Speed of that order is what an ensemble needs, because every member has to be pushed through
+the power-flow model separately. What Nguyen et al.'s method takes as input is the nodal admittance
+matrix — per-branch impedances, thermal ratings, and voltage limits — and none of those reach this
+project. The electricity-network data NGED supplies is an edge list of which primaries can
+interconnect, plus the map of which substation each one feeds into above it (see [data
+sources](data-sources.md)).
+
+**A separate GB-wide programme is building the network-visibility layer Tier 3 would sit on.**
+[Fractal Flow](https://www.northernpowergrid.com/news-and-events/fractal-flow-sets-blueprint-smarter-future-energy-systems),
+an Ofgem Strategic Innovation Fund project led by Northern Powergrid with the National Energy System
+Operator (NESO) and the GB distribution network operators among its partners, is building a
+near-real-time model of the electricity network for control-room visibility. Flexpectation forecasts
+the power at each substation. Fractal Flow models the electricity network those substations sit in.
+Tier 3 sits on the far side of that boundary.
+
 **NGED derives upstream limits by combining substation forecasts in a power-flow model, so the
 forecasts must stay consistent across substations.** Percentiles cannot be added across substations:
 the sum of each substation's 95th percentile is generally not the 95th percentile of the combined
