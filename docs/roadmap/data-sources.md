@@ -200,7 +200,7 @@ asked for.
 | **ICON-EU** via Dynamical.org | Forecast | By addition | ✅ | ✅ | Free, already ingested by Dynamical.org |
 | **UKV** (Met Office) | Forecast | ✅ | ✅ | ✅ | Free on AWS, CC BY-SA 4.0; all three components in every run back to the archive's start, 2024-09-19 |
 | **MOGREPS-UK** (Met Office) | Forecast | ✅ | ✅ | ✅ | Free on AWS, CC BY-SA 4.0; all three components, plus net short-wave; **30-day rolling archive** |
-| **Global 10 km** (Met Office) | Forecast | ✅ | ✅ | By subtraction | Free on AWS, CC BY-SA 4.0; 168-hour horizon; no global field before the 2024-11-07 12 UTC run |
+| **Global 10 km** (Met Office) | Forecast | ✅ | ✅ | By subtraction | Free on AWS, CC BY-SA 4.0; 168-hour horizon, but no global field before the 2024-11-07 12 UTC run and none at T+168 before 2026-01-21 |
 | **WeatherNext 3** (Google DeepMind) | Forecast | ✅ | ✅ `fdir` | By subtraction | Access request; CC-BY-4.0 once at least 1 hour old |
 | **ERA5** | Reanalysis | ✅ `ssrd` | ✅ `fdir` | By subtraction | Free from the Copernicus Climate Data Store |
 | **CERRA** | Reanalysis | ✅ | ✅ | By subtraction | Free from the Copernicus Climate Data Store |
@@ -236,7 +236,7 @@ Asking for a change of feed is fair, provided the request is made as what it is.
 already publish direct and diffuse short-wave for ICON-EU, so a missing variable is not the obstacle
 — the obstacle is which ECMWF feed they hold.
 
-**The Met Office models are the cheaper ask, because their free feed already carries a direct beam.**
+**The Met Office models are the cheaper ask: their free feed already carries a direct beam.**
 The one open Met Office request on Dynamical.org's issue tracker is for [the global 10 km deterministic
 model](https://github.com/dynamical-org/reformatters/issues/646), which publishes global and direct
 short-wave and leaves diffuse to the same subtraction ECMWF would need. UKV and MOGREPS-UK go
@@ -256,11 +256,22 @@ archive, because no earlier run carries global short-wave.** Listing every 6-hou
 earliest on AWS, 2024-09-19 18 UTC, shows
 `radiation_flux_in_shortwave_direct_downward_at_surface` throughout and
 `radiation_flux_in_shortwave_total_downward_at_surface` only from 2024-11-07 12 UTC onwards. That
-run also carries 4,470 files where the run 6 hours before it carries 2,842, so the feed gained more
-than the one field. Global short-wave then took a week to settle: the first run carrying the field
-carries it at 78 lead times against the direct field's 89, and runs up to 2024-11-13 drop it at one
-lead time or another. UKV and MOGREPS-UK need no such cut-off, because the earliest run of each on
-AWS already carries global, direct, and diffuse short-wave at every lead time that run publishes.
+run carries 4,470 files against the 4,310 of the 00 UTC run the same day, the extra 160 being global
+short-wave at 78 lead times and `cloud_amount_on_height_levels` at 82. Compare runs at the same
+hour: the 06 and 18 UTC runs stop at 54 hours and carry about 2,842 files whatever their date.
+
+**Global short-wave then stayed one lead time short of the direct field for another 14 months, and
+the missing lead time is T+168 — the one a 7-day horizon exists for.** Runs settle on 2024-11-13
+at 88 lead times against the direct field's 89, and every 00 and 12 UTC run from then until
+2026-01-21 00 UTC drops T+168. The first run carrying global short-wave at all 89 lead times is
+2026-01-21 12 UTC. A backtest that needs the full 168-hour horizon therefore starts there, 14 months
+after the field first appears.
+
+**UKV and MOGREPS-UK need no cut-off of either kind.** Both carry global, direct, and diffuse
+short-wave at the same lead times as each model's other hourly fields — 55 for a UKV run reaching 54
+hours, 126 for a MOGREPS-UK run — with no component lagging another. That holds in the earliest UKV
+run on AWS and in the earliest complete MOGREPS-UK run, the oldest surviving run of a 30-day rolling
+window being part-deleted rather than whole.
 
 ### ECMWF has published no plan to open a direct beam or hourly ensemble steps
 
@@ -278,7 +289,11 @@ planned addition.
 [announced](https://forum.ecmwf.int/t/open-data-transition-early-success/14478) in December 2025
 that total cloud cover, snow depth, and snowfall had been added to the IFS open dataset, and all
 three are in the feed today. A request for a radiation parameter is therefore a request of a kind
-ECMWF granted recently, rather than one the feed's design rules out.
+ECMWF granted recently, rather than one the feed's design rules out. Asking is invited, too: the
+same July 2025 reply says ECMWF are "happy to take suggestions and we keep a list of requests for
+the open data", and when a user asked for `fdir` among the AIFS outputs in June 2025, ECMWF
+[replied](https://forum.ecmwf.int/t/aifs-expanded-products/13606) that they would pass the request
+to the AIFS developers — a request logged, not a plan.
 
 **The free feed's ensemble steps are 3-hourly to 144 hours, and the one dated commitment to widen
 the free feed is about grid spacing rather than steps.** ECMWF's announcement of 1 October 2025,
@@ -290,11 +305,13 @@ steps the licensed catalogue carries out to 90 hours appear neither there nor an
 searched. Hourly steps would be worth having for solar, because the coarser the step, the flatter
 and later the reconstructed solar day.
 
-**Removing the licence fee did not widen the free feed.** The October 2025 change made ECMWF's whole
-Real-time Catalogue open, but the open-data catalogue page, updated for IFS Cycle 50r1 on 13 May
-2026, still lists the same five radiation parameters — `ssrd`, `strd`, `ssr`, `str`, and `ttr` — and
-the same step list as before. Listing the index files of the 2026-09-19 00Z run agrees: 47
-parameters, those same five radiation fields, and no step finer than 3 hours.
+**Removing the licence fee brought neither the direct beam nor a finer step to the free feed.** The
+October 2025 change made ECMWF's whole Real-time Catalogue open, and the free feed has gained
+parameters since, but the open-data catalogue page, updated for IFS Cycle 50r1 on 13 May 2026, still
+lists five radiation parameters — `ssrd`, `strd`, `ssr`, `str`, and `ttr` — and the same 3-hourly
+step floor. Listing the index files of the 2026-09-19 00Z run agrees: 47
+parameters at any one ensemble step, those same five radiation fields, and no step finer than
+3 hours.
 
 ### Two traps for whoever builds on ECMWF's direct beam
 
