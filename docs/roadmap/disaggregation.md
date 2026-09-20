@@ -429,15 +429,17 @@ resolution, tap-changer movements would blur any topology signal in voltage anyw
 movements _could_ themselves reveal topology, but only in data sampled at around 1 Hz.
 
 **[Nguyen et al. (2026)](https://doi.org/10.48550/arXiv.2608.25095) make evaluating one candidate
-switch configuration cheap, but they do not search over configurations.** Their
+switch configuration cheap on a large network, but they do not search over configurations.** Their
 Sherman-Morrison-Woodbury update refreshes the inverse of the admittance matrix when switches move,
-instead of re-inverting that matrix from scratch, and runs 28 times faster than re-inversion on
-their largest feeder. Scoring many candidate configurations against observed power is what an
-inverse topology problem needs. But Nguyen et al. take the switch positions as a known input, so the
-update would accelerate the inner loop of a topology search that something else has to write. A
-Sherman-Morrison-Woodbury update also needs the full nodal admittance matrix of a reference
-configuration, which this project does not hold. The update is a candidate building block, not a
-plan.
+instead of re-inverting that matrix from scratch. The saving scales with the size of the matrix: 28
+times faster than re-inversion on their largest, 8,500-node feeder, but only 1.1 times on their
+13-bus feeder, and slower than re-inversion there once the iterative refinement the paper recommends
+for small systems is switched on. The paper also reports the update is worst conditioned under
+"ill-conditioned switch reconfigurations with high-impedance tie switches or near-parallel paths",
+which is the case a search over a meshed network with movable cut points would meet most often.
+Nguyen et al. take the switch positions as a known input, so the update would accelerate the inner
+loop of a topology search that something else has to write. The update is a candidate building
+block, not a plan.
 
 ## Where this work is novel
 
