@@ -61,7 +61,12 @@ OUTAGE_RUN_HOURS: Final[int] = 24
 """A run of exactly-zero hourly power at least this long is treated as an outage and dropped.
 
 Twenty-four hours necessarily spans a daylight period, so a PV site cannot produce such a run by
-physics. The filter reads only the power column, never irradiance, so it cannot favour an arm.
+physics. Reading only the power column does not by itself make the filter neutral between the arms,
+because power is a function of irradiance: a short, heavily overcast winter day whose output is
+exactly zero joins the long nights either side and can clear 24 hours, and an overcast day is the
+high-diffuse regime one arm exists to exploit. What makes it acceptable is the size of the tilt it
+introduces, which `main` logs: the filter removes about 1.2% of daylight rows, a little over 3% of
+December rows against 1.5% of June rows.
 """
 
 IMPLAUSIBLE_CAPACITY_MULTIPLE: Final[float] = 1.5
@@ -70,9 +75,34 @@ IMPLAUSIBLE_CAPACITY_MULTIPLE: Final[float] = 1.5
 MIN_SOLAR_ELEVATION_DEGREES: Final[float] = 0.0
 """Rows whose window-midpoint sun is below this elevation are dropped.
 
-Night is trivially zero for every arm, so keeping it would dilute the arm-to-arm difference with
-rows no arm can get wrong.
+Zero degrees means "the sun is above the horizon", which is the one definition of daylight nobody
+can argue was chosen to flatter a result. It leaves the twilight hours in, where power is near zero
+and every arm is equally right, so every percentage difference this experiment reports is diluted by
+rows no arm can get wrong. Raising the threshold would sharpen the contrast and would also be a
+choice made with the answer in view, which is the worse trade.
 """
+
+CONTROL_TILT_DEGREES: Final[float] = 30.0
+"""Tilt of the notional array the synthetic control target is built from."""
+
+CONTROL_AZIMUTH_DEGREES: Final[float] = 180.0
+"""Azimuth of that notional array: due south, the usual choice for a GB fixed-tilt farm."""
+
+GROUND_ALBEDO: Final[float] = 0.2
+"""Ground reflectance for the synthetic control target's transposition."""
+
+REFERENCE_PLANE_OF_ARRAY_W_M2: Final[float] = 1000.0
+"""Plane-of-array irradiance at which the synthetic array is taken to produce its full capacity."""
+
+CONTROL_NOISE_FRACTION_OF_CAPACITY: Final[float] = 0.05
+"""Noise added to the synthetic control target, as a fraction of the site's capacity.
+
+A noise-free target would only show that the pipeline can detect an enormous effect. Five per cent
+of capacity is the order of a competent irradiance-driven PV forecast's error, so clearing the bar
+on this target says the pipeline can find a split effect at a realistic signal-to-noise ratio.
+"""
+
+CONTROL_NOISE_SEED: Final[int] = 5150
 
 JOULES_PER_HOUR_TO_WATTS: Final[float] = 3600.0
 KELVIN_TO_CELSIUS_OFFSET: Final[float] = 273.15
@@ -82,8 +112,16 @@ SITE_LABELS: Final[tuple[str, ...]] = ("A", "B", "C", "D", "E", "F")
 """Anonymous site labels.
 
 These metered generators' output is commercially sensitive, so nothing downstream of this script
-ever sees a `time_series_id` or a site name. Labels are assigned by ascending `time_series_id`,
-which is an arbitrary order carrying no information about the sites.
+ever sees a `time_series_id`, a site name or a coordinate.
+"""
+
+LABEL_PERMUTATION_SEED: Final[int] = 784
+"""Seed for the shuffle that assigns `SITE_LABELS` to sites.
+
+Assigning labels in `time_series_id` order would not anonymise anything: `time_series_id` comes
+from NGED's own feed, so anyone holding the same roster could sort it and read the mapping straight
+off a published per-site table. Shuffling breaks that. The seed is fixed so a re-run reproduces the
+same labels.
 """
 
 
@@ -179,7 +217,8 @@ def _pv_sites() -> pl.DataFrame:
     if sites.height != len(SITE_LABELS):
         msg = f"expected {len(SITE_LABELS)} usable PV sites, found {sites.height}"
         raise ValueError(msg)
-    return sites.with_columns(site=pl.Series(SITE_LABELS, dtype=pl.Utf8)).drop("n_rows")
+    shuffled = np.random.default_rng(LABEL_PERMUTATION_SEED).permutation(list(SITE_LABELS))
+    return sites.with_columns(site=pl.Series(shuffled, dtype=pl.Utf8)).drop("n_rows")
 
 
 def _hourly_power(*, sites: pl.DataFrame) -> pl.DataFrame:
@@ -220,7 +259,8 @@ def _hourly_power(*, sites: pl.DataFrame) -> pl.DataFrame:
 def _drop_outages_and_spikes(*, power: pl.DataFrame, sites: pl.DataFrame) -> pl.DataFrame:
     """Remove multi-day zero runs and physically impossible meter spikes.
 
-    Both filters read the power column alone, never irradiance, so neither can favour an arm.
+    Whatever these filters remove is removed before the arms exist, so every arm trains and is
+    scored on exactly the same rows.
 
     Args:
         power: Hourly power from `_hourly_power`.
@@ -243,8 +283,12 @@ def _drop_outages_and_spikes(*, power: pl.DataFrame, sites: pl.DataFrame) -> pl.
     run_lengths = labelled.filter("_zero").group_by("site", "_run_id").agg(run_hours=pl.len())
     outage_runs = run_lengths.filter(pl.col("run_hours") >= OUTAGE_RUN_HOURS)
 
+    # A run id is shared by the zero rows of an outage *and* by the non-zero row immediately before
+    # it, because the id increments on the first row that is not a contiguous zero. Requiring
+    # `_zero` as well as a matching run id keeps that last good reading.
+    doomed = labelled.filter("_zero").join(outage_runs, on=["site", "_run_id"], how="semi")
     return (
-        labelled.join(outage_runs, on=["site", "_run_id"], how="anti")
+        labelled.join(doomed.select("site", "time"), on=["site", "time"], how="anti")
         .drop("_zero", "_run_id")
         .sort("site", "time")
     )
@@ -322,9 +366,20 @@ def _add_solar_geometry(*, joined: pl.DataFrame) -> pl.DataFrame:
 def _add_separation_models(*, frame: pl.DataFrame) -> pl.DataFrame:
     """Add the irradiance columns each arm draws on, including the separation-model estimates.
 
+    **Every arm's beam column is a flux onto a horizontal plane, never a direct-normal one.** A
+    separation model returns direct normal irradiance, which is beam-on-horizontal divided by the
+    cosine of the solar zenith — a much larger number at low sun, where beam-on-horizontal is near
+    zero. Feeding one arm normal components and another horizontal ones would let the arms differ
+    in how the quantity is encoded as well as in what it knows, and a tree cannot divide, so it
+    would have to rediscover the cosine across many splits. Converting the separation models' output
+    back to the horizontal plane removes that confound.
+
     Erbs is the separation model the [Horat, Klerings and Lerch
-    (2024)](https://arxiv.org/abs/2406.04424) chain uses, and is the primary. DISC is carried as a
-    sensitivity: its child DIRINT needs a pandas `DatetimeIndex`, and this repo forbids pandas.
+    (2024)](https://arxiv.org/abs/2406.04424) chain uses, and is the primary. DISC is the
+    sensitivity, in place of the DIRINT model the issue suggested, because DISC is like Erbs a
+    per-row function of global irradiance and solar geometry. DIRINT's `delta_kt_prime` term reads
+    the neighbouring hours' global irradiance, which the global-only arm never sees, so a DIRINT arm
+    could beat that arm by smuggling in temporal structure rather than by carrying the split.
 
     Args:
         frame: Rows carrying `ghi_w_m2`, `bhi_w_m2` and `solar_zenith_deg`.
@@ -340,21 +395,70 @@ def _add_separation_models(*, frame: pl.DataFrame) -> pl.DataFrame:
     erbs = pvlib.irradiance.erbs(ghi=ghi, zenith=zenith, datetime_or_doy=day_of_year)
     disc = pvlib.irradiance.disc(ghi=ghi, solar_zenith=zenith, datetime_or_doy=day_of_year)
     cos_zenith = np.clip(np.cos(np.radians(zenith)), 0.0, None)
-    disc_dni = np.nan_to_num(np.asarray(disc["dni"]), nan=0.0)
-    disc_dhi = ghi - disc_dni * cos_zenith
+
+    erbs_bhi = np.nan_to_num(np.asarray(erbs["dni"]), nan=0.0) * cos_zenith
+    disc_bhi = np.nan_to_num(np.asarray(disc["dni"]), nan=0.0) * cos_zenith
 
     # The direct fraction is undefined when there is no global irradiance at all, and a ratio taken
     # near zero is numerical noise rather than a physical quantity, so both are pinned to zero.
     direct_fraction = np.where(ghi > 1.0, np.clip(bhi / np.maximum(ghi, 1e-9), 0.0, 1.0), 0.0)
 
     return frame.with_columns(
-        erbs_dni_w_m2=pl.Series(np.nan_to_num(np.asarray(erbs["dni"]), nan=0.0)),
-        erbs_dhi_w_m2=pl.Series(np.nan_to_num(np.asarray(erbs["dhi"]), nan=0.0)),
-        disc_dni_w_m2=pl.Series(disc_dni),
-        disc_dhi_w_m2=pl.Series(disc_dhi),
+        erbs_bhi_w_m2=pl.Series(np.clip(erbs_bhi, 0.0, ghi)),
+        erbs_dhi_w_m2=pl.Series(np.clip(ghi - erbs_bhi, 0.0, None)),
+        disc_bhi_w_m2=pl.Series(np.clip(disc_bhi, 0.0, ghi)),
+        disc_dhi_w_m2=pl.Series(np.clip(ghi - disc_bhi, 0.0, None)),
         dhi_w_m2=pl.Series(np.maximum(ghi - bhi, 0.0)),
         direct_fraction=pl.Series(direct_fraction),
     )
+
+
+def _add_synthetic_control_target(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Add a synthetic power target that the beam/diffuse split is guaranteed to help predict.
+
+    **This is the experiment's positive control, and without it a null result would be
+    uninterpretable.** Finding no arm-to-arm difference on the real meters says "we did not detect
+    an effect", which only becomes "there is no effect to detect" once the instrument has been shown
+    to detect one. The synthetic target is the plane-of-array irradiance a south-facing array tilted
+    at `CONTROL_TILT_DEGREES` would see, scaled to the site's capacity and buried in noise:
+    transposition needs the beam and the diffuse separately, so the split *must* help here. An arm
+    that cannot beat the global-only arm on this target cannot be trusted to have looked properly at
+    the real one.
+
+    Beam on the tilted plane is the beam's horizontal flux times the ratio of the cosine of the
+    angle of incidence to the cosine of the solar zenith. The cosine of the zenith is floored,
+    because it goes to zero at sunset while beam-on-horizontal goes to zero with it, and the ratio
+    of two vanishing quantities is numerical noise.
+
+    Args:
+        frame: Rows carrying the true split, solar geometry and `effective_capacity_mw`.
+
+    Returns:
+        `frame` with `synthetic_power_mw` added.
+    """
+    zenith = np.radians(frame["solar_zenith_deg"].to_numpy().astype(np.float64))
+    azimuth = np.radians(frame["solar_azimuth_deg"].to_numpy().astype(np.float64))
+    tilt = np.radians(CONTROL_TILT_DEGREES)
+    surface_azimuth = np.radians(CONTROL_AZIMUTH_DEGREES)
+
+    cos_incidence = np.clip(
+        np.cos(zenith) * np.cos(tilt)
+        + np.sin(zenith) * np.sin(tilt) * np.cos(azimuth - surface_azimuth),
+        0.0,
+        None,
+    )
+    beam_on_plane = frame["bhi_w_m2"].to_numpy() * cos_incidence / np.maximum(np.cos(zenith), 0.05)
+    sky_diffuse = frame["dhi_w_m2"].to_numpy() * (1.0 + np.cos(tilt)) / 2.0
+    ground_reflected = frame["ghi_w_m2"].to_numpy() * GROUND_ALBEDO * (1.0 - np.cos(tilt)) / 2.0
+    plane_of_array = beam_on_plane + sky_diffuse + ground_reflected
+
+    capacity = frame["effective_capacity_mw"].to_numpy().astype(np.float64)
+    generator = np.random.default_rng(CONTROL_NOISE_SEED)
+    noise = generator.normal(0.0, CONTROL_NOISE_FRACTION_OF_CAPACITY * capacity)
+    synthetic = np.clip(
+        capacity * plane_of_array / REFERENCE_PLANE_OF_ARRAY_W_M2 + noise, 0.0, None
+    )
+    return frame.with_columns(synthetic_power_mw=pl.Series(synthetic))
 
 
 def main() -> int:
@@ -369,8 +473,13 @@ def main() -> int:
     _LOG.info("hourly power after outage and spike filtering: %d rows", power.height)
 
     sites_with_cells = _nearest_era5_cell(sites=sites, era5=era5)
+    _LOG.info(
+        "the %d sites resolve to %d distinct ERA5 grid cells",
+        sites_with_cells.height,
+        sites_with_cells.select("cell_latitude", "cell_longitude").n_unique(),
+    )
     joined = (
-        power.join(sites_with_cells.drop("effective_capacity_mw"), on="site")
+        power.join(sites_with_cells, on=["site", "effective_capacity_mw"])
         .join(
             era5,
             left_on=["time", "cell_latitude", "cell_longitude"],
@@ -385,7 +494,9 @@ def main() -> int:
     daylight = with_geometry.filter(pl.col("solar_elevation_deg") > MIN_SOLAR_ELEVATION_DEGREES)
     _LOG.info("daylight rows: %d", daylight.height)
 
-    dataset = _add_separation_models(frame=daylight).drop("cell_latitude", "cell_longitude")
+    dataset = _add_synthetic_control_target(frame=_add_separation_models(frame=daylight)).drop(
+        "cell_latitude", "cell_longitude", "latitude", "longitude"
+    )
     dataset.write_parquet(OUTPUT_PATH)
     _LOG.info("wrote %d rows to %s", dataset.height, OUTPUT_PATH)
     _LOG.info(
