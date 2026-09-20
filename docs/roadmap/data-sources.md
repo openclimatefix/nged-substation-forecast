@@ -198,9 +198,9 @@ asked for.
 | **ECMWF ENS** from ECMWF | Forecast | ✅ `ssrd` | ✅ `fdir` | By subtraction | Licensed dissemination or a MARS subscription |
 | **ECMWF AIFS**, both Single and ENS | Forecast | ✅ `ssrd` | ❌ | ❌ | Free ECMWF open data; no direct field exists to license |
 | **ICON-EU** via Dynamical.org | Forecast | By addition | ✅ | ✅ | Free, already ingested by Dynamical.org |
-| **UKV** (Met Office) | Forecast | ✅ | ✅ | ✅ | Free on AWS, CC BY-SA 4.0; 2-year archive |
-| **MOGREPS-UK** (Met Office) | Forecast | ✅ | ✅ | ✅ | Free on AWS, CC BY-SA 4.0; **30-day rolling archive** |
-| **Global 10 km** (Met Office) | Forecast | ✅ | ✅ | By subtraction | Free on AWS, CC BY-SA 4.0; 168-hour horizon, but the global field is absent from 2024 runs |
+| **UKV** (Met Office) | Forecast | ✅ | ✅ | ✅ | Free on AWS, CC BY-SA 4.0; all three components in every run back to the archive's start, 2024-09-19 |
+| **MOGREPS-UK** (Met Office) | Forecast | ✅ | ✅ | ✅ | Free on AWS, CC BY-SA 4.0; all three components, plus net short-wave; **30-day rolling archive** |
+| **Global 10 km** (Met Office) | Forecast | ✅ | ✅ | By subtraction | Free on AWS, CC BY-SA 4.0; 168-hour horizon; no global field before the 2024-11-07 12 UTC run |
 | **WeatherNext 3** (Google DeepMind) | Forecast | ✅ | ✅ `fdir` | By subtraction | Access request; CC-BY-4.0 once at least 1 hour old |
 | **ERA5** | Reanalysis | ✅ `ssrd` | ✅ `fdir` | By subtraction | Free from the Copernicus Climate Data Store |
 | **CERRA** | Reanalysis | ✅ | ✅ | By subtraction | Free from the Copernicus Climate Data Store |
@@ -248,10 +248,19 @@ what makes them a cheaper ask than `fdir`.
 model reaches 168 hours, UKV reaches 120 hours on its 03 and 15 UTC runs and 54 hours on the rest,
 and MOGREPS-UK reaches 126 hours. No Met Office model covers NGED's 14-day horizon. A Met Office
 model would therefore sit alongside ECMWF ENS rather than replace the ECMWF feed, exactly as
-ICON-EU would. MOGREPS-UK is held on AWS as a
-30-day rolling window, which rules out backtesting unless we archive the feed ourselves from the day
-we start. And the global model's archive is not uniform: the runs we listed from September 2024 carry
-the direct field but no global field, whereas the runs from September 2026 carry both.
+ICON-EU would. MOGREPS-UK is held on AWS as a 30-day rolling window, which rules out backtesting
+unless we archive the feed ourselves from the day we start.
+
+**A backtest on the global 10 km model starts at its 2024-11-07 12 UTC run, not at the start of its
+archive, because no earlier run carries global short-wave.** Listing every 6-hourly run from the
+earliest on AWS, 2024-09-19 18 UTC, shows
+`radiation_flux_in_shortwave_direct_downward_at_surface` throughout and
+`radiation_flux_in_shortwave_total_downward_at_surface` only from 2024-11-07 12 UTC onwards. That
+run also carries 4,470 files where the run 6 hours before it carries 2,842, so the feed gained more
+than the one field. Global short-wave then took a week to settle: the first run carrying the field
+carries it at 78 lead times against the direct field's 89, and runs up to 2024-11-13 drop it at one
+lead time or another. UKV and MOGREPS-UK need no such cut-off, because the earliest run of each on
+AWS already carries global, direct, and diffuse short-wave at every lead time that run publishes.
 
 ### Two traps for whoever builds on ECMWF's direct beam
 
