@@ -215,6 +215,9 @@ def _chart(*, differences: pl.DataFrame) -> alt.FacetChart:
             column=alt.Column("panel:N", title=None, sort=list(PANEL_TITLES)),
             row=alt.Row("instrument_label:N", title=None, sort=list(INSTRUMENT_LABELS.values())),
         )
+        # Only the x scale is resolved per panel. Resolving y as well would drop the three rows the
+        # physical model has no arm for, but it also detaches the column headers from the columns
+        # they label, which is a chart that misleads rather than one with a gap in it.
         .resolve_scale(x="independent")
         .properties(
             title=alt.TitleParams(
