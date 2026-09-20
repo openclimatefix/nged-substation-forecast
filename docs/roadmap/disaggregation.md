@@ -100,8 +100,10 @@ Dynamical.org](data-sources.md#weather-data) publishes the global horizontal com
 the [CAMS Radiation Service](capacity-estimation.md#irradiance-inputs) supplies the split over
 history but issues no forecast. That leaves two routes: a differentiable model that decomposes
 global horizontal irradiance into its direct and diffuse parts, or a second forecast source that
-publishes the direct component. [WeatherNext 3](data-sources.md#weather-data) takes the second
-route, publishing total-sky direct short-wave (`fdir`) hourly at 0.1°.
+publishes the direct component. Two sources already on the
+[shortlist](data-sources.md#weather-data) take the second route: ICON-EU publishes direct and
+diffuse short-wave separately, though only as a deterministic run out to 120 hours, and WeatherNext
+3 publishes total-sky direct short-wave (`fdir`) hourly at 0.1° across a 64-member ensemble.
 
 ### Metered vs. unmetered DERs
 
