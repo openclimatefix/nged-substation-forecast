@@ -429,16 +429,17 @@ resolution, tap-changer movements would blur any topology signal in voltage anyw
 movements _could_ themselves reveal topology, but only in data sampled at around 1 Hz.
 
 **[Nguyen et al. (2026)](https://doi.org/10.48550/arXiv.2608.25095) make evaluating one candidate
-switch configuration cheap on a large network, but they do not search over configurations.** Their
-Sherman-Morrison-Woodbury update refreshes the inverse of the admittance matrix when switches move,
-instead of re-inverting that matrix from scratch. The saving scales with the size of the matrix: 28
-times faster than re-inversion on their largest, 8,500-node feeder, but only 1.1 times on their
-13-bus feeder, and slower than re-inversion there once the iterative refinement the paper recommends
-for small systems is switched on. The paper also reports the update is worst conditioned under
-"ill-conditioned switch reconfigurations with high-impedance tie switches or near-parallel paths",
-which is the case a search over a meshed network with movable cut points would meet most often.
-Nguyen et al. take the switch positions as a known input, so the update would accelerate the inner
-loop of a topology search that something else has to write. The update is a candidate building
+switch configuration fast on a large electricity network, but they do not search over
+configurations.** Their Sherman-Morrison-Woodbury update refreshes the inverse of the admittance
+matrix when switches move, instead of re-inverting that matrix from scratch. The speed-up scales
+with the size of the matrix. On their largest, 8,500-node feeder the update is 28 times faster than
+re-inversion; on their 13-bus feeder, only 1.1 times. On that small feeder the update is slower than
+re-inversion once the iterative refinement is switched on, and the paper recommends that refinement
+for small systems. The paper also reports the update is worst conditioned under "ill-conditioned
+switch reconfigurations with high-impedance tie switches or near-parallel paths". A search over a
+meshed electricity network with movable cut points would meet that case routinely. Nguyen et al.
+take the switch positions as a known input. So the update would accelerate the inner loop of a
+topology search that this project would still have to write. The update is a candidate building
 block, not a plan.
 
 ## Where this work is novel

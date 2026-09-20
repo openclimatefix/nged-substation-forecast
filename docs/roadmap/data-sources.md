@@ -5,7 +5,8 @@ data.
 
 > **Status legend** — ✅ Ingested today · 🚧 Planned ingestion · 🔬 Research. The ECMWF ENS NWP and the
 > NGED time-series JSON / metadata are ✅ ingested; the supporting NGED files and the extra weather
-> datasets are 🚧 planned (needed for switching-event detection and capacity estimation). See the
+> datasets are 🚧 planned (needed for switching-event detection and capacity estimation), and
+> NGED's published electricity-network model is 🔬 research. See the
 > [roadmap index](index.md) for status conventions.
 
 ---
@@ -54,6 +55,38 @@ the averaging rule needs to say what happens when one reading of a pair is missi
 | **Switching Logs.xlsx** | 🚧 | History of every normally-open switching point between primaries, labelled by time-series ID. Primaries outside the trial area are labelled "Unknown". | **Extremely valuable** as the gold-standard *test set* for [switching-event detection](switching-events.md) — lets us validate the unsupervised method on the trial area (labels do **not** exist at scale). Some edges "collapse" into `[substation ID] – unknown`. Two edges present in Interconnections.csv are missing: 900016 (ID 10) ↔ 900019 (ID 13), and 900022 (ID 16) ↔ unknown (910026). Logs go back to ≥ 2019. |
 | **MPAN to Substation Number.csv** | 🚧 | Associates each Embedded Capacity Register (ECR) generator to the substation it connects to. | All trial-area generators present, each with two Meter Point Administration Numbers (MPANs, import + export). Three primaries appear with one MPAN each, to be confirmed with NGED. |
 | **Peak Loads.xlsx** | 🚧 | Manually selected peak demand per trial-area substation, from 2024/25 (most recent survey). | Covers all 16 trial primaries. Of these, 12 have 2024/25 readings above the recorded peak. Even at the 99th percentile of observed power, 3 primaries (IDs 8, 13, and 25) show 2–4× the recorded peak. One other primary has a recorded peak above 14 MVA, but its telemetry has never exceeded 6.8 MVA. Given these discrepancies, we use the **99th percentile of observed power** as the substation "capacity" proxy, at least initially. |
+
+### NGED's published electricity-network model (the Long Term Development Statement)
+
+**NGED publishes a description of the electricity network itself, and that description does not
+arrive in Flexpectation's pipeline.** The two tables above list what NGED sends. The Long Term
+Development Statement (LTDS) is separate. The LTDS sits on NGED's open-data portal in two forms. The
+LTDS describes the wires rather than the power flowing through them.
+
+| Dataset | Status | Description |
+|---|---|---|
+| [LTDS Tabular Model](https://connecteddata.nationalgrid.co.uk/dataset/ltds-tabular-model) | 🔬 | Comma-separated tables covering circuits, nodes, two- and three-winding transformers, demand, fault levels, and generation, across NGED's four licence areas. |
+| [LTDS Common Information Model](https://connecteddata.nationalgrid.co.uk/dataset/ltds-common-information-model) | 🔬 | The same electricity network in the Common Information Model format, as one archive per licence area, covering 132 kV grid supply points down to 11 kV or 6.6 kV primaries. A separate lookup table maps the model's substations to NGED substation numbers. |
+
+**Between them, the two publications carry the per-branch impedances and thermal ratings a
+power-flow model is built from.** Flexpectation holds neither anywhere else. The circuit table holds
+22,516 rows. Of those, 6,145 carry positive- and zero-sequence impedances and four seasonal thermal
+ratings, at 132, 66, 33, 11, and 6.6 kV. The rest are switching devices such as disconnectors, which
+have no impedance.
+
+Three planned pieces of work would draw on the two publications:
+
+- [Tier 3 curtailment costing](cost-savings-metrics.md#tier-3-full-power-flow-modelling), which is
+  out of scope today for want of exactly this model.
+- [Switching-event detection](switching-events.md), which reasons about which substations can
+  exchange load.
+- [Capacity estimation](capacity-estimation.md), which needs a firmer limit per node than the 99th
+  percentile of observed power.
+
+**No Flexpectation code reads either dataset.** Two questions have to be answered first. Do the LTDS
+node names join cleanly to the `time_series_id`s Flexpectation forecasts? The Common Information
+Model's substation-number lookup is where that join would start. How far below the primary
+substations does the published model reach? Neither question has been investigated.
 
 ---
 

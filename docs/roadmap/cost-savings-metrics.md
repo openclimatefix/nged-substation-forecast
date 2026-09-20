@@ -214,43 +214,40 @@ reason to keep delivering the [ensemble of deterministic
 forecasts](delivery-tables.md#representation-1-ensemble-of-deterministic-forecasts) alongside the
 percentile representations.
 
-**Solving the power flow is not what gates Tier 3.** [Nguyen et al.
+**Tier 3 is not gated on the speed of the power-flow solve.** [Nguyen et al.
 (2026)](https://doi.org/10.48550/arXiv.2608.25095) train a self-supervised surrogate for multiphase
-AC optimal power flow, the dispatch optimisation that sits on top of a power-flow solve. On
-in-distribution, feasible test cases the surrogate stays within 0.2% of the cost the interior-point
-solver IPOPT reaches, across IEEE test feeders of 13 to 8,500 nodes. The gap rises to 1.5% on the
-largest feeder, and to about 1% under the widest load and distributed-energy-resource shift the
-paper tests. Measured as batched inference on a graphics processing unit against IPOPT on a central
-processing unit, the surrogate runs one to three orders of magnitude faster, reaching 780 and 1,121
-times on the two largest feeders. Tier 3 needs the power-flow solve rather than the optimisation
-layered on top. Nguyen et al. do not time the two separately, but nothing in their results suggests
-solver speed is what stops an ensemble being pushed through member by member.
+alternating-current (AC) optimal power flow. That is the dispatch optimisation layered on top of a
+power-flow solve, and Tier 3 needs only the solve. The surrogate still shows how fast the harder of
+the two problems can run. On feasible, in-distribution test cases it stays within 0.2% of the cost
+the interior-point solver IPOPT reaches. It runs one to three orders of magnitude faster than
+IPOPT, reaching 780 and 1,121 times on the two largest IEEE test feeders it was tried on, which
+range from 13 to 8,500 nodes. That comparison times batched inference on a graphics processing unit
+against IPOPT on a central processing unit. Nguyen et al. do not time the power-flow solve
+separately from the optimisation. Their results give no reason to think the solve is too slow to
+push an ensemble through member by member.
 
-**The gate is bringing an electricity-network model into this project, not the absence of one.**
-Nguyen et al. build their method around a nodal admittance matrix assembled from per-branch
-impedances, plus the per-branch thermal ratings and voltage limits their constraints enforce. NGED
-publishes the first two of those three quantities as open data. The [Long Term Development
-Statement's circuit table](https://connecteddata.nationalgrid.co.uk/dataset/ltds-tabular-model)
-carries positive- and zero-sequence impedances and four seasonal ratings for 6,145 circuits across
-NGED's four licence areas, and the [Long Term Development Statement Common Information
-Model](https://connecteddata.nationalgrid.co.uk/dataset/ltds-common-information-model) covers 132 kV
-grid supply points down to 11 kV or 6.6 kV primaries. Neither reaches this project's pipeline today.
-Joining either to the `time_series_id`s Flexpectation forecasts is unscoped work, though the Common
-Information Model publication includes a substation-number lookup that is the obvious starting
-point.
+**NGED already publishes an electricity-network model, so the gate is integration work rather than
+a missing model.** Nguyen et al.'s method needs three inputs: per-branch impedances, per-branch
+thermal ratings, and voltage limits. NGED publishes the impedances and the thermal ratings as open
+data, in its Long Term Development Statement. See [data
+sources](data-sources.md#ngeds-published-electricity-network-model-the-long-term-development-statement)
+for what the two publications contain. Joining either publication to the `time_series_id`s
+Flexpectation forecasts is unscoped work.
 
-**Fractal Flow is building a shared cross-operator twin, which is a larger thing than Tier 3 needs
-and arrives later.** [Fractal Flow's Strategic Innovation Fund Beta
-registration](https://smarter.energynetworks.org/projects/npg_sif_026/) describes a shared,
-near-real-time digital twin across the transmission-distribution boundary, led by Northern
-Powergrid. Every GB distribution system operator, NGED among them, and the National Energy System
-Operator (NESO) are Beta partners, for a phase running from September 2026 to September 2028 that
-trials the twin on historic data in three control rooms, none of them NGED's. The registration puts
-phased rollout at 2030, extending to all distribution system operators by 2035. Fractal Flow also
-sits on the far side of the forecasting boundary from Flexpectation: the registration has it
-combining "DNO and NESO forecasts into a unified view up to 24-hours ahead of the settlement period"
-and, separately, predicting "possible power-flow changes through the network 24-hours ahead of the
-settlement period".
+**[Fractal Flow](https://smarter.energynetworks.org/projects/npg_sif_026/), a Northern Powergrid
+project building a shared cross-operator digital twin, is not a route to that model.** The twin is
+wider in scope than Tier 3 needs, and arrives later. The project's Strategic Innovation Fund Beta
+registration describes a shared, near-real-time digital twin across the transmission-distribution
+boundary. Every GB distribution system operator (NGED included) and the National Energy System
+Operator (NESO) are Beta partners. The Beta phase runs from September 2026 to September 2028. That
+phase trials the twin on historic data in three control rooms, none of them NGED's. The
+registration puts phased rollout at 2030, extending to all distribution system operators by 2035.
+
+**Fractal Flow also sits on the far side of the forecasting boundary from Flexpectation.** The
+registration describes the twin combining distribution network operator ("DNO") and NESO forecasts
+"into a unified view up to 24-hours ahead of the settlement period". Separately, the registration
+describes the twin predicting "possible power-flow changes through the network 24-hours ahead of
+the settlement period".
 
 ### Curtailment price basis
 
