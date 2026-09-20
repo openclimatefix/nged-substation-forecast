@@ -428,16 +428,16 @@ measurements. Voltage at primary substations is not part of this project's data 
 resolution, tap-changer movements would blur any topology signal in voltage anyway. Tap-changer
 movements _could_ themselves reveal topology, but only in data sampled at around 1 Hz.
 
-**Evaluating one candidate switch configuration is cheap in the methods reviewed here; searching
-over configurations is not what those methods address.** [Nguyen et al.
-(2026)](https://doi.org/10.48550/arXiv.2608.25095) refresh the inverse admittance matrix across
-switch configurations with a Sherman-Morrison-Woodbury update, dropping the cost of evaluating one
-configuration from cubic in the number of nodes to quadratic, as long as only a few switches move
-between configurations. Scoring many candidate configurations against observed power is what an
-inverse topology problem needs. Nguyen et al. take the switch positions as a known input rather than
-inferring them, so the update speeds up the inner loop and leaves the search itself untouched. A
-Sherman-Morrison-Woodbury update also needs per-branch impedances, which this project does not hold,
-so the technique is noted here as a candidate primitive rather than a plan.
+**[Nguyen et al. (2026)](https://doi.org/10.48550/arXiv.2608.25095) make evaluating one candidate
+switch configuration cheap, but they do not search over configurations.** Their
+Sherman-Morrison-Woodbury update refreshes the inverse of the admittance matrix when switches move,
+instead of re-inverting that matrix from scratch, and runs 28 times faster than re-inversion on
+their largest feeder. Scoring many candidate configurations against observed power is what an
+inverse topology problem needs. But Nguyen et al. take the switch positions as a known input, so the
+update would accelerate the inner loop of a topology search that something else has to write. A
+Sherman-Morrison-Woodbury update also needs the full nodal admittance matrix of a reference
+configuration, which this project does not hold. The update is a candidate building block, not a
+plan.
 
 ## Where this work is novel
 
