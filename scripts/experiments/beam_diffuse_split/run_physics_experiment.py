@@ -34,7 +34,7 @@ from typing import Final, NamedTuple
 
 import numpy as np
 import polars as pl
-from physics_model import Geometry, power_mw
+from physics_model import MIN_COS_ZENITH, Geometry, power_mw
 from run_experiment import (
     N_FOLDS,
     SEEDS,
@@ -158,7 +158,7 @@ def _geometry_for(*, rows: pl.DataFrame, arm: str, weights: np.ndarray | None) -
         beam = np.clip((beams * np.asarray(weights)[:, None]).sum(axis=0), 0.0, global_horizontal)
         diffuse = global_horizontal - beam
     return Geometry(
-        cos_zenith=np.maximum(np.cos(zenith), 0.05),
+        cos_zenith=np.maximum(np.cos(zenith), MIN_COS_ZENITH),
         sin_zenith=np.sin(zenith),
         solar_azimuth_rad=np.radians(rows["solar_azimuth_deg"].to_numpy()),
         global_horizontal=global_horizontal,
