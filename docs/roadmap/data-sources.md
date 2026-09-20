@@ -161,15 +161,15 @@ radiation), [#143](https://github.com/openclimatefix/nged-substation-forecast/is
 
 | Source | Status | Description |
 |---|---|---|
-| **ECMWF ENS** (Dynamical.org) | ✅ | Main NWP source: 51-member ensemble, distributed as live-updating Zarrs. OCF converts gridded NWP to tabular via the H3 spatial index and stores as Delta Lake, stored as `Float32` rounded to a 13-bit significand, with zstd compression (~40 GB/year for all of GB; ~1 minute to download+convert one day). **The archive currently only extends back to 2024-04-01**; Dynamical.org are back-filling the operational archive from MARS to 2016-03-08 (51 members, 0.25°, 00Z inits only), but at ~0.8 TB/day against ~446 TB remaining the estimate is **~November 2027** — after v1.0, which is why we [extend the training history with ERA5](training-history.md) instead. Radiation: **global short-wave (GHI) only, no direct component** — [DP forecasting of PV](disaggregation.md) (v2) therefore needs a differentiable GHI → DNI/DHI decomposition model, or `fdir` from another source. ECMWF's own ENS carries `fdir`; the open feed Dynamical.org ingests does not, which is [a different ask](#ecmwf-publishes-a-direct-beam-forecast-but-not-in-the-open-feed-dynamicalorg-ingests). |
-| **ERA5** (ECMWF global reanalysis) — *the project's reanalysis* | 🚧 (v0.5) | The **single reanalysis** we ingest, serving both **pre-training** and near-real-time **capacity estimation**. Covers 1940 to the present — far enough back to pre-train on the long power histories that predate the ENS archive (2024-04-01). Its 31 km resolution is coarser than CERRA, which is acceptable because weather anomalies are synoptic-scale and the high-resolution *solar* irradiance comes from CAMS regardless. Radiation is global plus **direct** (`fdir`), giving the beam/diffuse split. Its **ERA5T** near-real-time stream lands ~5 days behind real time, and final ERA5 overwrites it ~2–3 months later after quality control. Shares the ECMWF **IFS lineage** with the ENS forecasts, so systematic biases largely cancel when the two are combined. Ingest **2020 to present**, including the 2024+ ENS overlap, which is not optional — see [Extending the training history](training-history.md). [Which access route](#era5-which-access-route) is still open. |
-| **CERRA** (Copernicus regional reanalysis for Europe) | 🔬 (deprioritised) | Higher-resolution (5.5 km) European reanalysis. Per the [Copernicus CDS](https://cds.climate.copernicus.eu/datasets/reanalysis-cerra-single-levels), it now runs from **September 1984 to the present** — monthly updates, but **~3.5 months behind real time**. **Superseded by ERA5** for the active plan: that ~3.5-month latency rules it out for near-real-time capacity estimation, ERA5 reaches further back for pre-training, and we prefer to ingest a single reanalysis. Kept here because its 5.5 km resolution could still earn a place for fine-scale work (e.g. wind over complex terrain) if that ever proves decisive. Radiation: global plus time-integrated **direct** short-wave (diffuse by subtraction); accumulated fluxes from 3-hourly forecast cycles, so temporally coarser than SARAH-3. |
-| **CM SAF** (Satellite Application Facility on Climate Monitoring) | 🔬 (v2 comparison) | SARAH-3 provides global (SIS), **direct (SID) and direct-normal (DNI)** irradiance on a 0.05° grid at 30 minutes from 1983 (diffuse = SIS − SID). Two reasons SARAH-3 is not the first ingest. Its climate data record ends 2020-12-31 and the Interim Climate Data Record extends that record, putting a version seam inside the 2019-onward history we train on. And its 30-minute values are **instantaneous snapshots**, whereas CAMS accumulates over the step, which is what a period-ending meter reading measures — under broken cloud an instantaneous sample and a 30-minute mean can differ a lot. Its gridded delivery would suit the H3 pipeline better than CAMS point requests, and comparing the two resolutions is not straightforward, because the CAMS point service interpolates to the requested location rather than publishing a grid. Latency is 2–5 days ([Pfeifroth et al. (2024)](https://doi.org/10.5194/essd-16-5243-2024)), immaterial offline. Worth a genuine head-to-head against CAMS in v2 — see [Correcting satellite irradiance over Great Britain](disaggregation.md#correcting-satellite-irradiance-over-great-britain). |
-| **CAMS solar radiation** (Copernicus Atmosphere Monitoring Service) | 🚧 (v0.7) | The satellite-derived irradiance we ingest, used to estimate **solar PV** capacity. Used **offline only** — capacity estimation runs over history, and the production serving path takes no dependency on it. The CAMS Radiation Service carries **global, direct, diffuse, and direct-normal** irradiance under both clear sky and observed cloud, from 2004-02, under CC-BY-4.0, at steps of 1 minute, 15 minutes, 1 hour, 1 day, or 1 month — the beam/diffuse split the [DP solar model](../techniques/differentiable-physics.md#the-core-building-block-differentiablesolarplant) needs. Cloud information comes from Meteosat Second Generation; aerosol, ozone, and water vapour come from the CAMS global forecasting system, so aerosol optical depth is a 3-hourly analysis rather than SARAH-3's monthly climatology. Values are interpolated to the requested location rather than served on a grid. Chosen over SARAH-3 on **delivery and record continuity, not on measured accuracy over Great Britain** — see [CAMS: use the point API, not the gridded product](#cams-use-the-point-api-not-the-gridded-product) for the route and its traps, and [Correcting satellite irradiance over Great Britain](disaggregation.md#correcting-satellite-irradiance-over-great-britain) for what is known about this source's error and what v2 might do about it. |
-| **ICON-EU** (Dynamical.org) | 🔬 (v0.9, uncertain) | Possible additional NWP source to test whether it improves skill over ECMWF ENS: a deterministic run from DWD, Germany's national weather service, on a ~6.5 km grid, 4 runs a day out to 5 days. Radiation: **direct and diffuse short-wave separately, and no global component** (global = direct + diffuse), so ICON-EU already carries the beam/diffuse split [the PV forward model](disaggregation.md#the-forward-model) needs. The Met Office models and WeatherNext 3 carry a direct component too, but ICON-EU's v0.9 is the earliest roadmap slot any of them holds. Starts early 2026, so it can't enter the canonical CV folds directly — assessed via ad-hoc ablation first. |
-| **AIFS-ENS** (ECMWF) | 🔬 (v2.1, uncertain) | ECMWF's machine-learned ensemble, now operational with the same 51 members, 6-hourly steps and 15-day horizon as the physics ensemble, and more accurate than it on the majority of variables and lead times ([Lang et al. (2026)](https://doi.org/10.1038/s44387-026-00073-7)). Whether that translates into a better substation-load forecast is an open question. AIFS-ENS member *n* starts from the [same initial conditions](https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+ENS+v1) as ECMWF ENS member *n*, so the two can be fed [side by side](xgboost-improvements.md#several-nwp-sources-as-features-v21) rather than swapped. Radiation: **global short-wave (`ssrd`) only, no direct component**, per [ECMWF's implementation notes](https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+ENS+v1) and confirmed by reading the GRIB index of an AIFS-ENS open-data run. AIFS Single, the deterministic AIFS, carries no direct component either. Unlike the physics ensemble, AIFS has no direct-beam field to ask for at all. Same folds problem as ICON-EU: the archive starts mid-2025, so it is an ad-hoc ablation before it is a canonical source. |
-| **WeatherNext 3** (Google DeepMind) | 🔬 (after v2, unlikely) | Google DeepMind's machine-learned 64-member ensemble, with single-level fields at 0.1° on hourly steps, running 15 days from the 00/06/12/18 UTC cycles and 48 hours from the hourly interim runs. 2 m temperature and dewpoint also arrive at 0.05°, from a neural-network output head trained directly on in-situ surface observations from airport stations, regional station networks, ships, and buoys ([Rasp et al. (2026)](https://arxiv.org/abs/2609.03582); [model specs](https://developers.google.com/weathernext/guides/models)). Radiation: **global short-wave and total-sky direct short-wave (`fdir`)**, so WeatherNext 3 is the one ensemble here offering [the PV forward model](disaggregation.md#the-forward-model) a beam/diffuse split. The paper reports a lower [continuous ranked probability score](../techniques/evaluation-metrics.md#crps-continuous-ranked-probability-score) than ECMWF ENS on surface solar radiation, scored on the 6-hour accumulations rather than the hourly fields. Every radiation evaluation in the paper scores against an ECMWF analysis, and none scores against a surface measurement, so any irradiance gain would have to be measured downstream on power. Two structural differences from AIFS-ENS: all 64 members start from one analysis, so the ensemble's spread comes from the model alone rather than from perturbed initial conditions, and no member pairs with an ECMWF ENS member. Data at least 1 hour old is CC-BY-4.0, real-time data falls under Google DeepMind's experimental terms, and access needs [a request form](https://developers.google.com/weathernext/guides/access-forecast). BigQuery and Earth Engine serve six summary statistics per variable (the mean, and the 10th, 25th, 50th, 75th, and 90th percentiles); the 64 members sit only in the Cloud Storage Zarr store. The folds problem is worse than ICON-EU's or AIFS-ENS's: the archive starts 2026-01-01, with 2024 and 2025 being backfilled. On current priorities we do not expect to reach this source inside the Network Innovation Allowance project. |
-| **UKV and MOGREPS-UK** (Met Office, via AWS) | 🔬 (uncertain) | The Met Office's 2 km deterministic UK model and its 2.2 km, 5-day UK ensemble. Both publish **direct, diffuse, and total downward short-wave at the surface as three separate fields**, so neither needs a subtraction to give [the PV forward model](disaggregation.md#the-forward-model) its beam/diffuse split, and both are free on AWS under British Crown copyright and CC BY-SA 4.0 ([UKV](https://registry.opendata.aws/met-office-uk-deterministic/), [MOGREPS-UK](https://registry.opendata.aws/met-office-uk-ensemble/)). Verified by listing the `met-office-atmospheric-model-data` and `met-office-uk-ensemble-model-data` buckets rather than from the documentation. Horizons are short: UKV reaches 5 days on its 03 and 15 UTC runs and 54 hours on the rest, and MOGREPS-UK reaches 126 hours, so both would sit alongside ECMWF ENS rather than replace it for NGED's 14-day horizon. **MOGREPS-UK's archive is a 30-day rolling window** — listing the bucket on 2026-09-20 returns runs from 2026-08-20 onwards and nothing earlier — which rules out backtesting unless we archive the feed ourselves from the day we start. UKV's window is 2 years. |
+| **ECMWF ENS** (Dynamical.org) | ✅ | Main NWP source: 51-member ensemble, distributed as live-updating Zarrs. OCF converts gridded NWP to tabular via the H3 spatial index and stores as Delta Lake, stored as `Float32` rounded to a 13-bit significand, with zstd compression (~40 GB/year for all of GB; ~1 minute to download+convert one day). **The archive currently only extends back to 2024-04-01**; Dynamical.org are back-filling the operational archive from MARS to 2016-03-08 (51 members, 0.25°, 00Z inits only), but at ~0.8 TB/day against ~446 TB remaining the estimate is **~November 2027** — after v1.0, which is why we [extend the training history with ERA5](training-history.md) instead. Radiation: no direct component, which is what forces [DP forecasting of PV](disaggregation.md) (v2) to find the beam/diffuse split elsewhere — see [which sources carry which irradiance components](#which-sources-carry-which-irradiance-components). |
+| **ERA5** (ECMWF global reanalysis) — *the project's reanalysis* | 🚧 (v0.5) | The **single reanalysis** we ingest, serving both **pre-training** and near-real-time **capacity estimation**. Covers 1940 to the present — far enough back to pre-train on the long power histories that predate the ENS archive (2024-04-01). Its 31 km resolution is coarser than CERRA, which is acceptable because weather anomalies are synoptic-scale and the high-resolution *solar* irradiance comes from CAMS regardless. Carries the [beam/diffuse split](#which-sources-carry-which-irradiance-components), which the live ENS feed does not. Its **ERA5T** near-real-time stream lands ~5 days behind real time, and final ERA5 overwrites it ~2–3 months later after quality control. Shares the ECMWF **IFS lineage** with the ENS forecasts, so systematic biases largely cancel when the two are combined. Ingest **2020 to present**, including the 2024+ ENS overlap, which is not optional — see [Extending the training history](training-history.md). [Which access route](#era5-which-access-route) is still open. |
+| **CERRA** (Copernicus regional reanalysis for Europe) | 🔬 (deprioritised) | Higher-resolution (5.5 km) European reanalysis. Per the [Copernicus CDS](https://cds.climate.copernicus.eu/datasets/reanalysis-cerra-single-levels), it now runs from **September 1984 to the present** — monthly updates, but **~3.5 months behind real time**. **Superseded by ERA5** for the active plan: that ~3.5-month latency rules it out for near-real-time capacity estimation, ERA5 reaches further back for pre-training, and we prefer to ingest a single reanalysis. Kept here because its 5.5 km resolution could still earn a place for fine-scale work (e.g. wind over complex terrain) if that ever proves decisive. Its [direct short-wave](#which-sources-carry-which-irradiance-components) is time-integrated from 3-hourly forecast cycles, so temporally coarser than SARAH-3. |
+| **CM SAF** (Satellite Application Facility on Climate Monitoring) | 🔬 (v2 comparison) | SARAH-3 carries [every irradiance component](#which-sources-carry-which-irradiance-components) on a 0.05° grid at 30 minutes from 1983. Two reasons SARAH-3 is not the first ingest. Its climate data record ends 2020-12-31 and the Interim Climate Data Record extends that record, putting a version seam inside the 2019-onward history we train on. And its 30-minute values are **instantaneous snapshots**, whereas CAMS accumulates over the step, which is what a period-ending meter reading measures — under broken cloud an instantaneous sample and a 30-minute mean can differ a lot. Its gridded delivery would suit the H3 pipeline better than CAMS point requests, and comparing the two resolutions is not straightforward, because the CAMS point service interpolates to the requested location rather than publishing a grid. Latency is 2–5 days ([Pfeifroth et al. (2024)](https://doi.org/10.5194/essd-16-5243-2024)), immaterial offline. Worth a genuine head-to-head against CAMS in v2 — see [Correcting satellite irradiance over Great Britain](disaggregation.md#correcting-satellite-irradiance-over-great-britain). |
+| **CAMS solar radiation** (Copernicus Atmosphere Monitoring Service) | 🚧 (v0.7) | The satellite-derived irradiance we ingest, used to estimate **solar PV** capacity. Used **offline only** — capacity estimation runs over history, and the production serving path takes no dependency on it. The CAMS Radiation Service carries [every irradiance component](#which-sources-carry-which-irradiance-components), under both clear sky and observed cloud, from 2004-02, under CC-BY-4.0, at steps of 1 minute, 15 minutes, 1 hour, 1 day, or 1 month — the beam/diffuse split the [DP solar model](../techniques/differentiable-physics.md#the-core-building-block-differentiablesolarplant) needs. Cloud information comes from Meteosat Second Generation; aerosol, ozone, and water vapour come from the CAMS global forecasting system, so aerosol optical depth is a 3-hourly analysis rather than SARAH-3's monthly climatology. Values are interpolated to the requested location rather than served on a grid. Chosen over SARAH-3 on **delivery and record continuity, not on measured accuracy over Great Britain** — see [CAMS: use the point API, not the gridded product](#cams-use-the-point-api-not-the-gridded-product) for the route and its traps, and [Correcting satellite irradiance over Great Britain](disaggregation.md#correcting-satellite-irradiance-over-great-britain) for what is known about this source's error and what v2 might do about it. |
+| **ICON-EU** (Dynamical.org) | 🔬 (v0.9, uncertain) | Possible additional NWP source to test whether it improves skill over ECMWF ENS: a deterministic run from DWD, Germany's national weather service, on a ~6.5 km grid, 4 runs a day out to 5 days. Already carries the [beam/diffuse split](#which-sources-carry-which-irradiance-components) [the PV forward model](disaggregation.md#the-forward-model) needs, and holds the earliest roadmap slot of any source that does. Starts early 2026, so it can't enter the canonical CV folds directly — assessed via ad-hoc ablation first. |
+| **AIFS-ENS** (ECMWF) | 🔬 (v2.1, uncertain) | ECMWF's machine-learned ensemble, now operational with the same 51 members, 6-hourly steps and 15-day horizon as the physics ensemble, and more accurate than it on the majority of variables and lead times ([Lang et al. (2026)](https://doi.org/10.1038/s44387-026-00073-7)). Whether that translates into a better substation-load forecast is an open question. AIFS-ENS member *n* starts from the [same initial conditions](https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+ENS+v1) as ECMWF ENS member *n*, so the two can be fed [side by side](xgboost-improvements.md#several-nwp-sources-as-features-v21) rather than swapped. Unlike the physics ensemble, AIFS has [no direct-beam field](#which-sources-carry-which-irradiance-components) to ask for at all, in either the ensemble or the deterministic AIFS Single. Same folds problem as ICON-EU: the archive starts mid-2025, so it is an ad-hoc ablation before it is a canonical source. |
+| **WeatherNext 3** (Google DeepMind) | 🔬 (after v2, unlikely) | Google DeepMind's machine-learned 64-member ensemble, with single-level fields at 0.1° on hourly steps, running 15 days from the 00/06/12/18 UTC cycles and 48 hours from the hourly interim runs. 2 m temperature and dewpoint also arrive at 0.05°, from a neural-network output head trained directly on in-situ surface observations from airport stations, regional station networks, ships, and buoys ([Rasp et al. (2026)](https://arxiv.org/abs/2609.03582); [model specs](https://developers.google.com/weathernext/guides/models)). Carries the [beam/diffuse split](#which-sources-carry-which-irradiance-components) [the PV forward model](disaggregation.md#the-forward-model) needs. The paper reports a lower [continuous ranked probability score](../techniques/evaluation-metrics.md#crps-continuous-ranked-probability-score) than ECMWF ENS on surface solar radiation, scored on the 6-hour accumulations rather than the hourly fields. Every radiation evaluation in the paper scores against an ECMWF analysis, and none scores against a surface measurement, so any irradiance gain would have to be measured downstream on power. Two structural differences from AIFS-ENS: all 64 members start from one analysis, so the ensemble's spread comes from the model alone rather than from perturbed initial conditions, and no member pairs with an ECMWF ENS member. Data at least 1 hour old is CC-BY-4.0, real-time data falls under Google DeepMind's experimental terms, and access needs [a request form](https://developers.google.com/weathernext/guides/access-forecast). BigQuery and Earth Engine serve six summary statistics per variable (the mean, and the 10th, 25th, 50th, 75th, and 90th percentiles); the 64 members sit only in the Cloud Storage Zarr store. The folds problem is worse than ICON-EU's or AIFS-ENS's: the archive starts 2026-01-01, with 2024 and 2025 being backfilled. On current priorities we do not expect to reach this source inside the Network Innovation Allowance project. |
+| **UKV and MOGREPS-UK** (Met Office, via AWS) | 🔬 (uncertain) | The Met Office's 2 km deterministic UK model and its 2.2 km UK ensemble. Both publish [every irradiance component](#which-sources-carry-which-irradiance-components) as its own field, so neither needs a subtraction to give [the PV forward model](disaggregation.md#the-forward-model) its beam/diffuse split, and both are free on AWS under British Crown copyright and CC BY-SA 4.0 ([UKV](https://registry.opendata.aws/met-office-uk-deterministic/), [MOGREPS-UK](https://registry.opendata.aws/met-office-uk-ensemble/)). Verified by listing the `met-office-atmospheric-model-data` and `met-office-uk-ensemble-model-data` buckets rather than from the documentation. Neither the horizons nor the archives suit the canonical folds — MOGREPS-UK is held as a 30-day rolling window — see [which feed carries a direct beam](#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost). |
 
 **ERA6 is a future upgrade, not a current option.** ECMWF began ERA6 production in March 2026, but
 the phased release runs from late 2027 (first 20 years) into 2028, so it is out of scope for the
@@ -179,134 +179,100 @@ the resolution gap with CERRA that motivates keeping CERRA on the list at all.
 
 ### Which sources carry which irradiance components
 
-**The Met Office's UK models are the only forecast sources in this table that publish all three
-irradiance components in a feed that costs nothing.** Every other forecast source is missing a
-component, behind a licence, or both. The reanalyses and the satellite products are better supplied
-than the forecasts, which is why [capacity estimation](capacity-estimation.md#irradiance-inputs) plans
-on having the split and [forecasting](disaggregation.md#the-forward-model) has no route to one today.
+**The Met Office's UKV and MOGREPS-UK are the only forecast sources listed below that publish
+global, direct, and diffuse short-wave as three separate fields in a free feed.** Every other free
+forecast source makes the reader recover at least one component by arithmetic, and ECMWF's own
+direct beam needs a licence. Both reanalyses and both satellite products carry a direct component,
+where most of the forecast sources do not. That is why [capacity
+estimation](capacity-estimation.md#irradiance-inputs) plans on having the beam/diffuse split, while
+[forecasting](disaggregation.md#the-forward-model) has no route to the split today.
+
+**Two rows below are not in the catalogue above**, because neither is a source we could ingest as
+things stand: ECMWF's own ENS is the licensed feed behind the free one, and the Met Office's global
+10 km model is the Met Office model Dynamical.org have on their tracker rather than one we have
+asked for.
 
 | Source | Kind | Global | Direct | Diffuse | Where it comes from |
 |---|---|---|---|---|---|
 | **ECMWF ENS** via Dynamical.org | Forecast | ✅ `ssrd` | ❌ | ❌ | Free ECMWF open data on AWS |
 | **ECMWF ENS** from ECMWF | Forecast | ✅ `ssrd` | ✅ `fdir` | By subtraction | Licensed dissemination or a MARS subscription |
 | **ECMWF AIFS**, both Single and ENS | Forecast | ✅ `ssrd` | ❌ | ❌ | Free ECMWF open data; no direct field exists to license |
-| **ICON-EU** via Dynamical.org | Forecast | ❌ (= direct + diffuse) | ✅ | ✅ | Free, already ingested by Dynamical.org |
+| **ICON-EU** via Dynamical.org | Forecast | By addition | ✅ | ✅ | Free, already ingested by Dynamical.org |
 | **UKV** (Met Office) | Forecast | ✅ | ✅ | ✅ | Free on AWS, CC BY-SA 4.0; 2-year archive |
 | **MOGREPS-UK** (Met Office) | Forecast | ✅ | ✅ | ✅ | Free on AWS, CC BY-SA 4.0; **30-day rolling archive** |
-| **Global 10 km** (Met Office) | Forecast | ✅ | ✅ | By subtraction | Free on AWS, CC BY-SA 4.0; 7-day horizon, but the global field is absent from 2024 runs |
+| **Global 10 km** (Met Office) | Forecast | ✅ | ✅ | By subtraction | Free on AWS, CC BY-SA 4.0; 168-hour horizon, but the global field is absent from 2024 runs |
 | **WeatherNext 3** (Google DeepMind) | Forecast | ✅ | ✅ `fdir` | By subtraction | Access request; CC-BY-4.0 once at least 1 hour old |
 | **ERA5** | Reanalysis | ✅ `ssrd` | ✅ `fdir` | By subtraction | Free from the Copernicus Climate Data Store |
 | **CERRA** | Reanalysis | ✅ | ✅ | By subtraction | Free from the Copernicus Climate Data Store |
 | **CAMS Radiation Service** | Satellite | ✅ | ✅ | ✅ | Free, CC-BY-4.0; also direct normal, and every component under clear sky |
 | **CM SAF SARAH-3** | Satellite | ✅ SIS | ✅ SID | By subtraction | Free; also direct normal |
 
-**"By subtraction" means the diffuse component is global minus direct, which is exact in the model
-but not free of consequence.** The subtraction inherits both components' errors, and for ECMWF it
-lands on a quantity that is close to, but not identical with, what a shadow-band diffuse pyranometer
-measures — see the definitional points below. A source publishing diffuse as its own field, as the
-Met Office models and the Radiation Service do, avoids the subtraction entirely.
+**"By subtraction" means the diffuse component is global minus direct, and "by addition" means
+global is direct plus diffuse.** Both are exact inside the model, and both inherit the errors of the
+two components they combine. For ECMWF the subtraction lands on a quantity close to, but not
+identical with, what a shadow-band diffuse pyranometer measures, for the reasons under [two traps
+for whoever builds on ECMWF's direct beam](#two-traps-for-whoever-builds-on-ecmwfs-direct-beam). A
+source publishing all three components as their own fields, as UKV, MOGREPS-UK, and the Radiation
+Service do, needs no arithmetic at all.
 
-### ECMWF publishes a direct-beam forecast, but not in the open feed Dynamical.org ingests
+### Which feed carries a direct beam, and what asking for one would cost
 
 **ECMWF's own ENS carries the direct beam. The free open-data subset does not, and the free subset
 is what Dynamical.org ingests.** ECMWF's [ENS
 catalogue](https://www.ecmwf.int/en/forecasts/datasets/set-iii) lists total-sky direct solar
 radiation at the surface (`fdir`, paramId 228021) alongside global short-wave (`ssrd`, paramId 169),
-on the same steps: hourly to T+90, 3-hourly to T+144, and 6-hourly to T+360. Reading the GRIB index
-of any single step of an open-data ENS run gives 47 parameters, `ssrd` among them and `fdir` not; the
-union across steps is 50, and `fdir` is absent from every one. Dynamical.org's
-[ECMWF IFS ENS dataset](https://dynamical.org/catalog/ecmwf-ifs-ens-forecast-15-day-0-25-degree/)
-names ECMWF Open Data on the AWS Open Data Registry as its source. So the variable Dynamical.org
-would have to add is not in the feed they read.
+on the same steps: hourly to T+90, 3-hourly to T+144, and 6-hourly to T+360. Reading the GRIB
+(gridded binary) index of any single step of an open-data ENS run gives 47 parameters, with `ssrd`
+among them and `fdir` not. Across all steps the union is 50 parameters, and `fdir` appears in no
+step. Dynamical.org's [ECMWF IFS ENS
+dataset](https://dynamical.org/catalog/ecmwf-ifs-ens-forecast-15-day-0-25-degree/) names ECMWF Open
+Data on the AWS Open Data Registry as its source. So the variable Dynamical.org would have to add is
+not in the feed they read.
 
 **Asking Dynamical.org for `fdir` is therefore a request to change feed, not a request to widen a
 variable list.** Serving `fdir` would mean a licensed ECMWF dissemination or a MARS subscription in
 place of, or alongside, the free bucket, which costs them money and a contract rather than storage.
-That is a fair thing to ask, but it should be asked as what it is. Dynamical.org already publish
-direct and diffuse short-wave for ICON-EU, so a missing variable is not the obstacle — the obstacle
-is which ECMWF feed they hold.
+Asking for a change of feed is fair, provided the request is made as what it is. Dynamical.org
+already publish direct and diffuse short-wave for ICON-EU, so a missing variable is not the obstacle
+— the obstacle is which ECMWF feed they hold.
 
 **The Met Office models are the cheaper ask, because their free feed already carries a direct beam.**
-Dynamical.org's only open Met Office request is for [the global 10 km deterministic
+The one open Met Office request on Dynamical.org's issue tracker is for [the global 10 km deterministic
 model](https://github.com/dynamical-org/reformatters/issues/646), which publishes global and direct
 short-wave and leaves diffuse to the same subtraction ECMWF would need. UKV and MOGREPS-UK go
 further and publish diffuse as its own field, but neither appears on Dynamical.org's tracker, so
-either would have to be asked for. None of the three needs a new licence, which is what separates
-all of them from `fdir`.
+either would have to be asked for. None of the three Met Office models needs a new licence, which is
+what makes them a cheaper ask than `fdir`.
 
 **Every Met Office model brings a horizon problem, and two bring an archive problem.** The global
 model reaches 168 hours, UKV reaches 120 hours on its 03 and 15 UTC runs and 54 hours on the rest,
-and MOGREPS-UK reaches 126 hours. None covers NGED's 14-day horizon, so a Met Office model would sit
-alongside ECMWF ENS rather than replace it, exactly as ICON-EU would. MOGREPS-UK is held on AWS as a
+and MOGREPS-UK reaches 126 hours. No Met Office model covers NGED's 14-day horizon. A Met Office
+model would therefore sit alongside ECMWF ENS rather than replace the ECMWF feed, exactly as
+ICON-EU would. MOGREPS-UK is held on AWS as a
 30-day rolling window, which rules out backtesting unless we archive the feed ourselves from the day
-we start. And the global model's archive is not uniform: its September 2024 runs carry the direct
-field with no global field, where its September 2026 runs carry both.
+we start. And the global model's archive is not uniform: the runs we listed from September 2024 carry
+the direct field but no global field, whereas the runs from September 2026 carry both.
 
-**Ask for `dsrp` as well as `fdir`, because `fdir` is a horizontal-plane flux and `dsrp` is already
-direct normal irradiance.** The same ENS single-level table carries three direct fields: `fdir`
-(228021, total-sky direct at the surface), `cdir` (228022, the clear-sky equivalent), and `dsrp`
-(47, direct solar radiation into a plane facing the sun). Deriving direct normal irradiance from
-`fdir` means dividing by the cosine of the solar zenith angle, which blows up at low sun — and
-GB spends much of the year at low sun. `dsrp` skips that division, so a request that names only
-`fdir` leaves the more convenient field behind.
+### Two traps for whoever builds on ECMWF's direct beam
 
-**`ssrd` − `fdir` is close to a diffuse pyranometer reading, but not equal to one.** [ECMWF's
+**`dsrp` is the more convenient field to ask for, because `fdir` is a horizontal-plane flux and
+`dsrp` is already direct normal irradiance.** The ENS catalogue linked above carries three direct
+fields: `fdir` (paramId 228021, total-sky direct at the surface), `cdir` (paramId 228022, the
+clear-sky equivalent), and `dsrp` (paramId 47, direct solar radiation into a plane facing the sun).
+Deriving direct normal irradiance from `fdir` means dividing by the cosine of the solar zenith
+angle, which is numerically unstable at low sun, and the sun is low over GB for much of the year.
+`dsrp` needs no division, so a request naming only `fdir` leaves behind the field that needs none.
+
+**`ssrd` − `fdir` is close to a diffuse pyranometer reading, but not equal to that reading.** [ECMWF's
 radiation
 note](https://www.ecmwf.int/sites/default/files/elibrary/2015/18490-radiation-quantities-ecmwf-model-and-mars.pdf)
 records that the model treats strongly forward-scattered radiation as unscattered, and that its
 diffuse part includes the circumsolar radiation a shadow-band pyranometer excludes. The note puts
 the correction on the measurement rather than on the model output: a diffuse measurement has to be
 corrected for the shadow band before it is compared with `ssrd` − `fdir`. The note also warns
-that these fluxes are accumulated over a period across which the solar zenith angle moves, which is
-its own reason that converting them to an instantaneous pyranometer convention is not
-straightforward.
-
-### We found no published test of the NWP's own direct beam
-
-**We found no study that runs the clean comparison — one NWP, one PV model chain, one arm fed
-the model's own direct beam and the other fed a separation model's estimate from the same model's
-global irradiance.** What was searched: the terms "separation model", "decomposition model",
-"direct irradiance", "fdir", and "model chain" against the solar-forecasting literature, the
-`literature/` library, and the reference lists of the model-chain papers below. The absence is a
-statement about that search, not about the field.
-
-**What the literature does establish is that the separation step is one of the largest error
-sources in the chain.** [Mayer and Gróf
-(2021)](https://doi.org/10.1016/j.apenergy.2020.116239) built 32,400 model chains from every
-combination of 9 separation models, 10 transposition models, 3 reflection-loss models, 5 cell
-temperature models, 4 performance models, 2 shading models, and 3 inverter models, and verified all
-of them against a year of 15-minute production data from 16 Hungarian photovoltaic plants at
-day-ahead and intraday horizons. Best chain to worst spans 13% in mean absolute error and 12% in
-root-mean-square error, and they name separation and transposition as the two most critical steps,
-with the inverter models the least. That bounds what choosing well inside the separation step buys.
-It does not measure what skipping the step buys, because every chain they tested contains one.
-
-**Separation models carry large irreducible error, especially under broken cloud.** [Gueymard and
-Ruiz-Arias (2016)](https://doi.org/10.1016/j.solener.2015.10.010) validated 140 separation models
-against 1-minute measurements from 54 research-class radiometric stations across seven continents and
-four climate zones, 49 of them from the Baseline Surface Radiation Network, and report that the
-errors of every model are made worse by cloud enhancement and by high surface albedo. Broken
-cloud is the GB condition that matters most for a substation's solar, because that is when a
-feeder's output moves fastest.
-
-**Using global irradiance plus a separation model is still what recent work does, including work
-built on ECMWF.** [Horat, Klerings and Lerch
-(2024)](https://arxiv.org/abs/2406.04424) post-process ECMWF ensemble global horizontal irradiance
-and put a separation step inside their model chain. So the practice we would be departing from is
-the current default, which is a reason to measure the departure rather than to assume it.
-
-**Two caveats cut against the direct beam being an easy win.** An NWP's direct-beam forecast is not
-ground truth: it carries the model's own cloud errors, and over GB the diffuse fraction is high, so
-there is less direct beam for a better estimate of it to improve. And the [differentiable PV
-model](../techniques/differentiable-physics.md#the-core-building-block-differentiablesolarplant)
-would learn its own corrections either way. The honest position is that the split is *required* by
-the physics chain, the question is only whether the forecast's own split beats a decomposed one,
-and that question is open. Whichever route supplies the split, the test is
-[disaggregation](disaggregation.md#evaluating-disaggregation)'s own: held-out metered photovoltaic
-output. A gradient-boosted tree fed the split as extra features would settle the question for the
-[tree path](xgboost-improvements.md) alone, because the tree can ignore a feature whereas the physics
-chain cannot proceed without the split. A null result from a tree is therefore evidence about the
-tree, not a licence to drop the direct beam from the physics plan.
+that these fluxes are accumulated over a period across which the solar zenith angle moves.
+Converting an accumulated flux to an instantaneous pyranometer convention is therefore not
+straightforward either.
 
 ### ERA5: which access route
 
