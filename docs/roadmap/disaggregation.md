@@ -100,10 +100,11 @@ PV physics needs must come either from a decomposition model or from a second fo
 component alone, and the [CAMS Radiation Service](capacity-estimation.md#irradiance-inputs) supplies
 the split over history but issues no forecast. The decomposition route means a differentiable model
 that splits global horizontal irradiance into its direct and diffuse parts. The second-source route
-has two candidates already on the [shortlist](data-sources.md#weather-data). ICON-EU publishes
-direct and diffuse short-wave separately, though only as a deterministic run out to 120 hours.
-WeatherNext 3 publishes total-sky direct short-wave (`fdir`) hourly at 0.1° across a 64-member
-ensemble.
+has candidates already on the [shortlist](data-sources.md#weather-data): ICON-EU, the Met Office's
+UKV and MOGREPS-UK, and WeatherNext 3 all carry a direct component, and none of them reaches the
+14-day horizon on its own except WeatherNext 3. Which source could realistically supply the split,
+and what the split is worth, are set out under [the direct-beam
+forecast](data-sources.md#ecmwf-publishes-a-direct-beam-forecast-but-not-in-the-open-feed-dynamicalorg-ingests).
 
 ### Metered vs. unmetered DERs
 
