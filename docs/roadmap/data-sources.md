@@ -177,6 +177,35 @@ near-term milestones. When it lands it should drop in cleanly — same IFS famil
 ERA5T-style near-real-time fast track — and at ~14 km (2× finer than ERA5) it would close most of
 the resolution gap with CERRA that motivates keeping CERRA on the list at all.
 
+### Which sources carry which irradiance components
+
+**The Met Office's UK models are the only forecast sources in this table that publish all three
+irradiance components in a feed that costs nothing.** Every other forecast source is missing a
+component, behind a licence, or both. The reanalyses and the satellite products are better supplied
+than the forecasts, which is why [capacity estimation](capacity-estimation.md#irradiance-inputs) has
+the split today and [forecasting](disaggregation.md#the-forward-model) does not.
+
+| Source | Kind | Global | Direct | Diffuse | Where it comes from |
+|---|---|---|---|---|---|
+| **ECMWF ENS** via Dynamical.org | Forecast | ✅ `ssrd` | ❌ | ❌ | Free ECMWF open data on AWS |
+| **ECMWF ENS** from ECMWF | Forecast | ✅ `ssrd` | ✅ `fdir` | By subtraction | Licensed dissemination or a MARS subscription |
+| **ECMWF AIFS**, both Single and ENS | Forecast | ✅ `ssrd` | ❌ | ❌ | Free ECMWF open data; no direct field exists to license |
+| **ICON-EU** via Dynamical.org | Forecast | ❌ (= direct + diffuse) | ✅ | ✅ | Free, already ingested by Dynamical.org |
+| **UKV** (Met Office) | Forecast | ✅ | ✅ | ✅ | Free on AWS, CC BY-SA 4.0 |
+| **MOGREPS-UK** (Met Office) | Forecast | ✅ | ✅ | ✅ | Free on AWS, CC BY-SA 4.0 |
+| **Global 10 km** (Met Office) | Forecast | ❌ | ✅ | ❌ | Free on AWS, but one component alone is unusable |
+| **WeatherNext 3** (Google DeepMind) | Forecast | ✅ | ✅ `fdir` | By subtraction | Access request; CC-BY-4.0 once at least 1 hour old |
+| **ERA5** | Reanalysis | ✅ `ssrd` | ✅ `fdir` | By subtraction | Free from the Copernicus Climate Data Store |
+| **CERRA** | Reanalysis | ✅ | ✅ | By subtraction | Free from the Copernicus Climate Data Store |
+| **CAMS Radiation Service** | Satellite | ✅ | ✅ | ✅ | Free, CC-BY-4.0; also direct normal, and every component under clear sky |
+| **CM SAF SARAH-3** | Satellite | ✅ SIS | ✅ SID | By subtraction | Free; also direct normal |
+
+**"By subtraction" means the diffuse component is global minus direct, which is exact in the model
+but not free of consequence.** The subtraction inherits both components' errors, and for ECMWF it
+lands on a quantity that is close to, but not identical with, what a shadow-band diffuse pyranometer
+measures — see the definitional points below. A source publishing diffuse as its own field, as the
+Met Office models and the Radiation Service do, avoids the subtraction entirely.
+
 ### ECMWF publishes a direct-beam forecast, but not in the open feed Dynamical.org ingests
 
 **ECMWF's own ENS carries the direct beam. The free open-data subset does not, and the free subset
@@ -253,7 +282,10 @@ would learn its own corrections either way. The honest position is that the spli
 the physics chain, the question is only whether the forecast's own split beats a decomposed one,
 and that question is open. Whichever route supplies the split, the test is
 [disaggregation](disaggregation.md#evaluating-disaggregation)'s own: held-out metered photovoltaic
-output.
+output. A gradient-boosted tree fed the split as extra features would settle the question for the
+[tree path](xgboost-improvements.md) alone, because the tree can ignore a feature whereas the physics
+chain cannot proceed without the split. A null result from a tree is therefore evidence about the
+tree, not a licence to drop the direct beam from the physics plan.
 
 ### ERA5: which access route
 
