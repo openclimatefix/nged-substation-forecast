@@ -55,14 +55,14 @@ DEFAULT_SOURCE: Final[str] = "cds"
 """The Copernicus download is the headline; `open-meteo` reruns everything on the mirror."""
 
 
-def dataset_path_for(*, source: str) -> Path:
-    """Return the frame `build_dataset.py` wrote for one ERA5 source."""
-    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}.parquet"
+def dataset_path_for(*, source: str, alignment: str) -> Path:
+    """Return the frame `build_dataset.py` wrote for one ERA5 source and stamp alignment."""
+    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}_{alignment}.parquet"
 
 
-def results_dir_for(*, source: str) -> Path:
-    """Return where one ERA5 source's results are written."""
-    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_results_{source}"
+def results_dir_for(*, source: str, alignment: str) -> Path:
+    """Return where one run's results are written."""
+    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_results_{source}_{alignment}"
 
 
 SHARED_FEATURES: Final[tuple[str, ...]] = (
@@ -347,19 +347,24 @@ def _run_site_arm(
                 seed=seed,
                 with_quantiles=with_quantiles,
             )
+            # Every loss column is pinned to Float64. The real target is Float32 and the synthetic
+            # control target is Float64, so without the cast the two runs produce frames that
+            # cannot be stacked.
             crps = (
-                pl.Series(_crps(actual=actual, quantiles=quantiles))
+                pl.Series(_crps(actual=actual, quantiles=quantiles), dtype=pl.Float64)
                 if quantiles is not None
                 else pl.lit(None, dtype=pl.Float64)
             )
             outputs.append(
-                test.select("site", "time", "month", "fold", "effective_capacity_mw").with_columns(
+                test.select("site", "time", "month", "fold", "effective_capacity_mw")
+                .cast({"effective_capacity_mw": pl.Float64})
+                .with_columns(
                     arm=pl.lit(arm),
                     setting=pl.lit(setting_name),
                     target=pl.lit(target),
                     seed=pl.lit(seed, dtype=pl.Int32),
-                    absolute_error_mw=pl.Series(np.abs(actual - point)),
-                    signed_error_mw=pl.Series(point - actual),
+                    absolute_error_mw=pl.Series(np.abs(actual - point), dtype=pl.Float64),
+                    signed_error_mw=pl.Series(point - actual, dtype=pl.Float64),
                     crps_mw=crps,
                 )
             )
@@ -633,12 +638,17 @@ def _intervals_for(
 def main() -> int:
     """Run every arm, the controls and the bootstrap, and write the results."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo"), default=DEFAULT_SOURCE)
-    source = parser.parse_args().source
-    results_dir = results_dir_for(source=source)
+    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default=DEFAULT_SOURCE)
+    parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="as-labelled")
+    arguments = parser.parse_args()
+    results_dir = results_dir_for(source=arguments.source, alignment=arguments.alignment)
     results_dir.mkdir(parents=True, exist_ok=True)
     dataset = _assign_folds(
-        dataset=_add_time_features(dataset=pl.read_parquet(dataset_path_for(source=source)))
+        dataset=_add_time_features(
+            dataset=pl.read_parquet(
+                dataset_path_for(source=arguments.source, alignment=arguments.alignment)
+            )
+        )
     )
     sites = sorted(dataset["site"].unique().to_list())
     _LOG.info(

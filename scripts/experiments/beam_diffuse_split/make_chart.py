@@ -28,7 +28,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _LOG: Final[logging.Logger] = logging.getLogger("make_chart")
 
 RESULTS_DIR: Final[Path] = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ERA5/beam_diffuse_results_cds"
+    "/home/jack/dev/nged-substation-forecast/data/ERA5/beam_diffuse_results_open-meteo_shifted"
 )
 """The Copernicus run is what the published chart shows; the mirror's run is reported as text."""
 

@@ -51,19 +51,50 @@ POWER_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "NGED" / "power_time_series.de
 METADATA_PATH: Final[Path] = REPO_DATA_DIR / "NGED" / "metadata.parquet"
 CAPACITY_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "effective_capacity")
 OPEN_METEO_PATH: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_open_meteo.parquet"
+CAMS_PATH: Final[Path] = REPO_DATA_DIR / "CAMS" / "beam_diffuse_cams.parquet"
 
-SourceType = Literal["cds", "open-meteo"]
-"""Which ERA5 download to build from.
+AlignmentType = Literal["as-labelled", "shifted"]
+"""How the power stamps are read against ERA5.
 
-`cds` is the Copernicus Climate Data Store archive and the source of the headline result;
-`open-meteo` is the mirror, reported beside it as a replication. `verify_era5_sources.py` is what
-establishes that the two carry the same fields.
+`as-labelled` takes `PowerTimeSeries.time` at its word: the reading stamped `T` is the mean over
+`(T - 30 min, T]`. `shifted` moves every power stamp 30 minutes earlier before the join.
+
+**Three independent tests say the stamps arrive half an hour late, which is why the second reading
+exists.** Against the sun's own horizon crossings the first and last generating half-hour of a clear
+day both fall 30 minutes later than they should — a truncation at low sun would move those two edges
+towards each other rather than shifting both the same way. The power-weighted centroid of a clear
+day runs 0.45 hours late. And the correlation with ERA5 global irradiance is maximised at a
+30-minute shift for all six meters, in every year. It is not a daylight-saving bug: the centroid
+offset is flat across the March and October boundaries, where a local-time error would step by a
+whole hour.
+
+The experiment is run both ways rather than one, because a half-hour misalignment blunts the beam
+component more than the diffuse one — beam is the sharper, faster-varying signal — so it penalises
+exactly the arm under test. That is an asymmetric error, and a paired design gives no protection
+against it. Whether the contract or the feed is at fault is a question for NGED and is not settled
+here.
+"""
+
+SourceType = Literal["cds", "open-meteo", "cams"]
+"""Which irradiance download to build from.
+
+`cds` is the Copernicus Climate Data Store's ERA5 archive and the source of the headline result;
+`open-meteo` is a mirror of the same reanalysis, reported beside it as a replication, and
+`verify_era5_sources.py` is what establishes that the two carry the same fields.
+
+`cams` is a different instrument rather than a second route to the same one. The CAMS radiation
+service infers cloud from Meteosat at around 5 km and publishes the global, beam and diffuse
+horizontal irradiances at each meter's own coordinates, where ERA5 averages its cloud field over
+roughly 31 km and lands the meter in a grid cell up to 17 km away. Running the same arms on both
+separates "the split carries no information" from "ERA5's grid has already smoothed the beam away".
+The CAMS build takes its air temperature from the Open-Meteo ERA5 frame, because the radiation
+service publishes no temperature and the temperature feature is shared by every arm.
 """
 
 
-def output_path_for(*, source: SourceType) -> Path:
-    """Return where the built frame for one ERA5 source is written."""
-    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}.parquet"
+def output_path_for(*, source: SourceType, alignment: AlignmentType) -> Path:
+    """Return where the built frame for one irradiance source and stamp alignment is written."""
+    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}_{alignment}.parquet"
 
 
 MIN_YEARS_OF_READINGS: Final[float] = 1.0
@@ -85,8 +116,44 @@ introduces, which `main` logs: the filter removes about 1.2% of daylight rows, a
 December rows against 1.5% of June rows.
 """
 
+FALSE_ZERO_IRRADIANCE_W_M2: Final[float] = 100.0
+"""An hour with an exactly-zero half-hour and more global irradiance than this is dropped.
+
+A grid-connected PV site under 100 W m⁻² of global horizontal irradiance produces a small positive
+output, never an exact zero, so an exact zero there is a meter dropout. NGED's own delivery spec
+names the condition: a `GENERATOR OR CIRCUIT FAULT` warning is raised "whenever metered generation
+is zero when the generator should be generating (e.g. a solar farm reading zero at midday on a sunny
+day)". Estimating each dropped reading's expected output from its own site's median capacity factor
+in the same irradiance and elevation bin puts the mean at 0.37 to 0.76 of capacity: these are holes,
+not dim conditions.
+
+**The test is "either half-hour reads zero", not "the hourly mean reads zero", because the average
+of one dropped half-hour and one real one is the dangerous case** — it reads plausible and is wrong
+by about half the site's output. That corrupted-average case is roughly two thirds of what this rule
+removes.
+
+The rule has to be blind to the beam/diffuse split, or it would bias the very comparison the
+experiment makes. Matched within irradiance bins, the rows it removes differ from the rows it keeps
+by 0.010 in diffuse fraction, against a 0.24-to-0.75 range across irradiance bins — the most neutral
+of every variant tested. Conditioning on irradiance alone makes the *unmatched* comparison
+misleading in both directions, so neutrality has to be judged within bins.
+"""
+
 IMPLAUSIBLE_CAPACITY_MULTIPLE: Final[float] = 1.5
-"""Readings above this multiple of the site's effective capacity are dropped as meter spikes."""
+"""Readings above this multiple of the site's effective capacity are dropped as meter spikes.
+
+Nothing in seven years reaches it, so the rule removes no rows today and is kept only as a guard.
+A tighter threshold would not be free: `effective_capacity_mw` is the 99th percentile of the
+absolute power, so about 1% of readings must exceed it arithmetically, and cutting at 1.1 times
+capacity would delete genuine high-output rows with a matched diffuse-fraction bias of 0.023.
+"""
+
+MIN_CAMS_RELIABILITY: Final[float] = 0.9
+"""Hours where the CAMS service flags less than this fraction of its inputs as reliable are dropped.
+
+The flag covers the satellite retrieval the global, beam and diffuse fluxes are all derived from, so
+dropping an hour removes it from every arm at once and cannot favour one of them.
+"""
 
 MIN_SOLAR_ELEVATION_DEGREES: Final[float] = 0.0
 """Rows whose window-midpoint sun is below this elevation are dropped.
@@ -166,6 +233,25 @@ def _read_open_meteo() -> pl.DataFrame:
         msg = f"{OPEN_METEO_PATH} missing; run fetch_era5_open_meteo.py first"
         raise FileNotFoundError(msg)
     return pl.read_parquet(OPEN_METEO_PATH).sort("time", "latitude", "longitude")
+
+
+def _read_cams() -> pl.DataFrame:
+    """Read the CAMS per-site frame `fetch_cams.py` wrote, trimmed and quality-filtered.
+
+    Returns:
+        One row per (site, time) with `ghi_w_m2` and `bhi_w_m2`.
+    """
+    if not CAMS_PATH.exists():
+        msg = f"{CAMS_PATH} missing; run fetch_cams.py first"
+        raise FileNotFoundError(msg)
+    cams = pl.read_parquet(CAMS_PATH)
+    reliable = cams.filter(pl.col("reliability") >= MIN_CAMS_RELIABILITY)
+    _LOG.info(
+        "CAMS: %d of %d hours pass the reliability flag",
+        reliable.height,
+        cams.height,
+    )
+    return reliable.select("site", "time", "ghi_w_m2", "bhi_w_m2").sort("site", "time")
 
 
 def _read_cds_archives() -> pl.DataFrame:
@@ -264,7 +350,7 @@ def _pv_sites() -> pl.DataFrame:
     return sites.with_columns(site=pl.Series(shuffled, dtype=pl.Utf8)).drop("n_rows")
 
 
-def _hourly_power(*, sites: pl.DataFrame) -> pl.DataFrame:
+def _hourly_power(*, sites: pl.DataFrame, alignment: AlignmentType) -> pl.DataFrame:
     """Aggregate the half-hourly PV readings onto the ERA5 hourly, period-ending grid.
 
     An hour ending at `T` is the mean of the two half-hours ending at `T - 30 min` and `T`, and is
@@ -273,9 +359,11 @@ def _hourly_power(*, sites: pl.DataFrame) -> pl.DataFrame:
 
     Args:
         sites: The site roster from `_pv_sites`.
+        alignment: Whether to take the power stamps at face value or move them 30 minutes earlier
+            first. See `AlignmentType`.
 
     Returns:
-        One row per (site, time) with `power_mw`.
+        One row per (site, time) with `power_mw` and `has_zero_half_hour`.
     """
     half_hourly = (
         pl.scan_delta(POWER_DELTA_URI)
@@ -286,12 +374,18 @@ def _hourly_power(*, sites: pl.DataFrame) -> pl.DataFrame:
         .select("site", "time", "power_mw")
     )
     # Both half-hours of the window (T-1h, T] carry the stamp of their own end, so the later one is
-    # already stamped T and the earlier one has to be rolled forward by 30 minutes.
-    hour_end = pl.col("time").dt.offset_by("30m").dt.truncate("1h")
+    # already stamped T and the earlier one has to be rolled forward by 30 minutes. Under the
+    # shifted reading every stamp is half an hour late, which cancels that roll-forward exactly.
+    offset = "0m" if alignment == "shifted" else "30m"
+    hour_end = pl.col("time").dt.offset_by(offset).dt.truncate("1h")
     return (
         half_hourly.with_columns(hour_end=hour_end)
         .group_by("site", "hour_end")
-        .agg(power_mw=pl.col("power_mw").mean(), n_half_hours=pl.len())
+        .agg(
+            power_mw=pl.col("power_mw").mean(),
+            n_half_hours=pl.len(),
+            has_zero_half_hour=(pl.col("power_mw") == 0.0).any(),
+        )
         .filter(pl.col("n_half_hours") == 2)
         .drop("n_half_hours")
         .rename({"hour_end": "time"})
@@ -335,6 +429,31 @@ def _drop_outages_and_spikes(*, power: pl.DataFrame, sites: pl.DataFrame) -> pl.
         .drop("_zero", "_run_id")
         .sort("site", "time")
     )
+
+
+def _drop_false_zeros(*, joined: pl.DataFrame) -> pl.DataFrame:
+    """Drop hours whose meter read exactly zero while the sun was well up.
+
+    Runs after the ERA5 join because it is the only filter that needs irradiance. It reads global
+    horizontal irradiance alone and never the beam or the diffuse component, which is what keeps it
+    from favouring an arm — see `FALSE_ZERO_IRRADIANCE_W_M2`.
+
+    Args:
+        joined: Hourly power already joined to ERA5.
+
+    Returns:
+        `joined` with the false zeros removed, and without the flag column.
+    """
+    kept = joined.filter(
+        ~(pl.col("has_zero_half_hour") & (pl.col("ghi_w_m2") > FALSE_ZERO_IRRADIANCE_W_M2))
+    )
+    _LOG.info(
+        "false-zero filter removed %d of %d hours (%.2f%%)",
+        joined.height - kept.height,
+        joined.height,
+        100.0 * (joined.height - kept.height) / joined.height,
+    )
+    return kept.drop("has_zero_half_hour")
 
 
 def _nearest_era5_cell(*, sites: pl.DataFrame, era5: pl.DataFrame) -> pl.DataFrame:
@@ -505,46 +624,65 @@ def _add_synthetic_control_target(*, frame: pl.DataFrame) -> pl.DataFrame:
 
 
 def main() -> int:
-    """Build the joined frame for the ERA5 source named on the command line."""
+    """Build the joined frame for the irradiance source named on the command line."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo"), default="cds")
-    source: SourceType = parser.parse_args().source
+    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cds")
+    parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="as-labelled")
+    arguments = parser.parse_args()
+    source: SourceType = arguments.source
+    alignment: AlignmentType = arguments.alignment
 
     sites = _pv_sites()
-    _LOG.info("using %d PV sites, ERA5 source %s", sites.height, source)
+    _LOG.info(
+        "using %d PV sites, irradiance source %s, power stamps %s", sites.height, source, alignment
+    )
 
-    era5 = _read_era5(source=source)
-    _LOG.info("ERA5: %d rows, %s to %s", era5.height, era5["time"].min(), era5["time"].max())
+    gridded = _read_era5(source="open-meteo" if source == "cams" else source)
+    _LOG.info(
+        "gridded fields: %d rows, %s to %s",
+        gridded.height,
+        gridded["time"].min(),
+        gridded["time"].max(),
+    )
 
-    power = _drop_outages_and_spikes(power=_hourly_power(sites=sites), sites=sites)
+    power = _drop_outages_and_spikes(
+        power=_hourly_power(sites=sites, alignment=alignment), sites=sites
+    )
     _LOG.info("hourly power after outage and spike filtering: %d rows", power.height)
 
-    sites_with_cells = _nearest_era5_cell(sites=sites, era5=era5)
+    sites_with_cells = _nearest_era5_cell(sites=sites, era5=gridded)
     _LOG.info(
         "the %d sites resolve to %d distinct ERA5 grid cells",
         sites_with_cells.height,
         sites_with_cells.select("cell_latitude", "cell_longitude").n_unique(),
     )
+    # Every source needs the gridded frame's air temperature, which is a shared feature rather than
+    # an irradiance one, so the gridded join runs for the CAMS build too and only its two irradiance
+    # columns are then replaced.
     joined = (
         power.join(sites_with_cells, on=["site", "effective_capacity_mw"])
         .join(
-            era5,
+            gridded,
             left_on=["time", "cell_latitude", "cell_longitude"],
             right_on=["time", "latitude", "longitude"],
             how="inner",
         )
         .drop("time_series_id")
     )
-    _LOG.info("after joining ERA5: %d rows", joined.height)
+    if source == "cams":
+        joined = joined.drop("ghi_w_m2", "bhi_w_m2").join(
+            _read_cams(), on=["site", "time"], how="inner"
+        )
+    _LOG.info("after joining irradiance: %d rows", joined.height)
 
-    with_geometry = _add_solar_geometry(joined=joined)
+    with_geometry = _add_solar_geometry(joined=_drop_false_zeros(joined=joined))
     daylight = with_geometry.filter(pl.col("solar_elevation_deg") > MIN_SOLAR_ELEVATION_DEGREES)
     _LOG.info("daylight rows: %d", daylight.height)
 
     dataset = _add_synthetic_control_target(frame=_add_separation_models(frame=daylight)).drop(
         "cell_latitude", "cell_longitude", "latitude", "longitude"
     )
-    output_path = output_path_for(source=source)
+    output_path = output_path_for(source=source, alignment=alignment)
     dataset.write_parquet(output_path)
     _LOG.info("wrote %d rows to %s", dataset.height, output_path)
     _LOG.info(

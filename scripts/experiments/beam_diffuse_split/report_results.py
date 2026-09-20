@@ -24,6 +24,15 @@ import polars as pl
 
 REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
 
+SHORT_ARM_LABELS: Final[dict[str, str]] = {
+    "A_global_only": "A",
+    "B_erbs": "B",
+    "C_era5_split": "C",
+    "D_direct_fraction": "D",
+    "B_disc": "B-DISC",
+}
+"""Arm keys to the one-or-two-character label a contrast row uses."""
+
 ARM_LABELS: Final[dict[str, str]] = {
     "A_global_only": "A — global irradiance only",
     "B_erbs": "B — Erbs separation model",
@@ -118,7 +127,8 @@ def _contrast_table(*, intervals: pl.DataFrame, summary: pl.DataFrame, setting: 
         )
         marker = " **(headline)**" if row["is_headline"] else ""
         lines.append(
-            f"| {row['treatment'].split('_')[0]} − {row['reference'].split('_')[0]}{marker} | "
+            f"| {SHORT_ARM_LABELS[row['treatment']]} − {SHORT_ARM_LABELS[row['reference']]}"
+            f"{marker} | "
             f"{row['difference'] * PERCENTAGE_POINTS:+.4f} | "
             f"[{row['lower_95'] * PERCENTAGE_POINTS:+.4f}, "
             f"{row['upper_95'] * PERCENTAGE_POINTS:+.4f}] | "
@@ -140,7 +150,7 @@ def _per_site_table(
         & (pl.col("scope") != "all_sites")
     ).sort("scope")
     lines = [
-        f"{treatment.split('_')[0]} − {reference.split('_')[0]}, per site:",
+        f"{SHORT_ARM_LABELS[treatment]} − {SHORT_ARM_LABELS[reference]}, per site:",
         "",
         "| Site | ΔMAE (pp of capacity) | 95% interval | Hours |",
         "|---|---|---|---|",
@@ -158,9 +168,12 @@ def _per_site_table(
 def main() -> int:
     """Write every table to `report.md` and to standard output."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo"), default="cds")
-    source = parser.parse_args().source
-    results_dir = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_results_{source}"
+    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cds")
+    parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="as-labelled")
+    arguments = parser.parse_args()
+    results_dir = (
+        REPO_DATA_DIR / "ERA5" / f"beam_diffuse_results_{arguments.source}_{arguments.alignment}"
+    )
 
     intervals = pl.read_parquet(results_dir / "bootstrap_intervals.parquet")
     summary = pl.read_parquet(results_dir / "per_site_summary.parquet")
