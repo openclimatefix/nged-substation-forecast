@@ -28,8 +28,10 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _LOG: Final[logging.Logger] = logging.getLogger("make_chart")
 
 RESULTS_DIR: Final[Path] = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ERA5/beam_diffuse_results"
+    "/home/jack/dev/nged-substation-forecast/data/ERA5/beam_diffuse_results_cds"
 )
+"""The Copernicus run is what the published chart shows; the mirror's run is reported as text."""
+
 OUTPUT_PATH: Final[Path] = RESULTS_DIR / "beam_diffuse_split_result.svg"
 
 ARM_LABELS: Final[dict[str, str]] = {

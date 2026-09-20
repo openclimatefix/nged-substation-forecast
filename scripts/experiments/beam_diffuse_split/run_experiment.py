@@ -35,6 +35,7 @@ of the split, not forecast skill.
 Run it with `uv run --no-project` plus `--with polars --with xgboost --with numpy`.
 """
 
+import argparse
 import concurrent.futures
 import json
 import logging
@@ -50,8 +51,19 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _LOG: Final[logging.Logger] = logging.getLogger("run_experiment")
 
 REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
-DATASET_PATH: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_dataset.parquet"
-RESULTS_DIR: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_results"
+DEFAULT_SOURCE: Final[str] = "cds"
+"""The Copernicus download is the headline; `open-meteo` reruns everything on the mirror."""
+
+
+def dataset_path_for(*, source: str) -> Path:
+    """Return the frame `build_dataset.py` wrote for one ERA5 source."""
+    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}.parquet"
+
+
+def results_dir_for(*, source: str) -> Path:
+    """Return where one ERA5 source's results are written."""
+    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_results_{source}"
+
 
 SHARED_FEATURES: Final[tuple[str, ...]] = (
     "solar_zenith_deg",
@@ -620,8 +632,14 @@ def _intervals_for(
 
 def main() -> int:
     """Run every arm, the controls and the bootstrap, and write the results."""
-    RESULTS_DIR.mkdir(parents=True, exist_ok=True)
-    dataset = _assign_folds(dataset=_add_time_features(dataset=pl.read_parquet(DATASET_PATH)))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source", choices=("cds", "open-meteo"), default=DEFAULT_SOURCE)
+    source = parser.parse_args().source
+    results_dir = results_dir_for(source=source)
+    results_dir.mkdir(parents=True, exist_ok=True)
+    dataset = _assign_folds(
+        dataset=_add_time_features(dataset=pl.read_parquet(dataset_path_for(source=source)))
+    )
     sites = sorted(dataset["site"].unique().to_list())
     _LOG.info(
         "dataset: %d rows, %d sites, %d months",
@@ -649,7 +667,7 @@ def main() -> int:
         absolute_error_fraction_of_capacity=pl.col("absolute_error_mw")
         / pl.col("effective_capacity_mw")
     )
-    losses.write_parquet(RESULTS_DIR / "per_row_losses.parquet")
+    losses.write_parquet(results_dir / "per_row_losses.parquet")
 
     records: list[dict[str, object]] = []
     for setting_name, setting_target in (
@@ -663,7 +681,7 @@ def main() -> int:
             target=setting_target,
             sites=sites,
         )
-    pl.DataFrame(records).write_parquet(RESULTS_DIR / "bootstrap_intervals.parquet")
+    pl.DataFrame(records).write_parquet(results_dir / "bootstrap_intervals.parquet")
 
     summary = (
         losses.group_by("setting", "arm", "site")
@@ -676,9 +694,9 @@ def main() -> int:
         )
         .sort("setting", "arm", "site")
     )
-    summary.write_parquet(RESULTS_DIR / "per_site_summary.parquet")
-    (RESULTS_DIR / "diagnostic.json").write_text(json.dumps(diagnostic, indent=2))
-    _LOG.info("results written to %s", RESULTS_DIR)
+    summary.write_parquet(results_dir / "per_site_summary.parquet")
+    (results_dir / "diagnostic.json").write_text(json.dumps(diagnostic, indent=2))
+    _LOG.info("results written to %s", results_dir)
     return 0
 
 

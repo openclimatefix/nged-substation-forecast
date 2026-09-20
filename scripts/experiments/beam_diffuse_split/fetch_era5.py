@@ -33,6 +33,7 @@ from typing import Final
 
 # cdsapi is not a workspace dependency; this throwaway script is run with `uv run --with cdsapi`.
 import cdsapi  # ty: ignore[unresolved-import]
+from era5_grid import AREA, FIRST_MONTH_OF_FIRST_YEAR, FIRST_YEAR, LAST_YEAR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_era5")
@@ -43,27 +44,14 @@ OUTPUT_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data/ERA
 Outside the repo working tree on purpose: these are data, and `data/` is git-ignored.
 """
 
-AREA: Final[tuple[float, float, float, float]] = (53.50, -0.50, 52.75, 0.50)
-"""CDS `area` as (north, west, south, east) in degrees.
-
-The six PV sites span 52.92–53.15 N and -0.10–0.24 E, so this box clears them by at least a quarter
-of a degree on every side and lands on the 0.25-degree ERA5 grid without interpolation.
-"""
-
 VARIABLES: Final[tuple[str, ...]] = (
     "surface_solar_radiation_downwards",
     "total_sky_direct_solar_radiation_at_surface",
     "2m_temperature",
 )
 
-FIRST_YEAR: Final[int] = 2019
-LAST_YEAR: Final[int] = 2026
-
-FIRST_MONTH_OF_FIRST_YEAR: Final[int] = 9
-"""The earliest usable PV series starts in September 2019, so earlier months are not requested."""
-
 LAST_MONTH_OF_LAST_YEAR: Final[int] = 9
-"""The power data currently runs to September 2026."""
+"""The last month `era5_grid.LAST_DATE` falls in; whole months are requested and trimmed later."""
 
 MONTHS_PER_REQUEST: Final[int] = 6
 """The largest chunk that stays inside the Climate Data Store's per-request field limit."""

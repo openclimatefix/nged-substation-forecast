@@ -26,12 +26,13 @@ Three conventions have to line up and are the easiest thing to get wrong:
 diffuse flux onto a horizontal plane is `ssrd - fdir` with no cosine anywhere.
 """
 
+import argparse
 import logging
 import sys
 import tempfile
 import zipfile
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal
 
 import numpy as np
 import polars as pl
@@ -39,6 +40,7 @@ import polars as pl
 # pvlib is not a workspace dependency; this throwaway script is run with `uv run --with pvlib`.
 import pvlib  # ty: ignore[unresolved-import]
 import xarray as xr
+from era5_grid import LAST_DATE
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("build_dataset")
@@ -48,7 +50,21 @@ ERA5_DIR: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse"
 POWER_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "NGED" / "power_time_series.delta")
 METADATA_PATH: Final[Path] = REPO_DATA_DIR / "NGED" / "metadata.parquet"
 CAPACITY_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "effective_capacity")
-OUTPUT_PATH: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_dataset.parquet"
+OPEN_METEO_PATH: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_open_meteo.parquet"
+
+SourceType = Literal["cds", "open-meteo"]
+"""Which ERA5 download to build from.
+
+`cds` is the Copernicus Climate Data Store archive and the source of the headline result;
+`open-meteo` is the mirror, reported beside it as a replication. `verify_era5_sources.py` is what
+establishes that the two carry the same fields.
+"""
+
+
+def output_path_for(*, source: SourceType) -> Path:
+    """Return where the built frame for one ERA5 source is written."""
+    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}.parquet"
+
 
 MIN_YEARS_OF_READINGS: Final[float] = 1.0
 """A PV series with less than this much history is dropped.
@@ -125,8 +141,35 @@ same labels.
 """
 
 
-def _read_era5() -> pl.DataFrame:
-    """Read every downloaded ERA5 month into one long frame of hourly fluxes.
+def _read_era5(*, source: SourceType) -> pl.DataFrame:
+    """Read one ERA5 download into a long frame of hourly fluxes, trimmed to the shared span.
+
+    Both sources are trimmed at `era5_grid.LAST_DATE`, because the Copernicus request is made in
+    whole months and would otherwise run a few days past where the mirror stops.
+
+    Args:
+        source: Which download to read.
+
+    Returns:
+        One row per (time, latitude, longitude) with `ghi_w_m2`, `bhi_w_m2` and `temp_c`.
+    """
+    era5 = _read_open_meteo() if source == "open-meteo" else _read_cds_archives()
+    return era5.filter(
+        pl.col("time")
+        <= pl.lit(f"{LAST_DATE} 23:00:00").str.to_datetime().dt.replace_time_zone("UTC")
+    )
+
+
+def _read_open_meteo() -> pl.DataFrame:
+    """Read the Open-Meteo long frame `fetch_era5_open_meteo.py` wrote."""
+    if not OPEN_METEO_PATH.exists():
+        msg = f"{OPEN_METEO_PATH} missing; run fetch_era5_open_meteo.py first"
+        raise FileNotFoundError(msg)
+    return pl.read_parquet(OPEN_METEO_PATH).sort("time", "latitude", "longitude")
+
+
+def _read_cds_archives() -> pl.DataFrame:
+    """Read every downloaded Copernicus archive into one long frame of hourly fluxes.
 
     Returns:
         One row per (time, latitude, longitude) with `ghi_w_m2`, `bhi_w_m2` and `temp_c`.
@@ -462,11 +505,15 @@ def _add_synthetic_control_target(*, frame: pl.DataFrame) -> pl.DataFrame:
 
 
 def main() -> int:
-    """Build the joined frame and write it to parquet."""
-    sites = _pv_sites()
-    _LOG.info("using %d PV sites", sites.height)
+    """Build the joined frame for the ERA5 source named on the command line."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source", choices=("cds", "open-meteo"), default="cds")
+    source: SourceType = parser.parse_args().source
 
-    era5 = _read_era5()
+    sites = _pv_sites()
+    _LOG.info("using %d PV sites, ERA5 source %s", sites.height, source)
+
+    era5 = _read_era5(source=source)
     _LOG.info("ERA5: %d rows, %s to %s", era5.height, era5["time"].min(), era5["time"].max())
 
     power = _drop_outages_and_spikes(power=_hourly_power(sites=sites), sites=sites)
@@ -497,8 +544,9 @@ def main() -> int:
     dataset = _add_synthetic_control_target(frame=_add_separation_models(frame=daylight)).drop(
         "cell_latitude", "cell_longitude", "latitude", "longitude"
     )
-    dataset.write_parquet(OUTPUT_PATH)
-    _LOG.info("wrote %d rows to %s", dataset.height, OUTPUT_PATH)
+    output_path = output_path_for(source=source)
+    dataset.write_parquet(output_path)
+    _LOG.info("wrote %d rows to %s", dataset.height, output_path)
     _LOG.info(
         "span %s to %s; per-site rows %s",
         dataset["time"].min(),

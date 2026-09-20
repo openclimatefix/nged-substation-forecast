@@ -14,6 +14,7 @@ Run it with `uv run --no-project --with polars python
 scripts/experiments/beam_diffuse_split/report_results.py`.
 """
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -21,10 +22,7 @@ from typing import Final
 
 import polars as pl
 
-RESULTS_DIR: Final[Path] = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ERA5/beam_diffuse_results"
-)
-OUTPUT_PATH: Final[Path] = RESULTS_DIR / "report.md"
+REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
 
 ARM_LABELS: Final[dict[str, str]] = {
     "A_global_only": "A — global irradiance only",
@@ -159,9 +157,14 @@ def _per_site_table(
 
 def main() -> int:
     """Write every table to `report.md` and to standard output."""
-    intervals = pl.read_parquet(RESULTS_DIR / "bootstrap_intervals.parquet")
-    summary = pl.read_parquet(RESULTS_DIR / "per_site_summary.parquet")
-    diagnostic = json.loads((RESULTS_DIR / "diagnostic.json").read_text())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--source", choices=("cds", "open-meteo"), default="cds")
+    source = parser.parse_args().source
+    results_dir = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_results_{source}"
+
+    intervals = pl.read_parquet(results_dir / "bootstrap_intervals.parquet")
+    summary = pl.read_parquet(results_dir / "per_site_summary.parquet")
+    diagnostic = json.loads((results_dir / "diagnostic.json").read_text())
 
     lines: list[str] = ["## Arms, primary setting", ""]
     lines += _arm_table(summary=summary, setting="primary")
@@ -191,7 +194,7 @@ def main() -> int:
     ]
 
     report = "\n".join(lines) + "\n"
-    OUTPUT_PATH.write_text(report)
+    (results_dir / "report.md").write_text(report)
     sys.stdout.write(report)
     return 0
 

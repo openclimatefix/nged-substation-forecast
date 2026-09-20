@@ -23,10 +23,20 @@ A forecast of `fdir` would carry its own error, which this experiment says nothi
 
 | Script | What it does |
 |---|---|
-| `fetch_era5.py` | Downloads `ssrd`, `fdir` and `t2m` from the Copernicus Climate Data Store, one request per calendar month, into `data/ERA5/beam_diffuse/`. Resumable. |
-| `build_dataset.py` | Joins the PV power readings to ERA5, adds solar geometry and the separation-model estimates, and writes the one frame every arm reads. |
-| `run_experiment.py` | Fits every arm, at every fold, seed and hyperparameter setting, and writes per-row losses, per-site metrics and bootstrap intervals. |
+| `era5_grid.py` | The grid and date range both downloads share, so "the same cells" is checkable rather than a coincidence of two literals. |
+| `fetch_era5.py` | Downloads `ssrd`, `fdir` and `t2m` from the Copernicus Climate Data Store, six months per request, into `data/ERA5/beam_diffuse/`. Resumable. Source of the headline result. |
+| `fetch_era5_open_meteo.py` | Downloads the same fields from Open-Meteo's ERA5 mirror onto the same grid, in about a minute rather than most of a night. |
+| `verify_era5_sources.py` | Compares the two downloads hour by hour, which is what establishes that the mirror serves ERA5's own `fdir` rather than a separation model's estimate of it. |
+| `build_dataset.py` | Joins the PV power readings to ERA5, adds solar geometry, the separation-model estimates and the synthetic control target, and writes the one frame every arm reads. Takes `--source`. |
+| `run_experiment.py` | Fits every arm, at every fold, seed and hyperparameter setting, and writes per-row losses, per-site metrics and bootstrap intervals. Takes `--source`. |
+| `report_results.py` | Prints the markdown tables the write-up quotes, so no number is transcribed by hand. |
 | `make_chart.py` | Draws the anonymised result chart. |
+
+**Two ERA5 downloads, one experiment.** The Copernicus Climate Data Store is the source of the
+headline result, and Open-Meteo's mirror of the same reanalysis is run beside it as a replication.
+The mirror exists here because the Climate Data Store runs one of an account's jobs at a time and
+takes around five minutes per month of hourly fields, so seven years is most of a night. Reporting
+both costs one extra run and says whether the answer survives a change of delivery route.
 
 ## The arms
 
@@ -36,15 +46,24 @@ columns change.
 | Arm | Irradiance features |
 |---|---|
 | A — global only | `ssrd` |
-| B — separation model | `ssrd`, plus the direct-normal and diffuse-horizontal estimates Erbs derives from `ssrd` |
+| B — separation model | `ssrd`, plus the beam and diffuse horizontal fluxes Erbs derives from `ssrd` |
 | C — the model's own split | `ssrd`, `fdir`, and `ssrd − fdir` |
 | D — direct fraction | `ssrd` and `fdir / ssrd` |
 | B-DISC — sensitivity | arm B with the DISC separation model in place of Erbs |
 
-**Arm C against arm B is the comparison the experiment exists for.** Arm B only re-expresses
-information arm A already holds, because Erbs is a deterministic function of the clearness index and
-the sun's position, both of which arm A can reach. Arm C adds a quantity the radiation scheme
-computed and `ssrd` alone does not carry.
+Every beam column is a flux onto a horizontal plane, never a direct-normal one, so no two arms
+differ in how a quantity is encoded as well as in what it knows.
+
+**Arm C against arm B is the comparison the experiment exists for, and arm B is a negative control
+the experiment gets for free.** Erbs reads global irradiance and solar geometry and nothing else,
+all of which arm A already holds, so arm B cannot carry information arm A lacks. Whatever B−A comes
+out as is this pipeline's reading on a feature set known to be uninformative, and it is the band any
+real effect has to clear. Arm C adds a quantity the radiation scheme computed and `ssrd` alone does
+not carry, and has the same column count as arm B.
+
+**A second control runs every arm against a synthetic target built by transposing the true split
+onto a tilted plane**, where the split must help by construction. A null result on the real meters
+means nothing until the instrument has been shown to detect an effect it should detect.
 
 ## Anonymisation
 
