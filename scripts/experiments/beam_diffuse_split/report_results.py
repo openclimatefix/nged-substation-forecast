@@ -38,6 +38,7 @@ SHORT_ARM_LABELS: Final[dict[str, str]] = {
     "C_era5_split": "C",
     "D_direct_fraction": "D",
     "B_disc": "B-DISC",
+    "B_learned": "B-LEARNED",
     "P_A_global_only": "P-A",
     "P_B_erbs": "P-B",
     "P_B_disc": "P-B-DISC",
@@ -52,6 +53,7 @@ ARM_LABELS: Final[dict[str, str]] = {
     "C_era5_split": "C — the source's own split",
     "D_direct_fraction": "D — the source's direct fraction",
     "B_disc": "B-DISC — DISC separation model",
+    "B_learned": "B-LEARNED — the best separation model derivable from arm A's features",
     "P_A_global_only": "P-A — global irradiance only, no transposition",
     "P_B_erbs": "P-B — transposed with the Erbs split",
     "P_B_disc": "P-B-DISC — transposed with the DISC split",
@@ -87,7 +89,7 @@ def _pooled_mean(*, summary: pl.DataFrame, setting: str, arm: str, column: str) 
 def _arm_table(*, summary: pl.DataFrame, setting: str) -> list[str]:
     """Render the per-arm pooled metrics as a markdown table."""
     lines = [
-        "| Arm | MAE (% of capacity) | MAE (MW) | CRPS (MW) |",
+        "| Arm | MAE (% of P99 output) | MAE (MW) | CRPS (MW) |",
         "|---|---|---|---|",
     ]
     arms = [
@@ -117,10 +119,10 @@ def _arm_table(*, summary: pl.DataFrame, setting: str) -> list[str]:
 
 
 def _contrast_table(*, intervals: pl.DataFrame, summary: pl.DataFrame, setting: str) -> list[str]:
-    """Render the pooled arm-to-arm contrasts, in percentage points of capacity."""
+    """Render the pooled arm-to-arm contrasts, in percentage points of P99 output."""
     lines = [
         (
-            "| Contrast | ΔMAE (pp of capacity) | 95% interval | Relative | Excludes zero? |"
+            "| Contrast | ΔMAE (pp of P99 output) | 95% interval | Relative | Excludes zero? |"
             " Folds with the same sign |"
         ),
         "|---|---|---|---|---|---|",
@@ -157,6 +159,42 @@ def _contrast_table(*, intervals: pl.DataFrame, summary: pl.DataFrame, setting: 
     return lines
 
 
+def _crps_contrast_table(*, intervals: pl.DataFrame, setting: str) -> list[str]:
+    """Render the same contrasts scored by CRPS rather than by mean absolute error.
+
+    The continuous ranked probability score is the run's only probabilistic evidence, and an arm
+    that sharpened its central estimate while widening its distribution would show up here and
+    nowhere else.
+
+    Args:
+        intervals: The bootstrap intervals frame.
+        setting: Which hyperparameter setting to report.
+
+    Returns:
+        The table's lines, or an empty list where the instrument scores no distribution.
+    """
+    pooled = intervals.filter(
+        (pl.col("setting") == setting)
+        & (pl.col("scope") == "all_sites")
+        & (pl.col("metric") == "crps_mw")
+    )
+    if pooled.is_empty():
+        return []
+    lines = [
+        "| Contrast | ΔCRPS (MW) | 95% interval | Excludes zero? |",
+        "|---|---|---|---|",
+    ]
+    for row in pooled.iter_rows(named=True):
+        excludes_zero = "**yes**" if row["lower_95"] * row["upper_95"] > 0 else "no"
+        marker = " **(headline)**" if row["is_headline"] else ""
+        lines.append(
+            f"| {SHORT_ARM_LABELS[row['treatment']]} − {SHORT_ARM_LABELS[row['reference']]}"
+            f"{marker} | {row['difference']:+.6f} | "
+            f"[{row['lower_95']:+.6f}, {row['upper_95']:+.6f}] | {excludes_zero} |"
+        )
+    return lines
+
+
 def _per_site_table(
     *, intervals: pl.DataFrame, setting: str, contrast: tuple[str, str]
 ) -> list[str]:
@@ -172,7 +210,7 @@ def _per_site_table(
     lines = [
         f"{SHORT_ARM_LABELS[treatment]} − {SHORT_ARM_LABELS[reference]}, per site:",
         "",
-        "| Site | ΔMAE (pp of capacity) | 95% interval | Hours |",
+        "| Site | ΔMAE (pp of P99 output) | 95% interval | Hours |",
         "|---|---|---|---|",
     ]
     lines.extend(
@@ -194,15 +232,17 @@ def _fitted_parameter_table(*, results_dir: Path) -> list[str]:
     lines = [
         "Fitted on each site's whole span, for the arm given the source's own split:",
         "",
-        "| Site | Tilt (degrees) | Azimuth (degrees) | Capacity / registered | Clip / registered |",
+        "| Site | Tilt (degrees) | Azimuth (degrees) | Capacity / P99 output | Clip / P99 output |",
         "|---|---|---|---|---|",
     ]
-    lines.extend(
-        f"| {row['site']} | {row['tilt_degrees']:.1f} | {row['azimuth_degrees']:.1f} | "
-        f"{row['capacity_fraction_of_registered']:.3f} | "
-        f"{row['clip_fraction_of_registered']:.3f} |"
-        for row in rows.iter_rows(named=True)
-    )
+    for row in rows.iter_rows(named=True):
+        clip = row["clip_fraction_of_p99"]
+        clip_cell = "—" if clip is None else f"{clip:.3f}"
+        lines.append(
+            f"| {row['site']} | {row['tilt_degrees']:.1f} | {row['azimuth_degrees']:.1f} | "
+            f"{row['capacity_fraction_of_p99']:.3f} | {clip_cell} |"
+        )
+    lines.extend(["", "An em dash means the clip never binds, so the data does not identify it."])
     return lines
 
 
@@ -242,10 +282,23 @@ def main() -> int:
     intervals = pl.read_parquet(results_dir / "bootstrap_intervals.parquet")
     summary = pl.read_parquet(results_dir / "per_site_summary.parquet")
 
-    lines: list[str] = ["## Arms, primary setting", ""]
+    lines: list[str] = [
+        (
+            "**P99 output** is each site's 99th-percentile absolute metered output over its whole"
+            " history, which every percentage below is a percentage of. It is not the site's"
+            " registered capacity, which this experiment never reads."
+        ),
+        "",
+        "## Arms, primary setting",
+        "",
+    ]
     lines += _arm_table(summary=summary, setting="primary")
     lines += ["", "## Contrasts, primary setting", ""]
     lines += _contrast_table(intervals=intervals, summary=summary, setting="primary")
+    crps_lines = _crps_contrast_table(intervals=intervals, setting="primary")
+    if crps_lines:
+        lines += ["", "## Contrasts by CRPS, primary setting", ""]
+        lines += crps_lines
     if instrument == "xgboost":
         lines += ["", "## Contrasts, sensitivity hyperparameters", ""]
         lines += _contrast_table(intervals=intervals, summary=summary, setting="sensitivity")

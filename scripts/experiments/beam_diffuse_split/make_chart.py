@@ -8,7 +8,10 @@ arm against the arm shown global horizontal irradiance alone, which is what *hav
 The right panel measures the arm shown the product's own published beam against the arm shown a
 separation model's estimate of the same beam, which is what the *published field* buys on top of
 what global irradiance already implies. Both panels are drawn in the same units, a percentage of
-the global-only arm's mean absolute error, so the two effects can be read against each other.
+the global-only arm's mean absolute error, but **each panel carries its own x scale**, because the
+right panel's effects are an order of magnitude smaller than the left panel's and a shared scale
+would flatten them to nothing. Compare bars within a panel, and read the numbers rather than the
+lengths across panels.
 
 Each row of panels is one instrument, because a tree and a fitted physical model disagree about how
 much of the split they can use, and that disagreement is part of the answer.
@@ -39,8 +42,11 @@ OUTPUT_PATH: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_split_result.s
 ALIGNMENT: Final[str] = "shifted"
 """Which stamp alignment the chart draws.
 
-The two alignments agree on every contrast the chart shows, so drawing both would double the rows
-and say nothing. The tables report both.
+The tree's contrasts agree across the two alignments, but the fitted physical model's do not: on
+the reanalysis its headline contrast changes sign between them, because a 30-minute stamp shift is
+absorbed into the fitted azimuth and the arms are then fitting different geometry as well as
+different beam fields. Drawing one alignment therefore understates the physical model's
+instability, which is why the subtitle says so and the tables report both alignments.
 """
 
 SOURCE_LABELS: Final[dict[str, str]] = {
@@ -64,9 +70,11 @@ REFERENCE_ARMS: Final[dict[str, str]] = {
 CONTRAST_LABELS: Final[dict[str, str]] = {
     "B_erbs|A_global_only": "Erbs split",
     "B_disc|A_global_only": "DISC split",
+    "B_learned|A_global_only": "Learned split",
     "C_era5_split|A_global_only": "The product's own split",
     "D_direct_fraction|A_global_only": "The product's direct fraction",
     "C_era5_split|B_erbs": "The product's split vs. Erbs",
+    "C_era5_split|B_learned": "The product's split vs. the learned split",
     "P_B_erbs|P_A_global_only": "Erbs split",
     "P_B_disc|P_A_global_only": "DISC split",
     "P_C_source_split|P_A_global_only": "The product's own split",
@@ -83,17 +91,28 @@ PANEL_TITLES: Final[tuple[str, str]] = (
 ROW_ORDER: Final[tuple[str, ...]] = (
     "Erbs split",
     "DISC split",
+    "Learned split",
     "The product's own split",
     "The product's direct fraction",
     "The product's split vs. Erbs",
+    "The product's split vs. the learned split",
 )
 """The order the contrasts are stacked in, best-known to least-known."""
 
+RIGHT_PANEL_LABELS: Final[tuple[str, ...]] = (
+    "The product's split vs. Erbs",
+    "The product's split vs. the learned split",
+)
+"""The contrasts drawn in the right panel, which compares two ways of getting a split."""
+
 SUBTITLE: Final[tuple[str, ...]] = (
     "Six PV sites in one 34 km box in Lincolnshire, hourly daylight rows, 2019-2026.",
-    "Negative is better. Bars are 95% monthly block bootstrap intervals;",
-    "a bar crossing zero has not been shown to help. Reanalysis and satellite",
-    "retrieval, not forecasts, so this is information content, not forecast skill.",
+    "Change in mean absolute error against the global-irradiance-only arm (%).",
+    "Negative is better. Bars are 95% monthly block bootstrap intervals; a bar",
+    "crossing zero has not been shown to help. Each panel has its own x scale.",
+    "Reanalysis and satellite retrieval, not forecasts, so this is information",
+    "content, not forecast skill. The physical model's contrasts change sign",
+    "under the other stamp alignment; the tree's do not.",
 )
 
 PERCENTAGE_POINTS: Final[float] = 100.0
@@ -155,7 +174,7 @@ def _differences() -> pl.DataFrame:
             )
     combined = pl.concat(frames)
     return combined.with_columns(
-        panel=pl.when(pl.col("contrast_label") == ROW_ORDER[-1])
+        panel=pl.when(pl.col("contrast_label").is_in(RIGHT_PANEL_LABELS))
         .then(pl.lit(PANEL_TITLES[1]))
         .otherwise(pl.lit(PANEL_TITLES[0]))
     )
@@ -167,14 +186,16 @@ def _chart(*, differences: pl.DataFrame) -> alt.FacetChart:
         y=alt.Y("contrast_label:N", title=None, sort=list(ROW_ORDER)),
         yOffset=alt.YOffset("source_label:N", sort=list(SOURCE_LABELS.values())),
         color=alt.Color(
-            "source_label:N", title="Irradiance source", sort=list(SOURCE_LABELS.values())
+            "source_label:N",
+            title="Irradiance source",
+            sort=list(SOURCE_LABELS.values()),
+            legend=alt.Legend(orient="bottom", direction="horizontal", titleLimit=0, labelLimit=0),
         ),
     )
+    # The axis title lives in the subtitle instead: four facets each drawing their own would
+    # collide, and every panel measures the same quantity in the same units.
     interval = base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
-        x=alt.X(
-            "lower_95_percent:Q",
-            title="Change in mean absolute error vs. global irradiance alone (%)",
-        ),
+        x=alt.X("lower_95_percent:Q", title=None),
         x2=alt.X2("upper_95_percent:Q"),
     )
     estimate = base.mark_point(filled=True, size=70).encode(  # ty: ignore[unresolved-attribute]

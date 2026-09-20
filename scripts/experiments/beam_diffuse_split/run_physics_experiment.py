@@ -210,7 +210,8 @@ def _unpack(*, parameters: np.ndarray, arm: str, capacity_guess: float) -> Fitte
     Args:
         parameters: The unbounded vector the optimiser proposes.
         arm: The key into `ARM_SPLITS`, which fixes how many weights the vector carries.
-        capacity_guess: The site's registered capacity, which the scale is measured against.
+        capacity_guess: The site's 99th-percentile metered output, which the scale is measured
+            against. It is not the registered capacity, which this experiment never reads.
 
     Returns:
         The physical parameters, and the convex weights over the arm's splits.
@@ -268,7 +269,7 @@ def _fit(
         train: The training rows.
         arm: The key into `ARM_SPLITS`.
         target: The column to fit.
-        capacity_guess: The site's registered capacity.
+        capacity_guess: The site's 99th-percentile metered output.
         seed: Chooses the random starting points.
 
     Returns:
@@ -350,6 +351,12 @@ def _fitted_parameters(*, dataset: pl.DataFrame) -> pl.DataFrame:
     never saw its test fold. They exist so the write-up can say whether the fitted tilt and azimuth
     are physically sensible, which is the cheapest check that the model is doing what it claims.
 
+    **The clip is reported only where it binds.** A clip fitted above the site's own highest reading
+    never limits the modelled power, so the optimiser has no gradient on it and leaves it wherever
+    its starting point put it. Reporting that starting point as a fitted inverter ceiling would
+    invite a reader to interpret a number the data never constrained, so an unidentified clip is
+    written as null instead.
+
     Args:
         dataset: The full frame.
 
@@ -365,14 +372,19 @@ def _fitted_parameters(*, dataset: pl.DataFrame) -> pl.DataFrame:
                 train=rows, arm=arm, target="power_mw", capacity_guess=capacity_guess, seed=0
             )
             fitted = _unpack(parameters=parameters, arm=arm, capacity_guess=capacity_guess)
+            highest_output_mw = float(rows["power_mw"].to_numpy().max())
             records.append(
                 {
                     "arm": arm,
                     "site": site,
                     "tilt_degrees": float(np.degrees(fitted.tilt_rad)),
                     "azimuth_degrees": float(np.degrees(fitted.azimuth_rad)),
-                    "capacity_fraction_of_registered": fitted.capacity_mw / capacity_guess,
-                    "clip_fraction_of_registered": fitted.clip_mw / capacity_guess,
+                    "capacity_fraction_of_p99": fitted.capacity_mw / capacity_guess,
+                    "clip_fraction_of_p99": (
+                        fitted.clip_mw / capacity_guess
+                        if fitted.clip_mw < highest_output_mw
+                        else None
+                    ),
                     "weights": [float(weight) for weight in fitted.weights],
                 }
             )

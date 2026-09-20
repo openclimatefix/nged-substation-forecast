@@ -92,9 +92,18 @@ service publishes no temperature and the temperature feature is shared by every 
 """
 
 
-def output_path_for(*, source: SourceType, alignment: AlignmentType) -> Path:
-    """Return where the built frame for one irradiance source and stamp alignment is written."""
-    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}_{alignment}.parquet"
+def output_path_for(*, dataset_name: str, alignment: AlignmentType) -> Path:
+    """Return where one built frame is written.
+
+    Args:
+        dataset_name: The irradiance source, plus any suffix distinguishing a variant build from
+            the main one for the same source.
+        alignment: Which stamp alignment the frame was built under.
+
+    Returns:
+        The parquet path every arm of that run reads.
+    """
+    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{dataset_name}_{alignment}.parquet"
 
 
 MIN_YEARS_OF_READINGS: Final[float] = 1.0
@@ -261,8 +270,12 @@ def _read_open_meteo() -> pl.DataFrame:
     return pl.read_parquet(OPEN_METEO_PATH).sort("time", "latitude", "longitude")
 
 
-def _read_cams() -> pl.DataFrame:
+def _read_cams(*, min_reliability: float) -> pl.DataFrame:
     """Read the CAMS per-site frame `fetch_cams.py` wrote, trimmed and quality-filtered.
+
+    Args:
+        min_reliability: Hours the service flags below this fraction are dropped. Passing zero
+            keeps every hour, which is what measures whether the filter changed the answer.
 
     Returns:
         One row per (site, time) with `ghi_w_m2` and `bhi_w_m2`.
@@ -271,7 +284,7 @@ def _read_cams() -> pl.DataFrame:
         msg = f"{CAMS_PATH} missing; run fetch_cams.py first"
         raise FileNotFoundError(msg)
     cams = pl.read_parquet(CAMS_PATH)
-    reliable = cams.filter(pl.col("reliability") >= MIN_CAMS_RELIABILITY)
+    reliable = cams.filter(pl.col("reliability") >= min_reliability)
     _LOG.info(
         "CAMS: %d of %d hours pass the reliability flag",
         reliable.height,
@@ -679,6 +692,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cds")
     parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="as-labelled")
+    parser.add_argument(
+        "--min-cams-reliability",
+        type=float,
+        default=MIN_CAMS_RELIABILITY,
+        help="Drop CAMS hours flagged below this fraction. Zero keeps every hour.",
+    )
+    parser.add_argument(
+        "--suffix",
+        default="",
+        help="Appended to the output filename, so a variant build does not overwrite the main one.",
+    )
     arguments = parser.parse_args()
     source: SourceType = arguments.source
     alignment: AlignmentType = arguments.alignment
@@ -722,7 +746,9 @@ def main() -> int:
     )
     if source == "cams":
         joined = joined.drop("ghi_w_m2", "bhi_w_m2").join(
-            _read_cams(), on=["site", "time"], how="inner"
+            _read_cams(min_reliability=arguments.min_cams_reliability),
+            on=["site", "time"],
+            how="inner",
         )
     _LOG.info("after joining irradiance: %d rows", joined.height)
 
@@ -733,7 +759,7 @@ def main() -> int:
     dataset = _add_synthetic_control_target(frame=_add_separation_models(frame=daylight)).drop(
         "cell_latitude", "cell_longitude", "latitude", "longitude"
     )
-    output_path = output_path_for(source=source, alignment=alignment)
+    output_path = output_path_for(dataset_name=f"{source}{arguments.suffix}", alignment=alignment)
     dataset.write_parquet(output_path)
     _LOG.info("wrote %d rows to %s", dataset.height, output_path)
     _LOG.info(

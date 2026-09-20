@@ -65,6 +65,12 @@ def results_dir_for(*, source: str, alignment: str) -> Path:
     return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_results_{source}_{alignment}"
 
 
+LEARNED_BEAM_TEMPLATE: Final[str] = "learned_bhi_w_m2_fold{fold}"
+"""Column holding the learned separation model's beam, for rows scored on one named fold."""
+
+LEARNED_DIFFUSE_TEMPLATE: Final[str] = "learned_dhi_w_m2_fold{fold}"
+"""Column holding the learned separation model's diffuse, for rows scored on one named fold."""
+
 SHARED_FEATURES: Final[tuple[str, ...]] = (
     "solar_zenith_deg",
     "solar_azimuth_deg",
@@ -87,8 +93,14 @@ ARM_FEATURES: Final[dict[str, tuple[str, ...]]] = {
     "C_era5_split": ("ghi_w_m2", "bhi_w_m2", "dhi_w_m2"),
     "D_direct_fraction": ("ghi_w_m2", "direct_fraction"),
     "B_disc": ("ghi_w_m2", "disc_bhi_w_m2", "disc_dhi_w_m2"),
+    "B_learned": ("ghi_w_m2", LEARNED_BEAM_TEMPLATE, LEARNED_DIFFUSE_TEMPLATE),
 }
-"""The irradiance columns each arm is shown, on top of `SHARED_FEATURES`."""
+"""The irradiance columns each arm is shown, on top of `SHARED_FEATURES`.
+
+A name carrying `{fold}` is resolved against the fold being scored, which is what keeps arm
+`B_learned`'s separation model out of its own test fold. Every other name is left alone, because
+formatting a string with no placeholder in it returns the string.
+"""
 
 HEADLINE_CONTRAST: Final[tuple[str, str]] = ("C_era5_split", "B_erbs")
 """The one contrast named before the experiment ran, so it cannot be picked after the fact.
@@ -104,6 +116,9 @@ CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("D_direct_fraction", "A_global_only"),
     ("D_direct_fraction", "B_erbs"),
     ("B_disc", "A_global_only"),
+    ("C_era5_split", "B_learned"),
+    ("B_learned", "B_erbs"),
+    ("B_learned", "A_global_only"),
 )
 """Every (treatment, reference) pairing an interval is computed for."""
 
@@ -263,6 +278,19 @@ def _booster_parameters(*, hyper_parameters: HyperParameters, seed: int) -> dict
     }
 
 
+def _features_for(*, arm: str, fold: int) -> list[str]:
+    """Return the feature columns one arm is shown when the named fold is the one being scored.
+
+    Args:
+        arm: The key into `ARM_FEATURES`.
+        fold: The fold about to be held out.
+
+    Returns:
+        The shared features followed by the arm's own irradiance columns.
+    """
+    return [*SHARED_FEATURES, *(column.format(fold=fold) for column in ARM_FEATURES[arm])]
+
+
 def _fit_one_fold(
     *,
     train: pl.DataFrame,
@@ -329,13 +357,13 @@ def _run_site_arm(
     Returns:
         One row per (time, seed) with the losses.
     """
-    features = [*SHARED_FEATURES, *ARM_FEATURES[arm]]
     outputs: list[pl.DataFrame] = []
     for fold in range(N_FOLDS):
         test = site_rows.filter(pl.col("fold") == fold)
         train = site_rows.filter(pl.col("fold") != fold)
         if test.is_empty() or train.is_empty():
             continue
+        features = _features_for(arm=arm, fold=fold)
         actual = test[target].to_numpy()
         for seed in SEEDS:
             point, quantiles = _fit_one_fold(
@@ -575,6 +603,62 @@ def _direct_fraction_predictability(*, dataset: pl.DataFrame) -> dict[str, float
     }
 
 
+def _add_learned_split(*, dataset: pl.DataFrame) -> pl.DataFrame:
+    """Add the best split a model can *derive* from the global-only arm's own features.
+
+    Arm C could beat arm B for either of two reasons, and they carry opposite decisions. The
+    published beam may hold information no function of global irradiance and solar geometry can
+    recover, in which case the field is worth asking a supplier for. Or the product may simply
+    publish a better separation model than Erbs, in which case the same gain is available locally
+    for nothing. Erbs alone cannot tell those apart, because Erbs is one fixed correlation rather
+    than the best available one.
+
+    This arm is the discriminator. Its beam is an out-of-fold prediction of the product's own direct
+    fraction from exactly arm A's feature set, so it is the strongest separation model this data
+    supports and it provably carries no information arm A lacks. If arm C still beats it, the
+    advantage is information rather than representation.
+
+    **One separation model is fitted per scored fold, and it never sees that fold.** A single
+    out-of-fold column would not do: the prediction for a row in fold *j* would come from a model
+    trained on every other fold, the test fold among them, so the beam on the training rows would
+    carry the test fold's irradiance back into the arm. Fitting one model per scored fold and
+    applying it to every row costs five fits and closes that path.
+
+    Args:
+        dataset: The full frame, already carrying `fold`.
+
+    Returns:
+        The frame with a beam and a diffuse column for each fold that can be scored.
+    """
+    features = [*SHARED_FEATURES, *ARM_FEATURES["A_global_only"]]
+    predictors = dataset.select(features).to_numpy()
+    columns: dict[str, pl.Series] = {}
+    for fold in range(N_FOLDS):
+        train = dataset.filter(pl.col("fold") != fold)
+        if train.is_empty() or dataset.filter(pl.col("fold") == fold).is_empty():
+            continue
+        model = xgb.train(
+            {
+                **_booster_parameters(hyper_parameters=PRIMARY_HYPER_PARAMETERS, seed=0),
+                "objective": "reg:squarederror",
+            },
+            xgb.DMatrix(
+                train.select(features).to_numpy(), label=train["direct_fraction"].to_numpy()
+            ),
+            num_boost_round=PRIMARY_HYPER_PARAMETERS["num_boost_round"],
+        )
+        # Clipping to a fraction keeps the pair a genuine split of this arm's own global
+        # irradiance, so no arm differs from another in what its two components sum to.
+        fraction = np.clip(model.predict(xgb.DMatrix(predictors)), 0.0, 1.0)
+        beam = fraction * dataset["ghi_w_m2"].to_numpy()
+        columns[LEARNED_BEAM_TEMPLATE.format(fold=fold)] = pl.Series(beam, dtype=pl.Float64)
+        columns[LEARNED_DIFFUSE_TEMPLATE.format(fold=fold)] = pl.Series(
+            dataset["ghi_w_m2"].to_numpy() - beam, dtype=pl.Float64
+        )
+        _LOG.info("learned separation fitted for fold %d", fold)
+    return dataset.with_columns(**columns)
+
+
 def _intervals_for(
     *, losses: pl.DataFrame, setting_name: str, target: str, sites: list[str]
 ) -> list[dict[str, object]]:
@@ -660,6 +744,8 @@ def main() -> int:
 
     diagnostic = _direct_fraction_predictability(dataset=dataset)
     _LOG.info("direct-fraction predictability diagnostic: %s", diagnostic)
+
+    dataset = _add_learned_split(dataset=dataset)
 
     jobs: list[tuple[str, str, str, HyperParameters, bool]] = [
         (arm, "primary", "power_mw", PRIMARY_HYPER_PARAMETERS, True) for arm in ARM_FEATURES

@@ -97,8 +97,8 @@ def main() -> int:
             f"### {instrument}, {arguments.source}, {arguments.alignment} stamps",
             "",
             (
-                "| Solar elevation (degrees) | ΔMAE (pp of capacity) |"
-                " Reference MAE (% of capacity) | Relative | Hours |"
+                "| Solar elevation (degrees) | ΔMAE (pp of P99 output) |"
+                " Reference MAE (% of P99 output) | Relative | Hours |"
             ),
             "|---|---|---|---|---|",
         ]

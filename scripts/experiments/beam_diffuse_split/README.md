@@ -65,6 +65,18 @@ Identical rows, folds, seeds and non-irradiance features. Only the irradiance co
 | C — the product's own split | Global irradiance, the published beam, and the difference |
 | D — direct fraction | Global irradiance and the published beam's share of it |
 | B-DISC — sensitivity | Arm B with the DISC separation model in place of Erbs |
+| B-LEARNED — the discriminator | Arm B with a fitted separation model in place of Erbs: an out-of-fold prediction of the published direct fraction from arm A's own feature set |
+
+**Arm B-LEARNED separates the two reasons arm C could win, which carry opposite decisions.** The
+published beam may hold information no function of global irradiance and solar geometry can
+recover, and that field is worth asking a supplier for. Or the product may merely publish a better
+separation model than Erbs, and then the same gain is available locally for nothing. Erbs alone
+cannot tell those apart, because Erbs is one fixed correlation from 1982 rather than the best
+correlation this data supports. Arm B-LEARNED is that best correlation, and it provably carries no
+information arm A lacks, so arm C beating it is evidence of information rather than of
+representation. One separation model is fitted per scored fold and never sees that fold, because a
+single out-of-fold column would carry the test fold's irradiance back into the arm through the
+training rows.
 
 The physical instrument runs the same arms under the names `P-A` to `P-C`, plus `P-E`, which is
 handed all three beam estimates at once and fits the weights of a convex combination over them. Arm
@@ -102,11 +114,73 @@ time from the private roster, and writes only the anonymised label.
 
 Six sites inside a 34 km box share their weather, so the effective sample size is the number of
 independent weather episodes rather than the number of site-hours. The bar for a result is a
-monthly block bootstrap interval on the arm-to-arm difference that excludes zero. A point estimate
-on its own is not a result, and neither is a difference smaller than the positive control's own
-arm-to-arm difference. The seed-to-seed spread the runners report means different things for the
-two instruments: for XGBoost it measures how much of a difference is fitting noise, and for the
-physical model it only measures how far the optimiser's restarts wander, which is a few parts in a
-million.
+monthly block bootstrap interval on the arm-to-arm difference that excludes zero, and a point
+estimate on its own is not a result. The seed-to-seed spread the runners report means different
+things for the two instruments: for XGBoost it measures how much of a difference is fitting noise,
+and for the physical model it only measures how far the optimiser's restarts wander, which is a few
+parts in a million.
+
+**What the positive control licenses is a statement about detection, not a threshold a real effect
+has to clear.** The control's target is a transposition of the true split plus Gaussian noise at 2%
+of each site's 99th-percentile output, so the noise alone fixes a floor of about 1.59 percentage
+points on any arm's error, and the whole span between the global-only arm and perfection is about
+0.38 points. The control's own arm-to-arm difference is therefore a *ceiling* — the largest
+difference this instrument could report on a target that is a pure function of the split — and
+requiring a real effect to exceed it would demand that real weather beat a synthetic target with no
+physics in it but transposition. It would also make the bar a free parameter, because halving the
+control's noise widens its arm-to-arm difference without anything about the real measurement
+changing. The control answers one question: whether the instrument detects an effect of this kind
+at all. Report the real effect against the error it removes, and say what fraction of the control's
+difference it comes to, rather than treating that fraction as a pass mark.
 
 Whatever the answer, it is about one micro-region of Lincolnshire over 2019 to 2026.
+
+**"Percentage of capacity" here means percentage of the site's 99th-percentile metered output.**
+The denominator is `effective_capacity_mw`, which `ml_core.metrics` computes as the 99th percentile
+of each series' own absolute output over its whole history. It is not the registered capacity, and
+because it is a statistic of the target it is not a data-independent unit. Every arm is divided by
+the same number, so it cannot manufacture a contrast.
+
+## What each reading does not settle
+
+**The fitted physical model is a misspecification probe, not a second reading of the same
+quantity.** Its two arms do not differ only in the beam field they are handed: the arm given the
+product's own split settles on a tilt 3 to 11 degrees shallower than the arm given Erbs, in every
+run and at every site, so the arms differ in fitted geometry as well. A 30-minute stamp shift is
+absorbed into the fitted azimuth — the shifted runs settle around 162 to 179 degrees and the
+as-labelled runs around 200 to 212 — and the ordering of the arms changes with it, in sample as
+well as out. So the physical model answers "which beam field lets a five-parameter isotropic-sky
+model with a fitted azimuth fit best", and its answer moves with a timestamp convention. Do not
+reconcile its sign with the tree's; report what each instrument measured.
+
+**The physical model also amplifies beam error where the tree does not.** `MIN_COS_ZENITH` floors
+the divisor that converts a horizontal beam to a normal one, so a beam error near the horizon is
+magnified up to twentyfold, and the tree never performs that division at all. The penalty is
+largest in the lowest elevation band but it is present in every band, so low-sun amplification is
+part of the physical model's penalty rather than all of it.
+
+**The satellite run discards the hours the service itself flags, and the reanalysis run discards
+none.** `MIN_CAMS_RELIABILITY` removes about 17% of the satellite source's daylight hours, and
+those hours are darker and more diffuse than the ones kept — the regime where no arm can be far
+wrong. The reanalysis has no equivalent flag, so the two sources' row sets differ for that reason
+as well as through their own false-zero filters. `compare_sources.py` exists to settle whether a
+source difference survives a common row set.
+
+**On the reanalysis the six per-site rows are two irradiance series, not six replications.** The
+roster's six meters fall inside two ERA5 grid cells, and within each group the global irradiance is
+bit-identical, so the per-site table is two experiments run three times each against a different
+power target. The satellite source is clean here, because it retrieves at each meter's own
+coordinates. The pooled bootstrap is unaffected either way, because it resamples whole calendar
+months across all six sites at once.
+
+**The second hyperparameter setting did not do its job on the reanalysis.** It exists to check that
+the arm ordering is a property of the features rather than of the settings, and on the reanalysis
+the headline contrast is null at the primary setting and excludes zero at the sensitivity setting.
+Both are reported; the check simply did not pass there.
+
+**The false-zero filter was added after the first results existed.** It removes about 3.7% of
+daylight rows, three times what the outage filter removes, and it was written once the first run
+had already produced tables. Matched within irradiance bins the dropped rows' diffuse fraction
+differs from the kept rows' by about 0.004, so it favours no arm, and the pre-cleaning run reaches
+the same verdict — but a filter chosen after seeing results has to be declared rather than
+defended.

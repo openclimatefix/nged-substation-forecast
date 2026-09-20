@@ -112,7 +112,7 @@ def main() -> int:
             "",
             f"{shared.height:,} hours shared by both sources.",
             "",
-            f"| Arm | {sources[0]} MAE (% of capacity) | {sources[1]} MAE (% of capacity) |",
+            f"| Arm | {sources[0]} MAE (% of P99 output) | {sources[1]} MAE (% of P99 output) |",
             "|---|---|---|",
         ]
         for arm in arms:
