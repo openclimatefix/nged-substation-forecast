@@ -166,15 +166,16 @@ over-confident predictions during a real outage — the worst possible moment. U
 outage-shaped** dropout drawn from the same failure-scenario vocabulary the rest of the project
 scores against.
 
-**Masking whole sources is the cheap half of the same idea, and operational weather models already
-do it.** [Rasp et al. (2026)](https://arxiv.org/abs/2609.03582) train WeatherNext 3 with the inputs
-that are absent at initialisation — the two satellite precipitation products and the cumulative
-analysis variables — masked on 90% of training steps, supplied in part on 2%, and supplied in
-full on the remaining 8%, so that one model forecasts skilfully from whichever inputs arrived rather
-than needing separate handling at initialisation time. Masking at source granularity is closer to
-how a feed actually fails than element-wise dropout is. What source-level masking still misses is
-the correlation between an outage and the weather that caused the outage, which is what
-outage-shaped dropout adds.
+**Masking a whole source during training is a cheaper approximation to the same problem, and it
+does not replace outage-shaped dropout.** [Rasp et al.
+(2026)](https://arxiv.org/abs/2609.03582) train WeatherNext 3 on a training set where the
+late-arriving inputs are usually missing. The two satellite precipitation products and the
+accumulated radiation and precipitation fields are masked on 90% of training steps, supplied in part
+on 2%, and supplied in full on the remaining 8%. One model therefore forecasts skilfully from
+whichever inputs arrived, with no separate handling at initialisation time. A whole feed fails at
+once, so masking a whole source reproduces the failure mode better than element-wise dropout does.
+What source-level masking still misses is the correlation between an outage and the weather that
+caused the outage, which is what outage-shaped dropout adds.
 
 See [Inherent Stability](../design-philosophy/inherent-stability.md) for the whole principle.
 

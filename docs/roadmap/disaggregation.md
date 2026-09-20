@@ -94,16 +94,16 @@ Each right-hand-side term is modelled explicitly:
   [roadmap](index.md#v20-scale-up).)*
 - **`losses(t)`** — approximated as a smooth function of load level. *(Also a later refinement.)*
 
-**The live NWP feed carries global short-wave irradiance only, so the beam/diffuse split the PV
-physics needs has to come from somewhere else.** [ECMWF ENS from
-Dynamical.org](data-sources.md#weather-data) publishes the global horizontal component alone, and
-the [CAMS Radiation Service](capacity-estimation.md#irradiance-inputs) supplies the split over
-history but issues no forecast. That leaves two routes: a differentiable model that decomposes
-global horizontal irradiance into its direct and diffuse parts, or a second forecast source that
-publishes the direct component. Two sources already on the
-[shortlist](data-sources.md#weather-data) take the second route: ICON-EU publishes direct and
-diffuse short-wave separately, though only as a deterministic run out to 120 hours, and WeatherNext
-3 publishes total-sky direct short-wave (`fdir`) hourly at 0.1° across a 64-member ensemble.
+**The live ECMWF ENS feed carries global short-wave irradiance only, so the beam/diffuse split the
+PV physics needs must come either from a decomposition model or from a second forecast source.**
+[ECMWF ENS from Dynamical.org](data-sources.md#weather-data) publishes the global horizontal
+component alone, and the [CAMS Radiation Service](capacity-estimation.md#irradiance-inputs) supplies
+the split over history but issues no forecast. The decomposition route means a differentiable model
+that splits global horizontal irradiance into its direct and diffuse parts. The second-source route
+has two candidates already on the [shortlist](data-sources.md#weather-data). ICON-EU publishes
+direct and diffuse short-wave separately, though only as a deterministic run out to 120 hours.
+WeatherNext 3 publishes total-sky direct short-wave (`fdir`) hourly at 0.1° across a 64-member
+ensemble.
 
 ### Metered vs. unmetered DERs
 
