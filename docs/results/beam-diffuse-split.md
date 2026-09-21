@@ -20,9 +20,14 @@ account predicts.
 
 **The ECMWF ensemble feed this project ingests carries the total short-wave irradiance and no
 direct-beam component, so a physically-grounded PV model has to derive the split rather than read
-it.** The alternatives are to ask Dynamical.org to add the direct beam to the feed they build for
-us, to take the split from a different source, or to derive the split locally from the total we
-already have. Each costs something, and none is worth paying before knowing what the split is
+it.** Asking our supplier to add the beam is not among the options. Dynamical.org build the feed
+from ECMWF's free and open data, which does not carry `fdir`, so serving it would mean taking on a
+licensed ECMWF dissemination rather than widening a variable list. The only route to a beam on this
+feed runs through ECMWF widening the open catalogue, which [they have published no plan to
+do](../roadmap/data-sources.md#ecmwf-has-published-no-plan-to-open-a-direct-beam-or-hourly-ensemble-steps).
+What remains is to take the split from a different weather model whose free feed already carries a
+direct beam, to take it from a separate irradiance source, or to derive it locally from the total
+we already have. Each costs something, and none is worth paying before knowing what the split is
 worth. This page measures that.
 
 ### The three quantities, and the two ways to get the split
@@ -590,10 +595,12 @@ What the measurements above bear on, in the order the project meets them. Each i
 rather than a plan; what the project does about any of them belongs to the roadmap and the issue
 tracker.
 
-- **Asking a supplier to add the direct beam to the ECMWF ENS feed is the weakest of the three
-  options.** The open ENS feed publishes [at 25 km](../roadmap/data-sources.md), within a few
-  kilometres of the 31 km reanalysis where the published beam bought nothing detectable, and a
-  separation model run locally is free and available now.
+- **Nothing here argues for pursuing a direct beam on the ECMWF ENS feed, which is just as well,
+  because [our supplier cannot add
+  one](../roadmap/data-sources.md#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost).**
+  The open ENS feed publishes at 25 km, within a few kilometres of the 31 km reanalysis where the
+  published beam bought nothing detectable, so even if ECMWF did open the field it would be the
+  lowest-value of the routes to a split. A separation model run locally is free and available now.
 - **The same result points the other way for ICON-EU.** At about 6.5 km it sits beside the 5 km
   retrieval where the beam field did help, and it already carries the split, so the planned
   [ICON-EU ablation](../roadmap/data-sources.md) is where the beam question is worth asking again
