@@ -675,7 +675,7 @@ the spirit of the existing `_nullify_leaky_lags` tests before it's trusted.
 
 ### Neighbouring-H3-cell weather context
 
-Each series currently gets its nearest NWP cell only. Add the mean and gradient across the
+Each series currently gets only the NWP cell it sits inside. Add the mean and gradient across the
 neighbouring ring (~9 extra columns) for frontal-timing and wind-ramp information. Modest expected
 gain, low effort given the `geo` H3 machinery exists.
 
@@ -1226,7 +1226,11 @@ member *n*, so the two members share one row. Before relying on the pairing, che
 Dynamical.org keeps ECMWF's member numbering in both datasets. ICON-EU is a single deterministic
 run, so its values repeat on every member's row and are absent beyond its 120-hour horizon. Train
 with whole sources randomly blanked, so that a failed feed degrades the forecast rather than
-breaking it.
+breaking it. [Rasp et al. (2026)](https://arxiv.org/abs/2609.03582) train WeatherNext 3 with its
+late-arriving inputs masked on 90% of training steps, so that one model copes with whichever inputs
+arrived; [masking whole
+sources](../techniques/encoders.md#handling-missing-inputs-remove-the-token-dont-zero-fill) sets out
+what that precedent does and does not cover.
 
 **Each step of the experiment has to beat the step before on out-of-sample CRPS per horizon slice,
 with a block-bootstrap confidence interval that excludes zero:**

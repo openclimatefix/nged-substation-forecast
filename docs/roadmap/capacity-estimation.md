@@ -93,13 +93,13 @@ candidate meets them with its own machinery, and the judging checks each one.
 
 ### What effective capacity must exclude
 
-ANM curtailment is a deliberate, network-driven reduction, not a loss of physical capability.
-Folding curtailment into capacity would corrupt exactly the signal NGED needs. We identify curtailed
-periods from NGED's curtailment/ANM feed and keep them out of the capacity estimate — in the
-physics-model formulation this is a separate multiplicative **curtailment gate** on the generator's
-output (see [the v2 engine's node definitions](disaggregation.md#node-definitions) for where the
-same gate reappears at scale); in the convex formulation it amounts to masking or down-weighting
-flagged periods.
+Active Network Management (ANM) curtailment is a deliberate, network-driven reduction, not a loss of
+physical capability. Folding curtailment into capacity would corrupt exactly the signal NGED needs.
+We identify curtailed periods from NGED's curtailment/ANM feed and keep them out of the capacity
+estimate — in the physics-model formulation this is a separate multiplicative **curtailment gate**
+on the generator's output (see [the v2 engine's node
+definitions](disaggregation.md#node-definitions) for where the same gate reappears at scale); in the
+convex formulation it amounts to masking or down-weighting flagged periods.
 
 **The ANM feed is imperfect, in both directions.** Like any operational log, the ANM feed is an
 imperfect label: curtailment can happen with no matching log entry (for example, a generator's
@@ -546,8 +546,9 @@ covered by the weather ingests: the **CAMS Radiation Service** as the primary in
 ERA5T stream for the capacity estimate's freshness — see [Data sources → Weather
 data](data-sources.md#weather-data) for both specs, why CAMS is preferred to CM SAF SARAH-3, and why
 ERA5 beats CERRA here. The live **ECMWF ENS** feed carries only GHI — fine for v0.7, but v2 physics
-*forecasting* of PV needs a differentiable GHI → DNI/DHI decomposition model (or `fdir` added to the
-upstream dataset).
+*forecasting* of PV needs a differentiable GHI → DNI/DHI decomposition model, or `fdir` from
+another source — see [the forward model](disaggregation.md#the-forward-model) for both routes
+and the sources that take them.
 
 **The shared irradiance-bias term has an expected sign, which gives it a prior.** The CAMS Radiation
 Service reads high in clear conditions and low in cloudy ones ([Lezaca Galeano et al.

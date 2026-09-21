@@ -29,7 +29,7 @@ The blocks are:
    demand](switching-events.md) (v0.6 detector → v2 mixture models). "Normal" means:
     - *Substations*: all "normally closed" switches are closed and all "normally open" switches are
       open.
-    - *Generators*: the generator is unconstrained by NGED's Automatic Network Management (ANM) and
+    - *Generators*: the generator is unconstrained by NGED's Active Network Management (ANM) and
       operating at full capacity.
 2. **Dynamically changing effective capacity of generators** (the
    [`effective_capacity`](delivery-tables.md#table-4-effective_capacity) table). E.g. if a wind

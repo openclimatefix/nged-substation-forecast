@@ -7,13 +7,14 @@ without this format applied.
 
 Stores plain ``Float32`` + ``delta_store.precision.round_to_significand_bits`` — the technique
 used by ``delta_store.power_forecasts``, but with *different* writer properties. Measured on real
-NWP data (9 partitions spread across two years of history): ``BYTE_STREAM_SPLIT`` made every
-continuous column *larger*, not smaller — the opposite of the ``power_forecasts`` result. Working
-hypothesis: significand rounding collapses NWP values into a small set of repeats (many H3 cells
-/ ensemble members round to the same value), which Parquet's *default* dictionary+RLE encoding
-captures directly; ``BYTE_STREAM_SPLIT`` scatters that repetition across four separate byte
-planes and loses more than it gains. ``power_forecasts``'s target values have no such repetition
-(near-continuous ML output), so ``BYTE_STREAM_SPLIT`` wins there instead — the two tables need
+numerical weather prediction (NWP) data (9 partitions spread across two years of history):
+``BYTE_STREAM_SPLIT`` made every continuous column *larger*, not smaller — the opposite of the
+``power_forecasts`` result. Working hypothesis: significand rounding collapses NWP values into a
+small set of repeats, because many H3 cells and many ensemble members round to the same value.
+Parquet's *default* dictionary+RLE encoding captures those repeats directly.
+``BYTE_STREAM_SPLIT`` instead scatters that repetition across four separate byte planes, and so
+loses more than it gains. ``power_forecasts``'s target values are near-continuous ML output, and
+have no such repetition. ``BYTE_STREAM_SPLIT`` wins there instead, so the two tables need
 different writer properties. See
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#storage-formats-measured-not-assumed>
 for the measured GB/yr numbers, and
@@ -41,26 +42,27 @@ temperature, ≤8 Pa (0.08 hPa) for mean-sea-level pressure — both well inside
 (temperature ≤0.25 K, MSL pressure ≤1 hPa)."""
 
 NWP_SORT_COLS: Final[tuple[str, ...]] = ("init_time", "ensemble_member", "valid_time", "h3_index")
-"""Within-file row order for ``nwp`` writes — **member before valid_time** (the opposite
-priority from ``power_forecasts``, which sorts member-adjacent for a different reason: there
-it's about compressing near-duplicate ensemble values; here it's about row-group pruning).
+"""Within-file row order for ``nwp`` writes — **member before valid_time**. That is the opposite
+priority from ``power_forecasts``, which sorts member-adjacent for a different reason. In
+``power_forecasts`` member adjacency is about compressing near-duplicate ensemble values; in ``nwp``
+it is about row-group pruning.
 Sorting ``ensemble_member`` early puts each member's rows in one contiguous block, which
 `_member_aligned_row_group_size` then turns into one row group per member. A single-member predicate
 then matches a single row group's min/max range and skips the rest of the partition instead of
-decoding those rows. That pruning holds for **any** member, not only the control member: the sort
-alone is not enough, because row groups that straddle member boundaries advertise the whole span
-between their extremes.
+decoding those rows. That pruning holds for **any** member, not only the control member. The sort
+alone is not enough: row groups that straddle member boundaries advertise the whole span between
+their extremes.
 
 Measured on the stored table, a single-member read decodes 1.96% of a partition's rows — one row
-group in 51 — for every member: every partition we sampled held 51 row groups, each spanning a
-single member, and the 51 together covered members 0 to 50. Reading 29 daily partitions, nine H3
-cells, and the control member alone runs in 30 ms and 400 MB of peak resident memory, against 170 ms
-and 2,200 MB for the same read of a table sorted ``valid_time``-first. The member-early sort holds
-3.7% more stored bytes than the ``valid_time``-first sort. Measured on a real partition with half
-its rows removed at random members, so that the member-to-row-group alignment degrades rather than
-holding exactly, the worst member still reads 5.88% of the partition's rows, against that 1.96%
-floor. The method and the full figures live
-beside the storage measurements in
+group in 51 — and it does so for every member. Every partition the census sampled held 51 row
+groups, each spanning a single member, and those 51 row groups together covered members 0 to 50.
+Reading 29 daily partitions, nine H3 cells, and the control member alone runs in 30 ms and 400 MB of
+peak resident memory. The same read of a table sorted ``valid_time``-first takes 170 ms and 2,200
+MB. The member-early sort holds 3.7% more stored bytes than the ``valid_time``-first sort. One
+measurement took a real partition and removed half its rows at random members, so that the
+member-to-row-group alignment degrades rather than holding exactly. Under that degraded alignment
+the worst member still reads 5.88% of the partition's rows, against the 1.96% floor above. The
+method and the full figures live beside the storage measurements in
 <https://openclimatefix.github.io/nged-substation-forecast/api/dynamical_data/>.
 
 Two conditions have to hold for the predicate to reach the Parquet scan at all. The predicate must
@@ -71,9 +73,8 @@ survive ``Nwp.scan_delta``'s cast, which requires that cast to be a no-op (see t
 NWP_TARGET_FILE_SIZE_BYTES: Final[int] = 2_000_000_000
 """Target size for each Parquet file delta-rs writes, sized to keep one partition in one file.
 
-A daily partition of the European Centre for Medium-Range Weather Forecasts' ensemble
-forecast (ECMWF ENS) is
-~158 MB, so the target leaves more than a tenfold headroom.
+The ensemble forecast of the European Centre for Medium-Range Weather Forecasts is abbreviated ECMWF
+ENS. One daily partition of ECMWF ENS is ~158 MB, so the target leaves more than a tenfold headroom.
 
 **The file-size target is an optimisation, not a correctness requirement.** A partition that
 outgrows the target still writes correctly and still prunes well, because the single Arrow chunk
@@ -85,7 +86,7 @@ NWP_ROW_GROUP_SIZE_LIMITS: Final[tuple[int, int]] = (1_024, 1_048_576)
 """Floor and ceiling clamped around the member-aligned row-group size.
 
 The floor stops a frame with very few rows per member producing row groups too small to compress
-or too numerous to track; the floor has not bound on any real ECMWF ENS run measured so far, where
+or too numerous to track. The floor has not bound on any real ECMWF ENS run measured so far, where
 one member occupies ~142,000 rows. The ceiling is Parquet's conventional maximum, which also bounds
 the streaming engine's peak memory per morsel."""
 
@@ -93,18 +94,19 @@ the streaming engine's peak memory per morsel."""
 def _member_aligned_row_group_size(nwp: pt.DataFrame[Nwp]) -> int:
     """Rows one ensemble member occupies, clamped to `NWP_ROW_GROUP_SIZE_LIMITS`.
 
-    Setting Parquet's row-group size to the number of rows one member occupies, on a frame already
-    sorted member-early by `NWP_SORT_COLS`, lands each ensemble member in a row group of its own. A
-    single-member predicate then matches one row group's ``ensemble_member`` min/max range exactly,
-    so the scan decodes 1/51 of the partition's rows instead of the wider span of rows a straddling
-    row group would advertise.
+    On a frame already sorted member-early by `NWP_SORT_COLS`, setting Parquet's row-group size to
+    the number of rows one member occupies then lands each ensemble member in a row group of its
+    own. A single-member predicate then matches one row group's ``ensemble_member`` min/max range
+    exactly. An ECMWF ENS run carries 51 members. The scan therefore decodes 1/51 of the partition's
+    rows, instead of the wider span of rows a straddling row group would advertise.
 
-    Derived from the frame rather than hard-coded so the alignment survives a change to the H3
-    grid or the forecast horizon, both of which change how many rows one member occupies. Where
-    the division is inexact the alignment degrades gently: a row group straddles two members
-    instead of one member, rather than reverting to the full span. The measured degradation under
-    an uneven member split is documented on `NWP_SORT_COLS`, beside the 1.96% floor that
-    degradation qualifies.
+    Derived from the frame rather than hard-coded, so the alignment survives a change to the H3 grid
+    or the forecast horizon. A change to either the H3 grid or the forecast horizon changes how many
+    rows one member occupies. Where the division is inexact the alignment degrades gently: a row
+    group straddles two members instead of one member, rather than reverting to the full span. That
+    1/51 is the 1.96% of a partition's rows a single-member read decodes when the alignment holds
+    exactly, and 1.96% is a floor rather than a guarantee. `NWP_SORT_COLS` documents the measured
+    degradation under an uneven member split, beside that floor.
 
     Args:
         nwp: The frame about to be written, carrying every ensemble member for one run.
@@ -120,10 +122,11 @@ def _member_aligned_row_group_size(nwp: pt.DataFrame[Nwp]) -> int:
 def _writer_properties(*, max_row_group_size: int) -> WriterProperties:
     """Parquet writer properties for the ``nwp`` table, at the given row-group size.
 
-    Deliberately **no** per-column encoding overrides (no ``BYTE_STREAM_SPLIT``,
-    ``DELTA_BINARY_PACKED``, or disabled dictionary encoding) — see this module's docstring for why
-    that choice, which won for ``power_forecasts``, measures worse here. Built per write rather
-    than held as a module constant because the row-group size is derived from the frame.
+    Deliberately **no** per-column encoding overrides: no ``BYTE_STREAM_SPLIT``,
+    ``DELTA_BINARY_PACKED``, and no disabled dictionary encoding. That override set won for
+    ``power_forecasts``, but it measures worse here. See this module's docstring for why.
+    Built per write rather than held as a module constant because the row-group size is derived
+    from the frame.
 
     Args:
         max_row_group_size: Rows per Parquet row group, from `_member_aligned_row_group_size`.
@@ -151,33 +154,33 @@ def write_nwp(
 
     The write **replaces** the ``(nwp_model_id, init_time)`` partition named by the frame's first
     row, so re-materialising an ``ecmwf_ens`` partition leaves one copy of the run.
-    delta-rs checks every row against that predicate and rejects the whole write, table untouched,
-    if any row falls outside it (confirmed empirically against ``deltalake`` 1.6.3, locally and on
-    S3, on a partition column despite its percent-encoded Hive directory name). Two materialisations
-    of the *same* partition at once contend and the loser raises ``CommitFailedError``; disjoint
-    partitions do not.
+    delta-rs checks every row against that predicate. If any row falls outside the predicate,
+    delta-rs rejects the whole write and leaves the table untouched. That was confirmed empirically
+    against ``deltalake`` 1.6.3, locally and on S3, on a partition column despite its
+    percent-encoded Hive directory name. Two materialisations of the *same* partition at once
+    contend and the loser raises ``CommitFailedError``; disjoint partitions do not.
 
-    ``schema_mode="overwrite"`` is passed on every write, not just to migrate an old table. This
-    safety claim holds only for a **widening** contract change, which is the only kind this
-    function has been used for so far: confirmed empirically (``deltalake`` 1.6.3) that widening
-    updates only the table's *logical* schema (the ``_delta_log`` metadata) to match the incoming
-    frame's dtypes, and leaves every other partition's physical Parquet bytes untouched — a later
-    read at the new logical dtype is correct and lossless even for a partition still physically
-    stored at an older, narrower dtype.
+    ``schema_mode="overwrite"`` is passed on every write, not just to migrate an old table.
+    Passing it on every write is safe. That safety claim holds only for a **widening** contract
+    change, and a widening change is the only kind this function has been used for so far. Confirmed
+    empirically against ``deltalake`` 1.6.3: widening updates only the table's *logical* schema —
+    the ``_delta_log`` metadata — to match the incoming frame's dtypes. Widening leaves every other
+    partition's physical Parquet bytes untouched. A later read at the new logical dtype is therefore
+    correct and lossless, even for a partition still physically stored at an older, narrower dtype.
 
-    **A validated ``pt.DataFrame[Nwp]`` input is what makes the flag safe to leave on.** The
-    ``nwp`` argument carries the full column set at the *current* contract's dtypes, so the only
-    way this can ever change the table's schema is a deliberate widening of an ``Nwp`` dtype — it
-    cannot silently drop a column.
+    **A validated ``pt.DataFrame[Nwp]`` input is what makes ``schema_mode="overwrite"`` safe to
+    leave on.** The ``nwp`` argument carries the full column set at the *current* contract's dtypes.
+    The only way the write can ever change the table's schema is a deliberate widening of an ``Nwp``
+    dtype, and the write cannot silently drop a column.
 
     A **narrowing** contract change is a different, worse failure mode, also confirmed
-    empirically: the write that narrows a column succeeds silently — ``schema_mode="overwrite"``
-    accepts it at write time — and the table is left with a logical schema that its own,
-    previously-written partitions can no longer safely satisfy. Nothing fails until a *later* read
-    of the whole table (by anyone, not necessarily the writer that broke it), which then raises
-    ``SchemaError: incoming dtype cannot safely cast to target dtype`` — a confusing error far
-    removed from its cause, especially if further partitions land on the bad schema before anyone
-    reads across all of them.
+    empirically: the write that narrows a column succeeds silently, because
+    ``schema_mode="overwrite"`` accepts that write at write time. The table is then left with a
+    logical schema that its own, previously-written partitions can no longer safely satisfy. Nothing
+    fails until a *later* read of the whole table, by anyone, not necessarily the writer that broke
+    the table. That read raises ``SchemaError: incoming dtype cannot safely cast to target dtype``.
+    The error is confusing and far removed from its cause, especially if further partitions land on
+    the bad schema before anyone reads across all of them.
 
     **Leaving ``schema_mode="overwrite"`` on permanently is an accepted, disclosed risk rather
     than a defect.** Nothing in this contract's own dtype-widening history has ever narrowed a

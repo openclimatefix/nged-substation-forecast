@@ -2,7 +2,9 @@
 
 Download & process numerical weather predictions from Dynamical.org.
 
-We convert the ECMWF ENS 0.25 degree data to these H3 resolution 5 hexagons:
+We convert the European Centre for Medium-Range Weather Forecasts' ensemble forecast (ECMWF ENS)
+from its 0.25 degree latitude/longitude grid to these H3 resolution 5 hexagons. H3 tiles the globe
+in hexagons at nested resolutions, and resolution 5 is the cell size drawn below:
 
 ![Map of Great Britain using H3 resolution 5
 hexagons](../geo/assets/map-of-Great-Britain-H3-resolution-5.png)
@@ -27,22 +29,26 @@ assume](https://openclimatefix.github.io/nged-substation-forecast/design-philoso
 
 **Current scheme:** physical-unit `Float32`, every continuous variable rounded to a 13-bit
 significand (max relative error 2⁻¹³ ≈ 1.2×10⁻⁴ — measured ≤ 0.004 °C for temperature, ≤ 8 Pa for
-MSL pressure), rows sorted `init_time → ensemble_member → valid_time → h3_index`, plain ZSTD
-level 3.
+mean-sea-level (MSL) pressure), rows sorted `init_time → ensemble_member → valid_time → h3_index`,
+plain ZSTD level 3. `init_time` is when the weather model was run; `valid_time` is the moment being
+forecast.
 
-**Why round at all, when Dynamical.org already rounds?** Dynamical stores ECMWF ENS with 6–11
-mantissa bits per variable (their
+**Why round at all, when Dynamical.org already rounds?** A significand is one bit wider than a
+mantissa, because the leading 1 is implicit, so 6–11 mantissa bits are 7–12 significand bits.
+Dynamical stores ECMWF ENS with 6–11 mantissa bits per variable (their
 [`binary_rounding.py`](https://github.com/dynamical-org/reformatters/blob/main/src/reformatters/common/binary_rounding.py)).
 But trailing zeros do not survive arithmetic: our H3 aggregation is a weighted mean over grid
-points, and wind speed/direction are derived from their u/v via `sqrt`/`arctan2`, so by the time
-values reach our writer their mantissas are full entropy again (measured: 100% of Dynamical-style
-rounded values have zeroed low bits; after a weighted mean, 0.07% do). Our 13-significand-bit
-rounding restores compressibility while being 1–6 bits *finer* than the upstream precision, so it
-discards almost nothing beyond what Dynamical already dropped.
+points, and ECMWF publishes wind as an eastward component `u` and a northward component `v`, from
+which wind speed and direction are derived via `sqrt`/`arctan2`, so by the time values reach our
+writer their mantissas are full entropy again (measured: 100% of Dynamical-style rounded values have
+zeroed low bits; after a weighted mean, 0.07% do). Our 13-significand-bit rounding restores
+compressibility while being 1–6 bits *finer* than the upstream precision, so it discards almost
+nothing beyond what Dynamical already dropped.
 
-**How much space does GB-wide ECMWF ENS take?** One daily run (1,671 H3 cells × 51 members × 85 lead
-times, up to ~7.24M rows) averages ~158 MB, so a year is **~58 GB**. The full local development
-table — 899 daily runs (Apr 2024 → Sep 2026, ~6.5 billion rows) — is **142 GB**.
+**How much space does Great-Britain-wide ECMWF ENS take?** A lead time is one forecast step ahead of
+`init_time`. One daily run (1,671 H3 cells × 51 ensemble members × 85 lead times, up to ~7.24M rows)
+averages ~158 MB, so a year is **~58 GB**. The full local development table — 899 daily runs (Apr
+2024 → Sep 2026, ~6.5 billion rows) — is **142 GB**.
 
 **Storage** — the table below compares the writer configurations against each other, on nine real
 partitions spread across every season. **The table's absolute figures are older than the NWP table
@@ -65,16 +71,18 @@ directly, and `BYTE_STREAM_SPLIT` scatters that repetition across four byte plan
 properties are data-dependent — measure per table.
 
 **Read path** — the member-early sort puts each ensemble member's rows in one contiguous block, and
-`delta_store.nwp` sizes each parquet row group to hold exactly one member. A single-member read
-(every training run reads just the control member) therefore matches one row group's min/max range
-and skips the other 50 row groups.
+`delta_store.nwp` sizes each parquet row group to hold exactly one member. Of the 51 members, member
+0 is the unperturbed control run and the other 50 are perturbed. A single-member read (every
+training run reads just the control member) therefore matches one row group's min/max range and
+skips the other 50 row groups.
 
-Measured against a `valid_time`-first sort of the same 29 daily partitions, reading nine H3 cells
-and the control member alone: **5.7× faster and 5.5× less peak memory** (170 ms / 2,200 MB → 30 ms /
-400 MB), for **3.7% more stored bytes** (4.35 GB → 4.51 GB across the 29 partitions). Both tables
-were written freshly through `write_nwp`, differ only in the sort order, and use the member-aligned
-row-group size, so the comparison isolates the row order. Each figure is the warm-cache median of
-five timed repetitions.
+The read-path measurements below were taken on their own set of 29 consecutive daily partitions, not
+on the nine seasonal partitions the storage table above used. Measured against a `valid_time`-first
+sort of the same 29 daily partitions, reading nine H3 cells and the control member alone: **5.7×
+faster and 5.5× less peak memory** (170 ms / 2,200 MB → 30 ms / 400 MB), for **3.7% more stored
+bytes** (4.35 GB → 4.51 GB across the 29 partitions). Both tables were written freshly through
+`write_nwp`, differ only in the sort order, and use the member-aligned row-group size, so the
+comparison isolates the row order. Each figure is the warm-cache median of five timed repetitions.
 
 **The read decodes 1.96% of each partition censused — one row group in 51 — and that 1.96% holds for
 every member.** A census of partitions from 2024, 2025, and 2026 found 51 row groups in each. Every
@@ -120,7 +128,7 @@ These figures share the Storage table's older ~41 GB/yr basis, so the percentage
 comparable against each other but the absolute GB/yr sit below today's ~58 GB/yr.
 
 The full squeeze adds ~2.3% power-equivalent wind error — not tolerable. The wind-safe ceiling is
-−13% ≈ 5.4 GB/yr, and the NWP table is GB-wide so it does **not** grow with the V2 scale-up to
-~2,500 time series: a fixed ~5 GB/yr saving doesn't justify maintaining a dict of per-variable
-precision budgets. If disk ever becomes a real constraint, the wind-protected config is the one to
-reach for.
+−13% ≈ 5.4 GB/yr, and the NWP table covers the whole of Great Britain, so it does **not** grow with
+the V2 scale-up to ~2,500 time series: a fixed ~5 GB/yr saving doesn't justify maintaining a dict of
+per-variable precision budgets. If disk ever becomes a real constraint, the wind-protected config is
+the one to reach for.

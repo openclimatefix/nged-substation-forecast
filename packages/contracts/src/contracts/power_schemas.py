@@ -1,4 +1,10 @@
-"""Data schemas for the NGED substation forecast project."""
+"""Contracts for NGED's power telemetry and for the forecasts we make from it.
+
+The half-hourly ``PowerTimeSeries`` observations as they arrive from NGED, the
+``TimeSeriesMetadata`` roster describing each series, the ``PowerForecast`` schema every model
+emits, and the ``EffectiveCapacity`` estimate the metrics pipeline divides the mean absolute
+error by, to express that error as a fraction of the series' capacity.
+"""
 
 from collections.abc import Sequence
 from datetime import datetime
@@ -46,8 +52,12 @@ class PowerTimeSeries(pt.Model):
         description=(
             "Average power (MW or MVA) over the preceding 30-minute period. Unit defined in "
             "TimeSeriesMetadata."
-            " Sign convention depends on `substation_type` in `TimeSeriesMetadata` — see the Sign"
-            " convention section in this package's README.md, also published at"
+            " Sign convention depends on `substation_type` in `TimeSeriesMetadata`, and describes"
+            " a direction, so it applies only where `units` is `MW`. A series metered in `MVA`"
+            " reports the magnitude of the flow and cannot see direction, so reverse power flow"
+            " appears as a rise rather than as a change of sign. A negative value is then a fault"
+            " between the meter and us rather than an export. See the Sign convention section in"
+            " this package's README.md, also published at"
             " https://openclimatefix.github.io/nged-substation-forecast/roadmap/forecast-building-blocks/#sign-convention."
         ),
     )
@@ -100,20 +110,24 @@ class PowerTimeSeries(pt.Model):
     def drop_implausible_rows(cls, dataframe: pl.DataFrame) -> DropImplausibleRowsResult:
         """Drop rows with a malformed ``time``, returning ``(survivors, n_dropped)``.
 
-        A row is dropped when its ``time`` lies outside the plausible datetime range, is null (the
-        schema declares ``time`` non-nullable, so a null this early is already malformed), or does
-        not fall on the top or bottom of the hour (minute 00 or 30). All three indicate a
-        malformed upstream reading — not a bug in our own pipeline — so under [inherent
+        A row is dropped when its ``time`` lies outside the plausible datetime range, is null, or
+        does not fall on the top or bottom of the hour (minute 00 or 30). The schema declares
+        ``time`` non-nullable, so a null this early is already malformed. All three conditions
+        indicate a malformed upstream reading — not a bug in our own pipeline — so under [inherent
         stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/)
         an ingestion boundary should degrade the batch rather than abort it entirely.
 
-        This exists alongside ``validate``, which stays strict and raises on the same two rules:
-        ``validate`` is also used as a hard assertion in tests and R&D code, where a
-        raise-on-violation contract must not silently change. Call this method BEFORE
-        ``validate``, and only at a boundary that receives data from outside our system (e.g.
-        NGED's raw JSON feed) — the uniqueness and sortedness checks in ``validate`` are NOT
-        relaxed here, because those indicate a bug in OUR pipeline, not malformed external data,
-        and should keep raising.
+        Dropping rows exists alongside ``validate``, which stays strict. ``validate`` raises on
+        two of the three conditions above: a ``time`` outside the plausible range, and a ``time``
+        that is not on the top or bottom of the hour. The third condition, a null ``time``, is
+        rejected earlier still, by the non-nullable field. ``validate`` is also used as a hard
+        assertion in tests and R&D code, where a raise-on-violation contract must not silently
+        change.
+
+        Call this method BEFORE ``validate``, and only at a boundary that receives data from
+        outside our system (e.g. NGED's raw JSON feed). The uniqueness and sortedness checks in
+        ``validate`` are NOT relaxed here, and should keep raising. A duplicate row or an unsorted
+        column indicates a bug in OUR pipeline rather than malformed external data.
 
         Args:
             dataframe: An already-cast frame with a ``time`` column; need not yet be validated.
@@ -125,11 +139,12 @@ class PowerTimeSeries(pt.Model):
         # `dt.minute()` is null for a null `time` and `.filter()` drops a row on a null predicate,
         # so this also drops the null `time`s the non-nullable schema forbids.
         survivors = survivors.filter(pl.col("time").dt.minute().is_in([0, 30]))
-        # Counted as a height difference rather than by summing the rejected partitions: whatever
-        # a filter does with a null predicate, every row that left is counted exactly once.
+        # The dropped-row count is computed as a difference in `height` (a frame's row count),
+        # rather than by summing the rejected partitions. Whatever a filter does with a null
+        # predicate, a height difference counts every row that left exactly once.
         return DropImplausibleRowsResult(survivors, dataframe.height - survivors.height)
 
-    # Define it as a ClassVar so Patito/Pydantic knows it's not a data field
+    # Define columns_to_sort_by as a ClassVar so Patito/Pydantic knows it is not a data field
     columns_to_sort_by: ClassVar[tuple[str, str]] = ("time_series_id", "time")
 
 
@@ -168,12 +183,16 @@ Notes:
 - Disaggregated Demand: In the trial area, exclusively associated with "Primary" substations. All
   "Primary" substations in the trial area have their TimeSeriesType set to "Disaggregated Demand".
   Indicates that NGED have already removed metered generation connected to that primary.
-- Raw Flow: Used for BSP and GSP substations.
+- PV: Photovoltaic (solar).
+- Raw Flow: Used for bulk supply point (BSP) and grid supply point (GSP) substations.
 """
 
 
 class TimeSeriesMetadata(pt.Model):
-    """One row per substation or asset: its name, location, H3 index, and substation type."""
+    """One row per time series — a substation or a customer meter.
+
+    Carries the series' name, location, H3 index, and substation type.
+    """
 
     time_series_id: int = _get_time_series_id_dtype(unique=True)
 
@@ -221,7 +240,8 @@ class TimeSeriesMetadata(pt.Model):
         dtype=pl.Enum(["BSP", "EHV Customer", "GSP", "HV Customer", "Primary"]),
         description=(
             "Substation voltage level / role: BSP, EHV Customer, GSP, HV Customer, or Primary."
-            " HV = high voltage. EHV = extra high voltage."
+            " BSP = bulk supply point. GSP = grid supply point. HV = high voltage."
+            " EHV = extra high voltage."
         ),
     )
 
@@ -254,11 +274,12 @@ class TimeSeriesMetadata(pt.Model):
     area_wkt: str | None = pt.Field(
         dtype=pl.String,
         allow_missing=True,
-        # Maps to the nested Area.WKT field in the JSON data.
+        # Maps to the nested Area.WKT field in NGED's source JSON.
         description=(
-            "WKT polygon for the asset’s area. In the trial, only Primary substations have this."
-            " No customer site has a polygon yet. Where a customer site does have a polygon, the"
-            " polygon refers to the area covered by the generator itself."
+            "Well-known text (WKT) polygon for the asset’s area. In the trial, only Primary"
+            " substations have this. No customer site has a polygon yet. Where a customer site"
+            " does have a polygon, the polygon refers to the area covered by the generator"
+            " itself."
         ),
     )
 
@@ -296,12 +317,18 @@ the reserved sentinel for a production forecast that belongs to no CV fold.
 
 
 class PowerForecast(pt.Model):
-    """Forecast data schema for deterministic ensemble forecasts.
+    """Forecast data schema for an ensemble of deterministic forecasts.
 
-    Internal vs delivered schema (Milestone 1 report Table 1, p.28): the columns
-    ``experiment_name``, ``fold_id``, and ``ml_flow_experiment_id`` are INTERNAL-ONLY — they
-    exist on this schema and the internal ``power_forecasts`` Delta table to support
-    cross-validation and the leaderboard, but they are NOT part of the ``power_forecast`` table
+    Each ensemble member carries its own single-valued, or deterministic, forecast. The spread
+    across the members is what expresses the forecast's uncertainty.
+
+    One row per time series, per forecast run, per target time, per ensemble member — the four
+    columns of ``PRIMARY_KEY``, declared below in that order.
+
+    Internal vs delivered schema (Milestone 1 report Table 1, p.28): three columns are
+    INTERNAL-ONLY — ``experiment_name``, ``fold_id``, and ``ml_flow_experiment_id``. They exist
+    on this schema and on the internal ``power_forecasts`` Delta table, to support
+    cross-validation and the leaderboard. They are NOT part of the ``power_forecast`` table
     delivered to NGED.
     """
 
@@ -321,7 +348,11 @@ class PowerForecast(pt.Model):
     time_series_id: int = _get_time_series_id_dtype()
 
     ensemble_member: int = pt.Field(
-        dtype=pl.Int8, description="Ensemble member index. 0 is the control NWP ensemble member."
+        dtype=pl.Int8,
+        description=(
+            "Ensemble member index. Member 0 is the control numerical weather prediction (NWP)"
+            " ensemble member."
+        ),
     )
 
     ml_flow_experiment_id: int | None = pt.Field(
@@ -349,10 +380,10 @@ class PowerForecast(pt.Model):
         ),
     )
 
-    # String (not Categorical): experiment_name/fold_id are the Delta partition columns and delta-rs
-    # stores dictionary-encoded columns as String anyway; String keeps them cast-free and lets
-    # predicate pushdown work. See the "Delta Lake dictionary-encoded columns" section of the
-    # `polars-patito-gotchas` skill.
+    # String (not Categorical): experiment_name/fold_id are the Delta partition columns, and
+    # delta-rs stores dictionary-encoded columns as String anyway. String keeps those two columns
+    # cast-free and lets predicate pushdown work. See the "Delta Lake dictionary-encoded columns"
+    # section of the `polars-patito-gotchas` skill.
     experiment_name: str = pt.Field(
         dtype=pl.String,
         description=(
@@ -384,19 +415,21 @@ class PowerForecast(pt.Model):
         description=(
             "The power forecast itself in units of MW (active power) or MVA (apparent power)."
             " The unit is defined in the `TimeSeriesMetadata` for this `time_series_id`."
-            " Sign convention depends on `substation_type` in `TimeSeriesMetadata` — see the Sign"
-            " convention section in this package's README.md, also published at"
+            " Sign convention depends on `substation_type` in `TimeSeriesMetadata`, and describes"
+            " a direction, so it applies only where `units` is `MW` — see the Sign convention"
+            " section in this package's README.md, also published at"
             " https://openclimatefix.github.io/nged-substation-forecast/roadmap/forecast-building-blocks/#sign-convention."
             " Rows read back from the internal `power_forecasts` Delta table carry reduced"
             " precision: values are rounded to a 13-bit significand at write time"
             " (max relative error 2^-13 ≈ 1.2e-4, far below forecast error) to aid compression;"
             " see `delta_store.power_forecasts`."
             # PLANNED: We intend to change `power_fcst` to a normalised value in the range
-            # [-1, +1] (which NGED multiplies by a capacity to recover MW/MVA), per the
-            # delivery-contract design agreed with NGED in the Milestone 1 report. The switch is
-            # planned for v0.5, using the static P99 `effective_capacity` estimate that already
-            # exists — the same scalar the `metrics` pipeline already divides by for NMAE — so it
-            # no longer needs to wait for a time-varying capacity estimate.
+            # [-1, +1], which NGED multiplies by a capacity to recover MW/MVA. That change follows
+            # the delivery-contract design agreed with NGED in the Milestone 1 report. The switch
+            # is planned for v0.5. The switch will use the static P99 `effective_capacity`
+            # estimate that already exists — the same scalar the `metrics` pipeline already divides
+            # by for normalised mean absolute error (NMAE). The switch therefore no longer waits
+            # for a time-varying capacity estimate.
         ),
     )
 
@@ -444,9 +477,9 @@ class PowerForecast(pt.Model):
             drop_superfluous_columns=drop_superfluous_columns,
         )
 
-        # `n_unique`, not `is_duplicated().any()`: the two are equivalent here (every primary-key
-        # column is non-nullable) but `is_duplicated` materialises a per-row mask, costing ~5x the
-        # peak memory on a predict-sized frame.
+        # `n_unique`, not `is_duplicated().any()`: the two expressions are equivalent here (every
+        # primary-key column is non-nullable) but `is_duplicated` materialises a per-row mask,
+        # costing ~5x the peak memory on a predict-sized frame.
         pk_cols = list(cls.PRIMARY_KEY)
         if validated_df.select(pk_cols).n_unique() != validated_df.height:
             raise ValueError(
@@ -458,24 +491,29 @@ class PowerForecast(pt.Model):
 
 
 class EffectiveCapacity(pt.Model):
-    """Effective capacity of each time series at each half-hourly timestep.
+    """Effective capacity of each time series, at one or more half-hourly timesteps.
+
+    Effective capacity is an estimate of the power a site actually reaches, derived from its own
+    observed history. Effective capacity is not a nameplate, firm, or connection-agreement rating.
 
     Delivered to NGED as ``effective_capacity`` Delta table (Table 4 in the Milestone 1 report).
     This table is backward-looking only — it does not cover the forecast period.
 
     **v0.1 implementation:** one row per ``time_series_id``, ``time`` set to the end of the
     available observation history, ``effective_capacity_mw`` = P99 of ``abs(power)`` over the
-    full observed history. This is a static scalar per series.
+    full observed history. The v0.1 estimate is a static scalar per series.
 
-    **Planned upgrade (v0.7):** replace the P99 scalar with a time-varying capacity estimate (see
+    **Planned upgrade (v0.7):** replace the P99 scalar with a time-varying capacity estimate,
+    giving one row per ``(time_series_id, time)`` half-hourly timestep. The candidate estimation
+    methods are described at
     <https://openclimatefix.github.io/nged-substation-forecast/techniques/convex-optimisation/>
     and
-    <https://openclimatefix.github.io/nged-substation-forecast/techniques/differentiable-physics/>
-    for the candidate estimation methods), giving one row per ``(time_series_id, time)``
-    half-hourly timestep. This schema is unchanged; the ``effective_capacity`` asset body changes
-    and the ``metrics`` pipeline swaps its ``time_series_id``-only NMAE-denominator join for a
-    temporal as-of join. Do **not** pre-densify the v0.1 scalar into one row per half-hour —
-    densifying a constant buys nothing, and the as-of join handles sparse capacity rows
+    <https://openclimatefix.github.io/nged-substation-forecast/techniques/differentiable-physics/>.
+    This schema is unchanged. The ``effective_capacity`` asset body changes, and the ``metrics``
+    pipeline swaps its ``time_series_id``-only normalised-mean-absolute-error-denominator join
+    for a temporal as-of join, which matches each forecast row to the most recent capacity row at
+    or before its timestamp. Do **not** pre-densify the v0.1 scalar into one row per half-hour —
+    densifying a constant adds no information, and the as-of join handles sparse capacity rows
     naturally.
     """
 
@@ -493,12 +531,17 @@ class EffectiveCapacity(pt.Model):
         dtype=pl.Float32,
         gt=0,
         description=(
-            "OCF's estimate of the effective capacity (MW) of this asset at this timestep. "
-            "For generators: absorbs PV panel degradation, partial inverter trips, etc., "
-            "but ignores ANM curtailment — a wind farm ANM-capped at 5 MW with 10 MW physical "
-            "capability has effective_capacity_mw = 10. "
-            "For substations: the 99th percentile of observed load over a rolling time window, "
-            "under normal running arrangement only. 'Switched' power (Table 5) should be "
+            "OCF's estimate of the effective capacity of this asset at this timestep. "
+            "Despite the column name, the value carries the series' own unit from "
+            "`TimeSeriesMetadata.units`, so a series metered in MVA has its effective capacity "
+            "in MVA. "
+            "For generators: absorbs any persistent loss of capability, such as photovoltaic "
+            "(PV) panel degradation or a partial inverter trip. The estimate ignores Active "
+            "Network Management (ANM) curtailment — a wind farm ANM-capped at 5 MW with 10 MW "
+            "physical capability has effective_capacity_mw = 10. "
+            "For substations: the 99th percentile of observed absolute power flow, under normal "
+            "running arrangement only. In v0.1 that percentile is taken over the full observed "
+            "history, giving one static scalar per series. 'Switched' power (Table 5) should be "
             "added or subtracted when a switching event is in effect."
         ),
     )

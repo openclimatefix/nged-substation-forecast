@@ -1,7 +1,9 @@
 # Geo Package
 
 Generic geospatial logic and data for the NGED substation forecast project: H3 spatial indexing and
-the Great Britain boundary the numerical weather prediction (NWP) grid is clipped to.
+the Great Britain boundary the numerical weather prediction (NWP) grid is clipped to. H3 is a grid
+system that tiles the globe in hexagons at nested resolutions, with 12 pentagons where hexagons
+alone cannot close the sphere, and each cell is identified by an index.
 
 ## Map of Great Britain using H3 resolution 5 hexagons
 
@@ -11,9 +13,10 @@ hexagons](assets/map-of-Great-Britain-H3-resolution-5.png)
 ## Purpose
 
 The `geo` package decouples generic geospatial operations from dataset-specific ingestion logic,
-such as the ECMWF data processing in `dynamical_data`. Any package in the workspace can therefore
-perform a spatial transformation — mapping a latitude/longitude grid to H3 hexagons, for example —
-without depending on heavy or unrelated packages.
+such as the processing of European Centre for Medium-Range Weather Forecasts (ECMWF) data in
+`dynamical_data`. Any package in the workspace can therefore perform a spatial transformation —
+mapping a latitude/longitude grid to H3 hexagons, for example — without depending on heavy or
+unrelated packages.
 
 `compute_h3_grid_weights_for_boundary` accepts any boundary polygon, not only the Great Britain
 shape this package ships. Accepting any boundary polygon adds no complexity here and means a new
@@ -25,7 +28,9 @@ applied to this package.
 Two neighbouring jobs are deliberately *not* here. The per-substation H3 index (`h3_res_5` on
 `TimeSeriesMetadata`) is computed by `nged_data` straight from each substation's coordinates. The
 spatial aggregation that consumes the grid weights computed here happens in `dynamical_data` at
-ECMWF ingest.
+ECMWF ingest. The weather grid is square and the H3 grid is hexagonal, so a grid weight is the
+fraction of one hexagon that one square grid point covers, and each hexagon takes a weighted share
+of the grid points overlapping it.
 
 ## Contents
 

@@ -1,11 +1,16 @@
 """Inspect the parquets ``scripts/forecasting/export_baseline_forecasts.py`` produces.
 
-For a chosen time series it overlays observed power against the forecast (ensemble mean, p50, and
-the p10-p90 band), plots the observed-minus-expected residual (the raw material for switching-event
-detection), and draws the raw ensemble members over a selected window. All three exported parquets
-(``*_full_ensemble``, ``*_ensemble_mean``, ``*_quantiles``) are used. Every chart is pan/zoom
-interactive; titles carry the series id, type, and name; the y-axis is labelled in the series' own
-unit (MW or MVA).
+For a chosen time series the notebook draws three charts. The first overlays observed power against
+the forecast — the ensemble mean, p50, and the p10-p90 band. Those are percentiles of the spread of
+ensemble members, so the p10-p90 band is the range eight forecasts in ten fall inside. The second
+plots the observed-minus-ensemble-mean residual, the raw material for switching-event detection: a
+sudden step in the gap between measured and forecast power is the signature of a feeder being
+switched onto or off the substation. The third draws the raw ensemble members over a selected
+window.
+
+All three exported parquets (``*_full_ensemble``, ``*_ensemble_mean``, ``*_quantiles``) are used.
+Every chart is pan/zoom interactive. Titles carry the series id, type, and name. The y-axis is
+labelled in the series' own unit (MW or MVA).
 
     uv run marimo edit packages/notebooks/view_baseline_export.py
 """
@@ -26,8 +31,9 @@ with app.setup:
 
     DEFAULT_EXPORT_DIR = PROJECT_ROOT / "data" / "exports"
 
-    # A single series spans ~17k half-hourly rows; mo.ui.altair_chart serves them as a virtual file
-    # rather than inlining, so lift altair's default 5000-row guard (mirrors the dashboard).
+    # A single series spans ~17k half-hourly rows, because the leaderboard fold validates on 12
+    # months. mo.ui.altair_chart serves those rows as a virtual file rather than inlining the
+    # rows. Lift altair's default 5,000-row guard the way the dashboard does.
     alt.data_transformers.disable_max_rows()
 
     SETTINGS = Settings()
@@ -65,18 +71,29 @@ with app.setup:
         )
 
     def load_frame(export_dir: Path, stem: str, kind: str) -> pl.DataFrame:
-        """Read one exported parquet (``kind`` in {full_ensemble, ensemble_mean, quantiles})."""
+        """Read one exported parquet (``kind`` in {full_ensemble, ensemble_mean, quantiles}).
+
+        Args:
+            export_dir: Directory holding the exported parquet files.
+            stem: The ``{experiment}__{fold}`` stem naming which export to read.
+            kind: Which of the three parquets that export wrote.
+
+        Returns:
+            The whole parquet, eagerly, for every time series in the export.
+        """
         return pl.read_parquet(export_dir / f"{stem}_{kind}.parquet")
 
     def series_descr(series_id: int) -> tuple[str, str]:
-        """Return ``(title_prefix, unit)`` for a series from its metadata.
+        """Return ``(title_prefix, unit)`` for a series from its name, type, and unit.
 
         Args:
             series_id: The ``time_series_id`` to describe.
 
         Returns:
-            A ``(title_prefix, unit)`` tuple — e.g. ``("id 7 · pv · Foo Primary", "MW")``.
-            Falls back to ``("id {series_id}", "MW/MVA")`` when the series is absent from metadata.
+            A ``(title_prefix, unit)`` tuple — e.g. ``("id 7 · PV · Foo Solar Farm", "MW")``. The
+            middle field of ``title_prefix`` is a ``LIST_OF_TIME_SERIES_TYPES`` value, and so
+            carries the contract's own capitalisation. Falls back to ``("id {series_id}",
+            "MW/MVA")`` when the series is absent from ``SERIES_META``.
         """
         meta = SERIES_META.get(series_id)
         if meta is None:
@@ -96,9 +113,11 @@ def _():
     mo.md("""
     # Baseline export viewer
 
-    Weather/calendar-only XGBoost baseline (no power lags) — issue #179. Pick an export and a
-    time series to compare the forecast against observed power and inspect the residual. Drag to
-    pan and scroll to zoom on any chart.
+    Weather/calendar-only XGBoost baseline (no power lags) — issue #179. A baseline is the
+    deliberately simple model that better models have to beat; this one is built from weather and
+    calendar inputs alone, and ignores recently measured power. Pick an export and a time series
+    to compare the forecast against observed power and inspect the residual. Drag to pan and
+    scroll to zoom on any chart.
     """)
     return
 
