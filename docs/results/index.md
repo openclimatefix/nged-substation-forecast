@@ -17,4 +17,6 @@ its numbers, the checks the result survived, and the limits on how far it genera
   effect is detectable; and choosing the better irradiance product matters about thirty times more
   than the split does. The page also measures the two irradiance products against each other, a
   gradient-boosted tree against a fitted five-parameter physical PV model, and what calibrating that
-  physical model with a tree recovers.
+  physical model with a tree recovers. It is also the first look anyone here has taken at NGED's
+  active-network-management curtailment feed, which turns out to reconstruct a curtailed site's
+  lost output accurately over the five months it covers.

@@ -120,6 +120,17 @@ the feed is a *noisy label*, not ground truth — use it, but do not lean on it:
   generator ran freely) — a milder failure, but one more reason the estimate should not *depend* on
   the feed being right.
 
+**Where the feed fires it is close to ground truth, and what limits it is how little of the record
+it reaches.** Joining it to six metered solar farms in the [beam/diffuse
+experiment](../results/beam-diffuse-split.md#one-site-is-curtailed-and-it-is-the-noisiest-of-the-six)
+found exactly one of the six in the feed, typed `ANM (DANM and TANM)`. On the hours it covers,
+adding the logged megawatts back to that site's metered output restores its yield to within about
+1% of what the other five run at, so a logged entry is a good enough label to mask on. But the feed
+starts on 29 April 2026 where the telemetry starts in September 2019, and inside even that window
+it accounts for 17 of the 33 hours whose output falls below half of what the irradiance implies.
+The two defences above are needed for the periods the feed cannot reach, rather than for the
+entries it gets wrong.
+
 ### The regularisation prior: piecewise-constant capacity
 
 The capacity series must not be free to bounce around at the data's sampling rate, or it will simply

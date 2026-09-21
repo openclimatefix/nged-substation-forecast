@@ -18,7 +18,25 @@ data.
 | Source | Status | Description |
 |---|---|---|
 | **Time-series JSON files** | ✅ | Half-hourly power flow + metadata per substation / customer meter in the trial area. Ingested by OCF to produce operational forecasts. Each reading is a **period-ending mean** — power averaged over the preceding 30 minutes, with `time` marking the end of that window, as `PowerTimeSeries` in `packages/contracts/src/contracts/power_schemas.py` records. The irradiance ingest is chosen to match, so [Weather data](#weather-data) prefers a source that accumulates over the interval to a source that samples an instant. |
-| **Curtailment (ANM set points)** | 🚧 | NGED-imposed curtailment. Crucial for distinguishing deliberate ANM ramp-downs from genuine faults / capacity loss. |
+| **Curtailment (ANM)** | 🚧 | Half-hourly megawatts lost to an active-network-management instruction, per curtailed generator. Crucial for distinguishing deliberate ANM ramp-downs from genuine faults or capacity loss. What the feed holds, and how far back it reaches, is [below](#what-the-curtailment-feed-holds). |
+
+### What the curtailment feed holds
+
+**The `curtailment/` prefix sits beside `timeseries/` on the same six-hour window convention, and
+publishes megawatts lost rather than set points.** Each object carries a `data` list of
+`{startTime, endTime, value}` at half-hourly resolution, under a header naming the generator, its
+substation number, its licence area, and a `CurtailmentType` such as `ANM (DANM and TANM)`. The
+`value` field is the power the instruction removed, not a cap: adding it back to the generator's
+metered output restores that generator to the yield its uncurtailed neighbours run at, to within
+about 1%. Nothing in this repository ingests the feed yet, and the check behind that sentence is
+in [the beam/diffuse
+results](../results/beam-diffuse-split.md#one-site-is-curtailed-and-it-is-the-noisiest-of-the-six).
+
+**Coverage is what limits the feed, not accuracy.** In September 2026 it carries one generator and
+starts on 29 April 2026, where the telemetry reaches back to September 2019. Analysis that needs
+curtailment labels before late April 2026 has none, and a generator absent from the feed cannot be
+read as uncurtailed — only as one NGED publishes no curtailment for. Asking NGED to extend the
+history is the obvious request, and the check above is the evidence for making it.
 
 **15-minute power data may become available. We deliberately stay on half-hourly until v2.** There
 is no room on the road to v1.0 to re-ingest the power feed at a finer step, so treat 15-minute data
