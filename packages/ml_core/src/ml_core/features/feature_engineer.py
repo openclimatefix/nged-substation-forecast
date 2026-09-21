@@ -1,10 +1,13 @@
 """Abstract base for pluggable feature-engineering strategies.
 
-A ``FeatureEngineer`` turns the raw inputs (observed power, gridded NWP, time-series metadata)
-into the model-ready frame a forecaster consumes. It is a strategy object **referenced** by a
-forecaster (composition), not a method **implemented** on it — so the forecaster keeps its single
-responsibility (train/predict) and a new model can swap the whole feature pipeline by pointing at
-a different ``FeatureEngineer``.
+A ``FeatureEngineer`` turns the raw inputs into the model-ready frame a forecaster consumes. The
+raw inputs are observed power, gridded numerical weather prediction (NWP) output, and time-series
+metadata. NWP is stored one row per H3 cell, H3 being a hexagonal grid over the globe at numbered
+resolutions, and each time series records the resolution-5 cell it sits in. Joining the weather
+to a series is therefore a join on that cell. A ``FeatureEngineer`` is a strategy object
+**referenced** by a forecaster (composition), not a method **implemented** on the forecaster. The
+forecaster therefore keeps its single responsibility (train/predict), and a new model can swap
+the whole feature pipeline by pointing at a different ``FeatureEngineer``.
 """
 
 from abc import ABC, abstractmethod
@@ -19,10 +22,11 @@ from contracts.weather_schemas import Nwp
 from ml_core.features._nwp import NWP_PUBLICATION_DELAY_HOURS
 
 DEFAULT_LOCAL_TIMEZONE: Final[str] = "Europe/London"
-"""IANA zone the local-time features (time of day, day of week, UTC offset) are computed in.
+"""IANA zone the local-time features are computed in.
 
+Those features are the time of day, the time of year, the day of week, and the offset from UTC.
 Defined here, on the interface, rather than inside ``TabularFeatureEngineer``, so a future
-``FeatureEngineer`` forecasting another region can override it through the same ``engineer()``
+``FeatureEngineer`` forecasting another region can override the zone through the same ``engineer()``
 call every production call site already uses — not just through the one implementation.
 """
 
@@ -51,17 +55,16 @@ class FeatureEngineer(ABC):
         - **Bulk mode** (``power_fcst_init_time=None``, the default): NWP-centric, vectorised
           over every NWP run in the input, one forecast per ``(nwp_init_time, valid_time)``
           pair. Used for training and multi-run backtesting.
-        - **Single-run mode** (``power_fcst_init_time`` given): power-centric, joins exactly
-          one NWP run (``nwp_init_time``, or derived from ``power_fcst_init_time`` minus
-          ``nwp_publication_delay_hours`` if omitted) and stamps a constant
-          ``power_fcst_init_time`` on every row. Used for production inference and replay
-          backfilling.
+        - **Single-run mode** (``power_fcst_init_time`` given): power-centric. Joins exactly one NWP
+        run, named by ``nwp_init_time``, or derived from ``power_fcst_init_time`` minus
+        ``nwp_publication_delay_hours`` when ``nwp_init_time`` is omitted. Stamps a constant
+        ``power_fcst_init_time`` on every row. Used for production inference and replay backfilling.
 
         Args:
             selected_features: The feature names to produce.
             power_time_series: Observed power, one row per ``(time_series_id, time)``.
-            time_series_metadata: Per-time-series metadata (carries ``h3_res_5`` for the
-                spatial mapping).
+            time_series_metadata: Per-time-series metadata. Carries ``h3_res_5``, the resolution-5
+                H3 cell each series sits in, which is what the spatial mapping joins on.
             nwp: Gridded NWP in physical units, keyed by ``h3_index``.
             power_fcst_init_time: ``None`` for bulk mode; a single datetime for single-run
                 mode. See ``_engineer_features`` for the full contract.
