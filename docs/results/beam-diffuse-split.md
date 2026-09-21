@@ -330,71 +330,47 @@ of due south, which is what these arrays plausibly are. Neither model is the pro
 the comparison exists to check that a null from one instrument is not an artefact of that
 instrument.
 
-### Calibrating the physical model closes most of the gap, but never overtakes the tree
+### Calibrating the physical model with a tree
 
 **Feeding the physical model's output into a tree recovers most of its deficit against XGBoost, but
-only when the calibration is allowed to see the weather as well — and the calibrated model never
-beats XGBoost alone.** Three calibrations separate the possible causes of the 0.9-point gap.
+only when the calibration is allowed to see the weather as well.** Three calibrations separate the
+possible causes of the gap.
 
-| Setup | MAE (% of P99 output) |
-|---|---|
-| Physical model alone | 6.84 |
-| Tree given only the physical model's output | 6.79 |
-| Tree given the physical model's output, plus time and temperature | 6.12 |
-| Tree given the physical model's output, plus the full weather feature set | 5.95 |
-| XGBoost alone, the product's own split | 5.93 |
-| XGBoost given global irradiance alone, no split | 6.05 |
+| Setup | CAMS | ERA5 |
+|---|---|---|
+| Physical model alone | 6.84 | 9.23 |
+| Tree given only the physical model's output | 6.79 | 9.20 |
+| Tree given the physical model's output, plus time and temperature | 6.12 | 8.90 |
+| Tree given the physical model's output, plus the full weather feature set | 5.95 | 8.77 |
+| XGBoost alone, the product's own split | 5.93 | 8.80 |
+| XGBoost given global irradiance alone, no split | 6.05 | 8.85 |
 
-CAMS, shifted stamps, the same 127,882 site-hours and the same folds as every other number here.
-Every physical-model prediction fed to a tree was produced by a fit that never saw that row's
-calendar month, through the same withheld-month inner cross-validation arm B-LEARNED uses.
+Mean absolute error as a percentage of P99 output, shifted stamps, on the same rows and folds as
+every other number here. Every physical-model prediction fed to a tree was produced by a fit that
+never saw that row's calendar month, through the same withheld-month inner cross-validation arm
+B-LEARNED uses.
 
-**A tree given nothing but the physical model's output buys −0.050 points [−0.103, +0.009], which
-is indistinguishable from zero.** Whatever the physical model gets wrong, it is not a
-mis-calibration that a monotone rescaling of its own output could repair.
+**A tree given nothing but the physical model's output buys nothing on either source** — −0.050
+points [−0.103, +0.009] on the satellite product and −0.037 [−0.073, +0.000] on the reanalysis,
+both spanning zero. Whatever the physical model gets wrong, it is not a mis-calibration that a
+rescaling of its own output could repair.
 
-**Letting the calibration vary by season, temperature, and hour recovers 0.73 of the 0.91-point
-gap** [0.57, 0.89]. Most of the physical model's deficit is therefore a slowly-varying offset
-rather than a wrong response to irradiance — which is consistent with the per-site drift reported
-above, since a fixed-capacity physical model has no way to track a plant that changes.
+**Letting the calibration vary by season, temperature, and hour recovers most of the gap on both
+sources**: 0.73 points [0.57, 0.89] of the 0.91-point deficit on the satellite product, and 0.33
+[0.20, 0.46] of the 0.43-point deficit on the reanalysis. Most of the physical model's deficit is
+therefore a slowly-varying offset rather than a wrong response to irradiance — which is consistent
+with the per-site drift reported above, since a fixed-capacity physical model has no way to track a
+plant that changes.
 
-**The full hybrid lands at 5.95% against XGBoost's 5.93%, a difference of +0.017 points [−0.017,
-+0.058] that spans zero.** Handing the tree a physical model's prediction on top of the weather it
-already has adds nothing measurable, so the physical model's structure carries no information a
-tree with the same inputs has not already found. Note also that the time-calibrated physical model
-at 6.12% is still worse than a tree given only global irradiance and no split at all, at 6.05%.
-
-## Where the advantage lives
-
-**The satellite advantage falls to nothing under a clear sky and concentrates where cloud makes the
-split uncertain.** That is the shape an information account predicts: under a clear sky almost all
-the irradiance is beam and the direct fraction follows from the sun's position, so a separation
-model already knows it; under broken cloud two hours with the same total can carry very different
-beam, depending on whether the sun's disc happens to be covered.
-
-![The headline contrast split by sky condition](sky_conditions.svg)
-
-| Sky condition | Clearness index | C − B | Relative | Hours |
-|---|---|---|---|---|
-| Overcast | below 0.2 | −0.0588 [−0.0795, −0.0392] | −1.75% | 19,331 |
-| Mostly cloudy | 0.2 to 0.4 | −0.1299 [−0.1569, −0.1045] | −2.47% | 34,411 |
-| Broken cloud | 0.4 to 0.6 | −0.1344 [−0.1783, −0.0973] | −1.91% | 39,936 |
-| Clear | above 0.6 | −0.0151 [−0.0459, +0.0171] | −0.21% | 33,076 |
-
-CAMS, XGBoost, shifted stamps. Rows whose sun sits below 5 degrees of elevation are excluded,
-because the clearness index divides by a quantity that goes to zero at sunrise and is numerically
-unstable there; that exclusion is why these bins total 126,754 hours rather than the full 127,882.
-
-Under thick overcast the effect shrinks again, as it must when there is almost no beam left to know
-about, leaving the gain concentrated in the two middle bins at about 0.13 points. On the reanalysis
-the contrast excludes zero in none of the four bins, consistent with its pooled null; the closest
-to an effect there is the clear-sky bin at +0.065 [−0.001, +0.127], which points towards Erbs
-rather than towards the published field.
-
-**The clear-sky bin is a weak null rather than a demonstrated zero.** Its interval runs from −0.046
-to +0.017, and the lower end is half the pooled effect, so the honest statement is that no effect is
-detectable there rather than that none exists. The contrast between that bin and the two middle
-bins, whose intervals sit well away from zero, is what carries the argument.
+**Whether the physical model's output then adds anything to a tree that already has the weather
+depends on the source, and where it does the gain is small.** On the satellite product the full
+hybrid lands at 5.95% against XGBoost's 5.93%, a difference of +0.017 points [−0.017, +0.058] that
+spans zero: the physical model's structure carries nothing a tree with the same inputs has not
+already found. On the reanalysis the hybrid does beat XGBoost, by 0.033 points [0.017, 0.047]. A
+plausible reading is that a coarser irradiance field leaves more for an explicit physical prior to
+supply — on the reanalysis the six sites share two irradiance series, so a per-site fitted tilt,
+azimuth, and capacity is most of what distinguishes them. That gain is the same size as this
+pipeline's re-encoding floor, discussed below, so it should not be read as more than a hint.
 
 ## Does the published beam field add information?
 
@@ -486,6 +462,38 @@ evenly-bright sky and a fitted azimuth fit best", and its answer moves with a ti
 convention.** The physical model is a misspecification probe rather than a second reading of the
 same quantity, and the right response is to report what each instrument measured rather than to
 reconcile the signs.
+
+## Where the advantage lives
+
+**The satellite advantage falls to nothing under a clear sky and concentrates where cloud makes the
+split uncertain.** That is the shape an information account predicts: under a clear sky almost all
+the irradiance is beam and the direct fraction follows from the sun's position, so a separation
+model already knows it; under broken cloud two hours with the same total can carry very different
+beam, depending on whether the sun's disc happens to be covered.
+
+![The headline contrast split by sky condition](sky_conditions.svg)
+
+| Sky condition | Clearness index | C − B | Relative | Hours |
+|---|---|---|---|---|
+| Overcast | below 0.2 | −0.0588 [−0.0795, −0.0392] | −1.75% | 19,331 |
+| Mostly cloudy | 0.2 to 0.4 | −0.1299 [−0.1569, −0.1045] | −2.47% | 34,411 |
+| Broken cloud | 0.4 to 0.6 | −0.1344 [−0.1783, −0.0973] | −1.91% | 39,936 |
+| Clear | above 0.6 | −0.0151 [−0.0459, +0.0171] | −0.21% | 33,076 |
+
+CAMS, XGBoost, shifted stamps. Rows whose sun sits below 5 degrees of elevation are excluded,
+because the clearness index divides by a quantity that goes to zero at sunrise and is numerically
+unstable there; that exclusion is why these bins total 126,754 hours rather than the full 127,882.
+
+Under thick overcast the effect shrinks again, as it must when there is almost no beam left to know
+about, leaving the gain concentrated in the two middle bins at about 0.13 points. On the reanalysis
+the contrast excludes zero in none of the four bins, consistent with its pooled null; the closest
+to an effect there is the clear-sky bin at +0.065 [−0.001, +0.127], which points towards Erbs
+rather than towards the published field.
+
+**The clear-sky bin is a weak null rather than a demonstrated zero.** Its interval runs from −0.046
+to +0.017, and the lower end is half the pooled effect, so the honest statement is that no effect is
+detectable there rather than that none exists. The contrast between that bin and the two middle
+bins, whose intervals sit well away from zero, is what carries the argument.
 
 ## What follows for the forecast feed
 
