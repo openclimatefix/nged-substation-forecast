@@ -658,6 +658,12 @@ the **peak-events slice** (the top 5% highest *observed* demand) and NGED's hand
 examples**. Both are described under [Tail & exceedance
 metrics](#tail-exceedance-metrics-scoring-the-question-nged-actually-asks).
 
+**A prediction clamped to a generator's export cap is diagnostic only too, and for the same reason
+about what was known when.** The clamp uses the setpoint the network operator issued for the hour
+being scored, which a forecast issued hours earlier could not have held. When the clamp is fair and
+when the clamp is lookahead bias are set out under [drop curtailed hours from the training
+target](xgboost-improvements.md#drop-curtailed-hours-from-the-training-target).
+
 **Every ratio between a model and a reference is corrected for the ensemble-size bias [Weigel et al.
 (2007)](https://doi.org/10.1175/MWR3280.1) describe, and carries its reference forecast, population,
 and ensemble-member count** — see [Publishing results that others can compare

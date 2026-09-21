@@ -530,6 +530,18 @@ guardrails](../ml_experimentation/model-configuration.md#lookahead-bias-guardrai
 prevent. Holding an already-delivered forecast down to a cap the operator has since set is a
 different question, and one for the serving path rather than the training loop.
 
+**Clamping a prediction to the export cap is fair when the cap is already on the record, and
+lookahead bias when the cap is still in the future.** The [beam/diffuse
+experiment](../results/beam-diffuse-split.md) scores `min(export cap, prediction)` at the one site
+under active network management. That experiment reads reanalysis and satellite irradiance for
+hours that have already happened, so the cap the operator set is as much a historical record as the
+weather is. Every arm in that experiment gets the same clamp, so the clamp cannot favour the arm
+under test. A forecast issued at 06:00 for 14:00 holds no such record, because the operator sets the
+14:00 cap during the day. A live service that clamped to that cap would be scored on megawatts the
+service could not have published, which is the same fault as handing the cap to the model as a
+feature. Score a live forecast against the megawatts that forecast actually published, and keep the
+clamped figure for offline comparisons, where the realised cap is a legitimate input.
+
 **One generator in the trial area is connected under active network management, and NGED has
 confirmed there are no others**, so a generator absent from the setpoint record ran free rather
 than uncapped-but-unrecorded — see [what the curtailment feed
