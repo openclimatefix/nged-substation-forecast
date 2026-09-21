@@ -1,7 +1,10 @@
 """Shared building blocks for the Patito schemas.
 
-The canonical UTC dtype, the plausible-datetime bounds and the checks that enforce them, and the
-delivery quantile levels.
+This module holds the canonical UTC dtype, the plausible-datetime bounds and the checks that
+enforce them, the quantile levels agreed with NGED for the delivery tables and their ``p{level}``
+labels, the shared ``time_series_id`` field factory, and ``validate_schema``. ``validate_schema``
+checks a frame's columns and dtypes against a model without materialising it, that is, without
+reading any of the frame's rows.
 """
 
 from datetime import UTC, datetime
@@ -25,24 +28,24 @@ MIN_PLAUSIBLE_DATETIME: Final[datetime] = datetime(2000, 1, 1, tzinfo=UTC)
 A column is bounded when its model's ``validate`` passes it to `check_datetime_bounds`; the
 constant says nothing about columns that have not opted in.
 
-NGED telemetry cannot predate the instrumentation that produced it, and the ECMWF archive we
-ingest begins later still, so no legitimate row is older than this. The bound is also deliberately
-far later than 1847: ``Europe/London`` ran on local mean time at UTC−0:01:15 until then, so a
-pre-1848 timestamp produces a sub-minute UTC offset and a nonsensical value for every local-time
-feature. Enforcing this bound is what guarantees the local-time features in ``ml_core`` never see
-a sub-minute UTC offset.
+NGED telemetry cannot predate the instrumentation that produced the telemetry, and the ECMWF archive
+we ingest begins later still. No legitimate row is therefore older than 2000-01-01. The bound is
+also deliberately far later than 1847: ``Europe/London`` ran on local mean time at UTC−0:01:15 until
+then, so a pre-1848 timestamp produces a sub-minute UTC offset and a nonsensical value for every
+local-time feature. Enforcing this bound is what guarantees the local-time features in ``ml_core``
+never see a sub-minute UTC offset.
 """
 
 MAX_PLAUSIBLE_DATETIME: Final[datetime] = datetime(2100, 1, 1, tzinfo=UTC)
 """The latest timestamp a bounded datetime column may carry (inclusive).
 
-This is a fixed date rather than an offset from the current time, so validation never depends on
-the wall clock: a frame that validated when it was written still validates when it is read back
+The maximum is a fixed date rather than an offset from the current time, so validation never depends
+on the wall clock. A frame that validated when it was written still validates when it is read back
 years later, and tests need no clock control. A fixed far-future bound still catches an epoch-unit
-mix-up, where Unix milliseconds read as seconds land tens of thousands of years in the future —
-the plausible failure on any path that converts a numeric timestamp rather than parsing an ISO-8601
-string. It deliberately does not catch a small clock skew that ships tomorrow's data as today's;
-that is a monitoring concern, not a contract one.
+mix-up, where Unix milliseconds read as seconds land tens of thousands of years in the future — a
+plausible failure on any path that converts a numeric timestamp rather than parsing an ISO-8601
+string. The bound deliberately does not catch a small clock skew that ships tomorrow's data as
+today's. Clock skew is a monitoring concern, not a contract concern.
 """
 
 
@@ -50,11 +53,12 @@ def check_datetime_bounds(dataframe: pl.DataFrame, column: str, *more_columns: s
     """Raise ``ValueError`` if any timestamp lies outside the plausible-datetime range.
 
     Call this from a Patito model's ``validate`` override, after ``super().validate()``. It exists
-    because Patito **silently ignores** ``ge``/``le`` on a datetime field: Patito derives its bounds
-    checks from the Pydantic JSON schema's ``minimum``/``maximum`` keywords, which JSON Schema
-    defines for numbers only, so a datetime field's ``Ge``/``Le`` metadata never reaches the JSON
-    schema and no check is ever generated. (``ge``/``le`` on a *numeric* field works normally, which
-    is why ``PowerTimeSeries.power`` can state its bounds on the field itself.)
+    because Patito **silently ignores** ``ge``/``le`` on a datetime field. Patito derives its bounds
+    checks from the Pydantic JSON schema's ``minimum``/``maximum`` keywords, and JSON Schema defines
+    those two keywords for numbers only. The ``Ge``/``Le`` annotations Pydantic builds from a
+    datetime field's ``ge``/``le`` arguments therefore never reach the JSON schema, and no check is
+    ever generated. (``ge``/``le`` on a *numeric* field works normally, which is why
+    ``PowerTimeSeries.power`` can state its bounds on the field itself.)
 
     Args:
         dataframe: An already-validated frame. Every named column must be a datetime column.
@@ -84,9 +88,9 @@ def split_by_datetime_plausibility(
     after `MAX_PLAUSIBLE_DATETIME` — the same bounds `check_datetime_bounds` enforces.
     Nulls are always plausible (absence is not malformedness).
 
-    Use this at an ingestion boundary to drop-and-report malformed external rows instead of
-    aborting the whole batch; use `check_datetime_bounds` where a hard assertion is
-    appropriate instead (e.g. inside a Patito model's ``validate``).
+    Use this at an ingestion boundary, to drop-and-report malformed external rows rather than
+    abort the whole batch. Where a hard assertion is wanted instead — inside a Patito model's
+    ``validate``, for example — use `check_datetime_bounds`.
 
     Args:
         dataframe: Any frame; ``column`` must be a datetime column.
@@ -139,12 +143,12 @@ DELIVERY_QUANTILES: Final[tuple[float, ...]] = (
     0.98,
     0.99,
 )
-"""The thirteen quantile levels agreed with NGED for the delivery tables.
+"""The 13 quantile levels agreed with NGED for the delivery tables.
 
-Deliberately tail-heavy: NGED is far more interested in the tails than the shoulders. This
-tuple is the single source of truth for every quantile-indexed artefact — the pinball-loss
-``metric_param`` labels today, and the percentile columns of the delivery-table
-representations (Representations 2 and 3) when those land in v0.5.
+The levels are deliberately tail-heavy, because NGED is far more interested in the tails than the
+shoulders. This tuple is the single source of truth for every quantile-indexed artefact — the
+pinball-loss ``metric_param`` labels today, and the percentile columns of the delivery-table
+representations (Representations 2 and 3) when those representations land in v0.5.
 """
 
 

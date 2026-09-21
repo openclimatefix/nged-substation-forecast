@@ -4,8 +4,8 @@ __generated_with = "0.23.14"
 app = marimo.App(width="full")
 
 with app.setup:
-    from datetime import UTC, datetime
-    from typing import cast
+    from datetime import UTC, datetime, timedelta
+    from typing import Final, cast
 
     import altair as alt
     import geoarrow.pyarrow as geo_pyarrow
@@ -21,6 +21,15 @@ with app.setup:
     from contracts.typing_utils import typeddict_to_dict
     from dashboard.data_source import settings_for_source, source_status_message
     from plotting.ocf_theme import BLUE, hex_to_rgb
+
+    RECENT_WINDOW: Final[timedelta] = timedelta(days=21)
+    """How far back the power chart looks, measured from the selected series' newest row.
+
+    NGED telemetry is half-hourly, 48 rows a day, and Altair's default row-count guard rejects a
+    frame over 5,000 rows — so the window has to stay well under about 104 days. 21 days is
+    roughly 1,000 rows, comfortably inside that limit, and covers the most recent few weeks the
+    chart is meant to show.
+    """
 
 
 @app.cell
@@ -112,9 +121,6 @@ def _(settings):
     delta_df = pl.scan_delta(
         settings.power_time_series_data_path,
         storage_options=typeddict_to_dict(settings.storage_options),
-    ).filter(
-        # Filter to only show recent data. Altair crashes if you try to show too much data.
-        pl.col("time") > pl.lit(datetime(2026, 5, 1, tzinfo=UTC)).cast(UTC_DATETIME_DTYPE)
     )
     return (delta_df,)
 
@@ -124,8 +130,10 @@ def _(delta_df, df, layer_widget, map):
     if layer_widget.selected_index is None:
         right_pane = mo.md(
             """
-            ### Select a Substation
-            *Click a dot on the map to view the demand profile.*
+            ### Select a site
+            *Click a dot on the map to view that site's power time series. The map shows
+            substations, generation sites, and storage sites together, so the line is not
+            always demand.*
             """
         )
     else:
@@ -133,9 +141,29 @@ def _(delta_df, df, layer_widget, map):
         time_series_id = selected_df["time_series_id"].item()
 
         try:
+            # Both reads below are scoped to the selected series first. `power_time_series` is
+            # partitioned by `time_series_id`, so scoping first leaves Delta reading one
+            # partition instead of all of them, and it defers both reads until a chart is
+            # actually about to be drawn.
+            series_lf = delta_df.filter(pl.col("time_series_id") == time_series_id)
+
+            # Anchor the rolling window on this series' own newest row, rather than on
+            # wall-clock time, so a series that stopped reporting still shows its last
+            # RECENT_WINDOW of telemetry instead of an empty chart. No engine on this stack
+            # answers a `max` from Parquet statistics, so this reads the series' `time` column
+            # in full; the streaming engine keeps the peak memory of that read bounded.
+            newest_time: datetime | None = (
+                series_lf.select(pl.col("time").max()).collect(engine="streaming").item()
+            )
+            anchor = newest_time if newest_time is not None else datetime.now(UTC)
+
+            # `anchor - RECENT_WINDOW` is a plain Python datetime, so the filter stays a single
+            # comparison against a literal, which Delta and Parquet can push down to the scan.
             filtered_demand = cast(
                 pt.DataFrame[PowerTimeSeries],
-                delta_df.filter(pl.col("time_series_id") == time_series_id).collect(),
+                series_lf.filter(
+                    pl.col("time") > pl.lit(anchor - RECENT_WINDOW).cast(UTC_DATETIME_DTYPE)
+                ).collect(),
             )
         except Exception as e:  # noqa: BLE001 — surface any read failure in the pane, never crash.
             right_pane = mo.md(f"{e}")
