@@ -131,8 +131,10 @@ can also consume the cap directly, because it enters as `min(what the weather al
 — an upper bound on export rather than a volume to subtract, so it changes nothing on the hours
 it does not bind.
 
-**The coverage gap is what the defences above are for.** The setpoint history for that generator
-starts in July 2024 and its telemetry starts in February 2024; the other five generators have no
+**The setpoint record covers one generator from August 2024, so the estimator cannot depend on a
+curtailment label existing.** That generator's setpoint history reaches back to the day after its
+telemetry begins, but the scheme does not enforce anything until 6 August 2024 and the cap reads a
+flat zero until then, so the usable record starts there. The other five generators have no
 curtailment record at all. So an estimator cannot depend on a label existing, and the upper-envelope
 loss remains the structural defence for every period and every generator the record does not
 reach.
@@ -619,11 +621,12 @@ B](#candidate-b-the-differentiable-physics-estimator), answered for solar on thi
 
 **A half-hour timestamp error is absorbed into the fitted azimuth, so pin the stamp convention
 before trusting a fitted orientation or the capacity that comes with it.** The same model fitted on
-the same rows settles around 163 to 179 degrees when the stamps are shifted by one half-hour and
-around 200 to 212 degrees when they are taken as labelled — a 35-degree swing from a 30-minute
-change in what the timestamp means. The ordering of the experiment's arms changes sign with it, in
-sample as well as out. Any estimator that fits orientation has the same exposure, and an orientation
-error feeds straight into the capacity it reports.
+the same rows moves its fitted azimuth by about 35 degrees when the stamps are shifted by one
+half-hour, which is a quarter of the range a GB array's orientation can plausibly occupy, from a
+30-minute change in what the timestamp means. The [power stamps on this
+feed](../results/beam-diffuse-split.md#the-power-stamps-before-26-march-2026-are-half-an-hour-late)
+were half an hour late until NGED corrected them. Any estimator that fits orientation has the same
+exposure, and an orientation error feeds straight into the capacity it reports.
 
 **The `effective_capacity` table is a single snapshot, not a time series.** It holds exactly one row
 per `time_series_id` — 32 rows for 32 series — so code that sorts it by time and takes the last row

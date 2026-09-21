@@ -470,18 +470,19 @@ supply risk.
 
 ### What a CAMS-against-ERA5 comparison on the trial area's solar farms found
 
-**The satellite retrieval beat the reanalysis by 4.1 points of mean absolute error on the six
+**The satellite retrieval beat the reanalysis by 4.29 points of mean absolute error on the six
 metered solar farms, which is the largest effect anything in that experiment varied.** On the
-126,784 hours both products cover, CAMS cut an XGBoost forecast's error from 10.12% to 6.07% of P99
-output, and a fitted five-parameter physical model's from 10.37% to 6.73%. The largest contrast
-from changing which beam/diffuse split the model saw was 0.124 points, and changing the model
-family moved about 0.9. Which product feeds the model dominates both. The write-up is [Does a
+124,849 hours both products cover, CAMS cut an XGBoost forecast's error from 9.66% to 5.37% of P99
+output — the 99th percentile of each site's own metered output, which every figure there is
+normalised by — and a fitted five-parameter physical model's from 10.03% to 6.20%. The largest
+contrast from changing which beam/diffuse split the model saw was 0.126 points, and changing the
+model family moved 1.05. Which product feeds the model dominates both. The write-up is [Does a
 weather product's beam/diffuse split help a PV forecast?](../results/beam-diffuse-split.md); the
 code sits in a pull request kept for reference rather than merged,
 [#785](https://github.com/openclimatefix/nged-substation-forecast/pull/785).
 
-**That gap is what a 5 km cloud field at the meter's own coordinates delivers over a 31 km field
-averaged across a cell the meter may sit 13 km from.** Both measurements are of these two products
+**The two products differ in resolution, in delivery, and in how they are produced, so the gap is
+not attributable to resolution alone.** Both measurements are of these two products
 on this fleet, and neither has been shown to hold for every product at those resolutions.
 
 **CAMS's own reliability flag is worth acting on, and dropping the flagged hours raises a

@@ -157,14 +157,15 @@ rather than merged,
 [#785](https://github.com/openclimatefix/nged-substation-forecast/pull/785).
 
 **Which product feeds the model matters far more than which split it sees.** Swapping the 31 km
-reanalysis for the 5 km retrieval moved mean absolute error by 4.1 points of P99 output, against
-0.124 points for the largest split contrast anywhere in that experiment. Any effort spent on the
+reanalysis for the 5 km retrieval moved mean absolute error by 4.29 points of P99 output, against
+0.126 points for the largest split contrast anywhere in that experiment. Any effort spent on the
 beam field is worth weighing against effort spent on the retrieval that carries it.
 
 **A 30-minute timestamp error is absorbed into a physical model's fitted azimuth, which is how a
 model-chain comparison can silently answer a different question.** In that experiment the fitted
-azimuths move by about 35 degrees between the two stamp conventions, and the ordering of the arms
-changes sign with them. Settle the stamp convention before comparing chains that fit orientation.
+azimuths move by about 35 degrees when the stamps are shifted by one half-hour — whether the stamp
+marks the start or the end of the averaging window. Settle the stamp convention before comparing
+chains that fit orientation.
 
 **We found no study that runs the clean comparison — one NWP, one PV model chain, one arm fed
 the model's own direct beam and the other fed a separation model's estimate from the same model's
