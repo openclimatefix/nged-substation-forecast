@@ -206,10 +206,8 @@ geometry can recover, in which case the field is worth asking a supplier for. Or
 simply publish a better separation model than a correlation fitted in 1982, in which case the same
 gain is available locally for nothing. Erbs alone cannot tell those two explanations apart. Arm
 B-LEARNED can: its beam is a prediction of the product's own direct fraction from exactly arm A's
-feature set, so every value that column carries is a function of what arm A already holds. Out of
-fold, arm B-LEARNED leaves 4.5% of the satellite product's direct-fraction variance unexplained,
-against Erbs's 9.5% — 2.1 times less residual variance. If arm C still beats arm B-LEARNED, the
-advantage is information rather than representation.
+feature set, so every value that column carries is a function of what arm A already holds. If arm C
+still beats arm B-LEARNED, the advantage is information rather than representation.
 
 That arm has to be built carefully, because the obvious construction leaks. Folds are cut inside
 each site's own span, so one fold number is a different calendar period at each site. A separation
@@ -237,8 +235,7 @@ the smooth diffuse signal, so it would penalise exactly the arm under test.
 **Arm B is a negative control the experiment gets for free.** Erbs reads global irradiance and
 solar geometry and nothing else, all of which arm A already holds, so arm B cannot carry
 information arm A lacks. Whatever B − A comes out as is this pipeline's reading on a feature set
-known to be uninformative, and that reading turns out to matter; the results below take up the B − A
-contrast.
+known to be uninformative.
 
 **A positive control runs the same arms against a synthetic target built by transposing the true
 split onto a tilted plane**, where the split must help by construction. The synthetic target is
@@ -257,8 +254,6 @@ clearest week in the record, the most variable, and the dullest, chosen by clear
 than by eye.
 
 ![Predicted against measured PV power at site A](power_timeseries_site_a.svg)
-
-The other five sites are below.
 
 ![Site B](power_timeseries_site_b.svg)
 
@@ -315,15 +310,15 @@ Mean absolute error as a percentage of P99 output, restricted to the hours both 
 
 **These ERA5 figures are higher than the per-site table's because the row set is smaller, not
 because the models changed.** Restricting to the hours both sources cover drops about 23,000 ERA5
-hours that the satellite service flagged as unreliable, and those hours average 36 W m⁻² of global
-irradiance and 3.5% of P99 output against 284 W m⁻² and 36.4% for the hours kept. Removing
+hours that the satellite service flagged as unreliable. ERA5 reads those hours at 36 W m⁻² of
+global irradiance against 284 W m⁻² for the hours kept, and they carry 3.5% of P99 output
+against 36.4%. Removing
 near-dark hours, where every model is nearly right, raises a P99-normalised mean error: ERA5 →
 XGBoost moves from 8.80% over all its hours to 10.07% over the shared hours. Every contrast in this
 section is computed within one row set, so the shift cancels.
 
 That gap is what a 5 km cloud field at the meter's own coordinates delivers over a 31 km field
-averaged across a cell the meter may sit 13 km from. It also explains why the beam question has
-different answers on the two sources, which a later section takes up.
+averaged across a cell the meter may sit 13 km from.
 
 ## XGBoost beats the fitted physical model, but not by much
 
@@ -338,8 +333,7 @@ and 25,800 hourly daylight rows per site to fit on, which a newly-built site wou
 model needs enough data to pin five parameters and no more. And the physical model produces
 interpretable quantities — the fitted tilts land between 17 and 25 degrees and the azimuths between
 163 and 179 degrees, which is south to south-south-east and is what these arrays plausibly are.
-Neither model is the production design, and the comparison exists to check that a null from one
-instrument is not an artefact of that instrument.
+Neither model is the production design.
 
 ### Calibrating the physical model with a tree
 
@@ -535,16 +529,9 @@ That content simply does not correspond to what the panel saw: a beam departure 
 time. Predictability alone cannot distinguish signal from noise; only the power result does, and
 here it says the reanalysis residual is noise.
 
-**Spend the first effort on the irradiance source rather than on the split.** The gap between the
-two products is 4.1 points of P99 output. The gap between having no split at all and having the
-published split — arm C against arm A, the widest pooled split contrast measured — is 0.124 points,
-a ratio of about thirty to one. Any decision that trades source quality for the split has the
-priorities backwards.
-
-Two caveats attach to carrying the satellite result into a forecasting decision. Both products here
-are analyses, so a forecast beam would arrive with its own error and the 1.5% is an upper bound. And
-"run the separation locally for free" presumes an archive of the published beam to fit a separation
-model on, which the forecast feed at issue does not carry.
+One caveat attaches to carrying the satellite result into a forecasting decision: "run the
+separation locally for free" presumes an archive of the published beam to fit a separation model
+on, which the forecast feed at issue does not carry.
 
 ## What the drift says about estimating effective capacity
 
@@ -593,14 +580,12 @@ computed over.
 everything the model does not represent — degradation, curtailment, soiling, snow, and any bias in
 the irradiance at that particular site — so the drift is an upper bound on how much capacity moved,
 not an estimate of it. Separating those causes is exactly the job of the estimator contest, and
-nothing here chooses between the candidates. What the residuals do supply is evidence that the
-signal the contest is chasing is present in this fleet, is several percent in size, and is
-site-specific enough to be identifiable.
+nothing here chooses between the candidates.
 
 ## Implications for Flexpectation
 
-Each of the implications below is an implication rather than a plan; what the project does about any
-of them belongs to the roadmap and the issue tracker.
+What the project does about any of the implications below belongs to the roadmap and the issue
+tracker.
 
 - **Nothing here argues for pursuing a direct beam on the ECMWF ENS feed, which is just as well,
   because [asking our supplier for one is not a request worth
@@ -616,8 +601,7 @@ of them belongs to the roadmap and the issue tracker.
 - **CAMS earns its ingest slot on power forecasting as well as capacity estimation.** It is already
   planned as an input to [capacity estimation](../roadmap/capacity-estimation.md); the 4.1-point
   gap over ERA5 makes which irradiance product feeds the model much the largest lever measured
-  here, about thirty times the widest pooled split contrast. Effort spent choosing the source beats effort
-  spent deriving the split.
+  here, about thirty times the widest pooled split contrast.
 - **The fitted physical model's case in the capacity contest rests on interpretability and graceful
   degradation, not on accuracy.** It trails XGBoost by 0.9 points on PV power, and calibrating its
   output with a tree recovers most of that gap without overtaking the tree. That is consistent with
@@ -636,12 +620,11 @@ of them belongs to the roadmap and the issue tracker.
 
 ## Limitations
 
-**The finding is about six metered sites inside one 25 km by 23 km box in Lincolnshire, and on
-the reanalysis those six sites resolve to two grid cells.** The record runs from 2019 to 2026,
-and the effective sample is the number of independent weather episodes rather than the
-128,000 site-hours. On the reanalysis the six sites resolve to two grid cells, so the per-site
-breakdown there is two irradiance series rather than six replications, and the reanalysis null rests
-on an effective sample of two.
+**The finding is about six metered sites inside one 25 km by 23 km box in Lincolnshire.** The record
+runs from 2019 to 2026, and the effective sample is the number of independent weather episodes
+rather than the 128,000 site-hours. On the reanalysis the six sites resolve to two grid cells,
+so the per-site breakdown there is two irradiance series rather than six replications, and the
+reanalysis null rests on an effective sample of two.
 
 **The reanalysis null fails its own sensitivity check.** The second hyperparameter setting exists
 to check that an arm ordering is a property of the features rather than of the settings. On the
@@ -671,13 +654,12 @@ design that eliminated the floor rather than arguing past it would be stronger.
 
 ## Reproducing this
 
-The code that produced every number and figure on this page lives in a pull request that was
-deliberately closed without merging:
+The code that produced every number and figure on this page lives in a pull request that will not
+be merged:
 [openclimatefix/nged-substation-forecast#785](https://github.com/openclimatefix/nged-substation-forecast/pull/785),
 answering [issue #784](https://github.com/openclimatefix/nged-substation-forecast/issues/784). The
-code is throwaway by design — outside the Dagster asset graph, importing nothing and imported by
-nothing, adding no package and changing no data contract. The conclusions are what the project
-keeps; the scripts are there so the measurement can be audited and re-run.
+code is throwaway by design, outside the Dagster asset graph and imported by nothing, and the
+scripts are there so the measurement can be audited and re-run.
 
 Every contrast, interval, and error level quoted here is printed by a script rather than
 transcribed by hand, and every figure is drawn from the results files rather than redrawn from a
