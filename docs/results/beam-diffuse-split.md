@@ -160,17 +160,18 @@ site-specific structure out of data.
 **Active network management is the cause, and NGED's own record of it says so hour by hour.** Site
 E is connected under active network management, so the network operator sets a cap on what it may
 export and moves that cap as the local network fills. NGED holds the history of that cap as a step
-function: one row each time the cap changed, in megawatts. On 13 May 2025 site E runs at 17.1 MW at
-10:00 with the cap at its 18.8 MW connection limit, then falls to 6.4 MW at 11:00 as the cap drops
-to 4.8 MW, and recovers at 15:00 when the cap returns to the limit — while irradiance rises
-throughout. The output is following the cap, not the sky.
+function, with one row each time the cap changed. On 13 May 2025 site E exports 91% of its
+connection limit at 10:00, with the cap still at that limit. The cap falls to zero during the 11:00
+hour and stays low until 14:00, and site E's output follows it down to 34% of the limit and then to
+12%, while global irradiance climbs from 744 to 876 W m⁻². Both recover together at 15:00. The
+output is following the cap, not the sky.
 
 **The cap holds at the connection limit 80% of the time, and the hours it does not are where site
-E's shortfall lives.** Over the 26 months the record covers, the cap sits at the full 18.8 MW for
-80.5% of the time, at zero for 12.7%, at 0.25 MW for 4.0%, and somewhere between for the rest. On
-site E's bright hours the separation is clean: where the cap never left the limit the median yield
-ratio is 1.2605, against the other five sites' 1.267, and where the cap moved it is 0.81. The
-record flags 45 of the 50 bright hours whose yield falls below half.
+E's shortfall lives.** Over the 26 months the record covers, the cap sits at the connection limit
+for 80.5% of the time, at zero for 12.7%, at 1.3% of the limit for 4.0%, and somewhere between for
+the rest. On site E's bright hours the separation is clean: where the cap never left the limit the
+median yield ratio is 1.2605, against the other five sites' 1.267, and where the cap moved it is
+0.81. The record flags 45 of the 50 bright hours whose yield falls below half.
 
 **The record still does not reach the whole of site E's history.** It begins on 31 July 2024, where
 the site's telemetry begins earlier in 2024, so the earliest months carry no cap at all. A separate
