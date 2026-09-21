@@ -1,8 +1,8 @@
 """Lint the markdown embedded in Python docstrings.
 
 `mkdocstrings` renders every module/class/function docstring as markdown in the published API
-docs (`docs/api/`), so a docstring with e.g. a list missing its blank line renders badly there
-just like it would in a `.md` file. This script extracts each docstring via `ast` and pipes it
+docs (`docs/api/`). So a docstring with, say, a list missing its blank line renders badly there,
+just as it would in a `.md` file. This script extracts each docstring via `ast` and pipes it
 through `pymarkdown scan-stdin`, the same linter used on `README.md`/`docs/*.md`.
 """
 
@@ -16,8 +16,8 @@ from typing import Final
 PYMARKDOWN_CONFIG: Final[str] = ".pymarkdown-docstrings.json"
 """Config overrides layered on top of `pyproject.toml`'s `[tool.pymarkdown]` for docstring text.
 
-Disables rules that only make sense for a whole document (e.g. requiring the first line to be a
-heading), since a docstring is a prose fragment, not a document.
+Disables the two rules that only make sense for a whole document — requiring the first line to be a
+heading, and requiring a trailing newline — since a docstring is a prose fragment, not a document.
 """
 
 
@@ -45,9 +45,9 @@ def _iter_docstrings(source: str, path: Path) -> Iterator[tuple[int, str]]:
     """Yield ``(source_start_line, dedented_text)`` for every docstring in `path`.
 
     Covers module, class, function, and async function docstrings (`ast.walk` naturally reaches
-    methods and nested definitions too). Attribute-level docstrings (a bare string literal
-    following an assignment, e.g. a `ClassVar` docstring) aren't picked up by `ast.get_docstring`
-    and are out of scope here.
+    methods and nested definitions too). An attribute-level docstring is a bare string literal
+    following an assignment, such as a `ClassVar` docstring. `ast.get_docstring` does not pick
+    those docstrings up, so they are out of scope here.
     """
     tree = ast.parse(source, filename=str(path))
     docstring_nodes: list[ast.Module | ast.ClassDef | ast.FunctionDef | ast.AsyncFunctionDef] = [
@@ -72,8 +72,8 @@ def _scan_docstring(text: str) -> tuple[str, str, int]:
         input=text,
         capture_output=True,
         text=True,
-        # A non-zero return code means pymarkdown found violations, which is the whole point of
-        # this call: the caller inspects `returncode` itself, so raising here would be wrong.
+        # A non-zero return code means pymarkdown found violations, which is the whole point of this
+        # call. The caller inspects `returncode` itself, so raising here would be wrong.
         check=False,
     )
     return result.stdout, result.stderr, result.returncode

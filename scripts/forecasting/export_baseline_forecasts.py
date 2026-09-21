@@ -1,25 +1,36 @@
-"""Export a CV experiment's forecasts to three parquet files for offline analysis.
+"""Export one cross-validation experiment's forecasts to three parquet files for offline analysis.
 
 Written for issue #179: hand the weather/calendar-only baseline forecasts (the switching-event
-"shared baseline") to a colleague for switching-event detection work. The forecasts are read from
-the internal ``power_forecasts`` Delta table and written as three self-contained parquet files,
-all in physical MW/MVA units (``power_fcst`` is already stored in MW/MVA on disk — see
-``PowerForecast.power_fcst``; the per-series unit lives in ``TimeSeriesMetadata.units``).
+"shared baseline") to a colleague for switching-event detection work. A switching event is a
+reconfiguration of the high-voltage network, after which load that was metered at one substation
+is metered at a neighbouring substation instead.
 
-For each ``(time_series_id, valid_time)`` we keep only the **freshest** forecast run — the one
-whose ``power_fcst_init_time`` is largest (i.e. the most recent run that still precedes the target
-time). ``PowerForecast`` guarantees ``valid_time > power_fcst_init_time``, so this is an
-analysis-proxy view: the shortest-lead hindcast of expected power, which is the natural baseline
-for an observed-minus-expected residual.
+The forecasts are read from the internal ``power_forecasts`` Delta table and written as three
+self-contained parquet files, all in physical MW/MVA units. ``power_fcst`` is already stored in
+MW/MVA on disk — see ``PowerForecast.power_fcst``. The per-series unit lives in
+``TimeSeriesMetadata.units``.
+
+For each ``(time_series_id, valid_time)`` we keep only the **freshest** forecast run: the run
+whose ``power_fcst_init_time`` is largest. That run is the most recent run that still precedes
+the target time. ``PowerForecast`` guarantees ``valid_time > power_fcst_init_time``, so the
+export is an analysis-proxy view. An analysis-proxy view takes, for each target time, the
+forecast from the most recent run that preceded it, which is the closest stand-in for a weather
+analysis of the past. Every row is therefore a hindcast of expected power at the shortest lead
+time available, and that hindcast is the natural baseline for an observed-minus-expected
+residual.
 
 Three files are written:
 
-- ``*_full_ensemble.parquet`` — every ECMWF ensemble member (~51) of the freshest run.
+- ``*_full_ensemble.parquet`` — every ECMWF ensemble member (~51) of the freshest run. ECMWF is
+  the European Centre for Medium-Range Weather Forecasts, whose ensemble runs the weather model
+  about 51 times: once unperturbed, and about 50 more times from slightly perturbed starting
+  states.
 - ``*_ensemble_mean.parquet`` — the ensemble mean of ``power_fcst`` per timestep.
 - ``*_quantiles.parquet``     — the p10 / p50 / p90 of ``power_fcst`` across members per timestep.
 
-Every file also carries ``observed_power`` (the metered value at that ``valid_time``, same MW/MVA
-units), left-joined from the ``power_time_series`` table so residuals can be computed directly.
+Every file also carries ``observed_power``, left-joined from the ``power_time_series`` table so
+residuals can be computed directly. ``observed_power`` is the metered value at that
+``valid_time``, in the same MW/MVA units.
 
 Run from a checkout where ``.env`` resolves (in a worktree, ``.env`` must be symlinked):
 
@@ -37,8 +48,8 @@ import polars as pl
 from contracts.settings import PROJECT_ROOT, Settings
 from contracts.typing_utils import typeddict_to_dict
 
-# Columns carried through to the full-ensemble file (internal-only partition columns
-# experiment_name / fold_id / ml_flow_experiment_id are intentionally dropped).
+# Columns carried through to the full-ensemble file. The internal-only partition columns
+# experiment_name, fold_id, and ml_flow_experiment_id are intentionally dropped.
 _FORECAST_COLUMNS: tuple[str, ...] = (
     "time_series_id",
     "valid_time",
@@ -58,9 +69,10 @@ def _freshest_forecasts(
     """Scan ``power_forecasts`` for one experiment/fold, keeping only the freshest run per timestep.
 
     ``experiment_name`` / ``fold_id`` are ``String`` partition columns, so both filters push down
-    into the Delta scan (partition pruning). For each ``(time_series_id, valid_time)`` the run with
-    the largest ``power_fcst_init_time`` is selected via a semi-join on the per-timestep max init
-    time — this keeps *all* ensemble members of that run (the whole ensemble shares one init time).
+    into the Delta scan (partition pruning). For each ``(time_series_id, valid_time)`` the run
+    with the largest ``power_fcst_init_time`` is selected, via a semi-join on the per-timestep
+    max init time. The semi-join keeps *all* ensemble members of that run, because the whole
+    ensemble shares one init time.
 
     Args:
         power_forecasts_path: URI of the ``power_forecasts`` Delta table.
@@ -75,9 +87,9 @@ def _freshest_forecasts(
         pl.col("experiment_name") == experiment_name,
         pl.col("fold_id") == fold_id,
     )
-    # NOTE (revisit if this export is ever re-run at larger scale): `scan` is consumed twice —
-    # once for this per-timestep max init time, once for the semi-join below — so the partition
-    # (~369M rows for #179) is read twice. Fine as a one-off; a single-pass "max init_time over
+    # NOTE (revisit if this export is ever re-run at larger scale): `scan` is consumed twice, once
+    # for this per-timestep max init time and once for the semi-join below. So the partition — ~369M
+    # rows for #179 — is read twice. Fine as a one-off; a single-pass "max init_time over
     # (time_series_id, valid_time)" window filter would avoid the second scan.
     freshest_init = scan.group_by("time_series_id", "valid_time").agg(
         power_fcst_init_time=pl.col("power_fcst_init_time").max()
@@ -116,8 +128,10 @@ def _observed_power(
 def _with_observed(forecasts: pl.LazyFrame, observed: pl.LazyFrame) -> pl.LazyFrame:
     """Left-join ``observed_power`` onto forecasts on ``valid_time == time``.
 
-    Both operands are plain (non-Patito) lazy frames, so Polars' cross-model join check does not
-    fire. The observed ``time`` column is dropped after the join (it duplicates ``valid_time``).
+    Both operands are plain lazy frames rather than Patito ones. Patito is the library this repo
+    declares its data contracts in, and Polars refuses a join between two frames carrying
+    different Patito models, so keeping both operands plain is what stops that check firing. The
+    observed ``time`` column is dropped after the join (it duplicates ``valid_time``).
 
     Args:
         forecasts: Forecast rows with a ``valid_time`` column.
@@ -163,9 +177,10 @@ def export_forecasts(experiment_name: str, fold_id: str, output_dir: Path) -> di
         observed_power=pl.col("observed_power").first(),
     )
     # NOTE (revisit if this export is ever re-run for serious use): Polars' default quantile
-    # interpolation is "nearest", so these band edges are actual member values across the ~51
-    # members, not linearly-interpolated p10/p50/p90. Acceptable for this under-dispersed baseline
-    # (the band is already caveated), but pass interpolation="linear" for true quantile estimates.
+    # interpolation is "nearest". So these band edges are actual member values across the ~51
+    # members, not linearly-interpolated p10/p50/p90. The baseline is under-dispersed — its ensemble
+    # spread is narrower than the real uncertainty — so the band is already caveated, and the
+    # nearest-member edges are acceptable. Pass interpolation="linear" for true quantile estimates.
     quantiles = full.group_by(per_timestep).agg(
         power_fcst_init_time=pl.col("power_fcst_init_time").first(),
         power_fcst_p10=pl.col("power_fcst").quantile(0.1),
