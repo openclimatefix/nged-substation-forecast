@@ -130,8 +130,9 @@ filter can favour one setup over another.
 - **Hours the satellite service flags as unreliable.** On the CAMS source only, hours the service
   itself flags as less than 90% reliable are dropped. Every flagged hour is a daylight hour, and
   they are 17.9% of the daylight hours the service delivers. Those hours are much darker than the
-  ones kept, averaging 36 W m⁻² against 284, so every satellite number here is conditional on
-  discarding them.
+  ones kept, averaging 36 W m⁻² against 284. The whole experiment was also re-run keeping every
+  hour, to check that no satellite conclusion depends on the filter; the outcome is
+  [below](#what-the-result-survives).
 
 ## Methods
 
@@ -438,6 +439,15 @@ six sites show the effect individually; the exception is site E, whose own contr
 [−0.078, +0.093] on much the shortest record, an interval wide enough to contain the pooled effect
 comfortably.
 
+**The satellite finding also survives keeping the hours the service flags as unreliable**, which is
+the check that matters most, because those hours are 17.9% of the daylight record and dropping them
+was a choice. Re-run over all 150,094 hours rather than the 127,882 that pass the flag, the
+headline contrast is −0.081 [−0.095, −0.067], against −0.091 [−0.110, −0.073] on the filtered set.
+The absolute figure shrinks because adding 22,000 much darker hours lowers every arm's error — arm
+B falls from 6.02 to 5.35% of P99 output — while the *relative* effect is unchanged at 1.51%
+against 1.50%. The discriminator behaves the same way on the wider set: arm B-LEARNED against arm B
+is −0.002 [−0.007, +0.003], still spanning zero.
+
 The reanalysis null is not an artefact of the mirror, the stamps, or the row set: the Copernicus
 download reproduces the Open-Meteo result to the third decimal (+0.003 against +0.007 at shifted
 stamps), both alignments agree, and the null survives restriction to the hours the satellite source
@@ -624,8 +634,9 @@ excludes zero at the sensitivity setting, so the check did not pass there, and t
 result should be read as "no effect detected at the pre-registered setting" rather than as a
 demonstrated absence.
 
-The satellite numbers are conditional on discarding the 17.9% of daylight hours the service flags
-as unreliable, which are much darker than the hours kept.
+The satellite error *levels* quoted here are conditional on discarding the 17.9% of daylight hours
+the service flags as unreliable, which are much darker than the hours kept; the satellite
+*conclusion* is not, because re-running over every hour leaves the relative effect unchanged.
 
 **The false-zero filter was added after the first results existed, so the pre-registration claim
 covers the contrast and not the row set it is computed on.** Matched within irradiance bins, that
