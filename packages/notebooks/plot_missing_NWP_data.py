@@ -124,8 +124,8 @@ def plot_null_distribution(df, target_init_time, target_h3_index, nwp_vars):
 @app.cell
 def _(df, nwp_vars):
     # The plotted cell, 599148110664433663, is an H3 resolution-5 cell in Shetland, at roughly
-    # 60.6 N, 0.7 W. That cell sits at the far north of the boundary the `h3_grid_weights` asset
-    # covers, and so is worth checking for gaps.
+    # 60.6 N, 0.7 W. That cell sits at the northern edge of the boundary the `h3_grid_weights`
+    # asset covers.
     chart = plot_null_distribution(
         df,
         target_init_time=datetime(2026, 5, 1, tzinfo=UTC),

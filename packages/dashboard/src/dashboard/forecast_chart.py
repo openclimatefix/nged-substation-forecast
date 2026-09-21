@@ -185,7 +185,8 @@ _NWP_LINE_COLORS: Final[dict[str, str]] = {
 
 Each colour deliberately carries the same meaning as on the power chart: grey for the model's
 view (the ensemble), blue for the closest-to-truth line, and orange-red for the shared init-time
-rule. """
+rule.
+"""
 
 _MIDNIGHT_TEST: Final[str] = "hours(datum.value) == 0"
 """Vega expression: is this tick at (wall-clock) midnight?
@@ -203,9 +204,9 @@ def _prepare_for_plot(lf: pl.LazyFrame, time_column: str, value_column: str) -> 
     otherwise re-localise tz-aware timestamps to the viewer's zone. Values are rounded to 3
     decimal places *as Float64*. A raw ``Float32`` serialises to JSON with ~17 significant digits
     (e.g. ``10.300000190734863``). Those digits roughly triple the inline-data size, and push the
-    ~34k-row ensemble past marimo's max-output-size guard. 3 d.p. display precision is finer than
-    the forecast's own error, so nothing visible is lost (the stored values are already rounded
-    to a 13-bit significand).
+    ~34k-row ensemble past marimo's max-output-size guard. Rounding to 3 d.p. leaves a display
+    precision finer than the forecast's own error, so nothing visible is lost (the stored values
+    are already rounded to a 13-bit significand).
     """
     return lf.with_columns(
         pl.col(time_column).dt.convert_time_zone(DISPLAY_TIME_ZONE).dt.replace_time_zone(None),
@@ -319,11 +320,11 @@ def _x_encoding(window_start: datetime, window_end: datetime, field: str = "vali
     minor ticks every 3 hours carry no label and no gridline. The conditional-axis-property dicts
     are Vega-Lite's native encoding for "major vs minor tick" styling.
 
-    Every layer must use this same encoding. The encoding hard-codes the column ``valid_time``,
-    so a layer whose time column is named something else overrides that one argument via
-    ``field``. The x scale is shared across layers, so Vega-Lite merges the layers' axis
-    definitions. One deviating definition (e.g. ``axis=None``) can then suppress the merged axis
-    — labels, ticks, and gridlines — for the whole chart.
+    Every layer must use this same encoding. The encoding reads the column ``valid_time`` by
+    default, so a layer whose time column carries a different name passes that name as ``field``.
+    The x scale is shared across layers, so Vega-Lite merges the layers' axis definitions. One
+    deviating definition (e.g. ``axis=None``) can then suppress the merged axis — labels, ticks,
+    and gridlines — for the whole chart.
     """
     tick_size: dict[str, Any] = {"condition": {"test": _MIDNIGHT_TEST, "value": 7}, "value": 3}
     grid_opacity: dict[str, Any] = {"condition": {"test": _MIDNIGHT_TEST, "value": 1}, "value": 0}
@@ -379,7 +380,8 @@ def build_view_forecast_chart(
     Returns:
         A layered, zoomable Altair chart in Europe/London wall time.
     """
-    # 51 members × 14 days × 48 half-hours ≈ 34k rows exceeds Altair's 5,000-row default guard.
+    # One forecast run for one series is 51 members × 14 days × 48 half-hours ≈ 34k rows, past
+    # Altair's 5,000-row default guard.
     alt.data_transformers.disable_max_rows()
 
     init_wall = _wall_time(power_fcst_init_time)

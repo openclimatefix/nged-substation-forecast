@@ -30,9 +30,9 @@ def _():
     Pick a time series and a forecast run. The plot shows every forecast ensemble member
     (thin grey lines) against the observed power (thick blue line), from 24 hours before the
     forecast init time to 14 days after the forecast init time. The init time is when the
-    forecast was issued. A member is one of the many runs that make up a single forecast,
-    each started from slightly different weather, so the spread of the grey lines is how
-    uncertain the forecast is.
+    forecast was issued. A member is one of the many possible futures that make up a single
+    forecast, each computed from a slightly different weather forecast, so the spread of the grey
+    lines is how uncertain the forecast is.
 
     Two optional lagged-power lines overlay observed power shifted forward by 7 and by 14
     days. Shifted observed power is the raw material of the models' power-lag features.

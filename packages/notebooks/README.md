@@ -7,21 +7,20 @@ Marimo notebooks for exploratory data analysis and ad-hoc experimentation.
 **A notebook here answers one question about the data, and is allowed to be rough.** What the
 numerical weather prediction (NWP) archive holds for one H3 cell — H3 being the grid of hexagons
 this project aggregates weather onto — where a weather variable goes missing, and whether a baseline
-export
-looks the way its author expected: each question is worth a chart, and worth no more engineering
-than a chart. Nothing in `src/`, and no other package under `packages/`, imports this package, so a
-notebook that stops working stops working alone.
+export looks the way its author expected: each question is worth a chart, and worth no more
+engineering than a chart. Nothing in `src/`, and no other package under `packages/`, imports this
+package, so a notebook that stops working stops working alone.
 
 **Roughness is acceptable here because a notebook is never the route into production.** [Design
 principle 3 — one execution path from research to
 production](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#3-one-execution-path-from-research-to-production)
 holds that an idea becomes an experiment — a candidate that can enter the leaderboard, and therefore
 be promoted to production — only once the idea is implemented in the pipeline's own code, behind the
-same data contracts and tests as everything else. The leaderboard is the ranked table candidate
-models are scored against each other on, and the winner is what the live service serves. A data
-contract is a written, enforced definition of what a table's columns mean. Exploring in a notebook
-first is expected. Lifting a notebook's code into the pipeline afterwards is not expected, because
-the pipeline gets its own implementation, reviewed and tested.
+same data contracts and tests as everything else. The leaderboard is the ranked table that scores
+candidate models against each other. The winner is what the live service serves. A data contract is
+a written, enforced definition of what a table's columns mean. Exploring in a notebook first is
+expected. Lifting a notebook's code into the pipeline afterwards is not expected, because the
+pipeline gets its own implementation, reviewed and tested.
 
 **`dashboard` owns the marimo apps that somebody other than the author opens.** The apps at
 `packages/dashboard/` are meant to be re-opened by whoever is watching the forecast, so each app
@@ -34,13 +33,12 @@ stop working the day the data moves.
 
 **Marimo reverses two ordinary Python habits, and both failures are silent.** A leading underscore
 makes a name cell-local rather than private, so a helper that more than one cell calls has to carry
-a public name. And every import belongs in the `with app.setup:` block. An import marimo threads
-through a cell signature instead arrives as a function parameter, and ruff treats a parameter as
-always defined. A genuinely missing import then fails only at runtime. **Never run `ruff check
---fix` over
-a notebook:** an autofix that needs a new import writes that import into the file's top-level import
-block, where no cell can see the import, and reports success. The full set of authoring rules is the
-`marimo-notebooks` skill.
+a public name. And every import belongs in the `with app.setup:` block. An import placed in a cell
+instead is threaded through that cell's signature, so the import arrives as a function parameter,
+and ruff treats a parameter as always defined. A genuinely missing import then fails only at
+runtime. **Never run `ruff check --fix` over a notebook:** an autofix that needs a new import writes
+that import into the file's top-level import block, where no cell can see the import, and reports
+success. The full set of authoring rules is the `marimo-notebooks` skill.
 
 **`scripts/lint/check_marimo_notebooks.py` is what catches a notebook broken that way.** The script
 reads the names each cell binds and the names each cell references, then reports any referenced name
@@ -76,8 +74,8 @@ root `.env` points at.
   outwards by 0.25° first, so coastal substations and nearby islands fall inside the cells drawn.
   Reads no Delta table, so `plot_gb_map.py` is the one notebook here that runs without an `.env`.
 - `plot_nwp_map.py` — two views of one ECMWF ENS run from the `nwp` Delta table: every ensemble
-  member's chosen variable over time at one H3 cell, and that same variable across every H3 cell at
-  one valid time, shaded by a continuous colour map.
+  member's chosen variable over time at one H3 cell, and that same variable for one ensemble member
+  across every H3 cell at one valid time, shaded by a continuous colour map.
 - `plot_missing_NWP_data.py` — shows where the NWP archive is missing values. For one run and one H3
   cell, the notebook draws a grey line per ensemble member and a red tick wherever a variable is
   null or NaN. The notebook is also the worked example the Testing page points at for testing a

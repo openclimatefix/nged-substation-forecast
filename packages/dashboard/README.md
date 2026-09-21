@@ -11,23 +11,25 @@ the importable `dashboard` package under `src/`.
 **A marimo cell cannot be unit tested, so everything worth a unit test is pushed out of the notebook
 and into `src/dashboard/`.** A cell is a `def _(...)` function whose parameters are the names other
 cells export, and marimo rebuilds the notebook from its cells rather than running the module, so no
-test can call a cell the way a caller calls a function. What is left in a notebook is the
-arrangement — which controls exist, which Delta queries run, and how the pieces stack on the page.
-Delta Lake is the table format the project's power, weather, and forecast tables are stored in, and
-its partitions are what a query prunes to. Two checks cover that arrangement, and both parse the
-notebook rather than running it: `scripts/lint/check_marimo_notebooks.py` proves each cell's names
-are bound and nothing more, and `packages/dashboard/tests/test_view_forecasts.py` proves that every
-cell holding a Delta read descends from the cell referencing the Reload button — that is, sits
-downstream of it in the cell graph, so clicking Reload re-runs it. Of the two modules under `src/`,
-`forecast_chart` is ordinary library code with its tests in `packages/dashboard/tests/`;
-`data_source` has no tests today.
+test can call a cell the way a caller calls a function. A helper written in marimo's `@app.function`
+form can be tested inside the notebook — `packages/notebooks/plot_missing_NWP_data.py` is the worked
+example — but these two apps keep their testable logic under `src/`, so the apps and the tests can
+both import it. What is left in a notebook is the arrangement — which controls exist, which Delta
+queries run, and how the pieces stack on the page. Delta Lake is the table format the project's
+power, weather, and forecast tables are stored in. Two checks cover that arrangement, and both parse
+the notebook rather than running it: `scripts/lint/check_marimo_notebooks.py` proves each cell's
+names are bound and nothing more, and `packages/dashboard/tests/test_view_forecasts.py` proves that,
+in `view_forecasts.py`, every cell holding a Delta read sits downstream of the cell referencing the
+Reload button in the cell graph, so clicking Reload re-runs every one of those cells. Of the two
+modules under `src/`, `forecast_chart` is ordinary library code with its tests in
+`packages/dashboard/tests/`; `data_source` has no tests today.
 
 **This package owns the arrangement and nothing else.** `contracts` owns what each table means and
 where the table lives, `weather_utils` owns the analysis-proxy query the dashboard shares with the
 feature pipeline, and `plotting` owns the Open Climate Fix (OCF) Altair theme and its colour
-constants. Altair is the Python charting library both apps draw with. A change to
-what a chart *means* therefore usually belongs in one of those packages; a change to what the reader
-*sees* belongs here.
+constants. Altair is the Python charting library both apps draw with. A change to what a chart
+*means* therefore usually belongs in one of those packages; a change to what the reader *sees*
+belongs here.
 
 ## Rules the two apps have to obey
 
@@ -45,16 +47,17 @@ block.
 
 - **`view_forecasts.py`** — inspect a single forecast run: pick a time series, a fold, and a
   forecast init time, then see every forecast ensemble member (thin grey lines) against the observed
-  power (thick blue line), from 24 hours before the init time to 14 days after it. A fold is one
-  slice of history a model was tested on: `live` is the model running in production, and a
-  cross-validation (CV) fold is one of the held-out slices the model was scored on. The x-axis is
-  labelled at Europe/London midnight with the day of week and date. Optional coloured lines overlay
-  observed power shifted forward by 7 and by 14 days — the raw material of the models' power-lag
-  features. A second panel below the power chart, on the same time axis, plots the numerical weather
-  prediction (NWP) ensemble that fed the forecast at the H3 cell containing the series, for
-  whichever weather variable is picked. H3 is a grid of hexagons covering Great Britain, onto which
-  the weather is aggregated. A stitched proxy-analysis line on that second panel stands in for the
-  weather that actually happened. **Reload data** re-reads the forecast, power, and NWP tables.
+  power (thick blue line), from 24 hours before the init time to 14 days after it. A fold id says
+  which forecasts to look at: a cross-validation (CV) fold id names one held-out slice of history a
+  model was scored on, and `live` is the reserved id for production forecasts, which belong to no CV
+  fold. The x-axis is labelled at Europe/London midnight with the day of week and date. Optional
+  coloured lines overlay observed power shifted forward by 7 and by 14 days — the raw material of
+  the models' power-lag features. A second panel below the power chart, on the same time axis, plots
+  the numerical weather prediction (NWP) ensemble that fed the forecast at the H3 cell containing
+  the series, for whichever weather variable is picked. H3 is a grid of hexagons covering Great
+  Britain, onto which the weather is aggregated. A stitched proxy-analysis line on that second panel
+  stands in for the weather that actually happened. **Reload data** re-reads the forecast, power,
+  and NWP tables.
 - **`map_and_timeseries.py`** — a map of every time series in the NGED trial area, the part of
   NGED's licence area this project forecasts; click a dot to see its observed power. The power query
   is capped to recent observations, because the chart inlines its rows and Altair refuses more than
@@ -107,10 +110,9 @@ guide](https://openclimatefix.github.io/nged-substation-forecast/live_service/aw
 **Every plotted time is naive Europe/London wall time**, where naive means the timestamp carries no
 time-zone label. Demand shape follows the local clock, so midnight ticks and day-of-week labels have
 to be local rather than UTC. Stripping the zone then makes a chart render identically in any
-viewer's browser,
-because Vega would otherwise re-localise a tz-aware timestamp to whatever zone the viewer sits in.
-Altair emits Vega-Lite specifications, which Vega renders in the viewer's browser, so a rendering
-rule stated here as Vega's or Vega-Lite's is a rule Altair has no say over.
+viewer's browser, because Vega would otherwise re-localise a tz-aware timestamp to whatever zone the
+viewer sits in. Altair emits Vega-Lite specifications, which Vega renders in the viewer's browser,
+so a rendering rule stated here as Vega's or Vega-Lite's is a rule Altair has no say over.
 
 **The power chart and the NWP panel are separate Altair specs whose x-axes align only by
 construction.** Both charts pin the same x encoding, both pin the y-axis region to the same pixel
@@ -122,6 +124,6 @@ visibly misaligns the pair.
 run for one series is 51 members × 14 days × 48 half-hours ≈ 34,000 rows, which is past both
 Altair's 5,000-row default guard and marimo's maximum output size. `build_view_forecast_chart` calls
 `alt.data_transformers.disable_max_rows()` to lift Altair's guard. To stay inside marimo's maximum
-output size, the builders round values to 3 decimal places as `Float64` before serialising, and the
-apps hand the result to `mo.ui.altair_chart`, which serves the rows as a virtual file instead of
-inlining the rows in the cell output.
+output size, the builders round values to 3 decimal places as `Float64` before serialising, and
+`view_forecasts.py` hands the result to `mo.ui.altair_chart`, which serves the rows as a virtual
+file instead of inlining the rows in the cell output.

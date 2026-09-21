@@ -1,6 +1,6 @@
 """The dashboard apps' local/S3 data-source toggle.
 
-Both marimo apps (``map_and_timeseries.py``, ``view_forecasts.py``) show a "Data source" radio,
+Both marimo apps (``map_and_timeseries.py``, ``view_forecasts.py``) show a "Data source" radio
 and re-instantiate `contracts.settings.Settings` from the selected source via
 `settings_for_source`. Production S3 data can therefore be viewed without restarting marimo.
 Swapping the whole `Settings` object is what keeps the toggle to two functions: no reader
