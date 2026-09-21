@@ -426,9 +426,9 @@ class Metrics(pt.Model):
         """Validate the given dataframe, ensuring the primary key is unique where it is present.
 
         A duplicated primary key means either a join fanned out on the way here or the same rows
-        were written twice. Both corrupt the leaderboard or monitoring chart built from them. It
-        is our own bug rather than the outside world misbehaving, so this raises rather than
-        degrading — see
+        were written twice. Both corrupt the leaderboard or monitoring chart built from them. A
+        duplicated primary key is our own bug rather than the outside world misbehaving, so
+        `validate` raises rather than degrading — see
         <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/>.
 
         Unlike `PowerForecast`, four `PRIMARY_KEY` columns (`experiment_name`,

@@ -11,21 +11,21 @@ config and the class-path pair are model-agnostic and need nothing heavier than 
 
 Two further modules sit here because every package needs them and neither is specific to machine
 learning (ML). `contracts.settings` holds `Settings`, the single source of every setting the
-pipeline reads: the data paths, the object-store credentials, the MLflow tracking URI, and the four
-settings for Sentry, the error-reporting service, all resolved from the environment and the
-workspace `.env` and reached through the cached `get_settings()`. The `Settings` docstring names the
-four Sentry settings. `contracts.uri` holds the local-or-remote path helpers those settings fields
-need, because a data-location field may be a local path or an `s3://` URI, and `pathlib` mangles a
-URI.
+pipeline reads from its environment: the data paths, the object-store credentials, the MLflow
+tracking URI, and the four settings for Sentry, the error-reporting service, all resolved from the
+environment and the workspace `.env` and reached through the cached `get_settings()`. The `Settings`
+docstring names the four Sentry settings. `contracts.uri` holds the local-or-remote path helpers
+those settings fields need, because a data-location field may be a local path or an `s3://` URI, and
+`pathlib` mangles a URI.
 
 ## Light enough for any component to import
 
 This package is designed to be lightweight. It defines the *shape* of the data using Patito and
 Polars, plus the settings and object-store path helpers those shapes are read and written through
-(`deltalake` and `obstore`), but it contains **no** ML-specific logic and no ML dependency such as
-MLflow, XGBoost, or Dagster. That light dependency footprint is what lets any component in the
-system (e.g., a data ingestion script or a dashboard) import these schemas without bringing in the
-entire ML stack.
+(`deltalake` and `obstore`), but it contains **no** ML-specific logic and no ML or orchestration
+dependency such as MLflow, XGBoost, or Dagster. That light dependency footprint is what lets any
+component in the system (e.g., a data ingestion script or a dashboard) import these schemas without
+bringing in the entire ML stack.
 
 ## Key data contracts
 
@@ -39,7 +39,8 @@ The five schemas below are the ones most callers touch. The package defines four
   identifier of one cell of the H3 hexagonal grid the weather is aggregated onto), `substation_type`
   (`Primary`, `BSP`, `GSP`, `EHV Customer`, or `HV Customer` — the field's own description expands
   the voltage acronyms), and `time_series_type` (`PV`, `Wind`, `BESS`, `Disaggregated Demand`, and
-  18 others — `LIST_OF_TIME_SERIES_TYPES` holds all 22 and expands each abbreviated one).
+  18 others — `LIST_OF_TIME_SERIES_TYPES` holds all 22, expands BESS and PV, and names the seven
+  types that appear in the V1 trial area).
 - **`Nwp`**: Numerical weather prediction (NWP) data from the European Centre for Medium-Range
   Weather Forecasts (ECMWF) ensemble (ENS), in physical units (`Float32`), on disk and in memory
   alike. An ensemble forecast runs the weather model many times over, and each run is one ensemble
@@ -70,7 +71,8 @@ whose five values (`BSP`, `EHV Customer`, `GSP`, `HV Customer`, `Primary`) parti
 behavioural cases:
 
 - **Substations** (`BSP`, `GSP`, `Primary`): positive = power flowing **towards end-users**;
-  negative = excess generation flowing **back upstream**, into the network above the substation.
+  negative = excess generation flowing **back upstream**, into the electricity network above the
+  substation.
 - **Customer meters** (`EHV Customer`, `HV Customer`): positive = the customer is **sending** power
   to NGED's distribution network; negative = the customer is **drawing** power from NGED's
   distribution network. A customer meter can sit at a demand site or a generation site, so this case
@@ -78,10 +80,11 @@ behavioural cases:
 
 **The convention describes a direction, so it applies only where `units` is `MW`.** A series metered
 in `MVA` reports the magnitude of the flow and cannot see direction, so reverse power flow appears
-as a rise rather than as a change of sign, and a negative value is a meter fault rather than an
-export. 10 sites in the trial area are metered in apparent power — see [apparent power (MVA)
+as a rise rather than as a change of sign. A negative value is then a fault between the meter and us
+rather than an export. In the trial area, 10 sites are metered in apparent power — see [apparent
+power (MVA)
 metering](https://openclimatefix.github.io/nged-substation-forecast/background/network/#apparent-power-mva-metering)
-for the "bouncing off zero" behaviour this produces.
+for the "bouncing off zero" behaviour apparent-power metering produces.
 
 <!-- sign-convention:end -->
 
@@ -126,5 +129,5 @@ for the "bouncing off zero" behaviour this produces.
   a distinct field from `nwp_init_time` (when the NWP model ran). Power lag features are nullified
   by `_nullify_leaky_lags()` when the lag is shorter than or equal to the forecast lead time — the
   lead time being the gap between `power_fcst_init_time` and `valid_time`. A short lag is the
-  dangerous one: a reading taken fewer hours before the target time than the lead time had not yet
+  dangerous case: a reading taken fewer hours before the target time than the lead time had not yet
   happened when the forecast was made, so using it would be reading the future.

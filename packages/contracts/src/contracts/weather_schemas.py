@@ -4,14 +4,15 @@ The `Nwp` frame as stored and read, plus the run-completeness and data-quality r
 assess an ingested run of the European Centre for Medium-Range Weather Forecasts' ensemble
 forecast (ECMWF ENS).
 
-Two words this module uses throughout and defines nowhere else. A *run* is one execution of the
-weather model, and every row of one run shares an `init_time`. A *slice* is one
+Three words recur throughout this module and are defined nowhere else. A *run* is one execution
+of the weather model, and every row of one run shares an `init_time`. A *slice* is one
 (`ensemble_member`, `valid_time`) combination within a run, holding one value per H3 cell.
 
-*De-accumulation* is the third. ECMWF publishes precipitation and radiation as running totals
+*De-accumulation* is the third word. ECMWF publishes precipitation and radiation as running totals
 accumulated since the start of the run, and Dynamical.org, who we download ECMWF ENS from,
 de-accumulates those fields into rates before we receive them. `Nwp.deaccumulated_var_names`
-names the three fields this applies to and says why they are legitimately null at lead-0.
+names the three fields de-accumulation applies to, and records that all three are legitimately
+null at lead-0.
 
 The rest of the vocabulary is defined where it is declared: the ensemble and its size on
 `ECMWF_ENS_ENSEMBLE_MEMBERS`, the forecast steps and lead-0 on `ECMWF_ENS_LEAD_TIME_HOURS`, and
@@ -130,7 +131,7 @@ class Nwp(pt.Model):
     `validate` is the fatal ingest gate. Two further checks are non-fatal. `assess_nwp_quality`
     reports the tolerated nulls in the de-accumulated variables, which are the known upstream
     ECMWF ENS corruption. `assess_nwp_run_completeness` reports a run that is missing whole
-    members, steps or cells. Neither fails the run, because each is the upstream provider
+    members, steps, or cells. Neither fails the run, because each is the upstream provider
     misbehaving rather than a contract violation. Which patterns are fatal versus tolerated, and
     why, is documented at
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/>.
@@ -181,7 +182,7 @@ class Nwp(pt.Model):
     # cast stopped Polars pushing `h3_index` filters into the Parquet scan.
     #
     # Signed is safe for the whole H3 index space, not just the values we happen to store. An H3
-    # index is a 64-bit integer that packs an index mode, a resolution and a cell address into
+    # index is a 64-bit integer that packs an index mode, a resolution, and a cell address into
     # fixed ranges of bits. H3 reserves bit 63 of that 64-bit index as always zero. Bit 63 is not
     # a value bit in any index mode (cell, directed edge, vertex) at any resolution. Every H3
     # index is therefore below 2**63, which is exactly the range a signed `Int64` covers. A cell
@@ -432,11 +433,11 @@ class Nwp(pt.Model):
         Two assumptions a caller must not make:
 
         - The judgement is made per `init_time`. A run whose column is empty is therefore caught
-          even inside a frame holding other, healthy runs. The same per-`init_time` judgement has
-          an unwanted consequence: a frame filtered down to nothing *but* a wholly-null slice is
-          indistinguishable from an empty column, so it does raise. That is true even though that
-          same slice was deliberately landed — written into the stored table — when the whole run
-          was validated. That raise is latent rather than live today. The production caller,
+          even inside a frame holding other, healthy runs. The same per-`init_time` judgement has an
+          unwanted consequence: a frame filtered down to nothing *but* a wholly-null slice is
+          indistinguishable from an empty column, so this check does raise. That is true even though
+          that same slice was deliberately landed — written into the stored table — when the whole
+          run was validated. That raise is latent rather than live today. The production caller,
           `dynamical_data.ecmwf_ens.convert_to_polars`, validates one whole run. Reads go through
           `scan_delta`/`set_model`, which do not validate.
         - Raising is not the end of the partition. `NwpVariableWhollyMissing` is a distinct type
@@ -714,8 +715,8 @@ class NwpRunCompletenessReport:
     expected_n_h3_cells: int
     """Distinct `h3_index` values the H3 grid weights say this run should cover.
 
-    The H3 grid weights are the `contracts.geo_schemas.H3GridWeights` table; every cell it gives
-    any overlap is a cell the run must cover."""
+    The H3 grid weights are the `contracts.geo_schemas.H3GridWeights` table; every distinct
+    `h3_index` in that table is a cell the run must cover."""
 
     valid_time_min: datetime | None
     """Earliest `valid_time`, or `None` for an empty frame."""
@@ -830,12 +831,12 @@ def assess_nwp_run_completeness(
 
     Never raises on a validated `Nwp` frame — not on an empty one, not on a multi-`init_time` one,
     not on one whose `valid_time`s are off-grid — so it cannot turn the warning path into a failure
-    path (rule 7 of
-    [Inherent
+    path (rule 7 of [Inherent
     Stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)).
-    The "validated" qualifier matters. `Nwp.validate` guarantees exactly that the key columns are
-    present and non-null. The production caller, the `ecmwf_ens` asset, only ever passes a frame
-    that `dynamical_data.ecmwf_ens.convert_to_polars` has already validated.
+    The "validated" qualifier matters. `Nwp.validate` guarantees the key columns are present and
+    non-null, which is exactly what this function relies on. The production caller, the `ecmwf_ens`
+    asset, only ever passes a frame that `dynamical_data.ecmwf_ens.convert_to_polars` has already
+    validated.
 
     Row counting is safe here despite Polars' 32-bit row index. This function runs on a single
     in-memory run: at V1 scale, 1671 cells x 51 members x 85 steps ~ 7.24M rows. That row count is

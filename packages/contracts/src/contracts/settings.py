@@ -5,10 +5,10 @@ keeps one shared instance. Prefer the accessor wherever a `Settings` would other
 while a module is still being imported. Building a `Settings` is what reads `.env` and the
 environment. An import-time build therefore couples a pure schema module to the environment, and
 freezes the values before a test can change them. A function that builds its own `Settings` when
-it runs is unaffected, and most of this repo's Dagster assets build their `Settings` when they
-run. `PROJECT_ROOT` resolves the workspace root. The `.env` file and the repo-relative path
-defaults are anchored to that root. Anchoring the defaults to a resolved root is what lets one
-set of defaults serve an editable install, a non-editable install, and the Docker image alike.
+it runs is unaffected, and every `Settings` this repo's Dagster code builds is built inside a
+function body. `PROJECT_ROOT` resolves the workspace root. The `.env` file and the repo-relative
+path defaults are anchored to that root. Anchoring the defaults to a resolved root is what lets
+one set of defaults serve an editable install, a non-editable install, and the Docker image alike.
 """
 
 from functools import lru_cache
@@ -216,7 +216,7 @@ class Settings(BaseSettings):
     # --- Object-store credentials for the data tables (used only when a data-path root is remote)
     #
     # All four are empty by default. On AWS they stay unset, because object_store — the Rust
-    # object-storage library underneath delta-rs, Polars and obstore — auto-discovers the
+    # object-storage library underneath delta-rs, Polars, and obstore — auto-discovers the
     # credentials of the AWS Identity and Access Management (IAM) role. Set them only for a dev
     # endpoint or for MinIO, the S3-compatible store a developer runs locally in place of S3. The
     # AWS/dev split, and how these four data-store settings differ from the nged_s3_bucket_*
@@ -277,8 +277,8 @@ class Settings(BaseSettings):
     nwp_data_path: str = ""
     """Delta table of NWP weather data."""
     power_forecasts_data_path: str = ""
-    """Delta table of power forecasts, with its files grouped on disk by experiment_name and
-    fold_id.
+    """Delta table of power forecasts, partitioned by experiment_name and fold_id, so its files
+    are grouped on disk by those two columns.
 
     An NGED-facing delivery table — derives from data_path_delivery, not data_path_internal.
     """

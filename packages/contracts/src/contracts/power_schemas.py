@@ -55,9 +55,9 @@ class PowerTimeSeries(pt.Model):
             " Sign convention depends on `substation_type` in `TimeSeriesMetadata`, and describes"
             " a direction, so it applies only where `units` is `MW`. A series metered in `MVA`"
             " reports the magnitude of the flow and cannot see direction, so reverse power flow"
-            " appears as a rise rather than as a change of sign, and a negative value is a meter"
-            " fault rather than an export. See the Sign convention section in this package's"
-            " README.md, also published at"
+            " appears as a rise rather than as a change of sign. A negative value is then a fault"
+            " between the meter and us rather than an export. See the Sign convention section in"
+            " this package's README.md, also published at"
             " https://openclimatefix.github.io/nged-substation-forecast/roadmap/forecast-building-blocks/#sign-convention."
         ),
     )
@@ -415,8 +415,9 @@ class PowerForecast(pt.Model):
         description=(
             "The power forecast itself in units of MW (active power) or MVA (apparent power)."
             " The unit is defined in the `TimeSeriesMetadata` for this `time_series_id`."
-            " Sign convention depends on `substation_type` in `TimeSeriesMetadata` — see the Sign"
-            " convention section in this package's README.md, also published at"
+            " Sign convention depends on `substation_type` in `TimeSeriesMetadata`, and describes"
+            " a direction, so it applies only where `units` is `MW` — see the Sign convention"
+            " section in this package's README.md, also published at"
             " https://openclimatefix.github.io/nged-substation-forecast/roadmap/forecast-building-blocks/#sign-convention."
             " Rows read back from the internal `power_forecasts` Delta table carry reduced"
             " precision: values are rounded to a 13-bit significand at write time"
@@ -425,10 +426,10 @@ class PowerForecast(pt.Model):
             # PLANNED: We intend to change `power_fcst` to a normalised value in the range
             # [-1, +1], which NGED multiplies by a capacity to recover MW/MVA. That change follows
             # the delivery-contract design agreed with NGED in the Milestone 1 report. The switch
-            # is planned for v0.5. It will use the static P99 `effective_capacity` estimate that
-            # already exists — the same scalar the `metrics` pipeline already divides by for
-            # normalised mean absolute error (NMAE). The switch therefore no longer waits for a
-            # time-varying capacity estimate.
+            # is planned for v0.5. The switch will use the static P99 `effective_capacity`
+            # estimate that already exists — the same scalar the `metrics` pipeline already divides
+            # by for normalised mean absolute error (NMAE). The switch therefore no longer waits
+            # for a time-varying capacity estimate.
         ),
     )
 
@@ -493,7 +494,7 @@ class EffectiveCapacity(pt.Model):
     """Effective capacity of each time series, at one or more half-hourly timesteps.
 
     Effective capacity is an estimate of the power a site actually reaches, derived from its own
-    observed history. It is not a nameplate, firm or connection-agreement rating.
+    observed history. Effective capacity is not a nameplate, firm, or connection-agreement rating.
 
     Delivered to NGED as ``effective_capacity`` Delta table (Table 4 in the Milestone 1 report).
     This table is backward-looking only — it does not cover the forecast period.
