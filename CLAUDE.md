@@ -255,6 +255,16 @@ gradient-boosted tree on the effort of tuning it". Keep "cost" and "price" for m
 spends procuring flexibility is a cost. Calling a lost percentage point of skill a cost as well
 makes the page ambiguous exactly where it has to be exact.
 
+**Don't give code, a config file, or a tool a will of its own.** A config file does not "want" a set
+of checks enabled, a script does not "like" one output format over another, and a tool does not
+"decide" anything except what a person decided when writing the tool. Name what the config or the
+code actually does: write "`pyproject.toml` states which of `pydoclint`'s checks will run", not
+"`pyproject.toml` says which checks this repo wants". An ordinary technical verb naming a coded
+behaviour — "the function expects an argument", "the check raises", "the parser assumes UTF-8" — is
+not this rule's target, because a documented precondition is not a preference. The rule catches
+"wants", "likes", "prefers", "believes", "decides", and "chooses": verbs that name a person's state
+of mind, not a coded behaviour.
+
 **Put the words in the order that cannot be misread.** "73 wind farms in GB" says what it means; "73
 GB wind farms" makes the reader parse a noun-pile and can be read as a unit of measure. Where a
 qualifier can attach to more than one noun, move it or add the word that pins it down.
