@@ -9,35 +9,49 @@ division costs either money or engineering time. This page measures what the div
 before anyone pays for it.
 
 **A weather product that publishes the direct-beam share of sunlight separately, rather than only
-the total, is worth having where the product resolves cloud finely and delivers it at the meter's
-own position, and is not worth having on a 31 km reanalysis.** On the CAMS satellite retrieval the
-published beam field cuts PV power error by 1.8% beyond what a fitted formula recovers from the
-total alone. On ERA5 no effect is detectable. Choosing the better irradiance product matters more
-than thirty times as much as having the split at all. The evidence is six metered solar farms inside
-one 25 km by 23 km box in Lincolnshire, seven years of hourly daylight readings, two irradiance
-products, and two model families.
+the total, is worth having where the product resolves cloud finely and delivers it at the
+generator's own coordinates, and is not worth having on a reanalysis whose grid cells are 31 km
+across.** A reanalysis is a physical weather model re-run over the past and pulled towards the
+observations of the time. On the Copernicus Atmosphere Monitoring Service's satellite retrieval —
+CAMS, which resolves cloud to about 5 km — the published beam field cuts photovoltaic power error by
+1.8% beyond what a published separation formula recovers from the total alone. On ERA5, the European
+Centre for Medium-Range Weather Forecasts' reanalysis, no effect is detectable. The evidence is six
+metered solar farms inside one 25 km by 23 km box in Lincolnshire, seven years of hourly daylight
+readings, two irradiance products, and two model families.
 
 **Where the beam field helps, it helps by carrying information, not by encoding the same facts
 better.** A formula fitted on this data reproduces the published beam more than twice as faithfully
 as the 1982 Erbs correlation does, and buys no accuracy for that fidelity: it leaves the forecast
-0.010 percentage points worse, an interval excluding zero. The published field itself cuts error by
-0.096 percentage points. That advantage is at its smallest under a clear sky and concentrates where
-cloud makes the split genuinely uncertain, which is the shape an information account predicts.
+0.010 percentage points worse. The published field itself cuts error by 0.096 percentage points, of
+the 5.33 points of a site's peak output that a model given the Erbs split still gets wrong. That
+advantage is at its smallest under a clear sky and concentrates where cloud makes the split
+genuinely uncertain, which is the shape an information account predicts.
+
+**Choosing the better irradiance product matters more than thirty times as much as having the split
+at all.** On the hours both products cover, moving from the reanalysis to the satellite retrieval
+cuts the same error by 4.29 points of peak output, against 0.126 points for the widest contrast
+between two setups differing only in their beam and diffuse columns. Which product feeds the model
+is the larger decision by a wide margin, and the split is a question to settle inside it.
 
 ## The decision this feeds
 
 **The ECMWF ensemble feed this project ingests carries the total short-wave irradiance and no
-direct-beam component, so a physically-grounded PV model has to derive the split rather than read
-it.** Asking our supplier to add the beam is not a request worth making. Dynamical.org build the
-feed from ECMWF's free and open data, which does not carry `fdir`. Serving a direct beam would
-therefore mean taking on a licensed ECMWF dissemination rather than widening a variable list. The
-remaining route to a beam on this feed runs through ECMWF widening the open catalogue, which [they
-have published no plan to
+direct-beam component, so a physically-grounded photovoltaic model has to derive the split rather
+than read it.** The feed is the European Centre for Medium-Range Weather Forecasts' ensemble
+forecast, ENS, which runs the model 51 times from slightly different starting states.
+
+**Asking our supplier to add the beam is not a request worth making.** Dynamical.org build the feed
+from ECMWF's free and open data, which does not carry `fdir` — the archive's name for the direct
+beam on a horizontal surface. Serving a direct beam would therefore mean taking on a licensed ECMWF
+data distribution rather than widening a variable list. The remaining route to a beam on this feed
+runs through ECMWF widening the open catalogue, which [they have published no plan to
 do](../roadmap/data-sources.md#ecmwf-has-published-no-plan-to-open-a-direct-beam-or-hourly-ensemble-steps).
-What remains is to take the split from a different weather model whose free feed already carries a
-direct beam, to take it from a separate irradiance source, or to derive it locally from the total we
-already have. Each route costs money or engineering effort, and none is worth paying for before
-knowing what the split is worth.
+
+**Three routes to a split remain, and each costs money or engineering effort.** The split can come
+from a different weather model whose free feed already carries a direct beam, from a separate
+irradiance source bought or ingested alongside the forecast, or from a separation model run locally
+on the total the feed already carries. None is worth paying for before knowing what the split is
+worth, which is what this page measures.
 
 ### The three quantities, and the two ways to get the split
 
@@ -71,8 +85,13 @@ A result saying the published beam helps is therefore an upper bound on what a f
 deliver. A result saying the published beam does not help rules the forecast case out as well.
 
 **The finding is about one micro-region over 2019 to 2026, and about models that predict power from
-irradiance at a single site.** It is not a statement about the physics of PV generation, where the
-value of the split is not in doubt — the transposition described above is standard.
+irradiance at a single site.** It is not a statement about the physics of photovoltaic generation,
+where the value of the split is not in doubt — the transposition described above is standard.
+
+Two words recur from here on. An **arm** is one setup under test: the same model, the same rows and
+the same settings, differing from every other arm only in which irradiance columns it is shown. A
+**contrast** is the difference in error between two arms, taken row by row on rows they both score.
+The six arms are set out [below](#the-arms-differ-only-in-which-irradiance-columns-the-model-sees).
 
 ## Data
 
@@ -152,184 +171,6 @@ filter can favour one setup over another.
   The whole experiment was also re-run keeping every hour, to check that no satellite conclusion
   depends on the filter; the outcome is [below](#what-the-result-survives).
 
-### One site is curtailed, and the export cap is what makes its hours scorable
-
-**Site E is connected under active network management, so the network operator caps what it may
-export and moves that cap as the local electricity network fills.** An hour spent under a lowered
-cap is a real measurement of a real export, but no irradiance product predicts a network
-instruction, so scoring a model on such an hour measures the instruction rather than the weather
-data under test. NGED holds the history of the cap as a step function, one row each time the cap
-changed, which is what makes those hours identifiable rather than merely suspicious.
-
-**Every arm's prediction is held to the cap in force before the error is taken.** The prediction
-scored for a capped hour is therefore the smaller of what the model said and what the operator
-allowed. Applying the cap identically to every arm is what keeps the comparison fair: the clamp
-cannot favour the arm under test, because each arm meets the same ceiling on the same rows. Of site
-E's 5,496 scored hours, 375 fall under a lowered cap.
-
-**Holding the predictions to the cap is legitimate here because this experiment reads hours that
-have already happened, and it would not be legitimate in a forecast.** Both irradiance products are
-analyses rather than forecasts, so the cap for a past hour is as much a matter of record as the
-irradiance for that hour. A service forecasting tomorrow has no such record, because the operator
-sets tomorrow's cap nearer the time. A service that clamped a forecast to a cap nobody had yet set
-would be scored on megawatts it could never have published, which is the lookahead bias this
-experiment escapes only because every hour it reads is already in the past. The roadmap carries that
-distinction where the production work will meet it, under [dropping curtailed hours from the
-training target](../roadmap/xgboost-improvements.md#drop-curtailed-hours-from-the-training-target).
-
-**The clamp is what stops one site's network instructions swamping its weather signal.** Inside a
-curtailed hour every arm's mean absolute error lands between 9.39% and 9.52% of P99 output once the
-prediction is clamped, and between 25.44% and 25.81% if it is not. The six arms differ from one
-another by 0.13 points clamped and 0.37 unclamped, against 16 points between the two readings. A
-curtailed hour is an hour every arm gets equally wrong, so leaving it unclamped adds a large shared
-penalty and no information about the split.
-
-**Site E is curtailed often enough for that to matter, and NGED's record says when.** Across its
-whole record site E has 2,132 bright hours, of which 161 produce less than half the yield the rest
-of the fleet manages in the same hour. Inside the five months the bucket's own curtailment feed
-covers, 595 bright hours, 64 carry a curtailment record; their median yield is 0.702 as metered and
-1.246 once the curtailed megawatts are added back, against 1.266 for the other five sites. Of the 34
-hours in that window where site E fell below half the fleet's yield, that feed accounts for 20.
-
-**The output follows the cap rather than the sky, hour by hour.** On 13 May 2025 site E exports 91%
-of its 18.80 MW connection limit at 10:00 with the cap still at that limit. The cap then falls, and
-the metered output falls with it: 34% of the limit at 11:00 against a cap of 8.37 MW, and 12% at
-13:00 against a cap of 2.46 MW. Both recover together through 14:00 and 15:00. Global irradiance
-climbs across the whole of that collapse.
-
-**NGED has confirmed site E is the only generator in the trial area connected under active network
-management**, so the five sites with no setpoint record ran free rather than being capped without a
-record. Without that confirmation an absent cap would mean either no curtailment or no data, and
-every diagnostic here would rest on the more generous reading.
-
-**The cap is not enforced for the first six months of its own record, which is the trap in this
-feed.** The export reaches back to 8 February 2024, the day after site E's telemetry begins, but
-across all 431 bright hours before 6 August 2024 the cap forbids export outright — while site E
-exported above 5% of its capacity in 423 of them, at a median of 44%. Honouring those readings would
-mask most of site E's first six months out of training and clamp its predictions to zero on days it
-ran normally. The cap is therefore honoured only from the first half-hour at which it reaches the
-connection limit, 15:16:20 UTC on 6 August 2024, a marker taken from the cap alone with no reference
-to metered output.
-
-**An independent sign agrees, and reading it needs both clocks kept straight.** The operator's event
-log was never mis-stamped, while the power feed ran half an hour late until March 2026, so the two
-have to be compared on the corrected clock. Corrected, site E reads zero from 08:00 until the
-half-hour ending 14:30 on 6 August 2024 while the other five farms climb to 29% of capacity, and the
-operator raises the cap from zero to 0.25 MW at 13:35 UTC and to the connection limit at 15:16. That
-is the shape of a commissioning test rather than of a curtailment.
-
-**A separate half-hourly feed disagrees with the cap, so the results here use the cap.** NGED
-publishes that feed on the same bucket as the telemetry. It covers only 29 April to 20 September
-2026 and reports a derived volume of megawatts lost rather than the cap itself, and the two disagree
-on the hours they share.
-
-### Site E was still being built for its first eight months
-
-**Site E's early record measures a smaller plant than its capacity says, so the rows before 6
-October 2024 are removed from the experiment entirely.** Dividing site E's daily output by the
-median output of the other five farms — a ratio that cancels cloud, season and time of day — gives
-flat multi-day plateaus at 12%, 29%, 56%, 76% and 88% of its settled level through April 2024, a
-shorter climb through 12%, 33% and 71% in July after a 24-day outage, a plateau at 81% from 11 July,
-and the settled level only from 6 October 2024. The evidence and the figure are under [how a new
-solar farm reaches full output in
-stages](../background/network.md#a-new-solar-farm-reaches-full-output-in-stages-over-months). The
-cut removes 2,097 of 128,033 rows, all of them site E's.
-
-**The shortfall is a fixed fraction of what the weather allowed, which is what rules out the other
-explanations.** Binned by how hard the rest of the fleet was generating, site E's relative output is
-79% to 85% at every decile. An undersized inverter would bite only at the top of that range, and an
-export cap would hold the site at a fixed number of megawatts rather than a fixed fraction. The cap
-record cannot settle it either way, because the scheme was not yet enforcing through any of those
-months and the cap reads a flat zero across all of them.
-
-**Unlike a curtailed hour, a commissioning hour cannot be kept and scored.** The cap says what a
-curtailed generator was allowed to produce, so a prediction can be held down to it. Nothing in the
-record says what fraction of the array was energised on a given day, so there is no ceiling to clamp
-to. Removal is the only treatment available, which is why these rows are cut rather than masked out
-of training alone.
-
-**Dropping the capped hours outright would move no contrast either, which is why keeping them and
-clamping them is safe.** Every contrast here is differenced row by row, so an error every arm shares
-cancels whether the row stays or goes. Removing the curtailed hours moves the satellite headline
-from −0.0962 to −0.0963. Site E is kept on that basis, and what removing the site altogether would
-do is in [Limitations](#limitations).
-
-## Methods
-
-### Two instruments
-
-**The first instrument is XGBoost**, one model per site, shown the irradiance columns as features
-and left to discover what to do with them. Alongside the point model, a second XGBoost model is
-fitted with a multi-quantile objective. Each arm therefore also produces a predicted distribution
-and can be scored on the continuous ranked probability score as well as on mean absolute error.
-
-**The second instrument is a five-parameter physical PV model** — panel tilt, panel azimuth,
-capacity, an inverter clipping limit, and a temperature coefficient — fitted per site on each
-training fold by a Powell optimiser from eight starting points, one fixed and seven random. Unlike
-the tree, the physical model is *given* the transposition: it projects the beam onto the fitted
-plane and adds the diffuse under an isotropic-sky assumption, then scales by capacity, applies the
-temperature coefficient, and clips. The second instrument exists because a null result from a tree
-is ambiguous between "the split carries nothing" and "the tree could not use it".
-
-### Folds, seeds, and why the intervals are wider than the row count suggests
-
-Each site's span is cut into five contiguous blocks of whole months. Each block is scored by a model
-fitted on the other four. Training on both sides of the test block is right here, because the
-question is about information content rather than about forecasting forward in time. Every fit is
-repeated at three random seeds, because XGBoost's own sampling makes a single fit a noisy estimate
-of what a setup can do.
-
-**Six meters inside a 25 km by 23 km box share their weather, so the effective sample size is the
-number of independent weather episodes rather than the number of site-hours.** On the reanalysis it
-is worse than that: the six sites fall inside only two ERA5 grid cells, and within each group the
-global irradiance is bit-identical. The per-site rows are therefore two irradiance series against
-six power targets. Every interval quoted below is therefore a monthly block bootstrap. Whole
-calendar months are resampled, with all six sites' rows inside each block, and both arms are
-resampled on the same months so the comparison stays paired. Each resample also draws one of the
-three seeds.
-
-### The arms differ only in which irradiance columns the model sees
-
-Every arm sees identical rows, identical folds, identical seeds, identical settings, and identical
-non-irradiance features — solar zenith and azimuth, extraterrestrial horizontal irradiance, air
-temperature, hour of day, and day of year. Only the irradiance columns change. Every beam and
-diffuse column among them is a flux onto a horizontal plane rather than a direct-normal one — a beam
-measured perpendicular to the sun's rays — so no contrast here confounds a change of units with a
-change of content.
-
-| Arm | What the model is shown |
-|---|---|
-| A — global only | Global horizontal irradiance |
-| B — Erbs | Global irradiance, plus the beam and diffuse fluxes the Erbs correlation derives from it |
-| C — the weather product's own split | Global irradiance, the published beam, and the diffuse left over |
-| D — direct fraction | Global irradiance and the published beam's share of it |
-| B-DISC | Arm B with the DISC correlation in place of Erbs |
-| B-LEARNED | Arm B with a separation model fitted on this data in place of Erbs |
-
-**Arm C against arm B is the comparison the experiment exists for, and that contrast was named
-before the run.** Giving the geometry to every arm is deliberate: a fixed-tilt array's sensitivity
-to the split is partly a function of sun position, which a gradient-boosted tree can absorb from the
-geometry columns. Arm A is therefore made as strong as it can be, and any advantage arm C shows is a
-lower bound.
-
-**Arm B-LEARNED exists because arm C could beat arm B for two reasons that carry opposite
-decisions.** The published beam may hold information no function of global irradiance and solar
-geometry can recover, in which case the field is worth asking a supplier for. Or the weather product
-may simply publish a better separation model than a correlation fitted in 1982, in which case the
-same gain is available locally for nothing. Erbs alone cannot tell those two explanations apart. Arm
-B-LEARNED can: its beam is a prediction of the weather product's own direct fraction from exactly
-arm A's feature set. Every value that column carries is therefore a function of what arm A already
-holds. If arm C still beats arm B-LEARNED, the advantage is information rather than representation.
-
-That arm has to be built carefully, because the obvious construction leaks. Folds are cut inside
-each site's own span, so one fold number is a different calendar period at each site. A separation
-model that merely dropped the rows carrying that fold number would still train on other sites' rows
-at the scored fold's own hours. On the reanalysis those other sites are the same grid cell. The
-withholding is therefore by calendar month, and it covers the training rows as well as the scored
-fold, through an inner cross-validation that withholds each training fold's own months in turn. A
-column sharper where the arm trains than where it is scored would be over-trusted by the power model
-and would penalise the arm for a reason unrelated to the split.
-
 ### The power stamps before 26 March 2026 are half an hour late
 
 **NGED corrected the half-hourly power feed at 08:30 UTC on 26 March 2026, and every reading stamped
@@ -373,6 +214,199 @@ settling rather than assuming.** A half-hour error blunts the sharp beam signal 
 diffuse signal, so it penalises the arm given the published beam more than the arm given a
 separation model's estimate of it. Any result computed on the uncorrected stamps would therefore
 understate what the beam field is worth.
+
+### One site is curtailed, and the export cap is what makes its hours scorable
+
+**Site E is connected under active network management, so the network operator caps what it may
+export and lowers that cap when the local wires are carrying as much as they safely can.** A
+generator on such a connection accepts a movable ceiling on its exports in return for connecting
+sooner and more cheaply than reinforcing the wires would allow. An hour spent under a lowered cap is
+a real measurement of a real export, but no irradiance product predicts a network instruction, so
+scoring a model on such an hour measures the instruction rather than the weather data under test.
+
+**Site E is curtailed often enough for that to matter, and NGED's record says when.** Two measures
+run through this section. A *bright hour* is an hour whose global horizontal irradiance reaches 400
+W m⁻². A site's *yield* is its output per unit of irradiance, scaled so that a site producing at its
+own P99 output under 1,000 W m⁻² reads 1. Across its whole record site E has 2,132 bright hours, of
+which 161 produce less than half the yield the rest of the fleet manages in the same hour. Inside
+the five months covered by the curtailment feed NGED publishes on the same cloud storage as the
+telemetry, site E has 595 bright hours, 64 of them carrying a curtailment record; their median yield
+is 0.702 as metered and 1.246 once the curtailed megawatts are added back, against 1.266 for the
+other five sites. Of the 34 hours in that window where site E fell below half the fleet's yield,
+that feed accounts for 20.
+
+**The output follows the cap rather than the sky, hour by hour.** Site E's connection limit — the
+highest export the cap ever permits, and where it rests whenever the scheme is not trimming — is
+18.80 MW. On 13 May 2025 site E exports 91% of that limit at 10:00 with the cap still at it. The cap
+then falls, and the metered output falls with it: 34% of the limit at 11:00 against a cap of 8.37
+MW, and 12% at 13:00 against a cap of 2.46 MW. Both recover together through 14:00 and 15:00. Global
+irradiance climbs across the whole of that collapse.
+
+**NGED has confirmed site E is the only generator in the trial area connected under active network
+management**, so the five sites with no setpoint record ran free rather than being capped without a
+record. Without that confirmation an absent cap would mean either no curtailment or no data, and
+every diagnostic here would rest on the more generous reading.
+
+**Every arm's prediction is held to the cap in force before the error is taken.** NGED holds the
+history of the cap as a step function, one row each time the cap changed, which is what makes a
+curtailed hour identifiable rather than merely suspicious. The prediction scored for such an hour is
+therefore the smaller of what the model said and what the operator allowed. Applying the cap
+identically to every arm is what keeps the comparison fair: the clamp cannot favour the arm under
+test, because each arm meets the same ceiling on the same rows. Of site E's 5,496 scored hours, 375
+fall under a lowered cap.
+
+**Holding the predictions to the cap is legitimate here because this experiment reads hours that
+have already happened, and it would not be legitimate in a forecast.** Both irradiance products are
+analyses rather than forecasts, so the cap for a past hour is as much a matter of record as the
+irradiance for that hour. A service forecasting tomorrow has no such record, because the operator
+sets tomorrow's cap nearer the time. A service that clamped a forecast to a cap nobody had yet set
+would be scored on megawatts it could never have published, which is the lookahead bias this
+experiment escapes only because every hour it reads is already in the past. The roadmap carries that
+distinction where the production work will meet it, under [dropping curtailed hours from the
+training target](../roadmap/xgboost-improvements.md#drop-curtailed-hours-from-the-training-target).
+
+**The clamp is what stops one site's network instructions swamping its weather signal.** Inside a
+curtailed hour every arm's mean absolute error lands between 9.39% and 9.52% of P99 output once the
+prediction is clamped, and between 25.44% and 25.81% if it is not. The six arms differ from one
+another by 0.13 points clamped and 0.37 unclamped, against 16 points between the two readings. A
+curtailed hour is an hour every arm gets equally wrong, so leaving it unclamped adds a large shared
+penalty and no information about the split.
+
+**Dropping those hours outright would move no contrast either, which is why keeping them and
+clamping them is safe.** Every contrast on this page is differenced row by row, so an error every
+arm shares cancels whether the row stays or goes. Removing the curtailed hours moves the satellite
+headline from −0.0962 to −0.0963. Site E is kept on that basis, and what removing the site
+altogether would do is in [Limitations](#limitations).
+
+**The cap is not enforced for the first six months of its own record, which is the trap in this
+feed.** The setpoint export NGED supplied reaches back to 8 February 2024, the day after site E's
+telemetry begins, but across all 431 bright hours before 6 August 2024 the cap forbids export
+outright — while site E exported above 5% of its capacity in 423 of them, at a median of 44%. Any
+consumer of this feed that honoured those readings would label a plant running normally as a plant
+held at zero. The cap is therefore honoured only from the first half-hour at which it reaches the
+connection limit, 15:16:20 UTC on 6 August 2024, a marker taken from the cap alone with no reference
+to metered output. That window falls wholly inside the rows the next section removes as
+commissioning, so the marker changes nothing here; it is stated because it will decide what a
+production cleaning step does with the same feed.
+
+**An independent sign agrees, and reading it needs both clocks kept straight.** The operator's event
+log was never mis-stamped, while [the power feed ran half an hour
+late](#the-power-stamps-before-26-march-2026-are-half-an-hour-late) until March 2026, so the two
+have to be compared on the corrected clock. Corrected, site E reads zero from 08:00 until the
+half-hour ending 14:30 on 6 August 2024 while the other five farms climb to 29% of capacity, and the
+operator raises the cap from zero to 0.25 MW at 13:35 UTC and to the connection limit at 15:16. That
+is the shape of a commissioning test rather than of a curtailment.
+
+**A separate half-hourly feed covers five months where the setpoint history covers 31, and reports a
+derived quantity rather than the cap, so the results here use the cap.** NGED publishes that feed on
+the same cloud storage as the telemetry. It runs from 29 April to 20 September 2026 and reports a
+volume of megawatts lost rather than the ceiling that was in force, and the two disagree on the
+hours they share.
+
+### Site E was still being built for its first eight months
+
+**Site E's early record measures a smaller plant than its capacity says, so the rows before 6
+October 2024 are removed from the experiment entirely.** Dividing site E's daily output by the
+median output of the other five farms — a ratio that cancels cloud, season and time of day — gives
+flat multi-day plateaus at 12%, 29%, 56%, 76% and 88% of its settled level through April 2024, a
+shorter climb through 12%, 33% and 71% in July after a 24-day outage, a plateau at 81% from 11 July,
+and the settled level only from 6 October 2024. The evidence and the figure are under [how a new
+solar farm reaches full output in
+stages](../background/network.md#a-new-solar-farm-reaches-full-output-in-stages-over-months). The
+cut removes 2,097 of 128,033 rows, all of them site E's.
+
+**The shortfall is a fixed fraction of what the weather allowed, which is what rules out the other
+explanations.** Binned by how hard the rest of the fleet was generating, site E's relative output is
+79% to 85% at every decile. An undersized inverter would bite only at the top of that range, and an
+export cap would hold the site at a fixed number of megawatts rather than a fixed fraction. The cap
+record cannot settle it either way, because the scheme was not yet enforcing through any of those
+months and the cap reads a flat zero across all of them.
+
+**Unlike a curtailed hour, a commissioning hour cannot be kept and scored.** The cap says what a
+curtailed generator was allowed to produce, so a prediction can be held down to it. Nothing in the
+record says what fraction of the array was energised on a given day, so there is no ceiling to clamp
+to. Removal is the only treatment available, which is why these rows are cut rather than masked out
+of training alone.
+
+## Methods
+
+### Two instruments
+
+**The first instrument is XGBoost**, one model per site, shown the irradiance columns as features
+and left to discover what to do with them. Alongside the point model, a second XGBoost model is
+fitted with a multi-quantile objective. Each arm therefore also produces a predicted distribution
+and can be scored on the continuous ranked probability score as well as on mean absolute error.
+
+**The second instrument is a five-parameter physical PV model** — panel tilt, panel azimuth,
+capacity, an inverter clipping limit, and a temperature coefficient — fitted per site on each
+training fold by a Powell optimiser from eight starting points, one fixed and seven random. Unlike
+the tree, the physical model is *given* the transposition: it projects the beam onto the fitted
+plane and adds the diffuse under an isotropic-sky assumption, then scales by capacity, applies the
+temperature coefficient, and clips. The second instrument exists because a null result from a tree
+is ambiguous between "the split carries nothing" and "the tree could not use it".
+
+### Folds, seeds, and why the intervals are wider than the row count suggests
+
+Each site's span is cut into five contiguous blocks of whole months. Each block is scored by a model
+fitted on the other four. Training on both sides of the test block is right here, because the
+question is about information content rather than about forecasting forward in time. Every fit is
+repeated at three random seeds, because XGBoost's own sampling makes a single fit a noisy estimate
+of what a setup can do.
+
+**Six meters inside a 25 km by 23 km box share their weather, so the effective sample size is the
+number of independent weather episodes rather than the number of site-hours.** On the reanalysis it
+is worse than that: the six sites fall inside only two ERA5 grid cells, and within each group the
+global irradiance is bit-identical. The per-site rows are therefore two irradiance series against
+six power targets. Every interval quoted below is therefore a monthly block bootstrap. Whole
+calendar months are resampled, with all six sites' rows inside each block, and both arms are
+resampled on the same months so the comparison stays paired. Each resample also draws one of the
+three seeds.
+
+### The arms differ only in which irradiance columns the model sees
+
+Every arm sees identical rows, identical folds, identical seeds, identical settings, and identical
+non-irradiance features — solar zenith and azimuth, extraterrestrial horizontal irradiance, air
+temperature, hour of day, and day of year. Nothing in that list says which year or which month of
+the record an hour falls in: hour of day and day of year are both cyclic, and the `%Y-%m` label the
+folds and the bootstrap are cut on is never handed to a model. No arm can therefore track a plant
+that degrades, which is what keeps the comparison with the physical model fair, because the physical
+model's parameters carry no time trend either. Only the irradiance columns change. Every beam and
+diffuse column among them is a flux onto a horizontal plane rather than a direct-normal one — a beam
+measured perpendicular to the sun's rays — so no contrast here confounds a change of units with a
+change of content.
+
+| Arm | What the model is shown |
+|---|---|
+| A — global only | Global horizontal irradiance |
+| B — Erbs | Global irradiance, plus the beam and diffuse fluxes the Erbs correlation derives from it |
+| C — the weather product's own split | Global irradiance, the published beam, and the diffuse left over |
+| D — direct fraction | Global irradiance and the published beam's share of it |
+| B-DISC | Arm B with the DISC correlation in place of Erbs |
+| B-LEARNED | Arm B with a separation model fitted on this data in place of Erbs |
+
+**Arm C against arm B is the comparison the experiment exists for, and that contrast was named
+before the run.** Giving the geometry to every arm is deliberate: a fixed-tilt array's sensitivity
+to the split is partly a function of sun position, which a gradient-boosted tree can absorb from the
+geometry columns. Arm A is therefore made as strong as it can be, and any advantage arm C shows is a
+lower bound.
+
+**Arm B-LEARNED exists because arm C could beat arm B for two reasons that carry opposite
+decisions.** The published beam may hold information no function of global irradiance and solar
+geometry can recover, in which case the field is worth asking a supplier for. Or the weather product
+may simply publish a better separation model than a correlation fitted in 1982, in which case the
+same gain is available locally for nothing. Erbs alone cannot tell those two explanations apart. Arm
+B-LEARNED can: its beam is a prediction of the weather product's own direct fraction from exactly
+arm A's feature set. Every value that column carries is therefore a function of what arm A already
+holds. If arm C still beats arm B-LEARNED, the advantage is information rather than representation.
+
+That arm has to be built carefully, because the obvious construction leaks. Folds are cut inside
+each site's own span, so one fold number is a different calendar period at each site. A separation
+model that merely dropped the rows carrying that fold number would still train on other sites' rows
+at the scored fold's own hours. On the reanalysis those other sites are the same grid cell. The
+withholding is therefore by calendar month, and it covers the training rows as well as the scored
+fold, through an inner cross-validation that withholds each training fold's own months in turn. A
+column sharper where the arm trains than where it is scored would be over-trusted by the power model
+and would penalise the arm for a reason unrelated to the split.
 
 ### Two controls
 
@@ -418,22 +452,39 @@ The error levels those predictions sit at, per site and per setup:
 
 | Site | ERA5 → XGBoost | CAMS → XGBoost | ERA5 → physical | CAMS → physical |
 |---|---|---|---|---|
-| A | 8.94 | 5.91 | 9.16 | 6.84 |
-| B | 8.48 | 5.53 | 8.99 | 6.34 |
-| C | 7.73 | 4.78 | 8.14 | 5.91 |
-| D | 8.93 | 5.55 | 9.81 | 6.89 |
-| E | 7.34 | 4.80 | 7.52 | 5.76 |
-| F | 8.18 | 4.62 | 8.73 | 5.73 |
-| **Pooled** | **8.37** | **5.24** | **8.85** | **6.28** |
+| A | 8.94 | **5.91** | 9.16 | 6.84 |
+| B | 8.48 | **5.53** | 8.99 | 6.34 |
+| C | 7.73 | **4.78** | 8.14 | 5.91 |
+| D | 8.93 | **5.55** | 9.81 | 6.89 |
+| E | 7.34 | **4.80** | 7.52 | 5.76 |
+| F | 8.18 | **4.62** | 8.73 | 5.73 |
+| Pooled | 8.37 | **5.24** | 8.85 | 6.28 |
 
 Each cell is the mean absolute error as a percentage of that site's P99 output, with every setup
-given the weather product's own beam/diffuse split, over all the hours that source covers. Site E is
-much the shortest series, at 5,496 satellite site-hours against 19,334 to 25,774 for the other five
-sites, and it is not the worst-scored of the six. On the satellite source it sits third for XGBoost
-and second for the physical model, because holding every prediction to the export cap — which is
-what [scoring a curtailed hour
-fairly](#one-site-is-curtailed-and-the-export-cap-is-what-makes-its-hours-scorable) requires — takes
-the network's instructions out of its error.
+given the weather product's own beam/diffuse split, over all the hours that source covers. The best
+setup at each site is in bold, and it is the same setup at all six. Site E is much the shortest
+series, at 5,496 satellite site-hours against 19,334 to 25,774 for the other five sites, and it is
+not the worst-scored of the six. On the satellite source it sits third for XGBoost and second for
+the physical model, because holding every prediction to the export cap — which is what [scoring a
+curtailed hour fairly](#one-site-is-curtailed-and-the-export-cap-is-what-makes-its-hours-scorable)
+requires — takes the network's instructions out of its error.
+
+**The clearest week is where a per-site bias is largest, which is why two of its panels look worse
+than the error levels above suggest.** A bias in a fitted capacity scales with output, so it is at
+its widest on the brightest hours of the record. In the week beginning 20 April 2026 the
+satellite-fed tree runs +16.0% of P99 output at site A and −4.5% at site B, against +0.08% and
++0.11% over their whole records. Site B's own peak that week reaches 113% of the value its error is
+normalised by, so that panel is the model meeting the highest output site B ever produced.
+
+**Under-prediction at the top of a site's range is what a mean-absolute-error objective produces,
+and it is not a sign the capacity denominator is wrong.** Minimising absolute error targets the
+conditional median rather than the mean, and the top decile of measured output is where the residual
+distribution is most one-sided. Pooled across the six sites the mean signed error runs from +2.3% of
+P99 in the lowest decile of output to −4.1% in the highest. The denominator cannot cause it, because
+no model on this page is told the capacity: the tree predicts megawatts, and the physical model's
+capacity is a free parameter. Normalising by the 99.9th percentile or by the highest reading instead
+moves the headline contrast from −0.096 to −0.088 and −0.086 points, and leaves the relative effect
+at 1.80% in every case. Choosing a different denominator changes the units and nothing else.
 
 **One site drifts across the record, and the paired design absorbs it.** At site A the mean signed
 error moves from −2.3% of P99 output in 2023 to +4.1% in 2026, so a model fitted mostly on earlier
@@ -456,11 +507,12 @@ columns the model sees — which product feeds the model is much the biggest lev
 | Instrument | ERA5 | CAMS | Difference |
 |---|---|---|---|
 | XGBoost, global only | 9.66 | 5.37 | −4.29 |
-| XGBoost, weather product's own split | 9.60 | 5.25 | −4.36 |
+| XGBoost, weather product's own split | **9.60** | **5.25** | −4.36 |
 | Physical model, Erbs split | 10.03 | 6.20 | −3.83 |
 
 Each cell is the mean absolute error as a percentage of P99 output, restricted to the hours both
-sources cover.
+sources cover. The lowest error in each source column is in bold. The Difference column is not a
+contest between the rows, so nothing is marked in it.
 
 **These ERA5 figures are higher than the per-site table's because the row set is smaller, not
 because the models changed.** Restricting to the hours both sources cover drops about 23,000 ERA5
@@ -499,13 +551,14 @@ possible causes of the gap.
 | Physical model alone | 6.28 | 8.85 |
 | Tree given only the physical model's output | 6.26 | 8.84 |
 | Tree given the physical model's output, plus time, solar geometry and temperature | 5.37 | 8.40 |
-| Tree given the physical model's output, plus the full weather feature set | 5.25 | 8.34 |
-| XGBoost alone, the weather product's own split | 5.24 | 8.37 |
+| Tree given the physical model's output, plus the full weather feature set | 5.25 | **8.34** |
+| XGBoost alone, the weather product's own split | **5.24** | 8.37 |
 | XGBoost given global irradiance alone, no split | 5.36 | 8.43 |
 
 Each cell is the mean absolute error as a percentage of P99 output, on the same rows and folds as
-every other number here. Every physical-model prediction fed to a tree was produced by a fit that
-never saw that row's calendar month, through the same withheld-month inner cross-validation arm
+every other number here. The lowest error in each source column is in bold, and the two sources
+disagree about which setup wins. Every physical-model prediction fed to a tree was produced by a fit
+that never saw that row's calendar month, through the same withheld-month inner cross-validation arm
 B-LEARNED uses.
 
 **A tree given nothing but the physical model's output buys nothing on either source** — −0.025
@@ -600,12 +653,12 @@ intervals excluding zero at each, from −0.066 [−0.113, −0.021] at site E o
 to −0.120 [−0.151, −0.092] at site A.
 
 **The satellite finding also survives keeping the hours the service flags as unreliable**, which is
-the check that matters most, because those hours are 17.9% of the daylight record and dropping them
-was a choice. Re-run over all 147,913 site-hours rather than the 125,936 that pass the flag, the
-experiment gives a headline contrast of −0.083 [−0.098, −0.069], against −0.096 [−0.116, −0.079] on
-the filtered set. The absolute figure shrinks because adding 22,000 much darker hours lowers every
-arm's error — arm B falls from 5.33 to 4.74% of P99 output — while the *relative* effect barely
-moves, at 1.74% against 1.80%. The discriminator behaves the same way on the wider set: arm
+the check that matters most, because those hours are about 15% of the daylight record and dropping
+them was a choice. Re-run over all 147,913 site-hours rather than the 125,936 that pass the flag,
+the experiment gives a headline contrast of −0.083 [−0.098, −0.069], against −0.096 [−0.116, −0.079]
+on the filtered set. The absolute figure shrinks because adding 22,000 much darker hours lowers
+every arm's error — arm B falls from 5.33 to 4.74% of P99 output — while the *relative* effect
+barely moves, at 1.74% against 1.80%. The discriminator behaves the same way on the wider set: arm
 B-LEARNED against arm B is +0.000 [−0.005, +0.005], spanning zero.
 
 The reanalysis null is not an artefact of the mirror or of the row set: the Copernicus download
@@ -615,22 +668,34 @@ hyperparameter check — see the limitations below.
 
 #### The physical model disagrees, and is not a second opinion
 
-On the same rows the physical model reports the opposite sign: the weather product's own split is
-*worse* than the Erbs split, by 0.13 points on the satellite source. The contradiction is only
-apparent, because the physical model's two arms do not differ only in the beam field they are
-handed. In every run and at every site, the arm given the weather product's split settles on a tilt
-2.5 to 11.5 degrees shallower than the arm given Erbs, so the arms differ in fitted geometry as
-well. The physical model also divides the horizontal beam by the cosine of the zenith angle to
-transpose it, which magnifies a beam error without limit as the sun approaches the horizon. The
-daylight filter keeps rows down to zero elevation. The tree never performs that division. At the
-lowest elevation band the physical model's arm ordering is at its most extreme, at +0.56 points
-against +0.00 to +0.17 in the three bands above it.
+**On the same rows the physical model reports the opposite sign: the weather product's own split is
+*worse* than the Erbs split, by 0.128 points [+0.101, +0.154] on the satellite source.** Each
+physical arm also fits its own panel geometry, and the arm given the weather product's split settles
+on a tilt 2.5 to 11.5 degrees shallower than the arm given Erbs, so the obvious suspicion is that
+the two arms differ in more than the beam field — which the XGBoost arms never do.
 
-**So the physical instrument answers "which beam field lets a five-parameter model with an
-evenly-bright sky and a fitted azimuth fit best", which is a different question from the one the
-tree answers.** The physical model is a misspecification probe rather than a second reading of the
-same quantity. The right response is to report what each instrument measured rather than to
-reconcile the signs.
+**That suspicion is wrong: holding the geometry fixed makes the disagreement larger, not smaller.**
+Refitting every arm with the tilt and azimuth held at the values the Erbs arm settled on for that
+site and fold leaves the arms differing only in their beam and diffuse columns, exactly as the
+XGBoost arms do. The contrast moves from +0.128 to +0.147 [+0.094, +0.202], and the DISC arm's from
++0.148 to +0.236. So the physical model really does prefer the Erbs beam to the published one, and
+the geometry it fits is not what makes it say so.
+
+**What does separate the two instruments is the transposition, and it shows up where the sun is
+low.** The physical model divides the horizontal beam by the cosine of the zenith angle to get the
+direct normal irradiance, which magnifies a beam error without limit as the sun approaches the
+horizon, and the daylight filter keeps rows down to zero elevation. The tree never performs that
+division. Below 10 degrees of elevation the physical model's arm ordering reaches +0.56 points,
+against +0.00 to +0.17 in the three bands above it, while the tree's contrast keeps the same sign in
+all four bands.
+
+**So the physical instrument answers "which beam field survives being divided by the cosine of the
+zenith angle and fed to a five-parameter model with an evenly-bright sky", which is a different
+question from the one the tree answers.** Erbs returns a smooth function of the clearness index, and
+the published beam varies more sharply hour to hour; a division that grows without bound near the
+horizon punishes the sharper field. The physical model is a misspecification probe rather than a
+second reading of the same quantity, so the right response is to report what each instrument
+measured rather than to reconcile the signs.
 
 ### Where the advantage lives
 
@@ -901,10 +966,17 @@ scripts named below print the cap, the curtailment feed, the inverter ceiling, t
 comparison, and the stamp offsets. What is left — the row counts, the fitted tilts and azimuths, and
 the per-site spans — was computed ad hoc against the same outputs.
 
-The export cap is built by `anm_setpoints.py` from the setpoint export NGED supplied, which is filed
-under `data/NGED/anm/` in the private data store. The bucket's own curtailment feed is read by
-`anm_curtailment.py`, which needs NGED's bucket credentials that the other scripts do not, and the
-inverter ceiling by `inverter_clipping.py`. The stamp offsets in [the power stamps before 26 March
-2026](#the-power-stamps-before-26-march-2026-are-half-an-hour-late) are printed by
-`stamp_alignment.py`, and the comparison of optimiser starting points by `restart_basins.py`. All
-five are in the same directory as the rest.
+Six of those scripts print a single section's numbers rather than the headline results, and sit in
+the same directory as the rest:
+
+- `anm_setpoints.py` builds the export cap from the setpoint export NGED supplied, which is filed
+  under `data/NGED/anm/` in the private data store.
+- `anm_curtailment.py` reads the separate curtailment feed, and needs the cloud-storage credentials
+  the other scripts do not.
+- `inverter_clipping.py` prints the inverter ceiling and how much of each site's output sits on it.
+- `stamp_alignment.py` prints the three stamp offsets in [the power stamps before 26 March
+  2026](#the-power-stamps-before-26-march-2026-are-half-an-hour-late).
+- `restart_basins.py` compares the optimiser's fixed starting point against 64 independent random
+  ones, which is what the restart limitation rests on.
+- `shared_geometry.py` refits the physical model's arms with their tilt and azimuth held equal, and
+  `capacity_denominator.py` recomputes the headline under four capacity denominators.
