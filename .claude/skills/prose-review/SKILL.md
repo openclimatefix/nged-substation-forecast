@@ -25,8 +25,8 @@ here.** Two copies of a style guide drift apart and then nobody knows which copy
 skill owns the *procedure*; the rules themselves stay in one place.
 
 **Five words below carry a specific meaning, and a reader meeting them cold will guess wrong.** A
-**sweep** is one reading of a text against the style rules, and a **finding** is one thing that
-reading reports: the sentence as it stands, and the sentence it should be instead. A **pass** is one
+**sweep** is one reading of a text against the style rules, and a **finding** is what a sweep
+reports: the sentence as it stands, and the sentence it should be instead. A **pass** is one
 stage of a review — the structural passes A to F below, then the sentence sweep. A **wave** is one
 batch of packages or pages swept together, and a whole programme of sweeps runs wave by wave over
 months. A **sub-agent** is a separate Claude instance this procedure dispatches, with its own
@@ -85,7 +85,7 @@ convention and the finding is wrong.
 
 **A paragraph that makes two distinct claims can carry a bolded lead for only one of them, which
 makes an oversized paragraph a structural defect rather than a stylistic one.** Nothing else in this
-repo looks for it. Until this pass existed, a 479-word paragraph, a 525-word paragraph and a
+repo looks for it. Until this pass existed, a 479-word paragraph, a 525-word paragraph, and a
 352-word paragraph all survived every review round the literature review had been given.
 
 Roughly 150 words or 10 wrapped lines is the prompt to look, not the test. The test is whether the
@@ -96,8 +96,8 @@ For every split, give the exact sentence to split at and write the bolded lead f
 paragraph. A split that leaves the second half without a lead has moved the defect rather than fixed
 it.
 
-**The mirror-image finding is a run of bullets that should be prose.** CLAUDE.md prefers
-sub-headings and short paragraphs over bullet lists, because a list flattens an argument into items
+**The mirror-image finding is a run of bullets that should be prose.** CLAUDE.md states that
+sub-headings and short paragraphs beat bullet lists, because a list flattens an argument into items
 of equal weight. A bulleted item carrying several sentences and a citation is a paragraph wearing a
 hyphen; a genuinely parallel set of short design notes is a list. Both directions are findings.
 
@@ -419,7 +419,7 @@ wording cannot be triaged and is worth nothing.
   tools.** Concurrent agents editing one file collide, and a finding that lands before triage cannot
   be rejected.
 - **Ask for absolute line numbers in the file**, not offsets into an extracted chunk.
-- **Ask for the findings as JSON** — a list of objects carrying `file`, `quote` and `replacement` —
+- **Ask for the findings as JSON** — a list of objects carrying `file`, `quote`, and `replacement` —
   so `scripts/apply_findings.py` can apply the whole batch without anything being retyped. Tell the
   agent to quote the sentence as the page reads; the script matches whether or not the agent kept
   the markdown, and rejects a quote that occurs twice rather than guessing which one was meant.
@@ -510,7 +510,7 @@ what it remembers is sometimes not what the line says.
 ## Applying and checking the edits
 
 **Apply a batch with `scripts/apply_findings.py`, which refuses the edits that would corrupt the
-page.** Write the findings to a JSON file — one object per finding, carrying `file`, `quote` and
+page.** Write the findings to a JSON file — one object per finding, carrying `file`, `quote`, and
 `replacement` — then dry-run the script, read what it refused, and re-run it with `--apply`:
 
 ```bash
@@ -545,8 +545,8 @@ sentence the file carries in two places, and both copies need the same fix.
 
 The paragraphs below say what the two appliers are defending against, in the markdown terms both
 share. Read them before hand-editing anything either script refused, because what the refusal was
-for decides how the edit has to be made instead. Every defect named below was written by an earlier
-apply script and then passed `pymarkdown scan`, `mkdocs build --strict` and
+for determines how the edit has to be made instead. Every defect named below was written by an
+earlier apply script and then passed `pymarkdown scan`, `mkdocs build --strict`, and
 `check_information_loss.py` unnoticed.
 
 **A sub-agent quotes the sentence with the markdown stripped, so a wrap-tolerant substitution still
@@ -594,9 +594,10 @@ per-paragraph check below catches one that reaches the file by another route.
 The getting-started page carries the comment `# create the virtualenv and install all workspace
 packages` inside a fenced block, and a serial-comma finding quoting those words rewrites the
 command. Nothing downstream notices: the page still lints, still builds, and `check_structure.py`
-sees no marker move. The script reports such a finding as `code block` and writes nothing, the way
-it already refuses one landing in a skill file's YAML frontmatter. Reword the finding to quote the
-prose it meant, or leave the block alone. A fence indented under a list item counts too. Only 16 of
+sees no marker move. The script reports a quote matching inside a fenced block as `code block` and
+writes nothing, the way it already refuses one landing in a skill file's YAML frontmatter. Reword
+the finding to quote the prose it meant, or leave the block alone. A fence indented under a list
+item counts too. Only 16 of
 the 121 fenced blocks across this repo's markdown are indented, but they cluster where a sweep runs:
 both blocks on the code-style page are indented, and 2 of the 7 on the getting-started page.
 
@@ -660,7 +661,7 @@ uv run python .claude/skills/prose-review/scripts/check_render_loss.py
 ## Did the restructure lose anything?
 
 **Run this after any large structural change, and skip it after a sentence-level sweep.** Splitting,
-merging, moving and cutting paragraphs moves text in bulk. The loss is silent: nothing fails, the
+merging, moving, and cutting paragraphs moves text in bulk. The loss is silent: nothing fails, the
 page still reads well, and the missing caveat is noticed only by the reader who needed it.
 
 Three checks, cheapest first. The first two are mechanical and take seconds:
@@ -669,7 +670,7 @@ Three checks, cheapest first. The first two are mechanical and take seconds:
 uv run python .claude/skills/prose-review/scripts/check_information_loss.py <old-ref> <path>
 ```
 
-1. **Diff the inventory of things that cannot survive being dropped** — every number, every link and
+1. **Diff the inventory of facts that cannot survive being dropped** — every number, every link and
    citation, every direct quotation, every bolded term. Losing one is always a defect, never a
    rewording. The script above extracts and diffs all four between a git ref and the working tree.
 2. **Shingle the old text against the new.** Every 9-word run of the original appearing nowhere in
@@ -677,7 +678,7 @@ uv run python .claude/skills/prose-review/scripts/check_information_loss.py <old
    list is short enough to read, and the script prints it.
 3. **Ask a fresh sub-agent what went missing.** Give it the before and after as two scratchpad files
    and one question: what does the old text state that the new text does not? Tell it to report
-   **hedges, caveats, scope limits and attributions first** — those are the losses that matter and
+   **hedges, caveats, scope limits, and attributions first** — those are the losses that matter and
    the ones a rewrite drops most easily. A restructure that quietly makes the document more
    confident than its evidence supports is the failure mode this check exists for, and it is the
    same fault as the triage rule above about self-serving cuts.
