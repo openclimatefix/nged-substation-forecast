@@ -824,6 +824,16 @@ of different sizes, and the same static estimate the
 a fixed denominator flatters or penalises a site depending on which part of the record a score is
 computed over.
 
+**Tracking the drift would lower every arm's error and move no contrast, which is why this
+experiment does not try.** An oracle correction that subtracts each arm's own mean signed error
+inside every site-year — the best a dynamic capacity estimate could do at annual resolution, and
+better, because it reads the mean off the rows being scored — takes arm B from 5.333 to 5.266% of
+P99 output and leaves the headline contrast at −0.0960 [−0.1141, −0.0794] against the published
+−0.0962. Doing the same inside every site-month takes arm B to 5.124 and still leaves the headline
+at −0.0960. The negative control behaves the same way, at −0.0287 and −0.0254 against −0.0289. So a
+capacity estimate that tracked every plant perfectly would buy about 4% of the error level and
+nothing at all of the comparison this page is about.
+
 **What this is not is a measurement of capacity.** A fixed-capacity model's signed error absorbs
 everything the model does not represent — degradation, curtailment, soiling, snow, and any bias in
 the irradiance at that particular site — so the drift is an upper bound on how much capacity moved,
@@ -996,7 +1006,7 @@ scripts named below print the cap, the curtailment feed, the inverter ceiling, t
 comparison, and the stamp offsets. What is left — the row counts, the fitted tilts and azimuths, and
 the per-site spans — was computed ad hoc against the same outputs.
 
-Six of those scripts print a single section's numbers rather than the headline results, and sit in
+Seven of those scripts print a single section's numbers rather than the headline results, and sit in
 the same directory as the rest:
 
 - `anm_setpoints.py` builds the export cap from the setpoint export NGED supplied, which is filed
@@ -1008,5 +1018,7 @@ the same directory as the rest:
   2026](#the-power-stamps-before-26-march-2026-are-half-an-hour-late).
 - `restart_basins.py` compares the optimiser's fixed starting point against 64 independent random
   ones, which is what the restart limitation rests on.
-- `shared_geometry.py` refits the physical model's arms with their tilt and azimuth held equal, and
-  `capacity_denominator.py` recomputes the headline under four capacity denominators.
+- `shared_geometry.py` refits the physical model's arms with their tilt and azimuth held equal.
+- `capacity_denominator.py` recomputes the headline under four capacity denominators, and
+  `oracle_capacity.py` recomputes it after an oracle removes each site-year's and each site-month's
+  own bias.
