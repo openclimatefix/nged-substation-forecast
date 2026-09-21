@@ -24,9 +24,10 @@ combination, so it can reproduce any single arm and is free to do better.
 
 **The seed means something different here from what it means in `run_experiment.py`.** There it
 reseeds XGBoost, so the spread across seeds measures how much of a difference is fitting noise.
-Here it only moves the optimiser's random restarts, and best-of-eight restarts lands on the same
-minimum every time, so the seed-to-seed spread this script reports is a few parts in a million and
-says the fit is stable rather than that the noise floor is that low. The bootstrap's seed draw
+Here it only moves the optimiser's random restarts, and every seed shares the fixed starting point
+that `restart_basins.py` shows reaching the lowest loss in 19 of 30 fits, so the seed-to-seed
+spread this script reports is a few parts in a million and says the seeds inherit one winning start
+rather than that the noise floor is that low. The bootstrap's seed draw
 likewise adds nothing to this instrument's intervals.
 
 Run it with `uv run --no-project` plus `--with polars --with numpy --with xgboost
@@ -122,11 +123,12 @@ genuinely matters — the threshold below which a difference on the real meters 
 """
 
 N_RESTARTS: Final[int] = 8
-"""How many random starting points each fit is run from.
+"""How many starting points each fit is run from: one fixed vector of zeros and seven random.
 
 Tilt and azimuth enter through a cosine, so the objective has more than one local minimum — a panel
-facing east and one facing west fit a symmetric day almost equally well. Restarting is what stops
-the answer depending on where the optimiser happened to begin.
+facing east and one facing west fit a symmetric day almost equally well. `restart_basins.py`
+measures how many: of 64 independent random starts, a median of 3 reach the lowest loss found. It
+also measures what raising this number would buy, which is nothing that moves an arm ordering.
 """
 
 MAX_ITERATIONS: Final[int] = 3000

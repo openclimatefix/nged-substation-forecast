@@ -80,9 +80,9 @@ by 25 units of perceptual distance under deuteranopia, against a floor of 8.
 
 MAE_SETUPS: Final[tuple[tuple[str, str, str], ...]] = (
     ("open-meteo", "xgboost", "ERA5 → XGBoost"),
+    ("open-meteo", "physics", "ERA5 → physical model"),
     ("cams", "xgboost", "CAMS → XGBoost"),
-    ("open-meteo", "physics", "ERA5 → fitted physical model"),
-    ("cams", "physics", "CAMS → fitted physical model"),
+    ("cams", "physics", "CAMS → physical model"),
 )
 """Every (source, instrument) pairing the per-site error figure compares."""
 
@@ -97,6 +97,16 @@ INSTRUMENT_LABELS: Final[dict[str, str]] = {
     "physics": "Fitted physical PV model",
 }
 """Instrument keys to the label a reader sees."""
+
+PER_SITE_COLOURS: Final[tuple[str, ...]] = ("#FF4901", "#992C01", "#306BFF", "#24499F")
+"""One colour per `MAE_SETUPS` entry: hue for the source, lightness for the model family.
+
+The two full-strength colours are the brand's orange-red and blue, which the headline contrast
+chart already uses for the two sources; the two darker ones are the same hues at about 60% of each
+channel. `dataviz`'s `validate_palette.js` passes all six pairs of these four on the lightness
+band, the chroma floor, colour-vision separation, the normal-vision floor, and contrast against
+this theme's surface.
+"""
 
 BEST_ARM: Final[dict[str, str]] = {
     "xgboost": "C_era5_split",
@@ -319,57 +329,50 @@ def _per_site_error() -> pl.DataFrame:
     return pl.DataFrame(records)
 
 
-def _per_site_chart(*, frame: pl.DataFrame) -> alt.FacetChart:
-    """Draw per-site mean absolute error, one panel per instrument and one hue per source.
+def _per_site_chart(*, frame: pl.DataFrame) -> alt.Chart:
+    """Draw all four setups' per-site mean absolute error in one panel.
 
-    Colour carries the source alone rather than the whole (source, instrument) pairing. Four hues
-    would need a fourth that separates from the other three under colour-vision deficiency, and the
-    two that read most naturally against this palette do not; splitting the instrument out into its
-    own panel keeps two hues, and they are the same two the headline chart uses.
+    The comparison this figure exists for is the tree against the physical model at one site, so
+    all four bars for a site sit in one column rather than across two panels. Hue carries the
+    irradiance source and lightness the model family, which is the encoding a reader can decode
+    two ways at once: the two sources separate by colour, and within a source the two model
+    families separate by lightness, which survives every colour-vision deficiency because
+    lightness does.
 
     Args:
         frame: One row per (setup, site).
 
     Returns:
-        The faceted bar chart.
+        The bar chart.
     """
-    sources = list(SOURCE_LABELS.values())
-    bars = (
+    setups = [label for _, _, label in MAE_SETUPS]
+    return (
         alt.Chart(frame)
         .mark_bar(cornerRadiusEnd=3)
         .encode(  # ty: ignore[unresolved-attribute]
             y=alt.Y("site:N", title="Site"),
             x=alt.X("mae_percent:Q", title="Mean absolute error (% of the site's P99 output)"),
-            yOffset=alt.YOffset("source_label:N", sort=sources),
+            yOffset=alt.YOffset("setup:N", sort=setups),
             color=alt.Color(
-                "source_label:N",
+                "setup:N",
                 title=None,
-                sort=sources,
-                scale=alt.Scale(domain=sources, range=[ocf.ORANGE_RED, ocf.BLUE]),
-                legend=alt.Legend(
-                    orient="bottom",
-                    direction="horizontal",
-                    labelLimit=0,
+                sort=setups,
+                scale=alt.Scale(domain=setups, range=list(PER_SITE_COLOURS)),
+                legend=alt.Legend(orient="bottom", columns=2, labelLimit=0),
+            ),
+        )
+        .properties(
+            width=560,
+            height=alt.Step(11),
+            title=alt.TitleParams(
+                text="Error level of each setup, per site",
+                subtitle=(
+                    "Every setup is given the weather product's own split. Lower is better.",
+                    "Site labels are shuffled and the error normalised,",
+                    "because these meters are commercially sensitive.",
                 ),
             ),
         )
-        .properties(width=560, height=alt.Step(15))
-    )
-    # Stacked rather than side by side: the comparison the figure exists for is the tree against
-    # the physical model at one site, and a shared x axis puts those two bars in the same column.
-    return bars.facet(
-        row=alt.Row("instrument_label:N", title=None, sort=list(INSTRUMENT_LABELS.values()))
-    ).properties(
-        title=alt.TitleParams(
-            text="Error level of each setup, per site",
-            subtitle=(
-                "Each setup given the weather product's own beam/diffuse split. Lower is better.",
-                (
-                    "Site labels are shuffled and the error normalised, because these"
-                    " meters are commercially sensitive."
-                ),
-            ),
-        ),
     )
 
 

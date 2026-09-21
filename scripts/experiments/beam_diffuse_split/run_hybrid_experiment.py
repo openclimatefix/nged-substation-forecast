@@ -73,9 +73,10 @@ model at its best-informed setting rather than at a deliberately starved one.
 PHYSICS_SEED: Final[int] = 0
 """Which optimiser restart seed the calibrated physical fits use.
 
-`run_physics_experiment` reports a seed-to-seed spread of a few parts in a million, because
-best-of-eight restarts lands on the same minimum every time, so one seed is enough here and three
-would only multiply the fit count.
+`run_physics_experiment` reports a seed-to-seed spread of a few parts in a million, because every
+seed shares one fixed starting point, so one seed is enough here and three would only multiply the
+fit count. `restart_basins.py` measures what that spread does and does not establish, and
+`shared_geometry.py` confirms the arm ordering does not move with the starting scheme.
 """
 
 HYBRID_ARMS: Final[dict[str, tuple[tuple[str, ...], bool]]] = {
