@@ -101,8 +101,7 @@ NWP_PLOT_VARIABLES: Final[dict[str, NwpPlotVariable]] = {
         "Downward short-wave (solar) radiation", "W/m²"
     ),
     # Stored as kg/m²/s, which is numerically mm/s. Multiplying by 3600 displays the value as
-    # mm/h. Forecasters expect mm/h, and mm/h survives _prepare_for_plot's 3-decimal-place
-    # display rounding.
+    # mm/h, the unit forecasters expect.
     "precipitation_surface": NwpPlotVariable("Precipitation rate", "mm/h", scale=3600.0),
 }
 """The NWP variables the dashboard offers, keyed by ``contracts.weather_schemas.Nwp`` column.
@@ -197,20 +196,20 @@ viewer is in.
 """
 
 
-def _prepare_for_plot(lf: pl.LazyFrame, time_column: str, value_column: str) -> pl.LazyFrame:
-    """Convert times to naive Europe/London wall time and compact values for serialisation.
+def _prepare_for_plot(lf: pl.LazyFrame, time_column: str) -> pl.LazyFrame:
+    """Convert ``time_column`` to naive Europe/London wall time for serialisation.
 
     Naive (zone-stripped) values render identically in any viewer's browser — Vega would
-    otherwise re-localise tz-aware timestamps to the viewer's zone. Values are rounded to 3
-    decimal places *as Float64*. A raw ``Float32`` serialises to JSON with ~17 significant digits
-    (e.g. ``10.300000190734863``). Those digits roughly triple the inline-data size, and push the
-    ~34k-row ensemble past marimo's max-output-size guard. Rounding to 3 d.p. leaves a display
-    precision finer than the forecast's own error, so nothing visible is lost (the stored values
-    are already rounded to a 13-bit significand).
+    otherwise re-localise tz-aware timestamps to the viewer's zone.
+
+    Values pass through at their stored ``Float32`` width. ``mo.ui.altair_chart`` serves the rows
+    as an Arrow virtual file rather than inlining them in the cell output, and Arrow is
+    fixed-width, so how many decimal digits a value would print to does not change the payload:
+    casting to ``Float64`` in order to round costs 4 bytes per value, measured at +33% on a
+    34,000-row ensemble.
     """
     return lf.with_columns(
-        pl.col(time_column).dt.convert_time_zone(DISPLAY_TIME_ZONE).dt.replace_time_zone(None),
-        pl.col(value_column).cast(pl.Float64).round(3),
+        pl.col(time_column).dt.convert_time_zone(DISPLAY_TIME_ZONE).dt.replace_time_zone(None)
     )
 
 
@@ -417,7 +416,7 @@ def build_view_forecast_chart(
         subtitle_notes.append("Shaded: weekends")
     if show_forecast:
         layers.append(
-            alt.Chart(_prepare_for_plot(forecasts, "valid_time", "power_fcst").collect())
+            alt.Chart(_prepare_for_plot(forecasts, "valid_time").collect())
             .mark_line(strokeWidth=1, opacity=0.3)
             .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
                 x=x,
@@ -432,9 +431,7 @@ def build_view_forecast_chart(
         layers.append(
             alt.Chart(
                 _prepare_for_plot(
-                    _lagged_power_frame(actuals, power_fcst_init_time, sorted_lags),
-                    "time",
-                    "power",
+                    _lagged_power_frame(actuals, power_fcst_init_time, sorted_lags), "time"
                 )
                 .rename({"time": "valid_time"})
                 .collect()
@@ -451,9 +448,7 @@ def build_view_forecast_chart(
         layers.append(
             alt.Chart(
                 _prepare_for_plot(
-                    actuals.filter(pl.col("time") >= power_fcst_init_time - PLOT_HISTORY),
-                    "time",
-                    "power",
+                    actuals.filter(pl.col("time") >= power_fcst_init_time - PLOT_HISTORY), "time"
                 )
                 .rename({"time": "valid_time"})
                 .collect()
@@ -544,14 +539,13 @@ def build_nwp_ensemble_chart(
         scale=alt.Scale(zero=False),
     )
 
-    # The display scale is applied before _prepare_for_plot so that function's 3-decimal-place
-    # rounding happens in display units (raw precipitation ~1e-4 kg/m²/s would round to zero).
+    # The display scale is applied here so the y axis carries display units: raw precipitation
+    # is ~1e-4 kg/m²/s, which no reader can size at a glance.
     data = _prepare_for_plot(
         nwp.filter(plot_window)
         .select("valid_time", "ensemble_member", variable)
         .with_columns(pl.col(variable) * var.scale),
         "valid_time",
-        variable,
     ).collect()
     analysis_data = (
         None
@@ -561,7 +555,6 @@ def build_nwp_ensemble_chart(
             .select("valid_time", variable)
             .with_columns(pl.col(variable) * var.scale),
             "valid_time",
-            variable,
         ).collect()
     )
 
