@@ -129,9 +129,9 @@ def assess_upstream_grid_point_nulls(
             passed here. Their nulls must share one meaning, because a rate pooled over variables
             with opposite null semantics measures nothing. The asset therefore makes two separate
             calls. One call passes the de-accumulated variables, which Dynamical.org differences
-            from ECMWF's running totals into per-step values, so their nulls are known upstream
-            corruption. The other call passes the instantaneous variables, whose nulls are
-            anomalous.
+            from ECMWF's running totals into rates (``W m-2`` for the radiation fluxes,
+            ``kg m-2 s-1`` for precipitation), so their nulls are known upstream corruption. The
+            other call passes the instantaneous variables, whose nulls are anomalous.
         exclude_lead_0: Skip the lead-0 step. True for the de-accumulated variables, which are null
             there by design, so counting it would report every healthy run as corrupt. False for
             the instantaneous ones, where lead-0 is an ordinary step and a null in it means what a

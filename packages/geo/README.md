@@ -2,7 +2,8 @@
 
 Generic geospatial logic and data for the NGED substation forecast project: H3 spatial indexing and
 the Great Britain boundary the numerical weather prediction (NWP) grid is clipped to. H3 is a grid
-system that tiles the globe in hexagons at nested resolutions, each hexagon identified by an index.
+system that tiles the globe in hexagons at nested resolutions, with 12 pentagons where hexagons
+alone cannot close the sphere, and each cell is identified by an index.
 
 ## Map of Great Britain using H3 resolution 5 hexagons
 

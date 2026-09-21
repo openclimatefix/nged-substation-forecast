@@ -541,8 +541,8 @@ def upsert_metadata(
     that ``new_metadata`` omits keeps its last stored values indefinitely. The roster therefore
     holds every time series we have ever seen, not only the series in the latest snapshot.
 
-    This function assumes it is called by one thread at a time, so no explicit locking is required,
-    and it is therefore not safe under concurrent callers.
+    This function is not safe under concurrent callers: it assumes it is called by one thread at a
+    time, and takes no lock.
 
     The rewrite is not atomic either. `write_parquet` overwrites the roster in place, with no
     write-to-temporary-file-and-rename. The roster therefore does not get the all-or-nothing
@@ -627,8 +627,8 @@ def upsert_metadata(
     # The first frame carrying the union of both inputs' columns: the concat adds to the snapshot's
     # rows any `allow_missing` field only the stored roster had. All four fields are nullable, so
     # this validate is a shape check on a frame neither validation above saw, not a guard against a
-    # known fault. This is the fourth validate call in this function, and the weakest of the four:
-    # it is the first to reconsider if the validate calls get trimmed.
+    # known fault. Of the four validate calls in this function this is the weakest, and the first
+    # to reconsider if the validate calls get trimmed.
     TimeSeriesMetadata.validate(metadata_diff)
 
     if metadata_diff.is_empty():

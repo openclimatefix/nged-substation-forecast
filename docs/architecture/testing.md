@@ -204,8 +204,8 @@ code. Later entries take precedence, so `error` stays first.
 **`pytest.fail()` and `pytest.skip()` raise from `BaseException`, so a broad `except BaseException`
 in the code under test swallows them along with every real error.** `defs/checks.py` and
 `defs/assets.py` each guard an asset check's body with `except BaseException`, because a Rust panic
-from a compiled dependency — Polars and the Delta Lake bindings are both compiled Rust extensions —
-does not derive from `Exception` — see [Warn on stale power data with a Dagster asset
+from a compiled dependency does not derive from `Exception`. Polars and the Delta Lake bindings are
+both compiled Rust extensions. See [Warn on stale power data with a Dagster asset
 check](production-deployment.md#warn-on-stale-power-data-with-a-dagster-asset-check) for the full
 reasoning. Calling `pytest.fail()` or `pytest.skip()` *inside* such a guarded body, as a "this
 branch must not run" sentinel, is caught by the same guard instead of failing the test. Assert after
@@ -275,12 +275,12 @@ Two GitHub workflows in `.github/workflows/` run the checks described on this pa
 fails on a broken link *within* `docs/`. `scripts/lint/check_docs_links.py` fails on a link *into*
 the published site — the form CLAUDE.md requires from a docstring, a comment or a GitHub issue body.
 `docs/` is rendered to a public website, and a link from outside `docs/` must name that site's URL
-rather than a repository path. Renaming a page moves the URL such a link points at, and rewriting a
+rather than a repository path. Renaming a page moves the URL that link points at, and rewriting a
 heading kills the anchor it points at.
 
 A script guessing an anchor slug would strip or hyphenate the underscores in a heading, as the
 common slug convention does. Python-Markdown's `toc` extension instead preserves underscores, so a
-guessed slug and the real one differ. `check_docs_links.py` therefore resolves each anchor by
+guessed slug and the real slug differ. `check_docs_links.py` therefore resolves each anchor by
 running the real `markdown.Markdown()` converter over the target page rather than guessing a slug.
 An extension the script cannot load fails the run rather than being skipped: dropping
 `pymdownx.superfences` makes a `#` comment inside an indented fenced code block parse as a heading,
@@ -424,7 +424,7 @@ what makes a plain `uv run pytest` collect it. The authoring rules for writing o
 
 ## Assertion style for Patito frames
 
-Every dataframe's shape is declared as a Patito model: a schema class naming the frame's columns and
+A tabular contract's shape is declared as a Patito model: a schema class naming the frame's columns and
 their dtypes. Bind a frame to its model with `set_model`, coerce the columns to the model's dtypes
 with `cast`, and validate for the happy path:
 

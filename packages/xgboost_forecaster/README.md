@@ -13,9 +13,10 @@ feature is one input column offered to the model: a lag feature is the power mea
 interval before the target time, and a rolling feature is a statistic over a recent window of that
 power. Categorical and string columns are encoded as integer codes before being handed to XGBoost;
 all features are cast to `Float32`, and missing values are left as `NaN` so XGBoost handles them
-natively. ECMWF publishes ~51 separately perturbed members of the same weather forecast, and an
-ensemble forecast is one power prediction per member. The model is deterministic, and an ensemble
-forecast still comes out of that deterministic model — the `XGBoostForecaster` class below says how.
+natively. ECMWF publishes ~51 members of the same weather forecast — one unperturbed control
+member plus ~50 perturbed members — and an ensemble forecast is one power prediction per member.
+The model is deterministic, and an ensemble forecast still comes out of that deterministic model
+— the `XGBoostForecaster` class below says how.
 
 Both `train()` and `predict()` collect their input once, so keeping that collect bounded is the
 **caller's** job. The dominant cost is the multi-tens-of-GB NWP scan, which has to be pruned at the
@@ -39,8 +40,8 @@ memory](https://openclimatefix.github.io/nged-substation-forecast/architecture/p
 `learning_rate`, `max_depth`, etc.). `BaseForecasterConfig` contributes `selected_features`,
 `random_seed` (threaded into XGBoost's own `seed` parameter for deterministic training), the
 experiment-identity fields `experiment_name` and `ml_flow_experiment_id`, and the leaderboard tag
-fields `weather_source` and `training_strategy`, which are the columns the leaderboard comparing
-trained models groups by. Model-family identity — `MODEL_NAME` ("xgboost") and `MODEL_VERSION` —
+fields `weather_source` and `training_strategy`, which label a run so the leaderboard can compare
+like with like. Model-family identity — `MODEL_NAME` ("xgboost") and `MODEL_VERSION` —
 lives on the `XGBoostForecaster` class itself, not in the config; both a config's experiment
 identity and the class's model-family identity are stamped onto every row of the `PowerForecast`
 output, so the Delta Lake table is self-describing. `XGBoostConfig` inherits `extra="forbid"` from

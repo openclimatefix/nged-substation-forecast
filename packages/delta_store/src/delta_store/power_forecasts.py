@@ -136,11 +136,10 @@ def write_power_forecasts(
             overwrite below the ``(experiment_name, fold_id)`` partition. For example,
             ``"power_fcst_init_time = '2026-07-04T06:00:00+00:00'"`` lets ``live_forecasts`` replace
             one 6-hourly slot's rows without wiping the rest of the ``"live"`` fold's
-            partition. The production service forecasts every six hours, and stores every one of
+            partition. The production service forecasts every 6 hours, and stores every one of
             those runs under the reserved ``fold_id`` of ``"live"`` rather than under a
             cross-validation fold. delta-rs' ``replaceWhere`` supports predicates on non-partition
-            columns
-            (confirmed empirically: a `datetime.isoformat()` literal round-trips correctly
+            columns (confirmed empirically: a `datetime.isoformat()` literal round-trips correctly
             against a ``Timestamp`` column). Only meaningful alongside ``replace_partition``.
         storage_options: delta-rs object-store options (credentials/endpoint) for a remote
             ``table_uri``; ``None``/empty for a local path.

@@ -54,7 +54,7 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
 
     Each variable is renormalised over its *own* denominator, which is what keeps one variable's
     corruption from nulling the others. The cost a caller must know about: two variables in one
-    cell can then be averaged over different sub-areas of the hexagon, So if `wind_u_*` and
+    cell can then be averaged over different sub-areas of the hexagon. So if `wind_u_*` and
     `wind_v_*` ever have different null footprints, the wind vector derived by `_calc_wind_speed`
     and `_calc_wind_direction` mixes two sub-areas. Upstream corruption has always been co-located
     across variables, so that is theoretical today.

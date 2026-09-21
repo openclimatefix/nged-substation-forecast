@@ -66,13 +66,13 @@ def round_to_significand_bits(expr: pl.Expr, *, keep_bits: int) -> pl.Expr:
       is never contracted into an FMA. Reassociation or contraction into an FMA would break the
       exactness of the subtractions.
     - Non-finite and overflow cases are guarded. For ``|x| > f32_max / C`` the product ``c``
-    overflows to ``inf``, and the naive result would be ``inf - inf = NaN``. For ``x`` NaN or
-    ``±inf``, ``c`` is likewise non-finite. Wherever ``c`` is non-finite, the input value is passed
-    through unchanged. A huge-but-finite value is therefore stored at full precision rather than
-    corrupted, and ``NaN``/``±inf`` survive verbatim.
+      overflows to ``inf``, and the naive result would be ``inf - inf = NaN``. For ``x`` NaN or
+      ``±inf``, ``c`` is likewise non-finite. Wherever ``c`` is non-finite, the input value is
+      passed through unchanged. A huge-but-finite value is therefore stored at full precision
+      rather than corrupted, and ``NaN``/``±inf`` survive verbatim.
     - Subnormal ``x`` (``|x| < 2**-126``) degrades gracefully. The relative-error bound loosens,
-    because precision is already at the absolute floor of the format. The result is still a faithful
-    nearby value.
+      because precision is already at the absolute floor of the format. The result is still a
+      faithful nearby value.
 
     Args:
         expr: A ``Float32`` expression (see the dtype precondition above).

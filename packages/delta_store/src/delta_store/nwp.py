@@ -102,12 +102,11 @@ def _member_aligned_row_group_size(nwp: pt.DataFrame[Nwp]) -> int:
 
     Derived from the frame rather than hard-coded, so the alignment survives a change to the H3 grid
     or the forecast horizon. A change to either the H3 grid or the forecast horizon changes how many
-    rows one member occupies. Where
-    the division is inexact the alignment degrades gently: a row group straddles two members
-    instead of one member, rather than reverting to the full span. That 1/51 is the 1.96% of a
-    partition's rows a single-member read decodes when the alignment holds exactly, and it is a
-    floor rather than a guarantee. `NWP_SORT_COLS` documents the measured degradation under an
-    uneven member split, beside that floor.
+    rows one member occupies. Where the division is inexact the alignment degrades gently: a row
+    group straddles two members instead of one member, rather than reverting to the full span. That
+    1/51 is the 1.96% of a partition's rows a single-member read decodes when the alignment holds
+    exactly, and 1.96% is a floor rather than a guarantee. `NWP_SORT_COLS` documents the measured
+    degradation under an uneven member split, beside that floor.
 
     Args:
         nwp: The frame about to be written, carrying every ensemble member for one run.
@@ -175,7 +174,7 @@ def write_nwp(
     dtype, and the write cannot silently drop a column.
 
     A **narrowing** contract change is a different, worse failure mode, also confirmed
-    empirically: The write that narrows a column succeeds silently, because
+    empirically: the write that narrows a column succeeds silently, because
     ``schema_mode="overwrite"`` accepts that write at write time. The table is then left with a
     logical schema that its own, previously-written partitions can no longer safely satisfy. Nothing
     fails until a *later* read of the whole table, by anyone, not necessarily the writer that broke
