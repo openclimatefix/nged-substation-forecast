@@ -186,7 +186,11 @@ def main() -> int:
             return [column.format(fold=fold) for column in HYBRID_ARMS[arm][0]]
         return original_features_for(arm=arm, fold=fold)
 
-    run_experiment._features_for = _features_for
+    # ty rejects this as `invalid-assignment` and prints both sides of the comparison
+    # identically, because it treats a module-level `def` as its own nominal type rather than
+    # as its signature. Any replacement function is unassignable, however well it matches. The
+    # signal to delete the suppression is ty reporting `unused-ignore-comment` here.
+    run_experiment._features_for = _features_for  # ty: ignore[invalid-assignment]
 
     jobs = [
         (arm, "primary", "power_mw", PRIMARY_HYPER_PARAMETERS, False)

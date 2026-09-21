@@ -60,7 +60,8 @@ SETUPS: Final[tuple[tuple[str, str, str, str], ...]] = (
 )
 """Each drawn setup as (source, instrument, arm, label), in legend order.
 
-Every one is the arm given the product's own split, which is the best each setup has to offer, so
+Every one is the arm given the weather product's own beam/diffuse split, which is the best each
+setup has to offer, so
 the figure shows what the pipeline can do rather than what a deliberately weakened arm can do.
 """
 
@@ -240,7 +241,11 @@ def _timeseries_chart(*, frame: pl.DataFrame, site: str) -> alt.FacetChart:
                 title=None,
                 sort=order,
                 scale=alt.Scale(domain=order, range=[MEASURED_COLOUR, *SETUP_COLOURS]),
-                legend=alt.Legend(orient="bottom", direction="horizontal", labelLimit=0),
+                legend=alt.Legend(
+                    orient="bottom",
+                    direction="horizontal",
+                    labelLimit=0,
+                ),
             ),
             strokeDash=alt.StrokeDash("series:N", sort=order, legend=None),
         )
@@ -253,13 +258,11 @@ def _timeseries_chart(*, frame: pl.DataFrame, site: str) -> alt.FacetChart:
             title=alt.TitleParams(
                 text=f"Site {site}: predicted against measured PV power",
                 subtitle=(
+                    ("Power as a percentage of the site's own 99th-percentile output,"),
+                    ("which keeps a commercially sensitive meter anonymous."),
                     (
-                        "Power as a percentage of the site's own 99th-percentile output,"
-                        " which keeps a commercially sensitive meter anonymous."
-                    ),
-                    (
-                        "Out-of-fold predictions, each given the product's own split."
-                        " Hourly, daylight hours only."
+                        "Out-of-fold predictions, each given the weather product's own"
+                        " beam/diffuse split. Hourly, daylight hours only."
                     ),
                 ),
             )
@@ -325,18 +328,24 @@ def _per_site_chart(*, frame: pl.DataFrame) -> alt.FacetChart:
                 title=None,
                 sort=sources,
                 scale=alt.Scale(domain=sources, range=[ocf.ORANGE_RED, ocf.BLUE]),
-                legend=alt.Legend(orient="bottom", direction="horizontal", labelLimit=0),
+                legend=alt.Legend(
+                    orient="bottom",
+                    direction="horizontal",
+                    labelLimit=0,
+                ),
             ),
         )
-        .properties(width=330, height=alt.Step(15))
+        .properties(width=560, height=alt.Step(15))
     )
+    # Stacked rather than side by side: the comparison the figure exists for is the tree against
+    # the physical model at one site, and a shared x axis puts those two bars in the same column.
     return bars.facet(
-        column=alt.Column("instrument_label:N", title=None, sort=list(INSTRUMENT_LABELS.values()))
+        row=alt.Row("instrument_label:N", title=None, sort=list(INSTRUMENT_LABELS.values()))
     ).properties(
         title=alt.TitleParams(
             text="Error level of each setup, per site",
             subtitle=(
-                "Each setup given the product's own split. Lower is better.",
+                "Each setup given the weather product's own beam/diffuse split. Lower is better.",
                 (
                     "Site labels are shuffled and the error normalised, because these"
                     " meters are commercially sensitive."
@@ -388,7 +397,8 @@ def _sky_chart(*, source: str) -> alt.Chart:
         title=alt.TitleParams(
             text="Where the published beam field earns its advantage",
             subtitle=(
-                "The product's own split against the Erbs split. Negative is better.",
+                "The weather product's own beam/diffuse split against the Erbs",
+                "separation model's split. Negative is better.",
                 "Bars are 95% monthly block bootstrap intervals.",
                 "Under a clear sky a separation model already knows the answer.",
             ),

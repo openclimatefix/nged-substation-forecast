@@ -68,52 +68,61 @@ REFERENCE_ARMS: Final[dict[str, str]] = {
 """The arm each instrument's percentages are measured against."""
 
 CONTRAST_LABELS: Final[dict[str, str]] = {
-    "B_erbs|A_global_only": "Erbs split",
-    "B_disc|A_global_only": "DISC split",
-    "B_learned|A_global_only": "Learned split",
-    "C_era5_split|A_global_only": "The product's own split",
-    "D_direct_fraction|A_global_only": "The product's direct fraction",
-    "C_era5_split|B_erbs": "The product's split vs. Erbs",
-    "C_era5_split|B_learned": "The product's split vs. the learned split",
-    "P_B_erbs|P_A_global_only": "Erbs split",
-    "P_B_disc|P_A_global_only": "DISC split",
-    "P_C_source_split|P_A_global_only": "The product's own split",
-    "P_C_source_split|P_B_erbs": "The product's split vs. Erbs",
+    "B_erbs|A_global_only": "Erbs beam/diffuse split",
+    "B_disc|A_global_only": "DISC beam/diffuse split",
+    "B_learned|A_global_only": "Learned beam/diffuse split",
+    "C_era5_split|A_global_only": "Weather product's beam/diffuse split",
+    "D_direct_fraction|A_global_only": "Weather product's direct-beam fraction",
+    "C_era5_split|B_erbs": "Weather product's split vs. Erbs's",
+    "C_era5_split|B_learned": "Weather product's split vs. the learned split",
+    "P_B_erbs|P_A_global_only": "Erbs beam/diffuse split",
+    "P_B_disc|P_A_global_only": "DISC beam/diffuse split",
+    "P_C_source_split|P_A_global_only": "Weather product's beam/diffuse split",
+    "P_C_source_split|P_B_erbs": "Weather product's split vs. Erbs's",
 }
 """Each plotted contrast, keyed by `treatment|reference`, to the label a reader sees."""
 
 PANEL_TITLES: Final[tuple[str, str]] = (
-    "Against global irradiance alone",
-    "The product's split against Erbs's",
+    "Against total irradiance alone",
+    "The weather product's split against Erbs's",
 )
 """The two panels, in the order they are drawn."""
 
 ROW_ORDER: Final[tuple[str, ...]] = (
-    "Erbs split",
-    "DISC split",
-    "Learned split",
-    "The product's own split",
-    "The product's direct fraction",
-    "The product's split vs. Erbs",
-    "The product's split vs. the learned split",
+    "Erbs beam/diffuse split",
+    "DISC beam/diffuse split",
+    "Learned beam/diffuse split",
+    "Weather product's beam/diffuse split",
+    "Weather product's direct-beam fraction",
+    "Weather product's split vs. Erbs's",
+    "Weather product's split vs. the learned split",
 )
 """The order the contrasts are stacked in, best-known to least-known."""
 
 RIGHT_PANEL_LABELS: Final[tuple[str, ...]] = (
-    "The product's split vs. Erbs",
-    "The product's split vs. the learned split",
+    "Weather product's split vs. Erbs's",
+    "Weather product's split vs. the learned split",
 )
 """The contrasts drawn in the right panel, which compares two ways of getting a split."""
 
 SUBTITLE: Final[tuple[str, ...]] = (
-    "Six PV sites in one 34 km box in Lincolnshire, hourly daylight rows, 2019-2026.",
-    "Change in mean absolute error against the global-irradiance-only arm (%).",
+    "Six PV sites in one 25 km by 23 km box in Lincolnshire, hourly daylight rows, 2019-2026.",
+    "The beam/diffuse split is how total sunlight divides between the direct beam",
+    "from the sun's disc and the light scattered across the rest of the sky.",
+    "Change in mean absolute error against a model given total irradiance alone (%).",
     "Negative is better. Bars are 95% monthly block bootstrap intervals; a bar",
     "crossing zero has not been shown to help. Each panel has its own x scale.",
     "Reanalysis and satellite retrieval, not forecasts, so this is information",
     "content, not forecast skill. The physical model's contrasts change sign",
     "under the other stamp alignment; the tree's do not.",
 )
+
+CHART_PADDING: Final[dict[str, int]] = {"left": 120, "top": 5, "right": 5, "bottom": 5}
+"""Outer padding in pixels, left-heavy so the y-axis labels have room.
+
+Vega lays a faceted chart's shared y axis out inside a row-header group of zero width, so
+an unlimited label runs off the left edge of the canvas instead of widening it. Padding the
+whole chart is what actually reserves the space."""
 
 PERCENTAGE_POINTS: Final[float] = 100.0
 
@@ -183,7 +192,16 @@ def _differences() -> pl.DataFrame:
 def _chart(*, differences: pl.DataFrame) -> alt.FacetChart:
     """Build the faceted point-and-interval chart."""
     base = alt.Chart(differences).encode(
-        y=alt.Y("contrast_label:N", title=None, sort=list(ROW_ORDER)),
+        y=alt.Y(
+            "contrast_label:N",
+            title=None,
+            sort=list(ROW_ORDER),
+            # Vega truncates a category label at 180 pixels by default, which cut the
+            # longest contrast to an ellipsis. Lifting the limit needs the chart padding
+            # below, because a faceted chart draws its shared y axis inside a zero-width
+            # row-header group and will otherwise run the text off the left edge.
+            axis=alt.Axis(labelLimit=0),
+        ),
         yOffset=alt.YOffset("source_label:N", sort=list(SOURCE_LABELS.values())),
         color=alt.Color(
             "source_label:N",
@@ -213,7 +231,14 @@ def _chart(*, differences: pl.DataFrame) -> alt.FacetChart:
         .properties(width=330, height=alt.Step(14))
         .facet(
             column=alt.Column("panel:N", title=None, sort=list(PANEL_TITLES)),
-            row=alt.Row("instrument_label:N", title=None, sort=list(INSTRUMENT_LABELS.values())),
+            row=alt.Row(
+                "instrument_label:N",
+                title=None,
+                sort=list(INSTRUMENT_LABELS.values()),
+                # Default is the left, where the row header collides with the longer
+                # contrast labels.
+                header=alt.Header(orient="right"),
+            ),
         )
         # Only the x scale is resolved per panel. Resolving y as well would drop the three rows the
         # physical model has no arm for, but it also detaches the column headers from the columns
@@ -223,7 +248,8 @@ def _chart(*, differences: pl.DataFrame) -> alt.FacetChart:
             title=alt.TitleParams(
                 text="Does a weather product's own beam/diffuse split help a PV model?",
                 subtitle=SUBTITLE,
-            )
+            ),
+            padding=CHART_PADDING,
         )
     )
 

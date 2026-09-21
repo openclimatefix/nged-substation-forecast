@@ -56,6 +56,8 @@ separation model's estimate of the same split, says what the *published field* b
 | `sky_conditions.py` | Splits the headline contrast by clearness index, which tests whether the gain sits where cloud makes the split uncertain — the shape the information account predicts and a calibration difference would not. |
 | `run_hybrid_experiment.py` | Feeds the physical model's out-of-fold prediction into XGBoost, to separate "the physical model is mis-calibrated" from "its five parameters are the wrong shape". Withholds each prediction by calendar month, the same way the learned separation arm does. |
 | `make_figures.py` | Draws the per-site time series, the per-site error chart and the sky-condition chart the write-up publishes. |
+| `inverter_clipping.py` | Splits the headline contrast by whether the meter was sitting on its inverter ceiling. A clipped hour cannot respond to irradiance, so this separates "clipping dilutes the effect" from "clipping manufactures it". |
+| `anm_curtailment.py` | Reads NGED's `curtailment/` feed — the active-network-management log nothing else in the repository ingests — and tests it against the one curtailed site's output shortfall. Needs the NGED bucket credentials the other scripts do not. |
 
 ## The arms
 
