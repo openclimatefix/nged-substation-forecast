@@ -1805,10 +1805,10 @@ dangerous". Two consequences follow for Flexpectation. Effort spent making the d
 is justified on separation grounds even where the richer demand model does not improve the fit to
 the substation's net flow. And the diagnostic to watch is the joint distribution over the components
 rather than the residual. Working in systems biology, [Wieland et al.
-(2021)](https://doi.org/10.1016/j.coisb.2021.03.005) add the matching warning about uncertainty:
-confidence intervals read off the curvature at the optimum are "insensitive to practical
-non-identifiabilities" and can look reassuringly finite for a parameter the data do not constrain at
-all — even though a differentiable model gives those intervals with little extra computation.
+(2021)](https://doi.org/10.1016/j.coisb.2021.03.005) add the matching warning about uncertainty: a
+differentiable model gives these confidence intervals, read off the curvature at the optimum, with
+little extra computation. The intervals are "insensitive to practical non-identifiabilities" and can
+look reassuringly finite for a parameter the data do not constrain at all.
 
 **Fitting a differentiable physical forward model to measurements is routine in exploration
 geophysics, and that field reports that the order in which the fit admits fine detail decides
