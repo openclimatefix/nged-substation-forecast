@@ -2,16 +2,16 @@
 
 Nearly every full-precision ``Float32`` value in a large forecast or weather table is distinct,
 so the low significand bits are incompressible noise — they defeat every general-purpose codec.
-Rounding each value to a small number of significand bits zeroes those low bits, after which a
-general-purpose codec has repetition to find, at the cost of a strictly bounded *relative* error.
-Which codec then wins is table-dependent and measured per table: ``delta_store.power_forecasts``
-adds a ``BYTE_STREAM_SPLIT`` encoding on top of zstd (see that module for measured numbers),
-while ``delta_store.nwp`` measured ``BYTE_STREAM_SPLIT`` as *worse* on NWP data and uses zstd
-alone. The rounding is what both tables have in common.
+Rounding each value to a small number of significand bits zeroes those low bits. A
+general-purpose codec then has repetition to find, at the cost of a strictly bounded *relative*
+error. Which codec then wins is table-dependent, and is measured per table.
+``delta_store.power_forecasts`` adds a ``BYTE_STREAM_SPLIT`` encoding on top of zstd; see that
+module for measured numbers. ``delta_store.nwp`` measured ``BYTE_STREAM_SPLIT`` as *worse* on NWP
+data, and uses zstd alone. The rounding is what both tables have in common.
 
-The rounding here is pure Polars arithmetic (no bit-twiddling, no numpy round-trip), which works
-because of a classical floating-point identity — Veltkamp splitting — documented in detail on
-`round_to_significand_bits`.
+The rounding here is pure Polars arithmetic, with no bit-twiddling and no numpy round-trip. The
+rounding works because of a classical floating-point identity, Veltkamp splitting, documented in
+detail on `round_to_significand_bits`.
 """
 
 from typing import Final
@@ -25,10 +25,11 @@ FLOAT32_SIGNIFICAND_BITS: Final[int] = 24
 def round_to_significand_bits(expr: pl.Expr, *, keep_bits: int) -> pl.Expr:
     """Round a ``Float32`` expression to ``keep_bits`` significand bits (round-to-nearest).
 
-    The result is exactly representable with a ``keep_bits``-bit significand, so the low
-    ``24 - keep_bits`` explicit fraction bits of every finite output are zero — which is what
-    gives the compression codec repetition to find — and the relative error is bounded by
-    the unit roundoff of a ``keep_bits``-bit format:
+    The result is exactly representable with a ``keep_bits``-bit significand. Write ``p`` for the
+    format's significand width, which `FLOAT32_SIGNIFICAND_BITS` above sets to 24. The low ``24 -
+    keep_bits`` explicit fraction bits of every finite output are therefore zero, which is what
+    gives the compression codec repetition to find. The relative error is bounded by the unit
+    roundoff of a ``keep_bits``-bit format:
 
         |result - x| <= 2**-keep_bits * |x|
 
@@ -47,36 +48,37 @@ def round_to_significand_bits(expr: pl.Expr, *, keep_bits: int) -> pl.Expr:
     [Muller et al. (2018)](https://doi.org/10.1007/978-3-319-76526-6), *Handbook of Floating-Point
     Arithmetic*, 2nd ed., §4.4, Algorithm 4.9 "Split") states that for
     ``2 <= s <= p - 2`` and no overflow, both subtractions are **exact** and ``result`` is ``x``
-    rounded to nearest onto ``p - s = keep_bits`` significand bits. The intuition: ``x*C``
-    stacks a copy of ``x`` shifted ``s`` exponent positions above itself; rounding that sum to
-    ``p`` bits (forming ``c``) is precisely what discards — with correct rounding — the low
-    ``s`` bits of the original ``x``; the two exact subtractions then peel the shifted copy back
+    rounded to nearest onto ``p - s = keep_bits`` significand bits. The intuition: ``x*C`` stacks a
+    copy of ``x`` shifted ``s`` exponent positions above itself. Rounding that sum to ``p`` bits,
+    which forms ``c``, is precisely what discards the low ``s`` bits of the original ``x``, and
+    discards them with correct rounding. The two exact subtractions then peel the shifted copy back
     off, leaving ``x`` with its low ``s`` significand bits rounded away.
 
     **Preconditions — each one is load-bearing:**
 
     - ``expr`` must be ``Float32``. The splitting constant is pinned to ``Float32``, but Polars
-      promotes mixed arithmetic: if a ``Float64`` expression is passed, the whole computation
-      runs at ``p = 53`` and silently keeps ``53 - s`` bits instead of ``keep_bits``. (A
-      ``.cast(pl.Float32)`` is deliberately *not* applied here — silently changing the dtype of
-      a ``Float64`` column would be its own trap; callers own their dtypes.)
-    - Arithmetic must be evaluated operation-by-operation in IEEE round-to-nearest. Polars
-      (Rust) guarantees this: floats are never reassociated and ``a*b + c`` is never contracted
-      into an FMA, either of which would break the exactness of the subtractions.
-    - Non-finite and overflow cases are guarded: for ``|x| > f32_max / C`` the product ``c``
-      overflows to ``inf`` and the naive result would be ``inf - inf = NaN``; for ``x`` NaN or
-      ``±inf``, ``c`` is likewise non-finite. Wherever ``c`` is non-finite the input value is
-      passed through unchanged (a huge-but-finite value is stored at full precision rather than
-      corrupted; ``NaN``/``±inf`` survive verbatim).
-    - Subnormal ``x`` (``|x| < 2**-126``) degrades gracefully: the relative-error bound loosens
-      because precision is already at the absolute floor of the format, but the result is still
-      a faithful nearby value.
+      promotes mixed arithmetic. If a ``Float64`` expression is passed, the whole computation runs
+      at ``p = 53`` and silently keeps ``53 - s`` bits instead of ``keep_bits``. A
+      ``.cast(pl.Float32)`` is deliberately *not* applied here. Silently changing the dtype of a
+      ``Float64`` column would be its own trap, and callers own their dtypes.
+    - Arithmetic must be evaluated operation-by-operation in IEEE round-to-nearest. Polars (Rust)
+      guarantees operation-by-operation evaluation: floats are never reassociated, and ``a*b + c``
+      is never contracted into an FMA. Reassociation or contraction into an FMA would break the
+      exactness of the subtractions.
+    - Non-finite and overflow cases are guarded. For ``|x| > f32_max / C`` the product ``c``
+      overflows to ``inf``, and the naive result would be ``inf - inf = NaN``. For ``x`` NaN or
+      ``±inf``, ``c`` is likewise non-finite. Wherever ``c`` is non-finite, the input value is
+      passed through unchanged. A huge-but-finite value is therefore stored at full precision
+      rather than corrupted, and ``NaN``/``±inf`` survive verbatim.
+    - Subnormal ``x`` (``|x| < 2**-126``) degrades gracefully. The relative-error bound loosens,
+      because precision is already at the absolute floor of the format. The result is still a
+      faithful nearby value.
 
     Args:
         expr: A ``Float32`` expression (see the dtype precondition above).
         keep_bits: Significand bits to keep, in ``[2, 22]`` (the theorem's ``2 <= s <= p - 2``).
-            Note this counts *significand* bits — the implicit leading 1 plus explicit fraction
-            bits — so ``keep_bits=13`` keeps 12 explicit fraction bits.
+            Note this counts *significand* bits: the implicit leading 1 plus the explicit fraction
+            bits. ``keep_bits=13`` therefore keeps 12 explicit fraction bits.
 
     Returns:
         A ``Float32`` expression: ``expr`` rounded to ``keep_bits`` significand bits, with

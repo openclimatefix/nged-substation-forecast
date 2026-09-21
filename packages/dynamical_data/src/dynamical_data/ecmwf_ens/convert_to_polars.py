@@ -35,16 +35,18 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
 ) -> pt.DataFrame[Nwp]:
     """Convert one downloaded ECMWF ENS run into the validated `Nwp` frame.
 
-    Loops over every `(lead_time, ensemble_member)` pair in `ds`, aggregates that chunk's grid
-    points onto `h3_grid`'s H3 cells, derives wind speed and direction from the downloaded u/v
-    components, and returns the concatenated result validated against the `Nwp` contract.
+    Loops over every `(lead_time, ensemble_member)` pair in `ds`. For each pair, aggregates that
+    chunk's grid points onto `h3_grid`'s H3 cells and derives wind speed and direction from the
+    downloaded u/v components. Returns the concatenated result, validated against the `Nwp`
+    contract.
 
     Guarantees, per cell:
 
-    - A **numeric** variable is the area-weighted mean of the points that supplied a value:
-      `sum(v * p)`, where the `proportion` weights `p` sum to 1 over the whole cell by construction
-      (see `geo.h3.compute_h3_grid_weights`), divided by the *contributing* weight rather than by
-      that 1.0, so a missing point costs only its own share instead of biasing the cell low.
+    - A **numeric** variable is the area-weighted mean of the points that supplied a value. The
+      numerator is `sum(v * p)`, where the `proportion` weights `p` sum to 1 over the whole cell by
+      construction (see `geo.h3.compute_h3_grid_weights`). The denominator is the *contributing*
+      weight rather than that 1.0, so a missing point takes only its own share out of the cell
+      instead of biasing the cell low.
     - A **categorical** variable is the category covering most of the cell's area, with an exact
       tie resolved to the lowest category code. Points that supplied no category are excluded from
       the ranking rather than competing in it.
@@ -52,31 +54,33 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
 
     Each variable is renormalised over its *own* denominator, which is what keeps one variable's
     corruption from nulling the others. The cost a caller must know about: two variables in one
-    cell can then be averaged over different sub-areas of the hexagon, so if `wind_u_*` and
-    `wind_v_*` ever have different null footprints, the wind vector that `_calc_wind_speed` and
-    `_calc_wind_direction` derive mixes two sub-areas. Upstream corruption has always been
-    co-located across variables, so that is theoretical today.
+    cell can then be averaged over different sub-areas of the hexagon. So if `wind_u_*` and
+    `wind_v_*` ever have different null footprints, the wind vector derived by `_calc_wind_speed`
+    and `_calc_wind_direction` mixes two sub-areas. Upstream corruption has always been co-located
+    across variables, so that is theoretical today.
 
     Args:
         ds: One downloaded ECMWF ENS run, as returned by
             `dynamical_data.ecmwf_ens.download.download_ecmwf_ens_data` — dimensions
             `(lead_time, ensemble_member, latitude, longitude)`, with `init_time` a scalar
             coordinate, and carrying the 13 downloaded ECMWF ENS variables.
-        h3_grid: The H3 grid weights to aggregate onto — one row per (H3 cell, NWP grid point)
-            pair whose cell and grid point overlap, with `proportion` the fraction of that cell's
-            area the point covers.
+        h3_grid: The H3 grid weights to aggregate onto. One row per (H3 cell, NWP grid point) pair
+            whose cell and grid point overlap. `proportion` is the fraction of that cell's area the
+            point covers.
 
     Returns:
-        One row per `(init_time, valid_time, ensemble_member, h3_index)`, validated against
-        `Nwp` — the wind components dropped in favour of the derived speed and direction, and
-        every other downloaded variable carried through under its `Nwp` field name.
+        One row per `(init_time, valid_time, ensemble_member, h3_index)`, validated against `Nwp`.
+        The wind components are dropped in favour of the derived speed and direction. Every other
+        downloaded variable is carried through under its `Nwp` field name.
     """
-    # Convention-sensitive to real ECMWF ENS data: the dim/coord order feeds the ravel + value-join,
-    # and the physical units feed Nwp.validate. The offline tests share those assumptions, so after
-    # changing this function run the network-gated test manually:
+    # Convention-sensitive to real ECMWF ENS data. The dimension and coordinate order feeds the
+    # ravel below and the value-join that follows it, and the physical units feed Nwp.validate. The
+    # offline tests share those assumptions, so after changing this function run the network-gated
+    # test manually:
     #     uv run pytest --run-network -m network
     # See
     # <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/#network-gated-tests>.
+
     # Precompute latitude and longitude grids
     lat_grid, lon_grid = np.meshgrid(
         ds.latitude.values.astype(np.float32),
@@ -107,18 +111,19 @@ def convert_nwp_xarray_dataset_to_polars_dataframe(
         .with_columns(
             nwp_model_id=pl.lit(NwpModelId.ECMWF_ENS_0_25_degree.name).cast(pl.String),
             init_time=pl.lit(ds["init_time"].values).cast(UTC_DATETIME_DTYPE),
-            # h3_grid.h3_index (H3GridWeights, joined in above) is UInt64 — that contract is
-            # Parquet-backed, so it never had Delta's no-unsigned-integer constraint — but
-            # Nwp.h3_index is Int64, so it needs an explicit cast here rather than at
-            # H3GridWeights's boundary. The narrowing loses nothing at any resolution: H3 reserves
-            # bit 63 of every index as zero, so no H3 value reaches the bit a signed Int64 gives
-            # up. See Nwp.h3_index in contracts.weather_schemas for the full argument.
+            # h3_grid.h3_index (H3GridWeights, joined in above) is UInt64. That contract is
+            # Parquet-backed, so it never had Delta's no-unsigned-integer constraint. Nwp.h3_index
+            # is Int64, so the cast belongs here rather than at H3GridWeights's boundary. The
+            # narrowing loses nothing at any resolution: H3 reserves bit 63 of every index as zero,
+            # so no H3 value reaches the bit a signed Int64 gives up. See Nwp.h3_index in
+            # contracts.weather_schemas for the full argument.
             h3_index=pl.col("h3_index").cast(pl.Int64),
-            # Computed here, after the H3 aggregation above, which is the order that matters:
-            # wind_u_*/wind_v_* are aggregated as ordinary numeric variables first, and speed and
-            # direction are derived from the already-aggregated components. Averaging *direction*
-            # over grid points instead would hit the same 0/360 wrap defect that a naive time
-            # resample has. Two points either side of North would average to due South. See
+            # Wind speed and direction are computed here, after the H3 aggregation above, and that
+            # order matters. wind_u_*/wind_v_* are aggregated as ordinary numeric variables first.
+            # Speed and direction are then derived from the already-aggregated components. Averaging
+            # *direction* over grid points instead would average bearings numerically, and two
+            # points either side of North would come out as due South. A naive time resample of a
+            # direction column hits that same 0/360 wrap defect. See
             # <https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp-variable-conventions/#wind-is-stored-as-speed-and-direction-and-why>.
             wind_speed_10m=_calc_wind_speed(height="10m"),
             wind_speed_100m=_calc_wind_speed(height="100m"),
@@ -184,11 +189,11 @@ def _process_chunk_for_1_lead_time_and_1_ens_member(
     for var_name in all_nwp_vars:
         data_dict[var_name] = ds[var_name].values.ravel()
 
-    # Normalise NaN to null here, at the boundary, for *every* weather variable. This is what gives
-    # "missing" a single representation downstream: xarray delivers upstream corruption as NaN,
-    # while a grid point the H3 weights name but the dataset does not carry arrives as a null from
-    # the left join below. The aggregation must treat the two identically, and it can only do that
-    # if they look the same.
+    # Normalise NaN to null here, at the boundary, for *every* weather variable. That normalisation
+    # gives "missing" a single representation downstream. xarray delivers upstream corruption as
+    # NaN. A grid point that the H3 weights name, but that the dataset does not carry, arrives as a
+    # null from the left join below. The aggregation must treat the two identically, and it can only
+    # do that if they look the same.
     nwp_df = pl.DataFrame(data_dict).with_columns(
         pl.col(numeric_vars).fill_nan(None),
         pl.col(categorical_vars).fill_nan(None).cast(pl.Int16),
@@ -244,8 +249,8 @@ def _aggregate_grid_points_to_h3_cells(
         for var in categorical_vars
     ]
     # The category covering the most of the cell's area wins. An exact tie goes to the lowest
-    # category code, which leans dry: code 0 is "no precipitation", so a cell split exactly between
-    # "no precipitation" and "snow" is recorded as "no precipitation".
+    # category code, which leans dry. Code 0 is "no precipitation". A cell split exactly between "no
+    # precipitation" and "snow" is therefore recorded as "no precipitation".
     weighted_modes = [
         pl.col(var)
         .sort_by(

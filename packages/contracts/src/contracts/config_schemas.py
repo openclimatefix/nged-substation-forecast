@@ -1,4 +1,7 @@
-"""Configuration schemas, and the class-path round-trip that ``_target_`` strings ride on."""
+"""Configuration schemas, and the class-path round-trip behind a ``_target_`` string.
+
+A ``_target_`` string is the key a YAML config file uses to name the Python class to build.
+"""
 
 import importlib
 from datetime import date
@@ -13,9 +16,10 @@ from contracts.power_schemas import FoldId
 def class_target(obj: type | object) -> str:
     """Return the fully-qualified import path of a class (or of an instance's class).
 
-    The inverse of ``import_class``. Together they are how a config file, an MLflow experiment tag
-    and a saved model's ``meta.json`` all name a Python class: a ``module.ClassName`` string that
-    survives being written to disk and read back in another process.
+    The inverse of ``import_class``. ``class_target`` and ``import_class`` together are how a
+    config file, an MLflow experiment tag, and a saved model's ``meta.json`` all name a Python
+    class: by a ``module.ClassName`` string. That string survives being written to disk and read
+    back in another process.
 
     Args:
         obj: The class to name, or an instance whose class should be named.
@@ -27,8 +31,8 @@ def class_target(obj: type | object) -> str:
         ValueError: ``obj``'s class is not defined at module level — it is nested inside another
             class or inside a function. ``import_class`` resolves a single attribute lookup on a
             module, so such a class has no path it could resolve. Failing here, where the class is
-            defined, beats emitting a target string that only breaks when something later tries to
-            load it.
+            defined, beats emitting a target string that only breaks when a later caller tries to
+            load the class.
     """
     cls = obj if isinstance(obj, type) else type(obj)
     if "." in cls.__qualname__:
@@ -61,8 +65,8 @@ def import_class(target: str) -> type:
     """
     module_path, _, class_name = target.rpartition(".")
     # A leading dot would make import_module read the target as a relative import and demand a
-    # package to resolve it against; that is a malformed target, so reject it here rather than
-    # letting it surface as the TypeError import_module would raise.
+    # package to resolve that target against. A relative target is malformed, so reject the target
+    # here rather than letting it surface as the TypeError import_module would raise.
     if not module_path or module_path.startswith("."):
         raise ValueError(f"{target!r} is not a fully-qualified class path (expected 'module.Cls').")
     try:
@@ -75,8 +79,9 @@ def import_class(target: str) -> type:
         raise ValueError(f"Module {module_path!r} has no attribute {class_name!r}.") from error
     if not isinstance(resolved, type):
         # TRY004 wants a TypeError, but the isinstance check is on what `target` *resolved to*,
-        # not on `target` itself, which is a perfectly well-typed str. What is wrong is its value,
-        # so every failure here is one ValueError and a caller needs to catch only that.
+        # not on `target` itself, which is a perfectly well-typed str. What is wrong is the target's
+        # value. Every failure here is therefore a ValueError, and a caller needs to catch only
+        # ValueError.
         raise ValueError(  # noqa: TRY004
             f"Target {target!r} resolved to {resolved!r}, which is not a class."
         )
@@ -84,12 +89,13 @@ def import_class(target: str) -> type:
 
 
 class CvFoldConfig(BaseModel):
-    """Configuration for a single expanding-window CV fold.
+    """Configuration for a single expanding-window cross-validation (CV) fold.
 
-    ``leaderboard`` distinguishes the epoch-pinned leaderboard folds (the apples-to-apples
-    evaluation protocol) from optional non-leaderboard dev folds such as ``smoke_test``: a
-    ``leaderboard=False`` fold runs through the identical pipeline but never feeds the
-    leaderboard.
+    ``leaderboard`` distinguishes two kinds of fold. The leaderboard folds are the
+    apples-to-apples evaluation protocol, and they are epoch-pinned: their dates are fixed for
+    the life of a leaderboard epoch, and changing them founds a new epoch. Optional dev folds,
+    such as ``smoke_test``, are non-leaderboard folds. A ``leaderboard=False`` fold runs through
+    the identical pipeline but never feeds the leaderboard.
 
     ``min_training_months`` overrides ``CvConfig.min_training_months`` for this fold alone
     (``None`` falls back to the config-level value). A short dev fold sets it to its train length
@@ -108,12 +114,16 @@ class CvFoldConfig(BaseModel):
 class CvConfig(BaseModel):
     """Configuration for expanding-window cross-validation.
 
+    Each fold trains on the history from its train_start to its train_end, and is scored on the
+    val_start-to-val_end span that follows. The window expands because each later fold keeps the
+    earlier folds' training history and adds more to it.
+
     The folds list defines the evaluation protocol shared by all experiments on the leaderboard.
     All models must be evaluated against the same folds to ensure apples-to-apples comparison.
 
-    min_training_months controls which time series are eligible for each fold: a time series is
-    only included if it has at least this many months of data before val_start (and data through
-    val_end).
+    min_training_months controls which time series are eligible for each fold. A time series is
+    included only if it has at least min_training_months months of data before val_start, and
+    data through val_end.
     """
 
     folds: list[CvFoldConfig]
@@ -121,7 +131,7 @@ class CvConfig(BaseModel):
 
     @property
     def fold_ids(self) -> list[str]:
-        """The fold ids in declaration order (e.g. ``["2022", "2023", ...]``).
+        """The fold ids in declaration order (e.g. ``["mid_2025_to_mid_2026", "smoke_test"]``).
 
         Used to build the ``cv_experiment_folds`` partitions and to expand experiment
         registration into per-fold partition keys — always read from config, never hard-coded.
@@ -141,7 +151,7 @@ class CvConfig(BaseModel):
         """Return the fold with the given ``fold_id``.
 
         Args:
-            fold_id: The fold identifier to look up (e.g. ``"2022"``).
+            fold_id: The fold identifier to look up (e.g. ``"mid_2025_to_mid_2026"``).
 
         Returns:
             The ``CvFoldConfig`` whose ``fold_id`` matches, carrying that fold's train and
