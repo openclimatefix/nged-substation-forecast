@@ -1,6 +1,14 @@
-"""`Settings`: every data path and object-store credential the pipeline reads.
+"""The pipeline's environment-resolved configuration, and the cached accessor that reaches it.
 
-Values are resolved from the environment and the workspace `.env`.
+`Settings` is the configuration class itself, and `get_settings()` is the cached accessor that
+keeps one shared instance. Prefer the accessor wherever a `Settings` would otherwise be built
+while a module is still being imported. Building a `Settings` is what reads `.env` and the
+environment. An import-time build therefore couples a pure schema module to the environment, and
+freezes the values before a test can change them. A function that builds its own `Settings` when
+it runs is unaffected, and every `Settings` this repo's Dagster code builds is built inside a
+function body. `PROJECT_ROOT` resolves the workspace root. The `.env` file and the repo-relative
+path defaults are anchored to that root. Anchoring the defaults to a resolved root is what lets
+one set of defaults serve an editable install, a non-editable install, and the Docker image alike.
 """
 
 from functools import lru_cache
@@ -20,17 +28,18 @@ def _find_project_root(start: Path) -> Path:
     """Walk up from ``start`` to the uv workspace root, marked by its ``uv.lock`` file.
 
     ``uv.lock`` exists only at the workspace root, so the first ancestor holding one is the
-    project root. This resolves correctly for every install mode that keeps the virtualenv
-    inside the repo: an editable install walks up from the source checkout, and a
-    non-editable install (``uv sync --no-editable``) walks up from
-    ``<repo>/.venv/lib/python*/site-packages/`` past the venv to the same root. The
-    production Docker image copies ``uv.lock`` to ``/app``, so there the root resolves to
-    ``/app``, where the image's ``COPY conf/`` places the resource files.
+    project root. The walk resolves correctly for every install mode that keeps the virtualenv
+    inside the repo. An editable install walks up from the source checkout. A non-editable install
+    (``uv sync --no-editable``) walks up from ``<repo>/.venv/lib/python*/site-packages/``, past the
+    venv, to the same root. The production Docker image copies ``uv.lock`` to ``/app``, so in the
+    image the root resolves to ``/app``. The image's ``COPY conf/`` places the cross-validation
+    fold definitions and the model config under ``/app`` too.
 
     When no ancestor holds a ``uv.lock`` — a wheel installed into a venv outside any
-    workspace checkout — fall back to the current working directory. Such a deployment must
-    either run with its working directory at a directory laid out like the repo root, or set
-    each path setting explicitly via its environment variable (``CV_CONFIG_PATH``, etc.).
+    workspace checkout — fall back to the current working directory. A deployment with no
+    ``uv.lock`` above it has two options. Run it with its working directory at a directory laid out
+    like the repo root. Or set each path setting explicitly via its environment variable
+    (``CV_CONFIG_PATH``, etc.).
 
     Args:
         start: File or directory to walk up from (typically ``Path(__file__)``).
@@ -53,12 +62,28 @@ and the caveat for wheels installed outside a workspace checkout.
 
 
 class Settings(BaseSettings):
-    """Configuration settings for the NGED substation forecast project."""
+    """Every setting the pipeline reads from its environment.
+
+    The fields cover the data paths, the object-store credentials, the MLflow tracking URI, and
+    the four Sentry settings: ``sentry_dsn``, ``sentry_environment``,
+    ``sentry_traces_sample_rate``, and ``sentry_monitor_forecasts``.
+
+    Each field takes its value from an environment variable of the same name, from the workspace
+    ``.env``, or from the default declared here, in that order of precedence. The managed
+    data-table paths default to ``""``, a sentinel meaning "derive me". The ``after``-mode model
+    validator ``_derive_unset_paths`` — a validator pydantic runs once, immediately after the
+    ``Settings`` is built — fills a path left unset from ``data_path_internal``,
+    ``data_path_delivery``, or ``local_artifacts_path``. A caller therefore never observes the
+    sentinel and always reads a concrete path, while a path set explicitly keeps the value it was
+    given. Every value is read when the ``Settings`` is built. A test that changes the
+    environment afterwards therefore has to build a fresh ``Settings``. If that test reads
+    through the cached accessor, it must call ``get_settings.cache_clear()`` first.
+    """
 
     mlflow_tracking_uri: str = Field(
         default="sqlite:///mlflow.db",
         description=(
-            "MLflow tracking URI. Centralized here for environment-specific configuration"
+            "MLflow tracking URI. Centralised here for environment-specific configuration"
             " (e.g., local SQLite for development, remote server for production)."
             " The application entrypoint should read this setting and set the"
             " MLFLOW_TRACKING_URI environment variable accordingly, which MLflow will"
@@ -70,13 +95,14 @@ class Settings(BaseSettings):
     # not required: `get_nged_s3_store` is their only consumer, and its only caller is the
     # `power_time_series_and_metadata` ingest asset. Making them required would mean every Delta
     # read, training run and dashboard could not build a `Settings` without third-party credentials
-    # it never uses — and since `.env` is gitignored, a fresh clone could not run the test suite at
-    # all, which is exactly what "the whole system must be exercisable on one laptop" forbids:
+    # it never uses. `.env` is gitignored, so a fresh clone could not run the test suite at all.
+    # That is exactly what "the whole system must be exercisable on one laptop" forbids:
     # https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#6-the-whole-system-must-be-exercisable-on-one-laptop
     #
-    # Absence is therefore caught at the point of *use* (`get_nged_s3_store`), which also confines
-    # a mis-wired secret to the one schedule that needs it: inference reads our own Delta tables and
-    # a baked-in model, so failing it over an ingest credential would stop the forecast.
+    # Absence is therefore caught at the point of *use*, in `get_nged_s3_store`. Catching it there
+    # confines a mis-wired secret to the one schedule that needs it. Inference — the scheduled run
+    # that produces a forecast — reads our own Delta tables and a model baked into the deployment
+    # image, so failing inference over an ingest credential would stop the forecast.
     nged_s3_bucket_url: str = Field(
         default="",
         description=(
@@ -99,9 +125,10 @@ class Settings(BaseSettings):
         Call this immediately before doing something that reads NGED's bucket, so the failure names
         the missing configuration instead of surfacing as an opaque auth error from ``obstore``.
 
-        Do *not* call it from process start-up or module import to fail a deployment fast: inference
-        needs none of these credentials, so that would stop the forecast over a missing ingest
-        secret. See the [AWS runbook](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-8-store-secrets-in-parameter-store).
+        Do *not* call this method from process start-up or module import in order to fail a
+        deployment fast. Inference needs none of these credentials, so a start-up call would stop
+        the forecast over a missing ingest secret. See the [AWS
+        runbook](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/#step-8-store-secrets-in-parameter-store).
 
         Raises:
             ValueError: Naming exactly which of the three environment variables are unset.
@@ -125,7 +152,7 @@ class Settings(BaseSettings):
             )
 
     def get_nged_s3_store(self) -> obstore.store.S3Store:
-        """Returns an initialized obstore.store.S3Store instance for the NGED bucket.
+        """Returns an initialised obstore.store.S3Store instance for the NGED bucket.
 
         Returns:
             An ``S3Store`` bound to ``nged_s3_bucket_url`` and authenticated with the
@@ -153,9 +180,9 @@ class Settings(BaseSettings):
     )
     # --- Storage roots -------------------------------------------------------------------
     #
-    # data_path_internal and data_path_delivery hold the (S3-capable) data tables; local_
-    # artifacts_path holds the always-local production model. Why they are split, and
-    # what belongs in each:
+    # data_path_internal and data_path_delivery hold the (S3-capable) data tables;
+    # local_artifacts_path holds the always-local production model. Why the three roots are
+    # split, and what belongs in each:
     # https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/
 
     data_path_internal: str = Field(
@@ -188,9 +215,12 @@ class Settings(BaseSettings):
 
     # --- Object-store credentials for the data tables (used only when a data-path root is remote)
     #
-    # All empty by default; unset on AWS (object_store auto-discovers the IAM-role credentials),
-    # set only for a dev/MinIO endpoint. The AWS/dev split, and how these differ from the
-    # nged_s3_bucket_* source-bucket creds above:
+    # All four are empty by default. On AWS they stay unset, because object_store — the Rust
+    # object-storage library underneath delta-rs, Polars, and obstore — auto-discovers the
+    # credentials of the AWS Identity and Access Management (IAM) role. Set them only for a dev
+    # endpoint or for MinIO, the S3-compatible store a developer runs locally in place of S3. The
+    # AWS/dev split, and how these four data-store settings differ from the nged_s3_bucket_*
+    # source-bucket credentials above:
     # https://openclimatefix.github.io/nged-substation-forecast/live_service/setup/
 
     data_store_endpoint_url: str = Field(
@@ -215,13 +245,14 @@ class Settings(BaseSettings):
     def storage_options(self) -> ObjectStoreOptions:
         """delta-rs / polars / obstore ``storage_options`` for the managed data tables.
 
-        Empty on AWS — object_store auto-discovers the Fargate task's IAM-role credentials and
-        region — and empty for a local data-path root (delta-rs ignores it there). Populated from
-        the ``data_store_*`` settings only for a dev/MinIO/S3-compatible endpoint. The ``aws_*``
-        keys are the shared object_store aliases understood by delta-rs, polars cloud IO, and
-        obstore alike, so one value feeds every IO site. Returned as an ``ObjectStoreOptions``
-        ``TypedDict`` so ``ty`` checks each key here, where they are authored; widen it to a
-        plain ``dict`` at each IO boundary with ``typeddict_to_dict``.
+        Empty on AWS, where object_store auto-discovers the IAM-role credentials and region of
+        the AWS Fargate task the pipeline runs in. Empty too for a local data-path root, because
+        delta-rs ignores storage_options there. Populated from the ``data_store_*`` settings only
+        for a dev/MinIO/S3-compatible endpoint. The ``aws_*`` keys are the shared object_store
+        aliases understood by delta-rs, polars cloud IO, and obstore alike, so one value feeds
+        every IO site. Returned as an ``ObjectStoreOptions`` ``TypedDict``, so that ``ty``, the
+        type checker this repo runs, checks each key here, where the keys are authored. Widen the
+        ``TypedDict`` to a plain ``dict`` at each IO boundary with ``typeddict_to_dict``.
         """
         options: ObjectStoreOptions = {}
         if self.data_store_endpoint_url:
@@ -246,7 +277,8 @@ class Settings(BaseSettings):
     nwp_data_path: str = ""
     """Delta table of NWP weather data."""
     power_forecasts_data_path: str = ""
-    """Delta table of power forecasts (partitioned by experiment_name, fold_id).
+    """Delta table of power forecasts, partitioned by experiment_name and fold_id, so its files
+    are grouped on disk by those two columns.
 
     An NGED-facing delivery table — derives from data_path_delivery, not data_path_internal.
     """
@@ -261,8 +293,9 @@ class Settings(BaseSettings):
         description=(
             "Delta table of the canonical per-fold eligible time_series_id population, written"
             " by the eligible_time_series asset (partitioned by fold_id) and read by"
-            " trained_cv_model and cv_power_forecasts so every experiment scores a fold on the"
-            " identical, experiment-independent population."
+            " trained_cv_model, so every experiment trains a fold on the identical,"
+            " experiment-independent population. cv_power_forecasts inherits that same population"
+            " from the trained model's trained_time_series_ids rather than reading this table."
         ),
     )
     effective_capacity_data_path: str = Field(
@@ -275,7 +308,7 @@ class Settings(BaseSettings):
         ),
     )
     h3_grid_weights_path: str = ""
-    """Parquet file of fractional H3 cell overlap with the GB boundary."""
+    """Parquet file of fractional H3 cell overlap with the Great Britain boundary."""
 
     # --- Always-local artifacts (derive from local_artifacts_path unless explicitly set) --
 
@@ -289,7 +322,7 @@ class Settings(BaseSettings):
         ),
     )
 
-    # --- Sentry observability (all optional; an empty DSN disables Sentry entirely) ---
+    # --- Sentry observability (all optional; an empty data source name (DSN) disables Sentry) ---
 
     sentry_dsn: str = Field(
         default="",
@@ -348,9 +381,12 @@ class Settings(BaseSettings):
         # NGED-facing delivery tables derive from data_path_delivery instead, so a new delivery
         # table can't silently land in the internal bucket by inheriting the default derivation.
         # `power_forecast` and `effective_capacity` are two of the five tables in NGED's stable
-        # delivery contract; see
-        # <https://openclimatefix.github.io/nged-substation-forecast/architecture/forecast-delivery/#securing-it>
-        # for the rest and why they live in a separate bucket.
+        # delivery contract — the agreement with NGED about which tables we publish, not a Patito
+        # schema of the kind this package otherwise calls a contract. The other three tables are
+        # listed at
+        # <https://openclimatefix.github.io/nged-substation-forecast/roadmap/delivery-tables/>,
+        # with what each one holds. Why the delivery tables live in a bucket of their own is at
+        # <https://openclimatefix.github.io/nged-substation-forecast/architecture/forecast-delivery/#securing-it>.
         self.power_forecasts_data_path = self.power_forecasts_data_path or uri_join(
             self.data_path_delivery, "power_forecasts"
         )
@@ -394,13 +430,13 @@ class Settings(BaseSettings):
 def get_settings() -> Settings:
     """Return the shared, lazily-constructed ``Settings`` singleton.
 
-    Prefer this over constructing ``Settings()`` at module import time: instantiation reads
-    ``.env`` and the environment, so deferring it to first *use* keeps library modules (e.g. the
-    ``contracts`` schemas) importable whatever the environment holds, and lets a test change the
-    environment before the first read.
+    Prefer ``get_settings()`` over constructing ``Settings()`` at module import time, because
+    instantiation reads ``.env`` and the environment. Deferring that read to first *use* keeps
+    library modules such as the ``contracts`` schemas importable whatever the environment holds.
+    Deferring it also lets a test change the environment before the first read.
 
-    Cached with ``lru_cache`` so every caller shares one instance (matching the previous
-    module-level singletons). Call ``get_settings.cache_clear()`` in a test that needs to re-read
-    the environment after changing it.
+    Cached with ``lru_cache`` so every caller shares one instance. Call
+    ``get_settings.cache_clear()`` in a test that needs to re-read the environment after changing
+    it.
     """
     return Settings()

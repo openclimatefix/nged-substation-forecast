@@ -93,13 +93,13 @@ candidate meets them with its own machinery, and the judging checks each one.
 
 ### What effective capacity must exclude
 
-ANM curtailment is a deliberate, network-driven reduction, not a loss of physical capability.
-Folding curtailment into capacity would corrupt exactly the signal NGED needs. We identify curtailed
-periods from NGED's curtailment/ANM feed and keep them out of the capacity estimate — in the
-physics-model formulation this is a separate multiplicative **curtailment gate** on the generator's
-output (see [the v2 engine's node definitions](disaggregation.md#node-definitions) for where the
-same gate reappears at scale); in the convex formulation it amounts to masking or down-weighting
-flagged periods.
+Active Network Management (ANM) curtailment is a deliberate, network-driven reduction, not a loss of
+physical capability. Folding curtailment into capacity would corrupt exactly the signal NGED needs.
+We identify curtailed periods from NGED's curtailment/ANM feed and keep them out of the capacity
+estimate — in the physics-model formulation this is a separate multiplicative **curtailment gate**
+on the generator's output (see [the v2 engine's node
+definitions](disaggregation.md#node-definitions) for where the same gate reappears at scale); in the
+convex formulation it amounts to masking or down-weighting flagged periods.
 
 **The ANM feed is imperfect, in both directions.** Like any operational log, the ANM feed is an
 imperfect label: curtailment can happen with no matching log entry (for example, a generator's
@@ -123,8 +123,9 @@ the feed is a *noisy label*, not ground truth — use it, but do not lean on it:
 **Ask for the raw export cap rather than a derived curtailment volume, and treat the cap as a
 constraint rather than as a label.** Joining both to six metered solar farms in the [beam/diffuse
 experiment](../results/beam-diffuse-split.md#one-site-is-curtailed-and-it-is-the-noisiest-of-the-six)
-found one of the six under active network management. Its cap sits at the connection limit 80.5% of
-the time, and on the bright hours where the cap never moved the site's yield matches the other five
+found one of the six under active network management. Its cap sits at the connection limit for
+80.7% of the half-hours since the scheme went live, and on the bright hours where the cap never
+moved the site's yield matches the other five
 to within half a percent, which is what says the cap is read correctly. The cap is also the form a
 physics-based estimator wants, because it enters as `min(what the weather allowed, the cap)` — an
 upper bound on export rather than a volume to subtract, so it costs nothing on the hours it does

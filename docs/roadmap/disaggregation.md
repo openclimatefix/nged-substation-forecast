@@ -279,9 +279,10 @@ Following the report's schematic, the graph uses the following node types:
    residential or commercial heat pump penetration.
 
 Each generation node feeds the substation through a **curtailment gate**: a separate multiplicative
-factor, driven by NGED's ANM/curtailment data feed, that represents network-enforced reductions.
-Keeping curtailment in its own gate (rather than inside the capacity parameter) is what lets the
-effective-capacity estimate stay a clean measure of physical availability — see [Capacity
+factor, driven by NGED's Active Network Management (ANM) curtailment data feed, that represents
+network-enforced reductions. Keeping curtailment in its own gate (rather than inside the capacity
+parameter) is what lets the effective-capacity estimate stay a clean measure of physical
+availability — see [Capacity
 estimation](capacity-estimation.md#what-effective-capacity-must-exclude) (including the caveat there
 that the ANM feed is itself imperfect) and Fig. 10.
 

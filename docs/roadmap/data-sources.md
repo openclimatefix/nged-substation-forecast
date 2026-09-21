@@ -18,7 +18,7 @@ data.
 | Source | Status | Description |
 |---|---|---|
 | **Time-series JSON files** | ✅ | Half-hourly power flow + metadata per substation / customer meter in the trial area. Ingested by OCF to produce operational forecasts. Each reading is a **period-ending mean** — power averaged over the preceding 30 minutes, with `time` marking the end of that window, as `PowerTimeSeries` in `packages/contracts/src/contracts/power_schemas.py` records. The irradiance ingest is chosen to match, so [Weather data](#weather-data) prefers a source that accumulates over the interval to a source that samples an instant. |
-| **Curtailment (ANM)** | 🚧 | Half-hourly megawatts lost to an active-network-management instruction, per curtailed generator. Crucial for distinguishing deliberate ANM ramp-downs from genuine faults or capacity loss. What the feed holds, and how far back it reaches, is [below](#what-the-curtailment-feed-holds). |
+| **Curtailment (active network management)** | 🚧 | Half-hourly megawatts lost to an active-network-management (ANM) instruction, per curtailed generator. Crucial for distinguishing deliberate ANM ramp-downs from genuine faults or capacity loss. What the feed holds, and how far back it reaches, is [below](#what-the-curtailment-feed-holds). |
 
 ### What the curtailment feed holds
 
