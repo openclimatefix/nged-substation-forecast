@@ -204,8 +204,8 @@ def _parse_args() -> argparse.Namespace:
         default="mid_2025_to_mid_2026",
         help=(
             "Cross-validation fold whose forecasts to export, matched against the fold_id"
-            " partition column. The folds are defined in conf/cv/default.yaml"
-            " (default: mid_2025_to_mid_2026)."
+            " partition column of the power_forecasts table. The folds are defined in"
+            " conf/cv/default.yaml (default: mid_2025_to_mid_2026)."
         ),
     )
     parser.add_argument(
