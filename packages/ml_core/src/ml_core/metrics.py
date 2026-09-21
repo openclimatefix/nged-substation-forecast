@@ -168,8 +168,8 @@ def _band_label(lower_quantile: float) -> str:
     A quantile band is a symmetric pair of delivery quantiles, such as p10 and p90, whose
     interval the forecast is scored for coverage and width. The label returned here is what the
     tall ``Metrics`` frame stores in its ``metric_param`` column, which says which quantile or
-    band a metric row belongs to. Note that ``metric_param`` also carries the *lead-time* bands
-    named by ``HORIZON_SLICES``; the two senses of "band" are distinguished by the metric.
+    band a metric row belongs to. The lead-time bands are a separate axis, carried by the
+    ``horizon_slice`` column rather than by ``metric_param``.
     """
     return f"{quantile_label(lower_quantile)}_{quantile_label(1 - lower_quantile)}"
 
@@ -325,14 +325,14 @@ def compute_metrics(
        covering a ``valid_time`` is scored independently, exactly as a production consumer would
        experience that run. Runs at different lead times are never pooled.
     4. Aggregates per ``horizon_slice``, plus the ``"all"`` aggregate over every lead time. The
-    delivery quantiles are the quantiles the forecast is published at, listed by
-    ``DELIVERY_QUANTILES``. The ensemble mean gives MAE, NMAE, RMSE, and mean bias error (MBE). The
-    member-aware quantities give CRPS and the spread-skill ratio. Each delivery quantile gives a
-    pinball loss, and the pinball losses also get a mean. Each symmetric quantile band gives a
-    prediction-interval coverage probability (PICP) and an interval width. 5. Joins
-    ``time_series_type`` from ``metadata`` onto each row. 6. Returns one row per ``(time_series_id,
-    fold_id, power_fcst_model_name,
-       horizon_slice, metric_name, metric_param)`` in the tall ``Metrics`` format.
+       delivery quantiles are the quantiles the forecast is published at, listed by
+       ``DELIVERY_QUANTILES``. The ensemble mean gives MAE, NMAE, RMSE, and mean bias error (MBE).
+       The member-aware quantities give CRPS and the spread-skill ratio. Each delivery quantile
+       gives a pinball loss, and the pinball losses also get a mean. Each symmetric quantile band
+       gives a prediction-interval coverage probability (PICP) and an interval width.
+    5. Joins ``time_series_type`` from ``metadata`` onto each row.
+    6. Returns one row per ``(time_series_id, fold_id, power_fcst_model_name, horizon_slice,
+       metric_name, metric_param)`` in the tall ``Metrics`` format.
 
     NMAE is normalised by the pre-computed ``effective_capacity_mw``, joined per ``time_series_id``
     from ``capacity``. That denominator is capacity-like, and is computed over the full history so

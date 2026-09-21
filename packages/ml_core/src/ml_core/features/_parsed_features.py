@@ -1,8 +1,8 @@
 """Feature name parsing and typed feature descriptors.
 
 Translates raw string requests (e.g. ``"power_lag_24h"``) into structured, typed objects so the
-rest of the pipeline never parses strings. ``ParsedFeatures.from_strings`` is the entry point. It
-also enforces two architectural guardrails. The raw target — the ``power`` column the models
+rest of the pipeline never parses strings. ``ParsedFeatures.from_strings`` is the entry point,
+and also enforces two architectural guardrails. The raw target — the ``power`` column the models
 predict — may not be requested as a feature. Nor may an identifying column that merely labels a
 row, such as ``time_series_id`` or ``valid_time``.
 """
@@ -141,7 +141,8 @@ class ParsedFeatures:
         weather_features: List of raw weather features. Identifies raw weather variables
             requested directly as input features.
         base_features: List of ``SafeInputBaseColumn`` values requested directly as input features.
-            These are the raw columns already on the frame that a model is allowed to consume as-is:
+            The base features are the raw columns already on the frame that a model is
+            allowed to consume as-is:
             ``time_series_id``, ``time_series_type``, ``nwp_lead_time_hours``, ``ensemble_member``,
             ``power_fcst_init_time``, and ``nwp_init_time``. Every other raw column is either the
             target or an identifier, and is refused.

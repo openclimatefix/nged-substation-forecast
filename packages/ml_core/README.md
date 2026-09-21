@@ -81,8 +81,9 @@ at `power_fcst_init_time`, never if it was merely knowable at `nwp_init_time`. A
 than or equal to the forecast lead time would read an observation from at or after
 `power_fcst_init_time`, which nobody had yet when the forecast was issued. Every such lag is set to
 null, in `_nullify_leaky_lags`. Weather lags reaching back before `power_fcst_init_time` are
-answered from an earlier NWP run rather than from the current run. Answering a past target time
-from the earlier run is the dual-strategy join in `_apply_weather_lag`.
+answered from the control member of the freshest NWP run covering that time, rather than from the
+row's own run and its own ensemble member. Answering a past target time that way is the
+dual-strategy join in `_apply_weather_lag`.
 
 **The train==predict population invariant keeps the leaderboard comparable.** A model scores exactly
 the `time_series_id` population it trained on, whatever the eligibility rules would admit today, and

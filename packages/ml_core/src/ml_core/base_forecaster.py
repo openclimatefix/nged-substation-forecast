@@ -111,10 +111,10 @@ def load_trained_metadata(model_dir: Path) -> pt.DataFrame[TimeSeriesMetadata]:
     """Read back the ``TimeSeriesMetadata`` rows a saved model carries.
 
     Patito offers two ways to put a schema on a frame: ``validate`` checks every row against the
-        schema and raises on a violation, while ``set_model`` attaches the schema without checking.
-        This function uses ``set_model``, matching how the cross-validation, training, and metrics
-        assets read the roster itself. ``load_trained_metadata`` reads back what was written, so
-        re-checking those rows would only reject rosters the rest of the system already accepts.
+    schema and raises on a violation, while ``set_model`` attaches the schema without checking.
+    This function uses ``set_model``, matching how the cross-validation, training, and metrics
+    assets read the roster itself. ``load_trained_metadata`` reads back what was written, so
+    re-checking those rows would only reject rosters the rest of the system already accepts.
 
     Args:
         model_dir: A directory written by ``save_to_mlflow`` (via ``write_trained_metadata``) and

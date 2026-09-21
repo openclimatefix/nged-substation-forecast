@@ -144,8 +144,9 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
     nulls are both left as null. A leading null sits before the group's first non-null value, and
     a trailing null sits after the group's last non-null value. The weather model this pipeline
     consumes is the European Centre for Medium-Range Weather Forecasts ensemble (ECMWF ENS). Some
-    ECMWF ENS variables — precipitation and the radiation fluxes — are accumulated over the step,
-    so they have nothing to accumulate at lead time 0 and are null there by convention. Every
+    ECMWF ENS variables — precipitation and the radiation fluxes — are period-ending: each value is
+    the average rate over the interval ending at that valid_time. There is no such interval at lead
+    time 0, so they are null there by convention. Every
     interpolated 30-min row before a group's first non-null native step therefore remains null —
     typically a 3-hour window per NWP run. ECMWF ENS runs at a 3-hour native step width out to
     144 hours, then coarsens to a 6-hour step width for the rest of its 360-hour horizon. The

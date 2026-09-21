@@ -68,11 +68,12 @@ def _apply_weather_lag(
     """Applies a weather lag using a dual-strategy time-aware join.
 
     - If target_time >= power_fcst_init_time, the target time sits in the NWP forecast window,
-    boundary included. The lag then uses the exact same NWP run (nwp_init_time) and ensemble member
-    as the weather used for valid_time. - If target_time < power_fcst_init_time, the target time is
-    already in the past. The lag then uses the freshest NWP run for that target time, reading its
-    control member (ensemble_member 0, the one unperturbed member). That freshest control member
-    stands in for the weather that actually happened, which is why it is called the analysis proxy.
+      boundary included. The lag then uses the exact same NWP run (nwp_init_time) and ensemble
+      member as the weather used for valid_time.
+    - If target_time < power_fcst_init_time, the target time is already in the past. The lag then
+      uses the freshest NWP run for that target time, reading its control member (ensemble_member
+      0, the one unperturbed member). That freshest control member stands in for the weather that
+      actually happened, which is why it is called the analysis proxy.
 
     Args:
         engineered_features_lf: The in-progress feature frame this helper attaches one lag

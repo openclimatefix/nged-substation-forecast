@@ -4,8 +4,9 @@ Every function here is deliberately free of I/O (no Delta, MLflow, or Dagster im
 be unit-tested in isolation. The CV asset bodies stay thin by delegating their logic here.
 
 A fold is one train-and-validate split of the history. Each fold is a ``CvFoldConfig`` carrying a
-``fold_id`` plus the calendar dates ``val_start`` and ``val_end`` that bound its validation
-window. Cross-validation scores one model over several such folds.
+``fold_id`` plus two pairs of calendar dates: ``train_start``/``train_end`` bounding its training
+window, and ``val_start``/``val_end`` bounding its validation window. Cross-validation scores one
+model over several such folds.
 """
 
 import calendar

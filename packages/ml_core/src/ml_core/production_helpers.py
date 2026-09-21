@@ -1,10 +1,10 @@
 """IO-light helpers for production (live) inference.
 
-The live service forecasts on a fixed schedule, and one scheduled forecast is a *slot*. The model
-this code builds against is a numerical weather prediction (NWP) run, initialised at
-``nwp_init_time``, carrying several ensemble members of which member 0 is the unperturbed control
-member. A *scan* below is a lazy Polars query over a Delta table, not a materialised frame. Every
-function here is unit-testable in isolation. The two data-shaping helpers
+The live service forecasts on a fixed schedule, and one scheduled forecast is a *slot*. The
+weather input a slot forecasts from is a numerical weather prediction (NWP) run, initialised at
+``nwp_init_time`` and carrying several ensemble members, of which member 0 is the unperturbed
+control member. A *scan* below is a lazy Polars query over a Delta table, not a materialised
+frame. Every function here is unit-testable in isolation. The two data-shaping helpers
 (``select_nwp_init_time``, ``build_live_power_frame``) take ``power_fcst_init_time`` as an
 explicit parameter rather than calling ``datetime.now()`` internally. A test can therefore pass
 any fixed time and get a deterministic result. The two disk/MLflow helpers are
@@ -102,9 +102,9 @@ def weather_lags_lack_their_control_member(
     """Whether this slot asks for weather lags that its NWP run cannot fully supply.
 
     A weather model's *analysis* is its best estimate of the weather that actually happened. This
-    pipeline has no analysis field, so it approximates one with the control member of the freshest
-    run — the analysis proxy. A weather lag reaching back before ``power_fcst_init_time`` is
-    answered by that analysis proxy, which reads the control member (``ensemble_member == 0``)
+    pipeline has no analysis field, so it approximates an analysis with the control member of the
+    freshest run — the analysis proxy. A weather lag reaching back before ``power_fcst_init_time``
+    is answered by that analysis proxy, which reads the control member (``ensemble_member == 0``)
     alone. A run may carry no control-member rows at all, which happens when an ECMWF ENS download
     is partial or malformed. Such a run therefore nulls each weather lag over the first
     ``lag_hours`` of the horizon, where the lag still points into the past. The rest of the horizon
@@ -225,10 +225,9 @@ def _check_meta_is_servable(meta: dict[str, Any], source: str) -> type[BaseForec
             not build that class's ``CONFIG_CLASS``, because a key the model declared has since been
             removed or renamed. Or one of ``meta``'s features is a name this code cannot parse.
     """
-    # The production container is built without MLflow installed, and
-    # scripts/deploy/build_and_verify_image.sh proves that by grepping the container log case-
-    # insensitively for "mlflow". Every message here can reach that log, so a message containing the
-    # word would read as a false positive. No message here may therefore contain that word.
+    # scripts/deploy/build_and_verify_image.sh proves the runtime never uses MLflow by grepping
+    # the container log case-insensitively for "mlflow". Every message here can reach that log, so
+    # a message carrying the word would fail that gate. No message here may contain it.
     remedy = (
         "Re-train against the current code and promote that run. Never hand-edit meta.json: that "
         "changes what the model claims, not what it was trained with."
