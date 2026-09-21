@@ -143,11 +143,19 @@ TILT_CEILING_DEGREES: Final[float] = 60.0
 AZIMUTH_HALF_RANGE_DEGREES: Final[float] = 90.0
 """How far either side of due south the fitted azimuth may swing."""
 
-TEMPERATURE_COEFFICIENT_CENTRE: Final[float] = -0.004
+TEMPERATURE_COEFFICIENT_CENTRE: Final[float] = -0.003
 """The middle of the range the fitted temperature coefficient may take, per degree Celsius."""
 
-TEMPERATURE_COEFFICIENT_HALF_RANGE: Final[float] = 0.002
-"""How far either side of the centre the fitted temperature coefficient may swing."""
+TEMPERATURE_COEFFICIENT_HALF_RANGE: Final[float] = 0.005
+"""How far either side of the centre the fitted temperature coefficient may swing.
+
+The range is -0.008 to +0.002 per degree Celsius. A crystalline-silicon module's maximum-power
+coefficient sits between -0.0045 and -0.0025, so the range contains every module this fleet could
+be built from and is wide enough that a binding bound means the model is absorbing something other
+than temperature. It reaches slightly past zero for the same reason: a fit that settles just below
+zero and a fit pinned against zero are different findings, and a range ending at zero cannot tell
+them apart.
+"""
 
 START_SPREAD: Final[float] = 1.0
 """The standard deviation of the random starting points, in the unbounded parameter space."""
@@ -396,6 +404,7 @@ def _fitted_parameters(*, dataset: pl.DataFrame) -> pl.DataFrame:
                     "tilt_degrees": float(np.degrees(fitted.tilt_rad)),
                     "azimuth_degrees": float(np.degrees(fitted.azimuth_rad)),
                     "capacity_fraction_of_p99": fitted.capacity_mw / capacity_guess,
+                    "temperature_coefficient_per_c": fitted.temperature_coefficient,
                     "clip_fraction_of_p99": (
                         fitted.clip_mw / capacity_guess
                         if fitted.clip_mw < highest_output_mw

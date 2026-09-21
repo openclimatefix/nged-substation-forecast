@@ -234,15 +234,19 @@ def _fitted_parameter_table(*, results_dir: Path) -> list[str]:
     lines = [
         "Fitted on each site's whole span, for the arm given the source's own split:",
         "",
-        "| Site | Tilt (degrees) | Azimuth (degrees) | Capacity / P99 output | Clip / P99 output |",
-        "|---|---|---|---|---|",
+        (
+            "| Site | Tilt (degrees) | Azimuth (degrees) | Capacity / P99 output |"
+            " Clip / P99 output | Temperature coefficient (per °C) |"
+        ),
+        "|---|---|---|---|---|---|",
     ]
     for row in rows.iter_rows(named=True):
         clip = row["clip_fraction_of_p99"]
         clip_cell = "—" if clip is None else f"{clip:.3f}"
         lines.append(
             f"| {row['site']} | {row['tilt_degrees']:.1f} | {row['azimuth_degrees']:.1f} | "
-            f"{row['capacity_fraction_of_p99']:.3f} | {clip_cell} |"
+            f"{row['capacity_fraction_of_p99']:.3f} | {clip_cell} | "
+            f"{row['temperature_coefficient_per_c']:+.4f} |"
         )
     lines.extend(["", "An em dash means the clip never binds, so the data does not identify it."])
     return lines

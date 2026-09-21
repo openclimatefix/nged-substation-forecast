@@ -606,14 +606,21 @@ def _direct_fraction_predictability(*, dataset: pl.DataFrame) -> dict[str, float
     arm is shown, arm C could hold no information arm A lacks, and a null result would say nothing
     about the split. This diagnostic is what rules that out.
 
-    It is fitted on four folds and scored on the fifth, and its predictors are exactly the
-    global-only arm's feature set. Scoring it in sample would shrink the residual by fitting noise,
-    biasing the number towards "there is nothing to find"; using only the clearness index and the
-    zenith would bias it the other way, by ignoring what a tree can recover from azimuth, hour and
-    season.
+    Its predictors are exactly the global-only arm's feature set. Scoring it in sample would shrink
+    the residual by fitting noise, biasing the number towards "there is nothing to find"; using only
+    the clearness index and the zenith would bias it the other way, by ignoring what a tree can
+    recover from azimuth, hour and season.
+
+    **The withholding is by calendar month rather than by fold label**, which is the same rule
+    `_add_learned_split` follows and for the same reason. Folds are cut inside each site's own span,
+    so one fold number names a different calendar period at each site, and a model that dropped only
+    the rows carrying the scored fold's label would still train on other sites' rows at the scored
+    fold's own hours. On a reanalysis those other sites are often the same grid cell, so that path
+    leaks the answer exactly. Scoring one site's fold at a time and excluding the months it covers
+    closes the path, at the cost of one fit per site and fold rather than one per fold.
 
     Args:
-        dataset: The full frame, already carrying `fold`.
+        dataset: The full frame, already carrying `fold` and `month`.
 
     Returns:
         The out-of-fold unexplained variance fraction, and the spreads behind it.
@@ -621,24 +628,27 @@ def _direct_fraction_predictability(*, dataset: pl.DataFrame) -> dict[str, float
     features = [*SHARED_FEATURES, *ARM_FEATURES["A_global_only"]]
     residuals: list[np.ndarray] = []
     targets: list[np.ndarray] = []
-    for fold in range(N_FOLDS):
-        test = dataset.filter(pl.col("fold") == fold)
-        train = dataset.filter(pl.col("fold") != fold)
-        if test.is_empty() or train.is_empty():
-            continue
-        model = xgb.train(
-            {
-                **_booster_parameters(hyper_parameters=PRIMARY_HYPER_PARAMETERS, seed=0),
-                "objective": "reg:squarederror",
-            },
-            xgb.DMatrix(
-                train.select(features).to_numpy(), label=train["direct_fraction"].to_numpy()
-            ),
-            num_boost_round=PRIMARY_HYPER_PARAMETERS["num_boost_round"],
-        )
-        actual = test["direct_fraction"].to_numpy()
-        residuals.append(actual - model.predict(xgb.DMatrix(test.select(features).to_numpy())))
-        targets.append(actual)
+    for site in sorted(dataset["site"].unique().to_list()):
+        for fold in range(N_FOLDS):
+            test = dataset.filter((pl.col("site") == site) & (pl.col("fold") == fold))
+            if test.is_empty():
+                continue
+            train = dataset.filter(~pl.col("month").is_in(test["month"].unique().to_list()))
+            if train.is_empty():
+                continue
+            model = xgb.train(
+                {
+                    **_booster_parameters(hyper_parameters=PRIMARY_HYPER_PARAMETERS, seed=0),
+                    "objective": "reg:squarederror",
+                },
+                xgb.DMatrix(
+                    train.select(features).to_numpy(), label=train["direct_fraction"].to_numpy()
+                ),
+                num_boost_round=PRIMARY_HYPER_PARAMETERS["num_boost_round"],
+            )
+            actual = test["direct_fraction"].to_numpy()
+            residuals.append(actual - model.predict(xgb.DMatrix(test.select(features).to_numpy())))
+            targets.append(actual)
 
     residual = np.concatenate(residuals)
     target = np.concatenate(targets)
