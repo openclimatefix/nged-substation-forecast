@@ -147,9 +147,8 @@ filter can favour one setup over another.
 ### One site is curtailed, and it is the noisiest of the six
 
 **Site E is a different kind of record from the other five, and every diagnostic on this page picks
-it out.** Its telemetry begins in February 2024 rather than September 2019, so it brings 2,131
-bright hours where each of the others brings about 6,700. It is the largest plant of the six, at
-roughly three times the effective capacity of the next biggest. And it produces far less than the
+it out.** Its telemetry begins in 2024 rather than 2019, so it brings 2,131
+bright hours where each of the others brings about 6,700. And it produces far less than the
 irradiance implies far more often. Taking output as a share of P99 divided by global irradiance as a
 share of 1,000 W m⁻², a normally-running site in this fleet sits at 1.27, and site E falls below
 half of that in 7.6% of its bright hours against 0.07% to 0.57% at the other five. It is also the
@@ -158,26 +157,33 @@ and 0.65 on the reanalysis, where the tree wins by 0.21 to 1.25 points everywher
 what a short and contaminated record does to a model whose advantage comes from learning
 site-specific structure out of data.
 
-**NGED's own curtailment feed names the cause, and reconstructs the shortfall almost exactly.** NGED
-publishes a `curtailment/` prefix beside the telemetry this project ingests, holding half-hourly
-megawatts under a header naming the generator, its substation, and its curtailment type. The feed
-carries exactly one generator, which is site E, typed "ANM (DANM and TANM)" — active network
-management. On the hours it covers, site E's median yield ratio is 0.715; adding the curtailed
-megawatts back raises it to 1.250, against the other five sites' 1.267. That agreement is what says
-the published field is power lost to a network instruction rather than a set point or a bare flag.
+**Active network management is the cause, and NGED's own record of it says so hour by hour.** Site
+E is connected under active network management, so the network operator sets a cap on what it may
+export and moves that cap as the local network fills. NGED holds the history of that cap as a step
+function: one row each time the cap changed, in megawatts. On 13 May 2025 site E runs at 17.1 MW at
+10:00 with the cap at its 18.8 MW connection limit, then falls to 6.4 MW at 11:00 as the cap drops
+to 4.8 MW, and recovers at 15:00 when the cap returns to the limit — while irradiance rises
+throughout. The output is following the cap, not the sky.
 
-**The feed reaches too little of the record to clean it.** It runs from 29 April 2026 to 20
-September 2026, 221 half-hourly records covering 595 of site E's 2,131 bright hours. Inside that
-window it accounts for 17 of the 33 hours whose yield falls below half, so active network management
-explains much of site E's shortfall and not all of it, and explains nothing at all before late April
-2026. Whether the rest is unlogged curtailment, an outage, or a fault, this experiment cannot say.
+**The cap holds at the connection limit 80% of the time, and the hours it does not are where site
+E's shortfall lives.** Over the 26 months the record covers, the cap sits at the full 18.8 MW for
+80.5% of the time, at zero for 12.7%, at 0.25 MW for 4.0%, and somewhere between for the rest. On
+site E's bright hours the separation is clean: where the cap never left the limit the median yield
+ratio is 1.2605, against the other five sites' 1.267, and where the cap moved it is 0.81. The
+record flags 45 of the 50 bright hours whose yield falls below half.
 
-**Dropping the curtailed hours moves no contrast on this page, because every arm is equally wrong
-inside them.** A curtailment instruction is not a weather event, so no irradiance product predicts
-it: all six arms land between 21.9% and 22.3% of P99 output on those rows, against about 6%
-overall. Every contrast here is differenced row by row, so a shared error cancels. Removing the
-1,710 scored rows inside a logged curtailment moves the headline from −0.0905 to −0.0908. Site E is
-kept on that basis, and what removing the site altogether would do is in
+**The record still does not reach the whole of site E's history.** It begins on 31 July 2024, where
+the site's telemetry begins earlier in 2024, so the earliest months carry no cap at all. A separate
+half-hourly feed NGED publishes on the same bucket as the telemetry covers only 29 April to 20
+September 2026, and reports a derived volume of megawatts lost rather than the cap itself; the two
+disagree on the hours they share, so the results here use the cap.
+
+**Masking the constrained hours moves no contrast on this page, because every arm is equally wrong
+inside them.** A cap is not a weather event, so no irradiance product predicts it: across the 8,010
+scored rows inside a moved cap, all six arms land between 14.80% and 14.94% of P99 output, against
+about 6% overall. Every contrast here is differenced row by row, so a shared error cancels. Masking
+those rows moves the satellite headline from −0.0905 to −0.0908 and the reanalysis from +0.0031 to
++0.0030. Site E is kept on that basis, and what removing the site altogether would do is in
 [Limitations](#limitations).
 
 ## Methods
@@ -319,9 +325,9 @@ The error levels those predictions sit at, per site and per setup:
 | F | 8.41 | 5.04 | 8.91 | 6.06 |
 | **Pooled** | **8.80** | **5.93** | **9.23** | **6.84** |
 
-Mean absolute error as a percentage of each site's P99 output, each setup given the weather
-product's own
-split, over all the hours that source covers. Site E is the worst everywhere and also much the
+Each cell is the mean absolute error as a percentage of that site's P99 output, with every
+setup given the weather product's own beam/diffuse split, over all the hours that source
+covers. Site E is the worst everywhere and also much the
 shortest series, at 7,588 satellite site-hours against 19,310 to 25,750 for the other five sites.
 
 **One site drifts across the record, and the paired design absorbs it.** At site A the mean signed
@@ -347,7 +353,8 @@ is much the biggest lever.
 | XGBoost, weather product's own split | 10.07 | 5.94 | −4.13 |
 | Physical model, Erbs split | 10.37 | 6.73 | −3.64 |
 
-Mean absolute error as a percentage of P99 output, restricted to the hours both sources cover.
+Each cell is the mean absolute error as a percentage of P99 output, restricted to the hours
+both sources cover.
 
 **These ERA5 figures are higher than the per-site table's because the row set is smaller, not
 because the models changed.** Restricting to the hours both sources cover drops about 23,000 ERA5
@@ -391,10 +398,10 @@ possible causes of the gap.
 | XGBoost alone, the weather product's own split | 5.93 | 8.80 |
 | XGBoost given global irradiance alone, no split | 6.05 | 8.85 |
 
-Mean absolute error as a percentage of P99 output, shifted stamps, on the same rows and folds as
-every other number here. Every physical-model prediction fed to a tree was produced by a fit that
-never saw that row's calendar month, through the same withheld-month inner cross-validation arm
-B-LEARNED uses.
+Each cell is the mean absolute error as a percentage of P99 output under shifted stamps, on the same
+rows and folds as every other number here. Every physical-model prediction fed to a tree was
+produced by a fit that never saw that row's calendar month, through the same withheld-month inner
+cross-validation arm B-LEARNED uses.
 
 **A tree given nothing but the physical model's output buys nothing on either source** — −0.050
 points [−0.103, +0.009] on the satellite product and −0.037 [−0.073, +0.000] on the reanalysis,
@@ -436,8 +443,9 @@ contrast is +0.007 points with an interval straddling zero.**
 | B-DISC − A — a second correlation, same two columns | −0.0360 [−0.0504, −0.0240] | −0.0564 [−0.0822, −0.0342] |
 | C − A — the weather product's split against global alone | −0.1240 [−0.1461, −0.1023] | −0.0450 [−0.0711, −0.0199] |
 
-Change in mean absolute error in percentage points of P99 output, XGBoost, shifted stamps. Negative
-favours the first arm. Bold marks the two contrasts the page's conclusion rests on.
+Each cell is the change in mean absolute error, in percentage points of P99 output, for XGBoost
+under shifted stamps. Negative favours the first arm. Bold marks the two contrasts the page's
+conclusion rests on.
 
 #### The negative control fires, and the headline is measured on top of it
 
@@ -538,10 +546,10 @@ beam, depending on whether the sun's disc happens to be covered.
 | Broken cloud | 0.4 to 0.6 | −0.1344 [−0.1783, −0.0973] | −1.91% | 39,936 |
 | Clear | above 0.6 | −0.0151 [−0.0459, +0.0171] | −0.21% | 33,076 |
 
-CAMS, XGBoost, shifted stamps. Rows whose sun sits below 5 degrees of elevation are excluded,
-because the clearness index divides by a quantity that goes to zero at sunrise and is numerically
-unstable there. That exclusion is why these bins total 126,754 site-hours rather than the full
-127,882.
+All four bins are measured on the CAMS satellite source, with XGBoost and shifted stamps. Rows whose
+sun sits below 5 degrees of elevation are excluded, because the clearness index divides by a
+quantity that goes to zero at sunrise and is numerically unstable there. That exclusion is why these
+bins total 126,754 site-hours rather than the full 127,882.
 
 Under thick overcast the effect shrinks again, as it must when there is almost no beam left to know
 about, leaving the gain concentrated in the two middle bins at about 0.13 points. On the reanalysis
@@ -598,9 +606,9 @@ site-specific. This experiment did not set out to test that premise, but its res
 | E | — | — | — | — | +8.5 | −5.7 | −2.0 |
 | F | +0.5 | −0.5 | +0.2 | −0.2 | +0.4 | +0.2 | +0.5 |
 
-Mean signed error as a percentage of each site's P99 output, CAMS into XGBoost, the weather
-product's own
-split. Positive means the model overpredicts. Site E's series begins in 2024. A year needs more
+Each cell is the mean signed error as a percentage of that site's P99 output, for CAMS into
+XGBoost with the weather product's own beam/diffuse split. Positive means the model
+overpredicts. Site E's series begins in 2024. A year needs more
 than 2,000 scored hours to appear, which drops 2019 for every site: the record starts in
 mid-September that year, and site A's 2019 reads +1.3%, against −1.3% in 2020.
 

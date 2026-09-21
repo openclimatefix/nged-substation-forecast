@@ -30,6 +30,41 @@ Ystradffin (1.99 MW, Dyfed). One entry is much larger — a 58.5 MW Cwm Rheidol 
 connect in the South Wales area — but its target energisation date is 2037. The 41 connected sites
 are spread across **32 distinct primary substations**, so no primary is hydro-dominated.
 
+## Active network management caps what a generator may export
+
+**A generator connected under active network management (ANM) may export only up to a cap the
+network operator moves in real time, so its output is the smaller of what the weather allowed and
+what the cap permitted.** A flexible connection of this kind is what lets a generator join a
+network with no spare firm capacity: instead of waiting years for reinforcement, it accepts being
+turned down when the local network fills. For anything that predicts generation from weather, the
+capped hours are unpredictable by construction — no irradiance or wind field carries the state of
+the network.
+
+**NGED holds two records of it, and they are different quantities.** The
+[`curtailment/` prefix](../roadmap/data-sources.md#what-the-curtailment-feed-holds) on the same S3
+bucket as the telemetry publishes a derived half-hourly volume of megawatts lost. Separately, NGED
+can export the raw setpoint history on request: one row each time a generator's export cap changed,
+in megawatts, which is the signal the derived volume is computed from. The cap is published as a
+negative number, because generation is negative in NGED's sign convention, and the largest
+magnitude a generator's cap ever reaches is its connection limit rather than a curtailment. Reading
+that limit as a curtailment volume inverts the signal.
+
+**On the one metered generator whose setpoint history we hold, the cap is at the connection limit
+80.5% of the time.** It sits at zero for 12.7% of the record, at 0.25 MW for 4.0%, and somewhere in
+between for the remaining 2.8%, over 26 months. The zero periods run long — one span lasts 38 days
+— and look like outage or works rather than the minute-by-minute trimming the rest of the record
+shows. Where the cap never left the connection limit, that generator's output per unit of
+irradiance matches the other five photovoltaic sites in the trial area to within half a percent,
+which is the check that says the cap is being read the right way round. The
+[beam/diffuse results](../results/beam-diffuse-split.md#one-site-is-curtailed-and-it-is-the-noisiest-of-the-six)
+set out the measurement.
+
+**Curtailment is not a capacity loss, which is why the two records matter beyond forecasting.** A
+turned-down generator is still physically capable of its full output, so
+[effective-capacity estimation](../roadmap/capacity-estimation.md) has to hold curtailment out
+rather than absorb it. Neither record reaches back to the start of the telemetry, and only one
+generator in the trial area has either, so an estimator cannot assume a label exists.
+
 ## Data quality in the trial area
 
 **As is typical of distribution networks, NGED's distribution-level telemetry carries more gaps and

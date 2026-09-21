@@ -120,16 +120,21 @@ the feed is a *noisy label*, not ground truth — use it, but do not lean on it:
   generator ran freely) — a milder failure, but one more reason the estimate should not *depend* on
   the feed being right.
 
-**Where the feed fires it is close to ground truth, and what limits it is how little of the record
-it reaches.** Joining it to six metered solar farms in the [beam/diffuse
+**Ask for the raw export cap rather than a derived curtailment volume, and treat the cap as a
+constraint rather than as a label.** Joining both to six metered solar farms in the [beam/diffuse
 experiment](../results/beam-diffuse-split.md#one-site-is-curtailed-and-it-is-the-noisiest-of-the-six)
-found exactly one of the six in the feed, typed `ANM (DANM and TANM)`. On the hours it covers,
-adding the logged megawatts back to that site's metered output restores its yield to within about
-1% of what the other five run at, so a logged entry is a good enough label to mask on. But the feed
-starts on 29 April 2026 where the telemetry starts in September 2019, and inside even that window
-it accounts for 17 of the 33 hours whose output falls below half of what the irradiance implies.
-The two defences above are needed for the periods the feed cannot reach, rather than for the
-entries it gets wrong.
+found one of the six under active network management. Its cap sits at the connection limit 80.5% of
+the time, and on the bright hours where the cap never moved the site's yield matches the other five
+to within half a percent, which is what says the cap is read correctly. The cap is also the form a
+physics-based estimator wants, because it enters as `min(what the weather allowed, the cap)` — an
+upper bound on export rather than a volume to subtract, so it costs nothing on the hours it does
+not bind.
+
+**The coverage gap is what the defences above are for.** The setpoint history for that generator
+starts in July 2024 and its telemetry starts in February 2024; the other five generators have no
+curtailment record at all. So an estimator cannot depend on a label existing, and the upper-envelope
+loss remains the structural defence for every period and every generator the record does not
+reach.
 
 ### The regularisation prior: piecewise-constant capacity
 

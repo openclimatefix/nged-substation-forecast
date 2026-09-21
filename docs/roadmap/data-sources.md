@@ -22,21 +22,28 @@ data.
 
 ### What the curtailment feed holds
 
-**The `curtailment/` prefix sits beside `timeseries/` on the same six-hour window convention, and
-publishes megawatts lost rather than set points.** Each object carries a `data` list of
-`{startTime, endTime, value}` at half-hourly resolution, under a header naming the generator, its
-substation number, its licence area, and a `CurtailmentType` such as `ANM (DANM and TANM)`. The
-`value` field is the power the instruction removed, not a cap: adding it back to the generator's
-metered output restores that generator to the yield its uncurtailed neighbours run at, to within
-about 1%. Nothing in this repository ingests the feed yet, and the check behind that sentence is
-in [the beam/diffuse
+**Curtailment reaches us two ways, and the export cap is the one to build on.** The `curtailment/`
+prefix sits beside `timeseries/` on the bucket, on the same six-hour window convention, and each
+object carries a `data` list of `{startTime, endTime, value}` at half-hourly resolution under a
+header naming the generator, its substation number, its licence area, and a `CurtailmentType` such
+as `ANM (DANM and TANM)`. Its `value` is a derived volume of megawatts lost. Separately, NGED can
+export the raw active-network-management setpoint history on request, one row per change of the
+generator's export cap — the signal the derived volume is computed from. Nothing in this repository
+ingests either yet.
+
+**Prefer the setpoint history: it reaches further back and it is the physical quantity.** For the
+one generator both cover, the setpoint history runs from July 2024 against the bucket feed's late
+April 2026, and the two disagree on the hours they share. The cap is also what a model can use
+directly, because export cannot exceed it: a generator's output is `min(what the weather allowed,
+the cap in force)`. The cap is published as a negative number, generation being negative in NGED's
+convention, and its largest magnitude is the connection limit rather than a curtailment. Reading
+the cap as a curtailment volume gets this backwards — the measurements are in [the beam/diffuse
 results](../results/beam-diffuse-split.md#one-site-is-curtailed-and-it-is-the-noisiest-of-the-six).
 
-**Coverage is what limits the feed, not accuracy.** In September 2026 it carries one generator and
-starts on 29 April 2026, where the telemetry reaches back to September 2019. Analysis that needs
-curtailment labels before late April 2026 has none, and a generator absent from the feed cannot be
-read as uncurtailed — only as one NGED publishes no curtailment for. Asking NGED to extend the
-history is the obvious request, and the check above is the evidence for making it.
+**Coverage is what limits both, not accuracy.** Neither reaches September 2019, where the telemetry
+starts, and a generator absent from both cannot be read as uncurtailed — only as one NGED has not
+sent us curtailment for. The setpoint export is per generator, so extending the history and widening
+it to the other generators are two separate requests.
 
 **15-minute power data may become available. We deliberately stay on half-hourly until v2.** There
 is no room on the road to v1.0 to re-ingest the power feed at a finer step, so treat 15-minute data
