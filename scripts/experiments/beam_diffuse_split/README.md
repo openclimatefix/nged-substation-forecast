@@ -53,6 +53,9 @@ separation model's estimate of the same split, says what the *published field* b
 | `compare_sources.py` | Compares two sources on the hours they both cover, which the per-source tables cannot do. |
 | `elevation_breakdown.py` | Splits the headline contrast by solar elevation, to separate an amplified error from a missing one. |
 | `make_chart.py` | Draws the anonymised result chart. |
+| `sky_conditions.py` | Splits the headline contrast by clearness index, which tests whether the gain sits where cloud makes the split uncertain — the shape the information account predicts and a calibration difference would not. |
+| `run_hybrid_experiment.py` | Feeds the physical model's out-of-fold prediction into XGBoost, to separate "the physical model is mis-calibrated" from "its five parameters are the wrong shape". Withholds each prediction by calendar month, the same way the learned separation arm does. |
+| `make_figures.py` | Draws the per-site time series, the per-site error chart and the sky-condition chart the write-up publishes. |
 
 ## The arms
 

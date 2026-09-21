@@ -45,8 +45,13 @@ FIGURES_DIR: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_figures"
 ALIGNMENT: Final[str] = "shifted"
 """The stamp alignment every figure is drawn under, the one three independent tests support."""
 
-MEASURED_COLOUR: Final[str] = "#3A3A3A"
-"""Measured power is drawn in ink rather than in a series colour, because it is the reference."""
+MEASURED_COLOUR: Final[str] = "#292B2B"
+"""Measured power is drawn in the OCF theme's ink rather than in a brand hue.
+
+It is the reference every model is judged against, not one more series, and giving it a hue from
+the palette would invite a reader to scan for which model it was. The value is the theme's own text
+colour, which `plotting.ocf_theme` keeps private.
+"""
 
 SETUPS: Final[tuple[tuple[str, str, str, str], ...]] = (
     ("open-meteo", "xgboost", "C_era5_split", "ERA5 → XGBoost"),
