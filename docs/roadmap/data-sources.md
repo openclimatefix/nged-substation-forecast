@@ -229,22 +229,22 @@ dataset](https://dynamical.org/catalog/ecmwf-ifs-ens-forecast-15-day-0-25-degree
 Data on the AWS Open Data Registry as its source. So the variable Dynamical.org would have to add is
 not in the feed they read.
 
-**`fdir` on ECMWF ENS is therefore not a route open to us.** Serving it would mean a licensed ECMWF
+**`fdir` on ECMWF ENS is therefore not a route open to us.** Serving `fdir` would mean a licensed ECMWF
 dissemination or a MARS subscription in place of, or alongside, the free bucket — a contract and a
-recurring cost, not a storage decision — and Dynamical.org build their catalogue from freely
-redistributable data. Asking them to widen a variable list would be reasonable; asking them to take
-on a licensed feed is asking them to work outside that model, so this is not a request worth
+recurring cost, not a storage decision. Dynamical.org build their catalogue from freely
+redistributable data. Asking them to widen a variable list would be reasonable. Asking them to take
+on a licensed feed is asking them to work outside that model, so a request for `fdir` is not worth
 making. Dynamical.org already publish direct and diffuse short-wave for ICON-EU, which shows that a
 missing variable was never the obstacle — the obstacle is which ECMWF feed the open bucket holds,
-and that is ECMWF's decision rather than theirs.
+and which feed the bucket holds is ECMWF's decision rather than Dynamical.org's.
 
-**The Met Office models are the ask worth making, because their free feed already carries a direct
-beam.** The one open Met Office request on Dynamical.org's issue tracker is for [the global 10 km
-deterministic model](https://github.com/dynamical-org/reformatters/issues/646), which publishes
+**The Met Office models are the request worth making, because their free feed already carries a
+direct beam.** The one open Met Office request on Dynamical.org's issue tracker is for [the global
+10 km deterministic model](https://github.com/dynamical-org/reformatters/issues/646), which publishes
 global and direct short-wave and leaves diffuse to the same subtraction ECMWF would need. UKV and
 MOGREPS-UK go further and publish diffuse as its own field, but neither appears on Dynamical.org's
 tracker, so either would have to be asked for. None of the three Met Office models needs a new
-licence, which is what makes them askable at all where `fdir` on ENS is not.
+licence, which is what makes them worth requesting at all where `fdir` on ENS is not.
 
 **Every Met Office model brings a horizon problem, and two bring an archive problem.** The global
 model reaches 168 hours, UKV reaches 120 hours on its 03 and 15 UTC runs and 54 hours on the rest,
