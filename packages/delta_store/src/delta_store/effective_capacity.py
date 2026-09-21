@@ -20,7 +20,7 @@ def write_effective_capacity(
 ) -> None:
     """Overwrite the ``effective_capacity`` Delta table with ``capacity``.
 
-    The whole (small — one row per series) table is replaced on every write; there is no
+    The table is small — one row per series. The whole table is replaced on every write. There is no
     partitioning or predicate to scope the overwrite.
 
     Args:

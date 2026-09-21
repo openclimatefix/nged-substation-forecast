@@ -9,7 +9,7 @@ One module per table — ``power_forecasts``, ``nwp``, ``power_time_series``,
 ``eligible_time_series``, ``effective_capacity``, ``forecast_metrics`` — plus the shared
 precision helper in ``precision``. Only ``power_forecasts`` and ``nwp`` tune their writer
 properties, sort order, and precision policy today. Each module's tuning was chosen from
-measurements on real data, and the two modules landed on different choices — see
+measurements on real data, and the two modules landed on different choices. See
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#storage-formats-measured-not-assumed>
 for the comparison. The other four modules exist so their writes go through ``delta_store`` like
 every other table. Those four modules carry no tuning because no one has yet measured those four

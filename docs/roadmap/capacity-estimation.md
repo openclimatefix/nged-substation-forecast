@@ -93,13 +93,13 @@ candidate meets them with its own machinery, and the judging checks each one.
 
 ### What effective capacity must exclude
 
-ANM curtailment is a deliberate, network-driven reduction, not a loss of physical capability.
-Folding curtailment into capacity would corrupt exactly the signal NGED needs. We identify curtailed
-periods from NGED's curtailment/ANM feed and keep them out of the capacity estimate — in the
-physics-model formulation this is a separate multiplicative **curtailment gate** on the generator's
-output (see [the v2 engine's node definitions](disaggregation.md#node-definitions) for where the
-same gate reappears at scale); in the convex formulation it amounts to masking or down-weighting
-flagged periods.
+Active Network Management (ANM) curtailment is a deliberate, network-driven reduction, not a loss of
+physical capability. Folding curtailment into capacity would corrupt exactly the signal NGED needs.
+We identify curtailed periods from NGED's curtailment/ANM feed and keep them out of the capacity
+estimate — in the physics-model formulation this is a separate multiplicative **curtailment gate**
+on the generator's output (see [the v2 engine's node
+definitions](disaggregation.md#node-definitions) for where the same gate reappears at scale); in the
+convex formulation it amounts to masking or down-weighting flagged periods.
 
 **The ANM feed is imperfect, in both directions.** Like any operational log, the ANM feed is an
 imperfect label: curtailment can happen with no matching log entry (for example, a generator's
