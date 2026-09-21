@@ -249,7 +249,7 @@ superlatives, umbrella nouns, and a money metaphor for the rest. Extended across
 sub-agents working one rule per pass returned 469 findings on a file that had already passed several
 reviews.
 
-**Say "one pass per rule" explicitly in the brief.** A brief that lists all thirteen rules together
+**Say "one pass per rule" explicitly in the brief.** A brief that lists all fifteen rules together
 gets a sweep that honours none of them, because listing the rules is not the same instruction as
 sequencing them.
 
@@ -260,23 +260,25 @@ expanded nowhere outside a table and the reference list.
 
 ### The order to sweep in
 
-The first two positions are fixed by dependencies; the rest run highest yield first, so that the
+The first four positions are fixed by dependencies; the rest run highest yield first, so that the
 expensive passes get the freshest attention:
 
 1. Clauses that can be deleted without the sentence losing anything
 2. Long sentences carrying two claims, which a full stop would split
-3. Pronouns and demonstratives, including "one", "ones", and "such a"
-4. Unenumerated singletons and superlatives
-5. Umbrella nouns — "thing", "something", "anything", "metadata"
-6. Counting nouns that never say what was counted — "records", "sources", "items", "entries",
+3. Long subjects standing in front of a short predicate
+4. Facts packed into a noun phrase before the reader has been told them
+5. Pronouns and demonstratives, including "one", "ones", and "such a"
+6. Unenumerated singletons and superlatives
+7. Umbrella nouns — "thing", "something", "anything", "metadata"
+8. Counting nouns that never say what was counted — "records", "sources", "items", "entries",
    "studies", "results"
-7. Money metaphors for performance
-8. Ambiguous "network"
-9. Numerals
-10. Serial commas
-11. Acronyms expanded on first use
-12. Sentences readable two ways, and noun-piles
-13. Sentences that announce content instead of stating it — "it is worth noting/saying," "it is
+9. Money metaphors for performance
+10. Ambiguous "network"
+11. Numerals
+12. Serial commas
+13. Acronyms expanded on first use
+14. Sentences readable two ways, and noun-piles
+15. Sentences that announce content instead of stating it — "it is worth noting/saying," "it is
     important to note," "let us consider," "there are several reasons why"
 
 Pronouns dominate every sweep run so far, by roughly an order of magnitude over any other rule.
@@ -312,6 +314,14 @@ below sees every sentence at its shortest. Set the threshold lower than the 160 
 worked when splitting ran last, and treat the grep as a way in rather than as the pass: the finding
 is two claims, not a character count.
 
+**Rules 3 and 4, the two front-loading passes, run third and fourth for the same reason the split
+pass runs second: both rewrite the shape of a sentence and hand the pronoun pass fresh work.**
+Extraposing a heavy subject introduces an anticipatory "it", and unpacking a packed premise leaves
+the new second sentence referring back to the first. Running the pronoun pass after both turns every
+stranded referent into an ordinary pronoun finding, instead of leaving it to be hunted by hand
+afterwards. Both passes also sit behind the deletion pass, because deleting a dead clause out of a
+subject is sometimes the whole fix.
+
 **Rule 2, long sentences carrying two claims, has a cheap way in: find the long sentences.** `grep
 -oE '[^.]{130,}\.'` over a whitespace-normalised copy returns the sentences worth reading, and the
 finding is real where the sentence carries two claims that read better apart. The joins to look for
@@ -319,13 +329,26 @@ are "and" and "but", a semicolon, an em dash, a "so", a "which", and a trailing 
 last three are the ones a sweep briefed on conjunctions alone will miss. A conjunction joining two
 verbs that share one subject is not a finding, and neither is a split that would leave a fragment.
 
-**Rule 6, counting nouns that never say what was counted, has a cheap way in too: find the sentences
+**Rule 3, long subjects standing in front of a short predicate, has a cheap way in for one of its
+shapes: a long subject ending in a short verdict.** Run this over a whitespace-normalised copy:
+
+```bash
+grep -oE "[^.]{45,}\b(is|are|was|were|would be)\b (not )?(worth|easier|harder|cheaper|safer|better|wrong|enough|unnecessary|impossible|safe|the (right|wrong|point|reason|mistake|job|fix))\b[^.]{0,45}\."
+```
+
+It returned 42 sentences across `docs/`, a mix of real findings and sentences that were already
+fine. The other shapes have no grep, so treat the heavy-subject pass as a reading pass: take each
+sentence's first eight words and ask whether the main verb has arrived yet. Rule 4, facts packed
+into a noun phrase, has no grep at all. Its test is to read each noun phrase on its own and ask
+whether the page has already told the reader everything that phrase asserts.
+
+**Rule 8, counting nouns that never say what was counted, has a cheap way in too: find the sentences
 carrying two or more numerals.** A count chain is where the fault lives, and a methods sentence
 reporting a screening funnel is where a count chain lives. `grep -oE
 '[^.]*[0-9]+[^.]*[0-9]+[^.]*\.'` over a whitespace-normalised copy finds them, and most will be
 fine. The ones that are not hand the reader a different unit at each number and define none of them.
 
-**Rule 13, sentences that announce content instead of stating it, has a cheap way in too: grep for
+**Rule 15, sentences that announce content instead of stating it, has a cheap way in too: grep for
 the throat-clearing openers themselves.** `grep -inE "it (is|would be)
 (worth|important|useful|interesting) (noting|saying|pointing out|mentioning)|let us (consider|turn
 to)|we now turn to|there are (several|many) reasons why|this raises the question of"` over a
@@ -346,6 +369,13 @@ never have been reported.
   candidate does not. Repeating the name there — "Kaas et al.'s 200 feeders" — costs readability and
   buys no precision. Left unstated in the brief, this pattern produces proposals as bad as "Enedis
   has forecast all 2,300 of Enedis's substations".
+- **An anticipatory "it".** "It is worth having a weather product that publishes the direct-beam
+  share separately" points its "it" forwards at the rest of its own sentence, not backwards at an
+  earlier noun. The front-loading rule is what puts that "it" there, so a pronoun finding against
+  that "it" undoes the fix.
+- **A long subject the sentence before it already established.** The front-loading rule is about new
+  material in front position rather than about length, so a 20-word subject naming something the
+  reader met a sentence ago is not a finding.
 - **"One" as a determiner in front of the noun it counts.** "the one review we found" both scopes a
   claim and names its noun.
 - **A demonstrative that already names its noun**, such as "those principles". The fault is a *bare*
