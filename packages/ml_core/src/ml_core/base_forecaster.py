@@ -264,8 +264,8 @@ class BaseForecaster(ABC):
     window's `init_time` partitions. Where all of the ensemble's members are needed, the caller
     processes one `init_time` chunk at a time. Filtering the engineered output cannot prune the
     upstream join, nor the upstream upsample that puts the weather onto the half-hourly power
-    grid. See the NWP scan-pruning notes in
-    <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>.
+    grid. See "Bounding feature-engineering memory: prune the inputs, not the output" in
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
 
     Persistence has two layers. Subclasses implement ``save``/``load`` for their own on-disk
     format and need know nothing about MLflow. The concrete
