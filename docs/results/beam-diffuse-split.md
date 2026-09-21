@@ -82,7 +82,9 @@ separation model could not have worked out for itself.
 do, so what follows is the information content of the beam field rather than forecast skill.** A
 forecast of the beam would carry its own error on top, and nothing measured here bounds that error.
 A result saying the published beam helps is therefore an upper bound on what a forecast beam could
-deliver. A result saying the published beam does not help rules the forecast case out as well.
+deliver. A result saying the published beam does not help rules the forecast case out as well, so
+long as forecasting a beam cannot make it more informative than the analysis it is forecasting —
+which is an assumption rather than something measured here.
 
 **The finding is about one micro-region over 2019 to 2026, and about models that predict power from
 irradiance at a single site.** It is not a statement about the physics of photovoltaic generation,
@@ -598,6 +600,7 @@ same contrast is +0.005 points with an interval straddling zero.**
 | Contrast | CAMS (5 km) | ERA5 (31 km) |
 |---|---|---|
 | C − B — the weather product's split against Erbs | **−0.0962** [−0.1155, −0.0793] | +0.0054 [−0.0153, +0.0257] |
+| D − B — the same beam as a fraction of the total, against Erbs | −0.0897 [−0.1075, −0.0735] | −0.0097 [−0.0301, +0.0101] |
 | C − B-LEARNED — against the fitted separation model | **−0.1058** [−0.1245, −0.0899] | −0.0020 [−0.0239, +0.0198] |
 | B-LEARNED − B — a better separation model, on its own | +0.0096 [+0.0032, +0.0162] | +0.0074 [−0.0086, +0.0241] |
 | B − A — the negative control | −0.0289 [−0.0386, −0.0194] | −0.0595 [−0.0785, −0.0405] |
@@ -655,6 +658,13 @@ mean absolute error, in 5 of 5 folds, and at every solar-elevation band. Seed-to
 0.003 points against a 0.096-point effect. All six sites show the effect individually, with
 intervals excluding zero at each, from −0.066 [−0.113, −0.021] at site E on much the shortest record
 to −0.120 [−0.151, −0.092] at site A.
+
+**The finding also survives changing how the beam is handed to the model.** Arm D shows the tree the
+published beam as a share of the total rather than as a flux beside the diffuse, which is the same
+information in a different shape. It reaches −0.090 [−0.108, −0.074] against arm B on the satellite
+source and −0.010 [−0.030, +0.010] on the reanalysis: the same effect on one source and the same
+null on the other. An encoding effect of the kind the negative control measures would not survive
+being re-encoded twice over.
 
 **The satellite finding also survives keeping the hours the service flags as unreliable**, which is
 the check that matters most, because those hours are about 15% of the daylight record and dropping
@@ -756,7 +766,10 @@ nothing left to move.
 
 An hour counts as on the ceiling when measured output reaches 0.90 of that site's P99. Shares of
 hours and of output are the satellite row set; the reanalysis splits 95.5% to 4.5% of hours and
-86.0% to 14.0% of output.
+86.0% to 14.0% of output. Defining the stratum on measured output selects hours whose residual is
+bounded on one side, so the error *levels* inside each stratum are not comparable with the levels
+elsewhere on this page. The contrast is differenced row by row between two arms scored on the same
+rows, so the selection falls on both arms alike and cancels.
 
 **Clipping dilutes the headline rather than creating it.** The whole satellite effect lives off the
 ceiling, at −0.100, and the pooled −0.096 is that number diluted by the clipped hours where the
@@ -836,7 +849,8 @@ given arm A's features predicts 95.4% of the satellite product's direct-fraction
 cannot reach, not less. That content simply does not correspond to what the panel saw: a beam
 departure averaged over a 31 km cell whose centre can be 13 km from the meter is unpredictable and
 irrelevant at the same time. Predictability alone cannot distinguish signal from noise. Only the
-power result does, and here the power result says the reanalysis residual is noise.
+power result does, and here the power result finds nothing the panel responded to — at the
+pre-registered setting, which is as far as the [limitations](#limitations) let that reading go.
 
 **The free alternative is free only where it is a published correlation.** Erbs and DISC need
 nothing but the global irradiance and the sun's position, so they run on any feed. A separation
