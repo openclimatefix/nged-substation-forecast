@@ -522,6 +522,9 @@ lets the operator turn a generator down when the local network fills, and that i
 no signature in any irradiance or wind field. A model trained on those hours is penalised for
 failing to predict a network instruction, and has an incentive to learn whatever weather pattern
 happened to correlate with one.
+Dropping those hours is also what makes the delivered forecast mean what [Table
+1](delivery-tables.md#table-1-power_forecast) says it means: the power available, rather than the
+power a network instruction allowed.
 
 **The export cap is a mask on the target, never a feature.** The cap in force at a future valid
 time is not known when the forecast is made, so giving the cap to the model is exactly the fault
