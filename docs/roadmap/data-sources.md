@@ -18,7 +18,7 @@ data.
 | Source | Status | Description |
 |---|---|---|
 | **Time-series JSON files** | ✅ | Half-hourly power flow + metadata per substation / customer meter in the trial area. Ingested by OCF to produce operational forecasts. Each reading is a **period-ending mean** — power averaged over the preceding 30 minutes, with `time` marking the end of that window, as `PowerTimeSeries` in `packages/contracts/src/contracts/power_schemas.py` records. The irradiance ingest is chosen to match, so [Weather data](#weather-data) prefers a source that accumulates over the interval to a source that samples an instant. |
-| **Curtailment (ANM set points)** | 🚧 | NGED-imposed curtailment. Crucial for distinguishing deliberate ANM ramp-downs from genuine faults / capacity loss. |
+| **Curtailment (ANM set points)** | 🚧 | NGED-imposed curtailment through Active Network Management (ANM). Crucial for distinguishing deliberate ANM ramp-downs from genuine faults / capacity loss. |
 
 **15-minute power data may become available. We deliberately stay on half-hourly until v2.** There
 is no room on the road to v1.0 to re-ingest the power feed at a finer step, so treat 15-minute data
