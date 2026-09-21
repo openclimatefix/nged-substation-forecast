@@ -253,21 +253,21 @@ producing a sane forecast. These are out-of-fold predictions for one site across
 clearest week in the record, the most variable, and the dullest, chosen by clearness index rather
 than by eye.
 
-![Predicted against measured PV power at site A](power_timeseries_site_a.svg)
+![Predicted against measured PV power at site A](assets/power_timeseries_site_a.svg)
 
-![Site B](power_timeseries_site_b.svg)
+![Site B](assets/power_timeseries_site_b.svg)
 
-![Site C](power_timeseries_site_c.svg)
+![Site C](assets/power_timeseries_site_c.svg)
 
-![Site D](power_timeseries_site_d.svg)
+![Site D](assets/power_timeseries_site_d.svg)
 
-![Site E](power_timeseries_site_e.svg)
+![Site E](assets/power_timeseries_site_e.svg)
 
-![Site F](power_timeseries_site_f.svg)
+![Site F](assets/power_timeseries_site_f.svg)
 
 The error levels those predictions sit at, per site and per setup:
 
-![Mean absolute error per site and setup](per_site_error.svg)
+![Mean absolute error per site and setup](assets/per_site_error.svg)
 
 | Site | ERA5 → XGBoost | CAMS → XGBoost | ERA5 → physical | CAMS → physical |
 |---|---|---|---|---|
@@ -383,7 +383,7 @@ pipeline's re-encoding floor, discussed below, so it should not be read as more 
 P99 output, or 1.5% relative, with an interval excluding zero. On the reanalysis, no: the same
 contrast is +0.007 points with an interval straddling zero.**
 
-![The headline contrasts, both sources and both instruments](beam_diffuse_split_result.svg)
+![The headline contrasts, both sources and both instruments](assets/beam_diffuse_split_result.svg)
 
 | Contrast | CAMS (5 km) | ERA5 (31 km) |
 |---|---|---|
@@ -485,7 +485,7 @@ the irradiance is beam and the direct fraction follows from the sun's position, 
 model already knows it; under broken cloud two hours with the same total can carry very different
 beam, depending on whether the sun's disc happens to be covered.
 
-![The headline contrast split by sky condition](sky_conditions.svg)
+![The headline contrast split by sky condition](assets/sky_conditions.svg)
 
 | Sky condition | Clearness index | C − B | Relative | Hours |
 |---|---|---|---|---|
