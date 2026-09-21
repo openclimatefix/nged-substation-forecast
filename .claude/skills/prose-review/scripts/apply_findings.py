@@ -2,10 +2,9 @@
 
 A sweep is one reading of a text against CLAUDE.md's prose rules, run by a sub-agent — a separate
 Claude instance with its own context. The sweep reports each fault as a finding: the sentence it
-wants changed, and the sentence it wants instead. Turning a finding into an edit is harder than it
-looks, and every guard below exists because its absence
-silently damaged a page that then passed `pymarkdown scan`, `mkdocs build --strict` and
-`check_information_loss.py`:
+wants changed, and the sentence it wants instead. Turning a finding into an edit is harder than
+it looks, and every guard below exists because its absence silently damaged a page that then
+passed `pymarkdown scan`, `mkdocs build --strict` and `check_information_loss.py`:
 
 - The agent quotes the sentence with the markdown stripped, so `[Gijon et al. (2025)](url) write`
   comes back as `Gijon et al. (2025) write` and a wrap-tolerant literal search misses it. Matching

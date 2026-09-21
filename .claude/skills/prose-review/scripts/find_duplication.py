@@ -3,7 +3,7 @@
 An idea should live on the one page a reader would look for it on, and every other page should
 link to that page rather than explaining the idea again. This script finds the pages that repeat
 each other *verbatim*, by counting the shingles they share. A shingle is one overlapping run of
-nine words: a 12-word sentence contributes four of them, each starting one word later than the
+9 words: a 12-word sentence contributes four of them, each starting one word later than the
 last.
 
 **Read the output as a hint, never as the work list.** Verbatim overlap is the small half of the

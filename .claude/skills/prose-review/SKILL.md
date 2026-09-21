@@ -245,7 +245,7 @@ purpose.
 on, so the quieter faults survive.** The evidence is direct rather than theoretical. A combined
 sweep of one section of the literature review reported **zero** findings. A one-rule-at-a-time sweep
 of the same text, by the same model, found **30**. Pronouns accounted for 26 of them, and unscoped
-superlatives, umbrella nouns and a money metaphor for the rest. Extended across the whole review, 6
+superlatives, umbrella nouns, and a money metaphor for the rest. Extended across the whole review, 6
 sub-agents working one rule per pass returned 469 findings on a file that had already passed several
 reviews.
 
@@ -565,7 +565,7 @@ command. Nothing downstream notices: the page still lints, still builds, and `ch
 sees no marker move. The script reports such a finding as `code block` and writes nothing, the way
 it already refuses one landing in a skill file's YAML frontmatter. Reword the finding to quote the
 prose it meant, or leave the block alone. A fence indented under a list item counts too. Only 16 of
-the 120 fenced blocks across this repo's markdown are indented, but they cluster where a sweep runs:
+the 121 fenced blocks across this repo's markdown are indented, but they cluster where a sweep runs:
 both blocks on the code-style page are indented, and 2 of the 7 on the getting-started page.
 
 **A replacement spanning a different number of lines from the text it replaced invalidates every
@@ -747,9 +747,9 @@ Five checks, none of which a `docs/` sweep needs:
   splice leaves in the middle of a comment block. An apply script rewrites one line of a block and
   re-wraps it, but `reflow_python_prose.py` declines any block whose lines already fit inside the
   width, so on those blocks the re-wrap never runs and the spliced line keeps whatever break the
-  splice gave it. Three commits on one contracts branch each shipped a stranded line of between 9
-  and 35 characters, and a fourth survived review and merged. Neither `ruff` nor `ruff format`
-  reformats comment text, so nothing else reports one. Run it as `check_comment_wrap.py <merge-base>
+  splice gave it. Three commits on one contracts branch each shipped a stranded line of 27
+  characters or fewer, and a fourth survived review and merged. Neither `ruff` nor `ruff format`
+  reformats comment text, so neither reports a stranded line. Run it as `check_comment_wrap.py <merge-base>
   <path> ...`. The gate is the count *rising*, because prose written before the guard existed holds
   short lines that are nobody's defect, and those cancel. The guard reads `#` comments only: a
   docstring's list items and `Args:` entries are legitimately short and all move when the prose

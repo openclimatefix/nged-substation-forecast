@@ -2,8 +2,8 @@
 
 The defect is invisible to every other guard in this repo: `ruff` does not reformat comment text,
 and `reflow_python_prose.py` declines a block whose lines already fit. Three commits on one
-branch each shipped one. The tests below pin down both halves of the design — which lines count
-as stranded, and the rule that the gate is the count rising rather than the count being non-zero,
+branch each shipped a stranded line. The tests below pin down both halves of the design — which
+lines count as stranded, and the rule that the gate is the count rising rather than being non-zero,
 because prose written before the guard existed holds short lines that are nobody's defect.
 """
 
@@ -66,6 +66,19 @@ def test_a_bare_hash_ends_the_block_so_the_line_before_it_may_be_short():
 
 
 def test_indentation_counts_towards_the_width():
+    """A line that straddles the threshold: 53 characters of text, 61 with its indentation.
+
+    Measuring the stripped line would report it; measuring the indented line, as `SHORT` says,
+    correctly stays silent. A fixture under the threshold both ways cannot tell the two apart.
+    """
+    text = (
+        "        # a line of comment prose just under fifty-five wide,\n"
+        "        # costing about five times the peak memory on a predict-sized frame.\n"
+    )
+    assert _short(text) == []
+
+
+def test_an_indented_line_short_both_ways_is_still_reported():
     text = (
         "        # per-row mask,\n"
         "        # costing about five times the peak memory on a predict-sized frame.\n"
@@ -80,6 +93,9 @@ def test_indentation_counts_towards_the_width():
         "# fmt: off",
         "# ruff: noqa",
         "# type: ignore[arg-type]",
+        "# ty: ignore[unresolved-attribute]",
+        "# -*- coding: utf-8 -*-",
+        "#!/usr/bin/env python3",
         "# ------------------------------",
         "# > a quoted line",
     ],
@@ -101,8 +117,42 @@ def test_a_hand_aligned_block_is_skipped():
 
 
 def test_a_short_line_before_a_url_is_left_alone():
-    text = "# The derive-from-root convention and the per-table overrides:\n# https://example.invalid/a/very/long/path/that/cannot/be/wrapped/anywhere\n"
+    """26 characters, so the exemption is what keeps it silent rather than the threshold."""
+    text = (
+        "# The per-table overrides:\n"
+        "# https://example.invalid/a/very/long/path/that/cannot/be/wrapped/anywhere\n"
+    )
     assert _short(text) == []
+
+
+def test_a_short_line_before_a_mid_sentence_url_is_still_reported():
+    """A line that merely mentions a URL is prose a wrapper would repack, so it hides no strand."""
+    text = (
+        "# A long enough first line of comment prose to sit above the threshold easily.\n"
+        "# a splice\n"
+        "# See https://example.com/x for the rest of this long explanation right here.\n"
+    )
+    assert _short(text) == ["# a splice"]
+
+
+def test_a_hash_inside_a_string_literal_is_not_a_comment():
+    """A regex scan reads this docstring's example as a comment block; `tokenize` does not."""
+    text = (
+        "def f():\n"
+        '    """Doc.\n'
+        "\n"
+        "        # The highest surface wind speed outside a tornado recorded by the World\n"
+        "        # Meteorological Organisation (WMO) in its\n"
+        "        # World Weather and Climate Extremes Archive:\n"
+        '    """\n'
+    )
+    assert _short(text) == []
+
+
+def test_a_file_that_does_not_tokenise_yields_no_blocks():
+    assert (
+        _short("def f(:\n# short\n# a second line long enough to run past the threshold.\n") == []
+    )
 
 
 def test_a_short_line_before_an_indented_sample_is_left_alone():
@@ -158,6 +208,70 @@ def test_the_command_passes_on_a_tidy_sweep(
     monkeypatch.setattr("sys.argv", ["check_comment_wrap.py", rev])
     check_comment_wrap.main()
     assert "PASS - 1 file" in capsys.readouterr().out
+
+
+def test_an_unresolvable_ref_fails_rather_than_passing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """Every per-file lookup reads a git failure as "new file", so a bad ref would pass silently."""
+    root, _path, _rev = _repo(tmp_path, TIDY)
+    monkeypatch.chdir(root)
+    monkeypatch.setattr("sys.argv", ["check_comment_wrap.py", "no-such-ref-at-all", "mod.py"])
+    with pytest.raises(SystemExit) as raised:
+        check_comment_wrap.main()
+    assert raised.value.code != 0
+
+
+def test_a_path_that_does_not_exist_fails_rather_than_passing(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+):
+    """A mistyped path would otherwise be read as a file the branch created, and pass."""
+    root, _path, rev = _repo(tmp_path, TIDY)
+    monkeypatch.chdir(root)
+    monkeypatch.setattr("sys.argv", ["check_comment_wrap.py", rev, "modd.py"])
+    with pytest.raises(SystemExit) as raised:
+        check_comment_wrap.main()
+    assert raised.value.code != 0
+
+
+def test_a_path_is_resolved_against_the_working_directory_not_the_repository_root(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+):
+    """Run from a subdirectory, `<ref>:<path>` resolves against the root and compares nothing.
+
+    The nested file is deliberately named something the repository root does not also hold. A
+    shared name would let the root-relative lookup succeed on the wrong file, and the test would
+    then pass whether or not the path is resolved correctly.
+    """
+    root, _path, _rev = _repo(tmp_path, TIDY)
+    nested = root / "pkg"
+    nested.mkdir()
+    (nested / "only_here.py").write_text(TIDY, encoding="utf-8")
+    rev = commit(root)
+    (nested / "only_here.py").write_text(STRANDED, encoding="utf-8")
+    monkeypatch.chdir(nested)
+    monkeypatch.setattr("sys.argv", ["check_comment_wrap.py", rev, "only_here.py"])
+    with pytest.raises(SystemExit) as raised:
+        check_comment_wrap.main()
+    assert raised.value.code != 0
+    assert "went from 0 to 1" in capsys.readouterr().out
+
+
+def test_the_failure_message_prints_the_width_that_was_measured(
+    capsys: pytest.CaptureFixture[str],
+):
+    """`SHORT` measures the indented line, so reporting the stripped width contradicts the gate."""
+    tidy = (
+        "        # A full line of comment prose that runs past the threshold without trouble.\n"
+        "        # and a closing line.\n"
+    )
+    stranded = (
+        "        # A full line of comment prose that runs past the threshold without trouble.\n"
+        "        # a splice\n"
+        "        # and a closing line that runs past the threshold without any trouble at all.\n"
+    )
+    assert check_comment_wrap._report(before=tidy, after=stranded, path="mod.py") is True
+    assert "18 chars: # a splice" in capsys.readouterr().out
 
 
 def test_a_file_the_branch_created_is_skipped(
