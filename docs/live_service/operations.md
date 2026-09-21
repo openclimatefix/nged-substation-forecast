@@ -161,7 +161,7 @@ The one thing to get right is finding the run id you are rolling back *to*. The 
 `promotion.json` records only the champion serving right now, and it is overwritten on every
 promotion, so the history lives in **Dagster's run history**: open Assets → `promoted_model` →
 "Runs", and read `PromotedModelConfig.mlflow_run_id` off the previous successful materialisation.
-Keeping a note of the outgoing run id *before* you promote is cheaper than looking it up under
+It is cheaper to keep a note of the outgoing run id *before* you promote than to look it up under
 pressure afterwards.
 
 On AWS there is the same extra leg as for promotion: rebuild and push the image, then point the task
@@ -408,9 +408,10 @@ principle, tracked for v0.5; until it is fixed, treat it as an alert to restore 
 then backfill the missed slots in replay mode (see [Backfilling a missed
 slot](#backfilling-a-missed-slot)).
 
-**When the model fails to load.** A raise complaining that the promoted model has no trained time
-series is *not* a data outage — it is a promotion bug, and it is meant to fail loudly. Re-promote
-(step 2), or roll back ([above](#rolling-back-to-the-previous-champion)).
+**When the model fails to load.** It is *not* a data outage when a raise complains that the
+promoted model has no trained time series: that raise is a promotion bug, and it is meant to fail
+loudly.
+Re-promote (step 2), or roll back ([above](#rolling-back-to-the-previous-champion)).
 
 **Log the intervention.** Every entry above that needed a human is a data point for the [T1.1
 operability

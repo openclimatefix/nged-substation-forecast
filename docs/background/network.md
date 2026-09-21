@@ -182,9 +182,9 @@ series 22)](assets/MVA_metering_bounce_at_Stickney_primary.png)
 Power is periodically diverted from one substation to another during maintenance or in response to
 faults ("abnormal running arrangement"). Each substation spends roughly 10% of its operating time in
 an abnormal arrangement. Switching events severely bias lagged-power features (the single most
-informative feature for demand forecasting) if not detected and handled. Recovering the demand that
-*would* have been metered under the normal running arrangement is described in [Switching
-Events](switching-events.md); the staged solution plan is in the
+informative feature for demand forecasting) if not detected and handled. [Switching
+Events](switching-events.md) describes how to recover the demand that *would* have been metered
+under the normal running arrangement; the staged solution plan is in the
 [roadmap](../roadmap/switching-events.md) (v0.6 detector → v2 mixture models).
 
 ## Behavioural calendar effects on demand

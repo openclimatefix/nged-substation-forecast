@@ -144,16 +144,16 @@ def _upsample_nwp_to_half_hourly(nwp_lf: pl.LazyFrame) -> pl.LazyFrame:
     nulls are both left as null. A leading null sits before the group's first non-null value, and
     a trailing null sits after the group's last non-null value. The weather model this pipeline
     consumes is the European Centre for Medium-Range Weather Forecasts ensemble (ECMWF ENS). Some
-    ECMWF ENS variables — precipitation and the radiation fluxes — are period-ending: each value is
-    the average rate over the interval ending at that valid_time. There is no such interval at lead
-    time 0, so they are null there by convention. Every
-    interpolated 30-min row before a group's first non-null native step therefore remains null —
-    typically a 3-hour window per NWP run. ECMWF ENS runs at a 3-hour native step width out to
-    144 hours, then coarsens to a 6-hour step width for the rest of its 360-hour horizon. The
-    trailing case is rarer but real: a wholly-null slice at the last native step of the horizon
-    is not bridged either, so that slice too reaches the caller as null. Callers and downstream
-    models should treat every one of these nulls as a genuinely missing value rather than as a
-    corrupted download to be repaired or imputed.
+    ECMWF ENS variables — precipitation and the radiation fluxes — are period-ending: each value
+    is the average rate over the interval ending at that valid_time. There is no such interval at
+    lead time 0, so they are null there by convention. Before a group's first non-null native
+    step — typically a 3-hour window per NWP run — every interpolated 30-min row therefore
+    remains null. ECMWF ENS runs at a 3-hour native step width out to 144 hours, then coarsens to
+    a 6-hour step width for the rest of its 360-hour horizon. The trailing case is rarer but
+    real: at the last native step of the horizon, a wholly-null slice is not bridged either, so
+    that slice too reaches the caller as null. Callers and downstream models should treat every
+    one of these nulls as a genuinely missing value rather than as a corrupted download to be
+    repaired or imputed.
     """
     schema_names = nwp_lf.collect_schema().names()
     all_weather_vars = Nwp.all_weather_var_names()

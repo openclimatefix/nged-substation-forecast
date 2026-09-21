@@ -765,8 +765,8 @@ delivery mechanism.
 
 ## Where these principles come from
 
-The framing — a greenfield chance to test-drive other industries' best practice and produce a field
-report rather than a rulebook — is stated on the [section overview](index.md).
+The [section overview](index.md) states the framing: a greenfield chance to test-drive other
+industries' best practice and produce a field report rather than a rulebook.
 
 We deliberately researched best practices across multiple industries. Several of the ideas on these
 pages are borrowed from disciplines that have been solving the same shape of problem for longer than
@@ -813,9 +813,9 @@ project that is doing research rather than only operating a fixed model. [Princi
 forecast never stops*")](#1-the-power-forecast-never-stops) is the contingent one: it is downstream
 of the fact that [an outage is cheap here](../background/requirements.md#uptime-lenient-by-design)
 and that [the manual heuristic is a floor beneath
-us](inherent-stability.md#the-manual-heuristic-is-the-floor); a system where a wrong-but-confident
-forecast costs real money — a trading desk, a control-room feed — should invert it and fail closed.
-And the push-work-to-the-engine and new-technology principles are general.
+us](inherent-stability.md#the-manual-heuristic-is-the-floor); a system should invert the principle
+and fail closed where a wrong-but-confident forecast costs real money, as on a trading desk or a
+control-room feed. And the push-work-to-the-engine and new-technology principles are general.
 
 [Principle 15 ("*transform data in feature engineering, not in the ingest, unless it saves a lot of
 storage*")](#15-transform-data-in-feature-engineering-not-in-the-ingest-unless-it-saves-a-lot-of-storage)

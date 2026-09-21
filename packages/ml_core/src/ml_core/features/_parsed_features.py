@@ -2,9 +2,9 @@
 
 Translates raw string requests (e.g. ``"power_lag_24h"``) into structured, typed objects so the
 rest of the pipeline never parses strings. ``ParsedFeatures.from_strings`` is the entry point,
-and also enforces two architectural guardrails. The raw target — the ``power`` column the models
-predict — may not be requested as a feature. Nor may an identifying column that merely labels a
-row, such as ``time_series_id`` or ``valid_time``.
+and also enforces two architectural guardrails. The ``power`` column is the raw target the models
+predict. That column may not be requested as a feature. Nor may an identifying column that merely
+labels a row, such as ``time_series_id`` or ``valid_time``.
 """
 
 import re
@@ -166,12 +166,12 @@ class ParsedFeatures:
             therefore knows exactly which features require lags to be nullified.
 
             Furthermore, this parser enforces strict architectural guardrails to prevent target
-            leakage and index column misuse. For example, requesting the raw target variable 'power'
-            as an input feature is forbidden, because it would let a downstream model learn a
-            trivial identity function. That identity function is useless at inference time, when the
-            actual power is unknown. Similarly, 'valid_time' is an index column and should not be
-            used directly as a feature. The local time features capture the behavioural patterns a
-            caller reaching for 'valid_time' is after.
+            leakage and index column misuse. For example, it is forbidden to request the raw target
+            variable 'power' as an input feature, because doing so would let a downstream model
+            learn a trivial identity function. That identity function is useless at inference time,
+            when the actual power is unknown. Similarly, 'valid_time' is an index column and should
+            not be used directly as a feature. The local time features capture the behavioural
+            patterns a caller reaching for 'valid_time' is after.
 
         Args:
             selected_features: A set of raw feature name strings requested for engineering. Six

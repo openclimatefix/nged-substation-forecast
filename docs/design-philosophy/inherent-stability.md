@@ -393,10 +393,10 @@ ingest schedule or the slot times change, and that still cannot say *how many* r
 signal is **missed runs** — how many daily runs are absent between the freshest run on disk and the
 freshest that ought to exist by now. That is zero in every healthy slot, whichever slot it is.
 
-`live_forecasts_are_healthy` implements exactly that count. How the "ought to exist by now" half is
-derived — and why the deadline it rests on is 14 hours after a run's `init_time` — is in [Read the
-live forecast back off
-disk](../architecture/production-deployment.md#read-the-live-forecast-back-off-disk-with-a-second-asset-check).
+`live_forecasts_are_healthy` implements exactly that count. [Read the live forecast back off
+disk](../architecture/production-deployment.md#read-the-live-forecast-back-off-disk-with-a-second-asset-check)
+explains how the "ought to exist by now" half is derived, and why the deadline it rests on sits 14
+hours after a run's `init_time`.
 
 ### Missingness in learned models
 

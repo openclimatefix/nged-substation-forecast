@@ -34,8 +34,8 @@ the computational graph, for three core reasons:
   explicit physical parameters like tilt, azimuth, or capacity. This lets engineers immediately
   audit the model's assumptions.
 
-**Adding a learned residual on top of a physical generator model is established practice, and adding
-the physics makes the forecast interpretable without making it less accurate** — the
+**It is established practice to add a learned residual on top of a physical generator model, and
+adding the physics makes the forecast interpretable without making it less accurate** — the
 [energy-forecasting
 review](../background/energy-forecasting-review.md#differentiable-physics-for-generators) reports
 [Gijón et al. (2025)](https://arxiv.org/abs/2502.07344)'s turbine result and its limits: the gain is
@@ -317,9 +317,9 @@ evidence for how much a photovoltaic power forecast improves from inferring tilt
 than using a registered or nameplate value. The gain is therefore a hypothesis to test against the
 forecast score rather than a settled prize.
 
-**Fitting capacity itself as a distribution, the way `log_dc_capacity` and `log_ac_capacity` are
-posteriors here, has a published precedent for wind — with a caveat on the headline number.** The
-[energy-forecasting
+**Fitting capacity itself as a distribution has a published precedent for wind, with a caveat on the
+headline number — the same treatment `log_dc_capacity` and `log_ac_capacity` get here as
+posteriors.** The [energy-forecasting
 review](../background/energy-forecasting-review.md#inferring-engineering-parameters) reports
 [Pierrot and Pinson (2024)](https://doi.org/10.1080/00401706.2024.2350421)'s 34.2% CRPS gain from
 jointly fitting a time-varying capacity bound, and their own isolated test showing most of that gain

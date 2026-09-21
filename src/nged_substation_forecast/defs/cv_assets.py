@@ -270,9 +270,9 @@ def _load_roster(
     """Read the ``TimeSeriesMetadata`` roster, filtered to ``time_series_ids``.
 
     **Research callers only.** The roster is the live registry of what NGED operates, so a fault in
-    it — an off-contract file, or one rebuilt from a snapshot that dropped rows — must stop a
-    training or scoring run rather than silently shrink its population. ``live_forecasts`` reads
-    ``ml_core.base_forecaster.load_trained_metadata`` instead.
+    it must stop a training or scoring run rather than silently shrink its population. A fault here
+    means an off-contract file, or a roster rebuilt from a snapshot that dropped rows.
+    ``live_forecasts`` reads ``ml_core.base_forecaster.load_trained_metadata`` instead.
 
     Args:
         settings: Application settings (data paths, credentials).
@@ -953,15 +953,15 @@ def metrics(context: AssetExecutionContext, config: MetricsConfig) -> None:
         .collect(engine="streaming")
         .rows()
     )
-    # `live_forecasts` writes its output to this same table under `fold_id="live"`, so an
-    # unfiltered leaderboard run — which the operator guide tells you to launch, leaving
-    # `fold_id` null to score every fold — discovers a group the CV config has never heard of.
-    # The same table also holds any non-leaderboard dev fold (e.g. `smoke_test`), which the CV
-    # config does define but which is not part of the leaderboard's evaluation protocol. Either
-    # way, leaderboard scope dates its window from the config's leaderboard folds, so those rows
-    # have no window to be scored against; skip them rather than fail the whole run on the first
-    # one. Ad-hoc scope takes its window from the rows themselves and is the supported way to
-    # score live output or dev folds.
+    # `live_forecasts` writes its output to this same table under `fold_id="live"`, so an unfiltered
+    # leaderboard run discovers a group the CV config has never heard of. The operator guide tells
+    # you to launch an unfiltered leaderboard run, leaving `fold_id` null to score every fold. The
+    # same table also holds any non-leaderboard dev fold (e.g. `smoke_test`), which the CV config
+    # does define but which is not part of the leaderboard's evaluation protocol. Either way,
+    # leaderboard scope dates its window from the config's leaderboard folds, so those rows have no
+    # window to be scored against; skip them rather than fail the whole run on the first one. Ad-hoc
+    # scope takes its window from the rows themselves and is the supported way to score live output
+    # or dev folds.
     skipped_fold_ids: list[str] = []
     if config.evaluation_scope == "leaderboard":
         configured_fold_ids = set(_cv_config.leaderboard_fold_ids)

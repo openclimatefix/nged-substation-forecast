@@ -110,9 +110,10 @@ un-trained, and `trained_cv_model` reads the config back from the experiment's `
 "Why `trained_cv_model` reads config from MLflow, not from YAML" below), so re-pointing that tag
 mid-flight would change what later folds train on.
 
-How the refusal decides that a config changed — which tags it compares, and why an absent tag does
-not count as a change — is in [Re-registering an experiment under a changed config is
-rejected](../architecture/ml-orchestration.md#re-registering-an-experiment-under-a-changed-config-is-rejected).
+[Re-registering an experiment under a changed config is
+rejected](../architecture/ml-orchestration.md#re-registering-an-experiment-under-a-changed-config-is-rejected)
+explains how the refusal decides that a config changed — which tags it compares, and why an absent
+tag does not count as a change.
 
 ## Step 7 — Materialise `trained_cv_model`
 
@@ -181,9 +182,10 @@ Experiment "xgboost_smoke_test"
 2. Forecasts the **inclusive validation window** across **all ~51 NWP ensemble members** (the
    probabilistic leaderboard metrics are meaningless on a single member).
 3. Bounds memory by predicting **one `init_time` chunk at a time** (`_PREDICT_INIT_CHUNK`, 14 days):
-   the full ensemble over the whole window is tens of GB, so chunking on `init_time` (the partition
-   key and the axis that fans the output out across runs) keeps each chunk's forecast frame small
-   while every partition is read once. Measured ~9 GB peak for a 10-month fold.
+   the full ensemble over the whole window is tens of GB. Chunking on `init_time` keeps each chunk's
+   forecast frame small while every partition is read once, because `init_time` is both the
+   partition key and the axis that fans the output out across runs. Measured ~9 GB peak for a
+   10-month fold.
 4. Writes to the `power_forecasts` Delta table keyed by `(experiment_name, fold_id)`: the **first**
    chunk overwrites the partition (clearing any prior run), the rest **append**, so a full
    re-materialisation replaces the fold's rows without ever holding all forecasts in memory.

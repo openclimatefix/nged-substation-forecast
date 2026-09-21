@@ -55,8 +55,8 @@ def check_datetime_bounds(dataframe: pl.DataFrame, column: str, *more_columns: s
     Call this from a Patito model's ``validate`` override, after ``super().validate()``. It exists
     because Patito **silently ignores** ``ge``/``le`` on a datetime field. Patito derives its bounds
     checks from the Pydantic JSON schema's ``minimum``/``maximum`` keywords, and JSON Schema defines
-    those two keywords for numbers only. The ``Ge``/``Le`` annotations Pydantic builds from a
-    datetime field's ``ge``/``le`` arguments therefore never reach the JSON schema, and no check is
+    those two keywords for numbers only. The JSON schema therefore never receives the ``Ge``/``Le``
+    annotations Pydantic builds from a datetime field's ``ge``/``le`` arguments, and no check is
     ever generated. (``ge``/``le`` on a *numeric* field works normally, which is why
     ``PowerTimeSeries.power`` can state its bounds on the field itself.)
 
