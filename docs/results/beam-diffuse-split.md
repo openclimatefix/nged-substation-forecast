@@ -759,6 +759,8 @@ transcribed by hand, and every figure is drawn from the results files rather tha
 table. The numbers describing the sites, the filters, and the fitted parameters were computed ad
 hoc against the same outputs, and are not printed by any script in that pull request.
 
-The curtailment feed is read by `anm_curtailment.py` and the inverter ceiling by
-`inverter_clipping.py`, both in the same directory. Reading the curtailment feed needs NGED's
-bucket credentials, which the other scripts do not.
+The export cap is built by `anm_setpoints.py` from the setpoint export NGED supplied, which is
+filed under `data/NGED/anm/` in the private data store. The bucket's own curtailment feed is
+read by `anm_curtailment.py`, which needs NGED's bucket credentials that the other scripts do
+not, and the inverter ceiling by `inverter_clipping.py`. All three are in the same directory
+as the rest.
