@@ -43,8 +43,8 @@
 #
 # Deliberately NOT here: creating any infrastructure (buckets, Identity and Access Management roles,
 # the cluster, the first task definition). One-time infrastructure stays in the console, per the
-# runbook, until Stage 2 of the access-phasing plan replaces those console steps with
-# infrastructure-as-code. Ad-hoc bash that mutates infrastructure would be unreviewable. The
+# runbook, until Stage 2 of the access-phasing plan, the point at which the roadmap starts
+# writing infrastructure-as-code. Ad-hoc bash that mutates infrastructure would be unreviewable. The
 # access-phasing plan is at
 # <https://openclimatefix.github.io/nged-substation-forecast/roadmap/live-service/#access-phasing>.
 

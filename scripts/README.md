@@ -2,7 +2,7 @@
 
 Standalone programs that are run directly rather than materialised: the repository's own linters,
 the two deployment commands, and a handful of ad-hoc forecasting and maintenance jobs. Materialising
-is what Dagster, the orchestrator that runs the rest of this repository, does to an asset when it
+is what Dagster, the orchestrator that runs the rest of this repository, does to an asset when Dagster
 builds that asset's output.
 
 Each script's own module docstring (or, for the two shell scripts, the comment header above the
@@ -58,7 +58,8 @@ report as over-long. The sixth module is a library with no command line of its o
 The champion model is the one trained model chosen to serve production forecasts; [Operating the
 live
 service](https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/#step-1-pick-a-champion-model)
-covers picking one. Both scripts are run by hand by a person doing a release, in the order given.
+covers picking a champion model. Both scripts are run by hand by a person doing a release, in
+the order given.
 Neither script takes any arguments, so that nothing can be mistyped or drift. The two scripts
 together are the recurring half of the runbook at [Setting up the live service on
 AWS](https://openclimatefix.github.io/nged-substation-forecast/live_service/aws/): the one-time
@@ -68,10 +69,11 @@ infrastructure steps around those two scripts stay in the AWS console.
   smoke-tests it with no network access and no credentials, failing hard if MLflow appears anywhere
   in the runtime log. MLflow is the experiment-tracking server used during training. Baking the
   champion model into the image is what frees production inference from needing MLflow at all, so a
-  mention of MLflow in the runtime log means that guarantee has gone. Step 4 of the runbook.
+  mention of MLflow in the runtime log means that guarantee has gone. The runbook runs it at
+  Step 4.
 - `push_and_deploy_image.sh` — pushes that image to the Elastic Container Registry and registers a
-  new Elastic Container Service task-definition revision pointing at the pushed image. Step 6 of the
-  runbook.
+  new Elastic Container Service task-definition revision pointing at the pushed image. The runbook
+  runs it at Step 6.
 
 ## `forecasting/` — ad-hoc experiment and maintenance runs
 
@@ -86,9 +88,10 @@ alone.
   error), then compute the leaderboard metrics that rank this experiment against the others. Takes
   no arguments.
 - `export_baseline_forecasts.py` — exports one cross-validation experiment's forecasts to three
-  self-contained parquet files (the full ensemble of about 51 ECMWF weather members, the mean across
-  those members, and quantiles across those members) for offline analysis, each carrying the
-  observed power beside the forecast so residuals can be computed directly.
+  self-contained parquet files (the full ensemble of about 51 members from the European Centre for
+  Medium-Range Weather Forecasts' (ECMWF) ensemble, the mean across those members, and quantiles
+  across those members) for offline analysis, each carrying the observed power beside the forecast
+  so residuals can be computed directly.
 - `rewrite_nwp_row_groups.py` — rewrites every partition of the `nwp` (numerical weather prediction)
   Delta table whose Parquet row groups span more than one ensemble member, so that a single-member
   read can skip the rest of the partition. A one-off migration: the script measures before writing,

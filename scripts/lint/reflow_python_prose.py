@@ -182,18 +182,17 @@ def _reflow_docstring(content: str, quote_width: int) -> str:
     the summary onto two lines. `pydocstyle` then reads those two lines as a missing blank line,
     because `D205` requires the summary to be the entire first physical line.
 
-    Leaves the docstring untouched if its dedented body carries a line indented 4 or more
-    columns. The first line is never indented, so the first line is excluded from that test.
+    Leaves the docstring untouched if its dedented body carries a line indented 4 or more columns.
+    The first line is never indented, so the first line is excluded from that test.
     `markdown_wrap.reflow_text` understands a CommonMark list item or blockquote, but a
-    Google-convention `Args:`/`Returns:`/`Raises:` section is neither, and 49 files in this repo
-    carry a Google-convention section. Its `name: description` entries carry no marker
-    `reflow_text` recognises, so `reflow_text` reads the whole section as one paragraph and
-    merges every parameter into a single run-on line. The same threshold also catches a
-    reStructuredText `::` literal block, which `reflow_text` has no fenced-code exemption for
-    either. A docstring elsewhere in this repo carries a `::` block holding an indented shell
-    command. A plain paragraph can carry 1-3 columns of leftover indentation from a previous
-    hand-wrap. That paragraph is common, and harmless to reflow normally, which is why the
-    threshold is 4, not 1.
+    Google-convention `Args:`/`Returns:`/`Raises:` section is neither. The section's
+    `name: description` entries carry no marker `reflow_text` recognises, so `reflow_text` reads
+    the whole section as one paragraph and merges every parameter into a single run-on line. The
+    same threshold also catches a reStructuredText `::` literal block, which `reflow_text` has no
+    fenced-code exemption for either. A docstring elsewhere in this repo carries a `::` block
+    holding an indented shell command. A plain paragraph can carry 1-3 columns of leftover
+    indentation from a previous hand-wrap. That paragraph is common, and harmless to reflow
+    normally, which is why the threshold is 4, not 1.
 
     Also leaves the docstring untouched if any line carries an `INTERIOR_DOUBLE_SPACE` — the same
     hand-alignment signal `_is_prose_comment` already exempts a comment block for.

@@ -3,9 +3,9 @@
 The experiment is the "shared baseline" for switching-event detection: the production XGBoost
 forecaster configured with **no power-lag features**, so weather and calendar covariates only.
 The forecaster's residual (observed - expected) therefore isolates switching events. A power-lag
-feature would give the model the substation's own measured power from a few hours ago, so the
-model would learn the step change a switching event causes and predict it, leaving nothing in the
-residual. See the roadmap:
+feature would give the model the substation's own measured power from 24 hours, 48 hours, one week
+or two weeks earlier, so the model would learn the step change a switching event causes and predict
+it, leaving little in the residual. See the roadmap:
 <https://openclimatefix.github.io/nged-substation-forecast/roadmap/switching-events/#the-baseline-shared-foundation>
 
 The whole pipeline runs in one process sharing a single ``DagsterInstance``. Sharing one instance

@@ -3,8 +3,7 @@
 Written for issue #179: hand the weather/calendar-only baseline forecasts (the switching-event
 "shared baseline") to a colleague for switching-event detection work. A switching event is a
 reconfiguration of the high-voltage network, after which load that was metered at one substation
-is metered at a neighbouring substation instead. See
-<https://openclimatefix.github.io/nged-substation-forecast/background/switching-events/>.
+is metered at a neighbouring substation instead.
 
 The forecasts are read from the internal ``power_forecasts`` Delta table and written as three
 self-contained parquet files, all in physical MW/MVA units. ``power_fcst`` is already stored in
@@ -24,7 +23,8 @@ Three files are written:
 
 - ``*_full_ensemble.parquet`` — every ECMWF ensemble member (~51) of the freshest run. ECMWF is
   the European Centre for Medium-Range Weather Forecasts, whose ensemble runs the weather model
-  about 51 times from slightly different starting states.
+  about 51 times: once unperturbed, and about 50 more times from slightly perturbed starting
+  states.
 - ``*_ensemble_mean.parquet`` — the ensemble mean of ``power_fcst`` per timestep.
 - ``*_quantiles.parquet``     — the p10 / p50 / p90 of ``power_fcst`` across members per timestep.
 

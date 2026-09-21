@@ -11,7 +11,7 @@ read that spans many stored runs. The read spanning the most runs by far is the 
 read the cross-validation assets do at training time, against the local table. The control member
 is ``ensemble_member == 0``, the one unperturbed member of the ensemble. Nothing running on AWS
 reads the back catalogue: the live forecast pins ``init_time`` to the one freshest run, which
-every write lays out correctly anyway.
+``write_nwp`` already lays out correctly anyway.
 
 The ``view_forecasts`` dashboard does read about 17 stored runs from S3 with a single-member
 filter. But an ``h3_index`` filter already cuts that query to one H3 cell in 1,671, and the query
@@ -141,9 +141,9 @@ def _rewrite_partition(
         storage_options: delta-rs object-store options; empty for a local path.
     """
     # Filtered on init_time alone although the partition key is (nwp_model_id, init_time):
-    # NwpModelId has one variant today, so an init_time identifies a partition. A second NWP model
-    # would need this predicate widened, and would be a reason to revisit this script rather than
-    # delete it.
+    # NwpModelId has one enum member today, so an init_time identifies a partition. A second
+    # NWP model would need this predicate widened, and would be a reason to revisit this script
+    # rather than delete it.
     rows = (
         Nwp.scan_delta(table_uri, storage_options=storage_options)
         .filter(pl.col("init_time") == init_time)

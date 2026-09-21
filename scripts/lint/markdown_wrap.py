@@ -192,8 +192,8 @@ def reflow_text(source: str) -> str:
     untouched. There is no exemption for a CommonMark *indented* code block (4+ spaces, no
     fence). The `code-style` skill requires every code sample in this repo to be fenced, and a
     4-space indent with no marker is otherwise indistinguishable from a nested list item's
-    continuation, which does need rewrapping. A scan of all 96 markdown files in the repository
-    found no unfenced indented code block outside a list. So an indented, unmarked line is
+    continuation, which does need rewrapping. A scan of every markdown file in the repository found
+    no unfenced indented code block outside a list. So an indented, unmarked line is
     treated as prose. Treating such a line as code instead would risk silently skipping list
     continuations.
 
