@@ -381,25 +381,28 @@ product](https://ads.atmosphere.copernicus.eu/datasets/cams-solar-radiation-time
 yesterday**, and takes one latitude and longitude per request. That is annoying rather than
 disqualifying: one request covers a location over a whole date range, so the count scales with sites
 rather than with days. The [v1 trial area](../index.md#scope) needs at most 32 requests, 6 of them
-for the solar farms, against a limit of 500 requests per day. One 14-day request at a 15-minute step
-returned in 27 seconds on 2026-09-21, so the daily request cap binds long before the wait does. Ask
-for `observed_cloud` rather than `clear`: the all-sky response carries the clear-sky columns
-(`GHIc`, `BHIc`, `DHIc`, `BNIc`) alongside the all-sky ones, so one request returns both, and their
-ratio is the clear-sky index that conditions the capacity fit and the published estimates of CAMS's
-own error.
+for the solar farms, against a limit of 500 requests per day. The daily cap binds long before the
+wait does, at least at the sizes tested: a 14-day request at a 15-minute step returned in 27 seconds
+on 2026-09-21. A multi-year request has not been timed. Ask for `observed_cloud` rather than
+`clear`: the all-sky response carries the clear-sky columns (`GHIc`, `BHIc`, `DHIc`, `BNIc`)
+alongside the all-sky ones, so one request returns both, and their ratio is the clear-sky index that
+conditions the capacity fit and the published estimates of CAMS's own error.
 
-**The freshest value on offer is 23:30 UTC yesterday, and a request naming today is rejected
-outright.** Probing the retrieval API on 2026-09-21 returned HTTP 400 for that same day, and all 24
-hours complete for 2026-09-20. A job running at 09:00 UTC therefore gets nothing at all about the
-day being forecast, and the most recent daylight irradiance the job can reach is yesterday's sunset
-— between roughly 16:00 UTC midwinter and 20:20 UTC midsummer over Great Britain. No intraday
-correction can rest on this source, whatever the accuracy of its irradiance.
+**No intraday correction can rest on CAMS, whatever the accuracy of its irradiance.** A request
+naming today is rejected outright: probing the retrieval API on 2026-09-21 returned HTTP 400 for
+that same day, and a complete set of values for 2026-09-20. The freshest value on offer is
+yesterday's last interval, which the period-ending convention below timestamps at 00:00 UTC today. A
+forecast job running at 09:00 UTC therefore gets nothing at all about the day it is forecasting. The
+most recent daylight irradiance that job can reach dates from yesterday's sunset — between roughly
+15:45 UTC midwinter and 20:35 UTC midsummer across NGED's licence areas.
 
-**Much of the documentation on the web still gives the latency as 2 days, and is out of date.** The
-CAMS Radiation Service halved the latency to 1 day in [February
-2026](https://forum.ecmwf.int/t/cams-solar-radiation-timeseries-new-data-availability-and-request-limits-on-ads/14735),
-the same change that raised the daily cap to the 500 requests above. SoDa, the DestinE catalogue,
-and the `camsRad` vignette all still describe the older 2-day service.
+**The latency is 1 day, not the 2 days some third-party documentation still gives.** The CAMS
+Radiation Service halved the latency in [February
+2026](https://forum.ecmwf.int/t/cams-solar-radiation-timeseries-new-data-availability-and-request-limits-on-ads/14735).
+The same change raised the daily cap to the 500 requests above. The [`camsRad`
+vignette](https://cran.r-project.org/web/packages/camsRad/vignettes/CAMS_solar_data.html) still
+gives the coverage as "up to 2 days ago", so check any latency figure taken from outside the
+Atmosphere Data Store against the request form itself.
 
 **Great Britain sits inside the Meteosat Second Generation field of view** that bounds the all-sky
 product, with the same low-winter-sun degradation SARAH-3 documents. Meteosat Third Generation is
