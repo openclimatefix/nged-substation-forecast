@@ -8,16 +8,17 @@ including the forecast feed this project runs on. Getting hold of a product that
 division costs either money or engineering time. This page measures what the division is worth
 before anyone pays for it.
 
-**A published direct-beam share is worth having where the product resolves cloud finely and delivers
-that share at the generator's own coordinates. The same published beam is not worth having on a
-reanalysis whose grid cells are 31 km across.** A reanalysis is a physical weather model re-run over
-the past and pulled towards the observations of the time. On the Copernicus Atmosphere Monitoring
-Service's satellite retrieval — CAMS, which resolves cloud to about 5 km — the published beam field
-cuts photovoltaic (PV) power error by 1.8% beyond what a published separation formula recovers from
-the total alone. On ERA5, the European Centre for Medium-Range Weather Forecasts' (ECMWF's)
-reanalysis, no effect is detected at the setting named before the run — and that null does not
-survive the second setting. The evidence is six metered solar farms inside one 25 km by 23 km box in
-Lincolnshire, 7 years of hourly daylight readings, two irradiance products, and two model families.
+**A published direct-beam share is worth having where the product publishing it resolves cloud
+finely and delivers that share at the generator's own coordinates. The same published beam is not
+worth having on a reanalysis whose grid cells are 31 km across.** A reanalysis is a physical weather
+model re-run over the past and pulled towards the observations of the time. On the Copernicus
+Atmosphere Monitoring Service's satellite retrieval — CAMS, which resolves cloud to about 5 km — the
+published beam field cuts photovoltaic (PV) power error by 1.8% beyond what a published separation
+formula recovers from the total alone. On ERA5, the European Centre for Medium-Range Weather
+Forecasts' (ECMWF's) reanalysis, no effect is detected at the setting named before the run — and
+that null does not survive the second setting. The evidence is 6 metered solar farms inside one 25
+km by 23 km box in Lincolnshire, 7 years of hourly daylight readings, 2 irradiance products, and 2
+model families.
 
 **Where the beam field helps, it helps by carrying information, not by encoding the same facts
 better.** A formula fitted on this data reproduces the published beam more than twice as faithfully
@@ -99,7 +100,7 @@ in error between two arms, taken row by row on rows they both score. The six arm
 
 ## Data
 
-### Six metered solar farms, seven years, hourly
+### 6 metered solar farms, 7 years, hourly
 
 The power readings are half-hourly metered output from six solar farms in National Grid Electricity
 Distribution's (NGED's) Lincolnshire licence area, running from September 2019 to September 2026.
