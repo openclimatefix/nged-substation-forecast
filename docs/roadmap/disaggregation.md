@@ -100,10 +100,12 @@ PV physics needs must come either from a decomposition model or from a second fo
 component alone, and the [CAMS Radiation Service](capacity-estimation.md#irradiance-inputs) supplies
 the split over history but issues no forecast. The decomposition route means a differentiable model
 that splits global horizontal irradiance into its direct and diffuse parts. The second-source route
-has two candidates already on the [shortlist](data-sources.md#weather-data). ICON-EU publishes
-direct and diffuse short-wave separately, though only as a deterministic run out to 120 hours.
-WeatherNext 3 publishes total-sky direct short-wave (`fdir`) hourly at 0.1° across a 64-member
-ensemble.
+has candidates already on the [shortlist](data-sources.md#weather-data): ICON-EU (deterministic, 120
+hours), the Met Office's UKV and MOGREPS-UK (126 hours or less), and WeatherNext 3 all carry a
+direct component. Of the four, only WeatherNext 3 reaches NGED's 14-day horizon. [Which feed carries
+a direct beam](data-sources.md#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost)
+sets out what asking for one would cost, and [Is the beam/diffuse split worth
+having?](#is-the-beamdiffuse-split-worth-having) sets out what the published evidence says.
 
 ### Metered vs. unmetered DERs
 
@@ -141,6 +143,58 @@ differently:
 This is also where the project graduates from *estimating capacity* to directly *forecasting power*
 with the physics models (including for MVA-metered sites, [below](#apparent-power-mva-metering)),
 and where the **latent-demand inversion** of the forward model is realised in full.
+
+## Is the beam/diffuse split worth having?
+
+**We found no study that runs the clean comparison — one NWP, one PV model chain, one arm fed
+the model's own direct beam and the other fed a separation model's estimate from the same model's
+global irradiance.** We searched the terms "separation model", "decomposition
+model", "direct irradiance", "fdir", and "model chain" on the open web, in the project's
+`literature/` library, and in the reference lists of the model-chain papers below. The absence is a
+statement about that search, not about the solar-forecasting literature as a whole.
+
+**In the one systematic model-chain study we found, separation was among the two steps that moved
+the error most.** [Mayer and Gróf
+(2021)](https://doi.org/10.1016/j.apenergy.2020.116239) built 32,400 model chains from every
+combination of 9 separation models, 10 transposition models, 3 reflection-loss models, 5 cell
+temperature models, 4 performance models, 2 shading models, and 3 inverter models, and verified every
+chain against a year of 15-minute production data from 16 Hungarian photovoltaic plants,
+at day-ahead and intraday horizons. The gap between the best chain and the worst is 13% in mean
+absolute error and 12% in root-mean-square error. They name separation and transposition as the two
+steps that move the error most, and the inverter model as the step that moves it least. Those figures
+bound how much accuracy a well-chosen separation model adds. They do not measure how much accuracy
+skipping separation would cost, because every chain the study tested contains a separation model.
+
+**In the largest separation-model validation we found, every model's error grew under cloud
+enhancement and over bright ground.** [Gueymard and
+Ruiz-Arias (2016)](https://doi.org/10.1016/j.solener.2015.10.010) validated 140 separation models
+against 1-minute measurements from 54 research-class radiometric stations across seven continents and
+four climate zones, 49 of the 54 from the Baseline Surface Radiation Network. They report that every
+model's error grows under cloud enhancement — bright cloud edges reflecting extra light onto the
+ground — and over high-albedo surfaces. Broken cloud matters for GB substations, because that is
+when a substation's solar output moves fastest.
+
+**The one recent post-processing study we found that builds on ECMWF still uses global irradiance
+plus a separation model.** [Horat, Klerings and Lerch (2024)](https://arxiv.org/abs/2406.04424)
+post-process ECMWF ensemble global horizontal irradiance and put a separation step inside their
+model chain. Departing from that practice is worth measuring rather than assuming it gains anything.
+
+**Three caveats cut against the direct beam being an easy win.** A forecast's direct beam is not
+ground truth, because the beam carries that model's own cloud errors. Over GB the diffuse fraction
+is high, so there is less direct beam for a better estimate to improve. And the [differentiable PV
+model](../techniques/differentiable-physics.md#the-core-building-block-differentiablesolarplant)
+would learn its own corrections either way.
+
+**The physics chain requires the split, so the open question is only which source should supply it.**
+Whether a forecast's own split beats a split derived by a separation model is what nobody appears to
+have measured. The test is the one [this page already sets](#evaluating-disaggregation): held-out
+metered photovoltaic output.
+
+**A gradient-boosted tree would settle the question for the tree path alone.** A tree fed the split
+as extra features can ignore those features, where the physics chain cannot proceed without the
+split. A null result from a tree is therefore evidence about the [tree
+path](xgboost-improvements.md#several-nwp-sources-as-features-v21), and does not justify dropping
+the direct beam from the physics plan.
 
 ## The graph-structured engine
 
@@ -203,9 +257,10 @@ Following the report's schematic, the graph uses the following node types:
    residential or commercial heat pump penetration.
 
 Each generation node feeds the substation through a **curtailment gate**: a separate multiplicative
-factor, driven by NGED's ANM/curtailment data feed, that represents network-enforced reductions.
-Keeping curtailment in its own gate (rather than inside the capacity parameter) is what lets the
-effective-capacity estimate stay a clean measure of physical availability — see [Capacity
+factor, driven by NGED's Active Network Management (ANM) curtailment data feed, that represents
+network-enforced reductions. Keeping curtailment in its own gate (rather than inside the capacity
+parameter) is what lets the effective-capacity estimate stay a clean measure of physical
+availability — see [Capacity
 estimation](capacity-estimation.md#what-effective-capacity-must-exclude) (including the caveat there
 that the ANM feed is itself imperfect) and Fig. 10.
 

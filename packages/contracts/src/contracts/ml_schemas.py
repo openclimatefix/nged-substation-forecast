@@ -1,7 +1,7 @@
-"""Contracts for the ML pipeline.
+"""Contracts for the machine-learning (ML) pipeline.
 
-The feature vocabulary, the joined `AllFeatures` frame handed to models, the eligible-time-series
-population, and the metrics schema.
+The feature names a model config may request, the joined `AllFeatures` frame handed to models,
+the eligible-time-series population, and the metrics schema.
 """
 
 from collections.abc import Sequence
@@ -51,16 +51,17 @@ class AllFeatures(pt.Model):
     precision during interpolation and feature engineering.
 
     DYNAMIC FEATURES: In addition to the explicitly defined columns below, the pipeline supports
-    dynamically generated features. You can request these in your model config:
+    dynamically generated features. You can request these dynamic features in your model config:
 
     * `power_lag_{hours}h`: The power value shifted by X hours (e.g., `power_lag_24h`).
     * `temperature_2m_rolling_mean_{hours}h`: Rolling average of temperature over X hours (e.g.,
       `temperature_2m_rolling_mean_6h`).
 
-    Note: Dynamic features are not explicitly typed as Patito fields below. This is intentional
-    to allow infinite parameterization (e.g., any lag hour) without the overhead of
-    metaprogramming or defining hundreds of static fields. The pipeline dynamically asserts their
-    presence during feature engineering.
+    Dynamic features are not explicitly typed as Patito fields below. Omitting the dynamic
+    features from the field list is intentional, to allow infinite parameterisation (e.g., any
+    lag hour). The two alternatives both cost more: generating the field definitions in code at
+    import time (metaprogramming), or defining hundreds of static fields by hand. During feature
+    engineering, the pipeline asserts that every requested dynamic feature is present.
     """
 
     valid_time: datetime = pt.Field(dtype=UTC_DATETIME_DTYPE)
@@ -147,7 +148,8 @@ HORIZON_SLICES: Final[tuple[str, ...]] = (
     "short_medium_range",
     "extended_range",
 )
-"""Horizon slice labels matching the four forecast ranges from the project report.
+"""Horizon slice labels: the four forecast ranges from the project report, plus `"all"` for the
+aggregate across every horizon.
 
 Bands are left-closed intervals of lead time (`valid_time − power_fcst_init_time`), as
 implemented by `ml_core.metrics`:
@@ -186,12 +188,13 @@ Deterministic (scored on the per-run ensemble mean):
 
 Probabilistic (scored on the ensemble members before the mean collapse):
 
-- `"crps"`: fair (finite-ensemble-unbiased) continuous ranked probability score (MW). The only
-  metric here that is comparable across models with different ensemble sizes.
-- `"spread_skill_ratio"`: Fortin-corrected RMS ensemble spread ÷ RMSE of the ensemble mean
-  (dimensionless; 1.0 = well-calibrated, < 1 = underdispersed/overconfident).
+- `"crps"`: fair (finite-ensemble-unbiased) continuous ranked probability score (MW). The fair form
+  removes the finite-ensemble bias, so scores stay comparable across models with different ensemble
+  sizes.
+- `"spread_skill_ratio"`: Fortin-corrected root-mean-square (RMS) ensemble spread ÷ RMSE of the
+  ensemble mean (dimensionless; 1.0 = well-calibrated, < 1 = underdispersed/overconfident).
 - `"pinball_loss"`: quantile loss (MW) at the quantile named by `metric_param`.
-- `"mean_pinball_loss"`: unweighted mean of `"pinball_loss"` over the thirteen
+- `"mean_pinball_loss"`: unweighted mean of `"pinball_loss"` over the 13
   `DELIVERY_QUANTILES` (MW). Tail-heavy by construction, matching NGED's priorities.
 - `"picp"`: prediction-interval coverage probability of the band named by `metric_param`
   (dimensionless fraction). The calibrated reference for empirical quantiles from a finite
@@ -216,7 +219,7 @@ BAND_METRIC_PARAMS: Final[tuple[str, ...]] = tuple(
 """`metric_param` labels for the symmetric prediction-interval bands (PICP, interval width).
 
 One band per symmetric pair of `DELIVERY_QUANTILES`: `"p1_p99"`, `"p2_p98"`, `"p5_p95"`,
-`"p10_p90"`, `"p20_p80"`, `"p35_p65"`. Together they trace a coverage curve from the 30%
+`"p10_p90"`, `"p20_p80"`, `"p35_p65"`. Together the six bands trace a coverage curve from the 30%
 band to the 98% band.
 """
 
@@ -253,33 +256,35 @@ Every time_series_type plus the sentinel `"all"` for the across-everything aggre
 
 
 class Metrics(pt.Model):
-    """Evaluation metrics for power forecasts — tall format.
+    """Evaluation metrics for power forecasts, in tall format.
+
+    Tall format means one row per metric value, rather than one column per metric.
 
     `metric_param` encodes the extra parameter dimension for metrics that have one, or `"all"`
     for scalar metrics with no extra dimension. Examples:
 
     | time_series_id | fold_id | horizon_slice | metric_name       | metric_param | metric_value |
     |----------------|---------|---------------|-------------------|--------------|--------------|
-    | 1              | 1       | all           | mae               | all          | 5.2          |
-    | 1              | 1       | day_ahead     | rmse              | all          | 7.1          |
-    | 1              | 1       | day_ahead     | pinball_loss      | p10          | 2.1          |
-    | 1              | 1       | day_ahead     | pinball_loss      | p50          | 3.4          |
-    | 1              | 1       | day_ahead     | mean_pinball_loss | all          | 2.4          |
-    | 1              | 1       | day_ahead     | picp              | p10_p90      | 0.78         |
+    | 1              | live    | all           | mae               | all          | 5.2          |
+    | 1              | live    | day_ahead     | rmse              | all          | 7.1          |
+    | 1              | live    | day_ahead     | pinball_loss      | p10          | 2.1          |
+    | 1              | live    | day_ahead     | pinball_loss      | p50          | 3.4          |
+    | 1              | live    | day_ahead     | mean_pinball_loss | all          | 2.4          |
+    | 1              | live    | day_ahead     | picp              | p10_p90      | 0.78         |
 
     Primary key: `(time_series_id, power_fcst_model_name, experiment_name, fold_id,
     evaluation_scope, horizon_slice, metric_name, metric_param, window_start, window_end)`. At
     most one metric value per series, model, experiment, fold, evaluation scope, horizon slice,
-    metric, parameter and window — recomputing an existing key replaces that row rather than
+    metric, parameter, and window. Recomputing an existing key replaces that row rather than
     duplicating it.
     """
 
     time_series_id: int = _get_time_series_id_dtype()
 
-    # String (not Categorical): fold_id/experiment_name are Delta partition columns and delta-rs
-    # stores dictionary-encoded columns as String anyway; String keeps them cast-free and lets
-    # predicate pushdown work. See the "Delta Lake dictionary-encoded columns" section of the
-    # `polars-patito-gotchas` skill.
+    # String (not Categorical): fold_id/experiment_name are Delta partition columns, and delta-rs
+    # stores dictionary-encoded columns as String anyway. String keeps those two columns cast-free
+    # and lets predicate pushdown work. See the "Delta Lake dictionary-encoded columns" section of
+    # the `polars-patito-gotchas` skill.
     power_fcst_model_name: str = pt.Field(
         dtype=pl.String,
         description="Identifier for the ML-based power forecasting model family.",
@@ -288,8 +293,8 @@ class Metrics(pt.Model):
     fold_id: str = pt.Field(
         dtype=pl.String,
         description=(
-            "CV fold year (e.g. '2022'), or 'live' for production forecasts. Matches "
-            "PowerForecast.fold_id."
+            "The CV fold's label from conf/cv/default.yaml (e.g. 'mid_2025_to_mid_2026'), or "
+            "'live' for production forecasts. Matches PowerForecast.fold_id."
         ),
     )
 
@@ -326,10 +331,13 @@ class Metrics(pt.Model):
             "one-off metrics coexist in one table and stay separable."
         ),
     )
-    """The columns from `evaluation_scope` and below are populated by the ``metrics`` Dagster asset.
-    They are ``allow_missing`` so that the pure ``compute_metrics()`` helper can emit the core
-    metric rows and have the asset enrich them with scope/window provenance before the frame is
-    written to the ``forecast_metrics`` Delta table."""
+    """`evaluation_scope` and the columns below it are populated by the ``metrics`` Dagster asset
+    through ``enrich_metrics_rows()``. Those columns are ``allow_missing`` so that the pure
+    ``compute_metrics()`` helper can emit the core metric rows on its own. The asset then enriches
+    those rows with scope/window provenance, before the frame is written to the
+    ``forecast_metrics`` Delta table. The one exception is `time_series_type`:
+    ``compute_metrics()`` populates `time_series_type` itself, by joining it on from the
+    metadata."""
 
     time_series_type: str = pt.Field(
         dtype=pl.Enum(TIME_SERIES_TYPE_SLICES),
@@ -418,18 +426,18 @@ class Metrics(pt.Model):
         """Validate the given dataframe, ensuring the primary key is unique where it is present.
 
         A duplicated primary key means either a join fanned out on the way here or the same rows
-        were written twice, and both corrupt the leaderboard or monitoring chart built from them.
-        It is our own bug rather than the outside world misbehaving, so this raises rather than
-        degrading — see
+        were written twice. Both corrupt the leaderboard or monitoring chart built from them. A
+        duplicated primary key is our own bug rather than the outside world misbehaving, so
+        `validate` raises rather than degrading — see
         <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/>.
 
         Unlike `PowerForecast`, four `PRIMARY_KEY` columns (`experiment_name`,
         `evaluation_scope`, `window_start`, `window_end`) are `allow_missing`:
         `compute_metrics()` validates its output before the `metrics` Dagster asset's
-        `enrich_metrics_rows()` adds them. The uniqueness check below is skipped, not run against
-        a partial key, whenever any of those columns is absent — the check that matters runs
-        inside `enrich_metrics_rows()`, on the fully-enriched frame that is actually written to
-        `forecast_metrics`.
+        `enrich_metrics_rows()` adds them. Whenever any of those four columns is absent, the
+        uniqueness check below is skipped entirely, rather than run against a partial key. The
+        check that matters runs inside `enrich_metrics_rows()`, on the fully-enriched frame that
+        is actually written to `forecast_metrics`.
         """
         validated_df = super().validate(
             dataframe=dataframe,
@@ -443,9 +451,9 @@ class Metrics(pt.Model):
         if not set(pk_cols).issubset(validated_df.columns):
             return validated_df
 
-        # `n_unique`, not `is_duplicated().any()`: the two are equivalent here (every primary-key
-        # column is non-nullable once present) but `is_duplicated` materialises a per-row mask,
-        # costing ~5x the peak memory on a predict-sized frame.
+        # `n_unique`, not `is_duplicated().any()`: the two expressions are equivalent here (every
+        # primary-key column is non-nullable once present) but `is_duplicated` materialises a
+        # per-row mask, costing ~5x the peak memory on a predict-sized frame.
         if validated_df.select(pk_cols).n_unique() != validated_df.height:
             raise ValueError(
                 f"Duplicate entries found for primary key columns: {pk_cols}. "
@@ -459,10 +467,11 @@ class EligibleTimeSeries(pt.Model):
     """The canonical per-fold population of eligible ``time_series_id``s.
 
     Written by the ``eligible_time_series`` Dagster asset (one Delta partition per ``fold_id``)
-    and read by ``trained_cv_model`` and ``cv_power_forecasts``. Eligibility is a function of
-    data coverage and the fold dates **only** — never the model or experiment config — so every
-    experiment trains and scores a fold on the identical population, which is what makes
-    leaderboard comparisons apples-to-apples.
+    and read by ``trained_cv_model``. ``cv_power_forecasts`` does not read this table; it
+    inherits the same population through the trained model's ``trained_time_series_ids``.
+    Eligibility depends on data coverage and the fold dates **only**, never on the model or
+    experiment config. Every experiment therefore trains and scores a fold on the identical
+    population, which is what makes leaderboard comparisons apples-to-apples.
 
     One row per eligible ``(fold_id, time_series_id)``.
     """

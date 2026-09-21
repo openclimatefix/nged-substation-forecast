@@ -270,13 +270,13 @@ the row shape and the join are unaffected by that.)
 **v0.7 upgrade:** replace the static P99 with a time-varying estimate from the winning [capacity
 estimator](capacity-estimation.md#several-estimators-one-winner). For generators, the prior comes
 from the Embedded Capacity Register and is updated at each half-hour from the generator's power time
-series, absorbing PV-panel degradation, partial inverter trips, etc., but **ignoring ANM** (a wind
-farm ANM-capped at 5 MW with 10 MW physical capability has `effective_capacity_mw = 10`). For
-substations, the 99th percentile of observed load over a rolling window, under normal running
-arrangement only. During a switching event, effective capacity = last known normal-arrangement value
-plus the "switched power" from [Table 5](#table-5-substation_switching) — a step that inherits Table
-5's conditional status, since it needs the per-event magnitudes only the discrete detector produces
-(see [the decision
+series, absorbing PV-panel degradation, partial inverter trips, etc., but **ignoring Active Network
+Management (ANM)** — a wind farm ANM-capped at 5 MW with 10 MW physical capability has
+`effective_capacity_mw = 10`. For substations, the 99th percentile of observed load over a rolling
+window, under normal running arrangement only. During a switching event, effective capacity = last
+known normal-arrangement value plus the "switched power" from [Table
+5](#table-5-substation_switching) — a step that inherits Table 5's conditional status, since it
+needs the per-event magnitudes only the discrete detector produces (see [the decision
 point](switching-events.md#the-decision-point-a-feature-based-mainline-vs-the-staged-detector)); if
 the discrete detector is not built, in-event effective capacity falls back to the last known
 normal-arrangement value alone. The v0.7 estimate should carry uncertainty (a [first-class judging
@@ -292,7 +292,7 @@ time-varying](metrics-and-leaderboard.md#effective-capacity-normalisation-and-th
 |---|---|---|
 | `time_series_id` | `int32` | NGED's time-series ID. |
 | `time` | `datetime` (UTC), every half hour | The half-hourly timestep this estimate applies to. In v0.1, set to the end of the available observation history for that series. |
-| `effective_capacity_mw` | `float32` | OCF's estimate of the effective capacity (MW) at this timestep. |
+| `effective_capacity_mw` | `float32` | OCF's estimate of the effective capacity at this timestep, in the same unit as the series' power (MW for active power, MVA for apparent power). |
 
 ---
 

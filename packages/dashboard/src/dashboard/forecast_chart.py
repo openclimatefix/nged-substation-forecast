@@ -1,24 +1,31 @@
 """Chart builders for the ``view_forecasts.py`` dashboard app.
 
-``build_view_forecast_chart`` plots one forecast run for one ``time_series_id``: every forecast
-ensemble member as a thin grey line, observed power as a thick blue line, a vertical rule at
-``power_fcst_init_time``, a faint shaded band behind each weekend (weekday/weekend structure
-dominates demand, so weekends should be findable at a glance), and optional lagged-power lines
-(observed power shifted forward by e.g. 7 days — the raw material of the models' power-lag
-features). A colour legend above the chart always lists every plottable line — its entry set is
-the shared colour scale's explicit domain, so it never changes as lines are toggled on and off.
+``build_view_forecast_chart`` plots one forecast run for one ``time_series_id``. The chart draws
+every forecast ensemble member as a thin grey line, observed power as a thick blue line, a
+vertical rule at ``power_fcst_init_time``, a faint shaded band behind each weekend, and optional
+lagged-power lines. Weekday/weekend structure dominates demand, so weekends should be findable at
+a glance. A lagged-power line is observed power shifted forward by e.g. 7 days — the raw material
+of the models' power-lag features.
 
-``build_nwp_ensemble_chart`` plots the NWP ensemble that fed the forecast (one weather variable
-at the H3 cell containing the series) as a second panel stacked below the power chart.
+A colour legend above the chart always lists every plottable line. The legend's entry set is the
+shared colour scale's explicit domain — that is, the legend is built from a fixed list of line
+names rather than from the lines currently drawn — so that entry set never changes as lines are
+toggled on and off.
 
-The two charts are separate Altair specs, so stacking them relies on identical horizontal
-geometry: they share the same pinned x encoding, both pin the y-axis region to ``Y_AXIS_EXTENT``
-pixels, and both charts' legends sit *above* the plot (``orient="top"``) so neither consumes
-horizontal plot space.
+``build_nwp_ensemble_chart`` plots the numerical weather prediction (NWP) ensemble that fed the
+forecast (one weather variable at the H3 cell containing the series) as a second panel stacked
+below the power chart.
 
-The x-axis deliberately overrides Altair's adaptive datetime ticks: labels sit at local midnight
-only (day-of-week first — crucial for demand forecasting), with unlabelled minor ticks every 3
-hours, all in Europe/London wall time.
+Altair emits Vega-Lite specifications, which Vega renders in the reader's browser, so the layout
+rules here and below are Vega-Lite's rather than Altair's. The two charts are separate Altair
+specs, so stacking the pair relies on identical horizontal geometry. Both charts share the same
+pinned x encoding, and both pin the y-axis region to ``Y_AXIS_EXTENT`` pixels. Both charts'
+legends sit *above* the plot (``orient="top"``), so neither legend consumes horizontal plot
+space.
+
+The x-axis deliberately overrides Altair's adaptive datetime ticks. Labels sit at local midnight
+only, and each label puts the day of week first — crucial for demand forecasting. Unlabelled
+minor ticks sit every 3 hours. Every tick and label is in Europe/London wall time.
 """
 
 import calendar
@@ -38,30 +45,34 @@ PLOT_HORIZON: Final[timedelta] = timedelta(days=14)
 """How far past ``power_fcst_init_time`` the plotted window ends — the live forecast horizon."""
 
 DISPLAY_TIME_ZONE: Final[str] = "Europe/London"
-"""All plotted times are converted to this zone's wall time (demand shape follows the local
-clock, so midnight ticks and day-of-week labels must be local, not UTC)."""
+"""All plotted times are converted to this zone's wall time.
+
+Demand shape follows the local clock, so midnight ticks and day-of-week labels must be local, not
+UTC.
+"""
 
 WEEKEND_SHADE_OPACITY: Final[float] = 0.07
 """Opacity of the weekend background bands.
 
 At this level, ``ocf_theme.MUSTARD`` over the cream theme background reads as a slightly warmer
-cream rather than an orange stripe, so the bands mark weekends without competing with the
+cream rather than an orange stripe. The bands therefore mark weekends without competing with the
 low-opacity grey ensemble lines.
 """
 
 Y_AXIS_EXTENT: Final[int] = 56
 """Pinned pixel width of the y-axis region (labels + ticks) on every chart.
 
-The power chart and the NWP subplot are separate stacked charts sharing one container width, so
-their x-axes only align vertically if the space to the left of each plot area is identical.
-Both charts therefore pin the y-axis extent to this constant instead of letting Vega size it to
-the tick labels. Wide enough for the widest expected label (surface pressure, ``100,000``).
+The power chart and the NWP subplot are separate stacked charts sharing one container width. One
+chart's x-axis lines up with the other chart's x-axis only when the space to the left of each plot
+area is identical. Both charts therefore pin the y-axis extent to this constant instead of letting
+Vega size the region to the tick labels. The extent is wide enough for the widest label expected —
+surface pressure, which Vega renders as ``100,000``.
 """
 
 
 @dataclass(frozen=True)
 class NwpPlotVariable:
-    """Display metadata for one NWP variable offered by the NWP-parameter dropdown."""
+    """Display label, unit, and display scale for one variable in the NWP-parameter dropdown."""
 
     label: str
     """Human-readable name, used in the dropdown, the chart title, and the y-axis title."""
@@ -89,32 +100,37 @@ NWP_PLOT_VARIABLES: Final[dict[str, NwpPlotVariable]] = {
     "downward_short_wave_radiation_flux_surface": NwpPlotVariable(
         "Downward short-wave (solar) radiation", "W/m²"
     ),
-    # Stored as kg/m²/s (numerically mm/s); ×3600 displays as mm/h, which forecasters expect
-    # and which survives _prepare_for_plot's 3-decimal-place display rounding.
+    # Stored as kg/m²/s, which is numerically mm/s. Multiplying by 3600 displays the value as
+    # mm/h, the unit forecasters expect.
     "precipitation_surface": NwpPlotVariable("Precipitation rate", "mm/h", scale=3600.0),
 }
 """The NWP variables the dashboard offers, keyed by ``contracts.weather_schemas.Nwp`` column.
 
-Exactly the *continuous* ``Nwp`` variables (a test guards against drift):
-``categorical_precipitation_type_surface`` is excluded because its values are category codes,
-which a line chart would render as meaningless slopes.
+The dict holds exactly the *continuous* ``Nwp`` variables. ``Nwp.continuous_var_names()`` is the
+authority, and ``test_nwp_plot_variables_cover_exactly_the_continuous_nwp_vars`` fails if this dict
+drifts from that set. ``categorical_precipitation_type_surface`` is the one ``Nwp`` weather column
+left out. Its values are category codes, and a line chart would render category codes as
+meaningless slopes.
 """
 
 NWP_ANALYSIS_LEAD: Final[timedelta] = timedelta(hours=27)
 """How much of each NWP run's start feeds the stitched proxy-analysis line.
 
-We hold no weather observations, so the closest available proxy for the *true* weather over
-historical times is each run's shortest-lead forecasts: the first ~day of every run across the
-window, stitched into one line. The daily-00Z run cadence is 24 hours; we take 27 hours so each
-run overlaps the next by 3 hours (one NWP step). The overlap is deliberate: accumulated variables
-(precipitation, radiation) are null at lead 0, so at each 24 h stitch boundary the incoming run's
-first value is missing — the 3 h overlap lets ``select_analysis_proxy``'s per-column null-fill draw
-that value from the outgoing run's lead-24 instead of leaving a gap.
+We hold no weather observations. The closest available proxy for the *true* weather over
+historical times is each run's shortest-lead forecasts. The proxy takes a little over the first
+day of every run across the window, stitched into one line. We ingest one 00Z ECMWF ENS run per
+day, so the run cadence is 24 hours. Taking 27 hours leaves each run overlapping the next by one
+3-hour NWP step.
 
-The proxy-analysis line uses the control member (member 0) — ``view_forecasts.py`` obtains it via
-``weather_utils.select_analysis_proxy``, which reduces the overlapping runs to one freshest-non-null
-row per valid time, so the frame reaching ``build_nwp_ensemble_chart`` is already a single stitched
-line.
+That one step of overlap is what the accumulated variables need. Precipitation and radiation are
+null at lead 0, so at each 24 h stitch boundary the incoming run's first value is missing. The
+overlap lets ``select_analysis_proxy``'s per-column null-fill draw that value from the outgoing
+run's lead-24 instead of leaving a gap.
+
+The proxy-analysis line uses the control member (member 0), which is the one unperturbed run in
+the ensemble. ``view_forecasts.py`` obtains the line via ``weather_utils.select_analysis_proxy``,
+which reduces the overlapping runs to one freshest-non-null row per valid time. The frame reaching
+``build_nwp_ensemble_chart`` is therefore already a single stitched line.
 """
 
 
@@ -129,12 +145,16 @@ LAG_OPTIONS: Final[dict[str, timedelta]] = {
 """The lagged-power lines the dashboard offers, as UI-label → lag.
 
 Hardcoded, illustrative model inputs: the dashboard cannot see which lag features a given
-experiment's model actually used (that config lives in MLflow), so we offer the common
-defaults rather than pretending to read them from the model.
+experiment's model actually used, because that config lives in MLflow. We therefore offer the
+common defaults rather than pretending to read the real lags from the model.
 """
 
 _LAG_COLORS: Final[tuple[str, ...]] = (ocf_theme.PURPLE, ocf_theme.SPRING_GREEN)
-"""Line colours assigned to lags in ascending-lag order; must cover ``len(LAG_OPTIONS)``."""
+"""Line colours assigned to lags in ascending-lag order.
+
+The tuple must hold exactly ``len(LAG_OPTIONS)`` colours, because ``_LINE_COLORS`` below zips the
+two together with ``strict=True``, which raises on any length mismatch.
+"""
 
 _FORECAST_LABEL: Final[str] = "Forecast power"
 _ACTUALS_LABEL: Final[str] = "Actual power"
@@ -150,8 +170,9 @@ _LINE_COLORS: Final[dict[str, str]] = {
 }
 """Legend label → line colour for everything the power chart can draw, in legend order.
 
-Used as the explicit domain/range of the shared colour scale, so the legend always lists every
-entry — whichever lines are currently toggled on — and each line keeps a stable colour.
+``_LINE_COLORS`` is the explicit domain/range of the shared colour scale. The legend therefore
+always lists every entry, whichever lines are currently toggled on, and each line keeps a stable
+colour.
 """
 
 _NWP_LINE_COLORS: Final[dict[str, str]] = {
@@ -161,32 +182,34 @@ _NWP_LINE_COLORS: Final[dict[str, str]] = {
 }
 """Legend label → line colour for the NWP panel — the counterpart of ``_LINE_COLORS``.
 
-The colours deliberately rhyme with the power chart's: grey for the model's view (ensemble),
-blue for the closest-to-truth line, orange-red for the shared init-time rule.
+Each colour deliberately carries the same meaning as on the power chart: grey for the model's
+view (the ensemble), blue for the closest-to-truth line, and orange-red for the shared init-time
+rule.
 """
 
 _MIDNIGHT_TEST: Final[str] = "hours(datum.value) == 0"
 """Vega expression: is this tick at (wall-clock) midnight?
 
-Wall times are serialised as naive timestamps, which Vega parses in the browser's zone — so the
-browser-local ``hours()`` recovers the Europe/London wall-clock hour whatever zone the viewer
-is in.
+Wall times are serialised as naive timestamps, which Vega parses in the browser's zone. The
+browser-local ``hours()`` therefore recovers the Europe/London wall-clock hour whatever zone the
+viewer is in.
 """
 
 
-def _prepare_for_plot(lf: pl.LazyFrame, time_column: str, value_column: str) -> pl.LazyFrame:
-    """Convert times to naive Europe/London wall time and compact values for serialisation.
+def _prepare_for_plot(lf: pl.LazyFrame, time_column: str) -> pl.LazyFrame:
+    """Convert ``time_column`` to naive Europe/London wall time for serialisation.
 
     Naive (zone-stripped) values render identically in any viewer's browser — Vega would
-    otherwise re-localise tz-aware timestamps to the viewer's zone. Values are rounded to 3
-    decimal places *as Float64*: a raw ``Float32`` serialises to JSON with ~17 significant digits
-    (e.g. ``10.300000190734863``), which roughly triples the inline-data size and pushes the
-    ~34k-row ensemble past marimo's max-output-size guard. 3 d.p. display precision is far below
-    forecast error (the stored values are already rounded to a 13-bit significand).
+    otherwise re-localise tz-aware timestamps to the viewer's zone.
+
+    Values pass through at their stored ``Float32`` width. ``mo.ui.altair_chart`` serves the rows
+    as an Arrow virtual file rather than inlining them in the cell output, and Arrow is
+    fixed-width, so how many decimal digits a value would print to does not change the payload:
+    casting to ``Float64`` in order to round costs 4 bytes per value, measured at +33% on a
+    34,000-row ensemble.
     """
     return lf.with_columns(
-        pl.col(time_column).dt.convert_time_zone(DISPLAY_TIME_ZONE).dt.replace_time_zone(None),
-        pl.col(value_column).cast(pl.Float64).round(3),
+        pl.col(time_column).dt.convert_time_zone(DISPLAY_TIME_ZONE).dt.replace_time_zone(None)
     )
 
 
@@ -228,10 +251,12 @@ def _lagged_power_frame(
 ) -> pl.LazyFrame:
     """Observed power shifted forward by each lag — the raw material of the power-lag features.
 
-    Only observations at or before ``power_fcst_init_time`` are shifted (the model cannot see
-    later ones), so each line ends at ``power_fcst_init_time + lag`` — precisely where feature
-    engineering nullifies that lag as leaky for longer lead times. The early end of the line is
-    the point, not an artefact.
+    Only observations at or before ``power_fcst_init_time`` are shifted, because the model cannot
+    see later observations. Each line therefore ends at ``power_fcst_init_time + lag`` — precisely
+    where feature engineering nullifies that lag as leaky for longer lead times. Nullifying a lag
+    means blanking it as a model input, because using an observation the model could not have had
+    at forecast time would leak the future into the forecast. The line stopping short of the
+    plotted window's right-hand edge is the point, not an artefact.
 
     Args:
         actuals: ``PowerTimeSeries`` observations (UTC ``time``), including history at least
@@ -255,8 +280,9 @@ def _lagged_power_frame(
 def _weekend_layer(window_start: datetime, window_end: datetime) -> alt.Chart:
     """The faint weekend-band layer, drawn first so every other layer sits on top.
 
-    No y encoding, so each band spans the full chart height. Uses the shared x encoding — see
-    ``_x_encoding``'s docstring for why deviating from it would suppress the merged x-axis.
+    The layer carries no y encoding, so each band spans the full chart height. The layer uses the
+    shared x encoding. See ``_x_encoding``'s docstring for why deviating from that encoding would
+    suppress the merged x-axis.
     """
     return (
         alt.Chart(_weekend_bands(window_start, window_end))
@@ -293,10 +319,11 @@ def _x_encoding(window_start: datetime, window_end: datetime, field: str = "vali
     minor ticks every 3 hours carry no label and no gridline. The conditional-axis-property dicts
     are Vega-Lite's native encoding for "major vs minor tick" styling.
 
-    Every layer must use this same encoding (via ``field`` when its time column isn't
-    ``valid_time``): the x scale is shared across layers, so Vega-Lite merges the layers' axis
-    definitions, and one deviating definition (e.g. ``axis=None``) can suppress the merged axis —
-    labels, ticks, and gridlines — for the whole chart.
+    Every layer must use this same encoding. The encoding reads the column ``valid_time`` by
+    default, so a layer whose time column carries a different name passes that name as ``field``.
+    The x scale is shared across layers, so Vega-Lite merges the layers' axis definitions. One
+    deviating definition (e.g. ``axis=None``) can then suppress the merged axis — labels, ticks,
+    and gridlines — for the whole chart.
     """
     tick_size: dict[str, Any] = {"condition": {"test": _MIDNIGHT_TEST, "value": 7}, "value": 3}
     grid_opacity: dict[str, Any] = {"condition": {"test": _MIDNIGHT_TEST, "value": 1}, "value": 0}
@@ -334,11 +361,12 @@ def build_view_forecast_chart(
         forecasts: ``PowerForecast`` rows for one ``(time_series_id, power_fcst_init_time)``
             (UTC ``valid_time``); every distinct ``ensemble_member`` becomes a thin grey line.
         actuals: ``PowerTimeSeries`` observations for the same series (UTC ``time``). The thick
-            blue line plots the window's observations, including past the init time; rows from
-            deeper history (which callers must include when requesting ``lags``) feed only the
-            lagged-power lines.
-        power_fcst_init_time: The forecast init time (tz-aware UTC). Sets the plotted window —
-            ``PLOT_HISTORY`` before it to ``PLOT_HORIZON`` after it — and the vertical rule.
+            blue line plots the window's observations, including past the init time. Rows from
+            deeper history feed only the lagged-power lines, and callers must include those rows
+            when requesting ``lags``.
+        power_fcst_init_time: The forecast init time (tz-aware UTC). Sets the plotted window: from
+            ``PLOT_HISTORY`` before that init time to ``PLOT_HORIZON`` after that init time. Also
+            sets the vertical rule.
         units: ``"MW"`` or ``"MVA"``, from this series' ``TimeSeriesMetadata``.
         title: Chart title (the series name / type / id line).
         subtitle: Chart subtitle (the init time / experiment line).
@@ -351,7 +379,8 @@ def build_view_forecast_chart(
     Returns:
         A layered, zoomable Altair chart in Europe/London wall time.
     """
-    # 51 members × 14 days × 48 half-hours ≈ 34k rows exceeds Altair's 5000-row default guard.
+    # One forecast run for one series is 51 members × 14 days × 48 half-hours ≈ 34k rows, past
+    # Altair's 5,000-row default guard.
     alt.data_transformers.disable_max_rows()
 
     init_wall = _wall_time(power_fcst_init_time)
@@ -359,25 +388,27 @@ def build_view_forecast_chart(
     window_end = init_wall + PLOT_HORIZON
     x = _x_encoding(window_start, window_end)
 
-    # All power layers share the y title (and the pinned _y_axis) so Vega-Lite merges them into
-    # one clean y-axis whichever subset of lines is toggled on.
+    # All power layers share the y title (and the pinned _y_axis) so Vega-Lite merges the layers
+    # into one clean y-axis whichever subset of lines is toggled on.
     y_title = f"Power ({units})"
 
     # The shared colour scale's explicit domain drives the legend, so the legend always lists
-    # every line — even ones currently toggled off — and colours never reshuffle. The scale and
-    # legend definitions ride on the field-encoded layers (lags and the always-present init-time
-    # rule); the single-colour layers reference the same scale via datum encodings.
-    # orient="top" keeps the legend out of the plot's horizontal space, so the x-axis aligns
-    # with the NWP panel stacked below, whose legend sits on top for the same reason (see the
-    # module docstring).
-    # (Swatch opacity is pinned to 1 in the OCF theme's legend config — a per-legend
-    # ``symbolOpacity`` here would lose to the opacity Vega-Lite derives from the marks.)
+    # every line — even the lines currently toggled off — and colours never reshuffle. The scale
+    # and legend definitions ride on the field-encoded layers (lags and the always-present
+    # init-time rule), which are the layers whose colour comes from a data column; the
+    # single-colour layers reference the same scale via datum encodings, which name one fixed
+    # legend label instead. orient="top" keeps the legend out of the plot's horizontal space, so
+    # the x-axis aligns with the NWP panel stacked below. That panel's legend sits on top for the
+    # same reason (see the module docstring).
+    # Swatch opacity is pinned to 1 in the OCF theme's legend config. A per-legend
+    # ``symbolOpacity`` here is overridden by the opacity Vega-Lite derives from the marks.
     line_color_scale = alt.Scale(domain=list(_LINE_COLORS), range=list(_LINE_COLORS.values()))
     line_legend = alt.Legend(title=None, orient="top", symbolType="stroke", symbolStrokeWidth=2)
 
-    # Layers are appended in draw order: weekend bands at the back, then the forecast
-    # ensemble, then lagged power (model *inputs*, which must not obscure observations), then
-    # observed power, with the init-time rule on top of everything.
+    # Layers are appended in draw order: weekend bands at the back, then the forecast ensemble,
+    # then lagged power, then observed power, with the init-time rule on top of everything. Lagged
+    # power sits below observed power because lagged power is a model *input*, and a model input
+    # must not obscure observations.
     layers: list[alt.Chart] = []
     subtitle_notes: list[str] = []
     if shade_weekends:
@@ -385,7 +416,7 @@ def build_view_forecast_chart(
         subtitle_notes.append("Shaded: weekends")
     if show_forecast:
         layers.append(
-            alt.Chart(_prepare_for_plot(forecasts, "valid_time", "power_fcst").collect())
+            alt.Chart(_prepare_for_plot(forecasts, "valid_time").collect())
             .mark_line(strokeWidth=1, opacity=0.3)
             .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
                 x=x,
@@ -400,9 +431,7 @@ def build_view_forecast_chart(
         layers.append(
             alt.Chart(
                 _prepare_for_plot(
-                    _lagged_power_frame(actuals, power_fcst_init_time, sorted_lags),
-                    "time",
-                    "power",
+                    _lagged_power_frame(actuals, power_fcst_init_time, sorted_lags), "time"
                 )
                 .rename({"time": "valid_time"})
                 .collect()
@@ -419,9 +448,7 @@ def build_view_forecast_chart(
         layers.append(
             alt.Chart(
                 _prepare_for_plot(
-                    actuals.filter(pl.col("time") >= power_fcst_init_time - PLOT_HISTORY),
-                    "time",
-                    "power",
+                    actuals.filter(pl.col("time") >= power_fcst_init_time - PLOT_HISTORY), "time"
                 )
                 .rename({"time": "valid_time"})
                 .collect()
@@ -451,8 +478,9 @@ def build_view_forecast_chart(
         width="container",
         height=400,
     )
-    # .interactive() on a LayerChart returns a LayerChart; the FacetChart half of the union in
-    # its annotation only arises for faceted charts.
+    # This cast is safe: .interactive() on a LayerChart returns a LayerChart. Its declared return
+    # type covers two chart kinds, and the FacetChart half of that union only arises for faceted
+    # charts, which this is not.
     return cast(alt.LayerChart, chart.interactive())
 
 
@@ -470,27 +498,28 @@ def build_nwp_ensemble_chart(
     Args:
         nwp: ``Nwp`` rows for one ``(nwp_model_id, init_time, h3_index)`` — the run recorded in
             the selected forecast's ``nwp_init_time``, at the H3 cell containing this time
-            series (``TimeSeriesMetadata.h3_res_5`` equals ``Nwp.h3_index``; both are resolution
-            5). Every distinct ``ensemble_member`` becomes a thin grey line. Native NWP time
-            steps (3- or 6-hourly) are drawn as-is, not upsampled.
+            series. ``TimeSeriesMetadata.h3_res_5`` equals ``Nwp.h3_index``, and both are
+            resolution 5. Every distinct ``ensemble_member`` becomes a thin grey line. Native NWP
+            time steps (3- or 6-hourly) are drawn as-is, not upsampled.
         variable: The ``Nwp`` column to plot; must be a key of ``NWP_PLOT_VARIABLES``.
         power_fcst_init_time: The *power* forecast init time (tz-aware UTC). Sets the plotted
             window and the dashed rule, matching the power chart above exactly.
         nwp_init_time: When the plotted NWP run was initialised (tz-aware UTC); shown in the
-            subtitle. The lines start here — the run has no earlier data — so the panel is
-            deliberately empty between the window start and the NWP init time.
+            subtitle. The lines start at the NWP init time, because the run has no earlier data.
+            The panel is therefore deliberately empty between the window start and the NWP init
+            time.
         analysis: The proxy-analysis line, already reduced to one control-member row per
-            ``valid_time`` by ``weather_utils.select_analysis_proxy`` (the first
-            ``NWP_ANALYSIS_LEAD`` of each run, freshest run winning where runs overlap), with
-            ``valid_time`` alongside the variable columns. Drawn as a single thick blue line: our
-            closest proxy for the true weather, since we hold no weather observations. ``None``, or
-            no rows in the window, omits the line.
+            ``valid_time`` by ``weather_utils.select_analysis_proxy``. That reduction takes the
+            first ``NWP_ANALYSIS_LEAD`` of each run, with the freshest run winning where runs
+            overlap. The frame carries ``valid_time`` alongside the variable columns. Drawn as a
+            single thick blue line: our closest proxy for the true weather, since we hold no
+            weather observations. ``None``, or no rows in the window, omits the line.
         shade_weekends: Whether to draw the same faint weekend bands as the power chart.
 
     Returns:
-        A layered, zoomable Altair chart in Europe/London wall time whose horizontal geometry
-        matches ``build_view_forecast_chart``'s (same pinned x encoding and y-axis extent), so
-        the two charts' x-axes align when stacked in the dashboard.
+        A layered, zoomable Altair chart in Europe/London wall time. The chart's horizontal
+        geometry matches ``build_view_forecast_chart``'s — the same pinned x encoding and the same
+        y-axis extent — so the two charts' x-axes align when stacked in the dashboard.
     """
     var = NWP_PLOT_VARIABLES[variable]
     init_wall = _wall_time(power_fcst_init_time)
@@ -500,9 +529,9 @@ def build_nwp_ensemble_chart(
     plot_window = pl.col("valid_time").is_between(
         power_fcst_init_time - PLOT_HISTORY, power_fcst_init_time + PLOT_HORIZON
     )
-    # zero=False: weather variables have no meaningful zero baseline, and Vega-Lite's zero
-    # default would squash e.g. surface pressure (~101,000 Pa) into a flat sliver at the top of
-    # a zero-based axis. Shared by every value-carrying layer so the axis definitions merge.
+    # zero=False: weather variables have no meaningful zero baseline. Vega-Lite's zero default
+    # would squash e.g. surface pressure (~101,000 Pa) into a flat sliver at the top of a
+    # zero-based axis. Shared by every value-carrying layer so the axis definitions merge.
     y = alt.Y(
         f"{variable}:Q",
         title=f"{var.label} ({var.unit})",
@@ -510,14 +539,13 @@ def build_nwp_ensemble_chart(
         scale=alt.Scale(zero=False),
     )
 
-    # The display scale is applied before _prepare_for_plot so its 3-decimal-place rounding
-    # happens in display units (raw precipitation ~1e-4 kg/m²/s would round to zero).
+    # The display scale is applied here so the y axis carries display units: raw precipitation
+    # is ~1e-4 kg/m²/s, which no reader can size at a glance.
     data = _prepare_for_plot(
         nwp.filter(plot_window)
         .select("valid_time", "ensemble_member", variable)
         .with_columns(pl.col(variable) * var.scale),
         "valid_time",
-        variable,
     ).collect()
     analysis_data = (
         None
@@ -527,13 +555,12 @@ def build_nwp_ensemble_chart(
             .select("valid_time", variable)
             .with_columns(pl.col(variable) * var.scale),
             "valid_time",
-            variable,
         ).collect()
     )
 
-    # The same always-shown-legend construction as the power chart: the shared colour scale's
-    # explicit domain drives the legend (so it lists every entry whatever is toggled on), the
-    # scale and legend ride on the always-drawn init-time rule, and the single-colour layers
+    # The same always-shown-legend construction as the power chart. The shared colour scale's
+    # explicit domain drives the legend, so the legend lists every entry whatever is toggled on.
+    # The scale and legend ride on the always-drawn init-time rule, and the single-colour layers
     # join via datum encodings. orient="top" keeps both charts' plot areas the same width.
     nwp_color_scale = alt.Scale(
         domain=list(_NWP_LINE_COLORS), range=list(_NWP_LINE_COLORS.values())
@@ -590,5 +617,6 @@ def build_nwp_ensemble_chart(
         width="container",
         height=220,
     )
-    # See build_view_forecast_chart for why this cast is safe.
+    # See the comment on build_view_forecast_chart's own .interactive() call for why this cast is
+    # safe.
     return cast(alt.LayerChart, chart.interactive())
