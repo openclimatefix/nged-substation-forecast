@@ -29,8 +29,11 @@ minimum every time, so the seed-to-seed spread this script reports is a few part
 says the fit is stable rather than that the noise floor is that low. The bootstrap's seed draw
 likewise adds nothing to this instrument's intervals.
 
-Run it with `uv run --no-project --with polars --with numpy --with scipy --with xgboost python
-scripts/experiments/beam_diffuse_split/run_physics_experiment.py --source cams --alignment shifted`.
+Run it with `uv run --no-project` plus `--with polars --with numpy --with xgboost
+--with scipy --with pvlib --with xarray --with netcdf4 --with pandas --with deltalake`, then
+`python scripts/experiments/beam_diffuse_split/run_physics_experiment.py --source cams
+--alignment shifted`. The long dependency list is `export_cap.py` reaching into `build_dataset.py`
+for the site roster, which is what maps NGED's `time_series_id` to an anonymous label.
 """
 
 import argparse
@@ -42,6 +45,8 @@ from typing import Final, NamedTuple
 
 import numpy as np
 import polars as pl
+from commissioning import drop_commissioning_ramp
+from export_cap import clamp_to_cap, with_export_cap
 from physics_model import MIN_COS_ZENITH, Geometry, power_mw
 from run_experiment import (
     N_FOLDS,
@@ -317,7 +322,10 @@ def _run_site_arm(
     outputs: list[pl.DataFrame] = []
     for fold in range(N_FOLDS):
         test = site_rows.filter(pl.col("fold") == fold)
-        train = site_rows.filter(pl.col("fold") != fold)
+        # Curtailed hours are dropped from the fit for the same reason the tree drops them, and
+        # for one more: an hour held at a low cap looks exactly like a small inverter, so fitting
+        # on it drags the clip parameter down and mis-states the site's geometry.
+        train = site_rows.filter((pl.col("fold") != fold) & ~pl.col("constrained"))
         if test.is_empty() or train.is_empty():
             continue
         actual = test[target].to_numpy().astype(np.float64)
@@ -328,8 +336,9 @@ def _run_site_arm(
             modelled = _predict(
                 rows=test, parameters=parameters, arm=arm, capacity_guess=capacity_guess
             )
+            capped = clamp_to_cap(prediction=modelled, cap_mw=test["cap_mw"])
             outputs.append(
-                test.select("site", "time", "month", "fold", "effective_capacity_mw")
+                test.select("site", "time", "month", "fold", "effective_capacity_mw", "constrained")
                 .cast({"effective_capacity_mw": pl.Float64})
                 .with_columns(
                     arm=pl.lit(arm),
@@ -339,6 +348,9 @@ def _run_site_arm(
                     absolute_error_mw=pl.Series(np.abs(modelled - actual), dtype=pl.Float64),
                     signed_error_mw=pl.Series(modelled - actual, dtype=pl.Float64),
                     crps_mw=pl.lit(None, dtype=pl.Float64),
+                    absolute_error_capped_mw=pl.Series(np.abs(capped - actual), dtype=pl.Float64),
+                    signed_error_capped_mw=pl.Series(capped - actual, dtype=pl.Float64),
+                    crps_capped_mw=pl.lit(None, dtype=pl.Float64),
                 )
             )
     return pl.concat(outputs)
@@ -357,8 +369,12 @@ def _fitted_parameters(*, dataset: pl.DataFrame) -> pl.DataFrame:
     invite a reader to interpret a number the data never constrained, so an unidentified clip is
     written as null instead.
 
+    **Curtailed hours are excluded here too.** An hour the operator held at a low cap is
+    indistinguishable from an undersized inverter to a model with a clip parameter, so leaving
+    those hours in would report a fitted ceiling that describes the network rather than the plant.
+
     Args:
-        dataset: The full frame.
+        dataset: The full frame, already carrying `constrained`.
 
     Returns:
         One row per (arm, site) with the fitted geometry.
@@ -366,7 +382,7 @@ def _fitted_parameters(*, dataset: pl.DataFrame) -> pl.DataFrame:
     records: list[dict[str, object]] = []
     for arm in ARM_SPLITS:
         for site in sorted(dataset["site"].unique().to_list()):
-            rows = dataset.filter(pl.col("site") == site)
+            rows = dataset.filter((pl.col("site") == site) & ~pl.col("constrained"))
             capacity_guess = float(rows["effective_capacity_mw"][0])
             parameters = _fit(
                 train=rows, arm=arm, target="power_mw", capacity_guess=capacity_guess, seed=0
@@ -476,9 +492,15 @@ def main() -> int:
     results_dir = results_dir_for(source=source, alignment=arguments.alignment)
     results_dir.mkdir(parents=True, exist_ok=True)
 
-    dataset = _assign_folds(
-        dataset=_add_time_features(
-            dataset=pl.read_parquet(dataset_path_for(source=source, alignment=arguments.alignment))
+    dataset = with_export_cap(
+        dataset=_assign_folds(
+            dataset=_add_time_features(
+                dataset=drop_commissioning_ramp(
+                    dataset=pl.read_parquet(
+                        dataset_path_for(source=source, alignment=arguments.alignment)
+                    )
+                )
+            )
         )
     )
     sites = sorted(dataset["site"].unique().to_list())
@@ -488,7 +510,9 @@ def main() -> int:
     jobs += [(arm, "positive_control", "synthetic_power_mw") for arm in CONTROL_ARMS]
     losses = _run_all(dataset=dataset, jobs=jobs).with_columns(
         absolute_error_fraction_of_capacity=pl.col("absolute_error_mw")
-        / pl.col("effective_capacity_mw")
+        / pl.col("effective_capacity_mw"),
+        absolute_error_capped_fraction_of_capacity=pl.col("absolute_error_capped_mw")
+        / pl.col("effective_capacity_mw"),
     )
     losses.write_parquet(results_dir / "per_row_losses.parquet")
 
@@ -511,6 +535,11 @@ def main() -> int:
             mae_mw=pl.col("absolute_error_mw").mean(),
             mae_fraction_of_capacity=pl.col("absolute_error_fraction_of_capacity").mean(),
             bias_mw=pl.col("signed_error_mw").mean(),
+            mae_capped_mw=pl.col("absolute_error_capped_mw").mean(),
+            mae_capped_fraction_of_capacity=pl.col(
+                "absolute_error_capped_fraction_of_capacity"
+            ).mean(),
+            constrained_rows=pl.col("constrained").sum() // len(SEEDS),
             n_rows=pl.len() // len(SEEDS),
         )
         .sort("setting", "arm", "site")

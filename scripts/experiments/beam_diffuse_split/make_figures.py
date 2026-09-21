@@ -34,6 +34,7 @@ import altair as alt
 # Importing the theme module registers and enables the OCF Altair theme as a side effect.
 import plotting.ocf_theme as ocf
 import polars as pl
+from commissioning import drop_commissioning_ramp
 from run_experiment import dataset_path_for, results_dir_for
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -136,8 +137,18 @@ def _predictions(*, source: str, instrument: str, arm: str) -> pl.DataFrame:
 
 
 def _measured() -> pl.DataFrame:
-    """Return measured power and the normalising denominator for every row of the CAMS build."""
-    return pl.read_parquet(dataset_path_for(source="cams", alignment=ALIGNMENT)).select(
+    """Return measured power and the normalising denominator for every row of the CAMS build.
+
+    The commissioning mask is applied here as well as in the runners, so a week the
+    experiment never scored cannot be chosen for a figure and then drawn with a measured
+    line and no predictions against it.
+
+    Returns:
+        One row per scored hour, carrying the columns the figures need.
+    """
+    return drop_commissioning_ramp(
+        dataset=pl.read_parquet(dataset_path_for(source="cams", alignment=ALIGNMENT))
+    ).select(
         "site",
         "time",
         "power_mw",
@@ -176,11 +187,12 @@ def _chosen_weeks(*, measured: pl.DataFrame) -> pl.DataFrame:
     clearest = complete.sort("mean_clearness", descending=True).head(1)
     dullest = complete.sort("mean_clearness").head(1)
     most_variable = complete.sort("daily_spread", descending=True).head(1)
+    year = pl.col("week").dt.strftime(" (%Y)")
     chosen = pl.concat(
         [
-            clearest.with_columns(sky=pl.lit("Clearest week in the record")),
-            most_variable.with_columns(sky=pl.lit("Most variable week")),
-            dullest.with_columns(sky=pl.lit("Dullest week")),
+            clearest.with_columns(sky=pl.lit("Clearest week in the record") + year),
+            most_variable.with_columns(sky=pl.lit("Most variable week") + year),
+            dullest.with_columns(sky=pl.lit("Dullest week") + year),
         ]
     )
     _LOG.info("weeks chosen: %s", chosen.select("week", "sky", "mean_clearness").to_dicts())
@@ -221,8 +233,17 @@ def _timeseries_frame(*, measured: pl.DataFrame, weeks: pl.DataFrame) -> pl.Data
     return pl.concat(frames)
 
 
-def _timeseries_chart(*, frame: pl.DataFrame, site: str) -> alt.FacetChart:
-    """Draw one site's measured and predicted power across the three chosen weeks."""
+def _timeseries_chart(*, frame: pl.DataFrame, site: str, sky_order: list[str]) -> alt.FacetChart:
+    """Draw one site's measured and predicted power across the three chosen weeks.
+
+    Args:
+        frame: Every setup's predictions and the measured power, for every site.
+        site: The anonymous label of the site to draw.
+        sky_order: The panel labels, from the easiest sky to the hardest.
+
+    Returns:
+        One faceted chart, one row per chosen week.
+    """
     rows = frame.filter(pl.col("site") == site).with_columns(
         day=pl.col("time").dt.strftime("%Y-%m-%d")
     )
@@ -252,7 +273,7 @@ def _timeseries_chart(*, frame: pl.DataFrame, site: str) -> alt.FacetChart:
     )
     return (
         lines.properties(width=620, height=150)
-        .facet(row=alt.Row("sky:N", title=None, sort=list(_SKY_ORDER)))
+        .facet(row=alt.Row("sky:N", title=None, sort=sky_order))
         .resolve_scale(x="independent")
         .properties(
             title=alt.TitleParams(
@@ -268,14 +289,6 @@ def _timeseries_chart(*, frame: pl.DataFrame, site: str) -> alt.FacetChart:
             )
         )
     )
-
-
-_SKY_ORDER: Final[tuple[str, ...]] = (
-    "Clearest week in the record",
-    "Most variable week",
-    "Dullest week",
-)
-"""Panel order, from the easiest sky to the hardest."""
 
 
 def _per_site_error() -> pl.DataFrame:
@@ -412,9 +425,10 @@ def main() -> int:
     measured = _measured()
     weeks = _chosen_weeks(measured=measured)
     frame = _timeseries_frame(measured=measured, weeks=weeks)
+    sky_order = weeks["sky"].to_list()
     for site in sorted(frame["site"].unique().to_list()):
         path = FIGURES_DIR / f"power_timeseries_site_{site.lower()}.svg"
-        _timeseries_chart(frame=frame, site=site).save(path)
+        _timeseries_chart(frame=frame, site=site, sky_order=sky_order).save(path)
         _LOG.info("wrote %s", path)
 
     errors = _per_site_error()

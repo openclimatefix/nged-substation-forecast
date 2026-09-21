@@ -27,8 +27,12 @@ trains than where it is scored gets over-trusted, which would flatter these arms
 has nothing to do with calibration. That is the construction
 `run_experiment._add_learned_split` uses, and for the same reason.
 
-Run it with `uv run --no-project --with polars --with numpy --with scipy --with xgboost python
-scripts/experiments/beam_diffuse_split/run_hybrid_experiment.py --source cams --alignment shifted`.
+Run it with `uv run --no-project` plus `--with polars --with numpy --with xgboost --with scipy
+--with pvlib --with xarray --with netcdf4 --with pandas --with deltalake`, then
+`python scripts/experiments/beam_diffuse_split/run_hybrid_experiment.py --source cams
+--alignment shifted`. The long dependency list is `export_cap.py` reaching into
+`build_dataset.py` for the site roster, which is what maps NGED's `time_series_id` to an
+anonymous label.
 """
 
 import argparse
@@ -39,6 +43,8 @@ from typing import Final
 import numpy as np
 import polars as pl
 import run_experiment
+from commissioning import drop_commissioning_ramp
+from export_cap import with_export_cap
 from run_experiment import (
     N_FOLDS,
     PRIMARY_HYPER_PARAMETERS,
@@ -164,10 +170,14 @@ def main() -> int:
     parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="shifted")
     arguments = parser.parse_args()
 
-    dataset = _assign_folds(
-        dataset=_add_time_features(
-            dataset=pl.read_parquet(
-                dataset_path_for(source=arguments.source, alignment=arguments.alignment)
+    dataset = with_export_cap(
+        dataset=_assign_folds(
+            dataset=_add_time_features(
+                dataset=drop_commissioning_ramp(
+                    dataset=pl.read_parquet(
+                        dataset_path_for(source=arguments.source, alignment=arguments.alignment)
+                    )
+                )
             )
         )
     )
@@ -198,7 +208,9 @@ def main() -> int:
     ]
     losses = _run_all(dataset=dataset, jobs=jobs).with_columns(
         absolute_error_fraction_of_capacity=pl.col("absolute_error_mw")
-        / pl.col("effective_capacity_mw")
+        / pl.col("effective_capacity_mw"),
+        absolute_error_capped_fraction_of_capacity=pl.col("absolute_error_capped_mw")
+        / pl.col("effective_capacity_mw"),
     )
 
     # The physical model's own score, on the identical rows, read straight from its per-row losses.

@@ -58,6 +58,8 @@ separation model's estimate of the same split, says what the *published field* b
 | `make_figures.py` | Draws the per-site time series, the per-site error chart and the sky-condition chart the write-up publishes. |
 | `inverter_clipping.py` | Splits the headline contrast by whether the meter was sitting on its inverter ceiling. A clipped hour cannot respond to irradiance, so this separates "clipping dilutes the effect" from "clipping manufactures it". |
 | `anm_curtailment.py` | Reads NGED's `curtailment/` feed — the active-network-management log nothing else in the repository ingests — and tests it against the one curtailed site's output shortfall. Needs the NGED bucket credentials the other scripts do not. |
+| `anm_setpoints.py` | Turns NGED's raw active-network-management setpoint export into a half-hourly export-cap series, and checks how the cap reads: a generator sitting at the largest cap it ever sees is unconstrained, not fully curtailed. Reaches 26 months where the bucket feed reaches five. |
+| `export_cap.py` | Joins that export cap onto the modelling dataset and marks the hours the operator had moved it. Imported by all three runners: the curtailed hours are dropped from every training fold, and the predictions are held down to the cap at scoring time. |
 
 ## The arms
 

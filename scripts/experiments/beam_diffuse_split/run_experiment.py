@@ -34,7 +34,10 @@ not earned the right to report a null on the real meters.
 Because ERA5 is a reanalysis rather than a forecast, what this measures is the *information content*
 of the split, not forecast skill.
 
-Run it with `uv run --no-project` plus `--with polars --with xgboost --with numpy`.
+Run it with `uv run --no-project` plus `--with polars --with numpy --with xgboost
+--with scipy --with pvlib --with xarray --with netcdf4 --with pandas --with deltalake`.
+The long dependency list is `export_cap.py` reaching into `build_dataset.py` for the site
+roster, which is what maps NGED's `time_series_id` to an anonymous label.
 """
 
 import argparse
@@ -48,6 +51,8 @@ from typing import Final, TypedDict
 import numpy as np
 import polars as pl
 import xgboost as xgb
+from commissioning import drop_commissioning_ramp
+from export_cap import clamp_to_cap, with_export_cap
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("run_experiment")
@@ -382,7 +387,10 @@ def _run_site_arm(
     outputs: list[pl.DataFrame] = []
     for fold in range(N_FOLDS):
         test = site_rows.filter(pl.col("fold") == fold)
-        train = site_rows.filter(pl.col("fold") != fold)
+        # A constrained hour is one the network operator turned down, so no irradiance product
+        # could have predicted it and a model that trains on it learns to read network
+        # instructions out of the sky. Scoring keeps those hours; only training drops them.
+        train = site_rows.filter((pl.col("fold") != fold) & ~pl.col("constrained"))
         if test.is_empty() or train.is_empty():
             continue
         features = _features_for(arm=arm, fold=fold)
@@ -405,8 +413,20 @@ def _run_site_arm(
                 if quantiles is not None
                 else pl.lit(None, dtype=pl.Float64)
             )
+            capped_point = clamp_to_cap(prediction=point, cap_mw=test["cap_mw"])
+            capped_crps = (
+                pl.Series(
+                    _crps(
+                        actual=actual,
+                        quantiles=clamp_to_cap(prediction=quantiles, cap_mw=test["cap_mw"]),
+                    ),
+                    dtype=pl.Float64,
+                )
+                if quantiles is not None
+                else pl.lit(None, dtype=pl.Float64)
+            )
             outputs.append(
-                test.select("site", "time", "month", "fold", "effective_capacity_mw")
+                test.select("site", "time", "month", "fold", "effective_capacity_mw", "constrained")
                 .cast({"effective_capacity_mw": pl.Float64})
                 .with_columns(
                     arm=pl.lit(arm),
@@ -416,6 +436,11 @@ def _run_site_arm(
                     absolute_error_mw=pl.Series(np.abs(actual - point), dtype=pl.Float64),
                     signed_error_mw=pl.Series(point - actual, dtype=pl.Float64),
                     crps_mw=crps,
+                    absolute_error_capped_mw=pl.Series(
+                        np.abs(actual - capped_point), dtype=pl.Float64
+                    ),
+                    signed_error_capped_mw=pl.Series(capped_point - actual, dtype=pl.Float64),
+                    crps_capped_mw=capped_crps,
                 )
             )
     return pl.concat(outputs)
@@ -793,9 +818,15 @@ def main() -> int:
     source = f"{arguments.source}{arguments.suffix}"
     results_dir = results_dir_for(source=source, alignment=arguments.alignment)
     results_dir.mkdir(parents=True, exist_ok=True)
-    dataset = _assign_folds(
-        dataset=_add_time_features(
-            dataset=pl.read_parquet(dataset_path_for(source=source, alignment=arguments.alignment))
+    dataset = with_export_cap(
+        dataset=_assign_folds(
+            dataset=_add_time_features(
+                dataset=drop_commissioning_ramp(
+                    dataset=pl.read_parquet(
+                        dataset_path_for(source=source, alignment=arguments.alignment)
+                    )
+                )
+            )
         )
     )
     sites = sorted(dataset["site"].unique().to_list())
@@ -825,7 +856,9 @@ def main() -> int:
 
     losses = _run_all(dataset=dataset, jobs=jobs).with_columns(
         absolute_error_fraction_of_capacity=pl.col("absolute_error_mw")
-        / pl.col("effective_capacity_mw")
+        / pl.col("effective_capacity_mw"),
+        absolute_error_capped_fraction_of_capacity=pl.col("absolute_error_capped_mw")
+        / pl.col("effective_capacity_mw"),
     )
     losses.write_parquet(results_dir / "per_row_losses.parquet")
 
@@ -850,6 +883,12 @@ def main() -> int:
             mae_fraction_of_capacity=pl.col("absolute_error_fraction_of_capacity").mean(),
             crps_mw=pl.col("crps_mw").mean(),
             bias_mw=pl.col("signed_error_mw").mean(),
+            mae_capped_mw=pl.col("absolute_error_capped_mw").mean(),
+            mae_capped_fraction_of_capacity=pl.col(
+                "absolute_error_capped_fraction_of_capacity"
+            ).mean(),
+            crps_capped_mw=pl.col("crps_capped_mw").mean(),
+            constrained_rows=pl.col("constrained").sum() // len(SEEDS),
             n_rows=pl.len() // len(SEEDS),
         )
         .sort("setting", "arm", "site")
