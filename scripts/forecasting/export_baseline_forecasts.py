@@ -190,8 +190,24 @@ def export_forecasts(experiment_name: str, fold_id: str, output_dir: Path) -> di
 
 def _parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--experiment-name", default="xgboost_no_power_lags")
-    parser.add_argument("--fold-id", default="mid_2025_to_mid_2026")
+    parser.add_argument(
+        "--experiment-name",
+        default="xgboost_no_power_lags",
+        help=(
+            "Experiment whose forecasts to export, matched against the experiment_name"
+            " partition column of the power_forecasts table"
+            " (default: xgboost_no_power_lags)."
+        ),
+    )
+    parser.add_argument(
+        "--fold-id",
+        default="mid_2025_to_mid_2026",
+        help=(
+            "Cross-validation fold whose forecasts to export, matched against the fold_id"
+            " partition column. The folds are defined in conf/cv/default.yaml"
+            " (default: mid_2025_to_mid_2026)."
+        ),
+    )
     parser.add_argument(
         "--output-dir",
         type=Path,
