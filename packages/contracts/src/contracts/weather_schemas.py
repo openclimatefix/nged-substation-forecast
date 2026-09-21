@@ -8,8 +8,8 @@ Three words recur throughout this module and are defined nowhere else. A *run* i
 of the weather model, and every row of one run shares an `init_time`. A *slice* is one
 (`ensemble_member`, `valid_time`) combination within a run, holding one value per H3 cell.
 
-*De-accumulation* is the third word. ECMWF publishes precipitation and radiation as running totals
-accumulated since the start of the run, and Dynamical.org, who we download ECMWF ENS from,
+*De-accumulation* is the third word. ECMWF publishes precipitation and radiation as running
+totals accumulated since the start of the run, and Dynamical.org, who we download ECMWF ENS from,
 de-accumulates those fields into rates before we receive them. `Nwp.deaccumulated_var_names`
 names the three fields de-accumulation applies to, and records that all three are legitimately
 null at lead-0.
@@ -426,20 +426,20 @@ class Nwp(pt.Model):
 
         Why an absent column is worth discarding a run over:
         <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#a-wholly-missing-variable-and-instantaneous-nulls-fatal>.
-        Why every smaller pattern is not — the slice arithmetic, and the interpolation argument
-        that makes a tolerated slice survivable:
+        Why every smaller pattern is not — the slice arithmetic, and the interpolation argument that
+        makes a tolerated slice survivable:
         <https://openclimatefix.github.io/nged-substation-forecast/architecture/ecmwf-ens-known-issues/#nulls-in-the-de-accumulated-variables-tolerated>.
 
         Two assumptions a caller must not make:
 
         - The judgement is made per `init_time`. A run whose column is empty is therefore caught
-          even inside a frame holding other, healthy runs. The same per-`init_time` judgement has an
-          unwanted consequence: a frame filtered down to nothing *but* a wholly-null slice is
-          indistinguishable from an empty column, so this check does raise. That is true even though
-          that same slice was deliberately landed — written into the stored table — when the whole
-          run was validated. That raise is latent rather than live today. The production caller,
-          `dynamical_data.ecmwf_ens.convert_to_polars`, validates one whole run. Reads go through
-          `scan_delta`/`set_model`, which do not validate.
+          even inside a frame holding other, healthy runs. The same per-`init_time` judgement has
+          an unwanted consequence: this check does raise when a frame is filtered down to nothing
+          *but* a wholly-null slice, which is indistinguishable from an empty column. That is
+          true even though that same slice was deliberately landed — written into the stored
+          table — when the whole run was validated. That raise is latent rather than live today.
+          The production caller, `dynamical_data.ecmwf_ens.convert_to_polars`, validates one
+          whole run. Reads go through `scan_delta`/`set_model`, which do not validate.
         - Raising is not the end of the partition. `NwpVariableWhollyMissing` is a distinct type
           because the `ecmwf_ens` asset retries it rather than failing outright.
         """
@@ -689,8 +689,8 @@ class NwpRunCompletenessReport:
     rule](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)
     says we land what arrived and warn, rather than throwing away an otherwise-good run. The
     `ecmwf_ens` asset wraps this into a WARN, non-blocking `AssetCheckResult`, which warns an
-    operator without stopping the pipeline. The asset also publishes the counts as
-    materialisation metadata, the numbers Dagster records against each run of an asset.
+    operator without stopping the pipeline. The asset also publishes the counts as materialisation
+    metadata, the numbers Dagster records against each run of an asset.
     """
 
     init_times: tuple[datetime, ...]

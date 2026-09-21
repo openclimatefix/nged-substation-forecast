@@ -4,11 +4,12 @@
 keeps one shared instance. Prefer the accessor wherever a `Settings` would otherwise be built
 while a module is still being imported. Building a `Settings` is what reads `.env` and the
 environment. An import-time build therefore couples a pure schema module to the environment, and
-freezes the values before a test can change them. A function that builds its own `Settings` when
-it runs is unaffected, and every `Settings` this repo's Dagster code builds is built inside a
+freezes the values before a test can change them. A function is unaffected if it builds its own
+`Settings` when it runs, and every `Settings` this repo's Dagster code builds is built inside a
 function body. `PROJECT_ROOT` resolves the workspace root. The `.env` file and the repo-relative
 path defaults are anchored to that root. Anchoring the defaults to a resolved root is what lets
-one set of defaults serve an editable install, a non-editable install, and the Docker image alike.
+one set of defaults serve an editable install, a non-editable install, and the Docker image
+alike.
 """
 
 from functools import lru_cache
@@ -70,9 +71,9 @@ class Settings(BaseSettings):
 
     Each field takes its value from an environment variable of the same name, from the workspace
     ``.env``, or from the default declared here, in that order of precedence. The managed
-    data-table paths default to ``""``, a sentinel meaning "derive me". The ``after``-mode model
-    validator ``_derive_unset_paths`` — a validator pydantic runs once, immediately after the
-    ``Settings`` is built — fills a path left unset from ``data_path_internal``,
+    data-table paths default to ``""``, a sentinel meaning "derive me". Pydantic runs the
+    ``after``-mode model validator ``_derive_unset_paths`` once, immediately after the
+    ``Settings`` is built. That validator fills a path left unset from ``data_path_internal``,
     ``data_path_delivery``, or ``local_artifacts_path``. A caller therefore never observes the
     sentinel and always reads a concrete path, while a path set explicitly keeps the value it was
     given. Every value is read when the ``Settings`` is built. A test that changes the

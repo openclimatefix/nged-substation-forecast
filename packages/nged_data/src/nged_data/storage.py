@@ -153,11 +153,11 @@ def remove_small_files_from_listing(
 
     That 68-byte gap comes from V1's 32 series ([phased
     rollout](https://openclimatefix.github.io/nged-substation-forecast/background/requirements/#phased-rollout)),
-    The gap is narrow, so V2's ~2,500 series want re-measuring before this default is trusted
-    there. Two changes would close the gap. A populated `information` field would push a
-    zero-reading file above 520 bytes; `TimeSeriesMetadata` records that field as always null in
-    the V1 trial area. A substation name shorter than any in V1 would pull a one-reading file
-    below 520 bytes. Re-run the measurement rather than assume the gap survives.
+    The gap is narrow, so V2's ~2,500 series want re-measuring before this default is trusted there.
+    Two changes would close the gap. A populated `information` field would push a zero-reading file
+    above 520 bytes; `TimeSeriesMetadata` records that field as always null in the V1 trial area. A
+    substation name shorter than any in V1 would pull a one-reading file below 520 bytes. Re-run the
+    measurement rather than assume the gap survives.
     """
     n_files_before_filter = file_listing.height
     filtered = file_listing.filter(pl.col("filesize_bytes") > size_threshold_bytes)
@@ -363,9 +363,9 @@ _LATE_FILE_LOOKBACK: Final[timedelta] = timedelta(days=3)
 downloaded. `select_new_rows`'s `_ProcessedFileListing` branch applies this margin.
 
 NGED's files land "at irregular, several-hours-apart intervals with no fixed schedule" (see
-`power_time_series_and_metadata`'s docstring). A file whose `end_time` falls a short while before
-the current watermark is therefore an ordinary late arrival, not a fault. The 3-day margin is a
-judgement call — generous enough to cover an ordinary late arrival, small enough that an hour
+`power_time_series_and_metadata`'s docstring). It is therefore an ordinary late arrival, not a
+fault, when a file's `end_time` falls a short while before the current watermark. The 3-day margin
+is a judgement call — generous enough to cover an ordinary late arrival, small enough that an hour
 doesn't re-download the whole bucket. Getting the margin's length exactly right doesn't matter for
 correctness: `select_new_rows`'s `PowerTimeSeries` branch is what decides which downloaded rows are
 genuinely new. A file let through by too generous a margin here just costs an extra download. A file
@@ -442,8 +442,7 @@ def select_new_rows(
     Delta table; `storage_options` carries the object-store credentials/endpoint for a remote
     `delta_path`.
 
-    A call against a Delta table that does not exist yet returns its input unchanged and scans
-    nothing.
+    When the Delta table does not exist yet, a call returns its input unchanged and scans nothing.
 
     For `PowerTimeSeries` rows, the filter is a genuine existence check: an anti-join on
     `(time_series_id, time)` against `_existing_power_time_series_keys`. A late file is therefore
@@ -550,12 +549,12 @@ def upsert_metadata(
     idempotent](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/design-principles/#10-every-write-is-atomic-and-idempotent-and-every-failure-is-confined-to-one-partition).
     A crash or an out-of-memory kill part-way through a local write leaves a partial file.
     `pl.read_parquet` below is what rejects that partial file on the next run, before
-    `TimeSeriesMetadata.validate` ever sees it. The error reads `ComputeError: parquet: File out
-    of specification: The file must end with PAR1`. `validate` is the guard for the other case: a
-    roster that reads back cleanly but is off-contract, from an older writer or a hand-edit.
-    Either way the asset records `metadata_upsert_failed`, and the roster stays broken until an
-    operator acts. A corrupt file is not a missing file, so the create branch below never runs
-    again by itself.
+    `TimeSeriesMetadata.validate` ever sees it. The error reads `ComputeError: parquet: File out of
+    specification: The file must end with PAR1`. `validate` is the guard for the other case: a
+    roster that reads back cleanly but is off-contract, from an older writer or a hand-edit. Either
+    way the asset records `metadata_upsert_failed`, and the roster stays broken until an operator
+    acts. A corrupt file is not a missing file, so the create branch below never runs again by
+    itself.
 
     Deleting the file is not on its own a fix. `power_time_series_and_metadata` extracts metadata
     only from the files `select_new_rows` judged new. The next hourly run would therefore rebuild

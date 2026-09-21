@@ -3,10 +3,10 @@
 For a chosen time series the notebook draws three charts. The first overlays observed power against
 the forecast — the ensemble mean, p50, and the p10-p90 band. Those are percentiles of the spread of
 ensemble members, so the p10-p90 band is the range eight forecasts in ten fall inside. The second
-plots the observed-minus-ensemble-mean residual, the raw material for switching-event detection: a
-sudden step in the gap between measured and forecast power is the signature of a feeder being
-switched onto or off the substation. The third draws the raw ensemble members over a selected
-window.
+plots the observed-minus-ensemble-mean residual, the raw material for switching-event detection: the
+residual shows a sudden step in the gap between measured and forecast power — the signature of a
+feeder being switched onto or off the substation. The third draws the raw ensemble members over a
+selected window.
 
 All three exported parquets (``*_full_ensemble``, ``*_ensemble_mean``, ``*_quantiles``) are used.
 Every chart is pan/zoom interactive. Titles carry the series id, type, and name. The y-axis is

@@ -156,10 +156,10 @@ class XGBoostForecaster(BaseForecaster):
     ) -> pt.DataFrame[PowerForecast]:
         """Generate one power_fcst per row, dispatching by time_series_id to the right Booster.
 
-        ``data`` is collected once and grouped in memory by ``time_series_id``. Rows for a
-        ``time_series_id`` this model was not trained on are ignored (the model only scores its
-        own trained population — see ``trained_time_series_ids``). Keeping the collect bounded is
-        the caller's job. Training reads the control member alone, but at validation the full
+        ``data`` is collected once and grouped in memory by ``time_series_id``. This model
+        ignores rows for any ``time_series_id`` it was not trained on, and only scores its own
+        trained population (see ``trained_time_series_ids``). Keeping the collect bounded is the
+        caller's job. Training reads the control member alone, but at validation the full
         ~51-member NWP ensemble is present, so the caller predicts one ``init_time`` chunk at a
         time. The caller appends each chunk to Delta as it goes. ``init_time`` is one of the NWP
         table's two partition columns, and it is the axis that fans the output out across runs.
@@ -219,11 +219,11 @@ class XGBoostForecaster(BaseForecaster):
     def save(self, path: Path) -> None:
         """Save all Boosters as .ubj files plus a meta.json with the full config.
 
-        Clears ``path`` first. Re-saving a model trained on fewer series, over a directory that
-        already holds the ``.ubj`` files of a model trained on more, can then never leave the
-        dropped series' boosters behind on disk (issue #197). The same replace-don't-merge
-        property holds through MLflow, because ``BaseForecaster.save_to_mlflow`` uploads this
-        directory as a single archive artifact.
+        Clears ``path`` first. The dropped series' boosters can then never be left behind on
+        disk, even when re-saving a model trained on fewer series over a directory that already
+        holds the ``.ubj`` files of a model trained on more (issue #197). The same
+        replace-don't-merge property holds through MLflow, because
+        ``BaseForecaster.save_to_mlflow`` uploads this directory as a single archive artifact.
         """
         shutil.rmtree(path, ignore_errors=True)
         path.mkdir(parents=True, exist_ok=True)

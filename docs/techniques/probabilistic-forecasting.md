@@ -64,11 +64,11 @@ Total predictive uncertainty decomposes into three terms:
 3. **Intrinsic noise** — even a perfect model given perfect weather couldn't predict power exactly:
    meter noise, occupant behaviour, unmodelled local events. Irreducible randomness.
 
-A deterministic model (XGBoost trained with squared error learns the **conditional mean**) pushed
-through 51 members captures term 1 *only*. Terms 2 and 3 are dropped entirely, at *every* lead time.
-The resulting ensemble is **under-dispersed** — systematically overconfident. The failure is most
-conspicuous at short horizons, where term 1 has barely grown, so the fan collapses toward the single
-line of the sketch above while our errors do not. The [spread-skill
+Push a deterministic model — XGBoost trained with squared error, which learns the **conditional
+mean** — through 51 members, and it captures term 1 *only*. Terms 2 and 3 are dropped entirely, at
+*every* lead time. The resulting ensemble is **under-dispersed** — systematically overconfident. The
+failure is most conspicuous at short horizons, where term 1 has barely grown, so the fan collapses
+toward the single line of the sketch above while our errors do not. The [spread-skill
 ratio](evaluation-metrics.md#spread-skill-ratio) is the metric that catches this: spread ÷ error ≪ 1
 means the fan is too thin.
 

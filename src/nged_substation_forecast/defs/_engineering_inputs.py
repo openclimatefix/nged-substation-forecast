@@ -44,18 +44,18 @@ def load_engineering_inputs(
     window_end]`` window; NWP stays bounded to ``[window_start, window_end]``. Both are filtered to
     ``time_series_ids``.
 
-    A caller that needs power history from before ``window_start`` — to compute a power lag
-    feature whose target time falls earlier than the window — has two options. The caller can
-    widen ``window_start`` itself, as ``live_forecasts`` does; widening ``window_start`` also
-    widens the NWP bound, so ``live_forecasts`` passes an explicit
-    ``init_time_start``/``init_time_end`` and filters the result afterwards to stay correct. Or
-    the caller can pass ``power_lookback``, which widens only the power scan. The default widens
-    neither. A ``power_lookback`` equal to the longest power lag a caller's features need is
-    exactly sufficient: the scan predicate below is inclusive, and the earliest target time any
-    lag can read is exactly ``window_start - power_lookback``.
+    A caller has two options when it needs power history from before ``window_start`` — for example,
+    to compute a power lag feature whose target time falls earlier than the window. The caller can
+    widen ``window_start`` itself, as ``live_forecasts`` does; widening ``window_start`` also widens
+    the NWP bound, so ``live_forecasts`` passes an explicit ``init_time_start``/``init_time_end``
+    and filters the result afterwards to stay correct. Or the caller can pass ``power_lookback``,
+    which widens only the power scan. The default widens neither. A ``power_lookback`` equal to the
+    longest power lag a caller's features need is exactly sufficient: the scan predicate below is
+    inclusive, and the earliest target time any lag can read is exactly ``window_start -
+    power_lookback``.
 
     The spine is the ``(time_series_id, valid_time)`` row scaffold that power values are later
-    joined onto as labels. The guarantee that widening the power scan adds no spine rows assumes
+    joined onto as labels. Widening the power scan adds no spine rows. That guarantee assumes
     the NWP-centric bulk-mode join, in which power is left-joined *onto* the NWP-derived spine.
     The guarantee does not hold when NWP is absent, where the spine is the power frame itself.
     Every caller that passes ``power_lookback`` also passes NWP, so ``load_engineering_inputs``

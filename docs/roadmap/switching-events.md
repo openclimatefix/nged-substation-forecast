@@ -14,11 +14,12 @@ from the v0.6 forecaster and detector to the later v2-scale mixture models.
 > work). None of the switching-events work described on this page is implemented yet. The
 nearest-term piece is the **two-stage
 > forecaster** (approach 1), which makes the production forecast robust to switching by consuming
-> continuous switching-state features, and ships no discrete event table. Whether the explicit
-> **staged detector** is then built on top of it — feeding the
+> continuous switching-state features, and ships no discrete event table. It is an open question,
+> governed by [the decision
+> point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector), whether the explicit
+> **staged detector** is then built on top of the two-stage forecaster — feeding the
 > [`substation_switching`](delivery-tables.md#table-5-substation_switching) table and the
-> training-data mask — is an open question governed by [the decision
-> point](#the-decision-point-a-feature-based-mainline-vs-the-staged-detector). The two v2-scale
+> training-data mask. The two v2-scale
 > mixture models are later research. The post-v2.0 roadmap is not yet fully specified, so read those
 > two as "some time after v2.0". See the [roadmap index](index.md) for status conventions and where
 > this fits the overall plan. This is the **canonical** treatment of switching events; the

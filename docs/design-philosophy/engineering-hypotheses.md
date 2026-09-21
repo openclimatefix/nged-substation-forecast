@@ -154,8 +154,8 @@ to redefine T2.1.
 > Moving the leaderboard winner into production, or reverting it, is a single command each way.
 
 **One command is not the same as one leap of faith, and that distinction is the substance of this
-hypothesis.** A promotion mechanism is only worth having if it is *safe* to use; a fast route to
-production that nobody trusts enough to press is no better than a slow one. What makes a
+hypothesis.** A promotion mechanism is only worth having if it is *safe* to use. A fast route to
+production is no better than a slow one if nobody trusts it enough to press. What makes a
 single-command promotion defensible is everything that will have happened by the time the command
 becomes available to run:
 

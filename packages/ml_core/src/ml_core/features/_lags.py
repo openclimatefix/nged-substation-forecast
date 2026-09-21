@@ -123,7 +123,7 @@ def _apply_weather_lag(
 
     return lf_joined.with_columns(
         # >= rather than >: at target_time == power_fcst_init_time the row's own run is already
-        # available. Bulk mode — the mode that vectorises over every NWP run in the input — derives
+        # available. Bulk mode vectorises over every NWP run in the input. Bulk mode derives
         # power_fcst_init_time = nwp_init_time + delay, which is exactly the instant that run
         # becomes usable. No fresher run can be available at that instant either, so the boundary
         # belongs to the same-run branch rather than the freshest-run branch. The boundary choice

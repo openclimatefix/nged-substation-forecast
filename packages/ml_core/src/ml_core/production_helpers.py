@@ -114,8 +114,7 @@ def weather_lags_lack_their_control_member(
     channel. [Rule
     4](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules)
     requires that Sentry report alongside the log, not as a substitute for the log. Reading the logs
-    is not a
-    monitoring strategy: the operator reads the alert.
+    is not a monitoring strategy: the operator reads the alert.
 
     Returns ``False`` when the model selects no weather lag. A model with no weather lags never
     reads the control member, because the same-run weather join reads whichever ensemble members the
@@ -204,9 +203,9 @@ def build_live_power_frame(
 def _check_meta_is_servable(meta: dict[str, Any], source: str) -> type[BaseForecaster]:
     """Raise if this code cannot serve the model that ``meta.json`` describes; return its class.
 
-    A saved model names its class, its hyper-parameters, and its features as strings. Renaming or
-    removing any of those names in code therefore leaves every model saved before the change
-    unservable. The whole of ``model_params`` is validated against the concrete ``CONFIG_CLASS``
+    A saved model names its class, its hyper-parameters, and its features as strings. Every model
+    saved before the change therefore becomes unservable if any of those names is renamed or removed
+    in code. The whole of ``model_params`` is validated against the concrete ``CONFIG_CLASS``
     reached from ``model_class``. That ``CONFIG_CLASS`` is the same object the subclass's ``load``
     builds its config from. A model that passes here is therefore a model ``load`` will accept. See
     <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>

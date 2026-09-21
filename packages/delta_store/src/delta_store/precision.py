@@ -1,6 +1,6 @@
 """Reduce the significand precision of ``Float32`` columns so parquet compression can work.
 
-Nearly every full-precision ``Float32`` value in a large forecast or weather table is distinct,
+In a large forecast or weather table, nearly every full-precision ``Float32`` value is distinct,
 so the low significand bits are incompressible noise — they defeat every general-purpose codec.
 Rounding each value to a small number of significand bits zeroes those low bits. A
 general-purpose codec then has repetition to find, at the cost of a strictly bounded *relative*
@@ -26,9 +26,9 @@ def round_to_significand_bits(expr: pl.Expr, *, keep_bits: int) -> pl.Expr:
     """Round a ``Float32`` expression to ``keep_bits`` significand bits (round-to-nearest).
 
     The result is exactly representable with a ``keep_bits``-bit significand. Write ``p`` for the
-    format's significand width, which `FLOAT32_SIGNIFICAND_BITS` above sets to 24. The low ``24 -
-    keep_bits`` explicit fraction bits of every finite output are therefore zero, which is what
-    gives the compression codec repetition to find. The relative error is bounded by the unit
+    format's significand width, which `FLOAT32_SIGNIFICAND_BITS` above sets to 24. Every finite
+    output therefore has its low ``24 - keep_bits`` explicit fraction bits set to zero, which is
+    what gives the compression codec repetition to find. The relative error is bounded by the unit
     roundoff of a ``keep_bits``-bit format:
 
         |result - x| <= 2**-keep_bits * |x|

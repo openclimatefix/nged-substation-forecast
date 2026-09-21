@@ -191,9 +191,9 @@ def _process_chunk_for_1_lead_time_and_1_ens_member(
 
     # Normalise NaN to null here, at the boundary, for *every* weather variable. That normalisation
     # gives "missing" a single representation downstream. xarray delivers upstream corruption as
-    # NaN. A grid point that the H3 weights name, but that the dataset does not carry, arrives as a
-    # null from the left join below. The aggregation must treat the two identically, and it can only
-    # do that if they look the same.
+    # NaN. A null arrives from the left join below for a grid point that the H3 weights name but
+    # that the dataset does not carry. The aggregation must treat the two identically, and it can
+    # only do that if they look the same.
     nwp_df = pl.DataFrame(data_dict).with_columns(
         pl.col(numeric_vars).fill_nan(None),
         pl.col(categorical_vars).fill_nan(None).cast(pl.Int16),

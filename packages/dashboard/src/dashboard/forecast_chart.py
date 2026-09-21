@@ -204,9 +204,9 @@ def _prepare_for_plot(lf: pl.LazyFrame, time_column: str) -> pl.LazyFrame:
 
     Values pass through at their stored ``Float32`` width. ``mo.ui.altair_chart`` serves the rows
     as an Arrow virtual file rather than inlining them in the cell output, and Arrow is
-    fixed-width, so how many decimal digits a value would print to does not change the payload:
-    casting to ``Float64`` in order to round costs 4 bytes per value, measured at +33% on a
-    34,000-row ensemble.
+    fixed-width, so the payload does not change no matter how many decimal digits a value would
+    print to: casting to ``Float64`` in order to round costs 4 bytes per value, measured at +33%
+    on a 34,000-row ensemble.
     """
     return lf.with_columns(
         pl.col(time_column).dt.convert_time_zone(DISPLAY_TIME_ZONE).dt.replace_time_zone(None)
@@ -254,9 +254,9 @@ def _lagged_power_frame(
     Only observations at or before ``power_fcst_init_time`` are shifted, because the model cannot
     see later observations. Each line therefore ends at ``power_fcst_init_time + lag`` — precisely
     where feature engineering nullifies that lag as leaky for longer lead times. Nullifying a lag
-    means blanking it as a model input, because using an observation the model could not have had
-    at forecast time would leak the future into the forecast. The line stopping short of the
-    plotted window's right-hand edge is the point, not an artefact.
+    means blanking it as a model input, because the future would leak into the forecast if the model
+    used an observation it could not have had at forecast time. It is the point, not an artefact,
+    that the line stops short of the plotted window's right-hand edge.
 
     Args:
         actuals: ``PowerTimeSeries`` observations (UTC ``time``), including history at least

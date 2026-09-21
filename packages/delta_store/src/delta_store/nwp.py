@@ -54,15 +54,15 @@ alone is not enough: row groups that straddle member boundaries advertise the wh
 their extremes.
 
 Measured on the stored table, a single-member read decodes 1.96% of a partition's rows — one row
-group in 51 — and it does so for every member. Every partition the census sampled held 51 row
-groups, each spanning a single member, and those 51 row groups together covered members 0 to 50.
-Reading 29 daily partitions, nine H3 cells, and the control member alone runs in 30 ms and 400 MB of
-peak resident memory. The same read of a table sorted ``valid_time``-first takes 170 ms and 2,200
-MB. The member-early sort holds 3.7% more stored bytes than the ``valid_time``-first sort. One
-measurement took a real partition and removed half its rows at random members, so that the
-member-to-row-group alignment degrades rather than holding exactly. Under that degraded alignment
-the worst member still reads 5.88% of the partition's rows, against the 1.96% floor above. The
-method and the full figures live beside the storage measurements in
+group in 51 — and it does so for every member. A census sampled the stored table's partitions. Every
+partition the census sampled held 51 row groups, each spanning a single member, and those 51 row
+groups together covered members 0 to 50. It takes 30 ms and 400 MB of peak resident memory to read
+29 daily partitions, nine H3 cells, and the control member alone. The same read of a table sorted
+``valid_time``-first takes 170 ms and 2,200 MB. The member-early sort holds 3.7% more stored bytes
+than the ``valid_time``-first sort. One measurement took a real partition and removed half its rows
+at random members, so that the member-to-row-group alignment degrades rather than holding exactly.
+Under that degraded alignment the worst member still reads 5.88% of the partition's rows, against
+the 1.96% floor above. The method and the full figures live beside the storage measurements in
 <https://openclimatefix.github.io/nged-substation-forecast/api/dynamical_data/>.
 
 Two conditions have to hold for the predicate to reach the Parquet scan at all. The predicate must
@@ -94,9 +94,9 @@ the streaming engine's peak memory per morsel."""
 def _member_aligned_row_group_size(nwp: pt.DataFrame[Nwp]) -> int:
     """Rows one ensemble member occupies, clamped to `NWP_ROW_GROUP_SIZE_LIMITS`.
 
-    On a frame already sorted member-early by `NWP_SORT_COLS`, setting Parquet's row-group size to
-    the number of rows one member occupies then lands each ensemble member in a row group of its
-    own. A single-member predicate then matches one row group's ``ensemble_member`` min/max range
+    On a frame already sorted member-early by `NWP_SORT_COLS`, each ensemble member lands in a row
+    group of its own once Parquet's row-group size is set to the number of rows one member occupies.
+    A single-member predicate then matches one row group's ``ensemble_member`` min/max range
     exactly. An ECMWF ENS run carries 51 members. The scan therefore decodes 1/51 of the partition's
     rows, instead of the wider span of rows a straddling row group would advertise.
 
@@ -170,7 +170,7 @@ def write_nwp(
 
     **A validated ``pt.DataFrame[Nwp]`` input is what makes ``schema_mode="overwrite"`` safe to
     leave on.** The ``nwp`` argument carries the full column set at the *current* contract's dtypes.
-    The only way the write can ever change the table's schema is a deliberate widening of an ``Nwp``
+    The write can only ever change the table's schema through a deliberate widening of an ``Nwp``
     dtype, and the write cannot silently drop a column.
 
     A **narrowing** contract change is a different, worse failure mode, also confirmed

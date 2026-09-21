@@ -27,9 +27,9 @@ deliberately few, so that logging an intervention is never the reason an interve
 | **Notes** | One sentence. Link the issue or PR if there is one |
 
 An intervention is **any occasion a human had to intervene in the running service**, including
-occasions that turn out to be trivial. Feature work and deliberate upgrades are not interventions;
-unglamorous keep-it-running chores — a credential rotation, a certificate, a dependency bump forced
-by an upstream deprecation — are, and belong in `routine-ops`.
+occasions that turn out to be trivial. Feature work and deliberate upgrades are not interventions.
+Unglamorous keep-it-running chores are interventions and belong in `routine-ops`: a credential
+rotation, a certificate, or a dependency bump forced by an upstream deprecation.
 
 A run that failed and then recovered on its own retry is *not* an intervention, but log it anyway,
 with `Minutes = 0` and `Cause = self-recovered`. Self-recovery is evidence for the design rather
@@ -79,8 +79,8 @@ from, and they are the honest record of what the service actually demanded of us
 The reverse also holds, and matters more. A *quiet* pre-v1.0 stretch does not score in favour of
 [H1, a service that mostly runs
 itself](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) either.
-Counting the good weeks of an excluded window while discounting the bad weeks would be the plainest
-possible case of the selective reading these hypotheses exist to prevent.
+It would be the plainest possible case of the selective reading these hypotheses exist to prevent:
+counting the good weeks of an excluded window while discounting the bad weeks.
 
 ## The log
 
@@ -90,8 +90,8 @@ possible case of the selective reading these hypotheses exist to prevent.
 
 ## Periods covered
 
-Recording the periods, and not only the entries, is what makes an empty table mean something. An
-empty log with no stated period is indistinguishable from a log nobody kept.
+An empty table means something only if the periods are recorded, not only the entries. An empty log
+with no stated period is indistinguishable from a log nobody kept.
 
 | Period | Version | Scope | Interventions | Scores [T1.1, operability](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)? |
 |---|---|---|---|---|
@@ -145,15 +145,15 @@ Three caveats, without which the window would be worth more than it is:
   in the same week — lands on `main` on 21 July, 6 days after the box was deployed and never
   updated. Whatever was running there therefore predates Sentry entirely: the missed-check-in
   monitor never existed on that box, and the alarm that did surface the missed run came from newer
-  code running on a laptop. `live_forecasts_are_healthy`, the check that reads each slot's rows back
-  and counts missed NWP runs, landed later still. The four degraded slots were reconstructable only
+  code running on a laptop. `live_forecasts_are_healthy` landed later still: that check reads each
+  slot's rows back and counts missed NWP runs. The four degraded slots were reconstructable only
   because `nwp_init_time` travels on every forecast row: the degradation was recoverable from the
   data, but nothing in the deployment announced it.
 - **A month is short, and this is the easy case.** v0.1 is 28 time series and one ECMWF run per day.
-  The dominant cause predicted by the [T1.1 operability
-  test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself) — an
-  upstream contract change — did not happen in a window this short; a partial publication is a
-  milder fault than a changed schema.
+  An upstream contract change — the dominant cause the [T1.1 operability
+  test](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)
+  predicts — did not happen in a window this short; a partial publication is a milder fault than a
+  changed schema.
 - **It does not score.** The window opens at v1.0, [as above](#the-scoring-window-opens-at-v10).
 
 So what this is, stated plainly: **weak, non-scoring evidence for [H1, a service that mostly runs
