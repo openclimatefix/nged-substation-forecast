@@ -574,6 +574,41 @@ nothing here chooses between the candidates. What the residuals do supply is evi
 signal the contest is chasing is present in this fleet, is several percent in size, and is
 site-specific enough to be identifiable.
 
+## Implications for Flexpectation
+
+What the measurements above bear on, in the order the project meets them. Each is an implication
+rather than a plan; what the project does about any of them belongs to the roadmap and the issue
+tracker.
+
+- **Asking a supplier to add the direct beam to the ECMWF ENS feed is the weakest of the three
+  options.** The open ENS feed publishes [at 25 km](../roadmap/data-sources.md), within a few
+  kilometres of the 31 km reanalysis where the published beam bought nothing detectable, and a
+  separation model run locally is free and available now.
+- **The same result points the other way for ICON-EU.** At about 6.5 km it sits beside the 5 km
+  retrieval where the beam field did help, and it already carries the split, so the planned
+  [ICON-EU ablation](../roadmap/data-sources.md) is where the beam question is worth asking again
+  rather than assumed settled by this page.
+- **CAMS earns its ingest slot on power forecasting as well as capacity estimation.** It is already
+  planned as an input to [capacity estimation](../roadmap/capacity-estimation.md); the 4.1-point
+  gap over ERA5 makes which irradiance product feeds the model much the largest lever measured
+  here, about thirty times the widest split contrast. Effort spent choosing the source beats effort
+  spent deriving the split.
+- **The fitted physical model's case in the capacity contest rests on interpretability and graceful
+  degradation, not on accuracy.** It trails XGBoost by 0.9 points on PV power, and calibrating its
+  output with a tree recovers most of that gap without overtaking the tree. That is consistent with
+  what the [capacity-estimation page](../roadmap/capacity-estimation.md) already claims for the
+  differentiable-physics candidate, and it is evidence against expecting an accuracy win too.
+- **The per-site residuals support the shared-regional-bias premise the capacity estimators are
+  designed around**, and caution against the static full-history P99 denominator where a plant
+  moves. Both are set out [above](#what-the-drift-says-about-estimating-effective-capacity).
+- **The half-hour power-stamp offset is a question for NGED that outlives this experiment.** Three
+  independent tests agree the stamps arrive 30 minutes later than the contract implies, and the
+  offset affects any model trained on this telemetry, not only this one.
+- **Feature-ablation experiments in this repository need a negative control.** A feature set that
+  is a deterministic function of an existing one still improved this pipeline by 0.033 points, a
+  third of the headline effect. An ablation run without such a control could report that
+  re-encoding gain as a finding.
+
 ## Limitations
 
 The finding is about six meters inside one 34 km box in Lincolnshire between 2019 and 2026, and the
