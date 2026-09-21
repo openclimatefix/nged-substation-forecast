@@ -634,7 +634,7 @@ reading a constant.
 
 **A fixed-capacity model's signed error drifts by more than 6 points between neighbouring sites,
 which bounds how much capacity moved without estimating it.** The per-site, per-year drift table is
-[in the write-up](../results/beam-diffuse-split.md#what-the-drift-says-about-estimating-effective-capacity).
+[in the write-up](../results/beam-diffuse-split.md#what-the-per-site-error-drift-says-about-estimating-effective-capacity).
 The drift appears on two independently-produced irradiance products and agrees between them to
 about half a point at the five longer-running sites, so it is in the power rather than in the
 weather. It remains an upper bound:
