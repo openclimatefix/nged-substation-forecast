@@ -156,7 +156,9 @@ def main() -> int:
     """Print what the curtailment feed holds and what it explains."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
-    parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="shifted")
+    parser.add_argument(
+        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
+    )
     parser.add_argument(
         "--refresh", action="store_true", help="Re-download rather than reading the cache."
     )
@@ -262,14 +264,22 @@ def main() -> int:
         [
             f"{inside.height} scored rows fall in a curtailed hour. Each arm's error there:",
             "",
-            "| Arm | MAE (% of P99 output) |",
-            "|---|---|",
+            (
+                "| Arm | MAE against the cap (% of P99 output) |"
+                " MAE ignoring the cap (% of P99 output) |"
+            ),
+            "|---|---|---|",
         ]
     )
+    # Both readings belong here. The capped column is what the experiment scores; the uncapped
+    # column is the size of the penalty the clamp removes.
     lines.extend(
-        f"| {row['arm']} | {row['mae']:.2f} |"
+        f"| {row['arm']} | {row['mae_capped']:.2f} | {row['mae_uncapped']:.2f} |"
         for row in inside.group_by("arm")
-        .agg(mae=pl.col("absolute_error_fraction_of_capacity").mean() * 100)
+        .agg(
+            mae_capped=pl.col("absolute_error_capped_fraction_of_capacity").mean() * 100,
+            mae_uncapped=pl.col("absolute_error_fraction_of_capacity").mean() * 100,
+        )
         .sort("arm")
         .iter_rows(named=True)
     )
@@ -281,7 +291,7 @@ def main() -> int:
             losses=frame,
             treatment=CONTRAST[0],
             reference=CONTRAST[1],
-            metric="absolute_error_fraction_of_capacity",
+            metric="absolute_error_capped_fraction_of_capacity",
         )
         lines.append(
             f"| {label} | {interval['difference'] * 100:+.4f} |"

@@ -434,7 +434,11 @@ def _intervals_for(
     *, losses: pl.DataFrame, setting_name: str, target: str, sites: list[str]
 ) -> list[dict[str, object]]:
     """Compute every contrast's bootstrap interval, pooled and per site."""
-    metrics = ["absolute_error_fraction_of_capacity", "absolute_error_mw"]
+    metrics = [
+        "absolute_error_capped_fraction_of_capacity",
+        "absolute_error_fraction_of_capacity",
+        "absolute_error_mw",
+    ]
     records: list[dict[str, object]] = []
     arms_present = set(losses["arm"].unique().to_list())
     for treatment, reference in CONTRASTS:
@@ -481,7 +485,9 @@ def main() -> int:
     """Fit every arm at every site and fold, bootstrap the contrasts, and write the results."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
-    parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="shifted")
+    parser.add_argument(
+        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
+    )
     parser.add_argument(
         "--suffix",
         default="",

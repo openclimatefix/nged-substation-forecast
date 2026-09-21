@@ -43,8 +43,13 @@ _LOG: Final[logging.Logger] = logging.getLogger("make_figures")
 REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
 FIGURES_DIR: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_figures"
 
-ALIGNMENT: Final[str] = "shifted"
-"""The stamp alignment every figure is drawn under, the one three independent tests support."""
+ALIGNMENT: Final[str] = "piecewise"
+"""The stamp alignment every figure is drawn under, and the only one that matches the feed.
+
+NGED corrected the half-hourly power stamps at 2026-03-26 08:30 UTC. Every reading before that
+instant is 30 minutes late and every reading from it is correct, so one global offset is wrong on
+one side of that instant whichever offset is chosen.
+"""
 
 MEASURED_COLOUR: Final[str] = "#292B2B"
 """Measured power is drawn in the OCF theme's ink rather than in a brand hue.
@@ -131,7 +136,7 @@ def _predictions(*, source: str, instrument: str, arm: str) -> pl.DataFrame:
     )
     return (
         losses.group_by("site", "time")
-        .agg(signed_error_mw=pl.col("signed_error_mw").mean())
+        .agg(signed_error_mw=pl.col("signed_error_capped_mw").mean())
         .sort("site", "time")
     )
 
@@ -306,7 +311,7 @@ def _per_site_error() -> pl.DataFrame:
                 "source_label": SOURCE_LABELS[source],
                 "instrument_label": INSTRUMENT_LABELS[instrument],
                 "site": row["site"],
-                "mae_percent": row["mae_fraction_of_capacity"] * PERCENT,
+                "mae_percent": row["mae_capped_fraction_of_capacity"] * PERCENT,
                 "hours": row["n_rows"],
             }
             for row in summary.iter_rows(named=True)

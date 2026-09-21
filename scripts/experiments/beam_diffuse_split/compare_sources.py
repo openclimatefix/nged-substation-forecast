@@ -82,7 +82,9 @@ def _losses_for(*, instrument: str, source: str, alignment: str) -> pl.DataFrame
 def main() -> int:
     """Print the shared-hours comparison for both instruments."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="shifted")
+    parser.add_argument(
+        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
+    )
     parser.add_argument("--first-source", default="cams")
     parser.add_argument("--second-source", default="open-meteo")
     arguments = parser.parse_args()
@@ -119,7 +121,7 @@ def main() -> int:
             cells = [
                 _scalar(
                     restricted[source]
-                    .filter(pl.col("arm") == arm)["absolute_error_fraction_of_capacity"]
+                    .filter(pl.col("arm") == arm)["absolute_error_capped_fraction_of_capacity"]
                     .mean()
                 )
                 * PERCENTAGE_POINTS
@@ -142,7 +144,7 @@ def main() -> int:
                     losses=restricted[source],
                     treatment=treatment,
                     reference=reference,
-                    metric="absolute_error_fraction_of_capacity",
+                    metric="absolute_error_capped_fraction_of_capacity",
                 )
                 cells.append(
                     f"{interval['difference'] * PERCENTAGE_POINTS:+.4f} | "

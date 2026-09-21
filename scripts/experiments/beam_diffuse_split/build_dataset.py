@@ -31,6 +31,7 @@ import logging
 import sys
 import tempfile
 import zipfile
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, Literal
 
@@ -53,11 +54,14 @@ CAPACITY_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "effective_capacity")
 OPEN_METEO_PATH: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_open_meteo.parquet"
 CAMS_PATH: Final[Path] = REPO_DATA_DIR / "CAMS" / "beam_diffuse_cams.parquet"
 
-AlignmentType = Literal["as-labelled", "shifted"]
+AlignmentType = Literal["as-labelled", "shifted", "piecewise"]
 """How the power stamps are read against ERA5.
 
 `as-labelled` takes `PowerTimeSeries.time` at its word: the reading stamped `T` is the mean over
 `(T - 30 min, T]`. `shifted` moves every power stamp 30 minutes earlier before the join.
+`piecewise` moves only the stamps before `ALIGNMENT_FIXED_AT`, which is the correct treatment:
+NGED corrected the feed at that instant, so the stamps before it are half an hour late and the
+stamps after it are not.
 
 **Three independent tests say the stamps arrive half an hour late, which is why the second reading
 exists.** Against the sun's own horizon crossings the first and last generating half-hour of a clear
@@ -91,6 +95,18 @@ roughly 31 km and lands the meter in a grid cell up to 17 km away. Running the s
 separates "the split carries no information" from "ERA5's grid has already smoothed the beam away".
 The CAMS build takes its air temperature from the Open-Meteo ERA5 frame, because the radiation
 service publishes no temperature and the temperature feature is shared by every arm.
+"""
+
+
+ALIGNMENT_FIXED_AT: Final[datetime] = datetime(2026, 3, 26, 8, 30, tzinfo=UTC)
+"""The instant NGED corrected the half-hourly stamps.
+
+Every reading stamped before this instant is half an hour late: its value is the mean over
+`(T - 60 min, T - 30 min]` rather than the `(T - 30 min, T]` the contract states. Readings from this
+instant on are correct as stamped. NGED reported the correction, and three independent measurements
+agree with it: the power-weighted centroid of a clear day's output steps from 45 minutes after solar
+noon to 15 minutes at this stamp, the feed stops publishing exact-zero rows at the same instant, and
+the published rows per day drop from 48 to 26.
 """
 
 
@@ -417,8 +433,18 @@ def _hourly_power(*, sites: pl.DataFrame, alignment: AlignmentType) -> pl.DataFr
     # Both half-hours of the window (T-1h, T] carry the stamp of their own end, so the later one is
     # already stamped T and the earlier one has to be rolled forward by 30 minutes. Under the
     # shifted reading every stamp is half an hour late, which cancels that roll-forward exactly.
-    offset = "0m" if alignment == "shifted" else "30m"
-    hour_end = pl.col("time").dt.offset_by(offset).dt.truncate("1h")
+    # NGED corrected the feed mid-record, so a single global offset is wrong either side of
+    # ALIGNMENT_FIXED_AT. Correct the stamp first, then one roll-forward serves every row.
+    if alignment == "piecewise":
+        corrected = (
+            pl.when(pl.col("time") < pl.lit(ALIGNMENT_FIXED_AT))
+            .then(pl.col("time").dt.offset_by("-30m"))
+            .otherwise(pl.col("time"))
+        )
+        hour_end = corrected.dt.offset_by("30m").dt.truncate("1h")
+    else:
+        offset = "0m" if alignment == "shifted" else "30m"
+        hour_end = pl.col("time").dt.offset_by(offset).dt.truncate("1h")
     return (
         half_hourly.with_columns(hour_end=hour_end)
         .group_by("site", "hour_end")
@@ -693,7 +719,9 @@ def main() -> int:
     """Build the joined frame for the irradiance source named on the command line."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="open-meteo")
-    parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="as-labelled")
+    parser.add_argument(
+        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
+    )
     parser.add_argument(
         "--min-cams-reliability",
         type=float,

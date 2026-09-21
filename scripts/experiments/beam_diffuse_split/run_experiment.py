@@ -758,7 +758,11 @@ def _intervals_for(
     Returns:
         One record per (contrast, metric, scope).
     """
-    metrics = ["absolute_error_fraction_of_capacity", "absolute_error_mw"]
+    metrics = [
+        "absolute_error_capped_fraction_of_capacity",
+        "absolute_error_fraction_of_capacity",
+        "absolute_error_mw",
+    ]
     if losses["crps_mw"].null_count() < losses.height:
         metrics.append("crps_mw")
 
@@ -808,7 +812,9 @@ def main() -> int:
     """Run every arm, the controls and the bootstrap, and write the results."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default=DEFAULT_SOURCE)
-    parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="as-labelled")
+    parser.add_argument(
+        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
+    )
     parser.add_argument(
         "--suffix",
         default="",

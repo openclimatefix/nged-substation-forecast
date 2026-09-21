@@ -132,7 +132,13 @@ def _add_physics_predictions(*, dataset: pl.DataFrame) -> pl.DataFrame:
                         .unique()
                         .to_list()
                     )
-                    train = site_rows.filter(~pl.col("month").is_in(excluded))
+                    # A curtailed hour is a network instruction no irradiance product
+                    # could predict, so the sibling runners drop it from training and so
+                    # does this fit. Leaving it in hands the hybrid arms a physics feature
+                    # fitted on rows the physics baseline never saw.
+                    train = site_rows.filter(
+                        ~pl.col("month").is_in(excluded) & ~pl.col("constrained")
+                    )
                     if train.is_empty():
                         continue
                     fitted[key] = _fit(
@@ -167,7 +173,9 @@ def main() -> int:
     """Score the calibrated arms against the physical model and against XGBoost."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
-    parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="shifted")
+    parser.add_argument(
+        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
+    )
     arguments = parser.parse_args()
 
     dataset = with_export_cap(
@@ -230,6 +238,8 @@ def main() -> int:
             arm=pl.lit("P_C_physics"),
             absolute_error_fraction_of_capacity=pl.col("absolute_error_mw")
             / pl.col("effective_capacity_mw"),
+            absolute_error_capped_fraction_of_capacity=pl.col("absolute_error_capped_mw")
+            / pl.col("effective_capacity_mw"),
         )
     )
     losses = pl.concat([losses, physics.select(losses.columns)], how="vertical")
@@ -247,7 +257,7 @@ def main() -> int:
         rows = losses.filter(pl.col("arm") == arm)
         if rows.is_empty():
             continue
-        mae = float(rows["absolute_error_fraction_of_capacity"].to_numpy().mean()) * 100
+        mae = float(rows["absolute_error_capped_fraction_of_capacity"].to_numpy().mean()) * 100
         lines.append(f"| {arm} | {mae:.3f} | {rows.select('site', 'time').n_unique():,} |")
 
     lines += [
@@ -263,7 +273,7 @@ def main() -> int:
             losses=scoped,
             treatment=treatment,
             reference=reference,
-            metric="absolute_error_fraction_of_capacity",
+            metric="absolute_error_capped_fraction_of_capacity",
         )
         excludes = interval["lower_95"] * interval["upper_95"] > 0
         lines.append(

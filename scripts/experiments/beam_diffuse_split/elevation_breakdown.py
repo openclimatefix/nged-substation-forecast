@@ -61,7 +61,9 @@ def main() -> int:
     """Print each instrument's headline contrast inside every elevation band."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
-    parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="shifted")
+    parser.add_argument(
+        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
+    )
     arguments = parser.parse_args()
 
     lines: list[str] = []
@@ -71,14 +73,14 @@ def main() -> int:
         )
         paired = (
             banded.filter(pl.col("arm") == reference)
-            .select("site", "time", "seed", "band", reference=pl.col("absolute_error_mw"))
+            .select("site", "time", "seed", "band", reference=pl.col("absolute_error_capped_mw"))
             .join(
                 banded.filter(pl.col("arm") == treatment).select(
                     "site",
                     "time",
                     "seed",
                     "effective_capacity_mw",
-                    treatment=pl.col("absolute_error_mw"),
+                    treatment=pl.col("absolute_error_capped_mw"),
                 ),
                 on=["site", "time", "seed"],
                 how="inner",

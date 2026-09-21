@@ -105,7 +105,9 @@ def main() -> int:
     """Print one table of contrasts per sky condition."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
-    parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="shifted")
+    parser.add_argument(
+        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
+    )
     parser.add_argument("--suffix", default="", help="Selects a variant build of the same source.")
     arguments = parser.parse_args()
     source = f"{arguments.source}{arguments.suffix}"
@@ -147,11 +149,11 @@ def main() -> int:
                 losses=scoped,
                 treatment=treatment,
                 reference=reference,
-                metric="absolute_error_fraction_of_capacity",
+                metric="absolute_error_capped_fraction_of_capacity",
             )
             reference_rows = scoped.filter(pl.col("arm") == reference)
             reference_mae = float(
-                reference_rows["absolute_error_fraction_of_capacity"].to_numpy().mean()
+                reference_rows["absolute_error_capped_fraction_of_capacity"].to_numpy().mean()
             )
             relative = interval["difference"] / reference_mae * 100.0
             records.append(

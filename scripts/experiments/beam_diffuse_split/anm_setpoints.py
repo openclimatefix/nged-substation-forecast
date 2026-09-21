@@ -123,7 +123,9 @@ def main() -> int:
     """Build the export-cap series for every setpoint export, and report how it reads."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
-    parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="shifted")
+    parser.add_argument(
+        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
+    )
     parser.add_argument(
         "--site", default="E", help="The anonymised label of the site the export belongs to."
     )

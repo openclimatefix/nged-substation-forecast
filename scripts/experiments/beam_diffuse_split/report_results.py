@@ -99,18 +99,20 @@ def _arm_table(*, summary: pl.DataFrame, setting: str) -> list[str]:
     ]
     for arm in arms:
         normalised = _pooled_mean(
-            summary=summary, setting=setting, arm=arm, column="mae_fraction_of_capacity"
+            summary=summary, setting=setting, arm=arm, column="mae_capped_fraction_of_capacity"
         )
-        absolute = _pooled_mean(summary=summary, setting=setting, arm=arm, column="mae_mw")
+        absolute = _pooled_mean(summary=summary, setting=setting, arm=arm, column="mae_capped_mw")
         crps_rows = summary.filter((pl.col("setting") == setting) & (pl.col("arm") == arm))
         scores_probabilistically = (
-            "crps_mw" in summary.columns and crps_rows["crps_mw"].null_count() == 0
+            "crps_capped_mw" in summary.columns and crps_rows["crps_capped_mw"].null_count() == 0
         )
-        crps = (
-            f"{_pooled_mean(summary=summary, setting=setting, arm=arm, column='crps_mw'):.4f}"
-            if scores_probabilistically
-            else "—"
-        )
+        if scores_probabilistically:
+            pooled_crps = _pooled_mean(
+                summary=summary, setting=setting, arm=arm, column="crps_capped_mw"
+            )
+            crps = f"{pooled_crps:.4f}"
+        else:
+            crps = "—"
         lines.append(
             f"| {ARM_LABELS[arm]} | {normalised * PERCENTAGE_POINTS:.3f}"
             f" | {absolute:.4f} | {crps} |"
@@ -130,14 +132,14 @@ def _contrast_table(*, intervals: pl.DataFrame, summary: pl.DataFrame, setting: 
     pooled = intervals.filter(
         (pl.col("setting") == setting)
         & (pl.col("scope") == "all_sites")
-        & (pl.col("metric") == "absolute_error_fraction_of_capacity")
+        & (pl.col("metric") == "absolute_error_capped_fraction_of_capacity")
     )
     for row in pooled.iter_rows(named=True):
         reference_mae = _pooled_mean(
             summary=summary,
             setting=setting,
             arm=row["reference"],
-            column="mae_fraction_of_capacity",
+            column="mae_capped_fraction_of_capacity",
         )
         relative = row["difference"] / reference_mae * PERCENTAGE_POINTS
         excludes_zero = "**yes**" if row["lower_95"] * row["upper_95"] > 0 else "no"
@@ -202,7 +204,7 @@ def _per_site_table(
     treatment, reference = contrast
     rows = intervals.filter(
         (pl.col("setting") == setting)
-        & (pl.col("metric") == "absolute_error_fraction_of_capacity")
+        & (pl.col("metric") == "absolute_error_capped_fraction_of_capacity")
         & (pl.col("treatment") == treatment)
         & (pl.col("reference") == reference)
         & (pl.col("scope") != "all_sites")
@@ -270,7 +272,9 @@ def main() -> int:
     """Write every table to `report.md` and to standard output."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="open-meteo")
-    parser.add_argument("--alignment", choices=("as-labelled", "shifted"), default="as-labelled")
+    parser.add_argument(
+        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
+    )
     parser.add_argument("--instrument", choices=("xgboost", "physics"), default="xgboost")
     parser.add_argument(
         "--suffix",

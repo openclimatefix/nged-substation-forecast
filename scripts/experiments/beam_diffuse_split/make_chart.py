@@ -39,14 +39,17 @@ REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data"
 
 OUTPUT_PATH: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_split_result.svg"
 
-ALIGNMENT: Final[str] = "shifted"
+ALIGNMENT: Final[str] = "piecewise"
 """Which stamp alignment the chart draws.
 
-The tree's contrasts agree across the two alignments, but the fitted physical model's do not: on
-the reanalysis its headline contrast changes sign between them, because a 30-minute stamp shift is
-absorbed into the fitted azimuth and the arms are then fitting different geometry as well as
-different beam fields. Drawing one alignment therefore understates the physical model's
-instability, which is why the subtitle says so and the tables report both alignments.
+NGED corrected the half-hourly power stamps at 2026-03-26 08:30 UTC, so readings before that
+instant are 30 minutes late and readings from it are correct. Only the piecewise reading matches
+the feed, and every figure and every headline number here is drawn under it.
+
+Getting the alignment right matters more for the fitted physical model than for the tree. Under
+the uncorrected stamps the physical model's headline contrast on the reanalysis changes sign,
+because a 30-minute error is absorbed into the fitted azimuth and the arms then differ in geometry
+as well as in beam field. The tree's contrasts hold their sign under every reading.
 """
 
 SOURCE_LABELS: Final[dict[str, str]] = {
@@ -60,12 +63,6 @@ INSTRUMENT_LABELS: Final[dict[str, str]] = {
     "physics": "Fitted physical PV model",
 }
 """Instrument keys to the labels a reader sees."""
-
-REFERENCE_ARMS: Final[dict[str, str]] = {
-    "xgboost": "A_global_only",
-    "physics": "P_A_global_only",
-}
-"""The arm each instrument's percentages are measured against."""
 
 CONTRAST_LABELS: Final[dict[str, str]] = {
     "B_erbs|A_global_only": "Erbs beam/diffuse split",
@@ -113,8 +110,8 @@ SUBTITLE: Final[tuple[str, ...]] = (
     "Negative is better. Bars are 95% monthly block bootstrap intervals; a bar",
     "crossing zero has not been shown to help. Each panel has its own x scale.",
     "Reanalysis and satellite retrieval, not forecasts, so this is information",
-    "content, not forecast skill. The physical model's contrasts change sign",
-    "under the other stamp alignment; the tree's do not.",
+    "content, not forecast skill. A half-hour error in the power stamps flips",
+    "the physical model's contrasts on the reanalysis; the tree's hold.",
 )
 
 CHART_PADDING: Final[dict[str, int]] = {"left": 120, "top": 5, "right": 5, "bottom": 5}
@@ -127,16 +124,32 @@ whole chart is what actually reserves the space."""
 PERCENTAGE_POINTS: Final[float] = 100.0
 
 
-def _reference_mean_absolute_error(*, instrument: str, source: str) -> float:
-    """Return the global-only arm's pooled mean absolute error in MW, weighted by row count."""
+def _arm_mean_absolute_errors(*, instrument: str, source: str) -> dict[str, float]:
+    """Return each arm's pooled mean absolute error as a fraction of P99 output.
+
+    Weighted by row count, and on the same capped metric, the same unit and the same weighting as
+    the contrast table in `report_results.py`, so the relative change the chart draws and the
+    relative change the table prints are one statistic rather than two.
+
+    Args:
+        instrument: Which instrument's run to read, `xgboost` or `physics`.
+        source: Which irradiance source's run to read.
+
+    Returns:
+        One pooled mean absolute error per arm, keyed by arm name.
+    """
     stem = "results" if instrument == "xgboost" else "physics"
     summary = pl.read_parquet(
         REPO_DATA_DIR
         / "ERA5"
         / f"beam_diffuse_{stem}_{source}_{ALIGNMENT}"
         / "per_site_summary.parquet"
-    ).filter((pl.col("setting") == "primary") & (pl.col("arm") == REFERENCE_ARMS[instrument]))
-    return float((summary["mae_mw"] * summary["n_rows"]).sum()) / float(summary["n_rows"].sum())
+    ).filter(pl.col("setting") == "primary")
+    pooled = summary.group_by("arm").agg(
+        mae=(pl.col("mae_capped_fraction_of_capacity") * pl.col("n_rows")).sum()
+        / pl.col("n_rows").sum()
+    )
+    return dict(zip(pooled["arm"], pooled["mae"], strict=True))
 
 
 def _differences() -> pl.DataFrame:
@@ -155,13 +168,15 @@ def _differences() -> pl.DataFrame:
             results_dir = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}_{ALIGNMENT}"
             if not results_dir.exists():
                 continue
-            reference_mae = _reference_mean_absolute_error(instrument=instrument, source=source)
-            percent = PERCENTAGE_POINTS / reference_mae
+            arm_mae = _arm_mean_absolute_errors(instrument=instrument, source=source)
             intervals = pl.read_parquet(results_dir / "bootstrap_intervals.parquet").filter(
                 (pl.col("setting") == "primary")
-                & (pl.col("metric") == "absolute_error_mw")
+                & (pl.col("metric") == "absolute_error_capped_fraction_of_capacity")
                 & (pl.col("scope") == "all_sites")
             )
+            # Each contrast is scaled by the arm it is against, so a bar reads as "this much
+            # better than the arm named after the minus sign".
+            percent = PERCENTAGE_POINTS / pl.col("reference").replace_strict(arm_mae)
             frames.append(
                 intervals.with_columns(
                     key=pl.col("treatment") + pl.lit("|") + pl.col("reference"),
