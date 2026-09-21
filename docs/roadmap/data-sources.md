@@ -38,7 +38,7 @@ directly, because export cannot exceed it: a generator's output is `min(what the
 the cap in force)`. The cap is published as a negative number, generation being negative in NGED's
 convention, and its largest magnitude is the connection limit rather than a curtailment. Reading
 the cap as a curtailment volume gets this backwards — the measurements are in [the beam/diffuse
-results](../results/beam-diffuse-split.md#one-site-is-curtailed-and-it-is-the-noisiest-of-the-six).
+results](../results/beam-diffuse-split.md#one-site-is-curtailed-and-the-export-cap-is-what-makes-its-hours-scorable).
 
 **Ask for the whole history, and expect the first request to be truncated.** The first export we
 were sent for that generator began in July 2024; a second request returned an exact superset

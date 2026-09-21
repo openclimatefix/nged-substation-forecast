@@ -122,7 +122,7 @@ the feed is a *noisy label*, not ground truth — use it, but do not lean on it:
 
 **Ask for the raw export cap rather than a derived curtailment volume, and treat the cap as a
 constraint rather than as a label.** Joining both to six metered solar farms in the [beam/diffuse
-experiment](../results/beam-diffuse-split.md#one-site-is-curtailed-and-it-is-the-noisiest-of-the-six)
+experiment](../results/beam-diffuse-split.md#one-site-is-curtailed-and-the-export-cap-is-what-makes-its-hours-scorable)
 found one of the six under active network management. Its cap sits at the connection limit for
 80.7% of the half-hours since the scheme went live, and on the bright hours where the cap never
 moved the site's yield matches the other five

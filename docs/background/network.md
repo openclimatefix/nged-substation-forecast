@@ -63,7 +63,7 @@ trimming the rest of the record shows. Where the cap never left the connection l
 generator's output per unit of irradiance matches the other five photovoltaic sites in the trial
 area to within half a percent,
 which is the check that says the cap is being read the right way round. The
-[beam/diffuse results](../results/beam-diffuse-split.md#one-site-is-curtailed-and-it-is-the-noisiest-of-the-six)
+[beam/diffuse results](../results/beam-diffuse-split.md#one-site-is-curtailed-and-the-export-cap-is-what-makes-its-hours-scorable)
 set out the measurement.
 
 **The setpoint feed exists before the scheme enforces anything, and reads zero while it waits.** The
