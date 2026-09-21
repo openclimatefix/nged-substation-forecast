@@ -221,11 +221,11 @@ Three places where a positional argument is right:
   an `Args:` section is present and incomplete; a block under the wrong heading, and an entry naming
   a parameter a rename removed, both pass every rule this repo configures. `pydoclint` catches those
   two, as a pre-commit hook and a CI step, and also requires a `Returns:` section on every function
-  that returns something. Which of its checks this repo wants, and why each of the others is
-  switched off, is in the `[tool.pydoclint]` block in `pyproject.toml`. Nothing catches a stale name
-  in the *prose* around the parameter list, which is why `compute_h3_grid_weights` described "a
-  DataFrame" for months after it began taking a list — check the description against the signature
-  whenever you rename anything.
+  that returns something. The `[tool.pydoclint]` block in `pyproject.toml` says which of its checks
+  this repo wants, and why each of the others is switched off. Nothing catches a stale name in the
+  *prose* around the parameter list, which is why `compute_h3_grid_weights` described "a DataFrame"
+  for months after it began taking a list — check the description against the signature whenever
+  you rename anything.
 - **Cross-reference another function with plain backticks, never a Sphinx role.** Write ``
   `write_nwp` ``, not `` :func:`write_nwp` ``. mkdocstrings parses these docstrings as Markdown and
   no extension interprets a reStructuredText role, so the role and its backticked name reach the

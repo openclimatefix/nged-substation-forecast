@@ -422,15 +422,15 @@ when embedded generation is high and demand is low.
 
 ##### Model families for Flexpectation version 2
 
-**All the text above is a verdict on Flexpectation version 1.** The more sophisticated ML model
-families we plan to research in 2027 — such as pre-trained encoders (a model trained once on a large
-body of data, then frozen and reused across several later tasks), connectivity-map models, and
-differentiable physics (explicitly building the known behaviour of a solar panel, a wind turbine, or
-a building into the model, so the model has to learn only the physical parameters, not the
-equations) — are planned to *simultaneously* reason about multiple sources of variation in
-substation power flow. The pipelines of separate models in this literature cannot reason about
-several sources at once. The closing section of this review sets out the case for the work we plan
-in Flexpectation version 2.
+**All the text above is a verdict on Flexpectation version 1.** Flexpectation plans to research
+three more sophisticated ML model families in 2027, each planned to *simultaneously* reason about
+multiple sources of variation in substation power flow: pre-trained encoders (a model trained once
+on a large body of data, then frozen and reused across several later tasks), connectivity-map
+models, and differentiable physics (explicitly building the known behaviour of a solar panel, a wind
+turbine, or a building into the model, so the model has to learn only the physical parameters, not
+the equations). The pipelines of separate models in this literature cannot reason about several
+sources at once. The closing section of this review sets out the case for the work we plan in
+Flexpectation version 2.
 
 **The evidence behind those three ML model families is uneven.**
 
@@ -616,13 +616,13 @@ the like — their method showed a real gain even at those short lead times in t
 probability score (CRPS), "which was not evident in the long-run average CRPS", because a
 deterministic method "is not able to discriminate between high/low weather uncertainty".
 
-**Two capabilities Dantas and Browell's method does not have are capabilities Flexpectation needs.**
-Dantas and Browell fit a separate model per wind farm rather than one model across all 73 farms.
-They list as future work a "member-by-member correction to retain spatio-temporal structure in
-ensemble members", which "would allow for spatio-temporal coherence between forecasts from different
-wind farms" — a plain signal that the forecasts as published carry no such coherence. A net-demand
-forecast that adds several generators and a substation together needs precisely that coherence, and
-cannot take it from this paper.
+**Dantas and Browell's method lacks two capabilities that Flexpectation needs.** Dantas and Browell
+fit a separate model per wind farm rather than one model across all 73 farms. They list as future
+work a "member-by-member correction to retain spatio-temporal structure in ensemble members", which
+"would allow for spatio-temporal coherence between forecasts from different wind farms" — a plain
+signal that the forecasts as published carry no such coherence. A net-demand forecast that adds
+several generators and a substation together needs precisely that coherence, and cannot take it from
+this paper.
 
 **Gradient-boosted trees, fitted separately for each kind of generator, are the approach the papers
 we read reach for most often, and what won when teams were scored against each other on the same
@@ -853,15 +853,15 @@ partial method for the biofuel plant.** For the battery, [Bian et al.
 (2024)](https://doi.org/10.1109/TSG.2023.3303469) recover a price-taking storage operator's own
 optimisation parameters from historical prices and observed dispatch.
 
-**The closest published case we found for the gas generator forecasts a market-dispatched plant from
-the schedule its operator provides, not from weather or from the plant's own history.** [Ruhhütl et
-al. (2023)](https://doi.org/10.1049/icp.2023.0476) call predicting pumped-storage hydro "almost
-impossible", because the plant follows continuously changing market prices and the operator's own
-strategy. Ruhhütl et al. forecast pumped-storage hydro instead by linear regression on the
-generation schedule its operator is obliged to provide, together with temperature. Ruhhütl et al.
-report no accuracy figure for that class of plant, saying only that pumped-storage plants "depend
-highly on the accuracy of the provided schedule". So what the method needs is a schedule rather than
-a better model.
+**For the gas generator, the closest published case we found forecasts a market-dispatched plant
+from the schedule its operator provides, not from weather or from the plant's own history.**
+[Ruhhütl et al. (2023)](https://doi.org/10.1049/icp.2023.0476) call predicting pumped-storage hydro
+"almost impossible", because the plant follows continuously changing market prices and the
+operator's own strategy. Ruhhütl et al. forecast pumped-storage hydro instead by linear regression
+on the generation schedule its operator is obliged to provide, together with temperature. Ruhhütl et
+al. report no accuracy figure for that class of plant, saying only that pumped-storage plants
+"depend highly on the accuracy of the provided schedule". So what the method needs is a schedule
+rather than a better model.
 
 **The second route models how the gas generator picks its own output, and nobody we found has fitted
 a model of that kind to an embedded generator's metered output.** Fitting a model of that shape to
@@ -1000,13 +1000,13 @@ prior built on the existing fleet. That prior is an answer to the cold-start pro
 faces at a generator that has just connected. Authen et al. decline to credit any of that with the
 differences in accuracy, because unavailability messages covered between 1% and 13% of timestamps
 depending on the bidding zone. Downtime events therefore "represent only a limited fraction of the
-full dataset". Two conclusions follow for Flexpectation. Independent teams converging on capacity
-factor as the target is evidence about what practitioners believe rather than a measurement of what
-the belief is worth. The hypothesis in the paragraph above therefore stands unaltered. And the part
-WindAI could skip is the part any GB distribution network operator cannot skip: the Embedded
-Capacity Register records the export limit permitted by a site's connection agreement rather than
-what the site can generate. So Flexpectation has to estimate the effective capacity that WindAI's
-entrants were given.
+full dataset". Two conclusions follow for Flexpectation. Independent teams converged on capacity
+factor as the target. That convergence is evidence about what practitioners believe, not a
+measurement of what the belief is worth. The hypothesis in the paragraph above therefore stands
+unaltered. And the part WindAI could skip is the part any GB distribution network operator cannot
+skip: the Embedded Capacity Register records the export limit permitted by a site's connection
+agreement rather than what the site can generate. So Flexpectation has to estimate the effective
+capacity that WindAI's entrants were given.
 
 **For solar, the equivalent estimate can be made from the power signal and nothing else, which
 matters because half of the trial area's metered generators are solar farms.** The tool most often
@@ -1557,9 +1557,9 @@ forecasts. TRANSITION's rooftop solar is not metered, but TRANSITION read each i
 capacity from a list of Feed-In Tariff installations. No register would carry Flexpectation as far,
 for the reasons set out under "The challenge" above.
 
-**Flexibility Market Asset Registration, the register being built now that sounds as though it
-should close this gap, will record the assets that trade flexibility, which is close to the
-complement of the arrays this challenge has to find.** Ofgem [appointed Elexon in
+**Flexibility Market Asset Registration, the register now being built, sounds as though it should
+close this gap. The register will record the assets that trade flexibility, close to the complement
+of the arrays this challenge has to find.** Ofgem [appointed Elexon in
 2025](https://www.ofgem.gov.uk/decision/decision-flexibility-market-asset-registration) to deliver
 Flexibility Market Asset Registration, digital infrastructure due by the third quarter of 2027 that
 will collect, store, and share data on assets participating in flexibility markets, aimed first at
@@ -1577,27 +1577,28 @@ an asset does enter a flexibility market that NGED itself runs, NGED is the coun
 holds the data. What Flexibility Market Asset Registration adds there is one standardised record
 across markets rather than a generator NGED could not previously see.
 
-**The published benchmarks we found of inferring capacity from the net flow work on individually
-metered premises, sit at a voltage level below NGED's, or do not say what aggregation they worked
-at, and the one GB project we found doing the same at primary substations has not yet published a
-result.** [Gouveia et al. (2026)](https://doi.org/10.1016/j.ijepes.2026.111848) benchmark that
-inference at low-voltage substations serving 10 to 100 customers rather than at a primary. UK Power
-Networks' [Power Flow to Solar Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/)
-project (with Open Climate Fix) infers solar photovoltaic capacity behind UK Power Networks' primary
-substations. [Kanchana et al. (2026)](https://doi.org/10.1016/j.epsr.2026.113279) separate load,
-photovoltaic generation, and energy storage from one aggregated net-load series, and report doing so
-"without requiring capital-intensive customer-level metering", which is NGED's position exactly. We
-hold the publisher's landing page for Kanchana et al. rather than the full text. That page names no
-customer count, no country, no time resolution, and no comparison method. So how far the reported
-errors of 8.14% for load, 5.12% for photovoltaic generation, and 11.51% for storage would carry to a
-GB primary substation cannot be judged from what we have read. The same page says a generative
+**We found published benchmarks for inferring capacity from the net flow, but those benchmarks work
+on individually metered premises, sit at a voltage level below NGED's, or do not say what
+aggregation they used. The one GB project we found doing the same at primary substations has not yet
+published a result.** [Gouveia et al. (2026)](https://doi.org/10.1016/j.ijepes.2026.111848)
+benchmark that inference at low-voltage substations serving 10 to 100 customers rather than at a
+primary. UK Power Networks' [Power Flow to Solar
+Capacity](https://smarter.energynetworks.org/projects/nia_ukpn0104/) project (with Open Climate Fix)
+infers solar photovoltaic capacity behind UK Power Networks' primary substations. [Kanchana et al.
+(2026)](https://doi.org/10.1016/j.epsr.2026.113279) separate load, photovoltaic generation, and
+energy storage from one aggregated net-load series, and report doing so "without requiring
+capital-intensive customer-level metering", which is NGED's position exactly. We hold the
+publisher's landing page for Kanchana et al. rather than the full text. That page names no customer
+count, no country, no time resolution, and no comparison method. So how far the reported errors of
+8.14% for load, 5.12% for photovoltaic generation, and 11.51% for storage would carry to a GB
+primary substation cannot be judged from what we have read. The same page says a generative
 adversarial network fills gaps in the load measurements while a variational autoencoder generates
 synthetic photovoltaic profiles, and that "observed net-load profiles are assembled to create
 validation scenarios". So whether the mixture being separated is a mixture a meter recorded is a
 question the page leaves open.
 
-**The one result we found that separated solar from demand at a real primary substation, without
-being told the installed capacity, used that substation's own reactive power.** [Kara et al.
+**Only one result we found separated solar from demand at a real primary substation without being
+told the installed capacity, and it used that substation's own reactive power.** [Kara et al.
 (2018)](https://doi.org/10.1016/j.segan.2017.11.001) estimate the solar generation downstream of a
 substation in Riverside, California, from the substation's active and reactive power, and report a
 root-mean-square error of 6% of installed capacity across all sky conditions. The estimator is given
@@ -1647,11 +1648,11 @@ Smarter Networks Portal](https://smarter.energynetworks.org/projects/nia2_ngeso0
 "Accuracy improvement over the previous model by approximately 30% for the GSP and National
 forecasts (4-8 hours)" and lists "Probabilistic forecasts for all horizons" among its outcomes.
 
-**The combination this challenge says is missing — unmetered generation, forecast probabilistically,
-at a spatial level below the country — has been built once in the GB work we found, at grid supply
-point level rather than at primary substations, and for solar rather than for net demand.** How NESO
-builds the embedded solar forecast it *publishes* is a separate question we cannot answer: NESO runs
-more than one solar forecast, and the published series does not name the model behind it.
+**This challenge says one combination is missing: unmetered generation, forecast probabilistically,
+at a spatial level below the country. The GB work we found has built that combination once — at grid
+supply point level rather than at primary substations, and for solar rather than for net demand.**
+How NESO builds the embedded solar forecast it *publishes* is a separate question we cannot answer:
+NESO runs more than one solar forecast, and the published series does not name the model behind it.
 
 **Two figures are quoted for what that national solar forecast is worth, and both are rough
 approximations rather than audited results.** [National Energy System
@@ -1683,23 +1684,24 @@ PVNet's horizon is hours rather than the 14 days NGED needs. And the grid supply
 forecasts are far larger than a primary substation, so PVNet's accuracy figures say nothing about
 how the same approach would perform at Flexpectation's scale.
 
-**An uncertainty estimate is useful only if the estimate widens where the answer gets worse, and the
-one substation-level disaggregation we found that tested for that widening reports the widening
-holding — until the generation pattern is unlike any pattern in the training data.** [Yi and Wang
-(2022)](https://arxiv.org/abs/2207.03490) summarise their two journal papers on disaggregating
-behind-the-meter solar at substations, and pose the problem as one of *partial labels*: for some
-aggregate measurements the operator knows which load types are present, but never their individual
-values. Yi and Wang's Bayesian dictionary-learning estimator reaches a total error rate of 8.97%,
-against 20.61% and 37.12% for two methods that need fully labelled training data. The estimator's
-error weighted so that the estimates the method is unsure about count less — 0.13 to 0.16 — comes
-out far below the estimator's unweighted root-mean-square error of 5.19 to 6.20. Yi and Wang read
-that gap as showing that the estimates carrying the largest errors are also the estimates carrying
-the largest uncertainty. Where the test period's solar pattern is unlike any pattern in the training
-data, however, Yi and Wang report that the true load may fall outside the 99.7% confidence interval.
-A generation pattern unlike any pattern in the training data is the failure mode that matters most
-to Flexpectation, whose substations will carry generation mixes that no training substation had. The
-validation runs on 360 generated training samples covering two industrial loads and one solar
-generation, not on measurements from a real substation, and carries no forecast horizon.
+**An uncertainty estimate is useful only if the estimate widens where the answer gets worse. Only
+one substation-level disaggregation we found tested for that widening, and that study reports the
+widening holding — until the generation pattern is unlike any pattern in the training data.** [Yi
+and Wang (2022)](https://arxiv.org/abs/2207.03490) summarise their two journal papers on
+disaggregating behind-the-meter solar at substations, and pose the problem as one of *partial
+labels*: for some aggregate measurements the operator knows which load types are present, but never
+their individual values. Yi and Wang's Bayesian dictionary-learning estimator reaches a total error
+rate of 8.97%, against 20.61% and 37.12% for two methods that need fully labelled training data. The
+estimator's error weighted so that the estimates the method is unsure about count less — 0.13 to
+0.16 — comes out far below the estimator's unweighted root-mean-square error of 5.19 to 6.20. Yi and
+Wang read that gap as showing that the estimates carrying the largest errors are also the estimates
+carrying the largest uncertainty. Where the test period's solar pattern is unlike any pattern in the
+training data, however, Yi and Wang report that the true load may fall outside the 99.7% confidence
+interval. A generation pattern unlike any pattern in the training data is the failure mode that
+matters most to Flexpectation, whose substations will carry generation mixes that no training
+substation had. The validation runs on 360 generated training samples covering two industrial loads
+and one solar generation, not on measurements from a real substation, and carries no forecast
+horizon.
 
 **The survey of behind-the-meter solar forecasting by Erdener et al. tabulates net-load
 disaggregation studies that run either at individually metered premises or at a whole balancing
@@ -1727,17 +1729,17 @@ are usually sums of individually metered households rather than a measurement ta
 aggregation point. The smart-meter literature therefore stops far below the thousands of customers
 behind a GB primary substation.
 
-**Whether more customers behind a substation makes the estimate easier or harder is unsettled, and
-the one study we found that varies the aggregation count on a simulated feeder does not settle the
-question.** [Tang et al. (2024)](https://doi.org/10.1016/j.segan.2024.101396) estimate installed
-photovoltaic capacity from 24-hour net-load curves for feeders of 20 to 80 London households, and
-report "a general trend of increasing RMSE [root-mean-square error] values as the number of
-households increases". The rising root-mean-square error is weaker evidence than the trend first
-appears: the error is in kilowatts against a total capacity that itself rises with the household
-count, the percentage error moves the other way, and the trend reverses sharply between 70 and 80
-households. The load and the household count are real, but the solar is simulated at three azimuths,
-45°, 0°, and −45°, all of them southerly. So the study has none of the north- and east-west-facing
-roofs a real street would carry.
+**It is unsettled whether more customers behind a substation makes the estimate easier or harder.
+Only one study we found varies the aggregation count on a simulated feeder, and that study does not
+settle the question.** [Tang et al. (2024)](https://doi.org/10.1016/j.segan.2024.101396) estimate
+installed photovoltaic capacity from 24-hour net-load curves for feeders of 20 to 80 London
+households, and report "a general trend of increasing RMSE [root-mean-square error] values as the
+number of households increases". The rising root-mean-square error is weaker evidence than the trend
+first appears: the error is in kilowatts against a total capacity that itself rises with the
+household count, the percentage error moves the other way, and the trend reverses sharply between 70
+and 80 households. The load and the household count are real, but the solar is simulated at three
+azimuths, 45°, 0°, and −45°, all of them southerly. So the study has none of the north- and
+east-west-facing roofs a real street would carry.
 
 #### What this means for Flexpectation
 
@@ -1804,9 +1806,9 @@ is justified on separation grounds even where the richer demand model does not i
 the substation's net flow. And the diagnostic to watch is the joint distribution over the components
 rather than the residual. Working in systems biology, [Wieland et al.
 (2021)](https://doi.org/10.1016/j.coisb.2021.03.005) add the matching warning about uncertainty:
-confidence intervals read off the curvature at the optimum, which a differentiable model gives with
-little extra computation, are "insensitive to practical non-identifiabilities" and can look
-reassuringly finite for a parameter the data do not constrain at all.
+confidence intervals read off the curvature at the optimum are "insensitive to practical
+non-identifiabilities" and can look reassuringly finite for a parameter the data do not constrain at
+all — even though a differentiable model gives those intervals with little extra computation.
 
 **Fitting a differentiable physical forward model to measurements is routine in exploration
 geophysics, and that field reports that the order in which the fit admits fine detail decides
@@ -1971,8 +1973,8 @@ diversity curves to measured trial data for general domestic load, heat pumps, a
 and then states that diversity "should not be applied when considering a BESS device" — a battery
 energy storage system — a diversity factor of exactly one.
 
-**A targeted literature search for disaggregating heat pumps, chargers, and batteries from
-substation measurements found the work split by asset, and found "substation level" used for
+**We ran a targeted literature search for disaggregating heat pumps, chargers, and batteries from
+substation measurements, and found the work split by asset, with "substation level" used for
 aggregations far smaller than a GB primary substation.** [Gao et al.
 (2024)](https://doi.org/10.1016/j.apenergy.2024.123361) disaggregate thermostatically controlled
 loads — air conditioners, heating and ventilation units, and furnaces — from an aggregated
@@ -2167,9 +2169,9 @@ had never seen the German feeder data, against models trained on the first 160 o
 low-voltage feeders and scored, like Chronos-2, on all 200 feeders. Chronos-2 beat every
 purpose-trained competitor on mean absolute error, 3.8 kW against 4.2 kW. The authors describe the
 purpose-trained models as lightly engineered, and challenge 1 above found only a modest return to
-model sophistication. But a model trained on the feeders' own history, beaten by a model trained on
-none of that history, still tells us how much any programme of heavy engineering is likely to
-improve accuracy.
+model sophistication. But the comparison still tells us how much any programme of heavy engineering
+is likely to improve accuracy: a model trained on the feeders' own history was beaten by a model
+trained on none of that history.
 
 **Two limits keep that one result from settling the question.** The margin is a single number: Kaas
 et al. report the median across the 200 feeders, 3.839 kW against 4.184 kW for the best
@@ -2222,20 +2224,20 @@ Forecasting](https://smarter.energynetworks.org/projects/npg_sif_006-1/) built a
 10% of demand values, made that metric its primary measure for comparing models, and reported the
 metric both against actual demand and normalised to transformer rating.
 
-**A metric that holds risk constant and prices the forecast in money has been published at
-distribution level once in the work we found, on a synthetic distribution network.** [Bernecker et
-al. (2025)](https://doi.org/10.1016/j.ijepes.2025.110713) fix at 95% the confidence level at which a
-network operator acts, and compare what two forecasts cost that operator in congestion management:
-**3,102 euros a year using standard load profiles against 86 euros using a smart-meter-informed
-forecast**, a 97% reduction, alongside a 90% fall in the number of voltage violations. Bernecker et
-al. also give the sensitivity NGED would want: a 1% cut in the standard deviation of forecast error
-is worth about 1.4% of congestion-management cost on average across rollout levels. The saving
-varies between rollout levels, though, and is negative at some of them. We read the sections of that
-paper bearing on the cost calculation rather than the whole of it. Two features of the study keep
-the gap open: the modelled distribution network is a modified IEEE 33-node test system rather than a
-real distribution network, and what Bernecker et al. compare is two *information levels* rather than
-two forecasting models. We found no case of the metric being used to rank one forecast against
-another at a real substation.
+**Only one metric in the work we found holds risk constant and prices the forecast in money at
+distribution level, and that metric was published on a synthetic distribution network rather than a
+real one.** [Bernecker et al. (2025)](https://doi.org/10.1016/j.ijepes.2025.110713) fix at 95% the
+confidence level at which a network operator acts, and compare what two forecasts cost that operator
+in congestion management: **3,102 euros a year using standard load profiles against 86 euros using a
+smart-meter-informed forecast**, a 97% reduction, alongside a 90% fall in the number of voltage
+violations. Bernecker et al. also give the sensitivity NGED would want: a 1% cut in the standard
+deviation of forecast error is worth about 1.4% of congestion-management cost on average across
+rollout levels. The saving varies between rollout levels, though, and is negative at some of them.
+We read the sections of that paper bearing on the cost calculation rather than the whole of it. Two
+features of the study keep the gap open: the modelled distribution network is a modified IEEE
+33-node test system rather than a real distribution network, and what Bernecker et al. compare is
+two *information levels* rather than two forecasting models. We found no case of the metric being
+used to rank one forecast against another at a real substation.
 
 **The rest of that decision metric exists in pieces, and the piece still missing is the price on a
 real distribution network.** [Browell and Fasiolo (2021)](https://arxiv.org/abs/2103.10335) fix a
@@ -2768,8 +2770,8 @@ model puts on the rest, and the same principle holds for a hyperparameter or a s
 widely used term is not Sculley et al.'s: "training-serving skew" is later vocabulary. The words
 "skew" and "serving" appear nowhere in the paper.
 
-**Four further reviews agree that the field is largely conceptual, and the one review we found that
-went looking for a measure of effectiveness reported finding none.** [Woźniak et al.
+**Four further reviews agree that the field is largely conceptual. Only one review we found went
+looking for a measure of effectiveness, and that review reported finding none.** [Woźniak et al.
 (2025)](https://doi.org/10.1109/ACCESS.2025.3534990) screened 2,615 records returned by their
 database searches down to the 135 publications that passed a title-and-abstract screen and then to
 the 41 publications kept after a full-text read. Woźniak et al. asked as one of their four research

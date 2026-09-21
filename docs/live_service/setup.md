@@ -88,10 +88,10 @@ overrides).
 > **Design choice: NGED sees every CV/backtest fold, not just live production forecasts.** The
 > `power_forecasts` table holds every CV/backtest experiment alongside live production forecasts,
 > distinguished by `fold_id` (`"live"` for production — see [Operating the live
-> service](operations.md)). Pointing the whole table at the delivery bucket is deliberate, not an
-> accidental side effect of the bucket split: it lets NGED see how each of OCF's model versions
-> actually behaves, not just whichever one is currently promoted. NGED filters on `fold_id="live"`
-> when it only wants the current production forecast.
+> service](operations.md)). It is deliberate to point the whole table at the delivery bucket, not an
+> accidental side effect of the bucket split: doing so lets NGED see how each of OCF's model
+> versions actually behaves, not just whichever one is currently promoted. NGED filters on
+> `fold_id="live"` when it only wants the current production forecast.
 
 ### The `.env` file and NGED source credentials
 

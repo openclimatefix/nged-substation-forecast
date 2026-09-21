@@ -34,23 +34,23 @@ backtesting vs. the live production service). Each `architecture/` design page n
 counterpart (and vice versa) in a "See also" section — e.g. [ML Orchestration
 Design](architecture/ml-orchestration.md) ↔ [ML Experimentation](ml_experimentation/index.md), and
 [Production Deployment — Design](architecture/production-deployment.md) ↔ [Setting up the live
-service on AWS](live_service/aws.md). A page mixing the two — design rationale followed by a runbook
-with literal commands — is a sign it should split along this line. The `docs/roadmap/` folder
-therefore contains **only design for work that is not yet implemented**, and is never a mirror of
-the code. Because roadmap pages are deletable, **code must never link into `roadmap/`** — instead,
-code docstrings link to the durable sections (`design-philosophy/`, `techniques/`, `architecture/`,
-`background/`, `ml_experimentation/`, `live_service/`) instead. The *methods* behind these plans —
-differentiable physics, learned encoders, the disaggregation-evaluation protocol — live in
-[Techniques](techniques/index.md) for exactly this reason: they survive the roadmap items that apply
-them.
+service on AWS](live_service/aws.md). A page is a candidate for splitting along this line when it
+mixes the two — design rationale followed by a runbook with literal commands. The `docs/roadmap/`
+folder therefore contains **only design for work that is not yet implemented**, and is never a
+mirror of the code. Because roadmap pages are deletable, **code must never link into `roadmap/`** —
+instead, code docstrings link to the durable sections (`design-philosophy/`, `techniques/`,
+`architecture/`, `background/`, `ml_experimentation/`, `live_service/`) instead. The *methods*
+behind these plans — differentiable physics, learned encoders, the disaggregation-evaluation
+protocol — live in [Techniques](techniques/index.md) for exactly this reason: they survive the
+roadmap items that apply them.
 
 ## Docstrings, READMEs and `docs/` hold three different jobs
 
 The section above covers the pages under `docs/`. Docstrings and package READMEs are documentation
 too — mkdocstrings renders every module listed in `docs/api/<package>/index.md` onto the published
-site — so the same question of which home an argument belongs in applies to them, and it is settled
-by asking what the reader already has in their hand when they arrive. Deciding a home is not a
-licence to delete the other copies: the bar for cutting prose out of code is [excessive
+site — so the same question applies to them — which home an argument belongs in — and the answer
+comes from asking what the reader already has in their hand when they arrive. Deciding a home is not
+a licence to delete the other copies: the bar for cutting prose out of code is [excessive
 duplication](architecture/code-style.md#comments-docstrings-and-links), not duplication.
 
 **A docstring holds everything that dies when the symbol dies**: units, preconditions, invariants,
@@ -83,9 +83,9 @@ one kept up to date.** The choice to round `power_fcst` to a 13-bit significand 
 docstring. Another page may restate the figure where its own reader needs it, as
 [Performance](architecture/performance.md) does, but should say where the decision lives so a later
 change knows what else to update. Restating a measurement is how it goes stale: a fold's row count
-appeared in three places, and when the fold gained series every copy became wrong at once. A
-measurement no single symbol owns — peak memory across a cross-validation fold, say — belongs on the
-`docs/` page alone.
+appeared in three places, and when the fold gained series every copy became wrong at once. Some
+measurements belong on the `docs/` page alone, because no single symbol owns them — peak memory
+across a cross-validation fold, say.
 
 ### Which place do I use?
 

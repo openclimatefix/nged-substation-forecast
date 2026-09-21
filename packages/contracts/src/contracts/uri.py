@@ -5,13 +5,13 @@ Settings data-location fields are plain ``str`` so they can hold either a local 
 URI (``Path("s3://b/a") / "c"`` collapses the double slash after the scheme and yields
 ``"s3:/b/a/c"``), so joins route through here.
 
-The asset IO layer, the code that writes our Delta tables and parquet files, takes two steps
-around every Delta/parquet write: it makes sure the parent directory exists, and it checks
-whether a table or object is already there. The existence/parent helpers below give that layer a
-single local-or-remote-aware call for those two steps. Making the parent directory is a no-op on
-object stores, which have no directories. Remote calls go through delta-rs / obstore with the
-caller's ``storage_options`` so the same code path serves both a local data-path root and an
-``s3://`` one.
+The asset IO layer is the code that writes our Delta tables and parquet files. That layer takes
+two steps around every Delta/parquet write: it makes sure the parent directory exists, and it
+checks whether a table or object is already there. The existence/parent helpers below give that
+layer a single local-or-remote-aware call for those two steps. Making the parent directory is a
+no-op on object stores, which have no directories. Remote calls go through delta-rs / obstore
+with the caller's ``storage_options`` so the same code path serves both a local data-path root
+and an ``s3://`` one.
 """
 
 import posixpath

@@ -67,8 +67,8 @@ def compute_effective_capacity(
     Version 0.1 of the capacity definition is the full-history P99 of ``|power|``.
 
     One row per ``time_series_id``: ``effective_capacity_mw`` is the 99th percentile of
-    ``abs(power)`` over all non-null observations. Series whose P99 is null or non-positive (e.g.
-    all-null or all-zero power) are dropped, since ``EffectiveCapacity`` requires
+    ``abs(power)`` over all non-null observations. A series is dropped when its P99 is null or
+    non-positive (e.g. all-null or all-zero power), since ``EffectiveCapacity`` requires
     ``effective_capacity_mw > 0``.
 
     ``time`` is set to that series' **latest timestep carrying a non-null power** (``time.max()``

@@ -335,8 +335,8 @@ class BaseForecaster(ABC):
           reconstruct the correct class from a plain model directory — no caller-supplied class
           name, no class registry, and no MLflow run (issue #221).
         - ``path`` must be cleared first, so that saving over a directory holding a *larger*
-          model's files leaves none of them behind. A save that merged into the directory instead
-          of replacing its contents would let a dropped time series' weights survive a re-train
+          model's files leaves none of them behind. A dropped time series' weights would survive
+          a re-train, if a save merged into the directory instead of replacing its contents
           (issue #197). ``XGBoostForecaster.save`` clears with ``shutil.rmtree(path,
           ignore_errors=True)``.
 

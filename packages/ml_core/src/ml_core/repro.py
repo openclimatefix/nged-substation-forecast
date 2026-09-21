@@ -8,9 +8,10 @@ Lake time travel makes data versioning one integer per table. A run can therefor
 replayed with ``pl.scan_delta(path, version=N)`` after ``git checkout {sha}``.
 
 Every function here is deliberately **non-raising**: the git SHA, the dirty flag, and each Delta
-table's version are a record *about* a run rather than an input to that run. A missing ``.git``
-directory (containers) or an absent Delta table must never fail the surrounding training or
-forecasting run. Each absence degrades to the sentinels ``"unknown"`` / ``"absent"`` instead.
+table's version are a record *about* a run rather than an input to that run. The surrounding
+training or forecasting run must never fail because of a missing ``.git`` directory (containers)
+or an absent Delta table. Each absence degrades to the sentinels ``"unknown"`` / ``"absent"``
+instead.
 
 ``provenance_tags`` **stage-prefixes** its keys (``register_``, ``train_``, ``predict_``,
 ``metrics_``) because four separate writers stamp provenance onto the same MLflow runs. Three are

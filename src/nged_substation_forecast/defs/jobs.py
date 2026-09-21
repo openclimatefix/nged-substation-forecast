@@ -219,8 +219,8 @@ def _identity_tags(
 _ABSENT: Final[object] = object()
 """Sentinel for a config field present on only one side of an identity comparison.
 
-A sentinel rather than ``None``, so a field that is genuinely ``null`` on one side and missing on
-the other is reported as the difference it is.
+A sentinel rather than ``None``, so the comparison reports that field as the difference it is when
+the field is genuinely ``null`` on one side and missing on the other.
 """
 
 

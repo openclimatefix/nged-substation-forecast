@@ -96,8 +96,8 @@ Two properties observed in the trial area shape the entire problem:
    balance**: one source's lost power is absorbed by a *subset* of neighbours whose individual
    pickups sum to the source's loss.
 
-2. **Partial transfer is the common case, and it is harder.** The clean whole-primary transfer in
-   the worked example (a big, obvious step) is the *easy, rarer* case. The common case is that
+2. **Partial transfer is the common case, and it is harder.** The *easy, rarer* case is the clean
+   whole-primary transfer in the worked example (a big, obvious step). The common case is that
    **only some of a substation's load is diverted** — an arbitrary continuous slice, cut at a
    movable point. The transferred magnitude is a free continuous variable with no minimum size.
    Small partial transfers therefore shade continuously down into the measurement noise. **Detection

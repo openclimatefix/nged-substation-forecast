@@ -133,11 +133,11 @@ window for a fast end-to-end check), so the concrete values below target it:
    `mid_2025_to_mid_2026`) to match the run below — otherwise training finds an empty population and
    raises.
 
-Then register an experiment and train a model. The full recipe — the run config for each job, what
-`smoke_test` versus `full_cv` does, and how the trained model is tracked in MLflow — is [Running an
-ML experiment end-to-end](ml_experimentation/dagster-workflow.md). Register the experiment with
-`run_mode="smoke_test"` to check the whole pipeline is wired up before committing to a long
-`full_cv` training run.
+Then register an experiment and train a model. [Running an ML experiment
+end-to-end](ml_experimentation/dagster-workflow.md) has the full recipe — the run config for each
+job, what `smoke_test` versus `full_cv` does, and how the trained model is tracked in MLflow.
+Register the experiment with `run_mode="smoke_test"` to check the whole pipeline is wired up before
+committing to a long `full_cv` training run.
 
 ## Running the live service on your laptop
 
