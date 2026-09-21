@@ -49,21 +49,37 @@ negative number, because generation is negative in NGED's sign convention, and t
 magnitude a generator's cap ever reaches is its connection limit rather than a curtailment. Reading
 that limit as a curtailment volume inverts the signal.
 
-**On the one metered generator whose setpoint history we hold, the cap is at the connection limit
-80.5% of the time.** It sits at zero for 12.7% of the record, at 0.25 MW for 4.0%, and somewhere in
-between for the remaining 2.8%, over 26 months. The zero periods run long — one span lasts 38 days
-— and look like outage or works rather than the minute-by-minute trimming the rest of the record
-shows. Where the cap never left the connection limit, that generator's output per unit of
-irradiance matches the other five photovoltaic sites in the trial area to within half a percent,
+**One generator in the trial area is connected under active network management, and NGED has
+confirmed there are no others.** A site with no setpoint history is therefore uncapped rather than
+unrecorded, which is what makes the absence of a cap usable: a missing record is a real absence of
+curtailment and not a gap in what we hold.
+
+**On that generator, the cap sits at the connection limit for 80.7% of the half-hours since the
+scheme went live.** It reads zero for 11.9% of them, 1.3% of the connection limit for 3.6%, a shade
+under the connection limit for a further 2.7%, and somewhere between for the rest, over those
+25 months. The zero periods run long — the cap sits at zero continuously from 21 July to
+8 September 2025, close to 49 days — and look like outage or works rather than the minute-by-minute
+trimming the rest of the record shows. Where the cap never left the connection limit, that
+generator's output per unit of irradiance matches the other five photovoltaic sites in the trial
+area to within half a percent,
 which is the check that says the cap is being read the right way round. The
 [beam/diffuse results](../results/beam-diffuse-split.md#one-site-is-curtailed-and-it-is-the-noisiest-of-the-six)
 set out the measurement.
 
+**The setpoint feed exists before the scheme enforces anything, and reads zero while it waits.** The
+export reaches back to the day after the generator's telemetry begins, six months before the scheme
+went live. Through those six months the cap forbids export in all 431 of the bright hours it covers —
+yet the generator exported above 5% of its capacity in 423 of them, at a median of 44%. A cap that
+permits 44% output is not being enforced. Anything consuming this feed has to find the date the
+scheme went live and discard what precedes it, or it will read a plant running normally as a plant
+held at zero. The
+first half-hour at which the cap reaches the connection limit is the marker we use, because a live
+scheme on an unconstrained generator rests at that limit most of the time.
+
 **Curtailment is not a capacity loss, which is why the two records matter beyond forecasting.** A
 turned-down generator is still physically capable of its full output, so
 [effective-capacity estimation](../roadmap/capacity-estimation.md) has to hold curtailment out
-rather than absorb it. Neither record reaches back to the start of the telemetry, and only one
-generator in the trial area has either, so an estimator cannot assume a label exists.
+rather than absorb it.
 
 ## Data quality in the trial area
 
@@ -86,6 +102,47 @@ area](assets/NGED_data_availability_periods.png)
 The first couple of months after a meter is installed tend to have poor data quality. Poor data
 quality in that period is handled by simply dropping the first 2 months of each time series. ![Bad
 data for the first few months for 3 substations](assets/bad_data_for_first_months.png)
+
+### A new solar farm reaches full output in stages over months
+
+**A newly connected solar farm does not produce its rated output from its first day of telemetry:
+one of the six metered solar farms in the trial area climbed to its settled level through eight
+months of discrete steps.** The site is the one labelled E in the
+[beam/diffuse results](../results/beam-diffuse-split.md). Measured as its daily output divided by
+the median output of the other five solar farms — a ratio that cancels cloud, season and time of
+day — it holds flat for several days at a time at 12%, 29%, 56%, 76% and 88% of its settled level
+through April 2024, drops back, climbs again through 12%, 33% and 71% in July after a 24-day outage,
+plateaus at 81% from 11 July, and only reaches 100% on 6 October 2024.
+
+![One solar farm's output relative to the rest of the fleet, day by day, over its first
+year](assets/site_e_commissioning.svg)
+
+**The deficit is a fixed proportion of what the weather allowed, which is what separates a
+part-built array from every other way a site can fall short.** Binned by how hard the rest of the
+fleet was generating, the site's relative output is 79% to 85% at every decile from the dimmest to
+the brightest. An undersized inverter would bite only at the top of the range, and an export cap
+would hold the site at a fixed number of megawatts rather than a fixed fraction. Only a fraction of
+the array being energised produces a flat ratio.
+
+**The steps are invisible in the site's own record and appear only against a reference.** A solar
+farm generating at a third of its capacity on a bright day looks exactly like a solar farm
+generating at full capacity under cloud, so nothing in the single series distinguishes them.
+Detecting the ramp needs either a nearby site generating under the same sky or a weather model, and
+the fleet median is the cheaper of the two.
+
+**This is a different fault from the meter ramp-up above, and it lasts far longer.** Poor data in
+the first weeks after a meter is installed is a metering problem, fixed by dropping a fixed window.
+A commissioning ramp is a real measurement of a plant that was genuinely smaller than its capacity
+record says, it runs for months rather than weeks, and it ends on a date that has to be found per
+site rather than assumed. A model fitted on the settled plant overshoots every one of these rows by
+construction, and a capacity estimator reading them at face value would understate the site.
+
+**A uniform metering correction would leave the same trace, and nothing in the telemetry separates
+the two.** A change of current-transformer ratio or scaling factor applied at the end of the ramp
+would also show up as a flat proportional step. Either reading leaves the early rows measuring a
+different quantity from the rest of the site's record, which is the reason to exclude them. The
+date the ramp ends is bracketed rather than sharp, because the winter months that follow it carry a
+fifth of summer's usable half-hours.
 
 ### False zeros
 

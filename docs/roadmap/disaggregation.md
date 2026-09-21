@@ -146,6 +146,26 @@ and where the **latent-demand inversion** of the forward model is realised in fu
 
 ## Is the beam/diffuse split worth having?
 
+**A throw-away experiment on the trial area's six metered solar farms has since run that
+comparison, and the answer depends on the product's resolution.** On a 5 km satellite retrieval,
+giving the model the product's own beam field rather than a separation model's estimate from the
+same product's global irradiance cut error by about 1.5% relative. On a 31 km reanalysis it added
+nothing detectable. Both claims are about those two products on those six sites. The write-up is
+[Does a weather product's beam/diffuse split help a PV
+forecast?](../results/beam-diffuse-split.md), and the code sits in a pull request kept for reference
+rather than merged,
+[#785](https://github.com/openclimatefix/nged-substation-forecast/pull/785).
+
+**Which product feeds the model matters far more than which split it sees.** Swapping the 31 km
+reanalysis for the 5 km retrieval moved mean absolute error by 4.1 points of P99 output, against
+0.124 points for the largest split contrast anywhere in that experiment. Any effort spent on the
+beam field is worth weighing against effort spent on the retrieval that carries it.
+
+**A 30-minute timestamp error is absorbed into a physical model's fitted azimuth, which is how a
+model-chain comparison can silently answer a different question.** In that experiment the fitted
+azimuths move by about 35 degrees between the two stamp conventions, and the ordering of the arms
+changes sign with them. Settle the stamp convention before comparing chains that fit orientation.
+
 **We found no study that runs the clean comparison — one NWP, one PV model chain, one arm fed
 the model's own direct beam and the other fed a separation model's estimate from the same model's
 global irradiance.** We searched the terms "separation model", "decomposition
@@ -185,16 +205,18 @@ is high, so there is less direct beam for a better estimate to improve. And the 
 model](../techniques/differentiable-physics.md#the-core-building-block-differentiablesolarplant)
 would learn its own corrections either way.
 
-**The physics chain requires the split, so the open question is only which source should supply it.**
-Whether a forecast's own split beats a split derived by a separation model is what nobody appears to
-have measured. The test is the one [this page already sets](#evaluating-disaggregation): held-out
-metered photovoltaic output.
+**The physics chain requires the split, so the question is only which source should supply it.**
+The test is the one [this page already sets](#evaluating-disaggregation): held-out metered
+photovoltaic output, which is what the experiment above ran on six sites.
 
-**A gradient-boosted tree would settle the question for the tree path alone.** A tree fed the split
-as extra features can ignore those features, where the physics chain cannot proceed without the
-split. A null result from a tree is therefore evidence about the [tree
+**A gradient-boosted tree settles the question for the tree path alone.** A tree fed the split as
+extra features can ignore those features, where the physics chain cannot proceed without the split.
+A null result from a tree is therefore evidence about the [tree
 path](xgboost-improvements.md#several-nwp-sources-as-features-v21), and does not justify dropping
-the direct beam from the physics plan.
+the direct beam from the physics plan. The experiment above used a tree as its primary instrument
+and a fitted physical model as a second one, and the two disagreed on the sign — the physical
+model's arms differed in fitted geometry as well as in beam field, so it answers a different
+question rather than confirming the tree's.
 
 ## The graph-structured engine
 

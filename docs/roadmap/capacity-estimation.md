@@ -596,6 +596,81 @@ Great Britain](disaggregation.md#correcting-satellite-irradiance-over-great-brit
 > would. Worth weighing before we commit ERA5 to the real-time critical path; it shapes the
 > [live-service cadence](../architecture/aws-costs.md#workload-model).
 
+## What the beam/diffuse experiment measured on this fleet
+
+**A throw-away experiment on the six metered solar farms in the trial area fitted a five-parameter
+physical model per site, and several of its by-products bear directly on this plan.** The write-up
+is [Does a weather product's beam/diffuse split help a PV
+forecast?](../results/beam-diffuse-split.md); the code is in a pull request kept open for reference
+rather than merged,
+[#785](https://github.com/openclimatefix/nged-substation-forecast/pull/785), answering [issue
+#784](https://github.com/openclimatefix/nged-substation-forecast/issues/784). None of it is a
+capacity estimator, and none of it chooses between the candidates above. What follows is what it
+established and the traps it hit.
+
+**Five parameters per site are identifiable from a meter and an irradiance series alone, and the
+fitted values are physically plausible.** Panel tilt, panel azimuth, capacity, an inverter clipping
+limit, and a temperature coefficient were fitted per site on each training fold by a Powell
+optimiser from eight random starts. The fitted tilts land between 17 and 25 degrees and the
+azimuths between 163 and 179 degrees — south to south-south-east, which is what these arrays
+plausibly are. That is the core feasibility question behind [candidate
+B](#candidate-b-the-differentiable-physics-estimator), answered for solar on this fleet.
+
+**A half-hour timestamp error is absorbed into the fitted azimuth, so pin the stamp convention
+before trusting a fitted orientation or the capacity that comes with it.** The same model fitted on
+the same rows settles around 163 to 179 degrees when the stamps are shifted by one half-hour and
+around 200 to 212 degrees when they are taken as labelled — a 35-degree swing from a 30-minute
+change in what the timestamp means. The ordering of the experiment's arms changes sign with it, in
+sample as well as out. Any estimator that fits orientation has the same exposure, and an orientation
+error feeds straight into the capacity it reports.
+
+**The `effective_capacity` table is a single snapshot, not a time series.** It holds exactly one row
+per `time_series_id` — 32 rows for 32 series — so code that sorts it by time and takes the last row
+silently gets the only row. Nothing errors. The [delivery-table
+spec](delivery-tables.md#table-4-effective_capacity) describes a time-varying trace, and the
+estimator this page plans is what will produce one; until then, anything reading that table is
+reading a constant.
+
+**A fixed-capacity model's signed error drifts by more than 6 points between neighbouring sites,
+which bounds how much capacity moved without estimating it.** The per-site, per-year drift table is
+[in the write-up](../results/beam-diffuse-split.md#what-the-drift-says-about-estimating-effective-capacity).
+The drift appears on two independently-produced irradiance products and agrees between them to
+about half a point at the five longer-running sites, so it is in the power rather than in the
+weather. It remains an upper bound:
+the residual absorbs degradation, soiling, snow, curtailment, and any site-specific irradiance bias
+together. Separating them is the estimator contest's job.
+
+**The satellite retrieval beats the reanalysis by 4.1 points of mean absolute error on this fleet,
+which is a local measurement to set beside the literature above.** On the 126,784 hours both cover,
+the CAMS Radiation Service cuts an XGBoost forecast's error from 10.12% to 6.07% of P99 output, and
+the fitted physical model from 10.37% to 6.73%. That is a forecasting measurement rather than a
+capacity one, but it is the same inputs feeding the same physics, and it supports [preferring CAMS
+for the capacity fit](#irradiance-inputs) on more than a literature argument.
+
+**Curtailment needs the export cap, and the export cap needs its go-live date.** NGED's setpoint
+feed reads zero for the six months before the scheme starts enforcing anything, while the generator
+exports normally — 423 of 431 bright hours above 5% of capacity, at a median of 44%. An estimator
+that took those readings as a constraint would conclude the site was pinned at zero while it ran.
+Honour the cap only from the first half-hour at which it reaches the connection limit. The evidence
+is under [active network management caps what a generator may
+export](../background/network.md#active-network-management-caps-what-a-generator-may-export).
+
+**A generator's commissioning ramp is signal for this estimator, not noise, and one is already
+measured.** One trial-area solar farm climbed to its settled output through eight months of
+discrete multi-day plateaus at 12%, 29%, 56%, 76% and 88%, reaching its settled level on 6 October
+2024 — exactly the upward, piecewise-constant movement [the metered-capacity
+prior](#metered-effective-capacity-can-go-up-or-down) is built for. The forecasting experiment cuts
+those rows because a forecast has no ceiling to clamp to; an estimator should track them instead,
+and the plateau dates and levels make a ready-made test case. The figure and the method are under
+[how a new solar farm reaches full output in
+stages](../background/network.md#a-new-solar-farm-reaches-full-output-in-stages-over-months).
+
+**Detecting that ramp needed a reference series rather than a threshold, which is a constraint on
+how this scales.** A part-built array under a clear sky produces what a whole array produces under
+cloud, so nothing in a single series separates them. Dividing by the median output of neighbouring
+sites cancels cloud, season and time of day; a clear-sky irradiance model would do the same job
+where no neighbour is available. At roughly 2,500 series neither is free.
+
 ## What comes after v0.7
 
 Once the metered assets are accurately tracked, the harder v2 goal — disaggregating the *unmetered*

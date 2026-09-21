@@ -513,6 +513,62 @@ Low-effort interim: drop training rows whose target sits inside a detected stuck
 ≈ 0) or an isolated exact-zero run. Cleaning only the *training* target is much lower-risk than
 cleaning delivered data, and it protects every subsequent experiment from learning artefacts.
 
+### Drop curtailed hours from the training target
+
+**An hour in which the network operator capped a generator's export is an hour no weather feature
+can explain, so it belongs out of the training target for the same reason a stuck meter does.** A
+[flexible connection](../background/network.md#active-network-management-caps-what-a-generator-may-export)
+lets the operator turn a generator down when the local network fills, and that instruction leaves
+no signature in any irradiance or wind field. A model trained on those hours is penalised for
+failing to predict a network instruction, and has an incentive to learn whatever weather pattern
+happened to correlate with one.
+
+**The export cap is a mask on the target, never a feature.** The cap in force at a future valid
+time is not known when the forecast is made, so giving the cap to the model is exactly the fault
+the [lookahead-bias
+guardrails](../ml_experimentation/model-configuration.md#lookahead-bias-guardrails) exist to
+prevent. Holding an already-delivered forecast down to a cap the operator has since set is a
+different question, and one for the serving path rather than the training loop.
+
+**One generator in the trial area is connected under active network management, and NGED has
+confirmed there are no others**, so a generator absent from the setpoint record ran free rather
+than uncapped-but-unrecorded — see [what the curtailment feed
+holds](data-sources.md#what-the-curtailment-feed-holds). That confirmation is what makes the mask
+safe to apply: without it, an absent record could mean either no curtailment or no data, and the
+cleaning step would quietly train on capped hours at every other site. It does not carry to the
+wider rollout, where the population of flexible connections has to be established again.
+
+**The setpoint feed reads zero for months before the scheme starts enforcing anything, so the
+cleaning step has to find the date the scheme went live and discard what precedes it.** On the one
+generator that has an export, the cap forbids export through all 431 of the bright hours in its
+first six months while the generator exported above 5% of its capacity in 423 of them, at a median
+of 44%.
+Masking on the raw feed would drop most of that site's early record as curtailed. The
+[beam/diffuse experiment](../results/beam-diffuse-split.md) honours the cap only from the first
+half-hour at which it reaches the connection limit, which is a marker taken from the cap alone.
+
+### Drop a generator's commissioning ramp from the training target
+
+**A solar farm's first months of telemetry measure a smaller plant than its capacity record
+describes, so those hours belong out of the target alongside the curtailed ones.** One trial-area
+site climbed to its settled output through eight months of discrete steps, holding for days at a
+time at 12%, 29%, 56%, 76% and 88% of what it produces now — see [how a new solar farm reaches full
+output](../background/network.md#a-new-solar-farm-reaches-full-output-in-stages-over-months). A
+model fitted on the settled plant overshoots every one of those hours, and a model fitted partly on
+them learns a gain that matches neither plant.
+
+**Unlike a curtailed hour, a commissioning hour cannot be kept for scoring.** The export cap says
+what a curtailed generator was allowed to produce, so a prediction can be held down to it. Nothing
+in the record says what fraction of an array was energised on a given day, so there is no ceiling
+to clamp to and no fair way to score the hour. Removal is the only treatment available.
+
+**Detecting the ramp needs a reference, because a part-built array under a clear sky looks exactly
+like a whole array under cloud.** Dividing a site's output by the median output of its neighbours
+cancels the weather and leaves the plateaus visible; a clear-sky irradiance model would do the same
+job where no neighbour is available. Neither is free at rollout scale, which is why this belongs
+with [effective-capacity estimation](capacity-estimation.md) rather than inside the feature
+pipeline.
+
 ### Effective (smoothed) temperature and degree-day features
 
 GB demand responds to *lagged* temperature (building thermal inertia), not instantaneous — National

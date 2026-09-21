@@ -32,18 +32,36 @@ generator's export cap — the signal the derived volume is computed from. Nothi
 ingests either yet.
 
 **Prefer the setpoint history: it reaches further back and it is the physical quantity.** For the
-one generator both cover, the setpoint history runs from July 2024 against the bucket feed's late
-April 2026, and the two disagree on the hours they share. The cap is also what a model can use
+one generator both cover, the setpoint history runs from February 2024 against the bucket feed's
+late April 2026, and the two disagree on the hours they share. The cap is also what a model can use
 directly, because export cannot exceed it: a generator's output is `min(what the weather allowed,
 the cap in force)`. The cap is published as a negative number, generation being negative in NGED's
 convention, and its largest magnitude is the connection limit rather than a curtailment. Reading
 the cap as a curtailment volume gets this backwards — the measurements are in [the beam/diffuse
 results](../results/beam-diffuse-split.md#one-site-is-curtailed-and-it-is-the-noisiest-of-the-six).
 
-**Coverage is what limits both, not accuracy.** Neither reaches September 2019, where the telemetry
-starts, and a generator absent from both cannot be read as uncurtailed — only as one NGED has not
-sent us curtailment for. The setpoint export is per generator, so extending the history and widening
-it to the other generators are two separate requests.
+**Ask for the whole history, and expect the first request to be truncated.** The first export we
+were sent for that generator began in July 2024; a second request returned an exact superset
+reaching back to February 2024, the day the generator's telemetry begins. Nothing in the first file
+said it was partial.
+
+**The setpoint feed reads zero for months before the scheme enforces anything, so find the go-live
+date before trusting a single reading.** Across all 431 bright hours the export covers before
+6 August 2024, the cap forbids export outright — while the generator exported above 5% of capacity
+in 423 of them, at a median of 44%. An ingest that honoured those readings would label a plant
+running normally as a plant held at zero, and would do it silently. Take the scheme as live from the
+first half-hour at which the cap reaches the connection limit: a live scheme on an unconstrained
+generator rests at that limit most of the time, and the marker needs no reference to metered output.
+Eight of the 2,268 rows also carry a positive value where the rest are negative, so read the
+magnitude rather than flipping the sign.
+
+**One generator in the trial area is connected under active network management, and NGED has
+confirmed there are no others.** Within the trial area a generator absent from the setpoint record
+therefore ran free, which is what lets an absent cap be read as evidence rather than as a gap. That
+confirmation does not extend past the trial area: at rollout the population of flexible connections
+has to be established again, and until it is, an absent record means only that NGED has not sent
+curtailment for that generator. The setpoint export is per generator, so widening it to a new set of
+sites is a fresh request each time.
 
 **15-minute power data may become available. We deliberately stay on half-hourly until v2.** There
 is no room on the road to v1.0 to re-ingest the power feed at a finer step, so treat 15-minute data
@@ -431,3 +449,33 @@ supply risk.
   aerosol and cloud inputs, so the same timestamp can return a different value next year. Snapshot
   each fetch into Delta and treat the snapshot as the source of truth, or experiments stop being
   reproducible.
+
+### What a CAMS-against-ERA5 comparison on the trial area's solar farms found
+
+**The satellite retrieval beat the reanalysis by 4.1 points of mean absolute error on the six
+metered solar farms, which is the largest effect anything in that experiment varied.** On the
+126,784 hours both products cover, CAMS cut an XGBoost forecast's error from 10.12% to 6.07% of P99
+output, and a fitted five-parameter physical model's from 10.37% to 6.73%. The largest contrast
+from changing which beam/diffuse split the model saw was 0.124 points, and changing the model
+family moved about 0.9. Which product feeds the model dominates both. The write-up is [Does a
+weather product's beam/diffuse split help a PV forecast?](../results/beam-diffuse-split.md); the
+code sits in a pull request kept for reference rather than merged,
+[#785](https://github.com/openclimatefix/nged-substation-forecast/pull/785).
+
+**That gap is what a 5 km cloud field at the meter's own coordinates delivers over a 31 km field
+averaged across a cell the meter may sit 13 km from.** Both measurements are of these two products
+on this fleet, and neither has been shown to hold for every product at those resolutions.
+
+**CAMS's own reliability flag is worth acting on, and dropping the flagged hours raises a
+P99-normalised error even though it improves the data.** The service flagged 17.9% of the daylight
+hours it delivered as less than 90% reliable. Those hours are much darker than the ones kept — 33
+W m⁻² of global irradiance against 285, and 3.5% of P99 output against 36.1% — so removing them
+removes hours where every model is nearly right, and the remaining mean error rises mechanically.
+Any comparison that drops them on one source and not on another is comparing two row sets rather
+than two products; restrict to the shared hours first.
+
+**The beam field CAMS publishes is worth having and the one ERA5 publishes is not.** On the 5 km
+retrieval, giving a model the product's own split rather than running a separation model locally cut
+error by about 1.5% relative. On the 31 km reanalysis it added nothing detectable. Whether the
+retrieval's beam field is worth paying for depends on what a supplier charges for it, which that
+experiment does not know.
