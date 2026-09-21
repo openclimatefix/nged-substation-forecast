@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 
 import polars as pl
+import pytest
 from _nwp_test_data import cast_to_nwp_dtypes
 from altair import LayerChart
 from contracts.weather_schemas import Nwp
@@ -259,6 +260,45 @@ def test_a_realistic_ensemble_size_does_not_hit_altairs_row_limit() -> None:
     assert len(ensemble_rows) > 5_000
 
 
+def test_forecast_values_keep_their_stored_float32_precision() -> None:
+    """Values reach Vega at the width they are stored at, with no display rounding.
+
+    ``mo.ui.altair_chart`` serves the rows as a fixed-width Arrow virtual file, so how many
+    decimal digits a value would print to does not change the payload. Rounding would need a
+    ``Float64`` cast, which adds 4 bytes per value.
+    """
+    stored = pl.Series([10.3], dtype=pl.Float32).item()
+    assert stored != 10.3, "the fixture needs a value whose Float32 form carries digits past 3 d.p."
+    valid_times = pl.datetime_range(
+        INIT_TIME, INIT_TIME + timedelta(hours=1), interval="30m", time_zone="UTC", eager=True
+    )
+    spec = build_view_forecast_chart(
+        pl.DataFrame(
+            {
+                "valid_time": valid_times,
+                "power_fcst": pl.Series([10.3] * len(valid_times), dtype=pl.Float32),
+                "ensemble_member": pl.Series([0] * len(valid_times), dtype=pl.Int8),
+            }
+        ).lazy(),
+        _actuals(),
+        power_fcst_init_time=INIT_TIME,
+        units="MW",
+        title="Test series — PV — id 1",
+        subtitle="Forecast init Sat 04 Jul 2026 06:00 UTC",
+        shade_weekends=False,
+        show_forecast=True,
+        show_actuals=False,
+        lags=(),
+    ).to_dict()
+    plotted = {
+        row["power_fcst"]
+        for rows in spec["datasets"].values()
+        for row in rows
+        if "power_fcst" in row
+    }
+    assert plotted == {stored}
+
+
 def _nwp(members: tuple[int, ...] = (0, 1, 2)) -> pl.LazyFrame:
     valid_times = pl.datetime_range(
         NWP_INIT_TIME,
@@ -400,8 +440,12 @@ def test_precipitation_is_displayed_in_mm_per_hour() -> None:
     spec = _build_nwp(variable="precipitation_surface").to_dict()
     assert spec["layer"][1]["encoding"]["y"]["title"] == "Precipitation rate (mm/h)"
     rows = spec["datasets"][spec["layer"][1]["data"]["name"]]
-    # Stored kg/m²/s values of 0, 1e-4, and 2e-4 (per member) become mm/h on display.
-    assert {row["precipitation_surface"] for row in rows} == {0.0, 0.36, 0.72}
+    # Stored kg/m²/s values of 0, 1e-4, and 2e-4 (per member) become mm/h on display. The values
+    # are serialised at their stored Float32 width, so compare to the Float32 product rather than
+    # to an exact decimal.
+    assert sorted({row["precipitation_surface"] for row in rows}) == pytest.approx(
+        [0.0, 0.36, 0.72], rel=1e-6
+    )
 
 
 def test_nwp_analysis_is_a_single_blue_line_over_the_ensemble() -> None:
@@ -437,7 +481,10 @@ def test_nwp_analysis_uses_the_same_display_units_as_the_ensemble() -> None:
     ).to_dict()
     rows = spec["datasets"][spec["layer"][2]["data"]["name"]]
     # The stored 1e-4 kg/m²/s becomes 0.36 mm/h — same ×3600 display scale as the grey lines.
-    assert {row["precipitation_surface"] for row in rows} == {0.36}
+    # Serialised at the stored Float32 width, so compare to the product rather than the decimal.
+    assert [row["precipitation_surface"] for row in rows] == pytest.approx(
+        [0.36] * len(rows), rel=1e-6
+    )
 
 
 def test_nwp_legend_always_lists_every_line() -> None:

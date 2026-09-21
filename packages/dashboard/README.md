@@ -120,10 +120,12 @@ width, and both put their legend above the plot rather than beside the plot, so 
 area ends up narrower than the other's. Changing any one of those three settings on one chart alone
 visibly misaligns the pair.
 
-**A chart's data is rounded and served out of line, because the ensemble is large.** One forecast
-run for one series is 51 members × 14 days × 48 half-hours ≈ 34,000 rows, which is past both
-Altair's 5,000-row default guard and marimo's maximum output size. `build_view_forecast_chart` calls
-`alt.data_transformers.disable_max_rows()` to lift Altair's guard. To stay inside marimo's maximum
-output size, the builders round values to 3 decimal places as `Float64` before serialising, and
-`view_forecasts.py` hands the result to `mo.ui.altair_chart`, which serves the rows as a virtual
-file instead of inlining the rows in the cell output.
+**A chart's data is served out of line, because the ensemble is large.** One forecast run for one
+series is 51 members × 14 days × 48 half-hours ≈ 34,000 rows, which is past both Altair's 5,000-row
+default guard and marimo's maximum output size. `build_view_forecast_chart` calls
+`alt.data_transformers.disable_max_rows()` to lift Altair's guard. `view_forecasts.py` hands the
+chart to `mo.ui.altair_chart`, which serves the rows as an Arrow virtual file instead of inlining
+the rows in the cell output, so the cell output marimo measures against its guard holds a URL
+rather than the rows. Values are serialised at their stored `Float32` width, because Arrow is
+fixed-width: rounding a value does not shrink it, and casting to `Float64` in order to round adds
+4 bytes per value.
