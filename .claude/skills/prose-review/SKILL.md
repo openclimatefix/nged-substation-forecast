@@ -249,7 +249,7 @@ superlatives, umbrella nouns, and a money metaphor for the rest. Extended across
 sub-agents working one rule per pass returned 469 findings on a file that had already passed several
 reviews.
 
-**Say "one pass per rule" explicitly in the brief.** A brief that lists all fifteen rules together
+**Say "one pass per rule" explicitly in the brief.** A brief that lists all sixteen rules together
 gets a sweep that honours none of them, because listing the rules is not the same instruction as
 sequencing them.
 
@@ -273,12 +273,14 @@ expensive passes get the freshest attention:
 8. Counting nouns that never say what was counted — "records", "sources", "items", "entries",
    "studies", "results"
 9. Money metaphors for performance
-10. Ambiguous "network"
-11. Numerals
-12. Serial commas
-13. Acronyms expanded on first use
-14. Sentences readable two ways, and noun-piles
-15. Sentences that announce content instead of stating it — "it is worth noting/saying," "it is
+10. Intent attributed to code, a config file or a tool — "wants", "likes", "prefers", "believes",
+    "decides", "chooses"
+11. Ambiguous "network"
+12. Numerals
+13. Serial commas
+14. Acronyms expanded on first use
+15. Sentences readable two ways, and noun-piles
+16. Sentences that announce content instead of stating it — "it is worth noting/saying," "it is
     important to note," "let us consider," "there are several reasons why"
 
 Pronouns dominate every sweep run so far, by roughly an order of magnitude over any other rule.
@@ -348,7 +350,7 @@ reporting a screening funnel is where a count chain lives. `grep -oE
 '[^.]*[0-9]+[^.]*[0-9]+[^.]*\.'` over a whitespace-normalised copy finds them, and most will be
 fine. The ones that are not hand the reader a different unit at each number and define none of them.
 
-**Rule 15, sentences that announce content instead of stating it, has a cheap way in too: grep for
+**Rule 16, sentences that announce content instead of stating it, has a cheap way in too: grep for
 the throat-clearing openers themselves.** `grep -inE "it (is|would be)
 (worth|important|useful|interesting) (noting|saying|pointing out|mentioning)|let us (consider|turn
 to)|we now turn to|there are (several|many) reasons why|this raises the question of"` over a
