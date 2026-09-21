@@ -127,7 +127,8 @@ def test_a_serial_comma_after_a_link_lands_outside_the_target(tmp_path: Path):
         "The runbook is the operations page, the aws page, and the alert rules",
     )
     assert status == "applied"
-    # The fixture wraps the second label across a line break, so match from its target on.
+    # The fixture wraps the second link's label across a line break, so start the assertion at
+    # that link's URL rather than at its label.
     assert "](https://example.com/aws), and the alert rules" in updated
     assert _counts(updated) == _counts(raw)
 
@@ -308,7 +309,8 @@ def test_punctuation_inserted_at_any_point_lands_between_the_markup_and_nothing_
     assert ";" not in raw
     projected, spans = apply_findings.project(raw)
     # The projection's trailing space comes from the file's final newline, and no quote ever
-    # carries it: `locate` matches a stripped needle.
+    # carries it. `locate`, the search routine, matches the quoted sentence with its surrounding
+    # whitespace removed, so the trailing space can never be part of a match.
     limit = len(projected.rstrip())
     for point in range(1, limit):
         spliced = apply_findings.splice(
@@ -379,7 +381,7 @@ def test_a_finding_in_the_prose_of_a_page_that_has_a_fenced_block_still_applies(
 
 
 def test_a_fence_indented_under_a_list_item_still_bounds_a_code_block(tmp_path: Path):
-    """Every fence on the code-style page is indented under a list item, and two of six here."""
+    """Both fences on the code-style page are indented under a list item, as is the one below."""
     page = (
         "Install the workspace before running anything else:\n\n"
         "1. Sync the environment, which creates the virtualenv:\n\n"
@@ -456,7 +458,8 @@ def test_an_arrow_before_a_bold_span_is_not_read_as_a_list_marker(tmp_path: Path
 
 
 def test_an_inline_triple_backtick_span_does_not_open_a_fenced_block(tmp_path: Path):
-    """A hard wrap can push such a span to the start of a line, where it looks like a fence.
+    """A hard wrap can push an inline triple-backtick span to the start of a line, where it looks
+    like a fence.
 
     Read as one, it opens a region no later line closes, and every finding in the rest of the
     file is refused. CommonMark forbids a backtick in a fence's info string, which tells the two

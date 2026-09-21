@@ -2,11 +2,12 @@
 
 A sweep that splits sentences and renames pronouns must leave a page's structure exactly as it
 found it: the same links, the same bold and code spans, the same list items, the same headings.
-Every defect this catches was written by an apply script and then passed `pymarkdown scan`,
-`mkdocs build --strict`, `check_render_loss.py` and `check_information_loss.py` — a citation that
-lost the `](url)` half of its link and stopped being a link, a re-wrap that merged two numbered
-list items into one, and one that swallowed the closing `---` of a skill file's YAML frontmatter.
-Counting is what found all three.
+This script counts each of those either side of the sweep and compares the totals. Every defect it
+catches was written by an apply script and then passed `pymarkdown scan`, `mkdocs build --strict`,
+`check_render_loss.py` and `check_information_loss.py` — a citation that lost the `](url)` half of
+its link and stopped being a link, a re-wrap that merged two numbered list items into one, and one
+that swallowed the closing `---` of the YAML frontmatter at the top of a skill file. Counting the
+markers is what found all three.
 
 Usage::
 
@@ -17,8 +18,8 @@ Usage::
 Exits non-zero when a count *falls*. A sweep can legitimately add a link or a code span, because
 naming the noun a pronoun stood for often means writing `file` or `prose-review` where the
 sentence said "it". No sweep can legitimately lose one. Increases are therefore reported and not
-gated, and so are over-long lines, which a page carrying unwrapped paragraphs would list every
-time.
+gated. Over-long lines are reported and not gated for the same reason: on a page whose paragraphs
+were never wrapped, the script would list every paragraph on every run.
 
 Use this after a sentence sweep, not after a restructure: a restructure is *meant* to move
 headings and list items, and `check_information_loss.py` is the check that fits it.

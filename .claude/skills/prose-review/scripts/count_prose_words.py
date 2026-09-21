@@ -7,6 +7,9 @@ figures in a pull-request body mean the same thing in wave 6 as they did in wave
 - For a Python file, the text of every docstring and every comment, and nothing else. Code,
   identifiers and string literals that are not docstrings are not prose.
 - For a markdown file, the whole file.
+- Alongside the word count, each path reports how many times it links to the rendered
+  documentation site. A sweep that names a noun often has somewhere to link that noun to, so the
+  link total is the second figure worth quoting in a pull-request body.
 - Any other suffix is reported as `not prose` and counted as nothing, because a `.json` or a
   `.toml` file read as markdown would contribute its keys and its punctuation to the figure.
 
