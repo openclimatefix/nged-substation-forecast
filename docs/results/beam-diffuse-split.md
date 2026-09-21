@@ -696,9 +696,9 @@ computed over.
 **What this is not is a measurement of capacity.** A fixed-capacity model's signed error absorbs
 everything the model does not represent — degradation, curtailment, soiling, snow, and any bias in
 the irradiance at that particular site — so the drift is an upper bound on how much capacity moved,
-not an estimate of it. Separating those causes is exactly the job of the estimator contest. Nothing
-here chooses between the candidates. Curtailment is the one cause an outside record can settle
-rather than an estimator infer, and for one of these six sites NGED publishes that record
+not an estimate of it. Separating those causes is exactly the job of the estimator contest, and the
+drift measured here separates none of them. Curtailment is the one cause an outside record can
+settle rather than an estimator infer, and for one of these six sites NGED publishes that record
 [above](#one-site-is-curtailed-and-it-is-the-noisiest-of-the-six).
 
 ## What follows for the forecast feed

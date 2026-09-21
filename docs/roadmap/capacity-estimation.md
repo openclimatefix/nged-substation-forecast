@@ -126,10 +126,10 @@ experiment](../results/beam-diffuse-split.md#one-site-is-curtailed-and-it-is-the
 found one of the six under active network management. Its cap sits at the connection limit for
 80.7% of the half-hours since the scheme went live, and on the bright hours where the cap never
 moved the site's yield matches the other five
-to within half a percent, which is what says the cap is read correctly. The cap is also the form a
-physics-based estimator wants, because it enters as `min(what the weather allowed, the cap)` — an
-upper bound on export rather than a volume to subtract, so it costs nothing on the hours it does
-not bind.
+to within half a percent, which is what says the cap is read correctly. A physics-based estimator
+can also consume the cap directly, because it enters as `min(what the weather allowed, the cap)`
+— an upper bound on export rather than a volume to subtract, so it changes nothing on the hours
+it does not bind.
 
 **The coverage gap is what the defences above are for.** The setpoint history for that generator
 starts in July 2024 and its telemetry starts in February 2024; the other five generators have no
@@ -606,8 +606,8 @@ forecast?](../results/beam-diffuse-split.md); the code is in a pull request kept
 rather than merged,
 [#785](https://github.com/openclimatefix/nged-substation-forecast/pull/785), answering [issue
 #784](https://github.com/openclimatefix/nged-substation-forecast/issues/784). None of it is a
-capacity estimator, and none of it chooses between the candidates above. What follows is what it
-established and the traps it hit.
+capacity estimator, and none of it settles which of the candidates above to build. What follows is
+what it established and the traps it hit.
 
 **Five parameters per site are identifiable from a meter and an irradiance series alone, and the
 fitted values are physically plausible.** Panel tilt, panel azimuth, capacity, an inverter clipping
