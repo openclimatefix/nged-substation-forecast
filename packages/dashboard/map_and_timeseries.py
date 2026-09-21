@@ -130,8 +130,10 @@ def _(delta_df, df, layer_widget, map):
     if layer_widget.selected_index is None:
         right_pane = mo.md(
             """
-            ### Select a Substation
-            *Click a dot on the map to view the demand profile.*
+            ### Select a site
+            *Click a dot on the map to view that site's power time series. The map shows
+            substations, generation sites, and storage sites together, so the line is not
+            always demand.*
             """
         )
     else:
