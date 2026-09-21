@@ -13,10 +13,10 @@ Two further modules sit here because every package needs them and neither is spe
 learning (ML). `contracts.settings` holds `Settings`, the single source of every setting the
 pipeline reads: the data paths, the object-store credentials, the MLflow tracking URI, and the four
 settings for Sentry, the error-reporting service, all resolved from the environment and the
-workspace `.env` and reached through the cached `get_settings()`. The `Settings` docstring names
-the four Sentry settings. `contracts.uri` holds the
-local-or-remote path helpers those settings fields need, because a data-location field may be a
-local path or an `s3://` URI, and `pathlib` mangles a URI.
+workspace `.env` and reached through the cached `get_settings()`. The `Settings` docstring names the
+four Sentry settings. `contracts.uri` holds the local-or-remote path helpers those settings fields
+need, because a data-location field may be a local path or an `s3://` URI, and `pathlib` mangles a
+URI.
 
 ## Light enough for any component to import
 
@@ -35,21 +35,19 @@ The five schemas below are the ones most callers touch. The package defines four
 - **`PowerTimeSeries`**: Half-hourly power observations in MW (megawatts) or MVA (megavolt-amperes)
   per `time_series_id`, as received from National Grid Electricity Distribution (NGED), the
   distribution network operator whose network this project forecasts.
-- **`TimeSeriesMetadata`**: Substation and customer meter metadata, including lat/lon, H3 index
-  (the identifier of one cell of the H3 hexagonal grid the weather is aggregated onto),
-  `substation_type` (`Primary`, `BSP`, `GSP`, `EHV Customer`, or `HV Customer` — the field's own
-  description expands the voltage acronyms), and `time_series_type` (`PV`, `Wind`, `BESS`,
-  `Disaggregated Demand`, and 18 others — `LIST_OF_TIME_SERIES_TYPES` holds all 22 and expands
-  each abbreviated one).
+- **`TimeSeriesMetadata`**: Substation and customer meter metadata, including lat/lon, H3 index (the
+  identifier of one cell of the H3 hexagonal grid the weather is aggregated onto), `substation_type`
+  (`Primary`, `BSP`, `GSP`, `EHV Customer`, or `HV Customer` — the field's own description expands
+  the voltage acronyms), and `time_series_type` (`PV`, `Wind`, `BESS`, `Disaggregated Demand`, and
+  18 others — `LIST_OF_TIME_SERIES_TYPES` holds all 22 and expands each abbreviated one).
 - **`Nwp`**: Numerical weather prediction (NWP) data from the European Centre for Medium-Range
   Weather Forecasts (ECMWF) ensemble (ENS), in physical units (`Float32`), on disk and in memory
   alike. An ensemble forecast runs the weather model many times over, and each run is one ensemble
   member, so the spread across the members is what expresses the forecast's uncertainty;
-  `ECMWF_ENS_ENSEMBLE_MEMBERS` gives the count and the control/perturbed split. The on-disk copy
-  is rounded to a 13-bit significand, which keeps a fixed number of significant figures rather
-  than a fixed number of decimal places, and is laid out so that compression works well and a
-  query can skip whole Parquet row groups — both by `delta_store.nwp`, which states the resulting
-  error bound.
+  `ECMWF_ENS_ENSEMBLE_MEMBERS` gives the count and the control/perturbed split. The on-disk copy is
+  rounded to a 13-bit significand, which keeps a fixed number of significant figures rather than a
+  fixed number of decimal places, and is laid out so that compression works well and a query can
+  skip whole Parquet row groups — both by `delta_store.nwp`, which states the resulting error bound.
 - **`AllFeatures`**: The final joined dataset passed to ML models. Primary key is `(time_series_id,
   power_fcst_init_time, valid_time[, ensemble_member])`, where the square brackets mark
   `ensemble_member` as a key column only when the frame carries one row per ensemble member.
@@ -75,8 +73,15 @@ behavioural cases:
   negative = excess generation flowing **back upstream**, into the network above the substation.
 - **Customer meters** (`EHV Customer`, `HV Customer`): positive = the customer is **sending** power
   to NGED's distribution network; negative = the customer is **drawing** power from NGED's
-  distribution network. A customer meter can sit at a demand site or a generation site, so this
-  case is not "generators only".
+  distribution network. A customer meter can sit at a demand site or a generation site, so this case
+  is not "generators only".
+
+**The convention describes a direction, so it applies only where `units` is `MW`.** A series metered
+in `MVA` reports the magnitude of the flow and cannot see direction, so reverse power flow appears
+as a rise rather than as a change of sign, and a negative value is a meter fault rather than an
+export. 10 sites in the trial area are metered in apparent power — see [apparent power (MVA)
+metering](https://openclimatefix.github.io/nged-substation-forecast/background/network/#apparent-power-mva-metering)
+for the "bouncing off zero" behaviour this produces.
 
 <!-- sign-convention:end -->
 
@@ -103,12 +108,12 @@ behavioural cases:
   `[MIN_PLAUSIBLE_DATETIME, MAX_PLAUSIBLE_DATETIME]` (2000-01-01 to 2100-01-01, inclusive), which
   rejects a corrupt feed or an epoch-unit mix-up without ever excluding a real reading. The check
   lives in each model's `validate` override via `check_datetime_bounds`, because Patito silently
-  ignores `ge` and `le` — the greater-than-or-equal and less-than-or-equal bounds a field
-  declares — on a datetime field. Patito derives its bounds checks from the JSON Schema
-  `minimum`/`maximum` keywords, which JSON Schema (the validation standard, not NGED's JSON feed)
-  defines for numbers only. Columns on our own *output*
-  schemas (`PowerForecast`, `EffectiveCapacity`, `AllFeatures`, `Metrics`) have not opted in: they
-  are computed from already-bounded inputs rather than received from outside.
+  ignores `ge` and `le` — the greater-than-or-equal and less-than-or-equal bounds a field declares —
+  on a datetime field. Patito derives its bounds checks from the JSON Schema `minimum`/`maximum`
+  keywords, which JSON Schema (the validation standard, not NGED's JSON feed) defines for numbers
+  only. Columns on our own *output* schemas (`PowerForecast`, `EffectiveCapacity`, `AllFeatures`,
+  `Metrics`) have not opted in: they are computed from already-bounded inputs rather than received
+  from outside.
 - **Degrade, don't abort, at an ingestion boundary**: `validate()` stays strict everywhere — it is
   also used as a hard assertion in tests and R&D code, where a raise-on-violation contract must not
   silently change. But a single malformed row from an external feed should not abort ingestion of
@@ -119,7 +124,7 @@ behavioural cases:
   relaxed, because those indicate a bug in our own pipeline rather than malformed external data.
 - **No lookahead bias**: `AllFeatures` carries `power_fcst_init_time` (when we make the forecast) as
   a distinct field from `nwp_init_time` (when the NWP model ran). Power lag features are nullified
-  by `_nullify_leaky_lags()` when the lag is shorter than or equal to the forecast lead time —
-  the lead time being the gap between `power_fcst_init_time` and `valid_time`. A short lag is the
+  by `_nullify_leaky_lags()` when the lag is shorter than or equal to the forecast lead time — the
+  lead time being the gap between `power_fcst_init_time` and `valid_time`. A short lag is the
   dangerous one: a reading taken fewer hours before the target time than the lead time had not yet
   happened when the forecast was made, so using it would be reading the future.

@@ -52,8 +52,12 @@ class PowerTimeSeries(pt.Model):
         description=(
             "Average power (MW or MVA) over the preceding 30-minute period. Unit defined in "
             "TimeSeriesMetadata."
-            " Sign convention depends on `substation_type` in `TimeSeriesMetadata` — see the Sign"
-            " convention section in this package's README.md, also published at"
+            " Sign convention depends on `substation_type` in `TimeSeriesMetadata`, and describes"
+            " a direction, so it applies only where `units` is `MW`. A series metered in `MVA`"
+            " reports the magnitude of the flow and cannot see direction, so reverse power flow"
+            " appears as a rise rather than as a change of sign, and a negative value is a meter"
+            " fault rather than an export. See the Sign convention section in this package's"
+            " README.md, also published at"
             " https://openclimatefix.github.io/nged-substation-forecast/roadmap/forecast-building-blocks/#sign-convention."
         ),
     )
@@ -526,7 +530,10 @@ class EffectiveCapacity(pt.Model):
         dtype=pl.Float32,
         gt=0,
         description=(
-            "OCF's estimate of the effective capacity (MW) of this asset at this timestep. "
+            "OCF's estimate of the effective capacity of this asset at this timestep. "
+            "Despite the column name, the value carries the series' own unit from "
+            "`TimeSeriesMetadata.units`, so a series metered in MVA has its effective capacity "
+            "in MVA. "
             "For generators: absorbs any persistent loss of capability, such as photovoltaic "
             "(PV) panel degradation or a partial inverter trip. The estimate ignores Active "
             "Network Management (ANM) curtailment — a wind farm ANM-capped at 5 MW with 10 MW "
