@@ -119,7 +119,7 @@ OPEN_METEO_MODELS: Final[dict[str, OpenMeteoModel]] = {
     "icon-d2": OpenMeteoModel(
         source="icon-d2",
         models_parameter="icon_d2",
-        archive_starts="2023-01-01",
+        archive_starts="2022-12-01",
         live_ingest_starts=None,
         native_radiation="accumulated",
     ),

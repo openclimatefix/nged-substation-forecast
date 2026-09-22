@@ -181,7 +181,7 @@ def fetch_point_frame(
         msg = f"asked for {sites.height} sites and got {len(blocks)} blocks"
         raise RuntimeError(msg)
 
-    return (
+    frame = (
         pl.concat(
             pl.DataFrame(
                 {"site": site, "time": block["hourly"]["time"]}
@@ -193,6 +193,16 @@ def fetch_point_frame(
         .drop_nulls()
         .with_columns(pl.col("time").str.to_datetime("%Y-%m-%dT%H:%M").dt.replace_time_zone("UTC"))
     )
+    # The block count above is checked before `drop_nulls`, so a meter the model answered for but
+    # filled entirely with nulls survives that check and then vanishes here. A limited-area model
+    # does exactly that outside its domain, and a five-meter frame would otherwise be scored
+    # without anyone noticing which meter left.
+    if frame["site"].n_unique() != sites.height:
+        present = set(frame["site"].unique().to_list())
+        missing = sorted(set(sites["site"].to_list()) - present)
+        msg = f"{models_parameter} returned only nulls for {missing}; it may not cover them"
+        raise RuntimeError(msg)
+    return frame
 
 
 def _renamed(*, frame: pl.DataFrame) -> pl.DataFrame:

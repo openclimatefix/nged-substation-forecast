@@ -313,8 +313,8 @@ the period-ending hourly mean of metered power the experiment predicts. Asking f
 multiplies the ratio back to recover the snapshot, which sits half an hour later than the window's
 centre.
 
-`build_dataset.py --ukv-temporal instant --suffix=-instant` builds the sensitivity. Pair
-`--ukv-temporal` with `--suffix` or the variant build overwrites the main one; and note that
+`build_dataset.py --point-temporal instant --suffix=-instant` builds the sensitivity. Pair
+`--point-temporal` with `--suffix` or the variant build overwrites the main one; and note that
 `argparse` needs `--suffix=-instant` rather than `--suffix -instant`, which it reads as a missing
 argument.
 

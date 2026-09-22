@@ -102,7 +102,7 @@ SOURCE_LABELS: Final[dict[str, str]] = {
 """Source keys to the label a reader sees, matching the headline contrast chart."""
 
 SKY_CHART_SOURCES: Final[tuple[str, ...]] = ("cams", "ukv", "icon-d2")
-"""Which sources get a sky-condition breakdown.
+"""Which sources get a sky-condition breakdown, where their results exist.
 
 Both are the fine-resolution sources, and the breakdown is where UKV's fixed aerosol climatology
 would show against CAMS's 3-hourly aerosol analysis: aerosol sets the beam/diffuse partition most
@@ -468,6 +468,10 @@ def main() -> int:
     _LOG.info("wrote %s", FIGURES_DIR / "per_site_error.svg")
 
     for source in SKY_CHART_SOURCES:
+        intervals = results_dir_for(source=source, alignment=ALIGNMENT) / "sky_intervals.parquet"
+        if not intervals.exists():
+            _LOG.info("no sky intervals for %s, skipping its chart", source)
+            continue
         path = FIGURES_DIR / f"sky_conditions_{source}.svg"
         _sky_chart(source=source).save(path)
         _LOG.info("wrote %s", path)
