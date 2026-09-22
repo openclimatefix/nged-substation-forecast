@@ -1,4 +1,4 @@
-# Results
+# Studies
 
 This section holds the **findings of experiments we have run**, written up so the conclusion
 survives the code that produced it. It complements the other sections:
@@ -6,9 +6,11 @@ survives the code that produced it. It complements the other sections:
 explains the *methods*, the [roadmap](../roadmap/index.md) says what we plan to build, and
 [architecture](../architecture/overview.md) documents what is already built.
 
-**A page lands here when an experiment answers a question that outlives its code.** An experiment
-here can be deliberately throwaway — no Dagster asset, no package, no data contract — with its pull
-request left open and unmerged so the measurement can be audited. What the project keeps is the
+**A page lands here when an experiment answers a question that outlives its code.** The code behind
+a page here is deliberately lighter than production code — no Dagster asset, no package, no data
+contract — and lives in
+[`scripts/experiments/`](https://github.com/openclimatefix/nged-substation-forecast/tree/main/scripts/experiments),
+which merges so that the measurement can be audited and re-run. What the project keeps is the
 answer, which is why each page states its numbers, the checks the result survived, and the limits on
 how far it generalises.
 

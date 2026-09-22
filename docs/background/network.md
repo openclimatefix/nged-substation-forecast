@@ -67,7 +67,7 @@ of the record shows. Where the cap never left the connection limit, that
 generator's output per unit of irradiance matches the other five photovoltaic sites in the trial
 area to within half a percent, which is the check that says the cap is being read the right way
 round. The [beam/diffuse
-results](../results/beam-diffuse-split.md#one-site-is-curtailed-and-the-export-cap-is-what-makes-its-hours-scorable)
+results](../studies/beam-diffuse-split.md#one-site-is-curtailed-and-the-export-cap-is-what-makes-its-hours-scorable)
 set out the measurement.
 
 **The setpoint feed exists before the scheme enforces anything, and reads zero while it waits.** The
@@ -111,7 +111,7 @@ data for the first few months for 3 substations](assets/bad_data_for_first_month
 **A newly connected solar farm does not produce its rated output from its first day of telemetry:
 one of the six metered solar farms in the trial area climbed to its settled level through eight
 months of discrete steps.** The site is the one labelled E in the [beam/diffuse
-results](../results/beam-diffuse-split.md). Measured as its daily output divided by the median
+results](../studies/beam-diffuse-split.md). Measured as its daily output divided by the median
 output of the other five solar farms — a ratio that cancels cloud, season and time of day — it holds
 flat for several days at a time at 12%, 29%, 56%, 76% and 88% of its settled level through April
 2024, drops back, climbs again through 12%, 33% and 71% in July after a 24-day outage, plateaus at
