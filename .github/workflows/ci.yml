@@ -34,8 +34,10 @@ jobs:
       - name: Install workspace
         run: uv sync --locked --all-packages
 
-      # Every step below uses --no-sync: a bare `uv run` re-syncs to the root environment,
-      # silently uninstalling the extra workspace members added by --all-packages above.
+      # Every step below uses --no-sync so that each one runs against exactly what the step above
+      # installed. A bare `uv run` would re-resolve and re-sync per step, which takes time. It
+      # would not uninstall the --all-packages members: `uv run` syncs inexactly, and `--exact`
+      # is opt-in.
       - name: Lint (ruff check)
         run: uv run --no-sync ruff check .
 
@@ -73,7 +75,6 @@ jobs:
       # `check-added-large-files` stays commit-time-only: without `--enforce-all` it inspects only
       # the files staged as additions, and `--enforce-all` would fail today on three tracked files
       # that already exceed 500 KB. This step repeats ruff, ty, pydoclint, pymarkdown, and
-      # check_docs_links, each of which has a step above, and adds about two minutes — most of it
-      # lint-docstring-markdown.
+      # check_docs_links, each of which has a step above, and adds a few seconds.
       - name: Pre-commit (every hook, every file)
         run: uv run --no-sync pre-commit run --all-files --show-diff-on-failure
