@@ -216,8 +216,11 @@ A null result from a tree is therefore evidence about the [tree
 path](xgboost-improvements.md#several-nwp-sources-as-features-v21), and does not justify dropping
 the direct beam from the physics plan. The experiment above used a tree as its primary instrument
 and a fitted physical model as a second one, and the two disagreed on the sign — the physical
-model's arms differed in fitted geometry as well as in beam field, so it answers a different
-question rather than confirming the tree's.
+model divides the horizontal beam by the cosine of the solar zenith angle, which magnifies a beam
+error without limit near the horizon, so the physical model answers a different question rather than
+confirming the tree's. [The write-up's comparison of the two
+instruments](../results/beam-diffuse-split.md#the-physical-model-disagrees-and-is-not-a-second-opinion)
+sets out how the fitted geometry was ruled out as the cause.
 
 ## The graph-structured engine
 

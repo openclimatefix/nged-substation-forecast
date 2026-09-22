@@ -17,9 +17,8 @@ than removed.
 **The site labelled E in the [beam/diffuse
 results](../results/beam-diffuse-split.md) produced less than its capacity record says until
 6 October 2024, so rows before that date do not describe the plant that exists now.** The site
-climbed to its settled output through eight months of discrete steps, holding for days at a time at
-12%, 29%, 56%, 76% and 88% of what it produces today — the evidence and the figure are under [how a
-new solar farm reaches full output in
+climbed to its settled output through eight months of discrete steps, each held for days at a time —
+the step levels, the evidence and the figure are under [how a new solar farm reaches full output in
 stages](../background/network.md#a-new-solar-farm-reaches-full-output-in-stages-over-months). Which
 series carries the label is recorded in the private data store rather than here, because this page
 is published.

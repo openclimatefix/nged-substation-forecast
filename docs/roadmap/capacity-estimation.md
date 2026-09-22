@@ -706,16 +706,16 @@ than a literature argument.
 
 **Curtailment needs the export cap, and the export cap needs its go-live date.** NGED's setpoint
 feed reads zero for the six months before the scheme starts enforcing anything, while the generator
-exports normally — 423 of 431 bright hours above 5% of capacity, at a median of 44%. An estimator
-that took those readings as a constraint would conclude the site was pinned at zero while it ran.
-Honour the cap only from the first half-hour at which it reaches the connection limit. The evidence
+exports normally. An estimator that took those readings as a constraint would conclude the site was
+pinned at zero while it ran. Honour the cap only from the first half-hour at which it reaches the
+connection limit. The evidence
 is under [active network management caps what a generator may
 export](../background/network.md#active-network-management-caps-what-a-generator-may-export).
 
 **A generator's commissioning ramp is signal for this estimator, not noise, and one is already
-measured.** One trial-area solar farm climbed to its settled output through eight months of
-discrete multi-day plateaus at 12%, 29%, 56%, 76% and 88%, reaching its settled level on 6 October
-2024 — exactly the upward, piecewise-constant movement [the metered-capacity
+measured.** One trial-area solar farm climbed to its settled output through eight months of discrete
+multi-day plateaus, reaching its settled level on 6 October 2024 — exactly the upward,
+piecewise-constant movement [the metered-capacity
 prior](#metered-effective-capacity-can-go-up-or-down) is built for. The forecasting experiment cuts
 those rows because a forecast has no ceiling to clamp to; an estimator should track them instead,
 and the plateau dates and levels make a ready-made test case. The figure and the method are under

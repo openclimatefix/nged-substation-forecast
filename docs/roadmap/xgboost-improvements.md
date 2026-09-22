@@ -555,9 +555,10 @@ wider rollout, where the population of flexible connections has to be establishe
 
 **The setpoint feed reads zero for months before the scheme starts enforcing anything, so the
 cleaning step has to find the date the scheme went live and discard what precedes it.** On the one
-generator that has an export, the cap forbids export through all 431 of the bright hours in its
-first six months while the generator exported above 5% of its capacity in 423 of them, at a median
-of 44%.
+generator that has an export, the cap reads a flat zero through every bright hour of its first six
+months while the generator exports normally — the hour counts and the yields are under [active
+network management caps what a generator may
+export](../background/network.md#active-network-management-caps-what-a-generator-may-export).
 Masking on the raw feed would drop most of that site's early record as curtailed. The
 [beam/diffuse experiment](../results/beam-diffuse-split.md) honours the cap only from the first
 half-hour at which it reaches the connection limit, which is a marker taken from the cap alone.
@@ -566,8 +567,8 @@ half-hour at which it reaches the connection limit, which is a marker taken from
 
 **A solar farm's first months of telemetry measure a smaller plant than its capacity record
 describes, so those hours belong out of the target alongside the curtailed ones.** One trial-area
-site climbed to its settled output through eight months of discrete steps, holding for days at a
-time at 12%, 29%, 56%, 76% and 88% of what it produces now — see [how a new solar farm reaches full
+site climbed to its settled output through eight months of discrete steps, each held for days at a
+time — the step levels and the figure are under [how a new solar farm reaches full
 output](../background/network.md#a-new-solar-farm-reaches-full-output-in-stages-over-months). A
 model fitted on the settled plant overshoots every one of those hours, and a model fitted partly on
 them learns a gain that matches neither plant.
