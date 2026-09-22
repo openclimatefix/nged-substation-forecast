@@ -768,8 +768,8 @@ denominator where a plant moves. Both readings are set out
 [above](#what-the-per-site-error-drift-says-about-estimating-effective-capacity).
 
 **The half-hour power-timestamp offset is settled, and it reaches further than this experiment.**
-NGED's feed has stamped readings correctly since 08:30 UTC on 26 March 2026. Three independent
-measurements agree that readings before that instant are half an hour late, and that readings from
+NGED report that the fault stops at 08:30 UTC on 26 March 2026. Three independent measurements are
+consistent with that account: readings before that instant are half an hour late, and readings from
 that instant onwards are not. Every model trained before the ingest began repairing the timestamps
 has learnt the offset, not only the models here, and the same step appears in series on this feed
 that are not PV meters.
@@ -861,7 +861,7 @@ design that eliminated the floor rather than arguing past it would be stronger.
 ### The power timestamps before 26 March 2026 are half an hour late
 
 **Every reading NGED stamped before 08:30 UTC on 26 March 2026 describes the half-hour before the
-half-hour its label names, and NGED's feed has stamped readings correctly since that instant.** The
+half-hour its label names, and NGED report that the fault stops at that instant.** The
 contract says a reading stamped `T` is the mean over `(T − 30 min, T]`. Before that instant a
 reading stamped `T` is instead the mean over `(T − 60 min, T − 30 min]`. Every number on
 this page is computed on the corrected reading: a reading before that instant is moved half an hour

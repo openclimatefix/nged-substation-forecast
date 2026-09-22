@@ -35,11 +35,11 @@ POWER_TIMESTAMPS_CORRECTED_BEFORE: Final[datetime] = datetime(2026, 3, 26, 8, 30
 onwards.
 
 A reading whose timestamp `T` falls before this instant is the mean over `(T - 60 min, T - 30 min]`,
-not the `(T - 30 min, T]` the `time` field states. NGED's feed has stamped every reading correctly
-since this instant. NGED's archive still carries the late timestamps: the earlier readings have
-not been republished. Three independent measurements agree with NGED's account of when the
-alignment changed — two against the sun's own position on a clear day, the third against satellite
-irradiance:
+not the `(T - 30 min, T]` the `time` field states. This instant is NGED's own account of where the
+fault stops, not a changepoint fitted from the readings. NGED's archive still carries the late
+timestamps: the earlier readings have not been republished. Three independent measurements are
+consistent with NGED's account — two against the sun's own position on a clear day, the third
+against satellite irradiance:
 <https://openclimatefix.github.io/nged-substation-forecast/results/beam-diffuse-split/#the-power-timestamps-before-26-march-2026-are-half-an-hour-late>.
 
 The repair applies to every `time_series_id`. NGED report that they convert every series in the

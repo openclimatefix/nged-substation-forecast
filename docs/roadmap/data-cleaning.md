@@ -38,10 +38,11 @@ a commissioning hour has no ceiling to compare a prediction against.
 ## NGED's power timestamps ran half an hour late, and the ingest repairs them
 
 **Every reading NGED stamped before 08:30 UTC on 26 March 2026 describes the half-hour before the
-half-hour its label names. The ingest moves those readings 30 minutes earlier.** NGED's feed has
-stamped every reading correctly since that instant. Three independent measurements agree with
-NGED's account of when the alignment changed: two compare a clear day's output against the sun's own
-position, and the third compares the power against satellite irradiance. The evidence is in the
+half-hour its label names. The ingest moves those readings 30 minutes earlier.** NGED report that
+the fault stops at that instant, and the instant comes from that report rather than being fitted
+from the readings. Three independent measurements are consistent with it: two compare a clear day's
+output against the sun's own position, and the third compares the power against satellite
+irradiance. The evidence is in the
 [beam/diffuse
 appendix](../results/beam-diffuse-split.md#the-power-timestamps-before-26-march-2026-are-half-an-hour-late).
 `PowerTimeSeries.correct_late_timestamps` applies the repair in `nged_data.read_nged_json`.
