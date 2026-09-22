@@ -35,9 +35,9 @@ jobs:
         run: uv sync --locked --all-packages
 
       # Every step below uses --no-sync so that each one runs against exactly what the step above
-      # installed. A bare `uv run` would re-resolve and re-sync per step, which costs time and
-      # would quietly paper over a lock file the install step should have rejected. It would not
-      # uninstall the --all-packages members: `uv run` syncs inexactly, and `--exact` is opt-in.
+      # installed. A bare `uv run` would re-resolve and re-sync per step, which takes time. It
+      # would not uninstall the --all-packages members: `uv run` syncs inexactly, and `--exact`
+      # is opt-in.
       - name: Lint (ruff check)
         run: uv run --no-sync ruff check .
 

@@ -10,7 +10,6 @@ import ast
 import sys
 from collections.abc import Iterator
 from concurrent.futures import ProcessPoolExecutor
-from functools import cache
 from pathlib import Path
 from typing import Final
 
@@ -23,15 +22,12 @@ Disables the two rules that only make sense for a whole document — requiring t
 heading, and requiring a trailing newline — since a docstring is a prose fragment, not a document.
 """
 
-POOL_FILE_COUNT: Final[int] = 16
-"""File count from which linting moves to a process pool.
+SCANNER: Final[PyMarkdownApi] = PyMarkdownApi().configuration_file_path(PYMARKDOWN_CONFIG)
+"""The configured scanner, reused for every docstring this process scans.
 
-A scan costs about 10 ms per docstring and releases no lock worth sharing, so the work is
-CPU-bound and splits cleanly across processes. Starting the pool is not free: Python 3.14 defaults
-to the `forkserver` start method, so every worker imports `pymarkdown` afresh, which costs about as
-much as linting 16 files. Below that count the serial path finishes sooner than the pool can start.
-The commit-time hook passes only the staged files and so almost always takes the serial path; a
-`--all-files` sweep passes a few hundred and takes the pool.
+`scan_string` holds no state between calls. It does reload the configuration and every plugin on
+each call, which is where its ~9 ms per docstring goes, and the API offers no way to hoist that
+work out — so a process pool is the only lever on the total.
 """
 
 
@@ -92,21 +88,6 @@ def _iter_docstrings(source: str, path: Path) -> Iterator[tuple[int, str]]:
         yield node.body[0].lineno, _dedent_docstring(raw)
 
 
-@cache
-def _scanner() -> PyMarkdownApi:
-    """Build the configured scanner once per process, and reuse it for every docstring.
-
-    Constructing the scanner re-reads `pyproject.toml` and `PYMARKDOWN_CONFIG`, which costs more
-    than scanning a docstring does. One instance scans any number of strings and keeps no state
-    between them. Each process pool worker builds its own, which is why the cache sits on a
-    function rather than on a module-level constant evaluated at import.
-
-    Returns:
-        A `PyMarkdownApi` carrying this repo's docstring configuration.
-    """
-    return PyMarkdownApi().configuration_file_path(PYMARKDOWN_CONFIG)
-
-
 def _format_violation(failure: PyMarkdownScanFailure, path: Path, start_line: int) -> str:
     """Render one scan failure as `path:line:col: RULE: description (rule-name)`.
 
@@ -140,10 +121,16 @@ def _lint_file(path: Path) -> list[str]:
     violations: list[str] = []
     source = path.read_text()
     for start_line, text in _iter_docstrings(source=source, path=path):
+        # `scan_string` rejects a blank string outright, so an empty or whitespace-only docstring
+        # would be reported as a tool failure rather than passing, which is what it should do:
+        # there is no markdown in it to get wrong. Ruff's D419 leaves these in tests, conftest
+        # files, and the notebooks, all of which this hook still scans.
+        if not text.strip():
+            continue
         try:
-            result = _scanner().scan_string(text)
+            result = SCANNER.scan_string(text)
         except PyMarkdownApiException as exception:
-            violations.append(f"{path}:{start_line}: pymarkdown failed: {exception}")
+            violations.append(f"{path}:{start_line}: pymarkdown failed: {exception.reason}")
             continue
         violations.extend(
             _format_violation(failure=failure, path=path, start_line=start_line)
@@ -161,12 +148,11 @@ def main(argv: list[str]) -> int:
     Returns:
         1 if any docstring carries a violation, 0 otherwise.
     """
-    paths = [Path(arg) for arg in argv]
-    if len(paths) < POOL_FILE_COUNT:
-        per_file = [_lint_file(path) for path in paths]
-    else:
-        with ProcessPoolExecutor() as pool:
-            per_file = list(pool.map(_lint_file, paths))
+    # Always a pool, at every file count. Scanning is CPU-bound and splits cleanly, and the parent
+    # never imports `pymarkdown` at all this way, so a pool beats the serial loop even on the
+    # single staged file the commit-time hook usually passes: 0.30s against 0.37s, measured.
+    with ProcessPoolExecutor() as pool:
+        per_file = pool.map(_lint_file, [Path(arg) for arg in argv])
     violations = [violation for file_violations in per_file for violation in file_violations]
     for violation in violations:
         print(violation)
