@@ -261,3 +261,9 @@ centre.
 `--ukv-temporal` with `--suffix` or the variant build overwrites the main one; and note that
 `argparse` needs `--suffix=-instant` rather than `--suffix -instant`, which it reads as a missing
 argument.
+
+**The two temporal builds are not paired row for row, so read the sensitivity as two runs rather
+than as a difference.** The false-zero and daylight filters both read the irradiance columns, so the
+two builds keep marginally different rows — a tenth of a percent of them on a synthetic month.
+`compare_sources.py --first-source ukv --second-source ukv-instant` scores on the hours both cover,
+which is the comparison that means something.
