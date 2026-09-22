@@ -33,6 +33,7 @@ from run_physics_experiment import (
     _predict,
 )
 from scipy.optimize import minimize
+from sources import SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("restart_basins")
@@ -112,7 +113,7 @@ def _losses_for(*, rows: pl.DataFrame, arm: str, site: str) -> dict[str, object]
 def main() -> int:
     """Fit every arm at every site from both start schemes and print the comparison."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     parser.add_argument(
         "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
     )

@@ -21,8 +21,7 @@ from pathlib import Path
 from typing import Final, Literal
 
 import polars as pl
-
-REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
+from sources import REPO_DATA_DIR, SOURCE_CHOICES
 
 InstrumentType = Literal["xgboost", "physics"]
 """Which of the two instruments' results to report.
@@ -275,7 +274,7 @@ def _blend_weight_table(*, results_dir: Path) -> list[str]:
 def main() -> int:
     """Write every table to `report.md` and to standard output."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="open-meteo")
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default="open-meteo")
     parser.add_argument(
         "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
     )

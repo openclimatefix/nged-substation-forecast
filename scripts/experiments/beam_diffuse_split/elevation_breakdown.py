@@ -19,12 +19,10 @@ scripts/experiments/beam_diffuse_split/elevation_breakdown.py --source cams --al
 
 import argparse
 import sys
-from pathlib import Path
 from typing import Final
 
 import polars as pl
-
-REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
+from sources import REPO_DATA_DIR, SOURCE_CHOICES
 
 PERCENTAGE_POINTS: Final[float] = 100.0
 
@@ -60,7 +58,7 @@ def _banded_losses(*, instrument: str, source: str, alignment: str) -> pl.DataFr
 def main() -> int:
     """Print each instrument's headline contrast inside every elevation band."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     parser.add_argument(
         "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
     )

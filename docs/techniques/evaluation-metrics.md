@@ -273,8 +273,10 @@ Interval width uses the same six bands as PICP.
 
 ## Tail and exceedance metrics 🚧
 
-> **Status: designed, not yet computed.** The metrics in this section are planned; the delivery plan
-> is [Metrics & leaderboard → Tail & exceedance
+> **Status: designed, not yet in the leaderboard.** The metrics pipeline computes none of the
+> metrics in this section. The Fractions Skill Score has been computed once, in an offline
+> experiment.
+> The delivery plan is [Metrics & leaderboard → Tail & exceedance
 > metrics](../roadmap/metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks).
 > The principles (which selections of hours are safe to score on, and why) are durable and apply
 > today.
@@ -423,6 +425,46 @@ expose, and the before/after instrument for the [calibration
 work](../roadmap/metrics-and-leaderboard.md#delivering-the-probabilistic-metrics). The
 per-probability breakdown (a *reliability diagram*) is a curve rather than a scalar, so it lives in
 ad-hoc analyses — see [What is deliberately not here](#what-is-deliberately-not-here).
+
+### Fractions Skill Score (FSS)
+
+**Dimensionless (0 to 1); larger is better.** Every metric above grades a forecast at one fixed
+timestamp, so a forecast that places a spike one step late is charged twice — the double penalty
+described in [Why the tails need their own metrics](#why-the-tails-need-their-own-metrics). The
+Fractions Skill Score ([Roberts and Lean (2008)](https://doi.org/10.1175/2007MWR2123.1)) forgives
+displacement up to a chosen width, by asking whether the forecast put a threshold exceedance
+somewhere *near* the right step rather than exactly on it.
+
+**The score compares how often each series crosses the threshold inside a window, rather than
+whether the two crossings land on the same step.** Over a window of $n$ steps centred on step $t$,
+$O_t$ is the fraction of that window in which the observation exceeds threshold $r$, and $F_t$ is
+the fraction in which the forecast exceeds it:
+
+$$ \mathrm{FSS}(n, r) = 1 - \frac{\sum_t \left( F_t - O_t \right)^2}{\sum_t F_t^2 + \sum_t
+O_t^2} $$
+
+**Report the curve across window widths, not one number.** At $n = 1$ the score is the
+point-in-time comparison and carries the full double penalty. Each wider window forgives more
+displacement. The width at which the curve flattens is the timescale beyond which timing no longer
+limits the forecast. Making the width the horizontal axis also removes the need to defend one arbitrary
+tolerance, because the reader sees every tolerance at once.
+
+**Thresholding both series keeps the Fractions Skill Score clear of the forecaster's dilemma.** The
+hours entering the score are not selected by the observed load alone, so the trap described in [The
+trap](#the-trap-scoring-only-the-hours-when-the-worst-case-actually-happened) does not apply. Two
+limits do apply. The Fractions Skill Score is **not a proper score**: a forecast can raise it by
+smearing exceedances across the window. So the score belongs beside MAE and twCRPS as a diagnostic,
+never replacing either as a ranking column. And the half-hourly target already averages over 30 minutes,
+which puts the informative window widths at one to four steps: a spike moved 4 hours is a
+different day's weather rather than a timing error.
+
+**In the beam/diffuse split experiment, forgiving one hour of displacement raised the score by
+roughly 0.10 for every irradiance source and every arm**, measured against each site's 90th
+percentile of metered power. Timing is therefore a large share of that experiment's error, though a
+share that moved together across the arms rather than separating them. The same runs showed the
+score is a blunter instrument than MAE, because reducing each hour to a yes-or-no exceedance throws
+the magnitude away. A contrast MAE resolved cleanly can sit inside the Fractions Skill Score's
+bootstrap interval, so an interval spanning zero here is weak evidence of no difference.
 
 ### Choosing the thresholds: static, per-series, quantile-derived
 

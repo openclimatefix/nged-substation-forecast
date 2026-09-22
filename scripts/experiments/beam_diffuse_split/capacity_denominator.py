@@ -27,6 +27,7 @@ from run_experiment import (
     _bootstrap_difference,
     dataset_path_for,
 )
+from sources import SOURCE_CHOICES
 
 CLEAREST_WEEK: Final[str] = "2026-04-20"
 """The week the clearest-week panels draw, as `make_figures._chosen_weeks` picks it."""
@@ -48,7 +49,7 @@ def _results_dir(*, source: str, alignment: str) -> pathlib.Path:
 def main() -> int:
     """Print the per-site scale, the clearest week's bias, and the headline per denominator."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     parser.add_argument(
         "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
     )

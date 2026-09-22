@@ -20,8 +20,11 @@ shuffled relabelling, and a per-site figure in MW would combine with the publish
 register to shortlist candidates inside a 34 km box. Normalising removes that, and costs the reader
 nothing the contrasts do not already express in the same unit.
 
+Run `sky_conditions.py` on every source in `SKY_CHART_SOURCES` first, because the sky-condition
+chart reads the intervals that script writes and fails with a missing-file error without them.
+
 Run it with `uv run --no-project --with polars --with altair --with vl-convert-python
---with numpy python scripts/experiments/beam_diffuse_split/make_figures.py`.
+--with numpy --with pvlib python scripts/experiments/beam_diffuse_split/make_figures.py`.
 """
 
 import logging
@@ -36,11 +39,11 @@ import plotting.ocf_theme as ocf
 import polars as pl
 from commissioning import drop_commissioning_ramp
 from run_experiment import dataset_path_for, results_dir_for
+from sources import REPO_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("make_figures")
 
-REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
 FIGURES_DIR: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_figures"
 
 ALIGNMENT: Final[str] = "piecewise"
@@ -61,6 +64,7 @@ colour, which `plotting.ocf_theme` keeps private.
 
 SETUPS: Final[tuple[tuple[str, str, str, str], ...]] = (
     ("open-meteo", "xgboost", "C_era5_split", "ERA5 → XGBoost"),
+    ("ukv", "xgboost", "C_era5_split", "UKV → XGBoost"),
     ("cams", "xgboost", "C_era5_split", "CAMS → XGBoost"),
     ("cams", "physics", "P_C_source_split", "CAMS → fitted physical model"),
 )
@@ -71,16 +75,19 @@ setup has to offer, so
 the figure shows what the pipeline can do rather than what a deliberately weakened arm can do.
 """
 
-SETUP_COLOURS: Final[tuple[str, ...]] = (ocf.ORANGE_RED, ocf.BLUE, ocf.DARK_GREEN)
-"""One hue per setup, in `SETUPS` order.
+SETUP_COLOURS: Final[tuple[str, ...]] = (ocf.ORANGE_RED, ocf.PURPLE, ocf.BLUE, ocf.DARK_GREEN)
+"""One hue per setup, in `SETUPS` order: orange-red for ERA5, purple for UKV, blue for CAMS.
 
-Checked for colour-vision deficiency rather than chosen by eye: the worst adjacent pair separates
-by 25 units of perceptual distance under deuteranopia, against a floor of 8.
+The three-colour set was checked for colour-vision deficiency rather than chosen by eye. Purple has
+not been through `dataviz`'s `validate_palette.js`, which lives in another repository, so the
+four-colour set's worst-pair separation under deuteranopia is unmeasured.
 """
 
 MAE_SETUPS: Final[tuple[tuple[str, str, str], ...]] = (
     ("open-meteo", "xgboost", "ERA5 → XGBoost"),
     ("open-meteo", "physics", "ERA5 → physical model"),
+    ("ukv", "xgboost", "UKV → XGBoost"),
+    ("ukv", "physics", "UKV → physical model"),
     ("cams", "xgboost", "CAMS → XGBoost"),
     ("cams", "physics", "CAMS → physical model"),
 )
@@ -88,9 +95,19 @@ MAE_SETUPS: Final[tuple[tuple[str, str, str], ...]] = (
 
 SOURCE_LABELS: Final[dict[str, str]] = {
     "open-meteo": "ERA5 (31 km reanalysis)",
+    "ukv": "UKV (2 km model analysis)",
+    "icon-d2": "ICON-D2 (2 km model analysis)",
     "cams": "CAMS (5 km satellite retrieval)",
 }
 """Source keys to the label a reader sees, matching the headline contrast chart."""
+
+SKY_CHART_SOURCES: Final[tuple[str, ...]] = ("cams", "ukv", "icon-d2")
+"""Which sources get a sky-condition breakdown, where their results exist.
+
+Both are the fine-resolution sources, and the breakdown is where UKV's fixed aerosol climatology
+would show against CAMS's 3-hourly aerosol analysis: aerosol sets the beam/diffuse partition most
+strongly under a clear sky, so that bin is where the asymmetry between the two bites hardest.
+"""
 
 INSTRUMENT_LABELS: Final[dict[str, str]] = {
     "xgboost": "XGBoost",
@@ -98,14 +115,21 @@ INSTRUMENT_LABELS: Final[dict[str, str]] = {
 }
 """Instrument keys to the label a reader sees."""
 
-PER_SITE_COLOURS: Final[tuple[str, ...]] = ("#FF4901", "#992C01", "#306BFF", "#24499F")
+PER_SITE_COLOURS: Final[tuple[str, ...]] = (
+    "#FF4901",
+    "#992C01",
+    "#B701FF",
+    "#6E0199",
+    "#306BFF",
+    "#24499F",
+)
 """One colour per `MAE_SETUPS` entry: hue for the source, lightness for the model family.
 
-The two full-strength colours are the brand's orange-red and blue, which the headline contrast
-chart already uses for the two sources; the two darker ones are the same hues at about 60% of each
-channel. `dataviz`'s `validate_palette.js` passes all six pairs of these four on the lightness
-band, the chroma floor, colour-vision separation, the normal-vision floor, and contrast against
-this theme's surface.
+The three full-strength colours are the brand's orange-red, purple, and blue, matching
+`SETUP_COLOURS`; each darker one is the same hue at about 60% of each channel. `dataviz`'s
+`validate_palette.js` passed the orange-red and blue pairs on the lightness band, the chroma floor,
+colour-vision separation, the normal-vision floor, and contrast against this theme's surface. The
+purple pair has not been through it, and that tool lives in another repository.
 """
 
 BEST_ARM: Final[dict[str, str]] = {
@@ -330,14 +354,13 @@ def _per_site_error() -> pl.DataFrame:
 
 
 def _per_site_chart(*, frame: pl.DataFrame) -> alt.Chart:
-    """Draw all four setups' per-site mean absolute error in one panel.
+    """Draw every setup's per-site mean absolute error in one panel.
 
     The comparison this figure exists for is the tree against the physical model at one site, so
-    all four bars for a site sit in one column rather than across two panels. Hue carries the
+    every bar for a site sits in one column rather than across separate panels. Hue carries the
     irradiance source and lightness the model family, which is the encoding a reader can decode
-    two ways at once: the two sources separate by colour, and within a source the two model
-    families separate by lightness, which survives every colour-vision deficiency because
-    lightness does.
+    two ways at once: the sources separate by colour, and within a source the two model families
+    separate by lightness, which survives every colour-vision deficiency because lightness does.
 
     Args:
         frame: One row per (setup, site).
@@ -444,8 +467,14 @@ def main() -> int:
     _per_site_chart(frame=errors).save(FIGURES_DIR / "per_site_error.svg")
     _LOG.info("wrote %s", FIGURES_DIR / "per_site_error.svg")
 
-    _sky_chart(source="cams").save(FIGURES_DIR / "sky_conditions.svg")
-    _LOG.info("wrote %s", FIGURES_DIR / "sky_conditions.svg")
+    for source in SKY_CHART_SOURCES:
+        intervals = results_dir_for(source=source, alignment=ALIGNMENT) / "sky_intervals.parquet"
+        if not intervals.exists():
+            _LOG.info("no sky intervals for %s, skipping its chart", source)
+            continue
+        path = FIGURES_DIR / f"sky_conditions_{source}.svg"
+        _sky_chart(source=source).save(path)
+        _LOG.info("wrote %s", path)
     return 0
 
 

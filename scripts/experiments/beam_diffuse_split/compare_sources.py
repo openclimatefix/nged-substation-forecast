@@ -14,19 +14,17 @@ source's own rows, so a difference that survives here is still a difference betw
 rather than between two grids alone. That confound cannot be removed without refitting one source on
 the other's rows, which is not what any of the arms are for.
 
-Run it with `uv run --no-project --with polars --with numpy --with xgboost python
+Run it with `uv run --no-project --with polars --with numpy --with xgboost --with pvlib python
 scripts/experiments/beam_diffuse_split/compare_sources.py --alignment shifted`.
 """
 
 import argparse
 import sys
-from pathlib import Path
 from typing import Final
 
 import polars as pl
 from run_experiment import _bootstrap_difference
-
-REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
+from sources import REPO_DATA_DIR
 
 PERCENTAGE_POINTS: Final[float] = 100.0
 

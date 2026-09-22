@@ -28,11 +28,11 @@ So the arms are built around two contrasts. Everything measured against arm A sa
 *transposition* buys. The arm given the product's split, measured against the arm given a
 separation model's estimate of the same split, says what the *published field* buys on top.
 
-## Three sources, two instruments, two stamp alignments
+## Four sources, two instruments, two stamp alignments
 
 | Dimension | Values | What changing it tests |
 |---|---|---|
-| Source | Copernicus ERA5, Open-Meteo's ERA5 mirror, CAMS radiation service | Whether an answer from ERA5's 31 km grid survives a 5 km satellite retrieval at the meter itself |
+| Source | Copernicus ERA5, Open-Meteo's ERA5 mirror, the Met Office's UKV, CAMS radiation service | Whether an answer from ERA5's 31 km grid survives a finer grid. UKV separates resolution from delivery, because ERA5 against UKV is a resolution contrast inside one product class where ERA5 against CAMS also crosses from a model to a satellite retrieval |
 | Instrument | XGBoost, a fitted five-parameter PV model | Whether a null result means the split carries nothing or that the tree could not use it |
 | Stamp alignment | as-labelled, shifted 30 minutes earlier | Whether the answer depends on a timestamp convention the power feed may have got wrong |
 
@@ -45,14 +45,18 @@ separation model's estimate of the same split, says what the *published field* b
 | `fetch_era5_open_meteo.py` | Downloads the same fields from Open-Meteo's ERA5 mirror onto the same grid, in about a minute rather than most of a night. |
 | `verify_era5_sources.py` | Compares the two ERA5 downloads hour by hour, which is what establishes that the mirror serves ERA5's own `fdir` rather than a separation model's estimate of it. |
 | `fetch_cams.py` | Downloads the CAMS radiation service's global, beam and diffuse irradiances at each meter's own coordinates, into `data/CAMS/`. |
+| `sources.py` | The source names, which sources are delivered per site, and the registry of Open-Meteo models this experiment can fetch. Standard library only, so every script here can import it, including the two that run on `polars` alone. |
+| `fetch_open_meteo_point.py` | Downloads one Open-Meteo forecast model at each meter's own coordinates, and runs two checks on what arrived before writing it: that the hourly column is a backward mean over the hour ending at its label, and that the published direct fraction is not a separation model. Takes `--model`. |
+| `verify_ukv_lineage.py` | Compares Open-Meteo's UKV against the Met Office's own files on AWS and establishes which forecast lead the archive holds. A gate: no model is trained on UKV until it has run. |
 | `build_dataset.py` | Joins the PV power readings to one source, adds solar geometry, the separation-model estimates and the synthetic control target, and writes the one frame every arm reads. Takes `--source` and `--alignment`. |
 | `run_experiment.py` | The XGBoost instrument: fits every arm at every fold, seed and hyperparameter setting, and writes per-row losses, per-site metrics and bootstrap intervals. |
 | `physics_model.py` | The transposition and the temperature-corrected power curve the second instrument fits. |
 | `run_physics_experiment.py` | The physical instrument: fits five parameters per site per training fold and scores the held-out fold, on the same rows and folds. |
 | `report_results.py` | Prints the markdown tables the write-up quotes, so no number is transcribed by hand. Takes `--instrument`. |
 | `compare_sources.py` | Compares two sources on the hours they both cover, which the per-source tables cannot do. |
+| `fractions_skill_score.py` | Rescores the stored forecasts with a timing-tolerant metric, at tolerances of 0 to 4 hours. |
 | `elevation_breakdown.py` | Splits the headline contrast by solar elevation, to separate an amplified error from a missing one. |
-| `make_chart.py` | Draws the anonymised result chart. |
+| `make_chart.py` | Draws the anonymised result chart. Raises on a results directory naming a source its label table does not, rather than drawing a chart that looks complete with an arm missing. |
 | `sky_conditions.py` | Splits the headline contrast by clearness index, which tests whether the gain sits where cloud makes the split uncertain — the shape the information account predicts and a calibration difference would not. |
 | `run_hybrid_experiment.py` | Feeds the physical model's out-of-fold prediction into XGBoost, to separate "the physical model is mis-calibrated" from "its five parameters are the wrong shape". Withholds each prediction by calendar month, the same way the learned separation arm does. |
 | `make_figures.py` | Draws the per-site time series, the per-site error chart and the sky-condition chart the write-up publishes. |
@@ -60,6 +64,11 @@ separation model's estimate of the same split, says what the *published field* b
 | `anm_curtailment.py` | Reads NGED's `curtailment/` feed — the active-network-management log nothing else in the repository ingests — and tests it against the one curtailed site's output shortfall. Needs the NGED bucket credentials the other scripts do not. |
 | `anm_setpoints.py` | Turns NGED's raw active-network-management setpoint export into a half-hourly export-cap series, and checks how the cap reads: a generator sitting at the largest cap it ever sees is unconstrained, not fully curtailed. Reaches 26 months where the bucket feed reaches five. |
 | `export_cap.py` | Joins that export cap onto the modelling dataset and marks the hours the operator had moved it. Imported by all three runners: the curtailed hours are dropped from every training fold, and the predictions are held down to the cap at scoring time. |
+| `verify_icon_d2_lineage.py` | Compares Open-Meteo's ICON-D2 against the German weather service's own files and measures which lead the archive holds. Open-Meteo stitches the first hours of each run, so a 3-hourly model's archive is a 1-to-3-hour forecast rather than an analysis. |
+| `fetch_ens_point.py` | Extracts ECMWF ensemble irradiance for the meters' H3 cells at five lead bands, reading the Delta transaction log rather than globbing parquet, which would return tombstoned files twice. |
+| `ens_horizons.py` | Scores the ensemble against ERA5 at each lead band, and four ways of reducing 51 members to one power number. Fits its own booster, so five settings differ from `run_experiment.py`; see its module docstring. |
+| `multi_nwp.py` | Fits XGBoost on two weather models at once, against two negative controls: a duplicated column, which cannot fail, and a column carrying the second product's climatology with its weather permuted away, which can. |
+| `era_comparison.py` | Scores every product on one common row set with the folds cut inside each era, which is what the per-source runs cannot do. Removes both the non-composing row sets and the train-on-one-version confound. |
 
 ## The arms
 
@@ -163,6 +172,39 @@ of each series' own absolute output over its whole history. It is not the regist
 because it is a statistic of the target it is not a data-independent unit. Every arm is divided by
 the same number, so it cannot manufacture a contrast.
 
+## What the Fractions Skill Score was checked against
+
+**Mean absolute error charges a forecast twice for a peak placed an hour late.** Placing the peak
+on time is the sharpness the published split is meant to add, so `fractions_skill_score.py`
+rescores every arm at tolerances from 0 to 4 hours. The metric itself is explained in [Evaluation
+metrics](https://openclimatefix.github.io/nged-substation-forecast/techniques/evaluation-metrics/#fractions-skill-score-fss).
+The score needs no refit: `run_experiment.py` writes `signed_error_capped_mw` as `capped_point -
+actual`, so adding the metered power back recovers each arm's capped point forecast exactly.
+
+**A centred rolling window is easy to get wrong by one step, so the implementation was driven with
+forecasts whose right answer is known.** One site, 30 days, a 3-hour spike each day, scored against
+a threshold the spike clears:
+
+| Forecast | ±0h | ±1h | ±2h | ±4h |
+|---|---|---|---|---|
+| Identical to the observation | 1.000 | 1.000 | 1.000 | 1.000 |
+| The observation, 1 hour late | 0.667 | 0.842 | 0.919 | 0.959 |
+| The observation, 3 hours late | 0.000 | 0.211 | 0.486 | 0.741 |
+| Never predicts a spike | 0.000 | 0.000 | 0.000 | 0.000 |
+
+The last row is the control the other three are read against: **widening the window must not rescue
+a forecast that never predicts the event**, or every recovery along a row would be the window
+inflating the score rather than the score crediting timing. The second row is the double penalty as
+a single number — perfect magnitude, 1 hour late, scores 0.667 against a point-in-time 1.000.
+
+**The score's verdict on the published split depends on which threshold it is read at, so it is
+reported as a sweep rather than a number.** Taking the headline contrast at each site's 75th, 90th,
+and 95th percentile of metered power moves the sign: the split is ahead at the 75th for CAMS and
+UKV, ahead only for CAMS at the 90th, and behind for all three sources at the 95th. The 95th
+percentile also halves the count of exceedances, which roughly doubles the interval, so low power
+and a real reversal are not separable here. Read the metric for the timing share of the error,
+which is consistent across every source and arm, rather than as a second opinion on the split.
+
 ## What each reading does not settle
 
 **The fitted physical model is a misspecification probe, not a second reading of the same
@@ -206,3 +248,93 @@ had already produced tables. Matched within irradiance bins the dropped rows' di
 differs from the kept rows' by about 0.004, so it favours no arm, and the pre-cleaning run reaches
 the same verdict — but a filter chosen after seeing results has to be declared rather than
 defended.
+
+## What the UKV arm is, and three caveats to hold before reading the result
+
+**Open-Meteo's UKV archive holds the T+0 analysis, so the UKV arm is an analysis rather than a
+forecast.** Open-Meteo builds its historical archive by stitching the first hours of each
+successive run, and UKV runs hourly, so the stitched series is the run initialised at each hour.
+Measured against the Met Office's own files at five instants spanning both sides of PS47, T+0
+agrees to between 0.11 and 0.55 W m⁻² and every other lead is tens to hundreds of W m⁻² away.
+
+**A product's effective lead follows its run frequency, so the archive is not analysis-class for
+every model.** ICON-D2 runs every 3 hours rather than hourly, so the first hours of each run carry
+a lead of 1 to 3 hours. `verify_icon_d2_lineage.py` measures that against the German weather
+service's own files: over one day, the freshest run matches Open-Meteo to 33.6 W m⁻² root-mean-
+square while runs 6, 9 and 12 hours older are 136, 108 and 156 away. The ICON-D2 arm is therefore a
+short-range forecast, and a comparison between it and UKV hands UKV the shorter lead.
+
+**UKV's 4D-Var assimilates a large volume of satellite-derived cloud, so at T+0 the arm is partly a
+retrieval.** Satellite-derived cloud fraction was the single largest observation type by count in
+UKV's published observation table, entering the humidity field as a pseudo-observation. A T+0 UKV
+cloud field is therefore anchored to the same geostationary satellite CAMS retrieves from, which
+blunts the "model against satellite retrieval" contrast between those two arms. The shared
+satellite does not touch the ERA5-against-UKV resolution contrast, which is the contrast this arm
+exists for.
+
+**UKV carries a fixed aerosol climatology whereas ERA5 and CAMS carry time-varying aerosol**, so
+ERA5 against UKV is a contrast in resolution *and* in aerosol treatment. The asymmetry bites hardest
+under a clear sky, where aerosol sets the beam/diffuse partition most strongly and where the
+published result is weakest, which is why `sky_conditions.py` runs on UKV as well as CAMS.
+
+### Why the two spans disagree: a Met Office upgrade, not the backfill
+
+Open-Meteo's archive claims to start on 2022-03-01, but its UKV downloader was only created on
+2024-08-12, so the earlier 29 months were backfilled from a source Open-Meteo does not name. Run
+both spans, with `build_dataset.py --first-date` and `--suffix` marking the shorter one. The two
+disagree — the headline contrast is roughly 1.5 times as large on the live-ingest span — but the
+backfill is not why.
+
+**Splitting the full archive by month puts the step at the Met Office's PS47 upgrade, which became
+operational on 2026-01-21, and puts nothing at Open-Meteo's ingest boundary.** Bootstrapping the
+headline contrast either side of the first full month after that upgrade gives −0.084 pp
+[−0.119, −0.053] over the 47 months before and −0.461 pp [−0.536, −0.377] over the 8 months after,
+a factor of five and a half. Crossing the 2024-08-12 ingest boundary moves the same number by less
+than a twentieth of that.
+
+**Running the same split on the other two sources is what rules out the weather and the power
+data.** Over the same 8 months the satellite source's contrast moves from −0.100 pp to −0.068 pp
+and the reanalysis stays null in both eras, so no arm of either source sees the jump UKV sees. A
+change in the metered power, in the export caps, or in what those months' weather happened to be
+would move all three sources together. Each source is scored on its own rows rather than on one
+common set, so that control rests on the three row sets overlapping heavily rather than on their
+being identical.
+
+**Most of the apparent step is a model being shown an input it never trained on.** Folds are
+contiguous month blocks, so every post-upgrade row falls in the last fold for five of the six
+generators, and that fold's model trained on pre-upgrade UKV alone. `era_comparison.py` cuts the
+folds inside each era instead, so a model scoring a post-upgrade row has trained on post-upgrade
+rows. Under that arrangement UKV still beats the reanalysis after the upgrade, by 0.09 pp with an
+interval from −0.49 to +0.21, against 0.34 pp [0.10, 0.56] before it. The upgrade did not cost UKV
+its standing against the reanalysis, and the figures above should be read as the cost of training
+on one version of a product and predicting with another — which is a real cost to a production
+pipeline, but a different finding from the product getting worse
+on the product.
+
+**Report by upgrade era, and treat the post-upgrade era as the one production would use.** The
+caveats are that 8 months is a thin sample beside 47, that these 8 months are a single winter and
+spring rather than a full year, and that the piecewise power-stamp shift falls inside the
+post-upgrade window — though the step appears in 2026-02, before that shift. One upgrade moved this
+product's value by a factor of five and a half, so a production ingest of UKV should score
+continuously rather than trust a figure measured once.
+
+### The default hourly column, not the `_instant` one
+
+UKV publishes radiation as an instantaneous snapshot. Open-Meteo divides that snapshot by the ratio
+of the instantaneous cosine of the solar zenith angle to its mean over the preceding hour, and
+stores the result, so the default column is a backward-looking mean over the hour *ending* at its
+label — the same temporal object as ERA5's hourly integral, as the CAMS hourly integration, and as
+the period-ending hourly mean of metered power the experiment predicts. Asking for `_instant`
+multiplies the ratio back to recover the snapshot, which sits half an hour later than the window's
+centre.
+
+`build_dataset.py --point-temporal instant --suffix=-instant` builds the sensitivity. Pair
+`--point-temporal` with `--suffix` or the variant build overwrites the main one; and note that
+`argparse` needs `--suffix=-instant` rather than `--suffix -instant`, which it reads as a missing
+argument.
+
+**The two temporal builds are not paired row for row, so read the sensitivity as two runs rather
+than as a difference.** The false-zero and daylight filters both read the irradiance columns, so the
+two builds keep marginally different rows — a tenth of a percent of them on a synthetic month.
+`compare_sources.py --first-source ukv --second-source ukv-instant` scores on the hours both cover,
+which is the comparison that means something.

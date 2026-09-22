@@ -59,11 +59,10 @@ from run_experiment import (
     dataset_path_for,
 )
 from scipy.optimize import minimize
+from sources import REPO_DATA_DIR, SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("run_physics_experiment")
-
-REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
 
 
 def results_dir_for(*, source: str, alignment: str) -> Path:
@@ -495,7 +494,7 @@ def _intervals_for(
 def main() -> int:
     """Fit every arm at every site and fold, bootstrap the contrasts, and write the results."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     parser.add_argument(
         "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
     )

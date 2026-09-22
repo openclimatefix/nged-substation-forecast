@@ -7,7 +7,7 @@ One-off throwaway script for the experiment in
 reason this script is usable here.** A mirror that reconstructed the beam from global irradiance
 would make arm C a copy of arm B and void the experiment, so the claim is checked rather than
 trusted: `verify_era5_sources.py` compares this frame against the Copernicus download field by
-field, and on the test day 2024-06-20 at 53.0 N, 0.0 E the two agree to Open-Meteo's 1 W m⁻²
+field, and on the test day 2024-06-20 at one grid cell the two agree to Open-Meteo's 1 W m⁻²
 rounding.
 
 What it buys is time. The Climate Data Store runs one of an account's jobs at a time and takes
@@ -40,13 +40,12 @@ from era5_grid import (
     LAST_YEAR,
     first_date_of,
 )
+from sources import REPO_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_era5_open_meteo")
 
-OUTPUT_PATH: Final[Path] = Path(
-    "/home/jack/dev/nged-substation-forecast/data/ERA5/beam_diffuse_open_meteo.parquet"
-)
+OUTPUT_PATH: Final[Path] = Path(REPO_DATA_DIR / "ERA5" / "beam_diffuse_open_meteo.parquet")
 
 ARCHIVE_URL: Final[str] = "https://archive-api.open-meteo.com/v1/archive"
 REQUEST_TIMEOUT_SECONDS: Final[float] = 300.0
