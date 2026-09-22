@@ -699,7 +699,7 @@ still.
 **The satellite retrieval beats the reanalysis by 4.29 points of mean absolute error on this fleet,
 which is a local measurement to set beside the literature above.** The comparison and its caveats
 are on the [data-sources
-page](data-sources.md#what-comparing-three-irradiance-products-on-the-trial-areas-solar-farms-found).
+page](data-sources.md#what-comparing-four-irradiance-products-on-the-trial-areas-solar-farms-found).
 That is a forecasting measurement rather than a capacity one, but it is the same inputs feeding the
 same physics, and it supports [preferring CAMS for the capacity fit](#irradiance-inputs) on more
 than a literature argument.

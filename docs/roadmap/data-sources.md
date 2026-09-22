@@ -468,7 +468,7 @@ supply risk.
   each fetch into Delta and treat the snapshot as the source of truth, or experiments stop being
   reproducible.
 
-### What comparing three irradiance products on the trial area's solar farms found
+### What comparing four irradiance products on the trial area's solar farms found
 
 **The satellite retrieval beat the reanalysis by 4.29 points of mean absolute error on the six
 metered solar farms, which is the largest effect anything in that experiment varied.** On the
@@ -480,21 +480,34 @@ model family moved 1.05. Which product feeds the model dominates both. The write
 weather product's beam/diffuse split help a PV forecast?](../results/beam-diffuse-split.md); the
 code sits in `scripts/experiments/beam_diffuse_split/`.
 
-**Adding the Met Office's 2 km UKV to the comparison separated resolution from delivery, and the
-resolution half bought almost nothing.** UKV scored 8.46% against ERA5's 8.39% on the 103,065 hours
-both cover, a gap of less than a tenth of a point despite a fifteenfold difference in grid spacing,
-and 9.62% against CAMS's 5.34% on the 88,569 hours those two share. So the retrieval beats both
-model products by roughly half the error while the two model products are indistinguishable from
-each other. **The likeliest reading is observation against model rather than resolution**: CAMS
-infers cloud from Meteosat at the hour in question, whereas ERA5 and UKV both simulate it.
+**Two 2 km models were added, and they disagree with each other by more than either disagrees with
+the 31 km reanalysis.** The Met Office's UKV scored 8.46% against ERA5's 8.39% over their 103,065
+shared hours — indistinguishable despite a fifteenfold difference in grid spacing. The German
+weather service's ICON-D2, at the same 2 km, scored 7.22% against ERA5's 8.28% over their 85,965
+shared hours, and 7.22% against UKV's 8.40% over the 86,113 hours those two share. **Fine grid
+spacing is therefore worth having and UKV is not collecting it**, which a comparison against one
+2 km model would have read as resolution buying nothing.
+
+**The retrieval still beats every model product.** CAMS scored 5.24% against ICON-D2's 8.22% over
+their 73,566 shared hours, and roughly halves the error against ERA5 and UKV as well. CAMS infers
+cloud from Meteosat at the hour in question, whereas the three models simulate it, so a retrieval
+of an hour that has already happened starts from the cloud field the others have to predict.
 
 **Three limits bound how far that carries.** Restricting the *scoring* to shared hours does not
 restrict the *training*, so each comparison is between two pipelines rather than two grids. UKV
 differs from ERA5 in aerosol treatment as well as in resolution, so the null result above is not a
-clean resolution contrast. And all three products are analyses or retrievals of an hour that has
+clean resolution contrast. And all four products are analyses or retrievals of an hour that has
 already happened, so none of these figures is forecast skill at a useful lead. Every measurement is
-of these three products on this fleet, and none has been shown to hold for every product at those
+of these four products on this fleet, and none has been shown to hold for every product at those
 resolutions.
+
+**ICON-D2 reaches only the eastern half of NGED's licence area, so its score is not a licence-wide
+result.** Probing the Open-Meteo archive along a west-to-east line puts the model's western
+boundary near 2.5°W: Bristol, Exeter, Cardiff, Swansea, and Truro return no data, while Birmingham
+and Nottingham are covered. The whole of South West England and South Wales therefore sit outside
+it, and every metered site in this comparison sits inside it, so nothing here says how ICON-D2
+would perform in the west. **A limited-area model from a neighbouring country can be a component of
+a blend over part of the licence area, and cannot be the single source feeding all of it.**
 
 **CAMS's own reliability flag is worth acting on, and dropping the flagged hours raises a
 P99-normalised error even though it improves the data.** The service flagged 17.9% of the daylight
