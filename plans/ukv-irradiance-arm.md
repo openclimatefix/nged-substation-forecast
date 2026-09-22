@@ -46,53 +46,64 @@ Two triggers fire, so the issue is **complex**: this plan, both plan reviews, an
 
 Everything is on branch `ukv-irradiance-arm`, cut from `beam-diffuse-split-experiment` rather than from `main`, because #785 is deliberately unmerged and its branch must be kept. The pull request's base is `beam-diffuse-split-experiment` for the same reason: based on `main` it would show all 28 of #785's scripts as additions.
 
-### New: `fetch_ukv_open_meteo.py`
+**The simplicity review cut this section to about a third of its first draft.** What survived, what was cut, and what was rejected are recorded under "What the simplicity review changed" below.
 
-Downloads UKV at each meter's own coordinates from `https://historical-forecast-api.open-meteo.com/v1/forecast` with `models=ukmo_uk_deterministic_2km`, requesting `shortwave_radiation`, `direct_radiation`, `diffuse_radiation` and each one's `_instant` variant. Writes `data/UKV/beam_diffuse_ukv.parquet`, one row per `(site, time)` carrying both temporal treatments as separate columns, so a single download serves the primary run and the sensitivity run.
+### New: `fetch_ukv_open_meteo.py`, roughly 110 lines
 
-Modelled on `fetch_cams.py` rather than on `fetch_era5_open_meteo.py`, because UKV is delivered per site rather than on a shared grid. It imports `_pv_sites` from `build_dataset`, reads each meter's coordinates at run time, sends them to Open-Meteo, and writes only the anonymised label — the pattern `fetch_cams.py` already uses for the same reason. No coordinate and no identifier reaches the written frame.
+Downloads UKV at each meter's own coordinates from `https://historical-forecast-api.open-meteo.com/v1/forecast` with `models=ukmo_uk_deterministic_2km`, requesting `shortwave_radiation`, `direct_radiation`, `diffuse_radiation` and each one's `_instant` variant. Writes `data/UKV/beam_diffuse_ukv.parquet`, one row per `(site, time)`.
 
-`direct + diffuse − total` is checked on ingest and logged, since the issue reports it holding to 0.062 W m⁻² on the native files. A departure from zero larger than Open-Meteo's own rounding would mean the three fields are not one consistent split, which would void arm C.
+It takes its API handling from `fetch_era5_open_meteo.py`, which already speaks this endpoint and this `models=` parameter, and its per-site anonymisation from `fetch_cams.py`: import `_pv_sites` from `build_dataset`, read each meter's coordinates at run time, send them to Open-Meteo, and write only the anonymised label. No coordinate and no identifier reaches the written frame.
 
-### New: `verify_ukv_lineage.py` — the gate
+**Three checks run at ingest, and each one can void the experiment on its own.** They cost no model fits and no S3 access, and all three cover the whole archive rather than the era AWS can check.
 
-The counterpart of `verify_era5_sources.py`, and the script this plan hangs on. It samples timestamps stratified across the AWS-verifiable era, deliberately covering both sides of the PS47 boundary on 2026-01-21 and the AWS encoding change at the same date, pulls the matching native files from `s3://met-office-atmospheric-model-data/uk-deterministic-2km/`, extracts the grid point nearest each meter, and compares against Open-Meteo at the same valid time.
+1. **`direct + diffuse − total` stays inside Open-Meteo's rounding.** A larger departure means the three fields are not one consistent split, which would void arm C.
+2. **The published direct is not a separation model's output.** Correlate it against the Erbs beam, which `build_dataset._add_separation_models` already computes for every source. If Open-Meteo served a decomposition of global irradiance rather than UKV's native field, arm C would be a copy of arm B and a null result would be guaranteed by construction. This is the failure `verify_era5_sources.py` exists to rule out for ERA5, and a correlation gets it here for two lines rather than a second download. **It also covers the 2022-to-2024 era that no AWS sampling can reach**, which makes it the more important of the two lineage checks rather than the cheaper substitute for one.
+3. **The hourly label is period-ending.** A lagged cross-correlation of UKV global irradiance against the ERA5 frame at −1, 0 and +1 hours. The pipeline treats every label as period-ending, and the issue's own arithmetic implies Open-Meteo's UKV is too, but that is inferred rather than measured on our own rows. **This project has already lost a fortnight to a half-hour stamp offset, and an off-by-one-hour on UKV would be the same failure in a new place.** The simplicity review contributed this check; the first draft did not have it.
+
+### New: `verify_ukv_lineage.py`, roughly 60 lines
+
+Samples a small number of valid instants, pulls the matching native files from `s3://met-office-atmospheric-model-data/uk-deterministic-2km/` with `obstore`, opens them with `xarray`, takes the nearest grid point to each meter, and compares against Open-Meteo at the same instant. One file covers the whole 970×1042 domain, so a single read serves all six meters at once.
 
 **The comparison is against the `_instant` columns, never the default hourly ones.** The native file holds an instantaneous snapshot; Open-Meteo's default is a trapezoid of two of them. Comparing the trapezoid against the snapshot would make a faithful mirror look broken, which is the single easiest way to get this script wrong.
 
-**The same download settles the lead-time question, which the assimilation finding above promotes from a quality check to a design question.** Rather than comparing one lead time, the script pulls T+0, T+3 and T+6 from the AWS runs valid at each sampled instant and reports which lead Open-Meteo's value matches. That establishes what the archive is built from, which the issue lists as an open question and which one matching timestamp does not settle. **If the answer is T+0, the UKV arm is built on a cloud field anchored to the same geostationary satellite CAMS retrieves from, and the between-product question changes meaning.** The remedy in that case is to fetch from the AWS bucket at a fixed longer lead instead of from Open-Meteo, which is available for the verifiable era and costs a heavier download; the plan does not commit to it in advance, because which lead Open-Meteo serves is not yet known.
+**The script sweeps lead time, because the assimilation finding above makes it a design question rather than a quality check.** For each sampled instant it pulls T+0, T+3 and T+6 from the AWS runs valid then and reports which lead Open-Meteo matches. **If the answer is T+0, the UKV arm is built on a cloud field anchored to the same geostationary satellite CAMS retrieves from, and the between-product question changes meaning.** The remedy in that case is to fetch from the AWS bucket at a fixed longer lead, which is available for the verifiable era and costs a heavier download. The plan does not commit to it in advance, because which lead Open-Meteo serves is not yet known.
 
-Output is a markdown table of mean and maximum absolute difference per era and per lead, plus an explicit statement of the span it could not check. It writes differences and counts, never a coordinate and never a site-keyed irradiance value paired with anything identifying.
+**Sampling covers both sides of the PS47 boundary on 2026-01-21, rather than a single date.** The issue records that the AWS encoding changed at PS47, so Open-Meteo's ingest could have changed there too. That makes roughly 12 to 18 reads: a handful of instants each side, times three lead times. It is not a stratified sweep across the whole era, which is what the first draft proposed and what the review rightly called oversized.
 
-Reading the native files needs an S3 client and a chunked-HDF5 reader; `obstore` is already a dependency of `contracts` and `nged_data`, and `xarray` of `dynamical_data`. The download is a few dozen files rather than the 79 GB a full pull would need.
+**This stays a gate: no model is trained on UKV until it has run and been read.** That is a direct instruction rather than the plan's own preference.
 
-### `build_dataset.py`
+### `build_dataset.py` — four edits
 
-- Hoist the duplicated `("cds", "open-meteo", "cams")` literal into one `SOURCE_CHOICES: Final[tuple[str, ...]]` beside the existing `SourceType`, and add `"ukv"` to both. This is the minimum change that adds a source without a 14-way find-and-replace, and every script that carries the literal already imports from `build_dataset` or from `run_experiment`.
-- Add `UKV_PATH` and `_read_ukv(*, temporal)`, mirroring `_read_cams`.
-- Generalise the `if source == "cams"` branch in `main()` to cover any per-site source, so UKV joins on `(site, time)` the same way.
-- Add `--ukv-temporal {trapezoid,instant}`, defaulting to `trapezoid`, and fold the value into the output filename so the two builds cannot overwrite each other.
-- **Air temperature keeps coming from the gridded ERA5 frame, including for the UKV build.** UKV publishes its own `temperature_2m`, and using it would change a shared non-irradiance feature between sources, breaking the invariant that arms and sources differ only in the irradiance columns. CAMS already takes ERA5's temperature for exactly this reason.
+- `"ukv"` into `SourceType` and into the `--source` `choices` literal.
+- `UKV_PATH` beside `CAMS_PATH`.
+- `_read_ukv()`, mirroring `_read_cams()`, roughly 20 lines. It selects the default hourly columns, or the `_instant` columns when a variant build asks for them.
+- The per-site branch generalised: `if source == "cams"` becomes a membership test over a `PER_SITE_SOURCES` tuple, and the gridded read's `"open-meteo" if source == "cams"` becomes the same test.
 
-### `compare_sources.py`
+**Air temperature keeps coming from the gridded ERA5 frame, including for the UKV build.** UKV publishes its own `temperature_2m`, and using it would change a shared non-irradiance feature between sources, breaking the invariant that arms and sources differ only in the irradiance columns. CAMS already takes ERA5's temperature for exactly this reason.
 
-Generalise from `--first-source`/`--second-source` to a repeatable `--source`, intersecting rows across every source named rather than across two. Three pairwise runs work with today's code but each restricts to a different row set, so the three tables would not be mutually comparable. The intersection of all three is bounded by UKV's span and by CAMS's reliability filter at once, and the script logs the resulting row count so the write-up can state it.
+**No `--ukv-temporal` flag.** `build_dataset.py` already has `--suffix` for precisely this, and it already composes into the run paths of all six downstream scripts — the `cams-allhours` variant on disk is the same mechanism in use. A second temporal build, if ever wanted, is `--source ukv --suffix -instant`.
 
-### New: `ps47_breakdown.py`
+**Nothing restricts or widens the UKV span in code.** `_read_era5` trims at `era5_grid.LAST_DATE`, and `main()` inner-joins power to the gridded frame before the per-site irradiance join, so the UKV dataset is automatically ERA5's rows intersected with whatever span the download covers. Both span runs are a matter of which download is on disk, not of a code path.
 
-Splits the UKV headline contrast either side of 2026-01-21, in the shape `elevation_breakdown.py` and `sky_conditions.py` already use. The post-PS47 era runs to about 7.5 months, so its interval will be wide, and the script prints the row count on each side so that width is readable rather than surprising.
+### The 13 scripts carrying the duplicated `choices` literal
 
-### The 12 scripts carrying the duplicated `choices` literal
+One word added to each `("cds", "open-meteo", "cams")` tuple. **No `SOURCE_CHOICES` constant is hoisted**, because `elevation_breakdown.py` and `report_results.py` deliberately import nothing from their siblings and document a run command supplying only `polars`, while `build_dataset` pulls in `pvlib`, `xarray` and a Delta store. Importing a shared constant would break both scripts under their own documented commands. The first draft asserted that every script already imports from a sibling; that was wrong for two of the 14, and the review caught it.
 
-`run_experiment.py`, `run_physics_experiment.py`, `run_hybrid_experiment.py`, `report_results.py`, `sky_conditions.py`, `elevation_breakdown.py`, `inverter_clipping.py`, `capacity_denominator.py`, `oracle_capacity.py`, `restart_basins.py`, `shared_geometry.py`, `anm_curtailment.py` and `anm_setpoints.py` each import `SOURCE_CHOICES` and drop their own literal. No other behaviour changes in any of them: `dataset_path_for` and `results_dir_for` take the source as a plain `str` and format it into a path, so the runners need nothing else.
+### No `ps47_breakdown.py`
+
+Cut. PS47 landed on 2026-01-21 and the record ends on 2026-09-10, so the post-upgrade era is 7.7 months of a 54.3-month archive — about 14% of rows, giving an interval roughly three times the full-span width against a published effect of 0.096 points. **And the split would not be attributable even if it were powered**, because the pre-upgrade era spans whole years while the post-upgrade era runs January to September with no autumn and no early winter, so a pre-and-post difference confounds the science upgrade with season. The write-up names PS47, its date, the 14% share, and the seasonal imbalance in one sentence instead.
+
+### No change to `compare_sources.py`
+
+Its source arguments carry no `choices`, so `--first-source ukv --second-source open-meteo` and `--first-source ukv --second-source cams` both run today. Two pairwise invocations answer the issue's between-product question with no edit. **Generalising to a three-way intersection would change the row set under the already-published CAMS-against-ERA5 comparison**, so the write-up would have to restate those numbers on a new basis or carry two row sets and explain the difference. The script already prints each pair's shared-hour count.
 
 ### `README.md` in the experiment directory
 
-The two new scripts in the run-order table, UKV in the sources table, and a section on the temporal axis and what it does and does not confound.
+The two new scripts in the run-order table, UKV in the sources table, and a short section on the temporal difference, the aerosol asymmetry, and the span the lineage check cannot cover.
 
 ### The write-up is a separate pull request against `main`
 
-`docs/results/beam-diffuse-split.md` lives on `main` and not on this branch, exactly as #786 was separate from #785. The scripts land here; the page is updated in its own pull request once the numbers exist. That page needs a UKV row in the sources table, the two questions reported separately, the lineage result including the span it could not cover and the lead time it found, the temporal caveat, the aerosol asymmetry between the three products, the PS47 breakdown, and a revision of "What this says about asking a supplier for the beam", which currently reasons from two products and will then reason from three.
+`docs/results/beam-diffuse-split.md` lives on `main` and not on this branch, exactly as #786 was separate from #785. The scripts land here; the page is updated in its own pull request once the numbers exist.
 
 ## Design-philosophy check
 
@@ -138,14 +149,20 @@ uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
 Plus, for this change specifically:
 
 - `uv run pymarkdown scan scripts/experiments/beam_diffuse_split/README.md`, which the default scan's path list does not reach.
+- Each of the three ingest checks in `fetch_ukv_open_meteo.py`, whose output goes in the pull request body.
 - `verify_ukv_lineage.py` run to completion, with its table pasted into the pull request body. **This is the gate: no model is trained on UKV until it has run and been read.**
-- The experiment run itself, which the timestamps of the existing outputs put at roughly 12 minutes for the XGBoost instrument, 29 for the physical model, and 15 for the hybrid, so about an hour of compute per source on the 32-core workstation, plus the dataset build and the diagnostics.
+- The experiment runs, which the timestamps of the existing outputs put at roughly 12 minutes for the XGBoost instrument, 29 for the physical model, and 15 for the hybrid, so about an hour of compute per span on the 32-core workstation, plus the dataset build and the diagnostics. Two spans means about three hours in total, unattended.
+- Each script this change touches run once under its own documented command, since 13 of them are edited and two of them deliberately run without their siblings on the path.
 
 `mkdocs build --strict` is not needed on this branch, which touches no page MkDocs renders; it is needed on the write-up pull request.
 
 ## Risks and open questions
 
-**Which UKV span should the primary run use?** The AWS-verifiable era from 2024-09-19 gives about 24 monthly bootstrap blocks and roughly a third of the row count the CAMS comparison used. The full archive from 2022-03-01 gives 54 blocks, with over half of them unverifiable against any Met Office source. *Recommendation: primary on the verifiable era, sensitivity on the full span.* The project has just been reminded what an unverified weather lineage cost it once, and the cheap order is to make the defensible number the headline and the larger sample the check, rather than the reverse.
+**Which UKV span should the primary run use? This is the first question for the human reviewer, and the simplicity review reversed the recommendation.** The AWS-verifiable era from 2024-09-19 gives about 24 monthly bootstrap blocks; the full archive from 2022-03-01 gives 54, with over half unverifiable against any Met Office source. *Recommendation, revised: primary on the full span, with the verifiable era as the check.*
+
+The first draft had these the other way round. The review's argument against it is right: 24 blocks chasing an effect the published page measures at 0.096 points will very likely return a null, and **a null from an underpowered run cannot be told apart from a null from a real absence** — which is the failure the README already records on the reanalysis. Restricting the *scored rows* also does not make the result more verified, because lineage is a property of the source established by sampling files, and it does not transfer row by row.
+
+Two things keep the verifiable-era run in the plan rather than cutting it. The span needs no code in either direction, so the second run costs about 90 minutes of unattended compute and nothing else. And the decomposition check in the fetcher covers the unverifiable era where AWS sampling cannot, so the residual risk on 2022 to 2024 is narrower than the first draft assumed. **If the lineage check shows any material discrepancy, the verifiable era becomes primary and the recommendation flips back.**
 
 **Is Open-Meteo's free tier compatible with this project's use?** It is non-commercial only. This is not new to this issue — Open-Meteo already feeds the *published* ERA5 numbers on the docs page, since `DEFAULT_SOURCE` is `open-meteo` — so it is a live question about work already shipped rather than a gate on this one. *Recommendation: settle it separately, and note that UKV has a licence-clean fallback the ERA5 arm does not, because the AWS bucket carries UKV under CC BY-SA 4.0 for the same two years the lineage check covers.*
 
@@ -158,6 +175,22 @@ Plus, for this change specifically:
 **`ARM_FEATURES` calls arm C `C_era5_split`, which has been wrong since CAMS was added and will be wrong a third time.** Renaming it to `C_source_split`, which the physical runner already uses, would touch eight scripts and invalidate every stored result parquet, since `arm` is a data column. *Recommendation: leave it, and record the wart here.* Flagged rather than fixed, per the out-of-scope rule.
 
 **`output_path_for` writes every source's dataset under `data/ERA5/`, including the CAMS one and now the UKV one.** The same reasoning applies: changing it would strand every existing result directory. Flagged, not fixed.
+
+**Should the resolution question be asked of CAMS against itself instead?** The simplicity review proposed a design the issue does not contain, and it tests the issue's stated mechanism better than UKV does. The issue's mechanism is spatial averaging: a 31 km cell containing both sunlit and shaded ground has a beam fraction describing no point inside it. `fetch_cams.py` already takes arbitrary coordinates, and CAMS is a point service, so requesting a stencil of points spanning a 31 km box around each meter and averaging them gives a fourth source — the same product, the same retrieval, the same hourly integral, the same licence, the same seven-year span, the same rows, and the same sites. **"CAMS at the point" against "CAMS smeared to 31 km" changes exactly one variable and is paired row for row**, which no between-product comparison in this experiment can be. Every complication in this plan — lineage, temporal treatment, PS47, span, aerosol asymmetry, licensing — exists because a product boundary is crossed, and this design does not cross one.
+
+*Recommendation: build the UKV arm as planned, and raise the CAMS stencil as its own issue.* It answers a different question from the one the page exists to feed: CAMS is a retrieval, no forecast feed will ever be one, and the procurement decision is about a forecast product's published split. It also cannot speak to whether to ask for UKV, which `docs/roadmap/data-sources.md` records as free on AWS under CC BY-SA 4.0 with all three components. **The number that decides whether the stencil is an afternoon or a week is the Atmosphere Data Store's per-request latency, and it is not established.** The existing downloads are 6 sites times 8 years at 3 concurrent requests; a 3-by-3 stencil is 432 requests. The file timestamps under `data/CAMS/` all fall inside one second, so they record a bulk rewrite rather than 48 downloads and settle nothing. Timing a single request would settle it in minutes.
+
+## What the simplicity review changed
+
+**The review cut the plan to roughly a third of its first draft, and every cut above was verified against the code before being taken.** Accepted: the `--ukv-temporal` flag, which re-invented the existing `--suffix` (confirmed composing through all six runners); the second full experiment run on the `_instant` columns, whose result is predictable because the trapezoid is the better estimator of an hourly mean in every signal regime; the `SOURCE_CHOICES` hoist; `ps47_breakdown.py`; and the `compare_sources.py` generalisation. The review also *added* the hourly-label check, which the first draft lacked and which guards against the same class of fault as the half-hour stamp offset.
+
+**The `SOURCE_CHOICES` cut is forced rather than chosen.** `elevation_breakdown.py` and `report_results.py` import only the standard library and `polars` and document a run command supplying only `polars`, while `build_dataset` pulls in `pvlib`, `xarray` and a Delta store. A shared constant would break both under their own commands. The first draft asserted the opposite and was wrong.
+
+Three findings were rejected, each with its reason:
+
+- **"Cut the verifiable-era run and run the full archive once."** Rejected as a cut, accepted as an argument: the recommendation on which span is *primary* is reversed above, but both runs stay, because the span costs no code and the second run is 90 minutes of unattended compute against a risk this project has paid for once already.
+- **"Drop the stratification across PS47 from the lineage check."** Rejected. The review's premise is that the archive's lead-time construction rule does not change with the science package, which is an assumption rather than a finding — the issue records that the AWS encoding changed at PS47, so Open-Meteo's ingest could have changed there too. The sweep is cut from a full stratification to roughly 12 to 18 reads, which is most of the saving the review wanted.
+- **"Demote the lineage check from a gate to a measurement, and size the reduced change medium."** Rejected on both halves. The gate is a direct instruction. And the sizing still turns on more than one defensible design: the lead time the archive serves can force a switch from Open-Meteo to the AWS bucket, which is a different data path end to end, and the span question is still open. A change that can still change its own data source after a measurement is not a medium change.
 
 ## What adding ICON-D2 alongside UKV would cost
 
