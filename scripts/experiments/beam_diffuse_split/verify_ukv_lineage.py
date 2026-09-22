@@ -119,24 +119,31 @@ stored column carries. Every other lead sat between 1.3 and 350 W m⁻² away, s
 separates a faithful mirror from the nearest wrong answer by a wide margin rather than a fine one.
 """
 
-CLEAR_SKY_MIN_CLEARNESS: Final[float] = 0.70
-BROKEN_CLOUD_CLEARNESS: Final[tuple[float, float]] = (0.30, 0.60)
-"""Which clearness indices count as each sky condition.
+BROKEN_CLOUD_CLEARNESS: Final[tuple[float, float]] = (0.25, 0.65)
+"""The clearness indices that count as broken cloud.
 
 **The sample is stratified by sky condition because otherwise the sweep cannot resolve what it is
 for.** Under broken cloud the native field varies by more than 100 W m⁻² across a handful of grid
-cells, so a mismatch there could be a wrong cell rather than a wrong lead. A clear sky flattens both
-the spatial and the temporal gradient, which is what makes it the condition to fix the grid mapping
-on; broken cloud is then the condition that discriminates between leads.
+cells, so that is the condition which discriminates hardest between leads. The clearest hours the
+window offers are sampled alongside it, because a flat field is where a wrong grid cell would show
+up as agreement that means nothing.
+
+**There is no absolute clear-sky threshold, because the window that brackets PS47 cannot meet one.**
+PS47 went operational on 2026-01-21, and at 53 N the midwinter sun reaches 17 degrees of elevation
+at noon. Measured over the 21 days either side, no hour has every meter above a clearness index of
+0.55, so a threshold of 0.7 selects nothing and the run has nothing to verify. `_sample_instants`
+takes the clearest hours available instead and reports the clearness it actually got.
 """
 
-MAX_SOLAR_ZENITH_DEGREES: Final[float] = 70.0
-"""Instants at a lower sun than 20 degrees of elevation are not sampled.
+GEOMETRY_FACTOR_RANGE: Final[tuple[float, float]] = (0.8, 1.25)
+"""How far the hour's solar geometry may depart from flat for an instant to be sampled.
 
-The served `_instant` column is reconstructed by multiplying the stored hourly mean by the ratio of
-the instantaneous to the hour-mean cosine of the solar zenith angle, and that ratio grows without
-bound near sunrise and sunset — which amplifies the stored column's 1 W m⁻² rounding into a
-difference that says nothing about lineage.
+The factor is the instantaneous cosine of the solar zenith angle over its mean across the preceding
+hour. Open-Meteo multiplies the stored hourly mean by it to serve the `_instant` column, so where
+the factor is far from one it also multiplies that column's 1 W m⁻² rounding, producing a difference
+that says nothing about lineage. **The condition is written on the factor rather than on solar
+elevation because the factor is what does the damage**: a low midwinter noon sun has a factor near
+one and is perfectly usable, where an hour near sunrise at any time of year does not.
 """
 
 
@@ -269,22 +276,26 @@ def _flux_variable_name(*, dataset: xr.Dataset) -> str:
 def _sample_instants(
     *, served: pl.DataFrame, era: str, per_stratum: int, seed: int
 ) -> list[SampledInstant]:
-    """Choose clear-sky and broken-cloud instants from one era's served rows.
+    """Choose the clearest and the broken-cloud instants from one era's served rows.
 
-    An instant is chosen on the whole roster agreeing about the sky, so that all six meters are
-    sampled under the condition the stratum names rather than one of them.
+    An instant qualifies only where the whole roster agrees about the sky, so that all six meters
+    are sampled under the condition the stratum names rather than one of them.
 
     Args:
-        served: One window of served rows, carrying the clearness index.
+        served: One window of served rows, carrying the clearness index and the solar geometry.
         era: The label to stamp on the chosen instants.
         per_stratum: How many instants to take from each sky condition.
-        seed: Seeds the choice, so a rerun samples the same instants.
+        seed: Seeds the choice among the broken-cloud candidates, so a rerun samples the same ones.
 
     Returns:
-        The chosen instants, which may be fewer than asked for if the window is short of either sky.
+        The chosen instants, fewer than asked for where the window is short of either sky.
     """
+    lowest_factor, highest_factor = GEOMETRY_FACTOR_RANGE
+    factor = pl.col("cos_zenith_instant") / pl.col("cos_zenith_hour_mean")
     by_instant = (
-        served.filter(pl.col("solar_zenith_deg") < MAX_SOLAR_ZENITH_DEGREES)
+        served.filter(
+            (pl.col("ghi_w_m2") > 20.0) & (factor > lowest_factor) & (factor < highest_factor)
+        )
         .group_by("time")
         .agg(
             lowest=pl.col("clearness_index").min(),
@@ -293,22 +304,30 @@ def _sample_instants(
         )
         .filter(pl.col("sites") == served["site"].n_unique())
     )
+    broken = by_instant.filter(
+        (pl.col("lowest") >= BROKEN_CLOUD_CLEARNESS[0])
+        & (pl.col("highest") <= BROKEN_CLOUD_CLEARNESS[1])
+    )
     strata = {
-        "clear": by_instant.filter(pl.col("lowest") >= CLEAR_SKY_MIN_CLEARNESS),
-        "broken": by_instant.filter(
-            (pl.col("lowest") >= BROKEN_CLOUD_CLEARNESS[0])
-            & (pl.col("highest") <= BROKEN_CLOUD_CLEARNESS[1])
-        ),
+        "clearest": by_instant.sort("lowest", descending=True).head(per_stratum),
+        "broken": broken.sample(n=min(per_stratum, broken.height), seed=seed),
     }
     chosen: list[SampledInstant] = []
     for sky, candidates in strata.items():
         if candidates.height == 0:
             _LOG.warning("no %s instant in the %s window", sky, era)
             continue
-        picked = candidates.sample(n=min(per_stratum, candidates.height), seed=seed)
+        _LOG.info(
+            "%s %s: %d instants, roster-minimum clearness %.2f to %.2f",
+            era,
+            sky,
+            candidates.height,
+            candidates["lowest"].min(),
+            candidates["lowest"].max(),
+        )
         chosen += [
             SampledInstant(valid_time=row["time"], era=era, sky=sky)
-            for row in picked.sort("time").to_dicts()
+            for row in candidates.sort("time").to_dicts()
         ]
     return chosen
 
@@ -366,7 +385,9 @@ def _report(*, results: pl.DataFrame) -> None:
         )
         .sort("era", "sky", "lead_hours")
     )
-    _LOG.info("per-lead agreement against the Met Office's own files:\n%s", summary)
+    # Polars shows ten rows by default, which would cut the table the gate exists to be read.
+    with pl.Config(tbl_rows=-1, tbl_width_chars=120):
+        _LOG.info("per-lead agreement against the Met Office's own files:\n%s", summary)
 
 
 def _assert_lead_is_as_expected(*, results: pl.DataFrame) -> None:
