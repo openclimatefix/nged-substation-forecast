@@ -42,7 +42,6 @@ from run_experiment import (
     _add_time_features,
     _assign_folds,
     _booster_parameters,
-    _bootstrap_difference,
     dataset_path_for,
 )
 from sources import REPO_DATA_DIR
@@ -150,6 +149,51 @@ def _fit_and_predict(
     ]
 
 
+def _paired_month_bootstrap(
+    *, losses: pl.DataFrame, treatment: str, reference: str, draws: int = 1000
+) -> dict[str, float]:
+    """Interval the difference between two variants by resampling whole months.
+
+    Written here rather than reused from `run_experiment` because that module's bootstrap expects
+    the main experiment's frame — arms, seeds and a per-row pairing this script does not produce.
+
+    Both variants are scored on the same stamps, so the difference is taken per month before
+    resampling: the weather both saw cancels, leaving only where they disagree. Months are the
+    resampling unit because errors within a day are not independent.
+
+    Args:
+        losses: Rows carrying `month`, `variant`, and `absolute_error_mw`.
+        treatment: The variant whose score is being tested.
+        reference: The variant it is tested against.
+        draws: How many resamples to take.
+
+    Returns:
+        The mean difference and its 95% interval, in MW.
+    """
+    per_month = (
+        losses.filter(pl.col("variant").is_in([treatment, reference]))
+        .group_by("month", "variant")
+        .agg(mean_error=pl.col("absolute_error_mw").mean(), rows=pl.len())
+        .pivot(on="variant", index="month", values=["mean_error", "rows"])
+    )
+    treatment_column = f"mean_error_{treatment}"
+    reference_column = f"mean_error_{reference}"
+    paired = per_month.drop_nulls([treatment_column, reference_column])
+    difference = (paired[treatment_column] - paired[reference_column]).to_numpy()
+    weight = paired[f"rows_{treatment}"].to_numpy().astype(float)
+
+    generator = np.random.default_rng(0)
+    picks = generator.integers(0, len(difference), size=(draws, len(difference)))
+    resampled = np.array([float(np.average(difference[row], weights=weight[row])) for row in picks])
+    lower, upper = np.percentile(resampled, (2.5, 97.5))
+    return {
+        "difference": float(np.average(difference, weights=weight)),
+        "lower_95": float(lower),
+        "upper_95": float(upper),
+        "months": float(len(difference)),
+    }
+
+
 def _scored(*, rows: pl.DataFrame, horizon: str, seed: int) -> pl.DataFrame:
     """Score every variant and the ERA5 baseline on one horizon's rows.
 
@@ -188,9 +232,10 @@ def _scored(*, rows: pl.DataFrame, horizon: str, seed: int) -> pl.DataFrame:
                     seed=seed,
                 )[0]
                 outputs.append(
-                    test.select("site", "valid_time", "month", "fold").with_columns(
+                    test.select("site", "month", "fold", time=pl.col("valid_time")).with_columns(
                         horizon=pl.lit(horizon),
                         variant=pl.lit(variant),
+                        seed=pl.lit(seed, dtype=pl.Int32),
                         absolute_error_mw=pl.Series(np.abs(test["power_mw"].to_numpy() - fitted)),
                     )
                 )
@@ -210,9 +255,10 @@ def _scored(*, rows: pl.DataFrame, horizon: str, seed: int) -> pl.DataFrame:
                 ("median_of_power", np.median(stacked, axis=0)),
             ):
                 outputs.append(
-                    test.select("site", "valid_time", "month", "fold").with_columns(
+                    test.select("site", "month", "fold", time=pl.col("valid_time")).with_columns(
                         horizon=pl.lit(horizon),
                         variant=pl.lit(variant),
+                        seed=pl.lit(seed, dtype=pl.Int32),
                         absolute_error_mw=pl.Series(np.abs(test["power_mw"].to_numpy() - reduced)),
                     )
                 )
@@ -297,16 +343,27 @@ def main() -> int:
         )
     lines += ["", "MAE in MW. Lower is better. ERA5 is scored on the same rows.", ""]
 
-    interval = _bootstrap_difference(
-        losses=every.filter(pl.col("horizon") == "day+1").rename({"valid_time": "time"}),
-        treatment="mean_of_power",
-        reference="mean_of_irradiance",
-        metric="absolute_error_mw",
+    lines += [
+        "| Horizon | contrast | ΔMAE (MW) | 95% interval | excludes zero? |",
+        "|---|---|---|---|---|",
+    ]
+    contrasts = (
+        ("mean_of_irradiance", "era5"),
+        ("mean_of_power", "era5"),
+        ("mean_of_power", "mean_of_irradiance"),
+        ("median_of_power", "mean_of_power"),
+        ("mean_of_power", "control"),
     )
-    lines.append(
-        f"At day+1, mean_of_power − mean_of_irradiance = {interval['difference']:+.5f} MW "
-        f"[{interval['lower_95']:+.5f}, {interval['upper_95']:+.5f}]."
-    )
+    for horizon in ens["horizon"].unique(maintain_order=True).to_list():
+        at = every.filter(pl.col("horizon") == horizon)
+        for treatment, reference in contrasts:
+            interval = _paired_month_bootstrap(losses=at, treatment=treatment, reference=reference)
+            excludes = interval["lower_95"] > 0.0 or interval["upper_95"] < 0.0
+            lines.append(
+                f"| {horizon} | {treatment} − {reference} | {interval['difference']:+.5f} | "
+                f"[{interval['lower_95']:+.5f}, {interval['upper_95']:+.5f}] | "
+                f"{'**yes**' if excludes else 'no'} |"
+            )
     report = "\n".join(lines) + "\n"
     (OUTPUT_DIR / "report.md").write_text(report)
     sys.stdout.write(report)
