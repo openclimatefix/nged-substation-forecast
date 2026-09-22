@@ -206,8 +206,8 @@ def main() -> int:
     """Fit every arm on the shared rows and report the table and the intervals."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
-    # This script takes no arguments. Parsing anyway keeps `--help` working, and makes a stale
-    # `--alignment` on the command line an error rather than a silently ignored flag.
+    # This script takes no arguments. Parsing anyway keeps `--help` working and rejects unknown
+    # flags.
     parser.parse_args()
 
     dataset = with_export_cap(

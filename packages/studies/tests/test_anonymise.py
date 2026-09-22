@@ -1,10 +1,11 @@
 import pytest
 from studies.anonymise import site_labels_for
 
-# The six identifiers of the metered generators the beam/diffuse study ran on, and the labels the
-# published write-up gives them. A change to the seed, to the generator, or to SITE_LABELS' order
-# would relabel every site and orphan every label already in print, and this is what notices.
-PUBLISHED_LABELS: dict[int, str] = {31: "A", 22: "B", 30: "C", 29: "D", 23: "E", 21: "F"}
+# Placeholder identifiers, not NGED's. The labels are a shuffle over the sorted identifiers, so any
+# six pin the permutation the published write-up rests on. A change to the seed, to the generator,
+# or to SITE_LABELS' order would relabel every site and orphan every label already in print, and
+# this is what notices.
+PUBLISHED_LABELS: dict[int, str] = {6: "A", 2: "B", 5: "C", 4: "D", 3: "E", 1: "F"}
 
 
 def test_reproduces_the_published_labels():

@@ -195,8 +195,8 @@ def main() -> int:
     """Score every product in every era, and write the report."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
-    # This script takes no arguments. Parsing anyway keeps `--help` working, and makes a stale
-    # `--alignment` on the command line an error rather than a silently ignored flag.
+    # This script takes no arguments. Parsing anyway keeps `--help` working and rejects unknown
+    # flags.
     parser.parse_args()
 
     common = _add_time_features(dataset=drop_commissioning_ramp(dataset=_joined()))

@@ -35,15 +35,10 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from build_dataset import (
-    METADATA_PATH,
-    MIN_YEARS_OF_READINGS,
-    POWER_DELTA_URI,
-)
+from build_dataset import METADATA_PATH, _pv_sites
 from contracts.settings import Settings
 from run_experiment import _bootstrap_difference, dataset_path_for, results_dir_for
 from sources import SOURCE_CHOICES
-from studies.anonymise import site_labels_for
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("anm_curtailment")
@@ -110,24 +105,13 @@ def _download() -> pl.DataFrame:
 
 
 def _site_labels() -> pl.DataFrame:
-    """Return the same site relabelling `build_dataset` applies, with substation numbers."""
-    metadata = pl.read_parquet(METADATA_PATH).filter(pl.col("time_series_type") == "PV")
-    counts = (
-        pl.scan_delta(POWER_DELTA_URI)
-        .group_by("time_series_id")
-        .agg(pl.len().alias("n_rows"))
-        .collect()
+    """Return the site labels `build_dataset` applies, with substation numbers."""
+    metadata = pl.read_parquet(METADATA_PATH).select("time_series_id", "substation_number")
+    return (
+        _pv_sites()
+        .join(metadata, on="time_series_id", how="inner")
+        .select("site", "substation_number")
     )
-    eligible = (
-        metadata.select("time_series_id", "substation_number")
-        .join(counts, on="time_series_id", how="inner")
-        .filter(pl.col("n_rows") >= int(MIN_YEARS_OF_READINGS * 365.25 * 48))
-        .sort("time_series_id")
-    )
-    labels = site_labels_for(eligible_ids=eligible["time_series_id"].to_list())
-    return eligible.with_columns(
-        site=pl.col("time_series_id").replace_strict(labels, return_dtype=pl.Utf8)
-    ).select("site", "substation_number")
 
 
 def _hourly(*, curtailment: pl.DataFrame, site: str) -> pl.DataFrame:

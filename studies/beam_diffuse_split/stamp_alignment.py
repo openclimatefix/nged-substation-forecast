@@ -23,19 +23,20 @@ reports the shift that maximises the correlation. Irradiance and power are diffe
 from different measurement systems, so a shared clock fault is the only thing that would align them
 at a non-zero lag.
 
-**This measures the repair, not the fault.** `PowerTimeSeries.correct_late_timestamps` moves the
-late stamps at ingestion, so the stored table is already repaired and every measurement below should
-read close to zero on *both* sides of the correction instant. The era split is what makes that
-checkable: an offset that reappears on the `before` side means the repair has stopped matching the
-feed — either NGED has republished the early readings with corrected stamps, in which case the
-ingest is now shifting rows that need no shift, or the fault did not stop where NGED reported.
+**This measures the feed as NGED published it, not the stored table.**
+`PowerTimeSeries.correct_late_timestamps` moves the late stamps at ingestion, so `_power_for` undoes
+that move before measuring; the evidence for the repair cannot be read off the repaired table. A
+correctly stamped feed reads about +15 minutes on the two geometric measurements, because a label
+names the end of the half-hour it averages, and 0 on the correlation. The `before` side should read
+about +45 and −30. A `before` side reading +15 and 0 instead means NGED has republished the early
+readings with corrected stamps, and the ingest is now shifting rows that need no shift.
 
 Run it with `uv run python studies/beam_diffuse_split/stamp_alignment.py`.
 """
 
 import logging
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
@@ -118,12 +119,18 @@ def _solar_noons(*, latitude: float, longitude: float, days: list) -> dict[str, 
 
 
 def _power_for(*, time_series_id: int) -> pl.DataFrame:
-    """Read one meter's half-hourly power, labelled with its era and minute of day."""
+    """Read one meter's half-hourly power as NGED stamped it, labelled with its era and minute."""
+    repaired_before = POWER_TIMESTAMPS_CORRECTED_BEFORE - timedelta(minutes=30)
     return (
         pl.scan_delta(POWER_DELTA)
         .filter(pl.col("time_series_id") == time_series_id)
         .select("time", "power")
         .collect()
+        .with_columns(
+            time=pl.when(pl.col("time") < pl.lit(repaired_before))
+            .then(pl.col("time").dt.offset_by("30m"))
+            .otherwise(pl.col("time"))
+        )
         .with_columns(
             day=pl.col("time").dt.date(),
             # `dt.hour()` is Int8, and Int8 cannot hold hour * 60. Widen before multiplying,
@@ -240,8 +247,9 @@ def main() -> int:
         f"{POWER_TIMESTAMPS_CORRECTED_BEFORE:%Y-%m-%d %H:%M} UTC"
     )
     print(
-        "Every offset below is minutes after solar noon. A feed stamped as its contract states"
-        " reads zero; a feed half an hour late reads +30.\n"
+        "Every offset below is minutes after solar noon, measured on the feed as NGED stamped it. A"
+        " feed stamped as its contract states reads about +15 on the two geometric measurements"
+        " and 0 on the correlation; a feed half an hour late reads about +45 and -30.\n"
     )
 
     centroid_frames: list[pl.DataFrame] = []

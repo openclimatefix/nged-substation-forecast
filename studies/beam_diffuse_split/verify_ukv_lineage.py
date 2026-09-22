@@ -23,8 +23,8 @@ The script answers two questions, and only the second is about trust:
 **Neither question can be asked of the archive before 2024-08-12**, when Open-Meteo's UKV downloader
 first existed. The Met Office's bucket holds a rolling two-year window, and the earlier half of the
 archive was backfilled from a source Open-Meteo does not name, so no sampling can reach it. What
-covers that era instead is `fetch_open_meteo_point._check_direct_is_not_a_separation_model`, which
-needs no reference product.
+covers that era instead is `studies.served_column_checks.check_direct_is_not_a_separation_model`,
+which needs no reference product.
 
 The comparison is against the `_instant` columns, never the default hourly ones. The native file
 holds an instantaneous snapshot; Open-Meteo's default is a backward-looking hourly mean derived from

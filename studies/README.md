@@ -52,7 +52,7 @@ branch. The directory is not an attic.
   can reuse them; what one study builds from them sits in `<name>/`. None of it is in version
   control, and a data directory that has been cleaned out will not refill itself. `data/NGED/` and
   `data/NWP/` are the pipeline's own, and a study reads them rather than writing to them.
-- **A run command in a module docstring is the tested way to run that script.** Each one runs
+- **A run command in a module docstring is the checked way to run that script.** Each one runs
   against the workspace environment, and names with `--with` only what the lockfile does not carry.
 - **Read the study's own README first.** Each directory has one, covering what the study measured,
   what the arms are, and which readings the result does not support.

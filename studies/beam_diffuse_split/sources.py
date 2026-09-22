@@ -4,11 +4,6 @@ One-off throwaway module for the experiment in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/784> and its UKV extension in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/800>.
 
-**The module imports nothing outside the standard library, which is what lets every script in this
-directory import it.** `elevation_breakdown.py` and `report_results.py` document a run command
-supplying only `polars`, and `build_dataset.py` pulls in `pvlib`, `xarray`, and a Delta store, so a
-registry living there would break the two lean scripts.
-
 `SOURCE_CHOICES` is the single copy of the source list, imported by every `argparse` parser that
 offers `--source`. A second Open-Meteo model still needs its own entries in `SourceType`,
 `PER_SITE_SOURCES`, and `build_dataset`, and its own labels in the two figure scripts; what the
@@ -18,6 +13,8 @@ registry saves is the download itself, which needs no new code at all.
 import os
 from pathlib import Path
 from typing import Final, Literal, NamedTuple
+
+from contracts.settings import PROJECT_ROOT
 
 SourceType = Literal["cds", "open-meteo", "cams", "ukv", "icon-d2"]
 """Which irradiance download to build from.
@@ -132,33 +129,15 @@ has read the upstream documentation or the downloader that converts it.
 """
 
 
-def _find_project_root(start: Path) -> Path:
-    """Return the workspace root, by walking up to the directory holding `uv.lock`.
-
-    Mirrors `contracts.settings._find_project_root` rather than importing it, because the
-    workspace copy resolves `data/` to a linked worktree's own root, where `_main_checkout` below
-    resolves it to the main checkout that holds the downloads.
-
-    Args:
-        start: File or directory to walk up from.
-
-    Returns:
-        The workspace root, or the current working directory if no ancestor holds `uv.lock`.
-    """
-    for parent in start.resolve().parents:
-        if (parent / "uv.lock").is_file():
-            return parent
-    return Path.cwd()
-
-
 def _main_checkout(root: Path) -> Path:
     """Return the repository's main working tree, given any working tree's root.
 
-    A linked worktree carries `uv.lock` of its own, so `_find_project_root` stops at the worktree
-    and every worktree would otherwise get an empty `data/` of its own. The downloads under
-    `data/` run to tens of gigabytes and are shared by every branch, so a per-worktree copy would
-    mean re-fetching the lot. Git marks a linked worktree by making `.git` a file holding
-    `gitdir: <main>/.git/worktrees/<name>`, which names the main checkout two levels up.
+    A linked worktree carries `uv.lock` of its own, so `contracts.settings.PROJECT_ROOT` is the
+    worktree's own root, and every worktree would otherwise get an empty `data/` of its own. The
+    downloads under `data/` run to tens of gigabytes and are shared by every branch, so a
+    per-worktree copy would mean re-fetching the lot. Git marks a linked worktree by making `.git` a
+    file holding `gitdir: <main>/.git/worktrees/<name>`, which names the main checkout two levels
+    up.
 
     Args:
         root: A working tree's root directory.
@@ -179,8 +158,7 @@ def _main_checkout(root: Path) -> Path:
 
 
 REPO_DATA_DIR: Final[Path] = Path(
-    os.environ.get("DATA_PATH_INTERNAL")
-    or _main_checkout(_find_project_root(Path(__file__))) / "data"
+    os.environ.get("DATA_PATH_INTERNAL") or _main_checkout(PROJECT_ROOT) / "data"
 )
 """Where every download and every built frame lands.
 

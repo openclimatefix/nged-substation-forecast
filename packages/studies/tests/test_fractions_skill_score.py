@@ -83,13 +83,13 @@ def test_the_score_credits_timing_at_each_tolerance(
 
 
 @pytest.mark.parametrize("tolerance_hours", list(WINDOW_FOR_TOLERANCE))
-def test_a_wider_window_never_rescues_a_forecast_that_predicts_nothing(tolerance_hours: int):
+def test_a_wider_window_never_rescues_a_forecast_twelve_hours_late(tolerance_hours: int):
     # The control the other three rows are read against: without it, every recovery along a row
-    # could be the widening window inflating the score rather than the score crediting timing.
-    never_predicts = [0.0] * len(_stamps())
-
+    # could be the widening window inflating the score rather than the score crediting timing. A
+    # spike 12 hours late lies beyond every tolerance, so only a mis-sized or mis-centred window
+    # could give it credit.
     assert _score(
-        forecast=never_predicts, window_hours=WINDOW_FOR_TOLERANCE[tolerance_hours]
+        forecast=_late_by(12), window_hours=WINDOW_FOR_TOLERANCE[tolerance_hours]
     ) == pytest.approx(0.0, abs=5e-4)
 
 

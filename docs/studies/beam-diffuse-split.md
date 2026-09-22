@@ -887,7 +887,8 @@ a clock fault shared by the two would be the only thing aligning them at a non-z
 The centroid row rests on 795 clear site-days before the correction and 125 after, and its per-site
 medians span +40.9 to +45.2 before and +10.8 to +15.9 after. The generating-window row holds as the
 threshold defining "generating" moves from 0.1% to 10% of the day's peak, so the window's edge is
-not what sets the answer. `stamp_alignment.py` prints all three.
+not what sets the answer. `stamp_alignment.py` prints all three, measured on the readings as NGED
+stamped them.
 
 **The offset is neither a daylight-saving fault nor an artefact of how this project reads the
 feed.** A daylight-saving fault would step at the March and October boundaries and would be an hour;

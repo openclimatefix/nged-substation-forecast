@@ -44,7 +44,7 @@ separation model's estimate of the same split, says what the *published field* b
 | `fetch_era5_open_meteo.py` | Downloads the same fields from Open-Meteo's ERA5 mirror onto the same grid, in about a minute rather than most of a night. |
 | `verify_era5_sources.py` | Compares the two ERA5 downloads hour by hour, which is what establishes that the mirror serves ERA5's own `fdir` rather than a separation model's estimate of it. |
 | `fetch_cams.py` | Downloads the CAMS radiation service's global, beam and diffuse irradiances at each meter's own coordinates, into `data/studies/weather/CAMS/`. |
-| `sources.py` | The source names, which sources are delivered per site, and the registry of Open-Meteo models this experiment can fetch. Standard library only, so every script here can import it. |
+| `sources.py` | The source names, which sources are delivered per site, and the registry of Open-Meteo models this experiment can fetch. |
 | `fetch_open_meteo_point.py` | Downloads one Open-Meteo forecast model at each meter's own coordinates, and runs two checks on what arrived before writing it: that the hourly column is a backward mean over the hour ending at its label, and that the published direct fraction is not a separation model. Takes `--model`. |
 | `verify_ukv_lineage.py` | Compares Open-Meteo's UKV against the Met Office's own files on AWS and establishes which forecast lead the archive holds. A gate: no model is trained on UKV until it has run. |
 | `build_dataset.py` | Joins the PV power readings to one source, adds solar geometry, the separation-model estimates and the synthetic control target, and writes the one frame every arm reads. Takes `--source`. |
@@ -183,11 +183,11 @@ actual`, so adding the metered power back recovers each arm's capped point forec
 **A centred rolling window is easy to get wrong by one step, so the score is driven with forecasts
 whose right answer is known.** One site, 30 days, a 3-hour spike each day, scored against a
 threshold the spike clears: a forecast identical to the observation, one an hour late, one three
-hours late, and one that never predicts a spike. The four cases live in
+hours late, and one twelve hours late. The four cases live in
 `packages/studies/tests/test_fractions_skill_score.py`, which asserts the score at four tolerances
 for each. The last is the control the other three are read against — widening the window must not
-rescue a forecast that never predicts the event, or every recovery along a row would be the window
-inflating the score rather than the score crediting timing.
+rescue a forecast whose spike lies beyond every tolerance, or every recovery along a row would be the
+window inflating the score rather than the score crediting timing.
 
 **The score's verdict on the published split depends on which threshold it is read at, so it is
 reported as a sweep rather than a number.** Taking the headline contrast at each site's 75th, 90th,
@@ -203,11 +203,12 @@ which is consistent across every source and arm, rather than as a second opinion
 quantity.** Its two arms do not differ only in the beam field they are handed: the arm given the
 product's own split settles on a tilt 3 to 11 degrees shallower than the arm given Erbs, in every
 run and at every site, so the arms differ in fitted geometry as well. A 30-minute stamp shift is
-absorbed into the fitted azimuth — the shifted runs settle around 162 to 179 degrees and the
-as-labelled runs around 200 to 212 — and the ordering of the arms changes with it, in sample as
-well as out. So the physical model answers "which beam field lets a five-parameter isotropic-sky
-model with a fitted azimuth fit best", and its answer moves with a timestamp convention. Do not
-reconcile its sign with the tree's; report what each instrument measured.
+absorbed into the fitted azimuth: with the stamps shifted 30 minutes the fitted azimuth settled
+around 162 to 179 degrees, against 200 to 212 without the shift, and the ordering of the arms
+changed with it, in sample as well as out. So the physical model answers "which beam field lets a
+five-parameter isotropic-sky model with a fitted azimuth fit best", and its answer moves with a
+timestamp convention. Do not reconcile its sign with the tree's; report what each instrument
+measured.
 
 **The physical model also amplifies beam error where the tree does not.** `MIN_COS_ZENITH` floors
 the divisor that converts a horizontal beam to a normal one, so a beam error near the horizon is
