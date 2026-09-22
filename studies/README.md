@@ -46,11 +46,12 @@ branch. The directory is not an attic.
 - **Nothing here is imported by production code.** No study touches a Patito contract or enters the
   Dagster asset graph, and nothing in `src/` or `packages/` imports one. A study that needs to do
   any of that has stopped being a study.
-- **Paths may have rotted.** Each study reads its data from `data/studies/<name>/`, under the
-  directory `DATA_PATH_INTERNAL` names — the same variable `contracts.Settings` reads. The downloads
-  themselves are not in version control, and a data directory that has been cleaned out will not
-  refill itself. `data/NGED/` and `data/NWP/` are the pipeline's own, and a study reads them rather
-  than writing to them.
+- **Paths may have rotted.** Every study's data lives under `data/studies/`, in the directory
+  `DATA_PATH_INTERNAL` names — the same variable `contracts.Settings` reads. Downloaded weather sits
+  in `weather/<product>/` and NGED's active network management exports in `anm/`, so a later study
+  can reuse them; what one study builds from them sits in `<name>/`. None of it is in version
+  control, and a data directory that has been cleaned out will not refill itself. `data/NGED/` and
+  `data/NWP/` are the pipeline's own, and a study reads them rather than writing to them.
 - **A run command in a module docstring is the tested way to run that script.** Each one runs
   against the workspace environment, and names with `--with` only what the lockfile does not carry.
 - **Read the study's own README first.** Each directory has one, covering what the study measured,

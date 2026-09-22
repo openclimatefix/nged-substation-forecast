@@ -66,12 +66,12 @@ is the other instrument rather than another route to this one.
 
 def dataset_path_for(*, source: str) -> Path:
     """Return the frame `build_dataset.py` wrote for one ERA5 source."""
-    return STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}.parquet"
+    return STUDY_DATA_DIR / f"beam_diffuse_dataset_{source}.parquet"
 
 
 def results_dir_for(*, source: str) -> Path:
     """Return where one run's results are written."""
-    return STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_results_{source}"
+    return STUDY_DATA_DIR / f"beam_diffuse_results_{source}"
 
 
 LEARNED_BEAM_TEMPLATE: Final[str] = "learned_bhi_w_m2_fold{fold}"

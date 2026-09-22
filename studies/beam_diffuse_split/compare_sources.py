@@ -64,7 +64,7 @@ def _losses_for(*, instrument: str, source: str) -> pl.DataFrame:
         FileNotFoundError: If that run has not been produced.
     """
     stem = "results" if instrument == "xgboost" else "physics"
-    path = STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}" / "per_row_losses.parquet"
+    path = STUDY_DATA_DIR / f"beam_diffuse_{stem}_{source}" / "per_row_losses.parquet"
     if not path.exists():
         msg = f"{path} missing; run the {instrument} instrument on {source} first"
         raise FileNotFoundError(msg)

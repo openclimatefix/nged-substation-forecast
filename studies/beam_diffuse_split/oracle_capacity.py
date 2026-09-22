@@ -42,7 +42,7 @@ def main() -> int:
     parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     arguments = parser.parse_args()
 
-    results = STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_results_{arguments.source}"
+    results = STUDY_DATA_DIR / f"beam_diffuse_results_{arguments.source}"
     losses = (
         pl.read_parquet(results / "per_row_losses.parquet")
         .filter((pl.col("setting") == "primary") & (pl.col("target") == "power_mw"))

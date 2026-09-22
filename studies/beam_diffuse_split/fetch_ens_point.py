@@ -34,7 +34,7 @@ from typing import Final
 
 import h3.api.basic_int as h3
 import polars as pl
-from sources import REPO_DATA_DIR, STUDY_DATA_DIR
+from sources import REPO_DATA_DIR, WEATHER_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ logger = logging.getLogger(__name__)
 NWP_ROOT: Final[Path] = REPO_DATA_DIR / "NWP" / "nwp_model_id=ECMWF_ENS_0_25_degree"
 """Where the ENS Delta table's daily run partitions live."""
 
-OUTPUT_PATH: Final[Path] = STUDY_DATA_DIR / "ENS" / "beam_diffuse_ens.parquet"
+OUTPUT_PATH: Final[Path] = WEATHER_DATA_DIR / "ENS" / "beam_diffuse_ens.parquet"
 """Where this script writes the per-meter, per-member, per-horizon frame."""
 
 H3_RESOLUTION: Final[int] = 5

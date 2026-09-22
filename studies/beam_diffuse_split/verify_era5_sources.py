@@ -30,7 +30,7 @@ from sources import STUDY_DATA_DIR
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("verify_era5_sources")
 
-OUTPUT_PATH: Final[Path] = STUDY_DATA_DIR / "ERA5" / "era5_source_agreement.json"
+OUTPUT_PATH: Final[Path] = STUDY_DATA_DIR / "era5_source_agreement.json"
 
 COMPARED_FIELDS: Final[tuple[str, ...]] = ("ghi_w_m2", "bhi_w_m2", "temp_c")
 

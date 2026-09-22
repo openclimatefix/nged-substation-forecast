@@ -217,7 +217,7 @@ def main() -> int:
         "| Era | Contrast | ΔMAE (pp of capacity) | 95% interval | excludes zero? |",
         "|---|---|---|---|---|",
     ]
-    output_dir = STUDY_DATA_DIR / "ERA5" / "beam_diffuse_eras"
+    output_dir = STUDY_DATA_DIR / "beam_diffuse_eras"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for era in ("pre_all", "pre_matched", "post"):

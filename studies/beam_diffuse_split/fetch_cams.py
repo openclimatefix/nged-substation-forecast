@@ -32,12 +32,12 @@ import cdsapi  # ty: ignore[unresolved-import]
 import polars as pl
 from build_dataset import _pv_sites
 from era5_grid import FIRST_YEAR, LAST_DATE, LAST_YEAR, first_date_of
-from sources import STUDY_DATA_DIR
+from sources import WEATHER_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_cams")
 
-CAMS_DIR: Final[Path] = STUDY_DATA_DIR / "CAMS"
+CAMS_DIR: Final[Path] = WEATHER_DATA_DIR / "CAMS"
 OUTPUT_PATH: Final[Path] = CAMS_DIR / "beam_diffuse_cams.parquet"
 
 ADS_URL: Final[str] = "https://ads.atmosphere.copernicus.eu/api"

@@ -78,9 +78,9 @@ def _capped_forecasts(*, source: str, suffix: str, instrument: str) -> pl.DataFr
     """
     stem = "results" if instrument == "xgboost" else "physics"
     losses_path = (
-        STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}{suffix}" / "per_row_losses.parquet"
+        STUDY_DATA_DIR / f"beam_diffuse_{stem}_{source}{suffix}" / "per_row_losses.parquet"
     )
-    dataset_path = STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}{suffix}.parquet"
+    dataset_path = STUDY_DATA_DIR / f"beam_diffuse_dataset_{source}{suffix}.parquet"
     for path in (losses_path, dataset_path):
         if not path.exists():
             msg = f"{path} missing; run the {instrument} instrument on {source} first"

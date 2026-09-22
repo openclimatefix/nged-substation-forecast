@@ -41,7 +41,7 @@ PERCENT: Final[float] = 100.0
 
 def _results_dir(*, source: str) -> pathlib.Path:
     """Return where the XGBoost results for one source live."""
-    return STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_results_{source}"
+    return STUDY_DATA_DIR / f"beam_diffuse_results_{source}"
 
 
 def main() -> int:

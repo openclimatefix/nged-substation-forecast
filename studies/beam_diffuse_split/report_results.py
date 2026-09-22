@@ -284,9 +284,7 @@ def main() -> int:
     arguments = parser.parse_args()
     instrument: InstrumentType = arguments.instrument
     stem = "results" if instrument == "xgboost" else "physics"
-    results_dir = (
-        STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{arguments.source}{arguments.suffix}"
-    )
+    results_dir = STUDY_DATA_DIR / f"beam_diffuse_{stem}_{arguments.source}{arguments.suffix}"
 
     intervals = pl.read_parquet(results_dir / "bootstrap_intervals.parquet")
     summary = pl.read_parquet(results_dir / "per_site_summary.parquet")

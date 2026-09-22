@@ -234,7 +234,7 @@ def main() -> int:
         _LOG.info("fitted %s", arm)
     losses = pl.concat(frames)
 
-    output_dir = STUDY_DATA_DIR / "ERA5" / "beam_diffuse_multi_nwp"
+    output_dir = STUDY_DATA_DIR / "beam_diffuse_multi_nwp"
     output_dir.mkdir(parents=True, exist_ok=True)
     losses.write_parquet(output_dir / "losses.parquet")
 

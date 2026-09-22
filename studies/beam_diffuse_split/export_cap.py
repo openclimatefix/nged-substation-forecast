@@ -46,12 +46,10 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from build_dataset import REPO_DATA_DIR, _pv_sites
+from build_dataset import _pv_sites
+from sources import ANM_DATA_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger("export_cap")
-
-ANM_DIR: Final[Path] = REPO_DATA_DIR / "NGED" / "anm"
-"""Where `anm_setpoints.py` writes one export-cap file per generator."""
 
 CAP_FILE_PREFIX: Final[str] = "export_cap_"
 """The filenames `anm_setpoints.py` writes, each ending in the generator's `time_series_id`."""
@@ -124,7 +122,7 @@ def with_export_cap(*, dataset: pl.DataFrame) -> pl.DataFrame:
     """
     labels: dict[int, str] = dict(_pv_sites().select("time_series_id", "site").iter_rows())
     frames: list[pl.DataFrame] = []
-    for path in sorted(ANM_DIR.glob(f"{CAP_FILE_PREFIX}*.parquet")):
+    for path in sorted(ANM_DATA_DIR.glob(f"{CAP_FILE_PREFIX}*.parquet")):
         time_series_id = int(path.stem.removeprefix(CAP_FILE_PREFIX))
         site = labels.get(time_series_id)
         if site is None:
@@ -133,7 +131,7 @@ def with_export_cap(*, dataset: pl.DataFrame) -> pl.DataFrame:
         frames.append(_hourly_cap(path=path).with_columns(site=pl.lit(site)))
 
     if not frames:
-        _LOG.warning("no export caps under %s: every row will read as unconstrained", ANM_DIR)
+        _LOG.warning("no export caps under %s: every row will read as unconstrained", ANM_DATA_DIR)
         return dataset.with_columns(
             cap_mw=pl.lit(None, dtype=pl.Float64), constrained=pl.lit(value=False)
         )

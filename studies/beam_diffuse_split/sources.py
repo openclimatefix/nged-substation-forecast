@@ -199,16 +199,32 @@ storage has to point this variable at a local directory instead.
 """
 
 
-STUDY_DATA_DIR: Final[Path] = REPO_DATA_DIR / "studies" / "beam_diffuse_split"
-"""Where everything this study downloads and builds lives.
+STUDIES_DATA_DIR: Final[Path] = REPO_DATA_DIR / "studies"
+"""Where every study's inputs and outputs live, apart from the pipeline's own tables.
 
-Under `data/studies/` rather than beside the pipeline's own tables, so that a weather product this
+Under `data/studies/` rather than beside the pipeline's own tables, so that a weather product a
 study alone fetches cannot be mistaken for one the Dagster asset graph ingests. `data/NWP/` holds
-what production ingests; `data/studies/beam_diffuse_split/ICON-D2/` holds what this study fetched to
-answer one question.
+what production ingests; `data/studies/weather/ICON-D2/` holds what a study fetched to answer one
+question. `data/NGED/` stays outside it: the pipeline's own power and metadata tables, which a study
+reads and does not own.
+"""
 
-The NGED tables stay outside it. `data/NGED/` is the pipeline's own power, metadata, and active
-network management data, which this study reads and does not own.
+WEATHER_DATA_DIR: Final[Path] = STUDIES_DATA_DIR / "weather"
+"""Where downloaded weather lands, one subdirectory per product (`ERA5`, `CAMS`, `ENS`, `UKV`,
+`ICON-D2`).
+
+Kept apart from any one study's outputs because a download is an input a later study can reuse, and
+some take most of a night to fetch again.
+"""
+
+ANM_DATA_DIR: Final[Path] = STUDIES_DATA_DIR / "anm"
+"""Where NGED's active network management setpoint exports are filed, one CSV per `time_series_id`,
+beside the export-cap parquet `anm_setpoints.py` derives from each.
+"""
+
+STUDY_DATA_DIR: Final[Path] = STUDIES_DATA_DIR / "beam_diffuse_split"
+"""Where everything this study builds from its inputs lives: the joined datasets, each arm's
+results, and the figures.
 """
 
 
@@ -224,7 +240,7 @@ def point_output_path_for(*, source: SourceType) -> Path:
     Returns:
         The parquet path holding that source's per-site fluxes.
     """
-    return STUDY_DATA_DIR / source.upper() / f"beam_diffuse_{source}.parquet"
+    return WEATHER_DATA_DIR / source.upper() / f"beam_diffuse_{source}.parquet"
 
 
 HISTORICAL_FORECAST_URL: Final[str] = "https://historical-forecast-api.open-meteo.com/v1/forecast"

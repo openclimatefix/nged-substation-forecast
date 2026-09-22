@@ -63,7 +63,7 @@ _LOG: Final[logging.Logger] = logging.getLogger("run_physics_experiment")
 
 def results_dir_for(*, source: str) -> Path:
     """Return where this instrument's results for one source are written."""
-    return STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_physics_{source}"
+    return STUDY_DATA_DIR / f"beam_diffuse_physics_{source}"
 
 
 ARM_SPLITS: Final[dict[str, tuple[str, ...]]] = {

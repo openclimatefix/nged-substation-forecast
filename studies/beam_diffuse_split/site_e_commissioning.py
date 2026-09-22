@@ -30,12 +30,12 @@ import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
 from build_dataset import _pv_sites
-from sources import REPO_DATA_DIR, STUDY_DATA_DIR
+from sources import ANM_DATA_DIR, REPO_DATA_DIR, STUDY_DATA_DIR
 from studies.anonymise import site_labels_for
 
 _LOG: Final[logging.Logger] = logging.getLogger("site_e_commissioning")
 
-FIGURES_DIR: Final[Path] = STUDY_DATA_DIR / "ERA5" / "beam_diffuse_figures"
+FIGURES_DIR: Final[Path] = STUDY_DATA_DIR / "beam_diffuse_figures"
 
 
 SUBJECT: Final[str] = "E"
@@ -101,7 +101,7 @@ def _went_live() -> tuple[pl.Series, float]:
     Returns:
         That half-hour, and the connection limit itself.
     """
-    cap = pl.read_parquet(REPO_DATA_DIR / "NGED" / "anm" / "export_cap_23.parquet").sort("time")
+    cap = pl.read_parquet(ANM_DATA_DIR / "export_cap_23.parquet").sort("time")
     limit = float(np.max(cap["cap_mw"].to_numpy()))
     return cap.filter(pl.col("cap_mw") >= limit - CAP_TOLERANCE_MW)["time"][0], limit
 
@@ -113,7 +113,7 @@ def _half_hourly_gain() -> pl.DataFrame:
         `(time, date, gain)`, with the half-hours the live export cap had moved removed.
     """
     went_live, limit = _went_live()
-    cap = pl.read_parquet(REPO_DATA_DIR / "NGED" / "anm" / "export_cap_23.parquet")
+    cap = pl.read_parquet(ANM_DATA_DIR / "export_cap_23.parquet")
     capacity = (
         pl.scan_delta(str(REPO_DATA_DIR / "effective_capacity"))
         .sort("time")

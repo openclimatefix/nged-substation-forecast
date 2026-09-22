@@ -1033,7 +1033,7 @@ Eight of those scripts print a single section's numbers rather than the headline
 the same directory as the rest:
 
 - `anm_setpoints.py` builds the export cap from the setpoint extract NGED supplied, which is filed
-  under `data/NGED/anm/` in the private data store.
+  under `data/studies/anm/` in the private data store.
 - `anm_curtailment.py` reads the separate curtailment feed, and needs the cloud-storage credentials
   the other scripts do not.
 - `inverter_clipping.py` prints the inverter ceiling and how much of each site's output sits on it.

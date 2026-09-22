@@ -220,7 +220,7 @@ def main() -> int:
     )
 
     # The physical model's own score, on the identical rows, read straight from its per-row losses.
-    physics_dir = run_experiment.STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_physics_{source}"
+    physics_dir = run_experiment.STUDY_DATA_DIR / f"beam_diffuse_physics_{source}"
     physics = (
         pl.read_parquet(physics_dir / "per_row_losses.parquet")
         .filter(

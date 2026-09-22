@@ -44,6 +44,7 @@ from sources import (
     REPO_DATA_DIR,
     SOURCE_CHOICES,
     STUDY_DATA_DIR,
+    WEATHER_DATA_DIR,
     PointTemporalType,
     SourceType,
     point_output_path_for,
@@ -55,12 +56,12 @@ from studies.solar import azimuth, extraterrestrial_horizontal, zenith
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("build_dataset")
 
-ERA5_DIR: Final[Path] = STUDY_DATA_DIR / "ERA5" / "beam_diffuse"
+ERA5_DIR: Final[Path] = WEATHER_DATA_DIR / "ERA5" / "beam_diffuse"
 POWER_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "NGED" / "power_time_series.delta")
 METADATA_PATH: Final[Path] = REPO_DATA_DIR / "NGED" / "metadata.parquet"
 CAPACITY_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "effective_capacity")
-OPEN_METEO_PATH: Final[Path] = STUDY_DATA_DIR / "ERA5" / "beam_diffuse_open_meteo.parquet"
-CAMS_PATH: Final[Path] = STUDY_DATA_DIR / "CAMS" / "beam_diffuse_cams.parquet"
+OPEN_METEO_PATH: Final[Path] = WEATHER_DATA_DIR / "ERA5" / "beam_diffuse_open_meteo.parquet"
+CAMS_PATH: Final[Path] = WEATHER_DATA_DIR / "CAMS" / "beam_diffuse_cams.parquet"
 
 
 def output_path_for(*, dataset_name: str) -> Path:
@@ -73,7 +74,7 @@ def output_path_for(*, dataset_name: str) -> Path:
     Returns:
         The parquet path every arm of that run reads.
     """
-    return STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{dataset_name}.parquet"
+    return STUDY_DATA_DIR / f"beam_diffuse_dataset_{dataset_name}.parquet"
 
 
 MIN_YEARS_OF_READINGS: Final[float] = 1.0

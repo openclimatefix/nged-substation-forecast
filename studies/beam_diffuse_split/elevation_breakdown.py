@@ -40,11 +40,11 @@ def _banded_losses(*, instrument: str, source: str) -> pl.DataFrame:
     """Read one run's primary losses and attach the solar elevation band of each row."""
     stem = "results" if instrument == "xgboost" else "physics"
     losses = pl.read_parquet(
-        STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}" / "per_row_losses.parquet"
+        STUDY_DATA_DIR / f"beam_diffuse_{stem}_{source}" / "per_row_losses.parquet"
     ).filter(pl.col("setting") == "primary")
-    elevation = pl.read_parquet(
-        STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}.parquet"
-    ).select("site", "time", "solar_elevation_deg")
+    elevation = pl.read_parquet(STUDY_DATA_DIR / f"beam_diffuse_dataset_{source}.parquet").select(
+        "site", "time", "solar_elevation_deg"
+    )
     return losses.join(elevation, on=["site", "time"], how="inner").with_columns(
         band=pl.col("solar_elevation_deg").cut(
             breaks=list(ELEVATION_BAND_EDGES_DEGREES[1:-1]), labels=None

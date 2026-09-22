@@ -34,15 +34,11 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from build_dataset import REPO_DATA_DIR
 from run_experiment import dataset_path_for
-from sources import SOURCE_CHOICES
+from sources import ANM_DATA_DIR, SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("anm_setpoints")
-
-ANM_DIR: Final[Path] = REPO_DATA_DIR / "NGED" / "anm"
-"""Where NGED's setpoint exports are filed, one CSV per `time_series_id`."""
 
 BRIGHT_W_M2: Final[float] = 400.0
 """Global irradiance above which a yield ratio is stable enough to compare."""
@@ -129,9 +125,9 @@ def main() -> int:
     )
     arguments = parser.parse_args()
 
-    exports = sorted(ANM_DIR.glob("ANM_Historic_Data_*.csv"))
+    exports = sorted(ANM_DATA_DIR.glob("ANM_Historic_Data_*.csv"))
     if not exports:
-        _LOG.error("no setpoint exports under %s", ANM_DIR)
+        _LOG.error("no setpoint exports under %s", ANM_DATA_DIR)
         return 1
 
     dataset = pl.read_parquet(dataset_path_for(source=arguments.source)).with_columns(
@@ -147,7 +143,7 @@ def main() -> int:
         events = _events(path=path)
         limit = float(np.max(events["cap_mw"].to_numpy()))
         half_hourly = _half_hourly(events=events)
-        out = ANM_DIR / f"{path.stem.replace('ANM_Historic_Data', 'export_cap')}.parquet"
+        out = ANM_DATA_DIR / f"{path.stem.replace('ANM_Historic_Data', 'export_cap')}.parquet"
         half_hourly.write_parquet(out)
         _LOG.info("wrote %s", out)
 
