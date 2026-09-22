@@ -35,6 +35,45 @@ and the same reasoning applies here.** A curtailed hour can be kept and scored a
 operator set. Nothing in the record says what fraction of an array was energised on a given day, so
 a commissioning hour has no ceiling to compare a prediction against.
 
+## NGED's power timestamps ran half an hour late, and the ingest repairs them
+
+**Every reading NGED stamped before 08:30 UTC on 26 March 2026 describes the half-hour before the
+one its label names, and the ingest moves those readings 30 minutes earlier.** NGED reported the
+fault and corrected the feed at that instant, and three independent measurements agree with their
+account — the evidence is in the [beam/diffuse
+appendix](../results/beam-diffuse-split.md#the-power-timestamps-before-26-march-2026-are-half-an-hour-late).
+`PowerTimeSeries.correct_late_timestamps` applies the repair in `nged_data.read_nged_json`, so
+`PowerTimeSeries.time` ends the observation period for every stored row rather than only for rows
+NGED stamped correctly.
+
+**The repair runs at the ingestion boundary rather than in feature engineering, which trades away
+[design principle 15](../design-philosophy/design-principles.md#15-transform-data-in-feature-engineering-not-in-the-ingest-unless-it-saves-a-lot-of-storage).**
+What it buys is that the `PowerTimeSeries` contract stays a true account of the table it governs, so
+no consumer has to know which regime a row came from and no future consumer can get it wrong by
+omission. What it costs is that revising the correction means rebuilding the table from NGED's
+bucket rather than editing a function. That cost is accepted because rebuilding is already the
+maintenance route for this table.
+
+**The correction applies to every series, on a mechanism rather than on a measurement.** NGED
+convert every series in the trial area through one code path, so no series can have escaped the
+fault. The three measurements cover the six metered solar farms alone, because each needs solar
+geometry that a substation load profile has no equivalent of — and the two signals that look
+fleet-wide are not: only the generation series drop from 48 published rows a day to about 24, and
+only the generation series stop publishing exact zeros, both being NGED ceasing to pad a
+generator's overnight hours.
+
+**A corrected series carries no reading at 08:00 on 26 March 2026.** The last late reading is
+stamped 08:00 and moves to 07:30, while the first correct reading is stamped 08:30, so NGED never
+published the half-hour ending at 08:00. The gap is left as a gap: it says "no measurement", where
+interpolating would invent one. Nothing downstream requires a gapless half-hourly grid — the lag
+features join on time, the rolling means use `rolling_mean_by`, and eligibility reads only each
+series' first and last reading.
+
+**Should NGED republish their history already corrected, the repair has to be removed before the
+next rebuild.** A corrected file is indistinguishable from an uncorrected one when read on its own,
+so nothing in the pipeline can detect the change unaided;
+[#804](https://github.com/openclimatefix/nged-substation-forecast/issues/804) covers detecting it.
+
 ## Detecting a ramp needs a reference series, not a threshold
 
 **A part-built solar farm under a clear sky produces exactly what a whole solar farm produces under

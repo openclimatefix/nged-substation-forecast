@@ -343,7 +343,9 @@ def test_power_time_series_and_metadata_drops_and_reports_malformed_rows(
 
     power = pl.read_delta(str(env / "NGED" / "power_time_series.delta"))
     assert power.height == 1
-    assert power["time"][0] == datetime(year=2026, month=3, day=5, hour=12, minute=30, tzinfo=UTC)
+    # 12:00, not the 12:30 NGED stamped: this reading predates their correction, so the ingest
+    # moves it back 30 minutes (`PowerTimeSeries.correct_late_timestamps`).
+    assert power["time"][0] == datetime(year=2026, month=3, day=5, hour=12, minute=0, tzinfo=UTC)
 
     materialisations = result.asset_materializations_for_node("power_time_series_and_metadata")
     metadata = {k: v for mat in materialisations for k, v in mat.metadata.items()}

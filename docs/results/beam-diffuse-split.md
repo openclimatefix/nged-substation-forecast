@@ -185,7 +185,7 @@ rest of the check is [below](#what-the-result-survives).
 
 ### Three faults in NGED's own feeds had to be settled before the rows were usable
 
-**The power stamps ran half an hour late until March 2026, one site is curtailed under active
+**The power timestamps ran half an hour late until March 2026, one site is curtailed under active
 network management, and one site spent its first 8 months being commissioned.** Each of the three
 decides which rows are scorable and what those rows mean, and each was settled from NGED's own
 records rather than assumed. The evidence sits in an
@@ -767,7 +767,7 @@ everything the model does not represent. They also caution against the static fu
 denominator where a plant moves. Both readings are set out
 [above](#what-the-per-site-error-drift-says-about-estimating-effective-capacity).
 
-**The half-hour power-stamp offset is settled, and it reaches further than this experiment.** NGED
+**The half-hour power-timestamp offset is settled, and it reaches further than this experiment.** NGED
 corrected the feed at 08:30 UTC on 26 March 2026, and three independent measurements agree that
 readings before that instant are half an hour late while readings after it are not. Any model
 trained on telemetry from before the correction is affected, not only the models here, and the same
@@ -857,7 +857,7 @@ design that eliminated the floor rather than arguing past it would be stronger.
 
 ## Appendix: what the NGED feeds needed before their rows were usable
 
-### The power stamps before 26 March 2026 are half an hour late
+### The power timestamps before 26 March 2026 are half an hour late
 
 **NGED corrected the half-hourly power feed at 08:30 UTC on 26 March 2026, and every reading stamped
 before that instant describes the half-hour before the one its label names.** The contract says a
@@ -891,14 +891,14 @@ not what sets the answer. `stamp_alignment.py` prints all three.
 **The offset is neither a daylight-saving fault nor an artefact of how this project reads the
 feed.** A daylight-saving fault would step at the March and October boundaries and would be an hour;
 this offset does neither. NGED's own JSON labels every reading with an explicit `startTime` and
-`endTime`, both carrying a UTC offset and each abutting the next record, and the ingest takes
-`endTime` unchanged. So the feed states which half-hour it means, and until 26 March 2026 the sun
-disagreed with it by one half-hour.
+`endTime`, both carrying a UTC offset and each abutting the next record, and the ingest reads
+`endTime` and then repairs it. So the feed states which half-hour it means, and until 26 March 2026
+the sun disagreed with it by one half-hour.
 
-**Reading the stamps correctly matters most to the arm under test.** A half-hour error blunts the
+**Reading the timestamps correctly matters most to the arm under test.** A half-hour error blunts the
 sharp beam signal more than the smooth diffuse signal, so it penalises the arm given the published
 beam more than the arm given a separation model's estimate of it. Any result computed on the
-uncorrected stamps would therefore understate what the beam field is worth.
+uncorrected timestamps would therefore understate what the beam field is worth.
 
 ### One site is curtailed, and the export cap is what makes its hours scorable
 
@@ -975,7 +975,8 @@ would have to make the same call.
 
 **An independent sign agrees, and reading it needs both clocks kept straight.** The operator's event
 log was never mis-stamped, while [the power feed ran half an hour
-late](#the-power-stamps-before-26-march-2026-are-half-an-hour-late) until March 2026, so the two
+late](#the-power-timestamps-before-26-march-2026-are-half-an-hour-late) until March 2026, so the
+two
 have to be compared on the corrected clock. Corrected, site E reads zero from 08:00 until the
 half-hour ending 14:30 on 6 August 2024 while the other five farms climb to 29% of capacity, and the
 operator raises the cap from zero to 0.25 MW at 13:35 UTC and to the connection limit at 15:16. That
@@ -1024,7 +1025,7 @@ are there so the measurement can be audited and re-run.
 Every contrast, interval, and error level quoted here is printed by a script rather than transcribed
 by hand, and every figure is drawn from the results files rather than redrawn from a table. The
 scripts named below print the cap, the curtailment feed, the inverter ceiling, the restart
-comparison, the shared-geometry refit, the capacity denominators, and the stamp offsets. What is
+comparison, the shared-geometry refit, the capacity denominators, and the timestamp offsets. What is
 left — the row counts, the fitted tilts and azimuths, and the per-site spans — was computed ad hoc
 against the same outputs.
 
@@ -1036,8 +1037,8 @@ the same directory as the rest:
 - `anm_curtailment.py` reads the separate curtailment feed, and needs the cloud-storage credentials
   the other scripts do not.
 - `inverter_clipping.py` prints the inverter ceiling and how much of each site's output sits on it.
-- `stamp_alignment.py` prints the three stamp offsets in [the power stamps before 26 March
-  2026](#the-power-stamps-before-26-march-2026-are-half-an-hour-late).
+- `stamp_alignment.py` prints the three timestamp offsets in [the power timestamps before
+  26 March 2026](#the-power-timestamps-before-26-march-2026-are-half-an-hour-late).
 - `restart_basins.py` compares the optimiser's fixed starting point against 64 independent random
   ones, which is what the restart limitation rests on.
 - `shared_geometry.py` refits the physical model's arms with their tilt and azimuth held equal.

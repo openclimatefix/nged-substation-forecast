@@ -1,8 +1,10 @@
+from datetime import UTC, datetime
 from pathlib import Path
 
 import patito as pt
 import polars as pl
 import pytest
+from contracts.common import MIN_PLAUSIBLE_DATETIME
 from contracts.power_schemas import PowerTimeSeries, TimeSeriesMetadata
 from nged_data.read_nged_json import (
     _camel_to_snake,
@@ -148,3 +150,49 @@ def test_extract_power_time_series_rejects_non_numeric_value():
     df = pl.read_json(invalid_json)
     with pytest.raises(pl.exceptions.InvalidOperationError, match="conversion from `str` to `f32`"):
         _extract_power_time_series(df, time_series_id=1)
+
+
+def test_extract_power_time_series_corrects_late_timestamps():
+    """A reading NGED stamped late is stored 30 minutes earlier; a correct one is stored as sent.
+
+    Both regimes are asserted in one test, because the parser has to cross NGED's correction
+    instant and take a different branch on each side of it.
+    """
+    raw_json = b"""
+    {
+        "data": [
+            {"endTime": "2026-03-26T08:00:00Z", "value": 1.0},
+            {"endTime": "2026-03-26T08:30:00Z", "value": 2.0}
+        ]
+    }
+    """
+    df = pl.read_json(raw_json)
+
+    extracted = _extract_power_time_series(df, time_series_id=42)
+
+    assert extracted.dataframe["time"].to_list() == [
+        datetime(2026, 3, 26, 7, 30, tzinfo=UTC),
+        datetime(2026, 3, 26, 8, 30, tzinfo=UTC),
+    ]
+    assert extracted.n_dropped == 0
+
+
+def test_extract_power_time_series_drops_a_reading_the_correction_pushes_out_of_range():
+    """A reading is judged on the timestamp that will be stored, not on the one NGED sent.
+
+    `MIN_PLAUSIBLE_DATETIME` itself is the only `endTime` that is in range before the correction
+    and out of range after it, so it is the only reading that can distinguish correcting before
+    dropping from correcting after. Correcting second would leave this row to raise out of
+    `validate`, failing the whole ingest run over one malformed external reading.
+    """
+    raw_json = (
+        b'{"data": [{"endTime": "'
+        + f"{MIN_PLAUSIBLE_DATETIME:%Y-%m-%dT%H:%M:%S}Z".encode()
+        + b'", "value": 1.0}]}'
+    )
+    df = pl.read_json(raw_json)
+
+    extracted = _extract_power_time_series(df, time_series_id=42)
+
+    assert extracted.dataframe.is_empty()
+    assert extracted.n_dropped == 1

@@ -97,6 +97,14 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     ``live_forecasts`` in ``defs/production_assets.py``, all read the Delta table this asset
     writes directly.
 
+    One repair does happen here, and an operator rebuilding this table has to know about it: a
+    reading NGED stamped before ``POWER_TIMESTAMPS_CORRECTED_BEFORE`` is stored 30 minutes earlier
+    than NGED stamped it, because their feed ran half an hour late until they corrected it. The
+    stored ``time`` is therefore NGED's own timestamp for recent readings and a corrected one for
+    older readings. Should NGED ever republish their history already corrected, this repair must be
+    removed before the next rebuild or those readings will be corrected twice — see
+    ``PowerTimeSeries.correct_late_timestamps``.
+
     Runs hourly on ``power_time_series_and_metadata_schedule``, 5 minutes before
     ``live_forecasts_schedule`` ticks. A failed or skipped run leaves nothing behind to repair:
     this asset re-lists NGED's bucket from scratch on every run, so the next hourly run appends

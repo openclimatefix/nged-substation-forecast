@@ -7,7 +7,7 @@ error by, to express that error as a fraction of the series' capacity.
 """
 
 from collections.abc import Sequence
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import ClassVar, Final, NamedTuple, Self
 
 import patito as pt
@@ -30,6 +30,24 @@ class DropImplausibleRowsResult(NamedTuple):
     n_dropped: int
 
 
+POWER_TIMESTAMPS_CORRECTED_BEFORE: Final[datetime] = datetime(2026, 3, 26, 8, 30, tzinfo=UTC)
+"""NGED's power timestamps are half an hour late before this instant, and correct from it onwards.
+
+A reading NGED stamps `T` before this instant is the mean over `(T - 60 min, T - 30 min]`, not the
+`(T - 30 min, T]` the `time` field states. NGED reported the fault and corrected the feed at this
+instant, and three independent measurements agree with their account: the power-weighted centroid of
+a clear day's output steps from 45 minutes after solar noon to 15 minutes, the generating window's
+midpoint steps the same way, and the stamp shift maximising the correlation with satellite
+irradiance steps from -30 minutes to zero. The evidence is at
+<https://openclimatefix.github.io/nged-substation-forecast/results/beam-diffuse-split/#the-power-timestamps-before-26-march-2026-are-half-an-hour-late>.
+
+The correction applies to every `time_series_id`, because NGED convert every series in the trial
+area through one code path, so no series can have escaped the fault. The measurements above cover
+the six metered solar farms only: they need solar geometry, which a substation load profile has no
+equivalent of.
+"""
+
+
 class PowerTimeSeries(pt.Model):
     """Half-hourly power observations (MW or MVA), one row per (time_series_id, time)."""
 
@@ -39,6 +57,10 @@ class PowerTimeSeries(pt.Model):
         dtype=UTC_DATETIME_DTYPE,
         description=(
             "End time of the 30-minute observation period (all NGED data is already half-hourly)."
+            " A value before `POWER_TIMESTAMPS_CORRECTED_BEFORE` is NGED's own timestamp moved 30"
+            " minutes earlier by `correct_late_timestamps`, which repairs a known fault in their"
+            " feed at the ingestion boundary, so this column ends the observation period for every"
+            " row rather than only for rows NGED stamped correctly."
             f" Must fall between {MIN_PLAUSIBLE_DATETIME:%Y-%m-%d} and"
             f" {MAX_PLAUSIBLE_DATETIME:%Y-%m-%d} (enforced by `validate`, not by the field, because"
             " Patito ignores `ge`/`le` on datetime fields — see `check_datetime_bounds`)."
@@ -108,6 +130,42 @@ class PowerTimeSeries(pt.Model):
             raise ValueError("the `time` column is not sorted!")
 
         return validated_df
+
+    @classmethod
+    def correct_late_timestamps(cls, dataframe: pl.DataFrame) -> pl.DataFrame:
+        """Move every `time` before ``POWER_TIMESTAMPS_CORRECTED_BEFORE`` 30 minutes earlier.
+
+        NGED stamped this feed half an hour late until they corrected it; the constant's docstring
+        holds the evidence and the scope. Correcting at ingestion is what lets the `time` field
+        mean one thing for the whole table, so no consumer has to know which regime a row came
+        from.
+
+        Call this BEFORE ``drop_implausible_rows``, and only at a boundary that receives NGED's
+        raw JSON. The order is not cosmetic: ``drop_implausible_rows`` has to judge the timestamp
+        that will actually be stored. Reversed, a reading whose corrected timestamp falls outside
+        the plausible range survives the drop and then raises out of ``validate``, which turns one
+        malformed external reading into a failed ingest run — the outcome
+        ``drop_implausible_rows`` exists to prevent.
+
+        The correction cannot collide with an existing row or disturb the sort order, because it
+        shifts a contiguous prefix of each series by a constant and the shifted prefix ends 30
+        minutes before the unshifted remainder begins. It leaves the feed's one-reading gap at
+        ``POWER_TIMESTAMPS_CORRECTED_BEFORE - 30 min`` visible rather than filled: NGED never
+        published the half-hour ending there, and inventing a value would be worse than showing
+        the absence.
+
+        Args:
+            dataframe: A frame with a `time` column already cast to ``UTC_DATETIME_DTYPE``; need
+                not yet be validated.
+
+        Returns:
+            `dataframe` with `time` corrected, and every other column untouched.
+        """
+        return dataframe.with_columns(
+            time=pl.when(pl.col("time") < POWER_TIMESTAMPS_CORRECTED_BEFORE)
+            .then(pl.col("time").dt.offset_by("-30m"))
+            .otherwise(pl.col("time"))
+        )
 
     @classmethod
     def drop_implausible_rows(cls, dataframe: pl.DataFrame) -> DropImplausibleRowsResult:
