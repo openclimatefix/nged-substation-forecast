@@ -87,15 +87,20 @@ That buys both plan reviews and both diff reviews, run on Opus 5.5 as the mainta
   - the `HyperParameters` TypedDict, with `PRIMARY_HYPER_PARAMETERS` and
     `SENSITIVITY_HYPER_PARAMETERS`, including the load-bearing `colsample_bytree` docstring;
   - `QUANTILE_LEVELS` and `QUANTILE_LEVEL_SPACING`;
-  - `assign_folds(*, dataset, n_folds=N_FOLDS, by=("site",))`, which is today's `_assign_folds` with
-    `.over("site")` generalised to `.over(by)`. #809 adds an `era` column and passes
+  - `assign_folds(*, dataset, by=("site",))`, which is today's `_assign_folds` with `.over("site")`
+    generalised to `.over(by)`. The fold count stays the `N_FOLDS` constant, not a parameter,
+    because `out_of_fold_losses` and `per_fold_differences` iterate `range(N_FOLDS)`, and a caller
+    passing a different count would silently leave folds unscored. #809 adds an `era` column and passes
     `("site", "era")`, so every fold holds a slice of every era.
   - `booster_parameters`, `crps`, and `fit_one_fold`, which is today's absolute-error point fit plus
     optional quantiles;
   - `clamp_to_cap`, moved from `export_cap.py` because the loop needs it and it is pure.
     `export_cap.py` keeps `with_export_cap`, which reads the data store.
   - `out_of_fold_losses(*, site_rows, features, target, hyper_parameters, with_quantiles)`, which
-    is today's `_run_site_arm` body minus the `arm` and `setting` labels.
+    is today's `_run_site_arm` body minus the `arm` and `setting` labels. The loop calls
+    `fit_one_fold` through the module global, so a test can replace it with a recording stub.
+    `cross_validation.py` must not import `export_cap`, which imports `build_dataset._pv_sites`
+    and so reaches the data store.
 
   In `out_of_fold_losses`, `features` is a list whose entries may carry a `{fold}` placeholder,
   resolved per fold, which is how arm `B_learned` and the hybrid arms keep their own fold out of
@@ -105,8 +110,9 @@ That buys both plan reviews and both diff reviews, run on Opus 5.5 as the mainta
   `run_experiment.main`. The caller adds the labels.
 - **`bootstrap.py`** holds `paired_differences`, `bootstrap_difference` and
   `per_fold_differences`, moved from `run_experiment.py`. Two things change:
-  - the seed axis is read from the data (`sorted(unique seeds)`) rather than from the `SEEDS`
-    constant;
+  - the seed axis is read from the joined, paired frame (`sorted(unique seeds)`) rather than from
+    the `SEEDS` constant. Taking the seeds after the join rather than before it matters when one
+    arm lacks a seed.
   - `n_resamples` and `rng_seed` become keyword arguments with today's defaults.
 
   The random stream is preserved exactly: a fresh `default_rng(20260920)` per call, then per
@@ -118,7 +124,8 @@ That buys both plan reviews and both diff reviews, run on Opus 5.5 as the mainta
   its `lambert_azimuthal_equal_area` attributes. #806 adds a latitude/longitude path once it knows
   where SARAH-3 is served and what its coordinates are named.
 - **`packages/studies/pyproject.toml`** adds `xgboost`, `xarray` and `pyproj`. All three are
-  already in the lock.
+  already in the lock, but the `studies` package's own dependency list changes, so `uv lock` runs
+  and `uv.lock` is committed, because CI runs `uv sync --locked`.
 
 ### `studies/beam_diffuse_split/`
 
@@ -141,7 +148,7 @@ That buys both plan reviews and both diff reviews, run on Opus 5.5 as the mainta
   folds, import from the package. These are `anm_curtailment`, `capacity_denominator`,
   `compare_sources`, `inverter_clipping`, `oracle_capacity`, `sky_conditions`, `restart_basins`,
   `shared_geometry`, `run_physics_experiment`, `ens_horizons` (folds and hyperparameters only), and
-  the three fitting scripts.
+  the three fitting scripts. `ens_horizons.py` imports `_booster_parameters` too.
 - **`verify_ukv_lineage.py`** passes its variable and CRS to `sample_nearest_cell`.
 - **`fractions_skill_score.py`** (the study script) gains one docstring line on
   `_bootstrap_fss_difference`.
@@ -167,24 +174,32 @@ assertion that matters is listed for each test.
   - `crps` on a hand-computed two-row case, with crossing quantiles sorted before scoring;
   - `booster_parameters` carries no `colsample_bytree`;
   - `clamp_to_cap` clamps where a cap exists and passes through where it is null.
-- **The loop, on a small synthetic frame with a real XGBoost fit of a few rounds:**
-  - no row of the test fold is ever a training row, which is checked by the loop's own output
-    covering each row exactly once per seed;
-  - constrained rows are scored but not trained on;
-  - an empty fold is skipped;
-  - a `{fold}` placeholder resolves to that fold's column;
+- **The loop, with `monkeypatch` replacing `studies.cross_validation.fit_one_fold` by a recording
+  stub:**
+  - each fold's training times and test times are disjoint, which fails if the `fold != k` filter
+    is dropped;
+  - no constrained row reaches training, and every constrained row is scored;
+  - a fold whose training side is empty is skipped;
+  - the feature list the stub receives names `..._fold{k}` for fold `k`;
+  - every `(test row, seed)` appears exactly once in the output.
+- **The losses, from the same stub returning known predictions:**
   - the capped columns are clamped and the uncapped columns are not;
-  - two sites with different capacities give a pooled mean of per-row ratios, not a ratio of means.
-    That is the #809 normalisation trap, pinned.
+  - each `*_fraction_of_capacity` equals the matching megawatt column divided by that row's
+    `effective_capacity_mw`, exactly.
+- **One real XGBoost smoke test** of a few rounds on a small frame. It checks that the same seed
+  gives identical predictions twice, and it must survive `filterwarnings = error`.
 - **`test_bootstrap.py`:**
   - the point estimate is the mean paired difference;
   - a constant difference gives a zero-width interval at that value;
   - a frame with one seed works, where the hard-coded `SEEDS` failed before;
   - the interval equals a literal pinned from today's implementation on a fixed frame, which pins
-    the random stream.
+    the random stream. The frame has at least two seeds and months with unequal row counts, which
+    is what makes a lost `seed` join key visible: the point estimate alone is unchanged under a
+    cross-seed join.
 - **`test_grid_sampling.py`:** an in-memory Lambert azimuthal equal-area grid, with each cell
-  holding its own index, returns the right cell for points placed inside known cells. It needs no
-  netCDF library, network or data store.
+  holding its own index, returns the right cell for points placed inside known cells. The grid is
+  non-square, with distinct x and y ranges and asymmetric points, so a swapped axis or a missing
+  `always_xy` fails. It needs no netCDF library, network or data store.
 
 ## The reproduction check
 
@@ -196,13 +211,26 @@ assertion that matters is listed for each test.
 2. **On the branch,** run `run_experiment.py --source cams` against the same dataset. Then run
    `run_hybrid_experiment.py --source cams` against the baseline's physics losses. The physics code
    is unchanged, so its run is not repeated.
-3. **Compare** `per_row_losses.parquet`, sorted by `(setting, arm, site, time, seed)`, and
-   `bootstrap_intervals.parquet` and `per_site_summary.parquet`, with exact `polars.testing`
-   equality. Any difference is a bug in the refactor.
-4. **Build the open-meteo, UKV and ICON-D2 datasets on the branch,** then run `era_comparison.py`
-   and `multi_nwp.py`. Their arm tables must reproduce the published 9.572 and 9.895, and 6.922 and
-   7.224, exactly, because the arm tables already use per-row ratios. Only the contrast columns may
-   move. Record the old and new contrasts in the PR body.
+3. **Compare exactly, with `polars.testing` and `check_column_order=False`:**
+   - `per_row_losses.parquet`, sorted by `(setting, arm, site, time, seed)`;
+   - `bootstrap_intervals.parquet`, which is deterministic because the pairing sorts before any
+     arithmetic;
+   - `hybrid_per_row_losses.parquet`, sorted by `(arm, site, time, seed)`.
+
+   `per_site_summary.parquet` is compared at a relative tolerance of 1e-12. It averages over a
+   frame concatenated in completion order, so it is not bit-stable even between two runs of
+   `main`. Any difference beyond these limits is a bug in the refactor.
+4. **The era and multi-NWP runs are compared against a `main` baseline, not against the published
+   figures.** The baseline also builds the open-meteo, UKV and ICON-D2 datasets into the scratch
+   directory, and runs `main`'s `era_comparison.py` and `multi_nwp.py` on them. The branch runs the
+   same two scripts on the same datasets. Their sorted loss files and arm tables must match the
+   baseline exactly, and only the contrast columns may move.
+
+   The published figures cannot serve as the reference. The published datasets were built before
+   the power table was re-materialised, and today's `effective_capacity` table gives five of the
+   six sites a capacity that differs in the third or fourth significant figure (5.956 to 5.955 MW,
+   17.621 to 17.605 MW, and so on). Every per-row ratio moves with the capacity, whether or not
+   the refactor is correct.
 
 ## Docs to update
 
@@ -211,7 +239,8 @@ assertion that matters is listed for each test.
 - **The #809 and #810 issue bodies:** a comment on each giving the re-normalised figures, because
   they quote these scripts.
 - **`packages/studies/README.md`:** one line per new module.
-- **`studies/beam_diffuse_split/README.md`:** the script table, where a script's role changed.
+- **`studies/beam_diffuse_split/README.md`:** the script table where a script's role changed, and
+  lines 299–302, which quote the era contrasts.
 
 ## Verification commands
 
@@ -236,7 +265,22 @@ assertion that matters is listed for each test.
    not fixed.
 4. **The row-order risk.** The reproduction check is what would catch a slip.
 
+5. **The headline figures drift, because the data changed rather than the code.** The baseline
+   rebuilds the CAMS dataset from today's power and capacity tables. The capacities differ, as step
+   4 of the reproduction check describes, so the baseline's headline numbers will differ slightly
+   from `docs/studies/beam-diffuse-split.md`. That drift would appear with or without this PR. This
+   PR records the baseline-against-published comparison in its body. If any number on the page
+   moves at its printed precision, refreshing the page is filed as its own issue, because it is a
+   data refresh rather than part of the refactor. #815's claim that a re-run reproduces the
+   published figures is then corrected in a comment.
+
 ## Rejected from the simplicity review
 
 - Deferring the within-era fold grouping to #809 entirely: the issue asks for it, and it is one
   argument.
+
+## Rejected from the correctness review
+
+- None of the correctness findings was rejected. The `n_folds` finding is resolved by dropping the
+  parameter rather than by iterating the fold values present, because no caller needs a different
+  count.
