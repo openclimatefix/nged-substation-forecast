@@ -50,6 +50,40 @@ def test_the_interval_reproduces_the_published_random_stream():
     }
 
 
+def test_the_interval_does_not_depend_on_the_order_of_the_rows():
+    # The runners stack their losses in whatever order the fits finish, so the pairing has to
+    # sort before it assigns months, or the published digits would change from run to run.
+    shuffled = _losses(seeds=(0, 1, 2)).sample(fraction=1.0, shuffle=True, seed=3)
+
+    assert bootstrap_difference(
+        losses=shuffled, treatment="T", reference="R", metric="loss"
+    ) == bootstrap_difference(
+        losses=_losses(seeds=(0, 1, 2)), treatment="T", reference="R", metric="loss"
+    )
+
+
+def test_rows_are_paired_within_a_site():
+    # Every site shares the same timestamps, so pairing on time alone would cross sites.
+    site_a = _losses(seeds=(0, 1, 2), difference=0.25)
+    site_b = site_a.with_columns(site=pl.lit("B"), loss=pl.col("loss") * 2)
+
+    interval = bootstrap_difference(
+        losses=pl.concat([site_a, site_b]), treatment="T", reference="R", metric="loss"
+    )
+
+    assert interval["difference"] == pytest.approx(0.375)
+    assert interval["n_rows"] == 28
+
+
+def test_each_interval_starts_its_own_random_stream():
+    losses = _losses(seeds=(0, 1, 2))
+
+    first = bootstrap_difference(losses=losses, treatment="T", reference="R", metric="loss")
+    second = bootstrap_difference(losses=losses, treatment="T", reference="R", metric="loss")
+
+    assert first == second
+
+
 def test_a_constant_difference_gives_a_zero_width_interval_at_that_value():
     losses = _losses(seeds=(0, 1, 2), difference=0.25)
 

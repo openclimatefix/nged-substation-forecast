@@ -123,7 +123,7 @@ def assign_folds(*, dataset: pl.DataFrame, by: Sequence[str] = ("site",)) -> pl.
     group = list(by)
     month_rank = pl.col("month").rank(method="dense").over(group)
     month_count = pl.col("month").n_unique().over(group)
-    fold = ((month_rank - 1) * N_FOLDS // month_count).clip(upper_bound=N_FOLDS - 1)
+    fold = (month_rank - 1) * N_FOLDS // month_count
     return dataset.with_columns(fold=fold.cast(pl.Int32))
 
 

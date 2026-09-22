@@ -33,6 +33,8 @@ from run_physics_experiment import MAX_ITERATIONS, START_SPREAD, _n_parameters, 
 from scipy.optimize import minimize
 from sources import SOURCE_CHOICES
 from studies.bootstrap import bootstrap_difference
+
+# The block bootstrap draws one seed per resample, so every arm it compares shares `SEEDS`.
 from studies.cross_validation import N_FOLDS, SEEDS, assign_folds, clamp_to_cap
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -53,9 +55,6 @@ GEOMETRY_INDICES: Final[tuple[int, int]] = (0, 1)
 
 N_RESTARTS: Final[int] = 8
 """Starting points per fit, matching `run_physics_experiment`."""
-
-# The seeds come from `run_experiment`, because the block bootstrap draws one of them per
-# resample and would otherwise see a ragged array.
 
 
 def _fit(

@@ -7,6 +7,7 @@ import pytest
 from studies.cross_validation import (
     N_FOLDS,
     PRIMARY_HYPER_PARAMETERS,
+    QUANTILE_LEVELS,
     SEEDS,
     HyperParameters,
     assign_folds,
@@ -35,12 +36,14 @@ def test_folds_match_the_published_scheme():
     assert by_site["fold"].to_list() == [[0, 0, 1, 1, 2, 2, 3, 3, 4, 4], [0, 0, 1, 2, 2, 3, 4]]
 
 
-def test_every_row_of_a_month_shares_one_fold():
-    rows = pl.DataFrame(_months("A", 10) * 3)
+def test_many_rows_a_month_are_ranked_by_month_not_by_row():
+    # Real months hold hundreds of rows each. Ranking rows rather than distinct months would push
+    # almost every month into the last fold.
+    rows = pl.DataFrame(sorted(_months("A", 10) * 3, key=lambda row: str(row["month"])))
 
-    per_month = assign_folds(dataset=rows).group_by("month").agg(pl.col("fold").n_unique())
+    folds = assign_folds(dataset=rows)
 
-    assert per_month["fold"].to_list() == [1] * 10
+    assert folds["fold"].to_list() == [fold for fold in range(N_FOLDS) for _ in range(6)]
 
 
 def test_grouping_by_era_puts_every_era_in_every_fold():
@@ -63,6 +66,15 @@ def test_crps_of_a_forecast_every_level_puts_one_above_the_outcome():
     assert crps(actual=np.zeros(1), quantiles=quantiles) == pytest.approx([0.9])
 
 
+def test_crps_weights_an_overshoot_by_one_minus_its_level():
+    # Only the 0.9 quantile misses, by 1 on the high side, so the score is 2 * 0.1 * (1 - 0.9).
+    # Swapping the two pinball weights would give 2 * 0.1 * 0.9 instead.
+    quantiles = np.zeros((1, 9))
+    quantiles[0, -1] = 1.0
+
+    assert crps(actual=np.zeros(1), quantiles=quantiles) == pytest.approx([0.02])
+
+
 def test_crps_sorts_crossing_quantiles_before_scoring():
     ordered = np.linspace(0.0, 2.0, 9)[None, :]
 
@@ -71,16 +83,68 @@ def test_crps_sorts_crossing_quantiles_before_scoring():
     )
 
 
-def test_the_booster_never_subsamples_columns():
-    parameters = booster_parameters(hyper_parameters=PRIMARY_HYPER_PARAMETERS, seed=0)
+def test_the_booster_settings_translate_exactly_and_never_subsample_columns():
+    # An ignored seed would make every seed fit the same model and the seed spread read zero.
+    assert booster_parameters(hyper_parameters=PRIMARY_HYPER_PARAMETERS, seed=3) == {
+        "max_depth": 6,
+        "eta": 0.05,
+        "subsample": 0.8,
+        "min_child_weight": 20.0,
+        "lambda": 1.0,
+        "tree_method": "hist",
+        "seed": 3,
+        "nthread": 4,
+    }
 
-    assert not any(name.startswith("colsample") for name in parameters)
+
+def test_the_published_seeds_are_the_ones_fitted():
+    assert SEEDS == (0, 1, 2)
+
+
+def test_each_model_is_fitted_on_its_own_objective(monkeypatch: pytest.MonkeyPatch):
+    # The point model is scored on absolute error, so it has to be fitted on it; the quantile model
+    # has to be fitted at every level the score integrates over.
+    calls: list[tuple[dict[str, object], int]] = []
+
+    class _Booster:
+        def predict(self, matrix: object) -> np.ndarray:
+            return np.zeros((4, 9))
+
+    def _train(parameters: dict[str, object], matrix: object, num_boost_round: int) -> _Booster:
+        calls.append((parameters, num_boost_round))
+        return _Booster()
+
+    monkeypatch.setattr(cross_validation.xgb, "train", _train)
+    site_rows = _site_rows()
+    fit_one_fold(
+        train=site_rows,
+        test=site_rows.head(4),
+        features=["x"],
+        target="power_mw",
+        hyper_parameters=PRIMARY_HYPER_PARAMETERS,
+        seed=0,
+        with_quantiles=True,
+    )
+
+    (point, point_rounds), (quantile, quantile_rounds) = calls
+    assert point["objective"] == "reg:absoluteerror"
+    assert quantile["objective"] == "reg:quantileerror"
+    assert np.asarray(quantile["quantile_alpha"]).tolist() == list(QUANTILE_LEVELS)
+    assert point_rounds == quantile_rounds == PRIMARY_HYPER_PARAMETERS["num_boost_round"]
 
 
 def test_the_clamp_holds_a_prediction_to_its_cap_and_leaves_uncapped_rows_alone():
     clamped = clamp_to_cap(prediction=np.array([5.0, 5.0, 1.0]), cap_mw=pl.Series([3.0, None, 3.0]))
 
     assert clamped.tolist() == [3.0, 5.0, 1.0]
+
+
+def test_the_clamp_holds_each_quantile_row_to_its_own_cap():
+    clamped = clamp_to_cap(
+        prediction=np.array([[1.0, 5.0], [1.0, 5.0]]), cap_mw=pl.Series([3.0, None])
+    )
+
+    assert clamped.tolist() == [[1.0, 3.0], [1.0, 5.0]]
 
 
 def _site_rows() -> pl.DataFrame:
@@ -195,14 +259,31 @@ def test_a_fold_with_nothing_to_train_on_is_skipped(monkeypatch: pytest.MonkeyPa
 
 
 def test_the_capped_losses_are_clamped_and_the_uncapped_are_not(monkeypatch: pytest.MonkeyPatch):
+    # The stub predicts 10 MW above the outcome at every quantile level. Uncapped, every level
+    # overshoots by 10, so the score is 2 * 0.1 * 10 * sum(1 - level) = 9.
     losses, _ = _run(monkeypatch, site_rows=_site_rows(), offset_mw=10.0)
     joined = losses.join(_site_rows().select("time", "cap_mw", "power_mw"), on="time")
+    capped = joined.filter(pl.col("cap_mw").is_not_null())
+    shortfall = capped["cap_mw"].to_numpy() - capped["power_mw"].to_numpy()
 
     assert joined["absolute_error_mw"].to_numpy() == pytest.approx(10.0)
-    capped = joined.filter(pl.col("cap_mw").is_not_null())
-    assert capped["absolute_error_capped_mw"].to_numpy() == pytest.approx(
-        np.abs(capped["cap_mw"].to_numpy() - capped["power_mw"].to_numpy())
+    assert joined["signed_error_mw"].to_numpy() == pytest.approx(10.0)
+    assert joined["crps_mw"].to_numpy() == pytest.approx(9.0)
+    assert capped["absolute_error_capped_mw"].to_numpy() == pytest.approx(np.abs(shortfall))
+    assert capped["signed_error_capped_mw"].to_numpy() == pytest.approx(shortfall)
+    assert capped["crps_capped_mw"].to_numpy() == pytest.approx(
+        crps(
+            actual=capped["power_mw"].to_numpy(),
+            quantiles=np.repeat(capped["cap_mw"].to_numpy()[:, None], 9, axis=1),
+        )
     )
+
+
+def test_every_loss_is_float64_whatever_the_target_precision(monkeypatch: pytest.MonkeyPatch):
+    losses, _ = _run(monkeypatch, site_rows=_site_rows())
+
+    loss_columns = [name for name in losses.columns if name.endswith(("_mw", "_of_capacity"))]
+    assert {losses.schema[name] for name in loss_columns} == {pl.Float64}
 
 
 def test_each_row_is_divided_by_its_own_capacity(monkeypatch: pytest.MonkeyPatch):
