@@ -25,6 +25,7 @@ from typing import Final
 import numpy as np
 import polars as pl
 from sources import REPO_DATA_DIR, SOURCE_CHOICES
+from studies.fractions_skill_score import fss_from, monthly_components, on_a_complete_hourly_grid
 
 WINDOW_HOURS: Final[tuple[int, ...]] = (1, 3, 5, 7, 9)
 """The temporal tolerances the score is reported at, in hours, widest last.
@@ -94,92 +95,6 @@ def _capped_forecasts(*, source: str, suffix: str, instrument: str) -> pl.DataFr
     )
 
 
-def _on_a_complete_hourly_grid(*, frame: pl.DataFrame, thresholds: pl.DataFrame) -> pl.DataFrame:
-    """Place one arm's exceedance indicators on an unbroken hourly index per site.
-
-    A rolling window over the scored rows alone would silently span a night, joining the hours
-    either side of a 12-hour gap into one 3-hour window. Reindexing to every hour between a site's
-    first and last scored hour leaves a null wherever a row is absent, and the rolling aggregation
-    below rejects any window holding one.
-
-    Args:
-        frame: One arm and seed's rows, carrying `power_mw` and `forecast_mw`.
-        thresholds: Each site's exceedance threshold, as `site` and `threshold_mw`.
-
-    Returns:
-        The complete grid, with `exceeded_observed` and `exceeded_forecast` null off the scored
-        rows.
-    """
-    spans = frame.group_by("site").agg(
-        first_time=pl.col("time").min(), last_time=pl.col("time").max()
-    )
-    grid = (
-        spans.with_columns(
-            time=pl.datetime_ranges(
-                pl.col("first_time"), pl.col("last_time"), interval="1h", time_zone="UTC"
-            )
-        )
-        .explode("time")
-        .select("site", "time")
-    )
-    return (
-        grid.join(frame.join(thresholds, on="site", how="inner"), on=["site", "time"], how="left")
-        .with_columns(
-            exceeded_observed=(pl.col("power_mw") > pl.col("threshold_mw")).cast(pl.Float64),
-            exceeded_forecast=(pl.col("forecast_mw") > pl.col("threshold_mw")).cast(pl.Float64),
-        )
-        .sort("site", "time")
-    )
-
-
-def _monthly_components(*, gridded: pl.DataFrame, window_hours: int) -> pl.DataFrame:
-    """Reduce one arm and seed to the per-month sums an FSS is assembled from.
-
-    The score is a ratio of two means over windows, so keeping the numerator and denominator as
-    monthly sums lets the bootstrap below resample whole months and re-form the ratio, rather than
-    resampling hours that are correlated within a day.
-
-    Args:
-        gridded: One arm and seed's exceedance indicators on a complete hourly grid.
-        window_hours: The width of the centred window, in hours.
-
-    Returns:
-        One row per month, carrying the Fractions Brier Score numerator, its reference, and how
-        many complete windows each was summed over.
-    """
-    fractions = gridded.with_columns(
-        observed_fraction=pl.col("exceeded_observed")
-        .rolling_mean(window_size=window_hours, min_samples=window_hours, center=True)
-        .over("site"),
-        forecast_fraction=pl.col("exceeded_forecast")
-        .rolling_mean(window_size=window_hours, min_samples=window_hours, center=True)
-        .over("site"),
-    ).drop_nulls(["observed_fraction", "forecast_fraction", "month"])
-    return fractions.group_by("month").agg(
-        squared_difference=(pl.col("forecast_fraction") - pl.col("observed_fraction")).pow(2).sum(),
-        reference=(pl.col("forecast_fraction").pow(2) + pl.col("observed_fraction").pow(2)).sum(),
-        windows=pl.len(),
-    )
-
-
-def _fss_from(*, squared_difference: float, reference: float) -> float:
-    """Form the Fractions Skill Score from its two summed components.
-
-    Args:
-        squared_difference: The summed squared difference of the two window fractions.
-        reference: The summed reference, being both fractions' summed squares.
-
-    Returns:
-        The score, 1 for a forecast whose exceedances coincide with the observed exceedances at
-        this tolerance, and 0 for a forecast with no skill over the reference. `nan` where no
-        window at this tolerance held an exceedance in either series, leaving the reference at
-        zero.
-    """
-    if reference == 0.0:
-        return float("nan")
-    return 1.0 - squared_difference / reference
-
-
 def _bootstrap_fss_difference(
     *, treatment: pl.DataFrame, reference: pl.DataFrame, generator: np.random.Generator
 ) -> dict[str, float]:
@@ -201,9 +116,9 @@ def _bootstrap_fss_difference(
     columns = paired.select(
         "squared_difference", "reference", "squared_difference_reference", "reference_reference"
     ).to_numpy()
-    point = _fss_from(
+    point = fss_from(
         squared_difference=float(columns[:, 0].sum()), reference=float(columns[:, 1].sum())
-    ) - _fss_from(
+    ) - fss_from(
         squared_difference=float(columns[:, 2].sum()), reference=float(columns[:, 3].sum())
     )
 
@@ -211,8 +126,8 @@ def _bootstrap_fss_difference(
     sums = columns[draws].sum(axis=1)
     differences = np.array(
         [
-            _fss_from(squared_difference=float(row[0]), reference=float(row[1]))
-            - _fss_from(squared_difference=float(row[2]), reference=float(row[3]))
+            fss_from(squared_difference=float(row[0]), reference=float(row[1]))
+            - fss_from(squared_difference=float(row[2]), reference=float(row[3]))
             for row in sums
         ]
     )
@@ -264,12 +179,12 @@ def main() -> int:
     components: dict[tuple[str, int, int], pl.DataFrame] = {}
     for arm in arms:
         for seed in seeds:
-            gridded = _on_a_complete_hourly_grid(
+            gridded = on_a_complete_hourly_grid(
                 frame=forecasts.filter((pl.col("arm") == arm) & (pl.col("seed") == seed)),
                 thresholds=thresholds,
             )
             for window in WINDOW_HOURS:
-                components[arm, seed, window] = _monthly_components(
+                components[arm, seed, window] = monthly_components(
                     gridded=gridded, window_hours=window
                 )
 
@@ -289,7 +204,7 @@ def main() -> int:
         cells = []
         for window in WINDOW_HOURS:
             scores = [
-                _fss_from(
+                fss_from(
                     squared_difference=float(
                         components[arm, seed, window]["squared_difference"].sum()
                     ),
