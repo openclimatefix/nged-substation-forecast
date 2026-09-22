@@ -3,7 +3,7 @@
 **The problem.** NGED stamped every half-hourly power reading half an hour late until 08:30 UTC on
 26 March 2026, then corrected the feed without marking the change. `PowerTimeSeries.time` is
 documented as period-ending — the value stamped `T` is the mean over `(T − 30 min, T]` — and for
-roughly 95% of the rows in our `power_time_series` Delta table that is false: the value stamped `T`
+roughly 93% of the rows in our `power_time_series` Delta table that is false: the value stamped `T`
 is the mean over `(T − 60 min, T − 30 min]`. Every model trained on that table has learnt a
 half-hour timing error, and the error is not uniform across the record. The measurement, and the
 three independent signals that pin the changepoint, are in the [beam/diffuse
@@ -489,3 +489,35 @@ The guards the skill requires all pass: `check_prose_only.py` proves the sweep c
 of no Python file, `check_comment_wrap.py` that it stranded no comment line, `check_structure.py`
 that no link, span, list item or heading was lost, and `check_render_loss.py` that no table row
 loses content when rendered.
+
+
+## What the final correctness review changed
+
+A third independent review of the finished diff, briefed on correctness alone, **found no real
+defect**. It ran the repair rather than reasoning about it: the dtype and timezone at the call site,
+the exclusive boundary, a null `time`, an empty frame, frames wholly on either side of the
+boundary, and a reading at `MIN_PLAUSIBLE_DATETIME`. A naive or non-UTC column raises `SchemaError`
+on the comparison rather than coercing silently, which is the safe failure and is unreachable from
+the ingest. It confirmed the de-duplication anti-join can discard but never duplicate a corrected
+key in the pre-rebuild mixed state, and that no downstream consumer assumes a gapless grid.
+
+It also re-derived the claims this plan makes rather than trusting them: the 54 appended rows across
+series 32 and 33 (1 and 53 respectively), the 08:00 gap on 26 March 2026 across all 30 reporting
+series, and that `live_forecast_partitions` starts on 2026-06-28, so the live path cannot reach
+before 10 April 2026 even on a full backfill — a stronger guarantee than the 15-day
+`LIVE_POWER_HISTORY` this plan cited.
+
+**It independently confirmed the `after_stays` case is load-bearing**, mutating the predicate three
+ways and finding `after_stays` the sole killer of `!=`. It read the comment attached to that case
+and judged its argument sound, which is what the comment was written to achieve.
+
+Three non-defect observations, all acted on:
+
+- **"Roughly 95%" was stale.** Measured on the workstation table, the pre-correction share is 92.7%
+  and falls every day NGED publish more readings. The figure came from the issue body. Corrected to
+  93%.
+- **The one-code-path claim was stated as bare fact.** We have not read NGED's code: NGED reported
+  it, and CLAUDE.md asks for a finding to carry its scope. Both the constant docstring and
+  `data-cleaning.md` now attribute it and say the fleet-wide scope rests on that report.
+- **The PR body had dropped this plan's recommendation to ask NGED about a republish before
+  scheduling the rebuild.** Restored, because that question is what prevents a double correction.

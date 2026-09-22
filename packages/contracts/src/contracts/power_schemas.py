@@ -40,10 +40,11 @@ this instant. Three independent measurements of when a solar farm's output peaks
 agree with NGED's account:
 <https://openclimatefix.github.io/nged-substation-forecast/results/beam-diffuse-split/#the-power-timestamps-before-26-march-2026-are-half-an-hour-late>.
 
-The correction applies to every `time_series_id`. NGED convert every series in the trial area
-through one code path, so no series can have escaped the fault. The published measurements cover the
-six metered solar farms only, because each measurement needs solar geometry, which a substation load
-profile has no equivalent of.
+The correction applies to every `time_series_id`. NGED report that they convert every series in the
+trial area through one code path, so no series can have escaped the fault. That report is what the
+fleet-wide scope rests on: the published measurements cover the six metered solar farms only,
+because each measurement needs solar geometry, which a substation load profile has no equivalent
+of.
 """
 
 
