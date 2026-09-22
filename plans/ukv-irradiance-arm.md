@@ -48,9 +48,19 @@ Everything is on branch `ukv-irradiance-arm`, cut from `beam-diffuse-split-exper
 
 **The simplicity review cut this section to about a third of its first draft.** What survived, what was cut, and what was rejected are recorded under "What the simplicity review changed" below.
 
-### New: `fetch_ukv_open_meteo.py`, roughly 110 lines
+### New: `sources.py`, a stdlib-only leaf module
 
-Downloads UKV at each meter's own coordinates from `https://historical-forecast-api.open-meteo.com/v1/forecast` with `models=ukmo_uk_deterministic_2km`, requesting `shortwave_radiation`, `direct_radiation`, `diffuse_radiation` and each one's `_instant` variant. Writes `data/UKV/beam_diffuse_ukv.parquet`, one row per `(site, time)`.
+Holds the source list, the set of sources delivered per site rather than on a grid, and a registry of the Open-Meteo models this experiment can fetch — for each one its `models=` value, its source name in paths, its archive start date, and its native temporal convention.
+
+**It imports nothing outside the standard library, which is what makes it importable by every script in the directory.** `era5_grid.py` already sets this precedent: it holds shared constants behind `from typing import Final` alone and is imported by four scripts including standalone ones. A registry in `build_dataset` would not work, because that module pulls in `pvlib`, `xarray` and a Delta store, and `elevation_breakdown.py` and `report_results.py` document run commands supplying only `polars`.
+
+**This reverses part of the simplicity review, on new information.** The review was right that hoisting the constant into `build_dataset` breaks two scripts, and that generalising for a caller that does not exist is waste. A second Open-Meteo source is now committed rather than hypothetical, and a stdlib-only leaf module is a mechanism the review did not consider, so the constant earns its place: adding ICON-D2 becomes one registry entry rather than a 13-place edit repeated. The 13 scripts import `SOURCE_CHOICES` from `sources` and drop their own literal.
+
+### New: `fetch_open_meteo_point.py`, roughly 120 lines
+
+**One fetcher parameterised by model, rather than a UKV-specific script, because ICON-D2 is planned as a follow-on.** It takes `--model` and looks the rest up in the `sources.py` registry. Open-Meteo normalises variable names across models, so `shortwave_radiation`, `direct_radiation` and `diffuse_radiation` are the same request for UKV and for ICON-D2; only the `models=` value, the output path and the temporal convention differ. It downloads at each meter's own coordinates from `https://historical-forecast-api.open-meteo.com/v1/forecast`, and for UKV requests each radiation field's `_instant` variant as well. Writes `data/<SOURCE>/beam_diffuse_<source>.parquet`, one row per `(site, time)`.
+
+**The `_instant` request is driven by the registry's temporal-convention field rather than hard-coded.** UKV's native radiation is an instantaneous snapshot, so Open-Meteo's default hourly value is a trapezoid of two of them and the `_instant` columns are worth having as a diagnostic. **ICON-D2's native fields are accumulated since model start, so Open-Meteo de-accumulates them to a genuine hourly mean, and ICON-D2 would not carry UKV's sub-hourly sampling problem at all.** That asymmetry is why the convention belongs in the registry rather than in the fetcher's body — but it is recorded as established for UKV and *to be measured* for ICON-D2, since the follow-on issue has to verify it rather than inherit this plan's assumption.
 
 It takes its API handling from `fetch_era5_open_meteo.py`, which already speaks this endpoint and this `models=` parameter, and its per-site anonymisation from `fetch_cams.py`: import `_pv_sites` from `build_dataset`, read each meter's coordinates at run time, send them to Open-Meteo, and write only the anonymised label. No coordinate and no identifier reaches the written frame.
 
@@ -62,7 +72,9 @@ It takes its API handling from `fetch_era5_open_meteo.py`, which already speaks 
 
 ### New: `verify_ukv_lineage.py`, roughly 60 lines
 
-Samples a small number of valid instants, pulls the matching native files from `s3://met-office-atmospheric-model-data/uk-deterministic-2km/` with `obstore`, opens them with `xarray`, takes the nearest grid point to each meter, and compares against Open-Meteo at the same instant. One file covers the whole 970×1042 domain, so a single read serves all six meters at once.
+**This script is UKV-specific and does not generalise to the ICON-D2 follow-on, which is a fact about the data rather than about the code.** DWD's open-data server holds roughly a day of ICON-D2, so no multi-year native archive exists to sample against, and a `--model` flag here would promise a capability that cannot exist. The follow-on issue carries an unverified lineage as a stated caveat instead.
+
+It samples a small number of valid instants, pulls the matching native files from `s3://met-office-atmospheric-model-data/uk-deterministic-2km/` with `obstore`, opens them with `xarray`, takes the nearest grid point to each meter, and compares against Open-Meteo at the same instant. One file covers the whole 970×1042 domain, so a single read serves all six meters at once.
 
 **The comparison is against the `_instant` columns, never the default hourly ones.** The native file holds an instantaneous snapshot; Open-Meteo's default is a trapezoid of two of them. Comparing the trapezoid against the snapshot would make a faithful mirror look broken, which is the single easiest way to get this script wrong.
 
@@ -87,7 +99,7 @@ Samples a small number of valid instants, pulls the matching native files from `
 
 ### The 13 scripts carrying the duplicated `choices` literal
 
-One word added to each `("cds", "open-meteo", "cams")` tuple. **No `SOURCE_CHOICES` constant is hoisted**, because `elevation_breakdown.py` and `report_results.py` deliberately import nothing from their siblings and document a run command supplying only `polars`, while `build_dataset` pulls in `pvlib`, `xarray` and a Delta store. Importing a shared constant would break both scripts under their own documented commands. The first draft asserted that every script already imports from a sibling; that was wrong for two of the 14, and the review caught it.
+Each drops its `("cds", "open-meteo", "cams")` tuple for `from sources import SOURCE_CHOICES`. Every one of them already imports a sibling or can, and `sources.py` adds no third-party dependency, so the two scripts documented to run on `polars` alone keep working. Each is run once under its own documented command as part of the verification set, because that is the claim being relied on.
 
 ### No `ps47_breakdown.py`
 
@@ -158,11 +170,21 @@ Plus, for this change specifically:
 
 ## Risks and open questions
 
-**Which UKV span should the primary run use? This is the first question for the human reviewer, and the simplicity review reversed the recommendation.** The AWS-verifiable era from 2024-09-19 gives about 24 monthly bootstrap blocks; the full archive from 2022-03-01 gives 54, with over half unverifiable against any Met Office source. *Recommendation, revised: primary on the full span, with the verifiable era as the check.*
+**Which UKV span should the primary run use, and do the two runs agree?** The question is less which run is primary than whether the two agree, and running both settles it for about 90 minutes of unattended compute and no code, because the span is a date filter on the download rather than a code path.
 
-The first draft had these the other way round. The review's argument against it is right: 24 blocks chasing an effect the published page measures at 0.096 points will very likely return a null, and **a null from an underpowered run cannot be told apart from a null from a real absence** — which is the failure the README already records on the reanalysis. Restricting the *scored rows* also does not make the result more verified, because lineage is a property of the source established by sampling files, and it does not transfer row by row.
+Counted on the existing dataset — month counts are exact and are what the block bootstrap resamples, while row counts come from the CAMS build and so run about 20% low for UKV, which carries no reliability filter:
 
-Two things keep the verifiable-era run in the plan rather than cutting it. The span needs no code in either direction, so the second run costs about 90 minutes of unattended compute and nothing else. And the decomposition check in the fetcher covers the unverifiable era where AWS sampling cannot, so the residual risk on 2022 to 2024 is narrower than the first draft assumed. **If the lineage check shows any material discrepancy, the verifiable era becomes primary and the recommendation flips back.**
+| Span | Rows | Months | Detection threshold |
+|---|---|---|---|
+| Published CAMS span, 2019-09 to 2026-09 | 128,033 | 85 | 0.018 |
+| UKV full archive, 2022-03 to 2026-09 | 90,968 | 55 | ~0.023 |
+| UKV AWS-verifiable era, 2024-09-19 to 2026-09 | 41,041 | 25 | ~0.033 |
+
+The threshold column scales the published headline's half-width of 0.018 points by the square root of the ratio of months.
+
+**If UKV behaves like CAMS the span does not matter**, because an effect of 0.096 points excludes zero on either span. The spans diverge only for small effects, which is the outcome most worth planning for: "UKV's split is worth something, but less than the 5 km retrieval's" lands somewhere around 0.03 to 0.06 points. **The verifiable era's threshold of 0.033 sits above the re-encoding floor of 0.029 that arm B minus arm A measures**, so on 25 months an effect at floor size cannot be told from zero and a null there would be uninterpretable. The full archive's 0.023 sits below the floor and can tell them apart.
+
+*Recommendation: report the full archive as the headline, the verifiable era as the lineage check, and the agreement between them as the evidence that the headline is safe to read.* If the two point estimates agree, the era no AWS sampling can reach is not behaving differently from the era that can be checked, which is evidence about the risk obtained for nothing. **If they disagree materially, that is the finding**, because it would mean the pre-2024 archive is a different product — the failure this whole exercise exists to avoid.
 
 **Is Open-Meteo's free tier compatible with this project's use?** It is non-commercial only. This is not new to this issue — Open-Meteo already feeds the *published* ERA5 numbers on the docs page, since `DEFAULT_SOURCE` is `open-meteo` — so it is a live question about work already shipped rather than a gate on this one. *Recommendation: settle it separately, and note that UKV has a licence-clean fallback the ERA5 arm does not, because the AWS bucket carries UKV under CC BY-SA 4.0 for the same two years the lineage check covers.*
 
@@ -180,7 +202,7 @@ Two things keep the verifiable-era run in the plan rather than cutting it. The s
 
 **The review cut the plan to roughly a third of its first draft, and every cut above was verified against the code before being taken.** Accepted: the `--ukv-temporal` flag, which re-invented the existing `--suffix` (confirmed composing through all six runners); the second full experiment run on the `_instant` columns, whose result is predictable because the trapezoid is the better estimator of an hourly mean in every signal regime; the `SOURCE_CHOICES` hoist; `ps47_breakdown.py`; and the `compare_sources.py` generalisation. The review also *added* the hourly-label check, which the first draft lacked and which guards against the same class of fault as the half-hour stamp offset.
 
-**The `SOURCE_CHOICES` cut is forced rather than chosen.** `elevation_breakdown.py` and `report_results.py` import only the standard library and `polars` and document a run command supplying only `polars`, while `build_dataset` pulls in `pvlib`, `xarray` and a Delta store. A shared constant would break both under their own commands. The first draft asserted the opposite and was wrong.
+**The `SOURCE_CHOICES` cut was taken and has since been partly reversed, on new information.** The review was right that the first draft's mechanism was broken: `elevation_breakdown.py` and `report_results.py` import only the standard library and `polars` and document a run command supplying only `polars`, while `build_dataset` pulls in `pvlib`, `xarray` and a Delta store, so hoisting the constant there would break both. The first draft asserted the opposite and was wrong. A second Open-Meteo source is now committed rather than hypothetical, and a stdlib-only leaf module — the shape `era5_grid.py` already uses — carries the constant without the dependency that broke it. `sources.py` above is that module.
 
 Three findings were rejected, each with its reason:
 
@@ -191,18 +213,19 @@ Three findings were rejected, each with its reason:
 
 ## What adding ICON-D2 alongside UKV would cost
 
-**Roughly one extra day of agent work and 90 minutes of compute, if ICON-D2 ships with an unverified lineage.** If it has to meet UKV's lineage standard, it cannot be done from an archive at all.
+**Roughly half a day of agent work and 90 minutes of compute, if ICON-D2 ships with an unverified lineage.** If it has to meet UKV's lineage standard, it cannot be done from an archive at all. The estimate has halved from this plan's first draft, because ICON-D2 is now a committed follow-on and the scripts above are built for it rather than around UKV alone.
 
-Most of the machinery is paid for by UKV and costs nothing again:
+Most of the machinery is paid for here and costs nothing again:
 
-- The fetcher becomes a parameter rather than a second script, because Open-Meteo normalises variable names across models: a different `models=` value on the same endpoint.
-- `build_dataset.py`'s per-site branch is already generalised by this plan, so a second per-site source is a member of `SOURCE_CHOICES`.
+- The fetcher already takes `--model`, so ICON-D2 is one entry in the `sources.py` registry rather than a second script.
+- `SOURCE_CHOICES` lives in one place, so the 13 argparse sites need no edit at all.
+- `build_dataset.py`'s per-site branch is a membership test, so a second per-site source is one more tuple member.
 - Every runner, the report script, and the figure scripts take `--source` and need no change.
 - The compute is another pass of the same runs, about 90 minutes, unattended.
 
 What actually costs time is specific to ICON-D2:
 
-- **Its radiation carries a third temporal convention.** DWD's `ASWDIR_S` and `ASWDIFD_S` are averages since model start in the native output, which Open-Meteo de-accumulates to hourly means. That is neither UKV's snapshot nor ERA5's integral, and it has to be established rather than assumed — the same species of defect this plan spends its care on for UKV. Half a day.
+- **Its temporal convention has to be measured, not inherited.** DWD's `ASWDIR_S` and `ASWDIFD_S` are averages since model start in the native output, which Open-Meteo de-accumulates to hourly means — so ICON-D2 likely matches ERA5's and CAMS's hourly integral more closely than UKV does, and likely carries none of UKV's sub-hourly sampling penalty. That is a reason to expect an easier arm, not a reason to skip the check: the `sources.py` registry records the convention as measured for UKV and unmeasured for ICON-D2, and the follow-on issue establishes it. A few hours.
 - **The lineage check has no counterpart.** DWD's open-data server holds roughly a day of ICON-D2, so there is no multi-year archive to sample against. Either the arm ships with a caveat where UKV ships with a measurement, or the check becomes a live-forward capture run over several days.
 - **A third discontinuity audit**, for ICON-D2's own upgrades inside the window.
 - **The common row set shrinks again.** ICON-D2's archive starts 2022-11-24 against UKV's 2022-03-01, so a four-way comparison on shared hours loses another eight months on top of whatever the span decision above costs.
