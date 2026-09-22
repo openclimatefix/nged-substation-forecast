@@ -37,9 +37,7 @@ from typing import Final, Literal
 
 import numpy as np
 import polars as pl
-
-# pvlib is not a workspace dependency; this throwaway script is run with `uv run --with pvlib`.
-import pvlib  # ty: ignore[unresolved-import]
+import pvlib
 import xarray as xr
 from era5_grid import LAST_DATE
 from sources import (

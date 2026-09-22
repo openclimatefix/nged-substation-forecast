@@ -40,9 +40,7 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-
-# pvlib is not a workspace dependency; this throwaway script is run with `uv run --with pvlib`.
-import pvlib  # ty: ignore[unresolved-import]
+import pvlib
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 

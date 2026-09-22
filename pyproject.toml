@@ -59,6 +59,12 @@ dev = [
     # dashboard is a leaf marimo app that nothing depends on at runtime, so it is a dev
     # dependency purely so `uv sync` installs it and `uv run pytest` can collect its tests.
     "dashboard",
+    # studies is the tested machinery the one-off studies under studies/ call. It is a dev
+    # dependency for the same reason as dashboard — a plain `uv sync` has to install it or
+    # `uv run pytest` cannot collect its tests — and for a second reason dashboard does not have:
+    # it pulls in pvlib, which the live-forecast service has no use for. The Dockerfile runs
+    # `uv sync --frozen --no-dev`, so this line is what keeps pvlib out of the production image.
+    "studies",
     "pytest-xdist>=3.6.1",
     # Pinned below 1.2.3: that release and later pull in `properdocs` as a transitive dependency,
     # which prints an unsolicited warning urging a switch away from MkDocs on every build.
@@ -97,6 +103,7 @@ dynamical_data = { workspace = true }
 geo = { workspace = true }
 weather_utils = { workspace = true }
 dashboard = { workspace = true }
+studies = { workspace = true }
 
 # --- DAGSTER ---
 

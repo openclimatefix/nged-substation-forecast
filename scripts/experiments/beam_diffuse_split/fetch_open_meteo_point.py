@@ -37,9 +37,7 @@ from typing import Any, Final
 
 import numpy as np
 import polars as pl
-
-# pvlib is not a workspace dependency; this throwaway script is run with `uv run --with pvlib`.
-import pvlib  # ty: ignore[unresolved-import]
+import pvlib
 from build_dataset import SOLAR_CONSTANT_W_M2, _pv_sites
 from era5_grid import LAST_DATE, LAST_YEAR
 from sources import (

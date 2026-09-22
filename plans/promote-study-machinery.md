@@ -406,7 +406,6 @@ settled in favour of `packages/studies/` rather than tests in place; questions 2
 each one recommends. The questions are kept as written, with their evidence, because the reasoning
 is what a later reader needs — not just the answer. Nothing below is still open.
 
-
 1. **Nothing mechanically forces the new package. Should it be deferred until #809 or #810 gives it
    a second caller?** The simplicity review argued this and its evidence checks out, verified in
    this worktree rather than reasoned about: a bare `uv run pytest` already collects a test placed

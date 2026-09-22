@@ -1,0 +1,24 @@
+[project]
+name = "studies"
+version = "0.2.0"
+description = "Tested machinery the one-off studies under studies/ call: solar geometry, served-column checks, power aggregation, anonymisation, and the Fractions Skill Score"
+readme = "README.md"
+authors = [
+    { name = "Jack Kelly", email = "jack@openclimatefix.org" }
+]
+requires-python = ">=3.14"
+dependencies = [
+    "contracts",
+    "numpy>=1.24",
+    "polars>=1.38.1",
+    "pvlib>=0.11.0",
+]
+
+[build-system]
+requires = ["uv_build>=0.12.6,<0.13.0"]
+build-backend = "uv_build"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.2",
+]
