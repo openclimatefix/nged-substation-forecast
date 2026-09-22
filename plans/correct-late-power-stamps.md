@@ -64,10 +64,10 @@ action. Both are recorded under "Risks and open questions" so neither is lost.
 
 - **Add `POWER_STAMPS_CORRECTED_AT: Final[datetime] = datetime(2026, 3, 26, 8, 30, tzinfo=UTC)`**, a
   module-level constant whose docstring states what the fault is, which three measurements pin the
-  instant, and links to the published appendix. The same constant already exists twice on the
-  unmerged `beam-diffuse-split-experiment` branch (`build_dataset.py:101`,
-  `site_e_commissioning.py:51`); this is its permanent home, and that branch should import it rather
-  than re-declare it once both have merged.
+  instant, and links to the published appendix. The same instant is already declared twice on the
+  unmerged `beam-diffuse-split-experiment` branch, under the name `ALIGNMENT_FIXED_AT`
+  (`build_dataset.py:101`, `site_e_commissioning.py:51`); this is its permanent home, and that
+  branch should import and rename rather than re-declare once both have merged.
 
 - **Add `PowerTimeSeries.correct_late_stamps(dataframe) -> pl.DataFrame`**, a classmethod applying
   `pl.when(pl.col("time") < POWER_STAMPS_CORRECTED_AT).then(pl.col("time").dt.offset_by("-30m")).otherwise(pl.col("time"))`.
@@ -87,10 +87,15 @@ action. Both are recorded under "Risks and open questions" so neither is lost.
 ### `packages/nged_data/src/nged_data/read_nged_json.py`
 
 - **Call `PowerTimeSeries.correct_late_stamps` inside `_extract_power_time_series`**, after the
-  `str.to_datetime` on line 86-88 and before `drop_implausible_rows` on line 97. Order matters and
-  should carry a one-line comment: correcting first means `drop_implausible_rows` judges the stamp
-  that will actually be stored, so a corrected stamp landing outside the plausible range is caught
-  rather than stored.
+  `str.to_datetime` on lines 89-91 and before `drop_implausible_rows` on line 97. Order matters,
+  and the comment should name the real consequence: correcting first means `drop_implausible_rows`
+  judges the stamp that will actually be stored. Reversed, a row whose corrected stamp falls outside
+  the plausible range survives the drop and then fails `PowerTimeSeries.validate`
+  (`power_schemas.py:87` → `common.py:116`), which raises. `download_and_parse_files` catches only
+  the null-`data` `InvalidOperationError` (`storage.py:236-245`), so that `ValueError` reaches the
+  asset's `BaseException` guard (`assets.py:153-165`) and costs three retries and a failed run. The
+  chosen order is the fail-open one; the reversed order turns malformed external data into an
+  ingest outage, which is exactly what `drop_implausible_rows` exists to prevent.
 
 - The `:00`/`:30` alignment check is unaffected: a 30-minute shift maps the half-hour grid onto
   itself.
@@ -99,8 +104,8 @@ action. Both are recorded under "Risks and open questions" so neither is lost.
 
 Stated explicitly, because a reviewer should see these as decisions rather than omissions:
 
-- **No read site changes.** `_engineering_inputs.py:125`, `cv_assets.py:199`, `cv_assets.py:987`,
-  `view_forecasts.py:311`, `map_and_timeseries.py:122` and `export_baseline_forecasts.py:170` all
+- **No read site changes.** `_engineering_inputs.py:125`, `cv_assets.py:198`, `cv_assets.py:986`,
+  `view_forecasts.py:311`, `map_and_timeseries.py:121` and `export_baseline_forecasts.py:121` all
   keep their bare scans.
 - **`select_new_rows` and `time_series_coverage` are untouched.** Both compare parsed rows against
   stored rows; after this change both sides carry corrected stamps, so the anti-join and the
@@ -110,16 +115,35 @@ Stated explicitly, because a reviewer should see these as decisions rather than 
 ## Design-philosophy check
 
 **This code path runs in production, and the change cannot degrade the live service.**
-`live_forecasts` reads power over a `power_lookback` window measured in days
-(`_engineering_inputs.py:37`), so every row it reads is post-changepoint, where the correction is an
-identity. The live service's behaviour is unchanged by this merge, and stays unchanged until a model
+`live_forecasts` widens its window by `LIVE_POWER_HISTORY`, 15 days
+(`production_assets.py:57`, applied at `:329`), so every row it reads is post-changepoint, where the
+correction is an identity. It does not pass `power_lookback`, which defaults to `timedelta(0)`. The live service's behaviour is unchanged by this merge, and stays unchanged until a model
 is retrained on the rebuilt table.
 
-**The change is also inert until the table is rebuilt, which is the safety property that makes it
-shippable on its own.** `select_new_rows`' file-listing filter uses a 3-day `_LATE_FILE_LOOKBACK`
-(`storage.py:362`), so the hourly ingest never re-parses a historic file. Merging this change
-against the existing table therefore corrects nothing and breaks nothing: the correction fires only
-on a full re-materialise. There is no window in which corrected and uncorrected stamps interleave.
+**The change is very nearly inert until the table is rebuilt, but not entirely, and the exception
+is worth stating precisely.** `select_new_rows`' file-listing branch keeps a file when its
+`end_time` falls within `_LATE_FILE_LOOKBACK` — 3 days (`storage.py:361`) — of *that series' own*
+on-disk `last_time`. A series is therefore inert under this change if and only if every file inside
+its own 3-day window carries post-changepoint stamps only. That holds for every series still
+reporting, whose trailing 3 days sit months after the changepoint. It fails for a series whose
+`last_time` is itself pre-changepoint, because then the 3-day window reaches back into 2026 or
+earlier and NGED's bulk history file for that series is re-listed and re-parsed every hour — as it
+already is on `main` today, where the anti-join discards every row because the keys match.
+
+**Two dead series are in that state, and the merge appends about 54 rows to them.** Series 33 is the
+out-of-service meter `checks.py:142` silences, with no readings since 2026-01-26, and series 32
+holds a single 2024 reading. After the merge their re-parsed stamps move 30 minutes earlier, so the
+anti-join key becomes `(time_series_id, T − 30 min)`, which matches nothing wherever the series has
+a gap at `T − 30 min`. Those rows are appended, leaving two dead series holding a mixture of
+corrected and uncorrected stamps until the rebuild erases them. The append is one-off: on the next
+hourly run the corrected keys exist and the anti-join discards them. A new `time_series_id`, whose
+null `last_time` downloads its whole history unconditionally (`storage.py:496`), would land in the
+same state — no duplicates, but a corrected series inside an uncorrected table.
+
+**None of that is a defect in the change, and no code guards against it. The rebuild is the
+guard.** The harm is bounded to two series that are out of service, and it is why the rebuild should
+follow the merge promptly rather than at leisure. It goes in the PR body so that whoever runs the
+rebuild is not surprised by a row count that moved before they touched anything.
 
 **Nothing raises and nothing degrades.** `correct_late_stamps` is a pure Polars expression with no
 I/O, no branch on data availability, and no failure mode short of the `time` column being absent,
@@ -161,24 +185,36 @@ do not open a second file):
 
 In `packages/nged_data/tests/test_read_nged_json.py`:
 
-4. **A parsed pre-changepoint reading is stored 30 minutes earlier than its `endTime`.** The
-   existing fixture at lines 121-123 uses `2026-01-01` stamps, which sit before the changepoint, so
-   its expected `time` values move by −30 minutes. Extend the fixture with a post-changepoint
-   reading whose expected `time` does not move, so one test pins both branches at the boundary the
-   ingest actually crosses. Fails on `main`, which stores `endTime` unchanged.
-5. **The correction runs before `drop_implausible_rows`, not after.** A reading whose `endTime` sits
-   just inside the plausible range but whose corrected stamp falls outside it must be dropped, not
-   stored. Fails on an implementation that corrects after dropping. This is the only ordering bug
-   the change can have, and nothing else would catch it.
+4. **A parsed pre-changepoint reading is stored 30 minutes earlier than its `endTime`.** Write a
+   new test rather than leaning on the existing fixture at lines 121-123: that test asserts only
+   `n_dropped`, `height` and `power` (lines 131-134) and no `time` value at all, so it passes on
+   `main` and after the change alike. The new test parses one pre-changepoint reading and one
+   post-changepoint reading and asserts both stored `time` values, pinning both branches at the
+   boundary the ingest actually crosses. Fails on `main`, which stores `endTime` unchanged.
+5. **A reading whose corrected stamp falls out of the plausible range is dropped, not raised on.**
+   There is exactly one such reading, and the test must use it: `endTime` of
+   `2000-01-01T00:00:00Z`, which sits on `MIN_PLAUSIBLE_DATETIME` (`common.py:25`) while its
+   corrected stamp, `1999-12-31 23:30Z`, does not. The `MAX` side is unreachable, because the shift
+   only ever moves a stamp earlier. Assert the row is dropped and `n_dropped` counts it. Fails on an
+   implementation that drops before correcting, where the row survives the drop and then raises out
+   of `validate` — so this test discriminates the ordering bug by the exception, and it is the only
+   test that would.
 
-In `tests/test_assets.py`: the ingest-asset fixture at line 323 uses `2026-03-05 12:30:00+0000`,
-which is pre-changepoint, so its expected stored `time` moves by −30 minutes. No new assertion; the
+In `tests/test_assets.py`: the ingest-asset fixture at line 323 uses an `endTime` of
+`2026-03-05 12:30:00+0000`, and line 346 asserts the stored `time` is `12:30`. That assertion
+becomes `12:00`. It is the one existing assertion in the repo that changes, and it is a valuable
+one — an end-to-end run of the Dagster asset, not of the parser alone. No new assertion; the
 existing one is updated and gains a comment naming why.
 
 ## Docs to update
 
-- **`packages/contracts/README.md`** — if it describes `PowerTimeSeries.time`, restate it to match
-  the extended field description. Check before editing.
+- **`docs/results/beam-diffuse-split.md:894-895`** — states "the ingest takes `endTime`
+  unchanged", which this change makes false. This page does not mention `power_time_series`, so the
+  grep below does not find it; it is named here because it is the one published page that documents
+  the behaviour being changed.
+- **`packages/contracts/README.md:124-131`** — describes `drop_implausible_rows` at length as *the*
+  ingest-boundary repair of this feed. Add a sentence for `correct_late_stamps`, or the README names
+  one of two boundary repairs.
 - **`docs/roadmap/data-cleaning.md`** — add a section for the stamp correction alongside the
   commissioning ramp and the export cap, in the present tense: what the fault was, that the ingest
   now corrects it, and that a corrected series carries no reading at 08:00 on 26 March 2026 (see
@@ -189,7 +225,7 @@ existing one is updated and gains a comment naming why.
   ingest corrects the stamp offset, because a Dagster asset docstring is operator documentation and
   an operator rebuilding this table needs to know the stored stamps are not NGED's own.
 - **`docs/architecture/` and `docs/ml_experimentation/dagster-workflow.md`** — a grep for
-  `power_time_series` across `docs/` returns 17 files. The implementer reads them and edits only
+  `power_time_series` across `docs/` returns 13 files. The implementer reads them and edits only
   those left inconsistent, rather than working from a guessed list here.
 - **No roadmap status banner moves.** This issue completes no roadmap item:
   `docs/roadmap/data-cleaning.md` stays 🚧 Planned, because the commissioning ramp and the
@@ -213,15 +249,21 @@ pre-commit hook runs it anyway).
 
 ## Risks and open questions
 
-**1. Is the correction fleet-wide, or only the six metered solar farms?** The measurement needs
-solar geometry, so it cannot speak for a substation load series. Two of the three signals — the
-rows-per-day drop from 48 to 26 and the disappearance of exact-zero rows — are properties of what
-NGED publishes rather than of PV physics, and both are consistent with a fleet-wide change, but
-neither establishes the direction or magnitude of the offset on a non-PV series. *Recommendation:*
-correct fleet-wide, because a single feed correcting at a single instant is by far the likeliest
-reading, and ask NGED in parallel. If the answer is "per feed", `POWER_STAMPS_CORRECTED_AT` becomes
-a per-`time_series_id` lookup and the table is rebuilt again. **This is the reviewer's call to
-confirm.**
+**1. Is the correction fleet-wide, or only the six metered solar farms? The only fleet-wide
+evidence is NGED's own statement, and every measurement we have is PV-only.** The centroid
+measurement needs solar geometry, so it cannot speak for a substation load series. The two
+corroborating signals do not rescue it, contrary to what the issue body implies and what an earlier
+draft of this plan repeated: measured around the changepoint, only the PV series drop from 48 rows
+per day to about 24 and only the PV series stop publishing exact zeros, while the Disaggregated
+Demand and Raw Flow series stay at 48 rows per day and never carried exact zeros at all. Both
+signals are NGED ceasing to pad a generator's overnight hours with zeros, which a demand series has
+no equivalent of. What stands is NGED's own quote in the issue — "looking at the historic data ...
+all the data is 30 mins late" — which says the feed, not the PV feed. *Recommendation:* correct
+fleet-wide on that statement, and ask NGED to confirm it in writing before the rebuild, because the
+rebuild is the moment the answer becomes expensive to have wrong. If the answer is "per feed",
+`POWER_STAMPS_CORRECTED_AT` becomes a per-`time_series_id` lookup and the table is rebuilt again.
+**This is the reviewer's call to confirm, and it now rests on one sentence from NGED rather than on
+three measurements.**
 
 **2. If NGED republishes a corrected history, this correction must be deleted before the next
 re-materialise, or the stamps are corrected twice.** Nothing in the code can detect that, because a
@@ -229,10 +271,12 @@ corrected pre-changepoint file is indistinguishable from an uncorrected one. *Re
 so in `correct_late_stamps`' docstring, where whoever runs the rebuild will meet it, and ask NGED
 whether a republish is coming before the rebuild is scheduled.
 
-**3. The change does nothing until the table is dropped and re-materialised.** That is an
-operational step, not a code step, and it has to happen on the workstation and on AWS. *There is no
-question here for the reviewer* — it is recorded so the PR body carries it and so it is not
-mistaken for a defect when the merged code changes no stored row.
+**3. The change does almost nothing until the table is dropped and re-materialised.** That is an
+operational step, not a code step, and it has to happen on the workstation and on AWS. The one
+exception is the roughly 54 rows the first hourly run appends to the two dead series, set out in the
+design-philosophy check above. *There is no question here for the reviewer* — it is recorded so the
+PR body carries it and so neither the unchanged row counts nor the small change in those two series
+is mistaken for a defect.
 
 **4. A corrected series has no reading at 08:00 on 26 March 2026.** The last late reading is stamped
 08:00 and moves to 07:30; the first correct reading is stamped 08:30. The half-hour ending 08:00 was
@@ -291,3 +335,43 @@ drop-and-re-materialise decision, and its note that swapping `pl.scan_delta(` fo
 `view_forecasts.py` would silently empty the `DELTA_READ_CALLS` guard
 (`packages/dashboard/tests/test_view_forecasts.py:22`) no longer applies, since no notebook is
 edited. Both are recorded because each would bite a future change that revisits this decision.
+
+
+## What the correctness review changed, and what was rejected
+
+The second adversarial review checked every line reference against the code, and checked the safety
+claims against the local table and a read-only listing of NGED's bucket. Its findings, all verified
+and all taken:
+
+- **The plan's central safety claim was false.** "The hourly ingest never re-parses a historic file"
+  is wrong: `select_new_rows` applies `_LATE_FILE_LOOKBACK` against *each series' own* `last_time`,
+  so a series whose `last_time` is pre-changepoint re-lists its bulk history file every hour.
+  Series 32 and 33 are in that state, and the merge appends about 54 corrected rows to them before
+  any rebuild. The design-philosophy check now states the true condition and the consequence.
+- **The ordering rationale was the weaker of the two available.** Reversing `correct_late_stamps`
+  and `drop_implausible_rows` does not store a bad row — it raises out of `validate`, which costs
+  three retries and a failed ingest run. That is a fail-open-versus-fail-closed boundary, and it is
+  now what the plan and its comment say.
+- **Test 4 would not have failed on `main`.** The fixture the plan leaned on asserts `n_dropped`,
+  `height` and `power`, and no `time` value, so it passes either way. Test 4 is now a new test that
+  asserts both stored stamps. Test 5's row is now named exactly — `2000-01-01T00:00:00Z` is the only
+  reading whose corrected stamp leaves the plausible range.
+- **The docs sweep missed the one page that documents the behaviour being changed.**
+  `docs/results/beam-diffuse-split.md:894-895` says the ingest takes `endTime` unchanged, and does
+  not contain the string the plan's grep searched for.
+- **Risk 1's evidence was inherited from the issue body rather than checked.** Both corroborating
+  signals are PV-only, so the fleet-wide case rests on NGED's own sentence alone. Risk 1 now says so,
+  which makes the confirmation worth asking for rather than a formality.
+- **Line-reference corrections taken:** `_LATE_FILE_LOOKBACK` at `storage.py:361`; `str.to_datetime`
+  at `read_nged_json.py:89-91`; `cv_assets.py:198`/`:986`; `map_and_timeseries.py:121`;
+  `export_baseline_forecasts.py:121`; `LIVE_POWER_HISTORY` rather than `power_lookback` on the live
+  path; the unmerged branch's constant is named `ALIGNMENT_FIXED_AT`; the `docs/` grep returns 13
+  files, not 17.
+
+Nothing was rejected. The review independently confirmed four things the plan had right and which
+the implementer should therefore not re-litigate: the 08:00 gap arithmetic on 26 March 2026 and
+test 3's "duplicate key unreachable by construction" argument; that nothing downstream assumes a
+gapless half-hourly grid (the lag features are a time-keyed left join, the rolling means use
+`rolling_mean_by`, eligibility reads only `first_time`/`last_time`, and capacity is a quantile);
+that no new fail-closed path is introduced and no warning path can raise; and that
+`tests/test_assets.py:346` is the only asserted `time` value in the repo that moves.
