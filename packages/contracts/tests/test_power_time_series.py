@@ -250,7 +250,7 @@ def test_drop_implausible_rows_leaves_a_validatable_frame() -> None:
 def test_correct_late_timestamps_moves_only_the_late_readings(
     time: datetime, expected: datetime
 ) -> None:
-    """The boundary is exclusive: NGED's correction instant is itself already correct.
+    """The boundary is exclusive: the first correctly stamped reading must not move.
 
     An implementation using `<=` where the correction requires `<` passes `before_moves_back` and
     fails `instant_stays`, which is the whole of what separates the two regimes.

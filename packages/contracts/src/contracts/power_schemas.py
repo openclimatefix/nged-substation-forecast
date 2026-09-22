@@ -35,16 +35,16 @@ POWER_TIMESTAMPS_CORRECTED_BEFORE: Final[datetime] = datetime(2026, 3, 26, 8, 30
 onwards.
 
 A reading whose timestamp `T` falls before this instant is the mean over `(T - 60 min, T - 30 min]`,
-not the `(T - 30 min, T]` the `time` field states. NGED reported the fault and corrected the feed at
-this instant. Three independent measurements of when a solar farm's output peaks against the sun
-agree with NGED's account:
+not the `(T - 30 min, T]` the `time` field states. NGED's feed has stamped every reading correctly
+since this instant. The earlier readings have not been republished with corrected timestamps, so
+NGED's archive still carries the late ones. Three independent measurements of when a solar farm's
+output peaks against the sun agree with NGED's account of when the alignment changed:
 <https://openclimatefix.github.io/nged-substation-forecast/results/beam-diffuse-split/#the-power-timestamps-before-26-march-2026-are-half-an-hour-late>.
 
 The correction applies to every `time_series_id`. NGED report that they convert every series in the
 trial area through one code path, so no series can have escaped the fault. That report is what the
 fleet-wide scope rests on: the published measurements cover the six metered solar farms only,
-because each measurement needs solar geometry, which a substation load profile has no equivalent
-of.
+because each measurement needs solar geometry. A substation load profile has no equivalent.
 """
 
 
@@ -59,8 +59,8 @@ class PowerTimeSeries(pt.Model):
             "End time of the 30-minute observation period (all NGED data is already half-hourly)."
             " A value before `POWER_TIMESTAMPS_CORRECTED_BEFORE` is NGED's own timestamp moved 30"
             " minutes earlier by `correct_late_timestamps`: NGED's feed stamped every reading half"
-            " an hour late until NGED corrected the feed at that instant, and the ingest repairs"
-            " the late readings as they arrive."
+            " an hour late until that instant, and has stamped every reading correctly since, so"
+            " the ingest repairs the late readings as they arrive."
             f" Must fall between {MIN_PLAUSIBLE_DATETIME:%Y-%m-%d} and"
             f" {MAX_PLAUSIBLE_DATETIME:%Y-%m-%d} (enforced by `validate`, not by the field, because"
             " Patito ignores `ge`/`le` on datetime fields — see `check_datetime_bounds`)."
@@ -135,10 +135,10 @@ class PowerTimeSeries(pt.Model):
     def correct_late_timestamps(cls, dataframe: pl.DataFrame) -> pl.DataFrame:
         """Move every `time` before ``POWER_TIMESTAMPS_CORRECTED_BEFORE`` 30 minutes earlier.
 
-        NGED stamped this feed half an hour late until they corrected the feed; the constant's
-        docstring holds the evidence and the scope. Correcting at ingestion is what lets the `time`
-        field mean the same half-hour for every row, so no consumer has to know whether a row was
-        stamped before or after NGED's correction.
+        NGED stamped this feed half an hour late until ``POWER_TIMESTAMPS_CORRECTED_BEFORE``, and
+        have stamped it correctly since; the constant's docstring holds the evidence and the scope.
+        Correcting at ingestion is what lets the `time` field mean the same half-hour for every row,
+        so no consumer has to know which side of that instant a row was stamped on.
 
         Call ``correct_late_timestamps`` BEFORE ``drop_implausible_rows``, and only at a boundary
         that receives NGED's raw JSON. ``drop_implausible_rows`` has to judge the timestamp that

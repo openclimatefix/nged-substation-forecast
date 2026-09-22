@@ -768,10 +768,10 @@ denominator where a plant moves. Both readings are set out
 [above](#what-the-per-site-error-drift-says-about-estimating-effective-capacity).
 
 **The half-hour power-timestamp offset is settled, and it reaches further than this experiment.**
-NGED corrected the feed at 08:30 UTC on 26 March 2026, and three independent measurements agree that
-readings before that instant are half an hour late while readings after it are not. Any model
-trained on telemetry from before the correction is affected, not only the models here, and the same
-step appears in series on this feed that are not PV meters.
+NGED's feed has stamped readings correctly since 08:30 UTC on 26 March 2026, and three independent
+measurements agree that readings before that instant are half an hour late while readings after it
+are not. Any model trained on telemetry from before that instant is affected, not only the models
+here, and the same step appears in series on this feed that are not PV meters.
 
 **NGED holds a usable record of active network management, and of the two records it holds, the
 setpoint history is the one to read.** The [capacity-estimation
@@ -859,12 +859,12 @@ design that eliminated the floor rather than arguing past it would be stronger.
 
 ### The power timestamps before 26 March 2026 are half an hour late
 
-**NGED corrected the half-hourly power feed at 08:30 UTC on 26 March 2026, and every reading stamped
-before that instant describes the half-hour before the one its label names.** The contract says a
-reading stamped `T` is the mean over `(T − 30 min, T]`. Before the correction it is the mean over
-the half-hour ending 30 minutes earlier than that. Every number on this page is computed on the
-corrected reading: a reading before the correction is moved half an hour earlier, and a reading from
-the correction onwards is taken as it stands.
+**NGED's half-hourly power feed has stamped readings correctly since 08:30 UTC on 26 March 2026,
+and every reading stamped before that instant describes the half-hour before the one its label
+names.** The contract says a reading stamped `T` is the mean over `(T − 30 min, T]`. Before that
+instant a reading stamped `T` is instead the mean over `(T − 60 min, T − 30 min]`. Every number on
+this page is computed on the corrected reading: a reading before that instant is moved half an hour
+earlier, and a reading from that instant onwards is taken as it stands.
 
 **A correctly stamped feed reads 15 minutes rather than zero on the two geometric measurements
 below, because the label names the end of the period it covers.** A reading stamped `T` averages the

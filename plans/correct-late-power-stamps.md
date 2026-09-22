@@ -1,7 +1,7 @@
 # Correct NGED's half-hour-late power stamps (#790)
 
 **The problem.** NGED stamped every half-hourly power reading half an hour late until 08:30 UTC on
-26 March 2026, then corrected the feed without marking the change. `PowerTimeSeries.time` is
+26 March 2026, and have stamped every reading correctly since, without marking the change. `PowerTimeSeries.time` is
 documented as period-ending — the value stamped `T` is the mean over `(T − 30 min, T]` — and for
 roughly 93% of the rows in our `power_time_series` Delta table that is false: the value stamped `T`
 is the mean over `(T − 60 min, T − 30 min]`. Every model trained on that table has learnt a

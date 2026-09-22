@@ -38,9 +38,10 @@ a commissioning hour has no ceiling to compare a prediction against.
 ## NGED's power timestamps ran half an hour late, and the ingest repairs them
 
 **Every reading NGED stamped before 08:30 UTC on 26 March 2026 describes the half-hour before the
-half-hour its label names. The ingest moves those readings 30 minutes earlier.** NGED reported the
-fault and corrected the feed at that instant, and three independent measurements of when a solar
-farm's output peaks against the sun agree with NGED's account. The evidence is in the [beam/diffuse
+half-hour its label names. The ingest moves those readings 30 minutes earlier.** NGED's feed has
+stamped every reading correctly since that instant, and three independent measurements of when a
+solar farm's output peaks against the sun agree with NGED's account of when the alignment changed.
+The evidence is in the [beam/diffuse
 appendix](../results/beam-diffuse-split.md#the-power-timestamps-before-26-march-2026-are-half-an-hour-late).
 `PowerTimeSeries.correct_late_timestamps` applies the repair in `nged_data.read_nged_json`.
 `PowerTimeSeries.time` therefore ends the observation period for every stored row, not only for
@@ -59,7 +60,7 @@ maintenance route for this table.
 every series was measured.** NGED report that they convert every series in the trial area through
 one code path, so no series can have escaped the fault. That report is what the fleet-wide scope
 rests on, because the three measurements cover the six metered solar farms alone: each measurement
-needs solar geometry that a substation load profile has no equivalent of.
+needs solar geometry. A substation load profile has no equivalent.
 
 **A corrected series carries no reading at 08:00 on 26 March 2026.** The last late reading is
 stamped 08:00 and moves to 07:30, while the first correct reading is stamped 08:30. NGED therefore
@@ -70,8 +71,9 @@ features join on time, the rolling means use `rolling_mean_by`, and eligibility 
 series' first and last reading.
 
 **Should NGED republish their history already corrected, the repair has to be removed before the
-next rebuild.** A corrected file is indistinguishable from an uncorrected file when read on its
-own, so detecting the change needs
+next rebuild.** No such republication has happened so far, so every file the ingest reads today
+still carries the late timestamps. A corrected file is indistinguishable from an uncorrected file
+when read on its own, so detecting the change needs
 [#804](https://github.com/openclimatefix/nged-substation-forecast/issues/804).
 
 ## Detecting a ramp needs a reference series, not a threshold

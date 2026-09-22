@@ -98,11 +98,11 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     writes directly.
 
     One repair does happen here, and an operator rebuilding this table has to know about the
-    repair. NGED's feed stamped every reading half an hour late until NGED corrected the feed at
-    ``POWER_TIMESTAMPS_CORRECTED_BEFORE``, so a reading stamped before that instant is stored 30
-    minutes earlier than NGED stamped it. Should NGED ever republish their history already
-    corrected, this repair must be removed before the next rebuild, or those readings will be
-    corrected twice.
+    repair. NGED's feed stamped every reading half an hour late until
+    ``POWER_TIMESTAMPS_CORRECTED_BEFORE``, and has stamped every reading correctly since, so a
+    reading stamped before that instant is stored 30 minutes earlier than NGED stamped it. The late
+    readings have not been republished with corrected timestamps. Should NGED ever republish them,
+    this repair must be removed before the next rebuild, or those readings will be corrected twice.
 
     Runs hourly on ``power_time_series_and_metadata_schedule``, 5 minutes before
     ``live_forecasts_schedule`` ticks. A failed or skipped run leaves nothing behind to repair:

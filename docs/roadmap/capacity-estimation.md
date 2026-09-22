@@ -636,8 +636,8 @@ the same rows moves its fitted azimuth by about 35 degrees when the timestamps a
 half-hour, which is a quarter of the range a GB array's orientation can plausibly occupy, from a
 30-minute change in what the timestamp means. The [power stamps on this
 feed](../results/beam-diffuse-split.md#the-power-timestamps-before-26-march-2026-are-half-an-hour-late)
-were half an hour late until NGED corrected them. Any estimator that fits orientation has the same
-exposure, and an orientation error feeds straight into the capacity it reports.
+were half an hour late until 08:30 UTC on 26 March 2026. Any estimator that fits orientation has
+the same exposure, and an orientation error feeds straight into the capacity it reports.
 
 **What limits the fitted physical model is its specification, not its optimiser, and the term
 that hurts is the transposition.** Given the same rows, the physical model and the tree disagree
