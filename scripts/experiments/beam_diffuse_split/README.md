@@ -267,19 +267,41 @@ ERA5 against UKV is a contrast in resolution *and* in aerosol treatment. The asy
 under a clear sky, where aerosol sets the beam/diffuse partition most strongly and where the
 published result is weakest, which is why `sky_conditions.py` runs on UKV as well as CAMS.
 
-### Two spans, reported separately rather than pooled
+### Why the two spans disagree: a Met Office upgrade, not the backfill
 
 Open-Meteo's archive claims to start on 2022-03-01, but its UKV downloader was only created on
-2024-08-12, so the earlier 29 months were backfilled from a source Open-Meteo does not name. The Met
-Office's bucket holds a rolling two-year window, which reaches back to roughly the same date, so the
-era that can be checked is essentially the era Open-Meteo ingested live.
+2024-08-12, so the earlier 29 months were backfilled from a source Open-Meteo does not name. Run
+both spans, with `build_dataset.py --first-date` and `--suffix` marking the shorter one. The two
+disagree — the headline contrast is roughly half again as large on the live-ingest span — but the
+backfill is not why.
 
-Run both, with `build_dataset.py --first-date` and `--suffix` marking the shorter one, and report
-the live-ingest era as the headline. The full archive has the statistical power — 55 months against
-25, and 25 months puts the detection threshold above the floor arm B minus arm A measures — but over
-half of it predates the ingest pipeline. **If the two agree, the backfill is behaving like the live
-ingest. If they disagree, that is the finding**, because it would mean the earlier archive is a
-different product.
+**Splitting the full archive by month puts the step at the Met Office's PS47 upgrade, which became
+operational on 2026-01-21, and puts nothing at Open-Meteo's ingest boundary.** Bootstrapping the
+headline contrast either side of the first full month after that upgrade gives −0.084 pp
+[−0.119, −0.053] over the 47 months before and −0.461 pp [−0.536, −0.377] over the 8 months after,
+a factor of five and a half. Crossing the 2024-08-12 ingest boundary moves the same number by less
+than a twentieth of that.
+
+**Running the same split on the other two sources is what rules out the weather and the power
+data.** Over the same 8 months the satellite source's contrast moves from −0.100 pp to −0.068 pp
+and the reanalysis stays null in both eras, so no arm of either source sees the jump UKV sees. A
+change in the metered power, in the export caps, or in what those months' weather happened to be
+would move all three sources together, because all three are scored on the same hours.
+
+**UKV's total irradiance moved the other way over the same boundary.** Arm A's error against the
+reanalysis, on the hours both cover, oscillates around zero for 46 months and then sits about 1 pp
+worse for every month from 2026-01. The upgrade therefore looks like it cost UKV accuracy in the
+global field at these sites while making the published direct-beam share substantially more
+informative — two effects that have to be reported separately rather than netted into one verdict
+on the product.
+
+**Report by upgrade era, and treat the post-upgrade era as the one production would use.** The
+caveats are that 8 months is a thin sample beside 47, that these 8 months are a single winter and
+spring rather than a full year, and that the piecewise power-stamp shift falls inside the
+post-upgrade window — though the step appears in 2026-02, before that shift. A model upgrade
+changing what a product is worth is the general case rather than a quirk of this one: any
+production ingest of UKV has to expect its skill to move at upgrade boundaries, which is an
+argument for scoring continuously rather than trusting a figure measured once.
 
 ### The default hourly column, not the `_instant` one
 

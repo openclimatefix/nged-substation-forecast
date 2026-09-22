@@ -452,6 +452,15 @@ account for the stated start either, and the window has since rolled past all of
 can be checked against the Met Office's files is essentially the era Open-Meteo ingested live**, and
 the earlier half cannot be checked against anything.
 
+**A Met Office upgrade moved what UKV is worth, by more than the backfill boundary does.** In the
+beam/diffuse split experiment, the gain from UKV's published direct-beam share is five and a half
+times larger over the 8 months after PS47 became operational on 2026-01-21 than over the 47 months
+before, while the same contrast on the satellite and reanalysis sources does not move over those
+months. UKV's global irradiance went the other way, sitting about 1 pp worse against the reanalysis
+from the same date. **Any production ingest of UKV should expect its skill to step at upgrade
+boundaries, which is an argument for scoring continuously rather than trusting a figure measured
+once**, and against assuming that one era of UKV stands in for another.
+
 **Three mechanical facts about the served columns, each of which fails silently if assumed wrong.**
 
 - **Only global and direct short-wave are ingested; diffuse is served as their difference.** The Met
