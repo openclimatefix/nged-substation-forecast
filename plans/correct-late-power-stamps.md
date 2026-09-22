@@ -271,10 +271,17 @@ different path, the constant becomes a per-series lookup and the table is rebuil
 cheap, because rebuilding is already the standing maintenance route for this table.
 
 **2. If NGED republishes a corrected history, this correction must be deleted before the next
-re-materialise, or the stamps are corrected twice.** Nothing in the code can detect that, because a
-corrected pre-changepoint file is indistinguishable from an uncorrected one. *Recommendation:* say
-so in `correct_late_stamps`' docstring, where whoever runs the rebuild will meet it, and ask NGED
-whether a republish is coming before the rebuild is scheduled.
+re-materialise, or the stamps are corrected twice.** Nothing this plan builds can detect that: a
+corrected pre-changepoint file is indistinguishable from an uncorrected one when read on its own.
+*Recommendation:* say so in `correct_late_stamps`' docstring, where whoever runs the rebuild will
+meet it, and ask NGED whether a republish is coming before the rebuild is scheduled.
+
+Detection is not impossible, only out of scope here — a corrected republish arrives as a bulk
+history file whose rows suddenly fail the de-duplication anti-join for a period the series already
+covers, and the ingest already holds the frames that would show it. That work, and a separate
+detector for NGED re-aligning *new* readings, are
+[#804](https://github.com/openclimatefix/nged-substation-forecast/issues/804), which follows this
+issue rather than blocking it.
 
 **3. The change does almost nothing until the table is dropped and re-materialised.** That is an
 operational step, not a code step, and it has to happen on the workstation and on AWS. The one
