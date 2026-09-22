@@ -249,21 +249,26 @@ pre-commit hook runs it anyway).
 
 ## Risks and open questions
 
-**1. Is the correction fleet-wide, or only the six metered solar farms? The only fleet-wide
-evidence is NGED's own statement, and every measurement we have is PV-only.** The centroid
-measurement needs solar geometry, so it cannot speak for a substation load series. The two
-corroborating signals do not rescue it, contrary to what the issue body implies and what an earlier
-draft of this plan repeated: measured around the changepoint, only the PV series drop from 48 rows
-per day to about 24 and only the PV series stop publishing exact zeros, while the Disaggregated
-Demand and Raw Flow series stay at 48 rows per day and never carried exact zeros at all. Both
-signals are NGED ceasing to pad a generator's overnight hours with zeros, which a demand series has
-no equivalent of. What stands is NGED's own quote in the issue — "looking at the historic data ...
-all the data is 30 mins late" — which says the feed, not the PV feed. *Recommendation:* correct
-fleet-wide on that statement, and ask NGED to confirm it in writing before the rebuild, because the
-rebuild is the moment the answer becomes expensive to have wrong. If the answer is "per feed",
-`POWER_STAMPS_CORRECTED_AT` becomes a per-`time_series_id` lookup and the table is rebuilt again.
-**This is the reviewer's call to confirm, and it now rests on one sentence from NGED rather than on
-three measurements.**
+**1. Is the correction fleet-wide? Settled: yes, correct every series.** The measured evidence is
+PV-only, and weaker than the issue body implies. The centroid measurement needs solar geometry. The
+two corroborating signals do not extend it either: measured around the changepoint, only the PV
+series drop from 48 rows per day to about 24 and only the PV series stop publishing exact zeros,
+while the Disaggregated Demand and Raw Flow series stay at 48 rows per day and never carried exact
+zeros at all. Both signals are NGED ceasing to pad a generator's overnight hours with zeros, which a
+demand series has no equivalent of.
+
+**What settles it is a mechanism rather than a measurement: NGED's data conversion code treats every
+series in the trial area identically, so there is no path by which solar would be a special case.**
+That is better evidence than the statistics could have been, because it explains why a fleet-wide
+fault is the only kind this feed can have, rather than observing that one is consistent with six
+meters. It agrees with NGED's own account of the fault — "looking at the historic data ... all the
+data is 30 mins late" — which describes the feed rather than the PV feed. NGED have not tested the
+claim rigorously, and the decision is taken knowing that.
+
+*Decided:* apply `POWER_STAMPS_CORRECTED_AT` to every `time_series_id`, with no per-series
+exemption and no per-series lookup. Should NGED later report that some feed was converted by a
+different path, the constant becomes a per-series lookup and the table is rebuilt again — which is
+cheap, because rebuilding is already the standing maintenance route for this table.
 
 **2. If NGED republishes a corrected history, this correction must be deleted before the next
 re-materialise, or the stamps are corrected twice.** Nothing in the code can detect that, because a
