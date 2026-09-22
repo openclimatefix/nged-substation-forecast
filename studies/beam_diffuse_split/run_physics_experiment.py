@@ -31,10 +31,8 @@ rather than that the noise floor is that low. The bootstrap's seed draw
 likewise adds nothing to this instrument's intervals.
 
 Run it with `uv run --with netcdf4 python
-studies/beam_diffuse_split/run_physics_experiment.py`, then
-`python studies/beam_diffuse_split/run_physics_experiment.py --source cams
-The long dependency list is `export_cap.py` reaching into `build_dataset.py`
-for the site roster, which is what maps NGED's `time_series_id` to an anonymous label.
+studies/beam_diffuse_split/run_physics_experiment.py --source cams`. `netcdf4` is the one
+dependency the workspace environment does not already carry.
 """
 
 import argparse
