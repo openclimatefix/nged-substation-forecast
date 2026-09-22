@@ -152,7 +152,9 @@ AWS.*
 *Epic: [#150](https://github.com/openclimatefix/nged-substation-forecast/issues/150)*
 
 - Automatic cleaning of NGED's power data. Versions 0.1 to 0.3 do none: the models train on, and the
-  live service forecasts from, uncleaned telemetry
+  live service forecasts from, uncleaned telemetry. What has been measured about the trial area's
+  faults, including the one commissioning cut-off already established, is in [cleaning the
+  trial-area telemetry](data-cleaning.md)
 - `power_forecast_warnings` **Phase 1** — `STALE NWP` and `STALE POWER`, with `warning_source`
   ([#439](https://github.com/openclimatefix/nged-substation-forecast/issues/439))
 - `power_forecast_warnings` **Phase 2** — the meter-error warning types, which are this milestone's

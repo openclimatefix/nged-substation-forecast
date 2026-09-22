@@ -58,6 +58,16 @@ There are **five** tables. This table tracks where each one stands today:
 Stores OCF's probabilistic power forecasts. The table extends ~14 days **forwards** in time (the
 forecast horizon) and **backwards** to the start of the backtesting period.
 
+**Every row states the power available, not the power a network instruction will allow.** A
+generator on a flexible connection can be told to turn down when the local electricity network
+fills, and `power_forecast` deliberately ignores that instruction. The table answers what the
+weather and the site made possible, which is the [normal running
+arrangement](forecast-building-blocks.md#the-idea) the delivery blocks are built on. Holding a
+forecast down to an active-network-management cap is a step the consumer takes, because the
+operator sets the cap for a half-hour far nearer that half-hour than the forecast is issued. The
+metered series in `power_time_series` follows the opposite convention and carries whatever
+curtailment the operator instructed.
+
 The Milestone 1 report describes **three** ways of expressing uncertainty. We may deliver one or
 several of these:
 

@@ -57,7 +57,10 @@ The five schemas below are the ones most callers touch. The package defines four
   `time_series_type` is the one metadata column it can carry, and only when a feature set asks for
   it.
 - **`PowerForecast`**: ML model output schema. `power_fcst` is in MW (active power) or MVA (apparent
-  power), with the unit given per `time_series_id` in `TimeSeriesMetadata`. A planned change will
+  power), with the unit given per `time_series_id` in `TimeSeriesMetadata`. The forecast is of the power
+  *available*, meaning what the series would have exported or drawn had no
+  active-network-management instruction been in force, so a consumer that wants the flow a capped
+  generator will actually be allowed applies the cap itself. A planned change will
   normalise the forecast to [−1, +1] for NGED to multiply by that series' `effective_capacity`, in
   the same MW or MVA, to recover a power — see [Forecast Building
   Blocks](https://openclimatefix.github.io/nged-substation-forecast/roadmap/forecast-building-blocks/).

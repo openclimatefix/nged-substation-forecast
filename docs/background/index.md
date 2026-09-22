@@ -8,7 +8,7 @@ this problem; [architecture](../architecture/overview.md) describes what is buil
 
 - [NGED's network and its data](network.md) — the primary substations, bulk supply points, and grid
   supply points NGED operates, the generation connected to them, and the false zeros, stuck values,
-  and missing-data gaps in the trial-area telemetry.
+  missing-data gaps, and months-long commissioning ramps in the trial-area telemetry.
 - [Requirements](requirements.md) — the phased rollout from 32 time series to roughly 2,500, and the
   objectives NGED prioritises.
 - [The manual heuristic forecast](manual-heuristic-forecast.md) — the historical-analogue method
