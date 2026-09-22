@@ -31,9 +31,8 @@ import logging
 import sys
 import tempfile
 import zipfile
-from datetime import UTC, datetime
 from pathlib import Path
-from typing import Final, Literal
+from typing import Final
 
 import numpy as np
 import polars as pl
@@ -49,6 +48,7 @@ from sources import (
     SourceType,
     point_output_path_for,
 )
+from studies.power import hourly_from_half_hourly
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("build_dataset")
@@ -59,55 +59,19 @@ METADATA_PATH: Final[Path] = REPO_DATA_DIR / "NGED" / "metadata.parquet"
 CAPACITY_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "effective_capacity")
 OPEN_METEO_PATH: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_open_meteo.parquet"
 CAMS_PATH: Final[Path] = REPO_DATA_DIR / "CAMS" / "beam_diffuse_cams.parquet"
-AlignmentType = Literal["as-labelled", "shifted", "piecewise"]
-"""How the power stamps are read against ERA5.
-
-`as-labelled` takes `PowerTimeSeries.time` at its word: the reading stamped `T` is the mean over
-`(T - 30 min, T]`. `shifted` moves every power stamp 30 minutes earlier before the join.
-`piecewise` moves only the stamps before `ALIGNMENT_FIXED_AT`, which is the correct treatment:
-NGED corrected the feed at that instant, so the stamps before it are half an hour late and the
-stamps after it are not.
-
-**Three independent tests say the stamps arrive half an hour late, which is why the second reading
-exists.** Against the sun's own horizon crossings the first and last generating half-hour of a clear
-day both fall 30 minutes later than they should — a truncation at low sun would move those two edges
-towards each other rather than shifting both the same way. The power-weighted centroid of a clear
-day runs 0.45 hours late. And the correlation with ERA5 global irradiance is maximised at a
-30-minute shift for all six meters, in every year. It is not a daylight-saving bug: the centroid
-offset is flat across the March and October boundaries, where a local-time error would step by a
-whole hour.
-
-The experiment is run both ways rather than one, because a half-hour misalignment blunts the beam
-component more than the diffuse one — beam is the sharper, faster-varying signal — so it penalises
-exactly the arm under test. That is an asymmetric error, and a paired design gives no protection
-against it. Whether the contract or the feed is at fault is a question for NGED and is not settled
-here.
-"""
-
-ALIGNMENT_FIXED_AT: Final[datetime] = datetime(2026, 3, 26, 8, 30, tzinfo=UTC)
-"""The instant NGED corrected the half-hourly stamps.
-
-Every reading stamped before this instant is half an hour late: its value is the mean over
-`(T - 60 min, T - 30 min]` rather than the `(T - 30 min, T]` the contract states. Readings from this
-instant on are correct as stamped. NGED reported the correction, and three independent measurements
-agree with it: the power-weighted centroid of a clear day's output steps from 45 minutes after solar
-noon to 15 minutes at this stamp, the feed stops publishing exact-zero rows at the same instant, and
-the published rows per day drop from 48 to 26.
-"""
 
 
-def output_path_for(*, dataset_name: str, alignment: AlignmentType) -> Path:
+def output_path_for(*, dataset_name: str) -> Path:
     """Return where one built frame is written.
 
     Args:
         dataset_name: The irradiance source, plus any suffix distinguishing a variant build from
             the main one for the same source.
-        alignment: Which stamp alignment the frame was built under.
 
     Returns:
         The parquet path every arm of that run reads.
     """
-    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{dataset_name}_{alignment}.parquet"
+    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{dataset_name}.parquet"
 
 
 MIN_YEARS_OF_READINGS: Final[float] = 1.0
@@ -436,17 +400,15 @@ def _pv_sites() -> pl.DataFrame:
     return sites.with_columns(site=pl.Series(shuffled, dtype=pl.Utf8)).drop("n_rows")
 
 
-def _hourly_power(*, sites: pl.DataFrame, alignment: AlignmentType) -> pl.DataFrame:
+def _hourly_power(*, sites: pl.DataFrame) -> pl.DataFrame:
     """Aggregate the half-hourly PV readings onto the ERA5 hourly, period-ending grid.
 
-    An hour ending at `T` is the mean of the two half-hours ending at `T - 30 min` and `T`, and is
-    produced only when both are present, so a partly-missing hour is dropped rather than silently
-    becoming a half-hour mean.
+    The stamps are taken at face value. `PowerTimeSeries.correct_late_timestamps` repairs NGED's
+    half-hour-late stamps at ingestion, so every row of the stored table already means the window
+    its `time` field states, and a second correction here would undo the repair on 93% of the rows.
 
     Args:
         sites: The site roster from `_pv_sites`.
-        alignment: Whether to take the power stamps at face value or move them 30 minutes earlier
-            first. See `AlignmentType`.
 
     Returns:
         One row per (site, time) with `power_mw` and `has_zero_half_hour`.
@@ -459,34 +421,7 @@ def _hourly_power(*, sites: pl.DataFrame, alignment: AlignmentType) -> pl.DataFr
         .rename({"power": "power_mw"})
         .select("site", "time", "power_mw")
     )
-    # Both half-hours of the window (T-1h, T] carry the stamp of their own end, so the later one is
-    # already stamped T and the earlier one has to be rolled forward by 30 minutes. Under the
-    # shifted reading every stamp is half an hour late, which cancels that roll-forward exactly.
-    # NGED corrected the feed mid-record, so a single global offset is wrong either side of
-    # ALIGNMENT_FIXED_AT. Correct the stamp first, then one roll-forward serves every row.
-    if alignment == "piecewise":
-        corrected = (
-            pl.when(pl.col("time") < pl.lit(ALIGNMENT_FIXED_AT))
-            .then(pl.col("time").dt.offset_by("-30m"))
-            .otherwise(pl.col("time"))
-        )
-        hour_end = corrected.dt.offset_by("30m").dt.truncate("1h")
-    else:
-        offset = "0m" if alignment == "shifted" else "30m"
-        hour_end = pl.col("time").dt.offset_by(offset).dt.truncate("1h")
-    return (
-        half_hourly.with_columns(hour_end=hour_end)
-        .group_by("site", "hour_end")
-        .agg(
-            power_mw=pl.col("power_mw").mean(),
-            n_half_hours=pl.len(),
-            has_zero_half_hour=(pl.col("power_mw") == 0.0).any(),
-        )
-        .filter(pl.col("n_half_hours") == 2)
-        .drop("n_half_hours")
-        .rename({"hour_end": "time"})
-        .sort("site", "time")
-    )
+    return hourly_from_half_hourly(half_hourly=half_hourly)
 
 
 def _drop_outages_and_spikes(*, power: pl.DataFrame, sites: pl.DataFrame) -> pl.DataFrame:
@@ -749,9 +684,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=SOURCE_CHOICES, default="open-meteo")
     parser.add_argument(
-        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
-    )
-    parser.add_argument(
         "--min-cams-reliability",
         type=float,
         default=MIN_CAMS_RELIABILITY,
@@ -781,12 +713,9 @@ def main() -> int:
     )
     arguments = parser.parse_args()
     source: SourceType = arguments.source
-    alignment: AlignmentType = arguments.alignment
 
     sites = _pv_sites()
-    _LOG.info(
-        "using %d PV sites, irradiance source %s, power stamps %s", sites.height, source, alignment
-    )
+    _LOG.info("using %d PV sites, irradiance source %s", sites.height, source)
 
     gridded = _read_era5(source="open-meteo" if source in PER_SITE_SOURCES else source)
     _LOG.info(
@@ -796,9 +725,7 @@ def main() -> int:
         gridded["time"].max(),
     )
 
-    power = _drop_outages_and_spikes(
-        power=_hourly_power(sites=sites, alignment=alignment), sites=sites
-    )
+    power = _drop_outages_and_spikes(power=_hourly_power(sites=sites), sites=sites)
     _LOG.info("hourly power after outage and spike filtering: %d rows", power.height)
 
     sites_with_cells = _nearest_era5_cell(sites=sites, era5=gridded)
@@ -849,7 +776,7 @@ def main() -> int:
             .dt.replace_time_zone("UTC")
         )
         _LOG.info("first-date filter kept %d of %d rows", dataset.height, before)
-    output_path = output_path_for(dataset_name=f"{source}{arguments.suffix}", alignment=alignment)
+    output_path = output_path_for(dataset_name=f"{source}{arguments.suffix}")
     dataset.write_parquet(output_path)
     _LOG.info("wrote %d rows to %s", dataset.height, output_path)
     _LOG.info(

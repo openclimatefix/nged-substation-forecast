@@ -15,7 +15,7 @@ rather than between two grids alone. That confound cannot be removed without ref
 the other's rows, which is not what any of the arms are for.
 
 Run it with `uv run --no-project --with polars --with numpy --with xgboost --with pvlib python
-scripts/experiments/beam_diffuse_split/compare_sources.py --alignment shifted`.
+scripts/experiments/beam_diffuse_split/compare_sources.py`.
 """
 
 import argparse
@@ -50,13 +50,12 @@ def _scalar(value: object) -> float:
     return float(value)  # ty: ignore[invalid-argument-type]
 
 
-def _losses_for(*, instrument: str, source: str, alignment: str) -> pl.DataFrame:
+def _losses_for(*, instrument: str, source: str) -> pl.DataFrame:
     """Read one run's per-row losses, restricted to the primary setting.
 
     Args:
         instrument: `xgboost` or `physics`.
         source: The irradiance source the run used.
-        alignment: The stamp alignment the run used.
 
     Returns:
         The primary setting's per-row losses.
@@ -65,12 +64,7 @@ def _losses_for(*, instrument: str, source: str, alignment: str) -> pl.DataFrame
         FileNotFoundError: If that run has not been produced.
     """
     stem = "results" if instrument == "xgboost" else "physics"
-    path = (
-        REPO_DATA_DIR
-        / "ERA5"
-        / f"beam_diffuse_{stem}_{source}_{alignment}"
-        / "per_row_losses.parquet"
-    )
+    path = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}" / "per_row_losses.parquet"
     if not path.exists():
         msg = f"{path} missing; run the {instrument} instrument on {source} first"
         raise FileNotFoundError(msg)
@@ -80,9 +74,6 @@ def _losses_for(*, instrument: str, source: str, alignment: str) -> pl.DataFrame
 def main() -> int:
     """Print the shared-hours comparison for both instruments."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
-    )
     parser.add_argument("--first-source", default="cams")
     parser.add_argument("--second-source", default="open-meteo")
     arguments = parser.parse_args()
@@ -90,10 +81,7 @@ def main() -> int:
 
     lines: list[str] = []
     for instrument, arms in COMPARED_ARMS.items():
-        runs = {
-            source: _losses_for(instrument=instrument, source=source, alignment=arguments.alignment)
-            for source in sources
-        }
+        runs = {source: _losses_for(instrument=instrument, source=source) for source in sources}
         shared = (
             runs[sources[0]]
             .select("site", "time")
@@ -108,7 +96,7 @@ def main() -> int:
         }
 
         lines += [
-            f"### {instrument}, {arguments.alignment} stamps",
+            f"### {instrument}",
             "",
             f"{shared.height:,} hours shared by both sources.",
             "",

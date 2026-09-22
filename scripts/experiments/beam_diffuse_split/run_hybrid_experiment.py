@@ -30,7 +30,7 @@ has nothing to do with calibration. That is the construction
 Run it with `uv run --no-project` plus `--with polars --with numpy --with xgboost --with scipy
 --with pvlib --with xarray --with netcdf4 --with pandas --with deltalake`, then
 `python scripts/experiments/beam_diffuse_split/run_hybrid_experiment.py --source cams
---alignment shifted`. The long dependency list is `export_cap.py` reaching into
+The long dependency list is `export_cap.py` reaching into
 `build_dataset.py` for the site roster, which is what maps NGED's `time_series_id` to an
 anonymous label.
 """
@@ -176,9 +176,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     parser.add_argument(
-        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
-    )
-    parser.add_argument(
         "--suffix",
         default="",
         help="Selects a variant build of the same source, and keeps its results beside the main.",
@@ -190,9 +187,7 @@ def main() -> int:
         dataset=_assign_folds(
             dataset=_add_time_features(
                 dataset=drop_commissioning_ramp(
-                    dataset=pl.read_parquet(
-                        dataset_path_for(source=source, alignment=arguments.alignment)
-                    )
+                    dataset=pl.read_parquet(dataset_path_for(source=source))
                 )
             )
         )
@@ -230,11 +225,7 @@ def main() -> int:
     )
 
     # The physical model's own score, on the identical rows, read straight from its per-row losses.
-    physics_dir = (
-        run_experiment.REPO_DATA_DIR
-        / "ERA5"
-        / f"beam_diffuse_physics_{source}_{arguments.alignment}"
-    )
+    physics_dir = run_experiment.REPO_DATA_DIR / "ERA5" / f"beam_diffuse_physics_{source}"
     physics = (
         pl.read_parquet(physics_dir / "per_row_losses.parquet")
         .filter(
@@ -252,7 +243,7 @@ def main() -> int:
     )
     losses = pl.concat([losses, physics.select(losses.columns)], how="vertical")
 
-    results_dir = results_dir_for(source=source, alignment=arguments.alignment)
+    results_dir = results_dir_for(source=source)
     results_dir.mkdir(parents=True, exist_ok=True)
 
     lines: list[str] = [

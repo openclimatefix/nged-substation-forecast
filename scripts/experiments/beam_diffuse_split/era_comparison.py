@@ -82,11 +82,8 @@ METRIC: Final[str] = "absolute_error_capped_mw"
 """The loss every table reports, with the export-cap clamp applied identically to every arm."""
 
 
-def _joined(*, alignment: str) -> pl.DataFrame:
+def _joined() -> pl.DataFrame:
     """Inner-join every product on the site-hours all of them cover.
-
-    Args:
-        alignment: The power-stamp alignment every dataset was built at.
 
     Returns:
         One row per common site-hour, carrying `ghi_<arm>` for every arm.
@@ -94,17 +91,17 @@ def _joined(*, alignment: str) -> pl.DataFrame:
     Raises:
         RuntimeError: If the four products share no site-hours.
     """
-    frame = pl.read_parquet(dataset_path_for(source=PRODUCTS[BASE_PRODUCT], alignment=alignment))
+    frame = pl.read_parquet(dataset_path_for(source=PRODUCTS[BASE_PRODUCT]))
     frame = frame.rename({"ghi_w_m2": f"ghi_{BASE_PRODUCT}"})
     for arm, source in PRODUCTS.items():
         if arm == BASE_PRODUCT:
             continue
-        other = pl.read_parquet(dataset_path_for(source=source, alignment=alignment)).select(
+        other = pl.read_parquet(dataset_path_for(source=source)).select(
             ["site", "time", pl.col("ghi_w_m2").alias(f"ghi_{arm}")]
         )
         frame = frame.join(other, on=["site", "time"], how="inner")
     if frame.is_empty():
-        msg = f"the {len(PRODUCTS)} products share no site-hours at alignment {alignment}"
+        msg = f"the {len(PRODUCTS)} products share no site-hours"
         raise RuntimeError(msg)
     return frame
 
@@ -198,14 +195,11 @@ def main() -> int:
     """Score every product in every era, and write the report."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
-    )
-    arguments = parser.parse_args()
+    # This script takes no arguments. Parsing anyway keeps `--help` working, and makes a stale
+    # `--alignment` on the command line an error rather than a silently ignored flag.
+    parser.parse_args()
 
-    common = _add_time_features(
-        dataset=drop_commissioning_ramp(dataset=_joined(alignment=arguments.alignment))
-    )
+    common = _add_time_features(dataset=drop_commissioning_ramp(dataset=_joined()))
     _LOG.info(
         "common rows: %s, sites: %d, months: %d",
         f"{common.height:,}",
@@ -223,7 +217,7 @@ def main() -> int:
         "| Era | Contrast | ΔMAE (pp of capacity) | 95% interval | excludes zero? |",
         "|---|---|---|---|---|",
     ]
-    output_dir = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_eras_{arguments.alignment}"
+    output_dir = REPO_DATA_DIR / "ERA5" / "beam_diffuse_eras"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for era in ("pre_all", "pre_matched", "post"):

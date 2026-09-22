@@ -60,14 +60,14 @@ HEADLINE_CONTRAST: Final[dict[str, tuple[str, str]]] = {
 """Each instrument's treatment and reference arm, whose FSS difference gets a bootstrap interval."""
 
 
-def _capped_forecasts(*, source: str, alignment: str, suffix: str, instrument: str) -> pl.DataFrame:
+def _capped_forecasts(*, source: str, suffix: str, instrument: str) -> pl.DataFrame:
     """Rebuild each arm's capped point forecast from its stored signed error.
 
     Args:
         source: The irradiance source the run used.
-        alignment: The stamp alignment the run used.
-        suffix: Selects a variant build of the same source.
-        instrument: `xgboost` or `physics`.
+        suffix: Distinguishes a variant build from the main one for the same source, and is empty
+            for the main one.
+        instrument: Which instrument's results to read, `xgboost` or `physics`.
 
     Returns:
         One row per site, hour, arm, and seed, carrying the metered power and the forecast.
@@ -77,14 +77,9 @@ def _capped_forecasts(*, source: str, alignment: str, suffix: str, instrument: s
     """
     stem = "results" if instrument == "xgboost" else "physics"
     losses_path = (
-        REPO_DATA_DIR
-        / "ERA5"
-        / f"beam_diffuse_{stem}_{source}{suffix}_{alignment}"
-        / "per_row_losses.parquet"
+        REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}{suffix}" / "per_row_losses.parquet"
     )
-    dataset_path = (
-        REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}{suffix}_{alignment}.parquet"
-    )
+    dataset_path = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}{suffix}.parquet"
     for path in (losses_path, dataset_path):
         if not path.exists():
             msg = f"{path} missing; run the {instrument} instrument on {source} first"
@@ -236,9 +231,6 @@ def main() -> int:
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=SOURCE_CHOICES, default="open-meteo")
-    parser.add_argument(
-        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
-    )
     parser.add_argument("--instrument", choices=("xgboost", "physics"), default="xgboost")
     parser.add_argument("--suffix", default="", help="Selects a variant build of the same source.")
     parser.add_argument(
@@ -251,7 +243,6 @@ def main() -> int:
 
     forecasts = _capped_forecasts(
         source=arguments.source,
-        alignment=arguments.alignment,
         suffix=arguments.suffix,
         instrument=arguments.instrument,
     )
@@ -284,10 +275,7 @@ def main() -> int:
 
     label = f"{arguments.source}{arguments.suffix}"
     lines = [
-        (
-            f"### Fractions Skill Score — {label}, {arguments.instrument}, "
-            f"{arguments.alignment} stamps"
-        ),
+        (f"### Fractions Skill Score — {label}, {arguments.instrument}, "),
         "",
         (
             f"Threshold: each site's {arguments.threshold_quantile:.0%} quantile of metered power. "

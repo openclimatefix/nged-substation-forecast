@@ -46,14 +46,6 @@ _LOG: Final[logging.Logger] = logging.getLogger("make_figures")
 
 FIGURES_DIR: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_figures"
 
-ALIGNMENT: Final[str] = "piecewise"
-"""The stamp alignment every figure is drawn under, and the only one that matches the feed.
-
-NGED corrected the half-hourly power stamps at 2026-03-26 08:30 UTC. Every reading before that
-instant is 30 minutes late and every reading from it is correct, so one global offset is wrong on
-one side of that instant whichever offset is chosen.
-"""
-
 MEASURED_COLOUR: Final[str] = "#292B2B"
 """Measured power is drawn in the OCF theme's ink rather than in a brand hue.
 
@@ -164,7 +156,7 @@ def _predictions(*, source: str, instrument: str, arm: str) -> pl.DataFrame:
         One row per (site, time) with `predicted_mw`.
     """
     stem = "results" if instrument == "xgboost" else "physics"
-    path = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}_{ALIGNMENT}"
+    path = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}"
     losses = pl.read_parquet(path / "per_row_losses.parquet").filter(
         (pl.col("setting") == "primary") & (pl.col("target") == "power_mw") & (pl.col("arm") == arm)
     )
@@ -185,9 +177,7 @@ def _measured() -> pl.DataFrame:
     Returns:
         One row per scored hour, carrying the columns the figures need.
     """
-    return drop_commissioning_ramp(
-        dataset=pl.read_parquet(dataset_path_for(source="cams", alignment=ALIGNMENT))
-    ).select(
+    return drop_commissioning_ramp(dataset=pl.read_parquet(dataset_path_for(source="cams"))).select(
         "site",
         "time",
         "power_mw",
@@ -335,7 +325,7 @@ def _per_site_error() -> pl.DataFrame:
     records: list[dict[str, object]] = []
     for source, instrument, label in MAE_SETUPS:
         stem = "results" if instrument == "xgboost" else "physics"
-        path = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}_{ALIGNMENT}"
+        path = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}"
         summary = pl.read_parquet(path / "per_site_summary.parquet").filter(
             (pl.col("setting") == "primary") & (pl.col("arm") == BEST_ARM[instrument])
         )
@@ -413,9 +403,9 @@ def _sky_chart(*, source: str) -> alt.Chart:
     Returns:
         The point-and-interval chart.
     """
-    intervals = pl.read_parquet(
-        results_dir_for(source=source, alignment=ALIGNMENT) / "sky_intervals.parquet"
-    ).filter((pl.col("treatment") == "C_era5_split") & (pl.col("reference") == "B_erbs"))
+    intervals = pl.read_parquet(results_dir_for(source=source) / "sky_intervals.parquet").filter(
+        (pl.col("treatment") == "C_era5_split") & (pl.col("reference") == "B_erbs")
+    )
     # The bin's clearness range belongs in the table, not in an axis label long enough to run off
     # the left of the figure.
     intervals = intervals.with_columns(
@@ -468,7 +458,7 @@ def main() -> int:
     _LOG.info("wrote %s", FIGURES_DIR / "per_site_error.svg")
 
     for source in SKY_CHART_SOURCES:
-        intervals = results_dir_for(source=source, alignment=ALIGNMENT) / "sky_intervals.parquet"
+        intervals = results_dir_for(source=source) / "sky_intervals.parquet"
         if not intervals.exists():
             _LOG.info("no sky intervals for %s, skipping its chart", source)
             continue

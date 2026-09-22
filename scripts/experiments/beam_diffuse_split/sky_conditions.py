@@ -22,7 +22,7 @@ top of the atmosphere offered actually arrived. Both quantities are already colu
 so binning on them introduces no information the arms lacked.
 
 Run it with `uv run --no-project --with polars --with numpy --with pvlib python
-scripts/experiments/beam_diffuse_split/sky_conditions.py --source cams --alignment shifted`.
+scripts/experiments/beam_diffuse_split/sky_conditions.py --source cams`.
 """
 
 import argparse
@@ -106,21 +106,16 @@ def main() -> int:
     """Print one table of contrasts per sky condition."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
-    parser.add_argument(
-        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
-    )
     parser.add_argument("--suffix", default="", help="Selects a variant build of the same source.")
     arguments = parser.parse_args()
     source = f"{arguments.source}{arguments.suffix}"
 
-    results_dir = results_dir_for(source=source, alignment=arguments.alignment)
+    results_dir = results_dir_for(source=source)
     losses = pl.read_parquet(results_dir / "per_row_losses.parquet").filter(
         (pl.col("setting") == "primary") & (pl.col("target") == "power_mw")
     )
     dataset = _assign_folds(
-        dataset=_add_time_features(
-            dataset=pl.read_parquet(dataset_path_for(source=source, alignment=arguments.alignment))
-        )
+        dataset=_add_time_features(dataset=pl.read_parquet(dataset_path_for(source=source)))
     )
     binned = _binned(dataset=dataset)
     _LOG.info(

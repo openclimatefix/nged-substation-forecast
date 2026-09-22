@@ -21,7 +21,6 @@ Run it with `uv run --no-project` plus `--with polars --with numpy --with altair
 
 import logging
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, Literal
 
@@ -47,16 +46,6 @@ SUBJECT: Final[str] = "E"
 
 CAP_TOLERANCE_MW: Final[float] = 0.001
 """How far below the connection limit a cap must sit before its half-hour counts as curtailed."""
-
-ALIGNMENT_FIXED_AT: Final[datetime] = datetime(2026, 3, 26, 8, 30, tzinfo=UTC)
-"""The instant NGED corrected the half-hourly power stamps.
-
-A reading stamped before this instant is half an hour late, and `build_dataset.ALIGNMENT_FIXED_AT`
-carries the evidence. The ratio this figure plots is insensitive to the lateness, because every
-site is late by the same half hour and the two capacity factors cancel it. The export cap is not:
-the cap is a second-resolution event log with no averaging window to mislabel, so joining a late
-power stamp to a correct cap stamp reads the wrong half-hour's setpoint.
-"""
 
 MIN_REFERENCE_SITES: Final[int] = 4
 """How many of the five reference sites must report before a half-hour's fleet median is usable."""
@@ -142,11 +131,6 @@ def _half_hourly_gain() -> pl.DataFrame:
         .collect()
         .join(capacity, on="time_series_id")
         .with_columns(
-            # Correct the stamp before anything joins on it, so the cap join below compares a
-            # half-hour of power against the setpoint that was actually in force during it.
-            time=pl.when(pl.col("time") < pl.lit(ALIGNMENT_FIXED_AT))
-            .then(pl.col("time").dt.offset_by("-30m"))
-            .otherwise(pl.col("time")),
             site=pl.col("time_series_id").replace_strict(SITE_IDS),
             capacity_factor=pl.col("power") / pl.col("effective_capacity_mw"),
         )

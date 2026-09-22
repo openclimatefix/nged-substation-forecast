@@ -275,9 +275,6 @@ def main() -> int:
     """Write every table to `report.md` and to standard output."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=SOURCE_CHOICES, default="open-meteo")
-    parser.add_argument(
-        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
-    )
     parser.add_argument("--instrument", choices=("xgboost", "physics"), default="xgboost")
     parser.add_argument(
         "--suffix",
@@ -288,9 +285,7 @@ def main() -> int:
     instrument: InstrumentType = arguments.instrument
     stem = "results" if instrument == "xgboost" else "physics"
     results_dir = (
-        REPO_DATA_DIR
-        / "ERA5"
-        / f"beam_diffuse_{stem}_{arguments.source}{arguments.suffix}_{arguments.alignment}"
+        REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{arguments.source}{arguments.suffix}"
     )
 
     intervals = pl.read_parquet(results_dir / "bootstrap_intervals.parquet")

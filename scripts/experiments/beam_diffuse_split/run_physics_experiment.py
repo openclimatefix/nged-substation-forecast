@@ -33,7 +33,7 @@ likewise adds nothing to this instrument's intervals.
 Run it with `uv run --no-project` plus `--with polars --with numpy --with xgboost
 --with scipy --with pvlib --with xarray --with netcdf4 --with pandas --with deltalake`, then
 `python scripts/experiments/beam_diffuse_split/run_physics_experiment.py --source cams
---alignment shifted`. The long dependency list is `export_cap.py` reaching into `build_dataset.py`
+The long dependency list is `export_cap.py` reaching into `build_dataset.py`
 for the site roster, which is what maps NGED's `time_series_id` to an anonymous label.
 """
 
@@ -65,9 +65,9 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _LOG: Final[logging.Logger] = logging.getLogger("run_physics_experiment")
 
 
-def results_dir_for(*, source: str, alignment: str) -> Path:
-    """Return where this instrument's results for one source and alignment are written."""
-    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_physics_{source}_{alignment}"
+def results_dir_for(*, source: str) -> Path:
+    """Return where this instrument's results for one source are written."""
+    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_physics_{source}"
 
 
 ARM_SPLITS: Final[dict[str, tuple[str, ...]]] = {
@@ -496,25 +496,20 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     parser.add_argument(
-        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
-    )
-    parser.add_argument(
         "--suffix",
         default="",
         help="Selects a variant build of the same source, and keeps its results beside the main.",
     )
     arguments = parser.parse_args()
     source = f"{arguments.source}{arguments.suffix}"
-    results_dir = results_dir_for(source=source, alignment=arguments.alignment)
+    results_dir = results_dir_for(source=source)
     results_dir.mkdir(parents=True, exist_ok=True)
 
     dataset = with_export_cap(
         dataset=_assign_folds(
             dataset=_add_time_features(
                 dataset=drop_commissioning_ramp(
-                    dataset=pl.read_parquet(
-                        dataset_path_for(source=source, alignment=arguments.alignment)
-                    )
+                    dataset=pl.read_parquet(dataset_path_for(source=source))
                 )
             )
         )

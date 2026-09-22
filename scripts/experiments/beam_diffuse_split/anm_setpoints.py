@@ -125,9 +125,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     parser.add_argument(
-        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
-    )
-    parser.add_argument(
         "--site", default="E", help="The anonymised label of the site the export belongs to."
     )
     arguments = parser.parse_args()
@@ -137,9 +134,7 @@ def main() -> int:
         _LOG.error("no setpoint exports under %s", ANM_DIR)
         return 1
 
-    dataset = pl.read_parquet(
-        dataset_path_for(source=arguments.source, alignment=arguments.alignment)
-    ).with_columns(
+    dataset = pl.read_parquet(dataset_path_for(source=arguments.source)).with_columns(
         yield_ratio=(pl.col("power_mw") / pl.col("effective_capacity_mw"))
         / (pl.col("ghi_w_m2") / 1000.0)
     )

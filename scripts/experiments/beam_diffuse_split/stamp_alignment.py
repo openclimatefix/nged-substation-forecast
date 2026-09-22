@@ -23,10 +23,12 @@ reports the shift that maximises the correlation. Irradiance and power are diffe
 from different measurement systems, so a shared clock fault is the only thing that would align them
 at a non-zero lag.
 
-**The correction instant comes from NGED rather than being fitted here.** Running each measurement
-on both sides of it checks NGED's account rather than discovering it: a fault NGED had corrected
-leaves the readings after the correction aligned with the sun and the readings before it half an
-hour late.
+**This measures the repair, not the fault.** `PowerTimeSeries.correct_late_timestamps` moves the
+late stamps at ingestion, so the stored table is already repaired and every measurement below should
+read close to zero on *both* sides of the correction instant. The era split is what makes that
+checkable: an offset that reappears on the `before` side means the repair has stopped matching the
+feed — either NGED has republished the early readings with corrected stamps, in which case the
+ingest is now shifting rows that need no shift, or the fault did not stop where NGED reported.
 
 Run it with `uv run --no-project --with polars --with numpy --with pandas --with pvlib
 --with deltalake python scripts/experiments/beam_diffuse_split/stamp_alignment.py`.
@@ -45,11 +47,11 @@ import pvlib
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from build_dataset import (
-    ALIGNMENT_FIXED_AT,
     CAMS_PATH,
     REPO_DATA_DIR,
     _pv_sites,
 )
+from contracts.power_schemas import POWER_TIMESTAMPS_CORRECTED_BEFORE
 
 _LOG: Final[logging.Logger] = logging.getLogger("stamp_alignment")
 
@@ -129,7 +131,7 @@ def _power_for(*, time_series_id: int) -> pl.DataFrame:
             # or every stamp past 02:00 wraps and the measurement reads plausible nonsense.
             minute_of_day=pl.col("time").dt.hour().cast(pl.Int32) * MINUTES_PER_HOUR
             + pl.col("time").dt.minute().cast(pl.Int32),
-            era=pl.when(pl.col("time") < pl.lit(ALIGNMENT_FIXED_AT))
+            era=pl.when(pl.col("time") < pl.lit(POWER_TIMESTAMPS_CORRECTED_BEFORE))
             .then(pl.lit("before"))
             .otherwise(pl.lit("after")),
         )
@@ -234,7 +236,10 @@ def main() -> int:
     sites = _pv_sites().sort("site")
     cams = pl.read_parquet(CAMS_PATH)
 
-    print(f"Correction instant, as NGED reported it: {ALIGNMENT_FIXED_AT:%Y-%m-%d %H:%M} UTC")
+    print(
+        f"Correction instant, as NGED reported it: "
+        f"{POWER_TIMESTAMPS_CORRECTED_BEFORE:%Y-%m-%d %H:%M} UTC"
+    )
     print(
         "Every offset below is minutes after solar noon. A feed stamped as its contract states"
         " reads zero; a feed half an hour late reads +30.\n"

@@ -14,7 +14,7 @@ The band edges are fixed here and the split is applied after the fact to losses 
 without knowledge of it, so no arm's model was fitted differently because of the band.
 
 Run it with `uv run --no-project --with polars python
-scripts/experiments/beam_diffuse_split/elevation_breakdown.py --source cams --alignment shifted`.
+scripts/experiments/beam_diffuse_split/elevation_breakdown.py --source cams`.
 """
 
 import argparse
@@ -36,17 +36,14 @@ CONTRASTS: Final[dict[str, tuple[str, str]]] = {
 """Each instrument's headline contrast, as (treatment, reference)."""
 
 
-def _banded_losses(*, instrument: str, source: str, alignment: str) -> pl.DataFrame:
+def _banded_losses(*, instrument: str, source: str) -> pl.DataFrame:
     """Read one run's primary losses and attach the solar elevation band of each row."""
     stem = "results" if instrument == "xgboost" else "physics"
     losses = pl.read_parquet(
-        REPO_DATA_DIR
-        / "ERA5"
-        / f"beam_diffuse_{stem}_{source}_{alignment}"
-        / "per_row_losses.parquet"
+        REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}" / "per_row_losses.parquet"
     ).filter(pl.col("setting") == "primary")
     elevation = pl.read_parquet(
-        REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}_{alignment}.parquet"
+        REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}.parquet"
     ).select("site", "time", "solar_elevation_deg")
     return losses.join(elevation, on=["site", "time"], how="inner").with_columns(
         band=pl.col("solar_elevation_deg").cut(
@@ -59,16 +56,11 @@ def main() -> int:
     """Print each instrument's headline contrast inside every elevation band."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
-    parser.add_argument(
-        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
-    )
     arguments = parser.parse_args()
 
     lines: list[str] = []
     for instrument, (treatment, reference) in CONTRASTS.items():
-        banded = _banded_losses(
-            instrument=instrument, source=arguments.source, alignment=arguments.alignment
-        )
+        banded = _banded_losses(instrument=instrument, source=arguments.source)
         paired = (
             banded.filter(pl.col("arm") == reference)
             .select("site", "time", "seed", "band", reference=pl.col("absolute_error_capped_mw"))
@@ -94,7 +86,7 @@ def main() -> int:
             .sort("band")
         )
         lines += [
-            f"### {instrument}, {arguments.source}, {arguments.alignment} stamps",
+            f"### {instrument}, {arguments.source}",
             "",
             (
                 "| Solar elevation (degrees) | ΔMAE (pp of P99 output) |"

@@ -15,7 +15,7 @@ Run it from this directory as:
 
 ```bash
 uv run --no-project --with polars --with numpy --with deltalake \
-    python oracle_capacity.py --source cams --alignment piecewise
+    python oracle_capacity.py --source cams
 ```
 """
 
@@ -41,14 +41,9 @@ def main() -> int:
     """Print each contrast as published, and after an oracle removes the per-block bias."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
-    parser.add_argument(
-        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
-    )
     arguments = parser.parse_args()
 
-    results = (
-        REPO_DATA_DIR / "ERA5" / f"beam_diffuse_results_{arguments.source}_{arguments.alignment}"
-    )
+    results = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_results_{arguments.source}"
     losses = (
         pl.read_parquet(results / "per_row_losses.parquet")
         .filter((pl.col("setting") == "primary") & (pl.col("target") == "power_mw"))
@@ -73,7 +68,7 @@ def main() -> int:
         )
 
     metrics = ("published", "debiased_by_year", "debiased_by_month")
-    print(f"\n### Arm error levels, {arguments.source}, {arguments.alignment} stamps\n")
+    print(f"\n### Arm error levels, {arguments.source}\n")
     print("| Arm | As published | Oracle per site-year | Oracle per site-month |")
     print("|---|---|---|---|")
     for arm in sorted(losses["arm"].unique().to_list()):

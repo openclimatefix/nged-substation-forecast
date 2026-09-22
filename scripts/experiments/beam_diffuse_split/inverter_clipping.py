@@ -20,7 +20,7 @@ proxy rather than a measurement: a hot afternoon derates below the nameplate lim
 one runs above it, so no single threshold separates the two states cleanly.
 
 Run it with `uv run --no-project --with polars --with numpy --with pvlib python
-scripts/experiments/beam_diffuse_split/inverter_clipping.py --source cams --alignment shifted`.
+scripts/experiments/beam_diffuse_split/inverter_clipping.py --source cams`.
 """
 
 import argparse
@@ -103,9 +103,9 @@ def _top_flatness(*, dataset: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def _fitted_ratios(*, source: str, alignment: str) -> pl.DataFrame:
+def _fitted_ratios(*, source: str) -> pl.DataFrame:
     """Return the physical model's fitted direct-current to alternating-current ratio per site."""
-    path = physics_results_dir_for(source=source, alignment=alignment) / "fitted_parameters.parquet"
+    path = physics_results_dir_for(source=source) / "fitted_parameters.parquet"
     return (
         pl.read_parquet(path)
         .filter(pl.col("arm") == PHYSICS_ARM)
@@ -117,10 +117,10 @@ def _fitted_ratios(*, source: str, alignment: str) -> pl.DataFrame:
     )
 
 
-def _flatness_table(*, dataset: pl.DataFrame, source: str, alignment: str) -> list[str]:
+def _flatness_table(*, dataset: pl.DataFrame, source: str) -> list[str]:
     """Return the markdown rows describing how clipped each site is."""
     flatness = _top_flatness(dataset=dataset).join(
-        _fitted_ratios(source=source, alignment=alignment), on="site", how="left"
+        _fitted_ratios(source=source), on="site", how="left"
     )
     lines = [
         (
@@ -145,22 +145,19 @@ def main() -> int:
     """Print the headline contrast on and off the inverter ceiling."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
-    parser.add_argument(
-        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
-    )
     parser.add_argument("--suffix", default="", help="Selects a variant build of the same source.")
     arguments = parser.parse_args()
     source = f"{arguments.source}{arguments.suffix}"
 
-    results_dir = results_dir_for(source=source, alignment=arguments.alignment)
+    results_dir = results_dir_for(source=source)
     losses = pl.read_parquet(results_dir / "per_row_losses.parquet").filter(
         (pl.col("setting") == "primary") & (pl.col("target") == "power_mw")
     )
-    dataset = pl.read_parquet(
-        dataset_path_for(source=source, alignment=arguments.alignment)
-    ).filter(pl.col("solar_elevation_deg") > 0)
+    dataset = pl.read_parquet(dataset_path_for(source=source)).filter(
+        pl.col("solar_elevation_deg") > 0
+    )
 
-    lines = _flatness_table(dataset=dataset, source=source, alignment=arguments.alignment)
+    lines = _flatness_table(dataset=dataset, source=source)
     records: list[dict[str, object]] = []
 
     for threshold in CEILING_THRESHOLDS:

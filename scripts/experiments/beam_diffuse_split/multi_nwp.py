@@ -107,23 +107,20 @@ METRIC: Final[str] = "absolute_error_capped_mw"
 """The loss every table reports, with the export-cap clamp applied identically to every arm."""
 
 
-def _joined(*, alignment: str) -> pl.DataFrame:
+def _joined() -> pl.DataFrame:
     """Join the two products on the site-hours they both cover.
-
-    Args:
-        alignment: The power-stamp alignment both datasets were built at.
 
     Returns:
         One row per shared site-hour, carrying `PRIMARY_SOURCE`'s columns unchanged and
         `SECOND_SOURCE`'s irradiance under a `_ukv` suffix.
     """
-    primary = pl.read_parquet(dataset_path_for(source=PRIMARY_SOURCE, alignment=alignment))
-    second = pl.read_parquet(dataset_path_for(source=SECOND_SOURCE, alignment=alignment)).select(
+    primary = pl.read_parquet(dataset_path_for(source=PRIMARY_SOURCE))
+    second = pl.read_parquet(dataset_path_for(source=SECOND_SOURCE)).select(
         ["site", "time", *[pl.col(column).alias(f"{column}_ukv") for column in JOINED_IRRADIANCE]]
     )
     joined = primary.join(second, on=["site", "time"], how="inner")
     if joined.is_empty():
-        msg = f"{PRIMARY_SOURCE} and {SECOND_SOURCE} share no site-hours at alignment {alignment}"
+        msg = f"{PRIMARY_SOURCE} and {SECOND_SOURCE} share no site-hours"
         raise RuntimeError(msg)
     return joined.with_columns(ghi_w_m2_duplicate=pl.col("ghi_w_m2"))
 
@@ -209,17 +206,14 @@ def main() -> int:
     """Fit every arm on the shared rows and report the table and the intervals."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
-    )
-    arguments = parser.parse_args()
+    # This script takes no arguments. Parsing anyway keeps `--help` working, and makes a stale
+    # `--alignment` on the command line an error rather than a silently ignored flag.
+    parser.parse_args()
 
     dataset = with_export_cap(
         dataset=_assign_folds(
             dataset=_with_shuffled_second_product(
-                dataset=_add_time_features(
-                    dataset=drop_commissioning_ramp(dataset=_joined(alignment=arguments.alignment))
-                )
+                dataset=_add_time_features(dataset=drop_commissioning_ramp(dataset=_joined()))
             )
         )
     )
@@ -240,7 +234,7 @@ def main() -> int:
         _LOG.info("fitted %s", arm)
     losses = pl.concat(frames)
 
-    output_dir = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_multi_nwp_{arguments.alignment}"
+    output_dir = REPO_DATA_DIR / "ERA5" / "beam_diffuse_multi_nwp"
     output_dir.mkdir(parents=True, exist_ok=True)
     losses.write_parquet(output_dir / "losses.parquet")
 

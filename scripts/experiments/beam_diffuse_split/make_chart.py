@@ -39,19 +39,6 @@ _LOG: Final[logging.Logger] = logging.getLogger("make_chart")
 
 OUTPUT_PATH: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_split_result.svg"
 
-ALIGNMENT: Final[str] = "piecewise"
-"""Which stamp alignment the chart draws.
-
-NGED corrected the half-hourly power stamps at 2026-03-26 08:30 UTC, so readings before that
-instant are 30 minutes late and readings from it are correct. Only the piecewise reading matches
-the feed, and every figure and every headline number here is drawn under it.
-
-Getting the alignment right matters more for the fitted physical model than for the tree. Under
-the uncorrected stamps the physical model's headline contrast on the reanalysis changes sign,
-because a 30-minute error is absorbed into the fitted azimuth and the arms then differ in geometry
-as well as in beam field. The tree's contrasts hold their sign under every reading.
-"""
-
 SOURCE_LABELS: Final[dict[str, str]] = {
     "open-meteo": "ERA5 (31 km reanalysis)",
     "ukv": "UKV (2 km model analysis)",
@@ -162,10 +149,9 @@ def _raise_on_unlabelled_sources(*, stem: str) -> None:
         ValueError: If any results directory names a source the mapping does not.
     """
     prefix = f"beam_diffuse_{stem}_"
-    suffix = f"_{ALIGNMENT}"
     found = {
-        path.name[len(prefix) : -len(suffix)]
-        for path in (REPO_DATA_DIR / "ERA5").glob(f"{prefix}*{suffix}")
+        path.name[len(prefix) :]
+        for path in (REPO_DATA_DIR / "ERA5").glob(f"{prefix}*")
         if path.is_dir()
     }
     known = (*SOURCE_LABELS, *UNDRAWN_SOURCES)
@@ -197,10 +183,7 @@ def _arm_mean_absolute_errors(*, instrument: str, source: str) -> dict[str, floa
     """
     stem = "results" if instrument == "xgboost" else "physics"
     summary = pl.read_parquet(
-        REPO_DATA_DIR
-        / "ERA5"
-        / f"beam_diffuse_{stem}_{source}_{ALIGNMENT}"
-        / "per_site_summary.parquet"
+        REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}" / "per_site_summary.parquet"
     ).filter(pl.col("setting") == "primary")
     pooled = summary.group_by("arm").agg(
         mae=(pl.col("mae_capped_fraction_of_capacity") * pl.col("n_rows")).sum()
@@ -223,7 +206,7 @@ def _differences() -> pl.DataFrame:
         stem = "results" if instrument == "xgboost" else "physics"
         _raise_on_unlabelled_sources(stem=stem)
         for source in SOURCE_LABELS:
-            results_dir = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}_{ALIGNMENT}"
+            results_dir = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}"
             if not results_dir.exists():
                 continue
             arm_mae = _arm_mean_absolute_errors(instrument=instrument, source=source)

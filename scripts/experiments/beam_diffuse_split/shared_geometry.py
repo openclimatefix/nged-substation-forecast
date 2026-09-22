@@ -15,7 +15,7 @@ Run it from this directory as:
 
 ```bash
 uv run --no-project --with polars --with numpy --with scipy --with pvlib --with deltalake \
-    python shared_geometry.py --source cams --alignment piecewise
+    python shared_geometry.py --source cams
 ```
 """
 
@@ -171,18 +171,13 @@ def main() -> int:
     """Refit every arm under both geometry schemes and print the contrasts side by side."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
-    parser.add_argument(
-        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
-    )
     arguments = parser.parse_args()
 
     dataset = with_export_cap(
         dataset=_assign_folds(
             dataset=_add_time_features(
                 dataset=drop_commissioning_ramp(
-                    dataset=pl.read_parquet(
-                        dataset_path_for(source=arguments.source, alignment=arguments.alignment)
-                    )
+                    dataset=pl.read_parquet(dataset_path_for(source=arguments.source))
                 )
             )
         )
@@ -199,7 +194,7 @@ def main() -> int:
         losses = pl.concat([future.result() for future in futures])
 
     metric = "absolute_error_capped_fraction_of_capacity"
-    print(f"\n### physical model, {arguments.source}, {arguments.alignment} stamps\n")
+    print(f"\n### physical model, {arguments.source}\n")
     print("| Scheme | Arm | MAE (% of P99 output) |")
     print("|---|---|---|")
     for scheme in ("free", "shared"):

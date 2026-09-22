@@ -10,7 +10,7 @@ Run it from this directory as:
 
 ```bash
 uv run --no-project --with polars --with numpy --with scipy --with pvlib --with deltalake \
-    python restart_basins.py --source cams --alignment piecewise
+    python restart_basins.py --source cams
 ```
 """
 
@@ -114,18 +114,13 @@ def main() -> int:
     """Fit every arm at every site from both start schemes and print the comparison."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
-    parser.add_argument(
-        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
-    )
     arguments = parser.parse_args()
 
     dataset = with_export_cap(
         dataset=_assign_folds(
             dataset=_add_time_features(
                 dataset=drop_commissioning_ramp(
-                    dataset=pl.read_parquet(
-                        dataset_path_for(source=arguments.source, alignment=arguments.alignment)
-                    )
+                    dataset=pl.read_parquet(dataset_path_for(source=arguments.source))
                 )
             )
         )

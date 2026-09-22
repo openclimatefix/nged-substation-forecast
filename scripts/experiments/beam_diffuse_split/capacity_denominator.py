@@ -10,7 +10,7 @@ Run it from this directory as:
 
 ```bash
 uv run --no-project --with polars --with numpy --with deltalake \
-    python capacity_denominator.py --source cams --alignment piecewise
+    python capacity_denominator.py --source cams
 ```
 """
 
@@ -41,24 +41,19 @@ DECILES: Final[int] = 10
 PERCENT: Final[float] = 100.0
 
 
-def _results_dir(*, source: str, alignment: str) -> pathlib.Path:
-    """Return where the XGBoost results for one source and alignment live."""
-    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_results_{source}_{alignment}"
+def _results_dir(*, source: str) -> pathlib.Path:
+    """Return where the XGBoost results for one source live."""
+    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_results_{source}"
 
 
 def main() -> int:
     """Print the per-site scale, the clearest week's bias, and the headline per denominator."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
-    parser.add_argument(
-        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
-    )
     arguments = parser.parse_args()
 
     measured = drop_commissioning_ramp(
-        dataset=pl.read_parquet(
-            dataset_path_for(source=arguments.source, alignment=arguments.alignment)
-        )
+        dataset=pl.read_parquet(dataset_path_for(source=arguments.source))
     )
     scales = (
         measured.group_by("site")

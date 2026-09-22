@@ -321,11 +321,10 @@ def main() -> int:
         FileNotFoundError: If the ENS download or the ERA5 dataset is missing.
     """
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--alignment", default="piecewise")
     parser.add_argument("--seed", type=int, default=0)
     arguments = parser.parse_args()
 
-    era5_path = dataset_path_for(source="open-meteo", alignment=arguments.alignment)
+    era5_path = dataset_path_for(source="open-meteo")
     for path in (ENS_PATH, era5_path):
         if not path.exists():
             msg = f"{path} missing; run its fetcher and build_dataset first"

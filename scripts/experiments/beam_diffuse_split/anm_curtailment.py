@@ -158,9 +158,6 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     parser.add_argument(
-        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
-    )
-    parser.add_argument(
         "--refresh", action="store_true", help="Re-download rather than reading the cache."
     )
     arguments = parser.parse_args()
@@ -197,9 +194,7 @@ def main() -> int:
     ]
 
     hourly = _hourly(curtailment=curtailment, site=site)
-    dataset = pl.read_parquet(
-        dataset_path_for(source=arguments.source, alignment=arguments.alignment)
-    )
+    dataset = pl.read_parquet(dataset_path_for(source=arguments.source))
     scored = dataset.with_columns(
         yield_ratio=(pl.col("power_mw") / pl.col("effective_capacity_mw"))
         / (pl.col("ghi_w_m2") / 1000.0)
@@ -257,8 +252,7 @@ def main() -> int:
     )
 
     losses = pl.read_parquet(
-        results_dir_for(source=arguments.source, alignment=arguments.alignment)
-        / "per_row_losses.parquet"
+        results_dir_for(source=arguments.source) / "per_row_losses.parquet"
     ).filter((pl.col("setting") == "primary") & (pl.col("target") == "power_mw"))
     inside = losses.join(hourly.select("site", "time"), on=["site", "time"], how="semi")
     lines.extend(
@@ -300,10 +294,7 @@ def main() -> int:
         )
 
     report = "\n".join(lines) + "\n"
-    (
-        results_dir_for(source=arguments.source, alignment=arguments.alignment)
-        / "anm_curtailment.md"
-    ).write_text(report)
+    (results_dir_for(source=arguments.source) / "anm_curtailment.md").write_text(report)
     sys.stdout.write(report)
     return 0
 

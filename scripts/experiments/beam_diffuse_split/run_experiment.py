@@ -66,14 +66,14 @@ is the other instrument rather than another route to this one.
 """
 
 
-def dataset_path_for(*, source: str, alignment: str) -> Path:
-    """Return the frame `build_dataset.py` wrote for one ERA5 source and stamp alignment."""
-    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}_{alignment}.parquet"
+def dataset_path_for(*, source: str) -> Path:
+    """Return the frame `build_dataset.py` wrote for one ERA5 source."""
+    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}.parquet"
 
 
-def results_dir_for(*, source: str, alignment: str) -> Path:
+def results_dir_for(*, source: str) -> Path:
     """Return where one run's results are written."""
-    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_results_{source}_{alignment}"
+    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_results_{source}"
 
 
 LEARNED_BEAM_TEMPLATE: Final[str] = "learned_bhi_w_m2_fold{fold}"
@@ -823,24 +823,19 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=SOURCE_CHOICES, default=DEFAULT_SOURCE)
     parser.add_argument(
-        "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
-    )
-    parser.add_argument(
         "--suffix",
         default="",
         help="Selects a variant build of the same source, and keeps its results beside the main.",
     )
     arguments = parser.parse_args()
     source = f"{arguments.source}{arguments.suffix}"
-    results_dir = results_dir_for(source=source, alignment=arguments.alignment)
+    results_dir = results_dir_for(source=source)
     results_dir.mkdir(parents=True, exist_ok=True)
     dataset = with_export_cap(
         dataset=_assign_folds(
             dataset=_add_time_features(
                 dataset=drop_commissioning_ramp(
-                    dataset=pl.read_parquet(
-                        dataset_path_for(source=source, alignment=arguments.alignment)
-                    )
+                    dataset=pl.read_parquet(dataset_path_for(source=source))
                 )
             )
         )
