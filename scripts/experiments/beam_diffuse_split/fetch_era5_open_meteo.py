@@ -7,7 +7,7 @@ One-off throwaway script for the experiment in
 reason this script is usable here.** A mirror that reconstructed the beam from global irradiance
 would make arm C a copy of arm B and void the experiment, so the claim is checked rather than
 trusted: `verify_era5_sources.py` compares this frame against the Copernicus download field by
-field, and on the test day 2024-06-20 at 53.0 N, 0.0 E the two agree to Open-Meteo's 1 W m⁻²
+field, and on the test day 2024-06-20 at one grid cell the two agree to Open-Meteo's 1 W m⁻²
 rounding.
 
 What it buys is time. The Climate Data Store runs one of an account's jobs at a time and takes

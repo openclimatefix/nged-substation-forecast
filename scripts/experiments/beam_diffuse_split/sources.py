@@ -35,9 +35,9 @@ roughly 31 km and lands the meter in a grid cell up to 17 km away. Running the s
 separates "the split carries no information" from "ERA5's grid has already smoothed the beam away".
 
 `ukv` is the Met Office's 2 km deterministic UK model, taken from Open-Meteo's historical-forecast
-archive. It separates resolution from delivery: ERA5 against UKV is a resolution contrast inside one
-product class, where ERA5 against CAMS crosses from a reanalysis to a satellite retrieval as well as
-from 31 km to 5 km.
+archive. UKV separates resolution from delivery: ERA5 against UKV is a resolution contrast inside
+one product class, whereas ERA5 against CAMS crosses from a reanalysis to a satellite retrieval as
+well as from 31 km to 5 km.
 
 Both `cams` and `ukv` take their air temperature from the Open-Meteo ERA5 frame, because the
 temperature feature is shared by every arm and a source must differ from ERA5 only in its irradiance
@@ -187,8 +187,8 @@ storage has to point this variable at a local directory instead.
 def point_output_path_for(*, source: SourceType) -> Path:
     """Return where one per-site download is written.
 
-    The fetcher writes this path and `build_dataset` reads it, so both call this rather than
-    spelling the path twice and finding out they disagree only when a build comes up empty.
+    The fetcher writes this path and `build_dataset` reads it, so both call this function rather
+    than spelling the path twice and finding out they disagree only when a build comes up empty.
 
     Args:
         source: Which source's download to locate.

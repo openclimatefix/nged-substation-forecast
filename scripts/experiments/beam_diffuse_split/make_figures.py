@@ -124,7 +124,7 @@ PER_SITE_COLOURS: Final[tuple[str, ...]] = (
 )
 """One colour per `MAE_SETUPS` entry: hue for the source, lightness for the model family.
 
-The three full-strength colours are the brand's orange-red, purple and blue, matching
+The three full-strength colours are the brand's orange-red, purple, and blue, matching
 `SETUP_COLOURS`; each darker one is the same hue at about 60% of each channel. `dataviz`'s
 `validate_palette.js` passed the orange-red and blue pairs on the lightness band, the chroma floor,
 colour-vision separation, the normal-vision floor, and contrast against this theme's surface. The

@@ -4,11 +4,12 @@ One-off throwaway script for the experiment in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/800>.
 
 **This is a gate rather than a diagnostic: no model is trained on UKV until it has run and been
-read.** CEDA's UKV is statistically different from the live UKV, so a mirror can carry a model's
+read.** The Centre for Environmental Data Analysis (CEDA) serves a UKV archive
+statistically different from the live UKV, so a mirror can carry a model's
 name without being that model, and one matching timestamp is not evidence across four and a half
 years and a science upgrade.
 
-It answers two questions, and only the second is about trust:
+The script answers two questions, and only the second is about trust:
 
 - **Which forecast lead does the archive hold?** Open-Meteo ingests every hourly UKV run, and a
   later run overwrites an earlier one for the same valid time, so the archive should hold the T+0
@@ -73,8 +74,8 @@ BUCKET_URL: Final[str] = (
 """The Met Office's own UKV archive, served over plain HTTPS.
 
 The bucket is public and unsigned, so no credentials are involved and no object-store client is
-needed. It holds a **rolling two-year window**, so the span this script can reach shortens by a day
-every day.
+needed. The bucket holds a **rolling two-year window**, so the span this script can reach shortens
+by a day every day.
 """
 
 NATIVE_FILE_NAMES: Final[dict[str, str]] = {
@@ -113,7 +114,8 @@ Wide enough that the matching lead wins by a margin rather than by a rounding.
 MAX_MEDIAN_DIFFERENCE_W_M2: Final[float] = 2.0
 """How far the matching lead may sit from the served value before the mirror is not the model.
 
-Measured at 53.0 N, 0.0 E across five instants spanning both sides of PS47, the T+0 nearest-cell
+Measured at one meter's coordinates across five instants spanning both sides of PS47, the T+0
+nearest-cell
 difference runs from 0.11 to 0.55 W m⁻², which is the scale of the 1 W m⁻² rounding Open-Meteo's
 stored column carries. Every other lead sat between 1.3 and 350 W m⁻² away, so the threshold
 separates a faithful mirror from the nearest wrong answer by a wide margin rather than a fine one.
@@ -143,7 +145,7 @@ hour. Open-Meteo multiplies the stored hourly mean by it to serve the `_instant`
 the factor is far from one it also multiplies that column's 1 W m⁻² rounding, producing a difference
 that says nothing about lineage. **The condition is written on the factor rather than on solar
 elevation because the factor is what does the damage**: a low midwinter noon sun has a factor near
-one and is perfectly usable, where an hour near sunrise at any time of year does not.
+one and is perfectly usable, whereas an hour near sunrise at any time of year is not.
 """
 
 
@@ -195,7 +197,7 @@ def _read_native_at_sites(
         valid_time: The instant to read.
         lead_hours: Which run's copy of that instant to read.
         flux: `ghi` or `bhi`.
-        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        sites: The roster, carrying `site`, `latitude`, and `longitude`.
 
     Returns:
         The flux in W m⁻² at each site's nearest grid cell, or `None` if the bucket has no such
@@ -228,7 +230,7 @@ def _sample_grid(*, dataset: xr.Dataset, sites: pl.DataFrame) -> dict[str, float
 
     Args:
         dataset: One opened native file.
-        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        sites: The roster, carrying `site`, `latitude`, and `longitude`.
 
     Returns:
         The flux in W m⁻² at each site's nearest grid cell.
@@ -340,7 +342,7 @@ def _compare_one(
     Args:
         instant: The valid time and its stratum.
         served: The era's served rows.
-        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        sites: The roster, carrying `site`, `latitude`, and `longitude`.
 
     Returns:
         One record per (lead, flux) with the median and worst absolute difference across sites.
@@ -385,7 +387,7 @@ def _report(*, results: pl.DataFrame) -> None:
         )
         .sort("era", "sky", "lead_hours")
     )
-    # Polars shows ten rows by default, which would cut the table the gate exists to be read.
+    # Polars shows ten rows by default, which would truncate the table this gate exists to print.
     with pl.Config(tbl_rows=-1, tbl_width_chars=120):
         _LOG.info("per-lead agreement against the Met Office's own files:\n%s", summary)
 

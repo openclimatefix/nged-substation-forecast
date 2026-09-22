@@ -3,9 +3,10 @@
 One-off throwaway script for the experiment in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/800>.
 
-**It is parameterised by `--model` rather than written for UKV**, because Open-Meteo normalises
-variable names across models: `shortwave_radiation`, `direct_radiation` and `diffuse_radiation` are
-the same request whichever model serves them, so only the `models=` value, the output path and the
+**The script is parameterised by `--model` rather than written for UKV**, because Open-Meteo
+normalises variable names across models: `shortwave_radiation`, `direct_radiation`, and
+`diffuse_radiation` are the same request whichever model serves them, so only the `models=` value,
+the output path, and the
 native temporal convention differ. Those three live in `sources.OPEN_METEO_MODELS`, and a second
 model is one entry there rather than a second script.
 
@@ -154,7 +155,7 @@ def fetch_point_frame(
     carried past this function.
 
     Args:
-        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        sites: The roster, carrying `site`, `latitude`, and `longitude`.
         variables: Open-Meteo's names for the hourly variables to request.
         models_parameter: The value of the API's `models=` query parameter.
         first_date: First date to request, as `YYYY-MM-DD`.
@@ -213,7 +214,7 @@ def _solar_geometry(*, frame: pl.DataFrame, sites: pl.DataFrame) -> pl.DataFrame
 
     Args:
         frame: The downloaded rows, keyed by `site` and `time`.
-        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        sites: The roster, carrying `site`, `latitude`, and `longitude`.
 
     Returns:
         `frame` with `solar_zenith_deg`, `cos_zenith_instant`, `cos_zenith_hour_mean`,
@@ -271,9 +272,9 @@ def _zenith(*, stamps: pl.Series, latitude: float, longitude: float) -> np.ndarr
 COS_ZENITH_SUBSAMPLES: Final[int] = 60
 """How many samples the mean cosine of the solar zenith angle over an hour is taken from.
 
-One a minute. The quantity is smooth in time except at sunrise and sunset, where the clip at zero
-puts a corner in it, so the error a minute's spacing leaves is far below the 1 W m⁻² rounding of
-the column the check compares against.
+One sample a minute. The quantity is smooth in time except at sunrise and sunset, where the clip
+at zero puts a corner in it, so the error a minute's spacing leaves is far below the 1 W m⁻²
+rounding of the column the check compares against.
 """
 
 
@@ -312,12 +313,12 @@ would force a threshold loose enough to stop discriminating.
 MAX_INSTANT_RECONSTRUCTION_RMS_W_M2: Final[float] = 5.0
 """How far the reconstructed snapshot may sit from the served one.
 
-Measured at 53.0 N, 0.0 E over June 2026, the reconstruction lands at a root-mean-square error of
-0.65 W m⁻² for the global flux and 0.14 for the direct one — the scale of the 1 W m⁻² rounding the
-default columns carry. The threshold leaves room for other sites and seasons while staying well
-inside the failures it exists to catch: assuming the hour *beginning* at the label gives 68 W m⁻²
-and assuming an hour centred on it gives 26, so a half-hour error in either direction is five times
-the threshold rather than a marginal call.
+Measured at one meter's coordinates over June 2026, the reconstruction lands at a root-mean-square
+error of 0.65 W m⁻² for the global flux and 0.14 for the direct flux — the scale of the 1 W m⁻²
+rounding the default columns carry. The threshold leaves room for other sites and seasons while
+staying well inside the failures it exists to catch: assuming the hour *beginning* at the label
+gives 68 W m⁻² and assuming an hour centred on it gives 26, so a half-hour error in either
+direction is at least five times the threshold rather than a marginal call.
 """
 
 
@@ -381,10 +382,11 @@ MIN_DIRECT_FRACTION_SPREAD: Final[float] = 0.05
 
 A separation model's direct fraction is by construction a function of the clearness index and the
 solar zenith angle, so inside a fine bin on those two it is very nearly constant whatever formula it
-uses, and the spread it leaves comes only from the bin's own width. Measured over 2025 at 53.0 N,
-0.0 E on these bin widths, the median within-bin spread is 0.118 for UKV's published fraction and
+uses, and the spread it leaves comes only from the bin's own width. Measured over 2025 at one
+meter's coordinates on these bin widths, the median within-bin spread is 0.118 for UKV's published
+fraction and
 0.016 for an Erbs fraction derived from the same global irradiance — so the threshold sits three
-times above the separation-model floor and well below what a native field gives.
+times above the separation-model floor and well below what UKV's own field gave.
 """
 
 MIN_ZENITH_FOR_SPREAD_DEGREES: Final[float] = 80.0

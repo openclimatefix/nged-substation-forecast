@@ -71,7 +71,7 @@ UNDRAWN_SOURCES: Final[tuple[str, ...]] = ("cds",)
 `cds` is the Copernicus route to the same ERA5 fields `open-meteo` serves, checked against each
 other by `verify_era5_sources.py`, so drawing both would put one reanalysis on the chart twice
 under two names. Naming the exclusion here is what lets the guard below tell a deliberate omission
-from a forgotten one.
+from a forgotten omission.
 """
 
 INSTRUMENT_LABELS: Final[dict[str, str]] = {
@@ -146,7 +146,7 @@ def _raise_on_unlabelled_sources(*, stem: str) -> None:
 
     **The failure this exists for is a chart that looks finished with an arm missing from it.**
     Drawing iterates the label mapping rather than the directories on disk, so a source added to the
-    experiment and not to the mapping is dropped with no error, no warning and no gap in the chart
+    experiment and not to the mapping is dropped with no error, no warning, and no gap in the chart
     for a reader to notice. This is R&D code, so it stops rather than degrading.
 
     Two kinds of directory are left out on purpose and must not stop the run. A `--suffix` variant
