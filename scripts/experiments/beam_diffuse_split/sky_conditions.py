@@ -21,7 +21,7 @@ extraterrestrial horizontal irradiance — which is the standard way of saying h
 top of the atmosphere offered actually arrived. Both quantities are already columns every arm sees,
 so binning on them introduces no information the arms lacked.
 
-Run it with `uv run --no-project --with polars --with numpy python
+Run it with `uv run --no-project --with polars --with numpy --with pvlib python
 scripts/experiments/beam_diffuse_split/sky_conditions.py --source cams --alignment shifted`.
 """
 
@@ -38,6 +38,7 @@ from run_experiment import (
     dataset_path_for,
     results_dir_for,
 )
+from sources import SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("sky_conditions")
@@ -104,7 +105,7 @@ def _rows_for(*, losses: pl.DataFrame, binned: pl.DataFrame, label: str) -> pl.D
 def main() -> int:
     """Print one table of contrasts per sky condition."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     parser.add_argument(
         "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
     )

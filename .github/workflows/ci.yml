@@ -64,3 +64,16 @@ jobs:
 
       - name: Test (pytest)
         run: uv run --no-sync pytest
+
+      # Five hooks have no step above — trailing-whitespace, end-of-file-fixer, check-yaml,
+      # no-sphinx-roles, and lint-docstring-markdown — and the pymarkdown hook scans every tracked
+      # markdown file, not the narrower set the step above passes it. Commit-time hooks are not
+      # enough on their own: both failures in #812 landed from commits where the hooks never ran,
+      # which is the state of a clone where `pre-commit install` was never run.
+      # `check-added-large-files` stays commit-time-only: without `--enforce-all` it inspects only
+      # the files staged as additions, and `--enforce-all` would fail today on three tracked files
+      # that already exceed 500 KB. This step repeats ruff, ty, pydoclint, pymarkdown, and
+      # check_docs_links, each of which has a step above, and adds about two minutes — most of it
+      # lint-docstring-markdown.
+      - name: Pre-commit (every hook, every file)
+        run: uv run --no-sync pre-commit run --all-files --show-diff-on-failure

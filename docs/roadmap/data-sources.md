@@ -241,7 +241,7 @@ asked for.
 | **ECMWF ENS** from ECMWF | Forecast | ✅ `ssrd` | ✅ `fdir` | By subtraction | Licensed dissemination or a MARS subscription |
 | **ECMWF AIFS**, both Single and ENS | Forecast | ✅ `ssrd` | ❌ | ❌ | Free ECMWF open data; no direct field exists to license |
 | **ICON-EU** via Dynamical.org | Forecast | By addition | ✅ | ✅ | Free, already ingested by Dynamical.org |
-| **UKV** (Met Office) | Forecast | ✅ | ✅ | ✅ | Free on AWS, CC BY-SA 4.0; all three components in every run back to the archive's start, 2024-09-19 |
+| **UKV** (Met Office) | Forecast | ✅ | ✅ | ✅ | Free on AWS, CC BY-SA 4.0; all three components in every run the bucket's rolling two-year window still holds |
 | **MOGREPS-UK** (Met Office) | Forecast | ✅ | ✅ | ✅ | Free on AWS, CC BY-SA 4.0; all three components, plus net short-wave; **30-day rolling archive** |
 | **Global 10 km** (Met Office) | Forecast | ✅ | ✅ | By subtraction | Free on AWS, CC BY-SA 4.0; 168-hour horizon, but no global field before the 2024-11-07 12 UTC run and none at T+168 before 2026-01-21 |
 | **WeatherNext 3** (Google DeepMind) | Forecast | ✅ | ✅ `fdir` | By subtraction | Access request; CC-BY-4.0 once at least 1 hour old |
@@ -272,7 +272,8 @@ dataset](https://dynamical.org/catalog/ecmwf-ifs-ens-forecast-15-day-0-25-degree
 Data on the AWS Open Data Registry as its source. So the variable Dynamical.org would have to add is
 not in the feed they read.
 
-**`fdir` on ECMWF ENS is therefore not a route open to us.** Serving `fdir` would mean a licensed ECMWF
+**`fdir` on ECMWF ENS is therefore not a route open to us.** Serving `fdir` would mean a licensed
+ECMWF
 dissemination or a MARS subscription in place of, or alongside, the free bucket — a contract and a
 recurring cost, not a storage decision. Dynamical.org build their catalogue from freely
 redistributable data. Asking them to widen a variable list would be reasonable. Asking them to take
@@ -283,7 +284,8 @@ and which feed the bucket holds is ECMWF's decision rather than Dynamical.org's.
 
 **The Met Office models are the request worth making, because their free feed already carries a
 direct beam.** The one open Met Office request on Dynamical.org's issue tracker is for [the global
-10 km deterministic model](https://github.com/dynamical-org/reformatters/issues/646), which publishes
+10 km deterministic model](https://github.com/dynamical-org/reformatters/issues/646), which
+publishes
 global and direct short-wave and leaves diffuse to the same subtraction ECMWF would need. UKV and
 MOGREPS-UK go further and publish diffuse as its own field, but neither appears on Dynamical.org's
 tracker, so either would have to be asked for. None of the three Met Office models needs a new
@@ -297,8 +299,8 @@ ICON-EU would. MOGREPS-UK is held on AWS as a 30-day rolling window, which rules
 unless we archive the feed ourselves from the day we start.
 
 **A backtest on the global 10 km model starts at its 2024-11-07 12 UTC run, not at the start of its
-archive, because no earlier run carries global short-wave.** Listing every 6-hourly run from the
-earliest on AWS, 2024-09-19 18 UTC, shows
+archive, because no earlier run carries global short-wave.** Listing every 6-hourly run the bucket
+held on 2026-09-19, back to its earliest at 2024-09-19 18 UTC, shows
 `radiation_flux_in_shortwave_direct_downward_at_surface` throughout and
 `radiation_flux_in_shortwave_total_downward_at_surface` only from 2024-11-07 12 UTC onwards. That
 run carries 4,470 files against the 4,310 of the 00 UTC run the same day, the extra 160 being global
@@ -360,7 +362,8 @@ parameters at any one ensemble step, those same five radiation fields, and no st
 
 ### Two traps for whoever builds on ECMWF's direct beam
 
-**`dsrp` is the more convenient field to ask ECMWF for, because `fdir` is a horizontal-plane flux and
+**`dsrp` is the more convenient field to ask ECMWF for, because `fdir` is a horizontal-plane flux
+and
 `dsrp` is already direct normal irradiance.** The ENS catalogue linked above carries three direct
 fields: `fdir` (paramId 228021, total-sky direct at the surface), `cdir` (paramId 228022, the
 clear-sky equivalent), and `dsrp` (paramId 47, direct solar radiation into a plane facing the sun).
@@ -368,7 +371,8 @@ Deriving direct normal irradiance from `fdir` means dividing by the cosine of th
 angle, which is numerically unstable at low sun, and the sun is low over GB for much of the year.
 `dsrp` needs no division, so a request naming only `fdir` leaves behind the field that needs none.
 
-**`ssrd` − `fdir` is close to a diffuse pyranometer reading, but not equal to that reading.** [ECMWF's
+**`ssrd` − `fdir` is close to a diffuse pyranometer reading, but not equal to that reading.**
+[ECMWF's
 radiation
 note](https://www.ecmwf.int/sites/default/files/elibrary/2015/18490-radiation-quantities-ecmwf-model-and-mars.pdf)
 records that the model treats strongly forward-scattered radiation as unscattered, and that its
@@ -468,7 +472,7 @@ supply risk.
   each fetch into Delta and treat the snapshot as the source of truth, or experiments stop being
   reproducible.
 
-### What a CAMS-against-ERA5 comparison on the trial area's solar farms found
+### What comparing four irradiance products on the trial area's solar farms found
 
 **The satellite retrieval beat the reanalysis by 4.29 points of mean absolute error on the six
 metered solar farms, which is the largest effect anything in that experiment varied.** On the
@@ -478,12 +482,44 @@ normalised by — and a fitted five-parameter physical model's from 10.03% to 6.
 contrast from changing which beam/diffuse split the model saw was 0.126 points, and changing the
 model family moved 1.05. Which product feeds the model dominates both. The write-up is [Does a
 weather product's beam/diffuse split help a PV forecast?](../results/beam-diffuse-split.md); the
-code sits in a pull request kept for reference rather than merged,
-[#785](https://github.com/openclimatefix/nged-substation-forecast/pull/785).
+code sits in `scripts/experiments/beam_diffuse_split/`.
 
-**The two products differ in resolution, in delivery, and in how they are produced, so the gap is
-not attributable to resolution alone.** Both measurements are of these two products
-on this fleet, and neither has been shown to hold for every product at those resolutions.
+**Two 2 km models were added, and scoring all four products on one common set of hours put them in
+the order CAMS, ICON-D2, UKV, ERA5.** On the 58,411 generator-hours every product covers before
+February 2026, CAMS scores 5.59% of capacity, the German weather service's ICON-D2 8.43%, the Met
+Office's UKV 9.57%, and ERA5 9.90%. The order is the same on seasonally matched months and after
+February 2026.
+
+**Comparing each pair on its own shared hours gave the wrong answer, which is why the common row
+set matters.** Pair by pair, UKV appeared not to beat ERA5 at all. On the common set it beats ERA5
+in every era, by 0.34 points before February 2026 with an interval from 0.10 to 0.56. The absolute
+levels move too: ERA5 scores 9.90% on the common set against 8.28% on its pair with ICON-D2, the
+same product and the same generators, because restricting to hours every product covers keeps the
+harder hours. Figures measured on different row sets do not compose into a ranking.
+
+**The retrieval still beats every model product.** CAMS scored 5.24% against ICON-D2's 8.22% over
+their 73,566 shared hours, and roughly halves the error against ERA5 and UKV as well. CAMS infers
+cloud from Meteosat at the hour in question, whereas the three models simulate it, so a retrieval
+of an hour that has already happened starts from the cloud field the others have to predict.
+
+**Three limits bound how far that carries.** UKV differs from ERA5 in aerosol treatment as well as
+in resolution, so neither ordering is a clean resolution contrast. Open-Meteo's archive stitches
+the first hours of each successive run, so a product's effective lead follows its run frequency:
+hourly UKV is the T+0 analysis, while 3-hourly ICON-D2 carries a lead of 1 to 3 hours, measured
+against the German weather service's own files. ICON-D2 therefore beats UKV while forecasting
+further ahead than it, and the comparison is not analysis against analysis. And CAMS is a retrieval
+rather than a model, so its lead is nil and its win is partly a win for observing cloud rather than
+simulating it. Every measurement is
+of these four products on this fleet, and none has been shown to hold for every product at those
+resolutions.
+
+**ICON-D2 reaches only the eastern half of NGED's licence area, so its score is not a licence-wide
+result.** Probing the Open-Meteo archive along a west-to-east line puts the model's western
+boundary near 2.5°W: Bristol, Exeter, Cardiff, Swansea, and Truro return no data, while Birmingham
+and Nottingham are covered. The whole of South West England and South Wales therefore sit outside
+it, and every metered site in this comparison sits inside it, so nothing here says how ICON-D2
+would perform in the west. **A limited-area model from a neighbouring country can be a component of
+a blend over part of the licence area, and cannot be the single source feeding all of it.**
 
 **CAMS's own reliability flag is worth acting on, and dropping the flagged hours raises a
 P99-normalised error even though it improves the data.** The service flagged 17.9% of the daylight
@@ -498,3 +534,76 @@ retrieval, giving a model the product's own split rather than running a separati
 error by about 1.5% relative. On the 31 km reanalysis it added nothing detectable. Whether the
 retrieval's beam field is worth paying for depends on what a supplier charges for it, which that
 experiment does not know.
+
+### UKV assimilates satellite cloud, and carries a fixed aerosol climatology
+
+**UKV's radiation scheme sees no time-varying aerosol**, which matters because aerosol sets how
+sunlight divides between the direct beam and the diffuse sky. The regional configuration's radiation
+uses a fixed five-species climatology, unchanged from RAL1 through the RAL3 package that went
+operational at PS47 on 2026-01-21: [Bush et al. (2020)](https://doi.org/10.5194/gmd-13-1999-2020)
+describes the climatology, and [Bush et al. (2025)](https://doi.org/10.5194/gmd-18-3819-2025)
+records that no radiation parameters changed between RAL2 and RAL3. UKV's only advected aerosol
+quantity is the Murk tracer of [Clark et al. (2008)](https://doi.org/10.1002/qj.318), which
+diagnoses visibility and does not reach the radiation calculation. CAMS is aerosol-informed by
+construction and ERA5 carries a time-varying assimilated aerosol field, so **any skill UKV's split
+shows can only be cloud-sourced**, where the other two products' could be either.
+
+**UKV's 4D-Var assimilates a large volume of satellite-derived cloud, so at short lead times the
+model is partly a retrieval.** Satellite-derived cloud fraction was the single largest observation
+type by count in UKV's 2013 observation table, at 650,000 a day against 39,000 for SEVIRI radiances
+([Tubbs and Kelly
+(2013)](https://www-cdn.eumetsat.int/files/2020-04/pdf_conf_p_s7_09_tubbs_v.pdf)), entering the
+humidity field as a pseudo-observation by the mechanism of [Renshaw and Francis
+(2011)](https://doi.org/10.1002/qj.980). The [PS43 release
+notes](https://www.metoffice.gov.uk/services/data/met-office-data-for-reuse/ps43_ftp) confirm the
+stream was operational and being refined in December 2019, and the PS47 notes name only latent heat
+nudging and the adaptive vertical grid as assimilation methods removed. **No document from 2020
+onwards was found positively re-confirming the satellite cloud stream, and whether surface solar
+irradiance is assimilated anywhere in the Met Office's systems could not be established.** A UKV
+analysis and a satellite product are therefore partly downstream of the same geostationary
+satellite, so a contrast between the two weakens at short lead and recovers as the model's own
+physics overwrites the initial cloud field.
+
+### Open-Meteo's UKV archive is the T+0 analysis, and half of it is backfill
+
+**Open-Meteo mirrors UKV from the Met Office's own AWS bucket, ingesting every hourly run about four
+hours late.** A later run overwrites an earlier one for the same valid time, so the archive holds
+the T+0 analysis rather than a forecast at any lead. Sampled at five instants either side of PS47,
+the nearest grid cell in the Met Office's own file agrees with the served snapshot to between 0.11
+and 0.55 W m⁻², where every other lead sits tens to hundreds of W m⁻² away. **An archive of
+analyses is the right object to compare against a reanalysis or a retrieval and the wrong one to
+read as forecast skill.**
+
+**Over half the archive predates the ingest that produced the rest.** Open-Meteo's UKV downloader
+was created on 2024-08-12, and the archive claims to start on 2022-03-01, so the 29 months between
+were backfilled from a source Open-Meteo does not name. The AWS bucket's rolling two-year window
+reached back only to about August 2022 on the day the downloader landed, so an AWS backfill does not
+account for the stated start either, and the window has since rolled past all of it. **The era that
+can be checked against the Met Office's files is essentially the era Open-Meteo ingested live**, and
+the earlier half cannot be checked against anything.
+
+**A Met Office upgrade moved how much UKV's published split improves the forecast, by more than
+the backfill boundary does.** In the beam/diffuse split experiment, the gain from UKV's direct-beam
+share is five and a half times larger over the 8 months after Parallel Suite 47 became operational
+on 2026-01-21 than over the 47 months before. Neither other source steps over those same months:
+the satellite source's contrast moved by about a third, from −0.100 to −0.068 percentage points,
+and the reanalysis stayed null in both eras. UKV's global irradiance went the other way, sitting
+about 1 percentage point worse against the reanalysis from the same date.
+
+**One upgrade moved this product's value by a factor of five and a half, so a production ingest of
+UKV should score continuously rather than trust a figure measured once**, and should not assume
+that one era of UKV stands in for another.
+
+**Three mechanical facts about the served columns, each of which fails silently if assumed wrong.**
+
+- **Only global and direct short-wave are ingested; diffuse is served as their difference.** The Met
+  Office publishes its own diffuse field and Open-Meteo does not read it, so the served diffuse
+  carries no information the other two columns lack.
+- **The default hourly column is a backward-looking mean over the hour ending at its label**, which
+  matches the period-ending convention used everywhere else in this project. UKV publishes radiation
+  as an instantaneous snapshot, and Open-Meteo divides that snapshot by the ratio of the
+  instantaneous cosine of the solar zenith angle to its mean over the preceding hour. Asking for the
+  `_instant` suffix multiplies the ratio back to recover the snapshot, which lands half an hour
+  later than the hour's centre.
+- **That conversion is skipped where the ratio falls below 0.05**, near sunrise and sunset, so the
+  round trip between the two columns does not hold at very low sun.

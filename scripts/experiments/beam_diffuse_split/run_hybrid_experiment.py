@@ -56,6 +56,7 @@ from run_experiment import (
     results_dir_for,
 )
 from run_physics_experiment import _fit, _predict
+from sources import SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("run_hybrid_experiment")
@@ -173,18 +174,24 @@ def _add_physics_predictions(*, dataset: pl.DataFrame) -> pl.DataFrame:
 def main() -> int:
     """Score the calibrated arms against the physical model and against XGBoost."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     parser.add_argument(
         "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
     )
+    parser.add_argument(
+        "--suffix",
+        default="",
+        help="Selects a variant build of the same source, and keeps its results beside the main.",
+    )
     arguments = parser.parse_args()
+    source = f"{arguments.source}{arguments.suffix}"
 
     dataset = with_export_cap(
         dataset=_assign_folds(
             dataset=_add_time_features(
                 dataset=drop_commissioning_ramp(
                     dataset=pl.read_parquet(
-                        dataset_path_for(source=arguments.source, alignment=arguments.alignment)
+                        dataset_path_for(source=source, alignment=arguments.alignment)
                     )
                 )
             )
@@ -226,7 +233,7 @@ def main() -> int:
     physics_dir = (
         run_experiment.REPO_DATA_DIR
         / "ERA5"
-        / f"beam_diffuse_physics_{arguments.source}_{arguments.alignment}"
+        / f"beam_diffuse_physics_{source}_{arguments.alignment}"
     )
     physics = (
         pl.read_parquet(physics_dir / "per_row_losses.parquet")
@@ -245,7 +252,7 @@ def main() -> int:
     )
     losses = pl.concat([losses, physics.select(losses.columns)], how="vertical")
 
-    results_dir = results_dir_for(source=arguments.source, alignment=arguments.alignment)
+    results_dir = results_dir_for(source=source, alignment=arguments.alignment)
     results_dir.mkdir(parents=True, exist_ok=True)
 
     lines: list[str] = [

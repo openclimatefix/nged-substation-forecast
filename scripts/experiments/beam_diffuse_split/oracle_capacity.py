@@ -25,6 +25,7 @@ from typing import Final
 
 import polars as pl
 from run_experiment import REPO_DATA_DIR, _bootstrap_difference
+from sources import SOURCE_CHOICES
 
 CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("C_era5_split", "B_erbs"),
@@ -39,7 +40,7 @@ PERCENT: Final[float] = 100.0
 def main() -> int:
     """Print each contrast as published, and after an oracle removes the per-block bias."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     parser.add_argument(
         "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
     )

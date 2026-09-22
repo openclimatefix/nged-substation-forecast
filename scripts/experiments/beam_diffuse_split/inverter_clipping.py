@@ -19,7 +19,7 @@ P99 over its whole history. The cut is swept over two thresholds, because "on th
 proxy rather than a measurement: a hot afternoon derates below the nameplate limit and a cold bright
 one runs above it, so no single threshold separates the two states cleanly.
 
-Run it with `uv run --no-project --with polars --with numpy python
+Run it with `uv run --no-project --with polars --with numpy --with pvlib python
 scripts/experiments/beam_diffuse_split/inverter_clipping.py --source cams --alignment shifted`.
 """
 
@@ -31,6 +31,7 @@ from typing import Final
 import polars as pl
 from run_experiment import _bootstrap_difference, dataset_path_for, results_dir_for
 from run_physics_experiment import results_dir_for as physics_results_dir_for
+from sources import SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("inverter_clipping")
@@ -143,7 +144,7 @@ def _flatness_table(*, dataset: pl.DataFrame, source: str, alignment: str) -> li
 def main() -> int:
     """Print the headline contrast on and off the inverter ceiling."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     parser.add_argument(
         "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
     )
