@@ -28,11 +28,11 @@ So the arms are built around two contrasts. Everything measured against arm A sa
 *transposition* buys. The arm given the product's split, measured against the arm given a
 separation model's estimate of the same split, says what the *published field* buys on top.
 
-## Three sources, two instruments, two stamp alignments
+## Four sources, two instruments, two stamp alignments
 
 | Dimension | Values | What changing it tests |
 |---|---|---|
-| Source | Copernicus ERA5, Open-Meteo's ERA5 mirror, CAMS radiation service | Whether an answer from ERA5's 31 km grid survives a 5 km satellite retrieval at the meter itself |
+| Source | Copernicus ERA5, Open-Meteo's ERA5 mirror, the Met Office's UKV, CAMS radiation service | Whether an answer from ERA5's 31 km grid survives a finer grid. UKV separates resolution from delivery, because ERA5 against UKV is a resolution contrast inside one product class where ERA5 against CAMS also crosses from a model to a satellite retrieval |
 | Instrument | XGBoost, a fitted five-parameter PV model | Whether a null result means the split carries nothing or that the tree could not use it |
 | Stamp alignment | as-labelled, shifted 30 minutes earlier | Whether the answer depends on a timestamp convention the power feed may have got wrong |
 
@@ -45,6 +45,9 @@ separation model's estimate of the same split, says what the *published field* b
 | `fetch_era5_open_meteo.py` | Downloads the same fields from Open-Meteo's ERA5 mirror onto the same grid, in about a minute rather than most of a night. |
 | `verify_era5_sources.py` | Compares the two ERA5 downloads hour by hour, which is what establishes that the mirror serves ERA5's own `fdir` rather than a separation model's estimate of it. |
 | `fetch_cams.py` | Downloads the CAMS radiation service's global, beam and diffuse irradiances at each meter's own coordinates, into `data/CAMS/`. |
+| `sources.py` | The source names, which sources are delivered per site, and the registry of Open-Meteo models this experiment can fetch. Standard library only, so every script here can import it, including the two that run on `polars` alone. |
+| `fetch_open_meteo_point.py` | Downloads one Open-Meteo forecast model at each meter's own coordinates, and asserts three things about what arrived before writing it. Takes `--model`. |
+| `verify_ukv_lineage.py` | Compares Open-Meteo's UKV against the Met Office's own files on AWS and establishes which forecast lead the archive holds. A gate: no model is trained on UKV until it has run. |
 | `build_dataset.py` | Joins the PV power readings to one source, adds solar geometry, the separation-model estimates and the synthetic control target, and writes the one frame every arm reads. Takes `--source` and `--alignment`. |
 | `run_experiment.py` | The XGBoost instrument: fits every arm at every fold, seed and hyperparameter setting, and writes per-row losses, per-site metrics and bootstrap intervals. |
 | `physics_model.py` | The transposition and the temperature-corrected power curve the second instrument fits. |
@@ -52,7 +55,7 @@ separation model's estimate of the same split, says what the *published field* b
 | `report_results.py` | Prints the markdown tables the write-up quotes, so no number is transcribed by hand. Takes `--instrument`. |
 | `compare_sources.py` | Compares two sources on the hours they both cover, which the per-source tables cannot do. |
 | `elevation_breakdown.py` | Splits the headline contrast by solar elevation, to separate an amplified error from a missing one. |
-| `make_chart.py` | Draws the anonymised result chart. |
+| `make_chart.py` | Draws the anonymised result chart. Raises on a results directory naming a source its label table does not, rather than drawing a chart that looks complete with an arm missing. |
 | `sky_conditions.py` | Splits the headline contrast by clearness index, which tests whether the gain sits where cloud makes the split uncertain — the shape the information account predicts and a calibration difference would not. |
 | `run_hybrid_experiment.py` | Feeds the physical model's out-of-fold prediction into XGBoost, to separate "the physical model is mis-calibrated" from "its five parameters are the wrong shape". Withholds each prediction by calendar month, the same way the learned separation arm does. |
 | `make_figures.py` | Draws the per-site time series, the per-site error chart and the sky-condition chart the write-up publishes. |
@@ -206,3 +209,55 @@ had already produced tables. Matched within irradiance bins the dropped rows' di
 differs from the kept rows' by about 0.004, so it favours no arm, and the pre-cleaning run reaches
 the same verdict — but a filter chosen after seeing results has to be declared rather than
 defended.
+
+## What the UKV arm is, and the three things to know before reading it
+
+**Open-Meteo's UKV archive holds the T+0 analysis, so the arm is UKV's analysis rather than a
+forecast.** UKV runs hourly, Open-Meteo ingests every run, and a later run overwrites an earlier one
+for the same valid time, so the last writer for an hour is the run initialised at that hour.
+Measured against the Met Office's own files at five instants spanning both sides of PS47, T+0 agrees
+to between 0.11 and 0.55 W m⁻² and every other lead is tens to hundreds of W m⁻² away. All three
+sources are therefore analysis-class estimates of the same instant, which is what makes them
+comparable — and none of them is a forecast, so every number here is information content rather than
+forecast skill.
+
+**UKV's 4D-Var assimilates a large volume of satellite-derived cloud, so at T+0 the arm is partly a
+retrieval.** Satellite-derived cloud fraction was the single largest observation type by count in
+UKV's published observation table, entering the humidity field as a pseudo-observation. A T+0 UKV
+cloud field is therefore anchored to the same geostationary satellite CAMS retrieves from, which
+blunts the "model against satellite retrieval" contrast between those two arms. It does not touch
+the ERA5-against-UKV resolution contrast, which is the one this arm exists for.
+
+**UKV carries a fixed aerosol climatology where ERA5 and CAMS carry time-varying aerosol**, so
+ERA5 against UKV is a contrast in resolution *and* in aerosol treatment. The asymmetry bites hardest
+under a clear sky, where aerosol sets the beam/diffuse partition most strongly and where the
+published result is weakest, which is why `sky_conditions.py` runs on UKV as well as CAMS.
+
+### Two spans, reported separately rather than pooled
+
+Open-Meteo's archive claims to start on 2022-03-01, but its UKV downloader was only created on
+2024-08-12, so the earlier 29 months were backfilled from a source Open-Meteo does not name. The Met
+Office's bucket holds a rolling two-year window, which reaches back to roughly the same date, so the
+era that can be checked is essentially the era Open-Meteo ingested live.
+
+Run both, with `build_dataset.py --first-date` and `--suffix` marking the shorter one, and report
+the live-ingest era as the headline. The full archive has the statistical power — 55 months against
+25, and 25 months puts the detection threshold above the floor arm B minus arm A measures — but over
+half of it predates the ingest pipeline. **If the two agree, the backfill is behaving like the live
+ingest. If they disagree, that is the finding**, because it would mean the earlier archive is a
+different product.
+
+### The default hourly column, not the `_instant` one
+
+UKV publishes radiation as an instantaneous snapshot. Open-Meteo divides that snapshot by the ratio
+of the instantaneous cosine of the solar zenith angle to its mean over the preceding hour, and
+stores the result, so the default column is a backward-looking mean over the hour *ending* at its
+label — the same temporal object as ERA5's hourly integral, as the CAMS hourly integration, and as
+the period-ending hourly mean of metered power the experiment predicts. Asking for `_instant`
+multiplies the ratio back to recover the snapshot, which sits half an hour later than the window's
+centre.
+
+`build_dataset.py --ukv-temporal instant --suffix=-instant` builds the sensitivity. Pair
+`--ukv-temporal` with `--suffix` or the variant build overwrites the main one; and note that
+`argparse` needs `--suffix=-instant` rather than `--suffix -instant`, which it reads as a missing
+argument.

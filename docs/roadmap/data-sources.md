@@ -198,7 +198,7 @@ asked for.
 | **ECMWF ENS** from ECMWF | Forecast | ✅ `ssrd` | ✅ `fdir` | By subtraction | Licensed dissemination or a MARS subscription |
 | **ECMWF AIFS**, both Single and ENS | Forecast | ✅ `ssrd` | ❌ | ❌ | Free ECMWF open data; no direct field exists to license |
 | **ICON-EU** via Dynamical.org | Forecast | By addition | ✅ | ✅ | Free, already ingested by Dynamical.org |
-| **UKV** (Met Office) | Forecast | ✅ | ✅ | ✅ | Free on AWS, CC BY-SA 4.0; all three components in every run back to the archive's start, 2024-09-19 |
+| **UKV** (Met Office) | Forecast | ✅ | ✅ | ✅ | Free on AWS, CC BY-SA 4.0; all three components in every run the bucket's rolling two-year window still holds |
 | **MOGREPS-UK** (Met Office) | Forecast | ✅ | ✅ | ✅ | Free on AWS, CC BY-SA 4.0; all three components, plus net short-wave; **30-day rolling archive** |
 | **Global 10 km** (Met Office) | Forecast | ✅ | ✅ | By subtraction | Free on AWS, CC BY-SA 4.0; 168-hour horizon, but no global field before the 2024-11-07 12 UTC run and none at T+168 before 2026-01-21 |
 | **WeatherNext 3** (Google DeepMind) | Forecast | ✅ | ✅ `fdir` | By subtraction | Access request; CC-BY-4.0 once at least 1 hour old |
@@ -252,8 +252,8 @@ ICON-EU would. MOGREPS-UK is held on AWS as a 30-day rolling window, which rules
 unless we archive the feed ourselves from the day we start.
 
 **A backtest on the global 10 km model starts at its 2024-11-07 12 UTC run, not at the start of its
-archive, because no earlier run carries global short-wave.** Listing every 6-hourly run from the
-earliest on AWS, 2024-09-19 18 UTC, shows
+archive, because no earlier run carries global short-wave.** Listing every 6-hourly run the bucket
+held on 2026-09-19, back to its earliest at 2024-09-19 18 UTC, shows
 `radiation_flux_in_shortwave_direct_downward_at_surface` throughout and
 `radiation_flux_in_shortwave_total_downward_at_surface` only from 2024-11-07 12 UTC onwards. That
 run carries 4,470 files against the 4,310 of the 00 UTC run the same day, the extra 160 being global
@@ -404,3 +404,64 @@ supply risk.
   aerosol and cloud inputs, so the same timestamp can return a different value next year. Snapshot
   each fetch into Delta and treat the snapshot as the source of truth, or experiments stop being
   reproducible.
+
+### UKV assimilates satellite cloud, and carries a fixed aerosol climatology
+
+**UKV's radiation scheme sees no time-varying aerosol**, which matters because aerosol sets how
+sunlight divides between the direct beam and the diffuse sky. The regional configuration's radiation
+uses a fixed five-species climatology, unchanged from RAL1 through the RAL3 package that went
+operational at PS47 on 2026-01-21: [Bush et al. (2020)](https://doi.org/10.5194/gmd-13-1999-2020)
+describes the climatology, and [Bush et al. (2025)](https://doi.org/10.5194/gmd-18-3819-2025)
+records that no radiation parameters changed between RAL2 and RAL3. UKV's only advected aerosol
+quantity is the Murk tracer of [Clark et al. (2008)](https://doi.org/10.1002/qj.318), which
+diagnoses visibility and does not reach the radiation calculation. CAMS is aerosol-informed by
+construction and ERA5 carries a time-varying assimilated aerosol field, so **any skill UKV's split
+shows can only be cloud-sourced**, where the other two products' could be either.
+
+**UKV's 4D-Var assimilates a large volume of satellite-derived cloud, so at short lead times the
+model is partly a retrieval.** Satellite-derived cloud fraction was the single largest observation
+type by count in UKV's 2013 observation table, at 650,000 a day against 39,000 for SEVIRI radiances
+([Tubbs and Kelly
+(2013)](https://www-cdn.eumetsat.int/files/2020-04/pdf_conf_p_s7_09_tubbs_v.pdf)), entering the
+humidity field as a pseudo-observation by the mechanism of [Renshaw and Francis
+(2011)](https://doi.org/10.1002/qj.980). The [PS43 release
+notes](https://www.metoffice.gov.uk/services/data/met-office-data-for-reuse/ps43_ftp) confirm the
+stream was operational and being refined in December 2019, and the PS47 notes name only latent heat
+nudging and the adaptive vertical grid as assimilation methods removed. **No document from 2020
+onwards was found positively re-confirming the satellite cloud stream, and whether surface solar
+irradiance is assimilated anywhere in the Met Office's systems could not be established** — both are
+open rather than settled. What follows for any comparison against a satellite product is that a UKV
+analysis and that product are partly downstream of the same geostationary satellite, so the contrast
+weakens at short lead and recovers as the model's own physics overwrites the initial cloud field.
+
+### Open-Meteo's UKV archive is the T+0 analysis, and half of it is backfill
+
+**Open-Meteo mirrors UKV from the Met Office's own AWS bucket, ingesting every hourly run about four
+hours late.** A later run overwrites an earlier one for the same valid time, so the archive holds
+the T+0 analysis rather than a forecast at any lead. Sampled at five instants either side of PS47,
+the nearest grid cell in the Met Office's own file agrees with the served snapshot to between 0.11
+and 0.55 W m⁻², where every other lead sits tens to hundreds of W m⁻² away. **An archive of
+analyses is the right object to compare against a reanalysis or a retrieval and the wrong one to
+read as forecast skill.**
+
+**Over half the archive predates the ingest that produced the rest.** Open-Meteo's UKV downloader
+was created on 2024-08-12, and the archive claims to start on 2022-03-01, so the 29 months between
+were backfilled from a source Open-Meteo does not name. The AWS bucket's rolling two-year window
+reached back only to about August 2022 on the day the downloader landed, so an AWS backfill does not
+account for the stated start either, and the window has since rolled past all of it. **The era that
+can be checked against the Met Office's files is essentially the era Open-Meteo ingested live**, and
+the earlier half cannot be checked against anything.
+
+**Three mechanical facts about the served columns, each of which fails silently if assumed wrong.**
+
+- **Only global and direct short-wave are ingested; diffuse is served as their difference.** The Met
+  Office publishes its own diffuse field and Open-Meteo does not read it, so the served diffuse
+  carries no information the other two columns lack.
+- **The default hourly column is a backward-looking mean over the hour ending at its label**, which
+  matches the period-ending convention used everywhere else in this project. UKV publishes radiation
+  as an instantaneous snapshot, and Open-Meteo divides that snapshot by the ratio of the
+  instantaneous cosine of the solar zenith angle to its mean over the preceding hour. Asking for the
+  `_instant` suffix multiplies the ratio back to recover the snapshot, half an hour later than the
+  window's centre.
+- **That conversion is skipped where the ratio falls below 0.05**, near sunrise and sunset, so the
+  round trip between the two columns does not hold at very low sun.

@@ -36,6 +36,7 @@ import numpy as np
 import polars as pl
 from build_dataset import REPO_DATA_DIR
 from run_experiment import dataset_path_for
+from sources import SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("anm_setpoints")
@@ -122,7 +123,7 @@ def _dwell(*, spans: pl.DataFrame) -> pl.DataFrame:
 def main() -> int:
     """Build the export-cap series for every setpoint export, and report how it reads."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     parser.add_argument(
         "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
     )

@@ -23,6 +23,7 @@ from pathlib import Path
 from typing import Final
 
 import polars as pl
+from sources import SOURCE_CHOICES
 
 REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
 
@@ -60,7 +61,7 @@ def _banded_losses(*, instrument: str, source: str, alignment: str) -> pl.DataFr
 def main() -> int:
     """Print each instrument's headline contrast inside every elevation band."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     parser.add_argument(
         "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
     )

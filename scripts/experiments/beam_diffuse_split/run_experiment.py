@@ -53,6 +53,7 @@ import polars as pl
 import xgboost as xgb
 from commissioning import drop_commissioning_ramp
 from export_cap import clamp_to_cap, with_export_cap
+from sources import SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("run_experiment")
@@ -821,7 +822,7 @@ def _intervals_for(
 def main() -> int:
     """Run every arm, the controls and the bootstrap, and write the results."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default=DEFAULT_SOURCE)
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default=DEFAULT_SOURCE)
     parser.add_argument(
         "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
     )

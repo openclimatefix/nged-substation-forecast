@@ -39,6 +39,7 @@ from run_experiment import (
 )
 from run_physics_experiment import MAX_ITERATIONS, START_SPREAD, _n_parameters, _predict
 from scipy.optimize import minimize
+from sources import SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("shared_geometry")
@@ -169,7 +170,7 @@ def _losses_for_site(*, site_rows: pl.DataFrame, site: str) -> pl.DataFrame:
 def main() -> int:
     """Refit every arm under both geometry schemes and print the contrasts side by side."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     parser.add_argument(
         "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
     )

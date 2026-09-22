@@ -54,9 +54,15 @@ as well as in beam field. The tree's contrasts hold their sign under every readi
 
 SOURCE_LABELS: Final[dict[str, str]] = {
     "open-meteo": "ERA5 (31 km reanalysis)",
+    "ukv": "UKV (2 km model analysis)",
     "cams": "CAMS (5 km satellite retrieval)",
 }
-"""Source keys to the labels a reader sees."""
+"""Source keys to the labels a reader sees, coarsest grid first.
+
+**A source missing from this mapping is drawn nowhere**, which is why `_unlabelled_sources` raises
+on a results directory the mapping does not name rather than letting the chart come out looking
+complete with an arm silently absent from it.
+"""
 
 INSTRUMENT_LABELS: Final[dict[str, str]] = {
     "xgboost": "XGBoost",
@@ -103,14 +109,15 @@ RIGHT_PANEL_LABELS: Final[tuple[str, ...]] = (
 """The contrasts drawn in the right panel, which compares two ways of getting a split."""
 
 SUBTITLE: Final[tuple[str, ...]] = (
-    "Six PV sites in one 25 km by 23 km box in Lincolnshire, hourly daylight rows, 2019-2026.",
+    "Six PV sites in one 25 km by 23 km box in Lincolnshire, hourly daylight rows.",
+    "ERA5 and CAMS cover 2019-2026; UKV's archive starts in 2022.",
     "The beam/diffuse split is how total sunlight divides between the direct beam",
     "from the sun's disc and the light scattered across the rest of the sky.",
     "Change in mean absolute error against a model given total irradiance alone (%).",
     "Negative is better. Bars are 95% monthly block bootstrap intervals; a bar",
     "crossing zero has not been shown to help. Each panel has its own x scale.",
-    "Reanalysis and satellite retrieval, not forecasts, so this is information",
-    "content, not forecast skill. A half-hour error in the power stamps flips",
+    "Every source is valid at the hour rather than forecast for it, so this is",
+    "information content, not forecast skill. A half-hour error in the stamps flips",
     "the physical model's contrasts on the reanalysis; the tree's hold.",
 )
 
@@ -122,6 +129,36 @@ an unlimited label runs off the left edge of the canvas instead of widening it. 
 whole chart is what actually reserves the space."""
 
 PERCENTAGE_POINTS: Final[float] = 100.0
+
+
+def _raise_on_unlabelled_sources(*, stem: str) -> None:
+    """Raise if a results directory exists for a source `SOURCE_LABELS` does not name.
+
+    **The failure this exists for is a chart that looks finished with an arm missing from it.**
+    Drawing iterates the label mapping rather than the directories on disk, so a source added to the
+    experiment and not to the mapping is dropped with no error, no warning and no gap in the chart
+    for a reader to notice. This is R&D code, so it stops rather than degrading.
+
+    Args:
+        stem: `results` for the tree's runs or `physics` for the fitted model's.
+
+    Raises:
+        ValueError: If any results directory names a source the mapping does not.
+    """
+    prefix = f"beam_diffuse_{stem}_"
+    suffix = f"_{ALIGNMENT}"
+    found = {
+        path.name[len(prefix) : -len(suffix)]
+        for path in (REPO_DATA_DIR / "ERA5").glob(f"{prefix}*{suffix}")
+        if path.is_dir()
+    }
+    unlabelled = sorted(found - set(SOURCE_LABELS))
+    if unlabelled:
+        msg = (
+            f"{stem} results exist for {unlabelled}, which SOURCE_LABELS does not name, so they "
+            "would be left out of the chart without saying so. Add each one to SOURCE_LABELS."
+        )
+        raise ValueError(msg)
 
 
 def _arm_mean_absolute_errors(*, instrument: str, source: str) -> dict[str, float]:
@@ -164,6 +201,7 @@ def _differences() -> pl.DataFrame:
     frames: list[pl.DataFrame] = []
     for instrument in INSTRUMENT_LABELS:
         stem = "results" if instrument == "xgboost" else "physics"
+        _raise_on_unlabelled_sources(stem=stem)
         for source in SOURCE_LABELS:
             results_dir = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}_{ALIGNMENT}"
             if not results_dir.exists():

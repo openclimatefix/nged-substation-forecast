@@ -1,0 +1,122 @@
+"""Which irradiance sources the experiment runs on, and what each Open-Meteo model serves.
+
+One-off throwaway module for the experiment in
+<https://github.com/openclimatefix/nged-substation-forecast/issues/784> and its UKV extension in
+<https://github.com/openclimatefix/nged-substation-forecast/issues/800>.
+
+**It imports nothing outside the standard library, which is what lets every script in this
+directory import it.** `elevation_breakdown.py` and `report_results.py` document a run command
+supplying only `polars`, and `build_dataset.py` pulls in `pvlib`, `xarray` and a Delta store, so a
+registry living there would break the two lean scripts. `era5_grid.py` already sets the precedent of
+a constants-only leaf module behind `from typing import Final` alone.
+
+The payoff is that adding a second Open-Meteo model is one `OPEN_METEO_MODELS` entry rather than an
+edit repeated across the 14 `argparse` sites that name the source list.
+"""
+
+from typing import Final, Literal, NamedTuple
+
+SourceType = Literal["cds", "open-meteo", "cams", "ukv"]
+"""Which irradiance download to build from.
+
+`open-meteo` is the reanalysis route the experiment runs on, because it serves the same fields in
+about a minute where the Copernicus archive takes most of a night. `cds` is that Copernicus archive,
+and it is the reference the mirror is checked against rather than a second result:
+`verify_era5_sources.py` compares the two over every hour both cover, and a run of it is what
+licenses reading an `open-meteo` result as an ERA5 result.
+
+`cams` is a different instrument rather than a second route to the same one. The CAMS radiation
+service infers cloud from Meteosat at around 5 km and publishes the global, beam and diffuse
+horizontal irradiances at each meter's own coordinates, where ERA5 averages its cloud field over
+roughly 31 km and lands the meter in a grid cell up to 17 km away. Running the same arms on both
+separates "the split carries no information" from "ERA5's grid has already smoothed the beam away".
+
+`ukv` is the Met Office's 2 km deterministic UK model, taken from Open-Meteo's historical-forecast
+archive. It separates resolution from delivery: ERA5 against UKV is a resolution contrast inside one
+product class, where ERA5 against CAMS crosses from a reanalysis to a satellite retrieval as well as
+from 31 km to 5 km.
+
+Both `cams` and `ukv` take their air temperature from the Open-Meteo ERA5 frame, because the
+temperature feature is shared by every arm and a source must differ from ERA5 only in its irradiance
+columns.
+"""
+
+SOURCE_CHOICES: Final[tuple[SourceType, ...]] = ("cds", "open-meteo", "cams", "ukv")
+"""Every source name, as `argparse` `choices` for the scripts that take `--source`."""
+
+PER_SITE_SOURCES: Final[tuple[SourceType, ...]] = ("cams", "ukv")
+"""Sources downloaded at each meter's own coordinates rather than on the ERA5 grid.
+
+A build from one of these still reads the gridded ERA5 frame, for the air temperature every arm
+shares, and then replaces only the two irradiance columns.
+"""
+
+NativeRadiationType = Literal["instantaneous", "accumulated", "unmeasured"]
+"""What a model's own output holds before Open-Meteo converts it to an hourly value.
+
+An `instantaneous` model publishes a snapshot at the step, which Open-Meteo divides by the ratio of
+the instantaneous to the hour-mean cosine of the solar zenith angle to reach a backward-looking
+hourly mean. An `accumulated` model publishes a running total since model start, which Open-Meteo
+de-accumulates into a genuine hourly mean with no solar geometry involved. The distinction decides
+whether the hourly value carries a sub-hourly approximation, so `_instant` is worth requesting
+alongside the default only for an `instantaneous` model.
+
+`unmeasured` means nobody has checked this model's own output, and a registry entry carrying it must
+not be trained on until someone has.
+"""
+
+
+UkvTemporalType = Literal["hourly", "instant"]
+"""Which pair of served columns a UKV build feeds the arms.
+
+`hourly` is the default column, a backward-looking mean over the hour ending at the label. That is
+the same temporal object as ERA5's hourly integral, as the CAMS hourly integration, and as the
+period-ending hourly mean of metered power the experiment predicts, which is why it is the primary.
+`instant` is the snapshot at the label, half an hour later than that window's centre, and exists so
+the sensitivity can be measured rather than argued about.
+"""
+
+
+class OpenMeteoModel(NamedTuple):
+    """One model the historical-forecast archive serves, and what it is known to hold.
+
+    Attributes:
+        source: The `--source` name, which also names the output directory and filename.
+        models_parameter: The value of the API's `models=` query parameter.
+        archive_starts: The first date the archive claims to serve, as `YYYY-MM-DD`.
+        live_ingest_starts: The date Open-Meteo's own downloader for this model first existed, as
+            `YYYY-MM-DD`, or `None` where nobody has established it. Everything in the archive
+            before this date was backfilled from a source Open-Meteo does not name, so it is a
+            different product until measurement says otherwise — see `verify_ukv_lineage.py`.
+        native_radiation: What the upstream model publishes, before Open-Meteo's conversion.
+    """
+
+    source: SourceType
+    models_parameter: str
+    archive_starts: str
+    live_ingest_starts: str | None
+    native_radiation: NativeRadiationType
+
+
+OPEN_METEO_MODELS: Final[dict[str, OpenMeteoModel]] = {
+    "ukv": OpenMeteoModel(
+        source="ukv",
+        models_parameter="ukmo_uk_deterministic_2km",
+        archive_starts="2022-03-01",
+        live_ingest_starts="2024-08-12",
+        native_radiation="instantaneous",
+    )
+}
+"""Every model `fetch_open_meteo_point.py` can download, keyed by its `--model` name.
+
+Adding a model means adding an entry and measuring what goes in it. `native_radiation` in
+particular is a claim about the upstream model, and `unmeasured` is the honest value until somebody
+has read the upstream documentation or the downloader that converts it.
+"""
+
+HISTORICAL_FORECAST_URL: Final[str] = "https://historical-forecast-api.open-meteo.com/v1/forecast"
+"""Where a forecast model's archive is served from.
+
+A different service from the `archive-api` endpoint `fetch_era5_open_meteo.py` uses for ERA5, with
+its own call-weight accounting, though the JSON `hourly` block has the same shape.
+"""

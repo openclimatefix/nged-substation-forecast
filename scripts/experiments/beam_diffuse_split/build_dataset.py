@@ -42,6 +42,7 @@ import polars as pl
 import pvlib  # ty: ignore[unresolved-import]
 import xarray as xr
 from era5_grid import LAST_DATE
+from sources import PER_SITE_SOURCES, SOURCE_CHOICES, SourceType, UkvTemporalType
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("build_dataset")
@@ -53,6 +54,7 @@ METADATA_PATH: Final[Path] = REPO_DATA_DIR / "NGED" / "metadata.parquet"
 CAPACITY_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "effective_capacity")
 OPEN_METEO_PATH: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_open_meteo.parquet"
 CAMS_PATH: Final[Path] = REPO_DATA_DIR / "CAMS" / "beam_diffuse_cams.parquet"
+UKV_PATH: Final[Path] = REPO_DATA_DIR / "UKV" / "beam_diffuse_ukv.parquet"
 
 AlignmentType = Literal["as-labelled", "shifted", "piecewise"]
 """How the power stamps are read against ERA5.
@@ -78,25 +80,6 @@ exactly the arm under test. That is an asymmetric error, and a paired design giv
 against it. Whether the contract or the feed is at fault is a question for NGED and is not settled
 here.
 """
-
-SourceType = Literal["cds", "open-meteo", "cams"]
-"""Which irradiance download to build from.
-
-`open-meteo` is the reanalysis route the experiment runs on, because it serves the same fields in
-about a minute where the Copernicus archive takes most of a night. `cds` is that Copernicus archive,
-and it is the reference the mirror is checked against rather than a second result:
-`verify_era5_sources.py` compares the two over every hour both cover, and a run of it is what
-licenses reading an `open-meteo` result as an ERA5 result.
-
-`cams` is a different instrument rather than a second route to the same one. The CAMS radiation
-service infers cloud from Meteosat at around 5 km and publishes the global, beam and diffuse
-horizontal irradiances at each meter's own coordinates, where ERA5 averages its cloud field over
-roughly 31 km and lands the meter in a grid cell up to 17 km away. Running the same arms on both
-separates "the split carries no information" from "ERA5's grid has already smoothed the beam away".
-The CAMS build takes its air temperature from the Open-Meteo ERA5 frame, because the radiation
-service publishes no temperature and the temperature feature is shared by every arm.
-"""
-
 
 ALIGNMENT_FIXED_AT: Final[datetime] = datetime(2026, 3, 26, 8, 30, tzinfo=UTC)
 """The instant NGED corrected the half-hourly stamps.
@@ -309,6 +292,30 @@ def _read_cams(*, min_reliability: float) -> pl.DataFrame:
         cams.height,
     )
     return reliable.select("site", "time", "ghi_w_m2", "bhi_w_m2").sort("site", "time")
+
+
+def _read_ukv(*, temporal: UkvTemporalType) -> pl.DataFrame:
+    """Read the UKV per-site frame `fetch_open_meteo_point.py` wrote.
+
+    Args:
+        temporal: Which pair of columns to feed the arms. `hourly` is the default served
+            column, a backward-looking mean over the hour ending at the label; `instant` is
+            the snapshot at that label.
+
+    Returns:
+        One row per (site, time) with `ghi_w_m2` and `bhi_w_m2`.
+    """
+    if not UKV_PATH.exists():
+        msg = f"{UKV_PATH} missing; run fetch_open_meteo_point.py --model ukv first"
+        raise FileNotFoundError(msg)
+    suffix = "_instant" if temporal == "instant" else ""
+    ukv = pl.read_parquet(UKV_PATH)
+    return ukv.select(
+        "site",
+        "time",
+        ghi_w_m2=pl.col(f"ghi{suffix}_w_m2"),
+        bhi_w_m2=pl.col(f"bhi{suffix}_w_m2"),
+    ).sort("site", "time")
 
 
 def _read_cds_archives() -> pl.DataFrame:
@@ -718,7 +725,7 @@ def _add_synthetic_control_target(*, frame: pl.DataFrame) -> pl.DataFrame:
 def main() -> int:
     """Build the joined frame for the irradiance source named on the command line."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="open-meteo")
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default="open-meteo")
     parser.add_argument(
         "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
     )
@@ -727,6 +734,23 @@ def main() -> int:
         type=float,
         default=MIN_CAMS_RELIABILITY,
         help="Drop CAMS hours flagged below this fraction. Zero keeps every hour.",
+    )
+    parser.add_argument(
+        "--ukv-temporal",
+        choices=("hourly", "instant"),
+        default="hourly",
+        help=(
+            "Which UKV columns the arms see. Pair it with --suffix, or the variant build "
+            "overwrites the main one."
+        ),
+    )
+    parser.add_argument(
+        "--first-date",
+        default=None,
+        help=(
+            "Drop rows before this YYYY-MM-DD. Pair it with --suffix. What it exists for is "
+            "running a source over the span another source can be checked against."
+        ),
     )
     parser.add_argument(
         "--suffix",
@@ -742,7 +766,7 @@ def main() -> int:
         "using %d PV sites, irradiance source %s, power stamps %s", sites.height, source, alignment
     )
 
-    gridded = _read_era5(source="open-meteo" if source == "cams" else source)
+    gridded = _read_era5(source="open-meteo" if source in PER_SITE_SOURCES else source)
     _LOG.info(
         "gridded fields: %d rows, %s to %s",
         gridded.height,
@@ -774,11 +798,14 @@ def main() -> int:
         )
         .drop("time_series_id")
     )
-    if source == "cams":
+    if source in PER_SITE_SOURCES:
+        per_site = (
+            _read_cams(min_reliability=arguments.min_cams_reliability)
+            if source == "cams"
+            else _read_ukv(temporal=arguments.ukv_temporal)
+        )
         joined = joined.drop("ghi_w_m2", "bhi_w_m2").join(
-            _read_cams(min_reliability=arguments.min_cams_reliability),
-            on=["site", "time"],
-            how="inner",
+            per_site, on=["site", "time"], how="inner"
         )
     _LOG.info("after joining irradiance: %d rows", joined.height)
 
@@ -789,6 +816,15 @@ def main() -> int:
     dataset = _add_synthetic_control_target(frame=_add_separation_models(frame=daylight)).drop(
         "cell_latitude", "cell_longitude", "latitude", "longitude"
     )
+    if arguments.first_date is not None:
+        before = dataset.height
+        dataset = dataset.filter(
+            pl.col("time")
+            >= pl.lit(f"{arguments.first_date} 00:00:00")
+            .str.to_datetime()
+            .dt.replace_time_zone("UTC")
+        )
+        _LOG.info("first-date filter kept %d of %d rows", dataset.height, before)
     output_path = output_path_for(dataset_name=f"{source}{arguments.suffix}", alignment=alignment)
     dataset.write_parquet(output_path)
     _LOG.info("wrote %d rows to %s", dataset.height, output_path)

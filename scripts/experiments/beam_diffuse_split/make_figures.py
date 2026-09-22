@@ -61,6 +61,7 @@ colour, which `plotting.ocf_theme` keeps private.
 
 SETUPS: Final[tuple[tuple[str, str, str, str], ...]] = (
     ("open-meteo", "xgboost", "C_era5_split", "ERA5 → XGBoost"),
+    ("ukv", "xgboost", "C_era5_split", "UKV → XGBoost"),
     ("cams", "xgboost", "C_era5_split", "CAMS → XGBoost"),
     ("cams", "physics", "P_C_source_split", "CAMS → fitted physical model"),
 )
@@ -71,7 +72,7 @@ setup has to offer, so
 the figure shows what the pipeline can do rather than what a deliberately weakened arm can do.
 """
 
-SETUP_COLOURS: Final[tuple[str, ...]] = (ocf.ORANGE_RED, ocf.BLUE, ocf.DARK_GREEN)
+SETUP_COLOURS: Final[tuple[str, ...]] = (ocf.ORANGE_RED, ocf.PURPLE, ocf.BLUE, ocf.DARK_GREEN)
 """One hue per setup, in `SETUPS` order.
 
 Checked for colour-vision deficiency rather than chosen by eye: the worst adjacent pair separates
@@ -81,6 +82,8 @@ by 25 units of perceptual distance under deuteranopia, against a floor of 8.
 MAE_SETUPS: Final[tuple[tuple[str, str, str], ...]] = (
     ("open-meteo", "xgboost", "ERA5 → XGBoost"),
     ("open-meteo", "physics", "ERA5 → physical model"),
+    ("ukv", "xgboost", "UKV → XGBoost"),
+    ("ukv", "physics", "UKV → physical model"),
     ("cams", "xgboost", "CAMS → XGBoost"),
     ("cams", "physics", "CAMS → physical model"),
 )
@@ -88,9 +91,18 @@ MAE_SETUPS: Final[tuple[tuple[str, str, str], ...]] = (
 
 SOURCE_LABELS: Final[dict[str, str]] = {
     "open-meteo": "ERA5 (31 km reanalysis)",
+    "ukv": "UKV (2 km model analysis)",
     "cams": "CAMS (5 km satellite retrieval)",
 }
 """Source keys to the label a reader sees, matching the headline contrast chart."""
+
+SKY_CHART_SOURCES: Final[tuple[str, ...]] = ("cams", "ukv")
+"""Which sources get a sky-condition breakdown.
+
+Both are the fine-resolution sources, and the breakdown is where UKV's fixed aerosol climatology
+would show against CAMS's 3-hourly aerosol analysis: aerosol sets the beam/diffuse partition most
+strongly under a clear sky, so that bin is where the asymmetry between the two bites hardest.
+"""
 
 INSTRUMENT_LABELS: Final[dict[str, str]] = {
     "xgboost": "XGBoost",
@@ -98,7 +110,14 @@ INSTRUMENT_LABELS: Final[dict[str, str]] = {
 }
 """Instrument keys to the label a reader sees."""
 
-PER_SITE_COLOURS: Final[tuple[str, ...]] = ("#FF4901", "#992C01", "#306BFF", "#24499F")
+PER_SITE_COLOURS: Final[tuple[str, ...]] = (
+    "#FF4901",
+    "#992C01",
+    "#8A2BE2",
+    "#53198B",
+    "#306BFF",
+    "#24499F",
+)
 """One colour per `MAE_SETUPS` entry: hue for the source, lightness for the model family.
 
 The two full-strength colours are the brand's orange-red and blue, which the headline contrast
@@ -444,8 +463,10 @@ def main() -> int:
     _per_site_chart(frame=errors).save(FIGURES_DIR / "per_site_error.svg")
     _LOG.info("wrote %s", FIGURES_DIR / "per_site_error.svg")
 
-    _sky_chart(source="cams").save(FIGURES_DIR / "sky_conditions.svg")
-    _LOG.info("wrote %s", FIGURES_DIR / "sky_conditions.svg")
+    for source in SKY_CHART_SOURCES:
+        path = FIGURES_DIR / f"sky_conditions_{source}.svg"
+        _sky_chart(source=source).save(path)
+        _LOG.info("wrote %s", path)
     return 0
 
 

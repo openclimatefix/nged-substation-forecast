@@ -46,6 +46,7 @@ from build_dataset import (
 )
 from contracts.settings import Settings
 from run_experiment import _bootstrap_difference, dataset_path_for, results_dir_for
+from sources import SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("anm_curtailment")
@@ -155,7 +156,7 @@ def _hourly(*, curtailment: pl.DataFrame, site: str) -> pl.DataFrame:
 def main() -> int:
     """Print what the curtailment feed holds and what it explains."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     parser.add_argument(
         "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
     )

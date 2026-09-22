@@ -59,6 +59,7 @@ from run_experiment import (
     dataset_path_for,
 )
 from scipy.optimize import minimize
+from sources import SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("run_physics_experiment")
@@ -495,7 +496,7 @@ def _intervals_for(
 def main() -> int:
     """Fit every arm at every site and fold, bootstrap the contrasts, and write the results."""
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--source", choices=("cds", "open-meteo", "cams"), default="cams")
+    parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     parser.add_argument(
         "--alignment", choices=("as-labelled", "shifted", "piecewise"), default="piecewise"
     )

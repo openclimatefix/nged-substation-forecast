@@ -136,19 +136,6 @@ It samples valid instants, pulls the matching native files from `s3://met-office
 
 **This stays a gate: no model is trained on UKV until it has run and been read.** That is a direct instruction rather than the plan's own preference. **Every check asserts with its measured number**, so the gate has a rule rather than an adjective.
 
-### `build_dataset.py` — four edits
-
-- `"ukv"` into `SourceType` and into the `--source` `choices` literal.
-- `UKV_PATH` beside `CAMS_PATH`.
-- `_read_ukv()`, mirroring `_read_cams()`, roughly 20 lines. It selects the default hourly columns, or the `_instant` columns when a variant build asks for them.
-- The per-site branch generalised: `if source == "cams"` becomes a membership test over a `PER_SITE_SOURCES` tuple, and the gridded read's `"open-meteo" if source == "cams"` becomes the same test.
-
-**Air temperature keeps coming from the gridded ERA5 frame, including for the UKV build.** UKV publishes its own `temperature_2m`, and using it would change a shared non-irradiance feature between sources, breaking the invariant that arms and sources differ only in the irradiance columns. CAMS already takes ERA5's temperature for exactly this reason.
-
-**No `--ukv-temporal` flag.** `build_dataset.py` already has `--suffix` for precisely this, and it already composes into the run paths of all six downstream scripts — the `cams-allhours` variant on disk is the same mechanism in use. A second temporal build, if ever wanted, is `--source ukv --suffix -instant`.
-
-**Nothing restricts or widens the UKV span in code.** `_read_era5` trims at `era5_grid.LAST_DATE`, and `main()` inner-joins power to the gridded frame before the per-site irradiance join, so the UKV dataset is automatically ERA5's rows intersected with whatever span the download covers. Both span runs are a matter of which download is on disk, not of a code path.
-
 ### The 13 scripts carrying the duplicated `choices` literal
 
 Each drops its `("cds", "open-meteo", "cams")` tuple for `from sources import SOURCE_CHOICES`. Every one of them already imports a sibling or can, and `sources.py` adds no third-party dependency, so the two scripts documented to run on `polars` alone keep working. Each is run once under its own documented command as part of the verification set, because that is the claim being relied on.
@@ -255,6 +242,57 @@ The threshold column scales the published headline's half-width of 0.018 points 
 **`ARM_FEATURES` calls arm C `C_era5_split`, which has been wrong since CAMS was added and will be wrong a third time.** Renaming it to `C_source_split`, which the physical runner already uses, would touch 12 scripts and invalidate every stored result parquet, since `arm` is a data column. *Recommendation: leave it, and record the wart here.* Flagged rather than fixed, per the out-of-scope rule.
 
 **`output_path_for` writes every source's dataset under `data/ERA5/`, including the CAMS one and now the UKV one.** The same reasoning applies: changing it would strand every existing result directory. Flagged, not fixed.
+
+## What implementing it established
+
+**Reading Open-Meteo's downloader first, as the plan required, answered three questions the plan had
+left to measurement, and one of them changes what the arm is.** Every answer below was then
+confirmed against live data rather than left as a reading of source code.
+
+**The archive holds the T+0 analysis, which is the awkward answer the plan warned about.** UKV runs
+hourly, `UkmoDownloader.swift` ingests every run about four hours late, radiation is written at
+every step including the first, and a later run overwrites an earlier one, so the last writer for a
+valid time is the run initialised at that instant. Sampled at five instants either side of PS47, the
+nearest native grid cell agrees with the served `_instant` snapshot to between 0.11 and 0.55 W m⁻²
+at T+0, against 1.3 to 350 W m⁻² at every other lead. **So the UKV arm is UKV's analysis rather than
+a forecast, and its cloud field is partly downstream of the same geostationary satellite CAMS
+retrieves from.** The arm ships labelled as an analysis, with the assimilation caveat attached, which
+is what this plan's "clear match at a short lead" outcome prescribes. The remedy the plan held in
+reserve — fetching from AWS at a fixed longer lead — stays available and stays the human reviewer's
+call, and is now a decision with a measurement behind it rather than a hedge.
+
+**One consolation the plan did not anticipate: all three sources are now analysis-class.** ERA5 is a
+reanalysis, CAMS is a retrieval, and UKV at T+0 is an analysis, so none of the three is a forecast
+and the comparison is between estimates of the same instant. That removes the
+forecast-against-analysis confound from the ERA5-against-UKV resolution contrast, which is the
+contrast this issue exists for. What it costs is the CAMS-against-UKV contrast, which no longer
+reads as "model against satellite retrieval".
+
+**The default hourly column is a backward-looking mean over the hour ending at its label, and the
+mechanism is now known rather than inferred.** The downloader divides UKV's instantaneous snapshot
+by the ratio of the instantaneous cosine of the solar zenith angle to its mean over the preceding
+hour. Reconstructing one served column from the other and that ratio lands at a root-mean-square
+error of 0.65 W m⁻² for the global flux and 0.14 for the direct one — against 26 W m⁻² for an hour
+centred on the label and 68 for the hour beginning at it. **Departure 1 is therefore settled by
+mechanism, and the reconstruction resolves a half-hour offset by a factor of 40.**
+
+**Open-Meteo ingests only the global and direct fields, so the served diffuse is their difference
+rather than UKV's own published diffuse field.** That makes UKV's arm C structurally identical to
+ERA5's — a native direct field with diffuse by subtraction — which is a consistency the plan assumed
+rather than checked. It also retires one of the plan's three ingest checks as written: a sum
+consistency test cannot fail on a subtraction. The check is kept with its purpose restated, as the
+guard that would notice the day Open-Meteo starts serving the native diffuse and arm C quietly
+changes meaning.
+
+**Two mechanical worries in the plan were unfounded, and both simplified the lineage script.** The
+Met Office bucket is served over plain HTTPS, so no object-store client and no anonymous-credential
+configuration are involved. And the native files do carry their projection coordinates and a full CF
+grid mapping, so the transform is read from the file rather than copied from a downloader — the
+nearest cell then matches to sub-1 W m⁻², leaving no cell-picking ambiguity to resolve.
+
+**One flag was added beyond the plan.** `build_dataset.py --first-date` makes a span a filter rather
+than a second download, because the plan's recommendation to run both spans would otherwise mean
+downloading the live-ingest era again over the top of the full archive.
 
 ## What the simplicity review changed
 
