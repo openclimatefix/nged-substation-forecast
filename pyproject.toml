@@ -314,13 +314,24 @@ docstring-code-line-length = 100
 # case, but only in preview, and implements neither DOC101 nor DOC103 for the first.
 #
 # pydoclint is deliberately NOT a dependency of this workspace, and is run from an isolated
-# ephemeral environment instead. It requires `docstring-parser-fork` while Dagster requires
-# `docstring-parser`, and both distributions install a top-level `docstring_parser` module — so in
-# a shared virtual environment whichever is installed last wins the files, and pydoclint fails at
-# import with `cannot import name 'DocstringYields'`. Which one wins depends on install order, so
-# a `uv sync` can break the linter without anything in this file changing. `uv run --isolated
-# --no-project --with pydoclint` gives pydoclint an environment of its own; the config below is
-# still read, because pydoclint looks for pyproject.toml in the working directory.
+# ephemeral environment instead. pydoclint requires `docstring-parser-fork` while Dagster requires
+# `docstring-parser`, and both distributions ship the same top-level `docstring_parser` module. In a
+# shared virtual environment, whichever distribution is installed last overwrites the other's files.
+# Installing `docstring-parser` last breaks pydoclint at import with `cannot import name
+# 'DocstringYields'`, so a `uv sync` that reorders the installs can break the linter with no edit to
+# this file.
+#
+# Removing `docstring-parser-fork` from a shared environment breaks Dagster instead, and the
+# breakage outlasts the fork's removal. The uninstall deletes every path listed in the fork's
+# install manifest (`RECORD`), and that manifest lists the whole `docstring_parser` module.
+# `docstring-parser`'s own `.dist-info` directory survives untouched. uv reads the surviving
+# `.dist-info` and counts `docstring-parser` as installed, so `uv sync` reports success and installs
+# nothing. `uv run dg dev` then fails with `ModuleNotFoundError: No module named
+# 'docstring_parser'`. A virtual environment that has ever held both distributions stays broken
+# until `uv sync --reinstall-package docstring-parser` rewrites the module files.
+#
+# `uv run --isolated --no-project --with pydoclint` gives pydoclint an environment of its own; the
+# config below is still read, because pydoclint looks for pyproject.toml in the working directory.
 #
 # The options below switch off the checks this repo does not want, each for its own reason.
 [tool.pydoclint]
