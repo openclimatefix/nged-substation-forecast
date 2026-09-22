@@ -9,203 +9,195 @@ half-hour timing error, and the error is not uniform across the record. The meas
 three independent signals that pin the changepoint, are in the [beam/diffuse
 appendix](https://openclimatefix.github.io/nged-substation-forecast/results/beam-diffuse-split/#the-power-stamps-before-26-march-2026-are-half-an-hour-late).
 
-**The planned solution.** Correct on read, through exactly one door, and leave the stored table
-holding what NGED sent. Add a `PowerTimeSeries.scan_delta()` classmethod — mirroring the
-`Nwp.scan_delta()` the repo already has — that scans the Delta table and rolls every stamp before
-the changepoint back by 30 minutes. Route the six production and script read sites that care about
-what `time` means through it, and leave the ingest, the dedupe and the freshness watermark reading
-the raw table, because those three are about what NGED sent rather than about what it measured.
+**The planned solution.** Correct the stamps at the ingest boundary, in
+`read_nged_json.py`, following the `PowerTimeSeries.drop_implausible_rows` precedent that already
+repairs this feed in the same function. The stored table then means what the contract says it means,
+and no read site can be silently wrong. The existing on-disk table is not migrated: it is dropped
+and re-materialised from NGED's bucket after this merges, on the workstation and on AWS. That is the
+maintainer's decision, and it is what makes the ingest the right home for the correction — a
+re-materialise re-parses every historic file, so without the ingest guard the rebuild would
+reintroduce the fault it is being run to remove.
+
+The change is three edits and no new mechanism: one constant, one classmethod, one call.
 
 ## Verdict, size and departures
 
 **Verdict: worth implementing, and the fault is real.** The issue's account of the current code is
 accurate: `read_nged_json.py:85` renames `endTime` to `time` and stores it unchanged, and nothing
-downstream corrects it. The changepoint instant, the direction and the magnitude are already
-settled and published on `main`; this issue is the engineering that acts on them, not a
-re-measurement.
+downstream corrects it. The changepoint instant, the direction and the magnitude are already settled
+and published on `main`; this issue is the engineering that acts on them, not a re-measurement.
 
 **Size: complex.** Answering each of the five triggers in turn:
 
 | Trigger | Answer |
 |---|---|
-| Changes what gets stored | **Fires.** The plan's central choice is whether the stored table holds corrected stamps. Even under the recommended correct-on-read design, the meaning of a stored `time` is restated in the `PowerTimeSeries` contract. |
-| Touches the production serving path | **Fires.** `live_forecasts` reads power through `_engineering_inputs.py::_scan_inputs`, which this change re-points at the new door. |
+| Changes what gets stored | **Fires.** Every pre-changepoint `time` in the `power_time_series` table changes by 30 minutes. |
+| Touches the production serving path | **Fires.** `live_forecasts` reads power through `load_engineering_inputs`, off the table this change rewrites. The change is an identity on every row that path reads (see the design-philosophy check), but the trigger fires on the surface touched, not on the measured effect. |
 | Touches a degradation rule | Does not fire. No degradation ladder, asset check or warning path is added or edited. |
-| More than one defensible design | **Fires.** Correct-on-ingest-plus-backfill and correct-on-read are both defensible, and the issue body asks for the choice explicitly. |
-| Callers you could not name without searching | **Fires.** Eight modules touch the power table and the list came from a grep, not from memory. |
+| More than one defensible design | **Fires.** Correct-at-ingest and correct-at-read are both defensible, and the issue asks for the choice explicitly. |
+| Callers you could not name without searching | **Fires.** Eight modules touch the power table, and the list came from a grep. |
 
 Four of five fire, so the issue gets a plan, both plan reviews, and both diff reviews.
 
-**Departure 1 — the issue frames correct-on-read as "every consumer has to know the rule". It does
-not have to.** The issue's "What to decide" section reads the choice as a trade between a one-off
-backfill and a rule spread across every consumer. There is a third shape: one function owns the
-rule and every consumer goes through that function. The repo already uses it for the NWP table —
-`Nwp.scan_delta()` in `packages/contracts/src/contracts/weather_schemas.py:527` is the only door to
-`nwp`, and it casts and types the frame on the way through. `PowerTimeSeries.scan_delta()` is the
-same pattern, and it costs one new classmethod plus six one-line call-site edits.
+**Departure 1 — the issue frames this as a choice between a backfill and a rule every consumer
+knows. Neither cost is paid.** The issue's "What to decide" section weighs "correct on ingest, and
+pay for a one-off backfill" against "correct on read, and make every consumer know the rule". The
+maintainer has since decided to drop the table and re-materialise it rather than migrate it, which
+removes the backfill from the ingest option altogether and leaves it strictly simpler than the read
+option on every axis: two files edited instead of nine, one new public name instead of three, no
+second meaning for `pt.DataFrame[PowerTimeSeries]`, and no door for a future read site to bypass.
 
-**Departure 2 — no backfill of the stored table, and no change to the ingest.** Design principle 15
-("Transform data in feature engineering, not in the ingest, unless it saves a lot of storage") is
-squarely on point: a 30-minute shift destroys nothing, so feature engineering can produce either
-form on demand and the transform has nothing to show for a place in the ingest. Principle 15's
-stated cost of getting an ingest transform wrong — "re-downloading and re-writing the whole
-archive" — is exactly what a stored correction would cost us if the changepoint moves, if the
-correction turns out to be per-feed rather than fleet-wide, or if NGED republishes a corrected
-history. All three are live possibilities, and the third is a question the issue itself says to ask
-NGED before building anything.
+**Departure 2 — nothing is added to `packages/delta_store/` or to the read path.** No
+`scan_delta` classmethod, no correction helper, no pre-commit guard, and no edit to
+`_engineering_inputs.py`, `cv_assets.py`, either dashboard notebook, or
+`export_baseline_forecasts.py`. All six read sites keep reading the table with a bare scan, which is
+correct once the table itself is correct.
 
 **Departure 3 — the retrain and the NGED conversation are not in this issue's scope.** The issue
-lists both under "What to decide". Retraining is a run of the existing CV assets once this merges,
-not a code change; asking NGED whether the correction was fleet-wide is a human action. Both are
-recorded under "Risks and open questions" so that neither is lost, and the second is a blocker on
-the *retrain*, not on this code.
+lists both under "What to decide". Retraining is a run of the existing CV assets once the table has
+been rebuilt, not a code change; asking NGED whether the correction was fleet-wide is a human
+action. Both are recorded under "Risks and open questions" so neither is lost.
 
 ## What changes, file by file
 
 ### `packages/contracts/src/contracts/power_schemas.py`
 
 - **Add `POWER_STAMPS_CORRECTED_AT: Final[datetime] = datetime(2026, 3, 26, 8, 30, tzinfo=UTC)`**, a
-  module-level constant with a docstring stating what the fault is, which three measurements pin the
-  instant, and a link to the published appendix. The same constant already exists twice on the
-  `beam-diffuse-split-experiment` branch (`build_dataset.py:101` and `site_e_commissioning.py:51`);
-  this is its permanent home, and that branch should import it rather than re-declare it once both
-  have merged.
-- **Add `PowerTimeSeries.correct_late_stamps(lf)`**, a classmethod taking and returning a
-  `pt.LazyFrame[PowerTimeSeries]`, which applies
+  module-level constant whose docstring states what the fault is, which three measurements pin the
+  instant, and links to the published appendix. The same constant already exists twice on the
+  unmerged `beam-diffuse-split-experiment` branch (`build_dataset.py:101`,
+  `site_e_commissioning.py:51`); this is its permanent home, and that branch should import it rather
+  than re-declare it once both have merged.
+
+- **Add `PowerTimeSeries.correct_late_stamps(dataframe) -> pl.DataFrame`**, a classmethod applying
   `pl.when(pl.col("time") < POWER_STAMPS_CORRECTED_AT).then(pl.col("time").dt.offset_by("-30m")).otherwise(pl.col("time"))`.
-  Separate from `scan_delta` so a caller holding an already-scanned frame — a test, a notebook, the
-  beam/diffuse scripts — can apply the same rule without going back to disk.
-- **Add `PowerTimeSeries.scan_delta(path=None, storage_options=None) -> pt.LazyFrame[Self]`**,
-  mirroring `Nwp.scan_delta`: resolve `path` from `get_settings().power_time_series_data_path` and
-  `storage_options` from `get_settings().storage_options` when either is `None`, scan, `set_model`,
-  `cast`, then `correct_late_stamps`. The docstring says plainly that the frame it returns carries
-  corrected stamps while the table on disk does not, and names `time_series_coverage` as the one
-  read that deliberately stays raw.
-- **Rewrite the `time` field description** so the contract stops asserting something false about the
-  stored table. It should say that `time` is period-ending, that rows stamped before
-  `POWER_STAMPS_CORRECTED_AT` are stored half an hour late exactly as NGED sent them, and that
-  `scan_delta` is the door that corrects them. This is a documentation change to a contract, not a
-  widening of a field or a relaxation of a range — see "Risks and open questions".
 
-The sort order is worth a note in the implementation: the shift is monotonic and applies to a
-contiguous prefix of each series, so it cannot reorder rows or create a duplicate `(time_series_id,
-time)` key. A reading stamped exactly at the changepoint stays put, and the reading before it moves
-to 08:00, where no row can already sit because the pre-correction feed published on the same
-half-hour grid. Worth an explicit test rather than a comment alone.
+  It sits beside `drop_implausible_rows` (`power_schemas.py:113`) and is documented the same way:
+  an ingest-boundary repair of a confirmed upstream fault, to be called only at the boundary that
+  receives NGED's raw JSON, before `validate`. `drop_implausible_rows` is the precedent this change
+  follows throughout — a repair of this feed, living as a method on this model, called from
+  `read_nged_json.py`.
 
-### Read sites routed through the new door
-
-| File | What it does with `time` | Change |
-|---|---|---|
-| `src/nged_substation_forecast/defs/_engineering_inputs.py:125` | Feeds `_engineer_features`; `time` becomes `valid_time` and is joined to NWP | Replace `pl.scan_delta(...)` + `pt.LazyFrame.from_existing(...).set_model(...)` with `PowerTimeSeries.scan_delta(...)`; keep the existing `.filter()` |
-| `src/nged_substation_forecast/defs/cv_assets.py:987` | `cv_forecast_metrics` actuals, joined to forecasts on `(time_series_id, valid_time)` | Same substitution |
-| `src/nged_substation_forecast/defs/cv_assets.py:199` | `effective_capacity`, a per-series P99 of `power` | Same substitution. The P99 is invariant to a time shift, so this is a no-op on the numbers; routing it through the door anyway keeps one rule for "how to read this table" |
-| `packages/dashboard/view_forecasts.py:311` | Plots actuals beside forecasts | Same substitution |
-| `packages/dashboard/map_and_timeseries.py:122` | Plots one series' history | Same substitution |
-| `scripts/forecasting/export_baseline_forecasts.py:170` | Left-joins `observed_power` onto delivered forecast rows | Same substitution inside `_observed_power` |
-
-Each dashboard edit is a marimo notebook, so the `marimo-notebooks` skill applies: the import must
-live in `with app.setup:`, and `ruff check --fix` must never run over either file.
-
-### Read sites that deliberately stay raw
-
-- **`nged_data/storage.py::select_new_rows`** and **`_existing_power_time_series_keys`**. The
-  anti-join that decides which parsed rows are new compares `(time_series_id, time)` against the
-  table on disk. Both sides must be raw or the ingest would re-append every historic row it ever
-  re-reads. Nothing here changes; the plan adds a sentence to `select_new_rows`' docstring saying
-  why it reads raw while everything else reads through `scan_delta`.
-- **`nged_data/storage.py::time_series_coverage`**, and therefore `defs/checks.py:400`
-  (`power_data_is_fresh`) and `defs/cv_assets.py:140` (`eligible_time_series`). Coverage answers
-  "when did NGED last send us anything", which is a fact about the feed rather than about the
-  measurement. The correction cannot move `last_time`, because every recent row is post-changepoint;
-  it moves `first_time` by 30 minutes, which no eligibility threshold measured in months can
-  notice. Same docstring sentence.
+- **Extend the `time` field description** to say that the ingest corrects NGED's known half-hour
+  offset on readings before `POWER_STAMPS_CORRECTED_AT`, so a reader of the contract can tell that
+  the stored value differs from NGED's own `endTime` for those rows, and why. The description's
+  existing claim — that `time` ends the 30-minute observation period — becomes true of the whole
+  table rather than of 5% of it.
 
 ### `packages/nged_data/src/nged_data/read_nged_json.py`
 
-**No change.** Stated here because "correct on ingest" is the option this plan rejects, and a
-reviewer should see that the rejection is deliberate rather than an omission.
+- **Call `PowerTimeSeries.correct_late_stamps` inside `_extract_power_time_series`**, after the
+  `str.to_datetime` on line 86-88 and before `drop_implausible_rows` on line 97. Order matters and
+  should carry a one-line comment: correcting first means `drop_implausible_rows` judges the stamp
+  that will actually be stored, so a corrected stamp landing outside the plausible range is caught
+  rather than stored.
+
+- The `:00`/`:30` alignment check is unaffected: a 30-minute shift maps the half-hour grid onto
+  itself.
+
+### Nothing else changes
+
+Stated explicitly, because a reviewer should see these as decisions rather than omissions:
+
+- **No read site changes.** `_engineering_inputs.py:125`, `cv_assets.py:199`, `cv_assets.py:987`,
+  `view_forecasts.py:311`, `map_and_timeseries.py:122` and `export_baseline_forecasts.py:170` all
+  keep their bare scans.
+- **`select_new_rows` and `time_series_coverage` are untouched.** Both compare parsed rows against
+  stored rows; after this change both sides carry corrected stamps, so the anti-join and the
+  watermark stay consistent with no edit.
+- **No migration script.** The table is dropped and re-materialised.
 
 ## Design-philosophy check
 
-**This code path runs in production, and the change cannot degrade it.** `live_forecasts` reads
-power through `_engineering_inputs.py` over a lookback window measured in days, so every row it
-reads is post-changepoint and the correction is an identity on all of them. The live service's
-behaviour is therefore unchanged by this merge, and stays unchanged until a model is retrained.
-That is the safety property that makes this change shippable ahead of the retrain rather than
-coupled to it.
+**This code path runs in production, and the change cannot degrade the live service.**
+`live_forecasts` reads power over a `power_lookback` window measured in days
+(`_engineering_inputs.py:37`), so every row it reads is post-changepoint, where the correction is an
+identity. The live service's behaviour is unchanged by this merge, and stays unchanged until a model
+is retrained on the rebuilt table.
 
-**Nothing raises and nothing degrades.** `correct_late_stamps` is a pure Polars expression on a lazy
-frame: it has no I/O, no branch on data availability, and no failure mode short of the column being
-absent, which the contract forbids. No asset check is added or edited, so the `WARN`/`blocking=False`
-rule has nothing to bite on here.
+**The change is also inert until the table is rebuilt, which is the safety property that makes it
+shippable on its own.** `select_new_rows`' file-listing filter uses a 3-day `_LATE_FILE_LOOKBACK`
+(`storage.py:362`), so the hourly ingest never re-parses a historic file. Merging this change
+against the existing table therefore corrects nothing and breaks nothing: the correction fires only
+on a full re-materialise. There is no window in which corrected and uncorrected stamps interleave.
 
-**Principle 15 is the principle this plan follows, and principle 7 is the one it strains.**
-Principle 15 — transform in feature engineering, not in the ingest — is why the stored table stays
-raw. Principle 7 ("Strict contracts at every boundary") is strained in return: a
-`pt.DataFrame[PowerTimeSeries]` will now carry either raw or corrected stamps with nothing in the
-type to say which. What is bought is that the rule stays a one-line edit for as long as its three
-open questions are open. What is given up is compile-time certainty, replaced by a single documented
-door and, if the reviewer agrees, a grep guard (see "Risks and open questions").
+**Nothing raises and nothing degrades.** `correct_late_stamps` is a pure Polars expression with no
+I/O, no branch on data availability, and no failure mode short of the `time` column being absent,
+which the schema forbids. No asset check is added or edited.
+
+**This trades away design principle 15, and the trade is the maintainer's explicit decision.**
+Principle 15 — "Transform data in feature engineering, not in the ingest, unless it saves a lot of
+storage" — makes feature engineering the default home for a transform, and this plan puts a
+transform in the ingest against it. What is bought is that `PowerTimeSeries` stays a true account of
+the table it governs, so no present or future read site can be silently wrong, and that the whole
+change is three edits rather than nine. What is given up is that revising the constant costs a
+re-materialise rather than a config change, which is the cost principle 15 exists to warn about.
+Two things make it the right trade here. The maintainer has chosen re-materialise-over-migrate as
+the standing maintenance route for this table, so that cost is already accepted rather than newly
+incurred. And principle 15's own test is what a transform *destroys*: this one destroys nothing that
+the recorded constant cannot restore, because a 30-minute shift is exactly invertible.
 
 **Hypotheses.** No hypothesis in `engineering-hypotheses.md` is delivered by this change. It is a
-data-correctness fix, not a claim about the engineering. The eventual retrain bears on forecast
-accuracy, which is measured on the leaderboard rather than by a hypothesis label.
+data-correctness fix, not a claim about the engineering.
 
 ## Tests
 
-New tests in `packages/contracts/tests/test_power_schemas.py`, each named with the assertion that
-fails on `main` today:
+New and changed tests, each named with the assertion that fails on `main` today.
+
+In `packages/contracts/tests/test_power_time_series.py` (the existing home for this model's tests —
+do not open a second file):
 
 1. **A stamp before the changepoint moves back 30 minutes.** `correct_late_stamps` on a row stamped
    `2026-03-26 08:00Z` returns `2026-03-26 07:30Z`. Fails on `main`: the method does not exist.
 2. **A stamp at the changepoint and a stamp after it are unchanged.** Rows stamped
    `2026-03-26 08:30Z` and `2026-03-26 09:00Z` come back identical. This is the boundary the whole
    change turns on, and a `<=` where the rule wants `<` passes test 1 and fails this one.
-3. **The corrected frame still validates.** Applying `correct_late_stamps` to a multi-series frame
-   spanning the changepoint and calling `PowerTimeSeries.validate()` raises nothing — proving the
-   shift creates no duplicate key and leaves the `time` column sorted within each series. Fails on
-   `main` for the same reason as test 1, and would fail on a buggy implementation that shifted rows
-   on both sides of the boundary by different signs.
-4. **`scan_delta` returns corrected stamps from a table written raw.** Write a small frame spanning
-   the changepoint to a `tmp_path` Delta table with `write_power_time_series`, read it back with
-   `PowerTimeSeries.scan_delta(path)`, and assert the pre-changepoint stamps came back 30 minutes
-   earlier while the table on disk still holds the raw values. This is the test that pins the
-   "stored raw, read corrected" contract, and it is the one a future correct-on-ingest change would
-   have to delete deliberately.
-5. **`scan_delta` resolves its defaults from settings.** With `power_time_series_data_path`
-   monkeypatched, a no-argument `scan_delta()` reads that table. Mirrors the equivalent coverage
-   `Nwp.scan_delta` has, if any; if `Nwp.scan_delta` has no such test, this one is optional and the
-   simplicity reviewer should say so.
+3. **A corrected multi-series frame still validates.** Apply `correct_late_stamps` to a frame
+   spanning the changepoint for two series and call `PowerTimeSeries.validate()`. Kept as a cheap
+   end-to-end invariant, not as proof of uniqueness: shifting a contiguous prefix by a constant
+   −30 min is injective, and the shifted range ends at 08:00 while the unshifted range starts at
+   08:30, so a duplicate key is unreachable by construction. What it does catch is an implementation
+   that shifts the wrong side of the boundary, or shifts by the wrong sign.
 
-Changed tests:
+In `packages/nged_data/tests/test_read_nged_json.py`:
 
-- **`packages/nged_data/tests/test_storage.py`** — add an assertion to the existing `select_new_rows`
-  coverage that a pre-changepoint row already on disk is *not* re-selected as new. Fails on a
-  version of this change that mistakenly routed `select_new_rows` through `scan_delta`, which is the
-  single most likely way to get this change wrong.
-- **`tests/test_assets.py`** — the ingest asset tests assert stored `time` values. They must keep
-  asserting the raw values, and gaining a comment saying so; no assertion changes.
+4. **A parsed pre-changepoint reading is stored 30 minutes earlier than its `endTime`.** The
+   existing fixture at lines 121-123 uses `2026-01-01` stamps, which sit before the changepoint, so
+   its expected `time` values move by −30 minutes. Extend the fixture with a post-changepoint
+   reading whose expected `time` does not move, so one test pins both branches at the boundary the
+   ingest actually crosses. Fails on `main`, which stores `endTime` unchanged.
+5. **The correction runs before `drop_implausible_rows`, not after.** A reading whose `endTime` sits
+   just inside the plausible range but whose corrected stamp falls outside it must be dropped, not
+   stored. Fails on an implementation that corrects after dropping. This is the only ordering bug
+   the change can have, and nothing else would catch it.
+
+In `tests/test_assets.py`: the ingest-asset fixture at line 323 uses `2026-03-05 12:30:00+0000`,
+which is pre-changepoint, so its expected stored `time` moves by −30 minutes. No new assertion; the
+existing one is updated and gains a comment naming why.
 
 ## Docs to update
 
 - **`packages/contracts/README.md`** — if it describes `PowerTimeSeries.time`, restate it to match
-  the new field description. Check before editing.
+  the extended field description. Check before editing.
 - **`docs/roadmap/data-cleaning.md`** — add a section for the stamp correction alongside the
-  commissioning ramp and the export cap, written in the present tense: what the fault is, where the
-  correction lives now, and that the stored table holds NGED's own stamps. This page is the catalogue
-  of trial-area data faults and is currently silent on the one fault we have actually fixed.
-- **`docs/architecture/`** — whichever page describes how the power table is read. A grep for
-  `power_time_series` across `docs/` returns 17 files; the implementer reads them and edits only
-  those left inconsistent, rather than working from this list.
-- **`docs/ml_experimentation/dagster-workflow.md`** — if it tells an experimenter how to load power
-  for a notebook, point it at `PowerTimeSeries.scan_delta()`.
-- **No roadmap status banner moves.** This issue completes no roadmap item: `docs/roadmap/data-cleaning.md`
-  stays 🚧 Planned, because the commissioning ramp and the shape-change detection are still open.
+  commissioning ramp and the export cap, in the present tense: what the fault was, that the ingest
+  now corrects it, and that a corrected series carries no reading at 08:00 on 26 March 2026 (see
+  risk 4). This page catalogues the trial-area data faults and is currently silent on the one fault
+  we have fixed.
+- **`src/nged_substation_forecast/defs/assets.py`** — `power_time_series_and_metadata`'s docstring
+  says "Nothing cleans this data further". That stays true, but the docstring should now say the
+  ingest corrects the stamp offset, because a Dagster asset docstring is operator documentation and
+  an operator rebuilding this table needs to know the stored stamps are not NGED's own.
+- **`docs/architecture/` and `docs/ml_experimentation/dagster-workflow.md`** — a grep for
+  `power_time_series` across `docs/` returns 17 files. The implementer reads them and edits only
+  those left inconsistent, rather than working from a guessed list here.
+- **No roadmap status banner moves.** This issue completes no roadmap item:
+  `docs/roadmap/data-cleaning.md` stays 🚧 Planned, because the commissioning ramp and the
+  shape-change detection are still open.
 
 ## Verification commands
 
-The green-before-push set from `implement-issue`, plus:
+The green-before-push set from `implement-issue`:
 
 ```bash
 uv run ruff check . && uv run ruff format --check .
@@ -213,11 +205,11 @@ uv run ty check
 uv run pytest
 uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
 uv run mkdocs build --strict          # docs/ pages and a new cross-link are edited
-uv run python scripts/lint/check_marimo_notebooks.py   # two dashboard notebooks are edited
 ```
 
 No network-gated tests are needed: nothing here touches NWP conversion conventions or an external
-feed.
+feed. No marimo notebook is edited, so `check_marimo_notebooks.py` has nothing new to see (the
+pre-commit hook runs it anyway).
 
 ## Risks and open questions
 
@@ -225,44 +217,77 @@ feed.
 solar geometry, so it cannot speak for a substation load series. Two of the three signals — the
 rows-per-day drop from 48 to 26 and the disappearance of exact-zero rows — are properties of what
 NGED publishes rather than of PV physics, and both are consistent with a fleet-wide change, but
-neither establishes the *direction* or *magnitude* of the offset on a non-PV series.
-*Recommendation:* ship the correction fleet-wide, because a single feed correcting at a single
-instant is by far the likeliest reading and the constant is one line to scope down. Ask NGED in
-parallel. If the answer comes back "per feed", the fix is to make
-`POWER_STAMPS_CORRECTED_AT` a per-`time_series_id` lookup, which the one-door design makes a local
-change. **This is the reviewer's call to confirm.**
+neither establishes the direction or magnitude of the offset on a non-PV series. *Recommendation:*
+correct fleet-wide, because a single feed correcting at a single instant is by far the likeliest
+reading, and ask NGED in parallel. If the answer is "per feed", `POWER_STAMPS_CORRECTED_AT` becomes
+a per-`time_series_id` lookup and the table is rebuilt again. **This is the reviewer's call to
+confirm.**
 
-**2. Should NGED be asked to republish a corrected history first?** The issue raises it and it is a
-human action, not a code change. *Recommendation:* ask, but do not block on the answer. Correct-on-read
-is the design that costs nothing if a corrected history later arrives — the constant moves to the
-epoch, or the method is deleted, and no stored bytes have to be rewritten. That asymmetry is itself
-an argument for this design over the backfill.
+**2. If NGED republishes a corrected history, this correction must be deleted before the next
+re-materialise, or the stamps are corrected twice.** Nothing in the code can detect that, because a
+corrected pre-changepoint file is indistinguishable from an uncorrected one. *Recommendation:* say
+so in `correct_late_stamps`' docstring, where whoever runs the rebuild will meet it, and ask NGED
+whether a republish is coming before the rebuild is scheduled.
 
-**3. Should a guard stop a future read site scanning the power table raw by accident?** Nothing
-enforces the door, and a new `pl.scan_delta(settings.power_time_series_data_path)` added in six
-months would be silently wrong. The repo already runs plain-regex pre-commit hooks of exactly this
-shape (`no-sphinx-roles` in `.pre-commit-config.yaml`) and a `scripts/lint/` directory of small
-Python linters. *Recommendation:* add a `pygrep` hook forbidding `power_time_series_data_path`
-outside an allow-list of `contracts/settings.py`, `contracts/power_schemas.py`, `defs/assets.py`,
-`nged_data/storage.py` and the tests. It is about six lines of YAML. **The reviewer should say
-whether this earns its place or is process for its own sake.**
+**3. The change does nothing until the table is dropped and re-materialised.** That is an
+operational step, not a code step, and it has to happen on the workstation and on AWS. *There is no
+question here for the reviewer* — it is recorded so the PR body carries it and so it is not
+mistaken for a defect when the merged code changes no stored row.
 
-**4. Re-scoring changes every stored leaderboard number.** `cv_forecast_metrics` joins actuals to
-forecasts on `valid_time`, so correcting the actuals changes the score of forecasts already on disk
-— including forecasts from models trained on late stamps, which will look worse rather than better.
-That is the honest number, but it means leaderboard rows computed before and after this merge are
-not comparable. *Recommendation:* state it in the PR body, re-materialise `cv_forecast_metrics`
-after merge, and treat the pre-merge rows as superseded rather than as a regression to investigate.
+**4. A corrected series has no reading at 08:00 on 26 March 2026.** The last late reading is stamped
+08:00 and moves to 07:30; the first correct reading is stamped 08:30. The half-hour ending 08:00 was
+therefore never published, and the corrected series carries a one-slot gap there. This is a fact
+about the feed rather than a bug in the correction, and it is the honest representation: a gap says
+"no measurement" where interpolating would invent one. *Recommendation:* document it in
+`docs/roadmap/data-cleaning.md` and leave the gap. **Worth the reviewer confirming that nothing
+downstream assumes a gapless half-hourly grid** — the rolling and lag features are the place to
+check.
 
-**5. Retraining before v0.2.1 goes to AWS (#646).** Every promoted model has learnt the late stamps.
-Retraining is a run of the existing CV assets, not a code change, so it belongs after this merge
+**5. Re-scoring changes every stored leaderboard number.** `cv_forecast_metrics` joins actuals to
+forecasts on `valid_time`, so once the table is rebuilt, forecasts already on disk score against
+different actuals — and forecasts from models trained on late stamps will look worse, not better.
+That is the honest number, but leaderboard rows computed before and after the rebuild are not
+comparable. *Recommendation:* state it in the PR body, re-materialise `cv_forecast_metrics` after
+the rebuild, and treat the pre-rebuild rows as superseded rather than as a regression to
+investigate.
+
+**6. Retraining before v0.2.1 goes to AWS (#646).** Every promoted model has learnt the late stamps.
+Retraining is a run of the existing CV assets, not a code change, so it belongs after the rebuild
 rather than in this PR. *Recommendation:* the PR body links #646 and says the retrain must land
-between the two. Worth a follow-up issue rather than a note that only lives in a PR body — **the
-reviewer's call.**
+between the two. Worth its own follow-up issue rather than a note that lives only in a PR body —
+**the reviewer's call.**
 
-**6. Editing a Patito contract.** CLAUDE.md says to ask before changing one. What this plan changes
-is the `time` field's `description` and the class's method set; no field is widened to `| None` and
-no range is relaxed, so the rule's stated failure mode — hiding a defect to make a failing
-`validate()` pass — is not in play. The description is currently false about 95% of the stored rows,
-so the edit makes the contract more accurate rather than less. **Flagged for the reviewer's
-explicit approval anyway.**
+**7. Editing a Patito contract.** CLAUDE.md says to ask before changing one. This plan extends the
+`time` field's `description` and adds a classmethod; no field is widened to `| None` and no range is
+relaxed, so the rule's stated failure mode — hiding a defect to make a failing `validate()` pass —
+is not in play. **Flagged for the reviewer's explicit approval anyway.**
+
+## What the simplicity review changed, and what was rejected
+
+The first adversarial review argued for exactly the design above — correct at ingest, build no read
+door — and its case was adopted in full. Its verified findings:
+
+- **The plan's `Nwp.scan_delta()` precedent was false.** `Nwp.scan_delta` is not the only door to the
+  `nwp` table: `view_forecasts.py:164`, `:409` and `:432` all read it with a bare `pl.scan_delta`.
+  The analogy the first plan leaned on does not hold, and `PowerTimeSeries.drop_implausible_rows`
+  — an ingest-boundary repair of this feed, on this model — is the much closer precedent.
+- **`drop_implausible_rows` also refutes "the stored table holds what NGED sent".** The ingest
+  already renames `endTime`, recasts the timezone, drops malformed rows and drops columns. NGED's own
+  bucket is the provenance record, not our Delta table.
+- **A `when/then` over `time` inside a read-time scan would have blocked predicate pushdown** into
+  the parquet row-group statistics, making the live path's few-day window scan each series' full
+  history over S3 (principle 11). The ingest design never meets this.
+- **Factual corrections adopted:** `_engineering_inputs.py` exports `load_engineering_inputs`, not
+  `_scan_inputs`; the test file is `test_power_time_series.py`, not `test_power_schemas.py`; the
+  last late reading moves to 07:30, not 08:00, leaving the gap in risk 4 that the first plan missed.
+- **Cut on the reviewer's argument:** the pre-commit guard hook (nothing left to guard), the
+  `correct_late_stamps`/`scan_delta` split (no in-repo caller for the second method), the
+  `scan_delta`-resolves-defaults test (tests pydantic-settings plumbing already covered by
+  `test_settings.py:40` and `:97`), and the four read-site edits that changed no number.
+
+Nothing was rejected. Two findings became moot rather than wrong: the reviewer's proposed migration
+script modelled on `scripts/forecasting/rewrite_nwp_row_groups.py` is unnecessary under the
+drop-and-re-materialise decision, and its note that swapping `pl.scan_delta(` for a helper call in
+`view_forecasts.py` would silently empty the `DELTA_READ_CALLS` guard
+(`packages/dashboard/tests/test_view_forecasts.py:22`) no longer applies, since no notebook is
+edited. Both are recorded because each would bite a future change that revisits this decision.
