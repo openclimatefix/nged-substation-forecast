@@ -42,7 +42,13 @@ import polars as pl
 import pvlib  # ty: ignore[unresolved-import]
 import xarray as xr
 from era5_grid import LAST_DATE
-from sources import PER_SITE_SOURCES, SOURCE_CHOICES, SourceType, UkvTemporalType
+from sources import (
+    PER_SITE_SOURCES,
+    SOURCE_CHOICES,
+    SourceType,
+    UkvTemporalType,
+    point_output_path_for,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("build_dataset")
@@ -54,7 +60,12 @@ METADATA_PATH: Final[Path] = REPO_DATA_DIR / "NGED" / "metadata.parquet"
 CAPACITY_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "effective_capacity")
 OPEN_METEO_PATH: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_open_meteo.parquet"
 CAMS_PATH: Final[Path] = REPO_DATA_DIR / "CAMS" / "beam_diffuse_cams.parquet"
-UKV_PATH: Final[Path] = REPO_DATA_DIR / "UKV" / "beam_diffuse_ukv.parquet"
+UKV_PATH: Final[Path] = point_output_path_for(source="ukv")
+"""Where `fetch_open_meteo_point.py` writes the UKV download.
+
+Both ends call `sources.point_output_path_for` rather than spelling the path twice, so the
+fetcher and this reader cannot disagree about it.
+"""
 
 AlignmentType = Literal["as-labelled", "shifted", "piecewise"]
 """How the power stamps are read against ERA5.
@@ -816,6 +827,8 @@ def main() -> int:
     dataset = _add_synthetic_control_target(frame=_add_separation_models(frame=daylight)).drop(
         "cell_latitude", "cell_longitude", "latitude", "longitude"
     )
+    # The filter runs after the synthetic control target, so a shorter span keeps the same seeded
+    # noise on the rows it shares with the full build rather than redrawing it.
     if arguments.first_date is not None:
         before = dataset.height
         dataset = dataset.filter(

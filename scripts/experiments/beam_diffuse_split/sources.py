@@ -7,13 +7,15 @@ One-off throwaway module for the experiment in
 **It imports nothing outside the standard library, which is what lets every script in this
 directory import it.** `elevation_breakdown.py` and `report_results.py` document a run command
 supplying only `polars`, and `build_dataset.py` pulls in `pvlib`, `xarray` and a Delta store, so a
-registry living there would break the two lean scripts. `era5_grid.py` already sets the precedent of
-a constants-only leaf module behind `from typing import Final` alone.
+registry living there would break the two lean scripts.
 
-The payoff is that adding a second Open-Meteo model is one `OPEN_METEO_MODELS` entry rather than an
-edit repeated across the 14 `argparse` sites that name the source list.
+`SOURCE_CHOICES` is the single copy of the source list, imported by the 14 `argparse` sites that
+offer `--source`. A second Open-Meteo model still needs its own entries in `SourceType`,
+`PER_SITE_SOURCES` and `build_dataset`, and its own labels in the two figure scripts; what the
+registry saves is the download itself, which needs no new code at all.
 """
 
+from pathlib import Path
 from typing import Final, Literal, NamedTuple
 
 SourceType = Literal["cds", "open-meteo", "cams", "ukv"]
@@ -113,6 +115,29 @@ Adding a model means adding an entry and measuring what goes in it. `native_radi
 particular is a claim about the upstream model, and `unmeasured` is the honest value until somebody
 has read the upstream documentation or the downloader that converts it.
 """
+
+REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
+"""Where every download and every built frame lands.
+
+Spelled here as well as in `build_dataset` so that `point_output_path_for` can be the one place a
+per-site download's path is written, rather than the fetcher and the reader each spelling it.
+"""
+
+
+def point_output_path_for(*, source: SourceType) -> Path:
+    """Return where one per-site download is written.
+
+    The fetcher writes this path and `build_dataset` reads it, so both call this rather than
+    spelling the path twice and finding out they disagree only when a build comes up empty.
+
+    Args:
+        source: Which source's download to locate.
+
+    Returns:
+        The parquet path holding that source's per-site fluxes.
+    """
+    return REPO_DATA_DIR / source.upper() / f"beam_diffuse_{source}.parquet"
+
 
 HISTORICAL_FORECAST_URL: Final[str] = "https://historical-forecast-api.open-meteo.com/v1/forecast"
 """Where a forecast model's archive is served from.

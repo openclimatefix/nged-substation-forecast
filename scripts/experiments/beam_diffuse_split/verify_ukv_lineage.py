@@ -4,10 +4,9 @@ One-off throwaway script for the experiment in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/800>.
 
 **This is a gate rather than a diagnostic: no model is trained on UKV until it has run and been
-read.** OCF has been bitten by a mirror that was not the product it named — CEDA's UKV is
-statistically different from the live UKV, and training on one while inferring on the other caused
-real problems — so one matching timestamp is not evidence across four and a half years and a science
-upgrade.
+read.** CEDA's UKV is statistically different from the live UKV, so a mirror can carry a model's
+name without being that model, and one matching timestamp is not evidence across four and a half
+years and a science upgrade.
 
 It answers two questions, and only the second is about trust:
 
@@ -28,8 +27,7 @@ needs no reference product.
 
 The comparison is against the `_instant` columns, never the default hourly ones. The native file
 holds an instantaneous snapshot; Open-Meteo's default is a backward-looking hourly mean derived from
-it. Comparing the mean against the snapshot would make a faithful mirror look broken, which is the
-single easiest way to get this script wrong.
+it. Comparing the mean against the snapshot would make a faithful mirror look broken.
 
 Coordinates are read at run time from the private roster and never written: the table names
 anonymised site labels and differences in W m⁻².
@@ -41,7 +39,6 @@ scripts/experiments/beam_diffuse_split/verify_ukv_lineage.py`.
 
 import argparse
 import datetime as dt
-import json
 import logging
 import os
 import sys
@@ -55,11 +52,17 @@ import numpy as np
 import polars as pl
 
 # None of these is a workspace dependency; this throwaway script is run with `uv run --with ...`.
-import pvlib  # ty: ignore[unresolved-import]
 import xarray as xr
-from build_dataset import SOLAR_CONSTANT_W_M2, _pv_sites
+from build_dataset import _pv_sites
+from fetch_open_meteo_point import (
+    HOURLY_VARIABLES,
+    INSTANT_SUFFIX,
+    _renamed,
+    _solar_geometry,
+    fetch_point_frame,
+)
 from pyproj import CRS, Transformer
-from sources import HISTORICAL_FORECAST_URL, OPEN_METEO_MODELS
+from sources import OPEN_METEO_MODELS
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("verify_ukv_lineage")
@@ -80,17 +83,17 @@ NATIVE_FILE_NAMES: Final[dict[str, str]] = {
 }
 """The bucket stores one variable per file, so each instant and lead needs one read per flux."""
 
-OPEN_METEO_INSTANT_COLUMNS: Final[dict[str, str]] = {
-    "ghi": "shortwave_radiation_instant",
-    "bhi": "direct_radiation_instant",
+SERVED_INSTANT_COLUMNS: Final[dict[str, str]] = {
+    "ghi": "ghi_instant_w_m2",
+    "bhi": "bhi_instant_w_m2",
 }
-"""Which served column each native file is compared against."""
+"""Which served column each native file is compared against, after `_renamed`."""
 
 PS47_OPERATIONAL: Final[dt.date] = dt.date(2026, 1, 21)
 """When the Met Office's PS47 science package went operational.
 
-The issue records that the archive's encoding changed here, so Open-Meteo's ingest could have
-changed too, and an unstratified sample would average across the boundary rather than test it.
+The archive's encoding changed at this date, so Open-Meteo's ingest could have changed too, and an
+unstratified sample would average across the boundary rather than test it.
 """
 
 EXPECTED_LEAD_HOURS: Final[int] = 0
@@ -104,8 +107,7 @@ valid time. The last writer for a valid time is therefore the run initialised at
 SWEPT_LEAD_HOURS: Final[tuple[int, ...]] = (0, 1, 3, 6)
 """Which leads are pulled for each sampled instant.
 
-Wide enough that the matching lead wins by a margin rather than by a rounding, which is what makes
-the answer readable rather than a ranking of near-ties.
+Wide enough that the matching lead wins by a margin rather than by a rounding.
 """
 
 MAX_MEDIAN_DIFFERENCE_W_M2: Final[float] = 2.0
@@ -128,8 +130,8 @@ the spatial and the temporal gradient, which is what makes it the condition to f
 on; broken cloud is then the condition that discriminates between leads.
 """
 
-MIN_SOLAR_ELEVATION_DEGREES: Final[float] = 20.0
-"""Instants at a lower sun than this are not sampled.
+MAX_SOLAR_ZENITH_DEGREES: Final[float] = 70.0
+"""Instants at a lower sun than 20 degrees of elevation are not sampled.
 
 The served `_instant` column is reconstructed by multiplying the stored hourly mean by the ratio of
 the instantaneous to the hour-mean cosine of the solar zenith angle, and that ratio grows without
@@ -196,8 +198,13 @@ def _read_native_at_sites(
     url = _native_url(valid_time=valid_time, lead_hours=lead_hours, flux=flux)
     try:
         payload = urllib.request.urlopen(url, timeout=300).read()
-    except urllib.error.HTTPError:
-        return None
+    except urllib.error.HTTPError as refusal:
+        # Only "there is no such object" is an ordinary answer. A 5xx means the bucket is
+        # struggling, and reading it as an absent file would drop that lead from the comparison
+        # without saying so. S3 answers a missing key with 403 when anonymous listing is denied.
+        if refusal.code in (403, 404):
+            return None
+        raise
 
     handle, path = tempfile.mkstemp(suffix=".nc")
     try:
@@ -221,16 +228,18 @@ def _sample_grid(*, dataset: xr.Dataset, sites: pl.DataFrame) -> dict[str, float
     """
     projection = CRS.from_cf(dict(dataset["lambert_azimuthal_equal_area"].attrs))
     transformer = Transformer.from_crs("EPSG:4326", projection, always_xy=True)
-    eastings = dataset["projection_x_coordinate"].values
-    northings = dataset["projection_y_coordinate"].values
-    field = dataset[_flux_variable_name(dataset=dataset)].values
+    field = dataset[_flux_variable_name(dataset=dataset)]
 
     sampled: dict[str, float] = {}
     for row in sites.to_dicts():
         easting, northing = transformer.transform(row["longitude"], row["latitude"])
-        column = int(np.abs(eastings - easting).argmin())
-        line = int(np.abs(northings - northing).argmin())
-        sampled[str(row["site"])] = float(field[line, column])
+        sampled[str(row["site"])] = float(
+            field.sel(
+                projection_x_coordinate=easting,
+                projection_y_coordinate=northing,
+                method="nearest",
+            ).item()
+        )
     return sampled
 
 
@@ -257,91 +266,6 @@ def _flux_variable_name(*, dataset: xr.Dataset) -> str:
     return str(candidates[0])
 
 
-def _open_meteo_window(*, sites: pl.DataFrame, first: dt.date, last: dt.date) -> pl.DataFrame:
-    """Download the served columns over one date window at every site.
-
-    Args:
-        sites: The roster, carrying `site`, `latitude` and `longitude`.
-        first: First date to request.
-        last: Last date to request.
-
-    Returns:
-        One row per (site, time) with the default and `_instant` fluxes.
-
-    Raises:
-        RuntimeError: If the response does not carry one block per site.
-    """
-    columns = ("shortwave_radiation", *OPEN_METEO_INSTANT_COLUMNS.values())
-    url = (
-        f"{HISTORICAL_FORECAST_URL}"
-        f"?latitude={','.join(str(value) for value in sites['latitude'])}"
-        f"&longitude={','.join(str(value) for value in sites['longitude'])}"
-        f"&start_date={first:%Y-%m-%d}&end_date={last:%Y-%m-%d}"
-        f"&hourly={','.join(columns)}"
-        f"&models={OPEN_METEO_MODELS['ukv'].models_parameter}"
-        "&timezone=UTC&cell_selection=nearest"
-    )
-    payload = json.loads(urllib.request.urlopen(url, timeout=300).read())
-    blocks = payload if isinstance(payload, list) else [payload]
-    if len(blocks) != sites.height:
-        msg = f"asked for {sites.height} sites and got {len(blocks)} blocks"
-        raise RuntimeError(msg)
-    return pl.concat(
-        pl.DataFrame(
-            {"site": site, "time": block["hourly"]["time"]}
-            | {name: block["hourly"][name] for name in columns},
-            schema_overrides=dict.fromkeys(columns, pl.Float64),
-        )
-        for site, block in zip(sites["site"], blocks, strict=True)
-    ).with_columns(pl.col("time").str.to_datetime("%Y-%m-%dT%H:%M").dt.replace_time_zone("UTC"))
-
-
-def _classify_sky(*, served: pl.DataFrame, sites: pl.DataFrame) -> pl.DataFrame:
-    """Add the clearness index and solar elevation the stratification bins on.
-
-    Args:
-        served: One window of served rows.
-        sites: The roster, carrying `site`, `latitude` and `longitude`.
-
-    Returns:
-        `served` with `clearness_index` and `solar_elevation_deg` added.
-    """
-    coordinates = {
-        str(row["site"]): (float(row["latitude"]), float(row["longitude"]))
-        for row in sites.to_dicts()
-    }
-    frames: list[pl.DataFrame] = []
-    for (site,), rows in served.sort("site", "time").group_by(["site"], maintain_order=True):
-        latitude, longitude = coordinates[str(site)]
-        midpoints = rows["time"].dt.offset_by("-30m")
-        zenith = (
-            pvlib.solarposition.get_solarposition(
-                time=midpoints.to_numpy(), latitude=latitude, longitude=longitude
-            )["apparent_zenith"]
-            .to_numpy()
-            .astype(np.float64)
-        )
-        extraterrestrial = np.asarray(
-            pvlib.irradiance.get_extra_radiation(
-                datetime_or_doy=midpoints.dt.ordinal_day().to_numpy(),
-                solar_constant=SOLAR_CONSTANT_W_M2,
-            )
-        ) * np.clip(np.cos(np.radians(zenith)), 0.0, None)
-        frames.append(
-            rows.with_columns(
-                solar_elevation_deg=pl.Series(90.0 - zenith),
-                clearness_index=pl.Series(
-                    np.where(
-                        extraterrestrial > 50.0,
-                        rows["shortwave_radiation"].to_numpy() / np.maximum(extraterrestrial, 1e-9),
-                        np.nan,
-                    )
-                ),
-            )
-        )
-    return pl.concat(frames)
-
-
 def _sample_instants(
     *, served: pl.DataFrame, era: str, per_stratum: int, seed: int
 ) -> list[SampledInstant]:
@@ -360,8 +284,7 @@ def _sample_instants(
         The chosen instants, which may be fewer than asked for if the window is short of either sky.
     """
     by_instant = (
-        served.filter(pl.col("solar_elevation_deg") > MIN_SOLAR_ELEVATION_DEGREES)
-        .drop_nulls("clearness_index")
+        served.filter(pl.col("solar_zenith_deg") < MAX_SOLAR_ZENITH_DEGREES)
         .group_by("time")
         .agg(
             lowest=pl.col("clearness_index").min(),
@@ -382,7 +305,7 @@ def _sample_instants(
         if candidates.height == 0:
             _LOG.warning("no %s instant in the %s window", sky, era)
             continue
-        picked = candidates.sample(n=min(per_stratum, candidates.height), seed=seed, shuffle=True)
+        picked = candidates.sample(n=min(per_stratum, candidates.height), seed=seed)
         chosen += [
             SampledInstant(valid_time=row["time"], era=era, sky=sky)
             for row in picked.sort("time").to_dicts()
@@ -406,7 +329,7 @@ def _compare_one(
     at_instant = served.filter(pl.col("time") == instant.valid_time)
     records: list[dict[str, object]] = []
     for lead_hours in SWEPT_LEAD_HOURS:
-        for flux, served_column in OPEN_METEO_INSTANT_COLUMNS.items():
+        for flux, served_column in SERVED_INSTANT_COLUMNS.items():
             native = _read_native_at_sites(
                 valid_time=instant.valid_time, lead_hours=lead_hours, flux=flux, sites=sites
             )
@@ -434,7 +357,7 @@ def _compare_one(
 
 
 def _report(*, results: pl.DataFrame) -> None:
-    """Log the per-lead table the pull-request body carries."""
+    """Log the per-lead agreement table."""
     summary = (
         results.group_by("era", "sky", "lead_hours")
         .agg(
@@ -529,8 +452,18 @@ def main() -> int:
     served_by_era: dict[str, pl.DataFrame] = {}
     for era in ("pre-PS47", "post-PS47"):
         first, last = _window_for(era=era, days=arguments.window_days)
-        served = _classify_sky(
-            served=_open_meteo_window(sites=sites, first=first, last=last), sites=sites
+        served = _solar_geometry(
+            frame=_renamed(
+                frame=fetch_point_frame(
+                    sites=sites,
+                    variables=HOURLY_VARIABLES
+                    + tuple(f"{name}{INSTANT_SUFFIX}" for name in HOURLY_VARIABLES),
+                    models_parameter=OPEN_METEO_MODELS["ukv"].models_parameter,
+                    first_date=f"{first:%Y-%m-%d}",
+                    last_date=f"{last:%Y-%m-%d}",
+                )
+            ),
+            sites=sites,
         )
         served_by_era[era] = served
         instants += _sample_instants(
@@ -558,12 +491,6 @@ def main() -> int:
     results = pl.DataFrame(records)
     _report(results=results)
     _assert_lead_is_as_expected(results=results)
-    _LOG.info(
-        "the archive holds the T+%d analysis, so the UKV arm is UKV's analysis rather than a "
-        "forecast, and its cloud field is partly downstream of the geostationary satellite CAMS "
-        "retrieves from",
-        EXPECTED_LEAD_HOURS,
-    )
     return 0
 
 

@@ -15,7 +15,7 @@ are read at run time from the private roster and sent in the query string. **No 
 identifier reaches the written frame**: rows are keyed by the anonymised site label
 `build_dataset._pv_sites` assigns.
 
-Three checks run over the downloaded frame before it is written, and each raises with its measured
+Two checks run over the downloaded frame before it is written, and each raises with its measured
 number rather than printing for a human to read. What they establish, and what they deliberately do
 not, is on each `_check_*` function.
 
@@ -32,7 +32,6 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from pathlib import Path
 from typing import Any, Final
 
 import numpy as np
@@ -40,9 +39,14 @@ import polars as pl
 
 # pvlib is not a workspace dependency; this throwaway script is run with `uv run --with pvlib`.
 import pvlib  # ty: ignore[unresolved-import]
-from build_dataset import REPO_DATA_DIR, SOLAR_CONSTANT_W_M2, _pv_sites
+from build_dataset import SOLAR_CONSTANT_W_M2, _pv_sites
 from era5_grid import LAST_DATE, LAST_YEAR
-from sources import HISTORICAL_FORECAST_URL, OPEN_METEO_MODELS, OpenMeteoModel
+from sources import (
+    HISTORICAL_FORECAST_URL,
+    OPEN_METEO_MODELS,
+    OpenMeteoModel,
+    point_output_path_for,
+)
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_open_meteo_point")
@@ -50,32 +54,16 @@ _LOG: Final[logging.Logger] = logging.getLogger("fetch_open_meteo_point")
 REQUEST_TIMEOUT_SECONDS: Final[float] = 600.0
 MAX_ATTEMPTS: Final[int] = 5
 
-HOURLY_VARIABLES: Final[tuple[str, ...]] = (
-    "shortwave_radiation",
-    "direct_radiation",
-    "diffuse_radiation",
-)
-"""The three horizontal fluxes, in Open-Meteo's normalised names.
+HOURLY_VARIABLES: Final[tuple[str, ...]] = ("shortwave_radiation", "direct_radiation")
+"""The two horizontal fluxes the arms consume, in Open-Meteo's normalised names.
 
-Every model serves all three under these names, whatever its own output holds. `diffuse_radiation`
-is not necessarily the model's own diffuse field — see `_check_diffuse_is_a_subtraction`.
+The served `diffuse_radiation` is not requested. `build_dataset._add_separation_models` derives the
+diffuse flux as global minus direct for every source, so a served diffuse column would reach no arm
+whatever it held.
 """
 
 INSTANT_SUFFIX: Final[str] = "_instant"
 """What Open-Meteo appends to ask for the snapshot behind a backward-looking hourly mean."""
-
-
-def output_path_for(*, model: OpenMeteoModel) -> Path:
-    """Return where one model's downloaded frame is written.
-
-    Args:
-        model: The registry entry being fetched.
-
-    Returns:
-        The parquet path `build_dataset` reads for that source.
-    """
-    directory = REPO_DATA_DIR / model.source.upper()
-    return directory / f"beam_diffuse_{model.source}.parquet"
 
 
 def _requested_variables(*, model: OpenMeteoModel) -> tuple[str, ...]:
@@ -83,7 +71,9 @@ def _requested_variables(*, model: OpenMeteoModel) -> tuple[str, ...]:
 
     The `_instant` snapshots are worth their share of the call weight only where the model's own
     output is instantaneous, because that is the case where Open-Meteo's hourly value is a
-    reconstruction rather than a de-accumulation, and the two columns then differ.
+    reconstruction rather than a de-accumulation, and the two columns then differ. An `accumulated`
+    model returns without them, and `main` then skips the reconstruction check, which would have
+    nothing to reconstruct against.
 
     Args:
         model: The registry entry being fetched.
@@ -110,11 +100,10 @@ def _last_date_of(*, year: int) -> str:
 def _get_json(*, url: str) -> Any:
     """Fetch one URL, retrying a transport failure but never an API refusal.
 
-    **A rate-limit refusal must not be retried, and telling the two apart is the whole point of this
-    function.** Open-Meteo answers an exceeded call budget with a JSON body carrying `error: true`
-    and a `reason`, at an HTTP status a bare `except` reads as one more transient failure — so a
-    retry loop copied from `fetch_era5_open_meteo.py` would sleep five times and then report a
-    network problem that never happened.
+    **A rate-limit refusal must not be retried.** Open-Meteo answers an exceeded call budget with a
+    JSON body carrying `error: true` and a `reason`, at an HTTP status a bare `except` reads as one
+    more transient failure — so a retry loop copied from `fetch_era5_open_meteo.py` would sleep
+    five times and then report a network problem that never happened.
 
     Args:
         url: The request to make.
@@ -130,9 +119,10 @@ def _get_json(*, url: str) -> Any:
             with urllib.request.urlopen(url, timeout=REQUEST_TIMEOUT_SECONDS) as response:
                 payload = json.loads(response.read())
         except urllib.error.HTTPError as refusal:
-            body = refusal.read()
-            reason = json.loads(body).get("reason", body[:200]) if body else refusal.reason
-            msg = f"Open-Meteo refused the request: {reason}"
+            # The body is read for its `reason` and never echoed whole: Open-Meteo's parameter
+            # errors quote the offending value back, and the values here are meter coordinates.
+            reason = json.loads(refusal.read() or b"{}").get("reason", "no reason given")
+            msg = f"Open-Meteo refused the request with HTTP {refusal.code}: {reason}"
             raise RuntimeError(msg) from refusal
         # urllib raises several unrelated types for a transient failure, and a retry is the right
         # response to all of them.
@@ -148,47 +138,59 @@ def _get_json(*, url: str) -> Any:
     raise RuntimeError(msg)
 
 
-def _fetch_year(*, model: OpenMeteoModel, sites: pl.DataFrame, year: int) -> pl.DataFrame:
-    """Fetch one year at every site's own coordinates.
+def fetch_point_frame(
+    *,
+    sites: pl.DataFrame,
+    variables: tuple[str, ...],
+    models_parameter: str,
+    first_date: str,
+    last_date: str,
+) -> pl.DataFrame:
+    """Fetch one date range at every site's own coordinates, in a single request.
 
-    Every site goes in one request, as `fetch_era5_open_meteo.py` does for the ERA5 grid cells,
-    which keeps the call count to one per year. Open-Meteo returns the blocks in the order the
-    coordinates were sent, so the anonymised labels are zipped back on by position rather than by
-    matching coordinates, and no coordinate is carried past this function.
+    Every site goes in one request, as `fetch_era5_open_meteo.py` does for the ERA5 grid cells.
+    Open-Meteo returns the blocks in the order the coordinates were sent, so the anonymised labels
+    are zipped back on by position rather than by matching coordinates, and no coordinate is
+    carried past this function.
 
     Args:
-        model: The registry entry being fetched.
         sites: The roster, carrying `site`, `latitude` and `longitude`.
-        year: The year to fetch.
+        variables: Open-Meteo's names for the hourly variables to request.
+        models_parameter: The value of the API's `models=` query parameter.
+        first_date: First date to request, as `YYYY-MM-DD`.
+        last_date: Last date to request, as `YYYY-MM-DD`.
 
     Returns:
-        One row per (site, time), with one column per requested variable.
+        One row per (site, time), with one column per requested variable and no null rows.
 
     Raises:
         RuntimeError: If the response does not carry one block per site.
     """
-    variables = _requested_variables(model=model)
     url = (
         f"{HISTORICAL_FORECAST_URL}"
         f"?latitude={','.join(str(value) for value in sites['latitude'])}"
         f"&longitude={','.join(str(value) for value in sites['longitude'])}"
-        f"&start_date={_first_date_of(model=model, year=year)}&end_date={_last_date_of(year=year)}"
+        f"&start_date={first_date}&end_date={last_date}"
         f"&hourly={','.join(variables)}"
-        f"&models={model.models_parameter}&timezone=UTC&cell_selection=nearest"
+        f"&models={models_parameter}&timezone=UTC&cell_selection=nearest"
     )
     payload = _get_json(url=url)
     blocks = payload if isinstance(payload, list) else [payload]
     if len(blocks) != sites.height:
-        msg = f"{year}: asked for {sites.height} sites and got {len(blocks)} blocks"
+        msg = f"asked for {sites.height} sites and got {len(blocks)} blocks"
         raise RuntimeError(msg)
 
-    return pl.concat(
-        pl.DataFrame(
-            {"site": site, "time": block["hourly"]["time"]}
-            | {name: block["hourly"][name] for name in variables},
-            schema_overrides=dict.fromkeys(variables, pl.Float64),
+    return (
+        pl.concat(
+            pl.DataFrame(
+                {"site": site, "time": block["hourly"]["time"]}
+                | {name: block["hourly"][name] for name in variables},
+                schema_overrides=dict.fromkeys(variables, pl.Float64),
+            )
+            for site, block in zip(sites["site"], blocks, strict=True)
         )
-        for site, block in zip(sites["site"], blocks, strict=True)
+        .drop_nulls()
+        .with_columns(pl.col("time").str.to_datetime("%Y-%m-%dT%H:%M").dt.replace_time_zone("UTC"))
     )
 
 
@@ -197,10 +199,8 @@ def _renamed(*, frame: pl.DataFrame) -> pl.DataFrame:
     mapping = {
         "shortwave_radiation": "ghi_w_m2",
         "direct_radiation": "bhi_w_m2",
-        "diffuse_radiation": "dhi_published_w_m2",
         "shortwave_radiation_instant": "ghi_instant_w_m2",
         "direct_radiation_instant": "bhi_instant_w_m2",
-        "diffuse_radiation_instant": "dhi_published_instant_w_m2",
     }
     return frame.rename({old: new for old, new in mapping.items() if old in frame.columns})
 
@@ -216,8 +216,8 @@ def _solar_geometry(*, frame: pl.DataFrame, sites: pl.DataFrame) -> pl.DataFrame
         sites: The roster, carrying `site`, `latitude` and `longitude`.
 
     Returns:
-        `frame` with `solar_zenith_deg`, `cos_zenith_instant`, `cos_zenith_hour_mean` and
-        `clearness_index` added.
+        `frame` with `solar_zenith_deg`, `cos_zenith_instant`, `cos_zenith_hour_mean`,
+        `clearness_index` and `extraterrestrial_horizontal_w_m2` added.
     """
     coordinates = {
         str(row["site"]): (float(row["latitude"]), float(row["longitude"]))
@@ -299,52 +299,15 @@ def _cos_zenith_hour_mean(*, stamps: pl.Series, latitude: float, longitude: floa
     return np.mean(samples, axis=0)
 
 
-MAX_SUBTRACTION_RESIDUAL_W_M2: Final[float] = 1.0
-"""How far `global - direct - diffuse` may stray before the diffuse field is not a subtraction.
+MIN_ELEVATION_FOR_RECONSTRUCTION_DEGREES: Final[float] = 10.0
+"""Rows at a lower sun than this are left out of the reconstruction test.
 
-One W m⁻² is the rounding of the served columns, so a residual inside it is consistent with the
-three fields being two fields and their difference.
+The reconstruction multiplies the default column by the ratio of the instantaneous to the hour-mean
+cosine of the solar zenith angle, and that ratio grows without bound as the sun sets — so near the
+horizon it amplifies the default column's 1 W m⁻² rounding into a residual of many W m⁻². That
+residual is a fact about rounding rather than about which hour the label names, and leaving it in
+would force a threshold loose enough to stop discriminating.
 """
-
-
-def _check_diffuse_is_a_subtraction(*, frame: pl.DataFrame) -> None:
-    """Assert the served diffuse field is global minus direct, and say why that is checked.
-
-    **This check exists to notice the day it stops being true, not to establish that it is.** For
-    UKV, Open-Meteo ingests only the global and direct fields and derives diffuse by subtracting
-    them, so the residual is identically zero and the check cannot fail today. The Met Office
-    publishes its own diffuse field alongside the other two, so an upstream decision to ingest it
-    would make the served diffuse an independent quantity — which changes what arm C knows, because
-    the arm would gain a third measurement rather than a rearrangement of two. Nothing else in the
-    experiment would notice that change, and the arm's result would move for a reason nobody
-    attributed.
-
-    The same reasoning is why the residual is not a test of the split's internal consistency: a
-    subtraction is consistent with itself whatever the fields hold.
-
-    Args:
-        frame: The downloaded rows.
-
-    Raises:
-        ValueError: If the residual clears the rounding of the served columns.
-    """
-    worst = frame.select(
-        (pl.col("ghi_w_m2") - pl.col("bhi_w_m2") - pl.col("dhi_published_w_m2")).abs().max()
-    ).item()
-    _LOG.info(
-        "diffuse-is-a-subtraction: worst |global - direct - diffuse| %.3f W m-2 on %d rows",
-        worst,
-        frame.height,
-    )
-    if worst > MAX_SUBTRACTION_RESIDUAL_W_M2:
-        msg = (
-            f"served diffuse is no longer global minus direct: worst residual {worst:.3f} W m-2 "
-            f"clears the {MAX_SUBTRACTION_RESIDUAL_W_M2} W m-2 rounding. The arm's diffuse column "
-            "has become an independent field, so re-read what arm C is being shown before "
-            "training on it."
-        )
-        raise ValueError(msg)
-
 
 MAX_INSTANT_RECONSTRUCTION_RMS_W_M2: Final[float] = 5.0
 """How far the reconstructed snapshot may sit from the served one.
@@ -361,9 +324,9 @@ the threshold rather than a marginal call.
 def _check_hourly_value_is_a_backward_mean(*, frame: pl.DataFrame) -> None:
     """Assert the hourly column is a backward mean over the hour ending at its label.
 
-    **This is the check that would have caught the half-hour stamp offset this project has already
-    paid a fortnight for**, and it is absolute rather than relative: it needs no reference product
-    and cannot be satisfied by two sources being wrong the same way.
+    **The check is absolute rather than relative:** it needs no reference product, and cannot be
+    satisfied by two sources being wrong the same way. A half-hour error in an hourly label is the
+    fault it exists to catch.
 
     Open-Meteo's own downloader states the mechanism. UKV publishes radiation as an instantaneous
     snapshot, and Open-Meteo divides that snapshot by the ratio of the instantaneous cosine of the
@@ -372,10 +335,8 @@ def _check_hourly_value_is_a_backward_mean(*, frame: pl.DataFrame) -> None:
     `_instant` column multiplies the same ratio back. Reconstructing one column from the other and
     the sun's geometry therefore pins both the conversion and which hour the label names.
 
-    The conclusion this settles is the one the temporal treatment rests on: the default column is
-    the same temporal object as ERA5's hourly integral, as the CAMS hourly integration, and as the
-    period-ending hourly mean of metered power the experiment predicts. The `_instant` column is a
-    snapshot at the hour's end, half an hour later than that window's centre.
+    What the check settles is which of the two served columns the arms should read, which
+    `sources.UkvTemporalType` records and explains.
 
     Args:
         frame: The downloaded rows, carrying the geometry `_solar_geometry` adds.
@@ -383,7 +344,10 @@ def _check_hourly_value_is_a_backward_mean(*, frame: pl.DataFrame) -> None:
     Raises:
         ValueError: If either flux fails to reconstruct.
     """
-    daylight = frame.filter(pl.col("ghi_w_m2") > 0.0)
+    daylight = frame.filter(
+        (pl.col("ghi_w_m2") > 0.0)
+        & (pl.col("solar_zenith_deg") < 90.0 - MIN_ELEVATION_FOR_RECONSTRUCTION_DEGREES)
+    )
     factor = daylight["cos_zenith_instant"].to_numpy() / np.maximum(
         daylight["cos_zenith_hour_mean"].to_numpy(), 1e-9
     )
@@ -488,7 +452,7 @@ def _check_direct_is_not_a_separation_model(*, frame: pl.DataFrame) -> None:
 
 
 def main() -> int:
-    """Download one model at every site, run the three checks, and write the frame."""
+    """Download one model at every site, run both checks, and write the frame."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--model", choices=tuple(OPEN_METEO_MODELS), required=True)
     arguments = parser.parse_args()
@@ -511,23 +475,28 @@ def main() -> int:
         LAST_YEAR - first_year + 1,
     )
 
+    variables = _requested_variables(model=model)
     frame = _renamed(
         frame=pl.concat(
-            _fetch_year(model=model, sites=sites, year=year)
+            fetch_point_frame(
+                sites=sites,
+                variables=variables,
+                models_parameter=model.models_parameter,
+                first_date=_first_date_of(model=model, year=year),
+                last_date=_last_date_of(year=year),
+            )
             for year in range(first_year, LAST_YEAR + 1)
         )
-        .with_columns(pl.col("time").str.to_datetime("%Y-%m-%dT%H:%M").dt.replace_time_zone("UTC"))
-        .drop_nulls()
         .unique(subset=["site", "time"], keep="first")
         .sort("site", "time")
     )
 
     with_geometry = _solar_geometry(frame=frame, sites=sites)
-    _check_diffuse_is_a_subtraction(frame=with_geometry)
-    _check_hourly_value_is_a_backward_mean(frame=with_geometry)
+    if model.native_radiation == "instantaneous":
+        _check_hourly_value_is_a_backward_mean(frame=with_geometry)
     _check_direct_is_not_a_separation_model(frame=with_geometry)
 
-    output_path = output_path_for(model=model)
+    output_path = point_output_path_for(source=model.source)
     output_path.parent.mkdir(parents=True, exist_ok=True)
     frame.write_parquet(output_path)
     _LOG.info(

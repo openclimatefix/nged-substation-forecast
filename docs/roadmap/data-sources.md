@@ -429,10 +429,10 @@ notes](https://www.metoffice.gov.uk/services/data/met-office-data-for-reuse/ps43
 stream was operational and being refined in December 2019, and the PS47 notes name only latent heat
 nudging and the adaptive vertical grid as assimilation methods removed. **No document from 2020
 onwards was found positively re-confirming the satellite cloud stream, and whether surface solar
-irradiance is assimilated anywhere in the Met Office's systems could not be established** — both are
-open rather than settled. What follows for any comparison against a satellite product is that a UKV
-analysis and that product are partly downstream of the same geostationary satellite, so the contrast
-weakens at short lead and recovers as the model's own physics overwrites the initial cloud field.
+irradiance is assimilated anywhere in the Met Office's systems could not be established.** A UKV
+analysis and a satellite product are therefore partly downstream of the same geostationary
+satellite, so a contrast between the two weakens at short lead and recovers as the model's own
+physics overwrites the initial cloud field.
 
 ### Open-Meteo's UKV archive is the T+0 analysis, and half of it is backfill
 
@@ -461,7 +461,7 @@ the earlier half cannot be checked against anything.
   matches the period-ending convention used everywhere else in this project. UKV publishes radiation
   as an instantaneous snapshot, and Open-Meteo divides that snapshot by the ratio of the
   instantaneous cosine of the solar zenith angle to its mean over the preceding hour. Asking for the
-  `_instant` suffix multiplies the ratio back to recover the snapshot, half an hour later than the
-  window's centre.
+  `_instant` suffix multiplies the ratio back to recover the snapshot, which lands half an hour
+  later than the hour's centre.
 - **That conversion is skipped where the ratio falls below 0.05**, near sunrise and sunset, so the
   round trip between the two columns does not hold at very low sun.

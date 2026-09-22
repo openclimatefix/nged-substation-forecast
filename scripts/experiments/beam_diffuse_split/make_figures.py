@@ -73,10 +73,11 @@ the figure shows what the pipeline can do rather than what a deliberately weaken
 """
 
 SETUP_COLOURS: Final[tuple[str, ...]] = (ocf.ORANGE_RED, ocf.PURPLE, ocf.BLUE, ocf.DARK_GREEN)
-"""One hue per setup, in `SETUPS` order.
+"""One hue per setup, in `SETUPS` order: orange-red for ERA5, purple for UKV, blue for CAMS.
 
-Checked for colour-vision deficiency rather than chosen by eye: the worst adjacent pair separates
-by 25 units of perceptual distance under deuteranopia, against a floor of 8.
+The three-colour set was checked for colour-vision deficiency rather than chosen by eye. Purple has
+not been through `dataviz`'s `validate_palette.js`, which lives in another repository, so the
+four-colour set's worst-pair separation under deuteranopia is unmeasured.
 """
 
 MAE_SETUPS: Final[tuple[tuple[str, str, str], ...]] = (
@@ -113,18 +114,18 @@ INSTRUMENT_LABELS: Final[dict[str, str]] = {
 PER_SITE_COLOURS: Final[tuple[str, ...]] = (
     "#FF4901",
     "#992C01",
-    "#8A2BE2",
-    "#53198B",
+    "#B701FF",
+    "#6E0199",
     "#306BFF",
     "#24499F",
 )
 """One colour per `MAE_SETUPS` entry: hue for the source, lightness for the model family.
 
-The two full-strength colours are the brand's orange-red and blue, which the headline contrast
-chart already uses for the two sources; the two darker ones are the same hues at about 60% of each
-channel. `dataviz`'s `validate_palette.js` passes all six pairs of these four on the lightness
-band, the chroma floor, colour-vision separation, the normal-vision floor, and contrast against
-this theme's surface.
+The three full-strength colours are the brand's orange-red, purple and blue, matching
+`SETUP_COLOURS`; each darker one is the same hue at about 60% of each channel. `dataviz`'s
+`validate_palette.js` passed the orange-red and blue pairs on the lightness band, the chroma floor,
+colour-vision separation, the normal-vision floor, and contrast against this theme's surface. The
+purple pair has not been through it, and that tool lives in another repository.
 """
 
 BEST_ARM: Final[dict[str, str]] = {
@@ -349,14 +350,13 @@ def _per_site_error() -> pl.DataFrame:
 
 
 def _per_site_chart(*, frame: pl.DataFrame) -> alt.Chart:
-    """Draw all four setups' per-site mean absolute error in one panel.
+    """Draw every setup's per-site mean absolute error in one panel.
 
     The comparison this figure exists for is the tree against the physical model at one site, so
-    all four bars for a site sit in one column rather than across two panels. Hue carries the
+    every bar for a site sits in one column rather than across separate panels. Hue carries the
     irradiance source and lightness the model family, which is the encoding a reader can decode
-    two ways at once: the two sources separate by colour, and within a source the two model
-    families separate by lightness, which survives every colour-vision deficiency because
-    lightness does.
+    two ways at once: the sources separate by colour, and within a source the two model families
+    separate by lightness, which survives every colour-vision deficiency because lightness does.
 
     Args:
         frame: One row per (setup, site).
