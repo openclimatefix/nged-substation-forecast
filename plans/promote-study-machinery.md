@@ -11,7 +11,7 @@ repaired and two of the three scripts would apply the shift a second time.
 
 **The planned solution.** Fix the double correction first, as its own commit, by deleting the
 `--alignment` axis from every script that carries it and keeping the one arithmetic that is now
-correct. Then move `scripts/experiments/` to a top-level `studies/`, promote eight pieces of
+correct. Then move `scripts/experiments/` to a top-level `studies/`, promote five pieces of
 reusable machinery into a new `packages/studies/` workspace member with unit tests, and keep the
 research dependencies out of the production image by listing the package in the root `dev`
 dependency group — the mechanism `dashboard` already uses and that the Dockerfile's `--no-dev`
@@ -99,11 +99,15 @@ both plan reviews, and the diff gets both diff reviews in `implement-issue`.
   `contracts.power_schemas.POWER_TIMESTAMPS_CORRECTED_BEFORE` rather than redeclaring it; rewrite the
   module docstring so the expected result is that **both** eras now measure as aligned, which is the
   evidence that the ingest repair worked.
-- **`run_experiment.py`, `run_physics_experiment.py`, `run_hybrid_experiment.py`,
-  `compare_sources.py`, `elevation_breakdown.py`, `sky_conditions.py`, `inverter_clipping.py`,
-  `era_comparison.py`, `report_results.py`, `fractions_skill_score.py`, `shared_geometry.py`,
-  `oracle_capacity.py`, `capacity_denominator.py`, `make_chart.py`** — delete the `--alignment`
-  argparse argument and the `_{alignment}` segment from every path and results-directory name.
+- **Nineteen scripts carry a `--alignment` argparse argument**, not the fourteen an earlier draft of
+  this plan counted: the five it missed are `anm_curtailment.py:161`, `anm_setpoints.py:128`,
+  `restart_basins.py:118`, `multi_nwp.py:213` and `ens_horizons.py:324`. Two more hold an
+  `ALIGNMENT` constant instead (`make_chart.py:42`, `make_figures.py:49`), and
+  `site_e_commissioning.py:51` holds its own `ALIGNMENT_FIXED_AT`, so the sweep is 22 files.
+  Eighteen of the nineteen only pass the string into a path, almost all through three helpers —
+  `run_experiment.dataset_path_for` and `results_dir_for` (`run_experiment.py:69-76`) and
+  `run_physics_experiment.results_dir_for` (`:68-70`). Drop the keyword argument from those three
+  first, then delete a three-line argparse block and one keyword argument per caller.
 - **`docs/studies/beam-diffuse-split.md`** — rewrite the passage describing the alignment axis to say
   the ingest owns the repair, and the `stamp_alignment.py` mentions at lines 890 and 1040. The
   published numbers stand: they were computed under `piecewise`, which is arithmetically what the
@@ -127,32 +131,52 @@ implementation the studies call, replacing the copies named beside it.
 
 | Module | What moves into it | What it replaces |
 |---|---|---|
-| `paths.py` | `REPO_DATA_DIR`, `_find_project_root`, `_main_checkout`, and a new `STUDIES_DATA_DIR = REPO_DATA_DIR / "studies"` | `sources.py`'s copy |
-| `anonymise.py` | `site_labels_for(roster)` — the seeded shuffle from `time_series_id` to `A`–`F` | three copies: `build_dataset._pv_sites`, `site_e_commissioning.SITE_IDS` (hard-coded), `anm_curtailment._site_labels` |
-| `solar.py` | `zenith`, `cos_zenith_hour_mean`, the extraterrestrial-flux and clearness-index columns, `solar_geometry` | `fetch_open_meteo_point._solar_geometry` and friends, `build_dataset._add_solar_geometry` |
-| `open_meteo.py` | `fetch_point_frame`, the retrying `_get_json`, the date-range helpers, `OpenMeteoModel` and `OPEN_METEO_MODELS`, `HISTORICAL_FORECAST_URL` | `fetch_open_meteo_point.py`'s fetcher half, the registry half of `sources.py` |
+| `anonymise.py` | `site_labels_for(eligible_ids)` — the seeded shuffle from `time_series_id` to `A`–`F` | three copies: `build_dataset._pv_sites`, `site_e_commissioning.SITE_IDS` (hard-coded), `anm_curtailment._site_labels` |
+| `solar.py` | `zenith`, `cos_zenith_hour_mean`, the extraterrestrial-flux and clearness-index columns, `solar_geometry` | two copies of the same `pvlib` calls: `fetch_open_meteo_point._solar_geometry` and `build_dataset._add_solar_geometry` — keep the union of their columns, because the second adds the azimuth and elevation the built datasets carry |
 | `served_column_checks.py` | `check_hourly_value_is_a_backward_mean`, `check_direct_is_not_a_separation_model` | `fetch_open_meteo_point.py`'s two `_check_*` functions |
-| `gridded.py` | `nearest_cell(sites, grid)` — projected-grid sampling at a set of coordinates | `build_dataset._nearest_era5_cell` |
 | `power.py` | `hourly_from_half_hourly(frame)` — the pure stamp-to-hour aggregation, with the Delta read left behind in the study | the arithmetic half of `build_dataset._hourly_power` |
-| `bootstrap.py` | `paired_monthly_block_interval(...)` — resample whole months, the same months for both arms, percentile interval | `run_experiment._bootstrap_difference`, `fractions_skill_score._bootstrap_fss_difference`, `ens_horizons._paired_month_bootstrap` |
-| `fractions_skill_score.py` | `on_a_complete_hourly_grid`, `monthly_components`, `fss_from`, and **a raise when an arm filter selects no rows** | `fractions_skill_score.py`'s scoring half |
+| `fractions_skill_score.py` | `on_a_complete_hourly_grid`, `monthly_components`, `fss_from` | `fractions_skill_score.py`'s scoring half |
 
-**The H3-cell mapping goes into `packages/geo`, not `packages/studies`.** `fetch_ens_point._cell_for_each_meter`
-maps latitude and longitude to an H3 cell, which is `geo`'s stated purpose and where
-`packages/geo/src/geo/h3.py` already lives. A new `cells_for_coordinates()` there serves the study
-and anything else that needs it; a copy in `studies` would be the fault this issue exists to remove.
+**Five modules, not the nine an earlier draft of this plan carried.** The four that were cut, each
+for its own reason:
 
-**Why `bootstrap.py` is one function and not three.** `run_experiment`, `fractions_skill_score` and
-`ens_horizons` each resample whole months, each pair the two arms on the same drawn months, and each
-take the same two percentiles. What differs is only the statistic re-formed from the resampled
-sums, which the caller passes in.
+- **`open_meteo.py`** (the fetcher and the model registry) — no test in this plan touches any of it,
+  because exercising it needs the network, which is what the existing `--run-network` gate is for.
+  Moving untested code into a package whose whole purpose is tested machinery inverts the issue.
+- **`bootstrap.py`** — the three bootstraps are three different statistics, not three copies.
+  `run_experiment._bootstrap_difference` resamples per-row differences within drawn months **and
+  draws one of the seeds per resample**, which its docstring calls load-bearing;
+  `ens_horizons._paired_month_bootstrap` takes per-month means with row-count weights, and says in
+  its own docstring why it does not reuse `run_experiment`'s; `fractions_skill_score` re-forms a
+  ratio from month sums. A shared function with a statistic callback expresses none of the seed axis
+  or the weights, so unifying them would either change the intervals on the published page or grow a
+  config surface to preserve three behaviours. The unification belongs with the deferred fit loop.
+- **`gridded.py`** — `build_dataset._nearest_era5_cell` calls `np.sort` on the grid coordinates
+  before the `argmin` (`build_dataset.py:571-572`), so the storage order it was to be tested against
+  cannot reach the comparison. Six lines of numpy with one caller, guarding a state that cannot
+  occur.
+- **`paths.py`** — `sources.py` already holds `_find_project_root`, `_main_checkout` and
+  `REPO_DATA_DIR`, and is deliberately stdlib-only so the lean scripts can import it. The `data/`
+  tidy the issue asks for is one line beside them: `STUDIES_DATA_DIR = REPO_DATA_DIR / "studies"`,
+  with the study's path constants repointed at it. Moving the walk into the package would only
+  duplicate the `contracts.settings` bug recorded in open question 7.
+
+**The H3-cell mapping needs no new function anywhere.** `packages/nged_data/src/nged_data/read_nged_json.py:52`
+already maps coordinates to cells with `polars_h3.latlng_to_cell`, and
+`contracts.weather_schemas.ECMWF_ENS_H3_RESOLUTION` already names the resolution that
+`fetch_ens_point.py:48` re-declares. `fetch_ens_point.py` runs in the project environment
+already — its run command carries no `--no-project` — so it can import both today. Replace its
+three-line list comprehension with the existing expression. An earlier draft of this plan proposed
+adding `cells_for_coordinates()` to `packages/geo`, which would have been a second implementation of
+a helper the repository already has: the exact fault the issue exists to remove.
 
 ### Commit 4 — dependency plumbing and the run commands
 
-- `packages/studies/pyproject.toml` — depends on `contracts`, `geo`, `numpy`, `polars`, `patito`,
-  `pvlib`. Deliberately **not** `cdsapi`, `xarray`, `netcdf4` or `xgboost`: the Copernicus
-  downloaders and the GRIB reading stay in the study scripts, run with `uv run --with cdsapi`, and
-  the fit loop is deferred.
+- `packages/studies/pyproject.toml` — depends on `contracts`, `numpy`, `polars`, `pvlib`.
+  Deliberately **not** `cdsapi`, `xarray`, `netcdf4` or `xgboost`: the Copernicus downloaders and
+  the GRIB reading stay in the study scripts, run with `uv run --with cdsapi`, and the fit loop is
+  deferred. `pvlib` is the only one of these absent from `uv.lock` today, so it is the whole of the
+  dependency change.
 - Root `pyproject.toml` — add `studies = { workspace = true }` under `[tool.uv.sources]` and
   `"studies"` to `[dependency-groups] dev`, with the same style of comment `dashboard` carries. It
   goes in `dev`, not in `[project] dependencies`, because `uv sync --frozen --no-dev` in the
@@ -170,6 +194,9 @@ sums, which the caller passes in.
 - **`docs/documentation-guide.md`** — line 19's tier row and line 110's "which place do I use?" row:
   the path changes and "no tests" becomes "the studies have no tests; the machinery they call does".
 - **`docs/studies/index.md`** — the `scripts/experiments/` link.
+- **`docs/roadmap/data-sources.md:485`** — a fourth inbound reference to the old path, which an
+  earlier draft of this plan missed. `grep -rn "scripts/experiments" docs/` finds all four; run it
+  again at implementation time rather than trusting this list.
 - **`CLAUDE.md`** — add `studies` to the packages table.
 - **`docs/architecture/testing.md`** — where the new tests live, and the dependency-group note.
 - **`studies/beam_diffuse_split/README.md`** — delete the Fractions Skill Score validation table and
@@ -181,11 +208,12 @@ sums, which the caller passes in.
 **This is R&D, so fail-fast is correct and no degradation path is involved.** Nothing in
 `studies/` or `packages/studies/` runs in production, enters the Dagster asset graph, or is reached
 by `src/nged_substation_forecast/defs/`. No asset check is added or edited, so the
-`WARN`/`blocking=False` rule does not apply. The one deliberate new raise — `fractions_skill_score`
-rejecting an arm filter that selects no rows — is the R&D half of
+`WARN`/`blocking=False` rule does not apply, and the change adds no new raise. The one place the
+R&D half of
 [inherent stability](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/)
-applied correctly: a quietly-empty comparison poisons every number built on it, exactly as a quietly
-degraded training run does.
+is visible is a guard that already exists: `fractions_skill_score.py:263-270` raises when no
+reported arm is present in the run, which is the fix for the silent empty table the issue narrates.
+The plan pins that guard with a regression test rather than adding behaviour.
 
 **Principle 4, "an experiment must be cheap to try, and cheap to abandon", is the one being
 traded.** A tested package raises the cost of the next study. What is bought is that the cost is
@@ -199,7 +227,8 @@ No hypothesis in `docs/design-philosophy/engineering-hypotheses.md` is claimed b
 
 ## Tests
 
-Each entry names the assertion that fails on `main` today.
+Seven tests, not the nine an earlier draft carried. Each entry names the assertion that fails on
+`main` today, and the two cuts are recorded below the list.
 
 1. **`test_hourly_power_places_a_reading_in_the_hour_ending_at_its_label`** — half-hours stamped
    09:30 and 10:00 on a date before 2026-03-26 form the hour ending 10:00. **Fails on `main`**:
@@ -211,18 +240,19 @@ Each entry names the assertion that fails on `main` today.
    0.211 / 0.486 / 0.741; never predicting the event scores 0.000 at every tolerance. **Fails on
    `main`**: no test exists, and the last row is the control that catches a widened window inflating
    the score rather than crediting timing.
-3. **`test_an_arm_filter_matching_no_rows_raises`** — selecting an arm name that no row carries
-   raises rather than returning an empty frame. **Fails on `main`**: `fractions_skill_score.py`
-   filtered on the gradient-boosted arm names, was run against the physical instrument, matched
-   nothing and printed an empty table with no error.
+3. **`test_an_arm_filter_matching_no_rows_raises`** — a regression test on the guard at
+   `fractions_skill_score.py:263-270`. **This one does not fail on `main`**, and is kept for that
+   reason rather than in spite of it: the guard is what stands between a mistyped arm name and a
+   silently empty comparison, and nothing currently holds it in place.
 4. **`test_a_window_spanning_a_gap_is_dropped`** — a site whose rows stop for a 12-hour night
    contributes no window across the gap, so the window count equals the complete windows only.
    **Fails on `main`**: no test, and a rolling window over the scored rows alone would join the
    hours either side of the night.
-5. **`test_site_labels_are_derived_once`** — the derived mapping equals the mapping
-   `site_e_commissioning.py` hard-codes, and adding a series that does not clear
-   `MIN_YEARS_OF_READINGS` leaves every existing label unchanged. **Fails on `main`**: the two
-   mappings are independent, and nothing checks that they agree.
+5. **`test_site_labels_are_derived_once`** — `site_labels_for` maps a fixed roster of eligible
+   `time_series_id`s to a fixed `A`–`F` mapping, and a roster of the wrong size raises. **Fails on
+   `main`**: the mapping is derived three separate ways and nothing checks that they agree. The
+   generator stays `np.random.default_rng(LABEL_PERMUTATION_SEED)`: any other random source
+   relabels every site and orphans the `A`–`F` labels in the published write-up.
 6. **`test_backward_mean_check_rejects_a_half_hour_offset`** — a frame whose hourly column holds the
    instantaneous value makes `check_hourly_value_is_a_backward_mean` raise; a correctly-converted
    frame passes. **Fails on `main`**: no test, and this check is the only absolute guard on which
@@ -231,13 +261,19 @@ Each entry names the assertion that fails on `main` today.
    pure function of clearness and zenith makes `check_direct_is_not_a_separation_model` raise; a
    frame with real within-bin spread passes. **Fails on `main`**: no test, and this check is what
    stands between arm C and being a copy of arm B.
-8. **`test_paired_bootstrap_gives_a_zero_interval_for_an_arm_against_itself`**, and a companion
-   asserting a non-zero interval for two genuinely different arms. **Fails on `main`**: no test, and
-   the issue records a negative control that was arithmetically incapable of failing while its
-   docstring asserted the opposite.
-9. **`test_nearest_grid_cell_uses_the_descending_latitude_order`** — a coordinate between two ERA5
-   rows picks the nearer one, with the archive's descending-latitude storage order. **Fails on
-   `main`**: no test, and a reversed order is silently plausible.
+
+**Two tests an earlier draft carried are cut.** A paired-bootstrap test is dropped with
+`bootstrap.py`, because the three bootstraps stay where they are; the property it would have
+asserted is worth writing against `_bootstrap_fss_difference` as it stands, and that is folded into
+test 2's file. A nearest-grid-cell test is dropped with `gridded.py`, because
+`build_dataset.py:571-572` sorts its own coordinates and the reversed order it would have guarded
+against cannot occur.
+
+**Test 5 is scoped to a pure function on purpose.** Asserting that the derived mapping equals the
+one `site_e_commissioning.py` hard-codes would need `metadata.parquet`, the power table's row
+counts and the effective-capacity table — private workstation data that CI does not have. What CI
+can check is that one implementation exists and is deterministic; the three-way agreement is bought
+by deleting two of the three copies, not by a test.
 
 ## Docs to update
 
@@ -275,36 +311,83 @@ figures is the user's step, on the workstation, and the PR body says so.
 
 ## Risks and open questions
 
-1. **Should the shared fitting helper land here or in its own issue?** *Recommendation: its own
+1. **Nothing mechanically forces the new package. Should it be deferred until #809 or #810 gives it
+   a second caller?** The simplicity review argued this and its evidence checks out, verified in
+   this worktree rather than reasoned about: a bare `uv run pytest` already collects a test placed
+   at `scripts/experiments/beam_diffuse_split/tests/`, because `norecursedirs` does not exclude
+   `scripts/`; adding that directory to `[tool.pytest.ini_options] pythonpath` makes the sibling
+   imports resolve under `--import-mode=importlib` (probed both ways — it fails with
+   `ModuleNotFoundError` without the entry and passes with it); and `pvlib` is the only dependency
+   any planned test needs that `uv.lock` lacks, which is one `dev`-group line with or without a
+   package. So the alternative is real: one `pyproject.toml` line, a `tests/` directory beside the
+   scripts, and no package, no `[tool.uv.sources]` entry, no lockfile churn beyond `pvlib`, and no
+   rewrite of 35 run commands.
+   *Recommendation: keep the package.* The issue asks for one, and its argument is about the tier
+   boundary rather than about mechanics — a package is what makes "the machinery is held to a
+   standard, the studies are not" a fact about the repository rather than a convention about which
+   files happen to have tests. But this is the human reviewer's call, not the plan's, and choosing
+   the deferral would cut roughly two-thirds of the diff. Choosing it would also dissolve question 2
+   below entirely.
+2. **Two things named `studies`.** The package `packages/studies/` (imported as `studies`) and the
+   directory `studies/` holding the study scripts. Nothing shadows anything — `studies/` carries no
+   `__init__.py`, and a script run from `studies/beam_diffuse_split/` puts only its own directory on
+   `sys.path` — but a reader meets the name twice meaning two things. *Recommendation: keep it*, as
+   the issue proposes. Two alternatives: `packages/study_kit/` for the machinery, or keeping the
+   scripts at `scripts/studies/` so only the word changes and not the level.
+3. **Should the shared fitting helper land here or in its own issue?** *Recommendation: its own
    issue, blocking #809 and #810.* It changes the numbers four scripts produce, so it wants to land
    beside a re-run rather than inside a rename, and this PR is already large. Against that: the next
    two studies are #809 and #810, and the issue's argument is that neither should be written on a
    fifth copy of the fit loop. Deferring it is only safe if the new issue lands before they start.
-2. **Two things named `studies`.** The package `packages/studies/` (imported as `studies`) and the
-   directory `studies/` holding the study scripts. Nothing shadows anything — `studies/` carries no
-   `__init__.py` and a script run from `studies/beam_diffuse_split/` puts only its own directory on
-   `sys.path` — but a reader meets the name twice meaning two things. *Recommendation: keep it*, as
-   the issue proposes; the alternative is `packages/study_kit/` for the machinery, which reads
-   clearly and costs nothing but a less obvious import name.
-3. **Where the Fractions Skill Score lives, given #805.** #805 wants it on the production
+   The bootstrap unification cut from commit 3 goes into the same follow-up.
+4. **Where the Fractions Skill Score lives, given #805.** #805 wants it on the production
    leaderboard beside MAE and the tail metrics, which would put it in `ml_core`.
    *Recommendation: `packages/studies/` now.* Moving it when #805 is planned is a rename in a young
    project with no external users, and placing it in `ml_core` today would be generalising for a
    caller that does not exist.
-4. **Deleting the `--alignment` axis outright.** The three settings existed to test a convention the
-   contract now settles, and two of the three are now arithmetically wrong.
-   *Recommendation: delete all three*, which removes an argument from fourteen scripts and a segment
-   from every output filename. The cost is that re-deriving the lateness needs the raw feed rather
-   than a flag; `stamp_alignment.py` against the repaired table is the measurement that replaces it.
-5. **`data/studies/` needs a manual `mv` on the workstation, and every study dataset rebuilt.** The
+5. **Deleting the `--alignment` axis outright**, across 22 files. Two of the three settings are now
+   arithmetically wrong, and the third is what the ingest applies. *Recommendation: delete all
+   three.* The only smaller change is a dishonest one — fix the two arithmetic sites and leave
+   `_piecewise` in every output filename naming a setting no code has. The cost is that re-deriving
+   the lateness needs the raw feed rather than a flag; `stamp_alignment.py` against the repaired
+   table is the measurement that replaces it.
+6. **`data/studies/` needs a manual `mv` on the workstation, and every study dataset rebuilt.** The
    rebuild is forced by #815 regardless. *Recommendation: proceed*, and name the `mv` in the PR body
    rather than trying to automate a move the PR cannot see.
-6. **Every `uv sync` grows by `pvlib` and its dependencies.** That is the price of testing the solar
+7. **Every `uv sync` grows by `pvlib` and its dependencies.** That is the price of testing the solar
    geometry, and it is paid by every developer and by CI, not by the production image.
    *Recommendation: accept it.* `cdsapi`, `xarray` and `netcdf4` stay out, which is where the bulk
    would have been.
-7. **Out of scope, reported rather than fixed:** `contracts.settings._find_project_root` resolves
+8. **Out of scope, reported rather than fixed:** `contracts.settings._find_project_root` resolves
    `data/` to a linked worktree's own root rather than the main checkout, which is why
-   `sources.py` carries the `_main_checkout` walk at all. Fixing it in `contracts` would let
-   `packages/studies/paths.py` drop the walk and would fix the same trap for every other caller.
-   That is a change to a production package and belongs in its own issue.
+   `sources.py` carries the `_main_checkout` walk at all. Fixing it in `contracts` would fix the
+   same trap for every other caller. That is a change to a production package and belongs in its own
+   issue.
+
+## What the first review changed, and what was rejected
+
+The first adversarial review hunted for a simpler way, saw none of the reasoning behind the plan,
+and produced ten findings. Every claim it made about the code was checked against the code before
+being applied.
+
+**Accepted, and already folded into the plan above:** the package drops from nine modules to five
+(`open_meteo.py`, `bootstrap.py`, `gridded.py` and `paths.py` cut, each for a reason recorded in
+commit 3); the tests drop from nine to seven; the false "fails on `main`" claim on the empty-arm
+test is corrected, because `fractions_skill_score.py:263-270` already carries that guard; the
+`--alignment` sweep is 22 files rather than 14; `docs/roadmap/data-sources.md:485` is a fourth
+inbound reference the plan had missed; the H3 mapping reuses the existing `polars_h3` expression
+instead of a new `geo` function; and test 5 is scoped to a pure function because the comparison it
+first proposed needs private workstation data CI does not have.
+
+**Rejected, with the reason:**
+
+- *"Ship #815 as its own pull request rather than as the first commit."* The user asked for one pull
+  request, was told why bundling a behaviour change into a rename is risky, and confirmed. The
+  first-commit split already buys the reviewability the finding is after.
+- *"Defer the package until a second caller exists."* Not rejected on the merits — the evidence is
+  sound and it is recorded as open question 1 above, for the human reviewer to decide. The plan
+  proceeds with the package because the issue asks for one, per the rule that a proposal larger or
+  smaller than the issue is the human's call rather than the plan's.
+- *"Move the studies to `scripts/studies/` rather than a top-level `studies/`."* A preference call
+  with no correctness content either way; recorded as an alternative under open question 2 rather
+  than applied, because the issue names the top-level layout.
