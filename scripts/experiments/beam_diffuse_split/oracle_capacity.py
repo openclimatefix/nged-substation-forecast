@@ -77,7 +77,9 @@ def main() -> int:
     print("|---|---|---|---|")
     for arm in sorted(losses["arm"].unique().to_list()):
         rows = losses.filter(pl.col("arm") == arm)
-        cells = " | ".join(f"{rows[metric].mean() * PERCENT:.3f}" for metric in metrics)
+        cells = " | ".join(
+            f"{rows.select(pl.col(metric).mean()).item() * PERCENT:.3f}" for metric in metrics
+        )
         print(f"| {arm} | {cells} |")
 
     print("\n### Contrasts under each correction\n")
@@ -88,7 +90,10 @@ def main() -> int:
             result = _bootstrap_difference(
                 losses=losses, treatment=treatment, reference=reference, metric=metric
             )
-            level = losses.filter(pl.col("arm") == reference)[metric].mean() * PERCENT
+            level = (
+                losses.filter(pl.col("arm") == reference).select(pl.col(metric).mean()).item()
+                * PERCENT
+            )
             point = result["difference"] * PERCENT
             print(
                 f"| {treatment} − {reference} | {metric} | {point:+.4f} "

@@ -204,7 +204,8 @@ def main() -> int:
     for scheme in ("free", "shared"):
         for arm in ARMS:
             rows = losses.filter((pl.col("scheme") == scheme) & (pl.col("arm") == arm))
-            print(f"| {scheme} | {arm} | {rows[metric].mean() * 100:.3f} |")
+            level = rows.select(pl.col(metric).mean()).item()
+            print(f"| {scheme} | {arm} | {level * 100:.3f} |")
 
     print("\n| Scheme | Contrast | ΔMAE (pp of P99 output) | 95% interval |")
     print("|---|---|---|---|")

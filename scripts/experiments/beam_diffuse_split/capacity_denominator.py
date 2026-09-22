@@ -110,9 +110,13 @@ def main() -> int:
         whole = per_hour.filter(pl.col("site") == site)
         if rows.is_empty():
             continue
-        bias = (rows["signed_error_mw"] / rows["effective_capacity_mw"]).mean() * PERCENT
-        overall = (whole["signed_error_mw"] / whole["effective_capacity_mw"]).mean() * PERCENT
-        peak = (rows["power_mw"] / rows["effective_capacity_mw"]).max() * PERCENT
+        share_of_capacity = pl.col("signed_error_mw") / pl.col("effective_capacity_mw")
+        bias = rows.select(share_of_capacity.mean()).item() * PERCENT
+        overall = whole.select(share_of_capacity.mean()).item() * PERCENT
+        peak = (
+            rows.select((pl.col("power_mw") / pl.col("effective_capacity_mw")).max()).item()
+            * PERCENT
+        )
         print(f"| {site} | {bias:+.2f} | {overall:+.2f} | {peak:.1f} |")
 
     print("\n### Mean signed error by decile of measured output, pooled and at sites A and B\n")
@@ -145,7 +149,10 @@ def main() -> int:
         result = _bootstrap_difference(
             losses=rescaled, treatment=HEADLINE[0], reference=HEADLINE[1], metric="metric"
         )
-        reference_level = rescaled.filter(pl.col("arm") == HEADLINE[1])["metric"].mean() * PERCENT
+        reference_level = (
+            rescaled.filter(pl.col("arm") == HEADLINE[1]).select(pl.col("metric").mean()).item()
+            * PERCENT
+        )
         point = result["difference"] * PERCENT
         print(
             f"| {label} | {point:+.4f} "
