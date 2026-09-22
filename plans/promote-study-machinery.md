@@ -29,8 +29,10 @@ code as it stands.
 
 The user asked for both in one pull request. **Bundling a behaviour change into a rename is the
 failure mode `plan-issue` step 7 names** — "is a refactor hiding a behaviour change inside it?" —
-so the plan keeps them separable inside the one branch: #815 lands as the first commit, complete
-with its test, before any file moves. A reviewer can read that commit alone.
+so the plan keeps them separable inside the one branch: #815 lands in commit 2, complete with its
+test, before any file moves. It cannot be commit 1, because the test that pins it needs `pvlib`
+installed to import the module under test, and commit 1 is what installs it. A reviewer can still
+read the #815 commit alone, which is the point.
 
 ### Departures from the issue body
 
@@ -86,7 +88,18 @@ both plan reviews, and the diff gets both diff reviews in `implement-issue`.
 
 ## What changes, file by file
 
-### Commit 1 — stop the double correction (#815)
+### Commit 1 — the dependency line, before anything that needs it
+
+`pvlib` is the only dependency any planned test needs that `uv.lock` lacks, and
+`build_dataset.py:42-43` imports `pvlib` and `xarray` at module scope, so **any** test that reaches
+the hourly-power arithmetic needs `pvlib` installed before it can even be collected. The dependency
+line therefore comes first, on its own: add `pvlib` to the root `dev` dependency group and
+regenerate `uv.lock`. Under the package layout this commit also carries `packages/studies/pyproject.toml`
+and the `[tool.uv.sources]` entry, because `[tool.uv.workspace] members = ["packages/*"]` makes a
+new directory a member on sight and `uv lock --check` fails from the moment it appears until the
+lock catches up.
+
+### Commit 2 — stop the double correction (#815)
 
 - **`scripts/experiments/beam_diffuse_split/build_dataset.py`** — delete `ALIGNMENT_FIXED_AT`, the
   `AlignmentType` literal, the `--alignment` argument and the `piecewise` branch of `_hourly_power`.
@@ -108,14 +121,19 @@ both plan reviews, and the diff gets both diff reviews in `implement-issue`.
   `run_experiment.dataset_path_for` and `results_dir_for` (`run_experiment.py:69-76`) and
   `run_physics_experiment.results_dir_for` (`:68-70`). Drop the keyword argument from those three
   first, then delete a three-line argparse block and one keyword argument per caller.
-- **`docs/studies/beam-diffuse-split.md`** — rewrite the passage describing the alignment axis to say
-  the ingest owns the repair, and the `stamp_alignment.py` mentions at lines 890 and 1040. The
+- **`docs/studies/beam-diffuse-split.md`** — a smaller edit than it looks. The page never names
+  `as-labelled`, `shifted` or `piecewise`; the passage at `:861-868` says the numbers are "computed
+  on the corrected reading" without saying who corrects, and stays true either way. What needs
+  rewriting is the `stamp_alignment.py` material at `:890` and `:1040`. The alignment axis is
+  described in `beam_diffuse_split/README.md:37`, `:51` and `:316` instead. **Do not touch the
+  heading at `:861`** — three places link to its anchor (`power_schemas.py:43`,
+  `docs/roadmap/data-cleaning.md:47`, `docs/roadmap/capacity-estimation.md:638`). The
   published numbers stand: they were computed under `piecewise`, which is arithmetically what the
   ingest now applies. Keep the `#the-power-timestamps-before-26-march-2026-are-half-an-hour-late`
   anchor intact — `packages/contracts/src/contracts/power_schemas.py:43` links to it.
 - **`beam_diffuse_split/README.md`** — the same, for its own alignment section.
 
-### Commit 2 — move `scripts/experiments/` to `studies/`
+### Commit 3 — move `scripts/experiments/` to `studies/`
 
 - `git mv scripts/experiments/beam_diffuse_split studies/beam_diffuse_split` and
   `git mv scripts/experiments/README.md studies/README.md`.
@@ -124,7 +142,7 @@ both plan reviews, and the diff gets both diff reviews in `implement-issue`.
 - Rewrite the run command in all 35 module docstrings (commit 4, once the scripts import the
   package).
 
-### Commit 3 — `packages/studies/`
+### Commit 4 — `packages/studies/`
 
 New workspace member, `src/studies/`, one module per promoted piece. Each is the single
 implementation the studies call, replacing the copies named beside it.
@@ -151,10 +169,16 @@ for its own reason:
   ratio from month sums. A shared function with a statistic callback expresses none of the seed axis
   or the weights, so unifying them would either change the intervals on the published page or grow a
   config surface to preserve three behaviours. The unification belongs with the deferred fit loop.
-- **`gridded.py`** — `build_dataset._nearest_era5_cell` calls `np.sort` on the grid coordinates
-  before the `argmin` (`build_dataset.py:571-572`), so the storage order it was to be tested against
-  cannot reach the comparison. Six lines of numpy with one caller, guarding a state that cannot
-  occur.
+- **`gridded.py`** — cut, but the reason has to name the right function. #807's "projected-grid
+  sampling at a set of coordinates" is `verify_ukv_lineage._sample_grid`
+  (`verify_ukv_lineage.py:228-252`: a `pyproj` Lambert azimuthal equal-area transform, then an
+  `xarray` `sel(..., method="nearest")`), not `build_dataset._nearest_era5_cell`. Both are cut,
+  for different reasons. `_nearest_era5_cell` calls `np.sort` on its grid coordinates before the
+  `argmin` (`build_dataset.py:571-572`), so the storage order it would have been tested against
+  cannot reach the comparison: six lines of numpy, one caller, guarding a state that cannot occur.
+  `_sample_grid` is genuinely testable — it needs no network, and `pyproj` and `xarray` are both
+  already locked — and is deferred only because nothing else calls it yet. **Deferring it is a
+  fifth departure from the issue body**, and the follow-up package issue should carry it.
 - **`paths.py`** — `sources.py` already holds `_find_project_root`, `_main_checkout` and
   `REPO_DATA_DIR`, and is deliberately stdlib-only so the lean scripts can import it. The `data/`
   tidy the issue asks for is one line beside them: `STUDIES_DATA_DIR = REPO_DATA_DIR / "studies"`,
@@ -170,7 +194,7 @@ three-line list comprehension with the existing expression. An earlier draft of 
 adding `cells_for_coordinates()` to `packages/geo`, which would have been a second implementation of
 a helper the repository already has: the exact fault the issue exists to remove.
 
-### Commit 4 — dependency plumbing and the run commands
+### Commit 5 — the run commands
 
 - `packages/studies/pyproject.toml` — depends on `contracts`, `numpy`, `polars`, `pvlib`.
   Deliberately **not** `cdsapi`, `xarray`, `netcdf4` or `xgboost`: the Copernicus downloaders and
@@ -188,7 +212,7 @@ a helper the repository already has: the exact fault the issue exists to remove.
   downloaders. A script importing a workspace package can no longer run under `--no-project`.
 - Delete the `# ty: ignore[unresolved-import]` on every `import pvlib`, now that `pvlib` resolves.
 
-### Commit 5 — docs
+### Commit 6 — docs
 
 - **`packages/studies/README.md`** — new.
 - **`docs/documentation-guide.md`** — line 19's tier row and line 110's "which place do I use?" row:
@@ -202,6 +226,34 @@ a helper the repository already has: the exact fault the issue exists to remove.
 - **`studies/beam_diffuse_split/README.md`** — delete the Fractions Skill Score validation table and
   point at the test file that now holds it. Deleting it is the point: a validation table in a README
   cannot fail.
+
+### What `data/studies/` must not swallow
+
+The move is for what the studies download and build, not for what the pipeline owns. **These stay
+where they are**: `POWER_DELTA_URI`, `METADATA_PATH` and `CAPACITY_DELTA_URI`
+(`build_dataset.py:59-61`), and `NWP_ROOT` (`fetch_ens_point.py:42`) — all four are the production
+tables the studies read. `data/NGED/anm/` (`export_cap.py:53`) is the genuinely ambiguous one: a
+study writes it (`anm_setpoints.py`), a study reads it (`site_e_commissioning.py:118,130`), and the
+docs page names it (`docs/studies/beam-diffuse-split.md:1036`). Decide it explicitly rather than by
+whichever `sed` runs first. Note also that `make_chart.py:168` globs `REPO_DATA_DIR / "ERA5"`
+directly, so a path constant alone will not catch it, and that three more docs lines name moved
+paths: `beam_diffuse_split/README.md:44` and `:47`, and the docs page at `:1036`.
+
+### Two behaviour changes hiding inside the moves
+
+**The solar union changes the built dataset's schema and its cost, not its numbers.**
+`fetch_open_meteo_point._solar_geometry` adds `cos_zenith_instant`, `cos_zenith_hour_mean` and
+`clearness_index` that `build_dataset._add_solar_geometry` does not, and `cos_zenith_hour_mean` is
+60 `pvlib` solar-position calls per stamp set (`fetch_open_meteo_point.py:282-310`). Every arm
+selects its features by name (`run_experiment.py:85-109`), so no published number moves — but every
+written parquet gains three columns and every build gets slower. Make the extra columns opt-in, or
+say plainly that the cost is accepted.
+
+**Two docstrings go stale the moment the run commands change.** `sources.py:135-139` states that
+"every script here runs under `uv run --no-project` and so cannot import a workspace package", and
+`scripts/experiments/README.md` says the same. That constraint is the stated reason for keeping
+`sources.py` stdlib-only, and commit 5 removes it for the scripts that import the package. Rewrite
+both rather than leaving a rule in place that the same commit falsifies.
 
 ## Design-philosophy check
 
@@ -227,40 +279,71 @@ No hypothesis in `docs/design-philosophy/engineering-hypotheses.md` is claimed b
 
 ## Tests
 
-Seven tests, not the nine an earlier draft carried. Each entry names the assertion that fails on
-`main` today, and the two cuts are recorded below the list.
+Seven tests, not the nine an earlier draft carried.
 
-1. **`test_hourly_power_places_a_reading_in_the_hour_ending_at_its_label`** — half-hours stamped
-   09:30 and 10:00 on a date before 2026-03-26 form the hour ending 10:00. **Fails on `main`**:
-   `build_dataset._hourly_power`'s default `piecewise` branch shifts both stamps 30 minutes earlier
-   and puts them in the hour ending 09:30. This is the #815 test.
+**Only test 1 fails against behaviour this change alters.** An earlier draft claimed "fails on
+`main`" for six of the seven, which was misleading in exactly the way the plan singled test 3 out
+for: tests 2, 4, 5, 6 and 7 pin behaviour that already exists and works, and on `main` they would
+fail only with `ImportError`, because the module they import does not exist yet. That is not a test
+of this change. They are worth writing anyway — a move that silently altered any of them would
+change numbers on a published page, and nothing currently stops it — but the honest description is
+**"pins existing behaviour so the move cannot change it"**, and that is how each is labelled below.
+
+1. **`test_hourly_power_places_a_reading_in_the_hour_ending_at_its_label`** — the #815 test, and
+   the only one that fails against arithmetic rather than against an absent import. **The fixture
+   needs four contiguous stamps, not two.** Measured in this worktree on stamps 09:00, 09:30, 10:00
+   and 10:30, all before 2026-03-26: the surviving expression yields one complete hour, ending
+   10:00, pooling the stamps 09:30 and 10:00 — the window `(09:00, 10:00]`, which is right. The
+   `piecewise` branch yields two complete hours, and its hour ending 10:00 pools the stamps 10:00
+   and 10:30 — the window `(09:30, 10:30]`, half an hour of the wrong weather. A two-stamp fixture
+   would not show this: under `piecewise` the two stamps land in different hours and the
+   `n_half_hours == 2` filter (`build_dataset.py:486`) drops both, so the frame comes back empty and
+   the test passes for the wrong reason. **The promoted function must keep that filter**, because it
+   is also what drops the single orphan half-hour at the correction boundary.
 2. **`test_fractions_skill_score_matches_the_forecasts_whose_answer_is_known`** — the four cases the
    README table holds, as a parametrised test: identical to the observation scores 1.000 at every
    tolerance; one hour late scores 0.667 / 0.842 / 0.919 / 0.959; three hours late scores 0.000 /
-   0.211 / 0.486 / 0.741; never predicting the event scores 0.000 at every tolerance. **Fails on
-   `main`**: no test exists, and the last row is the control that catches a widened window inflating
-   the score rather than crediting timing.
+   0.211 / 0.486 / 0.741; never predicting the event scores 0.000 at every tolerance. The last row is
+   the control: widening the window must not rescue a forecast that never predicts the event.
+   **Pins existing behaviour** — the arithmetic at `fractions_skill_score.py:102-183` is unchanged
+   by this plan, and the test exists so the move cannot change it and so a validation currently
+   living in a README can fail. Both fixtures need a `month` column, which `_monthly_components`
+   drops nulls on (`:162`) and which `run_experiment.py:256` supplies upstream; the promoted
+   function should derive it from `time` rather than make every caller carry it.
 3. **`test_an_arm_filter_matching_no_rows_raises`** — a regression test on the guard at
    `fractions_skill_score.py:263-270`. **This one does not fail on `main`**, and is kept for that
    reason rather than in spite of it: the guard is what stands between a mistyped arm name and a
    silently empty comparison, and nothing currently holds it in place.
 4. **`test_a_window_spanning_a_gap_is_dropped`** — a site whose rows stop for a 12-hour night
    contributes no window across the gap, so the window count equals the complete windows only.
-   **Fails on `main`**: no test, and a rolling window over the scored rows alone would join the
-   hours either side of the night.
+   **Pins existing behaviour**: the complete-grid reindex and `min_samples=window_hours` already
+   do this (`fractions_skill_score.py:102-137`, `:157`, `:160`). The test exists because a move
+   that dropped either would be invisible in the numbers until a night fell inside a window.
 5. **`test_site_labels_are_derived_once`** — `site_labels_for` maps a fixed roster of eligible
-   `time_series_id`s to a fixed `A`–`F` mapping, and a roster of the wrong size raises. **Fails on
-   `main`**: the mapping is derived three separate ways and nothing checks that they agree. The
-   generator stays `np.random.default_rng(LABEL_PERMUTATION_SEED)`: any other random source
+   `time_series_id`s to a fixed `A`–`F` mapping, and a roster of the wrong size raises. **Partly
+   pins existing behaviour**: the wrong-size raise is already at `build_dataset.py:433-435`; what
+   is new is that one implementation exists at all, where the mapping is derived three separate
+   ways today and nothing checks that they agree. **The helper unifies the shuffle, not the
+   roster** — `_pv_sites` (`build_dataset.py:404-438`) inner-joins the effective-capacity table
+   before the row-count filter and `anm_curtailment._site_labels` (`:115-133`) does not, so the two
+   rosters can differ; and `site_e_commissioning.py` imports nothing from `build_dataset`, so
+   replacing its hard-coded `SITE_IDS` means importing the roster query rather than growing a third
+   copy. The generator stays `np.random.default_rng(LABEL_PERMUTATION_SEED)`: any other random source
    relabels every site and orphans the `A`–`F` labels in the published write-up.
 6. **`test_backward_mean_check_rejects_a_half_hour_offset`** — a frame whose hourly column holds the
    instantaneous value makes `check_hourly_value_is_a_backward_mean` raise; a correctly-converted
-   frame passes. **Fails on `main`**: no test, and this check is the only absolute guard on which
-   hour a served label names.
+   frame passes. **Pins existing behaviour** (`fetch_open_meteo_point.py:335-384`). The fixture
+   needs care: the ratio of the instantaneous to the hour-mean cosine is near 1.0 at midday, so
+   hand-set geometry can land either side of the 5 W m⁻² threshold by accident. Build the geometry
+   with `pvlib` at a generic, non-meter coordinate over a few days, so the failing case misses by
+   tens of W m⁻² rather than by noise.
 7. **`test_direct_fraction_check_rejects_a_separation_model`** — a frame whose direct fraction is a
    pure function of clearness and zenith makes `check_direct_is_not_a_separation_model` raise; a
-   frame with real within-bin spread passes. **Fails on `main`**: no test, and this check is what
-   stands between arm C and being a copy of arm B.
+   frame with real within-bin spread passes. **Pins existing behaviour**
+   (`fetch_open_meteo_point.py:410-463`), and this check is what stands between arm C and being a
+   copy of arm B. **Match on the message, not just the type**: the function raises `ValueError`
+   twice, and the "no bin holds 30 rows" guard (`:444-449`) fires before the spread test
+   (`:456-463`), so a thin fixture satisfies `pytest.raises(ValueError)` for the wrong reason.
 
 **Two tests an earlier draft carried are cut.** A paired-bootstrap test is dropped with
 `bootstrap.py`, because the three bootstraps stay where they are; the property it would have
@@ -297,12 +380,19 @@ uv run mkdocs build --strict
 uv run python scripts/lint/check_docs_links.py
 uv run pre-commit run --all-files
 # The production install must not carry a research dependency:
-uv export --no-dev --format requirements-txt | grep -ciE '^(pvlib|cdsapi)' | grep -qx 0
+test "$(uv export --no-dev --format requirements-txt | grep -ciE '^(pvlib|cdsapi)')" -eq 0
 ```
 
 The last command is the one this change specifically needs, and it is the check that the `dev`-group
-placement actually does what it is chosen for. It belongs in the PR body's evidence, and is worth
-proposing as a CI step in a follow-up rather than adding to `ci.yml` inside this diff.
+placement actually does what it is chosen for. **Write it with `test "$(...)"`, not as a pipeline
+into `grep -qx 0`.** Measured in this worktree: `grep -c` exits 1 when it counts zero matches, so
+under `set -o pipefail` — which is what GitHub Actions gives every `run:` step — the pipeline form
+exits 1 exactly when the check *passes*. The `test "$(...)"` form carries the count through stdout,
+where the pipe's exit status cannot reach it. Do not reach for `! … | grep -q` either: `grep -q`
+exits early, which can `SIGPIPE` `uv export` and make the negated pipeline pass on a match.
+
+The check belongs in the PR body's evidence, and is worth proposing as a CI step in a
+follow-up rather than adding to `ci.yml` inside this diff.
 
 **Re-running any study is not part of the verification set.** Every built dataset under `data/` is
 invalidated by #815 and by the `data/studies/` move, and a rebuild needs the workstation's data and
@@ -391,3 +481,41 @@ first proposed needs private workstation data CI does not have.
 - *"Move the studies to `scripts/studies/` rather than a top-level `studies/`."* A preference call
   with no correctness content either way; recorded as an alternative under open question 2 rather
   than applied, because the issue names the top-level layout.
+
+## What the second review changed, and what was rejected
+
+The second adversarial review checked the plan for correctness and testability, saw neither the plan's
+reasoning nor what the first review changed, and produced thirteen findings. Every claim was checked
+against the code before being applied; four were re-measured in this worktree rather than reasoned
+about.
+
+**Accepted, and folded in above:** the commit order was wrong, because `build_dataset.py:42-43`
+imports `pvlib` at module scope, so the #815 test cannot exist before the dependency line — the
+dependency commit now comes first, and the package's `pyproject.toml` moves into it so
+`uv lock --check` is never red between commits. Test 1's stated failure mechanism was wrong, and its
+fixture needs four contiguous stamps rather than two: measured here, a two-stamp fixture returns an
+*empty* frame under `piecewise` and so passes for the wrong reason. Five of the seven tests were
+labelled "fails on `main`" when they pin existing behaviour and would fail only with `ImportError`,
+which is the same fault the plan had singled test 3 out for. The proposed verification command
+inverts under `pipefail` — measured: `grep -c` exits 1 on a zero count, so the pipeline form exits 1
+exactly when the check passes, and GitHub Actions runs every step under `bash -eo pipefail`. The
+`gridded.py` cut argued about the wrong function: #807's "projected-grid sampling" is
+`verify_ukv_lineage._sample_grid`, which is a fifth departure and now recorded as one. And three
+scoping points are now stated rather than left to the implementer: which `data/` paths must not
+move, that the solar union adds three columns and 60 `pvlib` calls per stamp set, and that two
+docstrings asserting the `--no-project` constraint are falsified by the commit that removes it.
+
+**Rejected, with the reason:**
+
+- *Nothing.* Every finding was either a real defect in the plan or a scoping point worth stating.
+  Two findings about commit ordering (the dependency line, and `uv lock --check` between commits 3
+  and 4) would partly dissolve under the tests-in-place alternative in open question 1, but the
+  underlying constraint survives it: `pvlib` has to be installed before any test can import the
+  module it exercises, whichever layout is chosen.
+
+**Verified correct, and left alone:** every claim the plan makes about current behaviour; the #815
+arithmetic, including the boundary — the repaired table has no row at 08:00 on 2026-03-26
+(`power_schemas.py:153-155`), so the orphan half-hour is dropped by the `n_half_hours == 2` filter,
+and piecewise-on-raw is row-for-row identical to the surviving expression on the repaired table,
+which is why the published numbers stand; the dependency plumbing; and the claim that a top-level
+`studies/` directory without `__init__.py` does not shadow the installed package.
