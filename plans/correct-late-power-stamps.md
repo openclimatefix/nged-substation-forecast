@@ -426,3 +426,34 @@ sits on a `docs/roadmap/` page marked Planned, when `docs/architecture/` is wher
 rationale for shipped behaviour — and that `code-style.md` forbids code linking to a roadmap page,
 which is why the docstrings carry the fleet-wide argument themselves rather than linking. That is a
 real structural observation and a larger change than this issue, so it is reported rather than made.
+
+
+## What the mutation review changed
+
+The mutation pass ran 27 mutations against the full suite and found **one survivor that matters** —
+and it is the test case the first diff review had just talked this plan into deleting.
+
+**Mutating the predicate from `<` to `!=` passes all 941 tests.** That mutation shifts every reading
+except the one at the correction instant, so it corrupts every reading the live service has ingested
+since 26 March 2026, and nothing goes red. The cause is that every timestamp the suite pushed
+through `correct_late_timestamps` sat at or before the instant: the unit test's two cases, the
+ingest test's 08:00 and 08:30, both JSON fixtures (which end at exactly 08:30), and the `test_assets`
+fixtures (all on 5 March). Reproduced here before acting on it, and the restored `after_stays` case
+was confirmed red against the mutation and green without it.
+
+**The first review's argument for deleting that case was wrong, and worth recording.** It reasoned
+that `after_stays` was subsumed by `instant_stays`, because "any monotone threshold mutation that
+moves 09:00 also moves 08:30". The reasoning holds for monotone mutations and `!=` is not one. The
+case now carries a comment saying why it is not the redundancy it looks like, so the next reviewer
+does not delete it again.
+
+**The one other survivor is an equivalent mutant, correctly not a finding.** Moving the call to
+after `.sort(...)`, still before `drop_implausible_rows`, changes no behaviour — a constant shift of
+a contiguous prefix cannot reorder the series, which is the docstring's own argument. The ordering
+constraint that does matter, before `drop_implausible_rows`, is killed by
+`test_extract_power_time_series_drops_a_reading_the_correction_pushes_out_of_range`, and by that
+test alone.
+
+Every other mutation was killed: both boundary directions on the constant, five offset mutations
+including `-29m` and `-30s`, dropping `.otherwise`, swapping the branches, the no-op, deleting the
+call site, calling it twice, and three timezone mutations on the constant.

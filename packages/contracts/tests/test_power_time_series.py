@@ -236,6 +236,15 @@ def test_drop_implausible_rows_leaves_a_validatable_frame() -> None:
         pytest.param(
             POWER_TIMESTAMPS_CORRECTED_BEFORE, POWER_TIMESTAMPS_CORRECTED_BEFORE, id="instant_stays"
         ),
+        # Not redundant beside `instant_stays`, though it looks it. Every other timestamp the
+        # suite pushes through this method sits at or before the correction instant, so without
+        # this case a predicate of `!=` — which shifts every reading the live service ingests and
+        # leaves only the instant itself alone — passes the whole suite.
+        pytest.param(
+            datetime(2026, 3, 26, 9, 0, tzinfo=UTC),
+            datetime(2026, 3, 26, 9, 0, tzinfo=UTC),
+            id="after_stays",
+        ),
     ],
 )
 def test_correct_late_timestamps_moves_only_the_late_readings(
