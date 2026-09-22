@@ -62,15 +62,19 @@ jobs:
       - name: Docs links (check_docs_links)
         run: uv run --no-sync python scripts/lint/check_docs_links.py
 
-      # The steps above run most of `.pre-commit-config.yaml`'s hooks but not all of them:
-      # end-of-file-fixer, trailing-whitespace, check-yaml, check-added-large-files,
-      # no-sphinx-roles and lint-docstring-markdown have no step here. A commit-time hook sees
-      # only the staged files, so a file nobody stages can break one of those and stay broken in
-      # `main`. This step runs every hook over the whole tree, so CI reports whatever
-      # `uv run pre-commit run --all-files` would report on a developer's machine; the price is
-      # ruff, ty, pydoclint and pymarkdown each running a second time.
-      - name: Pre-commit (every hook, every file)
-        run: uv run --no-sync pre-commit run --all-files
-
       - name: Test (pytest)
         run: uv run --no-sync pytest
+
+      # Five hooks have no step above — trailing-whitespace, end-of-file-fixer, check-yaml,
+      # no-sphinx-roles, and lint-docstring-markdown — and the pymarkdown hook scans every tracked
+      # markdown file, not the narrower set the step above passes it. Commit-time hooks are not
+      # enough on their own: both failures in #812 landed from commits where the hooks never ran,
+      # which is what a clone with no `pre-commit install` gets you. `check-added-large-files`
+      # stays commit-time-only regardless, because it inspects only the files staged as additions.
+      # The price is ruff, ty, pydoclint, and pymarkdown each running a second time.
+      #
+      # This runs last because every hook entry is a *bare* `uv run`, which re-syncs the root
+      # environment without `--all-packages` and so undoes the install step above. Moving it in
+      # front of pytest would strip the workspace members pytest needs.
+      - name: Pre-commit (every hook, every file)
+        run: uv run --no-sync pre-commit run --all-files --show-diff-on-failure

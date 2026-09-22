@@ -96,9 +96,8 @@ npx svgo@4 --multipass --precision=1 chart.svg -o chart.svg && printf '\n' >> ch
 which took `docs/example_power_forecast.svg` from 571 KB to 296 KB with no visible change (verified
 by rendering both to PNG at 2× and comparing pixel by pixel). Unoptimised exports tend to trip
 `check-added-large-files`' 500 KB limit, which is the signal that this step was skipped. `svgo`
-ends its output on the closing `>` and writes no trailing newline, so the `printf` appends one;
-without the `printf`, `end-of-file-fixer` rewrites the chart the first time anybody runs
-`pre-commit`.
+ends its output on the closing `>` and writes no trailing newline, so the `printf` appends one and
+`end-of-file-fixer` has nothing to rewrite.
 
 ### Prose style
 
