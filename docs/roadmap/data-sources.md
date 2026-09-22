@@ -357,6 +357,27 @@ is not analysis-ready. Separately, a precomputed *mean* climatology for the [wea
 feature](xgboost-improvements.md#weather-abnormality-climatology-z-score-features) is available from
 WeatherBench2 at `gs://weatherbench2/datasets/era5-hourly-climatology/`.
 
+### The satellite retrieval beat both model products by about half the error
+
+**On hours each pair both covers, the CAMS retrieval roughly halves the power error against ERA5 or
+UKV, and UKV's 2 km grid performs like ERA5's 31 km one.** In the beam/diffuse split experiment,
+predicting metered PV output from global irradiance alone gave 5.3% of the 99th-percentile output
+for CAMS against 9.7% for UKV over their 88,569 shared hours, and 8.5% for UKV against 8.4% for
+ERA5 over their 103,065 shared hours. The fitted PV model agreed, with a wider margin. **Choosing
+the source was worth about 4 percentage points and choosing the beam/diffuse split about 0.1**, so
+source selection dominates every other irradiance decision measured there.
+
+**Read the result as observation against model rather than as resolution.** CAMS infers cloud from
+Meteosat at the hour in question, where ERA5 and UKV both have to simulate it, and for irradiance
+that has already happened a retrieval should win — which is the usual finding in solar resource
+assessment. Raising the model resolution from 31 km to 2 km moved the error by less than a tenth of
+a percentage point, so resolution is not what separates these products.
+
+Two limits on how far that carries. Restricting the *scoring* to shared hours does not restrict the
+*training*, so each comparison is between two pipelines rather than two grids. And all three
+sources are analyses or retrievals of an hour that has already happened, so none of these numbers
+is forecast skill at a useful lead.
+
 ### CAMS: use the point API, not the gridded product
 
 **Two CAMS products exist, and only the point time-series product is current.** The [gridded
