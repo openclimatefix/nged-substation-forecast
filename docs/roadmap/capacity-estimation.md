@@ -614,10 +614,21 @@ what it established and the traps it hit.
 **Five parameters per site are identifiable from a meter and an irradiance series alone, and the
 fitted values are physically plausible.** Panel tilt, panel azimuth, capacity, an inverter clipping
 limit, and a temperature coefficient were fitted per site on each training fold by a Powell
-optimiser from eight random starts. The fitted tilts land between 17 and 25 degrees and the
-azimuths between 163 and 179 degrees — south to south-south-east, which is what these arrays
-plausibly are. That is the core feasibility question behind [candidate
+optimiser, from one fixed starting vector and seven random ones. On the corrected stamps the
+fitted tilts land between 14 and 27 degrees and the azimuths within 5 degrees of due south, which
+is what these arrays plausibly are. That is the core feasibility question behind [candidate
 B](#candidate-b-the-differentiable-physics-estimator), answered for solar on this fleet.
+
+**Fitting those five parameters needs no gradients, so candidate B's case has to rest on something
+other than the fit being hard.** The objective is not convex: refitting all 30 site-and-arm
+combinations from 64 independent random starts each, a median of only 3 of the 64 reach the lowest
+loss found, and the worst start lands at 3.5 times it. What makes a derivative-free optimiser
+enough is the low dimension rather than a single basin — 5 parameters, and a fixed starting vector
+that finds the lowest loss in 19 of the 30 fits and is the only start to find it in 6. Refitting
+from the random starts alone moves every arm-to-arm difference by at most 0.0001 MW. So the
+arguments for [candidate B](#candidate-b-the-differentiable-physics-estimator) are the ones already
+listed there — fitted posteriors, fleet-wide shared terms, and continuity with v2 — and not that a
+single site's PV parameters are hard to recover.
 
 **A half-hour timestamp error is absorbed into the fitted azimuth, so pin the stamp convention
 before trusting a fitted orientation or the capacity that comes with it.** The same model fitted on
@@ -627,6 +638,27 @@ half-hour, which is a quarter of the range a GB array's orientation can plausibl
 feed](../results/beam-diffuse-split.md#the-power-stamps-before-26-march-2026-are-half-an-hour-late)
 were half an hour late until NGED corrected them. Any estimator that fits orientation has the same
 exposure, and an orientation error feeds straight into the capacity it reports.
+
+**What limits the fitted physical model is its specification, not its optimiser, and the term
+that hurts is the transposition.** Given the same rows, the physical model and the tree disagree
+about which beam field is better, and the physical model divides the horizontal beam by the cosine
+of the solar zenith angle to recover the direct normal irradiance. That division magnifies a beam
+error without limit as the sun approaches the horizon: below 10 degrees of elevation the physical
+model's arm ordering reaches +0.56 percentage points against +0.00 to +0.17 in the bands above it.
+Holding tilt and azimuth equal across the arms makes the disagreement larger rather than smaller,
+from +0.128 to +0.147 points, so the fitted geometry is not the cause. An estimator built on the
+same model chain inherits the same sensitivity, and a floor on the zenith cosine is the cheapest
+guard against it.
+
+**One of the five fitted parameters lands outside physics, which is a warning about reading a
+fitted capacity as a measurement.** The fitted temperature coefficient runs from −0.0018 to +0.0020
+per degree Celsius across the six sites, where a crystalline-silicon module's maximum-power
+coefficient is negative and datasheets cluster between −0.0045 and −0.0025. A positive value means
+the fit is using that parameter for something other than the temperature response, and the fitted
+capacity absorbs whatever derating the temperature coefficient leaves unapplied. The fitted tilts
+and azimuths are unaffected. For this plan the lesson is that a capacity parameter is only as
+trustworthy as the terms beside it, which is an argument for the physically-constrained priors
+[candidate B](#candidate-b-the-differentiable-physics-estimator) carries.
 
 **The `effective_capacity` table is a single snapshot, not a time series.** It holds exactly one row
 per `time_series_id` — 32 rows for 32 series — so code that sorts it by time and takes the last row
@@ -644,12 +676,33 @@ weather. It remains an upper bound:
 the residual absorbs degradation, soiling, snow, curtailment, and any site-specific irradiance bias
 together. Separating them is the estimator contest's job.
 
-**The satellite retrieval beats the reanalysis by 4.1 points of mean absolute error on this fleet,
-which is a local measurement to set beside the literature above.** On the 126,784 hours both cover,
-the CAMS Radiation Service cuts an XGBoost forecast's error from 10.12% to 6.07% of P99 output, and
-the fitted physical model from 10.37% to 6.73%. That is a forecasting measurement rather than a
-capacity one, but it is the same inputs feeding the same physics, and it supports [preferring CAMS
-for the capacity fit](#irradiance-inputs) on more than a literature argument.
+**A perfect capacity tracker would take about 4% off the error level of a PV forecast on this
+fleet, which bounds what this estimator can be expected to buy a forecast.** An oracle correction
+subtracts each arm's own mean signed error inside every site-year, reading that mean off the rows
+being scored, so it beats any real estimator working at annual resolution. It takes the reference
+arm from 5.333 to 5.266% of P99 output; repeating it inside every site-month reaches 5.124. Both
+leave every contrast in that experiment where it was, to within 0.0003 points. Two readings follow.
+A dynamic capacity estimate is worth having for the quantity itself rather than for the forecast
+accuracy it returns, so the [judging criteria](#the-head-to-head-protocol) are right to score the
+capacity trace rather than a downstream forecast. And a forecasting experiment on this fleet does
+not need one, because the error a static denominator leaves is shared across whatever arms are
+being compared.
+
+**Changing the capacity denominator changes the units and nothing else.** That experiment
+normalises every error by each site's 99th percentile of output. Recomputing the headline against
+the 99.9th percentile, against the highest reading, and against a daylight-only 99th percentile
+moves the absolute figure between −0.096 and −0.086 percentage points and leaves the relative
+effect at 1.80% in all four cases. An estimator that reported a higher effective capacity would
+therefore not be validated by a forecasting score moving, and would not be refuted by one staying
+still.
+
+**The satellite retrieval beats the reanalysis by 4.29 points of mean absolute error on this fleet,
+which is a local measurement to set beside the literature above.** The comparison and its caveats
+are on the [data-sources
+page](data-sources.md#what-a-cams-against-era5-comparison-on-the-trial-areas-solar-farms-found).
+That is a forecasting measurement rather than a capacity one, but it is the same inputs feeding the
+same physics, and it supports [preferring CAMS for the capacity fit](#irradiance-inputs) on more
+than a literature argument.
 
 **Curtailment needs the export cap, and the export cap needs its go-live date.** NGED's setpoint
 feed reads zero for the six months before the scheme starts enforcing anything, while the generator
