@@ -50,8 +50,6 @@ from typing import Final, NamedTuple
 
 import numpy as np
 import polars as pl
-
-# None of these is a workspace dependency; this throwaway script is run with `uv run --with ...`.
 import xarray as xr
 from build_dataset import _pv_sites
 from fetch_open_meteo_point import (
@@ -61,8 +59,9 @@ from fetch_open_meteo_point import (
     _solar_geometry,
     fetch_point_frame,
 )
-from pyproj import CRS, Transformer
+from pyproj import CRS
 from sources import OPEN_METEO_MODELS
+from studies.grid_sampling import sample_nearest_cell
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("verify_ukv_lineage")
@@ -219,36 +218,13 @@ def _read_native_at_sites(
         with os.fdopen(handle, "wb") as scratch:
             scratch.write(payload)
         with xr.open_dataset(path) as dataset:
-            return _sample_grid(dataset=dataset, sites=sites)
+            return sample_nearest_cell(
+                field=dataset[_flux_variable_name(dataset=dataset)],
+                sites=sites,
+                crs=CRS.from_cf(dict(dataset["lambert_azimuthal_equal_area"].attrs)),
+            )
     finally:
         Path(path).unlink(missing_ok=True)
-
-
-def _sample_grid(*, dataset: xr.Dataset, sites: pl.DataFrame) -> dict[str, float]:
-    """Return the nearest grid cell's value at each site.
-
-    Args:
-        dataset: One opened native file.
-        sites: The roster, carrying `site`, `latitude`, and `longitude`.
-
-    Returns:
-        The flux in W m⁻² at each site's nearest grid cell.
-    """
-    projection = CRS.from_cf(dict(dataset["lambert_azimuthal_equal_area"].attrs))
-    transformer = Transformer.from_crs("EPSG:4326", projection, always_xy=True)
-    field = dataset[_flux_variable_name(dataset=dataset)]
-
-    sampled: dict[str, float] = {}
-    for row in sites.to_dicts():
-        easting, northing = transformer.transform(row["longitude"], row["latitude"])
-        sampled[str(row["site"])] = float(
-            field.sel(
-                projection_x_coordinate=easting,
-                projection_y_coordinate=northing,
-                method="nearest",
-            ).item()
-        )
-    return sampled
 
 
 def _flux_variable_name(*, dataset: xr.Dataset) -> str:

@@ -27,18 +27,15 @@ from typing import Final
 import numpy as np
 import polars as pl
 from commissioning import drop_commissioning_ramp
-from export_cap import clamp_to_cap, with_export_cap
-from run_experiment import (
-    N_FOLDS,
-    SEEDS,
-    _add_time_features,
-    _assign_folds,
-    _bootstrap_difference,
-    dataset_path_for,
-)
+from export_cap import with_export_cap
+from run_experiment import _add_time_features, dataset_path_for
 from run_physics_experiment import MAX_ITERATIONS, START_SPREAD, _n_parameters, _predict
 from scipy.optimize import minimize
 from sources import SOURCE_CHOICES
+from studies.bootstrap import bootstrap_difference
+
+# The block bootstrap draws one seed per resample, so every arm it compares shares `SEEDS`.
+from studies.cross_validation import N_FOLDS, SEEDS, assign_folds, clamp_to_cap
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("shared_geometry")
@@ -58,9 +55,6 @@ GEOMETRY_INDICES: Final[tuple[int, int]] = (0, 1)
 
 N_RESTARTS: Final[int] = 8
 """Starting points per fit, matching `run_physics_experiment`."""
-
-# The seeds come from `run_experiment`, because the block bootstrap draws one of them per
-# resample and would otherwise see a ragged array.
 
 
 def _fit(
@@ -173,7 +167,7 @@ def main() -> int:
     arguments = parser.parse_args()
 
     dataset = with_export_cap(
-        dataset=_assign_folds(
+        dataset=assign_folds(
             dataset=_add_time_features(
                 dataset=drop_commissioning_ramp(
                     dataset=pl.read_parquet(dataset_path_for(source=arguments.source))
@@ -207,7 +201,7 @@ def main() -> int:
     for scheme in ("free", "shared"):
         scoped = losses.filter(pl.col("scheme") == scheme)
         for treatment in ("P_C_source_split", "P_B_disc"):
-            result = _bootstrap_difference(
+            result = bootstrap_difference(
                 losses=scoped, treatment=treatment, reference=REFERENCE_ARM, metric=metric
             )
             point = result["difference"] * 100

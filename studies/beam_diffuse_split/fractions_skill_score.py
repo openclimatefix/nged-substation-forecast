@@ -100,6 +100,9 @@ def _bootstrap_fss_difference(
 ) -> dict[str, float]:
     """Interval the difference of two arms' scores by resampling whole months.
 
+    Not `studies.bootstrap.bootstrap_difference`, because the score is a ratio of two sums rather
+    than a mean of per-row errors.
+
     Both arms are resampled on the *same* drawn months, so the paired structure that makes the
     difference precise is preserved. The two arms saw the same weather, and the interval should
     reflect the shared weather rather than treat the arms as independent runs.

@@ -492,7 +492,8 @@ February 2026.
 
 **Comparing each pair on its own shared hours gave the wrong answer, which is why the common row
 set matters.** Pair by pair, UKV appeared not to beat ERA5 at all. On the common set it beats ERA5
-in every era, by 0.34 points before February 2026 with an interval from 0.10 to 0.56. The absolute
+by 0.32 points before February 2026, with an interval from 0.09 to 0.54, and its lead after that
+has an interval including zero. The absolute
 levels move too: ERA5 scores 9.90% on the common set against 8.28% on its pair with ICON-D2, the
 same product and the same generators, because restricting to hours every product covers keeps the
 harder hours. Figures measured on different row sets do not compose into a ranking.

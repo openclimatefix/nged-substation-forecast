@@ -23,7 +23,7 @@ import numpy as np
 import polars as pl
 from commissioning import drop_commissioning_ramp
 from export_cap import with_export_cap
-from run_experiment import _add_time_features, _assign_folds, dataset_path_for
+from run_experiment import _add_time_features, dataset_path_for
 from run_physics_experiment import (
     ARM_SPLITS,
     MAX_ITERATIONS,
@@ -33,6 +33,7 @@ from run_physics_experiment import (
 )
 from scipy.optimize import minimize
 from sources import SOURCE_CHOICES
+from studies.cross_validation import assign_folds
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("restart_basins")
@@ -116,7 +117,7 @@ def main() -> int:
     arguments = parser.parse_args()
 
     dataset = with_export_cap(
-        dataset=_assign_folds(
+        dataset=assign_folds(
             dataset=_add_time_features(
                 dataset=drop_commissioning_ramp(
                     dataset=pl.read_parquet(dataset_path_for(source=arguments.source))

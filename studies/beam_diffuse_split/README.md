@@ -62,7 +62,7 @@ separation model's estimate of the same split, says what the *published field* b
 | `inverter_clipping.py` | Splits the headline contrast by whether the meter was sitting on its inverter ceiling. A clipped hour cannot respond to irradiance, so this separates "clipping dilutes the effect" from "clipping manufactures it". |
 | `anm_curtailment.py` | Reads NGED's `curtailment/` feed — the active-network-management log nothing else in the repository ingests — and tests it against the one curtailed site's output shortfall. Needs the NGED bucket credentials the other scripts do not. |
 | `anm_setpoints.py` | Turns NGED's raw active-network-management setpoint export into a half-hourly export-cap series, and checks how the cap reads: a generator sitting at the largest cap it ever sees is unconstrained, not fully curtailed. Reaches 26 months where the bucket feed reaches five. |
-| `export_cap.py` | Joins that export cap onto the modelling dataset and marks the hours the operator had moved it. Imported by all three runners: the curtailed hours are dropped from every training fold, and the predictions are held down to the cap at scoring time. |
+| `export_cap.py` | Joins that export cap onto the modelling dataset and marks the hours the operator had moved it. Imported by all three runners: the curtailed hours are dropped from every training fold, and `studies.cross_validation` holds the predictions down to the cap at scoring time. |
 | `verify_icon_d2_lineage.py` | Compares Open-Meteo's ICON-D2 against the German weather service's own files and measures which lead the archive holds. Open-Meteo stitches the first hours of each run, so a 3-hourly model's archive is a 1-to-3-hour forecast rather than an analysis. |
 | `fetch_ens_point.py` | Extracts ECMWF ensemble irradiance for the meters' H3 cells at five lead bands, reading the Delta transaction log rather than globbing parquet, which would return tombstoned files twice. |
 | `ens_horizons.py` | Scores the ensemble against ERA5 at each lead band, and four ways of reducing 51 members to one power number. Fits its own booster, so five settings differ from `run_experiment.py`; see its module docstring. |
@@ -297,12 +297,12 @@ being identical.
 contiguous month blocks, so every post-upgrade row falls in the last fold for five of the six
 generators, and that fold's model trained on pre-upgrade UKV alone. `era_comparison.py` cuts the
 folds inside each era instead, so a model scoring a post-upgrade row has trained on post-upgrade
-rows. Under that arrangement UKV still beats the reanalysis after the upgrade, by 0.09 pp with an
-interval from −0.49 to +0.21, against 0.34 pp [0.10, 0.56] before it. The upgrade did not cost UKV
-its standing against the reanalysis, and the figures above should be read as the cost of training
-on one version of a product and predicting with another — which is a real cost to a production
-pipeline, but a different finding from the product getting worse
-on the product.
+rows. Under that arrangement UKV's lead over the reanalysis after the upgrade is 0.07 pp with an
+interval from −0.25 to +0.42, which includes zero, against 0.32 pp [0.09, 0.54] before it. The
+upgrade did not reverse UKV's standing against the reanalysis, and the figures above should be read
+as the cost of training on one version of a product and predicting with another — which is a real
+cost to a production pipeline, but a different finding from the product getting worse on the
+product.
 
 **Report by upgrade era, and treat the post-upgrade era as the one production would use.** The
 caveats are that 8 months is a thin sample beside 47, that these 8 months are a single winter and

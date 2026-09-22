@@ -25,11 +25,11 @@ selection keeps the control member and drops the rest.
 
 **Five settings differ from the main experiment, so an absolute figure here is not comparable with
 one from `run_experiment.py`.** This script fits its own booster rather than calling
-`_fit_one_fold`, and so inherits XGBoost's default squared-error objective where the main
-experiment asks for absolute error; it grows 400 trees rather than 500; it applies neither the
-export-cap clamp nor the commissioning-ramp exclusion; it drops no constrained hour from training;
-and it fits one seed rather than three, so its intervals carry month-to-month variation but not
-variation between seeds. Every variant and the ERA5 baseline share all five, so the paired
+`studies.cross_validation.fit_one_fold`, and so inherits XGBoost's default squared-error objective
+where the main experiment asks for absolute error; it grows 400 trees rather than 500; it applies
+neither the export-cap clamp nor the commissioning-ramp exclusion; it drops no constrained hour from
+training; and it fits one seed rather than three, so its intervals carry month-to-month variation
+but not variation between seeds. Every variant and the ERA5 baseline share all five, so the paired
 contrasts this script reports remain internally valid.
 
 **Every variant is shown ERA5's temperature**, because the 3-hourly frame is built from the ERA5
@@ -48,16 +48,14 @@ from typing import Final
 import numpy as np
 import polars as pl
 import xgboost as xgb
-from run_experiment import (
+from run_experiment import SHARED_FEATURES, _add_time_features, dataset_path_for
+from sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
+from studies.cross_validation import (
     N_FOLDS,
     PRIMARY_HYPER_PARAMETERS,
-    SHARED_FEATURES,
-    _add_time_features,
-    _assign_folds,
-    _booster_parameters,
-    dataset_path_for,
+    assign_folds,
+    booster_parameters,
 )
-from sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
@@ -158,7 +156,7 @@ def _fit_and_predict(
         One prediction array per entry in `test_inputs`.
     """
     booster = xgb.train(
-        _booster_parameters(hyper_parameters=PRIMARY_HYPER_PARAMETERS, seed=seed),
+        booster_parameters(hyper_parameters=PRIMARY_HYPER_PARAMETERS, seed=seed),
         xgb.DMatrix(train.select(features).to_numpy(), label=train["power_mw"].to_numpy()),
         num_boost_round=BOOST_ROUNDS,
     )
@@ -172,8 +170,8 @@ def _paired_month_bootstrap(
 ) -> dict[str, float]:
     """Interval the difference between two variants by resampling whole months.
 
-    Written here rather than reused from `run_experiment` because that module's bootstrap expects
-    the main experiment's frame — arms, seeds and a per-row pairing this script does not produce.
+    Written here rather than reused from `studies.bootstrap` because that bootstrap expects the
+    main experiment's frame — an `arm` column and a per-row pairing this script does not produce.
 
     Both variants are scored on the same stamps, so the difference is taken per month before
     resampling: the weather both saw cancels, leaving only where they disagree. Months are the
@@ -304,7 +302,7 @@ def _joined(*, three_hourly: pl.DataFrame, ens: pl.DataFrame, horizon: str) -> p
         ens_mean=pl.mean_horizontal([f"ens_m_{name}" for name in members])
     )
     joined = three_hourly.join(wide, on=["site", "valid_time"], how="inner").drop_nulls()
-    return _assign_folds(
+    return assign_folds(
         dataset=_add_time_features(dataset=joined.with_columns(time=pl.col("valid_time")))
     )
 

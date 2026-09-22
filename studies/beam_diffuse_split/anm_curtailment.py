@@ -37,8 +37,9 @@ import numpy as np
 import polars as pl
 from build_dataset import METADATA_PATH, _pv_sites
 from contracts.settings import Settings
-from run_experiment import _bootstrap_difference, dataset_path_for, results_dir_for
+from run_experiment import dataset_path_for, results_dir_for
 from sources import SOURCE_CHOICES
+from studies.bootstrap import bootstrap_difference
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("anm_curtailment")
@@ -263,7 +264,7 @@ def main() -> int:
     without = losses.join(hourly.select("site", "time"), on=["site", "time"], how="anti")
     lines.extend(["", "| Rows | ΔMAE (pp of P99 output) | 95% interval |", "|---|---|---|"])
     for label, frame in (("As published", losses), ("Curtailed hours removed", without)):
-        interval = _bootstrap_difference(
+        interval = bootstrap_difference(
             losses=frame,
             treatment=CONTRAST[0],
             reference=CONTRAST[1],

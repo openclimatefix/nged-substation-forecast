@@ -23,8 +23,8 @@ import sys
 from typing import Final
 
 import polars as pl
-from run_experiment import _bootstrap_difference
 from sources import SOURCE_CHOICES, STUDY_DATA_DIR
+from studies.bootstrap import bootstrap_difference
 
 CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("C_era5_split", "B_erbs"),
@@ -82,7 +82,7 @@ def main() -> int:
     print("|---|---|---|---|---|")
     for treatment, reference in CONTRASTS:
         for metric in metrics:
-            result = _bootstrap_difference(
+            result = bootstrap_difference(
                 losses=losses, treatment=treatment, reference=reference, metric=metric
             )
             level = (

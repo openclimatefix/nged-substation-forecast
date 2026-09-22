@@ -35,22 +35,13 @@ import logging
 import sys
 from typing import Final
 
-import numpy as np
 import polars as pl
 from commissioning import drop_commissioning_ramp
-from export_cap import clamp_to_cap, with_export_cap
-from run_experiment import (
-    N_FOLDS,
-    PRIMARY_HYPER_PARAMETERS,
-    SEEDS,
-    SHARED_FEATURES,
-    _add_time_features,
-    _assign_folds,
-    _bootstrap_difference,
-    _fit_one_fold,
-    dataset_path_for,
-)
+from export_cap import with_export_cap
+from run_experiment import SHARED_FEATURES, _add_time_features, dataset_path_for
 from sources import STUDY_DATA_DIR
+from studies.bootstrap import bootstrap_difference
+from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, assign_folds, out_of_fold_losses
 
 _LOG = logging.getLogger(__name__)
 
@@ -103,8 +94,12 @@ CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
 )
 """Every (treatment, reference) pairing an interval is computed for, headline first."""
 
-METRIC: Final[str] = "absolute_error_capped_mw"
-"""The loss every table reports, with the export-cap clamp applied identically to every arm."""
+METRIC: Final[str] = "absolute_error_capped_fraction_of_capacity"
+"""The loss every table reports, with the export-cap clamp applied identically to every arm.
+
+Each row's error is divided by its own generator's capacity before any mean or difference is taken,
+so the arm table and the contrast table subtract into each other exactly.
+"""
 
 
 def _joined() -> pl.DataFrame:
@@ -146,47 +141,6 @@ def _with_shuffled_second_product(*, dataset: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def _losses_for_site(*, site_rows: pl.DataFrame, arm: str) -> pl.DataFrame:
-    """Produce out-of-fold losses for one arm at one site, one row per (test row, seed).
-
-    Args:
-        site_rows: Every row for one site, already carrying `fold` and `month`.
-        arm: The key into `ARM_FEATURES`.
-
-    Returns:
-        One row per (time, seed) with the clamped absolute error.
-    """
-    features = [*SHARED_FEATURES, *ARM_FEATURES[arm]]
-    outputs: list[pl.DataFrame] = []
-    for fold in range(N_FOLDS):
-        test = site_rows.filter(pl.col("fold") == fold)
-        train = site_rows.filter((pl.col("fold") != fold) & ~pl.col("constrained"))
-        if test.is_empty() or train.is_empty():
-            continue
-        actual = test["power_mw"].to_numpy()
-        for seed in SEEDS:
-            point, _ = _fit_one_fold(
-                train=train,
-                test=test,
-                features=features,
-                target="power_mw",
-                hyper_parameters=PRIMARY_HYPER_PARAMETERS,
-                seed=seed,
-                with_quantiles=False,
-            )
-            capped = clamp_to_cap(prediction=point, cap_mw=test["cap_mw"])
-            outputs.append(
-                test.select("site", "time", "month", "fold", "effective_capacity_mw")
-                .cast({"effective_capacity_mw": pl.Float64})
-                .with_columns(
-                    arm=pl.lit(arm),
-                    seed=pl.lit(seed, dtype=pl.Int32),
-                    absolute_error_capped_mw=pl.Series(np.abs(actual - capped), dtype=pl.Float64),
-                )
-            )
-    return pl.concat(outputs)
-
-
 def _as_percentage_of_capacity(*, losses: pl.DataFrame, arm: str) -> float:
     """Return one arm's mean absolute error as a percentage of effective capacity.
 
@@ -195,11 +149,10 @@ def _as_percentage_of_capacity(*, losses: pl.DataFrame, arm: str) -> float:
         arm: The arm to score.
 
     Returns:
-        The mean error over capacity, in percentage points.
+        The mean of each row's error over its generator's capacity, in percentage points.
     """
     rows = losses.filter(pl.col("arm") == arm)
-    ratio = (pl.col(METRIC) / pl.col("effective_capacity_mw")).mean()
-    return float(rows.select(ratio).item()) * PERCENTAGE_POINTS
+    return float(rows.select(pl.col(METRIC).mean()).item()) * PERCENTAGE_POINTS
 
 
 def main() -> int:
@@ -211,7 +164,7 @@ def main() -> int:
     parser.parse_args()
 
     dataset = with_export_cap(
-        dataset=_assign_folds(
+        dataset=assign_folds(
             dataset=_with_shuffled_second_product(
                 dataset=_add_time_features(dataset=drop_commissioning_ramp(dataset=_joined()))
             )
@@ -228,7 +181,13 @@ def main() -> int:
     frames: list[pl.DataFrame] = []
     for arm in ARM_FEATURES:
         frames.extend(
-            _losses_for_site(site_rows=dataset.filter(pl.col("site") == site), arm=arm)
+            out_of_fold_losses(
+                site_rows=dataset.filter(pl.col("site") == site),
+                features=[*SHARED_FEATURES, *ARM_FEATURES[arm]],
+                target="power_mw",
+                hyper_parameters=PRIMARY_HYPER_PARAMETERS,
+                with_quantiles=False,
+            ).with_columns(arm=pl.lit(arm))
             for site in sites
         )
         _LOG.info("fitted %s", arm)
@@ -253,16 +212,17 @@ def main() -> int:
         "| Contrast | ΔMAE (pp of capacity) | 95% interval | excludes zero? |",
         "|---|---|---|---|",
     ]
-    capacity = float(losses.select(pl.col("effective_capacity_mw").mean()).item())
     for treatment, reference in CONTRASTS:
-        interval = _bootstrap_difference(
+        interval = bootstrap_difference(
             losses=losses, treatment=treatment, reference=reference, metric=METRIC
         )
-        scale = PERCENTAGE_POINTS / capacity
         excludes = interval["lower_95"] > 0.0 or interval["upper_95"] < 0.0
+        difference, lower, upper = (
+            interval[key] * PERCENTAGE_POINTS for key in ("difference", "lower_95", "upper_95")
+        )
         lines.append(
-            f"| {treatment} − {reference} | {interval['difference'] * scale:+.4f} | "
-            f"[{interval['lower_95'] * scale:+.4f}, {interval['upper_95'] * scale:+.4f}] | "
+            f"| {treatment} − {reference} | {difference:+.4f} | "
+            f"[{lower:+.4f}, {upper:+.4f}] | "
             f"{'**yes**' if excludes else 'no'} |"
         )
     report = "\n".join(lines) + "\n"

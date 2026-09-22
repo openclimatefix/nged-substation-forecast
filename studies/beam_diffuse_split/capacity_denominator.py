@@ -20,12 +20,9 @@ from typing import Final
 
 import polars as pl
 from commissioning import drop_commissioning_ramp
-from run_experiment import (
-    _add_time_features,
-    _bootstrap_difference,
-    dataset_path_for,
-)
+from run_experiment import _add_time_features, dataset_path_for
 from sources import SOURCE_CHOICES, STUDY_DATA_DIR
+from studies.bootstrap import bootstrap_difference
 
 CLEAREST_WEEK: Final[str] = "2026-04-20"
 """The week the clearest-week panels draw, as `make_figures._chosen_weeks` picks it."""
@@ -140,7 +137,7 @@ def main() -> int:
         rescaled = _add_time_features(
             dataset=losses.join(scales.select("site", column), on="site", how="inner")
         ).with_columns(metric=pl.col("absolute_error_capped_mw") / pl.col(column))
-        result = _bootstrap_difference(
+        result = bootstrap_difference(
             losses=rescaled, treatment=HEADLINE[0], reference=HEADLINE[1], metric="metric"
         )
         reference_level = (

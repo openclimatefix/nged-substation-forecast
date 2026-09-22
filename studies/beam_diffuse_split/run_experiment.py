@@ -43,14 +43,25 @@ import json
 import logging
 import sys
 from pathlib import Path
-from typing import Final, TypedDict
+from typing import Final
 
 import numpy as np
 import polars as pl
 import xgboost as xgb
 from commissioning import drop_commissioning_ramp
-from export_cap import clamp_to_cap, with_export_cap
+from export_cap import with_export_cap
 from sources import SOURCE_CHOICES, STUDY_DATA_DIR
+from studies.bootstrap import bootstrap_difference, per_fold_differences
+from studies.cross_validation import (
+    N_FOLDS,
+    PRIMARY_HYPER_PARAMETERS,
+    SEEDS,
+    SENSITIVITY_HYPER_PARAMETERS,
+    HyperParameters,
+    assign_folds,
+    booster_parameters,
+    out_of_fold_losses,
+)
 from studies.fractions_skill_score import MONTH_FORMAT
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -159,91 +170,8 @@ can on the meters.
 """
 
 
-class HyperParameters(TypedDict):
-    """The XGBoost settings held fixed across every arm, site, fold and seed."""
-
-    max_depth: int
-    learning_rate: float
-    subsample: float
-    min_child_weight: float
-    reg_lambda: float
-    num_boost_round: int
-
-
-PRIMARY_HYPER_PARAMETERS: Final[HyperParameters] = {
-    "max_depth": 6,
-    "learning_rate": 0.05,
-    "subsample": 0.8,
-    "min_child_weight": 20.0,
-    "reg_lambda": 1.0,
-    "num_boost_round": 500,
-}
-"""Fixed, not tuned.
-
-Tuning per arm would let the tuner's own noise decide which arm wins, and early stopping would give
-each arm a different number of rounds for reasons unrelated to the irradiance features. Both are
-channels through which an arm could win without carrying more information, so neither is used.
-
-**There is no `colsample_bytree` here, and its absence is load-bearing.** Column subsampling below 1
-hands every arm with more columns a free win over an arm with fewer: the one-irradiance-feature arm
-loses its only irradiance column in a large share of trees, while a three-column arm always keeps
-one. Measured on this data with a feature set padded out by duplicate columns carrying no
-information at all, `colsample_bytree=0.8` produced a 10% improvement in mean absolute error out of
-pure redundancy — comfortably larger than the effect being measured. Row subsampling is kept,
-because it does not depend on how many columns an arm has, and it is what gives the seeds something
-to vary.
-"""
-
-SENSITIVITY_HYPER_PARAMETERS: Final[HyperParameters] = {
-    "max_depth": 4,
-    "learning_rate": 0.03,
-    "subsample": 0.8,
-    "min_child_weight": 50.0,
-    "reg_lambda": 5.0,
-    "num_boost_round": 1200,
-}
-"""A shallower, more heavily regularised alternative.
-
-A single hyperparameter setting can favour an arm by accident — a wider feature set changes how much
-a fixed number of rounds overfits. Running a second, deliberately different setting says whether the
-arm ordering is a property of the features or of the settings.
-"""
-
-SEEDS: Final[tuple[int, ...]] = (0, 1, 2)
-"""Each (arm, site, fold) is fitted once per seed.
-
-Seed-to-seed variation is the noise floor any arm-to-arm difference has to clear, so it is measured
-rather than assumed, and the bootstrap draws a seed as well as a set of months so that the noise
-reaches the interval instead of being averaged out of it.
-"""
-
-N_FOLDS: Final[int] = 5
-"""Contiguous time blocks, each used once as the test fold.
-
-Blocks are contiguous rather than random because neighbouring hours share a weather system, so a
-random split would put near-copies of a test row in the training set. They are cut inside each
-site's own span rather than across the whole roster's, because the roster's span is seven years and
-the newest site has two and a half: global blocks would leave that site with three empty test folds
-and train the remaining two on its own future.
-"""
-
-QUANTILE_LEVELS: Final[tuple[float, ...]] = (0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
-"""Quantiles for the continuous ranked probability score.
-
-The score is the integral of twice the pinball loss over every level in (0, 1), approximated here by
-a Riemann sum: the level spacing times twice the summed loss. The same levels are used for every
-arm, so the approximation cannot favour one.
-"""
-
-QUANTILE_LEVEL_SPACING: Final[float] = 0.1
-
-N_BOOTSTRAP_RESAMPLES: Final[int] = 2000
-BOOTSTRAP_SEED: Final[int] = 20260920
-
 MAX_CONCURRENT_FITS: Final[int] = 8
 """How many (arm, site) fits to run at once, each on `THREADS_PER_FIT` cores."""
-
-THREADS_PER_FIT: Final[int] = 4
 
 
 def _add_time_features(*, dataset: pl.DataFrame) -> pl.DataFrame:
@@ -255,345 +183,59 @@ def _add_time_features(*, dataset: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def _assign_folds(*, dataset: pl.DataFrame) -> pl.DataFrame:
-    """Cut each site's own span into `N_FOLDS` contiguous blocks of whole months.
-
-    Args:
-        dataset: Rows carrying `site` and the `month` label.
-
-    Returns:
-        `dataset` with an integer `fold` column.
-    """
-    month_rank = pl.col("month").rank(method="dense").over("site")
-    month_count = pl.col("month").n_unique().over("site")
-    fold = ((month_rank - 1) * N_FOLDS // month_count).clip(upper_bound=N_FOLDS - 1)
-    return dataset.with_columns(fold=fold.cast(pl.Int32))
+Job = tuple[str, str, str, tuple[str, ...], HyperParameters, bool]
+"""One (arm, setting name, target, features, settings, whether to score quantiles) to fit."""
 
 
-def _crps(*, actual: np.ndarray, quantiles: np.ndarray) -> np.ndarray:
-    """Return the per-row continuous ranked probability score, approximated from the quantiles.
-
-    Args:
-        actual: Observed power, shape (n_rows,).
-        quantiles: Predicted quantiles, shape (n_rows, n_levels), in the order of `QUANTILE_LEVELS`.
-
-    Returns:
-        The per-row score, shape (n_rows,).
-    """
-    # XGBoost's multi-quantile head can return crossing quantiles; sorting each row repairs that
-    # without changing any individual level's calibration much, and is applied to every arm alike.
-    sorted_quantiles = np.sort(quantiles, axis=1)
-    levels = np.asarray(QUANTILE_LEVELS)[None, :]
-    difference = actual[:, None] - sorted_quantiles
-    pinball = np.where(difference >= 0, difference * levels, -difference * (1.0 - levels))
-    return 2.0 * QUANTILE_LEVEL_SPACING * pinball.sum(axis=1)
-
-
-def _booster_parameters(*, hyper_parameters: HyperParameters, seed: int) -> dict[str, object]:
-    """Translate the settings above into XGBoost's own parameter names."""
-    return {
-        "max_depth": hyper_parameters["max_depth"],
-        "eta": hyper_parameters["learning_rate"],
-        "subsample": hyper_parameters["subsample"],
-        "min_child_weight": hyper_parameters["min_child_weight"],
-        "lambda": hyper_parameters["reg_lambda"],
-        "tree_method": "hist",
-        "seed": seed,
-        "nthread": THREADS_PER_FIT,
-    }
-
-
-def _features_for(*, arm: str, fold: int) -> list[str]:
-    """Return the feature columns one arm is shown when the named fold is the one being scored.
+def features_for(*, arm: str) -> tuple[str, ...]:
+    """Return the feature columns one of this experiment's arms is shown.
 
     Args:
         arm: The key into `ARM_FEATURES`.
-        fold: The fold about to be held out.
 
     Returns:
-        The shared features followed by the arm's own irradiance columns.
+        The shared features followed by the arm's own irradiance columns, some carrying `{fold}`.
     """
-    return [*SHARED_FEATURES, *(column.format(fold=fold) for column in ARM_FEATURES[arm])]
+    return (*SHARED_FEATURES, *ARM_FEATURES[arm])
 
 
-def _fit_one_fold(
-    *,
-    train: pl.DataFrame,
-    test: pl.DataFrame,
-    features: list[str],
-    target: str,
-    hyper_parameters: HyperParameters,
-    seed: int,
-    with_quantiles: bool,
-) -> tuple[np.ndarray, np.ndarray | None]:
-    """Fit one point model, optionally one quantile model, and predict the test fold.
-
-    Args:
-        train: The training rows.
-        test: The test rows.
-        features: The feature columns to show the model.
-        target: The column to predict.
-        hyper_parameters: Settings shared by every arm.
-        seed: The XGBoost random seed.
-        with_quantiles: Whether to fit the quantile model as well.
-
-    Returns:
-        The point predictions, and the quantile predictions or `None`.
-    """
-    train_matrix = xgb.DMatrix(train.select(features).to_numpy(), label=train[target].to_numpy())
-    test_matrix = xgb.DMatrix(test.select(features).to_numpy())
-    shared = _booster_parameters(hyper_parameters=hyper_parameters, seed=seed)
-    rounds = hyper_parameters["num_boost_round"]
-
-    point_model = xgb.train(
-        {**shared, "objective": "reg:absoluteerror"}, train_matrix, num_boost_round=rounds
-    )
-    point = point_model.predict(test_matrix)
-    if not with_quantiles:
-        return point, None
-
-    quantile_model = xgb.train(
-        {**shared, "objective": "reg:quantileerror", "quantile_alpha": np.asarray(QUANTILE_LEVELS)},
-        train_matrix,
-        num_boost_round=rounds,
-    )
-    return point, np.atleast_2d(quantile_model.predict(test_matrix))
-
-
-def _run_site_arm(
-    *,
-    site_rows: pl.DataFrame,
-    arm: str,
-    setting_name: str,
-    target: str,
-    hyper_parameters: HyperParameters,
-    with_quantiles: bool,
-) -> pl.DataFrame:
-    """Produce out-of-fold losses for one arm at one site, one row per (test row, seed).
-
-    Args:
-        site_rows: Every row for one site, already carrying `fold` and `month`.
-        arm: The key into `ARM_FEATURES`.
-        setting_name: A label for the hyperparameter setting, carried into the results.
-        target: The column to predict.
-        hyper_parameters: The setting to fit at.
-        with_quantiles: Whether to score the continuous ranked probability score too.
-
-    Returns:
-        One row per (time, seed) with the losses.
-    """
-    outputs: list[pl.DataFrame] = []
-    for fold in range(N_FOLDS):
-        test = site_rows.filter(pl.col("fold") == fold)
-        # A constrained hour is one the network operator turned down, so no irradiance product
-        # could have predicted it and a model that trains on it learns to read network
-        # instructions out of the sky. Scoring keeps those hours; only training drops them.
-        train = site_rows.filter((pl.col("fold") != fold) & ~pl.col("constrained"))
-        if test.is_empty() or train.is_empty():
-            continue
-        features = _features_for(arm=arm, fold=fold)
-        actual = test[target].to_numpy()
-        for seed in SEEDS:
-            point, quantiles = _fit_one_fold(
-                train=train,
-                test=test,
-                features=features,
-                target=target,
-                hyper_parameters=hyper_parameters,
-                seed=seed,
-                with_quantiles=with_quantiles,
-            )
-            # Every loss column is pinned to Float64. The real target is Float32 and the synthetic
-            # control target is Float64, so without the cast the two runs produce frames that
-            # cannot be stacked.
-            crps = (
-                pl.Series(_crps(actual=actual, quantiles=quantiles), dtype=pl.Float64)
-                if quantiles is not None
-                else pl.lit(None, dtype=pl.Float64)
-            )
-            capped_point = clamp_to_cap(prediction=point, cap_mw=test["cap_mw"])
-            capped_crps = (
-                pl.Series(
-                    _crps(
-                        actual=actual,
-                        quantiles=clamp_to_cap(prediction=quantiles, cap_mw=test["cap_mw"]),
-                    ),
-                    dtype=pl.Float64,
-                )
-                if quantiles is not None
-                else pl.lit(None, dtype=pl.Float64)
-            )
-            outputs.append(
-                test.select("site", "time", "month", "fold", "effective_capacity_mw", "constrained")
-                .cast({"effective_capacity_mw": pl.Float64})
-                .with_columns(
-                    arm=pl.lit(arm),
-                    setting=pl.lit(setting_name),
-                    target=pl.lit(target),
-                    seed=pl.lit(seed, dtype=pl.Int32),
-                    absolute_error_mw=pl.Series(np.abs(actual - point), dtype=pl.Float64),
-                    signed_error_mw=pl.Series(point - actual, dtype=pl.Float64),
-                    crps_mw=crps,
-                    absolute_error_capped_mw=pl.Series(
-                        np.abs(actual - capped_point), dtype=pl.Float64
-                    ),
-                    signed_error_capped_mw=pl.Series(capped_point - actual, dtype=pl.Float64),
-                    crps_capped_mw=capped_crps,
-                )
-            )
-    return pl.concat(outputs)
-
-
-def _run_all(
-    *, dataset: pl.DataFrame, jobs: list[tuple[str, str, str, HyperParameters, bool]]
-) -> pl.DataFrame:
+def _run_all(*, dataset: pl.DataFrame, jobs: list[Job]) -> pl.DataFrame:
     """Run every (arm, site) job concurrently and concatenate the losses.
 
     XGBoost releases the interpreter lock while it trains, so threads give real parallelism here
     without the cost of shipping a copy of the frame to a subprocess.
 
     Args:
-        dataset: The full frame, already carrying `fold` and `month`.
-        jobs: One tuple per (arm, setting name, target, settings, whether to score quantiles).
+        dataset: The full frame, already carrying `fold`, `month`, `cap_mw` and `constrained`.
+        jobs: The fits to run.
 
     Returns:
-        Every job's losses, stacked.
+        Every job's losses, stacked, labelled with the arm, the setting and the target.
     """
     sites = sorted(dataset["site"].unique().to_list())
     outputs: list[pl.DataFrame] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT_FITS) as pool:
         futures = {}
-        for arm, setting_name, target, hyper_parameters, with_quantiles in jobs:
+        for arm, setting_name, target, features, hyper_parameters, with_quantiles in jobs:
             for site in sites:
                 future = pool.submit(
-                    _run_site_arm,
+                    out_of_fold_losses,
                     site_rows=dataset.filter(pl.col("site") == site),
-                    arm=arm,
-                    setting_name=setting_name,
+                    features=features,
                     target=target,
                     hyper_parameters=hyper_parameters,
                     with_quantiles=with_quantiles,
                 )
-                futures[future] = (setting_name, arm, site)
+                futures[future] = (setting_name, arm, target, site)
         for done, future in enumerate(concurrent.futures.as_completed(futures), start=1):
-            setting_name, arm, site = futures[future]
-            outputs.append(future.result())
+            setting_name, arm, target, site = futures[future]
+            outputs.append(
+                future.result().with_columns(
+                    arm=pl.lit(arm), setting=pl.lit(setting_name), target=pl.lit(target)
+                )
+            )
             _LOG.info("%d/%d done: %s / %s / site %s", done, len(futures), setting_name, arm, site)
     return pl.concat(outputs)
-
-
-def _paired_differences(
-    *, losses: pl.DataFrame, treatment: str, reference: str, metric: str
-) -> tuple[np.ndarray, np.ndarray]:
-    """Return the per-seed, per-row difference in one metric, and each row's month.
-
-    Args:
-        losses: Per-row losses holding both arms, restricted to the scope wanted.
-        treatment: The arm whose metric is being compared.
-        reference: The arm it is compared against.
-        metric: The loss column to difference.
-
-    Returns:
-        An array of shape (n_seeds, n_rows) of treatment-minus-reference differences, and the month
-        label of each row.
-    """
-    paired = (
-        losses.filter(pl.col("arm") == reference)
-        .select("site", "time", "seed", "month", reference=pl.col(metric))
-        .join(
-            losses.filter(pl.col("arm") == treatment).select(
-                "site", "time", "seed", treatment=pl.col(metric)
-            ),
-            on=["site", "time", "seed"],
-            how="inner",
-        )
-        .sort("seed", "site", "time")
-    )
-    by_seed = [
-        paired.filter(pl.col("seed") == seed).select(
-            "month", difference=pl.col("treatment") - pl.col("reference")
-        )
-        for seed in SEEDS
-    ]
-    differences = np.stack([frame["difference"].to_numpy() for frame in by_seed])
-    return differences, by_seed[0]["month"].to_numpy()
-
-
-def _bootstrap_difference(
-    *, losses: pl.DataFrame, treatment: str, reference: str, metric: str
-) -> dict[str, float]:
-    """Bootstrap the paired arm-to-arm difference, resampling whole months and a seed.
-
-    Six meters inside a box roughly 25 km by 23 km share their weather, and in fact resolve to only
-    two ERA5 grid cells, so the effective sample size is the number of independent weather episodes
-    rather than the number of site-hours. Resampling whole calendar months keeps each episode's rows
-    together, and resampling the *same* months for both arms keeps the comparison paired.
-
-    Each resample also draws one of the seeds, for both arms alike. Without that, the interval would
-    treat the seed-averaged loss as a fixed quantity and exclude a source of variation measured at
-    the same order as the effect itself.
-
-    Args:
-        losses: Per-row losses for both arms, already restricted to the scope wanted.
-        treatment: The arm whose metric is being compared.
-        reference: The arm it is compared against.
-        metric: The loss column to difference.
-
-    Returns:
-        The point estimate, the 2.5th and 97.5th percentiles, and what the estimate rests on.
-    """
-    differences, months = _paired_differences(
-        losses=losses, treatment=treatment, reference=reference, metric=metric
-    )
-    unique_months, month_index = np.unique(months, return_inverse=True)
-    rows_by_month = [np.flatnonzero(month_index == index) for index in range(len(unique_months))]
-
-    generator = np.random.default_rng(BOOTSTRAP_SEED)
-    resampled = np.empty(N_BOOTSTRAP_RESAMPLES)
-    for resample in range(N_BOOTSTRAP_RESAMPLES):
-        seed_index = generator.integers(0, differences.shape[0])
-        drawn = generator.integers(0, len(unique_months), size=len(unique_months))
-        rows = np.concatenate([rows_by_month[index] for index in drawn])
-        resampled[resample] = differences[seed_index, rows].mean()
-
-    return {
-        "difference": float(differences.mean()),
-        "lower_95": float(np.percentile(resampled, 2.5)),
-        "upper_95": float(np.percentile(resampled, 97.5)),
-        "seed_spread": float(differences.mean(axis=1).std()),
-        "n_rows": differences.shape[1],
-        "n_months": len(unique_months),
-    }
-
-
-def _per_fold_differences(
-    *, losses: pl.DataFrame, treatment: str, reference: str, metric: str
-) -> list[float]:
-    """Return the arm-to-arm difference within each fold separately.
-
-    Five folds agreeing in sign is the cheapest robustness statistic available here, and it is one
-    the block bootstrap cannot give: the bootstrap treats months as the unit of independence, while
-    each site rests on only five trained models per arm.
-
-    Args:
-        losses: Per-row losses for both arms.
-        treatment: The arm whose metric is being compared.
-        reference: The arm it is compared against.
-        metric: The loss column to difference.
-
-    Returns:
-        One difference per fold, in fold order.
-    """
-    differences: list[float] = []
-    for fold in range(N_FOLDS):
-        in_fold = losses.filter(pl.col("fold") == fold)
-        if in_fold.is_empty():
-            continue
-        paired, _ = _paired_differences(
-            losses=in_fold, treatment=treatment, reference=reference, metric=metric
-        )
-        differences.append(float(paired.mean()))
-    return differences
 
 
 def _direct_fraction_predictability(*, dataset: pl.DataFrame) -> dict[str, float]:
@@ -636,7 +278,7 @@ def _direct_fraction_predictability(*, dataset: pl.DataFrame) -> dict[str, float
                 continue
             model = xgb.train(
                 {
-                    **_booster_parameters(hyper_parameters=PRIMARY_HYPER_PARAMETERS, seed=0),
+                    **booster_parameters(hyper_parameters=PRIMARY_HYPER_PARAMETERS, seed=0),
                     "objective": "reg:squarederror",
                 },
                 xgb.DMatrix(
@@ -713,7 +355,7 @@ def _add_learned_split(*, dataset: pl.DataFrame) -> pl.DataFrame:
             train = dataset.filter(~pl.col("month").is_in(excluded))
             model = xgb.train(
                 {
-                    **_booster_parameters(hyper_parameters=PRIMARY_HYPER_PARAMETERS, seed=0),
+                    **booster_parameters(hyper_parameters=PRIMARY_HYPER_PARAMETERS, seed=0),
                     "objective": "reg:squarederror",
                 },
                 xgb.DMatrix(
@@ -798,7 +440,7 @@ def _intervals_for(
                         "metric": metric,
                         "scope": scope,
                         "per_fold_differences": (
-                            _per_fold_differences(
+                            per_fold_differences(
                                 losses=losses,
                                 treatment=treatment,
                                 reference=reference,
@@ -807,7 +449,7 @@ def _intervals_for(
                             if scope == "all_sites"
                             else []
                         ),
-                        **_bootstrap_difference(
+                        **bootstrap_difference(
                             losses=scoped, treatment=treatment, reference=reference, metric=metric
                         ),
                     }
@@ -830,7 +472,7 @@ def main() -> int:
     results_dir = results_dir_for(source=source)
     results_dir.mkdir(parents=True, exist_ok=True)
     dataset = with_export_cap(
-        dataset=_assign_folds(
+        dataset=assign_folds(
             dataset=_add_time_features(
                 dataset=drop_commissioning_ramp(
                     dataset=pl.read_parquet(dataset_path_for(source=source))
@@ -851,24 +493,34 @@ def main() -> int:
 
     dataset = _add_learned_split(dataset=dataset)
 
-    jobs: list[tuple[str, str, str, HyperParameters, bool]] = [
-        (arm, "primary", "power_mw", PRIMARY_HYPER_PARAMETERS, True) for arm in ARM_FEATURES
+    jobs: list[Job] = [
+        (arm, "primary", "power_mw", features_for(arm=arm), PRIMARY_HYPER_PARAMETERS, True)
+        for arm in ARM_FEATURES
     ]
     jobs += [
-        (arm, "sensitivity", "power_mw", SENSITIVITY_HYPER_PARAMETERS, False)
+        (
+            arm,
+            "sensitivity",
+            "power_mw",
+            features_for(arm=arm),
+            SENSITIVITY_HYPER_PARAMETERS,
+            False,
+        )
         for arm in SENSITIVITY_ARMS
     ]
     jobs += [
-        (arm, "positive_control", "synthetic_power_mw", PRIMARY_HYPER_PARAMETERS, False)
+        (
+            arm,
+            "positive_control",
+            "synthetic_power_mw",
+            features_for(arm=arm),
+            PRIMARY_HYPER_PARAMETERS,
+            False,
+        )
         for arm in CONTROL_ARMS
     ]
 
-    losses = _run_all(dataset=dataset, jobs=jobs).with_columns(
-        absolute_error_fraction_of_capacity=pl.col("absolute_error_mw")
-        / pl.col("effective_capacity_mw"),
-        absolute_error_capped_fraction_of_capacity=pl.col("absolute_error_capped_mw")
-        / pl.col("effective_capacity_mw"),
-    )
+    losses = _run_all(dataset=dataset, jobs=jobs)
     losses.write_parquet(results_dir / "per_row_losses.parquet")
 
     records: list[dict[str, object]] = []

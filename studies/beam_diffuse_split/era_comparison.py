@@ -30,22 +30,13 @@ import logging
 import sys
 from typing import Final
 
-import numpy as np
 import polars as pl
 from commissioning import drop_commissioning_ramp
-from export_cap import clamp_to_cap, with_export_cap
-from run_experiment import (
-    N_FOLDS,
-    PRIMARY_HYPER_PARAMETERS,
-    SEEDS,
-    SHARED_FEATURES,
-    _add_time_features,
-    _assign_folds,
-    _bootstrap_difference,
-    _fit_one_fold,
-    dataset_path_for,
-)
+from export_cap import with_export_cap
+from run_experiment import SHARED_FEATURES, _add_time_features, dataset_path_for
 from sources import STUDY_DATA_DIR
+from studies.bootstrap import bootstrap_difference
+from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, assign_folds, out_of_fold_losses
 
 _LOG = logging.getLogger(__name__)
 
@@ -78,8 +69,12 @@ CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
 )
 """Every (treatment, reference) pairing an interval is computed for, within each era."""
 
-METRIC: Final[str] = "absolute_error_capped_mw"
-"""The loss every table reports, with the export-cap clamp applied identically to every arm."""
+METRIC: Final[str] = "absolute_error_capped_fraction_of_capacity"
+"""The loss every table reports, with the export-cap clamp applied identically to every arm.
+
+Each row's error is divided by its own generator's capacity before any mean or difference is taken,
+so the arm table and the contrast table subtract into each other exactly.
+"""
 
 
 def _joined() -> pl.DataFrame:
@@ -139,41 +134,20 @@ def _losses(*, rows: pl.DataFrame, arm: str) -> pl.DataFrame:
         arm: The key into `PRODUCTS`.
 
     Returns:
-        One row per (site, time, seed) with the clamped absolute error.
+        One row per (site, time, seed) with the losses, labelled with the arm.
     """
-    features = [*SHARED_FEATURES, "ghi_w_m2"]
-    outputs: list[pl.DataFrame] = []
-    for site in sorted(rows["site"].unique().to_list()):
-        at_site = rows.filter(pl.col("site") == site).with_columns(ghi_w_m2=pl.col(f"ghi_{arm}"))
-        for fold in range(N_FOLDS):
-            test = at_site.filter(pl.col("fold") == fold)
-            train = at_site.filter((pl.col("fold") != fold) & ~pl.col("constrained"))
-            if test.is_empty() or train.is_empty():
-                continue
-            actual = test["power_mw"].to_numpy()
-            for seed in SEEDS:
-                point, _ = _fit_one_fold(
-                    train=train,
-                    test=test,
-                    features=features,
-                    target="power_mw",
-                    hyper_parameters=PRIMARY_HYPER_PARAMETERS,
-                    seed=seed,
-                    with_quantiles=False,
-                )
-                capped = clamp_to_cap(prediction=point, cap_mw=test["cap_mw"])
-                outputs.append(
-                    test.select("site", "time", "month", "fold", "effective_capacity_mw")
-                    .cast({"effective_capacity_mw": pl.Float64})
-                    .with_columns(
-                        arm=pl.lit(arm),
-                        seed=pl.lit(seed, dtype=pl.Int32),
-                        absolute_error_capped_mw=pl.Series(
-                            np.abs(actual - capped), dtype=pl.Float64
-                        ),
-                    )
-                )
-    return pl.concat(outputs)
+    return pl.concat(
+        out_of_fold_losses(
+            site_rows=rows.filter(pl.col("site") == site).with_columns(
+                ghi_w_m2=pl.col(f"ghi_{arm}")
+            ),
+            features=[*SHARED_FEATURES, "ghi_w_m2"],
+            target="power_mw",
+            hyper_parameters=PRIMARY_HYPER_PARAMETERS,
+            with_quantiles=False,
+        )
+        for site in sorted(rows["site"].unique().to_list())
+    ).with_columns(arm=pl.lit(arm))
 
 
 def _percentage_of_capacity(*, losses: pl.DataFrame, arm: str) -> float:
@@ -187,8 +161,7 @@ def _percentage_of_capacity(*, losses: pl.DataFrame, arm: str) -> float:
         The mean of each row's error over its generator's capacity, in percentage points.
     """
     rows = losses.filter(pl.col("arm") == arm)
-    ratio = (pl.col(METRIC) / pl.col("effective_capacity_mw")).mean()
-    return float(rows.select(ratio).item()) * PERCENTAGE_POINTS
+    return float(rows.select(pl.col(METRIC).mean()).item()) * PERCENTAGE_POINTS
 
 
 def main() -> int:
@@ -221,7 +194,7 @@ def main() -> int:
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for era in ("pre_all", "pre_matched", "post"):
-        rows = with_export_cap(dataset=_assign_folds(dataset=_era(frame=common, era=era)))
+        rows = with_export_cap(dataset=assign_folds(dataset=_era(frame=common, era=era)))
         _LOG.info("%s: %s rows, %d months", era, f"{rows.height:,}", rows["month"].n_unique())
         losses = pl.concat([_losses(rows=rows, arm=arm) for arm in PRODUCTS])
         losses.write_parquet(output_dir / f"losses_{era}.parquet")
@@ -233,16 +206,17 @@ def main() -> int:
             + " | ".join(f"{scores[arm]:.3f}" for arm in PRODUCTS)
             + " |"
         )
-        capacity = float(losses.select(pl.col("effective_capacity_mw").mean()).item())
-        scale = PERCENTAGE_POINTS / capacity
         for treatment, reference in CONTRASTS:
-            interval = _bootstrap_difference(
+            interval = bootstrap_difference(
                 losses=losses, treatment=treatment, reference=reference, metric=METRIC
             )
             excludes = interval["lower_95"] > 0.0 or interval["upper_95"] < 0.0
+            difference, lower, upper = (
+                interval[key] * PERCENTAGE_POINTS for key in ("difference", "lower_95", "upper_95")
+            )
             contrast_lines.append(
-                f"| {era} | {treatment} − {reference} | {interval['difference'] * scale:+.4f} | "
-                f"[{interval['lower_95'] * scale:+.4f}, {interval['upper_95'] * scale:+.4f}] | "
+                f"| {era} | {treatment} − {reference} | {difference:+.4f} | "
+                f"[{lower:+.4f}, {upper:+.4f}] | "
                 f"{'**yes**' if excludes else 'no'} |"
             )
 

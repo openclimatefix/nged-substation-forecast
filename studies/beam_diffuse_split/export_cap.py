@@ -146,21 +146,3 @@ def with_export_cap(*, dataset: pl.DataFrame) -> pl.DataFrame:
         int(joined["constrained"].sum()),
     )
     return joined
-
-
-def clamp_to_cap(*, prediction: np.ndarray, cap_mw: pl.Series) -> np.ndarray:
-    """Hold a prediction at or below the export cap that was in force.
-
-    Args:
-        prediction: Either one prediction per row, or one row per prediction and one column per
-            quantile level.
-        cap_mw: The cap for each row, null where no setpoint record covers it.
-
-    Returns:
-        `prediction`, with every element that exceeded its row's cap replaced by that cap. Rows
-        with no cap are returned unchanged.
-    """
-    ceiling = cap_mw.fill_null(np.inf).to_numpy()
-    if prediction.ndim > 1:
-        ceiling = ceiling[:, np.newaxis]
-    return np.minimum(prediction, ceiling)

@@ -23,8 +23,8 @@ import sys
 from typing import Final
 
 import polars as pl
-from run_experiment import _bootstrap_difference
 from sources import STUDY_DATA_DIR
+from studies.bootstrap import bootstrap_difference
 
 PERCENTAGE_POINTS: Final[float] = 100.0
 
@@ -126,7 +126,7 @@ def main() -> int:
         for treatment, reference in COMPARED_CONTRASTS[instrument]:
             cells = []
             for source in sources:
-                interval = _bootstrap_difference(
+                interval = bootstrap_difference(
                     losses=restricted[source],
                     treatment=treatment,
                     reference=reference,
