@@ -46,4 +46,4 @@ on a branch. The directory is not an attic.
 
 | Directory | Question it answered | Where the answer lives |
 |---|---|---|
-| `beam_diffuse_split/` | Does a weather product's own beam/diffuse split carry information a PV forecast can use, beyond the global horizontal irradiance alone? | [Does a weather product's beam/diffuse split help a PV forecast?](https://openclimatefix.github.io/nged-substation-forecast/results/beam-diffuse-split/) |
+| `beam_diffuse_split/` | Does a weather product's own beam/diffuse split carry information a PV forecast can use, beyond the global horizontal irradiance alone? | [Does a weather product's beam/diffuse split help a PV forecast?](https://openclimatefix.github.io/nged-substation-forecast/studies/beam-diffuse-split/) |

@@ -24,13 +24,3 @@ how far it generalises.
   drift says about estimating a generator's effective capacity. It reads NGED's two records of
   active network management against each other and against the telemetry, and finds the setpoint
   history the one to build on.
-- [Which irradiance product best describes an hour that already
-  happened?](comparison-of-analysis-products.md) — a satellite retrieval describes past sunshine
-  about twice as well as any weather model tested; among the models a 2 km grid beats a 31 km one,
-  but the Met Office's UKV underperforms for the grid it runs on, and its behaviour steps across the
-  January 2026 upgrade. Showing a tree two weather models' irradiance at once is worth about three
-  times what a published beam/diffuse split is worth.
-- [How far ahead is an ensemble forecast still worth having?](ens-forecast-horizons.md) — ECMWF's
-  ensemble beats a reanalysis at leads under a day, matches it at day-ahead, and loses by about 55%
-  at a week. Using all 51 members beats using the control member at every horizon, and whether the
-  members are best reduced before or after the power model flips with lead time.
