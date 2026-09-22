@@ -50,9 +50,10 @@ mlruns/
 
 # If you use a SQLite backend for MLflow (which is common for local development to enable better
 # searching/filtering than the file backend), this database file stores the run metadata. Like any
-# database file, it shouldn't be versioned.
+# database file, it shouldn't be versioned. The glob covers the timestamped copies taken before an
+# MLflow upgrade, such as mlflow.db.bak-pre-upgrade-20260915T115931.
 mlflow.db
-mlflow.db.bak
+mlflow.db.bak*
 
 
 #######################
