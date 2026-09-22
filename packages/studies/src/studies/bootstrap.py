@@ -73,8 +73,6 @@ def bootstrap_difference(
     treatment: str,
     reference: str,
     metric: str,
-    n_resamples: int = N_BOOTSTRAP_RESAMPLES,
-    rng_seed: int = BOOTSTRAP_SEED,
 ) -> BootstrapInterval:
     """Bootstrap the paired arm-to-arm difference, resampling whole months and a seed.
 
@@ -87,8 +85,6 @@ def bootstrap_difference(
         treatment: The arm whose metric is being compared.
         reference: The arm it is compared against.
         metric: The loss column to difference.
-        n_resamples: How many resamples the interval is read from.
-        rng_seed: Seeds this interval's random stream.
 
     Returns:
         The point estimate, the 2.5th and 97.5th percentiles, and what the estimate rests on.
@@ -101,9 +97,9 @@ def bootstrap_difference(
 
     # The seed draw comes before the month draw in every resample. Swapping them, or vectorising
     # the loop, would change every published interval's digits without changing its definition.
-    generator = np.random.default_rng(rng_seed)
-    resampled = np.empty(n_resamples)
-    for resample in range(n_resamples):
+    generator = np.random.default_rng(BOOTSTRAP_SEED)
+    resampled = np.empty(N_BOOTSTRAP_RESAMPLES)
+    for resample in range(N_BOOTSTRAP_RESAMPLES):
         seed_index = generator.integers(0, differences.shape[0])
         drawn = generator.integers(0, len(unique_months), size=len(unique_months))
         rows = np.concatenate([rows_by_month[index] for index in drawn])

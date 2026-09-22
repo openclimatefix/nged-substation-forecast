@@ -206,15 +206,17 @@ def main() -> int:
             + " | ".join(f"{scores[arm]:.3f}" for arm in PRODUCTS)
             + " |"
         )
-        scale = PERCENTAGE_POINTS
         for treatment, reference in CONTRASTS:
             interval = bootstrap_difference(
                 losses=losses, treatment=treatment, reference=reference, metric=METRIC
             )
             excludes = interval["lower_95"] > 0.0 or interval["upper_95"] < 0.0
+            difference, lower, upper = (
+                interval[key] * PERCENTAGE_POINTS for key in ("difference", "lower_95", "upper_95")
+            )
             contrast_lines.append(
-                f"| {era} | {treatment} − {reference} | {interval['difference'] * scale:+.4f} | "
-                f"[{interval['lower_95'] * scale:+.4f}, {interval['upper_95'] * scale:+.4f}] | "
+                f"| {era} | {treatment} − {reference} | {difference:+.4f} | "
+                f"[{lower:+.4f}, {upper:+.4f}] | "
                 f"{'**yes**' if excludes else 'no'} |"
             )
 

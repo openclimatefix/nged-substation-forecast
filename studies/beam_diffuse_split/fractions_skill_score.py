@@ -101,8 +101,7 @@ def _bootstrap_fss_difference(
     """Interval the difference of two arms' scores by resampling whole months.
 
     Not `studies.bootstrap.bootstrap_difference`, because the score is a ratio of two sums rather
-    than a mean of per-row errors: each resample has to re-sum both components and re-form both
-    ratios, which a mean of per-row differences cannot express.
+    than a mean of per-row errors.
 
     Both arms are resampled on the *same* drawn months, so the paired structure that makes the
     difference precise is preserved. The two arms saw the same weather, and the interval should

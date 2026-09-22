@@ -216,11 +216,13 @@ def main() -> int:
         interval = bootstrap_difference(
             losses=losses, treatment=treatment, reference=reference, metric=METRIC
         )
-        scale = PERCENTAGE_POINTS
         excludes = interval["lower_95"] > 0.0 or interval["upper_95"] < 0.0
+        difference, lower, upper = (
+            interval[key] * PERCENTAGE_POINTS for key in ("difference", "lower_95", "upper_95")
+        )
         lines.append(
-            f"| {treatment} − {reference} | {interval['difference'] * scale:+.4f} | "
-            f"[{interval['lower_95'] * scale:+.4f}, {interval['upper_95'] * scale:+.4f}] | "
+            f"| {treatment} − {reference} | {difference:+.4f} | "
+            f"[{lower:+.4f}, {upper:+.4f}] | "
             f"{'**yes**' if excludes else 'no'} |"
         )
     report = "\n".join(lines) + "\n"

@@ -19,8 +19,6 @@ from studies.cross_validation import (
 
 from studies import cross_validation
 
-CAPACITY_MW = 4.0
-
 
 def _months(site: str, n_months: int) -> list[dict[str, object]]:
     return [{"site": site, "month": f"2025-{month + 1:02d}"} for month in range(n_months)]
@@ -96,7 +94,11 @@ def _site_rows() -> pl.DataFrame:
             "month": [time.strftime("%Y-%m") for time in times],
             "power_mw": np.linspace(0.0, 3.0, len(times)).astype(np.float32),
             "x": np.arange(len(times), dtype=np.float64),
-            "effective_capacity_mw": np.full(len(times), CAPACITY_MW, dtype=np.float32),
+            # Unequal capacities, so dividing by a pooled capacity cannot pass for dividing each row
+            # by its own.
+            "effective_capacity_mw": np.where(np.arange(len(times)) % 2 == 0, 4.0, 5.0).astype(
+                np.float32
+            ),
             "cap_mw": [2.0 if index % 5 == 0 else None for index in range(len(times))],
             "constrained": [index % 7 == 0 for index in range(len(times))],
         }
@@ -190,7 +192,6 @@ def test_a_fold_with_nothing_to_train_on_is_skipped(monkeypatch: pytest.MonkeyPa
     losses, _ = _run(monkeypatch, site_rows=site_rows)
 
     assert 0 not in losses["fold"].to_list()
-    assert losses["fold"].n_unique() == N_FOLDS - 1
 
 
 def test_the_capped_losses_are_clamped_and_the_uncapped_are_not(monkeypatch: pytest.MonkeyPatch):

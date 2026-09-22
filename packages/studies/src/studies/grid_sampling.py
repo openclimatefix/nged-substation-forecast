@@ -12,9 +12,9 @@ def sample_nearest_cell(*, field: xr.DataArray, sites: pl.DataFrame, crs: CRS) -
     nearest cell is nearest in metres on the grid rather than in degrees. The grid's axes must be
     `projection_x_coordinate` and `projection_y_coordinate`, the CF names the Met Office uses.
 
-    **A site outside the grid is not an error.** `method="nearest"` returns the edge cell for a
-    point beyond the domain, so a caller whose sites might fall outside it has to check the domain
-    first.
+    **A site outside the grid silently reads the edge cell**, because `method="nearest"` returns
+    the edge cell for a point beyond the domain. A caller whose sites might fall outside it has to
+    check the domain first.
 
     Args:
         field: A two-dimensional field on the projected axes.

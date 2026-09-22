@@ -184,11 +184,7 @@ def _add_time_features(*, dataset: pl.DataFrame) -> pl.DataFrame:
 
 
 Job = tuple[str, str, str, tuple[str, ...], HyperParameters, bool]
-"""One (arm, setting name, target, features, settings, whether to score quantiles) to fit.
-
-The features are carried by the job rather than looked up by arm name, so a script with arms of its
-own builds its jobs from its own table instead of patching this module's.
-"""
+"""One (arm, setting name, target, features, settings, whether to score quantiles) to fit."""
 
 
 def features_for(*, arm: str) -> tuple[str, ...]:

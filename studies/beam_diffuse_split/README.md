@@ -298,7 +298,7 @@ contiguous month blocks, so every post-upgrade row falls in the last fold for fi
 generators, and that fold's model trained on pre-upgrade UKV alone. `era_comparison.py` cuts the
 folds inside each era instead, so a model scoring a post-upgrade row has trained on post-upgrade
 rows. Under that arrangement UKV still beats the reanalysis after the upgrade, by 0.07 pp with an
-interval from −0.42 to +0.25, against 0.32 pp [0.09, 0.54] before it. The upgrade did not cost UKV
+interval from −0.25 to +0.42, against 0.32 pp [0.09, 0.54] before it. The upgrade did not cost UKV
 its standing against the reanalysis, and the figures above should be read as the cost of training
 on one version of a product and predicting with another — which is a real cost to a production
 pipeline, but a different finding from the product getting worse
