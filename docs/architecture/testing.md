@@ -20,9 +20,23 @@ rows, in [Performance and Scale](performance.md#the-other-hard-ceiling-polars-32
   and every `packages/*/tests/` directory. A brand-new `packages/<pkg>/tests/` directory is picked
   up with no configuration change — provided the package is installed in the root environment, which
   is automatic only when something already depends on it. A **leaf** package that nothing depends on
-  (for example `dashboard`, a marimo app) is *not* in the default environment, so `uv run pytest`
-  cannot import its tests; add it to the root `[dependency-groups] dev` list (and give it a
-  `[tool.uv.sources]` workspace entry) so a plain `uv sync` installs it.
+  (`dashboard`, a marimo app, and `studies`, the machinery the one-off studies call) is *not* in the
+  default environment, so `uv run pytest` cannot import its tests; add it to the root
+  `[dependency-groups] dev` list (and give it a `[tool.uv.sources]` workspace entry) so a plain `uv
+  sync` installs it.
+- **The `dev` group is also what keeps a research dependency out of the production image.** The
+  `Dockerfile` runs `uv sync --frozen --no-dev`, so a package listed there is resolved for
+  developers and for CI and absent from the image. `studies` is the case that matters: it pulls in
+  `pvlib`, which the live-forecast service has no use for. The check is one command, and it belongs
+  in the pull request that adds such a dependency:
+
+    ```bash
+    test "$(uv export --no-dev --format requirements-txt | grep -ciE '^(pvlib|cdsapi)')" -eq 0
+    ```
+
+    Write it with `test "$(...)"` rather than as a pipeline into `grep -q`. `grep -c` exits 1 when
+    it counts zero matches, so under `set -o pipefail` — which is what GitHub Actions gives every
+    `run:` step — a pipeline form exits non-zero exactly when the check passes.
 - **Run the whole suite with plain `uv run pytest`, never `--all-packages`.** `uv run pytest`
   executes against the root environment, which holds exactly the packages reachable from the root's
   dependencies and dev group — i.e. every package that has tests, by the rule above.

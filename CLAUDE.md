@@ -550,6 +550,7 @@ in
 | `weather_utils` | Shared NWP query helpers used by both the dashboard and the feature pipeline (the analysis-proxy selection) |
 | `xgboost_forecaster` | Concrete `BaseForecaster` implementation using XGBoost |
 | `plotting` | The OCF-brand Altair theme and shared plotting helpers |
+| `studies` | The tested machinery the one-off studies under `studies/` call: solar geometry, served-column checks, power aggregation, anonymisation, the Fractions Skill Score |
 | `dashboard` | Marimo web apps for visualisation (`view_forecasts.py`, `map_and_timeseries.py`) plus their shared helpers in `src/dashboard/` |
 | `notebooks` | Marimo exploration notebooks |
 
