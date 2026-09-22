@@ -614,7 +614,7 @@ what it established and the traps it hit.
 **Five parameters per site are identifiable from a meter and an irradiance series alone, and the
 fitted values are physically plausible.** Panel tilt, panel azimuth, capacity, an inverter clipping
 limit, and a temperature coefficient were fitted per site on each training fold by a Powell
-optimiser, from one fixed starting vector and seven random ones. On the corrected stamps the
+optimiser, from one fixed starting vector and seven random ones. On the corrected timestamps the
 fitted tilts land between 14 and 27 degrees and the azimuths within 5 degrees of due south, which
 is what these arrays plausibly are. That is the core feasibility question behind [candidate
 B](#candidate-b-the-differentiable-physics-estimator), answered for solar on this fleet.
@@ -630,14 +630,14 @@ arguments for [candidate B](#candidate-b-the-differentiable-physics-estimator) a
 listed there — fitted posteriors, fleet-wide shared terms, and continuity with v2 — and not that a
 single site's PV parameters are hard to recover.
 
-**A half-hour timestamp error is absorbed into the fitted azimuth, so pin the stamp convention
+**A half-hour timestamp error is absorbed into the fitted azimuth, so pin the timestamp convention
 before trusting a fitted orientation or the capacity that comes with it.** The same model fitted on
-the same rows moves its fitted azimuth by about 35 degrees when the stamps are shifted by one
+the same rows moves its fitted azimuth by about 35 degrees when the timestamps are shifted by one
 half-hour, which is a quarter of the range a GB array's orientation can plausibly occupy, from a
-30-minute change in what the timestamp means. The [power stamps on this
-feed](../studies/beam-diffuse-split.md#the-power-stamps-before-26-march-2026-are-half-an-hour-late)
-were half an hour late until NGED corrected them. Any estimator that fits orientation has the same
-exposure, and an orientation error feeds straight into the capacity it reports.
+30-minute change in what the timestamp means. The [power timestamps on this
+feed](../studies/beam-diffuse-split.md#the-power-timestamps-before-26-march-2026-are-half-an-hour-late)
+were half an hour late until 08:30 UTC on 26 March 2026. Any estimator that fits orientation has
+the same exposure, and an orientation error feeds straight into the capacity it reports.
 
 **What limits the fitted physical model is its specification, not its optimiser, and the term
 that hurts is the transposition.** Given the same rows, the physical model and the tree disagree

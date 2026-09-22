@@ -5,7 +5,7 @@ import patito as pt
 import polars as pl
 import pytest
 from contracts.common import MAX_PLAUSIBLE_DATETIME, MIN_PLAUSIBLE_DATETIME
-from contracts.power_schemas import PowerTimeSeries
+from contracts.power_schemas import POWER_TIMESTAMPS_CORRECTED_BEFORE, PowerTimeSeries
 
 
 def test_power_time_series_validation():
@@ -223,3 +223,40 @@ def test_drop_implausible_rows_leaves_a_validatable_frame() -> None:
     )
 
     PowerTimeSeries.validate(survivors)
+
+
+@pytest.mark.parametrize(
+    ("time", "expected"),
+    [
+        pytest.param(
+            datetime(2026, 3, 26, 8, 0, tzinfo=UTC),
+            datetime(2026, 3, 26, 7, 30, tzinfo=UTC),
+            id="before_moves_back",
+        ),
+        pytest.param(
+            POWER_TIMESTAMPS_CORRECTED_BEFORE, POWER_TIMESTAMPS_CORRECTED_BEFORE, id="instant_stays"
+        ),
+        # Not redundant beside `instant_stays`, though the two cases look alike. Every other
+        # timestamp the suite pushes through this method sits at or before
+        # `POWER_TIMESTAMPS_CORRECTED_BEFORE`, so without this case the whole suite would pass with
+        # the predicate mutated to `!=`. That predicate shifts every reading the live service
+        # ingests and leaves only the reading at that instant alone.
+        pytest.param(
+            datetime(2026, 3, 26, 9, 0, tzinfo=UTC),
+            datetime(2026, 3, 26, 9, 0, tzinfo=UTC),
+            id="after_stays",
+        ),
+    ],
+)
+def test_correct_late_timestamps_moves_only_the_late_readings(
+    time: datetime, expected: datetime
+) -> None:
+    """The boundary is exclusive: the first correctly stamped reading must not move.
+
+    An implementation using `<=` where the repair requires `<` passes `before_moves_back` and
+    fails `instant_stays`. The choice between `<` and `<=` is the whole of what separates a late
+    reading from a correctly stamped reading.
+    """
+    corrected = PowerTimeSeries.correct_late_timestamps(_frame([time]))
+
+    assert corrected["time"].to_list() == [expected]

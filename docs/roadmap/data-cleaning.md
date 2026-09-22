@@ -9,8 +9,8 @@
 **The faults to clean are catalogued in [NGED's network and its
 data](../background/network.md#data-quality-in-the-trial-area); this page holds what has since been
 measured about them and what that implies for the cleaning step.** Versions 0.1 to 0.3 train on and
-forecast from uncleaned telemetry, so every finding here is currently absorbed by the models rather
-than removed.
+forecast from telemetry that is uncleaned apart from the timestamp repair below, so every other
+finding here is currently absorbed by the models rather than removed.
 
 ## A generator's commissioning ramp has to be cut, and one cut-off is already known
 
@@ -34,6 +34,50 @@ re-measurement can move it without anyone having to rediscover why it was there.
 and the same reasoning applies here.** A curtailed hour can be kept and scored against the cap the
 operator set. Nothing in the record says what fraction of an array was energised on a given day, so
 a commissioning hour has no ceiling to compare a prediction against.
+
+## NGED's power timestamps ran half an hour late, and the ingest repairs them
+
+**Every reading NGED stamped before 08:30 UTC on 26 March 2026 describes the half-hour before the
+half-hour its label names. The ingest moves those readings 30 minutes earlier.** NGED report that
+the fault stops at that instant, and the instant comes from that report rather than being fitted
+from the readings. Three independent measurements are consistent with it: two compare a clear day's
+output against the sun's own position, and the third compares the power against satellite
+irradiance. The evidence is in the
+[beam/diffuse
+appendix](../studies/beam-diffuse-split.md#the-power-timestamps-before-26-march-2026-are-half-an-hour-late).
+`PowerTimeSeries.correct_late_timestamps` applies the repair in `nged_data.read_nged_json`.
+`PowerTimeSeries.time` therefore marks the end of the observation period for every stored row.
+
+**The repair runs at the ingestion boundary rather than in feature engineering. Running the repair
+there trades away
+[design principle 15](../design-philosophy/design-principles.md#15-transform-data-in-feature-engineering-not-in-the-ingest-unless-it-saves-a-lot-of-storage).**
+What the repair buys is that the `PowerTimeSeries` contract stays a true account of the table it
+governs, so no consumer has to know whether a row was stamped before or after 08:30 UTC on 26 March
+2026. What the repair costs is that changing the rule means rebuilding the table from NGED's bucket
+rather than editing a function. That cost is accepted because rebuilding is already the maintenance
+route for this table.
+
+**The repair applies to every series, because of how NGED build the power feed rather than because
+every series was measured to be late.** NGED report that they convert every series in the trial area
+through one code path, so no series can have escaped the fault. That report is what the fleet-wide
+scope rests on, because the three measurements cover the six metered solar farms alone. Each
+measurement needs a series whose output follows the sun. A substation load profile has no
+equivalent.
+
+**A repaired series carries no reading at 08:00 UTC on 26 March 2026.** The last late reading is
+stamped 08:00 and moves to 07:30, while the first correct reading is stamped 08:30. NGED therefore
+never published the half-hour ending at 08:00.
+
+**The gap is left as a gap, because interpolating would invent a measurement nobody took.** No
+consumer of the stored power table needs a gapless half-hourly grid: the lag features join on time,
+the rolling means use `rolling_mean_by`, and eligibility reads only each series' first and last
+reading.
+
+**Should NGED republish their history already corrected, the repair has to be removed before the
+next rebuild.** NGED have not republished that history so far: every file the ingest reads today
+still carries the late timestamps. A republished file is indistinguishable from the file it replaces
+when read on its own, so detecting the change needs
+[#804](https://github.com/openclimatefix/nged-substation-forecast/issues/804).
 
 ## Detecting a ramp needs a reference series, not a threshold
 
