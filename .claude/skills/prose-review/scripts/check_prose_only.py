@@ -69,10 +69,11 @@ FAILING_VERDICTS: Final[frozenset[str]] = frozenset(
 class _StringBlanker(ast.NodeTransformer):
     """Replace every string constant in a tree with the empty string.
 
-    Docstrings, prose comments' neighbouring literals and genuine runtime strings are blanked
-    alike. Blanking a runtime string is deliberate: a sweep must not edit one, but if it does, the
-    edit is a prose-shaped change to a literal rather than a change of behaviour in the structural
-    sense this check tests for. `pytest` is what catches an edited runtime string.
+    Every string constant is blanked alike, whether it is a docstring or a string the code uses
+    at run time. Comments are not in the tree at all, so they need no blanking. Blanking a
+    runtime string is deliberate: a sweep must not edit one, but if it does, the edit is a
+    prose-shaped change to a literal rather than a change of behaviour in the structural sense
+    this check tests for. `pytest` is what catches an edited runtime string.
     """
 
     def visit_Constant(self, node: ast.Constant) -> ast.Constant:
@@ -153,7 +154,8 @@ def verdict_for(*, rev: str, path: Path) -> VerdictType:
         path: The file to check.
 
     Returns:
-        One of the `VerdictType` members.
+        One of the `VerdictType` members: `prose-only`, `new file`, `unparseable at rev`,
+        `unparseable`, `unreadable`, `gone from working tree`, or `BEHAVIOUR CHANGED`.
     """
     before = _at_revision(rev=rev, path=path)
     if before is None:

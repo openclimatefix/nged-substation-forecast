@@ -69,8 +69,8 @@ target protocol: an expanding training window with one **complete-year** validat
 2027** — after v1.0 — and covers 00Z initialisations only
 ([reformatters#446](https://github.com/dynamical-org/reformatters/issues/446)).
 
-Because of that timescale, the plan for using the long power histories some assets have back to 2020
-is to **pre-train** on ERA5 reanalysis and fine-tune on ECMWF ENS. Pre-training is a training-time
+Because of that timescale, the plan is to **pre-train** on ERA5 reanalysis and fine-tune on ECMWF
+ENS, using the long power histories some assets have back to 2020. Pre-training is a training-time
 technique, distinct from the validation folds described here; the design is in [Extending the
 training history](../roadmap/training-history.md).
 
@@ -112,9 +112,9 @@ does not by itself force the *two* experiments to share a population — the fro
 
 ### The confounded comparison, which must not be read as the ablation
 
-The tempting shortcut — take the canonical leaderboard champion, run it on the new source's window,
-and compare against a new-source model on that window — is **statistically confounded** and must not
-be read as evidence about the source. The two models differ in **two** variables at once: the
+The tempting shortcut is **statistically confounded** and must not be read as evidence about the
+source: take the canonical leaderboard champion, run it on the new source's window, and compare
+against a new-source model on that window. The two models differ in **two** variables at once: the
 feature set *and* the training window (the champion trained on the full archive; the new-source
 model is forced onto the short sliver). A win or loss cannot be attributed to the source rather than
 to the training data.
@@ -131,9 +131,9 @@ canonically available, with every experiment re-scored against that fold set for
 comparison. The ad-hoc ablation is the **interim** signal obtained before enough history exists to
 do this properly; it should never be presented with leaderboard rigour.
 
-These three patterns concern only *evaluation*. Actually **ingesting** a second NWP source (a second
-downloader, NWP contract changes, source-aware weather-feature parsing, a dual-source join in
-feature engineering) is separate engineering work — see the [roadmap](../roadmap/index.md).
+These three patterns concern only *evaluation*. Actually **ingesting** a second NWP source is
+separate engineering work: a second downloader, NWP contract changes, source-aware weather-feature
+parsing, and a dual-source join in feature engineering. See the [roadmap](../roadmap/index.md).
 
 ---
 
@@ -153,10 +153,10 @@ is bounded only on its upper edge (`time <= window_end`). The lower edge widens 
 power_lookback`, so a lag feature can read history from *before* the fold, exactly as the live
 service already does. That reach-back is not contamination: `_nullify_leaky_lags` keeps a power lag
 only when its target time is strictly before the row's own forecast-issue time, a per-row guarantee
-independent of where the joined value came from. A power value that was a training target during a
-training fold can be read as a lagged power feature in a validation fold. Reading a past label as a
-later input is intrinsic to autoregressive forecasting — yesterday's actual load is always both a
-past training target and today's input.
+independent of where the joined value came from. A power value can be read as a lagged power feature
+in a validation fold, even though the same value was a training target during a training fold.
+Reading a past label as a later input is intrinsic to autoregressive forecasting — yesterday's
+actual load is always both a past training target and today's input.
 
 **Overlapping forecasts inflate the apparent weight of evidence.** Within one horizon slice the same
 target half-hour is still scored many times: `extended_range` spans 168 hours and beyond. With

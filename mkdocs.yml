@@ -82,6 +82,9 @@ nav:
       - "Why Dagster, not Airflow?": architecture/why-dagster-not-airflow.md
       - Code style: architecture/code-style.md
       - Testing: architecture/testing.md
+  - Results:
+      - Overview: results/index.md
+      - "Does a weather product's beam/diffuse split help a PV forecast?": results/beam-diffuse-split.md
   - ML experimentation:
       - Overview: ml_experimentation/index.md
       - Model configuration: ml_experimentation/model-configuration.md
@@ -99,6 +102,7 @@ nav:
       - Overview: roadmap/index.md
       - Effective-capacity estimation: roadmap/capacity-estimation.md
       - Cost-savings metrics: roadmap/cost-savings-metrics.md
+      - Cleaning the trial-area telemetry: roadmap/data-cleaning.md
       - Data sources: roadmap/data-sources.md
       - Delivery tables: roadmap/delivery-tables.md
       - Engineering health: roadmap/engineering-health.md

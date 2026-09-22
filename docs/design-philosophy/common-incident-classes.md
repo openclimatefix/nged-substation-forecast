@@ -53,22 +53,21 @@ The forecast pipeline runs cleanly end to end and delivers a value — but the v
 an implausible magnitude, an internally inconsistent set of quantiles, or a forecast that quietly
 diverges from reality. Nothing rejects or flags it before a consumer notices.
 
-Two mechanisms already point the right way, both 🚧 planned rather than shipped. Normalising
-`power_fcst` to **[−1, +1]**
-([#246](https://github.com/openclimatefix/nged-substation-forecast/issues/246), the code today still
-forecasts raw MW/MVA) will make an order-of-magnitude output error structurally harder, since the
-value becomes capacity-bounded by construction rather than by a downstream check someone has to
-remember to run. And quantile crossing — one quantile level coming out below a lower one — is a
-*named* failure mode with a designed fix already: sorting each member's quantiles at predict time
-([Probabilistic
+Two mechanisms already point the right way, both 🚧 planned rather than shipped. The code today still
+forecasts raw MW/MVA. Normalising `power_fcst` to **[−1, +1]**
+([#246](https://github.com/openclimatefix/nged-substation-forecast/issues/246)) will make an
+order-of-magnitude output error structurally harder, since the value becomes capacity-bounded by
+construction rather than by a downstream check someone has to remember to run. And quantile crossing
+— one quantile level coming out below a lower one — is a *named* failure mode with a designed fix
+already: sorting each member's quantiles at predict time ([Probabilistic
 Forecasting](../techniques/probabilistic-forecasting.md#turning-51-quantile-sets-into-one-the-pooling-recipe),
 [#263](https://github.com/openclimatefix/nged-substation-forecast/issues/263)).
 
 The gap: `live_forecasts_are_healthy` already warns on a null, NaN, or infinite `power_fcst`, but
 nothing checks a *finite, plausible-looking* output for implausible magnitude or, once quantiles
-ship, crossed levels — the same "validate, and warn on what validation can't reject outright"
-pattern every input boundary in this project follows has not yet been applied to the output itself
-([#560](https://github.com/openclimatefix/nged-substation-forecast/issues/560)).
+ship, crossed levels. Every input boundary in this project follows the same pattern — validate, and
+warn on what validation can't reject outright — but that pattern has not yet been applied to the
+output itself ([#560](https://github.com/openclimatefix/nged-substation-forecast/issues/560)).
 
 ## Shared-compute blast radius
 

@@ -188,11 +188,15 @@ both read smoothly: write "an energy-forecasting lifecycle rather than a generic
 write "a measure of effectiveness", never "such a metric" where a metric was named a clause earlier.
 Repeating the noun is always available and always correct. "One" is fine as a determiner in front of
 the noun it counts — "the one review we found" both scopes a claim and names its noun — and wrong
-only when it stands in place of the noun. Prefer "the NWP download" over "it", "the
-threshold-weighted score" over "this". A little repetition beats an ambiguous sentence every time:
-never make the reader refer backwards to decode a sentence, and never buy elegance with a referent
-the reader has to hunt for. The same rule covers version numbers: write "Flexpectation v1" and
-"Flexpectation v2", never a bare "v1" or "v2", which could be a version of anything.
+only when it stands in place of the noun. An anticipatory "it" is outside this rule too: the "it" in
+"it is worth having a weather product that publishes the direct-beam share separately" points
+forwards at the rest of its own sentence rather than backwards at an earlier noun, and the
+front-loading rule below is the reason for writing the sentence that way. Prefer "the NWP download"
+over "it", "the threshold-weighted score" over "this". A little repetition beats an ambiguous
+sentence every time: never make the reader refer backwards to decode a sentence, and never buy
+elegance with a referent the reader has to hunt for. The same rule covers version numbers: write
+"Flexpectation v1" and "Flexpectation v2", never a bare "v1" or "v2", which could be a version of
+anything.
 
 **"Thing" is never the right noun.** Every use of "thing" or "things" has a specific noun waiting
 behind it, and the specific noun carries information the placeholder throws away: "the two
@@ -251,6 +255,16 @@ gradient-boosted tree on the effort of tuning it". Keep "cost" and "price" for m
 spends procuring flexibility is a cost. Calling a lost percentage point of skill a cost as well
 makes the page ambiguous exactly where it has to be exact.
 
+**Don't give code, a config file, or a tool a will of its own.** A config file does not "want" a set
+of checks enabled, a script does not "like" one output format over another, and a tool does not
+"decide" anything except what a person decided when writing the tool. Name what the config or the
+code actually does: write "`pyproject.toml` states which of `pydoclint`'s checks will run", not
+"`pyproject.toml` says which checks this repo wants". An ordinary technical verb naming a coded
+behaviour — "the function expects an argument", "the check raises", "the parser assumes UTF-8" — is
+not this rule's target, because a documented precondition is not a preference. The rule catches
+"wants", "likes", "prefers", "believes", "decides", and "chooses": verbs that name a person's state
+of mind, not a coded behaviour.
+
 **Put the words in the order that cannot be misread.** "73 wind farms in GB" says what it means; "73
 GB wind farms" makes the reader parse a noun-pile and can be read as a unit of measure. Where a
 qualifier can attach to more than one noun, move it or add the word that pins it down.
@@ -302,6 +316,31 @@ is present. Two limits keep the rule from doing harm. A split must leave full se
 a fragment, which is the rule below. And a conjunction joining two verbs that share one subject
 joins no second claim: "the forecast reuses yesterday's NWP run and widens the uncertainty bands" is
 one sentence and stays one.
+
+**Open a sentence with its short, familiar part, and leave the long, new material until the end.** A
+reader takes a sentence in word by word, and cannot begin to make sense of a subject until the verb
+arrives. A 20-word subject sitting in front of a 3-word predicate is therefore 20 words of suspense.
+"A weather product that publishes the direct-beam share of sunlight separately, rather than only the
+total, is worth having" holds the verdict back until the reader has carried the whole product
+description. State the verdict first and let the description fall at the end: "It is worth having a
+weather product that publishes the direct-beam share of sunlight separately, rather than only the
+total." The principle is called end weight, and the rewrite above is called extraposition. A long
+subject is fine where the sentence before it has already established what the subject names: length
+in front position costs the reader only where the material sitting there is new.
+
+**Don't pack a fact the reader does not have yet into a noun phrase; give the fact a sentence of its
+own first.** A clause hung on a noun asks the reader to take in the claim inside that clause while
+they are still working out what the sentence as a whole is about. "Catch the half-empty comment line
+a prose splice leaves behind, and repair what two first-stumble readers stalled on" buries a finding
+— the prose-splicing script leaves half-empty comment lines behind — inside the object of "catch".
+Pull the finding out and put it first: "The prose-splicing script leaves behind half-empty comment
+lines. Catch those lines, and repair what two first-stumble readers stalled on." The extra full stop
+costs a few words and buys two sentences the reader can take in on one pass. The test: read each
+noun phrase on its own, and ask whether the page has already told the reader everything that phrase
+asserts. A modifying clause restating what the reader knows already is fine, however long. The rule
+below on not introducing a name, a number, or an acronym before the reader has a use for it points
+the other way, and both rules hold: evidence supporting a claim goes after the claim, while a fact
+the next sentence cannot be parsed without goes before it.
 
 **Write full sentences; don't drop the subject.** Don't clip words for terseness if it leaves a
 sentence without a clear subject/verb. Prefer "We split storage across two buckets so that..." over

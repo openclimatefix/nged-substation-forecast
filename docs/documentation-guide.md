@@ -16,6 +16,7 @@ Planning content lives in five places with deliberately non-overlapping jobs:
 | **GitHub** ([issues](https://github.com/openclimatefix/nged-substation-forecast/issues) + the OCF Project board) | The **complete, ordered task list** — including quick tweaks and non-code tasks — plus all discussion. **Fine-grained prioritisation lives only in GitHub.** Epics map 1:1 to the [roadmap milestones](roadmap/index.md#milestones); dependencies are recorded as `blocked by` issue relationships. |
 | **[`docs/roadmap/`](roadmap/index.md)** | Design depth: What we plan to build and *why*. The milestone arc and inter-plan dependencies are recorded here; fine-grained task-level ordering is not. |
 | **`docs/`[techniques](techniques/index.md), [background](background/index.md), [architecture](architecture/overview.md), [ml_experimentation](ml_experimentation/index.md), [live_service](live_service/index.md)** | What is already built — design (`architecture/`) and operational how-to (`ml_experimentation/`, `live_service/`) alike. These pages are where content moves to from `docs/roadmap/` after implementation. |
+| **`scripts/experiments/`** (not published) | **Throwaway code that answered a question once.** Kept, and held to a lower standard than the rest of the repository: no tests, no maintenance, no backwards compatibility, never run in production. An experiment whose findings are cited in `docs/` has to merge, so a reader who doubts a number can re-run the code that produced it. `scripts/experiments/README.md` states the tier in full. |
 | **`plans/`** (repo root, not published) | At most **one** file per branch: the implementation plan for the work in flight on that branch, written before any code is touched and deleted when it merges. One worktree per branch is what keeps it to one file. Usually empty on `main`. |
 
 **Relationship between `docs/roadmap/` and GitHub**: Every substantial 🚧 plan in the `docs/roadmap/`
@@ -34,23 +35,23 @@ backtesting vs. the live production service). Each `architecture/` design page n
 counterpart (and vice versa) in a "See also" section — e.g. [ML Orchestration
 Design](architecture/ml-orchestration.md) ↔ [ML Experimentation](ml_experimentation/index.md), and
 [Production Deployment — Design](architecture/production-deployment.md) ↔ [Setting up the live
-service on AWS](live_service/aws.md). A page mixing the two — design rationale followed by a runbook
-with literal commands — is a sign it should split along this line. The `docs/roadmap/` folder
-therefore contains **only design for work that is not yet implemented**, and is never a mirror of
-the code. Because roadmap pages are deletable, **code must never link into `roadmap/`** — instead,
-code docstrings link to the durable sections (`design-philosophy/`, `techniques/`, `architecture/`,
-`background/`, `ml_experimentation/`, `live_service/`) instead. The *methods* behind these plans —
-differentiable physics, learned encoders, the disaggregation-evaluation protocol — live in
-[Techniques](techniques/index.md) for exactly this reason: they survive the roadmap items that apply
-them.
+service on AWS](live_service/aws.md). A page is a candidate for splitting along this line when it
+mixes the two — design rationale followed by a runbook with literal commands. The `docs/roadmap/`
+folder therefore contains **only design for work that is not yet implemented**, and is never a
+mirror of the code. Because roadmap pages are deletable, **code must never link into `roadmap/`** —
+instead, code docstrings link to the durable sections (`design-philosophy/`, `techniques/`,
+`architecture/`, `background/`, `ml_experimentation/`, `live_service/`) instead. The *methods*
+behind these plans — differentiable physics, learned encoders, the disaggregation-evaluation
+protocol — live in [Techniques](techniques/index.md) for exactly this reason: they survive the
+roadmap items that apply them.
 
 ## Docstrings, READMEs and `docs/` hold three different jobs
 
 The section above covers the pages under `docs/`. Docstrings and package READMEs are documentation
 too — mkdocstrings renders every module listed in `docs/api/<package>/index.md` onto the published
-site — so the same question of which home an argument belongs in applies to them, and it is settled
-by asking what the reader already has in their hand when they arrive. Deciding a home is not a
-licence to delete the other copies: the bar for cutting prose out of code is [excessive
+site — so the same question applies to them — which home an argument belongs in — and the answer
+comes from asking what the reader already has in their hand when they arrive. Deciding a home is not
+a licence to delete the other copies: the bar for cutting prose out of code is [excessive
 duplication](architecture/code-style.md#comments-docstrings-and-links), not duplication.
 
 **A docstring holds everything that dies when the symbol dies**: units, preconditions, invariants,
@@ -83,9 +84,9 @@ one kept up to date.** The choice to round `power_fcst` to a 13-bit significand 
 docstring. Another page may restate the figure where its own reader needs it, as
 [Performance](architecture/performance.md) does, but should say where the decision lives so a later
 change knows what else to update. Restating a measurement is how it goes stale: a fold's row count
-appeared in three places, and when the fold gained series every copy became wrong at once. A
-measurement no single symbol owns — peak memory across a cross-validation fold, say — belongs on the
-`docs/` page alone.
+appeared in three places, and when the fold gained series every copy became wrong at once. Some
+measurements belong on the `docs/` page alone, because no single symbol owns them — peak memory
+across a cross-validation fold, say.
 
 ### Which place do I use?
 
@@ -106,4 +107,5 @@ measurement no single symbol owns — peak memory across a cross-validation fold
 | Plan how to implement an issue, before writing code | `plans/<branch-name>.md` on that issue's branch (one file per branch, deleted on merge) |
 | Explain what a function guarantees, what a caller must not assume, or why *this* implementation | The symbol's **docstring** — everything that would die with the symbol. Rendered onto the API page by mkdocstrings |
 | Explain what a package is for, where its boundary against neighbouring packages falls, or what its modules are | The **package README** — the contents page for the docstrings rendered beneath it. Never restate a docstring here; both land on one page |
+| Keep the code behind a number a `docs/` page quotes | [`scripts/experiments/`](https://github.com/openclimatefix/nged-substation-forecast/tree/main/scripts/experiments) — merged so the measurement stays auditable, under a lower standard than production code |
 | Record a measured number | Wherever the decision it justifies is made — that copy is the one kept up to date. Another page may restate the figure where its reader needs it, but should name where the decision lives |

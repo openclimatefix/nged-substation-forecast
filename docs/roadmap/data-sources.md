@@ -18,7 +18,50 @@ data.
 | Source | Status | Description |
 |---|---|---|
 | **Time-series JSON files** | ✅ | Half-hourly power flow + metadata per substation / customer meter in the trial area. Ingested by OCF to produce operational forecasts. Each reading is a **period-ending mean** — power averaged over the preceding 30 minutes, with `time` marking the end of that window, as `PowerTimeSeries` in `packages/contracts/src/contracts/power_schemas.py` records. The irradiance ingest is chosen to match, so [Weather data](#weather-data) prefers a source that accumulates over the interval to a source that samples an instant. |
-| **Curtailment (ANM set points)** | 🚧 | NGED-imposed curtailment through Active Network Management (ANM). Crucial for distinguishing deliberate ANM ramp-downs from genuine faults / capacity loss. |
+| **Curtailment (active network management)** | 🚧 | Half-hourly megawatts lost to an active-network-management (ANM) instruction, per curtailed generator. Crucial for distinguishing deliberate ANM ramp-downs from genuine faults or capacity loss. What the feed holds, and how far back it reaches, is [below](#what-the-curtailment-feed-holds). |
+
+### What the curtailment feed holds
+
+**Curtailment reaches us two ways, and the export cap is the one to build on.** The `curtailment/`
+prefix sits beside `timeseries/` on the bucket, on the same six-hour window convention, and each
+object carries a `data` list of `{startTime, endTime, value}` at half-hourly resolution under a
+header naming the generator, its substation number, its licence area, and a `CurtailmentType` such
+as `ANM (DANM and TANM)`. Its `value` is a derived volume of megawatts lost. Separately, NGED can
+export the raw active-network-management setpoint history on request, one row per change of the
+generator's export cap — the signal the derived volume is computed from. Nothing in this repository
+ingests either yet.
+
+**Prefer the setpoint history: it reaches further back and it is the physical quantity.** For the
+one generator both cover, the setpoint history runs from February 2024 against the bucket feed's
+late April 2026, and the two disagree on the hours they share. The cap is also what a model can use
+directly, because export cannot exceed it: a generator's output is `min(what the weather allowed,
+the cap in force)`. The cap is published as a negative number, generation being negative in NGED's
+convention, and its largest magnitude is the connection limit rather than a curtailment. Reading
+the cap as a curtailment volume gets this backwards — the measurements are in [the beam/diffuse
+results](../results/beam-diffuse-split.md#one-site-is-curtailed-and-the-export-cap-is-what-makes-its-hours-scorable).
+
+**Ask for the whole history, and expect the first request to be truncated.** The first export we
+were sent for that generator began in July 2024; a second request returned an exact superset
+reaching back to February 2024, the day the generator's telemetry begins. Nothing in the first file
+said it was partial.
+
+**The setpoint feed reads zero for months before the scheme enforces anything, so find the go-live
+date before trusting a single reading.** Across all 431 bright hours the export covers before
+6 August 2024, the cap forbids export outright — while the generator exported above 5% of capacity
+in 423 of them, at a median of 44%. An ingest that honoured those readings would label a plant
+running normally as a plant held at zero, and would do it silently. Take the scheme as live from the
+first half-hour at which the cap reaches the connection limit: a live scheme on an unconstrained
+generator rests at that limit most of the time, and the marker needs no reference to metered output.
+Eight of the 2,268 rows also carry a positive value where the rest are negative, so read the
+magnitude rather than flipping the sign.
+
+**One generator in the trial area is connected under active network management, and NGED has
+confirmed there are no others.** Within the trial area a generator absent from the setpoint record
+therefore ran free, which is what lets an absent cap be read as evidence rather than as a gap. That
+confirmation does not extend past the trial area: at rollout the population of flexible connections
+has to be established again, and until it is, an absent record means only that NGED has not sent
+curtailment for that generator. The setpoint export is per generator, so widening it to a new set of
+sites is a fresh request each time.
 
 **15-minute power data may become available. We deliberately stay on half-hourly until v2.** There
 is no room on the road to v1.0 to re-ingest the power feed at a finer step, so treat 15-minute data
@@ -229,20 +272,22 @@ dataset](https://dynamical.org/catalog/ecmwf-ifs-ens-forecast-15-day-0-25-degree
 Data on the AWS Open Data Registry as its source. So the variable Dynamical.org would have to add is
 not in the feed they read.
 
-**Asking Dynamical.org for `fdir` is therefore a request to change feed, not a request to widen a
-variable list.** Serving `fdir` would mean a licensed ECMWF dissemination or a MARS subscription in
-place of, or alongside, the free bucket, which costs them money and a contract rather than storage.
-Asking for a change of feed is fair, provided the request is made as what it is. Dynamical.org
-already publish direct and diffuse short-wave for ICON-EU, so a missing variable is not the obstacle
-— the obstacle is which ECMWF feed they hold.
+**`fdir` on ECMWF ENS is therefore not a route open to us.** Serving `fdir` would mean a licensed ECMWF
+dissemination or a MARS subscription in place of, or alongside, the free bucket — a contract and a
+recurring cost, not a storage decision. Dynamical.org build their catalogue from freely
+redistributable data. Asking them to widen a variable list would be reasonable. Asking them to take
+on a licensed feed is asking them to work outside that model, so a request for `fdir` is not worth
+making. Dynamical.org already publish direct and diffuse short-wave for ICON-EU, which shows that a
+missing variable was never the obstacle — the obstacle is which ECMWF feed the open bucket holds,
+and which feed the bucket holds is ECMWF's decision rather than Dynamical.org's.
 
-**The Met Office models are the cheaper ask: their free feed already carries a direct beam.**
-The one open Met Office request on Dynamical.org's issue tracker is for [the global 10 km deterministic
-model](https://github.com/dynamical-org/reformatters/issues/646), which publishes global and direct
-short-wave and leaves diffuse to the same subtraction ECMWF would need. UKV and MOGREPS-UK go
-further and publish diffuse as its own field, but neither appears on Dynamical.org's tracker, so
-either would have to be asked for. None of the three Met Office models needs a new licence, which is
-what makes them a cheaper ask than `fdir`.
+**The Met Office models are the request worth making, because their free feed already carries a
+direct beam.** The one open Met Office request on Dynamical.org's issue tracker is for [the global
+10 km deterministic model](https://github.com/dynamical-org/reformatters/issues/646), which publishes
+global and direct short-wave and leaves diffuse to the same subtraction ECMWF would need. UKV and
+MOGREPS-UK go further and publish diffuse as its own field, but neither appears on Dynamical.org's
+tracker, so either would have to be asked for. None of the three Met Office models needs a new
+licence, which is what makes them worth requesting at all where `fdir` on ENS is not.
 
 **Every Met Office model brings a horizon problem, and two bring an archive problem.** The global
 model reaches 168 hours, UKV reaches 120 hours on its 03 and 15 UTC runs and 54 hours on the rest,
@@ -315,7 +360,7 @@ parameters at any one ensemble step, those same five radiation fields, and no st
 
 ### Two traps for whoever builds on ECMWF's direct beam
 
-**`dsrp` is the more convenient field to ask for, because `fdir` is a horizontal-plane flux and
+**`dsrp` is the more convenient field to ask ECMWF for, because `fdir` is a horizontal-plane flux and
 `dsrp` is already direct normal irradiance.** The ENS catalogue linked above carries three direct
 fields: `fdir` (paramId 228021, total-sky direct at the surface), `cdir` (paramId 228022, the
 clear-sky equivalent), and `dsrp` (paramId 47, direct solar radiation into a plane facing the sun).
@@ -357,31 +402,6 @@ is not analysis-ready. Separately, a precomputed *mean* climatology for the [wea
 feature](xgboost-improvements.md#weather-abnormality-climatology-z-score-features) is available from
 WeatherBench2 at `gs://weatherbench2/datasets/era5-hourly-climatology/`.
 
-### The satellite retrieval beat both model products by about half the error
-
-**On the hours both sources of a pair cover, the CAMS retrieval roughly halves the power error
-against either model product.** In the beam/diffuse split experiment, predicting metered PV output
-from global irradiance alone gave 5.4% of the 99th-percentile output for CAMS against 9.7% for ERA5
-over their 124,849 shared hours, and 5.3% against 9.7% for UKV over their 88,569 shared hours. The
-fitted PV model agreed, with a wider margin.
-
-**The two model products scored within a tenth of a percentage point of each other**, at 8.5% for
-UKV against 8.4% for ERA5 over their 103,065 shared hours, despite a fifteenfold difference in grid
-spacing. **Choosing the source moved the error by about 4 percentage points and choosing the
-beam/diffuse split by about 0.1**, so of the two irradiance decisions measured there, the source
-dominated.
-
-**The likeliest reading is observation against model rather than resolution.** CAMS infers cloud
-from Meteosat at the hour in question, whereas ERA5 and UKV both simulate it, so a retrieval of an
-hour that has already happened starts from the cloud field the other two have to predict. Raising
-the model resolution from 31 km to 2 km moved the error by less than a tenth of a percentage point.
-
-Three limits bound how far that result carries. Restricting the *scoring* to shared hours does not
-restrict the *training*, so each comparison is between two pipelines rather than two grids. UKV
-differs from ERA5 in aerosol treatment as well as in resolution, so the null result above is not a
-clean resolution contrast. And all three sources are analyses or retrievals of an hour that has
-already happened, so none of these numbers is forecast skill at a useful lead.
-
 ### CAMS: use the point API, not the gridded product
 
 **Two CAMS products exist, and only the point time-series product is current.** The [gridded
@@ -406,10 +426,28 @@ product](https://ads.atmosphere.copernicus.eu/datasets/cams-solar-radiation-time
 yesterday**, and takes one latitude and longitude per request. That is annoying rather than
 disqualifying: one request covers a location over a whole date range, so the count scales with sites
 rather than with days. The [v1 trial area](../index.md#scope) needs at most 32 requests, 6 of them
-for the solar farms, against a limit of 500 requests per day. Ask for `observed_cloud` rather than
+for the solar farms, against a limit of 500 requests per day. The daily cap binds long before the
+wait does, at least at the sizes tested: a 14-day request at a 15-minute step returned in 27 seconds
+on 2026-09-21. A multi-year request has not been timed. Ask for `observed_cloud` rather than
 `clear`: the all-sky response carries the clear-sky columns (`GHIc`, `BHIc`, `DHIc`, `BNIc`)
 alongside the all-sky ones, so one request returns both, and their ratio is the clear-sky index that
 conditions the capacity fit and the published estimates of CAMS's own error.
+
+**No intraday correction can rest on CAMS, whatever the accuracy of its irradiance.** A request
+naming today is rejected outright: probing the retrieval API on 2026-09-21 returned HTTP 400 for
+that same day, and a complete set of values for 2026-09-20. The freshest value on offer is
+yesterday's last interval, which the period-ending convention below timestamps at 00:00 UTC today. A
+forecast job running at 09:00 UTC therefore gets nothing at all about the day it is forecasting. The
+most recent daylight irradiance that job can reach dates from yesterday's sunset — between roughly
+15:45 UTC midwinter and 20:35 UTC midsummer across NGED's licence areas.
+
+**The latency is 1 day, not the 2 days some third-party documentation still gives.** The CAMS
+Radiation Service halved the latency in [February
+2026](https://forum.ecmwf.int/t/cams-solar-radiation-timeseries-new-data-availability-and-request-limits-on-ads/14735).
+The same change raised the daily cap to the 500 requests above. The [`camsRad`
+vignette](https://cran.r-project.org/web/packages/camsRad/vignettes/CAMS_solar_data.html) still
+gives the coverage as "up to 2 days ago", so check any latency figure taken from outside the
+Atmosphere Data Store against the request form itself.
 
 **Great Britain sits inside the Meteosat Second Generation field of view** that bounds the all-sky
 product, with the same low-winter-sun degradation SARAH-3 documents. Meteosat Third Generation is
@@ -429,6 +467,48 @@ supply risk.
   aerosol and cloud inputs, so the same timestamp can return a different value next year. Snapshot
   each fetch into Delta and treat the snapshot as the source of truth, or experiments stop being
   reproducible.
+
+### What comparing three irradiance products on the trial area's solar farms found
+
+**The satellite retrieval beat the reanalysis by 4.29 points of mean absolute error on the six
+metered solar farms, which is the largest effect anything in that experiment varied.** On the
+124,849 hours both products cover, CAMS cut an XGBoost forecast's error from 9.66% to 5.37% of P99
+output — the 99th percentile of each site's own metered output, which every figure there is
+normalised by — and a fitted five-parameter physical model's from 10.03% to 6.20%. The largest
+contrast from changing which beam/diffuse split the model saw was 0.126 points, and changing the
+model family moved 1.05. Which product feeds the model dominates both. The write-up is [Does a
+weather product's beam/diffuse split help a PV forecast?](../results/beam-diffuse-split.md); the
+code sits in `scripts/experiments/beam_diffuse_split/`.
+
+**Adding the Met Office's 2 km UKV to the comparison separated resolution from delivery, and the
+resolution half bought almost nothing.** UKV scored 8.46% against ERA5's 8.39% on the 103,065 hours
+both cover, a gap of less than a tenth of a point despite a fifteenfold difference in grid spacing,
+and 9.62% against CAMS's 5.34% on the 88,569 hours those two share. So the retrieval beats both
+model products by roughly half the error while the two model products are indistinguishable from
+each other. **The likeliest reading is observation against model rather than resolution**: CAMS
+infers cloud from Meteosat at the hour in question, whereas ERA5 and UKV both simulate it.
+
+**Three limits bound how far that carries.** Restricting the *scoring* to shared hours does not
+restrict the *training*, so each comparison is between two pipelines rather than two grids. UKV
+differs from ERA5 in aerosol treatment as well as in resolution, so the null result above is not a
+clean resolution contrast. And all three products are analyses or retrievals of an hour that has
+already happened, so none of these figures is forecast skill at a useful lead. Every measurement is
+of these three products on this fleet, and none has been shown to hold for every product at those
+resolutions.
+
+**CAMS's own reliability flag is worth acting on, and dropping the flagged hours raises a
+P99-normalised error even though it improves the data.** The service flagged 17.9% of the daylight
+hours it delivered as less than 90% reliable. Those hours are much darker than the ones kept — 33
+W m⁻² of global irradiance against 285, and 3.5% of P99 output against 36.1% — so removing them
+removes hours where every model is nearly right, and the remaining mean error rises mechanically.
+Any comparison that drops them on one source and not on another is comparing two row sets rather
+than two products; restrict to the shared hours first.
+
+**The beam field CAMS publishes is worth having and the one ERA5 publishes is not.** On the 5 km
+retrieval, giving a model the product's own split rather than running a separation model locally cut
+error by about 1.5% relative. On the 31 km reanalysis it added nothing detectable. Whether the
+retrieval's beam field is worth paying for depends on what a supplier charges for it, which that
+experiment does not know.
 
 ### UKV assimilates satellite cloud, and carries a fixed aerosol climatology
 

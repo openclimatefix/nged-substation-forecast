@@ -120,6 +120,25 @@ the feed is a *noisy label*, not ground truth — use it, but do not lean on it:
   generator ran freely) — a milder failure, but one more reason the estimate should not *depend* on
   the feed being right.
 
+**Ask for the raw export cap rather than a derived curtailment volume, and treat the cap as a
+constraint rather than as a label.** Joining both to six metered solar farms in the [beam/diffuse
+experiment](../results/beam-diffuse-split.md#one-site-is-curtailed-and-the-export-cap-is-what-makes-its-hours-scorable)
+found one of the six under active network management. Its cap sits at the connection limit for
+80.7% of the half-hours since the scheme went live, and on the bright hours where the cap never
+moved the site's yield matches the other five
+to within half a percent, which is what says the cap is read correctly. A physics-based estimator
+can also consume the cap directly, because it enters as `min(what the weather allowed, the cap)`
+— an upper bound on export rather than a volume to subtract, so it changes nothing on the hours
+it does not bind.
+
+**The setpoint record covers one generator from August 2024, so the estimator cannot depend on a
+curtailment label existing.** That generator's setpoint history reaches back to the day after its
+telemetry begins, but the scheme does not enforce anything until 6 August 2024 and the cap reads a
+flat zero until then, so the usable record starts there. The other five generators have no
+curtailment record at all. So an estimator cannot depend on a label existing, and the upper-envelope
+loss remains the structural defence for every period and every generator the record does not
+reach.
+
 ### The regularisation prior: piecewise-constant capacity
 
 The capacity series must not be free to bounce around at the data's sampling rate, or it will simply
@@ -579,6 +598,135 @@ Great Britain](disaggregation.md#correcting-satellite-irradiance-over-great-brit
 > is that ECMWF-only would almost certainly give a slightly *worse* capacity estimate than ERA5
 > would. Worth weighing before we commit ERA5 to the real-time critical path; it shapes the
 > [live-service cadence](../architecture/aws-costs.md#workload-model).
+
+## What the beam/diffuse experiment measured on this fleet
+
+**A throw-away experiment on the six metered solar farms in the trial area fitted a five-parameter
+physical model per site, and several of its by-products bear directly on this plan.** The write-up
+is [Does a weather product's beam/diffuse split help a PV
+forecast?](../results/beam-diffuse-split.md); the code is in a pull request kept open for reference
+rather than merged,
+[#785](https://github.com/openclimatefix/nged-substation-forecast/pull/785), answering [issue
+#784](https://github.com/openclimatefix/nged-substation-forecast/issues/784). None of it is a
+capacity estimator, and none of it settles which of the candidates above to build. What follows is
+what it established and the traps it hit.
+
+**Five parameters per site are identifiable from a meter and an irradiance series alone, and the
+fitted values are physically plausible.** Panel tilt, panel azimuth, capacity, an inverter clipping
+limit, and a temperature coefficient were fitted per site on each training fold by a Powell
+optimiser, from one fixed starting vector and seven random ones. On the corrected stamps the
+fitted tilts land between 14 and 27 degrees and the azimuths within 5 degrees of due south, which
+is what these arrays plausibly are. That is the core feasibility question behind [candidate
+B](#candidate-b-the-differentiable-physics-estimator), answered for solar on this fleet.
+
+**Fitting those five parameters needs no gradients, so candidate B's case has to rest on something
+other than the fit being hard.** The objective is not convex: refitting all 30 site-and-arm
+combinations from 64 independent random starts each, a median of only 3 of the 64 reach the lowest
+loss found, and the worst start lands at 3.5 times it. What makes a derivative-free optimiser
+enough is the low dimension rather than a single basin — 5 parameters, and a fixed starting vector
+that finds the lowest loss in 19 of the 30 fits and is the only start to find it in 6. Refitting
+from the random starts alone moves every arm-to-arm difference by at most 0.0001 MW. So the
+arguments for [candidate B](#candidate-b-the-differentiable-physics-estimator) are the ones already
+listed there — fitted posteriors, fleet-wide shared terms, and continuity with v2 — and not that a
+single site's PV parameters are hard to recover.
+
+**A half-hour timestamp error is absorbed into the fitted azimuth, so pin the stamp convention
+before trusting a fitted orientation or the capacity that comes with it.** The same model fitted on
+the same rows moves its fitted azimuth by about 35 degrees when the stamps are shifted by one
+half-hour, which is a quarter of the range a GB array's orientation can plausibly occupy, from a
+30-minute change in what the timestamp means. The [power stamps on this
+feed](../results/beam-diffuse-split.md#the-power-stamps-before-26-march-2026-are-half-an-hour-late)
+were half an hour late until NGED corrected them. Any estimator that fits orientation has the same
+exposure, and an orientation error feeds straight into the capacity it reports.
+
+**What limits the fitted physical model is its specification, not its optimiser, and the term
+that hurts is the transposition.** Given the same rows, the physical model and the tree disagree
+about which beam field is better, and the physical model divides the horizontal beam by the cosine
+of the solar zenith angle to recover the direct normal irradiance. That division magnifies a beam
+error without limit as the sun approaches the horizon: below 10 degrees of elevation the physical
+model's arm ordering reaches +0.56 percentage points against +0.00 to +0.17 in the bands above it.
+Holding tilt and azimuth equal across the arms makes the disagreement larger rather than smaller,
+from +0.128 to +0.147 points, so the fitted geometry is not the cause. An estimator built on the
+same model chain inherits the same sensitivity, and a floor on the zenith cosine is the cheapest
+guard against it.
+
+**One of the five fitted parameters lands outside physics, which is a warning about reading a
+fitted capacity as a measurement.** The fitted temperature coefficient runs from −0.0018 to +0.0020
+per degree Celsius across the six sites, where a crystalline-silicon module's maximum-power
+coefficient is negative and datasheets cluster between −0.0045 and −0.0025. A positive value means
+the fit is using that parameter for something other than the temperature response, and the fitted
+capacity absorbs whatever derating the temperature coefficient leaves unapplied. The fitted tilts
+and azimuths are unaffected. For this plan the lesson is that a capacity parameter is only as
+trustworthy as the terms beside it, which is an argument for the physically-constrained priors
+[candidate B](#candidate-b-the-differentiable-physics-estimator) carries.
+
+**The `effective_capacity` table is a single snapshot, not a time series.** It holds exactly one row
+per `time_series_id` — 32 rows for 32 series — so code that sorts it by time and takes the last row
+silently gets the only row. Nothing errors. The [delivery-table
+spec](delivery-tables.md#table-4-effective_capacity) describes a time-varying trace, and the
+estimator this page plans is what will produce one; until then, anything reading that table is
+reading a constant.
+
+**A fixed-capacity model's signed error drifts by more than 6 points between neighbouring sites,
+which bounds how much capacity moved without estimating it.** The per-site, per-year drift table is
+[in the write-up](../results/beam-diffuse-split.md#what-the-per-site-error-drift-says-about-estimating-effective-capacity).
+The drift appears on two independently-produced irradiance products and agrees between them to
+about half a point at the five longer-running sites, so it is in the power rather than in the
+weather. It remains an upper bound:
+the residual absorbs degradation, soiling, snow, curtailment, and any site-specific irradiance bias
+together. Separating them is the estimator contest's job.
+
+**A perfect capacity tracker would take about 4% off the error level of a PV forecast on this
+fleet, which bounds what this estimator can be expected to buy a forecast.** An oracle correction
+subtracts each arm's own mean signed error inside every site-year, reading that mean off the rows
+being scored, so it beats any real estimator working at annual resolution. It takes the reference
+arm from 5.333 to 5.266% of P99 output; repeating it inside every site-month reaches 5.124. Both
+leave every contrast in that experiment where it was, to within 0.0003 points. Two readings follow.
+A dynamic capacity estimate is worth having for the quantity itself rather than for the forecast
+accuracy it returns, so the [judging criteria](#the-head-to-head-protocol) are right to score the
+capacity trace rather than a downstream forecast. And a forecasting experiment on this fleet does
+not need one, because the error a static denominator leaves is shared across whatever arms are
+being compared.
+
+**Changing the capacity denominator changes the units and nothing else.** That experiment
+normalises every error by each site's 99th percentile of output. Recomputing the headline against
+the 99.9th percentile, against the highest reading, and against a daylight-only 99th percentile
+moves the absolute figure between −0.096 and −0.086 percentage points and leaves the relative
+effect at 1.80% in all four cases. An estimator that reported a higher effective capacity would
+therefore not be validated by a forecasting score moving, and would not be refuted by one staying
+still.
+
+**The satellite retrieval beats the reanalysis by 4.29 points of mean absolute error on this fleet,
+which is a local measurement to set beside the literature above.** The comparison and its caveats
+are on the [data-sources
+page](data-sources.md#what-comparing-three-irradiance-products-on-the-trial-areas-solar-farms-found).
+That is a forecasting measurement rather than a capacity one, but it is the same inputs feeding the
+same physics, and it supports [preferring CAMS for the capacity fit](#irradiance-inputs) on more
+than a literature argument.
+
+**Curtailment needs the export cap, and the export cap needs its go-live date.** NGED's setpoint
+feed reads zero for the six months before the scheme starts enforcing anything, while the generator
+exports normally. An estimator that took those readings as a constraint would conclude the site was
+pinned at zero while it ran. Honour the cap only from the first half-hour at which it reaches the
+connection limit. The evidence
+is under [active network management caps what a generator may
+export](../background/network.md#active-network-management-caps-what-a-generator-may-export).
+
+**A generator's commissioning ramp is signal for this estimator, not noise, and one is already
+measured.** One trial-area solar farm climbed to its settled output through eight months of discrete
+multi-day plateaus, reaching its settled level on 6 October 2024 — exactly the upward,
+piecewise-constant movement [the metered-capacity
+prior](#metered-effective-capacity-can-go-up-or-down) is built for. The forecasting experiment cuts
+those rows because a forecast has no ceiling to clamp to; an estimator should track them instead,
+and the plateau dates and levels make a ready-made test case. The figure and the method are under
+[how a new solar farm reaches full output in
+stages](../background/network.md#a-new-solar-farm-reaches-full-output-in-stages-over-months).
+
+**Detecting that ramp needed a reference series rather than a threshold, which is a constraint on
+how this scales.** A part-built array under a clear sky produces what a whole array produces under
+cloud, so nothing in a single series separates them. Dividing by the median output of neighbouring
+sites cancels cloud, season and time of day; a clear-sky irradiance model would do the same job
+where no neighbour is available. At roughly 2,500 series neither is free.
 
 ## What comes after v0.7
 

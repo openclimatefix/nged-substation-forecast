@@ -1,24 +1,26 @@
 """Reproduce the issue #179 weather/calendar-only baseline experiment end-to-end, headless.
 
-This is the "shared baseline" for switching-event detection: the production XGBoost forecaster
-configured with **no power-lag features** (weather + calendar covariates only), so its residual
-(observed - expected) isolates switching events rather than absorbing them through a lagged-power
-side door. See the roadmap:
+The experiment is the "shared baseline" for switching-event detection: the production XGBoost
+forecaster configured with **no power-lag features**, so weather and calendar covariates only.
+The forecaster's residual (observed - expected) therefore isolates switching events. A power-lag
+feature would give the model the substation's own measured power from 24 hours, 48 hours, one week
+or two weeks earlier, so the model would learn the step change a switching event causes and predict
+it, leaving little in the residual. See the roadmap:
 <https://openclimatefix.github.io/nged-substation-forecast/roadmap/switching-events/#the-baseline-shared-foundation>
 
-The whole pipeline runs in one process sharing a single ``DagsterInstance``. That is required, not
-incidental: ``register_experiment`` adds the dynamic partition key
-``xgboost_no_power_lags__mid_2025_to_mid_2026`` to the instance, and the subsequent
+The whole pipeline runs in one process sharing a single ``DagsterInstance``. Sharing one instance
+is required, not incidental. ``register_experiment`` adds the dynamic partition key
+``xgboost_no_power_lags__mid_2025_to_mid_2026`` to the instance. The subsequent
 ``materialize(..., partition_key=...)`` calls validate that key against the *same* instance's
 dynamic-partition store. Splitting the steps across processes with separate ephemeral instances
-would fail with "partition key not found". This mirrors the canonical pattern in
-``tests/test_metrics.py``.
+would fail with "partition key not found". The one-process arrangement mirrors the canonical
+pattern in ``tests/test_metrics.py``.
 
 Only ``selected_features`` (and an honest ``training_strategy`` tag) are overridden; every other
 hyperparameter is inherited from ``conf/model/xgboost.yaml``. The 20 features below are exactly the
 base config's list minus the four ``power_lag_*h`` entries.
 
-Run from the repo root, or a worktree where ``.env`` (and ``data``) are symlinked:
+Run from the repo root or a worktree where ``.env`` (and ``data``) are symlinked:
 
     uv run python scripts/forecasting/run_baseline_experiment.py
 """
@@ -120,7 +122,7 @@ def _report_metrics() -> None:
 
 
 def _run_pipeline(instance: DagsterInstance) -> None:
-    """Run the five pipeline steps against ``instance``, asserting each one succeeded."""
+    """Run the five pipeline steps against ``instance``, asserting that each step succeeded."""
     print(f"[1/5] Registering experiment {EXPERIMENT_NAME} ({len(SELECTED_FEATURES)} features)...")
     _register(instance)
 
@@ -161,8 +163,8 @@ def main() -> None:
 
     # Context manager, not a bare ``DagsterInstance.ephemeral()``: ``__exit__`` calls ``dispose()``,
     # closing the two SQLite connections the in-memory run and event-log storages hold open. Letting
-    # the local fall out of scope does not do this — Dagster caches retain a used instance until the
-    # interpreter exits. Rationale and measurements:
+    # the local variable fall out of scope never calls ``dispose()`` — Dagster caches retain a used
+    # instance until the interpreter exits. Rationale and measurements:
     # <https://openclimatefix.github.io/nged-substation-forecast/architecture/testing/>.
     with DagsterInstance.ephemeral() as instance:
         _run_pipeline(instance)

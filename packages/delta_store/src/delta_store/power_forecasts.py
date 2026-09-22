@@ -5,8 +5,8 @@ properties (codec + per-column encodings), the compression-friendly row order, a
 ``power_fcst`` precision reduction. Callers write through `write_power_forecasts` so it is
 impossible to land rows in the table without this format applied.
 
-Measured impact: rewriting the full 403.6M-row development table into this format shrank the
-table from 6.33 GB to 0.73 GB. The 6.33 GB figure is the delta-rs defaults: SNAPPY, dictionary
+Measured impact: the full 403.6M-row development table shrank from 6.33 GB to 0.73 GB when
+rewritten into this format. The 6.33 GB figure is the delta-rs defaults: SNAPPY, dictionary
 encoding, unsorted, full precision. See the ``POWER_FORECASTS_WRITER_PROPERTIES`` docstring for
 the per-lever breakdown.
 """
@@ -38,12 +38,11 @@ size impact.
 POWER_FORECASTS_SORT_COLS: Final[tuple[str, ...]] = PowerForecast.PRIMARY_KEY
 """Within-file row order for ``power_forecasts`` writes.
 
-Placing the ~51 ensemble members of one (series, init time, valid time) target on adjacent rows
-makes ``power_fcst`` locally smooth and the timestamp columns stepped sequences. Locally smooth
-values and stepped sequences are exactly what the BYTE_STREAM_SPLIT and DELTA_BINARY_PACKED
+``power_fcst`` becomes locally smooth, and the timestamp columns become stepped sequences, when the
+~51 ensemble members of one (series, init time, valid time) target sit on adjacent rows. Locally
+smooth values and stepped sequences are exactly what the BYTE_STREAM_SPLIT and DELTA_BINARY_PACKED
 encodings in ``POWER_FORECASTS_WRITER_PROPERTIES`` need to compress well. Leading with
-``time_series_id`` also lets parquet row-group statistics
-prune scans that filter on one series.
+``time_series_id`` also lets parquet row-group statistics prune scans that filter on one series.
 
 Defined as ``PowerForecast.PRIMARY_KEY`` rather than repeating its columns, because the set that
 identifies a row uniquely is exactly the set whose adjacency makes a row compress. The *order* is

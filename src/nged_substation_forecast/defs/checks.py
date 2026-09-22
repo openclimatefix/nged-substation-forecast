@@ -23,17 +23,17 @@ and it is the hand-off point for routing per-series staleness to Sentry: the sam
 ``nged_substation_forecast._sentry``) rather than recomputed. The two mechanisms stay
 complementary — the [Sentry missed-check-in
 alarm](https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#send-telemetry-to-sentry-and-alarm-on-absence)
-fires on total silence from outside the deployment, while this check (and its Sentry warning)
-report per-series staleness from inside Dagster while the daemon is alive.
+fires on total silence from outside the deployment, while this check (and its Sentry warning) report
+per-series staleness from inside Dagster while the daemon is alive.
 
 ``live_forecasts_are_healthy`` does the same job for the one asset NGED actually consumes. It
 answers two questions the asset's own success status cannot: did this 6-hourly slot really land
 valid forecast rows on disk, and how many daily NWP runs were missing when the forecast was made?
-Both are read back from disk after the write, so a run that "succeeded" while writing nothing —
-or writing null/non-finite forecasts, hindcast rows, or a short population — still shows up.
-Missed NWP runs are *counted as runs*, never measured in hours of age — healthy NWP is 12–30
-hours old depending on the slot, so any absolute age threshold would fire on two slots in four
-every day. The full argument is in [Inherent Stability → Three audiences, three
+Both are read back from disk after the write, so a run still shows up even when it "succeeded"
+while writing nothing — or writing null/non-finite forecasts, hindcast rows, or a short
+population. Missed NWP runs are *counted as runs*, never measured in hours of age — healthy NWP
+is 12–30 hours old depending on the slot, so any absolute age threshold would fire on two slots
+in four every day. The full argument is in [Inherent Stability → Three audiences, three
 channels](https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#three-audiences-three-channels).
 
 Both checks are ``AssetCheckSeverity.WARN`` and ``blocking=False``, and nothing either one's
@@ -254,13 +254,13 @@ def evaluate_power_freshness(
 
     # Stale: has data on disk, but the newest observation predates the cutoff.
     #
-    # NOTE: this is deliberately not restricted to `roster_ids`. A series that NGED has
-    # decommissioned but that still has old rows on disk will keep being flagged stale — which is
-    # what we want for now: we would rather be told about a series that has gone quiet than
-    # silently stop watching it. Restricting to `roster_ids` would not silence one anyway:
-    # `upsert_metadata` never drops a series, so a retired series stays in the roster for good.
-    # Silencing one takes the explicit record of silenced ids above, which serves a retired series
-    # and a broken sensor alike — the check cannot tell them apart, and does not need to.
+    # NOTE: this is deliberately not restricted to `roster_ids`. A series keeps being flagged stale
+    # even after NGED decommissions it, as long as old rows remain on disk — which is what we want
+    # for now: we would rather be told about a series that has gone quiet than silently stop
+    # watching it. Restricting to `roster_ids` would not silence one anyway: `upsert_metadata` never
+    # drops a series, so a retired series stays in the roster for good. Silencing one takes the
+    # explicit record of silenced ids above, which serves a retired series and a broken sensor alike
+    # — the check cannot tell them apart, and does not need to.
     stale = coverage.filter(pl.col("last_time") < cutoff).select(
         "time_series_id",
         last_seen=pl.col("last_time"),
@@ -613,9 +613,9 @@ class LiveForecastHealthResult:
     def horizon_is_truncated(self) -> bool:
         """True when the slot's rows stop well short of the forecast horizon we asked for.
 
-        ``live_forecasts`` drops rows outside the selected NWP run's coverage, so a run that was
-        only partly ingested — or one so old that its remaining coverage is nearly used up —
-        silently delivers a much shorter forecast than NGED expect, with every row still
+        ``live_forecasts`` drops rows outside the selected NWP run's coverage, so a run silently
+        delivers a much shorter forecast than NGED expect when it was only partly ingested, or
+        when it is so old that its remaining coverage is nearly used up — with every row still
         perfectly well-formed. That is structural, not a matter of skill, so it belongs here.
         """
         return self.horizon_hours is not None and self.horizon_hours < _MIN_HORIZON_HOURS
@@ -765,9 +765,9 @@ def _read_live_forecast_rows(
     promoting a champion from a *different* experiment leaves the outgoing experiment's rows for
     the same slot in place:
     <https://openclimatefix.github.io/nged-substation-forecast/architecture/production-deployment/#read-the-live-forecast-back-off-disk-with-a-second-asset-check>
-    ``None`` — the promoted model's ``meta.json`` is absent or unreadable, so there is no name to
-    scope to — falls back to reading every live experiment, which over-reports rather than
-    under-reports.
+    ``None`` means the promoted model's ``meta.json`` is absent or unreadable, so there is no name
+    to scope to; the read then falls back to reading every live experiment, which over-reports
+    rather than under-reports.
 
     The scan is pruned to the matching ``(experiment_name, fold_id="live")`` Delta partitions and
     then to the one ``power_fcst_init_time``, and every column is reduced to a scalar inside

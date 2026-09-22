@@ -48,8 +48,8 @@ make the NRA forecast better, and it is acceptable for the models to handle thes
   blocks](../roadmap/forecast-building-blocks.md).
 
 The shapes of the five [delivery tables](../roadmap/delivery-tables.md) were specified in a formal
-report to NGED, so changing a shape (such as replacing the discrete `substation_switching` table
-with continuous signals) needs NGED's agreement.
+report to NGED, so NGED's agreement is needed to change a shape, such as replacing the discrete
+`substation_switching` table with continuous signals.
 
 ### The worst case matters most: forecasting threshold exceedance
 
@@ -70,13 +70,13 @@ limit?**" — a [mock-up of the operator view](manual-heuristic-forecast.md#the-
 demand as headroom below a constraint line.
 
 The project's value therefore concentrates in **both tails** of each forecast distribution: A model
-that is excellent on typical half-hours but unreliable in the handful of near-limit hours has failed
-at the job. The near-limit hours sit at both ends. Flexibility procurement turns on the upper tail,
-where demand rises towards firm capacity, and bites in winter. Curtailment turns on the lower tail,
-where export rises towards whichever limit binds because embedded generation is high and demand is
-low, and bites in summer. The 13 `DELIVERY_QUANTILES` are deliberately tail-heavy at both ends and
-symmetric about the median — p1, p2, and p5 matching p95, p98, and p99. The delivery shape therefore
-already serves both decisions. This is why evaluation includes [tail & exceedance
+fails at the job if it is excellent on typical half-hours but unreliable in the handful of
+near-limit hours. The near-limit hours sit at both ends. Flexibility procurement turns on the upper
+tail, where demand rises towards firm capacity, and bites in winter. Curtailment turns on the lower
+tail, where export rises towards whichever limit binds because embedded generation is high and
+demand is low, and bites in summer. The 13 `DELIVERY_QUANTILES` are deliberately tail-heavy at both
+ends and symmetric about the median — p1, p2, and p5 matching p95, p98, and p99. The delivery shape
+therefore already serves both decisions. This is why evaluation includes [tail & exceedance
 metrics](../roadmap/metrics-and-leaderboard.md#tail-exceedance-metrics-scoring-the-question-nged-actually-asks)
 alongside average-error metrics. (One honest complication: a substation's real limit is not a single
 number — it varies with ambient temperature and with how long an overload lasts — so the evaluation
@@ -101,11 +101,12 @@ infrastructure requirement in its own right: we need to run **on the order of hu
 experiments per month**, and the workflow must make each experiment as frictionless as possible.
 That the throughput produces a better forecast is a bet this project is making rather than a result
 the literature has settled, for the reasons set out in [Our approach to
-MLOps](../ml_experimentation/index.md#our-approach-to-mlops). The pre-registered version of that
-requirement — deliberately relaxed to a peak-month, per-person claim, so that months spent hardening
-the service are not spurious falsifications — is [H2, a hundred experiments per person in a peak
-month](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month);
-the promotion half below is [H3, one-click promotion and one-click
+MLOps](../ml_experimentation/index.md#our-approach-to-mlops). [H2, a hundred experiments per person
+in a peak
+month](../design-philosophy/engineering-hypotheses.md#h2-a-hundred-experiments-per-person-in-a-peak-month)
+is the pre-registered version of that requirement, deliberately relaxed to a peak-month, per-person
+claim so that months spent hardening the service are not spurious falsifications. The promotion
+half below is [H3, one-click promotion and one-click
 rollback](../design-philosophy/engineering-hypotheses.md#h3-one-click-promotion-and-one-click-rollback).
 
 Three properties matter as much as raw throughput:

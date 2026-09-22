@@ -23,9 +23,9 @@ closes the translation gap:
 1. **Throughput.** The grunt work of an experiment — assembling features, training,
    cross-validating, recording results — is automated, so a small team can run hundreds of
    experiments per month instead of one or two. Humans still decide what to try; the infrastructure
-   runs those experiments. (See [Running an ML experiment end-to-end](dagster-workflow.md).) That
-   the throughput produces a better forecast is a bet this project is making rather than a result
-   the literature has settled. The energy-forecasting review found [no study measuring what adopting
+   runs those experiments. (See [Running an ML experiment end-to-end](dagster-workflow.md).) This
+   project is betting that the throughput produces a better forecast; the literature has not settled
+   the question. The energy-forecasting review found [no study measuring what adopting
    machine-learning-operations practice
    delivers](../background/energy-forecasting-review.md#mlops-research-describes-good-practice-but-does-not-measure-what-the-practice-improves),
    and the case for [fast, comparable
@@ -67,10 +67,10 @@ autoresearch](https://github.com/karpathy/autoresearch) fixes every training run
 changes".
 
 Holding the protocol fixed is what makes a one-command promotion *safe* to press rather than merely
-quick. One risk in a conventional setup — that the artifact measured and the artifact deployed are
-two different pieces of code — does not exist here. The comparison that picked the winner was made
+quick. In a conventional setup, the artifact measured and the artifact deployed can be two different
+pieces of code — a risk that does not exist here. The comparison that picked the winner was made
 against every other candidate on identical folds. And the way back to the previous champion is a
-single command too. A fast promotion route that nobody trusts enough to use is worth no more than a
-slow route. The speed comes from the protocol rather than from haste, a distinction [Karpathy
-(2019)](https://karpathy.github.io/2019/04/25/recipe/) puts bluntly: "a 'fast and furious' approach
-to training neural networks does not work and only leads to suffering".
+single command too. A fast promotion route is worth no more than a slow route if nobody trusts the
+fast route enough to use it. The speed comes from the protocol rather than from haste, a distinction
+[Karpathy (2019)](https://karpathy.github.io/2019/04/25/recipe/) puts bluntly: "a 'fast and furious'
+approach to training neural networks does not work and only leads to suffering".

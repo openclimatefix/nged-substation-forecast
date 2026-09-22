@@ -22,13 +22,13 @@ from ml_core.features import FeatureEngineer, TabularFeatureEngineer
 _MLFLOW_MODEL_ARTIFACT: Final[str] = "model.tar.gz"
 """Name of the single artifact, at an MLflow run's artifact root, holding the saved model.
 
-The whole model directory is uploaded as **one archive file** rather than as a directory of
-files, because MLflow's directory upload (``log_artifacts``) *merges* into a run's artifact
-store instead of replacing it, while re-logging a single artifact of the same name overwrites
-it (both verified empirically against MLflow 3.15.1). CV fold runs are reused across
-re-materialisations, so a directory upload lets a re-training on a **smaller** population leave
-the dropped series' files behind in the run forever — MLflow exposes no public artifact-delete
-API to clean them up. One replaceable archive makes that accumulation impossible. See
+The whole model directory is uploaded as **one archive file** rather than as a directory of files,
+because MLflow's directory upload (``log_artifacts``) *merges* into a run's artifact store instead
+of replacing the store, while re-logging a single artifact of the same name overwrites that artifact
+(both verified empirically against MLflow 3.16.0). Cross-validation (CV) fold runs are reused across
+re-materialisations, so a directory upload lets a re-training on a **smaller** population leave the
+dropped series' files behind in the run forever. MLflow exposes no public artifact-delete API to
+clean those files up. One replaceable archive makes that accumulation impossible. See
 <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#one-archive-file-not-a-directory-of-files>.
 
 A run holding exactly *one* model file is what the fix rests on: logging a second per-model
@@ -36,36 +36,39 @@ artifact alongside this archive would reopen the merge problem for that artifact
 """
 
 TRAINED_METADATA_FILENAME: Final[str] = "time_series_metadata.parquet"
-"""Name of the ``TimeSeriesMetadata`` rows a saved model carries for its trained population.
+"""Name of the file holding the ``TimeSeriesMetadata`` rows a saved model carries.
 
-Production inference reads each series' location from here, never from the
-``TimeSeriesMetadata`` roster, so an unreadable or thinned roster cannot fail a live slot or
-silently drop a series from it. Being the model's own frozen copy of what it trained against also
-keeps a series' H3 cell and static feature values identical between training and serving. See
+The file holds one row per series in the model's trained population. Production inference reads each
+series' location from that file, never from the ``TimeSeriesMetadata`` roster. An unreadable or
+thinned roster therefore cannot fail a live slot, and cannot silently drop a series from a slot.
+Being the model's own frozen copy of what it trained against also keeps a series' H3 cell and static
+feature values identical between training and serving. See
 <https://openclimatefix.github.io/nged-substation-forecast/design-philosophy/inherent-stability/#the-rules>.
 
-Logging it as a second MLflow artifact instead of putting it in the model directory would reopen
-the merge problem ``_MLFLOW_MODEL_ARTIFACT`` documents.
+Logging the frozen metadata copy as a second MLflow artifact rather than putting the copy in the
+model directory would reopen the merge problem ``_MLFLOW_MODEL_ARTIFACT`` documents.
 """
 
 _UNPERSISTED_METADATA_COLUMN: Final[str] = "area_wkt"
 """The one ``TimeSeriesMetadata`` column ``write_trained_metadata`` drops.
 
-Measured on the V1 roster (32 series, 12 columns): the frame is 129,582 bytes and ``area_wkt``
-holds 127,635 of them — 98.5%, against under 2 KB for everything else. Nothing in the feature
-pipeline reads it, and at V2 scale (~2,500 series) it would put megabytes of polygon text into
-every fold's archive. It is ``allow_missing``, so the frame still validates against
-``TimeSeriesMetadata`` without it.
+Measured on the V1 metadata roster (33 rows, 14 columns): the frame is 129,916 bytes in memory and
+``area_wkt`` holds 127,635 of those bytes — 98.2%, against 2,281 bytes for the other 13 columns put
+together. Nothing in the feature pipeline reads the well-known-text polygon ``area_wkt`` carries. At
+V2 scale (~2,500 series) that polygon text would put megabytes into every fold's archive. The column
+is ``allow_missing``, so the frame still validates against ``TimeSeriesMetadata`` once
+``write_trained_metadata`` has dropped the column.
 """
 
 _ARCHIVE_COMPRESSLEVEL: Final[int] = 1
 """gzip level used for the model archive — the fastest, not ``tarfile``'s default of 9.
 
 Measured on 40 real XGBoost boosters (500 estimators, depth 6, 24 features; 77 MB of ``.ubj``):
-level 1 takes 0.7 s for a 2.7x reduction, level 9 takes 14.9 s for 3.5x. Level 9 would put ~15
-minutes of pure CPU on every ``trained_cv_model`` materialisation at V2 scale (~2,500 series)
-to save a fifth of the bytes. Boosters are already dense, and the archive is transient — it
-exists to be one replaceable object, not to be small — so the fastest level is the right trade.
+level 1 takes 0.7 s and shrinks those 77 MB of boosters 2.7-fold, while level 9 takes 14.9 s and
+shrinks the same 77 MB 3.5-fold. Level 9 would put ~15 minutes of pure CPU on every
+``trained_cv_model`` materialisation at V2 scale (~2,500 series) to save a fifth of the bytes.
+Boosters are already dense, and the archive is transient — it exists to be one replaceable object,
+not to be small. The fastest level is therefore the right setting.
 """
 
 
@@ -94,10 +97,11 @@ def write_trained_metadata(
     Args:
         model_dir: The directory a subclass's ``save`` just wrote.
         time_series_metadata: The roster rows the model was engineered against.
-            ``_UNPERSISTED_METADATA_COLUMN`` is dropped; everything else is kept.
+            ``_UNPERSISTED_METADATA_COLUMN`` — the ``area_wkt`` polygon text — is dropped, for the
+            size reason given on that constant. Every other column is kept.
     """
-    # `pl.exclude` rather than `drop`: Patito overrides `DataFrame.drop` with a signature that
-    # takes no `strict=False`, and the column is `allow_missing`, so it may not be there to drop.
+    # `pl.exclude` rather than `drop`: Patito overrides `DataFrame.drop` with a signature that takes
+    # no `strict=False`. The column is `allow_missing`, so the column may not be there to drop.
     time_series_metadata.select(pl.exclude(_UNPERSISTED_METADATA_COLUMN)).write_parquet(
         model_dir / TRAINED_METADATA_FILENAME
     )
@@ -106,24 +110,26 @@ def write_trained_metadata(
 def load_trained_metadata(model_dir: Path) -> pt.DataFrame[TimeSeriesMetadata]:
     """Read back the ``TimeSeriesMetadata`` rows a saved model carries.
 
-    ``set_model`` rather than ``validate``, matching how the R&D assets read the roster itself:
-    this reads back what was written, so re-checking it would only reject rosters the rest of the
-    system already accepts.
+    Patito offers two ways to put a schema on a frame: ``validate`` checks every row against the
+    schema and raises on a violation, while ``set_model`` attaches the schema without checking.
+    This function uses ``set_model``, matching how the cross-validation, training, and metrics
+    assets read the roster itself. ``load_trained_metadata`` reads back what was written, so
+    re-checking those rows would only reject rosters the rest of the system already accepts.
 
     Args:
         model_dir: A directory written by ``save_to_mlflow`` (via ``write_trained_metadata``) and
             typically unpacked by ``fetch_model_artifacts``.
 
     Returns:
-        One row per series in ``trained_time_series_ids`` — the population the model will serve a
-        ``predict`` for, not the wider one it was engineered over — without
-        ``_UNPERSISTED_METADATA_COLUMN``.
+        One row per series in ``trained_time_series_ids``, without ``_UNPERSISTED_METADATA_COLUMN``.
+        That population is the population the model will serve a ``predict`` for, not the wider
+        population the model was engineered over.
 
     Raises:
-        FileNotFoundError: The directory holds no such file, so it was saved by code predating
-            this file or assembled by hand. This is a promotion fault rather than a data outage —
-            the model on disk is not one this code can serve — so it raises rather than degrading,
-            as a missing ``meta.json`` does.
+        FileNotFoundError: The directory holds no such file, so the model was saved by code
+            predating ``TRAINED_METADATA_FILENAME`` or assembled by hand. The absence is a promotion
+            fault rather than a data outage: the model on disk is not a model this code can serve. A
+            promotion fault raises rather than degrading, just as a missing ``meta.json`` does.
     """
     path = model_dir / TRAINED_METADATA_FILENAME
     if not path.exists():
@@ -139,8 +145,8 @@ def _download_and_unpack_model(run_id: str, work_dir: Path, remedy: str) -> Path
     """Download an MLflow run's model archive into ``work_dir`` and unpack it.
 
     Shared by ``BaseForecaster.load_from_mlflow`` and
-    ``ml_core.production_helpers.fetch_model_artifacts``, the two readers of a run's saved
-    model, so the archive layout is defined in exactly one place.
+    ``ml_core.production_helpers.fetch_model_artifacts``, the only two readers of a run's saved
+    model in this repo, so the archive layout is defined in exactly one place.
 
     The caller is responsible for setting the tracking URI (``mlflow.set_tracking_uri``)
     beforehand.
@@ -149,15 +155,14 @@ def _download_and_unpack_model(run_id: str, work_dir: Path, remedy: str) -> Path
         run_id: The MLflow run the model was saved under.
         work_dir: A scratch directory (typically a ``TemporaryDirectory``) to download and
             extract into. Needs room for the archive *and* its unpacked contents.
-        remedy: What the reader should do when the run holds no archive, appended to the
-            message. The two callers reach this state by different routes — a CV fold run that
-            no training has written yet, versus a run id an operator chose — so no one wording
-            is right for both.
+        remedy: What the reader should do when the run holds no archive, appended to the message.
+            The two callers reach this state by different routes: a CV fold run that no training has
+            written yet, versus a run id an operator chose. No one wording is right for both.
 
     Returns:
-        The directory holding the unpacked model, ready to hand to a subclass's ``load``. It
-        contains only what the archive held, so a stale file from an earlier, larger model
-        cannot appear in it.
+        The directory holding the unpacked model, ready to hand to a subclass's ``load``. The
+        returned directory contains only what the archive held, so a stale file from an earlier,
+        larger model cannot appear in that directory.
 
     Raises:
         MlflowException: The run holds no model archive; the message ends with ``remedy``.
@@ -186,36 +191,38 @@ class BaseForecasterConfig(BaseModel):
 
     Subclasses add model-specific hyperparameters. Having a shared base ensures that every
     forecaster carries its own feature list and optional MLflow experiment id in one serialisable
-    object, simplifying save/load and the ``conf/model/*.yaml`` config wiring.
+    object. That single object simplifies save/load and the ``conf/model/*.yaml`` config wiring.
 
-    The tag fields (weather_source, training_strategy) are stamped onto MLflow runs for
-    leaderboard grouping. They live here so that constructing the config from a model YAML's
-    ``model_params`` validates them at load time — they are present in every
-    ``conf/model/*.yaml`` file under ``model_params``.
+    An MLflow tag is a label that can be rewritten later, while an MLflow param is written once
+    and then fixed. The tag fields (weather_source, training_strategy) are stamped onto MLflow
+    runs for leaderboard grouping. The tag fields live here so that constructing the config from
+    a model YAML's ``model_params`` validates them at load time. Every ``conf/model/*.yaml`` file
+    carries both tag fields under ``model_params``.
 
-    ``experiment_name`` is the per-experiment key (set to the MLflow experiment name at
-    registration and stored in the saved config); it is stamped onto every ``PowerForecast`` row,
-    distinct from the model-family ``MODEL_NAME``. ``random_seed`` is threaded into each model's
-    training so that re-training a fold reproduces the same model — keeping retries and the
-    leaderboard stable.
+    ``experiment_name`` is the per-experiment key, set to the MLflow experiment name at
+    registration and stored in the saved config. Every ``PowerForecast`` row carries
+    ``experiment_name``, distinct from the model-family ``MODEL_NAME``. ``random_seed`` is
+    threaded into each model's training so that re-training a fold reproduces the same model —
+    keeping retries and the leaderboard stable.
 
     Model identity (name and version) lives on the ``BaseForecaster`` class itself as
-    ``MODEL_NAME`` and ``MODEL_VERSION`` — those are properties of the implementation, not the
-    experiment config.
+    ``MODEL_NAME`` and ``MODEL_VERSION``. Both constants are properties of the implementation,
+    not of the experiment config.
 
     **Serialisation must be canonical.** A config is compared and stored as its serialised form:
     ``register_experiment`` stamps ``model_dump_json()`` onto the MLflow experiment as the
-    ``config`` tag and compares a re-registration against it, and logs ``flatten_config(...)`` as
-    write-once MLflow params. Python's per-process string hash randomisation means a ``set``
-    iterates in a different order in every process, so a set dumped straight to a list would make
-    two dumps of the *same* config differ — a re-registration would then look like a config
-    change and its param write would be rejected. ``selected_features`` is therefore serialised
-    sorted. A subclass that adds a set-valued (or otherwise unordered) field must do the same.
+    ``config`` tag and compares a re-registration against that tag. ``register_experiment`` also
+    logs ``flatten_config(...)`` as write-once MLflow params. Python's per-process string hash
+    randomisation means a ``set`` iterates in a different order in every process. A set dumped
+    straight to a list would therefore make two dumps of the *same* config differ. A
+    re-registration would then look like a config change, and its param write would be rejected.
+    ``selected_features`` is therefore serialised sorted. A subclass that adds a set-valued (or
+    otherwise unordered) field must do the same.
 
     **Unknown keys are rejected, not ignored** (``extra="forbid"``). A key no field declares
     raises ``ValidationError``, so a misspelled hyperparameter in a run's ``config_overrides``
-    fails at registration, and a *stored* config carrying a key the current code no longer
-    declares is refused rather than silently losing it — the recovery is to re-train, never to
+    fails at registration. A *stored* config carrying a key the current code no longer declares
+    is refused rather than silently losing that key. The recovery is to re-train, never to
     hand-edit. Why this is worth failing over:
     <https://openclimatefix.github.io/nged-substation-forecast/ml_experimentation/model-configuration/#tweaking-a-config-for-an-experiment>.
     """
@@ -241,45 +248,49 @@ class BaseForecaster(ABC):
     Every forecasting model subclasses this abstract base to allow shared Dagster assets and
     evaluation code to remain completely agnostic to the underlying model implementation.
 
-    Subclasses must define ``MODEL_NAME``, ``MODEL_VERSION`` and ``CONFIG_CLASS`` as class-level
+    Subclasses must define ``MODEL_NAME``, ``MODEL_VERSION``, and ``CONFIG_CLASS`` as class-level
     constants. ``MODEL_NAME`` and ``MODEL_VERSION`` are stamped onto every ``PowerForecast`` row
-    at predict time and used as the MLflow experiment name. Bumping ``MODEL_VERSION`` requires a
-    code change (intentional), not a config edit.
+    at predict time. ``MODEL_NAME`` is also stamped on the experiment's parent MLflow run, as
+    that run's ``model_family`` tag. The MLflow experiment name comes from neither constant: the
+    name is the ``experiment_name`` the launcher hands to ``register_experiment``. Bumping
+    ``MODEL_VERSION`` requires a code change (intentional), not a config edit.
 
     Lazy evaluation contract: `train` and `predict` both accept a `pt.LazyFrame[AllFeatures]`.
-    Callers must not collect before passing data in; doing so wastes memory and prevents Polars
-    from optimising the full query plan. A subclass materialises the data at the model boundary
-    (typically a single `.collect()`, streamed). Keeping that bounded is the *caller's*
-    responsibility: it prunes the inputs (NWP control member, the relevant H3 cells, the window's
-    `init_time` partitions) and, where the full ensemble is needed, processes one `init_time`
-    chunk at a time — filtering the engineered output cannot prune the upstream join/upsample.
-    See the NWP scan-pruning notes in
-    <https://openclimatefix.github.io/nged-substation-forecast/architecture/overview/>.
+    Callers must not collect before passing data in. Collecting early wastes memory and prevents
+    Polars from optimising the full query plan. A subclass materialises the data at the model
+    boundary (typically a single `.collect()`, streamed). Keeping that collect bounded is the
+    *caller's* responsibility. The caller prunes the inputs: the NWP control member (member 0,
+    the one unperturbed member of the weather model's ensemble), the relevant H3 cells, and the
+    window's `init_time` partitions. Where all of the ensemble's members are needed, the caller
+    processes one `init_time` chunk at a time. Filtering the engineered output cannot prune the
+    upstream join, nor the upstream upsample that puts the weather onto the half-hourly power
+    grid. See "Bounding feature-engineering memory: prune the inputs, not the output" in
+    <https://openclimatefix.github.io/nged-substation-forecast/architecture/performance/#bounding-feature-engineering-memory-prune-the-inputs-not-the-output>.
 
     Persistence has two layers. Subclasses implement ``save``/``load`` for their own on-disk
     format and need know nothing about MLflow. The concrete
-    ``save_to_mlflow``/``load_from_mlflow`` methods, shared by all subclasses, wrap that disk
-    format with MLflow's artifact store, so the same trained model can be shared across machines
-    by round-tripping through a run.
+    ``save_to_mlflow``/``load_from_mlflow`` methods are shared by all subclasses. Those methods
+    wrap that disk format with MLflow's artifact store, so the same trained model can be shared
+    across machines by round-tripping through a run.
     """
 
     MODEL_NAME: ClassVar[str]
     MODEL_VERSION: ClassVar[int]
 
     CONFIG_CLASS: ClassVar[type[BaseForecasterConfig]]
-    """The config class ``load`` rebuilds from a saved ``model_params`` mapping.
+    """The config class that ``load`` rebuilds from a saved ``model_params`` mapping.
 
-    A subclass's ``load`` must build its config through this attribute rather than naming its
-    config class again, so the class ``ml_core.production_helpers._check_meta_is_servable``
-    validates a saved config against is always the class ``load`` uses.
-    """
+    A subclass's ``load`` must build its config through this attribute rather than naming its config
+    class again. ``ml_core.production_helpers._check_meta_is_servable`` then always validates a
+    saved config against the same class ``load`` uses. """
 
     feature_engineer: ClassVar[FeatureEngineer] = TabularFeatureEngineer()
     """The feature pipeline this forecaster's data is engineered through.
 
-    Associated by composition (the forecaster *references* a feature engineer rather than
-    *implementing* feature engineering), so a forecaster can swap the whole pipeline by overriding
-    this with a different ``FeatureEngineer``. The default produces the tabular ``AllFeatures``
+    Associated by composition: the forecaster *references* a feature engineer rather than
+        *implementing* feature engineering. A forecaster can therefore swap the whole pipeline by
+        overriding this attribute with a different ``FeatureEngineer``. The default produces the
+        tabular ``AllFeatures``
     frame that ``train``/``predict`` consume.
     """
 
@@ -292,44 +303,47 @@ class BaseForecaster(ABC):
     def trained_time_series_ids(self) -> list[int]:
         """The sorted ``time_series_id`` population this model will serve a ``predict`` for.
 
-        This is the model's own frozen record of who it trained on — *not* a statement about how
-        the model is internally structured. A model may hold one sub-model per series, a single
-        model spanning many series, or anything in between; the contract is only about which
-        ``time_series_id``s it will score.
+        The population is the model's own frozen record of who the model trained on — *not* a
+        statement about how the model is internally structured. A model may hold one sub-model
+        per series, a single model spanning many series, or anything in between. The contract is
+        only about which ``time_series_id``s the model will score.
 
-        **Why this is load-bearing.** The **train==predict population invariant**: the population
-        a model is scored on must equal the population it was trained on, *even if* the live
-        eligibility set has drifted since training (power coverage changes, so a series may newly
-        qualify or drop out). Consumers (``cv_power_forecasts``, ``live_forecasts``) filter their
-        inputs to this set, so a model scores exactly the population it learned — never whatever
-        eligibility says *today*. That is what keeps the leaderboard apples-to-apples and stops
-        production forecasting a series the model never saw.
+        **Why the frozen population is load-bearing.** The **train==predict population
+        invariant**: the population a model is scored on must equal the population it was trained
+        on. The invariant holds *even if* the live eligibility set has drifted since training.
+        Power coverage changes over time, so a series may newly qualify or newly drop out.
+        Consumers (``cv_power_forecasts``, ``live_forecasts``) filter their inputs to this set,
+        so a model scores exactly the population it learned — never whatever eligibility says
+        *today*. The frozen population is what keeps the leaderboard apples-to-apples, and what
+        stops production forecasting a series the model never saw.
 
         Subclasses persist and reconstruct this set through their own ``save``/``load`` (e.g. in
-        ``meta.json``), so it survives a round-trip through MLflow.
+        ``meta.json``), so the population survives a round-trip through MLflow.
         """
         ...
 
     @abstractmethod
     def save(self, path: Path) -> None:
-        """Save the trained model state to a directory, **replacing** anything already there.
+        """Save this trained model to a directory, **replacing** every file already there.
 
         Two requirements on every implementation:
 
-        - The saved directory must contain a ``meta.json`` with a ``model_class`` field — the
-          fully-qualified ``{module}.{qualname}`` of the concrete subclass (e.g.
-          ``"xgboost_forecaster.forecaster.XGBoostForecaster"``) — so that production inference
-          (``ml_core.production_helpers.load_forecaster_from_dir``) can reconstruct the correct
-          class from a plain model directory with no other context (issue #221).
+        - The saved directory must contain a ``meta.json`` with a ``model_class`` field. That
+          field holds the fully-qualified ``{module}.{qualname}`` of the concrete subclass, for
+          example ``"xgboost_forecaster.forecaster.XGBoostForecaster"``. Production inference
+          (``ml_core.production_helpers.load_forecaster_from_dir``) uses that field to
+          reconstruct the correct class from a plain model directory — no caller-supplied class
+          name, no class registry, and no MLflow run (issue #221).
         - ``path`` must be cleared first, so that saving over a directory holding a *larger*
-          model's files leaves none of them behind. Merging instead of replacing is how a dropped
-          time series' weights survive a re-train (issue #197); ``XGBoostForecaster.save`` clears
-          with ``shutil.rmtree(path, ignore_errors=True)``.
+          model's files leaves none of them behind. A dropped time series' weights would survive
+          a re-train, if a save merged into the directory instead of replacing its contents
+          (issue #197). ``XGBoostForecaster.save`` clears with ``shutil.rmtree(path,
+          ignore_errors=True)``.
 
-        The clearing requirement makes ``path`` the model's to own while it saves, so anything a
-        caller left there is gone afterwards. (Depositing a file *after* a save is fine, and is
-        how ``production_helpers.fetch_model_artifacts`` puts ``promotion.json`` beside the
-        model.)
+        The clearing requirement makes ``path`` the model's to own while it saves, so any file a
+        caller left there is gone afterwards. Depositing a file *after* a save is fine.
+        Depositing after a save is how ``production_helpers.fetch_model_artifacts`` puts
+        ``promotion.json`` beside the model.
         """
 
     @classmethod
@@ -342,21 +356,23 @@ class BaseForecaster(ABC):
     ) -> None:
         """Upload this trained model to the given MLflow run, as one replaceable archive.
 
-        Writes the model to a temporary directory via ``save`` (the subclass's own format), adds
-        the frozen metadata copy (``write_trained_metadata``), packs that directory into a single
-        ``model.tar.gz`` and logs *that one file* to the run's artifact root. Logging one archive
-        rather than a directory of files is what makes a re-upload **replace** the previous model
-        instead of merging with it — see ``_MLFLOW_MODEL_ARTIFACT``. The caller is responsible for
-        setting the tracking URI (``mlflow.set_tracking_uri``) beforehand.
+        Writes the model to a temporary directory via ``save`` (the subclass's own format), then
+        adds the frozen metadata copy (``write_trained_metadata``). Packs that directory into a
+        single ``model.tar.gz``, and logs *that one file* to the run's artifact root. Logging one
+        archive rather than a directory of files is what makes a re-upload **replace** the previous
+        model instead of merging with it — see ``_MLFLOW_MODEL_ARTIFACT``. The caller is responsible
+        for setting the tracking URI (``mlflow.set_tracking_uri``) beforehand.
 
         Args:
             run_id: The MLflow run to attach the artifact to.
             time_series_metadata: The roster rows this model was engineered against. Required,
                 because a model uploaded without them cannot be promoted — see
-                ``TRAINED_METADATA_FILENAME``. Narrowed to ``trained_time_series_ids`` before it is
-                written: callers engineer over a wider population than they end up training (an
-                eligible series with no usable power gets no model), and carrying the extras would
-                widen the NWP scan every consumer prunes with these rows.
+                ``TRAINED_METADATA_FILENAME``. Narrowed to ``trained_time_series_ids`` before the
+                rows are written. Callers engineer over a wider population than they end up
+                training, because an eligible series with no usable power gets no model. Every
+                consumer of these rows reads only the NWP cells the rows' own H3 cells cover, so
+                carrying rows for series the model cannot forecast would widen that NWP read for
+                nothing.
         """
         with tempfile.TemporaryDirectory() as tmp_dir:
             model_dir = Path(tmp_dir) / "model"
@@ -378,10 +394,11 @@ class BaseForecaster(ABC):
         """Download a trained model's archive from an MLflow run, unpack it and load it.
 
         Downloads into a temporary directory and loads from there. There is deliberately no
-        local-disk cache: a CV fold run is **reused** across re-materialisations
-        (``get_or_create_fold_run`` resolves the same run for every re-run of a fold's partition),
-        so a cache keyed by ``run_id`` would not be unique for its contents — and production
-        inference makes no MLflow call at all. Full rationale:
+        local-disk cache. A CV fold run is **reused** across re-materialisations:
+        ``get_or_create_fold_run`` resolves the same run for every re-run of a fold's partition, and
+        each re-run overwrites that run's single model archive. One ``run_id`` therefore names
+        different model bytes at different times, so a cache keyed by ``run_id`` would not be unique
+        for its contents. Production inference makes no MLflow call at all either. Full rationale:
         <https://openclimatefix.github.io/nged-substation-forecast/architecture/ml-orchestration/#why-there-is-no-local-cache>.
 
         The caller is responsible for setting the tracking URI (``mlflow.set_tracking_uri``)
@@ -409,10 +426,12 @@ class BaseForecaster(ABC):
         Args:
             data: The engineered features (lazy; the caller must not pre-collect).
             time_series_ids: The population the model must train on — the caller's eligible set.
-                The model decides how to map it onto boosters: one booster per id
-                (``XGBoostForecaster``), or one booster per group of ids (e.g. all solar sites) for
-                a future model. It is the model's frozen record of who it trained on (the
-                train==predict invariant), and bounds ``predict`` to that same population.
+                The model
+                decides how to map that population onto boosters. ``XGBoostForecaster`` uses one
+                booster per id. A future model could instead use one booster per group of ids, for
+                example all solar sites. The population is the model's frozen record of who the
+                model trained on (the train==predict invariant), and bounds ``predict`` to that same
+                population.
         """
 
     @abstractmethod
@@ -424,15 +443,19 @@ class BaseForecaster(ABC):
         Args:
             data: The engineered features to forecast from.
             fold_id: The value stamped onto every row's ``fold_id`` column. The model has no
-                inherent notion of which CV fold it is serving (``fold_id`` is orchestration
-                context), so the caller supplies it: ``cv_power_forecasts`` passes the fold's
-                label, while production inference keeps the ``"live"`` default.
+                inherent notion of which CV fold it is
+                serving, so the caller supplies the value. ``fold_id`` names the fold the
+                orchestrating asset is scoring, not a property the model learned.
+                ``cv_power_forecasts`` passes the fold's label, while production inference keeps the
+                ``"live"`` default.
 
         Returns:
             One row per ``(time_series_id, power_fcst_init_time, valid_time, ensemble_member)``
-            present in ``data``, holding the predicted ``power_fcst`` (MW or MVA, per the series'
-            unit in ``TimeSeriesMetadata``), the model identity (``power_fcst_model_name``,
-            ``power_fcst_model_version``), and ``fold_id`` set to the given ``fold_id``. Eager, not
-            lazy: this is the model boundary where the caller's ``pt.LazyFrame[AllFeatures]`` is
-            finally materialised.
+            present in ``data``. Each row holds the predicted ``power_fcst``, in megawatts (MW) or
+            megavolt-amperes (MVA) according to that series' unit in ``TimeSeriesMetadata``. Each
+            row also holds the model-family identity (``power_fcst_model_name``,
+            ``power_fcst_model_version``), the experiment identity the config carries
+            (``experiment_name``, ``ml_flow_experiment_id``), and ``fold_id`` set to the given
+            ``fold_id``. Eager, not lazy: this is the model boundary where the caller's
+            ``pt.LazyFrame[AllFeatures]`` is finally materialised.
         """
