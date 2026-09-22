@@ -488,8 +488,8 @@ code sits in `studies/beam_diffuse_split/`.
 weather model.** On 79,384 generator-hours from December 2022 to September 2026, CAMS scores 5.05%
 of capacity, the German weather service's ICON-D2 7.71%, ICON-EU 8.30%, ICON global 8.39%, the Met
 Office's UKV 8.79%, and ERA5 8.98%. ICON-D2's advantage fades within hours of each run, and ICON-EU
-and UKV cannot be told apart once UKV's hour is rebuilt from its own snapshots. The write-up, with what each
-offline consumer should read, is [Which weather product best describes past
+and UKV cannot be told apart once UKV's hour is rebuilt from its own snapshots. The write-up, with
+what each offline consumer should read, is [Which weather product best describes past
 sunshine?](../studies/weather-products-for-the-past.md).
 
 **Figures measured on different row sets do not compose into a ranking.** Pair by pair, UKV once

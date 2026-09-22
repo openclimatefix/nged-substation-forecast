@@ -120,9 +120,9 @@ RUN_INTERVAL_HOURS: Final[dict[str, int]] = {"icon_d2": 3, "icon_eu": 3, "icon_g
 
 `verify_icon_lineage.py` measured the mapping for ICON-EU against DWD's own files, on one day at one
 place: the freshest run reproduced Open-Meteo's served value to within 1 W m⁻² at all nine hours
-checked. For ICON-D2 the freshest run was the closest match at 7 of 9 hours but differed by up to
-44 W m⁻², so the period-3 sawtooth in ICON-D2's own errors is the stronger evidence. ICON global is published
-by DWD only on its icosahedral grid, so its mapping is inferred from the cadence alone.
+checked. For ICON-D2 the freshest run was the closest match at 7 of 9 hours but differed by up to 44
+W m⁻², so the period-3 sawtooth in ICON-D2's own errors is the stronger evidence. ICON global is
+published by DWD only on its icosahedral grid, so its mapping is inferred from the cadence alone.
 """
 
 LEAD_TABLE_HOURS: Final[tuple[int, int]] = (7, 19)
