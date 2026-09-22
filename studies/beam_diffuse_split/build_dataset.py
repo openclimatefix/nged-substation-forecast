@@ -50,6 +50,7 @@ from sources import (
 )
 from studies.anonymise import SITE_LABELS, site_labels_for
 from studies.power import hourly_from_half_hourly
+from studies.solar import azimuth, extraterrestrial_horizontal, zenith
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("build_dataset")
@@ -191,7 +192,6 @@ ratio of two vanishing quantities is numerical noise.
 
 JOULES_PER_HOUR_TO_WATTS: Final[float] = 3600.0
 KELVIN_TO_CELSIUS_OFFSET: Final[float] = 273.15
-SOLAR_CONSTANT_W_M2: Final[float] = 1361.0
 
 
 def _read_era5(*, source: SourceType) -> pl.DataFrame:
@@ -512,26 +512,19 @@ def _add_solar_geometry(*, joined: pl.DataFrame) -> pl.DataFrame:
     for _site_key, site_rows in joined.sort("site", "time").group_by(["site"], maintain_order=True):
         # The fluxes are means over (T - 1 h, T], so the representative sun position is the one at
         # the window's midpoint.
-        midpoints = site_rows["time"].dt.offset_by("-30m").to_numpy()
-        position = pvlib.solarposition.get_solarposition(
-            time=midpoints,
-            latitude=float(site_rows["latitude"][0]),
-            longitude=float(site_rows["longitude"][0]),
-        )
-        zenith = position["apparent_zenith"].to_numpy().astype(np.float64)
-        azimuth = position["azimuth"].to_numpy().astype(np.float64)
-        day_of_year = site_rows["time"].dt.ordinal_day().to_numpy()
-        extraterrestrial_normal = pvlib.irradiance.get_extra_radiation(
-            datetime_or_doy=day_of_year, solar_constant=SOLAR_CONSTANT_W_M2
-        )
+        latitude = float(site_rows["latitude"][0])
+        longitude = float(site_rows["longitude"][0])
+        midpoint_stamps = site_rows["time"].dt.offset_by("-30m")
+        zenith_deg = zenith(stamps=midpoint_stamps, latitude=latitude, longitude=longitude)
         frames.append(
             site_rows.with_columns(
-                solar_zenith_deg=pl.Series(zenith),
-                solar_elevation_deg=pl.Series(90.0 - zenith),
-                solar_azimuth_deg=pl.Series(azimuth),
+                solar_zenith_deg=pl.Series(zenith_deg),
+                solar_elevation_deg=pl.Series(90.0 - zenith_deg),
+                solar_azimuth_deg=pl.Series(
+                    azimuth(stamps=midpoint_stamps, latitude=latitude, longitude=longitude)
+                ),
                 extraterrestrial_horizontal_w_m2=pl.Series(
-                    np.asarray(extraterrestrial_normal)
-                    * np.clip(np.cos(np.radians(zenith)), 0.0, None)
+                    extraterrestrial_horizontal(stamps=site_rows["time"], zenith_deg=zenith_deg)
                 ),
             )
         )
