@@ -21,9 +21,7 @@ from pathlib import Path
 from typing import Final, Literal
 
 import polars as pl
-from sources import SOURCE_CHOICES
-
-REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
+from sources import REPO_DATA_DIR, SOURCE_CHOICES
 
 InstrumentType = Literal["xgboost", "physics"]
 """Which of the two instruments' results to report.

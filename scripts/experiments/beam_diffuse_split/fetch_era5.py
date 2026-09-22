@@ -34,11 +34,12 @@ from typing import Final
 # cdsapi is not a workspace dependency; this throwaway script is run with `uv run --with cdsapi`.
 import cdsapi  # ty: ignore[unresolved-import]
 from era5_grid import AREA, FIRST_MONTH_OF_FIRST_YEAR, FIRST_YEAR, LAST_YEAR
+from sources import REPO_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_era5")
 
-OUTPUT_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data/ERA5/beam_diffuse")
+OUTPUT_DIR: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse"
 """Where the downloads land.
 
 Outside the repo working tree on purpose: these are data, and `data/` is git-ignored.

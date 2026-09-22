@@ -15,6 +15,7 @@ offer `--source`. A second Open-Meteo model still needs its own entries in `Sour
 registry saves is the download itself, which needs no new code at all.
 """
 
+import os
 from pathlib import Path
 from typing import Final, Literal, NamedTuple
 
@@ -116,11 +117,70 @@ particular is a claim about the upstream model, and `unmeasured` is the honest v
 has read the upstream documentation or the downloader that converts it.
 """
 
-REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
+
+def _find_project_root(start: Path) -> Path:
+    """Return the workspace root, by walking up to the directory holding `uv.lock`.
+
+    Mirrors `contracts.settings._find_project_root` rather than importing it, because every script
+    here runs under `uv run --no-project` and so cannot import a workspace package.
+
+    Args:
+        start: File or directory to walk up from.
+
+    Returns:
+        The workspace root, or the current working directory if no ancestor holds `uv.lock`.
+    """
+    for parent in start.resolve().parents:
+        if (parent / "uv.lock").is_file():
+            return parent
+    return Path.cwd()
+
+
+def _main_checkout(root: Path) -> Path:
+    """Return the repository's main working tree, given any working tree's root.
+
+    A linked worktree carries `uv.lock` of its own, so `_find_project_root` stops at the worktree
+    and every worktree would otherwise get an empty `data/` of its own. The downloads under
+    `data/` run to tens of gigabytes and are shared by every branch, so a per-worktree copy would
+    mean re-fetching the lot. Git marks a linked worktree by making `.git` a file holding
+    `gitdir: <main>/.git/worktrees/<name>`, which names the main checkout two levels up.
+
+    Args:
+        root: A working tree's root directory.
+
+    Returns:
+        The main working tree's root, or `root` unchanged when it is already the main one.
+    """
+    marker = root / ".git"
+    if not marker.is_file():
+        return root
+    pointer = marker.read_text().removeprefix("gitdir:").strip()
+    if not pointer:
+        return root
+    git_dir = Path(pointer)
+    if git_dir.parent.name != "worktrees":
+        return root
+    return git_dir.parent.parent.parent
+
+
+REPO_DATA_DIR: Final[Path] = Path(
+    os.environ.get("DATA_PATH_INTERNAL")
+    or _main_checkout(_find_project_root(Path(__file__))) / "data"
+)
 """Where every download and every built frame lands.
 
-Spelled here as well as in `build_dataset` so that `point_output_path_for` can be the one place a
-per-site download's path is written, rather than the fetcher and the reader each spelling it.
+The same directory `contracts.Settings.data_path_internal` names, reached the same way — the
+`DATA_PATH_INTERNAL` environment variable if set, otherwise `data/` under the directory holding
+`uv.lock`. Only the environment is read, where `Settings` also reads the workspace `.env`, so a
+path configured solely in `.env` has to be exported before running any script here.
+
+**Run from a linked worktree, the default still resolves to the main checkout's `data/`**, which
+is what `_main_checkout` is for. Every branch shares one copy of the downloads rather than
+re-fetching tens of gigabytes per worktree.
+
+**A remote URI is not supported here, where `Settings` allows one.** These scripts read and write
+through `pathlib`, which mangles `s3://` into `s3:/`, so a workspace configured against object
+storage has to point this variable at a local directory instead.
 """
 
 

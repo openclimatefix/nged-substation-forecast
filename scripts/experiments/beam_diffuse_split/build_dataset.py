@@ -44,6 +44,7 @@ import xarray as xr
 from era5_grid import LAST_DATE
 from sources import (
     PER_SITE_SOURCES,
+    REPO_DATA_DIR,
     SOURCE_CHOICES,
     SourceType,
     UkvTemporalType,
@@ -53,7 +54,6 @@ from sources import (
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("build_dataset")
 
-REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
 ERA5_DIR: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse"
 POWER_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "NGED" / "power_time_series.delta")
 METADATA_PATH: Final[Path] = REPO_DATA_DIR / "NGED" / "metadata.parquet"

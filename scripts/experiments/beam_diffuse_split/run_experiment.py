@@ -53,12 +53,11 @@ import polars as pl
 import xgboost as xgb
 from commissioning import drop_commissioning_ramp
 from export_cap import clamp_to_cap, with_export_cap
-from sources import SOURCE_CHOICES
+from sources import REPO_DATA_DIR, SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("run_experiment")
 
-REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
 DEFAULT_SOURCE: Final[str] = "open-meteo"
 """The reanalysis route every run uses, the Copernicus archive being too slow to iterate on.
 

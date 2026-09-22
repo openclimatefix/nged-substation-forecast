@@ -20,14 +20,11 @@ scripts/experiments/beam_diffuse_split/fractions_skill_score.py --source ukv`.
 
 import argparse
 import sys
-from pathlib import Path
 from typing import Final
 
 import numpy as np
 import polars as pl
-from sources import SOURCE_CHOICES
-
-REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
+from sources import REPO_DATA_DIR, SOURCE_CHOICES
 
 WINDOW_HOURS: Final[tuple[int, ...]] = (1, 3, 5, 7, 9)
 """The temporal tolerances the score is reported at, in hours, widest last.

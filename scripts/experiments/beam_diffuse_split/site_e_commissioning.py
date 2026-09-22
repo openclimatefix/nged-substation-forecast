@@ -28,6 +28,7 @@ from typing import Final, Literal
 import altair as alt
 import numpy as np
 import polars as pl
+from sources import REPO_DATA_DIR
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "packages" / "plotting" / "src"))
 
@@ -36,7 +37,6 @@ import plotting.ocf_theme as ocf
 
 _LOG: Final[logging.Logger] = logging.getLogger("site_e_commissioning")
 
-REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
 FIGURES_DIR: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_figures"
 
 SITE_IDS: Final[dict[int, str]] = {31: "A", 22: "B", 30: "C", 29: "D", 23: "E", 21: "F"}

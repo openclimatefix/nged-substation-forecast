@@ -59,12 +59,10 @@ from run_experiment import (
     dataset_path_for,
 )
 from scipy.optimize import minimize
-from sources import SOURCE_CHOICES
+from sources import REPO_DATA_DIR, SOURCE_CHOICES
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("run_physics_experiment")
-
-REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
 
 
 def results_dir_for(*, source: str, alignment: str) -> Path:

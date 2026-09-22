@@ -31,11 +31,11 @@ from typing import Final
 import altair as alt
 import plotting.ocf_theme  # noqa: F401  (importing registers and enables the OCF theme)
 import polars as pl
+from sources import REPO_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("make_chart")
 
-REPO_DATA_DIR: Final[Path] = Path("/home/jack/dev/nged-substation-forecast/data")
 
 OUTPUT_PATH: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_split_result.svg"
 
