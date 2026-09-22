@@ -5,9 +5,9 @@ One-off throwaway module for the experiment in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/800>.
 
 `SOURCE_CHOICES` is the single copy of the source list, imported by every `argparse` parser that
-offers `--source`. A second Open-Meteo model still needs its own entries in `SourceType`,
-`PER_SITE_SOURCES`, and `build_dataset`, and its own labels in the two figure scripts; what the
-registry saves is the download itself, which needs no new code at all.
+offers `--source`. A further Open-Meteo model needs its own entries in `SourceType`,
+`SOURCE_CHOICES`, `PER_SITE_SOURCES`, and `OPEN_METEO_MODELS`, and its own labels in the two figure
+scripts before its results are charted. The download and the dataset build need no new code.
 """
 
 import os
@@ -45,7 +45,10 @@ de-accumulation rather than by reconstruction.
 
 `icon-eu` and `icon-global` are the same German modelling system on wider domains: about 7 km over
 Europe and about 11 km worldwide. ICON-D2's domain stops around 2.5°W, so it excludes South West
-England and South Wales, and a forecast for the whole of Great Britain has to use one of these two.
+England and South Wales, and an ICON forecast for the whole of Great Britain has to use one of these
+two. All three ICON domains are `accumulated` upstream: Open-Meteo reads every ICON domain through
+one downloader, `DownloadIconCommand`, which de-averages a field according to its GRIB step type,
+and DWD publishes the surface radiation of every domain as an average since the run started.
 
 Each of `cams`, `ukv`, `icon-d2`, `icon-eu`, and `icon-global` takes its air temperature from the
 Open-Meteo ERA5 frame, because the temperature feature is shared by every arm and a source must
@@ -81,10 +84,10 @@ NativeRadiationType = Literal["instantaneous", "accumulated", "unmeasured"]
 
 An `instantaneous` model publishes a snapshot at the step, which Open-Meteo divides by the ratio of
 the instantaneous to the hour-mean cosine of the solar zenith angle to reach a backward-looking
-hourly mean. An `accumulated` model publishes a running total since model start, which Open-Meteo
-de-accumulates into a genuine hourly mean with no solar geometry involved. The distinction decides
-whether the hourly value carries a sub-hourly approximation, so `_instant` is worth requesting
-alongside the default only for an `instantaneous` model.
+hourly mean. An `accumulated` model publishes a running total or average since model start, which
+Open-Meteo de-accumulates into a genuine hourly mean with no solar geometry involved. The
+distinction decides whether the hourly value carries a sub-hourly approximation, so `_instant` is
+worth requesting alongside the default only for an `instantaneous` model.
 
 `unmeasured` means nobody has checked this model's own output, and a registry entry carrying it must
 not be trained on until someone has.
@@ -102,28 +105,15 @@ the sensitivity can be measured rather than argued about.
 """
 
 
-ICON_WIDE_DOMAIN_ARCHIVE_STARTS: Final[str] = "2022-11-23"
-"""The first day ICON-EU and ICON global carry real values in Open-Meteo's archive.
-
-**The archive accepts earlier dates than it can serve.** Requests back to 2016-01-01 return HTTP 200
-with `shortwave_radiation` null throughout, and bisecting the dates put the first day with values
-at 2022-11-23 for both models. The fetcher drops null rows, so a start date taken from the range the
-API accepts would ask for six years of nothing rather than fail.
-
-Both models are `accumulated` for the same reason ICON-D2 is: Open-Meteo reads every ICON domain
-through one downloader, `DownloadIconCommand`, which de-averages a field according to its GRIB
-step type, and DWD publishes the surface radiation of every domain as an average since the run
-started.
-"""
-
-
 class OpenMeteoModel(NamedTuple):
     """One model the historical-forecast archive serves, and what it is known to hold.
 
     Attributes:
         source: The `--source` name, which also names the output directory and filename.
         models_parameter: The value of the API's `models=` query parameter.
-        archive_starts: The first date the archive claims to serve, as `YYYY-MM-DD`.
+        archive_starts: The first date the archive serves real values for, as `YYYY-MM-DD`. The
+            API accepts earlier dates and answers them with nulls, so this is found by probing
+            rather than read from the range the API accepts.
         live_ingest_starts: The date Open-Meteo's own downloader for this model first existed, as
             `YYYY-MM-DD`, or `None` where nobody has established it. Everything in the archive
             before this date was backfilled from a source Open-Meteo does not name, so it is a
@@ -156,19 +146,29 @@ OPEN_METEO_MODELS: Final[dict[str, OpenMeteoModel]] = {
     "icon-eu": OpenMeteoModel(
         source="icon-eu",
         models_parameter="icon_eu",
-        archive_starts=ICON_WIDE_DOMAIN_ARCHIVE_STARTS,
+        archive_starts="2022-11-23",
         live_ingest_starts=None,
         native_radiation="accumulated",
     ),
     "icon-global": OpenMeteoModel(
         source="icon-global",
         models_parameter="icon_global",
-        archive_starts=ICON_WIDE_DOMAIN_ARCHIVE_STARTS,
+        archive_starts="2022-11-17",
         live_ingest_starts=None,
         native_radiation="accumulated",
     ),
 }
 """Every model `fetch_open_meteo_point.py` can download, keyed by its `--model` name.
+
+A start date earlier than the first day with values fails the fetch on its first all-null year, with
+a message blaming domain coverage; a start date later than it truncates the download silently. The
+ICON-EU and ICON global starts are the first whole days with values at a probe in London: ICON-EU
+from 2022-11-23 07:00 UTC, ICON global from 2022-11-16 08:00 UTC.
+
+**ICON-EU's archive holds one corrupt block, 2023-06-21 01:00 to 06:00 UTC, at every site.** Its
+values there run about three hours early, reaching 150 W m⁻² at 03:00 UTC, where ICON global and
+ICON-D2 read zero. No other hour in either wide-domain download disagrees with its siblings that
+way.
 
 Adding a model means adding an entry and measuring what goes in it. `native_radiation` in
 particular is a claim about the upstream model, and `unmeasured` is the honest value until somebody
@@ -236,7 +236,7 @@ reads and does not own.
 
 WEATHER_DATA_DIR: Final[Path] = STUDIES_DATA_DIR / "weather"
 """Where downloaded weather lands, one subdirectory per product (`ERA5`, `CAMS`, `ENS`, `UKV`,
-`ICON-D2`).
+`ICON-D2`, `ICON-EU`, `ICON-GLOBAL`).
 
 Kept apart from any one study's outputs because a download is an input a later study can reuse, and
 some take most of a night to fetch again.
