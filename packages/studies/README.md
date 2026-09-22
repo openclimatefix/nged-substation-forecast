@@ -22,8 +22,8 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
 
 - `anonymise` — the one mapping from a meter's `time_series_id` to the anonymous label a chart or a
   write-up may carry.
-- `solar` — solar position, the extraterrestrial flux, and the clearness index, for a frame of
-  timestamps at a set of coordinates.
+- `solar` — solar position and the extraterrestrial flux, for a series of timestamps at one
+  coordinate.
 - `served_column_checks` — two assertions about a downloaded irradiance column: that the hourly
   value is a backward mean over the hour ending at its label, and that a published direct fraction
   carries information a separation model applied to the total would not.

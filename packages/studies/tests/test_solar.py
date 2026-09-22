@@ -4,6 +4,7 @@ import numpy as np
 import polars as pl
 import pytest
 from studies.solar import (
+    azimuth,
     cos_zenith,
     cos_zenith_hour_mean,
     extraterrestrial_horizontal,
@@ -72,3 +73,14 @@ def test_the_extraterrestrial_flux_varies_with_the_earth_sun_distance():
     )
 
     assert january[0] / july[0] == pytest.approx(1.069, abs=0.005)
+
+
+@pytest.mark.parametrize(
+    ("hour", "expected_deg"), [(6, 74.6), (12, 179.1), (18, 284.8)], ids=["dawn", "noon", "dusk"]
+)
+def test_the_azimuth_swings_from_east_through_south_to_west(hour: int, expected_deg: float):
+    # At Greenwich on the solstice the sun rises north of east and sets north of west. The
+    # physical model reads this angle to fit a panel's orientation.
+    angles = azimuth(stamps=_stamps([hour]), latitude=LATITUDE, longitude=LONGITUDE)
+
+    assert angles[0] == pytest.approx(expected_deg, abs=0.5)

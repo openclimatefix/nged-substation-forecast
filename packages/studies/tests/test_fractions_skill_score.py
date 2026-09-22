@@ -35,10 +35,12 @@ def _late_by(hours: int) -> list[float]:
     return [0.0] * hours + observed[:-hours] if hours else observed
 
 
-def _frame(stamps: list[datetime], observed: list[float], forecast: list[float]) -> pl.DataFrame:
+def _frame(
+    stamps: list[datetime], observed: list[float], forecast: list[float], *, site: str = "A"
+) -> pl.DataFrame:
     return pl.DataFrame(
         {
-            "site": ["A"] * len(stamps),
+            "site": [site] * len(stamps),
             "time": stamps,
             "power_mw": observed,
             "forecast_mw": forecast,
@@ -49,7 +51,8 @@ def _frame(stamps: list[datetime], observed: list[float], forecast: list[float])
 
 def _gridded(frame: pl.DataFrame) -> pl.DataFrame:
     return on_a_complete_hourly_grid(
-        frame=frame, thresholds=pl.DataFrame({"site": ["A"], "threshold_mw": [THRESHOLD_MW]})
+        frame=frame,
+        thresholds=pl.DataFrame({"site": ["A", "B"], "threshold_mw": [THRESHOLD_MW] * 2}),
     )
 
 
@@ -111,6 +114,30 @@ def test_a_window_spanning_a_gap_contributes_nothing():
     # The 12 absent hours cost their own windows plus the one either side that would have spanned
     # the gap, so the loss exceeds the 12 rows removed.
     assert complete == ungapped - 14
+
+
+def test_windows_do_not_span_two_sites():
+    # The studies score every site in one frame, so a window must never reach across the boundary
+    # between one site's last hour and the next site's first.
+    one_site = _frame(_stamps(), _observed(), _observed())
+    two_sites = pl.concat([one_site, one_site.with_columns(site=pl.lit("B"))])
+
+    single = monthly_components(gridded=_gridded(one_site), window_hours=3)["windows"].sum()
+    double = monthly_components(gridded=_gridded(two_sites), window_hours=3)["windows"].sum()
+
+    assert double == 2 * single
+
+
+def test_the_same_calendar_month_in_two_years_is_two_blocks():
+    # The bootstrap resamples whole months, and March 2024 and March 2025 are different weather.
+    june_2025 = _stamps()
+    june_2024 = [stamp.replace(year=2024) for stamp in june_2025]
+    power = _observed()
+    frame = _frame([*june_2024, *june_2025], power * 2, power * 2)
+
+    months = monthly_components(gridded=_gridded(frame), window_hours=1)["month"].sort()
+
+    assert months.to_list() == ["2024-06", "2025-06"]
 
 
 def test_no_exceedance_in_either_series_scores_nan():

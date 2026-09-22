@@ -162,7 +162,7 @@ REPO_DATA_DIR: Final[Path] = Path(
 )
 """Where every download and every built frame lands.
 
-The same directory `contracts.Settings.data_path_internal` names, reached the same way — the
+Run from the main checkout, the same directory `contracts.Settings.data_path_internal` names: the
 `DATA_PATH_INTERNAL` environment variable if set, otherwise `data/` under the directory holding
 `uv.lock`. Only the environment is read, where `Settings` also reads the workspace `.env`, so a
 path configured solely in `.env` has to be exported before running any script here.

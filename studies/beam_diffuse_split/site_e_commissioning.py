@@ -30,8 +30,8 @@ import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
 from build_dataset import _pv_sites
+from export_cap import CAP_FILE_PREFIX
 from sources import ANM_DATA_DIR, REPO_DATA_DIR, STUDY_DATA_DIR
-from studies.anonymise import site_labels_for
 
 _LOG: Final[logging.Logger] = logging.getLogger("site_e_commissioning")
 
@@ -95,13 +95,26 @@ def _day(*, text: str) -> pl.Series:
     return pl.Series([text]).str.to_date()
 
 
+def _subject_export_cap() -> pl.DataFrame:
+    """Read the subject site's export cap, finding its file through the label roster.
+
+    The cap files are named by `time_series_id`, so the path is derived rather than written down:
+    a literal identifier here would pair a public label with a generator's identifier.
+
+    Returns:
+        The subject's export cap, sorted by time.
+    """
+    time_series_id = _pv_sites().filter(pl.col("site") == SUBJECT)["time_series_id"].item()
+    return pl.read_parquet(ANM_DATA_DIR / f"{CAP_FILE_PREFIX}{time_series_id}.parquet").sort("time")
+
+
 def _went_live() -> tuple[pl.Series, float]:
-    """Read the export cap and find the first half-hour it reaches the connection limit.
+    """Find the first half-hour the subject's export cap reaches the connection limit.
 
     Returns:
         That half-hour, and the connection limit itself.
     """
-    cap = pl.read_parquet(ANM_DATA_DIR / "export_cap_23.parquet").sort("time")
+    cap = _subject_export_cap()
     limit = float(np.max(cap["cap_mw"].to_numpy()))
     return cap.filter(pl.col("cap_mw") >= limit - CAP_TOLERANCE_MW)["time"][0], limit
 
@@ -113,7 +126,7 @@ def _half_hourly_gain() -> pl.DataFrame:
         `(time, date, gain)`, with the half-hours the live export cap had moved removed.
     """
     went_live, limit = _went_live()
-    cap = pl.read_parquet(ANM_DATA_DIR / "export_cap_23.parquet")
+    cap = _subject_export_cap()
     capacity = (
         pl.scan_delta(str(REPO_DATA_DIR / "effective_capacity"))
         .sort("time")
@@ -121,18 +134,17 @@ def _half_hourly_gain() -> pl.DataFrame:
         .agg(pl.col("effective_capacity_mw").last())
         .collect()
     )
-    # Derived rather than written down, so this figure cannot label a generator differently from
-    # the frames the arms are scored on. `_pv_sites` is the one roster query, and `site_labels_for`
-    # the one shuffle over it.
-    site_ids = site_labels_for(eligible_ids=_pv_sites()["time_series_id"].to_list())
+    # `_pv_sites` is the one roster query, so this figure cannot label a generator differently from
+    # the frames the arms are scored on.
+    sites = _pv_sites().select("time_series_id", "site")
     power = (
         pl.scan_delta(str(REPO_DATA_DIR / "NGED" / "power_time_series.delta"))
-        .filter(pl.col("time_series_id").is_in(list(site_ids)))
+        .filter(pl.col("time_series_id").is_in(sites["time_series_id"].to_list()))
         .select("time_series_id", "time", "power")
         .collect()
         .join(capacity, on="time_series_id")
+        .join(sites, on="time_series_id")
         .with_columns(
-            site=pl.col("time_series_id").replace_strict(site_ids),
             capacity_factor=pl.col("power") / pl.col("effective_capacity_mw"),
         )
     )
