@@ -35,7 +35,7 @@ anonymised site labels and differences in W m⁻².
 
 Run it with `uv run --no-project --with polars --with numpy --with pvlib --with xarray --with
 netcdf4 --with pyproj --with deltalake python
-scripts/experiments/beam_diffuse_split/verify_ukv_lineage.py`.
+studies/beam_diffuse_split/verify_ukv_lineage.py`.
 """
 
 import argparse

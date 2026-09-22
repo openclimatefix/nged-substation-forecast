@@ -19,7 +19,7 @@ Requests are made at the ERA5 grid-cell centres rather than at the sites, with
 `cell_selection=nearest`, so both sources feed the same cells to the same join.
 
 Run it with `uv run --no-project --with polars python
-scripts/experiments/beam_diffuse_split/fetch_era5_open_meteo.py`.
+studies/beam_diffuse_split/fetch_era5_open_meteo.py`.
 """
 
 import itertools

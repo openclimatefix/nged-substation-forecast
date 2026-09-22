@@ -7,7 +7,7 @@ produced it, so the code stays where they can find and re-run it.
 
 ## What this tier promises, and what it does not
 
-| | `packages/` and `src/` | `scripts/experiments/` |
+| | `packages/` and `src/` | `studies/` |
 |---|---|---|
 | Runs in production | yes | never |
 | Has tests | yes | no |

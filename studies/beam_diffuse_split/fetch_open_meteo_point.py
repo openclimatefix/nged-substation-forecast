@@ -21,7 +21,7 @@ number rather than printing for a human to read. What they establish, and what t
 not, is on each `_check_*` function.
 
 Run it with `uv run --no-project --with polars --with numpy --with pvlib --with deltalake --with
-xarray --with netcdf4 python scripts/experiments/beam_diffuse_split/fetch_open_meteo_point.py
+xarray --with netcdf4 python studies/beam_diffuse_split/fetch_open_meteo_point.py
 --model ukv`. The extra dependencies are `build_dataset`'s, which this script imports the site
 roster from.
 """

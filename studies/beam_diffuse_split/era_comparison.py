@@ -22,7 +22,7 @@ cross-product gap inside one era is unaffected by any of this, because every pro
 rows.
 
 Run it with `uv run --no-project --with polars --with numpy --with xgboost --with pvlib python
-scripts/experiments/beam_diffuse_split/era_comparison.py`.
+studies/beam_diffuse_split/era_comparison.py`.
 """
 
 import argparse

@@ -15,7 +15,7 @@ rather than between two grids alone. That confound cannot be removed without ref
 the other's rows, which is not what any of the arms are for.
 
 Run it with `uv run --no-project --with polars --with numpy --with xgboost --with pvlib python
-scripts/experiments/beam_diffuse_split/compare_sources.py`.
+studies/beam_diffuse_split/compare_sources.py`.
 """
 
 import argparse

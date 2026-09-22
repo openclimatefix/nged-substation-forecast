@@ -20,7 +20,7 @@ also the mean flux in W m⁻², and no conversion is needed. Each row's `Observa
 interval's start and end; the end is kept, which is the period-ending convention ERA5 uses.
 
 Run it with `uv run --no-project --with polars --with cdsapi --with numpy --with deltalake --with
-pvlib --with pandas python scripts/experiments/beam_diffuse_split/fetch_cams.py`. The extra
+pvlib --with pandas python studies/beam_diffuse_split/fetch_cams.py`. The extra
 dependencies are `build_dataset`'s, which this script imports the site roster from.
 """
 

@@ -22,7 +22,7 @@ top of the atmosphere offered actually arrived. Both quantities are already colu
 so binning on them introduces no information the arms lacked.
 
 Run it with `uv run --no-project --with polars --with numpy --with pvlib python
-scripts/experiments/beam_diffuse_split/sky_conditions.py --source cams`.
+studies/beam_diffuse_split/sky_conditions.py --source cams`.
 """
 
 import argparse

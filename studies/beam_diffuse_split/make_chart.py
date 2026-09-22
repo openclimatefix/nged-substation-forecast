@@ -20,7 +20,7 @@ Sites are pooled here and no identifier reaches the chart, because a metered gen
 commercially sensitive and this repo is public.
 
 Run it with `uv run --with vl-convert-python python
-scripts/experiments/beam_diffuse_split/make_chart.py`.
+studies/beam_diffuse_split/make_chart.py`.
 """
 
 import logging

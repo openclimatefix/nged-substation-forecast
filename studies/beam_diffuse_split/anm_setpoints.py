@@ -23,7 +23,7 @@ where the cap never left the connection limit, the generator's output per unit o
 match the uncurtailed sites, and where the cap moved it should fall short.
 
 Run it from the repository root with `uv run --with pvlib python
-scripts/experiments/beam_diffuse_split/anm_setpoints.py`.
+studies/beam_diffuse_split/anm_setpoints.py`.
 """
 
 import argparse

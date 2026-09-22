@@ -14,7 +14,7 @@ The band edges are fixed here and the split is applied after the fact to losses 
 without knowledge of it, so no arm's model was fitted differently because of the band.
 
 Run it with `uv run --no-project --with polars python
-scripts/experiments/beam_diffuse_split/elevation_breakdown.py --source cams`.
+studies/beam_diffuse_split/elevation_breakdown.py --source cams`.
 """
 
 import argparse

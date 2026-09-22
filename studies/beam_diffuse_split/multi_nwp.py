@@ -27,7 +27,7 @@ Every arm is shown the same temperature — ICON-D2's — so that the contrasts 
 nothing else.
 
 Run it with `uv run --no-project --with polars --with numpy --with xgboost --with pvlib python
-scripts/experiments/beam_diffuse_split/multi_nwp.py`.
+studies/beam_diffuse_split/multi_nwp.py`.
 """
 
 import argparse

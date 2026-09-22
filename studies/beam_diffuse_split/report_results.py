@@ -11,7 +11,7 @@ No site identifier can reach the output: `build_dataset.py` relabelled the sites
 anything, so the results files hold only the shuffled letters.
 
 Run it with `uv run --no-project --with polars python
-scripts/experiments/beam_diffuse_split/report_results.py`.
+studies/beam_diffuse_split/report_results.py`.
 """
 
 import argparse

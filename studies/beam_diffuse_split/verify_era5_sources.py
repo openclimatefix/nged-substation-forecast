@@ -14,7 +14,7 @@ separation model would disagree by tens of W m⁻², which is the scale at which
 beam on this data.
 
 Run it with `uv run --no-project --with polars --with xarray --with netcdf4 --with numpy python
-scripts/experiments/beam_diffuse_split/verify_era5_sources.py`.
+studies/beam_diffuse_split/verify_era5_sources.py`.
 """
 
 import json

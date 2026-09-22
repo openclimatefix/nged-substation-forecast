@@ -29,7 +29,7 @@ has nothing to do with calibration. That is the construction
 
 Run it with `uv run --no-project` plus `--with polars --with numpy --with xgboost --with scipy
 --with pvlib --with xarray --with netcdf4 --with pandas --with deltalake`, then
-`python scripts/experiments/beam_diffuse_split/run_hybrid_experiment.py --source cams
+`python studies/beam_diffuse_split/run_hybrid_experiment.py --source cams
 The long dependency list is `export_cap.py` reaching into
 `build_dataset.py` for the site roster, which is what maps NGED's `time_series_id` to an
 anonymous label.

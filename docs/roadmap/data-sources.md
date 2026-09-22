@@ -482,7 +482,7 @@ normalised by — and a fitted five-parameter physical model's from 10.03% to 6.
 contrast from changing which beam/diffuse split the model saw was 0.126 points, and changing the
 model family moved 1.05. Which product feeds the model dominates both. The write-up is [Does a
 weather product's beam/diffuse split help a PV forecast?](../studies/beam-diffuse-split.md); the
-code sits in `scripts/experiments/beam_diffuse_split/`.
+code sits in `studies/beam_diffuse_split/`.
 
 **Two 2 km models were added, and scoring all four products on one common set of hours put them in
 the order CAMS, ICON-D2, UKV, ERA5.** On the 58,411 generator-hours every product covers before

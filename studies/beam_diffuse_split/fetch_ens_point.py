@@ -24,7 +24,7 @@ meters needs. Filtering to the four H3 cells the meters fall in, before anything
 takes the read to about 4 million rows in a few seconds.
 
 Run it with `uv run --with h3 --with pvlib --with polars python
-scripts/experiments/beam_diffuse_split/fetch_ens_point.py`.
+studies/beam_diffuse_split/fetch_ens_point.py`.
 """
 
 import logging

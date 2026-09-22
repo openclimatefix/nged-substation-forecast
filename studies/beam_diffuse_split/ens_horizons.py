@@ -38,7 +38,7 @@ dataset and only the irradiance column is taken from the ensemble. The ensemble'
 
 Run it with `uv run --no-project --with polars --with numpy --with xgboost --with scipy --with
 pvlib --with xarray --with netcdf4 --with pandas --with deltalake python
-scripts/experiments/beam_diffuse_split/ens_horizons.py`.
+studies/beam_diffuse_split/ens_horizons.py`.
 """
 
 import argparse

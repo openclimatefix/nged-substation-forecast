@@ -24,7 +24,7 @@ Run `sky_conditions.py` on every source in `SKY_CHART_SOURCES` first, because th
 chart reads the intervals that script writes and fails with a missing-file error without them.
 
 Run it with `uv run --no-project --with polars --with altair --with vl-convert-python
---with numpy --with pvlib python scripts/experiments/beam_diffuse_split/make_figures.py`.
+--with numpy --with pvlib python studies/beam_diffuse_split/make_figures.py`.
 """
 
 import logging

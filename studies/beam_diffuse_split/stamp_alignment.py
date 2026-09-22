@@ -31,7 +31,7 @@ feed — either NGED has republished the early readings with corrected stamps, i
 ingest is now shifting rows that need no shift, or the fault did not stop where NGED reported.
 
 Run it with `uv run --no-project --with polars --with numpy --with pandas --with pvlib
---with deltalake python scripts/experiments/beam_diffuse_split/stamp_alignment.py`.
+--with deltalake python studies/beam_diffuse_split/stamp_alignment.py`.
 """
 
 import logging

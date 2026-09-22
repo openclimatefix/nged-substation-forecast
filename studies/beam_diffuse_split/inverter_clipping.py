@@ -20,7 +20,7 @@ proxy rather than a measurement: a hot afternoon derates below the nameplate lim
 one runs above it, so no single threshold separates the two states cleanly.
 
 Run it with `uv run --no-project --with polars --with numpy --with pvlib python
-scripts/experiments/beam_diffuse_split/inverter_clipping.py --source cams`.
+studies/beam_diffuse_split/inverter_clipping.py --source cams`.
 """
 
 import argparse

@@ -11,7 +11,7 @@ whole point — it lets one arm of the experiment read the model's own beam/diff
 arm read only the global irradiance, with nothing else different between them.
 
 Run it with `uv run --no-project --with cdsapi python
-scripts/experiments/beam_diffuse_split/fetch_era5.py`.
+studies/beam_diffuse_split/fetch_era5.py`.
 
 Requires a Copernicus Climate Data Store token in `~/.cdsapirc`, and the account must have accepted
 both the "licence to use Copernicus products" and the CC-BY licence.

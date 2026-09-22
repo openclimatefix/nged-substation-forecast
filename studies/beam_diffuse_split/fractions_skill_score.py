@@ -15,7 +15,7 @@ The score is computed on the forecasts the runs already wrote. `run_experiment.p
 capped point forecast exactly.
 
 Run it with `uv run --no-project --with polars --with numpy python
-scripts/experiments/beam_diffuse_split/fractions_skill_score.py --source ukv`.
+studies/beam_diffuse_split/fractions_skill_score.py --source ukv`.
 """
 
 import argparse
