@@ -91,9 +91,9 @@ def _reflow_unit(unit_lines: list[str]) -> list[str]:
 
     A blockquote marker is stripped and reapplied to every output line uniformly, before the list
     or plain-paragraph handling runs on what is left. A list item nested inside a blockquote
-    carries `> - ` on each of its source lines. Stripping the marker first is what lets that item
-    keep its own marker, rather than being read as ordinary quoted prose and merged with its
-    siblings into one paragraph.
+    carries `> -` followed by a space on each of its source lines. Stripping the marker first is
+    what lets that item keep its own marker, rather than being read as ordinary quoted prose and
+    merged with its siblings into one paragraph.
 
     A paragraph with no marker of its own can still be a list item's body. Python-Markdown treats
     any indent at or past the item's content column as part of that item. The rule includes a

@@ -62,5 +62,15 @@ jobs:
       - name: Docs links (check_docs_links)
         run: uv run --no-sync python scripts/lint/check_docs_links.py
 
+      # The steps above run most of `.pre-commit-config.yaml`'s hooks but not all of them:
+      # end-of-file-fixer, trailing-whitespace, check-yaml, check-added-large-files,
+      # no-sphinx-roles and lint-docstring-markdown have no step here. A commit-time hook sees
+      # only the staged files, so a file nobody stages can break one of those and stay broken in
+      # `main`. This step runs every hook over the whole tree, so CI reports whatever
+      # `uv run pre-commit run --all-files` would report on a developer's machine; the price is
+      # ruff, ty, pydoclint and pymarkdown each running a second time.
+      - name: Pre-commit (every hook, every file)
+        run: uv run --no-sync pre-commit run --all-files
+
       - name: Test (pytest)
         run: uv run --no-sync pytest
