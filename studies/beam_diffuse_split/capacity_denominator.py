@@ -9,8 +9,7 @@ reading instead.
 Run it from this directory as:
 
 ```bash
-uv run \
-    python capacity_denominator.py --source cams
+uv run python capacity_denominator.py --source cams
 ```
 """
 

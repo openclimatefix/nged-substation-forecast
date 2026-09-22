@@ -14,8 +14,7 @@ not, the write-up's explanation is right and the physical model's ordering was g
 Run it from this directory as:
 
 ```bash
-uv run \
-    python shared_geometry.py --source cams
+uv run python shared_geometry.py --source cams
 ```
 """
 

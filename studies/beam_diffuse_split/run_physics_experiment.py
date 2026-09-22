@@ -30,9 +30,7 @@ spread this script reports is a few parts in a million and says the seeds inheri
 rather than that the noise floor is that low. The bootstrap's seed draw
 likewise adds nothing to this instrument's intervals.
 
-Run it with `uv run --with netcdf4 python
-studies/beam_diffuse_split/run_physics_experiment.py --source cams`. `netcdf4` is the one
-dependency the workspace environment does not already carry.
+Run it with `uv run python studies/beam_diffuse_split/run_physics_experiment.py --source cams`.
 """
 
 import argparse

@@ -385,9 +385,8 @@ def _pv_sites() -> pl.DataFrame:
 def _hourly_power(*, sites: pl.DataFrame) -> pl.DataFrame:
     """Aggregate the half-hourly PV readings onto the ERA5 hourly, period-ending grid.
 
-    The stamps are taken at face value. `PowerTimeSeries.correct_late_timestamps` repairs NGED's
-    half-hour-late stamps at ingestion, so every row of the stored table already means the window
-    its `time` field states, and a second correction here would undo the repair on 93% of the rows.
+    `studies.power.hourly_from_half_hourly` owns the arithmetic, and the reason no timestamp is
+    shifted here.
 
     Args:
         sites: The site roster from `_pv_sites`.

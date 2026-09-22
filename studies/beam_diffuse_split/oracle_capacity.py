@@ -14,8 +14,7 @@ what makes it an oracle, and therefore an upper bound on what any real estimator
 Run it from this directory as:
 
 ```bash
-uv run \
-    python oracle_capacity.py --source cams
+uv run python oracle_capacity.py --source cams
 ```
 """
 

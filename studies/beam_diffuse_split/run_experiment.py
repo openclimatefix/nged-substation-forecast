@@ -34,9 +34,7 @@ not earned the right to report a null on the real meters.
 Because ERA5 is a reanalysis rather than a forecast, what this measures is the *information content*
 of the split, not forecast skill.
 
-Run it with `uv run --with netcdf4 python studies/beam_diffuse_split/run_experiment.py`.
-The long dependency list is `export_cap.py` reaching into `build_dataset.py` for the site
-roster, which is what maps NGED's `time_series_id` to an anonymous label.
+Run it with `uv run python studies/beam_diffuse_split/run_experiment.py`.
 """
 
 import argparse
@@ -53,6 +51,7 @@ import xgboost as xgb
 from commissioning import drop_commissioning_ramp
 from export_cap import clamp_to_cap, with_export_cap
 from sources import SOURCE_CHOICES, STUDY_DATA_DIR
+from studies.fractions_skill_score import MONTH_FORMAT
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("run_experiment")
@@ -252,7 +251,7 @@ def _add_time_features(*, dataset: pl.DataFrame) -> pl.DataFrame:
     return dataset.with_columns(
         hour_of_day=pl.col("time").dt.hour(),
         day_of_year=pl.col("time").dt.ordinal_day(),
-        month=pl.col("time").dt.strftime("%Y-%m"),
+        month=pl.col("time").dt.strftime(MONTH_FORMAT),
     )
 
 

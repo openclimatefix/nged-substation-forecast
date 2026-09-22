@@ -2,9 +2,8 @@
 
 **These are primitives rather than a column set.** The studies want different columns from the same
 geometry — one wants the azimuth to fit a panel's orientation, another wants the hour-mean cosine to
-establish what an hourly irradiance column holds — so each caller composes what it needs. Promoting
-a merged column set instead would add every caller's columns to every caller's output, and the
-hour-mean cosine alone costs 60 solar-position evaluations per stamp.
+establish what an hourly irradiance column holds — so each caller composes what it needs, and no
+caller pays for the hour-mean cosine's 60 solar-position evaluations per stamp unless it asks.
 """
 
 from typing import Final

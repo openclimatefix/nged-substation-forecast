@@ -9,8 +9,7 @@ fixed start alone, and once from many independent random starts the fixed start 
 Run it from this directory as:
 
 ```bash
-uv run \
-    python restart_basins.py --source cams
+uv run python restart_basins.py --source cams
 ```
 """
 

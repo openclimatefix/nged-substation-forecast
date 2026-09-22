@@ -1,3 +1,4 @@
+import math
 from datetime import UTC, datetime, timedelta
 
 import polars as pl
@@ -34,20 +35,26 @@ def _late_by(hours: int) -> list[float]:
     return [0.0] * hours + observed[:-hours] if hours else observed
 
 
-def _score(*, forecast: list[float], window_hours: int) -> float:
-    stamps = _stamps()
-    frame = pl.DataFrame(
+def _frame(stamps: list[datetime], observed: list[float], forecast: list[float]) -> pl.DataFrame:
+    return pl.DataFrame(
         {
             "site": ["A"] * len(stamps),
             "time": stamps,
-            "power_mw": _observed(),
+            "power_mw": observed,
             "forecast_mw": forecast,
         },
         schema_overrides={"time": pl.Datetime("us", "UTC")},
     )
-    gridded = on_a_complete_hourly_grid(
+
+
+def _gridded(frame: pl.DataFrame) -> pl.DataFrame:
+    return on_a_complete_hourly_grid(
         frame=frame, thresholds=pl.DataFrame({"site": ["A"], "threshold_mw": [THRESHOLD_MW]})
     )
+
+
+def _score(*, forecast: list[float], window_hours: int) -> float:
+    gridded = _gridded(_frame(_stamps(), _observed(), forecast))
     components = monthly_components(gridded=gridded, window_hours=window_hours)
     return fss_from(
         squared_difference=float(components["squared_difference"].sum()),
@@ -92,34 +99,13 @@ def test_a_window_spanning_a_gap_contributes_nothing():
     # aggregation rejects any window holding one.
     stamps = _stamps()
     with_a_gap = [stamp for stamp in stamps if not (stamp.day == 15 and 0 <= stamp.hour < 12)]
-    frame = pl.DataFrame(
-        {
-            "site": ["A"] * len(with_a_gap),
-            "time": with_a_gap,
-            "power_mw": [SPIKE_MW if s.hour in SPIKE_HOURS else 0.0 for s in with_a_gap],
-            "forecast_mw": [SPIKE_MW if s.hour in SPIKE_HOURS else 0.0 for s in with_a_gap],
-        },
-        schema_overrides={"time": pl.Datetime("us", "UTC")},
-    )
-    gridded = on_a_complete_hourly_grid(
-        frame=frame, thresholds=pl.DataFrame({"site": ["A"], "threshold_mw": [THRESHOLD_MW]})
-    )
+    power = [SPIKE_MW if stamp.hour in SPIKE_HOURS else 0.0 for stamp in with_a_gap]
 
-    complete = monthly_components(gridded=gridded, window_hours=3)["windows"].sum()
+    complete = monthly_components(
+        gridded=_gridded(_frame(with_a_gap, power, power)), window_hours=3
+    )["windows"].sum()
     ungapped = monthly_components(
-        gridded=on_a_complete_hourly_grid(
-            frame=pl.DataFrame(
-                {
-                    "site": ["A"] * len(stamps),
-                    "time": stamps,
-                    "power_mw": _observed(),
-                    "forecast_mw": _observed(),
-                },
-                schema_overrides={"time": pl.Datetime("us", "UTC")},
-            ),
-            thresholds=pl.DataFrame({"site": ["A"], "threshold_mw": [THRESHOLD_MW]}),
-        ),
-        window_hours=3,
+        gridded=_gridded(_frame(stamps, _observed(), _observed())), window_hours=3
     )["windows"].sum()
 
     # The 12 absent hours cost their own windows plus the one either side that would have spanned
@@ -128,6 +114,4 @@ def test_a_window_spanning_a_gap_contributes_nothing():
 
 
 def test_no_exceedance_in_either_series_scores_nan():
-    assert fss_from(squared_difference=0.0, reference=0.0) != fss_from(
-        squared_difference=0.0, reference=0.0
-    )
+    assert math.isnan(fss_from(squared_difference=0.0, reference=0.0))

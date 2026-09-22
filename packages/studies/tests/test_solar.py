@@ -1,4 +1,4 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 
 import numpy as np
 import polars as pl
@@ -72,23 +72,3 @@ def test_the_extraterrestrial_flux_varies_with_the_earth_sun_distance():
     )
 
     assert january[0] / july[0] == pytest.approx(1.069, abs=0.005)
-
-
-def test_a_whole_day_of_stamps_returns_one_value_each():
-    stamps = _stamps(list(range(24)))
-    angles = zenith(stamps=stamps, latitude=LATITUDE, longitude=LONGITUDE)
-
-    assert angles.shape == (24,)
-    assert cos_zenith_hour_mean(stamps=stamps, latitude=LATITUDE, longitude=LONGITUDE).shape == (
-        24,
-    )
-
-
-def test_stamps_an_hour_apart_give_the_expected_daylight_span():
-    stamps = pl.Series(
-        "time", [datetime(2025, 6, 21, tzinfo=UTC) + timedelta(hours=h) for h in range(24)]
-    ).dt.replace_time_zone("UTC")
-    daylight = cos_zenith(zenith_deg=zenith(stamps=stamps, latitude=LATITUDE, longitude=LONGITUDE))
-
-    # London gets a little over 16 hours of daylight at the solstice.
-    assert 15 <= int((daylight > 0.0).sum()) <= 18

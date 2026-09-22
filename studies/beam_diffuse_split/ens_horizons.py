@@ -36,8 +36,7 @@ contrasts this script reports remain internally valid.
 dataset and only the irradiance column is taken from the ensemble. The ensemble's own
 `temperature_2m` is downloaded and unused, so these arms are not pure forecast arms.
 
-Run it with `uv run --with netcdf4 python
-studies/beam_diffuse_split/ens_horizons.py`.
+Run it with `uv run python studies/beam_diffuse_split/ens_horizons.py`.
 """
 
 import argparse

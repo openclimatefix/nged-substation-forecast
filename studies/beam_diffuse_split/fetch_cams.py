@@ -19,8 +19,7 @@ The service publishes irradiation in Wh m⁻² summed over each step, so at a 1-
 also the mean flux in W m⁻², and no conversion is needed. Each row's `Observation period` names the
 interval's start and end; the end is kept, which is the period-ending convention ERA5 uses.
 
-Run it with `uv run --with cdsapi python studies/beam_diffuse_split/fetch_cams.py`. The extra
-dependencies are `build_dataset`'s, which this script imports the site roster from.
+Run it with `uv run --with cdsapi python studies/beam_diffuse_split/fetch_cams.py`.
 """
 
 import concurrent.futures

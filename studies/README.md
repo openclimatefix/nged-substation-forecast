@@ -30,8 +30,8 @@ wrong hour, a site label derived two different ways. Code moves into `packages/s
 study has already got it wrong once, or when getting it wrong would produce a plausible-looking
 number rather than an error.
 
-The other column that matches is the linting, because a script nobody can read is no more auditable
-than a script nobody kept. Everything else is deliberately weaker.
+Linting is the one row where both columns agree, because a script nobody can read is no more
+auditable than a script nobody kept. Everything else is deliberately weaker.
 
 **The rule that earns a study its place: a study whose findings reach `docs/` has to merge.** A page
 on `main` citing a number that only an unmerged branch reproduces is an unverifiable claim. Merging
@@ -44,8 +44,8 @@ branch. The directory is not an attic.
 ## What to expect when reading one
 
 - **Nothing here is imported by production code.** No study touches a Patito contract or enters the
-  Dagster asset graph, and nothing in `src/` or in any package other than `packages/studies/`
-  imports one. A study that needs to do any of that has stopped being a study.
+  Dagster asset graph, and nothing in `src/` or `packages/` imports one. A study that needs to do
+  any of that has stopped being a study.
 - **Paths may have rotted.** Each study reads its data from `data/studies/<name>/`, under the
   directory `DATA_PATH_INTERNAL` names — the same variable `contracts.Settings` reads. The downloads
   themselves are not in version control, and a data directory that has been cleaned out will not

@@ -190,7 +190,7 @@ def main() -> int:
 
     label = f"{arguments.source}{arguments.suffix}"
     lines = [
-        (f"### Fractions Skill Score — {label}, {arguments.instrument}, "),
+        f"### Fractions Skill Score — {label}, {arguments.instrument}",
         "",
         (
             f"Threshold: each site's {arguments.threshold_quantile:.0%} quantile of metered power. "

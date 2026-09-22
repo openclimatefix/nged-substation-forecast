@@ -11,9 +11,11 @@ metrics](https://openclimatefix.github.io/nged-substation-forecast/techniques/ev
 explains what the score measures and the two limits on reading it.
 """
 
+from typing import Final
+
 import polars as pl
 
-MONTH_FORMAT: str = "%Y-%m"
+MONTH_FORMAT: Final[str] = "%Y-%m"
 """How a month is labelled when the bootstrap resamples whole months.
 
 A calendar month rather than a month-of-year, so that March 2024 and March 2025 are different
@@ -47,8 +49,8 @@ def on_a_complete_hourly_grid(*, frame: pl.DataFrame, thresholds: pl.DataFrame) 
                 pl.col("first_time"), pl.col("last_time"), interval="1h", time_zone="UTC"
             )
         )
-        # empty_as_null keeps a site whose span is a single hour out of the grid entirely rather
-        # than giving it a null timestamp. Polars 2.0 changes the default, so it is stated here.
+        # Never empty here, because first_time <= last_time, so the value cannot matter. It is
+        # stated because Polars warns that the default changes in 2.0.
         .explode("time", empty_as_null=True)
         .select("site", "time")
     )
@@ -87,7 +89,7 @@ def monthly_components(*, gridded: pl.DataFrame, window_hours: int) -> pl.DataFr
         forecast_fraction=pl.col("exceeded_forecast")
         .rolling_mean(window_size=window_hours, min_samples=window_hours, center=True)
         .over("site"),
-    ).drop_nulls(["observed_fraction", "forecast_fraction", "month"])
+    ).drop_nulls(["observed_fraction", "forecast_fraction"])
     return fractions.group_by("month").agg(
         squared_difference=(pl.col("forecast_fraction") - pl.col("observed_fraction")).pow(2).sum(),
         reference=(pl.col("forecast_fraction").pow(2) + pl.col("observed_fraction").pow(2)).sum(),

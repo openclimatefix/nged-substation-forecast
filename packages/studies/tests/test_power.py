@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 import polars as pl
 import pytest
@@ -44,22 +44,25 @@ def test_an_hour_missing_a_half_hour_is_dropped():
 
     hourly = hourly_from_half_hourly(half_hourly=_half_hourly(stamps, [1.0, 4.0, 8.0]))
 
-    # 09:00 is alone in the hour ending 09:00, so only the hour ending 11:00 — built from 10:30 —
-    # and the hour ending 10:00, built from 10:00 alone, are candidates. Neither has two readings.
+    # Each stamp lands in a different hour, so no hour has two readings.
     assert hourly.is_empty()
 
 
 def test_the_orphan_half_hour_at_the_repair_boundary_is_dropped():
     # A repaired series has no reading at POWER_TIMESTAMPS_CORRECTED_BEFORE - 30 min, because NGED
-    # never published that half-hour. The reading at the instant itself is therefore alone in the
-    # hour ending there, and the complete-hour filter is what removes it.
+    # never published that half-hour. The repaired reading 60 minutes before the instant is
+    # therefore alone in the hour ending at the missing stamp, and the complete-hour filter is what
+    # removes it. The hours either side are complete.
     boundary = POWER_TIMESTAMPS_CORRECTED_BEFORE
-    stamps = [boundary, boundary.replace(minute=0, hour=boundary.hour + 1)]
+    stamps = [boundary + timedelta(minutes=offset) for offset in (-120, -90, -60, 0, 30)]
 
-    hourly = hourly_from_half_hourly(half_hourly=_half_hourly(stamps, [1.0, 3.0]))
+    hourly = hourly_from_half_hourly(half_hourly=_half_hourly(stamps, [1.0, 2.0, 4.0, 8.0, 16.0]))
 
-    assert hourly["time"].to_list() == [datetime(2026, 3, 26, 9, 0, tzinfo=UTC)]
-    assert hourly["power_mw"].to_list() == [2.0]
+    assert hourly["time"].to_list() == [
+        boundary - timedelta(minutes=90),
+        boundary + timedelta(minutes=30),
+    ]
+    assert hourly["power_mw"].to_list() == [1.5, 12.0]
 
 
 @pytest.mark.parametrize(

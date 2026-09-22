@@ -22,10 +22,8 @@ The script prints:
 - what every arm's error looks like inside a curtailed hour, and what removing those hours does to
   the headline contrast.
 
-Unlike its siblings this one needs the repository's own environment, because it reads NGED's
-bucket through `contracts.settings`, which holds the credentials. Run it from the repository root
-with `uv run python
-studies/beam_diffuse_split/anm_curtailment.py`.
+Run it from the repository root with `uv run python studies/beam_diffuse_split/anm_curtailment.py`.
+It reads NGED's bucket through `contracts.settings`, which holds the credentials.
 """
 
 import argparse

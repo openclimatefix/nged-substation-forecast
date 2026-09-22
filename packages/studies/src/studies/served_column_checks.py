@@ -41,9 +41,7 @@ direction is at least five times the threshold rather than a marginal call.
 def check_hourly_value_is_a_backward_mean(*, frame: pl.DataFrame) -> None:
     """Assert the hourly column is a backward mean over the hour ending at its label.
 
-    **The check is absolute rather than relative:** it needs no reference product, and cannot be
-    satisfied by two sources being wrong the same way. A half-hour error in an hourly label is the
-    fault it exists to catch.
+    A half-hour error in an hourly label is the fault the check exists to catch.
 
     Open-Meteo's own downloader states the mechanism. UKV publishes radiation as an instantaneous
     snapshot, and Open-Meteo divides that snapshot by the ratio of the instantaneous cosine of the
@@ -52,11 +50,12 @@ def check_hourly_value_is_a_backward_mean(*, frame: pl.DataFrame) -> None:
     `_instant` column multiplies the same ratio back. Reconstructing one column from the other and
     the sun's geometry therefore pins both the conversion and which hour the label names.
 
-    What the check settles is which of the two served columns the arms should read, which
-    the study's `sources.PointTemporalType` records and explains.
+    What the check settles is which of the two served columns a study should read.
 
     Args:
-        frame: The downloaded rows, carrying the geometry `_solar_geometry` adds.
+        frame: The downloaded rows, carrying `ghi_w_m2`, `bhi_w_m2`, `ghi_instant_w_m2`,
+            `bhi_instant_w_m2`, `solar_zenith_deg`, `cos_zenith_instant` and
+            `cos_zenith_hour_mean`.
 
     Raises:
         ValueError: If either flux fails to reconstruct.
@@ -121,13 +120,14 @@ def check_direct_is_not_a_separation_model(*, frame: pl.DataFrame) -> None:
     the Met Office's AWS bucket holds a rolling two years, so the earlier half can only be checked
     from the inside.
 
-    What it would catch is the failure that would void arm C outright — a mirror that reconstructed
-    the beam from global irradiance with a separation model rather than serving the model's own
-    field. Arm C would then be a copy of arm B, and the headline contrast would be a measurement of
-    floating-point noise.
+    What it would catch is a mirror that reconstructed the beam from global irradiance with a
+    separation model rather than serving the model's own field. A model shown that published split
+    would then be a copy of a model shown only global irradiance, and any contrast between the two
+    would be a measurement of floating-point noise.
 
     Args:
-        frame: The downloaded rows, carrying the geometry `_solar_geometry` adds.
+        frame: The downloaded rows, carrying `ghi_w_m2`, `bhi_w_m2`, `solar_zenith_deg`,
+            `clearness_index` and `extraterrestrial_horizontal_w_m2`.
 
     Raises:
         ValueError: If the within-bin spread sits at the separation-model floor.
@@ -163,7 +163,7 @@ def check_direct_is_not_a_separation_model(*, frame: pl.DataFrame) -> None:
         msg = (
             f"the published direct fraction varies by only {median_spread:.4f} inside a "
             f"(clearness, zenith) bin, against a threshold of {MIN_DIRECT_FRACTION_SPREAD}. That "
-            "is what a separation model applied to global irradiance looks like, and it would make "
-            "arm C a copy of arm B."
+            "is what a separation model applied to global irradiance looks like, so the published "
+            "split carries no information beyond global irradiance."
         )
         raise ValueError(msg)

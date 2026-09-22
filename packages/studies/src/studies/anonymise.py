@@ -16,7 +16,8 @@ carry a `time_series_id`, a site name, or a coordinate.
 LABEL_PERMUTATION_SEED: Final[int] = 784
 """Seeds the shuffle that assigns `SITE_LABELS` to identifiers.
 
-The value is load-bearing rather than arbitrary: it fixes which generator is called `A`, and the
+**What protects the mapping is that the roster is private, not that the labels are shuffled.** The
+value is load-bearing only for consistency: it fixes which generator is called `A`, and the
 published write-up refers to the sites by these labels. Changing the seed, the generator, or
 `SITE_LABELS`' order silently relabels every site and orphans every label already in print.
 """

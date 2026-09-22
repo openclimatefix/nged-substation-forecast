@@ -27,9 +27,7 @@ trains than where it is scored gets over-trusted, which would flatter these arms
 has nothing to do with calibration. That is the construction
 `run_experiment._add_learned_split` uses, and for the same reason.
 
-Run it with `uv run --with netcdf4 python
-studies/beam_diffuse_split/run_hybrid_experiment.py --source cams`. `netcdf4` is the one dependency
-the workspace environment does not already carry.
+Run it with `uv run python studies/beam_diffuse_split/run_hybrid_experiment.py --source cams`.
 """
 
 import argparse

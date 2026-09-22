@@ -1,10 +1,7 @@
 # `studies`
 
 **The machinery a one-off study calls, held to the repository's normal standard while the studies
-themselves are not.** A study under `studies/` answers a question once, and the tier it belongs to
-promises no tests, no maintenance and no backwards compatibility. Code moves into this package when
-that promise is too weak for it: when a study already got this wrong once, or when getting it wrong
-would produce a plausible-looking number rather than an error.
+themselves are not.** `studies/README.md` says which code moves here, and why.
 
 ## What this package owns, and what it does not
 
@@ -24,18 +21,13 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
 ## The modules
 
 - `anonymise` — the one mapping from a meter's `time_series_id` to the anonymous label a chart or a
-  write-up may carry. NGED's generator data leaves the project anonymised only, and a second
-  derivation of the mapping is a second chance to disagree with the first.
+  write-up may carry.
 - `solar` — solar position, the extraterrestrial flux, and the clearness index, for a frame of
   timestamps at a set of coordinates.
 - `served_column_checks` — two assertions about a downloaded irradiance column: that the hourly
   value is a backward mean over the hour ending at its label, and that a published direct fraction
-  carries information a separation model applied to the total would not. Each raises rather than
-  warns, because a study that trains on a misread column produces a number nobody can distinguish
-  from a real one.
+  carries information a separation model applied to the total would not.
 - `power` — the half-hourly-to-hourly aggregation, on the period-ending convention
   `contracts.PowerTimeSeries` states.
 - `fractions_skill_score` — a timing-tolerant score, which asks whether a forecast put a threshold
-  exceedance near the right hour rather than exactly on it. [Evaluation
-  metrics](https://openclimatefix.github.io/nged-substation-forecast/techniques/evaluation-metrics/#fractions-skill-score-fss)
-  explains what the score measures and what limits it.
+  exceedance near the right hour rather than exactly on it.
