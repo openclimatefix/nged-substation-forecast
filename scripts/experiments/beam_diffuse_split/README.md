@@ -64,6 +64,11 @@ separation model's estimate of the same split, says what the *published field* b
 | `anm_curtailment.py` | Reads NGED's `curtailment/` feed — the active-network-management log nothing else in the repository ingests — and tests it against the one curtailed site's output shortfall. Needs the NGED bucket credentials the other scripts do not. |
 | `anm_setpoints.py` | Turns NGED's raw active-network-management setpoint export into a half-hourly export-cap series, and checks how the cap reads: a generator sitting at the largest cap it ever sees is unconstrained, not fully curtailed. Reaches 26 months where the bucket feed reaches five. |
 | `export_cap.py` | Joins that export cap onto the modelling dataset and marks the hours the operator had moved it. Imported by all three runners: the curtailed hours are dropped from every training fold, and the predictions are held down to the cap at scoring time. |
+| `verify_icon_d2_lineage.py` | Compares Open-Meteo's ICON-D2 against the German weather service's own files and measures which lead the archive holds. Open-Meteo stitches the first hours of each run, so a 3-hourly model's archive is a 1-to-3-hour forecast rather than an analysis. |
+| `fetch_ens_point.py` | Extracts ECMWF ensemble irradiance for the meters' H3 cells at five lead bands, reading the Delta transaction log rather than globbing parquet, which would return tombstoned files twice. |
+| `ens_horizons.py` | Scores the ensemble against ERA5 at each lead band, and four ways of reducing 51 members to one power number. Fits its own booster, so five settings differ from `run_experiment.py`; see its module docstring. |
+| `multi_nwp.py` | Fits XGBoost on two weather models at once, against two negative controls: a duplicated column, which cannot fail, and a column carrying the second product's climatology with its weather permuted away, which can. |
+| `era_comparison.py` | Scores every product on one common row set with the folds cut inside each era, which is what the per-source runs cannot do. Removes both the non-composing row sets and the train-on-one-version confound. |
 
 ## The arms
 
@@ -246,14 +251,18 @@ defended.
 
 ## What the UKV arm is, and three caveats to hold before reading the result
 
-**Open-Meteo's UKV archive holds the T+0 analysis, so the arm is UKV's analysis rather than a
-forecast.** UKV runs hourly, Open-Meteo ingests every run, and a later run overwrites an earlier one
-for the same valid time, so the last writer for an hour is the run initialised at that hour.
-Measured against the Met Office's own files at five instants spanning both sides of PS47, T+0 agrees
-to between 0.11 and 0.55 W m⁻² and every other lead is tens to hundreds of W m⁻² away. All three
-sources are therefore analysis-class estimates of the same instant, which is what makes them
-comparable — and none of them is a forecast, so every number here is information content rather than
-forecast skill.
+**Open-Meteo's UKV archive holds the T+0 analysis, so the UKV arm is an analysis rather than a
+forecast.** Open-Meteo builds its historical archive by stitching the first hours of each
+successive run, and UKV runs hourly, so the stitched series is the run initialised at each hour.
+Measured against the Met Office's own files at five instants spanning both sides of PS47, T+0
+agrees to between 0.11 and 0.55 W m⁻² and every other lead is tens to hundreds of W m⁻² away.
+
+**A product's effective lead follows its run frequency, so the archive is not analysis-class for
+every model.** ICON-D2 runs every 3 hours rather than hourly, so the first hours of each run carry
+a lead of 1 to 3 hours. `verify_icon_d2_lineage.py` measures that against the German weather
+service's own files: over one day, the freshest run matches Open-Meteo to 33.6 W m⁻² root-mean-
+square while runs 6, 9 and 12 hours older are 136, 108 and 156 away. The ICON-D2 arm is therefore a
+short-range forecast, and a comparison between it and UKV hands UKV the shorter lead.
 
 **UKV's 4D-Var assimilates a large volume of satellite-derived cloud, so at T+0 the arm is partly a
 retrieval.** Satellite-derived cloud fraction was the single largest observation type by count in
@@ -287,13 +296,19 @@ than a twentieth of that.
 data.** Over the same 8 months the satellite source's contrast moves from −0.100 pp to −0.068 pp
 and the reanalysis stays null in both eras, so no arm of either source sees the jump UKV sees. A
 change in the metered power, in the export caps, or in what those months' weather happened to be
-would move all three sources together, because all three are scored on the same hours.
+would move all three sources together. Each source is scored on its own rows rather than on one
+common set, so that control rests on the three row sets overlapping heavily rather than on their
+being identical.
 
-**UKV's total irradiance moved the other way over the same boundary.** Arm A's error against the
-reanalysis, on the hours both cover, oscillates around zero for 46 months and then sits about 1 pp
-worse for every month from 2026-01. The upgrade therefore looks like it cost UKV accuracy in the
-global field at these sites while making the published direct-beam share substantially more
-informative — two effects that have to be reported separately rather than netted into one verdict
+**Most of the apparent step is a model being shown an input it never trained on.** Folds are
+contiguous month blocks, so every post-upgrade row falls in the last fold for five of the six
+generators, and that fold's model trained on pre-upgrade UKV alone. `era_comparison.py` cuts the
+folds inside each era instead, so a model scoring a post-upgrade row has trained on post-upgrade
+rows. Under that arrangement UKV still beats the reanalysis after the upgrade, by 0.09 pp with an
+interval from −0.49 to +0.21, against 0.34 pp [0.10, 0.56] before it. The upgrade did not cost UKV
+its standing against the reanalysis, and the figures above should be read as the cost of training
+on one version of a product and predicting with another — which is a real cost to a production
+pipeline, but a different finding from the product getting worse
 on the product.
 
 **Report by upgrade era, and treat the post-upgrade era as the one production would use.** The

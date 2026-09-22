@@ -9,14 +9,19 @@ columns alone. This script joins the ICON-D2 and UKV datasets on the hours and s
 fits XGBoost on the shared rows, and reports what the pair achieves against either product on its
 own.
 
-**A duplicated-column arm is the negative control.** An arm holding two weather products has more
-features than an arm holding one, and a tree given more columns can find more splits, so a gain
-could be feature count rather than independent information. Arm `icon_duplicated` is shown the
-ICON-D2 global irradiance twice under two names. Any gain it shows is the free win from column
-count, and the two-product arms have to beat that rather than beat the single-product arms.
-`colsample_bytree` is 1.0 for every arm, which is what keeps that control meaningful: under column
-subsampling the wider arm would draw from a larger pool at every tree and win for that reason
-alone.
+**Two negative controls, because the obvious one cannot fail.** An arm holding two weather
+products has more columns than an arm holding one, and a gain could in principle be column count
+rather than information. Arm `icon_duplicated` shows the ICON-D2 irradiance twice under two names,
+but `colsample_bytree` is 1.0, so the duplicate is scored with identical gain at every split and
+every tree comes out identical: that arm is guaranteed to tie, and it therefore demonstrates only
+that XGBoost is deterministic on duplicate columns.
+
+Arm `icon_plus_shuffled_ukv` is the control that can fail. It shows the tree a second column with
+UKV's exact diurnal and seasonal distribution and no information about the weather of the hour it
+sits on, built by permuting UKV's irradiance among the rows sharing a site, a calendar month, and
+an hour of day. Folds are whole-month blocks, so a permuted value never crosses a fold boundary.
+If a second column of pure climatology bought skill, that arm would show it, and the gain from the
+real UKV column would have to beat it.
 
 Every arm is shown the same temperature — ICON-D2's — so that the contrasts measure irradiance and
 nothing else.
@@ -57,6 +62,9 @@ PRIMARY_SOURCE: Final[str] = "icon-d2"
 SECOND_SOURCE: Final[str] = "ukv"
 """The product contributing only its irradiance columns, under the `_ukv` suffix."""
 
+SHUFFLE_SEED: Final[int] = 20260922
+"""Seed for the permutation behind `icon_plus_shuffled_ukv`."""
+
 JOINED_IRRADIANCE: Final[tuple[str, ...]] = ("ghi_w_m2", "bhi_w_m2", "dhi_w_m2")
 """The columns taken from both products rather than from `PRIMARY_SOURCE` alone."""
 
@@ -64,6 +72,7 @@ ARM_FEATURES: Final[dict[str, tuple[str, ...]]] = {
     "icon_global": ("ghi_w_m2",),
     "ukv_global": ("ghi_w_m2_ukv",),
     "icon_duplicated": ("ghi_w_m2", "ghi_w_m2_duplicate"),
+    "icon_plus_shuffled_ukv": ("ghi_w_m2", "ghi_w_m2_ukv_shuffled"),
     "both_global": ("ghi_w_m2", "ghi_w_m2_ukv"),
     "icon_split": ("ghi_w_m2", "bhi_w_m2", "dhi_w_m2"),
     "both_split": (
@@ -83,6 +92,8 @@ HEADLINE_CONTRAST: Final[tuple[str, str]] = ("both_global", "icon_global")
 CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     HEADLINE_CONTRAST,
     ("icon_duplicated", "icon_global"),
+    ("icon_plus_shuffled_ukv", "icon_global"),
+    ("both_global", "icon_plus_shuffled_ukv"),
     ("both_global", "ukv_global"),
     ("both_global", "icon_duplicated"),
     ("icon_global", "ukv_global"),
@@ -115,6 +126,27 @@ def _joined(*, alignment: str) -> pl.DataFrame:
         msg = f"{PRIMARY_SOURCE} and {SECOND_SOURCE} share no site-hours at alignment {alignment}"
         raise RuntimeError(msg)
     return joined.with_columns(ghi_w_m2_duplicate=pl.col("ghi_w_m2"))
+
+
+def _with_shuffled_second_product(*, dataset: pl.DataFrame) -> pl.DataFrame:
+    """Add a column carrying UKV's distribution with the weather of the hour removed.
+
+    The permutation runs among the rows that share a site, a calendar month, and an hour of day,
+    so the column keeps UKV's diurnal shape and its month-to-month climatology exactly and loses
+    which day each value described. Folds are whole-month blocks, so no value crosses a fold
+    boundary.
+
+    Args:
+        dataset: The joined frame, already carrying `month` and `hour_of_day`.
+
+    Returns:
+        `dataset` with `ghi_w_m2_ukv_shuffled`.
+    """
+    return dataset.with_columns(
+        ghi_w_m2_ukv_shuffled=pl.col("ghi_w_m2_ukv")
+        .shuffle(seed=SHUFFLE_SEED)
+        .over(["site", "month", "hour_of_day"])
+    )
 
 
 def _losses_for_site(*, site_rows: pl.DataFrame, arm: str) -> pl.DataFrame:
@@ -184,8 +216,10 @@ def main() -> int:
 
     dataset = with_export_cap(
         dataset=_assign_folds(
-            dataset=_add_time_features(
-                dataset=drop_commissioning_ramp(dataset=_joined(alignment=arguments.alignment))
+            dataset=_with_shuffled_second_product(
+                dataset=_add_time_features(
+                    dataset=drop_commissioning_ramp(dataset=_joined(alignment=arguments.alignment))
+                )
             )
         )
     )

@@ -272,7 +272,8 @@ dataset](https://dynamical.org/catalog/ecmwf-ifs-ens-forecast-15-day-0-25-degree
 Data on the AWS Open Data Registry as its source. So the variable Dynamical.org would have to add is
 not in the feed they read.
 
-**`fdir` on ECMWF ENS is therefore not a route open to us.** Serving `fdir` would mean a licensed ECMWF
+**`fdir` on ECMWF ENS is therefore not a route open to us.** Serving `fdir` would mean a licensed
+ECMWF
 dissemination or a MARS subscription in place of, or alongside, the free bucket — a contract and a
 recurring cost, not a storage decision. Dynamical.org build their catalogue from freely
 redistributable data. Asking them to widen a variable list would be reasonable. Asking them to take
@@ -283,7 +284,8 @@ and which feed the bucket holds is ECMWF's decision rather than Dynamical.org's.
 
 **The Met Office models are the request worth making, because their free feed already carries a
 direct beam.** The one open Met Office request on Dynamical.org's issue tracker is for [the global
-10 km deterministic model](https://github.com/dynamical-org/reformatters/issues/646), which publishes
+10 km deterministic model](https://github.com/dynamical-org/reformatters/issues/646), which
+publishes
 global and direct short-wave and leaves diffuse to the same subtraction ECMWF would need. UKV and
 MOGREPS-UK go further and publish diffuse as its own field, but neither appears on Dynamical.org's
 tracker, so either would have to be asked for. None of the three Met Office models needs a new
@@ -360,7 +362,8 @@ parameters at any one ensemble step, those same five radiation fields, and no st
 
 ### Two traps for whoever builds on ECMWF's direct beam
 
-**`dsrp` is the more convenient field to ask ECMWF for, because `fdir` is a horizontal-plane flux and
+**`dsrp` is the more convenient field to ask ECMWF for, because `fdir` is a horizontal-plane flux
+and
 `dsrp` is already direct normal irradiance.** The ENS catalogue linked above carries three direct
 fields: `fdir` (paramId 228021, total-sky direct at the surface), `cdir` (paramId 228022, the
 clear-sky equivalent), and `dsrp` (paramId 47, direct solar radiation into a plane facing the sun).
@@ -368,7 +371,8 @@ Deriving direct normal irradiance from `fdir` means dividing by the cosine of th
 angle, which is numerically unstable at low sun, and the sun is low over GB for much of the year.
 `dsrp` needs no division, so a request naming only `fdir` leaves behind the field that needs none.
 
-**`ssrd` − `fdir` is close to a diffuse pyranometer reading, but not equal to that reading.** [ECMWF's
+**`ssrd` − `fdir` is close to a diffuse pyranometer reading, but not equal to that reading.**
+[ECMWF's
 radiation
 note](https://www.ecmwf.int/sites/default/files/elibrary/2015/18490-radiation-quantities-ecmwf-model-and-mars.pdf)
 records that the model treats strongly forward-scattered radiation as unscattered, and that its
@@ -480,24 +484,32 @@ model family moved 1.05. Which product feeds the model dominates both. The write
 weather product's beam/diffuse split help a PV forecast?](../results/beam-diffuse-split.md); the
 code sits in `scripts/experiments/beam_diffuse_split/`.
 
-**Two 2 km models were added, and they disagree with each other by more than either disagrees with
-the 31 km reanalysis.** The Met Office's UKV scored 8.46% against ERA5's 8.39% over their 103,065
-shared hours — indistinguishable despite a fifteenfold difference in grid spacing. The German
-weather service's ICON-D2, at the same 2 km, scored 7.22% against ERA5's 8.28% over their 85,965
-shared hours, and 7.22% against UKV's 8.40% over the 86,113 hours those two share. **Fine grid
-spacing is therefore worth having and UKV is not collecting it**, which a comparison against one
-2 km model would have read as resolution buying nothing.
+**Two 2 km models were added, and scoring all four products on one common set of hours put them in
+the order CAMS, ICON-D2, UKV, ERA5.** On the 58,411 generator-hours every product covers before
+February 2026, CAMS scores 5.59% of capacity, the German weather service's ICON-D2 8.43%, the Met
+Office's UKV 9.57%, and ERA5 9.90%. The order is the same on seasonally matched months and after
+February 2026.
+
+**Comparing each pair on its own shared hours gave the wrong answer, which is why the common row
+set matters.** Pair by pair, UKV appeared not to beat ERA5 at all. On the common set it beats ERA5
+in every era, by 0.34 points before February 2026 with an interval from 0.10 to 0.56. The absolute
+levels move too: ERA5 scores 9.90% on the common set against 8.28% on its pair with ICON-D2, the
+same product and the same generators, because restricting to hours every product covers keeps the
+harder hours. Figures measured on different row sets do not compose into a ranking.
 
 **The retrieval still beats every model product.** CAMS scored 5.24% against ICON-D2's 8.22% over
 their 73,566 shared hours, and roughly halves the error against ERA5 and UKV as well. CAMS infers
 cloud from Meteosat at the hour in question, whereas the three models simulate it, so a retrieval
 of an hour that has already happened starts from the cloud field the others have to predict.
 
-**Three limits bound how far that carries.** Restricting the *scoring* to shared hours does not
-restrict the *training*, so each comparison is between two pipelines rather than two grids. UKV
-differs from ERA5 in aerosol treatment as well as in resolution, so the null result above is not a
-clean resolution contrast. And all four products are analyses or retrievals of an hour that has
-already happened, so none of these figures is forecast skill at a useful lead. Every measurement is
+**Three limits bound how far that carries.** UKV differs from ERA5 in aerosol treatment as well as
+in resolution, so neither ordering is a clean resolution contrast. Open-Meteo's archive stitches
+the first hours of each successive run, so a product's effective lead follows its run frequency:
+hourly UKV is the T+0 analysis, while 3-hourly ICON-D2 carries a lead of 1 to 3 hours, measured
+against the German weather service's own files. ICON-D2 therefore beats UKV while forecasting
+further ahead than it, and the comparison is not analysis against analysis. And CAMS is a retrieval
+rather than a model, so its lead is nil and its win is partly a win for observing cloud rather than
+simulating it. Every measurement is
 of these four products on this fleet, and none has been shown to hold for every product at those
 resolutions.
 

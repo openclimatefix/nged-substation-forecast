@@ -14,12 +14,27 @@ period-ending over one hour. Interpolating ENS down to an hour it never resolved
 for an interpolation error that is not its own, so the hourly sources are averaged over the three
 hours ending at each ENS stamp instead, and a window missing any of its three hours is dropped.
 
-**Four ways of turning 51 members into one power forecast, because the obvious one is biased.**
+**Four ways of turning 51 members into one power forecast, because which one wins is not obvious.**
 The power curve bends at clipping and at the export cap, so the expected power is not the power of
-the expected irradiance: `mean(f(x))` and `f(mean(x))` differ, and only the first estimates what
-the meter will read. `median(f(x))` is reported beside them because mean absolute error is
-minimised by the median rather than the mean, and `control` is reported because the production
-analysis-proxy selection keeps the control member and drops the rest.
+the expected irradiance: `mean(f(x))` and `f(mean(x))` differ. Only `mean(f(x))` is unbiased for
+what the meter will read, and it nevertheless loses to `f(mean(x))` at the shorter leads measured
+here, where the members disagree too little for the bend to matter and averaging first filters
+noise. `median(f(x))` is reported beside them because mean absolute error is minimised by the
+median rather than the mean, and `control` is reported because the production analysis-proxy
+selection keeps the control member and drops the rest.
+
+**Five settings differ from the main experiment, so an absolute figure here is not comparable with
+one from `run_experiment.py`.** This script fits its own booster rather than calling
+`_fit_one_fold`, and so inherits XGBoost's default squared-error objective where the main
+experiment asks for absolute error; it grows 400 trees rather than 500; it applies neither the
+export-cap clamp nor the commissioning-ramp exclusion; it drops no constrained hour from training;
+and it fits one seed rather than three, so its intervals carry month-to-month variation but not
+variation between seeds. Every variant and the ERA5 baseline share all five, so the paired
+contrasts this script reports remain internally valid.
+
+**Every variant is shown ERA5's temperature**, because the 3-hourly frame is built from the ERA5
+dataset and only the irradiance column is taken from the ensemble. The ensemble's own
+`temperature_2m` is downloaded and unused, so these arms are not pure forecast arms.
 
 Run it with `uv run --no-project --with polars --with numpy --with xgboost --with scipy --with
 pvlib --with xarray --with netcdf4 --with pandas --with deltalake python
@@ -64,7 +79,12 @@ definition across every horizon at the cost of covering half of each long-lead s
 """
 
 BOOST_ROUNDS: Final[int] = 400
-"""How many trees each fit grows, matching the primary setting of the main experiment."""
+"""How many trees each fit grows.
+
+The main experiment's primary setting grows 500. Every variant and the ERA5 baseline here grow the
+same 400, so the paired contrasts are unaffected, but an absolute figure from this script is not
+comparable with one from `run_experiment.py`.
+"""
 
 VARIANTS: Final[tuple[str, ...]] = (
     "control",
