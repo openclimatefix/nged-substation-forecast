@@ -20,17 +20,15 @@ page](https://openclimatefix.github.io/nged-substation-forecast/architecture/nwp
   horizon here starts at lead 3 for that reason.
 
 The whole table runs to 135 GB across 905 daily runs, which is far more than a reader of six
-meters needs. Filtering each run to the four H3 cells the meters fall in, before anything is
-collected, takes the download to about 6 million rows.
+meters needs. Filtering to the four H3 cells the meters fall in, before anything is collected,
+takes the read to about 4 million rows in a few seconds.
 
 Run it with `uv run --with h3 --with pvlib --with polars python
 scripts/experiments/beam_diffuse_split/fetch_ens_point.py`.
 """
 
-import datetime as dt
 import logging
 import sys
-import urllib.parse
 from pathlib import Path
 from typing import Final
 
@@ -103,22 +101,6 @@ def _cell_for_each_meter(*, sites: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def _init_time_of(*, partition: Path) -> dt.datetime:
-    """Read a run's initialisation time out of its partition directory name.
-
-    The column is a Hive partition key rather than a column inside the parquet files, so a plain
-    `scan_parquet` of the files does not carry it.
-
-    Args:
-        partition: The `init_time=...` directory.
-
-    Returns:
-        The run's initialisation time, in UTC.
-    """
-    stamp = urllib.parse.unquote(partition.name.split("=", 1)[1])
-    return dt.datetime.fromisoformat(stamp).replace(tzinfo=dt.UTC)
-
-
 def _wanted_leads() -> list[int]:
     """Return every lead hour any horizon covers.
 
@@ -128,23 +110,36 @@ def _wanted_leads() -> list[int]:
     return sorted({lead for first, last in HORIZONS.values() for lead in range(first, last)})
 
 
-def _read_one_run(*, partition: Path, cells: list[int], leads: list[int]) -> pl.DataFrame:
-    """Read one run's rows for the meters' cells and the horizons' leads.
+def _read_meters(*, cells: list[int], leads: list[int]) -> pl.DataFrame:
+    """Read every run's rows for the meters' cells and the horizons' leads.
+
+    **Read through the Delta transaction log rather than globbing the parquet files under each
+    partition.** A partition written more than once keeps its superseded files on disk, tombstoned
+    in the log but still matching a glob, so globbing returns every superseded row a second time.
+    Measured here, the glob returned 8.65 million rows where the log returns 4.29 million, and the
+    surplus was exact duplicates.
+
+    Both filters are applied before anything is collected, so the scan prunes partitions and skips
+    row groups instead of reading the whole 135 GB table.
 
     Args:
-        partition: The `init_time=...` directory to read.
         cells: The H3 cells to keep.
         leads: The lead hours to keep.
 
     Returns:
-        That run's rows, carrying the irradiance, the temperature, and the lead.
+        Every kept row, carrying the irradiance, the temperature, and the lead.
     """
-    init_time = _init_time_of(partition=partition)
     return (
-        pl.scan_parquet(f"{partition}/*.parquet")
+        pl.scan_delta(str(NWP_ROOT.parent))
         .filter(pl.col("h3_index").is_in(cells))
-        .select("h3_index", "valid_time", "ensemble_member", RADIATION_COLUMN, "temperature_2m")
-        .with_columns(init_time=pl.lit(init_time, dtype=pl.Datetime("us", "UTC")))
+        .select(
+            "h3_index",
+            "init_time",
+            "valid_time",
+            "ensemble_member",
+            RADIATION_COLUMN,
+            "temperature_2m",
+        )
         .with_columns(
             lead_hours=((pl.col("valid_time") - pl.col("init_time")).dt.total_minutes() // 60).cast(
                 pl.Int32
@@ -181,30 +176,21 @@ def main() -> int:
         The process exit status.
 
     Raises:
-        FileNotFoundError: If the ENS table holds no run partitions.
+        FileNotFoundError: If the ENS table is not on disk.
     """
     from build_dataset import _pv_sites
 
-    partitions = sorted(NWP_ROOT.glob("init_time=*"))
-    if not partitions:
-        msg = f"{NWP_ROOT} holds no init_time partitions; run the ecmwf_ens asset first"
+    if not NWP_ROOT.exists():
+        msg = f"{NWP_ROOT} is missing; run the ecmwf_ens asset first"
         raise FileNotFoundError(msg)
 
     lookup = _cell_for_each_meter(sites=_pv_sites())
     cells = lookup["h3_index"].unique().to_list()
     leads = _wanted_leads()
-    logger.info(
-        "%d meters in %d cells, %d runs, %d lead hours",
-        lookup.height,
-        len(cells),
-        len(partitions),
-        len(leads),
-    )
+    logger.info("%d meters in %d cells, %d lead hours", lookup.height, len(cells), len(leads))
 
-    frames = [
-        _read_one_run(partition=partition, cells=cells, leads=leads) for partition in partitions
-    ]
-    rows = _labelled_by_horizon(frame=pl.concat(frames)).join(lookup, on="h3_index")
+    frame = _read_meters(cells=cells, leads=leads)
+    rows = _labelled_by_horizon(frame=frame).join(lookup, on="h3_index")
     rows = rows.select(
         "site",
         "init_time",
