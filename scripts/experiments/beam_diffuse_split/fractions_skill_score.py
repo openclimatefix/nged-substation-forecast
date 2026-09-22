@@ -12,7 +12,7 @@ magnitude, by asking whether each arm put a threshold exceedance *somewhere near
 
 The score is computed on the forecasts the runs already wrote. `run_experiment.py` stores
 `signed_error_capped_mw` as `capped_point - actual`, so adding the metered power back recovers the
-capped point forecast exactly, and no model is refitted here.
+capped point forecast exactly.
 
 Run it with `uv run --no-project --with polars --with numpy python
 scripts/experiments/beam_diffuse_split/fractions_skill_score.py --source ukv`.
@@ -32,8 +32,8 @@ WINDOW_HOURS: Final[tuple[int, ...]] = (1, 3, 5, 7, 9)
 A window of 1 hour is the point score, which carries the full double penalty and is the comparison
 every other column is read against. Each wider window centres on the same hour and forgives a
 displacement of up to half the window either side, so 3 hours forgives an hour and 9 hours forgives
-four. The half-hourly target NGED forecasts makes a tolerance beyond a few hours uninteresting: a
-spike moved four hours is a different day's weather, not a timing error.
+four. The target NGED forecasts is half-hourly, so a tolerance beyond a few hours is
+uninteresting: a spike moved 4 hours is a different day's weather, not a timing error.
 """
 
 BOOTSTRAP_DRAWS: Final[int] = 1000
@@ -70,7 +70,7 @@ def _capped_forecasts(*, source: str, alignment: str, suffix: str, instrument: s
         instrument: `xgboost` or `physics`.
 
     Returns:
-        One row per site, hour, arm and seed, carrying the metered power and the forecast.
+        One row per site, hour, arm, and seed, carrying the metered power and the forecast.
 
     Raises:
         FileNotFoundError: If that run or its dataset has not been produced.
@@ -175,9 +175,10 @@ def _fss_from(*, squared_difference: float, reference: float) -> float:
         reference: The summed reference, being both fractions' summed squares.
 
     Returns:
-        The score, 1 for a forecast whose exceedances coincide with the observed ones at this
-        tolerance and 0 for one with no skill over the reference. `nan` where no window at this
-        tolerance held an exceedance in either series, which leaves the reference at zero.
+        The score, 1 for a forecast whose exceedances coincide with the observed exceedances at
+        this tolerance, and 0 for a forecast with no skill over the reference. `nan` where no
+        window at this tolerance held an exceedance in either series, leaving the reference at
+        zero.
     """
     if reference == 0.0:
         return float("nan")
@@ -190,8 +191,8 @@ def _bootstrap_fss_difference(
     """Interval the difference of two arms' scores by resampling whole months.
 
     Both arms are resampled on the *same* drawn months, so the paired structure that makes the
-    difference precise is preserved — the two arms saw the same weather, and the interval should
-    reflect that rather than treating them as independent runs.
+    difference precise is preserved. The two arms saw the same weather, and the interval should
+    reflect the shared weather rather than treat the arms as independent runs.
 
     Args:
         treatment: The treatment arm's per-month components.

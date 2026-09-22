@@ -359,24 +359,28 @@ WeatherBench2 at `gs://weatherbench2/datasets/era5-hourly-climatology/`.
 
 ### The satellite retrieval beat both model products by about half the error
 
-**On hours each pair both covers, the CAMS retrieval roughly halves the power error against ERA5 or
-UKV, and UKV's 2 km grid performs like ERA5's 31 km one.** In the beam/diffuse split experiment,
-predicting metered PV output from global irradiance alone gave 5.3% of the 99th-percentile output
-for CAMS against 9.7% for UKV over their 88,569 shared hours, and 8.5% for UKV against 8.4% for
-ERA5 over their 103,065 shared hours. The fitted PV model agreed, with a wider margin. **Choosing
-the source was worth about 4 percentage points and choosing the beam/diffuse split about 0.1**, so
-source selection dominates every other irradiance decision measured there.
+**On the hours both sources of a pair cover, the CAMS retrieval roughly halves the power error
+against either model product.** In the beam/diffuse split experiment, predicting metered PV output
+from global irradiance alone gave 5.4% of the 99th-percentile output for CAMS against 9.7% for ERA5
+over their 124,849 shared hours, and 5.3% against 9.7% for UKV over their 88,569 shared hours. The
+fitted PV model agreed, with a wider margin.
 
-**Read the result as observation against model rather than as resolution.** CAMS infers cloud from
-Meteosat at the hour in question, where ERA5 and UKV both have to simulate it, and for irradiance
-that has already happened a retrieval should win — which is the usual finding in solar resource
-assessment. Raising the model resolution from 31 km to 2 km moved the error by less than a tenth of
-a percentage point, so resolution is not what separates these products.
+**The two model products scored within a tenth of a percentage point of each other**, at 8.5% for
+UKV against 8.4% for ERA5 over their 103,065 shared hours, despite a fifteenfold difference in grid
+spacing. **Choosing the source moved the error by about 4 percentage points and choosing the
+beam/diffuse split by about 0.1**, so of the two irradiance decisions measured there, the source
+dominated.
 
-Two limits on how far that carries. Restricting the *scoring* to shared hours does not restrict the
-*training*, so each comparison is between two pipelines rather than two grids. And all three
-sources are analyses or retrievals of an hour that has already happened, so none of these numbers
-is forecast skill at a useful lead.
+**The likeliest reading is observation against model rather than resolution.** CAMS infers cloud
+from Meteosat at the hour in question, whereas ERA5 and UKV both simulate it, so a retrieval of an
+hour that has already happened starts from the cloud field the other two have to predict. Raising
+the model resolution from 31 km to 2 km moved the error by less than a tenth of a percentage point.
+
+Three limits bound how far that result carries. Restricting the *scoring* to shared hours does not
+restrict the *training*, so each comparison is between two pipelines rather than two grids. UKV
+differs from ERA5 in aerosol treatment as well as in resolution, so the null result above is not a
+clean resolution contrast. And all three sources are analyses or retrievals of an hour that has
+already happened, so none of these numbers is forecast skill at a useful lead.
 
 ### CAMS: use the point API, not the gridded product
 
@@ -473,14 +477,17 @@ account for the stated start either, and the window has since rolled past all of
 can be checked against the Met Office's files is essentially the era Open-Meteo ingested live**, and
 the earlier half cannot be checked against anything.
 
-**A Met Office upgrade moved what UKV is worth, by more than the backfill boundary does.** In the
-beam/diffuse split experiment, the gain from UKV's published direct-beam share is five and a half
-times larger over the 8 months after PS47 became operational on 2026-01-21 than over the 47 months
-before, while the same contrast on the satellite and reanalysis sources does not move over those
-months. UKV's global irradiance went the other way, sitting about 1 pp worse against the reanalysis
-from the same date. **Any production ingest of UKV should expect its skill to step at upgrade
-boundaries, which is an argument for scoring continuously rather than trusting a figure measured
-once**, and against assuming that one era of UKV stands in for another.
+**A Met Office upgrade moved how much UKV's published split improves the forecast, by more than
+the backfill boundary does.** In the beam/diffuse split experiment, the gain from UKV's direct-beam
+share is five and a half times larger over the 8 months after Parallel Suite 47 became operational
+on 2026-01-21 than over the 47 months before. Neither other source steps over those same months:
+the satellite source's contrast moved by about a third, from −0.100 to −0.068 percentage points,
+and the reanalysis stayed null in both eras. UKV's global irradiance went the other way, sitting
+about 1 percentage point worse against the reanalysis from the same date.
+
+**One upgrade moved this product's value by a factor of five and a half, so a production ingest of
+UKV should score continuously rather than trust a figure measured once**, and should not assume
+that one era of UKV stands in for another.
 
 **Three mechanical facts about the served columns, each of which fails silently if assumed wrong.**
 

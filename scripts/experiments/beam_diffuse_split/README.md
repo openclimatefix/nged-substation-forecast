@@ -46,7 +46,7 @@ separation model's estimate of the same split, says what the *published field* b
 | `verify_era5_sources.py` | Compares the two ERA5 downloads hour by hour, which is what establishes that the mirror serves ERA5's own `fdir` rather than a separation model's estimate of it. |
 | `fetch_cams.py` | Downloads the CAMS radiation service's global, beam and diffuse irradiances at each meter's own coordinates, into `data/CAMS/`. |
 | `sources.py` | The source names, which sources are delivered per site, and the registry of Open-Meteo models this experiment can fetch. Standard library only, so every script here can import it, including the two that run on `polars` alone. |
-| `fetch_open_meteo_point.py` | Downloads one Open-Meteo forecast model at each meter's own coordinates, and asserts three things about what arrived before writing it. Takes `--model`. |
+| `fetch_open_meteo_point.py` | Downloads one Open-Meteo forecast model at each meter's own coordinates, and runs two checks on what arrived before writing it: that the hourly column is a backward mean over the hour ending at its label, and that the published direct fraction is not a separation model. Takes `--model`. |
 | `verify_ukv_lineage.py` | Compares Open-Meteo's UKV against the Met Office's own files on AWS and establishes which forecast lead the archive holds. A gate: no model is trained on UKV until it has run. |
 | `build_dataset.py` | Joins the PV power readings to one source, adds solar geometry, the separation-model estimates and the synthetic control target, and writes the one frame every arm reads. Takes `--source` and `--alignment`. |
 | `run_experiment.py` | The XGBoost instrument: fits every arm at every fold, seed and hyperparameter setting, and writes per-row losses, per-site metrics and bootstrap intervals. |
@@ -169,9 +169,9 @@ the same number, so it cannot manufacture a contrast.
 
 ## What the Fractions Skill Score was checked against
 
-**Mean absolute error charges a forecast twice for a peak placed an hour late**, which is the
-sharpness the published split is meant to buy, so `fractions_skill_score.py` rescores every arm at
-tolerances from 0 to 4 hours. The metric itself is explained in [Evaluation
+**Mean absolute error charges a forecast twice for a peak placed an hour late.** Placing the peak
+on time is the sharpness the published split is meant to add, so `fractions_skill_score.py`
+rescores every arm at tolerances from 0 to 4 hours. The metric itself is explained in [Evaluation
 metrics](https://openclimatefix.github.io/nged-substation-forecast/techniques/evaluation-metrics/#fractions-skill-score-fss).
 The score needs no refit: `run_experiment.py` writes `signed_error_capped_mw` as `capped_point -
 actual`, so adding the metered power back recovers each arm's capped point forecast exactly.
@@ -189,8 +189,8 @@ a threshold the spike clears:
 
 The last row is the control the other three are read against: **widening the window must not rescue
 a forecast that never predicts the event**, or every recovery along a row would be the window
-inflating the score rather than timing credit being given. The second row is the double penalty as
-a single number — perfect magnitude, one hour late, scores 0.667 against a point-in-time 1.000.
+inflating the score rather than the score crediting timing. The second row is the double penalty as
+a single number — perfect magnitude, 1 hour late, scores 0.667 against a point-in-time 1.000.
 
 **The score's verdict on the published split depends on which threshold it is read at, so it is
 reported as a sweep rather than a number.** Taking the headline contrast at each site's 75th, 90th,
@@ -244,7 +244,7 @@ differs from the kept rows' by about 0.004, so it favours no arm, and the pre-cl
 the same verdict — but a filter chosen after seeing results has to be declared rather than
 defended.
 
-## What the UKV arm is, and the three things to know before reading it
+## What the UKV arm is, and three caveats to hold before reading the result
 
 **Open-Meteo's UKV archive holds the T+0 analysis, so the arm is UKV's analysis rather than a
 forecast.** UKV runs hourly, Open-Meteo ingests every run, and a later run overwrites an earlier one
@@ -259,10 +259,11 @@ forecast skill.
 retrieval.** Satellite-derived cloud fraction was the single largest observation type by count in
 UKV's published observation table, entering the humidity field as a pseudo-observation. A T+0 UKV
 cloud field is therefore anchored to the same geostationary satellite CAMS retrieves from, which
-blunts the "model against satellite retrieval" contrast between those two arms. It does not touch
-the ERA5-against-UKV resolution contrast, which is the one this arm exists for.
+blunts the "model against satellite retrieval" contrast between those two arms. The shared
+satellite does not touch the ERA5-against-UKV resolution contrast, which is the contrast this arm
+exists for.
 
-**UKV carries a fixed aerosol climatology where ERA5 and CAMS carry time-varying aerosol**, so
+**UKV carries a fixed aerosol climatology whereas ERA5 and CAMS carry time-varying aerosol**, so
 ERA5 against UKV is a contrast in resolution *and* in aerosol treatment. The asymmetry bites hardest
 under a clear sky, where aerosol sets the beam/diffuse partition most strongly and where the
 published result is weakest, which is why `sky_conditions.py` runs on UKV as well as CAMS.
@@ -272,7 +273,7 @@ published result is weakest, which is why `sky_conditions.py` runs on UKV as wel
 Open-Meteo's archive claims to start on 2022-03-01, but its UKV downloader was only created on
 2024-08-12, so the earlier 29 months were backfilled from a source Open-Meteo does not name. Run
 both spans, with `build_dataset.py --first-date` and `--suffix` marking the shorter one. The two
-disagree — the headline contrast is roughly half again as large on the live-ingest span — but the
+disagree — the headline contrast is roughly 1.5 times as large on the live-ingest span — but the
 backfill is not why.
 
 **Splitting the full archive by month puts the step at the Met Office's PS47 upgrade, which became
@@ -298,10 +299,9 @@ on the product.
 **Report by upgrade era, and treat the post-upgrade era as the one production would use.** The
 caveats are that 8 months is a thin sample beside 47, that these 8 months are a single winter and
 spring rather than a full year, and that the piecewise power-stamp shift falls inside the
-post-upgrade window — though the step appears in 2026-02, before that shift. A model upgrade
-changing what a product is worth is the general case rather than a quirk of this one: any
-production ingest of UKV has to expect its skill to move at upgrade boundaries, which is an
-argument for scoring continuously rather than trusting a figure measured once.
+post-upgrade window — though the step appears in 2026-02, before that shift. One upgrade moved this
+product's value by a factor of five and a half, so a production ingest of UKV should score
+continuously rather than trust a figure measured once.
 
 ### The default hourly column, not the `_instant` one
 

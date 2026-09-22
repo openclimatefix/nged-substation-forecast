@@ -4,14 +4,14 @@ One-off throwaway module for the experiment in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/784> and its UKV extension in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/800>.
 
-**It imports nothing outside the standard library, which is what lets every script in this
+**The module imports nothing outside the standard library, which is what lets every script in this
 directory import it.** `elevation_breakdown.py` and `report_results.py` document a run command
-supplying only `polars`, and `build_dataset.py` pulls in `pvlib`, `xarray` and a Delta store, so a
+supplying only `polars`, and `build_dataset.py` pulls in `pvlib`, `xarray`, and a Delta store, so a
 registry living there would break the two lean scripts.
 
-`SOURCE_CHOICES` is the single copy of the source list, imported by the 14 `argparse` sites that
-offer `--source`. A second Open-Meteo model still needs its own entries in `SourceType`,
-`PER_SITE_SOURCES` and `build_dataset`, and its own labels in the two figure scripts; what the
+`SOURCE_CHOICES` is the single copy of the source list, imported by every `argparse` parser that
+offers `--source`. A second Open-Meteo model still needs its own entries in `SourceType`,
+`PER_SITE_SOURCES`, and `build_dataset`, and its own labels in the two figure scripts; what the
 registry saves is the download itself, which needs no new code at all.
 """
 
