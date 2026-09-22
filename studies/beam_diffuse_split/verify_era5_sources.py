@@ -13,7 +13,7 @@ A mirror that agrees to Open-Meteo's 1 W m⁻² rounding is serving the same fie
 separation model would disagree by tens of W m⁻², which is the scale at which Erbs misses ERA5's
 beam on this data.
 
-Run it with `uv run --no-project --with polars --with xarray --with netcdf4 --with numpy python
+Run it with `uv run --with netcdf4 python
 studies/beam_diffuse_split/verify_era5_sources.py`.
 """
 
@@ -24,12 +24,13 @@ from pathlib import Path
 from typing import Final
 
 import polars as pl
-from build_dataset import REPO_DATA_DIR, _read_era5
+from build_dataset import _read_era5
+from sources import STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("verify_era5_sources")
 
-OUTPUT_PATH: Final[Path] = REPO_DATA_DIR / "ERA5" / "era5_source_agreement.json"
+OUTPUT_PATH: Final[Path] = STUDY_DATA_DIR / "ERA5" / "era5_source_agreement.json"
 
 COMPARED_FIELDS: Final[tuple[str, ...]] = ("ghi_w_m2", "bhi_w_m2", "temp_c")
 

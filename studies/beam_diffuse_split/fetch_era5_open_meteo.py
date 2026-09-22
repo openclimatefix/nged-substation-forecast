@@ -18,7 +18,7 @@ source of the headline result, and this one is reported beside it.
 Requests are made at the ERA5 grid-cell centres rather than at the sites, with
 `cell_selection=nearest`, so both sources feed the same cells to the same join.
 
-Run it with `uv run --no-project --with polars python
+Run it with `uv run python
 studies/beam_diffuse_split/fetch_era5_open_meteo.py`.
 """
 
@@ -40,12 +40,12 @@ from era5_grid import (
     LAST_YEAR,
     first_date_of,
 )
-from sources import REPO_DATA_DIR
+from sources import STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_era5_open_meteo")
 
-OUTPUT_PATH: Final[Path] = Path(REPO_DATA_DIR / "ERA5" / "beam_diffuse_open_meteo.parquet")
+OUTPUT_PATH: Final[Path] = Path(STUDY_DATA_DIR / "ERA5" / "beam_diffuse_open_meteo.parquet")
 
 ARCHIVE_URL: Final[str] = "https://archive-api.open-meteo.com/v1/archive"
 REQUEST_TIMEOUT_SECONDS: Final[float] = 300.0

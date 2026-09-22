@@ -30,8 +30,8 @@ spread this script reports is a few parts in a million and says the seeds inheri
 rather than that the noise floor is that low. The bootstrap's seed draw
 likewise adds nothing to this instrument's intervals.
 
-Run it with `uv run --no-project` plus `--with polars --with numpy --with xgboost
---with scipy --with pvlib --with xarray --with netcdf4 --with pandas --with deltalake`, then
+Run it with `uv run --with netcdf4 python
+studies/beam_diffuse_split/run_physics_experiment.py`, then
 `python studies/beam_diffuse_split/run_physics_experiment.py --source cams
 The long dependency list is `export_cap.py` reaching into `build_dataset.py`
 for the site roster, which is what maps NGED's `time_series_id` to an anonymous label.
@@ -59,7 +59,7 @@ from run_experiment import (
     dataset_path_for,
 )
 from scipy.optimize import minimize
-from sources import REPO_DATA_DIR, SOURCE_CHOICES
+from sources import SOURCE_CHOICES, STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("run_physics_experiment")
@@ -67,7 +67,7 @@ _LOG: Final[logging.Logger] = logging.getLogger("run_physics_experiment")
 
 def results_dir_for(*, source: str) -> Path:
     """Return where this instrument's results for one source are written."""
-    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_physics_{source}"
+    return STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_physics_{source}"
 
 
 ARM_SPLITS: Final[dict[str, tuple[str, ...]]] = {

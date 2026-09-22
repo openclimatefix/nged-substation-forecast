@@ -10,7 +10,7 @@ inconvenient row goes missing.
 No site identifier can reach the output: `build_dataset.py` relabelled the sites before writing
 anything, so the results files hold only the shuffled letters.
 
-Run it with `uv run --no-project --with polars python
+Run it with `uv run python
 studies/beam_diffuse_split/report_results.py`.
 """
 
@@ -21,7 +21,7 @@ from pathlib import Path
 from typing import Final, Literal
 
 import polars as pl
-from sources import REPO_DATA_DIR, SOURCE_CHOICES
+from sources import SOURCE_CHOICES, STUDY_DATA_DIR
 
 InstrumentType = Literal["xgboost", "physics"]
 """Which of the two instruments' results to report.
@@ -285,7 +285,7 @@ def main() -> int:
     instrument: InstrumentType = arguments.instrument
     stem = "results" if instrument == "xgboost" else "physics"
     results_dir = (
-        REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{arguments.source}{arguments.suffix}"
+        STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{arguments.source}{arguments.suffix}"
     )
 
     intervals = pl.read_parquet(results_dir / "bootstrap_intervals.parquet")

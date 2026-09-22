@@ -26,7 +26,7 @@ real UKV column would have to beat it.
 Every arm is shown the same temperature — ICON-D2's — so that the contrasts measure irradiance and
 nothing else.
 
-Run it with `uv run --no-project --with polars --with numpy --with xgboost --with pvlib python
+Run it with `uv run python
 studies/beam_diffuse_split/multi_nwp.py`.
 """
 
@@ -50,7 +50,7 @@ from run_experiment import (
     _fit_one_fold,
     dataset_path_for,
 )
-from sources import REPO_DATA_DIR
+from sources import STUDY_DATA_DIR
 
 _LOG = logging.getLogger(__name__)
 
@@ -234,7 +234,7 @@ def main() -> int:
         _LOG.info("fitted %s", arm)
     losses = pl.concat(frames)
 
-    output_dir = REPO_DATA_DIR / "ERA5" / "beam_diffuse_multi_nwp"
+    output_dir = STUDY_DATA_DIR / "ERA5" / "beam_diffuse_multi_nwp"
     output_dir.mkdir(parents=True, exist_ok=True)
     losses.write_parquet(output_dir / "losses.parquet")
 

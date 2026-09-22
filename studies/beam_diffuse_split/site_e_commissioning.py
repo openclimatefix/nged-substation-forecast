@@ -14,8 +14,8 @@ an L2 cost over the daily medians put every changepoint where the adjacent plate
 Cohen's d of at least 2.0. This script takes those dates as given and recomputes each plateau's
 level, so the levels in the figure always match the data the figure plots.
 
-Run it with `uv run --no-project` plus `--with polars --with numpy --with altair --with pandas
---with deltalake --with vl-convert-python`, then copy the SVG it writes into
+Run it with `uv run --with vl-convert-python python
+studies/beam_diffuse_split/site_e_commissioning.py`, then copy the SVG it writes into
 `docs/background/assets/`.
 """
 
@@ -30,12 +30,12 @@ import numpy as np
 import plotting.ocf_theme as ocf
 import polars as pl
 from build_dataset import _pv_sites
-from sources import REPO_DATA_DIR
+from sources import REPO_DATA_DIR, STUDY_DATA_DIR
 from studies.anonymise import site_labels_for
 
 _LOG: Final[logging.Logger] = logging.getLogger("site_e_commissioning")
 
-FIGURES_DIR: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_figures"
+FIGURES_DIR: Final[Path] = STUDY_DATA_DIR / "ERA5" / "beam_diffuse_figures"
 
 
 SUBJECT: Final[str] = "E"

@@ -21,7 +21,7 @@ to the same calendar months, so a pre-against-post reading has the season held r
 cross-product gap inside one era is unaffected by any of this, because every product sees the same
 rows.
 
-Run it with `uv run --no-project --with polars --with numpy --with xgboost --with pvlib python
+Run it with `uv run python
 studies/beam_diffuse_split/era_comparison.py`.
 """
 
@@ -45,7 +45,7 @@ from run_experiment import (
     _fit_one_fold,
     dataset_path_for,
 )
-from sources import REPO_DATA_DIR
+from sources import STUDY_DATA_DIR
 
 _LOG = logging.getLogger(__name__)
 
@@ -217,7 +217,7 @@ def main() -> int:
         "| Era | Contrast | ΔMAE (pp of capacity) | 95% interval | excludes zero? |",
         "|---|---|---|---|---|",
     ]
-    output_dir = REPO_DATA_DIR / "ERA5" / "beam_diffuse_eras"
+    output_dir = STUDY_DATA_DIR / "ERA5" / "beam_diffuse_eras"
     output_dir.mkdir(parents=True, exist_ok=True)
 
     for era in ("pre_all", "pre_matched", "post"):

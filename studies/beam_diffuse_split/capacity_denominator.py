@@ -9,7 +9,7 @@ reading instead.
 Run it from this directory as:
 
 ```bash
-uv run --no-project --with polars --with numpy --with deltalake \
+uv run \
     python capacity_denominator.py --source cams
 ```
 """
@@ -22,12 +22,11 @@ from typing import Final
 import polars as pl
 from commissioning import drop_commissioning_ramp
 from run_experiment import (
-    REPO_DATA_DIR,
     _add_time_features,
     _bootstrap_difference,
     dataset_path_for,
 )
-from sources import SOURCE_CHOICES
+from sources import SOURCE_CHOICES, STUDY_DATA_DIR
 
 CLEAREST_WEEK: Final[str] = "2026-04-20"
 """The week the clearest-week panels draw, as `make_figures._chosen_weeks` picks it."""
@@ -43,7 +42,7 @@ PERCENT: Final[float] = 100.0
 
 def _results_dir(*, source: str) -> pathlib.Path:
     """Return where the XGBoost results for one source live."""
-    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_results_{source}"
+    return STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_results_{source}"
 
 
 def main() -> int:

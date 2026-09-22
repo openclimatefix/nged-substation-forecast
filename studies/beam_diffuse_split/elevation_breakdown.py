@@ -13,7 +13,7 @@ loses at every elevation, the finding is about the field carrying less informati
 The band edges are fixed here and the split is applied after the fact to losses that were produced
 without knowledge of it, so no arm's model was fitted differently because of the band.
 
-Run it with `uv run --no-project --with polars python
+Run it with `uv run python
 studies/beam_diffuse_split/elevation_breakdown.py --source cams`.
 """
 
@@ -22,7 +22,7 @@ import sys
 from typing import Final
 
 import polars as pl
-from sources import REPO_DATA_DIR, SOURCE_CHOICES
+from sources import SOURCE_CHOICES, STUDY_DATA_DIR
 
 PERCENTAGE_POINTS: Final[float] = 100.0
 
@@ -40,10 +40,10 @@ def _banded_losses(*, instrument: str, source: str) -> pl.DataFrame:
     """Read one run's primary losses and attach the solar elevation band of each row."""
     stem = "results" if instrument == "xgboost" else "physics"
     losses = pl.read_parquet(
-        REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}" / "per_row_losses.parquet"
+        STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}" / "per_row_losses.parquet"
     ).filter(pl.col("setting") == "primary")
     elevation = pl.read_parquet(
-        REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}.parquet"
+        STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}.parquet"
     ).select("site", "time", "solar_elevation_deg")
     return losses.join(elevation, on=["site", "time"], how="inner").with_columns(
         band=pl.col("solar_elevation_deg").cut(

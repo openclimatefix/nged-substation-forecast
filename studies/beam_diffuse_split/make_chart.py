@@ -31,13 +31,13 @@ from typing import Final
 import altair as alt
 import plotting.ocf_theme  # noqa: F401  (importing registers and enables the OCF theme)
 import polars as pl
-from sources import REPO_DATA_DIR
+from sources import STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("make_chart")
 
 
-OUTPUT_PATH: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_split_result.svg"
+OUTPUT_PATH: Final[Path] = STUDY_DATA_DIR / "ERA5" / "beam_diffuse_split_result.svg"
 
 SOURCE_LABELS: Final[dict[str, str]] = {
     "open-meteo": "ERA5 (31 km reanalysis)",
@@ -151,7 +151,7 @@ def _raise_on_unlabelled_sources(*, stem: str) -> None:
     prefix = f"beam_diffuse_{stem}_"
     found = {
         path.name[len(prefix) :]
-        for path in (REPO_DATA_DIR / "ERA5").glob(f"{prefix}*")
+        for path in (STUDY_DATA_DIR / "ERA5").glob(f"{prefix}*")
         if path.is_dir()
     }
     known = (*SOURCE_LABELS, *UNDRAWN_SOURCES)
@@ -183,7 +183,7 @@ def _arm_mean_absolute_errors(*, instrument: str, source: str) -> dict[str, floa
     """
     stem = "results" if instrument == "xgboost" else "physics"
     summary = pl.read_parquet(
-        REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}" / "per_site_summary.parquet"
+        STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}" / "per_site_summary.parquet"
     ).filter(pl.col("setting") == "primary")
     pooled = summary.group_by("arm").agg(
         mae=(pl.col("mae_capped_fraction_of_capacity") * pl.col("n_rows")).sum()
@@ -206,7 +206,7 @@ def _differences() -> pl.DataFrame:
         stem = "results" if instrument == "xgboost" else "physics"
         _raise_on_unlabelled_sources(stem=stem)
         for source in SOURCE_LABELS:
-            results_dir = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}"
+            results_dir = STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}"
             if not results_dir.exists():
                 continue
             arm_mae = _arm_mean_absolute_errors(instrument=instrument, source=source)

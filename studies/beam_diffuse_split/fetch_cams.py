@@ -19,8 +19,7 @@ The service publishes irradiation in Wh m⁻² summed over each step, so at a 1-
 also the mean flux in W m⁻², and no conversion is needed. Each row's `Observation period` names the
 interval's start and end; the end is kept, which is the period-ending convention ERA5 uses.
 
-Run it with `uv run --no-project --with polars --with cdsapi --with numpy --with deltalake --with
-pvlib --with pandas python studies/beam_diffuse_split/fetch_cams.py`. The extra
+Run it with `uv run --with cdsapi python studies/beam_diffuse_split/fetch_cams.py`. The extra
 dependencies are `build_dataset`'s, which this script imports the site roster from.
 """
 
@@ -32,13 +31,14 @@ from typing import Final, NamedTuple
 
 import cdsapi  # ty: ignore[unresolved-import]
 import polars as pl
-from build_dataset import REPO_DATA_DIR, _pv_sites
+from build_dataset import _pv_sites
 from era5_grid import FIRST_YEAR, LAST_DATE, LAST_YEAR, first_date_of
+from sources import STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_cams")
 
-CAMS_DIR: Final[Path] = REPO_DATA_DIR / "CAMS"
+CAMS_DIR: Final[Path] = STUDY_DATA_DIR / "CAMS"
 OUTPUT_PATH: Final[Path] = CAMS_DIR / "beam_diffuse_cams.parquet"
 
 ADS_URL: Final[str] = "https://ads.atmosphere.copernicus.eu/api"

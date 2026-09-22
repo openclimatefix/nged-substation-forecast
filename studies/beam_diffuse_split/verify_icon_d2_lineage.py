@@ -21,7 +21,7 @@ the sum of the direct and diffuse downward components, which is what Open-Meteo 
 
 The coordinate is a public place, never a metered generator's.
 
-Run it with `uv run --no-project --with cfgrib --with xarray --with numpy --with requests python
+Run it with `uv run --with cfgrib python
 studies/beam_diffuse_split/verify_icon_d2_lineage.py`.
 """
 

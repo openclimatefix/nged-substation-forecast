@@ -14,7 +14,7 @@ what makes it an oracle, and therefore an upper bound on what any real estimator
 Run it from this directory as:
 
 ```bash
-uv run --no-project --with polars --with numpy --with deltalake \
+uv run \
     python oracle_capacity.py --source cams
 ```
 """
@@ -24,8 +24,8 @@ import sys
 from typing import Final
 
 import polars as pl
-from run_experiment import REPO_DATA_DIR, _bootstrap_difference
-from sources import SOURCE_CHOICES
+from run_experiment import _bootstrap_difference
+from sources import SOURCE_CHOICES, STUDY_DATA_DIR
 
 CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("C_era5_split", "B_erbs"),
@@ -43,7 +43,7 @@ def main() -> int:
     parser.add_argument("--source", choices=SOURCE_CHOICES, default="cams")
     arguments = parser.parse_args()
 
-    results = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_results_{arguments.source}"
+    results = STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_results_{arguments.source}"
     losses = (
         pl.read_parquet(results / "per_row_losses.parquet")
         .filter((pl.col("setting") == "primary") & (pl.col("target") == "power_mw"))

@@ -135,8 +135,9 @@ has read the upstream documentation or the downloader that converts it.
 def _find_project_root(start: Path) -> Path:
     """Return the workspace root, by walking up to the directory holding `uv.lock`.
 
-    Mirrors `contracts.settings._find_project_root` rather than importing it, because every script
-    here runs under `uv run --no-project` and so cannot import a workspace package.
+    Mirrors `contracts.settings._find_project_root` rather than importing it, because the
+    workspace copy resolves `data/` to a linked worktree's own root, where `_main_checkout` below
+    resolves it to the main checkout that holds the downloads.
 
     Args:
         start: File or directory to walk up from.
@@ -198,6 +199,19 @@ storage has to point this variable at a local directory instead.
 """
 
 
+STUDY_DATA_DIR: Final[Path] = REPO_DATA_DIR / "studies" / "beam_diffuse_split"
+"""Where everything this study downloads and builds lives.
+
+Under `data/studies/` rather than beside the pipeline's own tables, so that a weather product this
+study alone fetches cannot be mistaken for one the Dagster asset graph ingests. `data/NWP/` holds
+what production ingests; `data/studies/beam_diffuse_split/ICON-D2/` holds what this study fetched to
+answer one question.
+
+The NGED tables stay outside it. `data/NGED/` is the pipeline's own power, metadata, and active
+network management data, which this study reads and does not own.
+"""
+
+
 def point_output_path_for(*, source: SourceType) -> Path:
     """Return where one per-site download is written.
 
@@ -210,7 +224,7 @@ def point_output_path_for(*, source: SourceType) -> Path:
     Returns:
         The parquet path holding that source's per-site fluxes.
     """
-    return REPO_DATA_DIR / source.upper() / f"beam_diffuse_{source}.parquet"
+    return STUDY_DATA_DIR / source.upper() / f"beam_diffuse_{source}.parquet"
 
 
 HISTORICAL_FORECAST_URL: Final[str] = "https://historical-forecast-api.open-meteo.com/v1/forecast"

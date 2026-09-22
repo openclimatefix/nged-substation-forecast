@@ -24,7 +24,7 @@ The script prints:
 
 Unlike its siblings this one needs the repository's own environment, because it reads NGED's
 bucket through `contracts.settings`, which holds the credentials. Run it from the repository root
-with `uv run --with pvlib python
+with `uv run python
 studies/beam_diffuse_split/anm_curtailment.py`.
 """
 

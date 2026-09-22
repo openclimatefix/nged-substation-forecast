@@ -36,8 +36,7 @@ contrasts this script reports remain internally valid.
 dataset and only the irradiance column is taken from the ensemble. The ensemble's own
 `temperature_2m` is downloaded and unused, so these arms are not pure forecast arms.
 
-Run it with `uv run --no-project --with polars --with numpy --with xgboost --with scipy --with
-pvlib --with xarray --with netcdf4 --with pandas --with deltalake python
+Run it with `uv run --with netcdf4 python
 studies/beam_diffuse_split/ens_horizons.py`.
 """
 
@@ -59,15 +58,15 @@ from run_experiment import (
     _booster_parameters,
     dataset_path_for,
 )
-from sources import REPO_DATA_DIR
+from sources import STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
-ENS_PATH: Final[Path] = REPO_DATA_DIR / "ENS" / "beam_diffuse_ens.parquet"
+ENS_PATH: Final[Path] = STUDY_DATA_DIR / "ENS" / "beam_diffuse_ens.parquet"
 """Where `fetch_ens_point.py` wrote the per-meter, per-member, per-horizon frame."""
 
-OUTPUT_DIR: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_ens_horizons"
+OUTPUT_DIR: Final[Path] = STUDY_DATA_DIR / "ERA5" / "beam_diffuse_ens_horizons"
 """Where this script writes its per-row losses and its report."""
 
 WINDOW_HOURS: Final[int] = 3

@@ -34,8 +34,7 @@ not earned the right to report a null on the real meters.
 Because ERA5 is a reanalysis rather than a forecast, what this measures is the *information content*
 of the split, not forecast skill.
 
-Run it with `uv run --no-project` plus `--with polars --with numpy --with xgboost
---with scipy --with pvlib --with xarray --with netcdf4 --with pandas --with deltalake`.
+Run it with `uv run --with netcdf4 python studies/beam_diffuse_split/run_experiment.py`.
 The long dependency list is `export_cap.py` reaching into `build_dataset.py` for the site
 roster, which is what maps NGED's `time_series_id` to an anonymous label.
 """
@@ -53,7 +52,7 @@ import polars as pl
 import xgboost as xgb
 from commissioning import drop_commissioning_ramp
 from export_cap import clamp_to_cap, with_export_cap
-from sources import REPO_DATA_DIR, SOURCE_CHOICES
+from sources import SOURCE_CHOICES, STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("run_experiment")
@@ -68,12 +67,12 @@ is the other instrument rather than another route to this one.
 
 def dataset_path_for(*, source: str) -> Path:
     """Return the frame `build_dataset.py` wrote for one ERA5 source."""
-    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}.parquet"
+    return STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}.parquet"
 
 
 def results_dir_for(*, source: str) -> Path:
     """Return where one run's results are written."""
-    return REPO_DATA_DIR / "ERA5" / f"beam_diffuse_results_{source}"
+    return STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_results_{source}"
 
 
 LEARNED_BEAM_TEMPLATE: Final[str] = "learned_bhi_w_m2_fold{fold}"

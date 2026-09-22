@@ -14,7 +14,7 @@ source's own rows, so a difference that survives here is still a difference betw
 rather than between two grids alone. That confound cannot be removed without refitting one source on
 the other's rows, which is not what any of the arms are for.
 
-Run it with `uv run --no-project --with polars --with numpy --with xgboost --with pvlib python
+Run it with `uv run python
 studies/beam_diffuse_split/compare_sources.py`.
 """
 
@@ -24,7 +24,7 @@ from typing import Final
 
 import polars as pl
 from run_experiment import _bootstrap_difference
-from sources import REPO_DATA_DIR
+from sources import STUDY_DATA_DIR
 
 PERCENTAGE_POINTS: Final[float] = 100.0
 
@@ -64,7 +64,7 @@ def _losses_for(*, instrument: str, source: str) -> pl.DataFrame:
         FileNotFoundError: If that run has not been produced.
     """
     stem = "results" if instrument == "xgboost" else "physics"
-    path = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}" / "per_row_losses.parquet"
+    path = STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}" / "per_row_losses.parquet"
     if not path.exists():
         msg = f"{path} missing; run the {instrument} instrument on {source} first"
         raise FileNotFoundError(msg)

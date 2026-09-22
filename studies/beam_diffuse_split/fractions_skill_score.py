@@ -14,7 +14,7 @@ The score is computed on the forecasts the runs already wrote. `run_experiment.p
 `signed_error_capped_mw` as `capped_point - actual`, so adding the metered power back recovers the
 capped point forecast exactly.
 
-Run it with `uv run --no-project --with polars --with numpy python
+Run it with `uv run python
 studies/beam_diffuse_split/fractions_skill_score.py --source ukv`.
 """
 
@@ -24,7 +24,7 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from sources import REPO_DATA_DIR, SOURCE_CHOICES
+from sources import SOURCE_CHOICES, STUDY_DATA_DIR
 from studies.fractions_skill_score import fss_from, monthly_components, on_a_complete_hourly_grid
 
 WINDOW_HOURS: Final[tuple[int, ...]] = (1, 3, 5, 7, 9)
@@ -78,9 +78,9 @@ def _capped_forecasts(*, source: str, suffix: str, instrument: str) -> pl.DataFr
     """
     stem = "results" if instrument == "xgboost" else "physics"
     losses_path = (
-        REPO_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}{suffix}" / "per_row_losses.parquet"
+        STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_{stem}_{source}{suffix}" / "per_row_losses.parquet"
     )
-    dataset_path = REPO_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}{suffix}.parquet"
+    dataset_path = STUDY_DATA_DIR / "ERA5" / f"beam_diffuse_dataset_{source}{suffix}.parquet"
     for path in (losses_path, dataset_path):
         if not path.exists():
             msg = f"{path} missing; run the {instrument} instrument on {source} first"

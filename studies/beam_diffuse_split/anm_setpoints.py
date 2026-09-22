@@ -22,7 +22,7 @@ The checks it prints are the ones that say the cap is read the right way round: 
 where the cap never left the connection limit, the generator's output per unit of irradiance should
 match the uncurtailed sites, and where the cap moved it should fall short.
 
-Run it from the repository root with `uv run --with pvlib python
+Run it from the repository root with `uv run python
 studies/beam_diffuse_split/anm_setpoints.py`.
 """
 
