@@ -441,6 +441,75 @@ anywhere near a real fit. In the aggregate-fleet case there is a second confound
 fleets are cleaned and rained on unevenly, so the fleet-level soiling ratio is a smeared average of
 many site-level sawtooths, which makes $\delta$ easier to identify than $r_{\text{wash}}$.
 
+## What a fitted five-parameter PV model measured on six solar farms
+
+**A throw-away experiment fitted this page's single-site physics on six metered solar farms without
+using any gradients, and three of its findings bear on the design sketched above.** Panel tilt,
+panel azimuth, capacity, an inverter clipping limit, and a temperature coefficient were fitted per
+site by a Powell optimiser. The write-up is [Does a weather product's
+beam/diffuse split help a PV forecast?](../results/beam-diffuse-split.md), and its scope is six
+sites inside one 25 km by 23 km box in Lincolnshire over 2019 to 2026 — a measurement on this fleet
+rather than a general result about fitting PV models. The by-products that bear on estimating
+capacity rather than on this method, among them a half-hour timestamp error absorbed into the fitted
+azimuth, are on the [capacity-estimation
+page](../roadmap/capacity-estimation.md#what-the-beamdiffuse-experiment-measured-on-this-fleet).
+
+**A single site's five parameters are recoverable without gradients, so the case for differentiable
+physics cannot rest on that fit being hard.** The objective is not convex. Refitting all 30
+site-and-arm combinations from 64 independent random starting points each, a median of only 3 of the
+64 starts reach the lowest loss found, and the worst start lands at up to 3.5 times that loss. What
+makes a derivative-free optimiser enough is the low dimension and a good fixed start rather than a
+single basin: the optimiser's own first start is a fixed vector shared by every seed, and that fixed
+start reaches the lowest loss in 19 of the 30 fits and is the only start to reach it in 6. The case
+for differentiable physics therefore rests on what this page argues elsewhere — posteriors that
+carry their own uncertainty, corrections shared across a whole fleet inside one training loop,
+gradients that reach back to the inputs, and continuity with the v2 engine — and not on a single
+site's PV parameters being hard to recover. None of that argues against differentiable physics; the
+finding narrows the list of reasons to reach for the method.
+
+**A five-parameter objective that is already multi-modal strengthens the case for [a convex twin as
+the initialiser](#a-convex-twin-for-initialisation-and-sanity-checking).** The fleet node below
+carries far more parameters than five, and nothing in the single-site result suggests the fleet
+node's loss surface is better behaved. A starting point derived from a convex problem, rather than a
+hand-picked vector that happens to be good, is what that section proposes.
+
+**What limits the fitted physical model is its specification, not its optimiser.** On the satellite
+irradiance source the fitted model reaches 6.28% of P99 output against XGBoost's 5.24%, so the tree
+is 1.05 percentage points better. A tree given nothing but the physical model's output lowers the
+error on neither irradiance source — the change is −0.025 percentage points [−0.061, +0.011] on the
+satellite source, an interval spanning zero. The deficit is therefore not a mis-calibration that
+rescaling the physical model's own output could repair.
+
+**The term that hurts is the transposition, and the sketch above carries no guard on it.** The
+experiment compared a weather product's published direct-beam field against a beam estimated from
+the total irradiance by a separation model, and the fitted physical model and the tree disagree
+about which of the two beam fields is better. The physical model divides the horizontal beam by the
+cosine of the solar zenith angle to recover the direct normal irradiance, which magnifies a beam
+error without limit as the sun approaches the horizon: the physical model's preference between the
+two beam fields reaches +0.56 percentage points below 10 degrees of solar elevation, against +0.00
+to +0.17 in the three elevation bands above it. Holding tilt and azimuth equal across the arms makes
+the disagreement larger rather than smaller, so the fitted geometry is not the cause — [the
+write-up's comparison of the two
+instruments](../results/beam-diffuse-split.md#the-physical-model-disagrees-and-is-not-a-second-opinion)
+carries those numbers. `DifferentiableSolarPlant` takes the direct normal irradiance as an input, so
+the division sits upstream of the sketch wherever a weather product publishes beam on the horizontal
+plane, and the sketch's own `clamp` is on the cosine of the angle of incidence, which is a different
+quantity. The simplest guard is a floor on the zenith cosine, applied wherever the direct normal
+irradiance is derived.
+
+**A fitted parameter can land outside physics, and the fitted capacity then absorbs the slack.** The
+fitted temperature coefficient runs from −0.0018 to +0.0020 per degree Celsius across the six sites,
+where a crystalline-silicon module's maximum-power coefficient is negative and datasheets cluster
+between −0.0045 and −0.0025 per degree Celsius — the range the sketch's fixed `TEMP_COEFF_POWER` of
+−0.004 sits inside. A positive fitted value means the parameter is absorbing something other than
+the temperature response, and the fitted capacity absorbs whatever derating the temperature
+coefficient leaves unapplied. The fitted tilts and azimuths are unaffected. A derivative-free fit
+with no prior has no way to rule a positive coefficient out, and the two devices [the sketch
+above](#the-core-building-block-differentiablesolarplant) gives every parameter do: a
+parameterisation whose range excludes what the physics forbids, and a KL term pulling the posterior
+toward a physical prior. Making $\gamma$ a learnable posterior, as [Panel
+temperature](#panel-temperature) proposes, is one place those two devices have concrete work to do.
+
 ---
 
 ## Scaling to aggregate fleets: `UniversalSolarFleetNode`
