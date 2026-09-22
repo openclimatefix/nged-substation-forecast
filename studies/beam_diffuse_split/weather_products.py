@@ -7,7 +7,7 @@ One-off throwaway script for the study in
 **Every product is shown to the same booster, on the same rows, with the same temperature.** Each
 arm differs from the others only in its irradiance columns, so a contrast between two arms is a
 contrast between two products' irradiance. The products are CAMS (a satellite retrieval), ERA5 (a
-reanalysis), UKV, ICON-D2, ICON-EU and ICON global (weather models).
+reanalysis), UKV, ICON-D2, ICON-EU, and ICON global (weather models).
 
 **The rows are chosen by nothing any product says.** Each per-source build drops an hour with a
 zero half-hour only where its own irradiance reads bright, so a plain inner join would drop an hour
@@ -32,7 +32,8 @@ sites and score the sixth, which is the situation of a generator with no metered
 **The forecast lead differs between products and is part of what a consumer receives.** UKV's
 archive holds the T+0 analysis; ICON-D2 and ICON-EU hold 1-to-3-hour forecasts; ICON global holds
 1-to-6-hour forecasts; ERA5's radiation comes from its own forecasts at 1 to 12 hours. The lead
-table breaks the ICON contrasts against ERA5 down by each ICON product's served lead.
+tables compare ICON-D2 with ICON-EU at matched served leads, and split ICON global against ICON-EU
+by ICON global's lead.
 
 Run it with `uv run python studies/beam_diffuse_split/weather_products.py`, after
 `build_dataset.py` has been run for `open-meteo`, `ukv`, `icon-d2`, `icon-eu`, `icon-global`, and
@@ -118,19 +119,13 @@ SERVED_LEAD: Final[dict[str, str]] = {
 RUN_INTERVAL_HOURS: Final[dict[str, int]] = {"icon_d2": 3, "icon_eu": 3, "icon_global": 6}
 """The run cadence of each ICON product, which fixes its served lead at each label hour.
 
-`verify_icon_lineage.py` measured the mapping for ICON-EU against DWD's own files, on one day at one
-place: the freshest run reproduced Open-Meteo's served value to within 1 W m⁻² at all nine hours
-checked. For ICON-D2 the freshest run was the closest match at 7 of 9 hours but differed by up to 44
-W m⁻², so the period-3 sawtooth in ICON-D2's own errors is the stronger evidence. ICON global is
-published by DWD only on its icosahedral grid, so its mapping is inferred from the cadence alone.
+The evidence for the mapping is on the write-up page.
 """
 
 LEAD_TABLE_HOURS: Final[tuple[int, int]] = (7, 19)
-"""The first and last UTC label hours the lead table uses.
+"""The first and last UTC label hours the lead tables use.
 
-UKV's hourly column is its T+0 snapshot rescaled by a ratio of cosines, which runs away at low sun,
-and ERA5's lead does not follow a 3-hour cycle, so differencing each ICON product against ERA5 on
-the middle of the day isolates the ICON product's own lead.
+Outside these hours the sun is too low for a difference between products to carry signal.
 """
 
 UPGRADE_MONTH: Final[str] = "2026-02"
@@ -174,16 +169,14 @@ UKV_SNAPSHOT_ARMS: Final[dict[str, tuple[str, ...]]] = {
     "ukv_trap_ctx_global": ("ghi_trap_previous_ukv", "ghi_trap_ukv", "ghi_trap_next_ukv"),
     "icon_eu_ctx_global": ("ghi_previous_icon_eu", "ghi_icon_eu", "ghi_next_icon_eu"),
 }
-"""Two further UKV arms built from its instantaneous snapshots rather than its served hourly value.
+"""Four post hoc arms: two build UKV's hour from its own snapshots, and two give UKV's snapshot mean
+and ICON-EU's hourly mean the same context.
 
 UKV publishes an instantaneous field each hour, and Open-Meteo's served hourly value is the
 snapshot at the hour's end rescaled by a ratio of cosines, where every ICON product serves a true
 mean over the hour. `ukv_trap_global` is the mean of the snapshots at both ends of the hour, and
-`ukv_pair_global` shows the model both snapshots, so a contrast against them separates the weather
-model from how its hour is built. Showing two values gives a model context the one-value arms lack,
-so the two `_ctx` arms give UKV's snapshot mean and ICON-EU's hourly mean the same context: the
-hour before and the hour after. Every arm here was added after the first run, on a reviewer's
-finding, and is post hoc.
+`ukv_pair_global` shows the model both snapshots. The two `_ctx` arms add the hour before and the
+hour after. Every arm here is post hoc.
 """
 
 LEAVE_ONE_SITE_OUT_SEED: Final[int] = SEEDS[0]
@@ -237,9 +230,9 @@ def _joined() -> pl.DataFrame:
     """Inner-join every product on the site-hours all of them cover.
 
     Returns:
-        One row per common site-hour, carrying `ghi_<p>`, `bhi_<p>`, `dhi_<p>`, `erbs_bhi_<p>` and
-        `erbs_dhi_<p>` for every product `p`, and the base product's power, geometry and
-        temperature.
+        One row per common site-hour on which UKV's snapshots and ICON-EU's neighbouring hours also
+        exist, carrying `ghi_<p>`, `bhi_<p>`, `dhi_<p>`, `erbs_bhi_<p>`, and `erbs_dhi_<p>` for
+        every product `p`, and the base product's power, geometry, and temperature.
     """
     irradiance = ("ghi_w_m2", "bhi_w_m2", "dhi_w_m2", "erbs_bhi_w_m2", "erbs_dhi_w_m2")
     base = pl.read_parquet(dataset_path_for(source=PRODUCTS[BASE_PRODUCT]))
@@ -309,6 +302,10 @@ def _ukv_snapshots() -> pl.DataFrame:
 
 def _icon_eu_context() -> pl.DataFrame:
     """Return ICON-EU's hourly mean in the hour before and the hour after each hour.
+
+    The neighbours are read from the raw download, so on 2023-06-21 the 07:00 UTC row carries the
+    corrupt 06:00 value as its previous hour in `icon_eu_ctx_global`, the one exception to that
+    block being dropped from every arm. It touches five rows of one post hoc arm.
 
     Returns:
         One row per (site, time) with `ghi_previous_icon_eu` and `ghi_next_icon_eu`.
@@ -461,7 +458,9 @@ def _leave_one_site_out_losses(*, frame: pl.DataFrame) -> pl.DataFrame:
     outputs: list[pl.DataFrame] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT_FITS) as pool:
         futures = [
-            pool.submit(_one, product, site, fold) for product in PRODUCTS for site, fold in folds
+            pool.submit(_one, product=product, site=site, fold=fold)
+            for product in PRODUCTS
+            for site, fold in folds
         ]
         outputs.extend(future.result() for future in concurrent.futures.as_completed(futures))
     return pl.concat(outputs)
@@ -531,6 +530,10 @@ def _implied_capacity(*, frame: pl.DataFrame) -> list[str]:
     for product, frame_log in log_by_product.items():
         spread = _spread_by_draw(frame=frame_log, months=months, draws=draws)
         difference = (spread - cams_spread) * PERCENTAGE_POINTS
+        plug_in = (
+            float(frame_log.select(pl.col("residual").std()).item())
+            - float(log_by_product["cams"].select(pl.col("residual").std()).item())
+        ) * PERCENTAGE_POINTS
         december = float(
             frame_log.filter(pl.col("calendar") == "12").select(pl.col("seasonal").mean()).item()
         )
@@ -538,7 +541,7 @@ def _implied_capacity(*, frame: pl.DataFrame) -> list[str]:
         lower, upper = np.percentile(difference, (2.5, 97.5))
         lines.append(
             f"| {product} | {residual_spread * PERCENTAGE_POINTS:.1f}% "
-            f"| {float(np.mean(difference)):+.1f} [{lower:+.1f}, {upper:+.1f}] "
+            f"| {plug_in:+.1f} [{lower:+.1f}, {upper:+.1f}] "
             f"| {np.expm1(december) * PERCENTAGE_POINTS:+.0f}% |"
         )
     return lines
@@ -661,7 +664,7 @@ def _served_lead(*, product: str) -> pl.Expr:
 
 
 def _lead_tables(*, losses: pl.DataFrame) -> list[str]:
-    """Compare ICON products at matched served leads, and list each hour's contrast against ERA5.
+    """Compare ICON products at matched served leads and hour by hour, and break CAMS down.
 
     ICON-D2 and ICON-EU run on the same 3-hourly cycle, so every label hour holds them at the same
     lead and their contrast within a lead bucket is lead-matched. ICON global's lead equals

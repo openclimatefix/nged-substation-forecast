@@ -492,15 +492,14 @@ and UKV cannot be told apart once UKV's hour is rebuilt from its own snapshots. 
 what each offline consumer should read, is [Which weather product best describes past
 sunshine?](../studies/weather-products-for-the-past.md).
 
-**Figures measured on different row sets do not compose into a ranking.** Pair by pair, UKV once
-appeared not to beat ERA5 at all, and ERA5 scores 8.28% on its pair with ICON-D2 against 8.98% on the
+**Figures measured on different row sets do not compose into a ranking.** Scored pair by pair, UKV
+does not beat ERA5 at all, and ERA5 scores 8.28% on its pair with ICON-D2 against 8.98% on the
 six-product set: the same product and the same generators, because restricting to hours every
 product covers keeps the harder hours.
 
-**The retrieval still beats every model product.** CAMS scored 5.24% against ICON-D2's 8.22% over
-their 73,566 shared hours, and roughly halves the error against ERA5 and UKV as well. CAMS infers
-cloud from Meteosat at the hour in question, whereas the three models simulate it, so a retrieval
-of an hour that has already happened starts from the cloud field the others have to predict.
+**CAMS infers cloud from Meteosat at the hour in question, whereas the weather models simulate it.**
+So a retrieval of an hour that has already happened starts from the cloud field the others have to
+predict.
 
 **Three limits bound how far that carries.** UKV differs from ERA5 in aerosol treatment as well as
 in resolution, so neither ordering is a clean resolution contrast. Open-Meteo's archive stitches
@@ -510,7 +509,7 @@ against the German weather service's own files. ICON-D2 therefore beats UKV whil
 further ahead than it, and the comparison is not analysis against analysis. And CAMS is a retrieval
 rather than a model, so its lead is nil and its win is partly a win for observing cloud rather than
 simulating it. Every measurement is
-of these four products on this fleet, and none has been shown to hold for every product at those
+of these six products on this fleet, and none has been shown to hold for every product at those
 resolutions.
 
 **ICON-D2 reaches only the eastern half of NGED's licence area, so its score is not a licence-wide
