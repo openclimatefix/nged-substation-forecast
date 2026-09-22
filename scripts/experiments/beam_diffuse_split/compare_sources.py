@@ -14,7 +14,7 @@ source's own rows, so a difference that survives here is still a difference betw
 rather than between two grids alone. That confound cannot be removed without refitting one source on
 the other's rows, which is not what any of the arms are for.
 
-Run it with `uv run --no-project --with polars --with numpy --with xgboost python
+Run it with `uv run --no-project --with polars --with numpy --with xgboost --with pvlib python
 scripts/experiments/beam_diffuse_split/compare_sources.py --alignment shifted`.
 """
 

@@ -54,6 +54,7 @@ separation model's estimate of the same split, says what the *published field* b
 | `run_physics_experiment.py` | The physical instrument: fits five parameters per site per training fold and scores the held-out fold, on the same rows and folds. |
 | `report_results.py` | Prints the markdown tables the write-up quotes, so no number is transcribed by hand. Takes `--instrument`. |
 | `compare_sources.py` | Compares two sources on the hours they both cover, which the per-source tables cannot do. |
+| `fractions_skill_score.py` | Rescores the stored forecasts with a timing-tolerant metric, at tolerances of 0 to 4 hours. |
 | `elevation_breakdown.py` | Splits the headline contrast by solar elevation, to separate an amplified error from a missing one. |
 | `make_chart.py` | Draws the anonymised result chart. Raises on a results directory naming a source its label table does not, rather than drawing a chart that looks complete with an arm missing. |
 | `sky_conditions.py` | Splits the headline contrast by clearness index, which tests whether the gain sits where cloud makes the split uncertain — the shape the information account predicts and a calibration difference would not. |
