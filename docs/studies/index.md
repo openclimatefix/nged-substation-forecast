@@ -6,9 +6,9 @@ survives the code that produced it. It complements the other sections:
 explains the *methods*, the [roadmap](../roadmap/index.md) says what we plan to build, and
 [architecture](../architecture/overview.md) documents what is already built.
 
-**A page lands here when an experiment answers a question that outlives its code.** The code behind
-a page here is deliberately lighter than production code — no Dagster asset, no package, no data
-contract — and lives in
+**A page lands here when a study answers a question that outlives its code.** The code behind a page
+here is deliberately lighter than production code — no Dagster asset, no data contract, and no
+maintenance promise — and lives in
 [`studies/`](https://github.com/openclimatefix/nged-substation-forecast/tree/main/studies),
 which merges so that the measurement can be audited and re-run. What the project keeps is the
 answer, which is why each page states its numbers, the checks the result survived, and the limits on

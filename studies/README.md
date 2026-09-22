@@ -1,48 +1,62 @@
-# Experiments
+# Studies
 
 **Code in this directory is held to a lower standard than the rest of the repository, and it is
-kept anyway because the findings it produced are cited elsewhere.** An experiment answers a
-question once. The answer goes into `docs/`, and a reader who doubts the answer needs the code that
-produced it, so the code stays where they can find and re-run it.
+kept anyway because the findings it produced are cited elsewhere.** A study answers a question once.
+The answer goes into `docs/`, and a reader who doubts the answer needs the code that produced it, so
+the code stays where they can find and re-run it.
+
+**"Study" rather than "experiment", because `experiment` already names a column.** `PowerForecast`
+carries `experiment_name` and `ml_flow_experiment_id`, and the forecasts Delta table is partitioned
+by `experiment_name`, so in this repository an experiment is one MLflow-tracked run of the
+production pipeline. A study of whether a weather product's published field carries information is a
+different kind of thing.
 
 ## What this tier promises, and what it does not
 
 | | `packages/` and `src/` | `studies/` |
 |---|---|---|
 | Runs in production | yes | never |
-| Has tests | yes | no |
+| Has tests | yes | the machinery does, the study does not |
 | Maintained as the repository changes | yes | no |
 | Backwards compatibility | within reason | none |
 | Linted by CI | yes | yes |
 | Validated against a Patito contract | yes | no |
 
-The one column that matches is the linting, because a script nobody can read is no more auditable
+**The tested half is `packages/studies/`, and the split is deliberate.** A study's arms, charts and
+write-up answer one question and are then done, so tests on them would have no second reader. The
+machinery those arms call is different: it is used by every arm, it will be used by the next study,
+and its failures are silent — a centred rolling window off by one step, a timestamp assigned to the
+wrong hour, a site label derived two different ways. Code moves into `packages/studies/` when a
+study has already got it wrong once, or when getting it wrong would produce a plausible-looking
+number rather than an error.
+
+The other column that matches is the linting, because a script nobody can read is no more auditable
 than a script nobody kept. Everything else is deliberately weaker.
 
-**The rule that earns an experiment its place: an experiment whose findings reach `docs/` has to
-merge.** A page on `main` citing a number that only an unmerged branch reproduces is an unverifiable
-claim. Merging the code is what keeps the claim checkable, and it is the whole of the argument for
-this directory existing.
+**The rule that earns a study its place: a study whose findings reach `docs/` has to merge.** A page
+on `main` citing a number that only an unmerged branch reproduces is an unverifiable claim. Merging
+the code is what keeps the claim checkable, and it is the whole of the argument for this directory
+existing.
 
-**An experiment that produced nothing worth citing does not belong here.** Delete it, or leave it
-on a branch. The directory is not an attic.
+**A study that produced nothing worth citing does not belong here.** Delete it, or leave it on a
+branch. The directory is not an attic.
 
 ## What to expect when reading one
 
-- **Nothing here is imported by production code.** No experiment adds a package, touches a Patito
-  contract, or enters the Dagster asset graph. An experiment that needs to do any of those has
-  stopped being an experiment.
-- **Paths may have rotted.** Each experiment reads its data from the directory
-  `DATA_PATH_INTERNAL` names, the same variable `contracts.Settings` reads, but the downloads
-  themselves are not in version control and a data directory that has been cleaned out will not
-  refill itself.
-- **A run command in a module docstring is the tested way to run that script.** Each one names its
-  own dependencies, because these scripts run under `uv run --no-project` rather than against the
-  workspace environment.
-- **Read the experiment's own README first.** Each directory has one, covering what the experiment
-  measured, what the arms are, and which readings the result does not support.
+- **Nothing here is imported by production code.** No study touches a Patito contract or enters the
+  Dagster asset graph, and nothing in `src/` or in any package other than `packages/studies/`
+  imports one. A study that needs to do any of that has stopped being a study.
+- **Paths may have rotted.** Each study reads its data from `data/studies/<name>/`, under the
+  directory `DATA_PATH_INTERNAL` names — the same variable `contracts.Settings` reads. The downloads
+  themselves are not in version control, and a data directory that has been cleaned out will not
+  refill itself. `data/NGED/` and `data/NWP/` are the pipeline's own, and a study reads them rather
+  than writing to them.
+- **A run command in a module docstring is the tested way to run that script.** Each one runs
+  against the workspace environment, and names with `--with` only what the lockfile does not carry.
+- **Read the study's own README first.** Each directory has one, covering what the study measured,
+  what the arms are, and which readings the result does not support.
 
-## The experiments
+## The studies
 
 | Directory | Question it answered | Where the answer lives |
 |---|---|---|

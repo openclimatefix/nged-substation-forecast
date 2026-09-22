@@ -28,13 +28,12 @@ So the arms are built around two contrasts. Everything measured against arm A sa
 *transposition* buys. The arm given the product's split, measured against the arm given a
 separation model's estimate of the same split, says what the *published field* buys on top.
 
-## Four sources, two instruments, two stamp alignments
+## Four sources and two instruments
 
 | Dimension | Values | What changing it tests |
 |---|---|---|
 | Source | Copernicus ERA5, Open-Meteo's ERA5 mirror, the Met Office's UKV, CAMS radiation service | Whether an answer from ERA5's 31 km grid survives a finer grid. UKV separates resolution from delivery, because ERA5 against UKV is a resolution contrast inside one product class where ERA5 against CAMS also crosses from a model to a satellite retrieval |
 | Instrument | XGBoost, a fitted five-parameter PV model | Whether a null result means the split carries nothing or that the tree could not use it |
-| Stamp alignment | as-labelled, shifted 30 minutes earlier | Whether the answer depends on a timestamp convention the power feed may have got wrong |
 
 ## The scripts, in the order they run
 
@@ -48,7 +47,7 @@ separation model's estimate of the same split, says what the *published field* b
 | `sources.py` | The source names, which sources are delivered per site, and the registry of Open-Meteo models this experiment can fetch. Standard library only, so every script here can import it, including the two that run on `polars` alone. |
 | `fetch_open_meteo_point.py` | Downloads one Open-Meteo forecast model at each meter's own coordinates, and runs two checks on what arrived before writing it: that the hourly column is a backward mean over the hour ending at its label, and that the published direct fraction is not a separation model. Takes `--model`. |
 | `verify_ukv_lineage.py` | Compares Open-Meteo's UKV against the Met Office's own files on AWS and establishes which forecast lead the archive holds. A gate: no model is trained on UKV until it has run. |
-| `build_dataset.py` | Joins the PV power readings to one source, adds solar geometry, the separation-model estimates and the synthetic control target, and writes the one frame every arm reads. Takes `--source` and `--alignment`. |
+| `build_dataset.py` | Joins the PV power readings to one source, adds solar geometry, the separation-model estimates and the synthetic control target, and writes the one frame every arm reads. Takes `--source`. |
 | `run_experiment.py` | The XGBoost instrument: fits every arm at every fold, seed and hyperparameter setting, and writes per-row losses, per-site metrics and bootstrap intervals. |
 | `physics_model.py` | The transposition and the temperature-corrected power curve the second instrument fits. |
 | `run_physics_experiment.py` | The physical instrument: fits five parameters per site per training fold and scores the held-out fold, on the same rows and folds. |
@@ -181,21 +180,14 @@ metrics](https://openclimatefix.github.io/nged-substation-forecast/techniques/ev
 The score needs no refit: `run_experiment.py` writes `signed_error_capped_mw` as `capped_point -
 actual`, so adding the metered power back recovers each arm's capped point forecast exactly.
 
-**A centred rolling window is easy to get wrong by one step, so the implementation was driven with
-forecasts whose right answer is known.** One site, 30 days, a 3-hour spike each day, scored against
-a threshold the spike clears:
-
-| Forecast | ±0h | ±1h | ±2h | ±4h |
-|---|---|---|---|---|
-| Identical to the observation | 1.000 | 1.000 | 1.000 | 1.000 |
-| The observation, 1 hour late | 0.667 | 0.842 | 0.919 | 0.959 |
-| The observation, 3 hours late | 0.000 | 0.211 | 0.486 | 0.741 |
-| Never predicts a spike | 0.000 | 0.000 | 0.000 | 0.000 |
-
-The last row is the control the other three are read against: **widening the window must not rescue
-a forecast that never predicts the event**, or every recovery along a row would be the window
-inflating the score rather than the score crediting timing. The second row is the double penalty as
-a single number — perfect magnitude, 1 hour late, scores 0.667 against a point-in-time 1.000.
+**A centred rolling window is easy to get wrong by one step, so the score is driven with forecasts
+whose right answer is known.** One site, 30 days, a 3-hour spike each day, scored against a
+threshold the spike clears: a forecast identical to the observation, one an hour late, one three
+hours late, and one that never predicts a spike. The four cases live in
+`packages/studies/tests/test_fractions_skill_score.py`, which asserts the score at four tolerances
+for each. The last is the control the other three are read against — widening the window must not
+rescue a forecast that never predicts the event, or every recovery along a row would be the window
+inflating the score rather than the score crediting timing.
 
 **The score's verdict on the published split depends on which threshold it is read at, so it is
 reported as a sweep rather than a number.** Taking the headline contrast at each site's 75th, 90th,
@@ -313,8 +305,8 @@ on the product.
 
 **Report by upgrade era, and treat the post-upgrade era as the one production would use.** The
 caveats are that 8 months is a thin sample beside 47, that these 8 months are a single winter and
-spring rather than a full year, and that the piecewise power-stamp shift falls inside the
-post-upgrade window — though the step appears in 2026-02, before that shift. One upgrade moved this
+spring rather than a full year, and that NGED's own correction to the power stamps falls inside the
+post-upgrade window — though the step appears in 2026-02, before that correction. One upgrade moved this
 product's value by a factor of five and a half, so a production ingest of UKV should score
 continuously rather than trust a figure measured once.
 
