@@ -20,26 +20,23 @@ Run it with `uv run --no-project` plus `--with polars --with numpy --with altair
 """
 
 import logging
-import sys
 from pathlib import Path
 from typing import Final, Literal
 
 import altair as alt
 import numpy as np
-import polars as pl
-from sources import REPO_DATA_DIR
-
-sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "packages" / "plotting" / "src"))
 
 # Importing the theme module registers and enables the OCF Altair theme as a side effect.
 import plotting.ocf_theme as ocf
+import polars as pl
+from build_dataset import _pv_sites
+from sources import REPO_DATA_DIR
+from studies.anonymise import site_labels_for
 
 _LOG: Final[logging.Logger] = logging.getLogger("site_e_commissioning")
 
 FIGURES_DIR: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_figures"
 
-SITE_IDS: Final[dict[int, str]] = {31: "A", 22: "B", 30: "C", 29: "D", 23: "E", 21: "F"}
-"""NGED's `time_series_id` for each photovoltaic site, mapped to its anonymous label."""
 
 SUBJECT: Final[str] = "E"
 """The site whose commissioning this figure traces."""
@@ -124,14 +121,18 @@ def _half_hourly_gain() -> pl.DataFrame:
         .agg(pl.col("effective_capacity_mw").last())
         .collect()
     )
+    # Derived rather than written down, so this figure cannot label a generator differently from
+    # the frames the arms are scored on. `_pv_sites` is the one roster query, and `site_labels_for`
+    # the one shuffle over it.
+    site_ids = site_labels_for(eligible_ids=_pv_sites()["time_series_id"].to_list())
     power = (
         pl.scan_delta(str(REPO_DATA_DIR / "NGED" / "power_time_series.delta"))
-        .filter(pl.col("time_series_id").is_in(list(SITE_IDS)))
+        .filter(pl.col("time_series_id").is_in(list(site_ids)))
         .select("time_series_id", "time", "power")
         .collect()
         .join(capacity, on="time_series_id")
         .with_columns(
-            site=pl.col("time_series_id").replace_strict(SITE_IDS),
+            site=pl.col("time_series_id").replace_strict(site_ids),
             capacity_factor=pl.col("power") / pl.col("effective_capacity_mw"),
         )
     )

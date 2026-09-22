@@ -48,6 +48,7 @@ from sources import (
     SourceType,
     point_output_path_for,
 )
+from studies.anonymise import SITE_LABELS, site_labels_for
 from studies.power import hourly_from_half_hourly
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -191,24 +192,6 @@ ratio of two vanishing quantities is numerical noise.
 JOULES_PER_HOUR_TO_WATTS: Final[float] = 3600.0
 KELVIN_TO_CELSIUS_OFFSET: Final[float] = 273.15
 SOLAR_CONSTANT_W_M2: Final[float] = 1361.0
-
-SITE_LABELS: Final[tuple[str, ...]] = ("A", "B", "C", "D", "E", "F")
-"""Anonymous site labels.
-
-These metered generators' output is commercially sensitive, so nothing downstream of this script
-ever sees a `time_series_id`, a site name or a coordinate.
-"""
-
-LABEL_PERMUTATION_SEED: Final[int] = 784
-"""Seed for the shuffle that assigns `SITE_LABELS` to sites.
-
-Assigning labels in `time_series_id` order would put the mapping one sort away for anyone who
-holds NGED's own roster and reads a published per-site table. The shuffle removes that sort, and
-nothing more: the seed and the shuffle both sit in this public file, so a roster-holder who runs
-`_pv_sites` reproduces the mapping exactly. **What protects the mapping is that the roster is
-private, not that the labels are shuffled.** The seed is fixed so a re-run reproduces the same
-labels.
-"""
 
 
 def _read_era5(*, source: SourceType) -> pl.DataFrame:
@@ -393,11 +376,10 @@ def _pv_sites() -> pl.DataFrame:
         .filter(pl.col("n_rows") >= min_rows)
         .sort("time_series_id")
     )
-    if sites.height != len(SITE_LABELS):
-        msg = f"expected {len(SITE_LABELS)} usable PV sites, found {sites.height}"
-        raise ValueError(msg)
-    shuffled = np.random.default_rng(LABEL_PERMUTATION_SEED).permutation(list(SITE_LABELS))
-    return sites.with_columns(site=pl.Series(shuffled, dtype=pl.Utf8)).drop("n_rows")
+    labels = site_labels_for(eligible_ids=sites["time_series_id"].to_list())
+    return sites.with_columns(
+        site=pl.col("time_series_id").replace_strict(labels, return_dtype=pl.Utf8)
+    ).drop("n_rows")
 
 
 def _hourly_power(*, sites: pl.DataFrame) -> pl.DataFrame:
