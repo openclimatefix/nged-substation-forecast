@@ -16,7 +16,7 @@ from typing import Final, Literal, NamedTuple
 
 from contracts.settings import PROJECT_ROOT
 
-SourceType = Literal["cds", "open-meteo", "cams", "ukv", "icon-d2"]
+SourceType = Literal["cds", "open-meteo", "cams", "ukv", "icon-d2", "icon-eu", "icon-global"]
 """Which irradiance download to build from.
 
 `open-meteo` is the reanalysis route the experiment runs on, because it serves the same fields in
@@ -43,15 +43,33 @@ about grid spacing rather than about one centre's radiation scheme. Its own radi
 accumulated where UKV's is instantaneous, so Open-Meteo reaches the hourly column by
 de-accumulation rather than by reconstruction.
 
-Each of `cams`, `ukv`, and `icon-d2` takes its air temperature from the Open-Meteo ERA5 frame,
-because the temperature feature is shared by every arm and a source must differ from ERA5 only in
-its irradiance columns.
+`icon-eu` and `icon-global` are the same German modelling system on wider domains: about 7 km over
+Europe and about 11 km worldwide. ICON-D2's domain stops around 2.5°W, so it excludes South West
+England and South Wales, and a forecast for the whole of Great Britain has to use one of these two.
+
+Each of `cams`, `ukv`, `icon-d2`, `icon-eu`, and `icon-global` takes its air temperature from the
+Open-Meteo ERA5 frame, because the temperature feature is shared by every arm and a source must
+differ from ERA5 only in its irradiance columns.
 """
 
-SOURCE_CHOICES: Final[tuple[SourceType, ...]] = ("cds", "open-meteo", "cams", "ukv", "icon-d2")
+SOURCE_CHOICES: Final[tuple[SourceType, ...]] = (
+    "cds",
+    "open-meteo",
+    "cams",
+    "ukv",
+    "icon-d2",
+    "icon-eu",
+    "icon-global",
+)
 """Every source name, as `argparse` `choices` for the scripts that take `--source`."""
 
-PER_SITE_SOURCES: Final[tuple[SourceType, ...]] = ("cams", "ukv", "icon-d2")
+PER_SITE_SOURCES: Final[tuple[SourceType, ...]] = (
+    "cams",
+    "ukv",
+    "icon-d2",
+    "icon-eu",
+    "icon-global",
+)
 """Sources downloaded at each meter's own coordinates rather than on the ERA5 grid.
 
 A build from one of these still reads the gridded ERA5 frame, for the air temperature every arm
@@ -81,6 +99,21 @@ the same temporal object as ERA5's hourly integral, as the CAMS hourly integrati
 period-ending hourly mean of metered power the experiment predicts, which is why it is the primary.
 `instant` is the snapshot at the label, half an hour later than that window's centre, and exists so
 the sensitivity can be measured rather than argued about.
+"""
+
+
+ICON_WIDE_DOMAIN_ARCHIVE_STARTS: Final[str] = "2022-11-23"
+"""The first day ICON-EU and ICON global carry real values in Open-Meteo's archive.
+
+**The archive accepts earlier dates than it can serve.** Requests back to 2016-01-01 return HTTP 200
+with `shortwave_radiation` null throughout, and bisecting the dates put the first day with values
+at 2022-11-23 for both models. The fetcher drops null rows, so a start date taken from the range the
+API accepts would ask for six years of nothing rather than fail.
+
+Both models are `accumulated` for the same reason ICON-D2 is: Open-Meteo reads every ICON domain
+through one downloader, `DownloadIconCommand`, which de-averages a field according to its GRIB
+step type, and DWD publishes the surface radiation of every domain as an average since the run
+started.
 """
 
 
@@ -117,6 +150,20 @@ OPEN_METEO_MODELS: Final[dict[str, OpenMeteoModel]] = {
         source="icon-d2",
         models_parameter="icon_d2",
         archive_starts="2022-12-01",
+        live_ingest_starts=None,
+        native_radiation="accumulated",
+    ),
+    "icon-eu": OpenMeteoModel(
+        source="icon-eu",
+        models_parameter="icon_eu",
+        archive_starts=ICON_WIDE_DOMAIN_ARCHIVE_STARTS,
+        live_ingest_starts=None,
+        native_radiation="accumulated",
+    ),
+    "icon-global": OpenMeteoModel(
+        source="icon-global",
+        models_parameter="icon_global",
+        archive_starts=ICON_WIDE_DOMAIN_ARCHIVE_STARTS,
         live_ingest_starts=None,
         native_radiation="accumulated",
     ),
