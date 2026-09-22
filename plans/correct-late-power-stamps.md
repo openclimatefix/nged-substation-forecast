@@ -387,3 +387,42 @@ gapless half-hourly grid (the lag features are a time-keyed left join, the rolli
 `rolling_mean_by`, eligibility reads only `first_time`/`last_time`, and capacity is a quantile);
 that no new fail-closed path is introduced and no warning path can raise; and that
 `tests/test_assets.py:346` is the only asserted `time` value in the repo that moves.
+
+
+## What the first diff review changed, and what was rejected
+
+The first diff review found **no correctness defect**. It verified the dtype at the call site (the
+`when/then` compares against a timezone-aware constant, and a naive or differently-zoned column
+would raise rather than coerce silently), the exclusive boundary, that a 30-minute shift maps the
+:00/:30 grid onto itself, that a null `time` passes through unchanged, and that no corrected key can
+meet an uncorrected one. Its findings were all about size, and all taken:
+
+- **One of the two new contract tests was redundant.** `correct_late_timestamps` cannot see
+  `time_series_id`, so "two series at once" tested nothing, and the value assertions duplicated the
+  parametrised test. That `validate` passes across the boundary is already proved on the real
+  pipeline by `test_extract_power_time_series_corrects_late_timestamps`, which ends in
+  `PowerTimeSeries.validate`. Deleting it also removed the reason for widening `_frame` to
+  `Sequence`, and two module-level fixtures.
+- **The `after_stays` parametrised case was subsumed** by `instant_stays`: any monotone threshold
+  mutation that moves 09:00 also moves 08:30.
+- **The contracts README restated the method docstring**, and `docs/api/contracts/index.md` renders
+  both within one screen — the rule at `docs/architecture/code-style.md:207`. Cut to one sentence.
+- **Prose cuts taken**: the constant docstring's three enumerated measurements (the linked page
+  holds them), "The order is not cosmetic:" as an announcing clause, the gap paragraph's argument
+  about what the function deliberately does not do, the `time` field description's restating trailing
+  clause, the call-site comment's first sentence, and the asset docstring's restating sentence.
+- **A false claim in a test docstring.** `MIN_PLAUSIBLE_DATETIME` is not the only `endTime` that is
+  in range before the correction and out of range after it — `MIN + 15 min` is too. It is the only
+  one that *distinguishes the two orderings*, because a misaligned reading is dropped either way.
+- **An incomplete rename and a broken wrap.** "Stamp" survived in the beam/diffuse results table, in
+  `capacity-estimation.md` and in `disaggregation.md`; and an earlier edit had left "two" orphaned on
+  its own line.
+
+**One finding rejected, and one referred rather than applied.** The review proposed cutting the
+clause in `data-cleaning.md` explaining that the rows-per-day and exact-zero signals are
+generation-only — accepted, because the docs page never makes the claim that clause rebuts, so a
+first-time reader has nothing to hang it on. It also observed that the section's design rationale
+sits on a `docs/roadmap/` page marked Planned, when `docs/architecture/` is where CLAUDE.md puts
+rationale for shipped behaviour — and that `code-style.md` forbids code linking to a roadmap page,
+which is why the docstrings carry the fleet-wide argument themselves rather than linking. That is a
+real structural observation and a larger change than this issue, so it is reported rather than made.

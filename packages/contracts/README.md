@@ -130,10 +130,8 @@ for the "bouncing off zero" behaviour apparent-power metering produces.
   relaxed, because those indicate a bug in our own pipeline rather than malformed external data.
 - **Repair a known upstream fault at the same boundary**:
   `PowerTimeSeries.correct_late_timestamps()` moves every reading NGED stamped before
-  `POWER_TIMESTAMPS_CORRECTED_BEFORE` 30 minutes earlier, because their feed ran half an hour late
-  until they corrected it. It runs in `nged_data.read_nged_json` immediately before
-  `drop_implausible_rows()`, so that a reading is judged on the timestamp that will actually be
-  stored. Correcting at the boundary is what lets `time` mean one thing for the whole table.
+  `POWER_TIMESTAMPS_CORRECTED_BEFORE` 30 minutes earlier; its docstring says why it runs before
+  `drop_implausible_rows()`.
 - **No lookahead bias**: `AllFeatures` carries `power_fcst_init_time` (when we make the forecast) as
   a distinct field from `nwp_init_time` (when the NWP model ran). Power lag features are nullified
   by `_nullify_leaky_lags()` when the lag is shorter than or equal to the forecast lead time — the

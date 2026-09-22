@@ -57,10 +57,7 @@ maintenance route for this table.
 **The correction applies to every series, on a mechanism rather than on a measurement.** NGED
 convert every series in the trial area through one code path, so no series can have escaped the
 fault. The three measurements cover the six metered solar farms alone, because each needs solar
-geometry that a substation load profile has no equivalent of — and the two signals that look
-fleet-wide are not: only the generation series drop from 48 published rows a day to about 24, and
-only the generation series stop publishing exact zeros, both being NGED ceasing to pad a
-generator's overnight hours.
+geometry that a substation load profile has no equivalent of.
 
 **A corrected series carries no reading at 08:00 on 26 March 2026.** The last late reading is
 stamped 08:00 and moves to 07:30, while the first correct reading is stamped 08:30, so NGED never

@@ -1,4 +1,3 @@
-from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
 
@@ -173,7 +172,7 @@ _OUT_OF_RANGE = datetime(1840, 6, 1, 0, 30, tzinfo=UTC)
 _MISALIGNED = datetime(2026, 1, 1, 0, 15, tzinfo=UTC)
 
 
-def _frame(times: Sequence[datetime | None]) -> pl.DataFrame:
+def _frame(times: list[datetime | None]) -> pl.DataFrame:
     """A `PowerTimeSeries`-shaped frame carrying `times`, cast but not yet validated."""
     return pl.DataFrame(
         {
@@ -226,22 +225,16 @@ def test_drop_implausible_rows_leaves_a_validatable_frame() -> None:
     PowerTimeSeries.validate(survivors)
 
 
-_LATE = datetime(2026, 3, 26, 8, 0, tzinfo=UTC)
-"""The last reading NGED stamped late: the half-hour it describes ends 30 minutes earlier."""
-
-_FIRST_CORRECT = POWER_TIMESTAMPS_CORRECTED_BEFORE
-"""The first reading NGED stamped correctly, so `correct_late_timestamps` must leave it alone."""
-
-
 @pytest.mark.parametrize(
     ("time", "expected"),
     [
-        pytest.param(_LATE, datetime(2026, 3, 26, 7, 30, tzinfo=UTC), id="before_moves_back"),
-        pytest.param(_FIRST_CORRECT, _FIRST_CORRECT, id="on_the_instant_stays"),
         pytest.param(
-            datetime(2026, 3, 26, 9, 0, tzinfo=UTC),
-            datetime(2026, 3, 26, 9, 0, tzinfo=UTC),
-            id="after_stays",
+            datetime(2026, 3, 26, 8, 0, tzinfo=UTC),
+            datetime(2026, 3, 26, 7, 30, tzinfo=UTC),
+            id="before_moves_back",
+        ),
+        pytest.param(
+            POWER_TIMESTAMPS_CORRECTED_BEFORE, POWER_TIMESTAMPS_CORRECTED_BEFORE, id="instant_stays"
         ),
     ],
 )
@@ -256,27 +249,3 @@ def test_correct_late_timestamps_moves_only_the_late_readings(
     corrected = PowerTimeSeries.correct_late_timestamps(_frame([time]))
 
     assert corrected["time"].to_list() == [expected]
-
-
-def test_correct_late_timestamps_leaves_a_validatable_frame() -> None:
-    """A frame spanning the correction still validates, for two series at once.
-
-    `validate` is what enforces uniqueness and sortedness, so this is what would catch a correction
-    that shifted the wrong side of the boundary or shifted by the wrong sign.
-    """
-    times = [_LATE, _FIRST_CORRECT]
-    two_series = pl.concat(
-        [_frame(times), _frame(times).with_columns(time_series_id=pl.lit(456, dtype=pl.Int32))]
-    )
-
-    corrected = PowerTimeSeries.correct_late_timestamps(two_series)
-
-    assert (
-        corrected["time"].to_list()
-        == [
-            datetime(2026, 3, 26, 7, 30, tzinfo=UTC),
-            _FIRST_CORRECT,
-        ]
-        * 2
-    )
-    PowerTimeSeries.validate(corrected)

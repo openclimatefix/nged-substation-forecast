@@ -630,7 +630,7 @@ arguments for [candidate B](#candidate-b-the-differentiable-physics-estimator) a
 listed there — fitted posteriors, fleet-wide shared terms, and continuity with v2 — and not that a
 single site's PV parameters are hard to recover.
 
-**A half-hour timestamp error is absorbed into the fitted azimuth, so pin the stamp convention
+**A half-hour timestamp error is absorbed into the fitted azimuth, so pin the timestamp convention
 before trusting a fitted orientation or the capacity that comes with it.** The same model fitted on
 the same rows moves its fitted azimuth by about 35 degrees when the timestamps are shifted by one
 half-hour, which is a quarter of the range a GB array's orientation can plausibly occupy, from a

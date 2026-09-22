@@ -881,7 +881,7 @@ a clock fault shared by the two would be the only thing aligning them at a non-z
 |---|---|---|---|
 | Centroid of a clear day's output, weighted by power, minutes after solar noon | +43.6 | +14.1 | +15 |
 | Generating-window midpoint, minutes after solar noon | +45 to +47 | +13 to +14 | +15 |
-| Stamp shift maximising the correlation with satellite irradiance | −30 min at all six meters | 0 min at all six meters | 0 min |
+| Timestamp shift maximising the correlation with satellite irradiance | −30 min at all six meters | 0 min at all six meters | 0 min |
 
 The centroid row rests on 795 clear site-days before the correction and 125 after, and its per-site
 medians span +40.9 to +45.2 before and +10.8 to +15.9 after. The generating-window row holds as the
@@ -976,8 +976,7 @@ would have to make the same call.
 **An independent sign agrees, and reading it needs both clocks kept straight.** The operator's event
 log was never mis-stamped, while [the power feed ran half an hour
 late](#the-power-timestamps-before-26-march-2026-are-half-an-hour-late) until March 2026, so the
-two
-have to be compared on the corrected clock. Corrected, site E reads zero from 08:00 until the
+two have to be compared on the corrected clock. Corrected, site E reads zero from 08:00 until the
 half-hour ending 14:30 on 6 August 2024 while the other five farms climb to 29% of capacity, and the
 operator raises the cap from zero to 0.25 MW at 13:35 UTC and to the connection limit at 15:16. That
 is the shape of a commissioning test rather than of a curtailment.

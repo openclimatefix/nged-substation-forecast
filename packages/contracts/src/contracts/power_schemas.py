@@ -35,16 +35,13 @@ POWER_TIMESTAMPS_CORRECTED_BEFORE: Final[datetime] = datetime(2026, 3, 26, 8, 30
 
 A reading NGED stamps `T` before this instant is the mean over `(T - 60 min, T - 30 min]`, not the
 `(T - 30 min, T]` the `time` field states. NGED reported the fault and corrected the feed at this
-instant, and three independent measurements agree with their account: the power-weighted centroid of
-a clear day's output steps from 45 minutes after solar noon to 15 minutes, the generating window's
-midpoint steps the same way, and the stamp shift maximising the correlation with satellite
-irradiance steps from -30 minutes to zero. The evidence is at
+instant, and three independent measurements agree with their account:
 <https://openclimatefix.github.io/nged-substation-forecast/results/beam-diffuse-split/#the-power-timestamps-before-26-march-2026-are-half-an-hour-late>.
 
 The correction applies to every `time_series_id`, because NGED convert every series in the trial
-area through one code path, so no series can have escaped the fault. The measurements above cover
-the six metered solar farms only: they need solar geometry, which a substation load profile has no
-equivalent of.
+area through one code path, so no series can have escaped the fault. The published measurements
+cover the six metered solar farms only: they need solar geometry, which a substation load profile
+has no equivalent of.
 """
 
 
@@ -59,8 +56,7 @@ class PowerTimeSeries(pt.Model):
             "End time of the 30-minute observation period (all NGED data is already half-hourly)."
             " A value before `POWER_TIMESTAMPS_CORRECTED_BEFORE` is NGED's own timestamp moved 30"
             " minutes earlier by `correct_late_timestamps`, which repairs a known fault in their"
-            " feed at the ingestion boundary, so this column ends the observation period for every"
-            " row rather than only for rows NGED stamped correctly."
+            " feed at the ingestion boundary."
             f" Must fall between {MIN_PLAUSIBLE_DATETIME:%Y-%m-%d} and"
             f" {MAX_PLAUSIBLE_DATETIME:%Y-%m-%d} (enforced by `validate`, not by the field, because"
             " Patito ignores `ge`/`le` on datetime fields — see `check_datetime_bounds`)."
@@ -141,18 +137,16 @@ class PowerTimeSeries(pt.Model):
         from.
 
         Call this BEFORE ``drop_implausible_rows``, and only at a boundary that receives NGED's
-        raw JSON. The order is not cosmetic: ``drop_implausible_rows`` has to judge the timestamp
-        that will actually be stored. Reversed, a reading whose corrected timestamp falls outside
-        the plausible range survives the drop and then raises out of ``validate``, which turns one
-        malformed external reading into a failed ingest run — the outcome
-        ``drop_implausible_rows`` exists to prevent.
+        raw JSON. ``drop_implausible_rows`` has to judge the timestamp that will actually be
+        stored: reversed, a reading whose corrected timestamp falls outside the plausible range
+        survives the drop and then raises out of ``validate``, turning one malformed external
+        reading into a failed ingest run.
 
         The correction cannot collide with an existing row or disturb the sort order, because it
         shifts a contiguous prefix of each series by a constant and the shifted prefix ends 30
-        minutes before the unshifted remainder begins. It leaves the feed's one-reading gap at
-        ``POWER_TIMESTAMPS_CORRECTED_BEFORE - 30 min`` visible rather than filled: NGED never
-        published the half-hour ending there, and inventing a value would be worse than showing
-        the absence.
+        minutes before the unshifted remainder begins. A corrected series has no reading at
+        ``POWER_TIMESTAMPS_CORRECTED_BEFORE - 30 min``, because NGED never published that
+        half-hour.
 
         Args:
             dataframe: A frame with a `time` column already cast to ``UTC_DATETIME_DTYPE``; need

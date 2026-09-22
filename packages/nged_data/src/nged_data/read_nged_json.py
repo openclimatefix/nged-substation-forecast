@@ -90,8 +90,7 @@ def _extract_power_time_series(df: pl.DataFrame, time_series_id: int) -> Extract
         time=pl.col("time").str.to_datetime(time_zone="UTC")
     )
 
-    # Repair NGED's half-hour timestamp offset before anything judges or stores a `time`. See
-    # `correct_late_timestamps` for why this has to precede `drop_implausible_rows`.
+    # Must run before `drop_implausible_rows` — see `correct_late_timestamps`.
     time_series_df = PowerTimeSeries.correct_late_timestamps(time_series_df)
 
     time_series_df = time_series_df.with_columns(time_series_id=pl.lit(time_series_id))
