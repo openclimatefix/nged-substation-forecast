@@ -122,7 +122,7 @@ the feed is a *noisy label*, not ground truth — use it, but do not lean on it:
 
 **Ask for the raw export cap rather than a derived curtailment volume, and treat the cap as a
 constraint rather than as a label.** Joining both to six metered solar farms in the [beam/diffuse
-experiment](../results/beam-diffuse-split.md#one-site-is-curtailed-and-the-export-cap-is-what-makes-its-hours-scorable)
+experiment](../studies/beam-diffuse-split.md#one-site-is-curtailed-and-the-export-cap-is-what-makes-its-hours-scorable)
 found one of the six under active network management. Its cap sits at the connection limit for
 80.7% of the half-hours since the scheme went live, and on the bright hours where the cap never
 moved the site's yield matches the other five
@@ -604,7 +604,7 @@ Great Britain](disaggregation.md#correcting-satellite-irradiance-over-great-brit
 **A throw-away experiment on the six metered solar farms in the trial area fitted a five-parameter
 physical model per site, and several of its by-products bear directly on this plan.** The write-up
 is [Does a weather product's beam/diffuse split help a PV
-forecast?](../results/beam-diffuse-split.md); the code is in a pull request kept open for reference
+forecast?](../studies/beam-diffuse-split.md); the code is in a pull request kept open for reference
 rather than merged,
 [#785](https://github.com/openclimatefix/nged-substation-forecast/pull/785), answering [issue
 #784](https://github.com/openclimatefix/nged-substation-forecast/issues/784). None of it is a
@@ -635,7 +635,7 @@ before trusting a fitted orientation or the capacity that comes with it.** The s
 the same rows moves its fitted azimuth by about 35 degrees when the timestamps are shifted by one
 half-hour, which is a quarter of the range a GB array's orientation can plausibly occupy, from a
 30-minute change in what the timestamp means. The [power timestamps on this
-feed](../results/beam-diffuse-split.md#the-power-timestamps-before-26-march-2026-are-half-an-hour-late)
+feed](../studies/beam-diffuse-split.md#the-power-timestamps-before-26-march-2026-are-half-an-hour-late)
 were half an hour late until 08:30 UTC on 26 March 2026. Any estimator that fits orientation has
 the same exposure, and an orientation error feeds straight into the capacity it reports.
 
@@ -669,7 +669,7 @@ reading a constant.
 
 **A fixed-capacity model's signed error drifts by more than 6 points between neighbouring sites,
 which bounds how much capacity moved without estimating it.** The per-site, per-year drift table is
-[in the write-up](../results/beam-diffuse-split.md#what-the-per-site-error-drift-says-about-estimating-effective-capacity).
+[in the write-up](../studies/beam-diffuse-split.md#what-the-per-site-error-drift-says-about-estimating-effective-capacity).
 The drift appears on two independently-produced irradiance products and agrees between them to
 about half a point at the five longer-running sites, so it is in the power rather than in the
 weather. It remains an upper bound:

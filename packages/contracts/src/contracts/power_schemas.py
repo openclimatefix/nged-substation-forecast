@@ -40,7 +40,7 @@ fault stops, not a changepoint fitted from the readings. NGED's archive still ca
 timestamps: the earlier readings have not been republished. Three independent measurements are
 consistent with NGED's account — two against the sun's own position on a clear day, the third
 against satellite irradiance:
-<https://openclimatefix.github.io/nged-substation-forecast/results/beam-diffuse-split/#the-power-timestamps-before-26-march-2026-are-half-an-hour-late>.
+<https://openclimatefix.github.io/nged-substation-forecast/studies/beam-diffuse-split/#the-power-timestamps-before-26-march-2026-are-half-an-hour-late>.
 
 The repair applies to every `time_series_id`. NGED report that they convert every series in the
 trial area through one code path, so no series can have escaped the fault. That report is what the

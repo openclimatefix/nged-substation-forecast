@@ -82,9 +82,9 @@ nav:
       - "Why Dagster, not Airflow?": architecture/why-dagster-not-airflow.md
       - Code style: architecture/code-style.md
       - Testing: architecture/testing.md
-  - Results:
-      - Overview: results/index.md
-      - "Does a weather product's beam/diffuse split help a PV forecast?": results/beam-diffuse-split.md
+  - Studies:
+      - Overview: studies/index.md
+      - "Does a weather product's beam/diffuse split help a PV forecast?": studies/beam-diffuse-split.md
   - ML experimentation:
       - Overview: ml_experimentation/index.md
       - Model configuration: ml_experimentation/model-configuration.md

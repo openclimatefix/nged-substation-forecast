@@ -447,7 +447,7 @@ many site-level sawtooths, which makes $\delta$ easier to identify than $r_{\tex
 using any gradients, and three of its findings bear on the design sketched above.** Panel tilt,
 panel azimuth, capacity, an inverter clipping limit, and a temperature coefficient were fitted per
 site by a Powell optimiser. The write-up is [Does a weather product's
-beam/diffuse split help a PV forecast?](../results/beam-diffuse-split.md), and its scope is six
+beam/diffuse split help a PV forecast?](../studies/beam-diffuse-split.md), and its scope is six
 sites inside one 25 km by 23 km box in Lincolnshire over 2019 to 2026 — a measurement on this fleet
 rather than a general result about fitting PV models. The by-products that bear on estimating
 capacity rather than on this method, among them a half-hour timestamp error absorbed into the fitted
@@ -490,7 +490,7 @@ two beam fields reaches +0.56 percentage points below 10 degrees of solar elevat
 to +0.17 in the three elevation bands above it. Holding tilt and azimuth equal across the arms makes
 the disagreement larger rather than smaller, so the fitted geometry is not the cause — [the
 write-up's comparison of the two
-instruments](../results/beam-diffuse-split.md#the-physical-model-disagrees-and-is-not-a-second-opinion)
+instruments](../studies/beam-diffuse-split.md#the-physical-model-disagrees-and-is-not-a-second-opinion)
 carries those numbers. `DifferentiableSolarPlant` takes the direct normal irradiance as an input, so
 the division sits upstream of the sketch wherever a weather product publishes beam on the horizontal
 plane, and the sketch's own `clamp` is on the cosine of the angle of incidence, which is a different

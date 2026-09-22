@@ -517,7 +517,8 @@ cleaning delivered data, and it protects every subsequent experiment from learni
 
 **An hour in which the network operator capped a generator's export is an hour no weather feature
 can explain, so it belongs out of the training target for the same reason a stuck meter does.** A
-[flexible connection](../background/network.md#active-network-management-caps-what-a-generator-may-export)
+[flexible
+connection](../background/network.md#active-network-management-caps-what-a-generator-may-export)
 lets the operator turn a generator down when the local network fills, and that instruction leaves
 no signature in any irradiance or wind field. A model trained on those hours is penalised for
 failing to predict a network instruction, and has an incentive to learn whatever weather pattern
@@ -535,7 +536,7 @@ different question, and one for the serving path rather than the training loop.
 
 **Clamping a prediction to the export cap is fair when the cap is already on the record, and
 lookahead bias when the cap is still in the future.** The [beam/diffuse
-experiment](../results/beam-diffuse-split.md) scores `min(export cap, prediction)` at the one site
+experiment](../studies/beam-diffuse-split.md) scores `min(export cap, prediction)` at the one site
 under active network management. That experiment reads reanalysis and satellite irradiance for
 hours that have already happened, so the cap the operator set is as much a historical record as the
 weather is. Every arm in that experiment gets the same clamp, so the clamp cannot favour the arm
@@ -560,7 +561,7 @@ months while the generator exports normally — the hour counts and the yields a
 network management caps what a generator may
 export](../background/network.md#active-network-management-caps-what-a-generator-may-export).
 Masking on the raw feed would drop most of that site's early record as curtailed. The
-[beam/diffuse experiment](../results/beam-diffuse-split.md) honours the cap only from the first
+[beam/diffuse experiment](../studies/beam-diffuse-split.md) honours the cap only from the first
 half-hour at which it reaches the connection limit, which is a marker taken from the cap alone.
 
 ### Drop a generator's commissioning ramp from the training target
@@ -1288,6 +1289,58 @@ metrics](../techniques/evaluation-metrics.md#probabilistic-metrics) — spread-s
 (prediction interval coverage probability) — because what is being traded away is uncertainty
 structure, which NMAE cannot see. A result where quantile features match on NMAE and lose on
 spread-skill is the outcome that tells you the decomposition was doing real work.
+
+### Reduce the members after the power model, as well as before it
+
+**The quantile-features option above collapses the ensemble before the model sees it, this page's
+planned design pushes each member through the model and combines in power space, and which of the
+two wins changes with lead time.** A run against 6 metered solar generators scored four ways of
+turning 51 ECMWF ENS members into one power number, at five bands of lead hours. Averaging the
+irradiance and predicting once beat predicting per member and averaging the resulting power by 0.017
+MW at leads of 24 to 48 hours and by 0.030 MW at 48 to 72 hours, both intervals excluding zero. At
+336 to 360 hours the ordering reversed, by 0.023 MW, again excluding zero.
+
+**The crossover is bracketed rather than located.** The week-ahead band could not separate the two,
+with its point estimate still favouring averaging the irradiance first, so the sign change lies
+somewhere between three days and a fortnight. That overlaps the 3-to-10-day band this page focuses
+on without being pinned inside it, which is itself a reason to measure it rather than adopt a
+convention.
+
+**The shape of the power curve is what predicts a crossover.** Averaging inside a function and
+averaging outside it agree only where the function is close to straight over the range being
+averaged. At short lead the member spread is narrow, the fitted power curve is nearly straight
+across it, and averaging the irradiance first acts as a noise filter on 51 noisy estimates of the
+same weather. At long lead the spread is wide enough to reach the generator's output ceiling at one
+end — inverter clipping, or the export cap on the one generator of the six that has one — and the
+zero floor at night at the other, which is where the curve bends hardest. An averaged irradiance
+then describes no member's weather and implies a power the generator could not have produced.
+
+**Blend the two, weighted by the ensemble spread rather than by the lead time.** Lead time only
+stands in for spread, so a lookup table on lead time would mishandle an unusually uncertain
+day-ahead forecast and would not transfer to a horizon it was not fitted on. One weight fitted out
+of fold, as a function of the member spread normalised by capacity, is enough to find out whether a
+blend beats both endpoints. With 6 generators a stacking model would fit the noise rather than the
+crossover.
+
+**Include a spread-calibration arm, because neither endpoint is the right answer for mean absolute
+error.** The point forecast that minimises mean absolute error is the median of the predicted power
+distribution, and pushing every member through the model produces an empirical version of that
+distribution at no extra cost. Taking its median scored no better than taking its mean in the run
+above, and worse at the shortest band. That is consistent with the members being under-dispersed,
+since a median drawn from a too-narrow distribution is not the median that minimises the loss — but
+the run measured no spread against error, and it fitted a squared-error objective, so each member's
+prediction is itself an estimate of a conditional mean rather than of a median. Both explanations
+are open, and the calibration arm is what separates them.
+
+**How to evaluate.** Four arms on the same folds and population: the irradiance mean, the power
+mean, the spread-weighted blend, and the spread-calibrated median. Report normalised mean absolute
+error sliced by horizon, because the whole claim is that the ordering changes with horizon, and
+report the [probabilistic metrics](../techniques/evaluation-metrics.md#probabilistic-metrics)
+alongside it, because the calibration arm changes the spread on purpose. Three limits on the
+evidence above: it covers solar generators only, so nothing yet says where the crossover falls for
+wind; it was measured on 6 generators sharing one region's weather; and the run that produced it
+fitted a different objective and different cleaning from the rest of this page's experiments, so its
+absolute figures are not comparable with theirs.
 
 ### Several NWP sources as features (v2.1)
 

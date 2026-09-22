@@ -7,7 +7,7 @@ roughly 93% of the rows in our `power_time_series` Delta table that is false: th
 is the mean over `(T − 60 min, T − 30 min]`. Every model trained on that table has learnt a
 half-hour timing error, and the error is not uniform across the record. The measurement, and the
 three independent signals that pin the changepoint, are in the [beam/diffuse
-appendix](https://openclimatefix.github.io/nged-substation-forecast/results/beam-diffuse-split/#the-power-timestamps-before-26-march-2026-are-half-an-hour-late).
+appendix](https://openclimatefix.github.io/nged-substation-forecast/studies/beam-diffuse-split/#the-power-timestamps-before-26-march-2026-are-half-an-hour-late).
 
 **The planned solution.** Correct the stamps at the ingest boundary, in
 `read_nged_json.py`, following the `PowerTimeSeries.drop_implausible_rows` precedent that already

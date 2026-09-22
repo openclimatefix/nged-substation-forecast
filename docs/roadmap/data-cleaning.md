@@ -15,7 +15,7 @@ finding here is currently absorbed by the models rather than removed.
 ## A generator's commissioning ramp has to be cut, and one cut-off is already known
 
 **The site labelled E in the [beam/diffuse
-results](../results/beam-diffuse-split.md) produced less than its capacity record says until
+results](../studies/beam-diffuse-split.md) produced less than its capacity record says until
 6 October 2024, so rows before that date do not describe the plant that exists now.** The site
 climbed to its settled output through eight months of discrete steps, each held for days at a time —
 the step levels, the evidence and the figure are under [how a new solar farm reaches full output in
@@ -44,7 +44,7 @@ from the readings. Three independent measurements are consistent with it: two co
 output against the sun's own position, and the third compares the power against satellite
 irradiance. The evidence is in the
 [beam/diffuse
-appendix](../results/beam-diffuse-split.md#the-power-timestamps-before-26-march-2026-are-half-an-hour-late).
+appendix](../studies/beam-diffuse-split.md#the-power-timestamps-before-26-march-2026-are-half-an-hour-late).
 `PowerTimeSeries.correct_late_timestamps` applies the repair in `nged_data.read_nged_json`.
 `PowerTimeSeries.time` therefore marks the end of the observation period for every stored row.
 
