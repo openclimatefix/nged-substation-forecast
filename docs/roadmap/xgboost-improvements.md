@@ -535,7 +535,7 @@ different question, and one for the serving path rather than the training loop.
 
 **Clamping a prediction to the export cap is fair when the cap is already on the record, and
 lookahead bias when the cap is still in the future.** The [beam/diffuse
-experiment](../results/beam-diffuse-split.md) scores `min(export cap, prediction)` at the one site
+experiment](../studies/beam-diffuse-split.md) scores `min(export cap, prediction)` at the one site
 under active network management. That experiment reads reanalysis and satellite irradiance for
 hours that have already happened, so the cap the operator set is as much a historical record as the
 weather is. Every arm in that experiment gets the same clamp, so the clamp cannot favour the arm
@@ -560,7 +560,7 @@ months while the generator exports normally — the hour counts and the yields a
 network management caps what a generator may
 export](../background/network.md#active-network-management-caps-what-a-generator-may-export).
 Masking on the raw feed would drop most of that site's early record as curtailed. The
-[beam/diffuse experiment](../results/beam-diffuse-split.md) honours the cap only from the first
+[beam/diffuse experiment](../studies/beam-diffuse-split.md) honours the cap only from the first
 half-hour at which it reaches the connection limit, which is a marker taken from the cap alone.
 
 ### Drop a generator's commissioning ramp from the training target

@@ -15,7 +15,7 @@ than removed.
 ## A generator's commissioning ramp has to be cut, and one cut-off is already known
 
 **The site labelled E in the [beam/diffuse
-results](../results/beam-diffuse-split.md) produced less than its capacity record says until
+results](../studies/beam-diffuse-split.md) produced less than its capacity record says until
 6 October 2024, so rows before that date do not describe the plant that exists now.** The site
 climbed to its settled output through eight months of discrete steps, each held for days at a time —
 the step levels, the evidence and the figure are under [how a new solar farm reaches full output in

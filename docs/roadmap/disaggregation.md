@@ -152,7 +152,7 @@ giving the model the product's own beam field rather than a separation model's e
 same product's global irradiance cut error by about 1.5% relative. On a 31 km reanalysis it added
 nothing detectable. Both claims are about those two products on those six sites. The write-up is
 [Does a weather product's beam/diffuse split help a PV
-forecast?](../results/beam-diffuse-split.md), and the code sits in a pull request kept for reference
+forecast?](../studies/beam-diffuse-split.md), and the code sits in a pull request kept for reference
 rather than merged,
 [#785](https://github.com/openclimatefix/nged-substation-forecast/pull/785).
 
@@ -219,7 +219,7 @@ and a fitted physical model as a second one, and the two disagreed on the sign â
 model divides the horizontal beam by the cosine of the solar zenith angle, which magnifies a beam
 error without limit near the horizon, so the physical model answers a different question rather than
 confirming the tree's. [The write-up's comparison of the two
-instruments](../results/beam-diffuse-split.md#the-physical-model-disagrees-and-is-not-a-second-opinion)
+instruments](../studies/beam-diffuse-split.md#the-physical-model-disagrees-and-is-not-a-second-opinion)
 sets out how the fitted geometry was ruled out as the cause.
 
 ## The graph-structured engine
