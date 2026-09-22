@@ -31,14 +31,10 @@ import sys
 from typing import Final
 
 import polars as pl
-from run_experiment import (
-    _add_time_features,
-    _assign_folds,
-    _bootstrap_difference,
-    dataset_path_for,
-    results_dir_for,
-)
+from run_experiment import _add_time_features, dataset_path_for, results_dir_for
 from sources import SOURCE_CHOICES
+from studies.bootstrap import bootstrap_difference
+from studies.cross_validation import assign_folds
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("sky_conditions")
@@ -114,7 +110,7 @@ def main() -> int:
     losses = pl.read_parquet(results_dir / "per_row_losses.parquet").filter(
         (pl.col("setting") == "primary") & (pl.col("target") == "power_mw")
     )
-    dataset = _assign_folds(
+    dataset = assign_folds(
         dataset=_add_time_features(dataset=pl.read_parquet(dataset_path_for(source=source)))
     )
     binned = _binned(dataset=dataset)
@@ -141,7 +137,7 @@ def main() -> int:
         for treatment, reference in CONTRASTS:
             if scoped.filter(pl.col("arm") == treatment).is_empty():
                 continue
-            interval = _bootstrap_difference(
+            interval = bootstrap_difference(
                 losses=scoped,
                 treatment=treatment,
                 reference=reference,

@@ -4923,6 +4923,9 @@ dependencies = [
     { name = "numpy" },
     { name = "polars" },
     { name = "pvlib" },
+    { name = "pyproj" },
+    { name = "xarray" },
+    { name = "xgboost" },
 ]
 
 [package.dev-dependencies]
@@ -4936,6 +4939,9 @@ requires-dist = [
     { name = "numpy", specifier = ">=1.24" },
     { name = "polars", specifier = ">=1.38.1" },
     { name = "pvlib", specifier = ">=0.11.0" },
+    { name = "pyproj", specifier = ">=3.6.0" },
+    { name = "xarray", specifier = ">=2026.1.0" },
+    { name = "xgboost", specifier = ">=2.1.0" },
 ]
 
 [package.metadata.requires-dev]

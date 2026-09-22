@@ -29,9 +29,10 @@ import sys
 from typing import Final
 
 import polars as pl
-from run_experiment import _bootstrap_difference, dataset_path_for, results_dir_for
+from run_experiment import dataset_path_for, results_dir_for
 from run_physics_experiment import results_dir_for as physics_results_dir_for
 from sources import SOURCE_CHOICES
+from studies.bootstrap import bootstrap_difference
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("inverter_clipping")
@@ -198,7 +199,7 @@ def main() -> int:
             for treatment, reference in CONTRASTS:
                 if scoped.filter(pl.col("arm") == treatment).is_empty():
                     continue
-                interval = _bootstrap_difference(
+                interval = bootstrap_difference(
                     losses=scoped,
                     treatment=treatment,
                     reference=reference,

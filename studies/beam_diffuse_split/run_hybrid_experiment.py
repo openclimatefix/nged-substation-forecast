@@ -37,21 +37,21 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-import run_experiment
 from commissioning import drop_commissioning_ramp
 from export_cap import with_export_cap
 from run_experiment import (
-    N_FOLDS,
-    PRIMARY_HYPER_PARAMETERS,
+    SHARED_FEATURES,
+    Job,
     _add_time_features,
-    _assign_folds,
-    _bootstrap_difference,
     _run_all,
     dataset_path_for,
+    features_for,
     results_dir_for,
 )
 from run_physics_experiment import _fit, _predict
-from sources import SOURCE_CHOICES
+from sources import SOURCE_CHOICES, STUDY_DATA_DIR
+from studies.bootstrap import bootstrap_difference
+from studies.cross_validation import N_FOLDS, PRIMARY_HYPER_PARAMETERS, assign_folds
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("run_hybrid_experiment")
@@ -179,7 +179,7 @@ def main() -> int:
     source = f"{arguments.source}{arguments.suffix}"
 
     dataset = with_export_cap(
-        dataset=_assign_folds(
+        dataset=assign_folds(
             dataset=_add_time_features(
                 dataset=drop_commissioning_ramp(
                     dataset=pl.read_parquet(dataset_path_for(source=source))
@@ -190,37 +190,25 @@ def main() -> int:
     _LOG.info("dataset: %d rows, %d sites", dataset.height, dataset["site"].n_unique())
     dataset = _add_physics_predictions(dataset=dataset)
 
-    # `_run_all` resolves an arm's columns through the module-level table, so the new arms are
-    # registered there rather than threaded through every helper. Throwaway code, one process.
-    for arm, (columns, _with_shared) in HYBRID_ARMS.items():
-        run_experiment.ARM_FEATURES[arm] = columns
-    original_features_for = run_experiment._features_for
-
-    def _features_for(*, arm: str, fold: int) -> list[str]:
-        """Resolve one arm's columns, dropping the shared features where an arm forgoes them."""
-        if arm in HYBRID_ARMS and not HYBRID_ARMS[arm][1]:
-            return [column.format(fold=fold) for column in HYBRID_ARMS[arm][0]]
-        return original_features_for(arm=arm, fold=fold)
-
-    # ty rejects this as `invalid-assignment` and prints both sides of the comparison
-    # identically, because it treats a module-level `def` as its own nominal type rather than
-    # as its signature. Any replacement function is unassignable, however well it matches. The
-    # signal to delete the suppression is ty reporting `unused-ignore-comment` here.
-    run_experiment._features_for = _features_for  # ty: ignore[invalid-assignment]
-
-    jobs = [
-        (arm, "primary", "power_mw", PRIMARY_HYPER_PARAMETERS, False)
-        for arm in (*HYBRID_ARMS, "C_era5_split", "A_global_only")
+    jobs: list[Job] = [
+        (
+            arm,
+            "primary",
+            "power_mw",
+            (*SHARED_FEATURES, *columns) if with_shared else columns,
+            PRIMARY_HYPER_PARAMETERS,
+            False,
+        )
+        for arm, (columns, with_shared) in HYBRID_ARMS.items()
     ]
-    losses = _run_all(dataset=dataset, jobs=jobs).with_columns(
-        absolute_error_fraction_of_capacity=pl.col("absolute_error_mw")
-        / pl.col("effective_capacity_mw"),
-        absolute_error_capped_fraction_of_capacity=pl.col("absolute_error_capped_mw")
-        / pl.col("effective_capacity_mw"),
-    )
+    jobs += [
+        (arm, "primary", "power_mw", features_for(arm=arm), PRIMARY_HYPER_PARAMETERS, False)
+        for arm in ("C_era5_split", "A_global_only")
+    ]
+    losses = _run_all(dataset=dataset, jobs=jobs)
 
     # The physical model's own score, on the identical rows, read straight from its per-row losses.
-    physics_dir = run_experiment.STUDY_DATA_DIR / f"beam_diffuse_physics_{source}"
+    physics_dir = STUDY_DATA_DIR / f"beam_diffuse_physics_{source}"
     physics = (
         pl.read_parquet(physics_dir / "per_row_losses.parquet")
         .filter(
@@ -263,7 +251,7 @@ def main() -> int:
         scoped = losses.filter(pl.col("arm").is_in([treatment, reference]))
         if scoped["arm"].n_unique() < 2:
             continue
-        interval = _bootstrap_difference(
+        interval = bootstrap_difference(
             losses=scoped,
             treatment=treatment,
             reference=reference,

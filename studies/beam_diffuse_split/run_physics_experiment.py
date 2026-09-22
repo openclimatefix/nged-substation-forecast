@@ -43,19 +43,13 @@ from typing import Final, NamedTuple
 import numpy as np
 import polars as pl
 from commissioning import drop_commissioning_ramp
-from export_cap import clamp_to_cap, with_export_cap
+from export_cap import with_export_cap
 from physics_model import MIN_COS_ZENITH, Geometry, power_mw
-from run_experiment import (
-    N_FOLDS,
-    SEEDS,
-    _add_time_features,
-    _assign_folds,
-    _bootstrap_difference,
-    _per_fold_differences,
-    dataset_path_for,
-)
+from run_experiment import _add_time_features, dataset_path_for
 from scipy.optimize import minimize
 from sources import SOURCE_CHOICES, STUDY_DATA_DIR
+from studies.bootstrap import bootstrap_difference, per_fold_differences
+from studies.cross_validation import N_FOLDS, SEEDS, assign_folds, clamp_to_cap
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("run_physics_experiment")
@@ -469,7 +463,7 @@ def _intervals_for(
                         "metric": metric,
                         "scope": scope,
                         "per_fold_differences": (
-                            _per_fold_differences(
+                            per_fold_differences(
                                 losses=losses,
                                 treatment=treatment,
                                 reference=reference,
@@ -478,7 +472,7 @@ def _intervals_for(
                             if scope == "all_sites"
                             else []
                         ),
-                        **_bootstrap_difference(
+                        **bootstrap_difference(
                             losses=scoped, treatment=treatment, reference=reference, metric=metric
                         ),
                     }
@@ -502,7 +496,7 @@ def main() -> int:
     results_dir.mkdir(parents=True, exist_ok=True)
 
     dataset = with_export_cap(
-        dataset=_assign_folds(
+        dataset=assign_folds(
             dataset=_add_time_features(
                 dataset=drop_commissioning_ramp(
                     dataset=pl.read_parquet(dataset_path_for(source=source))
