@@ -85,6 +85,7 @@ nav:
   - Studies:
       - Overview: studies/index.md
       - "Does a weather product's beam/diffuse split help a PV forecast?": studies/beam-diffuse-split.md
+      - "Which weather product best describes past sunshine?": studies/weather-products-for-the-past.md
   - ML experimentation:
       - Overview: ml_experimentation/index.md
       - Model configuration: ml_experimentation/model-configuration.md

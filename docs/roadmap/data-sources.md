@@ -484,19 +484,18 @@ model family moved 1.05. Which product feeds the model dominates both. The write
 weather product's beam/diffuse split help a PV forecast?](../studies/beam-diffuse-split.md); the
 code sits in `studies/beam_diffuse_split/`.
 
-**Two 2 km models were added, and scoring all four products on one common set of hours put them in
-the order CAMS, ICON-D2, UKV, ERA5.** On the 58,411 generator-hours every product covers before
-February 2026, CAMS scores 5.59% of capacity, the German weather service's ICON-D2 8.43%, the Met
-Office's UKV 9.57%, and ERA5 9.90%. The order is the same on seasonally matched months and after
-February 2026.
+**Scoring six products on one common set of hours puts the satellite retrieval far ahead of every
+weather model.** On 79,384 generator-hours from December 2022 to September 2026, CAMS scores 5.05%
+of capacity, the German weather service's ICON-D2 7.71%, ICON-EU 8.30%, ICON global 8.39%, the Met
+Office's UKV 8.79%, and ERA5 8.98%. ICON-EU, UKV, and ICON global cannot be told apart once UKV's
+hour is built as a mean and ICON global is held at ICON-EU's lead. The write-up, with what each
+offline consumer should read, is [Which weather product best describes past
+sunshine?](../studies/weather-products-for-the-past.md).
 
-**Comparing each pair on its own shared hours gave the wrong answer, which is why the common row
-set matters.** Pair by pair, UKV appeared not to beat ERA5 at all. On the common set it beats ERA5
-by 0.32 points before February 2026, with an interval from 0.09 to 0.54, and its lead after that
-has an interval including zero. The absolute
-levels move too: ERA5 scores 9.90% on the common set against 8.28% on its pair with ICON-D2, the
-same product and the same generators, because restricting to hours every product covers keeps the
-harder hours. Figures measured on different row sets do not compose into a ranking.
+**Figures measured on different row sets do not compose into a ranking.** Pair by pair, UKV once
+appeared not to beat ERA5 at all, and ERA5 scores 8.28% on its pair with ICON-D2 against 8.98% on the
+six-product set: the same product and the same generators, because restricting to hours every
+product covers keeps the harder hours.
 
 **The retrieval still beats every model product.** CAMS scored 5.24% against ICON-D2's 8.22% over
 their 73,566 shared hours, and roughly halves the error against ERA5 and UKV as well. CAMS infers

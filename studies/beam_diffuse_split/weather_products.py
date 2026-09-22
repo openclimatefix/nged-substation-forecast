@@ -59,7 +59,7 @@ from run_experiment import (
     _run_all,
     dataset_path_for,
 )
-from sources import STUDY_DATA_DIR
+from sources import STUDY_DATA_DIR, point_output_path_for
 from studies.bootstrap import bootstrap_difference, per_fold_differences
 from studies.cross_validation import (
     PRIMARY_HYPER_PARAMETERS,
@@ -103,11 +103,14 @@ SERVED_LEAD: Final[dict[str, str]] = {
 }
 """How far ahead each product's served hourly value was forecast, as the archive holds it."""
 
-RUN_INTERVAL_HOURS: Final[dict[str, int]] = {"icon_d2": 3, "icon_eu": 3}
-"""The run cadence of each product whose lead the lead table breaks down.
+RUN_INTERVAL_HOURS: Final[dict[str, int]] = {"icon_d2": 3, "icon_eu": 3, "icon_global": 6}
+"""The run cadence of each ICON product, which fixes its served lead at each label hour.
 
-ICON global's is 6 hours, but DWD publishes it only on its icosahedral grid, so which run
-Open-Meteo serves for each hour has not been measured and its lead buckets are not read.
+`verify_icon_lineage.py` measured the mapping for ICON-EU against DWD's own files: the freshest run
+reproduced Open-Meteo's served value to within 1 W m⁻² at every hour but one. For ICON-D2 the
+freshest run was the closest match at 7 of 9 hours but not exactly; the period-3 sawtooth in
+ICON-D2's own errors corroborates freshest-run serving across the record. ICON global is published
+by DWD only on its icosahedral grid, so its mapping is inferred from the cadence alone.
 """
 
 LEAD_TABLE_HOURS: Final[tuple[int, int]] = (7, 19)
@@ -153,10 +156,27 @@ against the regional one; which Great-Britain-wide weather model is better; and 
 ICON costs against the European one. Every other contrast in the report is exploratory.
 """
 
+UKV_SNAPSHOT_ARMS: Final[dict[str, tuple[str, ...]]] = {
+    "ukv_trap_global": ("ghi_trap_ukv",),
+    "ukv_pair_global": ("ghi_instant_previous_ukv", "ghi_instant_ukv"),
+}
+"""Two further UKV arms built from its instantaneous snapshots rather than its served hourly value.
+
+UKV publishes an instantaneous field each hour, and Open-Meteo's served hourly value is the
+snapshot at the hour's end rescaled by a ratio of cosines, where every ICON product serves a true
+mean over the hour. `ukv_trap_global` is the mean of the snapshots at both ends of the hour, and
+`ukv_pair_global` shows the model both snapshots, so a contrast against them separates the weather
+model from how its hour is built. Both were added after the first run, on a reviewer's finding, and
+are post hoc.
+"""
+
+LEAVE_ONE_SITE_OUT_SEED: Final[int] = SEEDS[0]
+"""The one seed the leave-one-site-out fits use, which keeps them to one fit per site and fold."""
+
 METRIC: Final[str] = "absolute_error_capped_fraction_of_capacity"
 """The loss every table reports: each row's clamped error over its own generator's capacity."""
 
-SCOPES: Final[tuple[str, ...]] = ("all", "pre", "pre_matched", "post", "ukv_live")
+SCOPES: Final[tuple[str, ...]] = ("all", "pre", "pre_matched", "post", "ukv_live", "cams_reliable")
 """Every scope the pooled losses are bootstrapped over."""
 
 CONTRAST_HEADER: Final[tuple[str, str]] = (
@@ -203,7 +223,27 @@ def _joined() -> pl.DataFrame:
             *(pl.col(column).alias(_named(column, product)) for column in irradiance),
         )
         frame = frame.join(other, on=["site", "time"], how="inner")
-    return frame.sort("site", "time")
+    return frame.join(_ukv_snapshots(), on=["site", "time"], how="inner").sort("site", "time")
+
+
+def _ukv_snapshots() -> pl.DataFrame:
+    """Return UKV's instantaneous global irradiance at both ends of each hour, and their mean.
+
+    Returns:
+        One row per (site, time) with `ghi_instant_previous_ukv`, `ghi_instant_ukv` and
+        `ghi_trap_ukv`, for every hour whose both snapshots were served.
+    """
+    download = pl.read_parquet(point_output_path_for(source="ukv")).select(
+        "site", "time", ghi_instant_ukv=pl.col("ghi_instant_w_m2")
+    )
+    previous = download.select(
+        "site",
+        time=pl.col("time").dt.offset_by("1h"),
+        ghi_instant_previous_ukv=pl.col("ghi_instant_ukv"),
+    )
+    return download.join(previous, on=["site", "time"], how="inner").with_columns(
+        ghi_trap_ukv=(pl.col("ghi_instant_previous_ukv") + pl.col("ghi_instant_ukv")) / 2.0
+    )
 
 
 def _common_rows(*, frame: pl.DataFrame) -> pl.DataFrame:
@@ -271,6 +311,10 @@ def _jobs() -> list[Job]:
             (arm, "pooled", "power_mw", (*shared, *columns), PRIMARY_HYPER_PARAMETERS, False)
             for arm, columns in arms.items()
         ]
+    jobs += [
+        (arm, "pooled", "power_mw", (*shared, *columns), PRIMARY_HYPER_PARAMETERS, False)
+        for arm, columns in UKV_SNAPSHOT_ARMS.items()
+    ]
     return jobs
 
 
@@ -299,31 +343,37 @@ def _post_only_losses(*, frame: pl.DataFrame) -> pl.DataFrame:
 
 
 def _leave_one_site_out_losses(*, frame: pl.DataFrame) -> pl.DataFrame:
-    """Train on five sites' capacity-normalised power and score the sixth, for every product.
+    """Train on five sites' capacity-normalised power and score the sixth, one fold at a time.
 
-    No model sees the scored site, so this measures how well a product transfers to a generator
-    with no metered history. The target is a fraction of capacity, so the five sites can share one
-    model, and the clamp is applied in megawatts before the error is divided back by capacity.
+    The scored site is never trained on, and neither are the scored fold's calendar months at any
+    other site: the six sites share their weather, so a model trained on a neighbour's power in the
+    same hours would learn each day's outcome rather than transfer. This is the withholding
+    `run_experiment._add_learned_split` applies for the same reason. The target is a fraction of
+    capacity, so five sites can share one model, and the site's own capacity is assumed known.
 
     Args:
-        frame: The common rows, carrying `constrained` and `cap_mw`.
+        frame: The common rows, carrying `fold`, `month`, `constrained` and `cap_mw`.
 
     Returns:
-        One row per (site, time, seed, arm) with the capped error as a fraction of capacity.
+        One row per (site, time, arm) with the capped error as a fraction of capacity.
     """
     frame = frame.with_columns(power_fraction=pl.col("power_mw") / pl.col("effective_capacity_mw"))
-    sites = sorted(frame["site"].unique().to_list())
+    folds = frame.select("site", "fold").unique().sort("site", "fold").rows()
 
-    def _one(product: str, site: str, seed: int) -> pl.DataFrame:
-        train = frame.filter((pl.col("site") != site) & ~pl.col("constrained"))
-        test = frame.filter(pl.col("site") == site)
+    def _one(product: str, site: str, fold: int) -> pl.DataFrame:
+        test = frame.filter((pl.col("site") == site) & (pl.col("fold") == fold))
+        train = frame.filter(
+            (pl.col("site") != site)
+            & ~pl.col("constrained")
+            & ~pl.col("month").is_in(test["month"].unique().to_list())
+        )
         point, _ = fit_one_fold(
             train=train,
             test=test,
             features=[*SHARED_FEATURES, "era_code", _named("ghi_w_m2", product)],
             target="power_fraction",
             hyper_parameters=PRIMARY_HYPER_PARAMETERS,
-            seed=seed,
+            seed=LEAVE_ONE_SITE_OUT_SEED,
             with_quantiles=False,
         )
         capacity = test["effective_capacity_mw"].cast(pl.Float64).to_numpy()
@@ -332,19 +382,46 @@ def _leave_one_site_out_losses(*, frame: pl.DataFrame) -> pl.DataFrame:
         return test.select("site", "time", "month", "fold", "era").with_columns(
             pl.Series(METRIC, error),
             arm=pl.lit(f"{product}_global"),
-            seed=pl.lit(seed, dtype=pl.Int32),
+            seed=pl.lit(LEAVE_ONE_SITE_OUT_SEED, dtype=pl.Int32),
         )
 
     outputs: list[pl.DataFrame] = []
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT_FITS) as pool:
         futures = [
-            pool.submit(_one, product, site, seed)
-            for product in PRODUCTS
-            for site in sites
-            for seed in SEEDS
+            pool.submit(_one, product, site, fold) for product in PRODUCTS for site, fold in folds
         ]
         outputs.extend(future.result() for future in concurrent.futures.as_completed(futures))
     return pl.concat(outputs)
+
+
+def _yield_stability(*, frame: pl.DataFrame) -> dict[str, float]:
+    """Measure how steady each product's monthly ratio of power to irradiance is.
+
+    Capacity estimation reads a product's irradiance with no model fitted to the site, so a product
+    whose bias drifts from month to month misleads it however well a recalibrated model scores.
+    For each site and month the ratio of summed power to summed irradiance is taken, its
+    month-to-month changes are divided by its median, and the median absolute change is pooled
+    across sites. Season moves every product's ratio alike, so the comparison between products is
+    what the number is for, not its level.
+
+    Args:
+        frame: The common rows.
+
+    Returns:
+        Each product's median absolute month-to-month change in its yield ratio, as a fraction.
+    """
+    stability: dict[str, float] = {}
+    for product in PRODUCTS:
+        monthly = (
+            frame.group_by("site", "month")
+            .agg(ratio=pl.col("power_mw").sum() / pl.col(_named("ghi_w_m2", product)).sum())
+            .sort("site", "month")
+            .with_columns(
+                change=(pl.col("ratio").diff().abs() / pl.col("ratio").median()).over("site")
+            )
+        )
+        stability[product] = float(monthly.select(pl.col("change").drop_nulls().median()).item())
+    return stability
 
 
 def _scope(*, losses: pl.DataFrame, scope: str) -> pl.DataFrame:
@@ -374,6 +451,9 @@ def _scope(*, losses: pl.DataFrame, scope: str) -> pl.DataFrame:
         )
     if scope == "ukv_live":
         return losses.filter(pl.col("time") >= UKV_LIVE_INGEST)
+    if scope == "cams_reliable":
+        reliable = pl.read_parquet(dataset_path_for(source="cams")).select("site", "time")
+        return losses.join(reliable, on=["site", "time"], how="semi")
     msg = f"unknown scope {scope}"
     raise ValueError(msg)
 
@@ -422,39 +502,101 @@ def _contrast_line(*, losses: pl.DataFrame, treatment: str, reference: str, labe
     )
 
 
-def _lead_buckets(*, losses: pl.DataFrame) -> list[str]:
-    """Break each ICON product's contrast against ERA5 down by the product's served lead.
+def _served_lead(*, product: str) -> pl.Expr:
+    """Return the served lead in hours of a product's value at each row's label hour.
 
     A served hourly value is a backward mean over the hour ending at its label, so the run that
     supplies label hour `T` is the latest one at or before `T - 1`, and the lead is `T` minus that
-    run: 1, 2 or 3 hours for a 3-hourly model.
+    run: 1, 2 or 3 hours for a 3-hourly model, 1 to 6 for a 6-hourly one.
+
+    Args:
+        product: A key of `RUN_INTERVAL_HOURS`.
+
+    Returns:
+        The lead, as an integer expression.
+    """
+    hour = pl.col("time").dt.hour().cast(pl.Int32)
+    return ((hour - 1) % RUN_INTERVAL_HOURS[product]) + 1
+
+
+def _lead_tables(*, losses: pl.DataFrame) -> list[str]:
+    """Compare ICON products at matched served leads, and list each hour's contrast against ERA5.
+
+    ICON-D2 and ICON-EU run on the same 3-hourly cycle, so every label hour holds them at the same
+    lead and their contrast within a lead bucket is lead-matched. ICON global's lead equals
+    ICON-EU's wherever its own lead is 3 hours or less. The per-hour table carries the time of day
+    as well as the lead, which is why it is listed rather than bucketed.
 
     Args:
         losses: The pooled losses.
 
     Returns:
-        Markdown table rows.
+        Markdown lines.
     """
     first, last = LEAD_TABLE_HOURS
     hour = pl.col("time").dt.hour().cast(pl.Int32)
-    daytime = losses.filter(hour.is_between(first, last))
-    lines: list[str] = []
-    for product, interval_hours in RUN_INTERVAL_HOURS.items():
-        with_lead = daytime.with_columns(lead=((hour - 1) % interval_hours) + 1)
-        lines += [
-            _contrast_line(
-                losses=with_lead.filter(pl.col("lead") == lead),
-                treatment=f"{product}_global",
-                reference="era5_global",
-                label=f"lead {lead} h, {first:02d}–{last:02d} UTC",
-            )
-            for lead in range(1, interval_hours + 1)
-        ]
+    daytime = losses.filter(hour.is_between(first, last)).with_columns(
+        lead_3h=_served_lead(product="icon_eu"), lead_6h=_served_lead(product="icon_global")
+    )
+    label = f"{first:02d}–{last:02d} UTC"
+    lines = ["#### ICON-D2 against ICON-EU at matched served leads", "", *CONTRAST_HEADER]
+    lines += [
+        _contrast_line(
+            losses=daytime.filter(pl.col("lead_3h") == lead),
+            treatment="icon_d2_global",
+            reference="icon_eu_global",
+            label=f"both at lead {lead} h, {label}",
+        )
+        for lead in (1, 2, 3)
+    ]
+    lines += ["", "#### ICON global against ICON-EU, split by ICON global's lead", ""]
+    lines += [*CONTRAST_HEADER]
+    lines += [
+        _contrast_line(
+            losses=daytime.filter(condition),
+            treatment="icon_global_global",
+            reference="icon_eu_global",
+            label=f"{name}, {label}",
+        )
+        for name, condition in (
+            ("ICON global lead 1 to 3 h, equal to ICON-EU's", pl.col("lead_6h") <= 3),
+            ("ICON global lead 4 to 6 h", pl.col("lead_6h") > 3),
+        )
+    ]
+    by_hour = (
+        daytime.filter(pl.col("arm").is_in(["era5_global", "icon_d2_global", "icon_eu_global"]))
+        .group_by("time", "site", "seed", "arm")
+        .agg(pl.col(METRIC).first())
+        .pivot(on="arm", index=["time", "site", "seed"], values=METRIC)
+        .group_by(hour.alias("hour"))
+        .agg(
+            icon_d2=(pl.col("icon_d2_global") - pl.col("era5_global")).mean(),
+            icon_eu=(pl.col("icon_eu_global") - pl.col("era5_global")).mean(),
+        )
+        .sort("hour")
+    )
+    lines += [
+        "",
+        "#### Each hour's contrast against ERA5 (pp of capacity; point estimates)",
+        "",
+        "| Hour (UTC) | Served lead, ICON-D2 and ICON-EU | ICON-D2 − ERA5 | ICON-EU − ERA5 |",
+        "|---|---|---|---|",
+    ]
+    lines += [
+        f"| {row['hour']:02d} | {((row['hour'] - 1) % 3) + 1} h "
+        f"| {row['icon_d2'] * PERCENTAGE_POINTS:+.3f} | {row['icon_eu'] * PERCENTAGE_POINTS:+.3f} |"
+        for row in by_hour.iter_rows(named=True)
+    ]
     return lines
 
 
 def _report(
-    *, frame: pl.DataFrame, pooled: pl.DataFrame, post_only: pl.DataFrame, transfer: pl.DataFrame
+    *,
+    frame: pl.DataFrame,
+    pooled: pl.DataFrame,
+    post_only: pl.DataFrame,
+    transfer: pl.DataFrame,
+    stability: dict[str, float],
 ) -> str:
     """Assemble the markdown report.
 
@@ -463,6 +605,7 @@ def _report(
         pooled: The pooled run's losses.
         post_only: The post-upgrade-only run's losses.
         transfer: The leave-one-site-out losses.
+        stability: Each product's month-to-month yield-ratio change.
 
     Returns:
         The report.
@@ -525,13 +668,46 @@ def _report(
         )
         for product in PRODUCTS
     ]
-    lines += ["", "#### Leave one site out: the deciding contrasts", "", *CONTRAST_HEADER]
+    lines += [
+        "",
+        "#### Leave one site out, the scored months withheld everywhere: the deciding contrasts",
+        "",
+        *CONTRAST_HEADER,
+    ]
     lines += [
         _contrast_line(losses=transfer, treatment=treatment, reference=reference, label="all")
         for treatment, reference in DECIDING_CONTRASTS
     ]
-    lines += ["", "#### ICON against ERA5 by the ICON product's served lead", "", *CONTRAST_HEADER]
-    lines += _lead_buckets(losses=pooled)
+    lines += [
+        "",
+        "#### UKV's served hour against the mean of its own two snapshots (post hoc)",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    lines += [
+        _contrast_line(losses=scoped, treatment=treatment, reference=reference, label=scope)
+        for scope in ("all", "ukv_live")
+        for scoped in (_scope(losses=pooled, scope=scope),)
+        for treatment, reference in (
+            ("ukv_trap_global", "ukv_global"),
+            ("icon_eu_global", "ukv_trap_global"),
+            ("icon_eu_global", "ukv_pair_global"),
+        )
+    ]
+    lines += [
+        "",
+        (
+            f"MAE: ukv_trap_global {_mae(losses=pooled, arm='ukv_trap_global'):.3f}, "
+            f"ukv_pair_global {_mae(losses=pooled, arm='ukv_pair_global'):.3f}."
+        ),
+        "",
+        "#### Month-to-month change in each product's ratio of power to irradiance",
+        "",
+        "| Product | Median absolute monthly change |",
+        "|---|---|",
+    ]
+    lines += [f"| {product} | {value:.3f} |" for product, value in stability.items()]
+    lines += ["", *_lead_tables(losses=pooled)]
     return "\n".join(lines) + "\n"
 
 
@@ -556,7 +732,13 @@ def main() -> int:
     transfer = _leave_one_site_out_losses(frame=frame)
     transfer.write_parquet(output_dir / "leave_one_site_out_losses.parquet")
 
-    report = _report(frame=frame, pooled=pooled, post_only=post_only, transfer=transfer)
+    report = _report(
+        frame=frame,
+        pooled=pooled,
+        post_only=post_only,
+        transfer=transfer,
+        stability=_yield_stability(frame=frame),
+    )
     (output_dir / "report.md").write_text(report)
     sys.stdout.write(report)
     return 0

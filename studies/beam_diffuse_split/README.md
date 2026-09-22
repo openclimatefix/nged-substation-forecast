@@ -67,7 +67,7 @@ separation model's estimate of the same split, says what the *published field* b
 | `fetch_ens_point.py` | Extracts ECMWF ensemble irradiance for the meters' H3 cells at five lead bands, reading the Delta transaction log rather than globbing parquet, which would return tombstoned files twice. |
 | `ens_horizons.py` | Scores the ensemble against ERA5 at each lead band, and four ways of reducing 51 members to one power number. Fits its own booster, so five settings differ from `run_experiment.py`; see its module docstring. |
 | `multi_nwp.py` | Fits XGBoost on two weather models at once, against two negative controls: a duplicated column, which cannot fail, and a column carrying the second product's climatology with its weather permuted away, which can. |
-| `era_comparison.py` | Scores every product on one common row set with the folds cut inside each era, which is what the per-source runs cannot do. Removes both the non-composing row sets and the train-on-one-version confound. |
+| `weather_products.py` | Scores six weather products on one common row set with the folds cut inside each UKV era, and answers which product best describes past sunshine. Written up as [Which weather product best describes past sunshine?](https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-the-past/). |
 
 ## The arms
 
@@ -295,11 +295,11 @@ being identical.
 
 **Most of the apparent step is a model being shown an input it never trained on.** Folds are
 contiguous month blocks, so every post-upgrade row falls in the last fold for five of the six
-generators, and that fold's model trained on pre-upgrade UKV alone. `era_comparison.py` cuts the
+generators, and that fold's model trained on pre-upgrade UKV alone. `weather_products.py` cuts the
 folds inside each era instead, so a model scoring a post-upgrade row has trained on post-upgrade
-rows. Under that arrangement UKV's lead over the reanalysis after the upgrade is 0.07 pp with an
-interval from −0.25 to +0.42, which includes zero, against 0.32 pp [0.09, 0.54] before it. The
-upgrade did not reverse UKV's standing against the reanalysis, and the figures above should be read
+rows. Fitted on the post-upgrade months alone, UKV against the reanalysis is −0.11 pp with an
+interval from −0.45 to +0.21, which includes zero. The upgrade did not reverse UKV's standing
+against the reanalysis, and the figures above should be read
 as the cost of training on one version of a product and predicting with another — which is a real
 cost to a production pipeline, but a different finding from the product getting worse on the
 product.
