@@ -167,6 +167,39 @@ of each series' own absolute output over its whole history. It is not the regist
 because it is a statistic of the target it is not a data-independent unit. Every arm is divided by
 the same number, so it cannot manufacture a contrast.
 
+## What the Fractions Skill Score was checked against
+
+**Mean absolute error charges a forecast twice for a peak placed an hour late**, which is the
+sharpness the published split is meant to buy, so `fractions_skill_score.py` rescores every arm at
+tolerances from 0 to 4 hours. The metric itself is explained in [Evaluation
+metrics](https://openclimatefix.github.io/nged-substation-forecast/techniques/evaluation-metrics/#fractions-skill-score-fss).
+The score needs no refit: `run_experiment.py` writes `signed_error_capped_mw` as `capped_point -
+actual`, so adding the metered power back recovers each arm's capped point forecast exactly.
+
+**A centred rolling window is easy to get wrong by one step, so the implementation was driven with
+forecasts whose right answer is known.** One site, 30 days, a 3-hour spike each day, scored against
+a threshold the spike clears:
+
+| Forecast | ±0h | ±1h | ±2h | ±4h |
+|---|---|---|---|---|
+| Identical to the observation | 1.000 | 1.000 | 1.000 | 1.000 |
+| The observation, 1 hour late | 0.667 | 0.842 | 0.919 | 0.959 |
+| The observation, 3 hours late | 0.000 | 0.211 | 0.486 | 0.741 |
+| Never predicts a spike | 0.000 | 0.000 | 0.000 | 0.000 |
+
+The last row is the control the other three are read against: **widening the window must not rescue
+a forecast that never predicts the event**, or every recovery along a row would be the window
+inflating the score rather than timing credit being given. The second row is the double penalty as
+a single number — perfect magnitude, one hour late, scores 0.667 against a point-in-time 1.000.
+
+**The score's verdict on the published split depends on which threshold it is read at, so it is
+reported as a sweep rather than a number.** Taking the headline contrast at each site's 75th, 90th,
+and 95th percentile of metered power moves the sign: the split is ahead at the 75th for CAMS and
+UKV, ahead only for CAMS at the 90th, and behind for all three sources at the 95th. The 95th
+percentile also halves the count of exceedances, which roughly doubles the interval, so low power
+and a real reversal are not separable here. Read the metric for the timing share of the error,
+which is consistent across every source and arm, rather than as a second opinion on the split.
+
 ## What each reading does not settle
 
 **The fitted physical model is a misspecification probe, not a second reading of the same
