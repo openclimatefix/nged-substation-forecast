@@ -6,8 +6,8 @@ repos:
       - id: end-of-file-fixer
       - id: check-yaml
       # A Vega/Altair chart exported straight to SVG trips the hook's 500 KB default, because a
-      # plot of half-hourly data carries one path point per reading. Run the export through
-      # `npx svgo@4 --multipass --precision=1` before committing it — that is how
+      # plot of half-hourly data carries one path point per reading. Run the export through the
+      # `svgo` recipe in CLAUDE.md before committing it — that is how
       # docs/example_power_forecast.svg came down from 571 KB to 296 KB, with no visible change.
       - id: check-added-large-files
 
