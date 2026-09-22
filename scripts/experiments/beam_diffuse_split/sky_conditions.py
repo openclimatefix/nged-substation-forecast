@@ -21,7 +21,7 @@ extraterrestrial horizontal irradiance — which is the standard way of saying h
 top of the atmosphere offered actually arrived. Both quantities are already columns every arm sees,
 so binning on them introduces no information the arms lacked.
 
-Run it with `uv run --no-project --with polars --with numpy python
+Run it with `uv run --no-project --with polars --with numpy --with pvlib python
 scripts/experiments/beam_diffuse_split/sky_conditions.py --source cams --alignment shifted`.
 """
 

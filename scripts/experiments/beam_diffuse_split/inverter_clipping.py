@@ -19,7 +19,7 @@ P99 over its whole history. The cut is swept over two thresholds, because "on th
 proxy rather than a measurement: a hot afternoon derates below the nameplate limit and a cold bright
 one runs above it, so no single threshold separates the two states cleanly.
 
-Run it with `uv run --no-project --with polars --with numpy python
+Run it with `uv run --no-project --with polars --with numpy --with pvlib python
 scripts/experiments/beam_diffuse_split/inverter_clipping.py --source cams --alignment shifted`.
 """
 

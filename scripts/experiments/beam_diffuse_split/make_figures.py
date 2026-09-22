@@ -20,8 +20,11 @@ shuffled relabelling, and a per-site figure in MW would combine with the publish
 register to shortlist candidates inside a 34 km box. Normalising removes that, and costs the reader
 nothing the contrasts do not already express in the same unit.
 
+Run `sky_conditions.py` on every source in `SKY_CHART_SOURCES` first, because the sky-condition
+chart reads the intervals that script writes and fails with a missing-file error without them.
+
 Run it with `uv run --no-project --with polars --with altair --with vl-convert-python
---with numpy python scripts/experiments/beam_diffuse_split/make_figures.py`.
+--with numpy --with pvlib python scripts/experiments/beam_diffuse_split/make_figures.py`.
 """
 
 import logging
