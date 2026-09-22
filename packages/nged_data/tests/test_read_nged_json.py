@@ -153,7 +153,7 @@ def test_extract_power_time_series_rejects_non_numeric_value():
 
 
 def test_extract_power_time_series_corrects_late_timestamps():
-    """A reading NGED stamped late is stored 30 minutes earlier; a correct one is stored as sent."""
+    """A late reading is stored 30 minutes earlier; a correct reading is stored as NGED sent it."""
     raw_json = b"""
     {
         "data": [
@@ -174,12 +174,12 @@ def test_extract_power_time_series_corrects_late_timestamps():
 
 
 def test_extract_power_time_series_drops_a_reading_the_correction_pushes_out_of_range():
-    """A reading is judged on the timestamp that will be stored, not on the one NGED sent.
+    """A reading is judged on the timestamp that will be stored, not on the timestamp NGED sent.
 
-    `MIN_PLAUSIBLE_DATETIME` is the only reading that can distinguish correcting before dropping
-    from correcting after: any other reading the correction pushes out of range is misaligned, and
-    so is dropped either way. Correcting second would leave this row to raise out of `validate`,
-    failing the whole ingest run over one malformed external reading.
+    A reading stamped exactly `MIN_PLAUSIBLE_DATETIME` is the only reading that can distinguish
+    correcting before dropping from correcting after: any other reading the correction pushes out
+    of range is misaligned, and so is dropped either way. Correcting second would leave this row to
+    raise out of `validate`, failing the whole ingest run over one malformed external reading.
     """
     raw_json = (
         b'{"data": [{"endTime": "'

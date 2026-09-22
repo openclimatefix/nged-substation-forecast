@@ -236,10 +236,10 @@ def test_drop_implausible_rows_leaves_a_validatable_frame() -> None:
         pytest.param(
             POWER_TIMESTAMPS_CORRECTED_BEFORE, POWER_TIMESTAMPS_CORRECTED_BEFORE, id="instant_stays"
         ),
-        # Not redundant beside `instant_stays`, though it looks it. Every other timestamp the
-        # suite pushes through this method sits at or before the correction instant, so without
-        # this case a predicate of `!=` — which shifts every reading the live service ingests and
-        # leaves only the instant itself alone — passes the whole suite.
+        # Not redundant beside `instant_stays`, though the two cases look alike. Every other
+        # timestamp the suite pushes through this method sits at or before the correction instant,
+        # so without this case the whole suite passes on a predicate of `!=`, which shifts every
+        # reading the live service ingests and leaves only the correction instant alone.
         pytest.param(
             datetime(2026, 3, 26, 9, 0, tzinfo=UTC),
             datetime(2026, 3, 26, 9, 0, tzinfo=UTC),
@@ -252,8 +252,8 @@ def test_correct_late_timestamps_moves_only_the_late_readings(
 ) -> None:
     """The boundary is exclusive: NGED's correction instant is itself already correct.
 
-    An implementation using `<=` where the rule wants `<` passes the first case and fails the
-    second, which is the whole of what distinguishes the two regimes.
+    An implementation using `<=` where the correction requires `<` passes `before_moves_back` and
+    fails `instant_stays`, which is the whole of what separates the two regimes.
     """
     corrected = PowerTimeSeries.correct_late_timestamps(_frame([time]))
 

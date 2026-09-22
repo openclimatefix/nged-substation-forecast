@@ -767,8 +767,8 @@ everything the model does not represent. They also caution against the static fu
 denominator where a plant moves. Both readings are set out
 [above](#what-the-per-site-error-drift-says-about-estimating-effective-capacity).
 
-**The half-hour power-timestamp offset is settled, and it reaches further than this experiment.** NGED
-corrected the feed at 08:30 UTC on 26 March 2026, and three independent measurements agree that
+**The half-hour power-timestamp offset is settled, and it reaches further than this experiment.**
+NGED corrected the feed at 08:30 UTC on 26 March 2026, and three independent measurements agree that
 readings before that instant are half an hour late while readings after it are not. Any model
 trained on telemetry from before the correction is affected, not only the models here, and the same
 step appears in series on this feed that are not PV meters.
@@ -892,8 +892,8 @@ not what sets the answer. `stamp_alignment.py` prints all three.
 feed.** A daylight-saving fault would step at the March and October boundaries and would be an hour;
 this offset does neither. NGED's own JSON labels every reading with an explicit `startTime` and
 `endTime`, both carrying a UTC offset and each abutting the next record, and the ingest reads
-`endTime` and then repairs it. So the feed states which half-hour it means, and until 26 March 2026
-the sun disagreed with it by one half-hour.
+`endTime` and then repairs the late timestamps. So the feed states which half-hour it means, and
+until 26 March 2026 the sun disagreed with it by one half-hour.
 
 **Reading the timestamps correctly matters most to the arm under test.** A half-hour error blunts the
 sharp beam signal more than the smooth diffuse signal, so it penalises the arm given the published

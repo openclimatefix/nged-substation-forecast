@@ -164,9 +164,8 @@ beam field is worth weighing against effort spent on the retrieval that carries 
 **A 30-minute timestamp error is absorbed into a physical model's fitted azimuth, which is how a
 model-chain comparison can silently answer a different question.** In that experiment the fitted
 azimuths move by about 35 degrees when the timestamps are shifted by one half-hour — whether the
-timestamp marks the start or the end of the averaging window. Settle the timestamp convention before
-comparing
-chains that fit orientation.
+timestamp marks the start or the end of the averaging window. Settle the timestamp convention
+before comparing chains that fit orientation.
 
 **We found no study that runs the clean comparison — one NWP, one PV model chain, one arm fed
 the model's own direct beam and the other fed a separation model's estimate from the same model's

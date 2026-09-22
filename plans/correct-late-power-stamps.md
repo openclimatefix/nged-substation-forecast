@@ -457,3 +457,35 @@ test alone.
 Every other mutation was killed: both boundary directions on the constant, five offset mutations
 including `-29m` and `-30s`, dropping `.otherwise`, swapping the branches, the no-op, deleting the
 call site, calling it twice, and three timezone mutations on the constant.
+
+
+## What the prose sweep changed
+
+The diff's new prose went through the `prose-review` procedure: Pass B by hand (the five new
+paragraphs in `docs/roadmap/data-cleaning.md` each run to one conclusion, so none was split), then a
+one-rule-at-a-time sentence sweep gated on the merge-base. It returned 29 findings, of which 28 were
+taken.
+
+The concentrations were the two rules that dominate every sweep in this repo: pronouns and "one"
+standing in place of a noun (12 findings, including "a correct one", "not on the one NGED sent", and
+an asset docstring carrying three "it"s with three different referents 40 words apart), and long
+sentences carrying two or three claims (6 findings). The sweep also caught a category error — a test
+docstring called `MIN_PLAUSIBLE_DATETIME` "the only reading", when it is a timestamp constant — and
+a sentence readable two ways: "a reading NGED stamps `T` before this instant" reads first as NGED
+having done the stamping before the instant, where the meaning is that the timestamp falls before
+it.
+
+**One finding rejected.** The sweep flagged "what it buys" and "what it costs" in
+`docs/roadmap/data-cleaning.md` under the money-metaphor rule. That rule is about describing
+*performance* in money terms, and CLAUDE.md's design-principles section explicitly asks a change
+that trades away a principle to say "what is bought in return". The idiom is house style for exactly
+this passage, so it stays; the dangling "get it wrong by omission" in the same sentence was fixed.
+
+The sweep also caught two mechanical artefacts of the earlier `stamp`-to-`timestamp` rename: an
+orphaned wrap in `docs/roadmap/disaggregation.md` and an over-long line in
+`docs/results/beam-diffuse-split.md`.
+
+The guards the skill requires all pass: `check_prose_only.py` proves the sweep changed the structure
+of no Python file, `check_comment_wrap.py` that it stranded no comment line, `check_structure.py`
+that no link, span, list item or heading was lost, and `check_render_loss.py` that no table row
+loses content when rendered.
