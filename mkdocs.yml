@@ -85,6 +85,8 @@ nav:
   - Studies:
       - Overview: studies/index.md
       - "Does a weather product's beam/diffuse split help a PV forecast?": studies/beam-diffuse-split.md
+      - "Which irradiance product best describes an hour that already happened?": studies/comparison-of-analysis-products.md
+      - "How far ahead is an ensemble forecast still worth having?": studies/ens-forecast-horizons.md
   - ML experimentation:
       - Overview: ml_experimentation/index.md
       - Model configuration: ml_experimentation/model-configuration.md
