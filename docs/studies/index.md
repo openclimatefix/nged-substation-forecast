@@ -26,7 +26,7 @@ how far it generalises.
   history the one to build on.
 - [Which weather product best describes past sunshine?](weather-products-for-the-past.md) — a
   satellite retrieval describes past sunshine far better than any weather model tested; among the
-  models, ICON-D2 is best as served, partly because it is re-run every 3 hours, while ICON-EU, UKV,
-  and ICON global cannot be told apart on equal terms. The page says which product each offline
+  models, ICON-D2 is best as served but its advantage fades within hours of each run, and ICON-EU
+  and UKV cannot be told apart once UKV's hour is rebuilt from its own snapshots. The page says which product each offline
   consumer — capacity estimation, pre-training, historical features, and disaggregation — should
   read.
