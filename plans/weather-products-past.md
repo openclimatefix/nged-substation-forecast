@@ -131,6 +131,69 @@ asks for one.
 2. **ECMWF IFS.** It is not a product here: its open data is 3-hourly, so what its hourly column
    holds at Open-Meteo is unmeasured. A candidate for #810.
 
+## Revisions from the correctness and science review
+
+The review found five real defects and three gaps; every one is taken.
+
+1. **Leads follow the hour-ending convention.** A served hourly value is a backward mean over the
+   hour ending at its label, so a run initialised at H can supply that hour only when the label is
+   at least H + 1. A product's served lead at label T is T minus the latest run at or before T − 1,
+   which takes the values 1, 2 or 3 for a 3-hourly model and 1 to 6 for ICON global. No ICON
+   product has a lead-0 bucket.
+2. **ERA5 is not lead-free.** Its hourly radiation comes from forecasts initialised at 06 and 18
+   UTC at steps of 1 to 12 hours. The products table gives each product's served lead: UKV T+0,
+   ICON-D2 and ICON-EU 1 to 3 hours, ICON global 1 to 6 hours, ERA5 1 to 12 hours, CAMS a
+   satellite retrieval with no forecast step. Under the direction rule, UKV − ERA5 and ICON-D2 −
+   ERA5 are unresolved rather than settled, and the page says so. The direction rule is stated as
+   an assumption — error rises with lead — supported by the measured lead gradient, not as a
+   theorem.
+3. **ICON-EU's served lead is measured before its lead buckets are read.**
+   `verify_icon_d2_lineage.py` becomes `verify_icon_lineage.py`, taking `--model icon-d2|icon-eu`,
+   downloading every run up to each valid hour rather than four fixed runs, and reporting the
+   root-mean-square difference per (valid hour, run) against Open-Meteo. ICON global is published
+   by DWD only on its icosahedral grid, so its lineage stays unmeasured and its lead buckets are
+   not interpreted.
+4. **The lead table differences against ERA5, on hours 07 to 19 UTC.** ERA5's lead does not follow
+   a 3-hour cycle, so differencing against it isolates the ICON product's lead, and trimming the
+   day's ends removes UKV's cos-zenith rescaling artefact at low sun.
+5. **Every arm is given an `era` feature**, identical across arms, so a pooled model can learn the
+   UKV upgrade's change of mapping. The separate per-era fit is kept for the `post` scope as a
+   sensitivity check.
+6. **The components question runs on the common row set, with folds cut within eras.** Each
+   product gets a `<product>_split` arm (arm C: its own global, beam and diffuse) and a
+   `<product>_erbs` arm (arm B: its own global plus the Erbs split computed from that global), and
+   the contrast is split − erbs, which cancels the re-encoding gain. The per-product
+   `run_experiment.py` runs are dropped. A split contrast is read within one product; the table
+   says so, although on the common row set the entries do at least share rows.
+7. **The false-zero filter is made independent of the products.** Each build drops an hour with a
+   zero half-hour only where its own global irradiance reads bright, and the inner join turns that
+   into "drop the row if any product reads bright". The common set instead drops every hour with a
+   zero half-hour, whatever any product says, recomputed from the power table with
+   `studies.power.hourly_from_half_hourly`. That removes the same rows from every arm, at the cost
+   of some genuine low-light zeros.
+8. **Known-bad rows are dropped from every arm:** ICON-EU's corrupt block (2023-06-21 01:00 to
+   06:00 UTC), and 21 to 31 January 2026, when UKV had already changed but the month is labelled
+   pre-upgrade.
+9. **The deciding contrasts are named before the run.** The recommendation rests on four pooled
+   contrasts; every other contrast is exploratory:
+   - `cams − icon_d2`: does a satellite retrieval beat the best weather model?
+   - `icon_eu − icon_d2`: what does the Great-Britain-wide ICON cost against the regional one?
+   - `icon_eu − ukv`: which Great-Britain-wide weather model is better?
+   - `icon_global − icon_eu`: what does the global ICON cost against the European one?
+10. **The `post` scope has only eight months, so a percentile bootstrap from eight clusters
+    under-covers.** Every `post` interval carries that caveat and the per-fold sign count.
+11. **A cheap scope splits UKV at 2024-08-12**, before which Open-Meteo's UKV is a backfill from an
+    unnamed source.
+12. **Evidence for the consumer recommendations beyond accuracy.** A leave-one-site-out arm per
+    product — trained on five sites' capacity-normalised power and scored on the sixth, with no
+    per-site fitting — measures how well each product transfers to a generator with no metered
+    history, which is the situation disaggregation and capacity estimation are in. The products
+    table gives domain coverage against NGED's licence area, history length, and publication
+    latency, each with a source. The page states that all six generators sit in one 25 by 23 km
+    box inside ICON-D2's domain, so a ranking here is regional evidence.
+13. **The page names the capacity snapshot it rests on**, because #825 may move the absolute
+    figures.
+
 ## Rejected from the simplicity review
 
 - **Dropping the CAMS all-hours primary in favour of the filtered set.** The filter is a selection
