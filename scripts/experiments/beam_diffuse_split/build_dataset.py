@@ -46,8 +46,8 @@ from sources import (
     PER_SITE_SOURCES,
     REPO_DATA_DIR,
     SOURCE_CHOICES,
+    PointTemporalType,
     SourceType,
-    UkvTemporalType,
     point_output_path_for,
 )
 
@@ -60,13 +60,6 @@ METADATA_PATH: Final[Path] = REPO_DATA_DIR / "NGED" / "metadata.parquet"
 CAPACITY_DELTA_URI: Final[str] = str(REPO_DATA_DIR / "effective_capacity")
 OPEN_METEO_PATH: Final[Path] = REPO_DATA_DIR / "ERA5" / "beam_diffuse_open_meteo.parquet"
 CAMS_PATH: Final[Path] = REPO_DATA_DIR / "CAMS" / "beam_diffuse_cams.parquet"
-UKV_PATH: Final[Path] = point_output_path_for(source="ukv")
-"""Where `fetch_open_meteo_point.py` writes the UKV download.
-
-Both ends call `sources.point_output_path_for` rather than spelling the path twice, so the
-fetcher and this reader cannot disagree about it.
-"""
-
 AlignmentType = Literal["as-labelled", "shifted", "piecewise"]
 """How the power stamps are read against ERA5.
 
@@ -305,23 +298,31 @@ def _read_cams(*, min_reliability: float) -> pl.DataFrame:
     return reliable.select("site", "time", "ghi_w_m2", "bhi_w_m2").sort("site", "time")
 
 
-def _read_ukv(*, temporal: UkvTemporalType) -> pl.DataFrame:
-    """Read the UKV per-site frame `fetch_open_meteo_point.py` wrote.
+def _read_open_meteo_point(*, source: SourceType, temporal: PointTemporalType) -> pl.DataFrame:
+    """Read one per-site frame `fetch_open_meteo_point.py` wrote.
+
+    Both models the fetcher serves write the same four columns under the same names, so one reader
+    covers them; only the path differs, and `point_output_path_for` owns that.
 
     Args:
+        source: Which model's download to read.
         temporal: Which pair of columns to feed the arms. `hourly` is the default served
             column, a backward-looking mean over the hour ending at the label; `instant` is
             the snapshot at that label.
 
     Returns:
         One row per (site, time) with `ghi_w_m2` and `bhi_w_m2`.
+
+    Raises:
+        FileNotFoundError: If that model has not been downloaded.
     """
-    if not UKV_PATH.exists():
-        msg = f"{UKV_PATH} missing; run fetch_open_meteo_point.py --model ukv first"
+    path = point_output_path_for(source=source)
+    if not path.exists():
+        msg = f"{path} missing; run fetch_open_meteo_point.py --model {source} first"
         raise FileNotFoundError(msg)
     suffix = "_instant" if temporal == "instant" else ""
-    ukv = pl.read_parquet(UKV_PATH)
-    return ukv.select(
+    frame = pl.read_parquet(path)
+    return frame.select(
         "site",
         "time",
         ghi_w_m2=pl.col(f"ghi{suffix}_w_m2"),
@@ -747,7 +748,7 @@ def main() -> int:
         help="Drop CAMS hours flagged below this fraction. Zero keeps every hour.",
     )
     parser.add_argument(
-        "--ukv-temporal",
+        "--point-temporal",
         choices=("hourly", "instant"),
         default="hourly",
         help=(
@@ -813,7 +814,7 @@ def main() -> int:
         per_site = (
             _read_cams(min_reliability=arguments.min_cams_reliability)
             if source == "cams"
-            else _read_ukv(temporal=arguments.ukv_temporal)
+            else _read_open_meteo_point(source=source, temporal=arguments.point_temporal)
         )
         joined = joined.drop("ghi_w_m2", "bhi_w_m2").join(
             per_site, on=["site", "time"], how="inner"

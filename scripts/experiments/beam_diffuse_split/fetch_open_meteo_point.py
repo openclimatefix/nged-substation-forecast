@@ -337,7 +337,7 @@ def _check_hourly_value_is_a_backward_mean(*, frame: pl.DataFrame) -> None:
     the sun's geometry therefore pins both the conversion and which hour the label names.
 
     What the check settles is which of the two served columns the arms should read, which
-    `sources.UkvTemporalType` records and explains.
+    `sources.PointTemporalType` records and explains.
 
     Args:
         frame: The downloaded rows, carrying the geometry `_solar_geometry` adds.

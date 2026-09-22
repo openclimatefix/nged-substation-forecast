@@ -96,11 +96,12 @@ MAE_SETUPS: Final[tuple[tuple[str, str, str], ...]] = (
 SOURCE_LABELS: Final[dict[str, str]] = {
     "open-meteo": "ERA5 (31 km reanalysis)",
     "ukv": "UKV (2 km model analysis)",
+    "icon-d2": "ICON-D2 (2 km model analysis)",
     "cams": "CAMS (5 km satellite retrieval)",
 }
 """Source keys to the label a reader sees, matching the headline contrast chart."""
 
-SKY_CHART_SOURCES: Final[tuple[str, ...]] = ("cams", "ukv")
+SKY_CHART_SOURCES: Final[tuple[str, ...]] = ("cams", "ukv", "icon-d2")
 """Which sources get a sky-condition breakdown.
 
 Both are the fine-resolution sources, and the breakdown is where UKV's fixed aerosol climatology

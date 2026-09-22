@@ -55,9 +55,10 @@ as well as in beam field. The tree's contrasts hold their sign under every readi
 SOURCE_LABELS: Final[dict[str, str]] = {
     "open-meteo": "ERA5 (31 km reanalysis)",
     "ukv": "UKV (2 km model analysis)",
+    "icon-d2": "ICON-D2 (2 km model analysis)",
     "cams": "CAMS (5 km satellite retrieval)",
 }
-"""Source keys to the labels a reader sees, the two model sources before the retrieval.
+"""Source keys to the labels a reader sees, the model sources before the retrieval.
 
 **A source missing from this mapping is drawn nowhere**, which is why
 `_raise_on_unlabelled_sources` stops on a results directory named by neither this mapping nor

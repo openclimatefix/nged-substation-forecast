@@ -19,7 +19,7 @@ import os
 from pathlib import Path
 from typing import Final, Literal, NamedTuple
 
-SourceType = Literal["cds", "open-meteo", "cams", "ukv"]
+SourceType = Literal["cds", "open-meteo", "cams", "ukv", "icon-d2"]
 """Which irradiance download to build from.
 
 `open-meteo` is the reanalysis route the experiment runs on, because it serves the same fields in
@@ -39,15 +39,22 @@ archive. UKV separates resolution from delivery: ERA5 against UKV is a resolutio
 one product class, whereas ERA5 against CAMS crosses from a reanalysis to a satellite retrieval as
 well as from 31 km to 5 km.
 
-Both `cams` and `ukv` take their air temperature from the Open-Meteo ERA5 frame, because the
-temperature feature is shared by every arm and a source must differ from ERA5 only in its irradiance
-columns.
+`icon-d2` is the German weather service's 2 km model, also from Open-Meteo's historical-forecast
+archive. A second model at the same grid spacing from a different forecasting centre is what turns
+a single 2 km result into a resolution claim: if the published split helps on both, the finding is
+about grid spacing rather than about one centre's radiation scheme. Its own radiation output is
+accumulated where UKV's is instantaneous, so Open-Meteo reaches the hourly column by
+de-accumulation rather than by reconstruction.
+
+Each of `cams`, `ukv`, and `icon-d2` takes its air temperature from the Open-Meteo ERA5 frame,
+because the temperature feature is shared by every arm and a source must differ from ERA5 only in
+its irradiance columns.
 """
 
-SOURCE_CHOICES: Final[tuple[SourceType, ...]] = ("cds", "open-meteo", "cams", "ukv")
+SOURCE_CHOICES: Final[tuple[SourceType, ...]] = ("cds", "open-meteo", "cams", "ukv", "icon-d2")
 """Every source name, as `argparse` `choices` for the scripts that take `--source`."""
 
-PER_SITE_SOURCES: Final[tuple[SourceType, ...]] = ("cams", "ukv")
+PER_SITE_SOURCES: Final[tuple[SourceType, ...]] = ("cams", "ukv", "icon-d2")
 """Sources downloaded at each meter's own coordinates rather than on the ERA5 grid.
 
 A build from one of these still reads the gridded ERA5 frame, for the air temperature every arm
@@ -69,8 +76,8 @@ not be trained on until someone has.
 """
 
 
-UkvTemporalType = Literal["hourly", "instant"]
-"""Which pair of served columns a UKV build feeds the arms.
+PointTemporalType = Literal["hourly", "instant"]
+"""Which pair of served columns a per-site Open-Meteo build feeds the arms.
 
 `hourly` is the default column, a backward-looking mean over the hour ending at the label. That is
 the same temporal object as ERA5's hourly integral, as the CAMS hourly integration, and as the
@@ -108,7 +115,14 @@ OPEN_METEO_MODELS: Final[dict[str, OpenMeteoModel]] = {
         archive_starts="2022-03-01",
         live_ingest_starts="2024-08-12",
         native_radiation="instantaneous",
-    )
+    ),
+    "icon-d2": OpenMeteoModel(
+        source="icon-d2",
+        models_parameter="icon_d2",
+        archive_starts="2023-01-01",
+        live_ingest_starts=None,
+        native_radiation="accumulated",
+    ),
 }
 """Every model `fetch_open_meteo_point.py` can download, keyed by its `--model` name.
 
