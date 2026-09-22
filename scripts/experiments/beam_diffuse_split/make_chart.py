@@ -59,9 +59,19 @@ SOURCE_LABELS: Final[dict[str, str]] = {
 }
 """Source keys to the labels a reader sees, coarsest grid first.
 
-**A source missing from this mapping is drawn nowhere**, which is why `_unlabelled_sources` raises
-on a results directory the mapping does not name rather than letting the chart come out looking
-complete with an arm silently absent from it.
+**A source missing from this mapping is drawn nowhere**, which is why
+`_raise_on_unlabelled_sources` stops on a results directory named by neither this mapping nor
+`UNDRAWN_SOURCES`, rather than letting the chart come out looking complete with an arm silently
+absent from it.
+"""
+
+UNDRAWN_SOURCES: Final[tuple[str, ...]] = ("cds",)
+"""Sources with results on disk that the chart deliberately leaves out.
+
+`cds` is the Copernicus route to the same ERA5 fields `open-meteo` serves, checked against each
+other by `verify_era5_sources.py`, so drawing both would put one reanalysis on the chart twice
+under two names. Naming the exclusion here is what lets the guard below tell a deliberate omission
+from a forgotten one.
 """
 
 INSTRUMENT_LABELS: Final[dict[str, str]] = {
@@ -139,6 +149,11 @@ def _raise_on_unlabelled_sources(*, stem: str) -> None:
     experiment and not to the mapping is dropped with no error, no warning and no gap in the chart
     for a reader to notice. This is R&D code, so it stops rather than degrading.
 
+    Two kinds of directory are left out on purpose and must not stop the run. A `--suffix` variant
+    build is named `{source}{suffix}`, so it begins with a source one of the two tables names, and
+    the chart draws each source's main build rather than its variants. And a source in
+    `UNDRAWN_SOURCES` is excluded by a decision recorded there.
+
     Args:
         stem: `results` for the tree's runs or `physics` for the fitted model's.
 
@@ -152,11 +167,15 @@ def _raise_on_unlabelled_sources(*, stem: str) -> None:
         for path in (REPO_DATA_DIR / "ERA5").glob(f"{prefix}*{suffix}")
         if path.is_dir()
     }
-    unlabelled = sorted(found - set(SOURCE_LABELS))
+    known = (*SOURCE_LABELS, *UNDRAWN_SOURCES)
+    unlabelled = sorted(
+        name for name in found if not any(name.startswith(source) for source in known)
+    )
     if unlabelled:
         msg = (
-            f"{stem} results exist for {unlabelled}, which SOURCE_LABELS does not name, so they "
-            "would be left out of the chart without saying so. Add each one to SOURCE_LABELS."
+            f"{stem} results exist for {unlabelled}, which neither SOURCE_LABELS nor "
+            "UNDRAWN_SOURCES names, so they would be left out of the chart without saying so. Add "
+            "each one to whichever it belongs in."
         )
         raise ValueError(msg)
 
