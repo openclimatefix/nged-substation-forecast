@@ -634,7 +634,7 @@ single site's PV parameters are hard to recover.
 before trusting a fitted orientation or the capacity that comes with it.** The same model fitted on
 the same rows moves its fitted azimuth by about 35 degrees when the timestamps are shifted by one
 half-hour, which is a quarter of the range a GB array's orientation can plausibly occupy, from a
-30-minute change in what the timestamp means. The [power stamps on this
+30-minute change in what the timestamp means. The [power timestamps on this
 feed](../results/beam-diffuse-split.md#the-power-timestamps-before-26-march-2026-are-half-an-hour-late)
 were half an hour late until 08:30 UTC on 26 March 2026. Any estimator that fits orientation has
 the same exposure, and an orientation error feeds straight into the capacity it reports.

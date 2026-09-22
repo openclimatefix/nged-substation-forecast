@@ -768,10 +768,11 @@ denominator where a plant moves. Both readings are set out
 [above](#what-the-per-site-error-drift-says-about-estimating-effective-capacity).
 
 **The half-hour power-timestamp offset is settled, and it reaches further than this experiment.**
-NGED's feed has stamped readings correctly since 08:30 UTC on 26 March 2026, and three independent
-measurements agree that readings before that instant are half an hour late while readings after it
-are not. Any model trained on telemetry from before that instant is affected, not only the models
-here, and the same step appears in series on this feed that are not PV meters.
+NGED's feed has stamped readings correctly since 08:30 UTC on 26 March 2026. Three independent
+measurements agree that readings before that instant are half an hour late, and that readings from
+that instant onwards are not. Every model trained before the ingest began repairing the timestamps
+has learnt the offset, not only the models here, and the same step appears in series on this feed
+that are not PV meters.
 
 **NGED holds a usable record of active network management, and of the two records it holds, the
 setpoint history is the one to read.** The [capacity-estimation
@@ -859,10 +860,10 @@ design that eliminated the floor rather than arguing past it would be stronger.
 
 ### The power timestamps before 26 March 2026 are half an hour late
 
-**NGED's half-hourly power feed has stamped readings correctly since 08:30 UTC on 26 March 2026,
-and every reading stamped before that instant describes the half-hour before the one its label
-names.** The contract says a reading stamped `T` is the mean over `(T − 30 min, T]`. Before that
-instant a reading stamped `T` is instead the mean over `(T − 60 min, T − 30 min]`. Every number on
+**Every reading NGED stamped before 08:30 UTC on 26 March 2026 describes the half-hour before the
+half-hour its label names, and NGED's feed has stamped readings correctly since that instant.** The
+contract says a reading stamped `T` is the mean over `(T − 30 min, T]`. Before that instant a
+reading stamped `T` is instead the mean over `(T − 60 min, T − 30 min]`. Every number on
 this page is computed on the corrected reading: a reading before that instant is moved half an hour
 earlier, and a reading from that instant onwards is taken as it stands.
 
@@ -891,9 +892,9 @@ not what sets the answer. `stamp_alignment.py` prints all three.
 **The offset is neither a daylight-saving fault nor an artefact of how this project reads the
 feed.** A daylight-saving fault would step at the March and October boundaries and would be an hour;
 this offset does neither. NGED's own JSON labels every reading with an explicit `startTime` and
-`endTime`, both carrying a UTC offset and each abutting the next record, and the ingest reads
-`endTime` and then repairs the late timestamps. So the feed states which half-hour it means, and
-until 26 March 2026 the sun disagreed with it by one half-hour.
+`endTime`, both carrying a UTC offset and each abutting the next record. The offset above is
+measured against those labels as NGED published them. So the feed states which half-hour it means,
+and until 08:30 UTC on 26 March 2026 the sun disagreed with it by one half-hour.
 
 **Reading the timestamps correctly matters most to the arm under test.** A half-hour error blunts the
 sharp beam signal more than the smooth diffuse signal, so it penalises the arm given the published

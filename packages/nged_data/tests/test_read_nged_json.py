@@ -177,9 +177,10 @@ def test_extract_power_time_series_drops_a_reading_the_correction_pushes_out_of_
     """A reading is judged on the timestamp that will be stored, not on the timestamp NGED sent.
 
     A reading stamped exactly `MIN_PLAUSIBLE_DATETIME` is the only reading that can distinguish
-    correcting before dropping from correcting after: any other reading the correction pushes out
-    of range is misaligned, and so is dropped either way. Correcting second would leave this row to
-    raise out of `validate`, failing the whole ingest run over one malformed external reading.
+    repairing the timestamps before dropping implausible rows from repairing them afterwards. Any
+    other reading the repair pushes out of range is misaligned, and so is dropped either way.
+    Repairing second would leave the `MIN_PLAUSIBLE_DATETIME` reading to raise out of `validate`.
+    One malformed external reading would then fail the whole ingest run.
     """
     raw_json = (
         b'{"data": [{"endTime": "'

@@ -128,10 +128,11 @@ for the "bouncing off zero" behaviour apparent-power metering produces.
   survivors plus a count of what was dropped. Only the NGED JSON ingestion path
   (`nged_data.read_nged_json`) calls it; the duplicate/sortedness checks in `validate()` are never
   relaxed, because those indicate a bug in our own pipeline rather than malformed external data.
-- **Repair a known upstream fault at the ingestion boundary**:
-  `PowerTimeSeries.correct_late_timestamps()` moves every reading NGED stamped before
-  `POWER_TIMESTAMPS_CORRECTED_BEFORE` 30 minutes earlier. The `correct_late_timestamps` docstring
-  says why the correction has to run before `drop_implausible_rows()`.
+- **Repair a known upstream fault at the ingestion boundary**: NGED's feed stamped every reading
+  half an hour late until 08:30 UTC on 26 March 2026 (`POWER_TIMESTAMPS_CORRECTED_BEFORE`), so
+  `PowerTimeSeries.correct_late_timestamps()` moves every reading stamped before that instant back
+  by 30 minutes. The `correct_late_timestamps` docstring says why the repair has to run before
+  `drop_implausible_rows()`.
 - **No lookahead bias**: `AllFeatures` carries `power_fcst_init_time` (when we make the forecast) as
   a distinct field from `nwp_init_time` (when the NWP model ran). Power lag features are nullified
   by `_nullify_leaky_lags()` when the lag is shorter than or equal to the forecast lead time — the

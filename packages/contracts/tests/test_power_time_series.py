@@ -237,9 +237,10 @@ def test_drop_implausible_rows_leaves_a_validatable_frame() -> None:
             POWER_TIMESTAMPS_CORRECTED_BEFORE, POWER_TIMESTAMPS_CORRECTED_BEFORE, id="instant_stays"
         ),
         # Not redundant beside `instant_stays`, though the two cases look alike. Every other
-        # timestamp the suite pushes through this method sits at or before the correction instant,
-        # so without this case the whole suite passes on a predicate of `!=`, which shifts every
-        # reading the live service ingests and leaves only the correction instant alone.
+        # timestamp the suite pushes through this method sits at or before
+        # `POWER_TIMESTAMPS_CORRECTED_BEFORE`, so without this case the whole suite would pass with
+        # the predicate mutated to `!=`. That predicate shifts every reading the live service
+        # ingests and leaves only the reading at that instant alone.
         pytest.param(
             datetime(2026, 3, 26, 9, 0, tzinfo=UTC),
             datetime(2026, 3, 26, 9, 0, tzinfo=UTC),
@@ -252,8 +253,9 @@ def test_correct_late_timestamps_moves_only_the_late_readings(
 ) -> None:
     """The boundary is exclusive: the first correctly stamped reading must not move.
 
-    An implementation using `<=` where the correction requires `<` passes `before_moves_back` and
-    fails `instant_stays`, which is the whole of what separates the two regimes.
+    An implementation using `<=` where the repair requires `<` passes `before_moves_back` and
+    fails `instant_stays`. The choice between `<` and `<=` is the whole of what separates a late
+    reading from a correctly stamped reading.
     """
     corrected = PowerTimeSeries.correct_late_timestamps(_frame([time]))
 
