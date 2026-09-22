@@ -45,21 +45,22 @@ BOOTSTRAP_DRAWS: Final[int] = 1000
 CONFIDENCE_PERCENTILES: Final[tuple[float, float]] = (2.5, 97.5)
 """The percentiles of the bootstrap distribution reported as a 95% interval."""
 
-REPORTED_ARMS: Final[tuple[str, ...]] = (
-    "A_global_only",
-    "B_erbs",
-    "C_era5_split",
-    "D_direct_fraction",
-)
-"""The arms the table prints, in the order it prints them.
+REPORTED_ARMS: Final[dict[str, tuple[str, ...]]] = {
+    "xgboost": ("A_global_only", "B_erbs", "C_era5_split", "D_direct_fraction"),
+    "physics": ("P_A_global_only", "P_B_erbs", "P_C_source_split", "P_E_blended"),
+}
+"""The arms each instrument's table prints, in the order it prints them.
 
 The two separation-model arms the main report carries — `B_disc` and `B_learned` — are left out
 because the double penalty is a claim about the published split, and the headline contrast that
-claim rests on is `C_era5_split` against `B_erbs`.
+claim rests on is the source's own split against the Erbs split.
 """
 
-HEADLINE_CONTRAST: Final[tuple[str, str]] = ("C_era5_split", "B_erbs")
-"""The treatment and reference arms whose FSS difference gets a bootstrap interval."""
+HEADLINE_CONTRAST: Final[dict[str, tuple[str, str]]] = {
+    "xgboost": ("C_era5_split", "B_erbs"),
+    "physics": ("P_C_source_split", "P_B_erbs"),
+}
+"""Each instrument's treatment and reference arm, whose FSS difference gets a bootstrap interval."""
 
 
 def _capped_forecasts(*, source: str, alignment: str, suffix: str, instrument: str) -> pl.DataFrame:
@@ -227,7 +228,14 @@ def _bootstrap_fss_difference(
 
 
 def main() -> int:
-    """Print the score for every arm, at every tolerance, and interval the headline contrast."""
+    """Print the score for every arm, at every tolerance, and interval the headline contrast.
+
+    Returns:
+        The process exit status.
+
+    Raises:
+        ValueError: If no arm this instrument reports is present in the run.
+    """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--source", choices=SOURCE_CHOICES, default="open-meteo")
     parser.add_argument(
@@ -254,7 +262,14 @@ def main() -> int:
         .group_by("site")
         .agg(threshold_mw=pl.col("power_mw").quantile(arguments.threshold_quantile))
     )
-    arms = [arm for arm in REPORTED_ARMS if arm in forecasts["arm"].unique().to_list()]
+    present = forecasts["arm"].unique().to_list()
+    arms = [arm for arm in REPORTED_ARMS[arguments.instrument] if arm in present]
+    if not arms:
+        msg = (
+            f"none of the {arguments.instrument} arms {REPORTED_ARMS[arguments.instrument]} "
+            f"is in this run, which holds {sorted(present)}"
+        )
+        raise ValueError(msg)
     seeds = sorted(forecasts["seed"].unique().to_list())
 
     components: dict[tuple[str, int, int], pl.DataFrame] = {}
@@ -299,7 +314,7 @@ def main() -> int:
             cells.append(f"{float(np.nanmean(scores)):.4f}")
         lines.append(f"| {arm} | " + " | ".join(cells) + " |")
 
-    treatment_arm, reference_arm = HEADLINE_CONTRAST
+    treatment_arm, reference_arm = HEADLINE_CONTRAST[arguments.instrument]
     if treatment_arm in arms and reference_arm in arms:
         lines += [
             "",
