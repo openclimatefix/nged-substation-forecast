@@ -21,14 +21,14 @@ points, against 0.126 for the widest gap between two XGBoost models differing on
 diffuse columns. The beam/diffuse split is therefore a question to settle inside the choice of
 irradiance product.
 
-![Figure 1: how much each beam/diffuse split changes the
-error](assets/beam_diffuse_split_result.svg)
+![Figure 1: On CAMS the published beam lowers XGBoost's error beyond the Erbs split; on ERA5 it does
+not](assets/beam_diffuse_split_result.svg)
 
-Figure 1 plots each change in error as a percentage of the error it is compared against, rather than
-in points. The right-hand panels hold the comparison the experiment exists for, the weather
-product's split against the Erbs split, where the CAMS row for XGBoost sits at −1.8%. The top row of
-panels is XGBoost and the bottom row the fitted physical PV model, and the left-hand panels compare
-each split against global irradiance alone.
+In Figure 1 each row is the error of one setup, meaning one PV power model given one set of
+irradiance columns, minus the error of another setup, in points. Each label gives both setups' own
+errors. The top panel holds the comparison the experiment exists for, with XGBoost. The second panel
+holds the same comparison for the fitted physical PV model, which disagrees. The bottom two panels
+compare each split against global irradiance alone. Each panel has its own x scale.
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
@@ -452,7 +452,7 @@ contrast is +0.005 points, not statistically significant at the 5% level.**
 
 Each cell is the change in mean absolute error, in points of P99 output, for XGBoost. Negative
 favours the first setup. Bold marks the two contrasts the page's conclusion rests on. Figure 1, at
-the top of the page, plots the same contrasts as percentages.
+the top of the page, plots these contrasts.
 
 #### Re-encoding alone improves this pipeline, and the headline is measured on top of it
 
