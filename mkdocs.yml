@@ -44,6 +44,7 @@ plugins:
   - redirects:
       redirect_maps:
         background/nged-incumbent-forecast.md: background/manual-heuristic-forecast.md
+        studies/weather-products-for-the-past.md: studies/weather-products-for-past-solar.md
 
 nav:
   - Home: index.md
@@ -86,7 +87,7 @@ nav:
   - Studies:
       - Overview: studies/index.md
       - "Does a weather product's beam/diffuse split help a PV forecast?": studies/beam-diffuse-split.md
-      - "Which weather product best describes past sunshine?": studies/weather-products-for-the-past.md
+      - "Which weather product best describes past sunshine?": studies/weather-products-for-past-solar.md
       - "Which weather product best describes past wind?": studies/weather-products-for-past-wind.md
   - ML experimentation:
       - Overview: ml_experimentation/index.md

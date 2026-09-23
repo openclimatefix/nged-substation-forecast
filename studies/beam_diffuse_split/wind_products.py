@@ -28,7 +28,8 @@ under-sampled; dropping no rows at all moves every contrast by 0.03 points or le
 `weather_products.py`.
 
 Run it with `uv run python studies/beam_diffuse_split/wind_products.py`, after
-`fetch_wind_point.py`.
+`fetch_wind_point.py`. With `--fit-missing` it keeps the losses a full run saved and fits only the
+arms they lack.
 """
 
 import argparse
@@ -51,6 +52,7 @@ from weather_products import (
     _mae,
     _scope,
     _with_eras,
+    geometry_lines,
 )
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
@@ -88,7 +90,7 @@ EXPLORATORY_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
 """Contrasts reported for context, not relied on."""
 
 
-def _hourly_power(*, sites: pl.DataFrame) -> pl.DataFrame:
+def _hourly_power(*, sites: pl.DataFrame, centred: bool = True) -> pl.DataFrame:
     """Average each wind generator's half-hours onto an hour centred on its label.
 
     Shifting every stamp back 30 minutes before `hourly_from_half_hourly` means the hour labelled T
@@ -96,6 +98,8 @@ def _hourly_power(*, sites: pl.DataFrame) -> pl.DataFrame:
 
     Args:
         sites: The wind roster.
+        centred: Whether to centre the hour on its label; False gives the solar study's hour,
+            ending at the label, for the `hour_ending` setting.
 
     Returns:
         One row per (site, time) with `power_mw` and `has_zero_half_hour`.
@@ -105,7 +109,11 @@ def _hourly_power(*, sites: pl.DataFrame) -> pl.DataFrame:
         .filter(pl.col("time_series_id").is_in(sites["time_series_id"].to_list()))
         .collect()
         .join(sites.select("time_series_id", "site"), on="time_series_id")
-        .select("site", time=pl.col("time").dt.offset_by("-30m"), power_mw=pl.col("power"))
+        .select(
+            "site",
+            time=pl.col("time").dt.offset_by("-30m" if centred else "0m"),
+            power_mw=pl.col("power"),
+        )
     )
     return hourly_from_half_hourly(half_hourly=half_hourly)
 
@@ -154,6 +162,9 @@ UKV_80M_COLUMNS: Final[tuple[str, str, str, str]] = (
 )
 """UKV's served 80 m speed and direction and its 10 m speed, for the check arm `ukv_80m`."""
 
+STEP_SITE: Final[str] = "W3"
+"""The generator at which ICON global's served wind steps, relative to ICON-EU's."""
+
 STEP_DATES: Final[tuple[datetime, datetime]] = (
     datetime(2025, 6, 2, tzinfo=UTC),
     datetime(2026, 6, 2, tzinfo=UTC),
@@ -161,7 +172,20 @@ STEP_DATES: Final[tuple[datetime, datetime]] = (
 """The two days ICON global's served wind steps at one generator, relative to ICON-EU's.
 
 The `_step` arms are told which of the three periods each hour falls in, which measures how much of
-ICON global's deficit the steps explain.
+ICON global's deficit the steps explain. ERA5 and ICON-EU get the same flag, so ICON global told the
+steps is compared with rivals that carry the same extra column.
+"""
+
+
+STEP_ARM_PRODUCTS: Final[tuple[str, ...]] = ("era5", "icon_eu", "icon_global")
+"""The products given a `_step` arm: ICON global, and the two rivals it is compared with."""
+
+
+ROW_SET_SETTINGS: Final[tuple[str, ...]] = ("hour_ending", "keep_zero_hours")
+"""Settings fitted on a different row set from the main one, each for every product's wind arm.
+
+`hour_ending` builds the power hour as the solar study does, ending at the label, and
+`keep_zero_hours` keeps the hours holding an exactly-zero half-hour. Both are post hoc checks.
 """
 
 
@@ -177,16 +201,17 @@ def _hub_height_m(*, product: str) -> int:
     return 80 if product.startswith("icon") else 100
 
 
-def _joined(*, sites: pl.DataFrame) -> pl.DataFrame:
+def _joined(*, sites: pl.DataFrame, centred: bool = True) -> pl.DataFrame:
     """Join the hourly power to every product's wind on the site-hours all of them cover.
 
     Args:
         sites: The wind roster.
+        centred: Passed to `_hourly_power`.
 
     Returns:
         One row per common site-hour with the power, the capacity, and every product's wind.
     """
-    frame = _hourly_power(sites=sites).join(
+    frame = _hourly_power(sites=sites, centred=centred).join(
         sites.select("site", "effective_capacity_mw"), on="site"
     )
     for product in PRODUCTS:
@@ -222,11 +247,13 @@ def _joined(*, sites: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def _common_rows(*, frame: pl.DataFrame) -> pl.DataFrame:
+def _common_rows(*, frame: pl.DataFrame, drop_zero_hours: bool = True) -> pl.DataFrame:
     """Drop the rows no product should be scored on, by rules no product's values decide.
 
     Args:
         frame: The joined frame.
+        drop_zero_hours: Whether to drop every hour holding an exactly-zero half-hour; False
+            keeps them, for the `keep_zero_hours` setting.
 
     Returns:
         The frame without zero-half-hour hours and the post-upgrade tail of January 2026, with the
@@ -235,8 +262,9 @@ def _common_rows(*, frame: pl.DataFrame) -> pl.DataFrame:
         constrained.
     """
     february = datetime(2026, 2, 1, tzinfo=UTC)
+    zero_rule = ~pl.col("has_zero_half_hour") if drop_zero_hours else pl.lit(value=True)
     return frame.filter(
-        ~pl.col("has_zero_half_hour"),
+        zero_rule,
         ~pl.col("time").is_between(UPGRADE_DAY, february, closed="left"),
     ).with_columns(constrained=pl.lit(value=False), cap_mw=pl.lit(None, dtype=pl.Float64))
 
@@ -245,7 +273,8 @@ def _jobs() -> list[Job]:
     """Return every product's wind arm at both settings and its served-100 m arm, and the checks.
 
     Returns:
-        Three jobs per product, plus the UKV 80 m arm and the two step-period arms.
+        Three jobs per product, the UKV 80 m arm, the three step-period arms, and one job per
+        product in each of `ROW_SET_SETTINGS`.
     """
     jobs: list[Job] = []
     for product in PRODUCTS:
@@ -288,7 +317,19 @@ def _jobs() -> list[Job]:
             PRIMARY_HYPER_PARAMETERS,
             False,
         )
-        for product in ("icon_eu", "icon_global")
+        for product in STEP_ARM_PRODUCTS
+    ]
+    jobs += [
+        (
+            f"{product}_wind",
+            setting,
+            "power_mw",
+            (*SHARED_FEATURES, *_wind_columns(product=product)),
+            PRIMARY_HYPER_PARAMETERS,
+            False,
+        )
+        for setting in ROW_SET_SETTINGS
+        for product in PRODUCTS
     ]
     return jobs
 
@@ -363,6 +404,7 @@ def _check_arms(*, losses: pl.DataFrame, wind: pl.DataFrame, sites: list[str]) -
         "",
         (
             f"MAE: ukv_80m {_mae(losses=losses, arm='ukv_80m'):.3f}, "
+            f"era5_step {_mae(losses=losses, arm='era5_step'):.3f}, "
             f"icon_eu_step {_mae(losses=losses, arm='icon_eu_step'):.3f}, "
             f"icon_global_step {_mae(losses=losses, arm='icon_global_step'):.3f}."
         ),
@@ -382,6 +424,16 @@ def _check_arms(*, losses: pl.DataFrame, wind: pl.DataFrame, sites: list[str]) -
             label=f"ICON lead {lead} h",
         )
         for t, r in (("icon_d2_wind", "ukv_wind"), ("icon_eu_wind", "ukv_wind"))
+        for lead in (0, 1, 2)
+    ]
+    lines += [
+        _contrast_line(
+            losses=_scoped(losses=three_hour, scope=era).filter(pl.col("icon_lead") == lead),
+            treatment="icon_d2_wind",
+            reference="ukv_wind",
+            label=f"ICON lead {lead} h, {era}",
+        )
+        for era in ("pre", "post")
         for lead in (0, 1, 2)
     ]
     six_hour = wind.with_columns(global_lead=pl.col("time").dt.hour() % 6)
@@ -419,15 +471,128 @@ def _check_arms(*, losses: pl.DataFrame, wind: pl.DataFrame, sites: list[str]) -
             ),
         )
     ]
+    others = [site for site in sites if site != STEP_SITE]
+    pooled_label = "sites " + " and ".join(others)
+    lines += [
+        _contrast_line(
+            losses=wind.filter(pl.col("site").is_in(others)),
+            treatment="icon_global_wind",
+            reference="icon_eu_wind",
+            label=pooled_label,
+        ),
+        _contrast_line(
+            losses=step.filter(pl.col("site").is_in(others)),
+            treatment="icon_global_step",
+            reference="icon_eu_step",
+            label=f"told the step period, {pooled_label}",
+        ),
+    ]
+    lines += [
+        _contrast_line(
+            losses=scoped, treatment="icon_global_step", reference="era5_step", label=label
+        )
+        for label, scoped in (
+            ("told the step period, all sites", step),
+            *(
+                (f"told the step period, site {site}", step.filter(pl.col("site") == site))
+                for site in sites
+            ),
+        )
+    ]
     return lines
 
 
-def _report(*, frame: pl.DataFrame, losses: pl.DataFrame) -> str:
+def _step_ratio_lines() -> list[str]:
+    """Report ICON global's mean wind speed over ICON-EU's at each site, either side of each step.
+
+    Each ratio is of the whole period's means, read from the downloads `fetch_wind_point.py` wrote.
+
+    Returns:
+        Markdown lines.
+    """
+    heights = (10, 80)
+    speeds = [f"wind_speed_{height}m" for height in heights]
+    joined = (
+        pl.read_parquet(output_path_for(product="icon_global"))
+        .select("site", "time", *speeds)
+        .join(
+            pl.read_parquet(output_path_for(product="icon_eu")).select("site", "time", *speeds),
+            on=["site", "time"],
+            suffix="_eu",
+        )
+        .with_columns(period=sum(pl.col("time") >= date for date in STEP_DATES))
+    )
+    lines = [
+        "#### ICON global's mean wind speed over ICON-EU's, by step period",
+        "",
+        "| Site | Height | Before 2 June 2025 | Between | From 2 June 2026 |",
+        "|---|---|---|---|---|",
+    ]
+    for site in sorted(joined["site"].unique().to_list()):
+        for height in heights:
+            speed = f"wind_speed_{height}m"
+            ratios = (
+                joined.filter(pl.col("site") == site)
+                .group_by("period")
+                .agg(ratio=pl.col(speed).mean() / pl.col(f"{speed}_eu").mean())
+                .sort("period")["ratio"]
+                .to_list()
+            )
+            cells = " | ".join(f"{ratio:.3f}" for ratio in ratios)
+            lines.append(f"| {site} | {height} m | {cells} |")
+    return lines
+
+
+def _row_set_lines(*, losses: pl.DataFrame, wind: pl.DataFrame) -> list[str]:
+    """Report the post hoc row-set checks: the solar study's power hour, and keeping zero hours.
+
+    Args:
+        losses: Every arm's losses, every setting.
+        wind: The main setting's `_wind` arms.
+
+    Returns:
+        Markdown lines.
+    """
+    by_setting = {
+        setting: losses.filter(pl.col("setting") == setting) for setting in ROW_SET_SETTINGS
+    }
+    lines = [
+        "#### The power hour and the zero rule (post hoc)",
+        "",
+        "| Product | Main | Hour ending at the label | Zero hours kept |",
+        "|---|---|---|---|",
+    ]
+    for product in PRODUCTS:
+        arm = f"{product}_wind"
+        cells = " | ".join(f"{_mae(losses=scoped, arm=arm):.3f}" for scoped in by_setting.values())
+        lines.append(f"| {product} | {_mae(losses=wind, arm=arm):.3f} | {cells} |")
+    lines += ["", *CONTRAST_HEADER]
+    for setting, scoped in by_setting.items():
+        lines += [
+            _contrast_line(losses=scoped, treatment=t, reference=r, label=setting)
+            for t, r in REPORTED_CONTRASTS
+        ]
+    lines.append("")
+    for setting, scoped in by_setting.items():
+        largest = max(
+            abs(
+                _mae(losses=scoped, arm=t)
+                - _mae(losses=scoped, arm=r)
+                - (_mae(losses=wind, arm=t) - _mae(losses=wind, arm=r))
+            )
+            for t, r in REPORTED_CONTRASTS
+        )
+        lines.append(f"Largest change in a reported contrast's estimate, {setting}: {largest:.3f}.")
+    return lines
+
+
+def _report(*, frame: pl.DataFrame, losses: pl.DataFrame, sites_roster: pl.DataFrame) -> str:
     """Assemble the markdown report.
 
     Args:
         frame: The common rows.
-        losses: Every arm's losses, at both settings.
+        losses: Every arm's losses, at every setting.
+        sites_roster: The wind roster, for the distances.
 
     Returns:
         The report.
@@ -513,6 +678,24 @@ def _report(*, frame: pl.DataFrame, losses: pl.DataFrame) -> str:
         for t, r in EXPLORATORY_CONTRASTS
     ]
     lines += [
+        _contrast_line(
+            losses=wind.filter(pl.col("site") == site),
+            treatment="icon_d2_wind",
+            reference="era5_wind",
+            label=f"site {site}",
+        )
+        for site in sites
+    ]
+    lines += [
+        _contrast_line(
+            losses=scoped, treatment="icon_global_wind", reference="era5_wind", label=label
+        )
+        for label, scoped in (
+            *((scope, _scoped(losses=wind, scope=scope)) for scope in ("winter", "summer")),
+            *((f"site {site}", wind.filter(pl.col("site") == site)) for site in sites),
+        )
+    ]
+    lines += [
         "",
         "Mean served 100 m wind speed, all sites: "
         + ", ".join(
@@ -521,25 +704,57 @@ def _report(*, frame: pl.DataFrame, losses: pl.DataFrame) -> str:
         )
         + ".",
     ]
+    lines += ["", *_row_set_lines(losses=losses, wind=wind)]
+    lines += ["", *_step_ratio_lines()]
+    lines += ["", *geometry_lines(sites=sites_roster, noun="wind farms")]
     return "\n".join(lines) + "\n"
 
 
 def main() -> int:
     """Fit every arm, bootstrap every contrast, and write the report."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    argparse.ArgumentParser(description=__doc__).parse_args()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--fit-missing",
+        action="store_true",
+        help="Keep the losses already on disk and fit only the jobs they lack.",
+    )
+    arguments = parser.parse_args()
 
     sites = _wind_sites()
     frame = _with_eras(frame=_add_time_features(dataset=_common_rows(frame=_joined(sites=sites))))
+    frames = {
+        "hour_ending": _with_eras(
+            frame=_add_time_features(
+                dataset=_common_rows(frame=_joined(sites=sites, centred=False))
+            )
+        ),
+        "keep_zero_hours": _with_eras(
+            frame=_add_time_features(
+                dataset=_common_rows(frame=_joined(sites=sites), drop_zero_hours=False)
+            )
+        ),
+    }
     by_site = frame.group_by("site", "era").agg(pl.len(), pl.col("month").n_unique()).sort("site")
     _LOG.info("common rows: %d\n%s", frame.height, by_site)
 
     output_dir = STUDY_DATA_DIR / OUTPUT_DIR_NAME
     output_dir.mkdir(parents=True, exist_ok=True)
-    losses = _run_all(dataset=frame, jobs=_jobs())
-    losses.write_parquet(output_dir / "losses.parquet")
+    path = output_dir / "losses.parquet"
+    jobs = _jobs()
+    saved = pl.read_parquet(path) if arguments.fit_missing else None
+    done = set(saved.select("arm", "setting").unique().iter_rows()) if saved is not None else set()
+    missing = [job for job in jobs if (job[0], job[1]) not in done]
+    _LOG.info("fitting %d jobs of %d", len(missing), len(jobs))
+    parts = [] if saved is None else [saved]
+    for key, dataset in (("main", frame), *frames.items()):
+        chosen = [job for job in missing if (job[1] if job[1] in frames else "main") == key]
+        if chosen:
+            parts.append(_run_all(dataset=dataset, jobs=chosen))
+    losses = pl.concat(parts)
+    losses.write_parquet(path)
 
-    report = _report(frame=frame, losses=losses)
+    report = _report(frame=frame, losses=losses, sites_roster=sites)
     (output_dir / "report.md").write_text(report)
     sys.stdout.write(report)
     return 0

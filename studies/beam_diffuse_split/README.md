@@ -67,7 +67,7 @@ separation model's estimate of the same split, says what the *published field* b
 | `fetch_ens_point.py` | Extracts ECMWF ensemble irradiance for the meters' H3 cells at five lead bands, reading the Delta transaction log rather than globbing parquet, which would return tombstoned files twice. |
 | `ens_horizons.py` | Scores the ensemble against ERA5 at each lead band, and four ways of reducing 51 members to one power number. Fits its own booster, so five settings differ from `run_experiment.py`; see its module docstring. |
 | `multi_nwp.py` | Fits XGBoost on two weather models at once, against two negative controls: a duplicated column, which cannot fail, and a column carrying the second product's climatology with its weather permuted away, which can. |
-| `weather_products.py` | Scores six weather products on one common row set with the folds cut inside each UKV era, and answers which product best describes past sunshine. Written up as [Which weather product best describes past sunshine?](https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-the-past/). |
+| `weather_products.py` | Scores six weather products on one common row set with the folds cut inside each UKV era, and answers which product best describes past sunshine. Written up as [Which weather product best describes past sunshine?](https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-solar/). |
 | `weather_product_charts.py` | Draws the eight anonymised charts on the sunshine write-up from `weather_products.py`'s report, and bootstraps the two sets of numbers the report lacks after reproducing a printed row. Optimise each SVG with `npx svgo@4 --multipass --precision=1 --final-newline` before committing it. |
 | `wind_product_charts.py` | The same for the five charts on [Which weather product best describes past wind?](https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-wind/), from `wind_products.py`'s report. |
 
@@ -257,7 +257,7 @@ every model.** ICON-D2 runs every 3 hours rather than hourly, so the first hours
 a lead of 1 to 3 hours. `verify_icon_lineage.py` measures that against the German weather
 service's own files: on one day the freshest run was the closest match at 7 of 9 daytime hours,
 though up to 44 W m⁻² away. [The weather-products
-write-up](https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-the-past/)
+write-up](https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-solar/)
 has the check. The ICON-D2 arm is therefore a
 short-range forecast, and a comparison between it and UKV hands UKV the shorter lead.
 

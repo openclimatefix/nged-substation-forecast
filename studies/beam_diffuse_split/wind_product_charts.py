@@ -4,13 +4,9 @@ One-off throwaway script for the charts in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/830>. The write-up is
 <https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-wind/>.
 
-**Almost every number is read from the report `wind_products.py` wrote**, so a chart cannot disagree
-with the page. Two charts need numbers the report lacks: ICON-D2 against ERA5 at each generator, and
-ICON global against ICON-EU pooled over the two generators without the steps in ICON global's
-served wind. Both are bootstrapped from `losses.parquet`, reading only the pooled setting, after
-two printed rows have been reproduced through the same code path. The step chart's wind-speed
-ratios are read from the downloads `fetch_wind_point.py` wrote, and checked against the figures the
-page quotes.
+**Every number a chart shares with the page is read from the report `wind_products.py` wrote**,
+so a chart cannot disagree with the page. The step chart's fortnightly wind-speed ratios are read
+from the downloads `fetch_wind_point.py` wrote, and its period means from the report.
 
 Generators appear only as `W1` to `W3`, and no chart plots output. The one per-generator time
 series, the ratio of two products' wind speeds at the generator with the steps, carries no
@@ -33,9 +29,9 @@ import plotting.ocf_theme as ocf
 import polars as pl
 from fetch_wind_point import output_path_for
 from sources import STUDY_DATA_DIR
-from studies.bootstrap import bootstrap_difference
 from studies.charts import (
     NAMED_SUFFIX,
+    PLOT_WIDTH_PX,
     ContrastKey,
     figure,
     interval_panel,
@@ -53,8 +49,8 @@ from weather_product_charts import (
     _rows,
     _two_places,
 )
-from weather_products import METRIC, PERCENTAGE_POINTS, _contrast_line
-from wind_products import OUTPUT_DIR_NAME, STEP_DATES, _renamed, _scoped
+from weather_products import _contrast_line
+from wind_products import OUTPUT_DIR_NAME, STEP_DATES, STEP_SITE, _renamed, _scoped
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -63,18 +59,6 @@ RESULTS_DIR: Final[Path] = STUDY_DATA_DIR / OUTPUT_DIR_NAME
 
 SITES: Final[tuple[str, ...]] = ("W1", "W2", "W3")
 """The anonymous wind generator labels."""
-
-STEP_SITE: Final[str] = "W3"
-"""The generator at which ICON global's served wind steps, relative to ICON-EU's."""
-
-STEP_RATIOS: Final[dict[int, tuple[float, float, float]]] = {
-    10: (1.128, 0.962, 1.111),
-    80: (1.028, 0.948, 1.020),
-}
-"""ICON global's mean wind speed over ICON-EU's at `STEP_SITE`, before, between and after the steps.
-
-The page's account of the steps rests on these, at 10 m and 80 m, so the chart must reproduce them.
-"""
 
 SECTION_DECIDING: Final[str] = "Deciding contrasts, named before the run"
 SECTION_ERA: Final[str] = "By era and by half of the year (exploratory)"
@@ -90,11 +74,10 @@ DECIDING: Final[tuple[tuple[str, str], ...]] = (
     ("icon_eu_wind", "ukv_wind"),
     ("icon_d2_wind", "icon_eu_wind"),
 )
-"""The four contrasts named before the run, as the report writes them."""
+"""The four planned contrasts, as the report writes them."""
 
-SCOPE: Final[str] = "3 wind farms in Lincolnshire, August 2024 to September 2026."
+SCOPE: Final[str] = "Three wind farms in Lincolnshire, August 2024 to September 2026."
 HALVES: Final[tuple[str, str]] = ("April to September", "October to March")
-WIDTH: Final[int] = 900
 
 
 def _wind_losses() -> pl.DataFrame:
@@ -139,27 +122,24 @@ def _reproduce(*, pooled: pl.DataFrame, report_text: str) -> None:
             raise ValueError(msg)
 
 
-def _new_row(*, losses: pl.DataFrame, treatment: str, reference: str) -> dict[str, float]:
-    """Bootstrap one contrast not in the report, in points of capacity.
+AFTER_FIRST_RUN_SUFFIX: Final[str] = " (planned; 80 m chosen after the first run)"
+"""Ends the label of a named contrast whose ICON arm was switched to 80 m after the first run."""
 
-    Args:
-        losses: Per-row losses for both arms, restricted to the scope wanted.
-        treatment: The arm whose error is being compared.
-        reference: The arm it is compared against.
 
-    Returns:
-        `difference`, `lower_95`, and `upper_95`.
-    """
-    interval = bootstrap_difference(
-        losses=losses, treatment=treatment, reference=reference, metric=METRIC
-    )
-    return {
-        key: interval[key] * PERCENTAGE_POINTS for key in ("difference", "lower_95", "upper_95")
-    }
+def _arm_suffix(*, treatment: str) -> str:
+    """Return the label suffix for a named arm: bold only where the arm is the planned one."""
+    return AFTER_FIRST_RUN_SUFFIX if treatment.startswith("icon") else NAMED_SUFFIX
+
+
+def _deciding_label(*, treatment: str, reference: str) -> str:
+    """Label a named contrast, marking it as changed where either arm is an ICON product."""
+    changed = treatment.startswith("icon") or reference.startswith("icon")
+    suffix = AFTER_FIRST_RUN_SUFFIX if changed else NAMED_SUFFIX
+    return _contrast_name(treatment=treatment, reference=reference) + suffix
 
 
 def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
-    """Draw every product against ERA5 beside the four contrasts named before the run.
+    """Draw every product against ERA5 above the four planned contrasts.
 
     Args:
         contrasts: Every contrast row in the report.
@@ -190,7 +170,8 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         pl.col("treatment").replace_strict({f"{p}_wind": i for i, p in enumerate(order)})
     )
     labels = [
-        f"{NAMES[p]} · {_two_places(errors[p])}%" + (NAMED_SUFFIX if f"{p}_wind" in named else "")
+        f"{NAMES[p]} · {_two_places(errors[p])}%"
+        + (_arm_suffix(treatment=f"{p}_wind") if f"{p}_wind" in named else "")
         for p in order
     ]
     domain = (-1.0, 1.0)
@@ -201,7 +182,6 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         zero_label="same as ERA5",
         better_label="better than ERA5",
         panel_title="Every product against ERA5",
-        width=300,
     )
     right = interval_panel(
         rows=_rows(
@@ -209,36 +189,29 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
                 contrasts=contrasts,
                 wanted=[ContrastKey(SECTION_DECIDING, "all", t, r) for t, r in DECIDING],
             ),
-            labels=[_contrast_name(treatment=t, reference=r) + NAMED_SUFFIX for t, r in DECIDING],
+            labels=[_deciding_label(treatment=t, reference=r) for t, r in DECIDING],
         ),
         x_domain=(-1.0, 0.6),
         x_title=X_TITLE,
         zero_label="no difference",
         better_label="first product better",
-        panel_title="The four contrasts named before the run",
-        width=420,
+        panel_title="The four planned contrasts",
     )
     return figure(
         panels=[left, right],
         number=1,
-        title="UKV and ICON-D2 describe past wind best",
+        planned=True,
+        title="UKV and ICON-D2 describe past wind best of the five products tested",
         subtitle=[
             (
-                "Left: each product's mean absolute error minus ERA5's. Each label gives the "
-                "product's own error, as a percentage of capacity."
+                "Top: each product against ERA5; each label gives the product's own error. The "
+                "ICON-D2 and ICON global rows are exploratory. Bottom: the four planned contrasts, "
+                "planned with the served 100 m wind; each ICON product was switched "
+                "to its 80 m wind after the first run."
             ),
-            (
-                "The ICON-D2 and ICON global rows are exploratory. Right: the four contrasts named "
-                "before the run."
-            ),
-            f"{CAPACITY} {DOTS}",
+            f"{DOTS} {CAPACITY}",
             SCOPE,
-            (
-                "Intervals on the left are against ERA5. Overlapping intervals do not mean two "
-                "products are indistinguishable; the right-hand panel compares them directly."
-            ),
         ],
-        width=WIDTH,
     )
 
 
@@ -276,18 +249,15 @@ def _half_years(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         better_label="better than ERA5",
         conditions=HALVES,
         condition_title="Months",
-        width=380,
     )
     return figure(
         panels=[panel],
         number=2,
-        title="Both leaders' advantage over ERA5 is mostly a summer result",
+        title="UKV's and ICON-D2's advantage over ERA5 is larger from April to September",
         subtitle=[
-            f"Each product's mean absolute error minus ERA5's, in points of capacity. {CAPACITY}",
             f"{DOTS} Exploratory.",
-            SCOPE,
+            f"{CAPACITY} {SCOPE}",
         ],
-        width=760,
     )
 
 
@@ -337,25 +307,22 @@ def _icon_d2_against_ukv(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
             better_label="ICON-D2 better",
             panel_title=name,
             reference_labels=index == 0,
-            width=420,
         )
         for index, (name, rows) in enumerate(groups.items())
     ]
     return figure(
         panels=panels,
         number=4,
-        title="ICON-D2 and UKV cannot be separated robustly",
+        title="ICON-D2 leads UKV across the window, but not since UKV's upgrade",
         subtitle=[
-            f"ICON-D2's mean absolute error minus UKV's, in points of capacity. {CAPACITY}",
             (
-                f"{DOTS} Exploratory. Post hoc, added after the first run: the UKV-at-80-m row "
-                "and the hours-into-the-run rows."
+                "ICON-D2's mean absolute error minus UKV's. Exploratory; the UKV-at-80-m and "
+                "hours-into-the-run rows were added after the first run."
             ),
-            "The post-upgrade row rests on 8 monthly clusters, so its interval under-covers.",
+            "The post-upgrade row rests on 8 months, so its interval is likely too narrow.",
+            f"{DOTS} {CAPACITY}",
             SCOPE,
         ],
-        width=700,
-        direction="vertical",
     )
 
 
@@ -365,10 +332,6 @@ def _fortnightly_ratios() -> pl.DataFrame:
     Returns:
         One row per (fortnight, height, group) with `ratio`, where `group` is the generator with
         the steps or the other two generators pooled.
-
-    Raises:
-        ValueError: If the ratio of each period's means at the generator with the steps differs
-            from `STEP_RATIOS`.
     """
     heights = (10, 80)
     speeds = [f"wind_speed_{height}m" for height in heights]
@@ -387,19 +350,6 @@ def _fortnightly_ratios() -> pl.DataFrame:
             period=sum(pl.col("time") >= date for date in STEP_DATES),
         )
     )
-    for height, expected in STEP_RATIOS.items():
-        speed = f"wind_speed_{height}m"
-        measured = (
-            joined.filter(pl.col("site") == STEP_SITE)
-            .group_by("period")
-            .agg(ratio=pl.col(speed).mean() / pl.col(f"{speed}_eu").mean())
-            .sort("period")["ratio"]
-            .round(3)
-            .to_list()
-        )
-        if tuple(measured) != expected:
-            msg = f"the {height} m period ratios are {measured}, not {expected}"
-            raise ValueError(msg)
     return pl.concat(
         joined.group_by(pl.col("time").dt.truncate("2w").alias("fortnight"), "group")
         .agg(
@@ -410,12 +360,33 @@ def _fortnightly_ratios() -> pl.DataFrame:
     ).sort("height", "group", "fortnight")
 
 
-def _ratio_panel(*, ratios: pl.DataFrame, height: str) -> alt.LayerChart:
+def _step_ratios(*, report_text: str) -> dict[int, tuple[float, ...]]:
+    """Read the step generator's period-mean speed ratios from the report, per height.
+
+    Args:
+        report_text: The report.
+
+    Returns:
+        For 10 m and 80 m, ICON global's mean speed over ICON-EU's before, between and after the
+        steps.
+    """
+    ratios: dict[int, tuple[float, ...]] = {}
+    for line in report_text.splitlines():
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) == 5 and cells[0] == STEP_SITE and cells[1].endswith(" m"):
+            ratios[int(cells[1].removesuffix(" m"))] = tuple(float(cell) for cell in cells[2:])
+    return ratios
+
+
+def _ratio_panel(
+    *, ratios: pl.DataFrame, height: str, step_ratios: dict[int, tuple[float, ...]]
+) -> alt.LayerChart:
     """Draw one height's fortnightly ratio, the step dates, and each period's mean at the step site.
 
     Args:
         ratios: The output of `_fortnightly_ratios`.
         height: `10 m` or `80 m`.
+        step_ratios: The output of `_step_ratios`.
 
     Returns:
         One panel.
@@ -433,11 +404,11 @@ def _ratio_panel(*, ratios: pl.DataFrame, height: str) -> alt.LayerChart:
         scale=alt.Scale(domain=[0.8, 1.3], nice=False, zero=False),
     )
     # Stroke rather than colour, so this scale stays apart from the family colour scale the
-    # interval panel beside it uses.
+    # interval panel below it uses.
     colour = alt.Stroke(
         "group:N",
         scale=alt.Scale(domain=groups, range=[ocf.DATA_BLUE, ocf.ENSEMBLE_LINE]),
-        legend=alt.Legend(title="Fortnightly mean speed ratio", labelLimit=400),
+        legend=None,
     )
     line = alt.Chart(data).mark_line(strokeWidth=2).encode(x=x, y=y, stroke=colour)  # ty: ignore[unresolved-attribute]
     steps = (
@@ -445,17 +416,21 @@ def _ratio_panel(*, ratios: pl.DataFrame, height: str) -> alt.LayerChart:
         .mark_rule(color=ocf.BLACK_1)
         .encode(x="date:T")  # ty: ignore[unresolved-attribute]
     )
-    step_labels = (
-        alt.Chart(pl.DataFrame({"date": list(STEP_DATES), "text": ["2 June 2025", "2 June 2026"]}))
-        .mark_text(align="left", baseline="top", dx=4, dy=2, color=ocf.BLACK_1)
+    # The second step falls near the right edge, so its label sits to the left of its rule.
+    step_labels = [
+        alt.Chart(pl.DataFrame({"date": [date], "text": [text]}))
+        .mark_text(align=align, baseline="top", dx=dx, dy=2, color=ocf.BLACK_1)
         .encode(x="date:T", y=alt.value(0), text="text:N")  # ty: ignore[unresolved-attribute]
-    )
+        for date, text, align, dx in zip(
+            STEP_DATES, ("2 June 2025", "2 June 2026"), ("left", "right"), (4, -4), strict=True
+        )
+    ]
     edges = [data["fortnight"].min(), *STEP_DATES, data["fortnight"].max()]
     periods = pl.DataFrame(
         {
             "start": edges[:3],
             "end": edges[1:],
-            "ratio": list(STEP_RATIOS[int(height.removesuffix(" m"))]),
+            "ratio": list(step_ratios[int(height.removesuffix(" m"))]),
         }
     )
     period_means = (
@@ -464,26 +439,26 @@ def _ratio_panel(*, ratios: pl.DataFrame, height: str) -> alt.LayerChart:
         .encode(x="start:T", x2="end:T", y="ratio:Q")  # ty: ignore[unresolved-attribute]
     )
     return alt.LayerChart(
-        layer=[steps, step_labels, period_means, line],
-        width=420,
-        height=180,
+        layer=[steps, *step_labels, period_means, line],
+        width=PLOT_WIDTH_PX,
+        height=160,
         title=alt.TitleParams(
             f"Wind speed at {height}", anchor="start", frame="group", fontSize=14
         ),
     )
 
 
-def _steps(*, contrasts: pl.DataFrame, pooled: pl.DataFrame) -> alt.VConcatChart:
-    """Draw the steps in ICON global's served wind beside what they cost ICON global.
+def _steps(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatChart:
+    """Draw the steps in ICON global's served wind above how much they add to its error.
 
     Args:
         contrasts: Every contrast row in the report.
-        pooled: The pooled setting's losses.
+        report_text: The report, for the step generator's period-mean ratios.
 
     Returns:
         Figure 5.
     """
-    conditions = ("Not told", "Told which side of the steps each hour falls on")
+    conditions = ("Not told", "Told when the steps fall")
     at_step_site = select_contrasts(
         contrasts=contrasts,
         wanted=[
@@ -496,17 +471,19 @@ def _steps(*, contrasts: pl.DataFrame, pooled: pl.DataFrame) -> alt.VConcatChart
             ),
         ],
     ).select("difference", "lower_95", "upper_95")
-    others = pooled.filter(pl.col("site") != STEP_SITE)
-    elsewhere = pl.DataFrame(
-        [
-            _new_row(
-                losses=_renamed(losses=others, suffix="_wind"),
-                treatment="icon_global_wind",
-                reference="icon_eu_wind",
+    others = " and ".join(site for site in SITES if site != STEP_SITE)
+    elsewhere = select_contrasts(
+        contrasts=contrasts,
+        wanted=[
+            ContrastKey(SECTION_CHECKS, f"sites {others}", "icon_global_wind", "icon_eu_wind"),
+            ContrastKey(
+                SECTION_CHECKS,
+                f"told the step period, sites {others}",
+                "icon_global_step",
+                "icon_eu_step",
             ),
-            _new_row(losses=others, treatment="icon_global_step", reference="icon_eu_step"),
-        ]
-    )
+        ],
+    ).select("difference", "lower_95", "upper_95")
     all_sites = select_contrasts(
         contrasts=contrasts,
         wanted=[
@@ -529,9 +506,7 @@ def _steps(*, contrasts: pl.DataFrame, pooled: pl.DataFrame) -> alt.VConcatChart
         condition=pl.Series([*conditions, *conditions, *conditions]),
     )
     ratios = _fortnightly_ratios()
-    left = alt.vconcat(
-        *(_ratio_panel(ratios=ratios, height=height) for height in ("10 m", "80 m")), spacing=20
-    )
+    step_ratios = _step_ratios(report_text=report_text)
     right = interval_panel(
         rows=rows,
         x_domain=(-0.5, 2.5),
@@ -541,70 +516,49 @@ def _steps(*, contrasts: pl.DataFrame, pooled: pl.DataFrame) -> alt.VConcatChart
         better_direction="positive",
         conditions=conditions,
         condition_title="The model is",
-        panel_title="What the steps cost ICON global",
-        width=280,
+        panel_title="How much the steps add to ICON global's error",
     )
     return figure(
-        panels=[left, right],
+        panels=[
+            *(
+                _ratio_panel(ratios=ratios, height=height, step_ratios=step_ratios)
+                for height in ("10 m", "80 m")
+            ),
+            right,
+        ],
         number=5,
-        title="ICON global is the weakest product, and half of its gap is a pair of steps in its "
-        "served wind",
+        title="About half of ICON global's gap to ICON-EU is a pair of steps in its served wind at "
+        "one generator",
         subtitle=[
             (
-                "Left: ICON global's wind speed over ICON-EU's, fortnightly, at the generator with "
-                "the steps and pooled over the other two."
+                "Top two panels: ICON global's wind speed over ICON-EU's, fortnightly, in blue at "
+                "the generator with the steps and grey at the other two; 1 means the two agree."
             ),
-            (
-                "Pale bars: the ratio of the whole period's means at the generator with the steps, "
-                "either side of each step."
-            ),
-            (
-                "Right: ICON global's mean absolute error minus ICON-EU's, in points of capacity. "
-                f"{CAPACITY}"
-            ),
-            (
-                f"{DOTS} Post hoc. The pooled row for the other two generators is computed for "
-                "this chart; the rest are in the report."
-            ),
+            ("Pale bars: the mean of each period at the generator with the steps."),
+            "Bottom: error difference, added after the first run.",
+            f"{DOTS} {CAPACITY}",
             SCOPE,
         ],
-        width=WIDTH,
     )
 
 
-def _per_generator(*, contrasts: pl.DataFrame, pooled: pl.DataFrame) -> alt.VConcatChart:
+def _per_generator(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     """Draw UKV, ICON-D2 and ICON-EU against ERA5 at each generator.
 
     Args:
         contrasts: Every contrast row in the report.
-        pooled: The pooled setting's losses.
 
     Returns:
         Figure 3.
     """
-    wind = _renamed(losses=pooled, suffix="_wind")
     panels = []
     for index, product in enumerate(("ukv", "icon_d2", "icon_eu")):
         treatment = f"{product}_wind"
-        if product == "icon_d2":
-            numbers = pl.DataFrame(
-                [
-                    _new_row(
-                        losses=wind.filter(pl.col("site") == site),
-                        treatment=treatment,
-                        reference="era5_wind",
-                    )
-                    for site in SITES
-                ]
-            ).with_columns(treatment=pl.lit(treatment))
-        else:
-            numbers = select_contrasts(
-                contrasts=contrasts,
-                wanted=[
-                    ContrastKey(SECTION_DECIDING, f"site {site}", treatment, "era5_wind")
-                    for site in SITES
-                ],
-            )
+        section = SECTION_OTHER if product == "icon_d2" else SECTION_DECIDING
+        numbers = select_contrasts(
+            contrasts=contrasts,
+            wanted=[ContrastKey(section, f"site {site}", treatment, "era5_wind") for site in SITES],
+        )
         name = _contrast_name(treatment=treatment, reference="era5_wind")
         panels.append(
             interval_panel(
@@ -615,23 +569,19 @@ def _per_generator(*, contrasts: pl.DataFrame, pooled: pl.DataFrame) -> alt.VCon
                 better_label="better than ERA5",
                 panel_title=name,
                 reference_labels=index == 0,
-                width=420,
             )
         )
     return figure(
         panels=panels,
         number=3,
-        title="UKV's advantage over ERA5 excludes zero at two of the three generators",
+        title=(
+            "UKV's advantage over ERA5 is statistically significant at the 5% level at two of the "
+            "three generators"
+        ),
         subtitle=[
-            f"Each product's mean absolute error minus ERA5's, in points of capacity. {CAPACITY}",
-            (
-                f"{DOTS} Exploratory. The ICON-D2 rows are computed for this chart; the rest are "
-                "in the report."
-            ),
-            SCOPE,
+            f"{DOTS} Exploratory. The ICON-D2 rows are computed for this chart.",
+            f"{CAPACITY} {SCOPE}",
         ],
-        width=700,
-        direction="vertical",
     )
 
 
@@ -649,8 +599,8 @@ def main() -> int:
         "wind_headline": _headline(contrasts=contrasts, errors=errors),
         "wind_half_years": _half_years(contrasts=contrasts),
         "wind_icon_d2_against_ukv": _icon_d2_against_ukv(contrasts=contrasts),
-        "wind_icon_global_steps": _steps(contrasts=contrasts, pooled=pooled),
-        "wind_per_generator": _per_generator(contrasts=contrasts, pooled=pooled),
+        "wind_icon_global_steps": _steps(contrasts=contrasts, report_text=report_text),
+        "wind_per_generator": _per_generator(contrasts=contrasts),
     }
     for name, chart in charts.items():
         path = ASSETS_DIR / f"{name}.svg"
