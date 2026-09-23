@@ -119,7 +119,7 @@ HEADLINE_DOMAIN: Final[tuple[float, float]] = (-4.5, 1.0)
 
 CAPACITY: Final[str] = "Capacity is each generator's 99th-percentile output."
 DOTS: Final[str] = "Dot: estimate. Line: 95% interval from resampling whole months."
-SCOPE: Final[str] = "6 solar farms in Lincolnshire, December 2022 to September 2026."
+SCOPE: Final[str] = "Six solar farms in Lincolnshire, December 2022 to September 2026."
 X_TITLE: Final[str] = "Difference in mean absolute error (points of capacity)"
 WIDTH: Final[int] = 900
 
@@ -276,7 +276,9 @@ def _cams_breakdown(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     return figure(
         panels=panels,
         number=2,
-        title="CAMS's lead over ICON-D2 holds at every generator, in every season, and every year",
+        title=(
+            "CAMS's margin over ICON-D2 holds at every generator, in every season, and every year"
+        ),
         subtitle=[
             f"CAMS's mean absolute error minus ICON-D2's, in points of capacity. {CAPACITY}",
             f"{DOTS} The breakdowns are exploratory.",
@@ -399,12 +401,12 @@ def _icon_d2_leads(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatC
     return figure(
         panels=[hourly, summary],
         number=3,
-        title="ICON-D2's advantage over ICON-EU fades within hours of each run",
+        title="ICON-D2's advantage over ICON-EU shrinks within hours of each run",
         subtitle=[
             f"ICON-D2's mean absolute error minus ICON-EU's, in points of capacity. {CAPACITY}",
             (
                 "Both models run every 3 hours, so at each hour both are served at the same lead. "
-                "Post hoc: the hourly and by-lead rows were added after the first run."
+                "The hourly and by-lead rows were added after the first run."
             ),
             f"{DOTS} {SCOPE}",
         ],
@@ -470,7 +472,7 @@ def _icon_eu_rivals(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
             rows=_rows(
                 contrasts=ukv,
                 labels=[
-                    "UKV as served" + NAMED_SUFFIX,
+                    "Open-Meteo's hourly value for UKV" + NAMED_SUFFIX,
                     "UKV's two snapshots given as a pair",
                     "UKV rebuilt as the mean of its two snapshots",
                     "Rebuilt UKV with neighbouring hours, against ICON-EU with them",
@@ -485,12 +487,15 @@ def _icon_eu_rivals(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     return figure(
         panels=panels,
         number=4,
-        title="ICON-EU beats ICON global and UKV as served, but not UKV rebuilt from its snapshots",
+        title=(
+            "ICON-EU beats ICON global and Open-Meteo's hourly UKV, but not UKV rebuilt from its "
+            "snapshots"
+        ),
         subtitle=[
             f"Each rival's mean absolute error minus ICON-EU's, in points of capacity. {CAPACITY}",
             (
-                "UKV rows other than UKV as served, and the ICON global rows split by lead, are "
-                "post hoc."
+                "UKV rows other than Open-Meteo's hourly value, and the ICON global rows split by "
+                "lead, were added after the first run."
             ),
             f"{DOTS} {SCOPE}",
         ],
@@ -500,7 +505,7 @@ def _icon_eu_rivals(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
 
 
 def _ukv_against_era5(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
-    """Draw UKV − ERA5 across the record, since the live downloader, and after the upgrade.
+    """Draw UKV − ERA5 by scope, for Open-Meteo's hourly value and for UKV rebuilt from snapshots.
 
     Args:
         contrasts: Every contrast row in the report.
@@ -508,39 +513,45 @@ def _ukv_against_era5(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     Returns:
         Figure 5.
     """
-    rows = select_contrasts(
-        contrasts=contrasts,
-        wanted=[
-            ContrastKey(SECTION_AGAINST_ERA5, "all", "ukv_global", "era5_global"),
-            ContrastKey(SECTION_AGAINST_ERA5, "ukv_live", "ukv_global", "era5_global"),
-            ContrastKey(SECTION_AGAINST_ERA5, "post", "ukv_global", "era5_global"),
-            ContrastKey(SECTION_POST_ONLY, "post", "ukv_global", "era5_global"),
-        ],
+    conditions = (
+        "Open-Meteo's hourly value for UKV",
+        "UKV rebuilt as the mean of its two snapshots, added after the first run",
     )
+    scopes = {
+        "all": "All hours, December 2022 to September 2026",
+        "ukv_live": "Since Open-Meteo's own UKV downloader started, August 2024",
+        "post": "After the January 2026 upgrade, one model fitted on both sides of it",
+    }
+    wanted = []
+    for scope in scopes:
+        wanted += [
+            ContrastKey(SECTION_AGAINST_ERA5, scope, "ukv_global", "era5_global"),
+            ContrastKey(SECTION_SNAPSHOTS, scope, "ukv_trap_global", "era5_global"),
+        ]
+    wanted.append(ContrastKey(SECTION_POST_ONLY, "post", "ukv_global", "era5_global"))
+    labels = [label for label in scopes.values() for _ in conditions]
+    labels.append("After the upgrade, models fitted on those 8 months alone")
     panel = interval_panel(
         rows=_rows(
-            contrasts=rows,
-            labels=[
-                "All hours, December 2022 to September 2026",
-                "Since Open-Meteo's own UKV downloader started, August 2024",
-                "After the January 2026 upgrade, one model for both eras",
-                "After the upgrade, models fitted on those 8 months alone",
-            ],
-        ),
-        x_domain=(-0.6, 0.6),
+            contrasts=select_contrasts(contrasts=contrasts, wanted=wanted), labels=labels
+        ).with_columns(condition=pl.Series([*conditions * len(scopes), conditions[0]])),
+        x_domain=(-1.2, 0.6),
         x_title="UKV's mean absolute error minus ERA5's (points of capacity)",
         zero_label="same as ERA5",
         better_label="UKV better",
+        conditions=conditions,
+        condition_title="UKV's hourly value",
         width=360,
     )
     return figure(
         panels=[panel],
         number=5,
-        title="UKV against ERA5 is unresolved",
+        title="UKV rebuilt from its snapshots beats ERA5; Open-Meteo's hourly UKV against ERA5 is "
+        "unresolved",
         subtitle=[
             f"UKV's mean absolute error minus ERA5's, in points of capacity. {CAPACITY}",
             f"{DOTS} Exploratory.",
-            "The two post-upgrade rows rest on 8 monthly clusters, so their intervals under-cover.",
+            "The post-upgrade rows rest on 8 months, so their intervals are likely too narrow.",
             SCOPE,
         ],
         width=760,
@@ -631,7 +642,7 @@ def _neighbours(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     return figure(
         panels=[panel],
         number=7,
-        title="The ranking holds for a generator trained on its neighbours",
+        title="The ranking holds for a generator predicted from its neighbours",
         subtitle=[
             f"The four contrasts named before the run, in points of capacity. {CAPACITY}",
             (
@@ -742,8 +753,8 @@ def _implied_capacity_chart(*, report_text: str) -> alt.VConcatChart:
                 "implied capacity minus the generator's own mean,"
             ),
             (
-                "shown as a percentage. Zero is the annual mean. Unconstrained hours with the sun "
-                "above 10°. No interval is drawn."
+                "shown as a percentage. Zero is the annual mean. Hours with no curtailment cap and "
+                "the sun above 10°. No interval is drawn."
             ),
             (
                 "With the seasonal cycle removed, CAMS's month-to-month spread is the smallest: "

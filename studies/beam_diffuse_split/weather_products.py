@@ -37,7 +37,8 @@ by ICON global's lead.
 
 Run it with `uv run python studies/beam_diffuse_split/weather_products.py`, after
 `build_dataset.py` has been run for `open-meteo`, `ukv`, `icon-d2`, `icon-eu`, `icon-global`, and
-for `cams` with `--min-cams-reliability 0 --suffix _allhours`.
+for `cams` with `--min-cams-reliability 0 --suffix _allhours`. With `--report-only` it skips the
+fits and rebuilds the report from the losses a full run saved.
 """
 
 import argparse
@@ -523,14 +524,14 @@ def _implied_capacity(*, log_by_product: dict[str, pl.DataFrame]) -> list[str]:
     Capacity estimation reads a product's irradiance with no model fitted to the generator, so the
     question is how far one month's implied capacity strays. The spread of
     `_log_capacity_by_month`'s residual is the month-to-month noise with the seasonal cycle
-    removed. The calendar-month means give the seasonal swing, reported as December's departure
-    from the annual mean.
+    removed. The calendar-month means give the seasonal swing, reported as the departures of
+    November, December and January from the annual mean.
 
     Args:
         log_by_product: The output of `_log_capacity_by_month`.
 
     Returns:
-        Markdown lines: a table of spread, interval against CAMS, and December's departure.
+        Markdown lines: a table of spread, interval against CAMS, and each winter month's departure.
     """
     months = sorted(log_by_product["cams"]["month"].unique().to_list())
     generator = np.random.default_rng(BOOTSTRAP_SEED)
@@ -538,7 +539,7 @@ def _implied_capacity(*, log_by_product: dict[str, pl.DataFrame]) -> list[str]:
     lines = [
         (
             "| Product | Month-to-month spread, seasonal cycle removed | Spread minus CAMS's "
-            "| December against the annual mean |"
+            "| November, December, January against the annual mean |"
         ),
         "|---|---|---|---|",
     ]
@@ -550,17 +551,33 @@ def _implied_capacity(*, log_by_product: dict[str, pl.DataFrame]) -> list[str]:
             float(frame_log.select(pl.col("residual").std()).item())
             - float(log_by_product["cams"].select(pl.col("residual").std()).item())
         ) * PERCENTAGE_POINTS
-        december = float(
-            frame_log.filter(pl.col("calendar") == "12").select(pl.col("seasonal").mean()).item()
+        winter = " / ".join(
+            f"{np.expm1(_seasonal(frame=frame_log, calendar=month)) * PERCENTAGE_POINTS:+.0f}%"
+            for month in ("11", "12", "01")
         )
         residual_spread = float(frame_log.select(pl.col("residual").std()).item())
         lower, upper = np.percentile(difference, (2.5, 97.5))
         lines.append(
             f"| {product} | {residual_spread * PERCENTAGE_POINTS:.1f}% "
             f"| {plug_in:+.1f} [{lower:+.1f}, {upper:+.1f}] "
-            f"| {np.expm1(december) * PERCENTAGE_POINTS:+.0f}% |"
+            f"| {winter} |"
         )
     return lines
+
+
+def _seasonal(*, frame: pl.DataFrame, calendar: str) -> float:
+    """Return a calendar month's mean seasonal term of the log implied capacity.
+
+    Args:
+        frame: One product's output of `_log_capacity_by_month`.
+        calendar: The two-digit calendar month, such as `12`.
+
+    Returns:
+        The mean over that month's site-months of `seasonal`.
+    """
+    return float(
+        frame.filter(pl.col("calendar") == calendar).select(pl.col("seasonal").mean()).item()
+    )
 
 
 def _spread_by_draw(*, frame: pl.DataFrame, months: list[str], draws: np.ndarray) -> np.ndarray:
@@ -706,6 +723,21 @@ def _lead_tables(*, losses: pl.DataFrame) -> list[str]:
             treatment="icon_d2_global",
             reference="icon_eu_global",
             label=f"both at lead {lead} h, {label}",
+        )
+        for lead in (1, 2, 3)
+    ]
+    lines += [
+        "",
+        "#### ICON-EU against UKV rebuilt from its snapshots, by ICON-EU's served lead (post hoc)",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    lines += [
+        _contrast_line(
+            losses=daytime.filter(pl.col("lead_3h") == lead),
+            treatment="icon_eu_global",
+            reference="ukv_trap_global",
+            label=f"ICON-EU at lead {lead} h, {label}",
         )
         for lead in (1, 2, 3)
     ]
@@ -876,6 +908,7 @@ def _report(
             ("ukv_trap_ctx_global", "ukv_trap_global"),
             ("icon_eu_ctx_global", "ukv_pair_global"),
             ("icon_eu_ctx_global", "ukv_trap_ctx_global"),
+            ("ukv_trap_global", "era5_global"),
         )
     ]
     lines += [
@@ -897,7 +930,12 @@ def main() -> int:
     """Fit every arm, bootstrap every contrast, and write the report."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.parse_args()
+    parser.add_argument(
+        "--report-only",
+        action="store_true",
+        help="Rebuild the report from the losses already on disk instead of refitting.",
+    )
+    arguments = parser.parse_args()
 
     frame = with_export_cap(
         dataset=_with_eras(frame=_add_time_features(dataset=_common_rows(frame=_joined())))
@@ -907,12 +945,18 @@ def main() -> int:
 
     output_dir = STUDY_DATA_DIR / OUTPUT_DIR_NAME
     output_dir.mkdir(parents=True, exist_ok=True)
-    pooled = _run_all(dataset=frame, jobs=_jobs())
-    pooled.write_parquet(output_dir / "losses.parquet")
-    post_only = _post_only_losses(frame=frame)
-    post_only.write_parquet(output_dir / "post_only_losses.parquet")
-    transfer = _leave_one_site_out_losses(frame=frame)
-    transfer.write_parquet(output_dir / "leave_one_site_out_losses.parquet")
+    paths = {
+        name: output_dir / f"{name}.parquet"
+        for name in ("losses", "post_only_losses", "leave_one_site_out_losses")
+    }
+    if arguments.report_only:
+        pooled, post_only, transfer = (pl.read_parquet(path) for path in paths.values())
+    else:
+        pooled = _run_all(dataset=frame, jobs=_jobs())
+        post_only = _post_only_losses(frame=frame)
+        transfer = _leave_one_site_out_losses(frame=frame)
+        for losses, path in zip((pooled, post_only, transfer), paths.values(), strict=True):
+            losses.write_parquet(path)
 
     report = _report(
         frame=frame,

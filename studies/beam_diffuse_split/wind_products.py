@@ -28,7 +28,8 @@ under-sampled; dropping no rows at all moves every contrast by 0.03 points or le
 `weather_products.py`.
 
 Run it with `uv run python studies/beam_diffuse_split/wind_products.py`, after
-`fetch_wind_point.py`.
+`fetch_wind_point.py`. With `--fit-missing` it keeps the losses a full run saved and fits only the
+arms they lack.
 """
 
 import argparse
@@ -161,8 +162,13 @@ STEP_DATES: Final[tuple[datetime, datetime]] = (
 """The two days ICON global's served wind steps at one generator, relative to ICON-EU's.
 
 The `_step` arms are told which of the three periods each hour falls in, which measures how much of
-ICON global's deficit the steps explain.
+ICON global's deficit the steps explain. ERA5 and ICON-EU get the same flag, so ICON global told the
+steps is compared with rivals that carry the same extra column.
 """
+
+
+STEP_ARM_PRODUCTS: Final[tuple[str, ...]] = ("era5", "icon_eu", "icon_global")
+"""The products given a `_step` arm: ICON global, and the two rivals it is compared with."""
 
 
 def _hub_height_m(*, product: str) -> int:
@@ -245,7 +251,7 @@ def _jobs() -> list[Job]:
     """Return every product's wind arm at both settings and its served-100 m arm, and the checks.
 
     Returns:
-        Three jobs per product, plus the UKV 80 m arm and the two step-period arms.
+        Three jobs per product, plus the UKV 80 m arm and the three step-period arms.
     """
     jobs: list[Job] = []
     for product in PRODUCTS:
@@ -288,7 +294,7 @@ def _jobs() -> list[Job]:
             PRIMARY_HYPER_PARAMETERS,
             False,
         )
-        for product in ("icon_eu", "icon_global")
+        for product in STEP_ARM_PRODUCTS
     ]
     return jobs
 
@@ -363,6 +369,7 @@ def _check_arms(*, losses: pl.DataFrame, wind: pl.DataFrame, sites: list[str]) -
         "",
         (
             f"MAE: ukv_80m {_mae(losses=losses, arm='ukv_80m'):.3f}, "
+            f"era5_step {_mae(losses=losses, arm='era5_step'):.3f}, "
             f"icon_eu_step {_mae(losses=losses, arm='icon_eu_step'):.3f}, "
             f"icon_global_step {_mae(losses=losses, arm='icon_global_step'):.3f}."
         ),
@@ -382,6 +389,16 @@ def _check_arms(*, losses: pl.DataFrame, wind: pl.DataFrame, sites: list[str]) -
             label=f"ICON lead {lead} h",
         )
         for t, r in (("icon_d2_wind", "ukv_wind"), ("icon_eu_wind", "ukv_wind"))
+        for lead in (0, 1, 2)
+    ]
+    lines += [
+        _contrast_line(
+            losses=_scoped(losses=three_hour, scope=era).filter(pl.col("icon_lead") == lead),
+            treatment="icon_d2_wind",
+            reference="ukv_wind",
+            label=f"ICON lead {lead} h, {era}",
+        )
+        for era in ("pre", "post")
         for lead in (0, 1, 2)
     ]
     six_hour = wind.with_columns(global_lead=pl.col("time").dt.hour() % 6)
@@ -410,6 +427,18 @@ def _check_arms(*, losses: pl.DataFrame, wind: pl.DataFrame, sites: list[str]) -
     lines += [
         _contrast_line(
             losses=scoped, treatment="icon_global_step", reference="icon_eu_step", label=label
+        )
+        for label, scoped in (
+            ("told the step period, all sites", step),
+            *(
+                (f"told the step period, site {site}", step.filter(pl.col("site") == site))
+                for site in sites
+            ),
+        )
+    ]
+    lines += [
+        _contrast_line(
+            losses=scoped, treatment="icon_global_step", reference="era5_step", label=label
         )
         for label, scoped in (
             ("told the step period, all sites", step),
@@ -513,6 +542,15 @@ def _report(*, frame: pl.DataFrame, losses: pl.DataFrame) -> str:
         for t, r in EXPLORATORY_CONTRASTS
     ]
     lines += [
+        _contrast_line(
+            losses=scoped, treatment="icon_global_wind", reference="era5_wind", label=label
+        )
+        for label, scoped in (
+            *((scope, _scoped(losses=wind, scope=scope)) for scope in ("winter", "summer")),
+            *((f"site {site}", wind.filter(pl.col("site") == site)) for site in sites),
+        )
+    ]
+    lines += [
         "",
         "Mean served 100 m wind speed, all sites: "
         + ", ".join(
@@ -527,7 +565,13 @@ def _report(*, frame: pl.DataFrame, losses: pl.DataFrame) -> str:
 def main() -> int:
     """Fit every arm, bootstrap every contrast, and write the report."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    argparse.ArgumentParser(description=__doc__).parse_args()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--fit-missing",
+        action="store_true",
+        help="Keep the losses already on disk and fit only the jobs they lack.",
+    )
+    arguments = parser.parse_args()
 
     sites = _wind_sites()
     frame = _with_eras(frame=_add_time_features(dataset=_common_rows(frame=_joined(sites=sites))))
@@ -536,8 +580,17 @@ def main() -> int:
 
     output_dir = STUDY_DATA_DIR / OUTPUT_DIR_NAME
     output_dir.mkdir(parents=True, exist_ok=True)
-    losses = _run_all(dataset=frame, jobs=_jobs())
-    losses.write_parquet(output_dir / "losses.parquet")
+    path = output_dir / "losses.parquet"
+    jobs = _jobs()
+    if arguments.fit_missing:
+        saved = pl.read_parquet(path)
+        done = set(saved.select("arm", "setting").unique().iter_rows())
+        missing = [job for job in jobs if (job[0], job[1]) not in done]
+        _LOG.info("fitting %d missing jobs of %d", len(missing), len(jobs))
+        losses = pl.concat([saved, _run_all(dataset=frame, jobs=missing)]) if missing else saved
+    else:
+        losses = _run_all(dataset=frame, jobs=jobs)
+    losses.write_parquet(path)
 
     report = _report(frame=frame, losses=losses)
     (output_dir / "report.md").write_text(report)

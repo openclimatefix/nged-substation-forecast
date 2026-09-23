@@ -26,11 +26,12 @@ how far it generalises.
   history the one to build on.
 - [Which weather product best describes past sunshine?](weather-products-for-past-solar.md) — a
   satellite retrieval describes past sunshine far better than any weather model tested; among the
-  models, ICON-D2 is best as served but its advantage fades within hours of each run, and ICON-EU
-  and UKV cannot be told apart once UKV's hour is rebuilt from its own snapshots. The page says
-  which product each offline consumer — capacity estimation, pre-training, historical features, and
+  models, ICON-D2 is best as served but its advantage shrinks within hours of each run, and ICON-EU
+  no longer beats UKV once UKV's hour is rebuilt from its own snapshots. The page says which product
+  each offline consumer — capacity estimation, training history, historical features, and
   disaggregation — should read.
 - [Which weather product best describes past wind?](weather-products-for-past-wind.md) — at the three
   metered wind farms, the Met Office's UKV and the German weather service's ICON-D2 describe past
-  hub-height wind best and both beat the ERA5 reanalysis, mostly in summer; ICON-EU also beats ERA5;
-  and ICON global is weakest, about half of its gap a pair of steps in the wind it is served.
+  hub-height wind best and both beat the ERA5 reanalysis, mostly from April to September; ICON-EU
+  also beats ERA5; and ICON global has the largest error, about half of its gap to ICON-EU a pair of
+  steps in the wind Open-Meteo's archive serves for it at one generator.

@@ -92,7 +92,7 @@ DECIDING: Final[tuple[tuple[str, str], ...]] = (
 )
 """The four contrasts named before the run, as the report writes them."""
 
-SCOPE: Final[str] = "3 wind farms in Lincolnshire, August 2024 to September 2026."
+SCOPE: Final[str] = "Three wind farms in Lincolnshire, August 2024 to September 2026."
 HALVES: Final[tuple[str, str]] = ("April to September", "October to March")
 WIDTH: Final[int] = 900
 
@@ -281,7 +281,7 @@ def _half_years(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     return figure(
         panels=[panel],
         number=2,
-        title="Both leaders' advantage over ERA5 is mostly a summer result",
+        title="UKV's and ICON-D2's advantage over ERA5 is larger from April to September",
         subtitle=[
             f"Each product's mean absolute error minus ERA5's, in points of capacity. {CAPACITY}",
             f"{DOTS} Exploratory.",
@@ -344,14 +344,14 @@ def _icon_d2_against_ukv(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     return figure(
         panels=panels,
         number=4,
-        title="ICON-D2 and UKV cannot be separated robustly",
+        title="ICON-D2 leads UKV across the window, but not since UKV's upgrade",
         subtitle=[
             f"ICON-D2's mean absolute error minus UKV's, in points of capacity. {CAPACITY}",
             (
-                f"{DOTS} Exploratory. Post hoc, added after the first run: the UKV-at-80-m row "
+                f"{DOTS} Exploratory. Added after the first run: the UKV-at-80-m row "
                 "and the hours-into-the-run rows."
             ),
-            "The post-upgrade row rests on 8 monthly clusters, so its interval under-covers.",
+            "The post-upgrade row rests on 8 months, so its interval is likely too narrow.",
             SCOPE,
         ],
         width=700,
@@ -474,7 +474,7 @@ def _ratio_panel(*, ratios: pl.DataFrame, height: str) -> alt.LayerChart:
 
 
 def _steps(*, contrasts: pl.DataFrame, pooled: pl.DataFrame) -> alt.VConcatChart:
-    """Draw the steps in ICON global's served wind beside what they cost ICON global.
+    """Draw the steps in ICON global's served wind beside how much they add to its error.
 
     Args:
         contrasts: Every contrast row in the report.
@@ -541,14 +541,14 @@ def _steps(*, contrasts: pl.DataFrame, pooled: pl.DataFrame) -> alt.VConcatChart
         better_direction="positive",
         conditions=conditions,
         condition_title="The model is",
-        panel_title="What the steps cost ICON global",
+        panel_title="How much the steps add to ICON global's error",
         width=280,
     )
     return figure(
         panels=[left, right],
         number=5,
-        title="ICON global is the weakest product, and half of its gap is a pair of steps in its "
-        "served wind",
+        title="About half of ICON global's gap to ICON-EU is a pair of steps in its served wind at "
+        "one generator",
         subtitle=[
             (
                 "Left: ICON global's wind speed over ICON-EU's, fortnightly, at the generator with "
@@ -563,8 +563,8 @@ def _steps(*, contrasts: pl.DataFrame, pooled: pl.DataFrame) -> alt.VConcatChart
                 f"{CAPACITY}"
             ),
             (
-                f"{DOTS} Post hoc. The pooled row for the other two generators is computed for "
-                "this chart; the rest are in the report."
+                f"{DOTS} Added after the first run. The pooled row for the other two generators "
+                "is computed for this chart; the rest are in the report."
             ),
             SCOPE,
         ],
