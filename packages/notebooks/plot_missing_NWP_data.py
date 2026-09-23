@@ -10,7 +10,7 @@ with app.setup:
     import plotting.ocf_theme  # noqa: F401 — registers OCF Altair theme as side effect
     import polars as pl
     from contracts.weather_schemas import Nwp
-    from plotting.ocf_theme import GRID, ORANGE_RED
+    from plotting.ocf_theme import BRAND_ORANGE, GRID
 
 
 @app.cell
@@ -98,7 +98,7 @@ def plot_null_distribution(df, target_init_time, target_h3_index, nwp_vars):
     missing_marks = (
         base.transform_filter(alt.datum.is_missing)
         .mark_tick(
-            color=ORANGE_RED,
+            color=BRAND_ORANGE,
             thickness=3,  # Make the red mark stand out
             size=12,  # Height of the tick mark
         )

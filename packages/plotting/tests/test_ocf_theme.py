@@ -3,23 +3,21 @@
 import re
 
 from plotting import ocf_theme
-from plotting.ocf_theme import BLUE, _ocf_theme, font_size, hex_to_rgb
+from plotting.ocf_theme import DATA_BLUE, _ocf_theme, font_size, hex_to_rgb
 
 _HEX_PATTERN = re.compile(r"^#[0-9A-Fa-f]{6}$")
 
-# Pairs of differently-named public constants the brand guidelines themselves print with the
-# same hex value: Black 1/Data Black, and Grey 1/BACKGROUND (BACKGROUND predates the brand
-# constants and keeps its own name for its existing callers).
+# Chart-role constants that name a brand colour rather than define one.
 _SANCTIONED_DUPLICATE_PAIRS: frozenset[frozenset[str]] = frozenset(
     {
-        frozenset({"BLACK_1", "DATA_BLACK"}),
+        frozenset({"BLACK_1", "TEXT"}),
         frozenset({"GREY_1", "BACKGROUND"}),
     }
 )
 
 
 def test_hex_to_rgb() -> None:
-    assert hex_to_rgb(BLUE) == [0x30, 0x6B, 0xFF]
+    assert hex_to_rgb(DATA_BLUE) == [0x30, 0x6B, 0xFF]
     assert hex_to_rgb("#000000") == [0, 0, 0]
     assert hex_to_rgb("FFFFFF") == [255, 255, 255]  # bare hex (no "#") also accepted
 
@@ -32,24 +30,24 @@ def test_legend_swatches_are_fully_opaque() -> None:
 
 def test_data_colours_light_pairs_with_data_colours() -> None:
     assert ocf_theme.DATA_COLOURS == (
-        ocf_theme.BLUE,
-        ocf_theme.SKY_BLUE,
-        ocf_theme.ORANGE_RED,
-        ocf_theme.PURPLE,
-        ocf_theme.SPRING_GREEN,
+        ocf_theme.DATA_BLUE,
+        ocf_theme.DATA_SKY,
+        ocf_theme.BRAND_ORANGE,
+        ocf_theme.DATA_PURPLE,
+        ocf_theme.DATA_GREEN,
     )
     assert ocf_theme.DATA_COLOURS_LIGHT == (
-        ocf_theme.BLUE_LIGHT,
-        ocf_theme.SKY_BLUE_LIGHT,
-        ocf_theme.ORANGE_RED_LIGHT,
-        ocf_theme.LAVENDER,
-        ocf_theme.MINT,
+        ocf_theme.DATA_BLUE_LIGHT,
+        ocf_theme.DATA_SKY_LIGHT,
+        ocf_theme.BRAND_ORANGE_LIGHT,
+        ocf_theme.DATA_PURPLE_LIGHT,
+        ocf_theme.DATA_GREEN_LIGHT,
     )
 
 
 def test_no_unintended_duplicate_colour_constants() -> None:
-    # Every public, uppercase, hex-valued constant should be a unique colour unless the brand
-    # guidelines themselves print two names for one value.
+    # Every public, uppercase, hex-valued constant is a unique colour, apart from the chart-role
+    # constants that name a brand colour.
     by_value: dict[str, list[str]] = {}
     for name, value in vars(ocf_theme).items():
         if (
