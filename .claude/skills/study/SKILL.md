@@ -73,8 +73,9 @@ page only after a committed script prints it into the report.
    publication. Triage, fix, and re-run. Keep reviewing until a reviewer finds nothing that must be
    fixed.
 6. **Finish the charts and the page** (sections below).
-7. **Diff review and prose review**, with the `implement-issue` and `prose-review` skills.
-8. **Merge, only as the maintainer has authorised,** after checking the PR's body and commit
+7. **Diff review**, with the `implement-issue` skill.
+8. **End with a `prose-review` of the page, one rule per pass** (see "Reviews").
+9. **Merge, only as the maintainer has authorised,** after checking the PR's body and commit
    messages for closing keywords (see "GitHub hygiene").
 
 Never publish a study with fewer than two scientific-validity reviews. If the process is shortened
@@ -352,6 +353,13 @@ wrong: one reviewer asserted that ICON-D2's lead was the precisely measured one 
 approximate one, which the lineage files showed was backwards. A finding can also be right with the
 wrong fix: a reviewer proposed deleting a test that asserted the wrong thing, where rewriting its
 fixture kept the coverage. Record each rejected finding and its reason in the PR.
+
+**Every study ends with a `prose-review` of its page, sweeping one rule per pass.** Run the review
+after the last science review and the diff review, so no later fix brings back prose the sweep has
+checked. A reviewer asked to check every rule at once reports the loudest fault in each paragraph
+and misses the quieter ones. The `prose-review` skill sets the order of the passes, how to split a
+long page across sub-agents, and how to triage the findings. Review the new prose in the READMEs and
+docstrings in the same sweep.
 
 ## Anonymisation
 
