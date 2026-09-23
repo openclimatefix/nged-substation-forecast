@@ -2,7 +2,7 @@
 
 One-off throwaway script for the study in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/809>. The write-up is
-<https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-the-past/>.
+<https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-solar/>.
 
 **Every product is shown to the same booster, on the same rows, with the same temperature.** Each
 arm differs from the others only in its irradiance columns, so a contrast between two arms is a
@@ -37,12 +37,16 @@ by ICON global's lead.
 
 Run it with `uv run python studies/beam_diffuse_split/weather_products.py`, after
 `build_dataset.py` has been run for `open-meteo`, `ukv`, `icon-d2`, `icon-eu`, `icon-global`, and
-for `cams` with `--min-cams-reliability 0 --suffix _allhours`.
+for `cams` with `--min-cams-reliability 0 --suffix _allhours`. With `--report-only` it skips the
+fits and rebuilds the report from the losses a full run saved.
 """
 
 import argparse
+import calendar
 import concurrent.futures
+import itertools
 import logging
+import math
 import sys
 from datetime import UTC, datetime
 from typing import Final
@@ -212,6 +216,81 @@ CONTRAST_HEADER: Final[tuple[str, str]] = (
     ),
     "|---|---|---|---|---|---|---|",
 )
+
+
+ICON_D2_WESTERN_EDGE_DEG: Final[tuple[float, float]] = (-2.5, -2.7)
+"""Two longitudes bracketing ICON-D2's western edge at the generators' latitude.
+
+Open-Meteo's ICON-D2 serves data at 2.5°W but not at 2.7°W near 53°N, so the edge lies between.
+"""
+
+ERA5_GRID_DEG: Final[float] = 0.25
+"""The spacing of the grid ERA5 is published on, which sets which generators share a cell."""
+
+EARTH_RADIUS_KM: Final[float] = 6371.0
+
+
+def _km(*, latitudes: tuple[float, float], longitudes: tuple[float, float]) -> float:
+    """Return the great-circle distance between two points, by the haversine formula.
+
+    Args:
+        latitudes: The two points' latitudes in degrees.
+        longitudes: The two points' longitudes in degrees.
+
+    Returns:
+        The distance in kilometres.
+    """
+    first, second = (math.radians(latitude) for latitude in latitudes)
+    half_chord = (
+        math.sin((second - first) / 2) ** 2
+        + math.cos(first)
+        * math.cos(second)
+        * math.sin(math.radians(longitudes[1] - longitudes[0]) / 2) ** 2
+    )
+    return 2 * EARTH_RADIUS_KM * math.asin(math.sqrt(half_chord))
+
+
+def geometry_lines(*, sites: pl.DataFrame, noun: str) -> list[str]:
+    """Report how the generators sit relative to each other, to ICON-D2's edge, and to ERA5's grid.
+
+    Only distances and counts are printed, never a coordinate.
+
+    Args:
+        sites: The roster, with `latitude` and `longitude`.
+        noun: What the generators are called in the heading, such as `solar farms`.
+
+    Returns:
+        Markdown lines.
+    """
+    latitudes = sites["latitude"].to_list()
+    longitudes = sites["longitude"].to_list()
+    points = list(zip(latitudes, longitudes, strict=True))
+    pairs = [
+        _km(latitudes=(a[0], b[0]), longitudes=(a[1], b[1]))
+        for a, b in itertools.combinations(points, 2)
+    ]
+    middle = sum(latitudes) / len(latitudes)
+    north_south = _km(latitudes=(min(latitudes), max(latitudes)), longitudes=(0.0, 0.0))
+    east_west = _km(latitudes=(middle, middle), longitudes=(min(longitudes), max(longitudes)))
+    cells = {
+        (round(latitude / ERA5_GRID_DEG), round(longitude / ERA5_GRID_DEG))
+        for latitude, longitude in points
+    }
+    lines = [
+        f"#### Where the {noun} sit",
+        "",
+        f"- Pairwise distance: {min(pairs):.1f} km to {max(pairs):.1f} km.",
+        f"- Bounding box: {north_south:.1f} km north to south by {east_west:.1f} km east to west.",
+    ]
+    for edge in ICON_D2_WESTERN_EDGE_DEG:
+        west = [_km(latitudes=(lat, lat), longitudes=(lon, edge)) for lat, lon in points]
+        lines.append(
+            f"- Due-west distance to {abs(edge)}°W: {min(west):.0f} km to {max(west):.0f} km."
+        )
+    lines.append(
+        f"- ERA5 {ERA5_GRID_DEG}° grid cells holding them: {len(cells)} (nearest grid point)."
+    )
+    return lines
 
 
 def _named(column: str, product: str) -> str:
@@ -538,24 +617,22 @@ def _leave_one_site_out_losses(*, frame: pl.DataFrame) -> pl.DataFrame:
     return pl.concat(outputs)
 
 
-def _implied_capacity(*, frame: pl.DataFrame) -> list[str]:
-    """Measure how steady each product's implied capacity is from month to month, and by season.
+def _log_capacity_by_month(*, frame: pl.DataFrame) -> dict[str, pl.DataFrame]:
+    """Return each product's log implied capacity per site and month, split into season and noise.
 
-    Capacity estimation reads a product's irradiance with no model fitted to the generator, so the
-    question is how far one month's implied capacity strays. A month's implied capacity is the
-    metered output divided by what a fixed panel model predicts per megawatt from the product: a
-    south-facing panel at 30° tilt, the Erbs split of the product's own global irradiance, and a
-    -0.4 %/K temperature derate. Only unconstrained hours with the sun above 10° are used. The
-    logarithm is taken per site and month; subtracting each site's mean for that calendar month
-    removes the seasonal cycle, and the spread of what is left is the month-to-month noise. The
-    calendar-month means themselves give the seasonal swing, reported as December's departure
-    from the annual mean.
+    A month's implied capacity is the metered output divided by what a fixed panel model predicts
+    per megawatt from the product: a south-facing panel at 30° tilt, the Erbs split of the
+    product's own global irradiance, and a -0.4 %/K temperature derate. Only unconstrained hours
+    with the sun above 10° are used. The logarithm is taken per site and month. `seasonal` is the
+    site's mean for that calendar month minus the site's overall mean, and `residual` is what is
+    left once the calendar month's mean is subtracted.
 
     Args:
         frame: The common rows.
 
     Returns:
-        Markdown lines: a table of spread, interval against CAMS, and December's departure.
+        Per product, one row per (site, month) with `log_capacity`, `calendar`, `seasonal`, and
+        `residual`.
     """
     daylight = frame.filter(~pl.col("constrained") & (pl.col("solar_elevation_deg") > 10.0))
     zenith = np.radians(daylight["solar_zenith_deg"].to_numpy())
@@ -588,13 +665,31 @@ def _implied_capacity(*, frame: pl.DataFrame) -> list[str]:
                 - pl.col("log_capacity").mean().over("site", "calendar"),
             )
         )
+    return log_by_product
+
+
+def _implied_capacity(*, log_by_product: dict[str, pl.DataFrame]) -> list[str]:
+    """Measure how steady each product's implied capacity is from month to month, and by season.
+
+    Capacity estimation reads a product's irradiance with no model fitted to the generator, so the
+    question is how far one month's implied capacity strays. The spread of
+    `_log_capacity_by_month`'s residual is the month-to-month noise with the seasonal cycle
+    removed. The calendar-month means give the seasonal swing, reported as the departures of
+    November, December and January from the annual mean.
+
+    Args:
+        log_by_product: The output of `_log_capacity_by_month`.
+
+    Returns:
+        Markdown lines: a table of spread, interval against CAMS, and each winter month's departure.
+    """
     months = sorted(log_by_product["cams"]["month"].unique().to_list())
     generator = np.random.default_rng(BOOTSTRAP_SEED)
     draws = generator.integers(0, len(months), size=(N_BOOTSTRAP_RESAMPLES, len(months)))
     lines = [
         (
             "| Product | Month-to-month spread, seasonal cycle removed | Spread minus CAMS's "
-            "| December against the annual mean |"
+            "| November, December, January against the annual mean |"
         ),
         "|---|---|---|---|",
     ]
@@ -606,16 +701,66 @@ def _implied_capacity(*, frame: pl.DataFrame) -> list[str]:
             float(frame_log.select(pl.col("residual").std()).item())
             - float(log_by_product["cams"].select(pl.col("residual").std()).item())
         ) * PERCENTAGE_POINTS
-        december = float(
-            frame_log.filter(pl.col("calendar") == "12").select(pl.col("seasonal").mean()).item()
+        winter = " / ".join(
+            f"{np.expm1(_seasonal(frame=frame_log, calendar=month)) * PERCENTAGE_POINTS:+.0f}%"
+            for month in ("11", "12", "01")
         )
         residual_spread = float(frame_log.select(pl.col("residual").std()).item())
         lower, upper = np.percentile(difference, (2.5, 97.5))
         lines.append(
             f"| {product} | {residual_spread * PERCENTAGE_POINTS:.1f}% "
             f"| {plug_in:+.1f} [{lower:+.1f}, {upper:+.1f}] "
-            f"| {np.expm1(december) * PERCENTAGE_POINTS:+.0f}% |"
+            f"| {winter} |"
         )
+    return lines
+
+
+def _seasonal(*, frame: pl.DataFrame, calendar: str) -> float:
+    """Return a calendar month's mean seasonal term of the log implied capacity.
+
+    Args:
+        frame: One product's output of `_log_capacity_by_month`.
+        calendar: The two-digit calendar month, such as `12`.
+
+    Returns:
+        The mean over that month's site-months of `seasonal`.
+    """
+    return float(
+        frame.filter(pl.col("calendar") == calendar).select(pl.col("seasonal").mean()).item()
+    )
+
+
+def _implied_capacity_by_month(*, log_by_product: dict[str, pl.DataFrame]) -> list[str]:
+    """Report each product's implied capacity in every calendar month, against its annual mean.
+
+    Each value is the exponential, minus one, of the mean over that month's site-months of
+    `_log_capacity_by_month`'s `seasonal` term, as a percentage.
+
+    Args:
+        log_by_product: The output of `_log_capacity_by_month`.
+
+    Returns:
+        Markdown lines: one row per product, one column per calendar month.
+    """
+    months = [f"{month:02d}" for month in range(1, 13)]
+    lines = [
+        "| Product | " + " | ".join(calendar.month_abbr[int(m)] for m in months) + " |",
+        "|---" * 13 + "|",
+    ]
+    for product, frame_log in log_by_product.items():
+        cells = [
+            f"{np.expm1(_seasonal(frame=frame_log, calendar=month)) * PERCENTAGE_POINTS:+.1f}"
+            for month in months
+        ]
+        lines.append(f"| {product} | " + " | ".join(cells) + " |")
+    december = log_by_product["cams"].filter(pl.col("calendar") == "12")
+    lines += [
+        "",
+        (
+            f"December's figure rests on {december['month'].n_unique()} Decembers and "
+            f"{december.height} generator-months."
+        ),
+    ]
     return lines
 
 
@@ -765,6 +910,21 @@ def _lead_tables(*, losses: pl.DataFrame) -> list[str]:
         )
         for lead in (1, 2, 3)
     ]
+    lines += [
+        "",
+        "#### ICON-EU against UKV rebuilt from its snapshots, by ICON-EU's served lead (post hoc)",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    lines += [
+        _contrast_line(
+            losses=daytime.filter(pl.col("lead_3h") == lead),
+            treatment="icon_eu_global",
+            reference="ukv_trap_global",
+            label=f"ICON-EU at lead {lead} h, {label}",
+        )
+        for lead in (1, 2, 3)
+    ]
     lines += ["", "#### ICON global against ICON-EU, split by ICON global's lead", ""]
     lines += [*CONTRAST_HEADER]
     lines += [
@@ -797,6 +957,21 @@ def _lead_tables(*, losses: pl.DataFrame) -> list[str]:
         f"| {row['hour']:02d} | {((row['hour'] - 1) % 3) + 1} h "
         f"| {row['difference'] * PERCENTAGE_POINTS:+.3f} |"
         for row in by_hour.iter_rows(named=True)
+    ]
+    lines += [
+        "",
+        "#### ICON-D2 against ICON-EU at each hour, with intervals (post hoc)",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    lines += [
+        _contrast_line(
+            losses=daytime.filter(hour == label_hour),
+            treatment="icon_d2_global",
+            reference="icon_eu_global",
+            label=f"hour {label_hour:02d} UTC",
+        )
+        for label_hour in range(first, last + 1)
     ]
     lines += ["", "#### CAMS against ICON-D2, broken down", "", *CONTRAST_HEADER]
     lines += [
@@ -833,6 +1008,8 @@ def _report(
     post_only: pl.DataFrame,
     transfer: pl.DataFrame,
     stability: list[str],
+    monthly: list[str],
+    geometry: list[str],
 ) -> str:
     """Assemble the markdown report.
 
@@ -842,6 +1019,8 @@ def _report(
         post_only: The post-upgrade-only run's losses.
         transfer: The leave-one-site-out losses.
         stability: The implied-capacity table.
+        monthly: The implied capacity in every calendar month.
+        geometry: Where the generators sit.
 
     Returns:
         The report.
@@ -932,6 +1111,7 @@ def _report(
             ("ukv_trap_ctx_global", "ukv_trap_global"),
             ("icon_eu_ctx_global", "ukv_pair_global"),
             ("icon_eu_ctx_global", "ukv_trap_ctx_global"),
+            ("ukv_trap_global", "era5_global"),
         )
     ]
     lines += [
@@ -945,7 +1125,14 @@ def _report(
         "",
         *stability,
     ]
+    lines += [
+        "",
+        "#### Implied capacity by calendar month against the annual mean (%)",
+        "",
+        *monthly,
+    ]
     lines += ["", *_lead_tables(losses=pooled)]
+    lines += ["", *geometry]
     return "\n".join(lines) + "\n"
 
 
@@ -953,7 +1140,12 @@ def main() -> int:
     """Fit every arm, bootstrap every contrast, and write the report."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.parse_args()
+    parser.add_argument(
+        "--report-only",
+        action="store_true",
+        help="Rebuild the report from the losses already on disk instead of refitting.",
+    )
+    arguments = parser.parse_args()
 
     frame = with_export_cap(
         dataset=_with_eras(frame=_add_time_features(dataset=_common_rows(frame=_joined())))
@@ -963,19 +1155,28 @@ def main() -> int:
 
     output_dir = STUDY_DATA_DIR / OUTPUT_DIR_NAME
     output_dir.mkdir(parents=True, exist_ok=True)
-    pooled = _run_all(dataset=frame, jobs=_jobs())
-    pooled.write_parquet(output_dir / "losses.parquet")
-    post_only = _post_only_losses(frame=frame)
-    post_only.write_parquet(output_dir / "post_only_losses.parquet")
-    transfer = _leave_one_site_out_losses(frame=frame)
-    transfer.write_parquet(output_dir / "leave_one_site_out_losses.parquet")
+    paths = {
+        name: output_dir / f"{name}.parquet"
+        for name in ("losses", "post_only_losses", "leave_one_site_out_losses")
+    }
+    if arguments.report_only:
+        pooled, post_only, transfer = (pl.read_parquet(path) for path in paths.values())
+    else:
+        pooled = _run_all(dataset=frame, jobs=_jobs())
+        post_only = _post_only_losses(frame=frame)
+        transfer = _leave_one_site_out_losses(frame=frame)
+        for losses, path in zip((pooled, post_only, transfer), paths.values(), strict=True):
+            losses.write_parquet(path)
 
+    log_by_product = _log_capacity_by_month(frame=frame)
     report = _report(
         frame=frame,
         pooled=pooled,
         post_only=post_only,
         transfer=transfer,
-        stability=_implied_capacity(frame=frame),
+        stability=_implied_capacity(log_by_product=log_by_product),
+        monthly=_implied_capacity_by_month(log_by_product=log_by_product),
+        geometry=geometry_lines(sites=_pv_sites(), noun="solar farms"),
     )
     (output_dir / "report.md").write_text(report)
     sys.stdout.write(report)

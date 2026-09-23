@@ -54,7 +54,7 @@ UTC.
 WEEKEND_SHADE_OPACITY: Final[float] = 0.07
 """Opacity of the weekend background bands.
 
-At this level, ``ocf_theme.MUSTARD`` over the cream theme background reads as a slightly warmer
+At this level, ``ocf_theme.DATA_AMBER`` over the cream theme background reads as a slightly warmer
 cream rather than an orange stripe. The bands therefore mark weekends without competing with the
 low-opacity grey ensemble lines.
 """
@@ -149,7 +149,7 @@ experiment's model actually used, because that config lives in MLflow. We theref
 common defaults rather than pretending to read the real lags from the model.
 """
 
-_LAG_COLORS: Final[tuple[str, ...]] = (ocf_theme.PURPLE, ocf_theme.SPRING_GREEN)
+_LAG_COLORS: Final[tuple[str, ...]] = (ocf_theme.DATA_PURPLE, ocf_theme.DATA_GREEN)
 """Line colours assigned to lags in ascending-lag order.
 
 The tuple must hold exactly ``len(LAG_OPTIONS)`` colours, because ``_LINE_COLORS`` below zips the
@@ -164,9 +164,9 @@ _NWP_ANALYSIS_LABEL: Final[str] = "NWP proxy analysis"
 
 _LINE_COLORS: Final[dict[str, str]] = {
     _FORECAST_LABEL: ocf_theme.ENSEMBLE_LINE,
-    _ACTUALS_LABEL: ocf_theme.BLUE,
+    _ACTUALS_LABEL: ocf_theme.DATA_BLUE,
     **dict(zip(LAG_OPTIONS, _LAG_COLORS, strict=True)),
-    _INIT_TIME_LABEL: ocf_theme.ORANGE_RED,
+    _INIT_TIME_LABEL: ocf_theme.BRAND_ORANGE,
 }
 """Legend label → line colour for everything the power chart can draw, in legend order.
 
@@ -177,8 +177,8 @@ colour.
 
 _NWP_LINE_COLORS: Final[dict[str, str]] = {
     _NWP_ENSEMBLE_LABEL: ocf_theme.ENSEMBLE_LINE,
-    _NWP_ANALYSIS_LABEL: ocf_theme.BLUE,
-    _INIT_TIME_LABEL: ocf_theme.ORANGE_RED,
+    _NWP_ANALYSIS_LABEL: ocf_theme.DATA_BLUE,
+    _INIT_TIME_LABEL: ocf_theme.BRAND_ORANGE,
 }
 """Legend label → line colour for the NWP panel — the counterpart of ``_LINE_COLORS``.
 
@@ -286,7 +286,7 @@ def _weekend_layer(window_start: datetime, window_end: datetime) -> alt.Chart:
     """
     return (
         alt.Chart(_weekend_bands(window_start, window_end))
-        .mark_rect(color=ocf_theme.MUSTARD, opacity=WEEKEND_SHADE_OPACITY)
+        .mark_rect(color=ocf_theme.DATA_AMBER, opacity=WEEKEND_SHADE_OPACITY)
         .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
             x=_x_encoding(window_start, window_end, field="start"),
             x2="end:T",
@@ -583,7 +583,7 @@ def build_nwp_ensemble_chart(
         )
     )
     if analysis_data is not None and analysis_data.height > 0:
-        # BLUE (via the shared scale) deliberately matches the power panel's observed-truth
+        # DATA_BLUE (via the shared scale) deliberately matches the power panel's observed-truth
         # colour; the stroke width matches the actual-power line's for the same reason.
         layers.append(
             alt.Chart(analysis_data)

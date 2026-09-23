@@ -43,10 +43,11 @@ about grid spacing rather than about one centre's radiation scheme. Its own radi
 accumulated where UKV's is instantaneous, so Open-Meteo reaches the hourly column by
 de-accumulation rather than by reconstruction.
 
-`icon-eu` and `icon-global` are the same German modelling system on wider domains: about 7 km over
-Europe and about 11 km worldwide. ICON-D2's domain stops around 2.5°W, so it excludes South West
-England and South Wales, and an ICON forecast for the whole of Great Britain has to use one of these
-two. All three ICON domains are `accumulated` upstream: Open-Meteo reads every ICON domain through
+`icon-eu` and `icon-global` are the same German modelling system on wider domains: 6.5 km over
+Europe and 13 km worldwide, which Open-Meteo serves on grids of about 7 km and 11 km. ICON-D2's
+domain stops around 2.5°W, so it excludes South West England and South Wales, and an ICON forecast
+for the whole of Great Britain has to use one of these two. All three ICON domains are
+`accumulated` upstream: Open-Meteo reads every ICON domain through
 one downloader, `DownloadIconCommand`, which de-averages a field according to its GRIB step type,
 and DWD publishes the surface radiation of every domain as an average since the run started.
 

@@ -86,7 +86,7 @@ LABEL_PLACEMENTS: Final[list[tuple[Literal["left", "right"], int]]] = [
 """How each dated annotation sits against its rule: which side, and how far from it."""
 
 Y_TITLE: Final[str] = "Relative output, % of site E's settled level"
-INK: Final[str] = "#292B2B"
+INK: Final[str] = ocf.TEXT
 GRID_GREY: Final[str] = "#9B9B9B"
 
 
@@ -260,7 +260,7 @@ def _panel(
     )
     points = (
         alt.Chart(daily.to_pandas())
-        .mark_circle(size=26, opacity=0.5, color=ocf.BLUE)
+        .mark_circle(size=26, opacity=0.5, color=ocf.DATA_BLUE)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "date:T",
@@ -280,7 +280,7 @@ def _panel(
         return alt.layer(hundred, points, rules).properties(width=760, height=215, title=title)
     bars = (
         alt.Chart(plateaus.to_pandas())
-        .mark_rect(color=ocf.ORANGE_RED, height=4)
+        .mark_rect(color=ocf.BRAND_ORANGE, height=4)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("start:T", scale=x_scale), x2="end:T", y=alt.Y("level:Q")
         )
