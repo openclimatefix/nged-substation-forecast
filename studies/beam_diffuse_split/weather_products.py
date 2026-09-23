@@ -43,14 +43,15 @@ record shortens the whole panel rather than giving that product easier or harder
 - `published`: the six products above, December 2022 to September 2026, as the first write-up
   reported them. Its outputs are the first round's, which other studies read, so it is never re-run
   over them.
-- `long`: the six plus SARAH-3 (a second satellite retrieval), ICON-DREAM-EU (a second reanalysis),
-  and ECMWF-IFS-HRES, over the same span cut to ICON-DREAM's last month. It runs every analysis the
-  `published` panel runs.
-- `all`: all twelve products, adding ARPEGE Europe and the two HARMONIE-AROME models, from July
-  2024 when the HARMONIE-AROME archive starts.
-- `record`: the five products with records from 2021, which is SARAH-3's start: ERA5, CAMS,
-  SARAH-3, ICON-DREAM-EU and ECMWF-IFS-HRES. It exists for the year-by-year table of ERA5's error
-  against every other product, which every panel prints for its own years.
+- `long`: the six plus SARAH-3 (a second satellite retrieval) and ICON-DREAM-EU (a second
+  reanalysis), over the same span cut to ICON-DREAM's last month. It runs every analysis the
+  `published` panel runs. The panel spans Open-Meteo's change of UKV source on 12 August 2024 and
+  treats it as the first round did, with the `ukv_live` scope.
+- `all`: all twelve products, adding the four fetched per site from Open-Meteo (ECMWF-IFS-HRES,
+  ARPEGE Europe, and the two HARMONIE-AROME models), from September 2024.
+- `record`: the four products with records from 2021, which is SARAH-3's start: ERA5, CAMS,
+  SARAH-3 and ICON-DREAM-EU. It exists for the year-by-year table of ERA5's error against every
+  other product, which every panel prints for its own years.
 
 Run it with `uv run python studies/beam_diffuse_split/weather_products.py`, after
 `build_dataset.py` has been run for `open-meteo`, `ukv`, `icon-d2`, `icon-eu`, `icon-global`, the
@@ -277,9 +278,9 @@ NEW_PLANNED_CONTRASTS: Final[dict[str, tuple[tuple[str, str], ...]]] = {
     "long": (
         ("sarah3_global", "cams_global"),
         ("icon_dream_global", "era5_global"),
-        ("ifs_hres_global", "icon_eu_global"),
     ),
     "all": (
+        ("ifs_hres_global", "icon_eu_global"),
         ("knmi_harmonie_global", "icon_eu_global"),
         ("dmi_harmonie_global", "icon_d2_global"),
     ),
@@ -287,7 +288,8 @@ NEW_PLANNED_CONTRASTS: Final[dict[str, tuple[tuple[str, str], ...]]] = {
 """The five contrasts the second round names before its run, by the panel each is measured on.
 
 Whether the second satellite retrieval matches CAMS; whether the second reanalysis beats ERA5;
-whether ECMWF's global model beats the Great-Britain-wide ICON; whether KNMI's 5.5 km
+whether ECMWF's global model beats the Great-Britain-wide ICON, measured on the `all` panel because
+ECMWF's model is one of the four fetched from Open-Meteo; whether KNMI's 5.5 km
 HARMONIE-AROME model over Europe beats the Great-Britain-wide ICON; and whether the Danish 2 km
 model matches the German one. Every other contrast involving a new product is exploratory.
 
@@ -343,7 +345,7 @@ PANELS: Final[dict[PanelType, Panel]] = {
         planned=DECIDING_CONTRASTS,
     ),
     "long": Panel(
-        products=(*PRODUCTS, "sarah3", "icon_dream", "ifs_hres"),
+        products=(*PRODUCTS, "sarah3", "icon_dream"),
         output_dir=UPDATE_OUTPUT_DIR / "solar_long",
         full_analysis=True,
         planned=(*DECIDING_CONTRASTS, *NEW_PLANNED_CONTRASTS["long"]),
@@ -356,7 +358,7 @@ PANELS: Final[dict[PanelType, Panel]] = {
         first_time=datetime(2024, 9, 1, tzinfo=UTC),
     ),
     "record": Panel(
-        products=("era5", "cams", "sarah3", "icon_dream", "ifs_hres"),
+        products=("era5", "cams", "sarah3", "icon_dream"),
         output_dir=UPDATE_OUTPUT_DIR / "solar_record",
         full_analysis=False,
         planned=(),
@@ -869,12 +871,15 @@ def sensitivity_jobs(*, panel: Panel) -> list[Job]:
     ]
 
 
-def _post_only_losses(*, frame: pl.DataFrame, products: tuple[str, ...]) -> pl.DataFrame:
+def _post_only_losses(
+    *, frame: pl.DataFrame, products: tuple[str, ...], max_workers: int
+) -> pl.DataFrame:
     """Fit every global arm on the post-upgrade rows alone, as the separate-era sensitivity check.
 
     Args:
         frame: The common rows with `era`.
         products: The arm prefixes to fit.
+        max_workers: How many fits run at once.
 
     Returns:
         Losses for every global arm, scored on the post-upgrade rows by models trained on them only.
@@ -891,10 +896,12 @@ def _post_only_losses(*, frame: pl.DataFrame, products: tuple[str, ...]) -> pl.D
         )
         for product in products
     ]
-    return run_all(dataset=post, jobs=jobs)
+    return run_all(dataset=post, jobs=jobs, max_workers=max_workers)
 
 
-def _leave_one_site_out_losses(*, frame: pl.DataFrame, products: tuple[str, ...]) -> pl.DataFrame:
+def _leave_one_site_out_losses(
+    *, frame: pl.DataFrame, products: tuple[str, ...], max_workers: int
+) -> pl.DataFrame:
     """Train on five sites' capacity-normalised power and score the sixth, one fold at a time.
 
     The scored site is never trained on, and neither are the scored fold's calendar months at any
@@ -906,6 +913,7 @@ def _leave_one_site_out_losses(*, frame: pl.DataFrame, products: tuple[str, ...]
     Args:
         frame: The common rows, carrying `fold`, `month`, `constrained` and `cap_mw`.
         products: The arm prefixes to fit.
+        max_workers: How many fits run at once.
 
     Returns:
         One row per (site, time, arm) with the capped error as a fraction of capacity.
@@ -939,7 +947,7 @@ def _leave_one_site_out_losses(*, frame: pl.DataFrame, products: tuple[str, ...]
         )
 
     outputs: list[pl.DataFrame] = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT_FITS) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = [
             pool.submit(_one, product=product, site=site, fold=fold)
             for product in products
@@ -1762,38 +1770,48 @@ def _panel_frame(*, panel: Panel, panel_jobs: list[Job]) -> pl.DataFrame:
     return frame
 
 
-def _fit_panel(*, panel: Panel, panel_jobs: list[Job], frame: pl.DataFrame) -> PanelLosses:
+def _fit_panel(
+    *, panel: Panel, panel_jobs: list[Job], frame: pl.DataFrame, max_workers: int
+) -> PanelLosses:
     """Fit every arm a panel reports.
 
     Args:
         panel: The panel.
         panel_jobs: The pooled fits, from `_panel_jobs`.
         frame: The panel's common rows.
+        max_workers: How many fits run at once.
 
     Returns:
         The panel's losses.
     """
-    losses = run_all(dataset=frame, jobs=panel_jobs)
+    losses = run_all(dataset=frame, jobs=panel_jobs, max_workers=max_workers)
     return PanelLosses(
         pooled=losses.filter(pl.col("setting") == "pooled"),
         sensitivity=losses.filter(pl.col("setting") == "sensitivity"),
         post_only=(
-            _post_only_losses(frame=frame, products=panel.products) if panel.full_analysis else None
+            _post_only_losses(frame=frame, products=panel.products, max_workers=max_workers)
+            if panel.full_analysis
+            else None
         ),
         transfer=(
-            _leave_one_site_out_losses(frame=frame, products=panel.products)
+            _leave_one_site_out_losses(
+                frame=frame, products=panel.products, max_workers=max_workers
+            )
             if panel.full_analysis
             else None
         ),
     )
 
 
-def run_panel(*, name: PanelType, report_only: bool) -> None:
+def run_panel(
+    *, name: PanelType, report_only: bool, max_workers: int = MAX_CONCURRENT_FITS
+) -> None:
     """Fit one panel, or read its saved losses, and write its report and year-by-year table.
 
     Args:
         name: The panel to run.
         report_only: Whether to read the losses a full run saved instead of fitting.
+        max_workers: How many fits run at once.
     """
     panel = PANELS[name]
     panel_jobs = _panel_jobs(name=name, panel=panel)
@@ -1825,7 +1843,9 @@ def run_panel(*, name: PanelType, report_only: bool) -> None:
     else:
         refuse_to_overwrite(paths=[*loss_paths.values(), *written])
         output_dir.mkdir(parents=True, exist_ok=True)
-        losses = _fit_panel(panel=panel, panel_jobs=panel_jobs, frame=frame)
+        losses = _fit_panel(
+            panel=panel, panel_jobs=panel_jobs, frame=frame, max_workers=max_workers
+        )
         pl.concat([losses.pooled, losses.sensitivity]).write_parquet(loss_paths["losses"])
         if losses.post_only is not None:
             losses.post_only.write_parquet(loss_paths["post_only_losses"])
@@ -1859,9 +1879,17 @@ def main() -> int:
         action="store_true",
         help="Rebuild the report from the losses already on disk instead of refitting.",
     )
+    parser.add_argument(
+        "--concurrent-fits",
+        type=int,
+        default=MAX_CONCURRENT_FITS,
+        help="How many fits run at once, each on 4 cores; lower it to share the machine.",
+    )
     arguments = parser.parse_args()
     for name in arguments.panel:
-        run_panel(name=name, report_only=arguments.report_only)
+        run_panel(
+            name=name, report_only=arguments.report_only, max_workers=arguments.concurrent_fits
+        )
     return 0
 
 
