@@ -14,8 +14,8 @@ pages share, with the parser that reads a study report's contrast tables into it
 
 It does not own the question, the arms, which charts a page draws, or the write-up. Those stay in
 the study, as scripts, because a one-off comparison is not a library and should not be dressed as
-one. It does not own downloads either: a fetcher needs the network to exercise, which is what the `--run-network`
-gate covers, so the fetchers stay in the study alongside the arms they serve.
+one. It does not own downloads either: a fetcher needs the network to exercise, which is what the
+`--run-network` gate covers, so the fetchers stay in the study alongside the arms they serve.
 
 Two neighbouring packages own things a reader might look for here. `geo` owns H3 indexing, including
 the mapping from a coordinate to a cell. `contracts` owns every data schema, including

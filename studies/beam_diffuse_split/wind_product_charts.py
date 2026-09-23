@@ -216,7 +216,7 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         zero_label="no difference",
         better_label="first product better",
         panel_title="The four contrasts named before the run",
-        width=320,
+        width=420,
     )
     return figure(
         panels=[left, right],
@@ -344,7 +344,7 @@ def _icon_d2_against_ukv(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     return figure(
         panels=panels,
         number=4,
-        title="ICON-D2 against UKV: level across settings, ahead at equal lead",
+        title="ICON-D2 and UKV cannot be separated robustly",
         subtitle=[
             f"ICON-D2's mean absolute error minus UKV's, in points of capacity. {CAPACITY}",
             (
@@ -507,12 +507,26 @@ def _steps(*, contrasts: pl.DataFrame, pooled: pl.DataFrame) -> alt.VConcatChart
             _new_row(losses=others, treatment="icon_global_step", reference="icon_eu_step"),
         ]
     )
-    rows = pl.concat([at_step_site, elsewhere]).with_columns(
+    all_sites = select_contrasts(
+        contrasts=contrasts,
+        wanted=[
+            ContrastKey(SECTION_OTHER, "all", "icon_global_wind", "icon_eu_wind"),
+            ContrastKey(
+                SECTION_CHECKS,
+                "told the step period, all sites",
+                "icon_global_step",
+                "icon_eu_step",
+            ),
+        ],
+    ).select("difference", "lower_95", "upper_95")
+    rows = pl.concat([at_step_site, elsewhere, all_sites]).with_columns(
         label=pl.Series(
-            ["The generator with the steps"] * 2 + ["The other two generators, pooled"] * 2
+            ["The generator with the steps"] * 2
+            + ["The other two generators, pooled"] * 2
+            + ["All three generators"] * 2
         ),
         family=pl.lit("weather model"),
-        condition=pl.Series([*conditions, *conditions]),
+        condition=pl.Series([*conditions, *conditions, *conditions]),
     )
     ratios = _fortnightly_ratios()
     left = alt.vconcat(
@@ -521,7 +535,7 @@ def _steps(*, contrasts: pl.DataFrame, pooled: pl.DataFrame) -> alt.VConcatChart
     right = interval_panel(
         rows=rows,
         x_domain=(-0.5, 2.5),
-        x_title="ICON global's mean absolute error minus ICON-EU's (points)",
+        x_title="ICON global's mean absolute error minus ICON-EU's (points of capacity)",
         zero_label="same as ICON-EU",
         better_label="ICON-EU better",
         better_direction="positive",

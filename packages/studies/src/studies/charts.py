@@ -352,7 +352,7 @@ def interval_panel(
             .then(pl.col("family"))
             .otherwise(pl.col("family") + ", light")
         )
-    data = rows.with_columns(shade=shade)
+    data = rows.with_columns(pl.col("difference", "lower_95", "upper_95").round(3), shade=shade)
     labels = list(dict.fromkeys(data["label"].to_list()))
     families = [family for family in FAMILY_COLOURS if family in set(data["family"].to_list())]
     encodings: dict[str, object] = {
@@ -390,7 +390,7 @@ def interval_panel(
     x_axis = alt.Axis(values=ticks(x_domain=x_domain))
     interval = (
         alt.Chart(data)
-        .mark_rule(strokeWidth=2, clip=True)
+        .mark_rule(strokeWidth=2, clip=True, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("lower_95:Q", scale=x_scale, title=x_title, axis=x_axis),
             x2="upper_95:Q",
@@ -399,13 +399,19 @@ def interval_panel(
     )
     first = pl.col("condition") == conditions[0] if conditions else pl.lit(value=True)
     x = alt.X("difference:Q", scale=x_scale, title=x_title, axis=x_axis)
+    tooltip = [
+        alt.Tooltip("label:N", title="Row"),
+        alt.Tooltip("difference:Q", title="Estimate"),
+        alt.Tooltip("lower_95:Q", title="Lower 95%"),
+        alt.Tooltip("upper_95:Q", title="Upper 95%"),
+    ]
     points = [
         alt.Chart(data.filter(first))
         .mark_point(filled=True, size=_POINT_SIZE, opacity=1, clip=True)
-        .encode(x=x, **encodings),  # ty: ignore[unresolved-attribute]
+        .encode(x=x, tooltip=tooltip, **encodings),  # ty: ignore[unresolved-attribute]
         alt.Chart(data.filter(~first))
         .mark_point(filled=False, size=_POINT_SIZE, strokeWidth=2, opacity=1, clip=True)
-        .encode(x=x, **encodings),  # ty: ignore[unresolved-attribute]
+        .encode(x=x, tooltip=tooltip, **encodings),  # ty: ignore[unresolved-attribute]
     ]
     reference = _reference_layers(
         x_domain=x_domain,

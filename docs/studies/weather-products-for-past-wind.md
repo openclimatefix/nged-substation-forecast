@@ -109,7 +109,7 @@ every 3 hours, so at each run hour it is served at T+0, like UKV. On those hours
 points ahead [0.19, 0.41]. An hour into the run ICON-D2 is 0.15 points ahead [0.02, 0.27], and 2
 hours in ICON-D2 and UKV are level. This comparison was made after the run.
 
-![Figure 4: ICON-D2 against UKV: level across settings, ahead at equal lead](assets/wind_icon_d2_against_ukv.svg)
+![Figure 4: ICON-D2 and UKV cannot be separated robustly](assets/wind_icon_d2_against_ukv.svg)
 
 ## ICON-EU beats the reanalysis at either height
 

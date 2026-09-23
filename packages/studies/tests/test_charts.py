@@ -56,13 +56,38 @@ def report(tmp_path: Path) -> Path:
     return path
 
 
-def test_report_contrasts_reads_verbatim_report_lines(report: Path) -> None:
+def test_report_contrasts_reads_verbatim_report_lines_and_skips_other_tables(report: Path) -> None:
     contrasts = report_contrasts(report_path=report)
 
-    assert contrasts.drop("section").rows() == [
-        ("all", "cams_global", "icon_d2_global", -2.651, -2.877, -2.42, True, 5, 5, 79384),
-        ("all", "icon_eu_global", "ukv_global", -0.484, -0.664, -0.296, True, 5, 5, 79384),
+    assert contrasts.rows() == [
         (
+            "Deciding contrasts, named before the run",
+            "all",
+            "cams_global",
+            "icon_d2_global",
+            -2.651,
+            -2.877,
+            -2.42,
+            True,
+            5,
+            5,
+            79384,
+        ),
+        (
+            "Deciding contrasts, named before the run",
+            "all",
+            "icon_eu_global",
+            "ukv_global",
+            -0.484,
+            -0.664,
+            -0.296,
+            True,
+            5,
+            5,
+            79384,
+        ),
+        (
+            "ICON global against ICON-EU, split by ICON global's lead",
             "ICON global lead 1 to 3 h, equal to ICON-EU's, 07–19 UTC",
             "icon_global_global",
             "icon_eu_global",
@@ -75,6 +100,7 @@ def test_report_contrasts_reads_verbatim_report_lines(report: Path) -> None:
             38298,
         ),
         (
+            "ICON global against ICON-EU, split by ICON global's lead",
             "season winter",
             "cams_global",
             "icon_d2_global",
@@ -86,17 +112,6 @@ def test_report_contrasts_reads_verbatim_report_lines(report: Path) -> None:
             4,
             13249,
         ),
-    ]
-
-
-def test_report_contrasts_skips_other_tables_and_keeps_each_rows_section(report: Path) -> None:
-    sections = report_contrasts(report_path=report)["section"].to_list()
-
-    assert sections == [
-        "Deciding contrasts, named before the run",
-        "Deciding contrasts, named before the run",
-        "ICON global against ICON-EU, split by ICON global's lead",
-        "ICON global against ICON-EU, split by ICON global's lead",
     ]
 
 
