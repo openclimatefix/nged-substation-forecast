@@ -31,10 +31,20 @@ def test_legend_swatches_are_fully_opaque() -> None:
 
 
 def test_data_colours_light_pairs_with_data_colours() -> None:
-    assert ocf_theme.DATA_COLOURS_LIGHT[0] == ocf_theme.BLUE_LIGHT  # Data Blue's light shade
-    assert (
-        ocf_theme.DATA_COLOURS_LIGHT[2] == ocf_theme.ORANGE_RED_LIGHT
-    )  # Brand Orange's light shade
+    assert ocf_theme.DATA_COLOURS == (
+        ocf_theme.BLUE,
+        ocf_theme.SKY_BLUE,
+        ocf_theme.ORANGE_RED,
+        ocf_theme.PURPLE,
+        ocf_theme.SPRING_GREEN,
+    )
+    assert ocf_theme.DATA_COLOURS_LIGHT == (
+        ocf_theme.BLUE_LIGHT,
+        ocf_theme.SKY_BLUE_LIGHT,
+        ocf_theme.ORANGE_RED_LIGHT,
+        ocf_theme.LAVENDER,
+        ocf_theme.MINT,
+    )
 
 
 def test_no_unintended_duplicate_colour_constants() -> None:
@@ -57,14 +67,19 @@ def test_no_unintended_duplicate_colour_constants() -> None:
 def test_font_size() -> None:
     assert font_size(style="Body", body_px=11) == 11
     assert font_size(style="Headline 1", body_px=11) == 18  # 11 * 1.65 = 18.15, rounds to 18
+    assert font_size(style="Label", body_px=10) == 9  # 10 * 0.88 = 8.8 rounds up, not down
 
 
-def test_theme_config_carries_font_stacks_where_described() -> None:
+def test_theme_config_sets_brand_fonts_and_sizes() -> None:
     config = _ocf_theme()["config"]
-    assert config["title"]["font"] == ocf_theme.FONT_TEXT
-    assert config["legend"]["titleFont"] == ocf_theme.FONT_TEXT
-    assert config["axis"]["labelFont"] == ocf_theme.FONT_LABEL
-    assert config["axis"]["titleFont"] == ocf_theme.FONT_LABEL
-    assert config["legend"]["labelFont"] == ocf_theme.FONT_LABEL
-    # FONT_NUMBER (big numbers and stats) is defined but not applied to any theme field.
-    assert ocf_theme.FONT_NUMBER == "Pangram Sans Rounded, DM Sans, sans-serif"
+    assert config["font"] == ocf_theme.FONT_TEXT
+    assert (config["title"]["font"], config["title"]["fontSize"]) == (ocf_theme.FONT_TEXT, 18)
+    for element in ("axis", "legend"):
+        assert (config[element]["titleFont"], config[element]["titleFontSize"]) == (
+            ocf_theme.FONT_TEXT,
+            11,
+        )
+        assert (config[element]["labelFont"], config[element]["labelFontSize"]) == (
+            ocf_theme.FONT_LABEL,
+            10,
+        )
