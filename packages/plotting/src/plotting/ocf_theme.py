@@ -4,157 +4,143 @@ Import this module to register and enable the OCF theme for Altair charts. The
 ``@alt.theme.register`` decorator fires at import time, so a bare ``import plotting.ocf_theme``
 is sufficient to activate it.
 
-The colour and typography constants below follow OCF's 2025 brand guidelines. Two values in the
-guidelines are typos, handled as noted beside each: "Grey 2" is printed twice for two different
-hex values, and Data Magenta is printed with the same hex as Data Amber.
+The colour and typography constants follow OCF's 2025 brand guidelines, and each colour is named as
+the guidelines name it. Three of the guidelines' printed swatch labels disagree with the swatch's
+own fill colour. Every other swatch's fill matches its label, so where the two disagree the
+constant takes the fill, and its docstring records the printed label.
 """
 
 from typing import Final, Literal, LiteralString
 
 import altair as alt
 
-# The colour constants below are typed ``LiteralString`` rather than ``str`` because Altair's
-# ``ThemeConfig`` declares every colour field as ``LiteralString``, which a plain ``str`` does
-# not satisfy — see ``_ocf_theme``.
-PALETTE: Final[tuple[LiteralString, ...]] = (
-    "#FF4901",  # Orange-Red
-    "#306BFF",  # Blue
-    "#B701FF",  # Purple
-    "#17E58F",  # Spring Green
-    "#10C5F7",  # Sky Blue
-    "#FC9700",  # Mustard
-    "#009C75",  # Dark green
-    "#BF4F04",  # Brown
-    "#B8F5DB",  # Mint
-    "#EFC8FF",  # Lavender
-)
-"""OCF brand colour palette, ordered by visual priority."""
+# The colour constants are typed ``LiteralString`` rather than ``str`` because Altair's
+# ``ThemeConfig`` declares every colour field as ``LiteralString``, which a plain ``str`` does not
+# satisfy — see ``_ocf_theme``.
 
-ORANGE_RED: Final[LiteralString] = PALETTE[0]
-"""Brand guidelines: Brand Orange (main data colours group)."""
+# Brand colours.
 
-BLUE: Final[LiteralString] = PALETTE[1]
-"""Brand guidelines: Data Blue (main data colours group)."""
+BRAND_ORANGE: Final[LiteralString] = "#FF4901"
+"""Brand guidelines: Brand Orange. Also the first of the main data colours."""
 
-PURPLE: Final[LiteralString] = PALETTE[2]
-"""Brand guidelines: Data Purple (main data colours group)."""
-
-SPRING_GREEN: Final[LiteralString] = PALETTE[3]
-"""Brand guidelines: Data Green (main data colours group)."""
-
-SKY_BLUE: Final[LiteralString] = PALETTE[4]
-"""Brand guidelines: Data Sky (main data colours group)."""
-
-MUSTARD: Final[LiteralString] = PALETTE[5]
-"""Brand guidelines: Data Amber (additional data colours group), internal use only in OCF's
-brand guidelines, so keep it out of anything published."""
-
-DARK_GREEN: Final[LiteralString] = PALETTE[6]
-"""Brand guidelines: Data Deep Teal (additional data colours group), internal use only in OCF's
-brand guidelines, so keep it out of anything published."""
-
-BROWN: Final[LiteralString] = PALETTE[7]
-"""Brand guidelines: Data Burnt Orange (additional data colours group), internal use only in
-OCF's brand guidelines, so keep it out of anything published."""
-
-MINT: Final[LiteralString] = PALETTE[8]
-"""Brand guidelines: Data Green Light (main data colours group, light shade)."""
-
-LAVENDER: Final[LiteralString] = PALETTE[9]
-"""Brand guidelines: Data Purple Light (main data colours group, light shade)."""
-
-# Additional brand colours not currently in PALETTE. Kept out of PALETTE deliberately: adding a
-# colour there changes every chart's category/ordinal/ramp range, which is out of scope here.
-ORANGE_RED_LIGHT: Final[LiteralString] = "#FF8F73"
-"""Brand guidelines: Brand Orange Light (brand colours group)."""
+BRAND_ORANGE_LIGHT: Final[LiteralString] = "#FF8F73"
+"""Brand guidelines: Brand Orange Light."""
 
 BLACK_1: Final[LiteralString] = "#292B2B"
-"""Brand guidelines: Black 1 (brand colours group). Same value as ``DATA_BLACK`` below, which the
-guidelines also print at ``#292B2B``."""
+"""Brand guidelines: Black 1, which the additional data colours also list as Data Black."""
 
 BLACK_2: Final[LiteralString] = "#0C0D0D"
-"""Brand guidelines: Black 2 (brand colours group)."""
+"""Brand guidelines: Black 2."""
 
 WHITE: Final[LiteralString] = "#FFFFFF"
-"""Brand guidelines: White (brand colours group)."""
+"""Brand guidelines: White."""
 
 GREY_1: Final[LiteralString] = "#FFFBF5"
-"""Brand guidelines: Grey 1 (brand colours group). Same value as ``BACKGROUND`` below, which
-keeps its own name for its existing callers."""
+"""Brand guidelines: Grey 1, a warm cream."""
 
 GREY_2: Final[LiteralString] = "#F0ECE8"
-"""Brand guidelines: Grey 2 (brand colours group)."""
+"""Brand guidelines: Grey 2."""
 
 GREY_3: Final[LiteralString] = "#D9D0CA"
-"""Brand guidelines: printed as "Grey 2" a second time, which is a typo in the guidelines PDF —
-called Grey 3 here to keep every constant name unique (brand colours group)."""
+"""The guidelines print this swatch as "Grey 2" a second time, a typo; Grey 3 here."""
 
-BLUE_LIGHT: Final[LiteralString] = "#9CB6E1"
-"""Brand guidelines: Blue Light. Listed under both the visualisation and the main data colours
-groups with the same value, so it is defined once here."""
+# Main data colours: "electric contrasting colours for easy visual separation", each with a light
+# shade for comparing two conditions in one hue.
 
-SKY_BLUE_LIGHT: Final[LiteralString] = "#A3D6E0"
-"""Brand guidelines: Sky Blue Light. Listed under both the visualisation and the main data
-colours groups with the same value, so it is defined once here."""
+DATA_BLUE: Final[LiteralString] = "#306BFF"
+"""Brand guidelines: Data Blue."""
 
-VISUALISATION_BLUE: Final[LiteralString] = "#4675C1"
-"""Brand guidelines: Blue (visualisation colours group)."""
+DATA_SKY: Final[LiteralString] = "#10C5F7"
+"""Brand guidelines: Data Sky."""
 
-VISUALISATION_SKY_BLUE: Final[LiteralString] = "#65B0C9"
-"""Brand guidelines: Sky Blue (visualisation colours group)."""
+DATA_PURPLE: Final[LiteralString] = "#B701FF"
+"""Brand guidelines: Data Purple."""
 
-VISUALISATION_TEAL: Final[LiteralString] = "#58B0A9"
-"""Brand guidelines: Teal (visualisation colours group)."""
+DATA_GREEN: Final[LiteralString] = "#17E58F"
+"""Brand guidelines: Data Green."""
 
-VISUALISATION_YELLOW: Final[LiteralString] = "#FFD480"
-"""Brand guidelines: Yellow (visualisation colours group)."""
+DATA_BLUE_LIGHT: Final[LiteralString] = "#9CB6E1"
+"""Brand guidelines: Blue Light, the light shade of both Data Blue and Visualisation Blue."""
 
-VISUALISATION_ORANGE: Final[LiteralString] = "#FAA056"
-"""Brand guidelines: Orange (visualisation colours group)."""
+DATA_SKY_LIGHT: Final[LiteralString] = "#A3D6E0"
+"""Brand guidelines: Sky Blue Light, the light shade of both Data Sky and Visualisation Sky Blue."""
 
-VISUALISATION_TEAL_LIGHT: Final[LiteralString] = "#9ED1CD"
-"""Brand guidelines: Teal Light (visualisation colours group)."""
+DATA_PURPLE_LIGHT: Final[LiteralString] = "#EFC8FF"
+"""Brand guidelines: Data Purple Light."""
 
-VISUALISATION_YELLOW_LIGHT: Final[LiteralString] = "#FFE9BC"
-"""Brand guidelines: Yellow Light (visualisation colours group)."""
-
-VISUALISATION_ORANGE_LIGHT: Final[LiteralString] = "#FFDABC"
-"""Brand guidelines: Orange Light (visualisation colours group)."""
-
-DATA_BLACK: Final[LiteralString] = BLACK_1
-"""Brand guidelines: Data Black (additional data colours group), internal use only in OCF's
-brand guidelines, so keep it out of anything published. Same value as ``BLACK_1``.
-
-The additional data colours group also lists Data Deep Teal (``DARK_GREEN`` above) and Data
-Burnt Orange (``BROWN`` above) — both already named constants, so no separate constant is added
-for either. It lists a fifth colour, Data Magenta, printed with the same hex value as Data Amber
-(``#FC9700``, ``MUSTARD`` above) — evidently a typo, since two differently-named swatches on the
-same page cannot share a value. No ``DATA_MAGENTA`` constant is defined here rather than guess at
-the intended value.
-"""
+DATA_GREEN_LIGHT: Final[LiteralString] = "#B8F5DB"
+"""Brand guidelines: Data Green Light. The guidelines label this swatch "Data Purple Light
+#EFC8FF" a second time, but fill it with ``#B8F5DB``."""
 
 DATA_COLOURS: Final[tuple[LiteralString, ...]] = (
-    BLUE,
-    SKY_BLUE,
-    ORANGE_RED,
-    PURPLE,
-    SPRING_GREEN,
+    DATA_BLUE,
+    DATA_SKY,
+    BRAND_ORANGE,
+    DATA_PURPLE,
+    DATA_GREEN,
 )
-"""Brand guidelines' five main data colours, in their printed order: Data Blue, Data Sky, Brand
-Orange, Data Purple, Data Green. "Electric contrasting colours for easy visual separation."
-"""
+"""The five main data colours, in the guidelines' printed order."""
 
 DATA_COLOURS_LIGHT: Final[tuple[LiteralString, ...]] = (
-    BLUE_LIGHT,
-    SKY_BLUE_LIGHT,
-    ORANGE_RED_LIGHT,
-    LAVENDER,
-    MINT,
+    DATA_BLUE_LIGHT,
+    DATA_SKY_LIGHT,
+    BRAND_ORANGE_LIGHT,
+    DATA_PURPLE_LIGHT,
+    DATA_GREEN_LIGHT,
 )
-"""Light shade of each ``DATA_COLOURS`` entry at the same index, e.g. ``DATA_COLOURS_LIGHT[0]``
-is the light shade of ``DATA_COLOURS[0]``. "Each has a lighter shade to create mono-coloured
-comparative graphs."
-"""
+"""The light shade of each ``DATA_COLOURS`` entry, at the same index."""
+
+# Additional data colours, which the guidelines reserve for internal use. Data Black is
+# ``BLACK_1``.
+
+DATA_AMBER: Final[LiteralString] = "#FC9700"
+"""Brand guidelines: Data Amber."""
+
+DATA_DEEP_TEAL: Final[LiteralString] = "#009C75"
+"""Brand guidelines: Data Deep Teal."""
+
+DATA_MAGENTA: Final[LiteralString] = "#FF17EC"
+"""Brand guidelines: Data Magenta. The guidelines label this swatch ``#FC9700``, Data Amber's
+value, but fill it with ``#FF17EC``."""
+
+DATA_BURNT_ORANGE: Final[LiteralString] = "#BF4F04"
+"""Brand guidelines: Data Burnt Orange."""
+
+ADDITIONAL_DATA_COLOURS: Final[tuple[LiteralString, ...]] = (
+    DATA_AMBER,
+    DATA_DEEP_TEAL,
+    DATA_MAGENTA,
+    DATA_BURNT_ORANGE,
+)
+"""The four coloured additional data colours, in the guidelines' printed order."""
+
+# Visualisation colours: a gradient "from cool sky blue to warm sunlight", inspired by the
+# troposphere.
+
+VISUALISATION_BLUE: Final[LiteralString] = "#4675C1"
+"""Brand guidelines: Blue (visualisation colours)."""
+
+VISUALISATION_SKY_BLUE: Final[LiteralString] = "#65B0C9"
+"""Brand guidelines: Sky Blue (visualisation colours)."""
+
+VISUALISATION_TEAL: Final[LiteralString] = "#58B0A9"
+"""Brand guidelines: Teal (visualisation colours)."""
+
+VISUALISATION_YELLOW: Final[LiteralString] = "#FFD073"
+"""Brand guidelines: Yellow (visualisation colours). The guidelines label this swatch
+``#FFD480``, but fill it with ``#FFD073``."""
+
+VISUALISATION_ORANGE: Final[LiteralString] = "#FAA056"
+"""Brand guidelines: Orange (visualisation colours)."""
+
+VISUALISATION_TEAL_LIGHT: Final[LiteralString] = "#9ED1CD"
+"""Brand guidelines: Teal Light (visualisation colours)."""
+
+VISUALISATION_YELLOW_LIGHT: Final[LiteralString] = "#FFE9BC"
+"""Brand guidelines: Yellow Light (visualisation colours)."""
+
+VISUALISATION_ORANGE_LIGHT: Final[LiteralString] = "#FFDABC"
+"""Brand guidelines: Orange Light (visualisation colours)."""
 
 VISUALISATION_COLOURS: Final[tuple[LiteralString, ...]] = (
     VISUALISATION_BLUE,
@@ -163,11 +149,39 @@ VISUALISATION_COLOURS: Final[tuple[LiteralString, ...]] = (
     VISUALISATION_YELLOW,
     VISUALISATION_ORANGE,
 )
-"""Brand guidelines' five visualisation colours, cool to warm: a gradient from cool sky blue to
-warm sunlight, for visualisations such as weather maps."""
+"""The five visualisation colours, cool to warm."""
+
+VISUALISATION_COLOURS_LIGHT: Final[tuple[LiteralString, ...]] = (
+    DATA_BLUE_LIGHT,
+    DATA_SKY_LIGHT,
+    VISUALISATION_TEAL_LIGHT,
+    VISUALISATION_YELLOW_LIGHT,
+    VISUALISATION_ORANGE_LIGHT,
+)
+"""The light shade of each ``VISUALISATION_COLOURS`` entry, at the same index."""
+
+# Chart roles.
+
+PALETTE: Final[tuple[LiteralString, ...]] = (
+    BRAND_ORANGE,
+    DATA_BLUE,
+    DATA_GREEN,
+    DATA_PURPLE,
+    DATA_SKY,
+    *ADDITIONAL_DATA_COLOURS,
+)
+"""The theme's categorical colours: the main data colours, then the additional data colours.
+
+The main data colours are reordered from the guidelines' printed order so that no two neighbours
+are hard to tell apart under colour-vision deficiency. In the printed order, Data Purple and Data
+Blue sit next to each other and are about 2 ΔE apart under deuteranopia.
+"""
 
 BACKGROUND: Final[LiteralString] = GREY_1
-"""Chart background colour. Same value as the brand guidelines' Grey 1 (``GREY_1``)."""
+"""Chart background colour."""
+
+TEXT: Final[LiteralString] = BLACK_1
+"""Colour of every piece of chart text, and of axis lines and ticks."""
 
 GRID: Final[LiteralString] = "#EAEAEA"
 """Axis grid line colour."""
@@ -177,8 +191,6 @@ ENSEMBLE_LINE: Final[LiteralString] = "#808080"
 
 Mid-grey stays visible at low opacity against BACKGROUND.
 """
-
-_TEXT: Final[LiteralString] = BLACK_1
 
 # Typography. Matter XH, Matter Semi Mono and Pangram Sans Rounded are commercial fonts that most
 # readers will not have installed, so each stack falls back to the free font OCF's own slide
@@ -195,7 +207,7 @@ FONT_LABEL: Final[LiteralString] = "Matter Semi Mono, Roboto Mono, monospace"
 FONT_NUMBER: Final[LiteralString] = "Pangram Sans Rounded, DM Sans, sans-serif"
 """Brand guidelines' typeface for big numbers and stats."""
 
-TypeStyle = Literal[
+TypeScaleStyleType = Literal[
     "Headline 4",
     "Headline 3",
     "Headline 2",
@@ -208,7 +220,7 @@ TypeStyle = Literal[
 ]
 """Brand guidelines' named type-scale styles."""
 
-TYPE_SCALE: Final[dict[TypeStyle, float]] = {
+TYPE_SCALE: Final[dict[TypeScaleStyleType, float]] = {
     "Headline 4": 4.5,
     "Headline 3": 3.0,
     "Headline 2": 2.25,
@@ -220,12 +232,12 @@ TYPE_SCALE: Final[dict[TypeStyle, float]] = {
     "Micro": 0.77,
 }
 """Brand guidelines' type-size scale: each style's size as a multiple of the body size. "Body
-Small" and "Label" share a multiplier in the guidelines. Label and Micro are set in
-``FONT_LABEL`` (the Semi Mono), every other style in ``FONT_TEXT``.
+Small" and "Label" share a multiplier in the guidelines. The guidelines set Label and Micro in
+``FONT_LABEL`` (the Semi Mono), and every other style in ``FONT_TEXT``.
 """
 
 
-def font_size(*, style: TypeStyle, body_px: float) -> int:
+def font_size(*, style: TypeScaleStyleType, body_px: float) -> int:
     """Pixel size for a type-scale style, given the body size.
 
     Args:
@@ -258,42 +270,50 @@ _BODY_PX: Final[float] = 11
 
 @alt.theme.register("ocf", enable=True)
 def _ocf_theme() -> alt.theme.ThemeConfig:
-    palette = list(PALETTE)
     title_px = font_size(style="Headline 1", body_px=_BODY_PX)
     body_px = font_size(style="Body", body_px=_BODY_PX)
     label_px = font_size(style="Label", body_px=_BODY_PX)
     return {
         "config": {
             "background": BACKGROUND,
+            # The default for every text element the entries below do not set: subtitles, facet
+            # headers, and text marks.
+            "font": FONT_TEXT,
             "view": {
                 "stroke": "transparent",
                 "fill": BACKGROUND,
             },
             "range": {
-                "category": palette,
-                "ordinal": palette,
-                "ramp": palette,
+                "category": list(PALETTE),
+                # Ordered data takes the cool-to-warm gradient, which Vega-Lite interpolates when
+                # there are more than five levels.
+                "ordinal": list(VISUALISATION_COLOURS),
+                "ramp": list(VISUALISATION_COLOURS),
             },
             "title": {
+                "color": TEXT,
                 "font": FONT_TEXT,
                 "fontSize": title_px,
+                # The guidelines set headlines in the regular weight, where Vega-Lite defaults
+                # to bold.
+                "fontWeight": "normal",
             },
             "axis": {
-                "domainColor": _TEXT,
+                "domainColor": TEXT,
                 "gridColor": GRID,
-                "tickColor": _TEXT,
-                "labelColor": _TEXT,
+                "tickColor": TEXT,
+                "labelColor": TEXT,
                 "labelFont": FONT_LABEL,
                 "labelFontSize": label_px,
-                "titleColor": _TEXT,
-                "titleFont": FONT_LABEL,
+                "titleColor": TEXT,
+                "titleFont": FONT_TEXT,
                 "titleFontSize": body_px,
             },
             "legend": {
-                "labelColor": _TEXT,
+                "labelColor": TEXT,
                 "labelFont": FONT_LABEL,
                 "labelFontSize": label_px,
-                "titleColor": _TEXT,
+                "titleColor": TEXT,
                 "titleFont": FONT_TEXT,
                 "titleFontSize": body_px,
                 # Legend swatches must stay fully opaque whatever opacity the marks draw at.

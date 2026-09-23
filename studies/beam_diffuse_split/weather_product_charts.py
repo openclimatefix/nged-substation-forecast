@@ -115,7 +115,7 @@ DECIDING: Final[tuple[tuple[str, str], ...]] = (
 """The four contrasts named before the run, as the report writes them."""
 
 HEADLINE_DOMAIN: Final[tuple[float, float]] = (-4.5, 1.0)
-"""The x range of the headline's left panel, shared with the direct-beam chart."""
+"""The x range of the headline's left panel."""
 
 CAPACITY: Final[str] = "Capacity is each generator's 99th-percentile output."
 DOTS: Final[str] = "Dot: estimate. Line: 95% interval from resampling whole months."
@@ -568,7 +568,7 @@ def _own_beam(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
             ),
             labels=[NAMES[product] for product in order],
         ),
-        x_domain=HEADLINE_DOMAIN,
+        x_domain=(-0.2, 0.1),
         x_title="Mean absolute error with its own beam minus with the Erbs split "
         "(points of capacity)",
         zero_label="no gain",
@@ -584,7 +584,10 @@ def _own_beam(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
                 "Each product shown its own published beam and diffuse, minus the same product "
                 "with the Erbs split of its own global irradiance."
             ),
-            f"Points of capacity. {CAPACITY} The x axis spans Figure 1's, for scale.",
+            (
+                f"Points of capacity. {CAPACITY} For scale, CAMS leads ERA5 by 3.92 points across "
+                "the whole record (Figure 1)."
+            ),
             f"{DOTS} Exploratory. {SCOPE}",
         ],
         width=760,
@@ -662,7 +665,8 @@ def _implied_capacity_rows(*, report_text: str) -> pl.DataFrame:
     if frame.height != COMMON_ROWS:
         msg = f"the rebuilt frame holds {frame.height} rows, not {COMMON_ROWS}"
         raise ValueError(msg)
-    table = _implied_capacity(frame=frame)
+    log_by_product = _log_capacity_by_month(frame=frame)
+    table = _implied_capacity(log_by_product=log_by_product)
     if "\n".join(table) not in report_text:
         msg = "the rebuilt implied-capacity table differs from the report's:\n" + "\n".join(table)
         raise ValueError(msg)
@@ -674,7 +678,7 @@ def _implied_capacity_rows(*, report_text: str) -> pl.DataFrame:
             month=pl.col("calendar").cast(pl.Int32),
             percent=pl.col("seasonal").map_batches(np.expm1) * PERCENTAGE_POINTS,
         )
-        for product, log_capacity in _log_capacity_by_month(frame=frame).items()
+        for product, log_capacity in log_by_product.items()
     )
 
 
@@ -698,9 +702,7 @@ def _implied_capacity_chart(*, report_text: str) -> alt.VConcatChart:
     colour = alt.Color(
         "family:N",
         scale=alt.Scale(domain=families, range=list(FAMILY_COLOURS.values())),
-        legend=alt.Legend(
-            title="Product type", values=[f for f in families if f in set(rows["family"])]
-        ),
+        legend=alt.Legend(title="Product type", values=families),
     )
     x = alt.X(
         "month_name:N",
@@ -742,6 +744,10 @@ def _implied_capacity_chart(*, report_text: str) -> alt.VConcatChart:
             (
                 "shown as a percentage. Zero is the annual mean. Unconstrained hours with the sun "
                 "above 10°. No interval is drawn."
+            ),
+            (
+                "With the seasonal cycle removed, CAMS's month-to-month spread is the smallest: "
+                "6.5%, against 7.9% to 10.0%."
             ),
             SCOPE,
         ],

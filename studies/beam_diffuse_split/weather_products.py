@@ -517,7 +517,7 @@ def _log_capacity_by_month(*, frame: pl.DataFrame) -> dict[str, pl.DataFrame]:
     return log_by_product
 
 
-def _implied_capacity(*, frame: pl.DataFrame) -> list[str]:
+def _implied_capacity(*, log_by_product: dict[str, pl.DataFrame]) -> list[str]:
     """Measure how steady each product's implied capacity is from month to month, and by season.
 
     Capacity estimation reads a product's irradiance with no model fitted to the generator, so the
@@ -527,12 +527,11 @@ def _implied_capacity(*, frame: pl.DataFrame) -> list[str]:
     from the annual mean.
 
     Args:
-        frame: The common rows.
+        log_by_product: The output of `_log_capacity_by_month`.
 
     Returns:
         Markdown lines: a table of spread, interval against CAMS, and December's departure.
     """
-    log_by_product = _log_capacity_by_month(frame=frame)
     months = sorted(log_by_product["cams"]["month"].unique().to_list())
     generator = np.random.default_rng(BOOTSTRAP_SEED)
     draws = generator.integers(0, len(months), size=(N_BOOTSTRAP_RESAMPLES, len(months)))
@@ -920,7 +919,7 @@ def main() -> int:
         pooled=pooled,
         post_only=post_only,
         transfer=transfer,
-        stability=_implied_capacity(frame=frame),
+        stability=_implied_capacity(log_by_product=_log_capacity_by_month(frame=frame)),
     )
     (output_dir / "report.md").write_text(report)
     sys.stdout.write(report)
