@@ -49,7 +49,7 @@ and 50,734 generator-hours from August 2024 to September 2026.
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
 > AI model (for this page, Claude Opus 5.5, reusing the data-preparation and model-fitting code that
 > Claude Opus 5 wrote for the [beam/diffuse study](beam-diffuse-split.md)). A human has reviewed the
-> figures, and the text, and several independent Claude reviewers have checked the method, the
+> figures and the text, and several independent Claude reviewers have checked the method, the
 > evidence, and the prose adversarially.
 
 ![Figure 1: UKV and ICON-D2 describe past wind best of the five products tested](assets/wind_headline.svg)

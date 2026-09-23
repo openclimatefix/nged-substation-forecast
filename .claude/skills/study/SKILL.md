@@ -351,7 +351,7 @@ findings:**
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
-> AI model (for this page, MODEL). A human has reviewed the figures, and the text, and several
+> AI model (for this page, MODEL). A human has reviewed the figures and the text, and several
 > independent Claude reviewers have checked the method, the evidence, and the prose adversarially.
 
 Take MODEL from the `Co-Authored-By` trailers of the commits that touch the page and the study
