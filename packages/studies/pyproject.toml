@@ -1,6 +1,6 @@
 [project]
 name = "studies"
-version = "0.2.0"
+version = "0.2.1"
 description = "Tested machinery the one-off studies under studies/ call: the out-of-fold fit loop, the paired bootstrap, solar geometry, served-column checks, power aggregation, anonymisation, grid sampling, the Fractions Skill Score, and the dot-and-interval chart form"
 readme = "README.md"
 authors = [

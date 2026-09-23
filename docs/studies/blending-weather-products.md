@@ -1,20 +1,29 @@
 # Does blending weather products beat the best single weather product?
 
+**This study asks which weather data best describes the weather that has already happened. The study
+does not test weather forecasts.** Every product is scored on hours in the past, against what each
+generator actually produced in those hours. Several of the products are numerical weather prediction
+(NWP) models: UKV, ICON-D2, ICON-EU, and ICON global. The NWP models are included because this study
+reads only the first few hours of each NWP run, at lead times of 0 to 6 hours depending on the
+model, and uses those hours as a stand-in for an analysis: the model's best estimate of the weather
+at the time the run starts. How well the same NWP models forecast hours or days ahead is a separate
+question, tracked in [#810](https://github.com/openclimatefix/nged-substation-forecast/issues/810).
+
 **At 6 solar farms and 3 wind farms in Lincolnshire, an XGBoost model given several weather products
 at once beats an XGBoost model given the best single product, even when the single product is also
 given its values for the neighbouring hours, the hours either side.** Every error here is a mean
 absolute error as a percentage of each generator's capacity. A difference between two errors is in
 percentage points of capacity, written "points", and a bracketed pair after a number is its 95%
-interval. For solar, an XGBoost model given all six products has an error of 4.74% of capacity,
-against 4.87% for an XGBoost model given CAMS, the Copernicus satellite retrieval, with its
+interval. For solar, an XGBoost model given all six products has an error of 4.79% of capacity,
+against 4.92% for an XGBoost model given CAMS, the Copernicus satellite retrieval, with its
 neighbouring hours and its split of sunlight into direct beam and diffuse light: 0.13 points better
 [0.10, 0.17]. At a solar farm with 10 MW of capacity, 0.13 points is 13 kW off a mean absolute error
-of 487 kW. For wind, an XGBoost model given all five products has an error of 5.76%, against 6.24%
+of 492 kW. For wind, an XGBoost model given all five products has an error of 5.76%, against 6.24%
 for an XGBoost model given the wind of UKV, the Met Office's UK model, with its neighbouring hours:
 0.48 points better [0.40, 0.56]. A blend that a live forecasting service could read beats the best
 single product as well: UKV with ICON-EU, by 0.26 points [0.21, 0.31] for wind. All three
 comparisons are post hoc, chosen after a first run's results, as "Data and methods" explains. The
-evidence is 79,384 generator-hours (one generator's output over one hour) at the 6 solar farms from
+evidence is 77,616 generator-hours (one generator's output over one hour) at the 6 solar farms from
 December 2022 to September 2026, and 50,734 generator-hours at the 3 wind farms from August 2024 to
 September 2026.
 
@@ -116,7 +125,7 @@ which this page does not test](../roadmap/assets/weather_product_domains.svg)
 **Every comparison is scored on the two earlier studies' own hours, folds, and fitting seeds.** Each
 XGBoost model is trained on some blocks of whole months and scored on the others. Each held-out
 block is called a fold, and there are five. Each XGBoost model is fitted three times, from three
-fitting seeds. The solar rows are 79,384 generator-hours at six solar farms, labelled A to F, from 1
+fitting seeds. The solar rows are 77,616 generator-hours at six solar farms, labelled A to F, from 1
 December 2022 to 10 September 2026. The wind rows are 50,734 generator-hours at three wind farms,
 labelled W1 to W3, from 12 August 2024 to 10 September 2026. Each hour is kept only if every product
 covers it. This study refits every single-product XGBoost model the two earlier pages published: 22
@@ -143,10 +152,10 @@ between two such XGBoost models, differing only in the weather columns:
 the set's products.** The candidates are every single-product XGBoost model the earlier pages
 published and every enriched one. For every set containing CAMS the best single product is enriched
 CAMS, with an
-error of 4.87%. For the four weather models it is ICON-D2 enriched, at 7.41%. For every wind set it
+error of 4.92%. For the four weather models it is ICON-D2 enriched, at 7.50%. For every wind set it
 is UKV enriched, at 6.24%, ahead of ICON-D2 enriched at 6.28%. The extra columns matter on their
 own: enriching UKV lowers its wind error by 0.59 points, and enriching CAMS lowers its solar error
-by 0.19 points.
+by 0.18 points.
 
 **Each set is blended four ways:**
 
@@ -193,7 +202,7 @@ compare enriched XGBoost models before the re-run that measured them. The plain 
 written into the plan before any result existed, and are reported as secondary.
 
 **If no two XGBoost models compared differed, about one exploratory interval in twenty would still
-be statistically significant at the 5% level by chance.** Here 120 of the 139 exploratory intervals
+be statistically significant at the 5% level by chance.** Here 121 of the 139 exploratory intervals
 exclude zero. The intervals share hours and XGBoost models with one another, so they are not
 independent tests, and the study script's report quotes no count of how many could be chance.
 
@@ -237,23 +246,23 @@ generator](assets/blend_per_generator.svg)
 
 **An XGBoost model given all six products beats an XGBoost model given enriched CAMS by 0.13 points
 [0.10, 0.17], 2.7% of CAMS's error, in a post hoc comparison.** The t-interval across the five folds
-is [0.08, 0.18], and the gain at each generator ranges from 0.09 to 0.18 points. With the shallower
-settings the gain is 0.12 points [0.08, 0.15].
+is [0.09, 0.18], and the gain at each generator ranges from 0.09 to 0.18 points. With the shallower
+settings the gain is 0.12 points [0.09, 0.16].
 
-**CAMS with ICON-EU alone gives most of that gain: 0.10 points [0.07, 0.13] over enriched CAMS, in a
-post hoc comparison.** The t-interval across the folds is [0.05, 0.15], and the per-generator gain
-ranges from 0.05 to 0.13 points. In exploratory comparisons, CAMS with ICON-D2 gains 0.12 points
-[0.09, 0.15], and CAMS with ERA5 0.07 points [0.04, 0.09].
+**CAMS with ICON-EU alone gives most of that gain: 0.10 points [0.07, 0.14] over enriched CAMS, in a
+post hoc comparison.** The t-interval across the folds is [0.06, 0.15], and the per-generator gain
+ranges from 0.06 to 0.13 points. In exploratory comparisons, CAMS with ICON-D2 gains 0.12 points
+[0.09, 0.15], and CAMS with ERA5 0.07 points [0.04, 0.10].
 
 **Among the weather models alone, an XGBoost model given all four beats an XGBoost model given
-enriched ICON-D2 by 0.34 points [0.25, 0.43], 4.5% of ICON-D2's error, in a post hoc comparison.**
-The t-interval across the folds is [0.21, 0.48], and the per-generator gain ranges from 0.27 to 0.43
-points. With the shallower settings the gain is 0.29 points [0.20, 0.38]. In an exploratory
-comparison, UKV with ICON-EU beats enriched UKV by 0.52 points [0.44, 0.60].
+enriched ICON-D2 by 0.34 points [0.25, 0.44], 4.5% of ICON-D2's error, in a post hoc comparison.**
+The t-interval across the folds is [0.22, 0.48], and the per-generator gain ranges from 0.26 to 0.42
+points. With the shallower settings the gain is 0.30 points [0.21, 0.40]. In an exploratory
+comparison, UKV with ICON-EU beats enriched UKV by 0.50 points [0.41, 0.58].
 
 **The plain comparisons, planned before the first run, show larger gains because their single
 product lacks the extra columns.** Against plain CAMS, an XGBoost model given all six products'
-plain columns gains 0.21 points [0.16, 0.25]. Against plain ICON-D2, an XGBoost model given the four
+plain columns gains 0.20 points [0.16, 0.24]. Against plain ICON-D2, an XGBoost model given the four
 weather models' plain columns gains 0.47 points [0.40, 0.55].
 
 ### Wind: a blend beats UKV given its neighbouring hours
@@ -277,7 +286,7 @@ ICON-D2, the best plain wind product, all five products' plain columns gain 0.82
 
 **For every named blend, the blend beats its control, and the control does no better than the best
 single product.** Figure 7 splits each blend's gain in two. For all six solar products, the blend
-beats its control by 0.20 points [0.17, 0.24], and the control is 0.07 points worse than enriched
+beats its control by 0.20 points [0.17, 0.23], and the control is 0.07 points worse than enriched
 CAMS [0.05, 0.09]. For all five wind products, the blend beats its control by 0.53 points [0.46,
 0.62], and the control is 0.06 points worse than enriched UKV [0.02, 0.09]. For UKV with ICON-EU,
 the control's difference from enriched UKV is not statistically significant at the 5% level (0.02
@@ -301,10 +310,10 @@ splits share hours and XGBoost models with the whole-record results and with one
 are not independent tests.
 
 **The solar gain is smallest from June to August, and the wind gain holds in every season.** An
-XGBoost model given all six products beats enriched CAMS by 0.09 points [0.03, 0.14] from June to
-August, and by 0.19 points [0.10, 0.28] from December to February. All five wind products beat
-enriched UKV by 0.39 to 0.58 points in each season. Since UKV's upgrade the solar gain is 0.08
-points [0.05, 0.12] and the wind gain 0.40 points [0.33, 0.50], each resting on 8 months.
+XGBoost model given all six products beats enriched CAMS by 0.09 points [0.03, 0.15] from June to
+August, and by 0.20 points [0.11, 0.28] from December to February. All five wind products beat
+enriched UKV by 0.39 to 0.58 points in each season. Since UKV's upgrade the solar gain is 0.07
+points [0.03, 0.12] and the wind gain 0.40 points [0.33, 0.50], each resting on 8 months.
 
 ![Figure 8: Each named blend beats its best single product at every generator, in every season, and
 on each side of UKV's upgrade](assets/blend_splits.svg)
@@ -332,17 +341,17 @@ down. The bottom panel of Figure 9 shows both running sums.
 ### An XGBoost blend beats a linear stack and simple averages
 
 **An XGBoost model given every product's columns beats a linear stack of the single-product XGBoost
-models, by 0.08 points for solar [0.05, 0.10] and 0.10 points for wind [0.05, 0.16], in post hoc
+models, by 0.07 points for solar [0.05, 0.10] and 0.10 points for wind [0.05, 0.16], in post hoc
 comparisons.** For wind the t-interval across the folds, [−0.01, +0.19], includes zero, so the wind
 result rests on the month resampling alone. With the shallower settings the wind difference is 0.11
 points [0.06, 0.17], with a fold t-interval of [0.03, 0.18]. The stack still beats the best single
-product for both solar and wind: by 0.06 points [0.03, 0.09] for all six solar products, and 0.38
+product for both solar and wind: by 0.06 points [0.03, 0.10] for all six solar products, and 0.38
 points [0.32, 0.43] for all five wind products, in exploratory comparisons.
 
 **Averaging CAMS with the other solar products makes the error far worse, because CAMS is far better
 than every other product.** For all six solar products, the XGBoost model given the products' mean
-is 1.64 points worse than enriched CAMS [1.47, 1.80], and the equal-weight mean of the predictions
-is 1.75 points worse [1.58, 1.92]. For wind, both averages of UKV and ICON-EU beat enriched UKV, by
+is 1.65 points worse than enriched CAMS [1.48, 1.81], and the equal-weight mean of the predictions
+is 1.78 points worse [1.61, 1.96]. For wind, both averages of UKV and ICON-EU beat enriched UKV, by
 0.22 points each. All of these comparisons are exploratory.
 
 ![Figure 10: Given every product's columns, an XGBoost model has the lowest error of the four blends
@@ -365,13 +374,13 @@ gains about 0.01 points.
 
 **The comparison recovers in full a synthetic gain planted at about the size of the solar headline
 gain.** The noise was sized on a pilot fit. Given the synthetic product, an XGBoost model beats the
-best single product by 0.13 points for solar [0.11, 0.16] and 0.14 points for wind [0.10, 0.19],
+best single product by 0.14 points for solar [0.11, 0.16] and 0.14 points for wind [0.10, 0.19],
 with all five folds agreeing, in exploratory comparisons. Against its shuffled control the gain is
-0.14 points for both (exploratory). Because the noise level was chosen to target the headline gain's
-size, this comparison shows the pipeline can recover a known gain of that size. The comparison does
-not independently confirm the headline gain's magnitude. A comparison where a large gain is known to
-exist, CAMS with ICON-D2 against ICON-D2 alone, shows a gain of 2.82 points [2.61, 3.03]
-(exploratory).
+0.15 points for solar and 0.14 points for wind (exploratory). Because the noise level was chosen to
+target the headline gain's size, this comparison shows the pipeline can recover a known gain of that
+size. The comparison does not independently confirm the headline gain's magnitude. A comparison
+where a large gain is known to exist, CAMS with ICON-D2 against ICON-D2 alone, shows a gain of 2.86
+points [2.64, 3.08] (exploratory).
 
 ![Figure 11: A known small signal is recovered in full](assets/blend_synthetic.svg)
 
@@ -399,7 +408,7 @@ over less than 4 years for solar and 2 years for wind.**
 
 - **Historical features in the live service: UKV with ICON-EU, anywhere in Great Britain; the four
   weather models where ICON-D2 covers.** UKV with ICON-EU beats enriched UKV by 0.26 points for wind
-  (post hoc) and 0.52 points for solar (exploratory). Inside ICON-D2's domain the four weather
+  (post hoc) and 0.50 points for solar (exploratory). Inside ICON-D2's domain the four weather
   models beat the best single weather model by 0.34 points for solar (post hoc) and 0.46 points for
   wind (exploratory). A live blend needs every product at run time, so a blend has more products
   that can go missing, and under this project's [inherent stability
@@ -443,6 +452,10 @@ over less than 4 years for solar and 2 years for wind.**
 - **Open-Meteo's UKV solar archive before 12 August 2024 is a backfill from a source Open-Meteo does
   not name.** Every set reading UKV, including UKV with ICON-EU, spans that boundary; the wind sets
   do not, because UKV's hub-height wind on Open-Meteo starts only in August 2024.
+- **The solar row set drops hours where UKV's archive holds a physically impossible sunrise value,
+  which the solar page's own [Limitations](weather-products-for-past-solar.md#limitations) section
+  describes in full.** Every solar figure on this page inherits that row set: 77,616 generator-hours
+  rather than 79,384.
 
 ## Reproducing the figures
 
