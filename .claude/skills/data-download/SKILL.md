@@ -5,9 +5,11 @@ description: >-
   backfill from an external weather or climate archive especially — so a crash partway through costs
   one chunk, not the whole run: checkpoint every chunk to disk as soon as it is fetched, resume by
   skipping whatever is already cached, measure one chunk before committing to the rest, look up a
-  provider's real parameter names before submitting a request, and size each chunk to the provider's
-  own constraints. Load before writing or resuming any bulk-download script (e.g.
-  `studies/*/fetch_*.py`) that makes more than a handful of requests.
+  provider's real parameter names before submitting a request, size each chunk to the provider's own
+  constraints, and get a fresh adversarial review before the script's first real request against a
+  metered or queued API. Load before writing or resuming any bulk-download script (e.g.
+  `studies/*/fetch_*.py`) that makes more than a handful of requests, and before running any such
+  script for the first time.
 ---
 
 # Writing a resumable bulk-download script
@@ -178,6 +180,43 @@ stalled. Launch with `PYTHONUNBUFFERED=1 uv run python script.py > log 2>&1 &` (
 script.py`), not a bare `python3 script.py`, which runs outside the workspace's `uv` virtual
 environment and will fail to import any workspace package (`delta_store`, `contracts`, and so on) a
 checkpointed downloader is likely to need.
+
+## Get an adversarial review before the first real request against a metered or queued source
+
+**Run every not-yet-executed download script through a fresh adversarial review before it makes its
+first real request**, the same review a diff gets under `implement-issue` — a second reader with no
+stake in the code finding what the author is too close to see. A batch of three download scripts
+written for issue #841, none yet run to completion, was reviewed this way before any of them
+touched a queued CDS account, and the review caught four bugs that would each have wasted a real
+request or corrupted output silently:
+
+- **An invalid request that the provider only rejects at submission time.** A CERRA solar request
+  used `product_type=analysis`, which does not exist for that variable — CDS has only a `forecast`
+  product for it. The bug was invisible reading the code in isolation; it surfaced only by checking
+  the request against the dataset's own `constraints.json` and its `/costing` endpoint (see "Look up
+  the provider's real parameter names" above) before ever submitting it for real.
+- **A chunking scheme that silently multiplies the request.** A CDS request built from
+  `year=[2019, 2020], month=[09..12, 01, 02]` asks for the cross product of both lists — every month
+  of both years, not the six months intended — because CDS's year/month/day fields are independent
+  lists, not a single date range. A chunk spanning a year boundary requested two to four times the
+  intended months without erroring. The fix is aligning chunks to calendar boundaries (a half-year,
+  not a rolling six months from an arbitrary start date) so every chunk sits inside one year.
+- **A wrong scale factor copied from a neighbouring variable.** Two variables served by the same
+  OPeNDAP catalog had different `scale_factor` attributes in their own `.das` metadata (`0.01` and
+  `0.1`); the download code applied one variable's factor to both, which is wrong by a factor of ten
+  and produces a plausible-looking number rather than an obvious error. Caught only by checking each
+  variable's own metadata rather than assuming two similar fields share a convention.
+- **An off-by-one in a datetime slice.** `.sel(time=slice(start, f"{year}-12-31"))` on a sub-daily
+  time axis excludes anything timestamped after midnight on the 31st — the slice's upper bound is a
+  bare date, which xarray reads as that date's midnight — so the year's last few timestamps are
+  silently dropped from every year, in every run, with no error. Slicing by `str(year)` instead of a
+  constructed date string avoids the ambiguity entirely.
+
+None of these four would show up in `ruff check`, in a syntax check, or in reading the code start to
+end without checking it against the actual provider. The review that caught them ran the same
+`costing_api` check, `form.json` check, and known-good sample file described elsewhere in this skill
+— it is a second pass of exactly those checks, done by a reader who did not write the request and so
+has no reason to assume it is right.
 
 ## Two traps from this repo's own conventions worth restating here
 
