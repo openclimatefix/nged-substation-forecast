@@ -4,13 +4,9 @@ One-off throwaway script for the charts in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/830>. The write-up is
 <https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-wind/>.
 
-**Almost every number is read from the report `wind_products.py` wrote**, so a chart cannot disagree
-with the page. Two charts need numbers the report lacks: ICON-D2 against ERA5 at each generator, and
-ICON global against ICON-EU pooled over the two generators without the steps in ICON global's
-served wind. Both are bootstrapped from `losses.parquet`, reading only the pooled setting, after
-two printed rows have been reproduced through the same code path. The step chart's wind-speed
-ratios are read from the downloads `fetch_wind_point.py` wrote, and checked against the figures the
-page quotes.
+**Every number a chart shares with the page is read from the report `wind_products.py` wrote**,
+so a chart cannot disagree with the page. The step chart's fortnightly wind-speed ratios are read
+from the downloads `fetch_wind_point.py` wrote, and its period means from the report.
 
 Generators appear only as `W1` to `W3`, and no chart plots output. The one per-generator time
 series, the ratio of two products' wind speeds at the generator with the steps, carries no
@@ -33,7 +29,6 @@ import plotting.ocf_theme as ocf
 import polars as pl
 from fetch_wind_point import output_path_for
 from sources import STUDY_DATA_DIR
-from studies.bootstrap import bootstrap_difference
 from studies.charts import (
     NAMED_SUFFIX,
     PLOT_WIDTH_PX,
@@ -54,8 +49,8 @@ from weather_product_charts import (
     _rows,
     _two_places,
 )
-from weather_products import METRIC, PERCENTAGE_POINTS, _contrast_line
-from wind_products import OUTPUT_DIR_NAME, STEP_DATES, _renamed, _scoped
+from weather_products import _contrast_line
+from wind_products import OUTPUT_DIR_NAME, STEP_DATES, STEP_SITE, _renamed, _scoped
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -64,18 +59,6 @@ RESULTS_DIR: Final[Path] = STUDY_DATA_DIR / OUTPUT_DIR_NAME
 
 SITES: Final[tuple[str, ...]] = ("W1", "W2", "W3")
 """The anonymous wind generator labels."""
-
-STEP_SITE: Final[str] = "W3"
-"""The generator at which ICON global's served wind steps, relative to ICON-EU's."""
-
-STEP_RATIOS: Final[dict[int, tuple[float, float, float]]] = {
-    10: (1.128, 0.962, 1.111),
-    80: (1.028, 0.948, 1.020),
-}
-"""ICON global's mean wind speed over ICON-EU's at `STEP_SITE`, before, between and after the steps.
-
-The page's account of the steps rests on these, at 10 m and 80 m, so the chart must reproduce them.
-"""
 
 SECTION_DECIDING: Final[str] = "Deciding contrasts, named before the run"
 SECTION_ERA: Final[str] = "By era and by half of the year (exploratory)"
@@ -139,23 +122,20 @@ def _reproduce(*, pooled: pl.DataFrame, report_text: str) -> None:
             raise ValueError(msg)
 
 
-def _new_row(*, losses: pl.DataFrame, treatment: str, reference: str) -> dict[str, float]:
-    """Bootstrap one contrast not in the report, in points of capacity.
+AFTER_FIRST_RUN_SUFFIX: Final[str] = " (named before the run; 80 m chosen after it)"
+"""Ends the label of a named contrast whose ICON arm was switched to 80 m after the first run."""
 
-    Args:
-        losses: Per-row losses for both arms, restricted to the scope wanted.
-        treatment: The arm whose error is being compared.
-        reference: The arm it is compared against.
 
-    Returns:
-        `difference`, `lower_95`, and `upper_95`.
-    """
-    interval = bootstrap_difference(
-        losses=losses, treatment=treatment, reference=reference, metric=METRIC
-    )
-    return {
-        key: interval[key] * PERCENTAGE_POINTS for key in ("difference", "lower_95", "upper_95")
-    }
+def _arm_suffix(*, treatment: str) -> str:
+    """Return the label suffix for a named arm: bold only where the arm is the planned one."""
+    return AFTER_FIRST_RUN_SUFFIX if treatment.startswith("icon") else NAMED_SUFFIX
+
+
+def _deciding_label(*, treatment: str, reference: str) -> str:
+    """Label a named contrast, marking it as changed where either arm is an ICON product."""
+    changed = treatment.startswith("icon") or reference.startswith("icon")
+    suffix = AFTER_FIRST_RUN_SUFFIX if changed else NAMED_SUFFIX
+    return _contrast_name(treatment=treatment, reference=reference) + suffix
 
 
 def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
@@ -190,7 +170,8 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         pl.col("treatment").replace_strict({f"{p}_wind": i for i, p in enumerate(order)})
     )
     labels = [
-        f"{NAMES[p]} · {_two_places(errors[p])}%" + (NAMED_SUFFIX if f"{p}_wind" in named else "")
+        f"{NAMES[p]} · {_two_places(errors[p])}%"
+        + (_arm_suffix(treatment=f"{p}_wind") if f"{p}_wind" in named else "")
         for p in order
     ]
     domain = (-1.0, 1.0)
@@ -208,7 +189,7 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
                 contrasts=contrasts,
                 wanted=[ContrastKey(SECTION_DECIDING, "all", t, r) for t, r in DECIDING],
             ),
-            labels=[_contrast_name(treatment=t, reference=r) + NAMED_SUFFIX for t, r in DECIDING],
+            labels=[_deciding_label(treatment=t, reference=r) for t, r in DECIDING],
         ),
         x_domain=(-1.0, 0.6),
         x_title=X_TITLE,
@@ -224,7 +205,8 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
             (
                 "Top: each product against ERA5; each label gives the product's own error. The "
                 "ICON-D2 and ICON global rows are exploratory. Bottom: the four contrasts named "
-                "before the run."
+                "before the run, planned on the served 100 m wind; each ICON product was switched "
+                "to its 80 m wind after the first run."
             ),
             f"{DOTS} {CAPACITY}",
             SCOPE,
@@ -350,9 +332,6 @@ def _fortnightly_ratios() -> pl.DataFrame:
         One row per (fortnight, height, group) with `ratio`, where `group` is the generator with
         the steps or the other two generators pooled.
 
-    Raises:
-        ValueError: If the ratio of each period's means at the generator with the steps differs
-            from `STEP_RATIOS`.
     """
     heights = (10, 80)
     speeds = [f"wind_speed_{height}m" for height in heights]
@@ -371,19 +350,6 @@ def _fortnightly_ratios() -> pl.DataFrame:
             period=sum(pl.col("time") >= date for date in STEP_DATES),
         )
     )
-    for height, expected in STEP_RATIOS.items():
-        speed = f"wind_speed_{height}m"
-        measured = (
-            joined.filter(pl.col("site") == STEP_SITE)
-            .group_by("period")
-            .agg(ratio=pl.col(speed).mean() / pl.col(f"{speed}_eu").mean())
-            .sort("period")["ratio"]
-            .round(3)
-            .to_list()
-        )
-        if tuple(measured) != expected:
-            msg = f"the {height} m period ratios are {measured}, not {expected}"
-            raise ValueError(msg)
     return pl.concat(
         joined.group_by(pl.col("time").dt.truncate("2w").alias("fortnight"), "group")
         .agg(
@@ -394,12 +360,33 @@ def _fortnightly_ratios() -> pl.DataFrame:
     ).sort("height", "group", "fortnight")
 
 
-def _ratio_panel(*, ratios: pl.DataFrame, height: str) -> alt.LayerChart:
+def _step_ratios(*, report_text: str) -> dict[int, tuple[float, ...]]:
+    """Read the step generator's period-mean speed ratios from the report, per height.
+
+    Args:
+        report_text: The report.
+
+    Returns:
+        For 10 m and 80 m, ICON global's mean speed over ICON-EU's before, between and after the
+        steps.
+    """
+    ratios: dict[int, tuple[float, ...]] = {}
+    for line in report_text.splitlines():
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if len(cells) == 5 and cells[0] == STEP_SITE and cells[1].endswith(" m"):
+            ratios[int(cells[1].removesuffix(" m"))] = tuple(float(cell) for cell in cells[2:])
+    return ratios
+
+
+def _ratio_panel(
+    *, ratios: pl.DataFrame, height: str, step_ratios: dict[int, tuple[float, ...]]
+) -> alt.LayerChart:
     """Draw one height's fortnightly ratio, the step dates, and each period's mean at the step site.
 
     Args:
         ratios: The output of `_fortnightly_ratios`.
         height: `10 m` or `80 m`.
+        step_ratios: The output of `_step_ratios`.
 
     Returns:
         One panel.
@@ -443,7 +430,7 @@ def _ratio_panel(*, ratios: pl.DataFrame, height: str) -> alt.LayerChart:
         {
             "start": edges[:3],
             "end": edges[1:],
-            "ratio": list(STEP_RATIOS[int(height.removesuffix(" m"))]),
+            "ratio": list(step_ratios[int(height.removesuffix(" m"))]),
         }
     )
     period_means = (
@@ -461,12 +448,12 @@ def _ratio_panel(*, ratios: pl.DataFrame, height: str) -> alt.LayerChart:
     )
 
 
-def _steps(*, contrasts: pl.DataFrame, pooled: pl.DataFrame) -> alt.VConcatChart:
+def _steps(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatChart:
     """Draw the steps in ICON global's served wind above how much they add to its error.
 
     Args:
         contrasts: Every contrast row in the report.
-        pooled: The pooled setting's losses.
+        report_text: The report, for the step generator's period-mean ratios.
 
     Returns:
         Figure 5.
@@ -484,17 +471,19 @@ def _steps(*, contrasts: pl.DataFrame, pooled: pl.DataFrame) -> alt.VConcatChart
             ),
         ],
     ).select("difference", "lower_95", "upper_95")
-    others = pooled.filter(pl.col("site") != STEP_SITE)
-    elsewhere = pl.DataFrame(
-        [
-            _new_row(
-                losses=_renamed(losses=others, suffix="_wind"),
-                treatment="icon_global_wind",
-                reference="icon_eu_wind",
+    others = " and ".join(site for site in SITES if site != STEP_SITE)
+    elsewhere = select_contrasts(
+        contrasts=contrasts,
+        wanted=[
+            ContrastKey(SECTION_CHECKS, f"sites {others}", "icon_global_wind", "icon_eu_wind"),
+            ContrastKey(
+                SECTION_CHECKS,
+                f"told the step period, sites {others}",
+                "icon_global_step",
+                "icon_eu_step",
             ),
-            _new_row(losses=others, treatment="icon_global_step", reference="icon_eu_step"),
-        ]
-    )
+        ],
+    ).select("difference", "lower_95", "upper_95")
     all_sites = select_contrasts(
         contrasts=contrasts,
         wanted=[
@@ -517,6 +506,7 @@ def _steps(*, contrasts: pl.DataFrame, pooled: pl.DataFrame) -> alt.VConcatChart
         condition=pl.Series([*conditions, *conditions, *conditions]),
     )
     ratios = _fortnightly_ratios()
+    step_ratios = _step_ratios(report_text=report_text)
     right = interval_panel(
         rows=rows,
         x_domain=(-0.5, 2.5),
@@ -530,7 +520,10 @@ def _steps(*, contrasts: pl.DataFrame, pooled: pl.DataFrame) -> alt.VConcatChart
     )
     return figure(
         panels=[
-            *(_ratio_panel(ratios=ratios, height=height) for height in ("10 m", "80 m")),
+            *(
+                _ratio_panel(ratios=ratios, height=height, step_ratios=step_ratios)
+                for height in ("10 m", "80 m")
+            ),
             right,
         ],
         number=5,
@@ -549,39 +542,23 @@ def _steps(*, contrasts: pl.DataFrame, pooled: pl.DataFrame) -> alt.VConcatChart
     )
 
 
-def _per_generator(*, contrasts: pl.DataFrame, pooled: pl.DataFrame) -> alt.VConcatChart:
+def _per_generator(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     """Draw UKV, ICON-D2 and ICON-EU against ERA5 at each generator.
 
     Args:
         contrasts: Every contrast row in the report.
-        pooled: The pooled setting's losses.
 
     Returns:
         Figure 3.
     """
-    wind = _renamed(losses=pooled, suffix="_wind")
     panels = []
     for index, product in enumerate(("ukv", "icon_d2", "icon_eu")):
         treatment = f"{product}_wind"
-        if product == "icon_d2":
-            numbers = pl.DataFrame(
-                [
-                    _new_row(
-                        losses=wind.filter(pl.col("site") == site),
-                        treatment=treatment,
-                        reference="era5_wind",
-                    )
-                    for site in SITES
-                ]
-            ).with_columns(treatment=pl.lit(treatment))
-        else:
-            numbers = select_contrasts(
-                contrasts=contrasts,
-                wanted=[
-                    ContrastKey(SECTION_DECIDING, f"site {site}", treatment, "era5_wind")
-                    for site in SITES
-                ],
-            )
+        section = SECTION_OTHER if product == "icon_d2" else SECTION_DECIDING
+        numbers = select_contrasts(
+            contrasts=contrasts,
+            wanted=[ContrastKey(section, f"site {site}", treatment, "era5_wind") for site in SITES],
+        )
         name = _contrast_name(treatment=treatment, reference="era5_wind")
         panels.append(
             interval_panel(
@@ -622,8 +599,8 @@ def main() -> int:
         "wind_headline": _headline(contrasts=contrasts, errors=errors),
         "wind_half_years": _half_years(contrasts=contrasts),
         "wind_icon_d2_against_ukv": _icon_d2_against_ukv(contrasts=contrasts),
-        "wind_icon_global_steps": _steps(contrasts=contrasts, pooled=pooled),
-        "wind_per_generator": _per_generator(contrasts=contrasts, pooled=pooled),
+        "wind_icon_global_steps": _steps(contrasts=contrasts, report_text=report_text),
+        "wind_per_generator": _per_generator(contrasts=contrasts),
     }
     for name, chart in charts.items():
         path = ASSETS_DIR / f"{name}.svg"

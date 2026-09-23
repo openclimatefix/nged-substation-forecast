@@ -42,8 +42,11 @@ fits and rebuilds the report from the losses a full run saved.
 """
 
 import argparse
+import calendar
 import concurrent.futures
+import itertools
 import logging
+import math
 import sys
 from datetime import UTC, datetime
 from typing import Final
@@ -212,6 +215,81 @@ CONTRAST_HEADER: Final[tuple[str, str]] = (
     ),
     "|---|---|---|---|---|---|---|",
 )
+
+
+ICON_D2_WESTERN_EDGE_DEG: Final[tuple[float, float]] = (-2.5, -2.7)
+"""Two longitudes bracketing ICON-D2's western edge at the generators' latitude.
+
+Open-Meteo's ICON-D2 serves data at 2.5°W but not at 2.7°W near 53°N, so the edge lies between.
+"""
+
+ERA5_GRID_DEG: Final[float] = 0.25
+"""The spacing of the grid ERA5 is published on, which sets which generators share a cell."""
+
+EARTH_RADIUS_KM: Final[float] = 6371.0
+
+
+def _km(*, latitudes: tuple[float, float], longitudes: tuple[float, float]) -> float:
+    """Return the great-circle distance between two points, by the haversine formula.
+
+    Args:
+        latitudes: The two points' latitudes in degrees.
+        longitudes: The two points' longitudes in degrees.
+
+    Returns:
+        The distance in kilometres.
+    """
+    first, second = (math.radians(latitude) for latitude in latitudes)
+    half_chord = (
+        math.sin((second - first) / 2) ** 2
+        + math.cos(first)
+        * math.cos(second)
+        * math.sin(math.radians(longitudes[1] - longitudes[0]) / 2) ** 2
+    )
+    return 2 * EARTH_RADIUS_KM * math.asin(math.sqrt(half_chord))
+
+
+def geometry_lines(*, sites: pl.DataFrame, noun: str) -> list[str]:
+    """Report how the generators sit relative to each other, to ICON-D2's edge, and to ERA5's grid.
+
+    Only distances and counts are printed, never a coordinate.
+
+    Args:
+        sites: The roster, with `latitude` and `longitude`.
+        noun: What the generators are called in the heading, such as `solar farms`.
+
+    Returns:
+        Markdown lines.
+    """
+    latitudes = sites["latitude"].to_list()
+    longitudes = sites["longitude"].to_list()
+    points = list(zip(latitudes, longitudes, strict=True))
+    pairs = [
+        _km(latitudes=(a[0], b[0]), longitudes=(a[1], b[1]))
+        for a, b in itertools.combinations(points, 2)
+    ]
+    middle = sum(latitudes) / len(latitudes)
+    north_south = _km(latitudes=(min(latitudes), max(latitudes)), longitudes=(0.0, 0.0))
+    east_west = _km(latitudes=(middle, middle), longitudes=(min(longitudes), max(longitudes)))
+    cells = {
+        (round(latitude / ERA5_GRID_DEG), round(longitude / ERA5_GRID_DEG))
+        for latitude, longitude in points
+    }
+    lines = [
+        f"#### Where the {noun} sit",
+        "",
+        f"- Pairwise distance: {min(pairs):.1f} km to {max(pairs):.1f} km.",
+        f"- Bounding box: {north_south:.1f} km north to south by {east_west:.1f} km east to west.",
+    ]
+    for edge in ICON_D2_WESTERN_EDGE_DEG:
+        west = [_km(latitudes=(lat, lat), longitudes=(lon, edge)) for lat, lon in points]
+        lines.append(
+            f"- Due-west distance to {abs(edge)}°W: {min(west):.0f} km to {max(west):.0f} km."
+        )
+    lines.append(
+        f"- ERA5 {ERA5_GRID_DEG}° grid cells holding them: {len(cells)} (nearest grid point)."
+    )
+    return lines
 
 
 def _named(column: str, product: str) -> str:
@@ -580,6 +658,40 @@ def _seasonal(*, frame: pl.DataFrame, calendar: str) -> float:
     )
 
 
+def _implied_capacity_by_month(*, log_by_product: dict[str, pl.DataFrame]) -> list[str]:
+    """Report each product's implied capacity in every calendar month, against its annual mean.
+
+    Each value is the exponential, minus one, of the mean over that month's site-months of
+    `_log_capacity_by_month`'s `seasonal` term, as a percentage.
+
+    Args:
+        log_by_product: The output of `_log_capacity_by_month`.
+
+    Returns:
+        Markdown lines: one row per product, one column per calendar month.
+    """
+    months = [f"{month:02d}" for month in range(1, 13)]
+    lines = [
+        "| Product | " + " | ".join(calendar.month_abbr[int(m)] for m in months) + " |",
+        "|---" * 13 + "|",
+    ]
+    for product, frame_log in log_by_product.items():
+        cells = [
+            f"{np.expm1(_seasonal(frame=frame_log, calendar=month)) * PERCENTAGE_POINTS:+.1f}"
+            for month in months
+        ]
+        lines.append(f"| {product} | " + " | ".join(cells) + " |")
+    december = log_by_product["cams"].filter(pl.col("calendar") == "12")
+    lines += [
+        "",
+        (
+            f"December's figure rests on {december['month'].n_unique()} Decembers and "
+            f"{december.height} generator-months."
+        ),
+    ]
+    return lines
+
+
 def _spread_by_draw(*, frame: pl.DataFrame, months: list[str], draws: np.ndarray) -> np.ndarray:
     """Return the residual spread for each bootstrap draw of whole months.
 
@@ -774,6 +886,21 @@ def _lead_tables(*, losses: pl.DataFrame) -> list[str]:
         f"| {row['difference'] * PERCENTAGE_POINTS:+.3f} |"
         for row in by_hour.iter_rows(named=True)
     ]
+    lines += [
+        "",
+        "#### ICON-D2 against ICON-EU at each hour, with intervals (post hoc)",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    lines += [
+        _contrast_line(
+            losses=daytime.filter(hour == label_hour),
+            treatment="icon_d2_global",
+            reference="icon_eu_global",
+            label=f"hour {label_hour:02d} UTC",
+        )
+        for label_hour in range(first, last + 1)
+    ]
     lines += ["", "#### CAMS against ICON-D2, broken down", "", *CONTRAST_HEADER]
     lines += [
         _contrast_line(
@@ -809,6 +936,8 @@ def _report(
     post_only: pl.DataFrame,
     transfer: pl.DataFrame,
     stability: list[str],
+    monthly: list[str],
+    geometry: list[str],
 ) -> str:
     """Assemble the markdown report.
 
@@ -818,6 +947,8 @@ def _report(
         post_only: The post-upgrade-only run's losses.
         transfer: The leave-one-site-out losses.
         stability: The implied-capacity table.
+        monthly: The implied capacity in every calendar month.
+        geometry: Where the generators sit.
 
     Returns:
         The report.
@@ -922,7 +1053,14 @@ def _report(
         "",
         *stability,
     ]
+    lines += [
+        "",
+        "#### Implied capacity by calendar month against the annual mean (%)",
+        "",
+        *monthly,
+    ]
     lines += ["", *_lead_tables(losses=pooled)]
+    lines += ["", *geometry]
     return "\n".join(lines) + "\n"
 
 
@@ -958,12 +1096,15 @@ def main() -> int:
         for losses, path in zip((pooled, post_only, transfer), paths.values(), strict=True):
             losses.write_parquet(path)
 
+    log_by_product = _log_capacity_by_month(frame=frame)
     report = _report(
         frame=frame,
         pooled=pooled,
         post_only=post_only,
         transfer=transfer,
-        stability=_implied_capacity(log_by_product=_log_capacity_by_month(frame=frame)),
+        stability=_implied_capacity(log_by_product=log_by_product),
+        monthly=_implied_capacity_by_month(log_by_product=log_by_product),
+        geometry=geometry_lines(sites=_pv_sites(), noun="solar farms"),
     )
     (output_dir / "report.md").write_text(report)
     sys.stdout.write(report)

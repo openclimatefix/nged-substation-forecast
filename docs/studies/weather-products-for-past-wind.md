@@ -14,9 +14,10 @@ farms in the trial area, and says which product those two consumers should read.
 percentile of output, which the page calls its capacity.** That capacity is a statistic of the
 metered output, not the farm's registered or export capacity. No wind measurement is used. Each
 error is that of a model fitted per generator to predict hourly output from one product's wind, so
-the figures rank how much each product's wind says about the output, not how close its speeds are
-to the true wind. A difference between two errors is in percentage points of capacity, written
-"points", and a bracketed pair after a figure is its 95% interval. All five products are read from
+the figures rank how much each product's wind says about the output, not how close its speeds are to
+the true wind. A difference between two errors is in percentage points of capacity, written
+"points", and a bracketed pair after a figure is its 95% interval. Where a product "beats" another,
+the difference is statistically significant at the 5% level. All five products are read from
 Open-Meteo's archives, and a weather model's value for an hour, as served, comes from the freshest
 run the archive holds for that hour.
 
@@ -25,12 +26,14 @@ variable-resolution model (UKV) describe past wind best of the five products tes
 belongs to the German weather service's (DWD's) Icosahedral Nonhydrostatic (ICON) model family.
 Across the window of this study, August 2024 to September 2026, UKV beats ERA5, the reanalysis of
 the European Centre for Medium-Range Weather Forecasts (ECMWF), by 0.44 points [0.24, 0.63], and
-ICON-D2 beats ERA5 by 0.58 points [0.40, 0.75]: 6% and 8% of ERA5's error. From October to March
-only ICON-D2's advantage over ERA5 is statistically significant at the 5% level.
+ICON-D2 beats ERA5 by 0.58 points [0.40, 0.75], in a comparison not named before the run: 6% and 8%
+of ERA5's error. From October to March only ICON-D2's advantage over ERA5 is statistically
+significant at the 5% level. UKV's lead over ICON-EU is small, 0.13 points [0.01, 0.23], and depends
+on the model's settings.
 
-**ICON-D2 leads UKV across the window, but not since the Met Office upgraded UKV in January 2026.**
-Across the window ICON-D2 leads by 0.14 points [0.03, 0.25]. Since the upgrade UKV is 0.06 points
-ahead [−0.03, +0.19].
+**In an exploratory comparison, ICON-D2 leads UKV across the window, but not since the Met Office
+upgraded UKV in January 2026.** Across the window ICON-D2 leads by 0.14 points [0.03, 0.25]. Since
+the upgrade UKV is 0.06 points ahead [−0.03, +0.19].
 
 **ICON-EU, the European ICON model, beats ERA5 both when shown its 80 m wind and when shown the 100
 m wind Open-Meteo serves, but from October to March the difference is not statistically significant
@@ -71,7 +74,7 @@ multi-decade record from one fixed model, not for local wind at a single farm, a
 farms here share one ERA5 grid cell.
 
 - **Hub heights.** The three wind farms' hub heights are not known. For each ICON product,
-  Open-Meteo serves a 100 m wind that is the product's 120 m speed multiplied by about 0.98, so a
+  Open-Meteo serves a 100 m wind that is the product's 120 m speed multiplied by 0.98, so a
   model cannot tell the served 100 m wind apart from the 120 m speed. The model is therefore given
   each ICON product's 80 m wind, which is not a fixed multiple of another height, and ERA5's and
   UKV's 100 m wind. A check gives the model UKV's 80 m wind instead, and scores 0.02 points worse
@@ -82,12 +85,13 @@ farms here share one ERA5 grid cell.
   leads for ICON-D2 and ICON global come from where their hour-to-hour jumps fall, because a jump
   marks the hour at which the archive switches from one run to the next. ICON-EU's jumps show its
   3-hourly pattern only weakly, so ICON-EU's lead rests on its 3-hourly run cycle and on the lineage
-  check described on the solar page.
+  check described on the solar page. The ICON leads here are an hour shorter than the solar page's 1
+  to 3 hours, because wind is an instantaneous value at the hour's timestamp while radiation is a
+  mean over the hour before it.
 - **History.** Open-Meteo's archive of UKV hub-height wind starts in August 2024. This study starts
   on 12 August 2024, when Open-Meteo's own UKV downloader started, so the comparison covers only 2
-  years. ERA5 starts in 1940, and Open-Meteo's archive of the ICON products' 80 m wind is complete
-  from December 2022. DWD has run ICON global and ICON-EU since 2015, and ICON-D2 since February
-  2021.
+  years. ERA5 starts in 1940, and Open-Meteo's archive of the ICON products' 80 m wind starts in
+  November 2022. DWD has run ICON global and ICON-EU since 2015, and ICON-D2 since February 2021.
 
 ## How the comparison was made
 
@@ -105,13 +109,14 @@ nearest grid cell over land.**
 - **The power hour is centred on its timestamp.** Open-Meteo's wind is an instantaneous value at the
   timestamp, where its radiation is a mean over the hour before. So the hour of power labelled T is
   the hour from 30 minutes before T to 30 minutes after. Every product scores best with the hour
-  centred this way. The solar study's hour, ending at T, would raise UKV's error by 0.27 points.
+  centred this way. The solar study's hour, ending at T, raises UKV's error by 0.28 points, in a
+  check added after the first run.
 - **Every hour holding an exactly-zero half-hour is dropped.** From April 2026 NGED's telemetry feed
   publishes no exact zeros at two of the generators. Their calm half-hours are missing instead, and
   the build already drops an hour with a missing half-hour. Dropping every hour holding an exact
   zero, before April 2026 as well, makes the two periods match. Most dropped hours are calm, so
-  behaviour near the turbines' cut-in speed is under-sampled. Dropping no hours at all moves every
-  contrast by 0.03 points or less.
+  behaviour near the turbines' cut-in speed is under-sampled. Dropping no hours at all moves no
+  contrast by more than 0.031 points, in a check added after the first run.
 - **Every product is read from its nearest grid cell over land.** At one generator ICON global's
   nearest cell is influenced by the sea, and outside June 2025 to June 2026 its 10 m speed runs
   about 30% above that of the nearest land cell. At the other two generators ICON global's nearest
@@ -149,10 +154,10 @@ across the three.
 
 **Both leaders' advantage over ERA5 is larger from April to September, and only ICON-D2's is
 statistically significant at the 5% level from October to March.** UKV beats ERA5 by 0.71 points
-[0.58, 0.85] from April to September and by 0.13 points [−0.17, +0.41] from October to March.
+[0.58, 0.85] from April to September, and is 0.13 points ahead [−0.17, +0.41] from October to March.
 ICON-D2 beats ERA5 by 0.77 points [0.63, 0.90] from April to September and by 0.36 points [0.08,
-0.64] from October to March. The seasonal split rests on two summers and two winters, and its cause
-was not examined.
+0.64] from October to March. The seasonal split rests on parts of three summers and two winters, and
+its cause was not examined.
 
 ![Figure 2: UKV's and ICON-D2's advantage over ERA5 is larger from April to September](assets/wind_half_years.svg)
 
@@ -265,12 +270,12 @@ handicap ICON global there.
   western edge for no measured gain. ERA5 arrives about 5 days late and cannot supply the last few
   hours at run time. Every figure here scores the archive's freshest run for each hour. At run time
   the last few hours come from an older run, at a longer lead than any scored here.
-- **Training history: ICON-D2 where ICON-D2 covers, from December 2022, with ICON-EU or ERA5
+- **Training history: ICON-D2 where ICON-D2 covers, from November 2022, with ICON-EU or ERA5
   elsewhere. This study scores none of them before August 2024.** ICON-D2 is the only product of the
   five that beats ERA5 in both halves of the year. ICON-EU's advantage over ERA5 is statistically
   significant at the 5% level only from April to September, so west of ICON-D2's edge this study
-  cannot choose between ICON-EU and ERA5 for October to March. ERA5 is the one product here with
-  neither a model upgrade nor a step in its archive during the window, and its record goes back to
+  cannot choose between ICON-EU and ERA5 for October to March. ERA5 is a reanalysis built with one
+  fixed version of its model, so it has no model upgrade by design, and its record goes back to
   1940. UKV is not recommended, because Open-Meteo's archive of its hub-height wind starts only in
   August 2024. A training history that switches from ERA5 to an ICON product part-way through has to
   tell the model which product each hour comes from, as this study tells the model which side of the
@@ -310,5 +315,8 @@ uv run python studies/beam_diffuse_split/wind_product_charts.py
 
 The report lands in `data/studies/beam_diffuse_split/beam_diffuse_wind_products/report.md`.
 `wind_products.py --fit-missing` keeps the losses already saved and fits only the arms they lack.
-The hour-offset scan, the run that drops no rows, the grid-cell check, and the step, jump, and
-archive-start diagnostics were one-off checks during review, and are not in the report.
+The report also prints the check with the solar study's power hour, the run that keeps the zero
+hours, the step ratios, and the distances between the farms and to ICON-D2's edge. `uv run python
+studies/beam_diffuse_split/check_served_wind.py` writes `served_wind_checks.md` beside it: the
+grid-cell check, the 100 m rescaling, and when the ICON 80 m wind starts. The hour-to-hour jump
+diagnostics behind the served leads were one-off checks during review, and are not in either report.

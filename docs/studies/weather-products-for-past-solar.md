@@ -29,12 +29,13 @@ hour itself, where every weather model simulates them, so a large gap is expecte
 
 **Among the four weather models tested, the German weather service's ICON-D2 (from its Icosahedral
 Nonhydrostatic model family) is the best as served, and its advantage over ICON-EU, the same
-service's European model, shrinks from 0.98 points 1 hour into each run to 0.30 points 3 hours in.**
-Across the record ICON-D2 beats ICON-EU by 0.60 points [0.46, 0.71].
+service's European model, shrinks from 0.98 points 1 hour into each run to 0.30 points 3 hours in,
+in a breakdown added after the first run.** Across the record ICON-D2 beats ICON-EU by 0.60 points
+[0.46, 0.71].
 
 **ICON-EU is 0.09 points ahead of ICON global, the same service's global model, as served [0.05,
-0.14], and most of that small gap sits in the hours ICON global is served further ahead than
-ICON-EU.**
+0.14], and in a split added after the first run most of that small gap sits in the hours ICON global
+is served further ahead than ICON-EU.**
 
 **Once UKV's hourly value is rebuilt from its own snapshots, ICON-EU no longer beats the Met
 Office's UK variable-resolution model (UKV).** Against Open-Meteo's hourly value for UKV, ICON-EU is
@@ -162,6 +163,7 @@ and the gap holds at every generator, in every season, and in each calendar year
 |---|---|
 | CAMS | 5.05 |
 | ICON-D2 | 7.71 |
+| UKV given its two snapshots as separate inputs (added after the first run) | 8.07 |
 | UKV rebuilt as the mean of its two snapshots (added after the first run) | 8.18 |
 | ICON-EU | 8.30 |
 | ICON global | 8.39 |
@@ -239,11 +241,11 @@ as the hour itself, improves by 0.18 points. The same context improves UKV's reb
 points. With context on both, ICON-EU is 0.14 points behind [−0.03, +0.31]. With context, ICON-EU
 is also 0.05 points behind UKV's two snapshots given as separate inputs [−0.13, +0.22].
 
-**Every rebuilt UKV construction scores ahead of ICON-EU across the record, and UKV is also served
-at the shorter lead.** UKV is served at T+0 and ICON-EU 1 to 3 hours ahead, so equal leads would if
-anything favour ICON-EU. On the 8 months after UKV's upgrade alone, ICON-EU is 0.01 points behind
-rebuilt UKV [−0.36, +0.36], with only 2 of 5 folds agreeing in sign. That interval rests on 8 months
-and is likely too narrow.
+**Every rebuilt UKV construction scores ahead of ICON-EU across the record in point estimate, and
+UKV is also served at the shorter lead.** UKV is served at T+0 and ICON-EU 1 to 3 hours ahead, so
+equal leads would if anything favour ICON-EU. On the 8 months after UKV's upgrade alone, ICON-EU is
+0.01 points behind rebuilt UKV [−0.36, +0.36], with only 2 of 5 folds agreeing in sign. That
+interval rests on 8 months and is likely too narrow.
 
 ![Figure 4: ICON-EU beats ICON global and Open-Meteo's hourly UKV, but not UKV rebuilt from its snapshots](assets/sunshine_icon_eu_rivals.svg)
 
@@ -302,13 +304,13 @@ not measure. For disaggregation, the result supports the ranking but not the siz
 **Once the seasonal cycle is removed, CAMS's implied capacity is the steadiest of the six products
 from month to month, but CAMS swings the most of the six with the seasons.** A month's implied
 capacity is the ratio of metered output to what a fixed south-facing panel at 30° tilt predicts per
-megawatt from each product. With each calendar month's average removed, CAMS's month-to-month spread
-is 6.5%, against 7.9% to 10.0% for the weather models and ERA5. For each of those five products, the
-difference between its spread and CAMS's is statistically significant at the 5% level. CAMS,
-however, implies a capacity 8%, 23%, and 10% below its annual mean in November, December, and
-January. No other product strays more than 11% from its annual mean in any of those three months.
-December's figure rests on about three Decembers at six generators that share their weather, and
-Figure 8 draws no interval.
+megawatt from each product, over the hours with the sun above 10° and no curtailment cap. With each
+calendar month's average removed, CAMS's month-to-month spread is 6.5%, against 7.9% to 10.0% for
+the weather models and ERA5. For each of those five products, the difference between its spread and
+CAMS's is statistically significant at the 5% level. CAMS, however, implies a capacity 8%, 23%, and
+10% below its annual mean in November, December, and January. No other product strays more than 11%
+from its annual mean in any of those three months. December's figure rests on four Decembers, 22
+generator-months at generators that share their weather, and Figure 8 draws no interval.
 
 **This study cannot say which product is right about December.** December's sun stays low all day,
 which is where a satellite retrieval and this page's assumed panel geometry are both at their least
@@ -373,8 +375,8 @@ against availability and coverage.**
   [#825](https://github.com/openclimatefix/nged-substation-forecast/issues/825), which refreshes the
   beam/diffuse study's figures on the current power and capacity tables, may move the absolute
   figures and the size of every contrast, because each generator's errors are divided by its own
-  capacity. The sign of a contrast that agrees at all six generators, such as CAMS against ICON-D2,
-  cannot change.
+  capacity. A change to the capacities alone cannot flip the sign of a contrast that agrees at all
+  six generators, such as CAMS against ICON-D2, but a change to the power table can move any figure.
 
 ## Reproducing the figures
 
@@ -390,8 +392,9 @@ uv run python studies/beam_diffuse_split/weather_products.py
 ```
 
 The report lands in `data/studies/beam_diffuse_split/beam_diffuse_weather_products/report.md`, and
-`weather_products.py --report-only` rebuilds it from the saved losses without refitting. The charts
-come from `uv run python studies/beam_diffuse_split/weather_product_charts.py`. The served-lead
-check runs with `uv run --with cfgrib python studies/beam_diffuse_split/verify_icon_lineage.py
---model icon-eu`, against the runs the German weather service still publishes, which cover about one
-day.
+`weather_products.py --report-only` rebuilds it from the saved losses without refitting. The report
+also prints the distances between the generators and to ICON-D2's edge, the ERA5 cells they fall in,
+and every number the charts draw. The charts come from `uv run python
+studies/beam_diffuse_split/weather_product_charts.py`. The served-lead check runs with `uv run
+--with cfgrib python studies/beam_diffuse_split/verify_icon_lineage.py --model icon-eu`, against the
+runs the German weather service still publishes, which cover about one day.
