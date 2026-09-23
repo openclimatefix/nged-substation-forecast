@@ -230,7 +230,10 @@ page does not name that generator.
 
 **UKV beats ERA5 by 0.44 points [0.24, 0.63] across the window, and ICON-D2 beats ERA5 by 0.58
 points [0.40, 0.75].** ICON-D2 also beats ICON-EU at every generator, by 0.26 points [0.19, 0.33]
-across the three.
+across the three. ERA5 trails every product except ICON global, and [Why ERA5 describes past
+sunshine and wind worse than current weather
+products](../roadmap/data-sources.md#why-era5-describes-past-sunshine-and-wind-worse-than-current-weather-products)
+sets out the documented causes.
 
 | Product | Mean absolute error, % of capacity |
 |---|---|

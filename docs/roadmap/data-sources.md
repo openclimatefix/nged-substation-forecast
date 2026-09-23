@@ -435,6 +435,73 @@ is not analysis-ready. Separately, a precomputed *mean* climatology for the [wea
 feature](xgboost-improvements.md#weather-abnormality-climatology-z-score-features) is available from
 WeatherBench2 at `gs://weatherbench2/datasets/era5-hourly-climatology/`.
 
+### Why ERA5 describes past sunshine and wind worse than current weather products
+
+**Neither the solar study nor the wind study measured how much each of the causes below contributes
+to ERA5's error at the study farms.** Those causes come from ECMWF's own descriptions of ERA5 and
+from published validations.
+
+**ERA5 runs a weather model and an assimilation system frozen in 2016, 10 cycles older than the
+system ERA6 is built on.** ERA5 is produced with cycle 41r2 of ECMWF's Integrated Forecasting System
+(IFS), the version ECMWF used for its operational forecasts in 2016 ([ERA5
+documentation](https://confluence.ecmwf.int/display/CKB/ERA5%3A+data+documentation)). The freeze is
+deliberate: a reanalysis is built to be consistent over decades, so ERA5 applies the same model
+physics, grid, and assimilation to 1940 as to last week. The operational IFS then moved through 10
+cycles to cycle 49r2, the cycle ERA6 runs on ([Copernicus
+announcement](https://climate.copernicus.eu/copernicus-climates-era6-reanalysis-production-starts)).
+ERA5 does keep absorbing current observations, about 24 million a day by the end of 2018 ([ECMWF
+Newsletter
+159](https://www.ecmwf.int/en/newsletter/159/meteorology/global-reanalysis-goodbye-era-interim-hello-era5)),
+but only as far as the 2016 assimilation system can use them. In 2019 ECMWF reported that infrared
+satellite radiances were still not assimilated operationally where cloud affects them ([ECMWF
+Newsletter
+161](https://www.ecmwf.int/en/newsletter/161/meteorology/recent-progress-all-sky-radiance-assimilation)).
+ERA5 therefore cannot use geostationary satellite imagery to place cloud. CAMS reads cloud from
+Meteosat images of the hour itself, and UKV assimilates satellite-derived cloud (see [UKV
+assimilates satellite
+cloud](#ukv-assimilates-satellite-cloud-and-carries-a-fixed-aerosol-climatology)). ERA6's grid is
+about 14 km, and its first two decades are due towards the end of 2027 ([Copernicus
+announcement](https://climate.copernicus.eu/copernicus-climates-era6-reanalysis-production-starts)).
+
+**ERA5's 31 km grid holds cloud only as a fraction of each grid cell.** A cloud smaller than a 31 km
+cell has no position inside the cell, so ERA5 cannot say which farm in the cell it shades.
+Validating daily irradiance at 41 Baseline Surface Radiation Network stations worldwide and 294
+stations in Europe, [Urraca et al. (2018)](https://doi.org/10.1016/j.solener.2018.02.059) found that
+ERA5 overestimates irradiance under cloud and slightly underestimates it under clear skies, "which
+suggests a poor prediction of cloud patterns", and that ERA5's 31 km grid "remains inadequate for
+places with high variability of surface irradiance (coasts and mountains)". Grid spacing alone does
+not set the ranking: at the wind study's farms, ICON global, on its 13 km grid, did not describe
+past wind better than ERA5 did ([Which weather product best describes past
+wind?](../studies/weather-products-for-past-wind.md)).
+
+**ERA5's hourly sunshine is a forecast up to 12 hours old, computed with prescribed aerosol rather
+than observed aerosol.** ERA5's hourly surface radiation is not an analysis: ERA5 takes it from
+short forecasts started at 06 and 18 UTC, at steps of 1 to 12 hours ([ERA5
+documentation](https://confluence.ecmwf.int/display/CKB/ERA5%3A+data+documentation)). ERA5's hourly
+wind is an analysis, so the forecast age applies to sunshine and not to wind. Cycle 41r2 reads
+tropospheric aerosol from the monthly climatology of [Tegen et al.
+(1997)](https://doi.org/10.1029/97JD01864) ([IFS documentation, cycle 41r2, part
+IV](https://doi.org/10.21957/tr5rv27xu)), and ERA5 takes its tropospheric sulphate and the
+stratospheric sulphate of volcanic eruptions from forcing data prepared for the Coupled Model
+Intercomparison Project Phase 5 ([ECMWF Newsletter
+159](https://www.ecmwf.int/en/newsletter/159/meteorology/global-reanalysis-goodbye-era-interim-hello-era5),
+[ECMWF Newsletter
+174](https://www.ecmwf.int/en/newsletter/174/news/updating-land-and-aerosol-properties-improve-reanalyses-and-seasonal)).
+CAMS's irradiance takes aerosol from CAMS's own reanalysis and global forecasting system ([CAMS
+radiation documentation](https://confluence.ecmwf.int/x/jOLjDw)), and UKV carries a fixed
+climatology (see [UKV assimilates satellite
+cloud](#ukv-assimilates-satellite-cloud-and-carries-a-fixed-aerosol-climatology)).
+
+**The published validations of ERA5's wind cited here come from sites unlike the wind study's farms,
+which are onshore in flat Lincolnshire.** Offshore, ERA5 underestimates strong wind speeds. [Gandoin
+and Garza (2024)](https://doi.org/10.5194/wes-9-1727-2024) trace the bias to ERA5's surface drag
+formulation and its dependence on sea state, worst for short fetches over shallow seas such as the
+North Sea, and at the IJmuiden mast they measure an underestimate of almost 10% for the largest wind
+speeds. Against Doppler lidar at 100 to 500 m, [Cheynet et al.
+(2025)](https://doi.org/10.5194/wes-10-733-2025) found ERA5 and the 3 km Norwegian hindcast NORA3
+similar offshore, and NORA3 better than ERA5 at two coastal sites and one complex-terrain site in
+Norway.
+
 ### CAMS: use the point API, not the gridded product
 
 **Two CAMS products exist, and only the point time-series product is current.** The [gridded

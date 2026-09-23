@@ -261,6 +261,11 @@ and the gap holds at every generator, in every season, and in each calendar year
 | UKV, Open-Meteo's hourly value | 8.79 |
 | ERA5 | 8.98 |
 
+**ERA5 has the largest error of the six products, and [Why ERA5 describes past sunshine and wind
+worse than current weather
+products](../roadmap/data-sources.md#why-era5-describes-past-sunshine-and-wind-worse-than-current-weather-products)
+sets out the documented causes.**
+
 Across the six generators, CAMS's margin over ICON-D2 ranges from 2.28 to 3.36 points. By season it
 ranges from 1.80 points in winter to 3.02 in autumn, and in each calendar year from 2023 to 2026
 (2026 to 10 September) it lies between 2.58 and 2.84.
