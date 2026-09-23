@@ -13,7 +13,7 @@ products three ways:
 - A statistical blend: the mean of the products' values, shown as one column set, so the arm has
   exactly as many columns as a single-product arm.
 - A linear stack of the single-product models' out-of-fold predictions, with non-negative weights
-  fitted on months the scored fold does not contain.
+  that sum to 1, fitted per generator on the folds other than the one scored.
 
 Every XGBoost blend is tested against a control arm whose extra columns carry the same products'
 climatology with the weather removed. Every model's out-of-fold predictions are saved to disk. The
@@ -57,7 +57,7 @@ reports to the printed digit, which checks that the rows and folds are unchanged
 | Satellite + GB-wide model | CAMS, ICON-EU | history anywhere in Great Britain |
 | Satellite + reanalysis | CAMS, ERA5 | history back to 2004 |
 | Live, GB-wide | UKV, ICON-EU | historical features in the live service |
-| Live, all | UKV, ICON-D2, ICON-EU, ICON global | the same, where ICON-D2 covers |
+| Live, all (weather models only) | UKV, ICON-D2, ICON-EU, ICON global | the same, where ICON-D2 covers |
 | Everything | all six | the upper bound |
 
 Global irradiance only, not each product's beam split: the solar page found the published split
@@ -79,30 +79,41 @@ that contains it, so its steps do not pass for information.
 ### Three blending methods per set
 
 1. **XGBoost on every column** (`xgb`). Column subsampling stays at 1.
-2. **The mean** (`mean`). Solar: the mean of the products' global irradiance, one column. Wind: the
-   mean hub-height speed, the mean 10 m speed, and the direction of the vector mean of the products'
-   hub-height winds, three columns. Each arm has exactly the columns of a single-product arm.
-3. **A linear stack** (`stack`). For each site and each outer fold, non-negative weights, with no
-   intercept, are fitted by least squares from the single-product models' out-of-fold power
-   predictions to the measured power. The fit uses only rows whose calendar month is absent from the
-   scored fold at every site, which stops the neighbouring generators' shared weather leaking in.
-   The weights are applied to the scored fold's out-of-fold predictions. No XGBoost fit is added.
+2. **The mean of the inputs** (`mean`). Solar: the mean of the products' global irradiance, one
+   column. Wind: the mean hub-height speed, the mean 10 m speed, and the means of the products'
+   direction sines and cosines, which together give the circular mean direction: four columns, as
+   in a single-product wind arm. The mean hub-height speed mixes ICON's 80 m wind with the others'
+   100 m wind, which a per-generator tree absorbs, and the page says so.
+3. **A linear stack** (`stack`). For each generator and each fold k, non-negative weights that sum to
+   1 are fitted by least squares on the generator's other folds and applied to fold k. With weights
+   summing to 1, the stacked error is the weighted sum of the single-product models' capped signed
+   errors, so the stack is fitted and scored from `signed_error_capped_mw` with no refit. The weights
+   are per generator, so no neighbour's target reaches them. Fitted with `scipy.optimize.nnls` and
+   one heavily weighted sum-to-one row.
+4. **The equal-weight mean of the single-product predictions** (`equal`), the standard benchmark for
+   combining forecasts. It needs no fitting.
 
-**The stack has a second-order leak, which a check bounds.** An out-of-fold prediction for month j
-comes from a model trained on every other fold, including the scored fold k. The stack's weights for
-fold k are fitted on those predictions. This is standard cross-validated stacking (Breiman, 1996,
-"Stacked regressions", <https://doi.org/10.1007/BF00117832>). The check: for the "everything" set,
-refit fully nested, where each outer fold's single-product models are retrained inside it and
-the weights come from an inner cross-validation. Report both. The nested run costs about five times
-the stack's base fits for one set per technology.
+**The stack has a second-order leak, and data already on disk bounds it.** An out-of-fold prediction
+for fold j comes from a model trained on every other fold, including the scored fold k, and the
+weights for fold k are fitted on those predictions. This is standard cross-validated stacking
+([Breiman (1996)](https://doi.org/10.1007/BF00117832)). Weights fitted on every fold, fold k
+included, carry that leak and the first-order leak too, so the gap between their error and the
+cross-fitted stack's error bounds the whole optimism of fitting the weights. The report prints that
+gap for every set.
+
+**A zero-fit preview of the stack exists.** The simplicity review stacked the published
+single-product errors before this run. The named contrasts below were written before that preview
+and are unchanged, and the page records that the preview existed.
 
 ### Controls
 
-**Every XGBoost blend has a climatology control.** The control arm holds the set's best single
-product's real columns, plus every other product's columns permuted among the rows sharing a site, a
-calendar month, and an hour of day. That keeps each column's diurnal and seasonal distribution and
-removes its weather. Folds are whole months, so a permuted value never crosses a fold. A blend's gain
-counts only against its control. The permutation helper moves from `multi_nwp.py` into
+**Every XGBoost blend has a climatology control, whether or not it is behind a named contrast.**
+The control arm holds the set's best single product's real columns, plus every other product's
+columns permuted among the rows sharing a site, a calendar month, and an hour of day. That keeps each
+column's diurnal and seasonal distribution and removes its weather. Folds are whole months, so a
+permuted value never crosses a fold. A blend's gain counts only against its control. ICON global's
+`step_period` column is carried unpermuted in a control, because it describes the served data's
+defect rather than the weather. The permutation helper moves from `multi_nwp.py` into
 `packages/studies` with tests.
 
 ### Named contrasts, fixed before the run
@@ -129,17 +140,13 @@ per-site, per-season and per-era splits, and the nested stack. The deciding cont
 
 - **`packages/studies/src/studies/blending.py` (new, tested).**
     - `climatology_permutation(*, frame, columns, by, seed)`: permutes each column within groups,
-      from `multi_nwp.py`.
-    - `stack_weights(*, predictions, target)`: non-negative least squares, no intercept, via
-      `scipy.optimize.nnls`.
-    - `stacked_out_of_fold(*, predictions, months, folds)`: fits the weights per site and outer fold
-      on rows whose month the scored fold does not hold at any site, and returns the stacked
-      predictions and the weights.
-    - `vector_mean_direction_deg(*, speeds, directions)`: the direction of the mean wind vector.
-- **`packages/studies/src/studies/cross_validation.py`:** `out_of_fold_losses` gains the out-of-fold
-  prediction as a column (`prediction_mw`, clamped as scored) beside the losses it already returns.
-  The losses themselves are unchanged. Checked by rerunning one published arm and diffing its losses
-  bit for bit.
+      moved from `multi_nwp.py`, which then imports it.
+    - `simplex_weights(*, errors)`: non-negative weights summing to 1 that minimise the squared
+      weighted-sum error.
+    - `stacked_errors(*, errors, sites, folds)`: per generator and fold, fits the weights on the
+      other folds and applies them to the scored fold. Returns the stacked errors and the weights.
+- **`packages/studies/src/studies/cross_validation.py` is unchanged.** The blend script writes each
+  arm's predictions as measured power plus the capped signed error.
 - **`studies/beam_diffuse_split/blend_products.py` (new).** Builds the solar and wind common rows
   with the published studies' own functions, runs every arm, stacks, bootstraps every contrast with
   `studies.bootstrap`, and writes the results below.
@@ -172,30 +179,39 @@ Otherwise it uses the form that PR defines.
   one row changes.
 - **The stack recovers known weights.** Predictions built as 0.7 × A + 0.3 × B with noise recover
   weights within 0.01. A product with no information gets weight 0.
-- **The stack withholds the scored months at every site.** A frame where one site's fold-k months
-  appear at a second site under a different fold: the weights for fold k must not change when those
-  rows' target is corrupted.
-- **The vector-mean direction handles the wrap at north**: 350° and 10° average to 0°, not 180°.
-- **`out_of_fold_losses` returns `prediction_mw` equal to the measured power plus the capped signed
-  error**, on a small fixture.
+- **The stack never sees the fold it scores.** Corrupting fold k's errors must leave fold k's weights
+  unchanged, and must change the other folds' weights.
+- **The weights are non-negative and sum to 1**, and a product whose errors are pure noise gets a
+  weight near 0.
 
-Each test fails on `main`, where the module and the column do not exist. The mutation pass then
+Each test fails on `main`, where the module does not exist. The mutation pass then
 checks each test fails on the bug it targets.
 
 ## Verification
 
 - The green-before-push set, as in `ci.yml`, plus `uv run mkdocs build --strict` and reading the
   rendered page.
-- **The refitted single-product arms reproduce both published reports' error tables exactly.**
-- **Adding `prediction_mw` changes no loss:** one published arm's losses, rerun, diff bit for bit.
+- **The refitted single-product arms reproduce both published reports' error tables exactly,** and
+  their (site, time, fold, seed) keys equal the published losses' keys.
 - Every chart looked at as a PNG render.
 
 ## Risks and open questions
 
-- **Run time.** Solar adds 7 sets × 2 XGBoost arms (blend and control) plus 6 singles and 6 mean
-  arms, about 26 arms; wind about 22. The published runs took about an hour each, so this run should
-  take a few hours, plus the nested stack. The machine has 32 cores.
+- **Run time.** Solar fits 6 singles, 6 XGBoost blends, 6 controls, and 6 mean arms, 24 arms; wind
+  fits 5 singles and 4 of each, 17 arms; plus the second hyperparameter setting on the deciding
+  arms. At about 2 minutes per arm, the run takes a couple of hours on this 32-core machine.
 - **A blend containing CAMS cannot serve the live service,** because CAMS arrives a day late. The
   page states each set's latency beside its result.
 - **The consumer recommendations on the two existing pages may change.** If a blend wins, the pages'
   "Which product each consumer should read" sections point to the new page rather than restating it.
+
+## Findings from the simplicity review
+
+- **Accepted:** bound the stack's leak from the in-sample against cross-fitted gap, not a nested run;
+  simplex weights fitted from the saved signed errors, with no change to `cross_validation.py`;
+  per-generator weights on the other folds, without the every-site month rule; the wind mean
+  direction from the published sine and cosine columns; an exact key check against the published
+  losses; the equal-weight benchmark; the "weather models only" label.
+- **Rejected: run controls and mean arms only for the sets behind named contrasts.** An arm takes
+  about 2 minutes, and a blend reported without its control invites exactly the column-count
+  misreading the control exists to rule out.
