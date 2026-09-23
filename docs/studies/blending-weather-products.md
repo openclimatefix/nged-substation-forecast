@@ -6,9 +6,8 @@ generator actually produced in those hours. Several of the products are numerica
 (NWP) models, such as UKV, ICON-EU, and ICON-D2. They are included because this study reads only
 the first few hours of each NWP run, at leads of 0 to 6 hours depending on the model, and uses
 those hours as a stand-in for an analysis: the model's best estimate of the weather at the time the
-run starts. How well the
-same NWP models forecast hours or days ahead is a separate question, tracked in
-[#810](https://github.com/openclimatefix/nged-substation-forecast/issues/810).
+run starts. How well the same NWP models forecast hours or days ahead is a separate question,
+tracked in [#810](https://github.com/openclimatefix/nged-substation-forecast/issues/810).
 
 **At 6 solar farms and 3 wind farms in Lincolnshire, an XGBoost model given several weather products
 at once beats an XGBoost model given the best single product, even when the single product is also
