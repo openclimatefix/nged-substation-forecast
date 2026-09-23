@@ -1,9 +1,7 @@
 """Show a model a weather product's value in the hours around each scored hour.
 
 **A product's neighbouring hours carry information its own hour does not**: a front arriving an
-hour early or late in the model, or a cloud edge that the hourly mean smooths away. The published
-weather-product studies show a model the hour before and the hour after for UKV and ICON-EU, and
-both improve by about 0.2 percentage points of capacity.
+hour early or late in the model, or a cloud edge that the hourly mean smooths away.
 
 **The neighbouring values must come from the product's own download, not from the scored rows.**
 The scored rows exclude every hour holding a zero half-hour of metered power, so a neighbour read
@@ -38,10 +36,15 @@ def with_neighbouring_hours(
 
     Raises:
         ValueError: If `source` holds more than one row for a (site, time), which would duplicate
-            the frame's rows.
+            the frame's rows, or if `frame` already carries a column named in `columns`, which a
+            join would otherwise rename rather than raise on.
     """
     if source.select(JOIN_KEYS).is_duplicated().any():
         msg = "the source holds more than one row for a (site, time)"
+        raise ValueError(msg)
+    clashes = sorted(set(columns) & set(frame.columns))
+    if clashes:
+        msg = f"frame already has {clashes}, which columns would add again"
         raise ValueError(msg)
     for name, (column, offset_hours) in columns.items():
         shifted = source.select(

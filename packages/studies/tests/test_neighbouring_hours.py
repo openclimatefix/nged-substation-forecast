@@ -78,3 +78,10 @@ def test_a_source_with_a_repeated_hour_raises():
 
     with pytest.raises(ValueError, match="more than one row"):
         with_neighbouring_hours(frame=_source(), source=source, columns={"after": ("value", 1)})
+
+
+def test_a_column_name_already_on_the_frame_raises():
+    frame = _hours(site="A", values=[2.0], first=2).rename({"value": "after"})
+
+    with pytest.raises(ValueError, match="after"):
+        with_neighbouring_hours(frame=frame, source=_source(), columns={"after": ("value", 1)})
