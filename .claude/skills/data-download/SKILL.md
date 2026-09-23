@@ -8,8 +8,8 @@ description: >-
   provider's real parameter names before submitting a request, size each chunk to the provider's own
   constraints, and get a fresh adversarial review before the script's first real run. Run the
   `data-validation` skill's checklist once the fetch completes — a clean run is not evidence the
-  data is right — and write a generated README alongside the lineage note, for the human reader the
-  lineage note isn't for. Load before writing or resuming any bulk-download script (e.g.
+  data is right — and write a generated README alongside the lineage note, for a human reader
+  picking up the directory cold. Load before writing or resuming any bulk-download script (e.g.
   `studies/*/fetch_*.py`) that makes more than a handful of requests, and before running any such
   script for the first time.
 ---
@@ -233,34 +233,53 @@ sections above already recommend, applied by a reader with no reason to assume t
 
 ## Write a README alongside the lineage note, for the human reader the JSON isn't for
 
-**`lineage.json` is machine-oriented — where the data came from and what was requested — and
-answers none of the questions a human picking up the directory cold actually has.** A later reader
-(a study author, a reviewer, a future session) needs to know what each column means, its unit, how a
-missing value is represented, what traps this product has, and how to get the data again — none of
-which a JSON blob answers quickly. Write a `README.md` (or `README_<variable>.md`, matching the
-per-variable lineage-note split for a product fetched one variable at a time) alongside every
-product's lineage note, covering:
+**A lineage note — the JSON file `write_lineage_note` writes, recording `source_address`,
+`request`, `variables`, `retrieved_at_utc`, plus whatever the caller passes via `extra` — is
+machine-oriented, and leaves most of what a human picking up the directory cold needs unanswered.**
+A later reader (a study author, a reviewer, a future session) needs to know what each column means,
+its unit, how a missing value is represented, what traps this product has, and how to get the data
+again. Write a `README.md` alongside every product's lineage note, covering:
 
-- **A link to the source** — the product's own web page or API documentation, not the raw request
-  URL (that belongs in `lineage.json`'s `source_address`).
+- **A link to the source** — the product's own web page or API documentation. The request URL
+  belongs in `lineage.json`'s `source_address`, not here.
 - **The script that produced this directory's data**, so a reader can re-run it.
 - **Every column**, with its unit and what it means — not only the value columns; a reader who does
   not know what `y_index` or `model_level` means cannot use the file at all.
-- **How a missing value is represented** — `NaN`, Polars null, both, or neither, and what causes it.
+- **How a missing value is represented** — `NaN`, Polars null, both, or neither, counted per column
+  on the written file rather than typed from memory, and what causes it.
 - **Every gotcha this skill's checklist or the `data-validation` skill's checklist turned up** — an
   upstream data defect, a label convention that is easy to get backwards, a value that needs
-  clipping or de-averaging before use. Keep each to a sentence or two and point at `lineage.json`'s
-  `note` field for the full numbers, rather than duplicating them — the numbers drift out of sync
-  with the README if a fact is corrected in only one place.
+  clipping or de-averaging before use.
 - **Further reading** — the product's own technical documentation, or a paper describing the model,
   for anything this README only summarises.
 
-Generate the README from code, the same way `lineage.json` is generated, rather than writing it by
-hand once and letting it go stale: `lineage.write_readme` (alongside `write_lineage_note` in the
-same module) takes these fields as arguments and formats them consistently, and a re-run of the
-fetch script regenerates the README along with the lineage note, so a fix to a gotcha's wording
-never has to be applied in two places. A README hand-written once, separately from the fetch script,
-is exactly the kind of fact that drifts the moment the data is re-fetched or a gotcha is corrected.
+**Only write a gotcha after actually running the checklist that found it, not as a guess made in
+advance.** Where a gotcha's full numbers are long, pass them to `write_lineage_note` via
+`extra={"note": ...}` and have the README point at that field instead of duplicating them —
+`write_lineage_note` has no `note` field by default, so a bare pointer to "the lineage note" only
+works once the caller has populated `extra` that way.
+
+**Every fact a README states about the fetched data has to be computed from the frame at write
+time, never typed as a literal.** A column's dtype, including whether a timestamp column is
+timezone-aware, a null or NaN count per column, a grid spacing, or a row count all drift out of
+sync with the data the moment the fetch script changes, unless the README-writing code reads them
+straight off the written frame (`frame.schema`, `frame.null_count()`) rather than from a hand-typed
+guess. The missing-value bullet above follows this rule: count nulls and NaNs on the written file
+rather than describing the convention from memory.
+
+**Generate the README from code, the same way `lineage.json` is generated, rather than writing it
+by hand once and letting it go stale.** `write_readme`, in the shared
+`studies/weather_downloads/lineage.py` module alongside `write_lineage_note`, takes these fields as
+arguments and formats them consistently. A re-run of the fetch script regenerates the README along
+with the lineage note, so a fix to a gotcha's wording never has to be applied in two places.
+
+**One README covers one independently-written parquet family; `write_readme` does not name that
+file automatically.** The caller passes a distinct `filename=` per family, the same way
+`write_lineage_note`'s own `filename=` parameter works — ICON-DREAM-EU writes one README per
+variable, while CERRA writes a single combined README pointing at its 8 lineage files, one per
+variable-and-height combination. Point the README's lineage-file reference at the actual
+filename(s) passed via `write_readme`'s `lineage_filenames` parameter, rather than guessing a
+`lineage_<variable>.json` pattern that may not match what was written.
 
 ## Two traps from this repo's own conventions worth restating here
 
