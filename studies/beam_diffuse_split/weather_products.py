@@ -1277,23 +1277,27 @@ def _matched_lead_lines(*, panel: Panel, losses: pl.DataFrame) -> list[str]:
 def _sarah_era_lines(*, losses: pl.DataFrame) -> list[str]:
     """Report SARAH-3's error against CAMS in each span of `SARAH_SATELLITE_ERAS`.
 
+    A span of fewer than `studies.bootstrap.MIN_MONTHS_FOR_INTERVAL` months is listed under the
+    table with its estimate and no interval, so the table holds only rows with an interval.
+
     Args:
         losses: The pooled losses, holding `sarah3_global` and `cams_global`.
 
     Returns:
-        Markdown lines, one row per span that holds rows. A span of fewer than
-        `studies.bootstrap.MIN_MONTHS_FOR_INTERVAL` months shows its estimate and no interval.
+        Markdown lines: the table, then any span too short for an interval.
     """
     lines = [
         "#### SARAH-3 against CAMS, by the satellite behind SARAH-3 (exploratory)",
         "",
         *CONTRAST_HEADER,
     ]
+    short: list[str] = []
     for label, start, end in SARAH_SATELLITE_ERAS:
         rows = losses.filter(pl.col("time").is_between(start, end, closed="left"))
         if not rows.height:
             continue
-        if rows["month"].n_unique() >= MIN_MONTHS_FOR_INTERVAL:
+        months = rows["month"].n_unique()
+        if months >= MIN_MONTHS_FOR_INTERVAL:
             lines.append(
                 _contrast_line(
                     losses=rows, treatment="sarah3_global", reference="cams_global", label=label
@@ -1301,11 +1305,12 @@ def _sarah_era_lines(*, losses: pl.DataFrame) -> list[str]:
             )
             continue
         difference = _mae(losses=rows, arm="sarah3_global") - _mae(losses=rows, arm="cams_global")
-        site_hours = rows.filter(pl.col("arm") == "cams_global").select("site", "time").n_unique()
-        lines.append(
-            f"| {label} | sarah3_global − cams_global | {difference:+.3f} | too few months | — "
-            f"| — | {site_hours:,} |"
+        short.append(
+            f"- {label}: sarah3_global − cams_global {difference:+.3f} on {months} months, too "
+            "few for an interval."
         )
+    if short:
+        lines += ["", *short]
     return lines
 
 

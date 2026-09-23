@@ -36,9 +36,8 @@ products tests them directly, and the bottom panel of Figure 2 holds the four pl
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
 > AI model (for this page, Claude Opus 5.5, reusing the data-preparation and model-fitting code that
-> Claude Opus 5 wrote for the [beam/diffuse study](beam-diffuse-split.md)). A human has reviewed the
-> figures and the text, and several independent Claude reviewers have checked the method, the
-> evidence, and the prose adversarially.
+> Claude Opus 5 wrote for the [beam/diffuse study](beam-diffuse-split.md)). Several independent
+> Claude reviewers have checked the method, the evidence, and the prose adversarially.
 
 ## Key findings
 
@@ -69,6 +68,9 @@ from the freshest run of that weather model that Open-Meteo's archive holds for 
   steps fall, the difference between ICON global and ERA5 is not statistically significant at the 5%
   level. See [About half of ICON global's gap to ICON-EU is a pair of steps in its served
   wind](#about-half-of-icon-globals-gap-to-icon-eu-is-a-pair-of-steps-in-its-served-wind).
+- **ERA5's deficit to UKV was about twice as large in 2026 as in 2025, and its deficit to ICON-EU
+  was the same in both years.** See [ERA5's deficit, year by
+  year](#era5s-deficit-year-by-year).
 
 ## Introduction
 
@@ -356,6 +358,29 @@ spacing is the most obvious difference between the two, though this study does n
 one of those two generators ICON global is read from a land cell further away than its nearest cell,
 which may handicap ICON global there.
 
+### ERA5's deficit, year by year
+
+**ERA5's deficit to UKV was about twice as large in 2026 as in 2025, and its deficit to ICON-EU was
+the same in both years.** Each comparison below is exploratory, and each year's interval comes from
+resampling that year's months alone. UKV beat ERA5 by 0.37 points [0.18, 0.56] in 2025 and by 0.75
+points [0.59, 0.93] in 2026, which ran to September. The larger 2026 figure is in step with UKV's
+January 2026 upgrade, described in [UKV and ICON-D2 describe past wind
+best](#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested). ICON-EU beat ERA5 by
+0.36 points in each year: [0.17, 0.55] in 2025 and [0.20, 0.52] in 2026. ICON-D2 beat ERA5 by 0.61
+points [0.34, 0.84] in 2025 and by 0.71 points [0.59, 0.83] in 2026. This page does not test whether
+two years differ from each other. August to December 2024 holds five months, too few for an
+interval, and is left out.
+
+**ICON global's two years are not comparable with each other.** The pair of steps in ICON global's
+served wind at one generator, described in [About half of ICON global's gap to ICON-EU is a pair of
+steps in its served
+wind](#about-half-of-icon-globals-gap-to-icon-eu-is-a-pair-of-steps-in-its-served-wind), falls in
+early June 2025 and early June 2026, so each year holds part of the stepped period. In neither year
+is ICON global's difference from ERA5 statistically significant at the 5% level.
+
+![Figure 10: ERA5's deficit to UKV was twice as large in 2026 as in 2025; its deficit to ICON-EU was
+the same](assets/wind_era5_by_year.svg)
+
 ## What to use
 
 **These recommendations rest on three wind farms in one flat part of Lincolnshire, over 2 years.**
@@ -412,6 +437,7 @@ product?](blending-weather-products.md#wind-a-blend-beats-ukv-given-its-neighbou
 ```bash
 uv run python studies/beam_diffuse_split/fetch_wind_point.py
 uv run python studies/beam_diffuse_split/wind_products.py
+uv run python studies/beam_diffuse_split/wind_products.py --era5-by-year
 uv run python studies/beam_diffuse_split/wind_product_charts.py
 ```
 
@@ -422,3 +448,5 @@ the zero hours, the step ratios, and the distances between the farms and to ICON
 python studies/beam_diffuse_split/check_served_wind.py` writes `served_wind_checks.md` beside it:
 the grid-cell check, the 100 m rescaling, and when the ICON 80 m wind starts. The hour-to-hour jump
 diagnostics behind the served leads were one-off checks during review, and are not in either report.
+`wind_products.py --era5-by-year` reads the saved losses, fits nothing, and writes Figure 10's table
+to `data/studies/beam_diffuse_split/past_weather_v2/wind/era5_by_year.md`.
