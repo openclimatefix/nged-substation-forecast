@@ -21,16 +21,16 @@ hour comes from a run that started up to a few hours earlier. The page calls a p
 the archive holds it the value "as served".
 
 **At six metered solar farms in Lincolnshire, a satellite retrieval describes past sunshine far
-better than any weather model or the reanalysis.** The Copernicus Atmosphere Monitoring Service's
-retrieval (CAMS) has a mean absolute error of 5.05% of capacity, against 7.71% for the best weather
-model, ICON-D2, and 8.98% for ERA5, the reanalysis of the European Centre for Medium-Range Weather
-Forecasts (ECMWF). The satellite observes the clouds of the hour itself, where every weather model
-forecasts them, so a large gap is expected.
+better than any of the weather models tested or the reanalysis.** The Copernicus Atmosphere
+Monitoring Service's retrieval (CAMS) has a mean absolute error of 5.05% of capacity, against 7.71%
+for the best of the weather models tested, ICON-D2, and 8.98% for ERA5, the reanalysis of the
+European Centre for Medium-Range Weather Forecasts (ECMWF). The satellite observes the clouds of the
+hour itself, where every weather model forecasts them, so a large gap is expected.
 
-**Among weather models, the German weather service's ICON-D2 (from its Icosahedral Nonhydrostatic
-model family) is the best as served, and its advantage over ICON-EU, the same service's European
-model, shrinks from 0.98 points 1 hour into each run to 0.30 points 3 hours in.** Across the record
-ICON-D2 beats ICON-EU by 0.60 points [0.46, 0.71].
+**Among the four weather models tested, the German weather service's ICON-D2 (from its Icosahedral
+Nonhydrostatic model family) is the best as served, and its advantage over ICON-EU, the same
+service's European model, shrinks from 0.98 points 1 hour into each run to 0.30 points 3 hours in.**
+Across the record ICON-D2 beats ICON-EU by 0.60 points [0.46, 0.71].
 
 **ICON-EU is 0.09 points ahead of ICON global, the same service's global model, as served [0.05,
 0.14], and most of that small gap sits in the hours ICON global is served further ahead than
@@ -48,7 +48,10 @@ one-day delay allows, and for historical features in the live service ICON-EU or
 evidence is six metered solar farms inside one 25 km by 23 km box in Lincolnshire, and 79,384
 generator-hours from December 2022 to September 2026.
 
-![Figure 1: CAMS describes past sunshine best, by a wide margin](assets/sunshine_headline.svg)
+![Figure 1: CAMS describes past sunshine best of the six products tested, by a wide margin](assets/sunshine_headline.svg)
+
+In Figure 1 the top panel's intervals are against ERA5, so two products whose intervals overlap
+there may still differ; the bottom panel compares the named pairs directly.
 
 ## The six products
 
@@ -71,10 +74,10 @@ in the Midlands.
 | ICON global | DWD global model | 1 to 6 hours | yes | 13 km; served at about 11 km | November 2022 | about 3.5 hours |
 
 **The four weather models come from Open-Meteo's historical-forecast archive, and ERA5 from
-Open-Meteo's copy of the Copernicus archive.** `verify_era5_sources.py` checked that copy against the
-Copernicus original. CAMS comes from the CAMS radiation service. The start dates for the weather
-models are those of Open-Meteo's archive: DWD has run ICON global and ICON-EU since 2015, and ICON-D2
-since February 2021.
+Open-Meteo's copy of the Copernicus archive.** `verify_era5_sources.py` checked that copy against
+the Copernicus original. CAMS comes from the CAMS radiation service. The start dates for the weather
+models are those of Open-Meteo's archive: DWD has run ICON global and ICON-EU since 2015, and
+ICON-D2 since February 2021.
 
 **The latencies come from each service's own documentation:** CAMS's [radiation-service
 notes](https://confluence.ecmwf.int/x/jOLjDw), the [ERA5 dataset
@@ -133,9 +136,12 @@ difference between two products is a difference between their irradiance alone.*
   mean or difference.
 - **Intervals from whole months.** The six generators share their weather, so each 95% interval
   comes from resampling whole calendar months 2,000 times, each time also drawing one of three model
-  fits that differ only in their random seed. The intervals are not corrected for the number of
-  comparisons, so among the many exploratory intervals on this page one or two may exclude zero by
-  chance.
+  fits that differ only in their random seed. A 95% interval from resampling whole months that
+  excludes zero is a test at the 5% level, so this page calls such a difference statistically
+  significant at the 5% level, and a difference whose interval includes zero not statistically
+  significant at the 5% level. The test covers month-to-month variation in the weather only, not
+  variation between generators. The intervals are not corrected for the number of comparisons, so
+  among the many exploratory rows some will reach significance by chance.
 - **Four contrasts named before the run.** A contrast is the difference between two products'
   errors on the same hours. The ranking rests on four contrasts, fixed before any result was seen:
   CAMS against ICON-D2, ICON-EU against ICON-D2, ICON-EU against UKV, and ICON global against
@@ -146,10 +152,11 @@ difference between two products is a difference between their irradiance alone.*
 **The folds are cut by `studies.cross_validation` and the intervals computed by `studies.bootstrap`,
 both covered by tests.**
 
-## CAMS describes past sunshine best, by a wide margin
+## CAMS describes past sunshine best of the six products tested, by a wide margin
 
-**The satellite retrieval beats the best weather model by 2.65 points [2.42, 2.88], and the gap
-holds at every generator, in every season, and in each calendar year from 2023 to 2026.**
+**The satellite retrieval beats the best of the weather models tested by 2.65 points [2.42, 2.88],
+and the gap holds at every generator, in every season, and in each calendar year from 2023 to
+2026.**
 
 | Product | Mean absolute error, % of capacity |
 |---|---|
@@ -172,7 +179,7 @@ hour after its run started, CAMS still beats it by 2.23 points [1.99, 2.45]. Rea
 the conservative choice: on the 71,279 hours CAMS rates as reliable, CAMS's margin over ERA5 widens
 from 3.92 to 4.36 points.
 
-## ICON-D2 is the best weather model as served, and its advantage shrinks within hours of each run
+## ICON-D2 is the best weather model tested, and its advantage shrinks within hours of each run
 
 **ICON-D2 beats ICON-EU across the record by 0.60 points [0.46, 0.71], by 0.98 points [0.83, 1.12]
 in the first hour after each run, and by only 0.30 points [0.14, 0.46] in the third hour.** ICON-D2
@@ -208,23 +215,23 @@ weather models for UK power forecasting.
 
 ## ICON-EU against ICON global and UKV
 
-**Most of ICON global's 0.09-point deficit to ICON-EU sits in the hours ICON global is served further
-ahead.** ICON global runs every 6 hours, so half its hours are served 4 to 6 hours after the run
-started, where ICON-EU is at 1 to 3 hours. On those hours ICON global is 0.18 points behind [0.09,
-0.29]. On the hours where the two leads are equal ICON global is 0.02 points behind [−0.03, +0.08].
-So no effect of the coarser grid is detected, though an effect as large as 0.08 points is not
-excluded. The split also divides the hours of the day: the longer leads fall at 10 to 12 and 16 to
-18 UTC, so a difference in either model's skill by time of day would show up here as an effect of
-lead.
+**Most of ICON global's 0.09-point deficit to ICON-EU sits in the hours ICON global is served
+further ahead.** ICON global runs every 6 hours, so half its hours are served 4 to 6 hours after the
+run started, where ICON-EU is at 1 to 3 hours. On those hours ICON global is 0.18 points behind
+[0.09, 0.29]. On the hours where the two leads are equal ICON global is 0.02 points behind [−0.03,
++0.08]. So the effect of the coarser grid is not statistically significant at the 5% level, though
+an effect as large as 0.08 points is not excluded. The split also divides the hours of the day: the
+longer leads fall at 10 to 12 and 16 to 18 UTC, so a difference in either model's skill by time of
+day would show up here as an effect of lead.
 
 **ICON-EU beats Open-Meteo's hourly value for UKV by 0.48 points [0.30, 0.66], one of the four
 contrasts named before the run, and the whole gap disappears once UKV's hour is rebuilt from its own
-snapshots.** Each ICON product's archived value for an hour is a mean over that hour. UKV publishes a
-snapshot each hour, and Open-Meteo builds UKV's hourly value from the snapshot at the hour's end,
-rescaled by the change in the sun's angle. In comparisons added after the first run, averaging
-UKV's snapshots at both ends of the hour cuts UKV's error by 0.60 points, which leaves ICON-EU 0.12
-points behind [−0.06, +0.30]. Given the two snapshots as separate inputs, UKV is 0.23 points ahead
-of ICON-EU [0.05, 0.41].
+snapshots.** Each ICON product's archived value for an hour is a mean over that hour. UKV publishes
+a snapshot each hour, and Open-Meteo builds UKV's hourly value from the snapshot at the hour's end,
+rescaled by the change in the sun's angle. In comparisons added after the first run, averaging UKV's
+snapshots at both ends of the hour cuts UKV's error by 0.60 points, which leaves ICON-EU 0.12 points
+behind [−0.06, +0.30]. Given the two snapshots as separate inputs, UKV is 0.23 points ahead of
+ICON-EU [0.05, 0.41].
 
 **Showing a model the neighbouring hours helps both products by about 0.2 points, which is more than
 the gap between them.** A model shown ICON-EU's hourly mean for the hour before and after, as well
@@ -232,8 +239,8 @@ as the hour itself, improves by 0.18 points. The same context improves UKV's reb
 points. With context on both, ICON-EU is 0.14 points behind [−0.03, +0.31]. With context, ICON-EU
 is also 0.05 points behind UKV's two snapshots given as separate inputs [−0.13, +0.22].
 
-**Every rebuilt UKV construction scores ahead of ICON-EU across the record, and UKV is also served at
-the shorter lead.** UKV is served at T+0 and ICON-EU 1 to 3 hours ahead, so equal leads would if
+**Every rebuilt UKV construction scores ahead of ICON-EU across the record, and UKV is also served
+at the shorter lead.** UKV is served at T+0 and ICON-EU 1 to 3 hours ahead, so equal leads would if
 anything favour ICON-EU. On the 8 months after UKV's upgrade alone, ICON-EU is 0.01 points behind
 rebuilt UKV [−0.36, +0.36], with only 2 of 5 folds agreeing in sign. That interval rests on 8 months
 and is likely too narrow.
@@ -242,20 +249,20 @@ and is likely too narrow.
 
 ## UKV rebuilt from its snapshots beats ERA5
 
-**UKV rebuilt from its snapshots beats ERA5 in every period tested, but Open-Meteo's hourly value for
-UKV against ERA5 is unresolved.** In comparisons added after the first run, UKV rebuilt as the mean
-of its two snapshots beats ERA5 by 0.79 points [0.61, 0.98] across the record, by 0.69 points [0.46,
-0.92] since Open-Meteo's own UKV downloader started in August 2024, and by 0.49 points [0.27, 0.63]
-after the January 2026 upgrade. The post-upgrade interval rests on 8 months and is likely too
+**UKV rebuilt from its snapshots beats ERA5 in every period tested, but Open-Meteo's hourly value
+for UKV against ERA5 is unresolved.** In comparisons added after the first run, UKV rebuilt as the
+mean of its two snapshots beats ERA5 by 0.79 points [0.61, 0.98] across the record, by 0.69 points
+[0.46, 0.92] since Open-Meteo's own UKV downloader started in August 2024, and by 0.49 points [0.27,
+0.63] after the January 2026 upgrade. The post-upgrade interval rests on 8 months and is likely too
 narrow, though 4 of 5 folds agree in sign.
 
 **Open-Meteo's hourly value for UKV is 0.19 points ahead of ERA5 across the record [0.03, 0.36], and
 0.11 points ahead since August 2024 [−0.07, +0.32].** After the upgrade the evidence on that value
 conflicts. Models trained on the whole record, both sides of the upgrade, score it 0.18 points worse
 than ERA5 on the post-upgrade months [+0.05, +0.42]. Models trained on the post-upgrade months alone
-find it 0.11 points ahead [−0.21, +0.45]. Both post-upgrade intervals rest on 8 months and are likely
-too narrow, and 8 months cannot settle which is better after the upgrade. No model for rebuilt UKV
-was trained on the post-upgrade months alone.
+find it 0.11 points ahead [−0.21, +0.45]. Both post-upgrade intervals rest on 8 months and are
+likely too narrow, and 8 months cannot settle which is better after the upgrade. No model for
+rebuilt UKV was trained on the post-upgrade months alone.
 
 **Every UKV contrast with ERA5 mixes the products with their leads.** UKV is served at T+0 and ERA5
 at 1 to 12 hours, and equalising the leads could narrow the gap.
@@ -268,10 +275,10 @@ at 1 to 12 hours, and equalising the leads could narrow the gap.
 instead of a separation model's estimate from its own total.** The separation model is the [Erbs et
 al. (1982)](https://doi.org/10.1016/0038-092X(82)90302-4) correlation, applied to each product's own
 global irradiance. CAMS improves by 0.08 points and UKV by 0.11. The three ICON products improve by
-0.03 to 0.05 points each. ERA5 shows no detectable effect. These effects are smaller than every
-difference between products except ICON global against ICON-EU. For CAMS and ERA5 the own-beam
-effects agree with [the beam/diffuse study](beam-diffuse-split.md), which tested whether the
-published beam carries information or merely encodes the total differently.
+0.03 to 0.05 points each. ERA5's effect is not statistically significant at the 5% level. These
+effects are smaller than every difference between products except ICON global against ICON-EU. For
+CAMS and ERA5 the own-beam effects agree with [the beam/diffuse study](beam-diffuse-split.md), which
+tested whether the published beam carries information or merely encodes the total differently.
 
 ![Figure 6: Every product except ERA5 gains 0.03 to 0.11 points from its own direct beam](assets/sunshine_own_beam.svg)
 
@@ -292,15 +299,16 @@ not measure. For disaggregation, the result supports the ranking but not the siz
 
 ## Implied capacity from month to month
 
-**Once the seasonal cycle is removed, CAMS's implied capacity is the steadiest from month to month,
-but CAMS swings the most with the seasons.** A month's implied capacity is the ratio of metered
-output to what a fixed south-facing panel at 30° tilt predicts per megawatt from each product. With
-each calendar month's average removed, CAMS's month-to-month spread is 6.5%, against 7.9% to 10.0%
-for the weather models and ERA5. For each of those five products, the 95% interval on its spread
-minus CAMS's excludes zero. CAMS, however, implies a capacity 8%, 23%, and 10% below its annual mean
-in November, December, and January. No other product strays more than 11% from its annual mean in
-any of those three months. December's figure rests on about three Decembers at six generators that
-share their weather, and Figure 8 draws no interval.
+**Once the seasonal cycle is removed, CAMS's implied capacity is the steadiest of the six products
+from month to month, but CAMS swings the most of the six with the seasons.** A month's implied
+capacity is the ratio of metered output to what a fixed south-facing panel at 30° tilt predicts per
+megawatt from each product. With each calendar month's average removed, CAMS's month-to-month spread
+is 6.5%, against 7.9% to 10.0% for the weather models and ERA5. For each of those five products, the
+difference between its spread and CAMS's is statistically significant at the 5% level. CAMS,
+however, implies a capacity 8%, 23%, and 10% below its annual mean in November, December, and
+January. No other product strays more than 11% from its annual mean in any of those three months.
+December's figure rests on about three Decembers at six generators that share their weather, and
+Figure 8 draws no interval.
 
 **This study cannot say which product is right about December.** December's sun stays low all day,
 which is where a satellite retrieval and this page's assumed panel geometry are both at their least
@@ -309,7 +317,7 @@ faces south at 30° tilt, which this page does not verify. Removing the seasonal
 several years of each calendar month, which a capacity estimator run on a short window does not
 have.
 
-![Figure 8: CAMS's implied capacity swings the most with the seasons](assets/sunshine_implied_capacity.svg)
+![Figure 8: Of the six products tested, CAMS's implied capacity swings the most with the seasons](assets/sunshine_implied_capacity.svg)
 
 ## Which product each consumer should read
 
@@ -338,8 +346,8 @@ against availability and coverage.**
   Office's files until the January 2026 upgrade, and the upgraded model since. A model trained on
   the whole UKV archive therefore mixes all three. Every figure here scores the archive's freshest
   run for each hour. At run time the most recent hours are not yet in the archive in that form: UKV
-  arrives about 4 hours and ICON-EU about 3.5 hours after each run starts, so the last few hours come
-  from an older run, at a longer lead than any scored here.
+  arrives about 4 hours and ICON-EU about 3.5 hours after each run starts, so the last few hours
+  come from an older run, at a longer lead than any scored here.
 - **Disaggregation: CAMS where its one-day delay allows, otherwise ICON-EU or rebuilt UKV.** The
   ranking holds for a generator predicted from its neighbours.
 

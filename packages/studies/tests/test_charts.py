@@ -5,9 +5,14 @@ import plotting.ocf_theme as ocf
 import polars as pl
 import pytest
 from studies.charts import (
+    CONDITION_COLOURS,
+    CONTENT_WIDTH_PX,
     FAMILY_COLOURS,
     FAMILY_COLOURS_LIGHT,
+    LABEL_WIDTH_PX,
+    PLOT_WIDTH_PX,
     ContrastKey,
+    Panel,
     figure,
     flip_contrast,
     interval_panel,
@@ -243,7 +248,8 @@ def _values(spec: dict, layer: dict) -> list[dict]:
 def test_the_plotted_numbers_are_the_input_numbers_in_the_given_order():
     rows = _rows(["weather model", "satellite"])
     spec = _panel(rows)
-    (interval,) = [layer for layer in _layer(spec, "rule") if "x2" in layer["encoding"]]
+    panel = spec["vconcat"][-1]
+    (interval,) = [layer for layer in _layer(panel, "rule") if "x2" in layer["encoding"]]
 
     plotted = _values(spec, interval)
 
@@ -254,14 +260,28 @@ def test_the_plotted_numbers_are_the_input_numbers_in_the_given_order():
     assert interval["encoding"]["y"]["sort"] == ["row 0", "row 1"]
 
 
-def test_colour_follows_the_family_and_the_legend_lists_only_families_present():
-    spec = _panel(_rows(["reanalysis"]))
-    (interval,) = [layer for layer in _layer(spec, "rule") if "x2" in layer["encoding"]]
+def test_colour_follows_the_family_and_the_key_lists_only_families_present():
+    spec = _panel(_rows(["reanalysis", "satellite"]))
+    key, panel = spec["vconcat"]
+    (interval,) = [layer for layer in _layer(panel, "rule") if "x2" in layer["encoding"]]
     colour = interval["encoding"]["color"]
+    (text,) = _layer(key, "text")
 
     assert colour["scale"]["domain"][:3] == list(FAMILY_COLOURS)
     assert colour["scale"]["range"] == [*FAMILY_COLOURS.values(), *FAMILY_COLOURS_LIGHT.values()]
-    assert colour["legend"]["values"] == ["reanalysis"]
+    assert colour["legend"] is None
+    assert [row["label"] for row in _values(spec, text)] == ["satellite", "reanalysis"]
+    assert [row["colour"] for row in _values(spec, text)] == [
+        FAMILY_COLOURS["satellite"],
+        FAMILY_COLOURS["reanalysis"],
+    ]
+
+
+def test_a_panel_of_one_family_draws_no_family_key():
+    spec = _panel(_rows(["weather model", "weather model"]))
+
+    assert "vconcat" not in spec
+    assert "layer" in spec
 
 
 def test_the_zero_rule_sits_at_zero():
@@ -363,11 +383,11 @@ def test_the_interval_draws_to_the_upper_bound():
     assert interval["encoding"]["x2"]["field"] == "upper_95"
 
 
-def test_condition_encoding_shades_shapes_and_offsets_a_second_condition():
+def _condition_panel(families: list[str]) -> tuple[dict, dict, dict, dict, dict, dict]:
     rows = pl.DataFrame(
         {
-            "label": ["row", "row"],
-            "family": ["weather model", "weather model"],
+            "label": ["row"] * len(families),
+            "family": families,
             "difference": [-1.5, -1.0],
             "lower_95": [-2.0, -1.5],
             "upper_95": [-1.0, -0.5],
@@ -375,8 +395,7 @@ def test_condition_encoding_shades_shapes_and_offsets_a_second_condition():
         }
     )
     spec = _panel(rows, conditions=("a", "b"))
-    panel = spec["hconcat"][0]
-    key = spec["hconcat"][1]
+    key, panel = spec["vconcat"][-2:]
     (interval,) = [
         layer
         for layer in panel["layer"]
@@ -386,16 +405,40 @@ def test_condition_encoding_shades_shapes_and_offsets_a_second_condition():
     filled = next(layer for layer in points if layer["mark"]["filled"])
     hollow = next(layer for layer in points if not layer["mark"]["filled"])
     (key_text,) = [layer for layer in key["layer"] if layer["mark"]["type"] == "text"]
+    return spec, interval, filled, hollow, key, key_text
+
+
+def test_condition_encoding_shades_shapes_and_offsets_a_second_condition():
+    spec, interval, filled, hollow, _, key_text = _condition_panel(["satellite", "weather model"])
 
     assert [row["shade"] for row in _values(spec, interval)] == [
-        "weather model",
+        "satellite",
         "weather model, light",
     ]
-    assert [row["shade"] for row in _values(spec, filled)] == ["weather model"]
+    assert [row["shade"] for row in _values(spec, filled)] == ["satellite"]
     assert [row["shade"] for row in _values(spec, hollow)] == ["weather model, light"]
     assert filled["encoding"]["shape"]["scale"]["range"] == ["circle", "diamond"]
     assert "yOffset" in interval["encoding"]
     assert [row["filled"] for row in _values(spec, key_text)] == [True, False]
+    assert len(spec["vconcat"]) == 3
+
+
+def test_a_one_family_panel_colours_its_conditions_and_keeps_their_shapes():
+    spec, interval, filled, hollow, key, key_text = _condition_panel(
+        ["weather model", "weather model"]
+    )
+    key_points = [layer for layer in key["layer"] if layer["mark"]["type"] == "point"]
+
+    assert [row["shade"] for row in _values(spec, interval)] == ["a", "b"]
+    assert interval["encoding"]["color"]["scale"]["range"] == list(CONDITION_COLOURS)
+    assert interval["encoding"]["color"]["legend"] is None
+    assert filled["encoding"]["shape"]["scale"]["range"] == ["circle", "diamond"]
+    assert hollow["mark"]["filled"] is False
+    assert [row["colour"] for layer in key_points for row in _values(spec, layer)] == list(
+        CONDITION_COLOURS
+    )
+    assert [row["label"] for row in _values(spec, key_text)] == ["a", "b"]
+    assert len(spec["vconcat"]) == 2
 
 
 def test_figure_shares_the_colour_scale_across_panels():
@@ -426,6 +469,77 @@ def test_figure_shares_the_colour_scale_across_panels():
         ),
     ]
 
-    spec = figure(panels=panels, number=1, title="t", subtitle=["s"], width=400).to_dict()
+    spec = figure(panels=panels, number=1, title="t", subtitle=["s"]).to_dict()
 
     assert spec["resolve"]["scale"]["color"] == "shared"
+
+
+@pytest.mark.parametrize(
+    ("x_title", "direction", "expected"),
+    [
+        (
+            "Difference (points of capacity)",
+            "negative",
+            "Difference (points of capacity; more negative means better than ERA5)",
+        ),
+        ("points", "positive", "points (more positive means better than ERA5)"),
+        ("", "negative", ""),
+    ],
+)
+def test_the_axis_title_says_which_direction_is_better(
+    x_title: str, direction: str, expected: str
+) -> None:
+    spec = _panel(_rows(["weather model"]), x_title=x_title, better_direction=direction)
+    titles = {
+        " ".join(layer["encoding"]["x"]["title"])
+        for layer in spec["layer"]
+        if "title" in layer["encoding"].get("x", {})
+    }
+
+    assert titles == {expected}
+
+
+def test_figure_stacks_panels_to_fill_the_text_column():
+    panels = [_panel_chart(_rows(["satellite", "reanalysis"])) for _ in range(2)]
+
+    spec = figure(panels=panels, number=1, title="t", subtitle=["s"]).to_dict()
+    first_panel = spec["vconcat"][0]["vconcat"][-1]
+    (interval,) = [
+        layer
+        for layer in first_panel["layer"]
+        if layer["mark"]["type"] == "rule" and "x2" in layer["encoding"]
+    ]
+
+    assert len(spec["vconcat"]) == len(panels)
+    assert first_panel["width"] == PLOT_WIDTH_PX
+    assert LABEL_WIDTH_PX + PLOT_WIDTH_PX + 10 == CONTENT_WIDTH_PX
+    assert interval["encoding"]["y"]["axis"]["minExtent"] == LABEL_WIDTH_PX
+    assert spec["config"]["legend"]["orient"] == "bottom"
+
+
+def _panel_chart(rows: pl.DataFrame) -> Panel:
+    return interval_panel(
+        rows=rows, x_domain=(-3.0, 1.0), x_title="x", zero_label="z", better_label="b"
+    )
+
+
+@pytest.mark.parametrize(
+    ("x_domain", "direction", "align"),
+    [
+        ((-3.0, 1.0), "negative", "left"),
+        ((-4.0, 0.5), "negative", "right"),
+        ((-1.0, 2.0), "positive", "right"),
+        ((-0.2, 2.5), "positive", "left"),
+    ],
+)
+def test_the_zero_label_stays_inside_the_plot(
+    x_domain: tuple[float, float], direction: str, align: str
+) -> None:
+    spec = _panel(_rows(["weather model"]), x_domain=x_domain, better_direction=direction)
+    (zero_text,) = [
+        layer
+        for layer in _layer(spec, "text")
+        if layer["encoding"]["text"].get("value") == "same as ERA5"
+    ]
+
+    assert zero_text["mark"]["align"] == align
