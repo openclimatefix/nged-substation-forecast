@@ -3,7 +3,7 @@ name: study
 description: >-
   How to run a one-off scientific study in this repository and publish it under `docs/studies/`,
   so the result is scientifically valid before anyone reads it: where a study's code, data, and page
-  live; the order of work, from contrasts named before the run to two Opus scientific-validity
+  live; the order of work, from planned contrasts to two Opus scientific-validity
   reviews and a re-run whenever a reviewer asks; the design rules that keep a comparison fair
   (shared rows, equal column counts, month-block folds, month-resampled intervals, leakage through
   neighbouring generators); the data traps that fail silently (served lead, derived fields,
@@ -61,8 +61,10 @@ page only after a committed script prints it into the report.
    (`implement-issue` step 7) runs only when `packages/studies/` changes, because study scripts
    have no tests; say so in the PR body.
 2. **Name the deciding contrasts in the plan, before any result exists.** Name two to five contrasts
-   that answer the question. Every other number the study produces is exploratory, and is labelled
-   so on the page. An analysis added after the first run is post hoc, and is labelled so too.
+   that answer the question: the planned contrasts, labelled "(planned)" on the page, never "named
+   before the run". Every other number the study produces is exploratory, and is labelled so on the
+   page. An analysis added after the first run is post hoc, and is labelled so
+   too.
 3. **Build the datasets, run, and write the report.** Print every arm's feature columns into the
    report (see "An arm can silently lose a column", below).
 4. **First Opus scientific-validity review**, of the design and the first results. Triage it, fix,
@@ -229,6 +231,12 @@ listing from an old date gives a confident wrong answer.
   region, so the data needs a manual order, with an area subset, through the CM SAF web user
   interface in the maintainer's name.
 
+**Keep each gridded weather product over a box around the NGED trial area, and keep the whole UK
+only for a small product.** The box takes a margin of a few grid cells. The box's bounds come
+from the private generator roster and are never published. A small product is one whose UK extent
+comes to no more than about 20 GB, such as the Met Office's MIDAS Open station data. Issue #841
+sets out the rule and the products the rule covers.
+
 ## Reproducibility
 
 - **Keep every intermediate result on disk unless it is truly huge, so a later chart or analysis
@@ -244,7 +252,7 @@ listing from an old date gives a confident wrong answer.
   XGBoost's row subsampling depends on row order.
 - **When a published number drifts because the data changed, file an issue; do not fold the change
   into unrelated work.** A rebuilt `effective_capacity` table moved the beam/diffuse figures in their
-  third or fourth decimal place (#825). Every page states, in "What this does not show", which
+  third or fourth decimal place (#825). Every page states, in its "Limitations" section, which
   `effective_capacity` table its figures rest on and when that table was built.
 - **Never overwrite an output a merged page quotes; move it to `superseded/` first.** Every worktree
   writes to the main checkout's `data/studies/` (`sources.REPO_DATA_DIR`), so a re-run in a review
@@ -260,8 +268,8 @@ listing from an old date gives a confident wrong answer.
 reading any text.** Each chart, with its title, subtitle, axis labels, and legend, tells its part of
 the story without the prose around it. Load the `dataviz` skill before drawing any chart.
 
-- **A headline chart opens every page**, directly under the opening paragraphs, showing the headline
-  result with its 95% intervals. Every section whose claim rests on a number gets a chart too.
+- **A headline chart opens every page**, directly under the summary, showing the headline result
+  with its 95% intervals. Every section whose claim rests on a number gets a chart too.
 - **Show the method working before any contrast.** A contrast of a tenth of a point means nothing
   unless the model produces a sane forecast. Plot out-of-fold predictions against the measured
   output for every anonymised generator, across a few weeks chosen by a stated rule rather than by
@@ -282,13 +290,23 @@ the story without the prose around it. Load the `dataviz` skill before drawing a
     - what a dot, a line, and a shade mean ("Dot: estimate. Line: 95% interval from resampling whole
       months");
     - the scope: which generators, which region, and which period;
-    - which rows are exploratory or post hoc.
+    - which rows are planned, exploratory, or post hoc.
+- **Label a planned row "(planned)" only in a chart that mixes planned and exploratory rows.** Where
+  every row of a chart is planned, or every row is exploratory, state the kind once in the subtitle:
+  "All rows are planned: written into the study plan before any result existed." or "All rows are
+  exploratory." `studies.charts.planning` works out which case a figure is from each row's
+  `planned` column, and `figure` writes the matching subtitle line.
+- **Size each chart to the page's text column, so the chart shows at about 1:1 scale.** Stack panels
+  vertically rather than side by side, let the plot area fill the column's width, put every key
+  above the plot, and keep subtitles short. `studies.charts` draws every figure `CONTENT_WIDTH_PX`
+  wide, the width of the text column. Check that the text is legible in the built site, not only
+  in the SVG.
 - **Show paired differences with their intervals, not each arm's level with an interval.** The arms
-  share their rows, so level intervals overlap even where the paired difference clearly excludes
-  zero, and a reader takes the overlap to mean no difference. Put each arm's absolute error in its
-  row label instead.
+  share their rows, so level intervals overlap even where the paired difference is statistically
+  significant at the 5% level, and a reader takes the overlap to mean no difference. Put each arm's
+  absolute error in its row label instead.
 - **A chart of differences from one reference cannot show whether two other rows differ.** Put the
-  named paired contrasts in a second panel beside it.
+  planned paired contrasts in a second panel below it.
 - **Take every number a chart shares with the page from the report**, so the chart cannot disagree
   with the page.
 - **Take colours from `plotting.ocf_theme`, which encodes OCF's brand guidelines, and check every set
@@ -300,26 +318,67 @@ the story without the prose around it. Load the `dataviz` skill before drawing a
   every colour explicitly. One colour per product fails the check (Data Purple and Data Blue sit 2.0
   ΔE apart under deuteranopia), so colour a group of products and put every product's name on the
   axis.
+- **Show a product-type legend only where a chart holds more than one product type.** Where a chart
+  holds one type, colour the condition instead, such as the half of the year. Keep a different point
+  shape for each condition too, so the chart still reads without colour. `interval_panel` colours
+  the conditions and keeps their shapes on any panel of one product type.
 - **Write SVG, then optimise it** with `npx svgo@4 --multipass --precision=1 --final-newline`, as
   `CLAUDE.md` requires, and look at every chart rendered to PNG before committing it.
 
 ## Writing the page
 
-The prose rules in `CLAUDE.md` apply, and the `long-form-prose` skill governs the page's order. The
-two weather-product pages are the pattern:
+The prose rules in `CLAUDE.md` apply, and the `long-form-prose` skill governs the page's order.
+Every study page takes this outline:
 
-1. **An opening paragraph** naming the consumers of the answer, then bolded leads stating each
-   finding with its number and interval, then the evidence's size ("six metered solar farms inside
-   one 25 km by 23 km box, and 79,384 generator-hours from December 2022 to September 2026"). The
-   headline chart follows.
-2. **What is being compared**, as a table: each product's lead, grid, coverage, history, and delay.
-3. **How the comparison was made**: rows, model, folds, normalisation, intervals, and which contrasts
-   were named before the run.
-4. **One section per finding**, headed by the finding, each with its chart.
-5. **Which option each consumer should use**, scoped to the evidence.
-6. **What this does not show**: the region, the period, the per-generator recalibration, the
-   capacity table, and every other scope a reader might over-read, such as equal leads.
-7. **Reproducing the figures**.
+1. **Summary.** At most two paragraphs stating the headline result, followed by the headline
+   figure. The summary is the page's abstract.
+2. **The AI disclaimer** (below).
+3. **Key findings.** The finer conclusions, one bolded sentence each, each linking to its results
+   section.
+4. **Introduction.** The question, who needs the answer, and what is being compared, with a table
+   of each product's lead, grid, coverage, history, and delay.
+5. **Data and methods.** The rows, the XGBoost model or other forecasting model, the folds, the
+   normalisation, the intervals, and which contrasts are planned.
+6. **Results.** One section per finding, each with its chart, and "The models work" first.
+7. **What to use.** A recommendation for each use of the data, limited to what the evidence
+   supports.
+8. **Limitations.** The region, the period, the per-generator recalibration, the capacity table,
+   and every other scope a reader might over-read, such as equal leads.
+9. **Reproducing the figures.**
+
+**Every study page carries this disclaimer, as a blockquote after the summary:**
+
+> **How this page was made.** The research question came from a human. Everything else — the code
+> behind every result, the analysis, the figures and the text — was written by Claude, Anthropic's
+> AI model (for this page, MODEL). A human has reviewed the figures and the text, and several
+> independent Claude reviewers have checked the method, the evidence and the prose adversarially.
+
+Take MODEL from the `Co-Authored-By` trailers of the commits that touch the page and the study
+code behind it, including the shared code in `packages/studies/` and the older study scripts the
+study imports. Name every Claude model that wrote any part of the page or of its code:
+
+```bash
+git log --follow --format=%b -- <file> | grep -o 'Co-Authored-By: Claude[^<]*' | sort | uniq -c
+```
+
+Leave out the sentence "A human has reviewed the figures and the text" until the maintainer has
+reviewed the page, and add the sentence in the commit that follows that review.
+
+**Define "planned" and "exploratory" once per page, in "Data and methods".** A planned contrast
+was written into the study plan before any result existed; every other number is exploratory. The
+same paragraph says what the significance test covers and what the test does not (below).
+
+**Write "statistically significant at the 5% level", never "excludes zero".** A reader outside
+statistics does not know that an interval excluding zero is a significance test. Explain once per
+page what the month-resampled test covers: the month-to-month weather and the fitting seed, not
+differences between generators. Say too that, among many exploratory rows, about 1 in 20 reaches
+significance at the 5% level by chance.
+
+**Say what the model was given, and say which kind of model it is.** Write "an XGBoost model given
+ICON-EU's 80 m wind", never "ICON-EU shown its 80 m wind". A study page can mean a weather model,
+an XGBoost model, a PV model, a linear stack, or Claude by "model". Qualify every "model" by its
+kind. Never write a bare "arm" on a published page without defining it: "arm" is experiment-design
+jargon that a distribution-network engineer reads as nothing.
 
 **Every claim carries its scope and its interval.** The reviews of the weather-product pages caught
 each of these overclaims, all described above:
