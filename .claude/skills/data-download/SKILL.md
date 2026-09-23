@@ -6,8 +6,9 @@ description: >-
   one chunk, not the whole run: checkpoint every chunk to disk as soon as it is fetched, resume by
   skipping whatever is already cached, measure one chunk before committing to the rest, look up a
   provider's real parameter names before submitting a request, size each chunk to the provider's own
-  constraints, and get a fresh adversarial review before the script's first real run. Load before
-  writing or resuming any bulk-download script (e.g.
+  constraints, and get a fresh adversarial review before the script's first real run. Run the
+  `data-validation` skill's checklist once the fetch completes — a clean run is not evidence the
+  data is right. Load before writing or resuming any bulk-download script (e.g.
   `studies/*/fetch_*.py`) that makes more than a handful of requests, and before running any such
   script for the first time.
 ---
@@ -19,9 +20,14 @@ already fetched when one chunk fails.** A DWD ICON-DREAM-EU backfill script ran 
 whole-domain GRIB downloads and cropping, one month at a time, and called `write_parquet` only after
 every month had succeeded. The 85th month 404'd — DWD had not published it yet — the script
 crashed, and the first 84 months' work vanished with it, because none of it had touched disk. This
-skill turns that incident into a general checklist; see the `study` skill for where a download's
-output lives (`data/studies/weather/<PRODUCT>/`) and for the CDS and anonymisation rules it already
-owns, which this skill does not repeat.
+skill turns that incident into a general checklist.
+
+See the `study` skill for where a download's output lives (`data/studies/weather/<PRODUCT>/`) and
+for the CDS and anonymisation rules it already owns, which this skill does not repeat. See the
+`data-validation` skill for the checklist to run once a fetch finishes — a clean run is not evidence
+the data it wrote is right, and this project's own download history has already produced a running
+mean stored as an hourly one, a dropped chunk-boundary timestamp, and a wrong scale factor, none of
+which raised an exception.
 
 ## Checkpoint every chunk to disk immediately, and resume by skipping what is cached
 
