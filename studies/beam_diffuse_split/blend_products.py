@@ -338,14 +338,20 @@ def _solar_published_jobs() -> tuple[Job, ...]:
 
 
 def _wind_published_jobs() -> tuple[Job, ...]:
-    """Return the published wind study's arms, less the ones told ICON global's step period.
+    """Return the published wind study's arms on the common rows, less the step-period arms.
 
     The step indicator works as a date-regime feature, so an arm carrying it is not a fair single.
+    The arms at each of `wind_products.ROW_SET_SETTINGS` are fitted on other row sets, so they are
+    left out too.
 
     Returns:
         The jobs, as `wind_products._jobs` builds them.
     """
-    return tuple(job for job in wind_products._jobs() if not job[0].endswith("_step"))
+    return tuple(
+        job
+        for job in wind_products._jobs()
+        if not job[0].endswith("_step") and job[1] not in wind_products.ROW_SET_SETTINGS
+    )
 
 
 SOLAR: Final[Domain] = Domain(
