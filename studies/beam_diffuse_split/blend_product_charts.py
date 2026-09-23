@@ -640,7 +640,7 @@ def _decomposition(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 6.
+        Figure 7.
     """
     conditions = ("Blend − control", "Control − best single product")
     marks = []
@@ -670,7 +670,7 @@ def _decomposition(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     )
     return figure(
         panels=[panel],
-        number=6,
+        number=7,
         title="The gain comes from the other products' weather, not from the extra columns",
         subtitle=[
             (
@@ -695,7 +695,7 @@ def _splits(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 7.
+        Figure 8.
     """
     panels = []
     for domain in ("solar", "wind"):
@@ -737,7 +737,7 @@ def _splits(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         )
     return figure(
         panels=panels,
-        number=7,
+        number=8,
         title=(
             "Each named blend beats its best single product at every generator, in every season, "
             "and on each side of UKV's upgrade"
@@ -763,7 +763,7 @@ def _methods(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 9.
+        Figure 10.
     """
     methods = (
         ("xgb", "XGBoost given every product's columns"),
@@ -806,7 +806,7 @@ def _methods(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         )
     return figure(
         panels=panels,
-        number=9,
+        number=10,
         title=(
             "Given every product's columns, an XGBoost model has the lowest error of the four "
             "blends in every named set"
@@ -837,7 +837,7 @@ def _synthetic(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 10.
+        Figure 11.
     """
     panels = []
     pairs: tuple[tuple[DomainType, str], ...] = (("solar", "cams_rich"), ("wind", "ukv_rich"))
@@ -892,7 +892,7 @@ def _synthetic(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         )
     return figure(
         panels=panels,
-        number=10,
+        number=11,
         title="A known small signal is recovered in full",
         subtitle=[
             (
@@ -1276,7 +1276,7 @@ def _per_generator_errors(
         errors: Each domain's enriched blend errors.
 
     Returns:
-        Figure 5.
+        Figure 6.
 
     Raises:
         ValueError: If a generator's difference does not reproduce the report's per-site row.
@@ -1379,7 +1379,7 @@ def _per_generator_errors(
     )
     return figure(
         panels=[key, *panels],
-        number=5,
+        number=6,
         title="Each blend's error is lower than its best single product's at every generator",
         subtitle=[
             (
@@ -1466,7 +1466,7 @@ def _wind_bands(*, tables: dict[str, list[dict[str, str]]], report_text: str) ->
         report_text: The report.
 
     Returns:
-        Figure 8.
+        Figure 9.
     """
     contrasts = {
         "everything_rich_xgb − ukv_rich": "All five products",
@@ -1577,7 +1577,7 @@ def _wind_bands(*, tables: dict[str, list[dict[str, str]]], report_text: str) ->
             bars,
             lower,
         ],
-        number=8,
+        number=9,
         title="The wind blends' gain is spread across every level of output",
         subtitle=[
             (
@@ -1616,7 +1616,7 @@ def main() -> int:
             single="cams_rich",
             blend="everything_rich_xgb",
             labels=("CAMS, enriched", "All six products"),
-            number=3,
+            number=4,
             title="XGBoost models given CAMS, or all six products, track measured solar output",
             errors=errors["solar"],
         ),
@@ -1625,7 +1625,7 @@ def main() -> int:
             single="ukv_rich",
             blend="everything_rich_xgb",
             labels=("UKV, enriched", "All five products"),
-            number=4,
+            number=5,
             title="XGBoost models given UKV, or all five products, track measured wind output",
             errors=errors["wind"],
         ),
