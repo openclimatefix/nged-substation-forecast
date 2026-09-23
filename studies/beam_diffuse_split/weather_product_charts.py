@@ -557,7 +557,7 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
     )
     return figure(
         panels=[left, right],
-        number=3,
+        number=1,
         figure_planning=figure_planning,
         title="CAMS describes past sunshine best of the six products tested, by a wide margin",
         subtitle=[
@@ -1189,7 +1189,7 @@ def _solar_models_work(*, errors: dict[str, float]) -> tuple[alt.VConcatChart, a
         week_order=week_order,
         order=order,
         colours=colours,
-        number=1,
+        number=2,
         title=(
             f"An XGBoost model given {best_label} tracks measured power at every generator, "
             "across a clear, a variable, and a dull week"
@@ -1211,7 +1211,7 @@ def _solar_models_work(*, errors: dict[str, float]) -> tuple[alt.VConcatChart, a
         names=NAMES,
         families=FAMILIES,
         errors=errors,
-        number=2,
+        number=3,
         title="Every product's error ranks the same way at each of the six generators",
         subtitle=[
             "Each dot is one generator's mean absolute error given one product.",

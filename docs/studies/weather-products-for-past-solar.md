@@ -19,9 +19,9 @@ is the Met Office's UK variable-resolution model (UKV) with its hourly value reb
 snapshots. The evidence is six metered solar farms inside one 25 km by 23 km box in Lincolnshire,
 and 79,384 generator-hours from December 2022 to September 2026.
 
-![Figure 3: CAMS describes past sunshine best of the six products tested, by a wide margin](assets/sunshine_headline.svg)
+![Figure 1: CAMS describes past sunshine best of the six products tested, by a wide margin](assets/sunshine_headline.svg)
 
-In Figure 3 the top panel's intervals are against ERA5, so two products whose intervals overlap
+In Figure 1 the top panel's intervals are against ERA5, so two products whose intervals overlap
 there may still differ; the bottom panel compares the named pairs directly.
 
 > **How this page was made.** The research question came from a human. Everything else — the code
@@ -202,7 +202,7 @@ both covered by tests.**
 ### The XGBoost models work
 
 **Before any contrast is worth reading, the XGBoost models have to be shown producing a sane
-forecast.** Figure 1 plots out-of-fold predictions against measured power at every generator, given
+forecast.** Figure 2 plots out-of-fold predictions against measured power at every generator, given
 CAMS (the best product) and given ERA5, across three weeks: the clearest, the most variable, and the
 dullest. The three weeks are chosen from measured power alone, pooled across every generator and
 restricted to April to September so a short midwinter day cannot dominate the choice: the clearest is
@@ -210,19 +210,19 @@ the week whose generators produced the most output relative to their own capacit
 least, and the most variable the week whose daily totals swing the most from day to day. No weather
 product's own values enter that choice, so the choice cannot favour CAMS or ERA5.
 
-![Figure 1: An XGBoost model given CAMS tracks measured power at every generator, across a clear,
+![Figure 2: An XGBoost model given CAMS tracks measured power at every generator, across a clear,
 a variable, and a dull week](assets/sunshine_models_work_timeseries.svg)
 
 **Given CAMS, the XGBoost model tracks measured power closely at every generator and in every week,
 including the most variable week's sharp day-to-day swings; given ERA5, it still follows the shape of
-each day but runs further from the measured line, most visibly on the dullest week.** Figure 2 plots
+each day but runs further from the measured line, most visibly on the dullest week.** Figure 3 plots
 every product's mean absolute error at each of the six generators separately, one dot per product per
 generator: CAMS's six dots all sit below 6.5% of capacity, ERA5's six all sit above 8.6%, and the four
 weather models fall between the two without overlapping either, so the ranking in [CAMS describes past
 sunshine best](#cams-describes-past-sunshine-best-of-the-six-products-tested-by-a-wide-margin) holds
 generator by generator rather than resting on a pooled average that one generator could dominate.
 
-![Figure 2: Every product's error ranks the same way at each of the six generators](assets/sunshine_models_work_error.svg)
+![Figure 3: Every product's error ranks the same way at each of the six generators](assets/sunshine_models_work_error.svg)
 
 ### CAMS describes past sunshine best of the six products tested, by a wide margin
 
