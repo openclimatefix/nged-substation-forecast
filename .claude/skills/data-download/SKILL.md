@@ -46,9 +46,7 @@ for year_month in year_months:
 
 # Combine only the months this run asked for, not every file the cache directory happens to
 # hold — an old run's leftover chunks from a different date range must not silently join in.
-cached_paths = [
-    p for ym in year_months if (p := month_cache_dir / f"{ym}.parquet").exists()
-]
+cached_paths = [p for ym in year_months if (p := month_cache_dir / f"{ym}.parquet").exists()]
 if not cached_paths:
     raise RuntimeError(f"{variable}: no month succeeded across {year_months[0]}-{year_months[-1]}")
 combined = pl.concat([pl.read_parquet(path) for path in cached_paths])
