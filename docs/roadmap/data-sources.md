@@ -230,30 +230,30 @@ the resolution gap with CERRA that motivates keeping CERRA on the list at all.
 **The Met Office's UKV and MOGREPS-UK are the only forecast sources listed below that publish
 global, direct, and diffuse short-wave as three separate fields in a free feed.** Every other free
 forecast source makes the reader recover at least one component by arithmetic. ECMWF's own direct
-beam, `fdir`, is outside ECMWF's free open-data subset for both the single 9 km forecast (called
-HRES until IFS Cycle 50r1 made it the ENS control on
-[12 May 2026](https://www.ecmwf.int/en/about/media-centre/news/2026/ifs-cycle-50r1-aifsv2-live))
-and the ENS ensemble. Since 1 October 2025 ECMWF's whole Real-time Catalogue, `fdir` included, has
-been licensed CC BY 4.0, but ECMWF delivers the full catalogue through its dissemination system or
-MARS, and that delivery "may involve service charges"
-([ECMWF](https://www.ecmwf.int/en/about/media-centre/news/2025/ecmwf-makes-its-entire-real-time-catalogue-open-all)).
-Both reanalyses and both satellite products carry a direct component, where most of the forecast
-sources do not. That is why [capacity
+beam, `fdir`, is outside ECMWF's free open-data subset for both the single 9 km forecast (formerly
+HRES; see the [weather products
+survey](../background/weather-products-survey.md#terms-used-on-this-page)) and the ENS ensemble;
+[what taking `fdir` from ECMWF directly
+involves](#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost) is below. Both
+reanalyses and both satellite products carry a direct component, where the free feed behind the ENS
+forecast in production does not. That is why [capacity
 estimation](capacity-estimation.md#irradiance-inputs) plans on having the beam/diffuse split, while
-[forecasting](disaggregation.md#the-forward-model) has no route to the split today.
+[forecasting](disaggregation.md#the-forward-model) has no route to the split through the feed it
+uses today.
 
-**Four rows below are not in the catalogue above**, because the project plans to ingest none of
-them: ECMWF's own ENS is the full-catalogue delivery route behind the free feed, the two ECMWF rows
-via Open-Meteo are on the [weather products survey](../background/weather-products-survey.md) page,
-and the Met Office's global 10 km model is the Met Office model Dynamical.org have on their
-tracker rather than one we have asked for.
+**Four rows below, and AIFS Single in the AIFS row, are not in the catalogue above**, because the
+project plans to ingest none of them: ECMWF's own ENS is the full-catalogue delivery route behind
+the free feed, the two ECMWF rows via Open-Meteo were researched only for the studies and are on the
+[weather products survey](../background/weather-products-survey.md) page, AIFS Single has no
+catalogue row, and the Met Office's global 10 km model is the Met Office model Dynamical.org have on
+their tracker rather than one we have asked for.
 
 | Source | Kind | Global | Direct | Diffuse | Where it comes from |
 |---|---|---|---|---|---|
 | **ECMWF ENS** via Dynamical.org | Forecast | ✅ `ssrd` | ❌ | ❌ | Free ECMWF open data on AWS |
-| **ECMWF ENS** from ECMWF | Forecast | ✅ `ssrd` | ✅ `fdir` | By subtraction | ECMWF dissemination or MARS; [CC BY 4.0 since 2025-10-01](https://www.ecmwf.int/en/about/media-centre/news/2025/ecmwf-makes-its-entire-real-time-catalogue-open-all), but not in the free subset, and delivery "may involve service charges" |
-| **ECMWF ENS 9 km Europe** via Open-Meteo | Forecast | ✅ `ssrd` | ✅ `fdir` | By subtraction | [Open-Meteo's Ensemble API](https://open-meteo.com/en/docs/ensemble-api), 51 members, 00 and 06 UTC runs; less than a day of history at Lincoln on 2026-09-23; data CC BY 4.0, but Open-Meteo's free API is for non-commercial use only |
-| **ECMWF IFS HRES 9 km** (the ENS control since 12 May 2026) via Open-Meteo | Forecast | ✅ `ssrd` | ✅ `fdir` | By subtraction | Open-Meteo, data CC BY 4.0, free API for non-commercial use only; Open-Meteo [takes `fdir` from ECMWF's dissemination system](https://github.com/open-meteo/open-meteo/blob/main/Sources/App/EcmwfEcpds/EcmwfEcpdsVariable.swift), and its stitched archive starts 2017-01-01 |
+| **ECMWF ENS** from ECMWF | Forecast | ✅ `ssrd` | ✅ `fdir` | By subtraction | ECMWF dissemination or MARS, not the free subset ([licence and delivery below](#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost)) |
+| **ECMWF ENS 9 km Europe** via Open-Meteo | Forecast | ✅ `ssrd` | ✅ `fdir` | By subtraction | Open-Meteo's Ensemble API, live runs only ([survey](../background/weather-products-survey.md#forecast-models)) |
+| **ECMWF IFS HRES 9 km** via Open-Meteo | Forecast | ✅ `ssrd` | ✅ `fdir` | By subtraction | Open-Meteo, from 2017 ([survey](../background/weather-products-survey.md#forecast-models)) |
 | **ECMWF AIFS**, both Single and ENS | Forecast | ✅ `ssrd` | ❌ | ❌ | Free ECMWF open data; no direct field exists in any AIFS feed |
 | **ICON-EU** via Dynamical.org | Forecast | By addition | ✅ | ✅ | Free, already ingested by Dynamical.org |
 | **UKV** (Met Office) | Forecast | ✅ | ✅ | ✅ | Free on AWS, CC BY-SA 4.0; all three components in every run the bucket's rolling two-year window still holds |
@@ -287,25 +287,29 @@ dataset](https://dynamical.org/catalog/ecmwf-ifs-ens-forecast-15-day-0-25-degree
 Data on the AWS Open Data Registry as its source. So the variable Dynamical.org would have to add is
 not in the feed they read. The single 9 km forecast is in the same position: the free subset's
 `oper` index for the 2026-09-22 00 UTC run carries `ssrd` and not `fdir`. Open-Meteo serves that
-forecast's direct beam, and the 51-member ensemble's over Europe, only because Open-Meteo's
+forecast's direct beam, and the 51-member ensemble's direct beam over Europe, only because
+Open-Meteo's
 [downloader](https://github.com/open-meteo/open-meteo/blob/main/Sources/App/EcmwfEcpds/EcmwfEcpdsVariable.swift)
 fetches `fdir` from ECMWF's dissemination system.
 
 **ENS `fdir` reaches us through Dynamical.org by no route open today, and through Open-Meteo only
 live.** Open-Meteo's [Ensemble API](https://open-meteo.com/en/docs/ensemble-api) serves the
-51-member ensemble at 9 km over Europe with `fdir`, from the 00 and 06 UTC runs. A query at Lincoln
-on 2026-09-23 asking for 7 past days
-returned values only from 01 UTC that day, so the route carries no history to train or backtest
-on. Commercial use needs a paid Open-Meteo plan. Taking `fdir` from ECMWF directly means ECMWF's
-dissemination or a MARS subscription in place of, or alongside, the free bucket. The data itself
-has been CC BY 4.0 since 1 October 2025, and ECMWF charges for delivery rather than for the data:
-delivery of the full catalogue "may involve service charges". That route is therefore a delivery
-contract with ECMWF, not a storage decision. Dynamical.org's live ENS store reads ECMWF's free
-subset, although their back-fill of past ENS runs comes from MARS. Whether that back-fill could
-carry `fdir`, and whether Dynamical.org would take on a delivery feed for live runs, has not been
-asked. Dynamical.org already publish direct and diffuse short-wave for ICON-EU, which shows that a
-missing variable was never the obstacle — the obstacle is which ECMWF feed the open bucket holds,
-and which feed the bucket holds is ECMWF's decision rather than Dynamical.org's.
+51-member ensemble at 9 km over Europe with `fdir`, from the 00 and 06 UTC runs, but keeps no
+history to train or backtest on
+([survey](../background/weather-products-survey.md#forecast-models)). Commercial use needs a paid
+Open-Meteo plan.
+
+**Taking `fdir` from ECMWF directly is a delivery contract with ECMWF, not a storage decision.** The
+route is ECMWF's dissemination or a MARS subscription in place of, or alongside, the free bucket.
+Since 1 October 2025 ECMWF's whole Real-time Catalogue, `fdir` included, has been licensed CC BY 4.0
+([ECMWF](https://www.ecmwf.int/en/about/media-centre/news/2025/ecmwf-makes-its-entire-real-time-catalogue-open-all)).
+Delivery of the full catalogue "may involve service charges". Dynamical.org's live ENS store reads
+ECMWF's free subset, although their back-fill of past ENS runs comes from MARS. The project has not
+asked Dynamical.org whether that back-fill could carry `fdir`, or whether Dynamical.org would take
+on a delivery feed for live runs. Dynamical.org already publish direct and diffuse short-wave for
+ICON-EU, which shows that a missing variable was never the obstacle — the obstacle is which ECMWF
+feed the open bucket holds, and which feed the bucket holds is ECMWF's decision rather than
+Dynamical.org's.
 
 **The Met Office models are the request worth making, because their free feed already carries a
 direct beam.** The one open Met Office request on Dynamical.org's issue tracker is for [the global

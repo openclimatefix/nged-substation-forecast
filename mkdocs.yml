@@ -52,7 +52,7 @@ nav:
   - Background:
       - Overview: background/index.md
       - NGED's network and its data: background/network.md
-      - Weather products surveyed for the studies: background/weather-products-survey.md
+      - Weather products surveyed for the weather-product studies: background/weather-products-survey.md
       - Requirements: background/requirements.md
       - The manual heuristic forecast: background/manual-heuristic-forecast.md
       - Switching events: background/switching-events.md

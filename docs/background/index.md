@@ -9,9 +9,10 @@ this problem; [architecture](../architecture/overview.md) describes what is buil
 - [NGED's network and its data](network.md) — the primary substations, bulk supply points, and grid
   supply points NGED operates, the generation connected to them, and the false zeros, stuck values,
   missing-data gaps, and months-long commissioning ramps in the trial-area telemetry.
-- [Weather products surveyed for the studies](weather-products-survey.md) — forecast models,
-  reanalyses, and satellite retrievals that could join the weather-product studies, with what each
-  carries and which the project has used. A survey, not a list of what the project will ingest.
+- [Weather products surveyed for the weather-product studies](weather-products-survey.md) — which
+  weather products the project uses, and the forecast models, reanalyses, and satellite retrievals
+  that could join the weather-product studies, with what each carries. A survey, not a list of what
+  the project will ingest.
 - [Requirements](requirements.md) — the phased rollout from 32 time series to roughly 2,500, and the
   objectives NGED prioritises.
 - [The manual heuristic forecast](manual-heuristic-forecast.md) — the historical-analogue method
