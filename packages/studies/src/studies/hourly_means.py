@@ -20,13 +20,13 @@ KEY_COLUMN: Final[str] = "key"
 NEGATIVE_LIMIT_W_M2: Final[float] = -1.0
 """A de-averaged hourly mean below this counts as negative, rather than as rounding noise."""
 
-MAX_NEGATIVE_FRACTION: Final[float] = 0.001
+MAX_NEGATIVE_FRACTION: Final[float] = 0.01
 """The largest share of de-averaged values allowed below `NEGATIVE_LIMIT_W_M2`.
 
-De-averaging on the wrong phase subtracts running means over different windows, which throws
-negative hourly means at every sunrise and sunset. Measured on ICON-DREAM-EU's download, the right
-phase leaves 223 of about 1.1 million values below -1 W m⁻², and a phase one hour off leaves about
-100,000, so a limit of one in a thousand separates the two by a wide margin either way.
+De-averaging on the wrong phase subtracts running means over different windows, so its negative
+hourly means are common. Measured on ICON-DREAM-EU's download, the right phase leaves about 2,200 of
+7.7 million values below -1 W m⁻², reaching 0.19% for some cells in some years, and a wrong phase
+leaves 8% to 10%. A limit of one in a hundred sits well clear of both.
 """
 
 SARAH_SLOT_OFFSETS_MINUTES: Final[tuple[int, int]] = (-60, -30)
@@ -57,9 +57,10 @@ def hourly_from_running_means(
     earlier, the mean over the hour ending at `h` is `k * A_k - (k - 1) * A_{k-1}`. At `k = 1` it
     is `A_1` itself.
 
-    **Negative results are clipped at zero, but only a few are allowed.** De-averaging subtracts
-    two nearly equal numbers at sunrise and sunset, and the upstream averaging leaves them a few
-    W m⁻² apart the wrong way; a negative flux is not a physical value. More than
+    **Negative results are clipped at zero, but only a few are allowed.** At the right phase the
+    upstream averaging leaves an occasional step 2 or step 3 a few W m⁻² below zero once
+    de-averaged, at UTC hours 8, 9, 11, 12, 14, 15, 17 and 18 rather than at sunrise or sunset; a
+    negative flux is not a physical value. More than
     `MAX_NEGATIVE_FRACTION` of values below `NEGATIVE_LIMIT_W_M2` means the phase is wrong, and
     raises rather than being clipped away.
 

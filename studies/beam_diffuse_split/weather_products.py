@@ -179,8 +179,13 @@ SARAH_SATELLITE_ERAS: Final[tuple[tuple[str, datetime, datetime], ...]] = (
         datetime(2022, 2, 1, tzinfo=UTC),
     ),
     (
-        "Meteosat-11, to 20 March 2023",
+        "Meteosat-11, 2021",
         datetime(2021, 1, 1, tzinfo=UTC),
+        datetime(2022, 1, 1, tzinfo=UTC),
+    ),
+    (
+        "Meteosat-11, February 2022 to 20 March 2023",
+        datetime(2022, 2, 1, tzinfo=UTC),
         datetime(2023, 3, 21, tzinfo=UTC),
     ),
     (
@@ -192,9 +197,9 @@ SARAH_SATELLITE_ERAS: Final[tuple[tuple[str, datetime, datetime], ...]] = (
 """The satellite behind SARAH-3's retrieval over each span, as (label, start, end before).
 
 SARAH-3's European disc moved from Meteosat-11 to Meteosat-10 on 21 March 2023, and Meteosat-9
-stood in for a fortnight in January 2022. The report prints SARAH-3's error against CAMS in each
-span; no era feature enters the fit. The Meteosat-11 row includes January 2022, which also has a row
-of its own.
+stood in for a fortnight in January 2022, which is therefore a span of its own, left out of both
+Meteosat-11 spans. The report prints SARAH-3's error against CAMS in each span; no era feature
+enters the fit.
 """
 
 LEAD_TABLE_HOURS: Final[tuple[int, int]] = (7, 19)
@@ -1200,7 +1205,8 @@ def _sarah_era_lines(*, losses: pl.DataFrame) -> list[str]:
         losses: The pooled losses, holding `sarah3_global` and `cams_global`.
 
     Returns:
-        Markdown lines, one row per span that holds rows.
+        Markdown lines, one row per span that holds rows. A span of fewer than
+        `studies.bootstrap.MIN_MONTHS_FOR_INTERVAL` months shows its estimate and no interval.
     """
     lines = [
         "#### SARAH-3 against CAMS, by the satellite behind SARAH-3 (exploratory)",
@@ -1209,12 +1215,21 @@ def _sarah_era_lines(*, losses: pl.DataFrame) -> list[str]:
     ]
     for label, start, end in SARAH_SATELLITE_ERAS:
         rows = losses.filter(pl.col("time").is_between(start, end, closed="left"))
-        if rows.height:
+        if not rows.height:
+            continue
+        if rows["month"].n_unique() >= MIN_MONTHS_FOR_INTERVAL:
             lines.append(
                 _contrast_line(
                     losses=rows, treatment="sarah3_global", reference="cams_global", label=label
                 )
             )
+            continue
+        difference = _mae(losses=rows, arm="sarah3_global") - _mae(losses=rows, arm="cams_global")
+        site_hours = rows.filter(pl.col("arm") == "cams_global").select("site", "time").n_unique()
+        lines.append(
+            f"| {label} | sarah3_global − cams_global | {difference:+.3f} | too few months | — "
+            f"| — | {site_hours:,} |"
+        )
     return lines
 
 

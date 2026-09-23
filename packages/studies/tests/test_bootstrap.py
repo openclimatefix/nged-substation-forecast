@@ -226,3 +226,11 @@ def test_losses_at_two_settings_raise():
         bootstrap_difference_by_year(
             losses=both, treatment="era5", references=("other",), metric="loss"
         )
+
+
+def test_a_year_of_exactly_six_months_is_enough():
+    intervals = bootstrap_difference_by_year(
+        losses=_yearly_losses(months_2024=6), treatment="era5", references=("other",), metric="loss"
+    )
+
+    assert (intervals[0]["n_months"], intervals[0]["enough_months"]) == (6, True)
