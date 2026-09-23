@@ -67,6 +67,7 @@ one, the mistake is already written.
 | `long-form-prose` | drafting new prose longer than a few paragraphs of connected argument — a `docs/` page, a roadmap section, a PR description explaining a design |
 | `prose-review` | reviewing, reordering or simplifying prose that already exists — structure first, then one pass per rule |
 | `literature-review` | researching, writing or reviewing a literature review or state-of-the-art section that an outside party will publish |
+| `study` | planning, running, re-running, charting, writing up or reviewing a study under `studies/`, or changing `packages/studies/` |
 
 ## Docs
 
