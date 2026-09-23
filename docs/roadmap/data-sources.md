@@ -641,11 +641,13 @@ that one era of UKV stands in for another.
 **The weather models the project reads have changed many times since 2019, and many of those
 changes alter irradiance, cloud, or wind.** ECMWF changed the IFS cycle behind ECMWF ENS seven
 times between June 2019 and May 2026. The German weather service (DWD) changed ICON in ways that
-touch cloud, radiation, or wind on 15 dates between July 2019 and September 2026. The Met Office
-changed UKV's physics package twice. A model trained on one version of a weather model and run on
-the next meets inputs whose relationship to power has moved. [The Met Office's PS47 upgrade moved
-how much UKV's split improves the forecast by a factor of five and a
-half](#open-meteos-ukv-archive-is-the-t0-analysis-and-half-of-it-is-backfill). How the live service
+touch cloud, radiation, or wind on 16 dates between July 2019 and September 2026, counting the
+introduction of ICON-D2. The Met Office changed UKV's physics package twice. A model trained on one
+version of a weather model and run on the next meets inputs whose relationship to power has moved.
+After the Met Office's PS47 upgrade, [the error reduction from giving a model UKV's published
+direct-beam share grew five and a half times
+larger](#open-meteos-ukv-archive-is-the-t0-analysis-and-half-of-it-is-backfill), comparing the 8
+months after the upgrade with the 47 months before. How the live service
 plans to handle an upgrade is in [Live service → NWP model
 upgrades](live-service.md#nwp-model-upgrades).
 
@@ -661,10 +663,11 @@ history.
 Britain, in the weather models the project reads or is evaluating, and in the two archives the
 studies read them through.** It leaves out changes confined to DWD's ICON-EPS ensemble, which the
 project does not read. ERA5 has no rows, because ECMWF froze ERA5 at IFS cycle 41r2 for the whole
-record. ERA5's near-real-time stream, ERA5T, has correction periods in which it differs from the final
-ERA5, but the check found no correction period that touches irradiance or wind. Between PS43 and
-PS47 the Met Office changed no UKV physics package: PS46, in May 2025, was a move to a new
-supercomputer with no science change intended, and no date for PS44 could be found.
+record. ERA5's near-real-time stream, ERA5T, has correction periods in which it differs from the
+final ERA5, but the check found no correction period that touches irradiance or wind. Between PS43
+and PS47 the check found no UKV physics change. UKV was still on the RAL2-M physics after PS45 in
+May 2022, PS46 in May 2025 was a move to a new supercomputer with no science change intended, and
+no date or content for PS44 could be found.
 
 | Takes effect | Model | What changed | Source |
 |---|---|---|---|
@@ -676,7 +679,7 @@ supercomputer with no science change intended, and no date for PS44 could be fou
 | 2024-11-12 06 UTC | ECMWF IFS 49r1 | 2 m temperature observations assimilated; the SPP stochastic scheme replaces SPPT in the ensemble; ECMWF reports better 10 m wind | [ECMWF](https://www.ecmwf.int/en/about/media-centre/news/2024/forecast-upgrade-improves-wind-and-temperature-predictions) |
 | 2026-05-12 06 UTC | ECMWF IFS 50r1 | SPP revised to reduce excessive 10 m wind spread; aerosol climatology updated | [ECMWF](https://confluence.ecmwf.int/display/FCST/Implementation+of+IFS+Cycle+50r1) |
 | 2025-07-01 06 UTC | ECMWF AIFS ENS v1 | First operational AIFS ENS: 51 members on a grid of about 31 km, with `ssrd` and 100 m wind among its outputs | [ECMWF](https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+ENS+v1) |
-| 2026-05-12 06 UTC | ECMWF AIFS ENS v2 | Multi-scale training loss and stricter variable bounds; fine-tuned on 2018 to 2024 data plus 50r1 data | [ECMWF](https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+Single+v2) |
+| 2026-05-12 06 UTC | ECMWF AIFS ENS v2 | Multi-scale training loss and stricter variable bounds; fine-tuned on 2018 to 2024 data plus 50r1 data | [ECMWF](https://confluence.ecmwf.int/spaces/FCST/pages/620418893) |
 | 2019-07-30 06 UTC | DWD ICON 2.5.0 | Revised cloud-cover scheme, aimed at better cloud and radiation forecasts | [DWD](https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2019/pdf_icon_30_07_2019.pdf?__blob=publicationFile) |
 | 2019-10-22 06 UTC | DWD ICON 2.5.1 | Cloud-cover scheme retuned; DWD reports global radiation error down 1–2% and daytime radiation bias down 3–4 W m⁻² | [DWD](https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2019/pdf_icon_22_10_2019.pdf?__blob=publicationFile) |
 | 2020-05-19 09 UTC | DWD ICON | Aeolus satellite wind observations assimilated | [DWD](https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2020/pdf_icon_19_05_2020.pdf?__blob=publicationFile) |
@@ -692,7 +695,7 @@ supercomputer with no science change intended, and no date for PS44 could be fou
 | 2025-07-23 06 UTC | DWD ICON | Dissipative heating and warm-layer ocean parameterisations added in every ICON configuration | [DWD](https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2025/pdf_icon_23_07_2025.pdf?__blob=publicationFile) |
 | 2025-09-24 06 UTC | DWD ICON | Inversion-cloud scheme extended from stratocumulus to stratus, for winter fog and low cloud, and switched on in ICON-D2 | [DWD](https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2025/pdf_icon_24_09_2025.pdf?__blob=publicationFile) |
 | 2026-02-18 09 UTC | DWD ICON-D2 | New output field for 10 m wind corrected for sub-grid orography; adaptive surface friction restricted | [DWD](https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2026/pdf_icon_18_02_2026.pdf?__blob=publicationFile) |
-| 2026-09-02 12 UTC | DWD ICON | A prognostic aerosol scheme replaces the Tegen climatology for non-dust aerosol in ICON global and ICON-EU; DWD reports that global radiation increases significantly | [DWD](https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2026/pdf_icon_02_09_2026.pdf?__blob=publicationFile) |
+| 2026-09-02 12 UTC | DWD ICON | A prognostic aerosol scheme replaces the Tegen climatology for non-dust aerosol in ICON global and ICON-EU; in DWD's tests over central Europe, global radiation increases significantly | [DWD](https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2026/pdf_icon_02_09_2026.pdf?__blob=publicationFile) |
 | 2026-10-06 06 UTC, announced | DWD ICON-EU | ICON-EU domain slightly enlarged, mainly to the south | [DWD](https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2026/pdf_icon_06_10_2026.pdf?__blob=publicationFile) |
 | 2019-12-04 | Met Office PS43 | UKV and MOGREPS-UK move to the RAL2-M physics: mixed-phase ice cloud fraction, sub-grid turbulence, and lying snow | [Met Office authors, GMD 2023](https://gmd.copernicus.org/articles/16/1713/2023/) |
 | 2026-01-21 | Met Office PS47 | UKV and MOGREPS-UK move to the RAL3 physics: double-moment microphysics (CASIM), a bimodal cloud scheme, and boundary-layer and land-surface updates | [Met Office](https://datahub.metoffice.gov.uk/support/changes-and-updates) |
@@ -700,11 +703,11 @@ supercomputer with no science change intended, and no date for PS44 could be fou
 | 2022-09 | CAMS Radiation Service v4.5 | New all-sky model, with the bias correction removed | [ECMWF](https://confluence.ecmwf.int/spaces/CKB/pages/266592908/CAMS+solar+radiation+time-series+data+documentation) |
 | 2023-07 | CAMS Radiation Service v4.6 | The McClear clear-sky model reads inputs from IFS cycle 48r1 from 2023-06-27; earlier data unchanged | [ECMWF](https://confluence.ecmwf.int/spaces/CKB/pages/266592908/CAMS+solar+radiation+time-series+data+documentation) |
 | 2023-07-04 | Open-Meteo v0.2.69 | Solar-radiation calculation improved, including direct normal irradiance | [Open-Meteo](https://github.com/open-meteo/open-meteo/releases) |
-| 2025-10-01 | Open-Meteo | Native 9 km IFS HRES served, with ECMWF's own direct radiation, after ECMWF opened its real-time catalogue | [Open-Meteo](https://openmeteo.substack.com/p/ecmwf-transitions-to-open-data) |
+| 2025-10-01 | Open-Meteo | Native 9 km IFS HRES served, with ECMWF's own direct radiation, after ECMWF opened its real-time catalogue. ECMWF's own news says the 9 km catalogue is planned for later in 2026, which conflicts with this date; the conflict is unresolved | [Open-Meteo](https://openmeteo.substack.com/p/ecmwf-transitions-to-open-data) |
 
 **Date an upgrade by the first run it applies to, not by the day it was announced.** ECMWF brings in
 each cycle at the 06 UTC run, so the 00 UTC run of the implementation day, which is the run the
-project ingests, is still on the old cycle. DWD publishes a notice one to two weeks before a change
+project ingests, is still on the old cycle. DWD publishes a notice 5 to 15 days before a change
 takes effect. The effective date is in each notice's title ("Gültigkeit ab") and in the PDF's file
 name, and the dates above are effective dates. A month-only date, such as the CAMS rows', means the
 producer published no day. Open-Meteo's dates are software releases, and the hosted service may
