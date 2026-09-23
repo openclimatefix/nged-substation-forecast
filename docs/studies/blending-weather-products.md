@@ -16,7 +16,19 @@ September 2026, 50,734 generator-hours.
 more columns.** A control that keeps the extra columns but replaces their weather with other days'
 values from the same month does no better than the single product.
 
-![Figure 1: At these nine farms, an XGBoost model given several weather products beats an XGBoost model
+![Figure 1: An XGBoost model given several weather products has the lowest error of every single
+product and blend tested](assets/blend_leaderboard.svg)
+
+**Figure 1 ranks every single product's and every blend's own absolute error; Figure 2 tests each
+named blend against its best single product directly, because these generators share their
+weather.** A leaderboard row has no arm to pair against, so its interval carries the full
+month-to-month weather noise that neighbouring generators share. Pairing two arms on the same months
+and the same fitting seed cancels that shared noise, so a paired difference's interval is narrower
+than either arm's own interval in Figure 1 — two rows can look like they overlap there even where
+the difference between them, tested directly in Figure 2, is statistically significant at the 5%
+level.
+
+![Figure 2: At these nine farms, an XGBoost model given several weather products beats an XGBoost model
 given the best single product, enriched](assets/blend_headline.svg)
 
 > **How this page was made.** The research question came from a human. Everything else — the code
@@ -177,7 +189,7 @@ a property of the features.** The main settings are those the two earlier pages 
 settings drop the maximum tree depth from 6 to 4, raise the regularisation strength, and run 1,200
 rounds at a lower learning rate.
 
-**Figures 2 and 3's three weeks per generator are chosen by rule, from the weeks in which every
+**Figures 3 and 4's three weeks per generator are chosen by rule, from the weeks in which every
 generator has at least 4 scored solar hours or 12 scored wind hours on each of the seven days.**
 From those weeks, each figure shows the week with the highest mean output, the week with the lowest
 mean output, and the most variable week: for solar, the week with the largest day-to-day spread in
@@ -188,24 +200,24 @@ daily mean output; for wind, the week with the largest mean hour-to-hour change.
 ### The XGBoost models track the measured output
 
 **The XGBoost models given the best single product, and those given every product, follow the
-measured output hour by hour at every generator, in weeks chosen by rule.** Figures 2 and 3 show
+measured output hour by hour at every generator, in weeks chosen by rule.** Figures 3 and 4 show
 three weeks at each generator: the week with the highest mean output, the most variable week, and
 the week with the lowest mean output. Each XGBoost model's prediction is out of fold, so the hours
 it predicts were held out of its training. The prediction shown is the mean over the three fitting
 seeds.
 
-![Figure 2: XGBoost models given CAMS, or all six products, track measured solar
+![Figure 3: XGBoost models given CAMS, or all six products, track measured solar
 output](assets/blend_solar_weeks.svg)
 
-![Figure 3: XGBoost models given UKV, or all five products, track measured wind
+![Figure 4: XGBoost models given UKV, or all five products, track measured wind
 output](assets/blend_wind_weeks.svg)
 
 **The blend's error is lower than the best single product's at every generator, for every set in
-Figure 4.** The errors range from about 4% of capacity at the best solar farm to about 9% for the
+Figure 5.** The errors range from about 4% of capacity at the best solar farm to about 9% for the
 four weather models at the worst. Generator W3's output swings for months at a time against every
 product's wind, which the wind page attributes to turbine availability the feed does not record.
 
-![Figure 4: Each blend's error is lower than its best single product's at every
+![Figure 5: Each blend's error is lower than its best single product's at every
 generator](assets/blend_per_generator.svg)
 
 ### Solar: a blend beats CAMS with its extra columns
@@ -251,7 +263,7 @@ ICON-D2, the best plain wind product, all five products' plain columns gain 0.82
 ### The gain comes from the other products' weather
 
 **For every named blend, the blend beats its control, and the control does no better than the best
-single product.** Figure 5 splits each blend's gain in two. For all six solar products, the blend
+single product.** Figure 6 splits each blend's gain in two. For all six solar products, the blend
 beats its control by 0.20 points [0.17, 0.24], and the control is 0.07 points worse than enriched
 CAMS [0.05, 0.09]. For all five wind products, the blend beats its control by 0.53 points [0.46,
 0.62], and the control is 0.06 points worse than enriched UKV [0.02, 0.09]. For UKV with ICON-EU,
@@ -263,7 +275,7 @@ control is larger than its gain over the best single product.** The control keep
 at each hour, which carries a little real information, so a blend's gain over its control is if
 anything understated.
 
-![Figure 5: The gain comes from the other products' weather, not from the extra
+![Figure 6: The gain comes from the other products' weather, not from the extra
 columns](assets/blend_decomposition.svg)
 
 ### The gain holds at every generator and in every season
@@ -279,7 +291,7 @@ August, and by 0.19 points [0.10, 0.28] from December to February. All five wind
 enriched UKV by 0.39 to 0.58 points in each season. Since UKV's upgrade the solar gain is 0.08
 points [0.05, 0.12] and the wind gain 0.40 points [0.33, 0.50], each resting on 8 months.
 
-![Figure 6: Each named blend beats its best single product at every generator and in every
+![Figure 7: Each named blend beats its best single product at every generator and in every
 season](assets/blend_splits.svg)
 
 ### The wind gain is spread across every level of output
@@ -288,7 +300,7 @@ season](assets/blend_splits.svg)
 in hours below half of capacity.** All five products gain 0.26 points in the hours below a tenth of
 capacity, which are 36% of the hours, and 0.73 to 0.83 points in each band above 0.3 of capacity.
 The hours below 0.3 of capacity carry 52% of the net gain, and the hours above 0.9 carry 4%. The top
-panel of Figure 7 shows each band.
+panel of Figure 8 shows each band.
 
 **The report's statement that the most-improved 5% of hours carry 99% of the gain describes gains
 and losses netting out, not a gain confined to a few hours.** Of the hours, 56% improve and 44%
@@ -297,10 +309,10 @@ passes the net gain
 after about 5% of hours, rises to 2.93 times the net gain where the improving hours end, and falls
 back as the worsening hours are added. So the other 95% of hours net to about 1% of the gain. For
 UKV with ICON-EU the most-improved 5% carry 143% of the net gain, and the running sum rises to 4.06
-times the net gain before the other 95% of hours bring it back down. The bottom panel of Figure 7
+times the net gain before the other 95% of hours bring it back down. The bottom panel of Figure 8
 shows both running sums.
 
-![Figure 7: The wind blends' gain is spread across every level of output](assets/blend_wind_bands.svg)
+![Figure 8: The wind blends' gain is spread across every level of output](assets/blend_wind_bands.svg)
 
 ### An XGBoost blend beats a linear stack and simple averages
 
@@ -318,7 +330,7 @@ is 1.64 points worse than enriched CAMS [1.47, 1.80], and the equal-weight mean 
 is 1.75 points worse [1.58, 1.92]. For wind, both averages of UKV and ICON-EU beat enriched UKV, by
 0.22 points each. All of these comparisons are exploratory.
 
-![Figure 8: An XGBoost model given every product's columns has the lowest error of the four blends in
+![Figure 9: An XGBoost model given every product's columns has the lowest error of the four blends in
 every named set but one](assets/blend_methods.svg)
 
 **The XGBoost blend has the lowest error of the four blends in every named set but one: for UKV with
@@ -345,7 +357,7 @@ chosen to target the headline gain's size, this comparison shows the pipeline ca
 gain of that size; it does not independently confirm the headline gain's magnitude. A larger positive
 control, CAMS with ICON-D2 against ICON-D2 alone, shows a gain of 2.82 points [2.61, 3.03].
 
-![Figure 9: A known small signal is recovered in full](assets/blend_synthetic.svg)
+![Figure 10: A known small signal is recovered in full](assets/blend_synthetic.svg)
 
 ## What to use
 

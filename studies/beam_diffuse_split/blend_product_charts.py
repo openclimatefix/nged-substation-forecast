@@ -49,7 +49,7 @@ from studies.charts import (
     interval_panel,
     wrapped,
 )
-from weather_product_charts import ASSETS_DIR, CAPACITY, DOTS, X_TITLE, _two_places
+from weather_product_charts import ASSETS_DIR, CAPACITY, DOTS, NAMES, X_TITLE, _two_places
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -113,6 +113,35 @@ NAMED_SETS: Final[tuple[NamedSet, ...]] = (
     NamedSet("wind", "live_gb", "UKV and ICON-EU", "ukv_rich"),
 )
 """The sets behind the deciding contrasts, in the order the page gives them."""
+
+SET_NAMES: Final[dict[DomainType, dict[str, str]]] = {
+    "solar": {
+        "cams_icon_d2": "CAMS and ICON-D2",
+        "cams_icon_eu": "CAMS and ICON-EU",
+        "cams_era5": "CAMS and ERA5",
+        "live_gb": "UKV and ICON-EU",
+        "live_all": "Four weather models",
+        "everything": "All six products",
+    },
+    "wind": {
+        "best_pair": "ICON-D2 and UKV",
+        "live_gb": "UKV and ICON-EU",
+        "live_all": "Four weather models",
+        "everything": "All five products",
+    },
+}
+"""Every set's name as the "What to use" table gives it, one entry per `Domain.sets` in
+`blend_products.py`."""
+
+LEADERBOARD_TITLE: Final[str] = (
+    "leaderboard, every single product and blend, plain and enriched (main XGBoost settings)"
+)
+LEADERBOARD_CONDITIONS: Final[tuple[str, str]] = ("Blend", "Single product")
+LEADERBOARD_DOMAIN: Final[dict[DomainType, tuple[float, float]]] = {
+    "solar": (4.0, 9.5),
+    "wind": (4.5, 9.0),
+}
+"""Each panel's x range, padded around the widest interval `blend_products.py` printed."""
 
 HEADLINE_DOMAIN: Final[tuple[float, float]] = (-0.7, 0.1)
 SETTING_CONDITIONS: Final[tuple[str, str]] = (
@@ -414,6 +443,90 @@ def _blend_errors(*, tables: dict[str, list[dict[str, str]]], domain: DomainType
     return pl.DataFrame(rows)
 
 
+def _leaderboard_rows(
+    *, tables: dict[str, list[dict[str, str]]], domain: DomainType
+) -> pl.DataFrame:
+    """Read one domain's leaderboard table, labelled as the page labels every row.
+
+    Args:
+        tables: The output of `_tables`.
+        domain: `solar` or `wind`.
+
+    Returns:
+        One row per arm, sorted with the lowest error first, with `label`, `family`, `condition`
+        (`Single product` or `Blend`), `difference` (the arm's own mean absolute error), `lower_95`
+        and `upper_95`.
+    """
+    rows = []
+    for row in tables[f"{domain.capitalize()}: {LEADERBOARD_TITLE}"]:
+        lower, upper = _bounds(text=row["95% interval, months and seed"])
+        single = row["Kind"] == "single"
+        base = NAMES[row["Set or product"]] if single else SET_NAMES[domain][row["Set or product"]]
+        label = f"An XGBoost model given {base}"
+        if row["Variant"] == "rich":
+            label += ", enriched"
+        rows.append(
+            {
+                "label": label,
+                "family": "weather model",
+                "condition": "Single product" if single else "Blend",
+                "difference": float(row["MAE (pp of capacity)"]),
+                "lower_95": lower,
+                "upper_95": upper,
+            }
+        )
+    return pl.DataFrame(rows).sort("difference")
+
+
+def _leaderboard(*, tables: dict[str, list[dict[str, str]]]) -> alt.VConcatChart:
+    """Draw every single product's and every blend's absolute error, ranked best first.
+
+    Args:
+        tables: The output of `_tables`.
+
+    Returns:
+        Figure 1.
+    """
+    panels = [
+        interval_panel(
+            rows=_leaderboard_rows(tables=tables, domain=domain),
+            x_domain=LEADERBOARD_DOMAIN[domain],
+            x_title="Mean absolute error (percentage of capacity)" if domain == "wind" else "",
+            zero_label="a perfect forecast",
+            better_label="smaller is better",
+            conditions=LEADERBOARD_CONDITIONS,
+            condition_title="Kind",
+            panel_title=domain.capitalize(),
+            reference_labels=False,
+            family_key=False,
+        )
+        for domain in ("solar", "wind")
+    ]
+    return figure(
+        panels=panels,
+        number=1,
+        title=(
+            "An XGBoost model given several weather products has the lowest error of every "
+            "single product and blend tested"
+        ),
+        subtitle=[
+            (
+                "Every single product and every named blend, plain and enriched, at the main "
+                "XGBoost settings, ranked best first."
+            ),
+            f"{DOTS} {CAPACITY}",
+            f"{SCOPES['solar']} {SCOPES['wind']}",
+            (
+                "Each arm's own interval, with no arm-to-arm pairing, so it carries the full "
+                "month-to-month weather noise that these generators share. Figure 2's paired "
+                "differences cancel that shared noise, which is why two arms can overlap here "
+                "and still differ significantly there."
+            ),
+        ],
+        figure_planning=None,
+    )
+
+
 def _headline(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     """Draw each named set's enriched blend against its enriched best single, at both settings.
 
@@ -421,7 +534,7 @@ def _headline(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 1.
+        Figure 2.
     """
     marks = []
     for named in NAMED_SETS:
@@ -454,7 +567,7 @@ def _headline(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     )
     return figure(
         panels=[panel],
-        number=1,
+        number=2,
         title=(
             "At these nine farms, an XGBoost model given several weather products beats an XGBoost "
             "model given "
@@ -481,7 +594,7 @@ def _decomposition(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 5.
+        Figure 6.
     """
     conditions = ("Blend − control", "Control − best single product")
     marks = []
@@ -511,7 +624,7 @@ def _decomposition(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     )
     return figure(
         panels=[panel],
-        number=5,
+        number=6,
         title="The gain comes from the other products' weather, not from the extra columns",
         subtitle=[
             (
@@ -536,7 +649,7 @@ def _splits(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 6.
+        Figure 7.
     """
     panels = []
     for domain in ("solar", "wind"):
@@ -579,7 +692,7 @@ def _splits(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         )
     return figure(
         panels=panels,
-        number=6,
+        number=7,
         title=(
             "Each named blend beats its best single product at every generator and in every season"
         ),
@@ -603,7 +716,7 @@ def _methods(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 8.
+        Figure 9.
     """
     methods = (
         ("xgb", "XGBoost given every product's columns"),
@@ -638,7 +751,7 @@ def _methods(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         )
     return figure(
         panels=panels,
-        number=8,
+        number=9,
         title=(
             "An XGBoost model given every product's columns has the lowest error of the four "
             "blends in every named set but one"
@@ -667,7 +780,7 @@ def _synthetic(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 9.
+        Figure 10.
     """
     panels = []
     pairs: tuple[tuple[DomainType, str], ...] = (("solar", "cams_rich"), ("wind", "ukv_rich"))
@@ -722,7 +835,7 @@ def _synthetic(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         )
     return figure(
         panels=panels,
-        number=9,
+        number=10,
         title="A known small signal is recovered in full",
         subtitle=[
             (
@@ -1106,7 +1219,7 @@ def _per_generator_errors(
         errors: Each domain's enriched blend errors.
 
     Returns:
-        Figure 4.
+        Figure 5.
 
     Raises:
         ValueError: If a generator's difference does not reproduce the report's per-site row.
@@ -1209,7 +1322,7 @@ def _per_generator_errors(
     )
     return figure(
         panels=[key, *panels],
-        number=4,
+        number=5,
         title="Each blend's error is lower than its best single product's at every generator",
         subtitle=[
             (
@@ -1296,7 +1409,7 @@ def _wind_bands(*, tables: dict[str, list[dict[str, str]]], report_text: str) ->
         report_text: The report.
 
     Returns:
-        Figure 7.
+        Figure 8.
     """
     contrasts = {
         "everything_rich_xgb − ukv_rich": "All five products",
@@ -1407,7 +1520,7 @@ def _wind_bands(*, tables: dict[str, list[dict[str, str]]], report_text: str) ->
             bars,
             lower,
         ],
-        number=7,
+        number=8,
         title="The wind blends' gain is spread across every level of output",
         subtitle=[
             (
@@ -1439,13 +1552,14 @@ def main() -> int:
         domain: _blend_errors(tables=tables, domain=domain) for domain in ("solar", "wind")
     }
     charts = {
+        "blend_leaderboard": _leaderboard(tables=tables),
         "blend_headline": _headline(contrasts=contrasts),
         "blend_solar_weeks": _weeks_figure(
             domain="solar",
             single="cams_rich",
             blend="everything_rich_xgb",
             labels=("CAMS, enriched", "All six products"),
-            number=2,
+            number=3,
             title="XGBoost models given CAMS, or all six products, track measured solar output",
             errors=errors["solar"],
         ),
@@ -1454,7 +1568,7 @@ def main() -> int:
             single="ukv_rich",
             blend="everything_rich_xgb",
             labels=("UKV, enriched", "All five products"),
-            number=3,
+            number=4,
             title="XGBoost models given UKV, or all five products, track measured wind output",
             errors=errors["wind"],
         ),

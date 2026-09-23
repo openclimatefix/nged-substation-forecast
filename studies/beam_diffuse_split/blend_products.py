@@ -72,7 +72,12 @@ from run_experiment import SHARED_FEATURES as SOLAR_SHARED_FEATURES
 from run_experiment import Job, _add_time_features, run_all
 from sources import STUDY_DATA_DIR
 from studies.blending import PERMUTED_SUFFIX, climatology_permutation, stacked_errors
-from studies.bootstrap import bootstrap_difference, fold_t_interval, per_fold_differences
+from studies.bootstrap import (
+    bootstrap_difference,
+    bootstrap_level,
+    fold_t_interval,
+    per_fold_differences,
+)
 from studies.cross_validation import (
     PRIMARY_HYPER_PARAMETERS,
     SENSITIVITY_HYPER_PARAMETERS,
@@ -849,6 +854,115 @@ def _mae(*, losses: pl.DataFrame, arm: str) -> float:
     if rows.is_empty():
         return float("nan")
     return float(rows.select(pl.col(METRIC).mean()).item()) * PERCENTAGE_POINTS
+
+
+LeaderboardKind = Literal["single", "blend"]
+"""Whether a leaderboard row is one product read alone, or a set of products blended."""
+
+
+class LeaderboardRow(TypedDict):
+    """One leaderboard row's arm and its bootstrapped absolute level."""
+
+    arm: str
+    kind: LeaderboardKind
+    name: str
+    variant: VariantType
+    mae_pp: float
+    lower_95_pp: float
+    upper_95_pp: float
+    n_months: int
+
+
+LEADERBOARD_HEADER: Final[tuple[str, str]] = (
+    (
+        "| Arm | Kind | Set or product | Variant | MAE (pp of capacity) | 95% interval, months "
+        "and seed |"
+    ),
+    "|---|---|---|---|---|---|",
+)
+
+
+def _leaderboard_arms(*, domain: Domain) -> list[tuple[str, LeaderboardKind, str, VariantType]]:
+    """Return every arm Figure 1's leaderboard ranks: each single product and each blend, twice.
+
+    Args:
+        domain: The domain.
+
+    Returns:
+        For each row: the arm name, whether it is a single product or a blend, the product or set
+        name, and plain or enriched.
+    """
+    arms: list[tuple[str, LeaderboardKind, str, VariantType]] = []
+    for product in domain.products:
+        arms.append((domain.single(product), "single", product, "plain"))
+        arms.append((rich(product), "single", product, "rich"))
+    for blend in domain.sets:
+        arms.append((_arm(blend.name, "plain", "xgb"), "blend", blend.name, "plain"))
+        arms.append((_arm(blend.name, "rich", "xgb"), "blend", blend.name, "rich"))
+    return arms
+
+
+def _leaderboard_rows(*, losses: pl.DataFrame, domain: Domain) -> list[LeaderboardRow]:
+    """Bootstrap every leaderboard arm's absolute level, at the primary setting.
+
+    Args:
+        losses: The domain's losses, every arm and setting.
+        domain: The domain.
+
+    Returns:
+        One row per arm in `_leaderboard_arms`, in that order.
+    """
+    pooled = losses.filter(pl.col("setting") == "pooled")
+    rows: list[LeaderboardRow] = []
+    for arm, kind, name, variant in _leaderboard_arms(domain=domain):
+        interval = bootstrap_level(losses=pooled, arm=arm, metric=METRIC)
+        rows.append(
+            {
+                "arm": arm,
+                "kind": kind,
+                "name": name,
+                "variant": variant,
+                "mae_pp": interval["level"] * PERCENTAGE_POINTS,
+                "lower_95_pp": interval["lower_95"] * PERCENTAGE_POINTS,
+                "upper_95_pp": interval["upper_95"] * PERCENTAGE_POINTS,
+                "n_months": interval["n_months"],
+            }
+        )
+    return rows
+
+
+def _leaderboard_lines(*, rows: list[LeaderboardRow], domain: Domain) -> list[str]:
+    """Render one domain's leaderboard table.
+
+    Args:
+        rows: The output of `_leaderboard_rows`.
+        domain: The domain.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        (
+            f"#### {domain.name.capitalize()}: leaderboard, every single product and blend, plain "
+            "and enriched (main XGBoost settings)"
+        ),
+        "",
+        (
+            "Each arm's own absolute mean error, with its own 95% interval from resampling whole "
+            "months and a seed. Unlike the paired contrasts below, a leaderboard row has no arm to "
+            "pair against, so its interval carries the full month-to-month weather noise that "
+            "neighbouring generators share; a paired difference's interval is narrower because "
+            "pairing cancels that shared noise."
+        ),
+        "",
+        *LEADERBOARD_HEADER,
+    ]
+    lines += [
+        f"| {row['arm']} | {row['kind']} | {row['name']} | {row['variant']} "
+        f"| {row['mae_pp']:.3f} | [{row['lower_95_pp']:.3f}, {row['upper_95_pp']:.3f}] |"
+        for row in rows
+    ]
+    return lines
 
 
 def _best_singles(*, losses: pl.DataFrame, domain: Domain) -> BestType:
@@ -1949,6 +2063,16 @@ def _report(
         "",
         *reproduction_lines,
         "",
+    ]
+    for domain in DOMAINS:
+        lines += [
+            *_leaderboard_lines(
+                rows=_leaderboard_rows(losses=outputs[domain.name]["losses"], domain=domain),
+                domain=domain,
+            ),
+            "",
+        ]
+    lines += [
         "#### Deciding contrasts: each named set's enriched blend against its enriched best single",
         "",
         (
