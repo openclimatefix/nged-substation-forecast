@@ -1,8 +1,14 @@
-"""Sample a projected weather grid at a set of coordinates, by nearest cell."""
+"""Find the grid cell nearest each site, on a projected grid or among a set of cell centres."""
 
+from typing import Final
+
+import numpy as np
 import polars as pl
 import xarray as xr
 from pyproj import CRS, Transformer
+
+EARTH_RADIUS_KM: Final[float] = 6371.0
+"""The mean radius of the Earth, which turns an angle on the sphere into a distance."""
 
 
 def sample_nearest_cell(*, field: xr.DataArray, sites: pl.DataFrame, crs: CRS) -> dict[str, float]:
@@ -36,3 +42,91 @@ def sample_nearest_cell(*, field: xr.DataArray, sites: pl.DataFrame, crs: CRS) -
             ).item()
         )
     return sampled
+
+
+def nearest_cells(*, sites: pl.DataFrame, cells: pl.DataFrame) -> pl.DataFrame:
+    """Return the cell whose centre is nearest each site, by great-circle distance.
+
+    **Distance is measured on the sphere, never in degrees.** At the trial area's latitude a degree
+    of longitude is about 0.6 of a degree of latitude, so the nearest cell in degrees can be a cell
+    further away on the ground. The cells can be any set of centres: a regular latitude-longitude
+    grid flattened to one row per cell, or an unstructured grid such as ICON's triangles.
+
+    **A site outside the cells' extent still gets a cell**, the nearest edge cell, so a caller whose
+    sites might fall outside the extent reads `distance_km` before trusting the result.
+
+    Args:
+        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        cells: One row per cell, carrying `cell_id`, `latitude` and `longitude`.
+
+    Returns:
+        One row per site with `site`, the nearest `cell_id`, and `distance_km` to its centre.
+
+    Raises:
+        ValueError: If `cells` is empty, which leaves no cell to choose.
+    """
+    if cells.height == 0:
+        msg = "no cells to choose from"
+        raise ValueError(msg)
+    cell_latitude = np.radians(cells["latitude"].to_numpy().astype(np.float64))
+    cell_longitude = np.radians(cells["longitude"].to_numpy().astype(np.float64))
+    site_latitude = np.radians(sites["latitude"].to_numpy().astype(np.float64))[:, None]
+    site_longitude = np.radians(sites["longitude"].to_numpy().astype(np.float64))[:, None]
+    half_chord = (
+        np.sin((cell_latitude - site_latitude) / 2.0) ** 2
+        + np.cos(site_latitude)
+        * np.cos(cell_latitude)
+        * np.sin((cell_longitude - site_longitude) / 2.0) ** 2
+    )
+    distance_km = 2.0 * EARTH_RADIUS_KM * np.arcsin(np.sqrt(np.clip(half_chord, 0.0, 1.0)))
+    nearest = distance_km.argmin(axis=1)
+    return pl.DataFrame(
+        {
+            "site": sites["site"],
+            "cell_id": cells["cell_id"].gather(nearest),
+            "distance_km": distance_km[np.arange(sites.height), nearest],
+        }
+    )
+
+
+def nearest_grid_indices(
+    *, sites: pl.DataFrame, latitudes: np.ndarray, longitudes: np.ndarray
+) -> pl.DataFrame:
+    """Return the indices into a regular latitude-longitude grid's two axes of each site's cell.
+
+    The grid is flattened latitude-major and handed to `nearest_cells`, and each flat index is
+    split back into its two axis indices. **A split that swapped the axes would still return
+    plausible distances**, so the result is checked against the cells it names before it is
+    returned.
+
+    Args:
+        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        latitudes: The grid's latitude axis, in degrees.
+        longitudes: The grid's longitude axis, in degrees.
+
+    Returns:
+        One row per site with `site`, `lat_index`, `lon_index` and `distance_km`.
+
+    Raises:
+        ValueError: If a returned index pair does not name the cell `nearest_cells` chose.
+    """
+    lat_grid, lon_grid = np.meshgrid(latitudes, longitudes, indexing="ij")
+    cells = pl.DataFrame(
+        {"latitude": lat_grid.ravel(), "longitude": lon_grid.ravel()}
+    ).with_row_index(name="cell_id")
+    nearest = nearest_cells(sites=sites, cells=cells).join(
+        cells.rename({"latitude": "cell_latitude", "longitude": "cell_longitude"}), on="cell_id"
+    )
+    indices = nearest.with_columns(
+        lat_index=pl.col("cell_id") // len(longitudes),
+        lon_index=pl.col("cell_id") % len(longitudes),
+    )
+    lat_index = indices["lat_index"].to_numpy()
+    lon_index = indices["lon_index"].to_numpy()
+    if not (
+        np.array_equal(latitudes[lat_index], indices["cell_latitude"].to_numpy())
+        and np.array_equal(longitudes[lon_index], indices["cell_longitude"].to_numpy())
+    ):
+        msg = "an axis index does not name the cell chosen"
+        raise ValueError(msg)
+    return indices.select("site", "lat_index", "lon_index", "distance_km").sort("site")

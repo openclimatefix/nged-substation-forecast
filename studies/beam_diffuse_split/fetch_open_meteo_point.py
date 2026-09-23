@@ -317,7 +317,14 @@ def main() -> int:
     with_geometry = _solar_geometry(frame=frame, sites=sites)
     if model.native_radiation == "instantaneous":
         check_hourly_value_is_a_backward_mean(frame=with_geometry)
-    check_direct_is_not_a_separation_model(frame=with_geometry)
+    if model.split_scored:
+        check_direct_is_not_a_separation_model(frame=with_geometry)
+    else:
+        _LOG.info(
+            "%s's direct flux is not scored, so the separation-model check is left to "
+            "check_new_products.py to report",
+            model.source,
+        )
 
     output_path = point_output_path_for(source=model.source)
     output_path.parent.mkdir(parents=True, exist_ok=True)

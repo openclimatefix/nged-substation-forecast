@@ -14,6 +14,11 @@ which merges so that the measurement can be audited and re-run. What the project
 answer, which is why each page states its numbers, the checks the result survived, and the limits on
 how far it generalises.
 
+**Every study here uses only Flexpectation's own data, and its purpose is to inform Flexpectation's
+choices.** Each study scores its weather products or methods only at the generators in
+Flexpectation's trial area in Lincolnshire. No study here compares results across many regions or
+climates, so a result may not hold elsewhere.
+
 - [Does a weather product's beam/diffuse split help a PV forecast?](beam-diffuse-split.md) — on a 5
   km satellite retrieval the published direct-beam field cuts photovoltaic (PV) power error by 1.8%
   beyond what a separation model recovers from the total irradiance; on a 31 km reanalysis no effect

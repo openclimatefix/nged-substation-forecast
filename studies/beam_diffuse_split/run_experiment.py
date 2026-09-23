@@ -199,7 +199,9 @@ def features_for(*, arm: str) -> tuple[str, ...]:
     return (*SHARED_FEATURES, *ARM_FEATURES[arm])
 
 
-def run_all(*, dataset: pl.DataFrame, jobs: list[Job]) -> pl.DataFrame:
+def run_all(
+    *, dataset: pl.DataFrame, jobs: list[Job], max_workers: int = MAX_CONCURRENT_FITS
+) -> pl.DataFrame:
     """Run every (arm, site) job concurrently and concatenate the losses.
 
     XGBoost releases the interpreter lock while it trains, so threads give real parallelism here
@@ -208,13 +210,15 @@ def run_all(*, dataset: pl.DataFrame, jobs: list[Job]) -> pl.DataFrame:
     Args:
         dataset: The full frame, already carrying `fold`, `month`, `cap_mw` and `constrained`.
         jobs: The fits to run.
+        max_workers: How many (arm, site) fits run at once, each on `THREADS_PER_FIT` cores.
+            Lower it to share the machine with another run.
 
     Returns:
         Every job's losses, stacked, labelled with the arm, the setting and the target.
     """
     sites = sorted(dataset["site"].unique().to_list())
     outputs: list[pl.DataFrame] = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT_FITS) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = {}
         for arm, setting_name, target, features, hyper_parameters, with_quantiles in jobs:
             for site in sites:

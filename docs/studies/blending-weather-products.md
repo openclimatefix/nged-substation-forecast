@@ -1,5 +1,10 @@
 # Does blending weather products beat the best single weather product?
 
+> **This study uses only Flexpectation's own data, and its purpose is to inform Flexpectation's
+> choices.** The study scores each weather product and each blend only at the generators in
+> Flexpectation's trial area in Lincolnshire. The study does not compare results across many regions
+> or climates, so a result on this page may not hold elsewhere.
+
 **This study asks which weather data best describes the weather that has already happened. The study
 does not test weather forecasts.** Every product is scored on hours in the past, against what each
 generator actually produced in those hours. Several of the products are numerical weather prediction

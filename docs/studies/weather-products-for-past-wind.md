@@ -1,5 +1,10 @@
 # Which weather product best describes past wind?
 
+> **This study uses only Flexpectation's own data, and its purpose is to inform Flexpectation's
+> choices.** The study scores each weather product only at the wind farms in Flexpectation's trial
+> area in Lincolnshire. The study does not compare results across many regions or climates, so a
+> result on this page may not hold elsewhere.
+
 **At three wind farms in Lincolnshire, the German weather service's ICON-D2 and the Met Office's UK
 variable-resolution model (UKV) describe past wind best of the five products tested.** ICON-D2
 belongs to the German weather service's (DWD's) Icosahedral Nonhydrostatic (ICON) model family. For
@@ -36,9 +41,8 @@ products tests them directly, and the bottom panel of Figure 2 holds the four pl
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
 > AI model (for this page, Claude Opus 5.5, reusing the data-preparation and model-fitting code that
-> Claude Opus 5 wrote for the [beam/diffuse study](beam-diffuse-split.md)). A human has reviewed the
-> figures and the text, and several independent Claude reviewers have checked the method, the
-> evidence, and the prose adversarially.
+> Claude Opus 5 wrote for the [beam/diffuse study](beam-diffuse-split.md)). Several independent
+> Claude reviewers have checked the method, the evidence, and the prose adversarially.
 
 ## Key findings
 
@@ -69,6 +73,10 @@ from the freshest run of that weather model that Open-Meteo's archive holds for 
   steps fall, the difference between ICON global and ERA5 is not statistically significant at the 5%
   level. See [About half of ICON global's gap to ICON-EU is a pair of steps in its served
   wind](#about-half-of-icon-globals-gap-to-icon-eu-is-a-pair-of-steps-in-its-served-wind).
+- **In an exploratory comparison on January to September of each year, UKV's lead over ERA5 grew
+  from 0.46 points in 2025 to 0.75 points in 2026, a change of 0.30 points [0.04, 0.58] after
+  rounding, while ICON-EU's and ICON-D2's leads did not change by a margin statistically
+  significant at the 5% level.** See [ERA5's deficit, year by year](#era5s-deficit-year-by-year).
 
 ## Introduction
 
@@ -87,11 +95,12 @@ comparison has to state the height and the lead each product is scored at.** The
 many hours after a run started its archived value was forecast. A lead of zero, written T+0, is the
 run's analysis: the weather model's best estimate of the weather at the moment the run starts. CAMS,
 the Copernicus Atmosphere Monitoring Service's satellite retrieval, describes past sunshine best of
-the six products on the solar page but publishes no wind, so it is not compared here.
+the eight products on the solar page but publishes no wind, so it is not compared here.
+ICON-DREAM-EU, which the solar page scores, is not scored for wind on this page.
 
 | Product | What it is | Grid spacing, native and as served | Wind heights served | Served lead | Covers all of Great Britain? | Start of the hub-height wind archive read here | Available after |
 |---|---|---|---|---|---|---|---|
-| ERA5 | ECMWF reanalysis, a consistent record back to 1940 | about 31 km | 10 m and 100 m | an hourly analysis | yes | 1940 | about 5 days |
+| ERA5 | ECMWF reanalysis, a consistent record back to 1940 | about 31 km; served on a 0.25° grid | 10 m and 100 m | an hourly analysis | yes | 1940 | about 5 days |
 | UKV | Met Office model for the UK | 1.5 km over the UK, coarsening to 4 km at the domain's edges; served at 2 km | 100 m (Open-Meteo also serves 50 m and 80 m) | T+0, the analysis | yes | August 2024 | about 4 hours |
 | ICON-D2 | DWD model for Germany and neighbouring countries | 2.2 km; served at about 2 km | 80 m and 120 m | 0 to 2 hours | no: its western edge runs from about 2°W on the south coast to about 2.5°W in the Midlands | November 2022 | about 1.5 hours |
 | ICON-EU | DWD model for Europe, nested inside ICON global | 6.5 km; served at about 7 km | 80 m and 120 m | 0 to 2 hours | yes | November 2022 | about 3.5 hours |
@@ -356,6 +365,40 @@ spacing is the most obvious difference between the two, though this study does n
 one of those two generators ICON global is read from a land cell further away than its nearest cell,
 which may handicap ICON global there.
 
+### ERA5's deficit, year by year
+
+**In an exploratory comparison on January to September of each year, UKV's lead over ERA5 grew
+from 0.46 points in 2025 to 0.75 points in 2026, a change of 0.30 points [0.04, 0.58] after
+rounding, while ICON-EU's and ICON-D2's leads did not change by a margin statistically significant
+at the 5% level.** Each comparison below is exploratory, and each year's interval comes from
+resampling that year's months alone, restricted to January to September so a partial 2026 compares
+against the same months of the earlier years rather than against their full 12 months. Each year's
+interval rests on 9 months, so the intervals are likely too narrow.
+
+**UKV, ICON-EU, and ICON-D2 each beat ERA5 in both years.** UKV beat ERA5 by 0.46 points [0.22,
+0.64] in 2025 and by 0.75 points [0.59, 0.93] in 2026. The larger 2026 figure is in step with
+UKV's January 2026 upgrade, and lines up with the post-upgrade contrast in [UKV and ICON-D2
+describe past wind best](#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested),
+0.79 points [0.63, 0.97] since the upgrade against 0.53 points [0.29, 0.72] over the same months a
+year earlier. ICON-EU beat ERA5 by 0.49 points [0.33, 0.66] in 2025 and by 0.36 points [0.20,
+0.52] in 2026. ICON-D2 beat ERA5 by 0.77 points [0.60, 0.97] in 2025 and by 0.71 points [0.59,
+0.83] in 2026. Resampling each year's months independently of the other's, so the test covers the
+change itself rather than each year on its own, UKV's lead over ERA5 grew by 0.30 points [0.04,
+0.58] from 2025 to 2026; ICON-EU's changed by −0.12 points [−0.36, +0.10]; ICON-D2's by −0.06
+points [−0.29, +0.15]. Only UKV's change is statistically significant at the 5% level. August to
+December 2024 holds 5 months, too few for an interval even before the January-to-September
+restriction, and is left out.
+
+**ICON global's two years are not comparable with each other.** The pair of steps in ICON global's
+served wind at one generator, described in [About half of ICON global's gap to ICON-EU is a pair of
+steps in its served
+wind](#about-half-of-icon-globals-gap-to-icon-eu-is-a-pair-of-steps-in-its-served-wind), falls in
+early June 2025 and early June 2026, so each year holds part of the stepped period. In neither year
+is ICON global's difference from ERA5 statistically significant at the 5% level.
+
+![Figure 10: On January to September of each year, UKV's lead over ERA5 grew in 2026; ICON-EU's and
+ICON-D2's did not](assets/wind_era5_by_year.svg)
+
 ## What to use
 
 **These recommendations rest on three wind farms in one flat part of Lincolnshire, over 2 years.**
@@ -412,6 +455,7 @@ product?](blending-weather-products.md#wind-a-blend-beats-ukv-given-its-neighbou
 ```bash
 uv run python studies/beam_diffuse_split/fetch_wind_point.py
 uv run python studies/beam_diffuse_split/wind_products.py
+uv run python studies/beam_diffuse_split/wind_products.py --era5-by-year
 uv run python studies/beam_diffuse_split/wind_product_charts.py
 ```
 
@@ -422,3 +466,5 @@ the zero hours, the step ratios, and the distances between the farms and to ICON
 python studies/beam_diffuse_split/check_served_wind.py` writes `served_wind_checks.md` beside it:
 the grid-cell check, the 100 m rescaling, and when the ICON 80 m wind starts. The hour-to-hour jump
 diagnostics behind the served leads were one-off checks during review, and are not in either report.
+`wind_products.py --era5-by-year` reads the saved losses, fits nothing, and writes Figure 10's table
+to `data/studies/beam_diffuse_split/past_weather_v2/wind/era5_by_year.md`.
