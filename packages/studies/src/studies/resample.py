@@ -182,3 +182,128 @@ def clear_sky_index_resample(
     filled = hold_flat_outside_daylight(index=index, morning=morning)
     interpolated = interpolate_linear(values=filled, x=step_midpoints, targets=target_midpoints)
     return np.where(target_clear_sky > 0.0, interpolated * target_clear_sky, 0.0)
+
+
+def step_means(
+    *, hourly: np.ndarray, first_hour: int, step_leads: np.ndarray, step_widths: np.ndarray
+) -> np.ndarray:
+    """Average hourly period means over each forecast step.
+
+    Args:
+        hourly: Shape (n_series, n_hours), the mean over each hour, column `k` being the hour that
+            ends at lead `first_hour + k`.
+        first_hour: The lead at which the first column's hour ends.
+        step_leads: Shape (n_steps,), each step's end.
+        step_widths: Shape (n_steps,), each step's width in whole hours.
+
+    Returns:
+        Shape (n_series, n_steps), the mean over the hours ending after `lead - width` and at or
+        before `lead`.
+
+    Raises:
+        ValueError: If a step reaches outside the hours given.
+    """
+    starts = (step_leads - step_widths + 1 - first_hour).astype(int)
+    ends = (step_leads + 1 - first_hour).astype(int)
+    if starts.min() < 0 or ends.max() > hourly.shape[1]:
+        msg = "a step reaches outside the hours given"
+        raise ValueError(msg)
+    return np.stack(
+        [hourly[:, start:end].mean(axis=1) for start, end in zip(starts, ends, strict=True)],
+        axis=1,
+    )
+
+
+def rescale_to_step_means(
+    *,
+    values: np.ndarray,
+    target_leads: np.ndarray,
+    step_values: np.ndarray,
+    step_leads: np.ndarray,
+    step_widths: np.ndarray,
+) -> np.ndarray:
+    """Scale the hours inside each step so their mean equals the step's own mean.
+
+    A clear-sky-index resample is close to conserving each step's energy but not exact, because the
+    index is interpolated between steps. Scaling each step's hours by the step's mean over their
+    mean makes it exact. A step whose hours sum to zero is left at zero.
+
+    Args:
+        values: Shape (n_series, n_targets), hourly means, each hour ending at its target lead.
+        target_leads: Shape (n_targets,), each hour's end, whole hours.
+        step_values: Shape (n_series, n_steps), each step's mean over the step.
+        step_leads: Shape (n_steps,), each step's end.
+        step_widths: Shape (n_steps,), each step's width in whole hours.
+
+    Returns:
+        `values`, each step's hours scaled.
+
+    Raises:
+        ValueError: If a target hour falls in no step, or a step's hours are not all targets.
+    """
+    scaled = values.copy()
+    covered = np.zeros(len(target_leads), dtype=bool)
+    for index, (lead, width) in enumerate(zip(step_leads, step_widths, strict=True)):
+        inside = (target_leads > lead - width) & (target_leads <= lead)
+        if not inside.any():
+            continue
+        if inside.sum() != width:
+            msg = (
+                f"only {inside.sum()} of the {width} hours of the step ending at {lead} are targets"
+            )
+            raise ValueError(msg)
+        covered |= inside
+        hourly_mean = values[:, inside].mean(axis=1)
+        factor = np.where(
+            hourly_mean > 0.0,
+            step_values[:, index] / np.where(hourly_mean > 0.0, hourly_mean, 1.0),
+            1.0,
+        )
+        scaled[:, inside] = values[:, inside] * factor[:, None]
+    if not covered.all():
+        msg = "a target hour falls in no step"
+        raise ValueError(msg)
+    return scaled
+
+
+def coarsen_to_six_hourly(
+    *,
+    leads: np.ndarray,
+    values: dict[str, np.ndarray],
+    period_means: frozenset[str],
+    last_three_hourly_lead: int,
+) -> tuple[np.ndarray, dict[str, np.ndarray]]:
+    """Emulate a 6-hourly forecast from one published on 3-hour steps to a lead, 6-hour beyond.
+
+    The steps at multiples of 6 hours are kept. An instantaneous field keeps its value at the step.
+    A period-mean field on the 3-hour part of the grid takes the mean of its value and the one 3
+    hours before, which is the 6-hour mean exactly, and a step whose earlier half is not given is
+    dropped.
+
+    Args:
+        leads: Shape (n_steps,), each step's lead, ascending.
+        values: Each field's values, shape (n_series, n_steps).
+        period_means: The fields that are a mean over the step ending at the lead.
+        last_three_hourly_lead: The last lead on the 3-hour part of the grid.
+
+    Returns:
+        The kept leads and each field's values at them.
+    """
+    position = {int(lead): index for index, lead in enumerate(leads)}
+    kept = [
+        index
+        for index, lead in enumerate(leads)
+        if int(lead) % 6 == 0
+        and (int(lead) > last_three_hourly_lead or int(lead) - 3 in position or not period_means)
+    ]
+    coarse: dict[str, np.ndarray] = {}
+    for name, array in values.items():
+        columns = []
+        for index in kept:
+            lead = int(leads[index])
+            if name in period_means and lead <= last_three_hourly_lead:
+                columns.append((array[:, index] + array[:, position[lead - 3]]) / 2.0)
+            else:
+                columns.append(array[:, index])
+        coarse[name] = np.stack(columns, axis=1)
+    return leads[kept], coarse

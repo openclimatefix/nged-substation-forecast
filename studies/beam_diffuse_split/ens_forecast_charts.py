@@ -33,7 +33,6 @@ import polars as pl
 from ens_forecast_horizons import (
     BAND_DAYS,
     EMULATED_DAY,
-    METHODS,
     METRIC,
     OUTPUT_DIR,
     PERCENTAGE_POINTS,
@@ -96,9 +95,23 @@ METHOD_NAMES: Final[dict[str, str]] = {
     "native": "Native steps",
     "linear": "Linear",
     "clear_sky": "Clear-sky index",
+    "clear_sky_conserving": "Clear-sky index, step mean kept",
+    "linear_pchip": "Linear, shape-preserving temperature",
     "clear_sky_pchip": "Clear-sky index, shape-preserving temperature",
-    "components": "Wind components",
+    "clear_sky_conserving_pchip": "Clear-sky index, step mean kept, shape-preserving temperature",
+    "direction_components": "Direction from components",
+    "speed_components": "Speed from components",
+    "components": "Speed and direction from components",
 }
+"""Each upsampling combination's name on a chart, as `ens_forecast_horizons.COMBINATIONS` keys
+them."""
+
+EXAMPLE_METHODS: Final[dict[DomainType, tuple[str, ...]]] = {
+    "solar": ("native", "linear", "clear_sky", "clear_sky_conserving"),
+    "wind": ("native", "linear", "components"),
+}
+"""The combinations the example days draw: for solar each radiation technique, for wind the two
+ways of taking the 100 m speed."""
 
 SHAPES: Final[tuple[str, ...]] = ("circle", "diamond", "square", "triangle-up")
 DASHES: Final[tuple[tuple[int, ...], ...]] = ((1, 0), (6, 3), (2, 2), (8, 2, 2, 2))
@@ -718,70 +731,90 @@ def against_baselines(
     )
 
 
-def upsampling_contrasts(*, contrasts: pl.DataFrame, title: str) -> alt.VConcatChart:
-    """Draw the upsampling figure: each technique against the one before it and against linear.
+def upsampling_contrasts(
+    *, contrasts: pl.DataFrame, domain: DomainType, number: int, title: str
+) -> alt.VConcatChart:
+    """Draw one technology's upsampling contrasts: each candidate against its comparator and linear.
+
+    The candidates and the combination each was judged against are read from the report's
+    upsampling section, so the figure shows whatever the choosing rule tried.
 
     Args:
         contrasts: Every interval.
+        domain: `solar` or `wind`.
+        number: The figure's number.
         title: The figure's title.
 
     Returns:
-        The figure.
+        The figure, one panel per candidate.
     """
+    rows = contrasts.filter((pl.col("domain") == domain) & (pl.col("section") == "upsampling"))
+    candidates = dict.fromkeys(
+        treatment.split("_day")[0].removeprefix("up_") for treatment in rows["treatment"].to_list()
+    )
     panels = []
-    for domain in DOMAINS:
-        methods = METHODS[domain]
+    for candidate in candidates:
+        compared = rows.filter(
+            pl.col("treatment") == upsampling_arm(method=candidate, day=BAND_DAYS[0])
+        )["reference"].to_list()
+        references = [reference.split("_day")[0].removeprefix("up_") for reference in compared]
         pairs = [
             (
-                f"{METHOD_NAMES[method]} minus {METHOD_NAMES[methods[index - 1]].lower()}",
+                f"Against {METHOD_NAMES[reference].lower()}",
                 [
                     (
-                        upsampling_arm(method=method, day=d),
-                        upsampling_arm(method=methods[index - 1], day=d),
+                        upsampling_arm(method=candidate, day=d),
+                        upsampling_arm(method=reference, day=d),
                     )
                     for d in BAND_DAYS
                 ],
             )
-            for index, method in enumerate(methods[1:], start=1)
-        ]
-        pairs += [
-            (
-                f"{METHOD_NAMES[method]} minus linear",
-                [
-                    (upsampling_arm(method=method, day=d), upsampling_arm(method="linear", day=d))
-                    for d in BAND_DAYS
-                ],
-            )
-            for method in methods[2:]
+            for reference in references
         ]
         triples = [(domain, t, r) for _, per_day in pairs for t, r in per_day]
         panels.append(
-            _contrast_panel(
-                contrasts=contrasts,
-                domain=domain,
-                pairs=pairs,
-                days=BAND_DAYS,
+            interval_panel(
+                rows=pl.DataFrame(
+                    [
+                        {
+                            "label": _band_label(day),
+                            "family": "weather model",
+                            "condition": condition,
+                            **_pick(
+                                contrasts=contrasts,
+                                domain=domain,
+                                treatment=treatment,
+                                reference=reference,
+                            ),
+                        }
+                        for condition, per_day in pairs
+                        for day, (treatment, reference) in zip(BAND_DAYS, per_day, strict=True)
+                    ]
+                ),
                 x_domain=_x_domain(contrasts=contrasts, pairs=triples),
+                x_title=X_TITLE,
                 zero_label="no difference",
-                better_label="first named better",
-                condition_title="Contrast",
-                keys=True,
+                better_label=f"{METHOD_NAMES[candidate].lower()} better",
+                conditions=[condition for condition, _ in pairs],
+                condition_title="Compared with",
+                panel_title=METHOD_NAMES[candidate],
+                family_key=False,
+                figure_planning="exploratory",
             )
         )
     return figure(
         panels=panels,
-        number=6,
+        number=number,
         title=title,
         subtitle=[
             (
                 "Mean absolute error of an XGBoost model given the ensemble mean upsampled one "
-                "way, "
-                "minus the same model given it upsampled another way, on the same generator-hours. "
-                "Days 0 to 5 sit on ENS's 3-hour steps, days 7 to 14 on its 6-hour steps. All "
-                "marks are exploratory."
+                "way, minus the same model given it upsampled another way, on the same "
+                "generator-hours. Days 0 to 5 sit on ENS's 3-hour steps, days 7 to 14 on its "
+                "6-hour steps. All marks are exploratory."
             ),
             f"{DOTS} {CAPACITY}",
-            f"{SCOPES['solar']} {SCOPES['wind']}",
+            SCOPES[domain],
         ],
         figure_planning=None,
     )
@@ -859,7 +892,7 @@ def _day_panels(
         & (pl.col("day") == day)
         & pl.col("time").is_between(start, end, closed="right" if domain == "solar" else "left")
     ).with_columns(hour=(pl.col("time") - start).dt.total_minutes() / 60.0)
-    methods = ["native", *METHODS[domain]]
+    methods = list(EXAMPLE_METHODS[domain])
     names = [METHOD_NAMES[m] for m in methods]
     colours = [ocf.BLACK_1, ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_SKY][: len(methods)]
     series = rows.filter(pl.col("method").is_in(methods)).select(
@@ -940,7 +973,7 @@ def example_days(
     for domain in DOMAINS:
         site, date = _example_day(inputs=inputs[domain], domain=domain)
         months[domain] = f"{date:%B %Y}"
-        methods = ["native", *METHODS[domain]]
+        methods = list(EXAMPLE_METHODS[domain])
         colours = [ocf.BLACK_1, ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_SKY][: len(methods)]
         key = _line_key(labels=[METHOD_NAMES[m] for m in methods], colours=colours)
         pair = alt.hconcat(
@@ -975,8 +1008,7 @@ def example_days(
                 (
                     "Days chosen by rule from measured output alone: for solar the April-to-"
                     "September day with the largest mean hour-to-hour change, for wind the day "
-                    "with "
-                    "the largest range. Generator not named."
+                    "with the largest range. Generator not named."
                 ),
                 CAPACITY,
             ],
@@ -1293,8 +1325,11 @@ def main() -> int:
             contrasts=contrasts, best=best, title=TITLES["baselines"]
         ),
         "ens_upsampling_days": days_chart,
-        "ens_upsampling_contrasts": upsampling_contrasts(
-            contrasts=contrasts, title=TITLES["upsampling"]
+        "ens_upsampling_solar": upsampling_contrasts(
+            contrasts=contrasts, domain="solar", number=6, title=TITLES["upsampling_solar"]
+        ),
+        "ens_upsampling_wind": upsampling_contrasts(
+            contrasts=contrasts, domain="wind", number=7, title=TITLES["upsampling_wind"]
         ),
         "ens_horizons_solar_week": solar_week,
         "ens_horizons_wind_week": wind_week,
@@ -1317,7 +1352,8 @@ TITLES: Final[dict[str, str]] = {
     "ways": "PLACEHOLDER",
     "baselines": "PLACEHOLDER",
     "example_days": "PLACEHOLDER",
-    "upsampling": "PLACEHOLDER",
+    "upsampling_solar": "PLACEHOLDER",
+    "upsampling_wind": "PLACEHOLDER",
     "solar_week": "PLACEHOLDER",
     "wind_week": "PLACEHOLDER",
     "per_generator": "PLACEHOLDER",

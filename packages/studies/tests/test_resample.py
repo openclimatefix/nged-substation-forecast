@@ -1,9 +1,14 @@
 import numpy as np
+import pytest
 from studies.resample import (
+    DEFAULT_DAYLIGHT_FLOOR_W_M2,
     clear_sky_index_resample,
+    coarsen_to_six_hourly,
     hold_flat_outside_daylight,
     interpolate_linear,
     interpolate_pchip,
+    rescale_to_step_means,
+    step_means,
     wind_components,
     wind_polar,
 )
@@ -180,3 +185,120 @@ def test_a_dark_target_hour_gets_zero_and_a_row_without_daylight_gets_nan():
     assert result[0, 1] == 50.0
     assert result[1, 0] == 0.0
     assert np.isnan(result[1, 1])
+
+
+def test_pchip_curves_between_steps_where_linear_would_not():
+    # On a quadratic, the chord between two steps sits above the curve; a shape-preserving cubic
+    # follows the curve, so its value halfway between two steps differs from the chord's.
+    x = np.array([0.0, 1.0, 2.0, 3.0, 4.0])
+    values = (x**2)[None, :]
+    halfway = np.array([2.5])
+
+    curved = interpolate_pchip(values=values, x=x, targets=halfway)
+    chord = interpolate_linear(values=values, x=x, targets=halfway)
+
+    assert curved[0, 0] < chord[0, 0] - 0.05
+
+
+def test_a_step_exactly_at_the_daylight_floor_anchors_an_index():
+    _, steps, step_midpoints, _ = _clear_sky_day()
+    clear = np.full_like(steps, DEFAULT_DAYLIGHT_FLOOR_W_M2)
+    below = clear - 1e-6
+    values = 0.3 * clear
+
+    at_floor = clear_sky_index_resample(
+        values=values[None, :],
+        step_clear_sky=clear[None, :],
+        step_midpoints=step_midpoints,
+        morning=step_midpoints < 12.0,
+        target_clear_sky=np.array([[100.0]]),
+        target_midpoints=np.array([12.0]),
+    )
+    under_floor = clear_sky_index_resample(
+        values=values[None, :],
+        step_clear_sky=below[None, :],
+        step_midpoints=step_midpoints,
+        morning=step_midpoints < 12.0,
+        target_clear_sky=np.array([[100.0]]),
+        target_midpoints=np.array([12.0]),
+    )
+
+    np.testing.assert_allclose(at_floor, [[30.0]])
+    assert np.isnan(under_floor[0, 0])
+
+
+def test_step_means_average_the_hours_ending_inside_each_step():
+    hourly = np.arange(12, dtype=float)[None, :]
+
+    means = step_means(
+        hourly=hourly,
+        first_hour=1,
+        step_leads=np.array([3.0, 6.0, 12.0]),
+        step_widths=np.array([3, 3, 6]),
+    )
+
+    np.testing.assert_allclose(means, [[1.0, 4.0, 8.5]])
+
+
+def test_step_means_refuse_a_step_outside_the_hours_given():
+    with pytest.raises(ValueError, match="outside"):
+        step_means(
+            hourly=np.ones((1, 3)),
+            first_hour=1,
+            step_leads=np.array([6.0]),
+            step_widths=np.array([6]),
+        )
+
+
+def test_rescaling_makes_each_steps_hours_average_to_the_step():
+    values = np.array([[1.0, 2.0, 3.0, 0.0, 0.0, 0.0]])
+    target_leads = np.arange(1, 7, dtype=float)
+
+    scaled = rescale_to_step_means(
+        values=values,
+        target_leads=target_leads,
+        step_values=np.array([[4.0, 5.0]]),
+        step_leads=np.array([3.0, 6.0]),
+        step_widths=np.array([3, 3]),
+    )
+
+    np.testing.assert_allclose(scaled, [[2.0, 4.0, 6.0, 0.0, 0.0, 0.0]])
+
+
+def test_rescaling_refuses_a_step_only_partly_among_the_targets():
+    with pytest.raises(ValueError, match="hours of the step"):
+        rescale_to_step_means(
+            values=np.ones((1, 2)),
+            target_leads=np.array([5.0, 6.0]),
+            step_values=np.ones((1, 1)),
+            step_leads=np.array([6.0]),
+            step_widths=np.array([3]),
+        )
+
+
+def test_coarsening_averages_a_period_mean_and_samples_an_instant():
+    leads = np.array([3.0, 6.0, 9.0, 12.0, 150.0])
+    radiation = np.array([[10.0, 20.0, 30.0, 50.0, 70.0]])
+    temperature = np.array([[1.0, 2.0, 3.0, 4.0, 5.0]])
+
+    kept, coarse = coarsen_to_six_hourly(
+        leads=leads,
+        values={"ghi": radiation, "temp": temperature},
+        period_means=frozenset({"ghi"}),
+        last_three_hourly_lead=144,
+    )
+
+    np.testing.assert_allclose(kept, [6.0, 12.0, 150.0])
+    np.testing.assert_allclose(coarse["ghi"], [[15.0, 40.0, 70.0]])
+    np.testing.assert_allclose(coarse["temp"], [[2.0, 4.0, 5.0]])
+
+
+def test_coarsening_drops_a_step_whose_earlier_half_is_missing():
+    kept, _ = coarsen_to_six_hourly(
+        leads=np.array([6.0, 9.0, 12.0]),
+        values={"ghi": np.ones((1, 3))},
+        period_means=frozenset({"ghi"}),
+        last_three_hourly_lead=144,
+    )
+
+    np.testing.assert_allclose(kept, [12.0])

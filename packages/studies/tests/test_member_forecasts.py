@@ -2,13 +2,16 @@ from datetime import UTC, datetime, timedelta
 
 import numpy as np
 import polars as pl
+import pytest
 from studies.cross_validation import (
     N_FOLDS,
     SEEDS,
     HyperParameters,
+    out_of_fold_forecasts_for_members,
     out_of_fold_losses,
     out_of_fold_member_forecasts,
     score_prediction,
+    summarise_member_forecasts,
 )
 
 QUICK: HyperParameters = {
@@ -152,3 +155,67 @@ def test_identical_members_give_the_forecast_one_row_per_hour_gives():
     np.testing.assert_allclose(
         joined["forecasts"].list.first().to_numpy(), joined["alone"].to_numpy(), atol=1e-4
     )
+
+
+def test_a_time_with_a_missing_member_is_refused():
+    rows = _stacked(scored_fold_target=0.0)
+    short = rows.filter(~((pl.col("time") == rows["time"][0]) & (pl.col("member") == 0)))
+
+    with pytest.raises(ValueError, match="same number of members"):
+        out_of_fold_member_forecasts(
+            site_rows=short, features=["weather"], target="power_mw", hyper_parameters=QUICK
+        )
+
+
+def test_the_summary_takes_the_mean_and_the_median_of_the_members():
+    forecasts = pl.DataFrame(
+        {
+            "site": ["A"],
+            "time": [datetime(2025, 6, 1, tzinfo=UTC)],
+            "seed": [0],
+            "forecasts": [[0.0, 1.0, 2.0, 3.0, 14.0]],
+        }
+    )
+
+    summary = summarise_member_forecasts(forecasts=forecasts).row(0, named=True)
+
+    assert summary["mean"] == 4.0
+    assert summary["median"] == 2.0
+    assert summary["members"] == 5
+    assert summary["p10"] <= 1.0 < summary["p90"]
+
+
+def test_a_model_trained_on_one_input_forecasts_every_member_and_never_its_scored_months():
+    rows = _stacked(scored_fold_target=100.0)
+    single = rows.filter(pl.col("member") == 0)
+
+    forecasts = out_of_fold_forecasts_for_members(
+        site_rows=single,
+        member_rows=rows,
+        features=["weather"],
+        target="power_mw",
+        hyper_parameters=QUICK,
+    )
+
+    assert set(forecasts["forecasts"].list.len().to_list()) == {MEMBERS}
+    assert forecasts.height == N_FOLDS * 40 * len(SEEDS)
+    last = forecasts.filter(pl.col("time") >= datetime(2025, N_FOLDS, 1, tzinfo=UTC))
+    assert last.select(pl.col("forecasts").list.max().max()).item() < 1.0
+
+
+def test_a_model_trained_on_one_input_leaves_out_curtailed_hours():
+    rows = _stacked(scored_fold_target=0.0).with_columns(
+        constrained=pl.col("time").dt.hour() == 0,
+        power_mw=pl.when(pl.col("time").dt.hour() == 0).then(1000.0).otherwise(0.0),
+    )
+    single = rows.filter(pl.col("member") == 0)
+
+    forecasts = out_of_fold_forecasts_for_members(
+        site_rows=single,
+        member_rows=rows,
+        features=["weather"],
+        target="power_mw",
+        hyper_parameters=QUICK,
+    )
+
+    assert forecasts.select(pl.col("forecasts").list.max().max()).item() < 1.0

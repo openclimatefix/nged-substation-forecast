@@ -415,6 +415,84 @@ def out_of_fold_member_forecasts(
     )
 
 
+def out_of_fold_forecasts_for_members(
+    *,
+    site_rows: pl.DataFrame,
+    member_rows: pl.DataFrame,
+    features: Sequence[str],
+    target: str,
+    hyper_parameters: HyperParameters,
+) -> pl.DataFrame:
+    """Fit on one input at one site, out of fold, and apply each fold's model to every member.
+
+    The model is trained on `site_rows`, one row per time, such as the ensemble mean, and each
+    fold's model forecasts every member's row at the fold's times. The input a model is scored on
+    therefore differs from the one it was trained on.
+
+    Args:
+        site_rows: One site's training input, one row per time, carrying `time`, `fold`,
+            `constrained`, the features and the target.
+        member_rows: The same site's rows, one per (time, member), carrying `time`, `member`,
+            `fold`, and the same feature columns.
+        features: The feature columns.
+        target: The column to predict.
+        hyper_parameters: The setting to fit at.
+
+    Returns:
+        One row per (site, time, seed), with `forecasts`, the members' uncapped forecasts in
+        member order.
+    """
+    outputs = []
+    for fold in range(N_FOLDS):
+        train = site_rows.filter((pl.col("fold") != fold) & ~pl.col("constrained"))
+        test = member_rows.filter(pl.col("fold") == fold).sort("time", "member")
+        if train.is_empty() or test.is_empty():
+            continue
+        for seed in SEEDS:
+            point, _ = fit_one_fold(
+                train=train,
+                test=test,
+                features=list(features),
+                target=target,
+                hyper_parameters=hyper_parameters,
+                seed=seed,
+                with_quantiles=False,
+            )
+            outputs.append(
+                test.select("site", "time")
+                .with_columns(
+                    seed=pl.lit(seed, dtype=pl.Int32), forecast=pl.Series(point, dtype=pl.Float64)
+                )
+                .group_by("site", "time", "seed", maintain_order=True)
+                .agg(forecasts=pl.col("forecast"))
+            )
+    return pl.concat(outputs)
+
+
+def summarise_member_forecasts(*, forecasts: pl.DataFrame) -> pl.DataFrame:
+    """Reduce each row's member forecasts to their mean, median, spread, and 10th and 90th centiles.
+
+    Args:
+        forecasts: One row per (site, time, seed), with `forecasts`, a list of member forecasts.
+
+    Returns:
+        One row per (site, time, seed), with `mean`, `median`, `spread` (the standard deviation),
+        `p10`, `p90`, and `members`, the list's length.
+    """
+    members = pl.col("forecasts")
+    return forecasts.select(
+        "site",
+        "time",
+        "seed",
+        mean=members.list.mean(),
+        median=members.list.median(),
+        spread=members.list.std(),
+        p10=members.list.eval(pl.element().quantile(0.1)).list.first(),
+        p90=members.list.eval(pl.element().quantile(0.9)).list.first(),
+        members=members.list.len(),
+    )
+
+
 def score_prediction(*, rows: pl.DataFrame, prediction: pl.DataFrame, target: str) -> pl.DataFrame:
     """Score a prediction per (site, time, seed) as `out_of_fold_losses` scores its own.
 

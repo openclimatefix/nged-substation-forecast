@@ -144,6 +144,7 @@ def main() -> int:
 
     Raises:
         FileNotFoundError: If the ENS table is not on disk.
+        ValueError: If a generator's H3 cell has no rows in the table.
     """
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     if not NWP_TABLE.exists():
@@ -163,6 +164,10 @@ def main() -> int:
         .drop("h3_index")
         .sort("site", "init_time", "valid_time", "ensemble_member")
     )
+    missing = set(sites["site"].to_list()) - set(rows["site"].unique().to_list())
+    if missing:
+        msg = f"no ENS rows for generators {sorted(missing)}: their H3 cells are not in the table"
+        raise ValueError(msg)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     rows.write_parquet(OUTPUT_PATH)
     _LOG.info(

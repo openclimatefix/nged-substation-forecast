@@ -6,6 +6,11 @@ telemetry is taken as available up to the issue time, with no delivery delay, wh
 for a persistence baseline. It is NGED's hourly power as published, with no cleaning: the hours a
 live service would have seen.
 
+**A forecast for the run's own day is cut off at the run's 00 UTC init time, not at 09:00.** An
+issue at 09:00 on the target day would hand the baseline the target's own morning hours, which the
+weather run it is compared with never saw; the run's init time is that run's own information
+cut-off.
+
 **An hour counts as observed at the issue time only once it has ended.** A solar hour is labelled by
 its end, so the last observed solar hour is the one ending at the issue time. A wind hour is centred
 on its label, so the last observed wind hour at 09:00 is the one labelled 08:00, covering 07:30 to
@@ -75,12 +80,14 @@ def issue_time(*, day_start: pl.Expr, day: int) -> pl.Expr:
 
     Args:
         day_start: Midnight UTC at the start of the target day.
-        day: The band's day.
+        day: The band's day: how many days after the run's own day the target day falls.
 
     Returns:
-        09:00 UTC on the run's own day.
+        09:00 UTC on the run's own day, or for the run's own day itself, the run's 00 UTC init
+        time.
     """
-    return day_start - pl.duration(days=day) + pl.lit(ISSUE_DELAY)
+    delay = ISSUE_DELAY if day > 0 else timedelta(0)
+    return day_start - pl.duration(days=day) + pl.lit(delay)
 
 
 def persistence(*, keys: pl.DataFrame, hourly: pl.DataFrame, observed_lag: timedelta) -> pl.Series:
@@ -249,6 +256,32 @@ def hourly_grid(*, hourly: pl.DataFrame) -> pl.DataFrame:
     return grid.join(hourly.select("site", "time", "power_mw"), on=["site", "time"], how="left")
 
 
+def _climatology_from(*, train: pl.DataFrame, rows: pl.DataFrame) -> pl.Series:
+    """Return each of `rows`' median training power at its generator, calendar month, and hour.
+
+    Args:
+        train: The training rows, with `site`, `time`, `constrained`, and `power_mw`.
+        rows: The rows to forecast, with `site` and `time`.
+
+    Returns:
+        The median, one per row of `rows` in its order: the month-and-hour median, or where the
+        training rows hold no such month and hour, the generator's median at that hour.
+    """
+    keys = {"calendar_month": pl.col("time").dt.month(), "hour": pl.col("time").dt.hour()}
+    kept = train.filter(~pl.col("constrained")).with_columns(**keys)
+    by_month = kept.group_by("site", "calendar_month", "hour").agg(
+        month_median=pl.col("power_mw").median()
+    )
+    by_hour = kept.group_by("site", "hour").agg(hour_median=pl.col("power_mw").median())
+    return (
+        rows.select("site", "time")
+        .with_columns(**keys)
+        .join(by_month, on=["site", "calendar_month", "hour"], how="left", maintain_order="left")
+        .join(by_hour, on=["site", "hour"], how="left", maintain_order="left")
+        .select(climatology=pl.coalesce("month_median", "hour_median"))["climatology"]
+    )
+
+
 def climatology(*, frame: pl.DataFrame) -> pl.Series:
     """Return each row's out-of-fold median power for its generator, calendar month, and hour.
 
@@ -258,33 +291,30 @@ def climatology(*, frame: pl.DataFrame) -> pl.Series:
     Returns:
         The median, one per row in `frame`'s order.
     """
-    keyed = frame.with_row_index("row").with_columns(
-        calendar_month=pl.col("time").dt.month(), hour=pl.col("time").dt.hour()
-    )
+    keyed = frame.with_row_index("row")
     parts = []
     for fold in range(N_FOLDS):
-        train = keyed.filter((pl.col("fold") != fold) & ~pl.col("constrained"))
         test = keyed.filter(pl.col("fold") == fold)
-        by_month = train.group_by("site", "calendar_month", "hour").agg(
-            month_median=pl.col("power_mw").median()
-        )
-        by_hour = train.group_by("site", "hour").agg(hour_median=pl.col("power_mw").median())
         parts.append(
-            test.join(by_month, on=["site", "calendar_month", "hour"], how="left")
-            .join(by_hour, on=["site", "hour"], how="left")
-            .select("row", climatology=pl.coalesce("month_median", "hour_median"))
+            test.select("row").with_columns(
+                climatology=_climatology_from(train=keyed.filter(pl.col("fold") != fold), rows=test)
+            )
         )
     return pl.concat(parts).sort("row")["climatology"]
 
 
-def shrunk_persistence(*, frame: pl.DataFrame, persisted: str, climatological: str) -> pl.DataFrame:
+def shrunk_persistence(*, frame: pl.DataFrame, persisted: str) -> pl.DataFrame:
     """Blend persistence with climatology, the weight fitted per generator on the training folds.
 
+    For each fold, climatology is taken from the other folds alone, and that one climatology is
+    both what the weight is fitted against on the training folds and what the scored fold is
+    forecast with, so nothing from the scored fold reaches the weight. Curtailed hours are left out
+    of the fit.
+
     Args:
-        frame: The scored rows, with `site`, `fold`, `constrained`, `power_mw`, and the two
-            forecasts named below.
+        frame: The scored rows, with `site`, `time`, `fold`, `constrained`, `power_mw`, and the
+            persistence forecast named below.
         persisted: The persistence forecast's column.
-        climatological: The climatology forecast's column.
 
     Returns:
         One row per row of `frame`, in its order, with the blended forecast `shrunk` and the
@@ -297,19 +327,23 @@ def shrunk_persistence(*, frame: pl.DataFrame, persisted: str, climatological: s
         for fold in range(N_FOLDS):
             train = rows.filter((pl.col("fold") != fold) & ~pl.col("constrained"))
             test = rows.filter(pl.col("fold") == fold)
-            if test.is_empty():
+            if test.is_empty() or train.is_empty():
                 continue
-            actual = train["power_mw"].to_numpy()[:, None]
+            train_climate = _climatology_from(train=train, rows=train).to_numpy()
             blended = (
                 weights[None, :] * train[persisted].to_numpy()[:, None]
-                + (1.0 - weights[None, :]) * train[climatological].to_numpy()[:, None]
+                + (1.0 - weights[None, :]) * train_climate[:, None]
             )
-            weight = float(weights[np.abs(blended - actual).mean(axis=0).argmin()])
+            errors = np.abs(blended - train["power_mw"].to_numpy()[:, None]).mean(axis=0)
+            weight = float(weights[errors.argmin()])
+            test_climate = _climatology_from(train=train, rows=test)
             parts.append(
-                test.select(
-                    "row",
-                    shrunk=weight * pl.col(persisted) + (1.0 - weight) * pl.col(climatological),
+                test.select("row")
+                .with_columns(climate=test_climate)
+                .with_columns(
+                    shrunk=weight * test[persisted] + (1.0 - weight) * pl.col("climate"),
                     weight=pl.lit(weight),
                 )
+                .drop("climate")
             )
     return pl.concat(parts).sort("row").drop("row")

@@ -47,6 +47,7 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
 - `grid_sampling` — the nearest grid cell's value at each site, on a projected grid.
 - `baselines` — power forecasts that read no weather forecast: persistence, diurnal persistence,
   clear-sky-index persistence, persistence shrunk towards climatology, and out-of-fold climatology.
+- `ensemble` — the check that an hour's members all come from one run, before they are averaged.
 - `resample` — upsampling a forecast's 3- or 6-hourly steps to hourly values: linearly, with a
   shape-preserving cubic, as wind components, and, for a period-mean radiation field, through the
   clear-sky index.
