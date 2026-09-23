@@ -13,17 +13,20 @@ The fitted physical PV model's effects against global irradiance are an order of
 than XGBoost's and would flatten them to nothing on a shared scale, so **each panel carries its own
 x scale**.
 
-Every difference is in percentage points of capacity, where capacity is each site's 99th
-percentile of metered output, and every row label carries the pooled mean absolute error of the two
+Every difference is in percentage points of P99 output, each site's 99th percentile of metered
+output, and every row label carries the pooled mean absolute error of the two
 setups it compares, so a reader can see the error level a difference sits on.
 
 Sites are pooled here and no identifier reaches the chart, because a metered generator's output is
 commercially sensitive and this repo is public.
 
 The script only reads the saved per-site summaries and bootstrap intervals, and writes the SVG
-straight into the docs assets. Run it with `uv run python studies/beam_diffuse_split/make_chart.py
---results-root <dir> --suffix <suffix>`, where the results directories are named
-`beam_diffuse_results_<source><suffix>` and `beam_diffuse_physics_<source><suffix>` under `<dir>`.
+straight into the docs assets. Run it with `uv run python studies/beam_diffuse_split/make_chart.py`
+after a fresh run of the experiment. The results the write-up quotes are filed under `superseded/`
+with the suffix `_piecewise`, and `--subdirectory superseded --suffix _piecewise` draws from those:
+the results directories are named `beam_diffuse_results_<source><suffix>` and
+`beam_diffuse_physics_<source><suffix>`, under the study's data directory or the subdirectory of it
+named.
 Optimise the SVG with `npx svgo@4 --multipass --precision=1 --final-newline` before committing it.
 """
 
@@ -152,15 +155,15 @@ PANELS: Final[tuple[PanelSpec, ...]] = (
 )
 """The panels, top to bottom."""
 
-X_TITLE: Final[str] = "Change in mean absolute error (points of capacity, smaller is better)"
+X_TITLE: Final[str] = "Change in mean absolute error (points of P99 output, smaller is better)"
 """The axis title every panel shares; `interval_panel` adds which sign is better."""
 
 SUBTITLE: Final[tuple[str, ...]] = (
     "Six PV sites in one 25 km by 23 km box in Lincolnshire, hourly daylight rows, 2019 to 2026.",
     (
         "Each row is one setup's mean absolute error minus another's, pooled over the six sites, "
-        "in percentage points of capacity: each site's 99th percentile of output. Each label gives "
-        "both setups' own errors."
+        "in percentage points of P99 output: each site's 99th percentile of output. Each label "
+        "gives both setups' own errors. Every XGBoost row uses the main XGBoost settings."
     ),
     (
         "Dot: estimate. Line: 95% interval from resampling whole months. "
@@ -216,7 +219,7 @@ def _raise_on_unlabelled_sources(*, root: Path, suffix: str) -> None:
 
 
 def _arm_errors(*, results_dir: Path) -> dict[str, float]:
-    """Return each setup's pooled mean absolute error, in percent of capacity.
+    """Return each setup's pooled mean absolute error, in percent of P99 output.
 
     Weighted by row count, on the same capped metric and the same weighting as the contrast table
     in `report_results.py`, so the error a label gives and the error the page prints agree.
@@ -247,7 +250,7 @@ def _panel_rows(*, spec: PanelSpec, root: Path, suffix: str) -> pl.DataFrame:
         suffix: The suffix the drawn results directories carry.
 
     Returns:
-        One row per drawn difference, in points of capacity, with the columns `interval_panel`
+        One row per drawn difference, in points of P99 output, with the columns `interval_panel`
         reads.
 
     Raises:
@@ -289,19 +292,17 @@ def main() -> int:
     """Write Figure 1 as an SVG into the docs assets."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "--results-root",
-        type=Path,
-        default=STUDY_DATA_DIR,
-        help="The directory holding the beam_diffuse_results_* and beam_diffuse_physics_* runs.",
+        "--subdirectory",
+        default="",
+        help="The subdirectory of the study's data directory holding the runs to draw.",
     )
     parser.add_argument(
         "--suffix", default="", help="The suffix the drawn results directories carry."
     )
     args = parser.parse_args()
-    _raise_on_unlabelled_sources(root=args.results_root, suffix=args.suffix)
-    panel_rows = [
-        _panel_rows(spec=spec, root=args.results_root, suffix=args.suffix) for spec in PANELS
-    ]
+    root = STUDY_DATA_DIR / args.subdirectory
+    _raise_on_unlabelled_sources(root=root, suffix=args.suffix)
+    panel_rows = [_panel_rows(spec=spec, root=root, suffix=args.suffix) for spec in PANELS]
     figure_planning = planning(rows=panel_rows)
     panels = [
         interval_panel(

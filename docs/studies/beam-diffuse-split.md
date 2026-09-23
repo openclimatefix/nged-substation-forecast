@@ -11,9 +11,12 @@ an XGBoost model given the published beam and diffuse irradiance has an error 0.
 from the total irradiance. The reduction is 1.8% of the 5.33% error left by the XGBoost model given
 the Erbs split. On ERA5, the European Centre for Medium-Range Weather Forecasts' (ECMWF's)
 reanalysis, the same difference is +0.005 points [−0.015, +0.026], which is not statistically
-significant at the 5% level. The ERA5 null also does not survive a second hyperparameter setting.
-The evidence is 6 solar farms inside one 25 km by 23 km box, 7 years of hourly daylight readings, 2
-irradiance products, and 2 families of PV power model.
+significant at the 5% level. When XGBoost is refitted at shallower settings, run as a check on the
+main ones, the Erbs split does better than ERA5's own split, by 0.027 points [0.007, 0.047], which
+is statistically significant at the 5% level. ERA5's result is therefore best read as no benefit
+detected, not as proof that the published beam carries nothing. The evidence is 6 solar farms inside
+one 25 km by 23 km box, 7 years of hourly daylight readings, 2 irradiance products, and 2 families
+of PV power model.
 
 **Choosing the better irradiance product matters about 34 times as much as having the split at
 all.** On the hours both products cover, moving from ERA5 to CAMS cuts XGBoost's error by 4.29
@@ -24,11 +27,11 @@ irradiance product.
 ![Figure 1: On CAMS the published beam lowers XGBoost's error beyond the Erbs split; on ERA5 it does
 not](assets/beam_diffuse_split_result.svg)
 
-In Figure 1 each row is the error of one setup, meaning one PV power model given one set of
-irradiance columns, minus the error of another setup, in points. Each label gives both setups' own
-errors. The top panel holds the comparison the experiment exists for, with XGBoost. The second panel
-holds the same comparison for the fitted physical PV model, which disagrees. The bottom two panels
-compare each split against global irradiance alone. Each panel has its own x scale.
+In Figure 1 each row is the error of one PV power model given one set of irradiance columns, minus
+the error of the same PV power model given another set, in points. Each label gives both errors. The
+top panel holds the comparison the experiment exists for, with XGBoost. The second panel holds the
+same comparison for the fitted physical PV model, which disagrees. The bottom two panels compare
+each split against global irradiance alone. Each panel has its own x scale.
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
@@ -42,8 +45,8 @@ compare each split against global irradiance alone. Each panel has its own x sca
   5.24% of P99 output pooled across the six sites, and is the best of the four pairings of
   irradiance product and PV power model at every site.
 - **[On CAMS the published beam beats the Erbs split by 0.096 points, statistically significant at
-  the 5% level. On ERA5 no effect is detected at the primary hyperparameter
-  setting](#the-published-beam-field-helps-on-the-satellite-retrieval-not-on-the-reanalysis).**
+  the 5% level. On ERA5 no effect is detected at the main XGBoost
+  settings](#the-published-beam-field-helps-on-the-satellite-retrieval-not-on-the-reanalysis).**
 - **[Adding beam and diffuse columns derived by a formula, which carry no new information, still
   improves XGBoost by 0.029 points, and the headline is measured against an XGBoost model that
   already has that
@@ -52,11 +55,12 @@ compare each split against global irradiance alone. Each panel has its own x sca
   formula](#the-gain-is-information-the-published-beam-carries-not-a-better-separation-formula)**: a
   formula fitted on this data reproduces the published beam more than twice as faithfully as Erbs,
   and leaves the forecast 0.010 points worse.
-- **[The CAMS finding holds at a second hyperparameter setting, in every fold, at every site, and
-  with the hours CAMS flags as unreliable kept. The ERA5 null does not hold at the second
-  setting](#what-the-result-survives).**
-- **[A fitted physical PV model reports the opposite sign, mostly because its conversion of the beam
-  to the panel's plane magnifies beam errors when the sun is
+- **[The CAMS finding holds at the shallower XGBoost settings, in every fold, at every site, and
+  with the hours CAMS flags as unreliable kept. At the shallower XGBoost settings the Erbs split
+  beats ERA5's own split](#what-the-result-survives).**
+- **[A fitted physical PV model reports the opposite sign: the published split raises its error, by
+  0.128 points on CAMS and 0.072 points on ERA5. On CAMS most of that disagreement comes from its
+  conversion of the beam to the panel's plane, which magnifies beam errors when the sun is
   low](#the-physical-model-disagrees-and-is-not-a-second-opinion).**
 - **[The published beam helps most under broken cloud and least under a clear
   sky](#the-published-beam-helps-most-under-broken-cloud)**: broken cloud is where the split is
@@ -345,6 +349,17 @@ span is cut into five contiguous blocks of whole months, and each block is score
 model fitted on the other four. Every fit is repeated at three random seeds, because XGBoost's own
 sampling makes a single fit a noisy estimate of what a setup can do.
 
+**XGBoost runs at two fixed sets of hyperparameters, neither tuned, and every number on this page
+uses the main XGBoost settings unless it says otherwise.** The main XGBoost settings are trees 6
+levels deep, a learning rate of 0.05, and 500 boosting rounds. The shallower XGBoost settings (a
+check) are trees 4 levels deep, a learning rate of 0.03, 1,200 boosting rounds, and heavier
+regularisation. A single set of hyperparameters can favour one setup by accident, because a wider
+feature set changes how much a fixed number of rounds overfits. The shallower XGBoost settings (a
+check) therefore test whether an ordering of the setups comes from the features rather than from the
+settings. They are run on setups A, B, C, and B-LEARNED, the setups the headline and the
+learned-split comparison rest on. Tuning either set per setup would let the tuner's own noise decide
+which setup wins, so neither set is tuned.
+
 **Six meters inside a 25 km by 23 km box share their weather, so the effective sample size is the
 number of independent weather episodes rather than the number of site-hours.** On the reanalysis the
 effective sample is smaller still: the six sites fall inside only two ERA5 grid cells, and within
@@ -354,12 +369,12 @@ whole calendar months, with all six sites' rows inside each block, and both setu
 the same months so the comparison stays paired. Each resample also draws one of the three seeds.
 
 **One contrast is planned, and every other number on this page is exploratory.** A planned contrast
-was written into the study plan before any result existed: here, setup C against setup B at the
-primary hyperparameter setting. A contrast is statistically significant at the 5% level when its 95%
-interval does not contain zero. The month-resampled test covers the month-to-month weather and the
-fitting seed. The test does not cover differences between generators, because the same six sites
-appear in every resample. Among the many exploratory rows on this page, about 1 in 20 of those with
-no real effect behind them would reach significance at the 5% level by chance alone.
+was written into the study plan before any result existed: here, setup C against setup B at the main
+XGBoost settings. A contrast is statistically significant at the 5% level when its 95% interval does
+not contain zero. The month-resampled test covers the month-to-month weather and the fitting seed.
+The test does not cover differences between generators, because the same six sites appear in every
+resample. Among the many exploratory rows on this page, about 1 in 20 of those with no real effect
+behind them would reach significance at the 5% level by chance alone.
 
 ## Results
 
@@ -382,9 +397,10 @@ were chosen by clearness index rather than by eye.
 
 ![Site F](assets/power_timeseries_site_f.svg)
 
-The error levels those predictions sit at, per site and per setup:
+The error levels those predictions sit at, per site and per pairing of irradiance product and PV
+power model:
 
-![Mean absolute error per site and setup](assets/per_site_error.svg)
+![Mean absolute error per site and pairing](assets/per_site_error.svg)
 
 | Site | ERA5 → XGBoost | CAMS → XGBoost | ERA5 → physical | CAMS → physical |
 |---|---|---|---|---|
@@ -396,9 +412,9 @@ The error levels those predictions sit at, per site and per setup:
 | F | 8.18 | **4.62** | 8.73 | 5.73 |
 | Pooled | 8.37 | **5.24** | 8.85 | 6.28 |
 
-Each cell is the mean absolute error as a percentage of that site's P99 output, with every setup
+Each cell is the mean absolute error as a percentage of that site's P99 output, with every pairing
 given the weather product's own beam/diffuse split, over all the hours that source covers. The best
-setup at each site is in bold, and it is the same setup at all six. Site E is much the shortest
+pairing at each site is in bold, and it is the same pairing at all six. Site E is much the shortest
 series, at 5,496 satellite site-hours against 19,334 to 25,774 for the other five sites, and it is
 not the worst-scored of the six. On the satellite source it sits third for XGBoost and second for
 the physical PV model, because holding every prediction to the export cap — which is what [scoring a
@@ -496,12 +512,12 @@ further gain unlikely rather than impossible.
 
 #### What the result survives
 
-**The satellite finding holds under each of the checks below.** It reproduces at both hyperparameter
-settings (−0.096 and −0.072), on the continuous ranked probability score as well as mean absolute
-error, in 5 of 5 folds, and at every solar-elevation band. Seed-to-seed spread is 0.003 points
-against a 0.096-point effect. All six sites show the effect individually, each statistically
-significant at the 5% level, from −0.066 [−0.113, −0.021] at site E on much the shortest record to
-−0.120 [−0.151, −0.092] at site A.
+**The satellite finding holds under each of the checks below.** It reproduces at the main and the
+shallower XGBoost settings (−0.096 and −0.072), on the continuous ranked probability score as well
+as mean absolute error, in 5 of 5 folds, and at every solar-elevation band. Seed-to-seed spread is
+0.003 points against a 0.096-point effect. All six sites show the effect individually, each
+statistically significant at the 5% level, from −0.066 [−0.113, −0.021] at site E on much the
+shortest record to −0.120 [−0.151, −0.092] at site A.
 
 **The finding also survives changing how the beam is handed to XGBoost.** Setup D gives XGBoost the
 published beam as a share of the total rather than as a flux beside the diffuse, which is the same
@@ -520,19 +536,21 @@ barely moves, at 1.74% against 1.80%. Setup B-LEARNED against setup B behaves th
 wider set, at +0.000 [−0.005, +0.005], not statistically significant at the 5% level.
 
 **The reanalysis null is not an artefact of the mirror or of the row set, but it does not survive
-its own sensitivity check.** The Copernicus download reproduces the Open-Meteo result to the third
-decimal (+0.005 against +0.005), and the null survives restriction to the hours the satellite source
-also covers. At the second hyperparameter setting, though, the reanalysis contrast becomes
-statistically significant at the 5% level in Erbs's favour. The [limitations](#limitations) set out
-what that leaves for the reanalysis result.
+the shallower XGBoost settings.** The Copernicus download reproduces the Open-Meteo result to the
+third decimal (+0.005 against +0.005), and the null survives restriction to the hours the satellite
+source also covers. At the shallower XGBoost settings, though, the Erbs split beats ERA5's own split
+by 0.027 points [0.007, 0.047], statistically significant at the 5% level. The
+[limitations](#limitations) set out what that leaves for the reanalysis result.
 
 #### The physical model disagrees, and is not a second opinion
 
 **On the same rows the physical PV model reports the opposite sign: the weather product's own split
-is *worse* than the Erbs split, by 0.128 points [+0.101, +0.154] on the satellite source.** Each
-physical setup also fits its own panel geometry, and the setup given the weather product's split
-settles on a tilt 2.5 to 11.5 degrees shallower than the setup given Erbs, so the obvious suspicion
-is that the two setups differ in more than the beam field — which the XGBoost setups never do.
+is *worse* than the Erbs split, by 0.128 points [+0.101, +0.154] on the satellite source and by
+0.072 points [+0.013, +0.134] on the reanalysis, in 4 of 5 folds there.** Both reanalysis figures
+are exploratory, and the rest of this section examines the satellite source. Each physical setup
+also fits its own panel geometry, and the setup given the weather product's split settles on a tilt
+2.5 to 11.5 degrees shallower than the setup given Erbs, so the obvious suspicion is that the two
+setups differ in more than the beam field — which the XGBoost setups never do.
 
 **That suspicion is wrong: holding the geometry fixed makes the disagreement larger, not smaller.**
 Every physical setup was refitted with the tilt and azimuth held at the values the Erbs setup
@@ -673,7 +691,7 @@ up in [Limitations](#limitations). Neither PV power model is the production desi
 alone, but only when the calibration is allowed to see the weather as well.** Three calibrations
 separate the possible causes of the gap.
 
-| Setup | CAMS | ERA5 |
+| Configuration | CAMS | ERA5 |
 |---|---|---|
 | Physical PV model alone | 6.28 | 8.85 |
 | XGBoost given only the physical PV model's output | 6.26 | 8.84 |
@@ -684,9 +702,9 @@ separate the possible causes of the gap.
 
 Each cell is the mean absolute error as a percentage of P99 output, on the same rows and folds as
 every other number here. The lowest error in each source column is in bold, and the two sources
-disagree about which setup wins. Every physical-model prediction fed to XGBoost was produced by a
-fit that never saw that row's calendar month, through the same withheld-month inner cross-validation
-setup B-LEARNED uses.
+disagree about which configuration wins. Every physical-model prediction fed to XGBoost was produced
+by a fit that never saw that row's calendar month, through the same withheld-month inner
+cross-validation setup B-LEARNED uses.
 
 **XGBoost given nothing but the physical PV model's output lowers the error on neither source** —
 −0.025 points [−0.061, +0.011] on the satellite product and −0.017 [−0.038, +0.004] on the
@@ -784,11 +802,12 @@ tracker.
 ### Asking a supplier for the beam
 
 **Ask a supplier for the direct beam only where the source resolves cloud finely enough to carry
-beam information its own global field lacks.** On the 31 km reanalysis measured here the beam field
-adds nothing detectable beyond a separation model run locally on the feed's own columns. On the 5 km
-retrieval measured here the beam field cuts error by 1.8%. Whether a 1.8% cut is worth paying for
-depends on the price, which this page does not know. Both claims are about the two products tested,
-and neither has been demonstrated for every product at those resolutions.
+beam information its own global field lacks, and delivers the beam at the generator's own
+coordinates.** On the 31 km reanalysis measured here the beam field adds nothing detectable beyond a
+separation model run locally on the feed's own columns. On the 5 km retrieval measured here the beam
+field cuts error by 1.8%. Whether a 1.8% cut is worth paying for depends on the price, which this
+page does not know. Both claims are about the two products tested, and neither has been demonstrated
+for every product at those resolutions.
 
 **The reanalysis beam carries *more* content a separation model cannot reach, not less — and that
 content does not correspond to what the panel saw.** The tempting story is the opposite one: that at
@@ -797,8 +816,8 @@ model given setup A's features predicts 95.4% of the satellite product's direct-
 and only 89.1% of the reanalysis's. The part of the reanalysis's direct fraction that XGBoost cannot
 predict is also irrelevant to the panel, being averaged over a 31 km cell whose centre can be 13 km
 from the meter. Predictability alone cannot distinguish signal from noise. Only the power result
-does, and here the power result finds nothing the panel responded to — at the planned setting, which
-is as far as the [limitations](#limitations) support that reading.
+does, and here the power result finds nothing the panel responded to — at the main XGBoost settings,
+which is as far as the [limitations](#limitations) support that reading.
 
 **The free alternative is free only where it is a published correlation.** Erbs and DISC need
 nothing but the global irradiance and the sun's position, so they run on any feed. A separation
@@ -812,7 +831,9 @@ publishes at 25 km, within a few kilometres of the 31 km reanalysis where the pu
 nothing detectable. Even if the free subset carried the field, the direct beam would be the
 lowest-value of the routes to a split this page can speak to — and [taking `fdir` from ECMWF
 directly](../roadmap/data-sources.md#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost)
-means a delivery arrangement with ECMWF rather than a request to our supplier.
+comes through ECMWF's dissemination system or a MARS subscription, not the free subset Dynamical.org
+reads. Whether Dynamical.org would carry `fdir` from ECMWF's own delivery is a question the project
+has not yet asked.
 
 **The same result points the other way for ICON-EU, the German weather service's European weather
 model.** At about 6.5 km ICON-EU sits beside the 5 km retrieval where the beam field did help, and
@@ -884,12 +905,13 @@ Removing it entirely strengthens the satellite result rather than weakening it, 
 +0.0049 [−0.0160, +0.0253]. All six sites are kept so that the reported effect is the smaller of the
 two, but a reader should know the choice was available and which way it cuts.
 
-**The reanalysis null fails its own sensitivity check.** The second hyperparameter setting exists to
-check that an ordering of the setups is a property of the features rather than of the settings. On
-the satellite source it passes. On the reanalysis the headline is null at the primary setting and
-lands at +0.027 [+0.007, +0.047] at the sensitivity setting — in Erbs's favour, not the published
-field's. The check therefore did not pass there, and the reanalysis result should be read as "no
-effect detected at the planned setting" rather than as a demonstrated absence.
+**The reanalysis null fails the check at the shallower XGBoost settings.** The shallower XGBoost
+settings (a check) exist to test that an ordering of the setups is a property of the features rather
+than of the settings. On the satellite source the check passes. On the reanalysis the headline is
+null at the main XGBoost settings and lands at +0.027 [+0.007, +0.047] at the shallower XGBoost
+settings — in Erbs's favour, not the published field's. The check therefore did not pass there, and
+the reanalysis result should be read as "no effect detected at the main XGBoost settings" rather
+than as a demonstrated absence.
 
 **The satellite error *levels* quoted here are conditional on the reliability filter; the satellite
 *conclusion* is not.** The filter discards about 15% of daylight hours, which are much darker than
@@ -1109,6 +1131,35 @@ The code is throwaway by design, outside the Dagster asset graph and imported by
 scripts are there so the measurement can be audited and re-run. The study's own README lists every
 script in the order the scripts run, and each script's module docstring carries the command that
 runs it.
+
+Build each source's dataset, fit both PV power models on it, and print the tables this page quotes:
+
+```bash
+for source in open-meteo cams; do
+  uv run --with netcdf4 python studies/beam_diffuse_split/build_dataset.py --source $source
+  uv run python studies/beam_diffuse_split/run_experiment.py --source $source
+  uv run python studies/beam_diffuse_split/run_physics_experiment.py --source $source
+  uv run python studies/beam_diffuse_split/report_results.py --source $source
+  uv run python studies/beam_diffuse_split/report_results.py --source $source --instrument physics
+done
+uv run --with netcdf4 python studies/beam_diffuse_split/build_dataset.py --source cams \
+  --min-cams-reliability 0 --suffix _allhours
+uv run python studies/beam_diffuse_split/run_experiment.py --source cams --suffix _allhours
+```
+
+The results this page quotes are filed in the private data store under
+`data/studies/beam_diffuse_split/superseded/`, in directories ending `_piecewise`. Figure 1 is drawn
+from them straight into the docs assets:
+
+```bash
+uv run python studies/beam_diffuse_split/make_chart.py --subdirectory superseded --suffix _piecewise
+npx svgo@4 --multipass --precision=1 --final-newline docs/studies/assets/beam_diffuse_split_result.svg
+```
+
+A fresh run writes its results directories straight under `data/studies/beam_diffuse_split/` with no
+suffix, and `make_chart.py` with no flags reads them there. The per-site charts and the
+sky-condition chart come from `uv run python studies/beam_diffuse_split/make_figures.py`, which
+reads the same fresh-run directories.
 
 Every contrast, interval, and error level quoted here is printed by a script rather than transcribed
 by hand, and every figure is drawn from the results files rather than redrawn from a table. The
