@@ -18,7 +18,9 @@
 > ([#326](https://github.com/openclimatefix/nged-substation-forecast/issues/326)), and the
 > MLflow-server / dev-dashboard future work
 > ([#235](https://github.com/openclimatefix/nged-substation-forecast/issues/235),
-> [#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)). The
+> [#236](https://github.com/openclimatefix/nged-substation-forecast/issues/236)), and the plan for
+> [NWP model upgrades](#nwp-model-upgrades)
+> ([#851](https://github.com/openclimatefix/nged-substation-forecast/issues/851)). The
 > [AWS-architecture decision](#aws-architecture) itself is built and running; its durable decision
 > record now lives in [Production Deployment —
 > Design](../architecture/production-deployment.md#infrastructure-tier-alternatives-to-the-ec2-control-plane-box),
@@ -380,6 +382,161 @@ Any metric added to `compute_metrics` flows through this scope automatically —
 (PICP/spread-skill) land, production monitoring tracks ensemble calibration over time for free. No
 coupling needed; the ordering is flexible.
 
+## NWP model upgrades
+
+Issue: [#851](https://github.com/openclimatefix/nged-substation-forecast/issues/851), under the v0.9
+epic [#361](https://github.com/openclimatefix/nged-substation-forecast/issues/361)
+
+> **Status: 🚧 Planned (v0.9).** Nothing below is built. The first step is [an
+> experiment](#the-experiment-how-fast-a-model-recovers-after-an-upgrade), whose result sets how
+> long the uncertainty bands stay wide after an upgrade.
+
+**An upgrade to a weather model changes what the forecast's NWP inputs mean without making them
+absent or malformed, so none of the live service's checks can see it.** The checks listed under
+[Inherent Stability → Failure modes](../design-philosophy/inherent-stability.md#failure-modes)
+catch NWP that is missing, stale, or rejected by the `Nwp` contract. A run from an upgraded model
+arrives on time and passes validation. Upgrades are not rare: ECMWF changed the IFS cycle behind
+ECMWF ENS seven times between June 2019 and May 2026, and the project's ENS archive, which starts on
+2024-04-01, already spans two of those changes, 49r1 on 2024-11-12 and 50r1 on 2026-05-12. The
+dated list, for every weather model the project reads, is [Data sources → NWP model upgrades since
+2019](data-sources.md#nwp-model-upgrades-since-2019).
+
+### What the one measured upgrade showed
+
+**In the one upgrade measured so far, most of the apparent loss of skill came from scoring
+post-upgrade rows with a model trained only on pre-upgrade rows.** The Met Office upgraded UKV at
+PS47 on 2026-01-21. The [beam/diffuse split study](../studies/beam-diffuse-split.md) cut its
+cross-validation folds as contiguous blocks of months. At five of the six generators every
+post-upgrade row therefore fell in the last fold, and the XGBoost model scoring that fold had
+trained on pre-upgrade UKV alone. Measured that way, [UKV's global irradiance scored about 1
+percentage point worse than ERA5's from the upgrade
+onwards](data-sources.md#open-meteos-ukv-archive-is-the-t0-analysis-and-half-of-it-is-backfill). The
+[weather-products study](../studies/weather-products-for-past-solar.md) cut its folds separately
+before and after the upgrade, so every post-upgrade row was scored by a model that had trained on
+other post-upgrade months. There, XGBoost models trained on both sides of the upgrade put UKV 0.18
+percentage points of capacity behind ERA5 after the upgrade [+0.05, +0.42], and XGBoost models
+trained on the post-upgrade months alone put UKV 0.11 points ahead [−0.21, +0.45]. The two studies
+score different row sets and normalise error differently, so the figures do not subtract. The
+beam/diffuse split study's README attributes most of the step to a model meeting an input it never
+trained on. Eight post-upgrade months cannot settle which of the two later fits is right.
+
+**The loss that remains is real for a production service, because the promoted model is always
+trained on the old version when an upgrade lands.** Folds cut inside each era hide the loss rather
+than removing it: they show how good a model can be once it has trained on the new version, not how
+good the model already promoted is on the day the new version arrives.
+
+### Why the model is not told the NWP version
+
+**For now, XGBoost is not given the NWP model version as a feature, for three reasons.** The
+[experiment](#the-experiment-how-fast-a-model-recovers-after-an-upgrade) includes a post-upgrade
+flag as one of its setups, so the decision can be revisited on evidence.
+
+**On the day of an upgrade, no training row carries the new version, so a version feature changes
+nothing.** An ordinal version feature sends every post-upgrade row down the branches the trees
+learned for the latest version they saw, which is what the trees do with no feature at all. The
+[era-covariate safety rule](training-history.md#scope-the-ingest-to-include-the-2024-overlap) says
+the same about any era feature: an era covariate is safe only when the value production will see is
+well represented in training, and a new version is represented by nothing. The feature starts to
+help only once post-upgrade rows have built up in training, and by then a retrain does the same job.
+The weather-products study did give its models an era flag, but every fold's training set held
+post-upgrade months, which is that later case.
+
+**ECMWF upgrades its forecast model roughly once a year, so the ENS version tracks the calendar
+closely.** The trees can use the version as a proxy for the date, and learn capacity changes,
+curtailment regimes, or meter swaps where they should have learned an NWP effect. The ERA5 plan is
+designed to avoid the same [era
+confounding](training-history.md#scope-the-ingest-to-include-the-2024-overlap).
+
+**The measured loss was mostly a training mismatch, and retraining removes a training mismatch
+directly.**
+
+### The plan
+
+**Record the NWP model cycle on every NWP row and every forecast row.** A column naming the cycle,
+such as `50r1` for ECMWF ENS today, lets production monitoring split error by version. The column
+also lets a backtest cut its folds so that a model scoring one version trained on that version,
+which `studies.cross_validation.assign_folds` already does for the studies. The column is filled
+from the dated list below, keyed on each run's `init_time`, so it does not depend on the feed
+publishing the cycle. `Nwp` and `PowerForecast` are both Patito contracts, so adding the column is a
+contract change, agreed before it is made. Whether the `power_forecast` table delivered to NGED
+carries the column is a question for the delivery contract
+([#96](https://github.com/openclimatefix/nged-substation-forecast/issues/96)).
+
+**Keep a dated list of upgrades in the repository, and warn when an NWP field shifts in a way the
+list does not explain.** Each entry names the NWP model, the cycle, and the first `init_time` on the
+new cycle, and [the data-sources list](data-sources.md#nwp-model-upgrades-since-2019) is where the
+entries come from. An upgrade the producer did not announce shows up as a sudden shift in a field's
+distribution that starts at one `init_time` and persists. A change-point test on each field's
+per-run statistics is the obvious detector. Choosing statistics that weather does not trip, such as
+the record-breaking dry, sunny July of 2026, is the open question already recorded under [Input
+drift detection](../design-philosophy/design-principles.md#input-drift-detection). The detector is
+an asset check: it warns, never blocks, and never raises. The detector's warning names the NWP
+model, the field, and the run where the shift starts, so a human can confirm the upgrade and add it
+to the list.
+
+**Treat an upgrade as a degradation, not an error.** The forecast keeps running. The row records
+that its NWP is post-upgrade, through the cycle column and a warning row in
+`power_forecast_warnings` whose `warning_source` names the model and the cycle, such as
+`"ecmwf_ens:50r1"`; that warning row needs a new `warning_type` in the [delivery
+contract](delivery-tables.md#table-2-power_forecast_warnings). A Sentry event goes to the digest
+rather than to a notification, because nothing of ours has broken. And the uncertainty bands widen
+until the promoted model has trained on enough rows from the new cycle.
+
+**Count the promoted model's post-upgrade training in weeks of data from the row's cycle, not in
+days since the upgrade.** A model retrained 3 weeks after an upgrade has 3 weeks of the new cycle
+behind it, while a model never retrained has none, however long ago the upgrade was. The same
+reasoning [measures NWP staleness in missed runs rather than in
+hours](../design-philosophy/inherent-stability.md#the-rules). The training run records how many
+weeks of each cycle it saw, so serving compares the row's cycle with a number in the model's saved
+config, a table lookup that keeps the [complexity
+offline](../design-philosophy/inherent-stability.md#where-complexity-should-live). How many weeks
+count as enough is what the experiment measures. Widening the bands needs quantile output
+([#263](https://github.com/openclimatefix/nged-substation-forecast/issues/263)) and
+[regime-conditional
+calibration](../design-philosophy/inherent-stability.md#widening-bands-the-in-band-signal) first;
+until both exist, the cycle column and the warning row are the only signals.
+
+**Retrain on a schedule, and early after an upgrade.** An upgrade is the concrete trigger that
+[A retraining cadence and
+trigger](../design-philosophy/design-principles.md#a-retraining-cadence-and-trigger) says the
+project lacks. A retrain can only use post-upgrade rows whose power has been observed, so the
+earliest useful retrain is set by how fast those rows build up, and the experiment says how many
+weeks are worth waiting for. A per-series correction of the forecast, refitted on the last few
+weeks of observed power, might bridge the gap sooner. That correction is untested.
+
+### The experiment: how fast a model recovers after an upgrade
+
+**The experiment measures how the error on post-upgrade rows falls as training gains post-upgrade
+data, around the Met Office's UKV upgrade of 2026-01-21.** That upgrade is the one with metered
+power on both sides of it in the studies' data. The recovery curve says how long the bands must stay
+wide after an upgrade, and whether a post-upgrade flag or recency weighting shortens that time.
+
+**Each XGBoost model trains on every pre-upgrade row plus the first 0, 2, 4, or 8 weeks after the
+upgrade, under three setups:**
+
+- **No version feature**, the current decision.
+- **A post-upgrade flag**, set to 1 on every row from the new version.
+- **A higher sample weight on recent rows**, so the weeks just before the forecast count for more.
+
+**Every arm is scored on the same post-upgrade rows, those after the eighth post-upgrade week**, so
+the four training lengths and the three setups are compared on one row set. At 0 weeks the flag
+takes a single value across the training rows, so that arm should match the no-feature arm up to
+fitting noise, which checks the harness. XGBoost's column subsampling stays off in every arm,
+because with it on, the arm holding an extra column gets a different draw of columns and the
+contrast measures the draw rather than the flag. A model trained with folds cut inside each era, as
+in the weather-products study, gives the fully recovered level the curve is heading towards.
+
+**Report each arm's absolute error, not only the contrasts between arms.** Each arm gets its mean
+absolute error as a percentage of capacity, with a 95% interval from resampling whole months, and
+each pair of arms gets a paired contrast on the same rows, using `studies.bootstrap`.
+
+**Two limits bound how far the result carries.** The scored window runs from 2026-03-18 to the end
+of the record, about 6 months, so whole-month resampling has few months to draw on. And the input is
+UKV's hourly analysis, not an ECMWF ENS forecast at a lead of 3 to 10 days, so the recovery at long
+leads may differ. ECMWF's 50r1 upgrade of 2026-05-12 falls inside the project's ENS archive, so the
+same design can be repeated on the product the live service reads once enough post-upgrade months
+have built up.
+
 ## Implementation details (deleted when this ships)
 
 ### Deployment workstream 1 — the production job (local dress rehearsal)
@@ -464,3 +621,27 @@ Verification: trigger a power update (or the sensor manually), see trailing-24h/
 the `production_monitoring` MLflow experiment and `forecast_metrics`; run `retire_experiment_job` on
 a throwaway experiment and watch its partitions disappear from the Dagster UI while its MLflow runs
 and Delta rows remain.
+
+### NWP model upgrades — order of work
+
+Issue: [#851](https://github.com/openclimatefix/nged-substation-forecast/issues/851)
+
+1. **Run [the experiment](#the-experiment-how-fast-a-model-recovers-after-an-upgrade)** under
+   `studies/`, on the fold and bootstrap machinery in `packages/studies/`. The recovery curve sets
+   how many weeks of post-upgrade training count as enough, and says whether the post-upgrade flag
+   or recency weighting earns a place in the production model.
+2. **Add the dated list of upgrades and the cycle column** to `Nwp` and `PowerForecast`, after the
+   contract change is agreed. The column's value at an upgrade boundary needs a test: ECMWF brings
+   in each cycle at the 06 UTC run, so the 00 UTC run of the implementation day belongs to the old
+   cycle.
+3. **Cut the cross-validation folds by cycle** where a fold would otherwise score one cycle with a
+   model trained only on another.
+4. **Record the cycles each training run saw**, in weeks per cycle, in the model's saved config, and
+   raise the post-upgrade warning row and digest event when a row's cycle is short of the threshold.
+   The warning path gets the same guard as every other warning path: it must not be able to fail the
+   asset it warns about.
+5. **Widen the bands for post-upgrade rows**, once quantile output
+   ([#263](https://github.com/openclimatefix/nged-substation-forecast/issues/263)) and
+   regime-conditional calibration exist.
+6. **Add the early-retrain trigger** and the change-point detector. The detector needs a test that
+   it fires on a synthetic step at one `init_time` and stays quiet on a seasonal ramp.
