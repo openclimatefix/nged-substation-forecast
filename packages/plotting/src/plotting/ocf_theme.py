@@ -108,9 +108,9 @@ VISUALISATION_SKY_BLUE: Final[LiteralString] = "#65B0C9"
 VISUALISATION_TEAL: Final[LiteralString] = "#58B0A9"
 """Brand guidelines: Teal (visualisation colours group)."""
 
-VISUALISATION_YELLOW: Final[LiteralString] = "#FFD480"
+VISUALISATION_YELLOW: Final[LiteralString] = "#FFD073"
 """Brand guidelines: Yellow (visualisation colours group). The guidelines label the swatch
-``#FFD480`` but fill it with ``#FFD073``; this constant follows the label."""
+``#FFD480`` but fill it with ``#FFD073``; this constant follows the fill."""
 
 VISUALISATION_ORANGE: Final[LiteralString] = "#FAA056"
 """Brand guidelines: Orange (visualisation colours group)."""
