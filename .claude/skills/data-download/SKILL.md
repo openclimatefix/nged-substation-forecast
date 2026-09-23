@@ -5,9 +5,11 @@ description: >-
   backfill from an external weather or climate archive especially — so a crash partway through costs
   one chunk, not the whole run: checkpoint every chunk to disk as soon as it is fetched, resume by
   skipping whatever is already cached, measure one chunk before committing to the rest, look up a
-  provider's real parameter names before submitting a request, and size each chunk to the provider's
-  own constraints. Load before writing or resuming any bulk-download script (e.g.
-  `studies/*/fetch_*.py`) that makes more than a handful of requests.
+  provider's real parameter names before submitting a request, size each chunk to the provider's own
+  constraints, and get a fresh adversarial review before the script's first real run. Load before
+  writing or resuming any bulk-download script (e.g.
+  `studies/*/fetch_*.py`) that makes more than a handful of requests, and before running any such
+  script for the first time.
 ---
 
 # Writing a resumable bulk-download script
@@ -178,6 +180,49 @@ stalled. Launch with `PYTHONUNBUFFERED=1 uv run python script.py > log 2>&1 &` (
 script.py`), not a bare `python3 script.py`, which runs outside the workspace's `uv` virtual
 environment and will fail to import any workspace package (`delta_store`, `contracts`, and so on) a
 checkpointed downloader is likely to need.
+
+## Get an adversarial review before a download script's first real run
+
+**Run every not-yet-executed download script through a fresh adversarial review before its first
+real run**, like the first diff review under `implement-issue` — a second reader with no stake in
+the code finding what the author is too close to see, and with network access and permission to make
+one small real fetch, not just a static read of the diff. Three download scripts written for
+issue #841 were reviewed this way — one before its first CDS request, the other two before resuming
+an interrupted or unfinished run — and the review caught four bugs, one per script area, each of
+which would have wasted a real request or corrupted output silently:
+
+- **An invalid request that the provider only rejects at submission time.** A CERRA solar request
+  used `product_type=analysis`, which does not exist for either solar variable — CDS has only a
+  `forecast` product for them. Caught by checking the request against the dataset's own
+  `constraints.json` and its costing endpoint (see "Look up the provider's real parameter names"
+  above), which also reports whether a request is valid, not only its field count.
+- **A chunking scheme that silently doubled or quadrupled the request.** A CDS request's month list
+  was built as every month of the year (`range(1, 13)`), relying on the year list alone to narrow the
+  range — so a single-year six-month chunk asked for twice its intended months, and a chunk spanning
+  a year boundary asked for the cross product of two years' full month lists against nothing narrower,
+  compounding to four times. The fix has two parts: align every chunk to a calendar half-year so it
+  never spans two years, and build the month list from the chunk's own start and end month. Caught by
+  reading the request-building code against what the costing endpoint reported for its field count.
+- **A wrong scale factor copied from a neighbouring variable.** Two variables served by the same
+  OPeNDAP dataset had different `scale_factor` attributes in their own metadata (`0.01` and `0.1`);
+  the download code applied one variable's factor to both, which is wrong by a factor of ten and
+  produces a plausible-looking number rather than an obvious error. Caught by reading each variable's
+  own `scale_factor`, `add_offset`, and `_FillValue` attributes rather than assuming two similar
+  fields share a convention, and confirmed with one small real fetch whose returned values were
+  implausible for the variable (a wind direction around 10-18° everywhere).
+- **A datetime-slice bound that silently dropped a year's last few timestamps.** `.sel(time=slice(
+  start, np.datetime64(f"{year}-12-31")))` on a sub-daily time axis excludes anything timestamped
+  after midnight on the 31st, because a `numpy.datetime64` bound is an exact instant, not a whole day
+  — a *string* bound (`"2021-12-31"`) is expanded by xarray to cover the whole day and would not have
+  had this fault. Caught by a local repro of the slice against a toy dataset, comparing a
+  `datetime64` bound against a string bound on the same data.
+
+None of these four would show up in `ruff check` or a syntax check. Only the first was caught by a
+read-through comparing the code to the provider's published constraints; the other three needed,
+respectively, comparing a measured field count against an expectation, a small real fetch with the
+returned values inspected for physical plausibility, and a local repro of ambiguous library behaviour
+— the same techniques the "Measure one chunk" and "Look up the provider's real parameter names"
+sections above already recommend, applied by a reader with no reason to assume the request is right.
 
 ## Two traps from this repo's own conventions worth restating here
 
