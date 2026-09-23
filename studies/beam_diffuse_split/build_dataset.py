@@ -201,7 +201,7 @@ JOULES_PER_HOUR_TO_WATTS: Final[float] = 3600.0
 KELVIN_TO_CELSIUS_OFFSET: Final[float] = 273.15
 
 
-def _read_era5(*, source: SourceType) -> pl.DataFrame:
+def read_era5(*, source: SourceType) -> pl.DataFrame:
     """Read one ERA5 download into a long frame of hourly fluxes, trimmed to the shared span.
 
     Both sources are trimmed at `era5_grid.LAST_DATE`, because the Copernicus request is made in
@@ -504,7 +504,7 @@ def _drop_false_zeros(*, joined: pl.DataFrame) -> pl.DataFrame:
     return kept.drop("has_zero_half_hour")
 
 
-def _nearest_era5_cell(*, sites: pl.DataFrame, era5: pl.DataFrame) -> pl.DataFrame:
+def nearest_era5_cell(*, sites: pl.DataFrame, era5: pl.DataFrame) -> pl.DataFrame:
     """Attach each site to the ERA5 grid cell whose centre is nearest it.
 
     Nearest-cell rather than interpolation on purpose. Interpolating between cells would smooth the
@@ -727,7 +727,7 @@ def main() -> int:
     sites = _pv_sites()
     _LOG.info("using %d PV sites, irradiance source %s", sites.height, source)
 
-    gridded = _read_era5(source="open-meteo" if source in PER_SITE_SOURCES else source)
+    gridded = read_era5(source="open-meteo" if source in PER_SITE_SOURCES else source)
     _LOG.info(
         "gridded fields: %d rows, %s to %s",
         gridded.height,
@@ -738,7 +738,7 @@ def main() -> int:
     power = _drop_outages_and_spikes(power=_hourly_power(sites=sites), sites=sites)
     _LOG.info("hourly power after outage and spike filtering: %d rows", power.height)
 
-    sites_with_cells = _nearest_era5_cell(sites=sites, era5=gridded)
+    sites_with_cells = nearest_era5_cell(sites=sites, era5=gridded)
     _LOG.info(
         "the %d sites resolve to %d distinct ERA5 grid cells",
         sites_with_cells.height,

@@ -53,7 +53,7 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from build_dataset import CAMS_PATH, _hourly_power, _nearest_era5_cell, _pv_sites, _read_era5
+from build_dataset import CAMS_PATH, _hourly_power, _pv_sites, nearest_era5_cell, read_era5
 from commissioning import drop_commissioning_ramp
 from export_cap import with_export_cap
 from physics_model import (
@@ -68,8 +68,8 @@ from run_experiment import (
     SHARED_FEATURES,
     Job,
     _add_time_features,
-    _run_all,
     dataset_path_for,
+    run_all,
 )
 from sources import STUDY_DATA_DIR, SourceType, point_output_path_for
 from studies.bootstrap import (
@@ -306,7 +306,7 @@ def _named(column: str, product: str) -> str:
     return f"{column.removesuffix('_w_m2')}_{product}"
 
 
-def _joined() -> pl.DataFrame:
+def joined() -> pl.DataFrame:
     """Inner-join every product on the site-hours all of them cover.
 
     Returns:
@@ -399,7 +399,7 @@ def _icon_eu_context() -> pl.DataFrame:
 CONTEXT_PRODUCTS: Final[tuple[str, ...]] = ("cams", "era5", "icon_d2", "icon_global")
 """The products `with_irradiance_context` adds neighbouring hours for.
 
-UKV's and ICON-EU's neighbouring hours are already in `_joined`'s frame, as `ghi_trap_previous_ukv`,
+UKV's and ICON-EU's neighbouring hours are already in `joined`'s frame, as `ghi_trap_previous_ukv`,
 `ghi_trap_next_ukv`, `ghi_previous_icon_eu`, and `ghi_next_icon_eu`.
 """
 
@@ -420,8 +420,8 @@ def _irradiance_download(*, product: str) -> pl.DataFrame:
         One row per (site, time) with `ghi_w_m2`.
     """
     if product == "era5":
-        gridded = _read_era5(source="open-meteo")
-        cells = _nearest_era5_cell(sites=_pv_sites(), era5=gridded)
+        gridded = read_era5(source="open-meteo")
+        cells = nearest_era5_cell(sites=_pv_sites(), era5=gridded)
         return cells.join(
             gridded,
             left_on=["cell_latitude", "cell_longitude"],
@@ -467,7 +467,7 @@ def with_irradiance_context(*, frame: pl.DataFrame) -> pl.DataFrame:
     return frame
 
 
-def _common_rows(*, frame: pl.DataFrame) -> pl.DataFrame:
+def common_rows(*, frame: pl.DataFrame) -> pl.DataFrame:
     """Drop the rows no product should be scored on, by rules no product's values decide.
 
     Args:
@@ -492,7 +492,7 @@ def _common_rows(*, frame: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def _with_eras(*, frame: pl.DataFrame) -> pl.DataFrame:
+def with_eras(*, frame: pl.DataFrame) -> pl.DataFrame:
     """Label each row's era, add the era feature, and cut folds inside each era.
 
     Args:
@@ -509,7 +509,7 @@ def _with_eras(*, frame: pl.DataFrame) -> pl.DataFrame:
     return assign_folds(dataset=labelled, by=("site", "era"))
 
 
-def _jobs() -> list[Job]:
+def jobs() -> list[Job]:
     """Return the three arms per product: global only, its own split, and Erbs on its own global.
 
     Returns:
@@ -560,7 +560,7 @@ def _post_only_losses(*, frame: pl.DataFrame) -> pl.DataFrame:
         )
         for product in PRODUCTS
     ]
-    return _run_all(dataset=post, jobs=jobs)
+    return run_all(dataset=post, jobs=jobs)
 
 
 def _leave_one_site_out_losses(*, frame: pl.DataFrame) -> pl.DataFrame:
@@ -1148,7 +1148,7 @@ def main() -> int:
     arguments = parser.parse_args()
 
     frame = with_export_cap(
-        dataset=_with_eras(frame=_add_time_features(dataset=_common_rows(frame=_joined())))
+        dataset=with_eras(frame=_add_time_features(dataset=common_rows(frame=joined())))
     )
     by_site = frame.group_by("site", "era").agg(pl.len(), pl.col("month").n_unique()).sort("site")
     _LOG.info("common rows: %d\n%s", frame.height, by_site)
@@ -1162,7 +1162,7 @@ def main() -> int:
     if arguments.report_only:
         pooled, post_only, transfer = (pl.read_parquet(path) for path in paths.values())
     else:
-        pooled = _run_all(dataset=frame, jobs=_jobs())
+        pooled = run_all(dataset=frame, jobs=jobs())
         post_only = _post_only_losses(frame=frame)
         transfer = _leave_one_site_out_losses(frame=frame)
         for losses, path in zip((pooled, post_only, transfer), paths.values(), strict=True):

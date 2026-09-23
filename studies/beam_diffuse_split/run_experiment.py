@@ -199,7 +199,7 @@ def features_for(*, arm: str) -> tuple[str, ...]:
     return (*SHARED_FEATURES, *ARM_FEATURES[arm])
 
 
-def _run_all(*, dataset: pl.DataFrame, jobs: list[Job]) -> pl.DataFrame:
+def run_all(*, dataset: pl.DataFrame, jobs: list[Job]) -> pl.DataFrame:
     """Run every (arm, site) job concurrently and concatenate the losses.
 
     XGBoost releases the interpreter lock while it trains, so threads give real parallelism here
@@ -520,7 +520,7 @@ def main() -> int:
         for arm in CONTROL_ARMS
     ]
 
-    losses = _run_all(dataset=dataset, jobs=jobs)
+    losses = run_all(dataset=dataset, jobs=jobs)
     losses.write_parquet(results_dir / "per_row_losses.parquet")
 
     records: list[dict[str, object]] = []
