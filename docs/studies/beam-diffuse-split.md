@@ -1,5 +1,10 @@
 # Does a weather product's beam/diffuse split help a PV forecast?
 
+> **This study uses only Flexpectation's own data, and its purpose is to inform Flexpectation's
+> choices.** The study tests the beam/diffuse split only at the solar farms in Flexpectation's trial
+> area in Lincolnshire. The study does not compare results across many regions or climates, so a
+> result on this page may not hold elsewhere.
+
 **At six metered solar farms in Lincolnshire, a weather product's own direct-beam field made an
 XGBoost model's photovoltaic (PV) power estimate more accurate on a 5 km satellite retrieval, and
 made no detectable difference on a 31 km reanalysis.** Every error on this page is a mean absolute
