@@ -49,6 +49,13 @@ one-day delay allows, and for historical features in the live service ICON-EU or
 evidence is six metered solar farms inside one 25 km by 23 km box in Lincolnshire, and 79,384
 generator-hours from December 2022 to September 2026.
 
+> **How this page was made.** The research question came from a human. Everything else — the code
+> behind every result, the analysis, the figures and the text — was written by Claude, Anthropic's
+> AI model (for this page, Claude Opus 5.5, reusing the data-preparation and model-fitting code that
+> Claude Opus 5 wrote for the [beam/diffuse study](beam-diffuse-split.md)). A human has reviewed the
+> figures and the text, and several independent Claude reviewers have checked the method, the
+> evidence and the prose adversarially.
+
 ![Figure 1: CAMS describes past sunshine best of the six products tested, by a wide margin](assets/sunshine_headline.svg)
 
 In Figure 1 the top panel's intervals are against ERA5, so two products whose intervals overlap

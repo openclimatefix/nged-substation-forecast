@@ -45,6 +45,13 @@ one generator.** Told when the steps fall, ICON global's difference from ERA5 to
 statistically significant at the 5% level. The evidence is three wind farms in flat Lincolnshire,
 and 50,734 generator-hours from August 2024 to September 2026.
 
+> **How this page was made.** The research question came from a human. Everything else — the code
+> behind every result, the analysis, the figures and the text — was written by Claude, Anthropic's
+> AI model (for this page, Claude Opus 5.5, reusing the data-preparation and model-fitting code that
+> Claude Opus 5 wrote for the [beam/diffuse study](beam-diffuse-split.md)). A human has reviewed the
+> figures and the text, and several independent Claude reviewers have checked the method, the
+> evidence and the prose adversarially.
+
 ![Figure 1: UKV and ICON-D2 describe past wind best of the five products tested](assets/wind_headline.svg)
 
 In Figure 1 the top panel's intervals are against ERA5, so two products whose intervals overlap
