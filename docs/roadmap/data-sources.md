@@ -658,8 +658,10 @@ describes the climatology, and [Bush et al. (2025)](https://doi.org/10.5194/gmd-
 records that no radiation parameters changed between RAL2 and RAL3. UKV's only advected aerosol
 quantity is the Murk tracer of [Clark et al. (2008)](https://doi.org/10.1002/qj.318), which
 diagnoses visibility and does not reach the radiation calculation. CAMS is aerosol-informed by
-construction and ERA5 carries a time-varying assimilated aerosol field, so **any skill UKV's split
-shows can only be cloud-sourced**, where the other two products' could be either.
+construction, while ERA5's aerosol is a prescribed climatology with nothing assimilated (see [Why
+ERA5 describes past sunshine and wind worse than current weather
+products](#why-era5-describes-past-sunshine-and-wind-worse-than-current-weather-products)). So **any
+skill UKV's split shows can only be cloud-sourced**, where CAMS's could be either.
 
 **UKV's 4D-Var assimilates a large volume of satellite-derived cloud, so at short lead times the
 model is partly a retrieval.** Satellite-derived cloud fraction was the single largest observation
