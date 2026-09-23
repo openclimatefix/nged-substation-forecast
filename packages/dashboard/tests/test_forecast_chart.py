@@ -200,10 +200,10 @@ def test_legend_always_lists_every_line() -> None:
         ]
         assert colour["scale"]["range"] == [
             ocf_theme.ENSEMBLE_LINE,
-            ocf_theme.BLUE,
-            ocf_theme.PURPLE,
-            ocf_theme.SPRING_GREEN,
-            ocf_theme.ORANGE_RED,
+            ocf_theme.DATA_BLUE,
+            ocf_theme.DATA_PURPLE,
+            ocf_theme.DATA_GREEN,
+            ocf_theme.BRAND_ORANGE,
         ]
         assert colour["legend"]["symbolType"] == "stroke"
 
@@ -504,8 +504,8 @@ def test_nwp_legend_always_lists_every_line() -> None:
         ]
         assert colour["scale"]["range"] == [
             ocf_theme.ENSEMBLE_LINE,
-            ocf_theme.BLUE,
-            ocf_theme.ORANGE_RED,
+            ocf_theme.DATA_BLUE,
+            ocf_theme.BRAND_ORANGE,
         ]
         assert colour["legend"]["symbolType"] == "stroke"
 

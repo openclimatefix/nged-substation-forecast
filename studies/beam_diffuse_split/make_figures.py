@@ -45,12 +45,11 @@ _LOG: Final[logging.Logger] = logging.getLogger("make_figures")
 
 FIGURES_DIR: Final[Path] = STUDY_DATA_DIR / "beam_diffuse_figures"
 
-MEASURED_COLOUR: Final[str] = "#292B2B"
-"""Measured power is drawn in the OCF theme's ink rather than in a brand hue.
+MEASURED_COLOUR: Final[str] = ocf.TEXT
+"""Measured power is drawn in the OCF theme's text colour rather than in a brand hue.
 
 It is the reference every model is judged against, not one more series, and giving it a hue from
-the palette would invite a reader to scan for which model it was. The value is the theme's own text
-colour, which `plotting.ocf_theme` keeps private.
+the palette would invite a reader to scan for which model it was.
 """
 
 SETUPS: Final[tuple[tuple[str, str, str, str], ...]] = (
@@ -66,8 +65,14 @@ setup has to offer, so
 the figure shows what the pipeline can do rather than what a deliberately weakened arm can do.
 """
 
-SETUP_COLOURS: Final[tuple[str, ...]] = (ocf.ORANGE_RED, ocf.PURPLE, ocf.BLUE, ocf.DARK_GREEN)
-"""One hue per setup, in `SETUPS` order: orange-red for ERA5, purple for UKV, blue for CAMS.
+SETUP_COLOURS: Final[tuple[str, ...]] = (
+    ocf.BRAND_ORANGE,
+    ocf.DATA_PURPLE,
+    ocf.DATA_BLUE,
+    ocf.DATA_DEEP_TEAL,
+)
+"""One hue per setup, in `SETUPS` order: Brand Orange for ERA5, Data Purple for UKV, Data Blue for
+CAMS.
 
 The three-colour set was checked for colour-vision deficiency rather than chosen by eye. Purple has
 not been through `dataviz`'s `validate_palette.js`, which lives in another repository, so the
@@ -414,11 +419,11 @@ def _sky_chart(*, source: str) -> alt.Chart:
     base = alt.Chart(intervals).encode(
         y=alt.Y("sky_short:N", title=None, sort=order),
     )
-    rule = base.mark_rule(strokeWidth=2, color=ocf.BLUE).encode(  # ty: ignore[unresolved-attribute]
+    rule = base.mark_rule(strokeWidth=2, color=ocf.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("lower_95:Q", title="Change in mean absolute error (pp of P99 output)"),
         x2=alt.X2("upper_95:Q"),
     )
-    point = base.mark_point(filled=True, size=80, color=ocf.BLUE).encode(  # ty: ignore[unresolved-attribute]
+    point = base.mark_point(filled=True, size=80, color=ocf.DATA_BLUE).encode(  # ty: ignore[unresolved-attribute]
         x=alt.X("difference:Q")
     )
     zero = (
