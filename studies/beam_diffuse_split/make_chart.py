@@ -1,318 +1,333 @@
-"""Draw the anonymised result chart for the beam/diffuse experiment.
+"""Draw the anonymised headline chart for the beam/diffuse experiment, Figure 1 of the write-up.
 
 One-off throwaway script for the experiment in
-<https://github.com/openclimatefix/nged-substation-forecast/issues/784>.
+<https://github.com/openclimatefix/nged-substation-forecast/issues/784>. The write-up is
+<https://openclimatefix.github.io/nged-substation-forecast/studies/beam-diffuse-split/>.
 
-The chart carries the two findings the experiment has to keep apart. The left panel measures every
-arm against the arm shown global horizontal irradiance alone, which is what *having* a split buys.
-The right panel measures the arm shown the product's own published beam against the arm shown a
-separation model's estimate of the same beam, which is what the *published field* buys on top of
-what global irradiance already implies. Both panels are drawn in the same units, a percentage of
-the global-only arm's mean absolute error, but **each panel carries its own x scale**, because the
-right panel's effects are an order of magnitude smaller than the left panel's and a shared scale
-would flatten them to nothing. Compare bars within a panel, and read the numbers rather than the
-lengths across panels.
+The chart carries the two findings the experiment has to keep apart, in four panels stacked one
+above the other. The top two measure the setup given the weather product's own published beam
+against setups given a separation model's estimate of the same beam, which is what the *published
+field* buys on top of what global irradiance already implies. The bottom two measure every setup
+against the setup given global horizontal irradiance alone, which is what *having* a split buys.
+The fitted physical PV model's effects against global irradiance are an order of magnitude larger
+than XGBoost's and would flatten them to nothing on a shared scale, so **each panel carries its own
+x scale**.
 
-Each row of panels is one instrument, because a tree and a fitted physical model disagree about how
-much of the split they can use, and that disagreement is part of the answer.
+Every difference is in percentage points of P99 output, each site's 99th percentile of metered
+output, and every row label carries the pooled mean absolute error of the two
+setups it compares, so a reader can see the error level a difference sits on.
 
 Sites are pooled here and no identifier reaches the chart, because a metered generator's output is
 commercially sensitive and this repo is public.
 
-Run it with `uv run --with vl-convert-python python
-studies/beam_diffuse_split/make_chart.py`.
+The script only reads the saved per-site summaries and bootstrap intervals, and writes the SVG
+straight into the docs assets. Run it with `uv run python studies/beam_diffuse_split/make_chart.py`
+after a fresh run of the experiment. The results the write-up quotes are filed under `superseded/`
+with the suffix `_piecewise`, and `--subdirectory superseded --suffix _piecewise` draws from those:
+the results directories are named `beam_diffuse_results_<source><suffix>` and
+`beam_diffuse_physics_<source><suffix>`, under the study's data directory or the subdirectory of it
+named.
+Optimise the SVG with `npx svgo@4 --multipass --precision=1 --final-newline` before committing it.
 """
 
+import argparse
 import logging
 import sys
 from pathlib import Path
-from typing import Final
+from typing import Final, Literal, NamedTuple
 
-import altair as alt
-import plotting.ocf_theme  # noqa: F401  (importing registers and enables the OCF theme)
 import polars as pl
 from sources import STUDY_DATA_DIR
+from studies.charts import ProductFamily, figure, interval_panel, planning
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("make_chart")
 
+InstrumentType = Literal["xgboost", "physics"]
+"""The two instruments: XGBoost, and the fitted physical PV model."""
 
-OUTPUT_PATH: Final[Path] = STUDY_DATA_DIR / "beam_diffuse_split_result.svg"
+SourceType = Literal["cams", "open-meteo"]
+"""The two irradiance sources the write-up reports, by the key their results directories carry."""
 
-SOURCE_LABELS: Final[dict[str, str]] = {
-    "open-meteo": "ERA5 (31 km reanalysis)",
-    "ukv": "UKV (2 km model analysis)",
-    "icon-d2": "ICON-D2 (2 km model analysis)",
-    "cams": "CAMS (5 km satellite retrieval)",
+OUTPUT_PATH: Final[Path] = (
+    Path(__file__).resolve().parents[2]
+    / "docs"
+    / "studies"
+    / "assets"
+    / "beam_diffuse_split_result.svg"
+)
+"""Where the write-up's Figure 1 lives."""
+
+SOURCE_NAMES: Final[dict[SourceType, str]] = {"cams": "CAMS", "open-meteo": "ERA5"}
+"""Source keys to the product names a reader sees, the satellite retrieval first."""
+
+SOURCE_FAMILIES: Final[dict[SourceType, ProductFamily]] = {
+    "cams": "satellite",
+    "open-meteo": "reanalysis",
 }
-"""Source keys to the labels a reader sees, the model sources before the retrieval.
+"""Each source's product family, which sets its colour."""
 
-**A source missing from this mapping is drawn nowhere**, which is why
-`_raise_on_unlabelled_sources` stops on a results directory named by neither this mapping nor
-`UNDRAWN_SOURCES`, rather than letting the chart come out looking complete with an arm silently
-absent from it.
-"""
-
-UNDRAWN_SOURCES: Final[tuple[str, ...]] = ("cds",)
+UNDRAWN_SOURCES: Final[tuple[str, ...]] = ("cds", "cams_allhours", "ukv", "ukv-live", "icon-d2")
 """Sources with results on disk that the chart deliberately leaves out.
 
 `cds` is the Copernicus route to the same ERA5 fields `open-meteo` serves, checked against each
 other by `verify_era5_sources.py`, so drawing both would put one reanalysis on the chart twice
-under two names. Naming the exclusion here is what lets the guard below tell a deliberate omission
-from a forgotten omission.
+under two names. `cams_allhours` is the reliability-filter sensitivity run, which the write-up
+reports in its text. UKV and ICON-D2 belong to the weather-products write-up, not to this one.
+Naming the exclusions here is what lets the guard below tell a deliberate omission from a forgotten
+one.
 """
 
-INSTRUMENT_LABELS: Final[dict[str, str]] = {
-    "xgboost": "XGBoost",
-    "physics": "Fitted physical PV model",
+ARM_NAMES: Final[dict[str, str]] = {
+    "A_global_only": "global only",
+    "B_erbs": "Erbs split",
+    "B_disc": "DISC split",
+    "B_learned": "learned split",
+    "C_era5_split": "product's split",
+    "D_direct_fraction": "product's beam fraction",
+    "P_A_global_only": "global only",
+    "P_B_erbs": "Erbs split",
+    "P_B_disc": "DISC split",
+    "P_C_source_split": "product's split",
 }
-"""Instrument keys to the labels a reader sees."""
+"""Each setup, by its name in the results, to the words a row label uses for it."""
 
-CONTRAST_LABELS: Final[dict[str, str]] = {
-    "B_erbs|A_global_only": "Erbs beam/diffuse split",
-    "B_disc|A_global_only": "DISC beam/diffuse split",
-    "B_learned|A_global_only": "Learned beam/diffuse split",
-    "C_era5_split|A_global_only": "Weather product's beam/diffuse split",
-    "D_direct_fraction|A_global_only": "Weather product's direct-beam fraction",
-    "C_era5_split|B_erbs": "Weather product's split vs. Erbs's",
-    "C_era5_split|B_learned": "Weather product's split vs. the learned split",
-    "P_B_erbs|P_A_global_only": "Erbs beam/diffuse split",
-    "P_B_disc|P_A_global_only": "DISC beam/diffuse split",
-    "P_C_source_split|P_A_global_only": "Weather product's beam/diffuse split",
-    "P_C_source_split|P_B_erbs": "Weather product's split vs. Erbs's",
-}
-"""Each plotted contrast, keyed by `treatment|reference`, to the label a reader sees."""
 
-PANEL_TITLES: Final[tuple[str, str]] = (
-    "Against total irradiance alone",
-    "The weather product's split against Erbs's",
+class Contrast(NamedTuple):
+    """One drawn difference: the treatment setup minus the reference setup."""
+
+    treatment: str
+    reference: str
+
+
+class PanelSpec(NamedTuple):
+    """One panel of the figure: which instrument, which contrasts, and the x range to draw."""
+
+    instrument: InstrumentType
+    contrasts: tuple[Contrast, ...]
+    title: str
+    x_domain: tuple[float, float]
+
+
+PLANNED: Final[frozenset[tuple[InstrumentType, Contrast]]] = frozenset(
+    {("xgboost", Contrast(treatment="C_era5_split", reference="B_erbs"))}
 )
-"""The two panels, in the order they are drawn."""
+"""The contrasts written into the study plan before any result existed, at the primary setting."""
 
-ROW_ORDER: Final[tuple[str, ...]] = (
-    "Erbs beam/diffuse split",
-    "DISC beam/diffuse split",
-    "Learned beam/diffuse split",
-    "Weather product's beam/diffuse split",
-    "Weather product's direct-beam fraction",
-    "Weather product's split vs. Erbs's",
-    "Weather product's split vs. the learned split",
+PANELS: Final[tuple[PanelSpec, ...]] = (
+    PanelSpec(
+        instrument="xgboost",
+        contrasts=(
+            Contrast(treatment="C_era5_split", reference="B_erbs"),
+            Contrast(treatment="C_era5_split", reference="B_learned"),
+        ),
+        title="XGBoost: the product's published split against a derived split",
+        x_domain=(-0.15, 0.05),
+    ),
+    PanelSpec(
+        instrument="physics",
+        contrasts=(Contrast(treatment="P_C_source_split", reference="P_B_erbs"),),
+        title="Physical PV model: the published split against Erbs's",
+        x_domain=(-0.3, 0.2),
+    ),
+    PanelSpec(
+        instrument="xgboost",
+        contrasts=(
+            Contrast(treatment="B_erbs", reference="A_global_only"),
+            Contrast(treatment="B_disc", reference="A_global_only"),
+            Contrast(treatment="B_learned", reference="A_global_only"),
+            Contrast(treatment="C_era5_split", reference="A_global_only"),
+            Contrast(treatment="D_direct_fraction", reference="A_global_only"),
+        ),
+        title="XGBoost: every split against global irradiance alone",
+        x_domain=(-0.15, 0.0),
+    ),
+    PanelSpec(
+        instrument="physics",
+        contrasts=(
+            Contrast(treatment="P_B_erbs", reference="P_A_global_only"),
+            Contrast(treatment="P_B_disc", reference="P_A_global_only"),
+            Contrast(treatment="P_C_source_split", reference="P_A_global_only"),
+        ),
+        title="Physical PV model: each split against global irradiance",
+        x_domain=(-2.0, 0.0),
+    ),
 )
-"""The order the contrasts are stacked in, best-known to least-known."""
+"""The panels, top to bottom."""
 
-RIGHT_PANEL_LABELS: Final[tuple[str, ...]] = (
-    "Weather product's split vs. Erbs's",
-    "Weather product's split vs. the learned split",
-)
-"""The contrasts drawn in the right panel, which compares two ways of getting a split."""
+X_TITLE: Final[str] = "Change in mean absolute error (points of P99 output, smaller is better)"
+"""The axis title every panel shares; `interval_panel` adds which sign is better."""
 
 SUBTITLE: Final[tuple[str, ...]] = (
-    "Six PV sites in one 25 km by 23 km box in Lincolnshire, hourly daylight rows.",
-    "ERA5 and CAMS cover 2019-2026; UKV's archive starts in 2022.",
-    "The beam/diffuse split is how total sunlight divides between the direct beam",
-    "from the sun's disc and the light scattered across the rest of the sky.",
-    "Change in mean absolute error against a model given total irradiance alone (%).",
-    "Negative is better. Bars are 95% monthly block bootstrap intervals; a bar",
-    "crossing zero has not been shown to help. Each panel has its own x scale.",
-    "Every source is valid at the hour rather than forecast for it, so this is",
-    "information content, not forecast skill. A half-hour error in the stamps flips",
-    "the physical model's contrasts on the reanalysis; the tree's hold.",
+    "Six PV sites in one 25 km by 23 km box in Lincolnshire, hourly daylight rows, 2019 to 2026.",
+    (
+        "Each row is one setup's mean absolute error minus another's, pooled over the six sites, "
+        "in percentage points of P99 output: each site's 99th percentile of output. Each label "
+        "gives both setups' own errors. Every XGBoost row uses the main XGBoost settings."
+    ),
+    (
+        "Dot: estimate. Line: 95% interval from resampling whole months. "
+        "Each panel has its own x scale."
+    ),
+    (
+        "CAMS and ERA5 describe weather that has already happened, so this measures what the beam "
+        "field carries, not forecast skill."
+    ),
 )
-
-CHART_PADDING: Final[dict[str, int]] = {"left": 120, "top": 5, "right": 5, "bottom": 5}
-"""Outer padding in pixels, left-heavy so the y-axis labels have room.
-
-Vega lays a faceted chart's shared y axis out inside a row-header group of zero width, so
-an unlimited label runs off the left edge of the canvas instead of widening it. Padding the
-whole chart is what actually reserves the space."""
+"""The lines under the title: scope, quantity, marks, and what kind of question this answers."""
 
 PERCENTAGE_POINTS: Final[float] = 100.0
 
 
-def _raise_on_unlabelled_sources(*, stem: str) -> None:
-    """Raise if a results directory exists for a source `SOURCE_LABELS` does not name.
+def _results_dir(
+    *, root: Path, instrument: InstrumentType, source: SourceType, suffix: str
+) -> Path:
+    """Return the directory one instrument's run on one source wrote to."""
+    stem = "results" if instrument == "xgboost" else "physics"
+    return root / f"beam_diffuse_{stem}_{source}{suffix}"
 
-    **The failure this exists for is a chart that looks finished with an arm missing from it.**
-    Drawing iterates the label mapping rather than the directories on disk, so a source added to the
+
+def _raise_on_unlabelled_sources(*, root: Path, suffix: str) -> None:
+    """Raise if a results directory names a source no table here names.
+
+    **The failure this exists for is a chart that looks finished with a source missing from it.**
+    Drawing iterates `SOURCE_NAMES` rather than the directories on disk, so a source added to the
     experiment and not to the mapping is dropped with no error, no warning, and no gap in the chart
     for a reader to notice. This is R&D code, so it stops rather than degrading.
 
-    Two kinds of directory are left out on purpose and must not stop the run. A `--suffix` variant
-    build is named `{source}{suffix}`, so it begins with a source one of the two tables names, and
-    the chart draws each source's main build rather than its variants. And a source in
-    `UNDRAWN_SOURCES` is excluded by a decision recorded there.
-
     Args:
-        stem: `results` for the tree's runs or `physics` for the fitted model's.
+        root: The directory the results directories sit in.
+        suffix: The suffix the drawn results directories carry.
 
     Raises:
-        ValueError: If any results directory names a source the mapping does not.
+        ValueError: If any results directory with this suffix names a source neither table does.
     """
-    prefix = f"beam_diffuse_{stem}_"
     found = {
-        path.name[len(prefix) :] for path in STUDY_DATA_DIR.glob(f"{prefix}*") if path.is_dir()
+        path.name.removeprefix(f"beam_diffuse_{stem}_").removesuffix(suffix)
+        for stem in ("results", "physics")
+        for path in root.glob(f"beam_diffuse_{stem}_*{suffix}")
+        if path.is_dir()
     }
-    known = (*SOURCE_LABELS, *UNDRAWN_SOURCES)
-    unlabelled = sorted(
-        name for name in found if not any(name.startswith(source) for source in known)
-    )
+    unlabelled = sorted(found - {*SOURCE_NAMES, *UNDRAWN_SOURCES})
     if unlabelled:
         msg = (
-            f"{stem} results exist for {unlabelled}, which neither SOURCE_LABELS nor "
-            "UNDRAWN_SOURCES names, so they would be left out of the chart without saying so. Add "
-            "each one to whichever it belongs in."
+            f"results exist for {unlabelled}, which neither SOURCE_NAMES nor UNDRAWN_SOURCES "
+            "names, so they would be left out of the chart without saying so. Add each one to "
+            "whichever it belongs in."
         )
         raise ValueError(msg)
 
 
-def _arm_mean_absolute_errors(*, instrument: str, source: str) -> dict[str, float]:
-    """Return each arm's pooled mean absolute error as a fraction of P99 output.
+def _arm_errors(*, results_dir: Path) -> dict[str, float]:
+    """Return each setup's pooled mean absolute error, in percent of P99 output.
 
-    Weighted by row count, and on the same capped metric, the same unit and the same weighting as
-    the contrast table in `report_results.py`, so the relative change the chart draws and the
-    relative change the table prints are one statistic rather than two.
+    Weighted by row count, on the same capped metric and the same weighting as the contrast table
+    in `report_results.py`, so the error a label gives and the error the page prints agree.
 
     Args:
-        instrument: Which instrument's run to read, `xgboost` or `physics`.
-        source: Which irradiance source's run to read.
+        results_dir: One instrument's run on one source.
 
     Returns:
-        One pooled mean absolute error per arm, keyed by arm name.
+        One pooled mean absolute error per setup, keyed by setup name.
     """
-    stem = "results" if instrument == "xgboost" else "physics"
-    summary = pl.read_parquet(
-        STUDY_DATA_DIR / f"beam_diffuse_{stem}_{source}" / "per_site_summary.parquet"
-    ).filter(pl.col("setting") == "primary")
+    summary = pl.read_parquet(results_dir / "per_site_summary.parquet").filter(
+        pl.col("setting") == "primary"
+    )
     pooled = summary.group_by("arm").agg(
         mae=(pl.col("mae_capped_fraction_of_capacity") * pl.col("n_rows")).sum()
         / pl.col("n_rows").sum()
+        * PERCENTAGE_POINTS
     )
     return dict(zip(pooled["arm"], pooled["mae"], strict=True))
 
 
-def _differences() -> pl.DataFrame:
-    """Collect every plotted contrast from every instrument and source.
+def _panel_rows(*, spec: PanelSpec, root: Path, suffix: str) -> pl.DataFrame:
+    """Collect one panel's rows, contrast by contrast, CAMS before ERA5 within each.
 
-    Dividing an interval by a constant is still an interval for the scaled quantity, so expressing
-    each difference as a percentage of the reference arm's error needs no second bootstrap.
+    Args:
+        spec: The panel.
+        root: The directory the results directories sit in.
+        suffix: The suffix the drawn results directories carry.
 
     Returns:
-        One row per (instrument, source, contrast) ready to plot.
+        One row per drawn difference, in points of P99 output, with the columns `interval_panel`
+        reads.
+
+    Raises:
+        ValueError: If a contrast the panel draws is not in the saved intervals exactly once.
     """
-    frames: list[pl.DataFrame] = []
-    for instrument in INSTRUMENT_LABELS:
-        stem = "results" if instrument == "xgboost" else "physics"
-        _raise_on_unlabelled_sources(stem=stem)
-        for source in SOURCE_LABELS:
-            results_dir = STUDY_DATA_DIR / f"beam_diffuse_{stem}_{source}"
-            if not results_dir.exists():
-                continue
-            arm_mae = _arm_mean_absolute_errors(instrument=instrument, source=source)
-            intervals = pl.read_parquet(results_dir / "bootstrap_intervals.parquet").filter(
+    rows = []
+    for contrast in spec.contrasts:
+        for source, name in SOURCE_NAMES.items():
+            results_dir = _results_dir(
+                root=root, instrument=spec.instrument, source=source, suffix=suffix
+            )
+            errors = _arm_errors(results_dir=results_dir)
+            found = pl.read_parquet(results_dir / "bootstrap_intervals.parquet").filter(
                 (pl.col("setting") == "primary")
                 & (pl.col("metric") == "absolute_error_capped_fraction_of_capacity")
                 & (pl.col("scope") == "all_sites")
+                & (pl.col("treatment") == contrast.treatment)
+                & (pl.col("reference") == contrast.reference)
             )
-            # Each contrast is scaled by the arm it is against, so a bar reads as "this much
-            # better than the arm named after the minus sign".
-            percent = PERCENTAGE_POINTS / pl.col("reference").replace_strict(arm_mae)
-            frames.append(
-                intervals.with_columns(
-                    key=pl.col("treatment") + pl.lit("|") + pl.col("reference"),
-                    instrument_label=pl.lit(INSTRUMENT_LABELS[instrument]),
-                    source_label=pl.lit(SOURCE_LABELS[source]),
-                    difference_percent=pl.col("difference") * percent,
-                    lower_95_percent=pl.col("lower_95") * percent,
-                    upper_95_percent=pl.col("upper_95") * percent,
-                )
-                .filter(pl.col("key").is_in(list(CONTRAST_LABELS)))
-                .select(
-                    "instrument_label",
-                    "source_label",
-                    "difference_percent",
-                    "lower_95_percent",
-                    "upper_95_percent",
-                    contrast_label=pl.col("key").replace_strict(CONTRAST_LABELS),
-                )
+            if found.height != 1:
+                msg = f"{contrast} on {source} appears {found.height} times in {results_dir}"
+                raise ValueError(msg)
+            treatment = f"{ARM_NAMES[contrast.treatment]} ({errors[contrast.treatment]:.2f}%)"
+            reference = f"{ARM_NAMES[contrast.reference]} ({errors[contrast.reference]:.2f}%)"
+            rows.append(
+                {
+                    "label": f"{name}: {treatment} − {reference}",
+                    "family": SOURCE_FAMILIES[source],
+                    "difference": found["difference"].item() * PERCENTAGE_POINTS,
+                    "lower_95": found["lower_95"].item() * PERCENTAGE_POINTS,
+                    "upper_95": found["upper_95"].item() * PERCENTAGE_POINTS,
+                    "planned": (spec.instrument, contrast) in PLANNED,
+                }
             )
-    combined = pl.concat(frames)
-    return combined.with_columns(
-        panel=pl.when(pl.col("contrast_label").is_in(RIGHT_PANEL_LABELS))
-        .then(pl.lit(PANEL_TITLES[1]))
-        .otherwise(pl.lit(PANEL_TITLES[0]))
-    )
-
-
-def _chart(*, differences: pl.DataFrame) -> alt.FacetChart:
-    """Build the faceted point-and-interval chart."""
-    base = alt.Chart(differences).encode(
-        y=alt.Y(
-            "contrast_label:N",
-            title=None,
-            sort=list(ROW_ORDER),
-            # Vega truncates a category label at 180 pixels by default, which cut the
-            # longest contrast to an ellipsis. Lifting the limit needs the chart padding
-            # below, because a faceted chart draws its shared y axis inside a zero-width
-            # row-header group and will otherwise run the text off the left edge.
-            axis=alt.Axis(labelLimit=0),
-        ),
-        yOffset=alt.YOffset("source_label:N", sort=list(SOURCE_LABELS.values())),
-        color=alt.Color(
-            "source_label:N",
-            title="Irradiance source",
-            sort=list(SOURCE_LABELS.values()),
-            legend=alt.Legend(orient="bottom", direction="horizontal", titleLimit=0, labelLimit=0),
-        ),
-    )
-    # The axis title lives in the subtitle instead: four facets each drawing their own would
-    # collide, and every panel measures the same quantity in the same units.
-    interval = base.mark_rule(strokeWidth=2).encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
-        x=alt.X("lower_95_percent:Q", title=None),
-        x2=alt.X2("upper_95_percent:Q"),
-    )
-    estimate = base.mark_point(filled=True, size=70).encode(  # ty: ignore[unresolved-attribute]
-        x=alt.X("difference_percent:Q")
-    )
-    zero = (
-        alt.Chart(differences)
-        .mark_rule(strokeDash=[4, 4], color="#292B2B")
-        .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.datum(0)
-        )
-    )
-    return (
-        (zero + interval + estimate)
-        .properties(width=330, height=alt.Step(14))
-        .facet(
-            column=alt.Column("panel:N", title=None, sort=list(PANEL_TITLES)),
-            row=alt.Row(
-                "instrument_label:N",
-                title=None,
-                sort=list(INSTRUMENT_LABELS.values()),
-                # Default is the left, where the row header collides with the longer
-                # contrast labels.
-                header=alt.Header(orient="right"),
-            ),
-        )
-        # Only the x scale is resolved per panel. Resolving y as well would drop the three rows the
-        # physical model has no arm for, but it also detaches the column headers from the columns
-        # they label, which is a chart that misleads rather than one with a gap in it.
-        .resolve_scale(x="independent")
-        .properties(
-            title=alt.TitleParams(
-                text="Does a weather product's own beam/diffuse split help a PV model?",
-                subtitle=SUBTITLE,
-            ),
-            padding=CHART_PADDING,
-        )
-    )
+    return pl.DataFrame(rows)
 
 
 def main() -> int:
-    """Write the chart as an SVG."""
-    differences = _differences()
-    _LOG.info("plotting %d contrasts", differences.height)
-    _chart(differences=differences).save(OUTPUT_PATH)
+    """Write Figure 1 as an SVG into the docs assets."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--subdirectory",
+        default="",
+        help="The subdirectory of the study's data directory holding the runs to draw.",
+    )
+    parser.add_argument(
+        "--suffix", default="", help="The suffix the drawn results directories carry."
+    )
+    args = parser.parse_args()
+    root = STUDY_DATA_DIR / args.subdirectory
+    _raise_on_unlabelled_sources(root=root, suffix=args.suffix)
+    panel_rows = [_panel_rows(spec=spec, root=root, suffix=args.suffix) for spec in PANELS]
+    figure_planning = planning(rows=panel_rows)
+    panels = [
+        interval_panel(
+            rows=rows,
+            x_domain=spec.x_domain,
+            x_title=X_TITLE,
+            zero_label="no difference",
+            better_label="first setup better",
+            panel_title=spec.title,
+            family_key=index == 0,
+            figure_planning=figure_planning,
+        )
+        for index, (spec, rows) in enumerate(zip(PANELS, panel_rows, strict=True))
+    ]
+    chart = figure(
+        panels=panels,
+        number=1,
+        title=(
+            "On CAMS the published beam lowers XGBoost's error beyond the Erbs split; "
+            "on ERA5 it does not"
+        ),
+        subtitle=list(SUBTITLE),
+        figure_planning=figure_planning,
+    )
+    chart.save(OUTPUT_PATH)
     _LOG.info("wrote %s", OUTPUT_PATH)
     return 0
 
