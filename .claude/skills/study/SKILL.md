@@ -383,9 +383,8 @@ study:
 
 ## GitHub hygiene
 
-- **Tag every study issue and pull request as a spike.** Give each issue the org issue Type
-  `Spike` and the `spike` label, and give each pull request the `spike` label, since a pull request
-  cannot take an issue Type. The `github-graphql` skill has the mutation that sets the Type.
+- **Give every study issue the org issue Type `Spike`.** The `github-graphql` skill has the
+  mutation that sets the Type.
 - **Keep closing keywords away from the parent issue's number.** A study usually lives under a parent
   issue, and "fixed" near "#809" in a PR body would have closed that parent on merge. The
   `github-issue-pr-workflow` skill has the check to run before merging.
