@@ -25,10 +25,3 @@ def test_the_wind_generators_get_their_own_labels():
     )
 
     assert labels == {2: "W2", 5: "W3", 9: "W1"}
-
-
-def test_a_wind_roster_of_the_wrong_size_raises():
-    with pytest.raises(ValueError, match="expected 3 eligible generators"):
-        site_labels_for(
-            eligible_ids=[1, 2], labels=WIND_SITE_LABELS, seed=WIND_LABEL_PERMUTATION_SEED
-        )

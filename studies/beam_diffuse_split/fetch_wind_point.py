@@ -1,4 +1,4 @@
-"""Download 100 m and 10 m wind from five weather products at each metered wind generator.
+"""Download 10 m, 80 m, and 100 m wind from five weather products at each metered wind generator.
 
 One-off throwaway script for the study in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/826>.
@@ -7,8 +7,8 @@ One-off throwaway script for the study in
 ICON products for their 80 m wind as well.** ERA5 and UKV publish 100 m wind natively. The three
 ICON products publish 80 m and 120 m, and Open-Meteo's 100 m value for them is the 120 m speed
 scaled by 0.98, which a tree cannot tell apart from the 120 m speed itself. So the study shows each
-ICON product its native 80 m wind as the hub-height column, which keeps every arm to the same number
-of columns, and keeps the 100 m column for a sensitivity check.
+ICON product its native 80 m wind, rather than both 80 m and 120 m, as the hub-height column, which
+keeps every arm to the same number of columns, and keeps the 100 m column for a sensitivity check.
 
 **Every product is read from the nearest land cell.** At one wind generator the nearest ICON global
 cell is influenced by the sea, with a 10 m speed 16% higher than the land cell's; every other
@@ -85,26 +85,22 @@ def main() -> int:
     sites = _wind_sites()
     first_year = int(FIRST_DATE[:4])
     for product, (models_parameter, base_url) in PRODUCTS.items():
-        frame = (
-            pl.concat(
-                fetch_point_frame(
-                    sites=sites,
-                    variables=(
-                        (*WIND_VARIABLES, *EIGHTY_METRE_VARIABLES)
-                        if product != "era5"
-                        else WIND_VARIABLES
-                    ),
-                    models_parameter=models_parameter,
-                    first_date=FIRST_DATE if year == first_year else f"{year}-01-01",
-                    last_date=LAST_DATE if year == LAST_YEAR else f"{year}-12-31",
-                    base_url=base_url,
-                    cell_selection="land",
-                )
-                for year in range(first_year, LAST_YEAR + 1)
+        frame = pl.concat(
+            fetch_point_frame(
+                sites=sites,
+                variables=(
+                    (*WIND_VARIABLES, *EIGHTY_METRE_VARIABLES)
+                    if product != "era5"
+                    else WIND_VARIABLES
+                ),
+                models_parameter=models_parameter,
+                first_date=FIRST_DATE if year == first_year else f"{year}-01-01",
+                last_date=LAST_DATE if year == LAST_YEAR else f"{year}-12-31",
+                base_url=base_url,
+                cell_selection="land",
             )
-            .unique(subset=["site", "time"], keep="first")
-            .sort("site", "time")
-        )
+            for year in range(first_year, LAST_YEAR + 1)
+        ).sort("site", "time")
         path = output_path_for(product=product)
         path.parent.mkdir(parents=True, exist_ok=True)
         frame.write_parquet(path)

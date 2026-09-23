@@ -9,9 +9,9 @@ height's direction as sine and cosine, and its 10 m speed — plus the hour of d
 year, and the UKV era, fitted per generator by the tested out-of-fold loop from
 `studies.cross_validation`. The hub height is 100 m for ERA5 and UKV and 80 m for the ICON products,
 whose served 100 m value is their 120 m speed rescaled. So a contrast between two arms is a contrast
-between the products' wind. A second arm per product, shown the served 100 m speed and direction
-alone, and a second hyperparameter setting are sensitivity checks. The products are ERA5, UKV,
-ICON-D2, ICON-EU, and ICON global, downloaded by `fetch_wind_point.py`.
+between the products' wind. A second arm per product, shown the served 100 m speed and direction and
+the 10 m speed, and a second hyperparameter setting are sensitivity checks. The products are ERA5,
+UKV, ICON-D2, ICON-EU, and ICON global, downloaded by `fetch_wind_point.py`.
 
 **The power hour is centred on the label, unlike the solar study's.** Open-Meteo's wind is an
 instantaneous value at the label, where its radiation is a mean over the hour ending there, so the
@@ -53,7 +53,7 @@ from weather_products import (
     _with_eras,
 )
 
-_LOG = logging.getLogger(__name__)
+_LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
 OUTPUT_DIR_NAME: Final[str] = "beam_diffuse_wind_products"
 """The results directory under `STUDY_DATA_DIR`."""
@@ -74,8 +74,13 @@ Great-Britain-wide models is better; and whether the regional model adds anythin
 contrast in the report is exploratory.
 """
 
-EXPLORATORY_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+REPORTED_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    *DECIDING_CONTRASTS,
     ("icon_d2_wind", "ukv_wind"),
+)
+"""The deciding contrasts, plus ICON-D2 against UKV, reported in every block."""
+
+EXPLORATORY_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("icon_global_wind", "icon_eu_wind"),
     ("icon_d2_wind", "era5_wind"),
     ("icon_global_wind", "era5_wind"),
@@ -161,13 +166,13 @@ ICON global's deficit the steps explain.
 
 
 def _hub_height_m(*, product: str) -> int:
-    """Return the height in metres a product's wind arm is shown: its native one nearest 100 m.
+    """Return the height in metres of the wind a product's arm is shown.
 
     Args:
         product: A key of `PRODUCTS`.
 
     Returns:
-        80 for the ICON products, 100 otherwise.
+        80 for the ICON products, whose native heights are 80 m and 120 m, and 100 otherwise.
     """
     return 80 if product.startswith("icon") else 100
 
@@ -289,7 +294,7 @@ def _jobs() -> list[Job]:
 
 
 def _mean_speed_m_s(*, frame: pl.DataFrame, product: str) -> float:
-    """Return one product's mean hub-height wind speed in m/s, from Open-Meteo's km/h.
+    """Return one product's mean served 100 m wind speed in m/s, from Open-Meteo's km/h.
 
     Args:
         frame: The common rows.
@@ -298,7 +303,7 @@ def _mean_speed_m_s(*, frame: pl.DataFrame, product: str) -> float:
     Returns:
         The mean speed.
     """
-    return float(frame.select(pl.col(f"speed_hub_{product}").mean()).item()) / 3.6
+    return float(frame.select(pl.col(f"speed_100m_{product}").mean()).item()) / 3.6
 
 
 def _scoped(*, losses: pl.DataFrame, scope: str) -> pl.DataFrame:
@@ -351,7 +356,6 @@ def _check_arms(*, losses: pl.DataFrame, wind: pl.DataFrame, sites: list[str]) -
             wind.filter(pl.col("arm") != "ukv_wind"),
             losses.filter(pl.col("arm") == "ukv_80m").with_columns(arm=pl.lit("ukv_wind")),
         ],
-        how="diagonal_relaxed",
     )
     lines = [
         "",
@@ -458,7 +462,7 @@ def _report(*, frame: pl.DataFrame, losses: pl.DataFrame) -> str:
         )
     lines += ["", "Mean absolute error as a percentage of each site's P99 output.", ""]
     lines += ["#### Deciding contrasts, named before the run", "", *CONTRAST_HEADER]
-    for treatment, reference in (*DECIDING_CONTRASTS, ("icon_d2_wind", "ukv_wind")):
+    for treatment, reference in REPORTED_CONTRASTS:
         lines.append(
             _contrast_line(losses=wind, treatment=treatment, reference=reference, label="all")
         )
@@ -484,11 +488,7 @@ def _report(*, frame: pl.DataFrame, losses: pl.DataFrame) -> str:
             losses=_scoped(losses=wind, scope=scope), treatment=t, reference=r, label=scope
         )
         for scope in ("pre", "pre_matched", "post", "winter", "summer")
-        for t, r in (
-            *DECIDING_CONTRASTS,
-            ("icon_d2_wind", "ukv_wind"),
-            ("icon_d2_wind", "era5_wind"),
-        )
+        for t, r in (*REPORTED_CONTRASTS, ("icon_d2_wind", "era5_wind"))
     ]
     lines += [
         "",
@@ -504,18 +504,17 @@ def _report(*, frame: pl.DataFrame, losses: pl.DataFrame) -> str:
     for label, scoped in (("served 100 m and 10 m", served_100m), ("second setting", sensitivity)):
         lines += [
             _contrast_line(losses=scoped, treatment=t, reference=r, label=label)
-            for t, r in (*DECIDING_CONTRASTS, ("icon_d2_wind", "ukv_wind"))
+            for t, r in REPORTED_CONTRASTS
         ]
     lines += _check_arms(losses=pooled, wind=wind, sites=sites)
     lines += ["", "#### Other contrasts (exploratory)", "", *CONTRAST_HEADER]
     lines += [
         _contrast_line(losses=wind, treatment=t, reference=r, label="all")
         for t, r in EXPLORATORY_CONTRASTS
-        if (t, r) != ("icon_d2_wind", "ukv_wind")
     ]
     lines += [
         "",
-        "Mean wind speed at the hub height shown, all sites: "
+        "Mean served 100 m wind speed, all sites: "
         + ", ".join(
             f"{product} {_mean_speed_m_s(frame=frame, product=product):.2f} m/s"
             for product in PRODUCTS

@@ -86,7 +86,7 @@ def output_path_for(*, dataset_name: str) -> Path:
 MIN_YEARS_OF_READINGS: Final[float] = 1.0
 """A series with less than this much history is dropped.
 
-The roster holds seven PV series, one of which is a single row; the threshold exists to drop that
+The PV roster holds seven series, one of which is a single row; the threshold exists to drop that
 one without naming it.
 """
 
