@@ -549,6 +549,24 @@ it, and every metered site in this comparison sits inside it, so nothing here sa
 would perform in the west. **A limited-area model from a neighbouring country can be a component of
 a blend over part of the licence area, and cannot be the single source feeding all of it.**
 
+![ICON-D2 has no data west of a line running from 1.8°W at 49.9°N to 3.9°W at 57.3°N, and AROME
+France has none north of 55.4°N. The map draws Great Britain only, because the repository holds no
+boundary for Northern Ireland](assets/weather_product_domains.svg)
+
+**Two limited-area weather models cover only part of the UK, and every other weather product this
+page names covers all of it.** ICON-D2 misses South West England, Wales, the western edge of
+the Midlands and of North West England, the Isle of Man, Northern Ireland, and Scotland west of
+Edinburgh and north of about 57.5°N, including Orkney and Shetland. Météo-France's AROME France,
+listed on the [weather products survey](../background/weather-products-survey.md), misses
+everything north of 55.4°N: all of Scotland except its southern fringe, and the northern tip of
+Northumberland. AROME France does cover Northern Ireland, whose northernmost point is at 55.3°N.
+The ICON-D2 outline is traced from the valid-data mask of one file the German weather service
+publishes, the 2 m temperature from the 00 UTC run of 23 September 2026. That outline's western
+edge at 53.2°N sits at 2.6°W, which agrees with Open-Meteo returning no data west of about 2.5°W.
+The AROME France outline is the plain rectangle in the grid description Open-Meteo publishes, and
+Open-Meteo's API confirms the northern edge by returning data at 55.3°N and none at 55.5°N. The
+map is drawn by `studies/beam_diffuse_split/weather_product_domains.py`.
+
 **CAMS's own reliability flag is worth acting on, and dropping the flagged hours raises a
 P99-normalised error even though it improves the data.** The service flagged 17.9% of the daylight
 hours it delivered as less than 90% reliable. Those hours are much darker than the ones kept — 33

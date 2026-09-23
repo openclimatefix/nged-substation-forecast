@@ -70,6 +70,7 @@ separation model's estimate of the same split, says what the *published field* b
 | `weather_products.py` | Scores six weather products on one common row set with the folds cut inside each UKV era, and answers which product best describes past sunshine. Written up as [Which weather product best describes past sunshine?](https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-solar/). |
 | `weather_product_charts.py` | Draws the eight anonymised charts on the sunshine write-up from `weather_products.py`'s report, and bootstraps the two sets of numbers the report lacks after reproducing a printed row. Optimise each SVG with `npx svgo@4 --multipass --precision=1 --final-newline` before committing it. |
 | `wind_product_charts.py` | The same for the five charts on [Which weather product best describes past wind?](https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-wind/), from `wind_products.py`'s report. |
+| `weather_product_domains.py` | Draws the map of the ICON-D2 and AROME France domains over Great Britain on [Data sources](https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#weather-data), from the three GeoJSON outlines in `domains/`. Its module docstring names where each outline came from. |
 
 ## The arms
 
