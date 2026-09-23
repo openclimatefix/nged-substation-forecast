@@ -74,7 +74,8 @@ page only after a committed script prints it into the report.
    fixed.
 6. **Finish the charts and the page** (sections below).
 7. **Diff review**, with the `implement-issue` skill.
-8. **End with a `prose-review` of the page, one rule per pass** (see "Reviews").
+8. **End with a `prose-review` of the page, one rule per pass, alongside persona and evidence
+   reviews** (see "Reviews").
 9. **Merge, only as the maintainer has authorised,** after checking the PR's body and commit
    messages for closing keywords (see "GitHub hygiene").
 
@@ -360,6 +361,33 @@ checked. A reviewer asked to check every rule at once reports the loudest fault 
 and misses the quieter ones. The `prose-review` skill sets the order of the passes, how to split a
 long page across sub-agents, and how to triage the findings. Review the new prose in the READMEs and
 docstrings in the same sweep.
+
+**Alongside the prose review, review the page from several personas, starting with the people who
+built each product the page compares.** A prose review checks how the page reads, not whether its
+claims are fair or would survive an expert reader. Give each role to its own fresh Opus reviewer,
+with the page's chart renders:
+
+- **The builders:** one persona per team whose product the page compares, such as DWD's ICON team,
+  the Met Office's UKV team, ECMWF's ERA5 team, or the CAMS radiation service team. Each checks that
+  the page describes the product's grid, leads, heights, and purpose correctly, and flags harsh
+  wording, rankings claimed more broadly than the evidence, and defects blamed on the product that
+  belong to the archive serving it. Ask for wording that is accurate and respectful and still
+  states the finding plainly, never a softening into vagueness.
+- **The users:** the network engineer who has to act on the recommendation, a forecasting
+  researcher who will cite the page, and a sceptical statistician. Each reports where they stop
+  understanding, where they would draw a wrong conclusion, and where they would stop trusting the
+  page.
+- **The evidence:** a reviewer who checks every number, every "beats", every "best", every causal
+  "because", and every chart title against the report and the saved losses, computing what the
+  report does not print.
+
+The personas earn their place. On the two weather-product pages, the builder reviewers found that
+ICON global's wind steps look like an artefact of how the archive serves its grid cells rather than
+a fault in DWD's model, and that "the weakest product" overclaimed a gap that closes once the model
+is told about the steps. Neither finding came from the prose or science reviews. Every reviewer
+reports findings as JSON (line, verbatim quote, replacement, and evidence) and edits nothing, and the
+findings from every reviewer are triaged together, because reviewers contradict each other and the
+contradiction is the signal.
 
 ## Anonymisation
 
