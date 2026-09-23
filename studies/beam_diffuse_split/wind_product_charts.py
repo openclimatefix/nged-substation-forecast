@@ -30,11 +30,11 @@ import polars as pl
 from fetch_wind_point import output_path_for
 from sources import STUDY_DATA_DIR
 from studies.charts import (
-    NAMED_SUFFIX,
     PLOT_WIDTH_PX,
     ContrastKey,
     figure,
     interval_panel,
+    planning,
     report_contrasts,
     report_errors,
     select_contrasts,
@@ -123,18 +123,21 @@ def _reproduce(*, pooled: pl.DataFrame, report_text: str) -> None:
 
 
 AFTER_FIRST_RUN_SUFFIX: Final[str] = " (planned; 80 m chosen after the first run)"
-"""Ends the label of a named contrast whose ICON arm was switched to 80 m after the first run."""
+"""Ends the label of a named contrast whose ICON arm was switched to 80 m after the first run.
+
+A row carrying this suffix is not marked `planned`, so `NAMED_SUFFIX` does not also bold its label
+in a mixed figure: only a row whose arm is exactly as the plan specified gets that.
+"""
 
 
-def _arm_suffix(*, treatment: str) -> str:
-    """Return the label suffix for a named arm: bold only where the arm is the planned one."""
-    return AFTER_FIRST_RUN_SUFFIX if treatment.startswith("icon") else NAMED_SUFFIX
+def _changed_after_first_run(*arms: str) -> bool:
+    """Say whether a named contrast has an ICON arm, each switched to 80 m after the first run."""
+    return any(arm.startswith("icon") for arm in arms)
 
 
 def _deciding_label(*, treatment: str, reference: str) -> str:
     """Label a named contrast, marking it as changed where either arm is an ICON product."""
-    changed = treatment.startswith("icon") or reference.startswith("icon")
-    suffix = AFTER_FIRST_RUN_SUFFIX if changed else NAMED_SUFFIX
+    suffix = AFTER_FIRST_RUN_SUFFIX if _changed_after_first_run(treatment, reference) else ""
     return _contrast_name(treatment=treatment, reference=reference) + suffix
 
 
@@ -171,36 +174,46 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
     )
     labels = [
         f"{NAMES[p]} · {_two_places(errors[p])}%"
-        + (_arm_suffix(treatment=f"{p}_wind") if f"{p}_wind" in named else "")
+        + (AFTER_FIRST_RUN_SUFFIX if f"{p}_wind" in named and _changed_after_first_run(p) else "")
         for p in order
     ]
+    left_rows = _rows(
+        contrasts=by_product,
+        labels=labels,
+        planned=[f"{p}_wind" in named and not _changed_after_first_run(p) for p in order],
+    )
+    right_rows = _rows(
+        contrasts=select_contrasts(
+            contrasts=contrasts,
+            wanted=[ContrastKey(SECTION_DECIDING, "all", t, r) for t, r in DECIDING],
+        ),
+        labels=[_deciding_label(treatment=t, reference=r) for t, r in DECIDING],
+        planned=[not _changed_after_first_run(t, r) for t, r in DECIDING],
+    )
+    figure_planning = planning(rows=[left_rows, right_rows])
     domain = (-1.0, 1.0)
     left = interval_panel(
-        rows=_rows(contrasts=by_product, labels=labels),
+        rows=left_rows,
         x_domain=domain,
         x_title="Mean absolute error minus ERA5's (points of capacity)",
         zero_label="same as ERA5",
         better_label="better than ERA5",
         panel_title="Every product against ERA5",
+        figure_planning=figure_planning,
     )
     right = interval_panel(
-        rows=_rows(
-            contrasts=select_contrasts(
-                contrasts=contrasts,
-                wanted=[ContrastKey(SECTION_DECIDING, "all", t, r) for t, r in DECIDING],
-            ),
-            labels=[_deciding_label(treatment=t, reference=r) for t, r in DECIDING],
-        ),
+        rows=right_rows,
         x_domain=(-1.0, 0.6),
         x_title=X_TITLE,
         zero_label="no difference",
         better_label="first product better",
         panel_title="The four planned contrasts",
+        figure_planning=figure_planning,
     )
     return figure(
         panels=[left, right],
         number=1,
-        planned=True,
+        figure_planning=figure_planning,
         title="UKV and ICON-D2 describe past wind best of the five products tested",
         subtitle=[
             (
@@ -241,6 +254,7 @@ def _half_years(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         pl.col("treatment").replace_strict({f"{p}_wind": i for i, p in enumerate(products)}),
         maintain_order=True,
     )
+    figure_planning = planning(rows=[rows])
     panel = interval_panel(
         rows=rows,
         x_domain=(-1.0, 0.6),
@@ -249,15 +263,14 @@ def _half_years(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         better_label="better than ERA5",
         conditions=HALVES,
         condition_title="Months",
+        figure_planning=figure_planning,
     )
     return figure(
         panels=[panel],
         number=2,
+        figure_planning=figure_planning,
         title="UKV's and ICON-D2's advantage over ERA5 is larger from April to September",
-        subtitle=[
-            f"{DOTS} Exploratory.",
-            f"{CAPACITY} {SCOPE}",
-        ],
+        subtitle=[DOTS, f"{CAPACITY} {SCOPE}"],
     )
 
 
@@ -289,34 +302,41 @@ def _icon_d2_against_ukv(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
             (SECTION_CHECKS, f"ICON lead {lead} h", f"{lead} h into the run") for lead in (0, 1, 2)
         ],
     }
+    group_rows = {
+        name: _rows(
+            contrasts=select_contrasts(
+                contrasts=contrasts,
+                wanted=[
+                    ContrastKey(section, scope, "icon_d2_wind", "ukv_wind")
+                    for section, scope, _ in rows
+                ],
+            ),
+            labels=[label for _, _, label in rows],
+        )
+        for name, rows in groups.items()
+    }
+    figure_planning = planning(rows=list(group_rows.values()))
     panels = [
         interval_panel(
-            rows=_rows(
-                contrasts=select_contrasts(
-                    contrasts=contrasts,
-                    wanted=[
-                        ContrastKey(section, scope, "icon_d2_wind", "ukv_wind")
-                        for section, scope, _ in rows
-                    ],
-                ),
-                labels=[label for _, _, label in rows],
-            ),
+            rows=rows,
             x_domain=(-0.6, 0.4),
             x_title=X_TITLE if index == len(groups) - 1 else "",
             zero_label="same as UKV",
             better_label="ICON-D2 better",
             panel_title=name,
             reference_labels=index == 0,
+            figure_planning=figure_planning,
         )
-        for index, (name, rows) in enumerate(groups.items())
+        for index, (name, rows) in enumerate(group_rows.items())
     ]
     return figure(
         panels=panels,
         number=4,
+        figure_planning=figure_planning,
         title="ICON-D2 leads UKV across the window, but not since UKV's upgrade",
         subtitle=[
             (
-                "ICON-D2's mean absolute error minus UKV's. Exploratory; the UKV-at-80-m and "
+                "ICON-D2's mean absolute error minus UKV's. The UKV-at-80-m and "
                 "hours-into-the-run rows were added after the first run."
             ),
             "The post-upgrade row rests on 8 months, so its interval is likely too narrow.",
@@ -507,6 +527,7 @@ def _steps(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatChart:
     )
     ratios = _fortnightly_ratios()
     step_ratios = _step_ratios(report_text=report_text)
+    figure_planning = planning(rows=[rows])
     right = interval_panel(
         rows=rows,
         x_domain=(-0.5, 2.5),
@@ -517,6 +538,7 @@ def _steps(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatChart:
         conditions=conditions,
         condition_title="The model is",
         panel_title="How much the steps add to ICON global's error",
+        figure_planning=figure_planning,
     )
     return figure(
         panels=[
@@ -527,6 +549,7 @@ def _steps(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatChart:
             right,
         ],
         number=5,
+        figure_planning=figure_planning,
         title="About half of ICON global's gap to ICON-EU is a pair of steps in its served wind at "
         "one generator",
         subtitle=[
@@ -551,35 +574,49 @@ def _per_generator(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     Returns:
         Figure 3.
     """
-    panels = []
-    for index, product in enumerate(("ukv", "icon_d2", "icon_eu")):
-        treatment = f"{product}_wind"
-        section = SECTION_OTHER if product == "icon_d2" else SECTION_DECIDING
-        numbers = select_contrasts(
-            contrasts=contrasts,
-            wanted=[ContrastKey(section, f"site {site}", treatment, "era5_wind") for site in SITES],
+    products = ("ukv", "icon_d2", "icon_eu")
+    product_rows = [
+        _rows(
+            contrasts=select_contrasts(
+                contrasts=contrasts,
+                wanted=[
+                    ContrastKey(
+                        SECTION_OTHER if product == "icon_d2" else SECTION_DECIDING,
+                        f"site {site}",
+                        f"{product}_wind",
+                        "era5_wind",
+                    )
+                    for site in SITES
+                ],
+            ),
+            labels=[f"Generator {site}" for site in SITES],
         )
-        name = _contrast_name(treatment=treatment, reference="era5_wind")
-        panels.append(
-            interval_panel(
-                rows=_rows(contrasts=numbers, labels=[f"Generator {site}" for site in SITES]),
-                x_domain=(-1.5, 0.5),
-                x_title=X_TITLE if index == 2 else "",
-                zero_label="same as ERA5",
-                better_label="better than ERA5",
-                panel_title=name,
-                reference_labels=index == 0,
-            )
+        for product in products
+    ]
+    figure_planning = planning(rows=product_rows)
+    panels = [
+        interval_panel(
+            rows=rows,
+            x_domain=(-1.5, 0.5),
+            x_title=X_TITLE if index == len(products) - 1 else "",
+            zero_label="same as ERA5",
+            better_label="better than ERA5",
+            panel_title=_contrast_name(treatment=f"{product}_wind", reference="era5_wind"),
+            reference_labels=index == 0,
+            figure_planning=figure_planning,
         )
+        for index, (product, rows) in enumerate(zip(products, product_rows, strict=True))
+    ]
     return figure(
         panels=panels,
         number=3,
+        figure_planning=figure_planning,
         title=(
             "UKV's advantage over ERA5 is statistically significant at the 5% level at two of the "
             "three generators"
         ),
         subtitle=[
-            f"{DOTS} Exploratory. The ICON-D2 rows are computed for this chart.",
+            f"{DOTS} The ICON-D2 rows are computed for this chart.",
             f"{CAPACITY} {SCOPE}",
         ],
     )

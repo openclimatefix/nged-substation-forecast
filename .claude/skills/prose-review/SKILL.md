@@ -275,7 +275,7 @@ expensive passes get the freshest attention:
 9. Money metaphors for performance
 10. Intent attributed to code, a config file or a tool — "wants", "likes", "prefers", "believes",
     "decides", "chooses"
-11. Ambiguous "network"
+11. Ambiguous "network" or "model"
 12. Numerals
 13. Serial commas
 14. Acronyms expanded on first use

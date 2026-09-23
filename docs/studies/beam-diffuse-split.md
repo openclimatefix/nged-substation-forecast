@@ -35,6 +35,12 @@ the same error by 4.29 points, against 0.126 for the widest contrast between two
 only in their beam and diffuse columns — a factor of 34. The split is a question to settle inside
 the choice of irradiance product.
 
+> **How this page was made.** The research question came from a human. Everything else — the code
+> behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
+> AI model (for this page, Claude Opus 5, with later revisions by Claude Opus 5.5). A human has
+> reviewed the figures and the text, and several independent Claude reviewers have checked the
+> method, the evidence, and the prose adversarially.
+
 ## The feed this project runs on carries no direct beam
 
 **The ECMWF ensemble feed this project ingests carries the total short-wave irradiance and no

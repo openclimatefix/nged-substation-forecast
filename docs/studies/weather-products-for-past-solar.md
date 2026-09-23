@@ -49,6 +49,13 @@ one-day delay allows, and for historical features in the live service ICON-EU or
 evidence is six metered solar farms inside one 25 km by 23 km box in Lincolnshire, and 79,384
 generator-hours from December 2022 to September 2026.
 
+> **How this page was made.** The research question came from a human. Everything else — the code
+> behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
+> AI model (for this page, Claude Opus 5.5, reusing the data-preparation and model-fitting code that
+> Claude Opus 5 wrote for the [beam/diffuse study](beam-diffuse-split.md)). A human has reviewed the
+> figures and the text, and several independent Claude reviewers have checked the method, the
+> evidence, and the prose adversarially.
+
 ![Figure 1: CAMS describes past sunshine best of the six products tested, by a wide margin](assets/sunshine_headline.svg)
 
 In Figure 1 the top panel's intervals are against ERA5, so two products whose intervals overlap
@@ -147,11 +154,12 @@ difference between two products is a difference between their irradiance alone.*
   hours. A comparison is planned when it was written into the study plan before any result existed;
   every other figure is exploratory, chosen or added after results were seen. The distinction
   matters because with many comparisons, about 1 in 20 exploratory rows reaches significance at the
-  5% level by chance, so an exploratory result is a lead to follow up rather than a finding. The
-  charts mark each planned row "(planned)". The ranking rests on four planned contrasts: CAMS
-  against ICON-D2, ICON-EU against ICON-D2, ICON-EU against UKV, and ICON global against ICON-EU.
-  Every other figure on this page is exploratory. The UKV snapshot rebuilds, the hour-by-hour and
-  by-lead breakdowns, and the split of ICON global by lead were added after the first run.
+  5% level by chance, so an exploratory result is a lead to follow up rather than a finding. A chart
+  holding both kinds marks each planned row "(planned)". A chart whose rows are all one kind says so
+  once, in its subtitle. The ranking rests on four planned contrasts: CAMS against ICON-D2, ICON-EU
+  against ICON-D2, ICON-EU against UKV, and ICON global against ICON-EU. Every other figure on this
+  page is exploratory. The UKV snapshot rebuilds, the hour-by-hour and by-lead breakdowns, and the
+  split of ICON global by lead were added after the first run.
 
 **The folds are cut by `studies.cross_validation` and the intervals computed by `studies.bootstrap`,
 both covered by tests.**
