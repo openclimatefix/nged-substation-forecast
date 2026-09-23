@@ -93,7 +93,7 @@ DECIDING: Final[tuple[tuple[str, str], ...]] = (
     ("icon_eu_global", "ukv_global"),
     ("icon_global_global", "icon_eu_global"),
 )
-"""The four contrasts named before the run, as the report writes them."""
+"""The four planned contrasts, as the report writes them."""
 
 HEADLINE_DOMAIN: Final[tuple[float, float]] = (-4.5, 1.0)
 """The x range of the headline's left panel."""
@@ -147,7 +147,7 @@ def _served_contrast_name(*, treatment: str, reference: str) -> str:
 
 
 def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
-    """Draw every product against ERA5 above the four contrasts named before the run.
+    """Draw every product against ERA5 above the four planned contrasts.
 
     Args:
         contrasts: Every contrast row in the report.
@@ -199,17 +199,18 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         x_title=X_TITLE,
         zero_label="no difference",
         better_label="first product better",
-        panel_title="The four contrasts named before the run",
+        panel_title="The four planned contrasts",
         family_key=False,
     )
     return figure(
         panels=[left, right],
         number=1,
+        planned=True,
         title="CAMS describes past sunshine best of the six products tested, by a wide margin",
         subtitle=[
             (
                 "Top: each product against ERA5 (exploratory); each label gives the product's own "
-                "error. Bottom: the four contrasts named before the run."
+                "error. Bottom: the four planned contrasts."
             ),
             f"{DOTS} {CAPACITY}",
             SCOPE,
@@ -264,6 +265,7 @@ def _cams_breakdown(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     return figure(
         panels=panels,
         number=2,
+        planned=True,
         title=(
             "CAMS's margin over ICON-D2 holds at every generator, in every season, and every year"
         ),
@@ -360,6 +362,7 @@ def _icon_d2_leads(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatC
     return figure(
         panels=[hourly, summary],
         number=3,
+        planned=True,
         title="ICON-D2's advantage over ICON-EU shrinks within hours of each run",
         subtitle=[
             (
@@ -449,6 +452,7 @@ def _icon_eu_rivals(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     return figure(
         panels=panels,
         number=4,
+        planned=True,
         title=(
             "ICON-EU does not beat UKV rebuilt from its snapshots, but beats ICON global and "
             "Open-Meteo's hourly UKV"
@@ -596,10 +600,11 @@ def _neighbours(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     return figure(
         panels=[panel],
         number=7,
+        planned=True,
         title="The ranking holds for a generator predicted from its neighbours",
         subtitle=[
             (
-                "The four contrasts named before the run. Hollow, and exploratory: a model trained "
+                "The four planned contrasts. Hollow, and exploratory: a model trained "
                 "on the other five generators, with the scored months withheld everywhere."
             ),
             f"{DOTS} {CAPACITY}",

@@ -74,7 +74,7 @@ DECIDING: Final[tuple[tuple[str, str], ...]] = (
     ("icon_eu_wind", "ukv_wind"),
     ("icon_d2_wind", "icon_eu_wind"),
 )
-"""The four contrasts named before the run, as the report writes them."""
+"""The four planned contrasts, as the report writes them."""
 
 SCOPE: Final[str] = "Three wind farms in Lincolnshire, August 2024 to September 2026."
 HALVES: Final[tuple[str, str]] = ("April to September", "October to March")
@@ -122,7 +122,7 @@ def _reproduce(*, pooled: pl.DataFrame, report_text: str) -> None:
             raise ValueError(msg)
 
 
-AFTER_FIRST_RUN_SUFFIX: Final[str] = " (named before the run; 80 m chosen after it)"
+AFTER_FIRST_RUN_SUFFIX: Final[str] = " (planned; 80 m chosen after the first run)"
 """Ends the label of a named contrast whose ICON arm was switched to 80 m after the first run."""
 
 
@@ -139,7 +139,7 @@ def _deciding_label(*, treatment: str, reference: str) -> str:
 
 
 def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
-    """Draw every product against ERA5 above the four contrasts named before the run.
+    """Draw every product against ERA5 above the four planned contrasts.
 
     Args:
         contrasts: Every contrast row in the report.
@@ -195,17 +195,18 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         x_title=X_TITLE,
         zero_label="no difference",
         better_label="first product better",
-        panel_title="The four contrasts named before the run",
+        panel_title="The four planned contrasts",
     )
     return figure(
         panels=[left, right],
         number=1,
+        planned=True,
         title="UKV and ICON-D2 describe past wind best of the five products tested",
         subtitle=[
             (
                 "Top: each product against ERA5; each label gives the product's own error. The "
-                "ICON-D2 and ICON global rows are exploratory. Bottom: the four contrasts named "
-                "before the run, planned on the served 100 m wind; each ICON product was switched "
+                "ICON-D2 and ICON global rows are exploratory. Bottom: the four planned contrasts, "
+                "planned with the served 100 m wind; each ICON product was switched "
                 "to its 80 m wind after the first run."
             ),
             f"{DOTS} {CAPACITY}",

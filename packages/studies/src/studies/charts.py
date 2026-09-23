@@ -64,8 +64,14 @@ Panel = alt.LayerChart | alt.HConcatChart | alt.VConcatChart
 BetterDirectionType = Literal["negative", "positive"]
 """Which sign of difference is the better one."""
 
-NAMED_SUFFIX: Final[str] = " (named before the run)"
-"""Ends the label of a row whose contrast was named before the run, which `interval_panel` bolds."""
+NAMED_SUFFIX: Final[str] = " (planned)"
+"""Ends the label of a row whose contrast was written into the study plan, which is set bold."""
+
+PLANNED_NOTE: Final[str] = (
+    "Planned: one of the comparisons written into the study plan before any result existed. "
+    "Every other row is exploratory."
+)
+"""The subtitle line `figure` adds to any figure whose rows carry `NAMED_SUFFIX`."""
 
 CONDITION_SHAPES: Final[tuple[str, ...]] = ("circle", "diamond", "square")
 """The point shape of each condition, in the order the conditions are given."""
@@ -650,6 +656,7 @@ def figure(
     number: int,
     title: str,
     subtitle: Sequence[str],
+    planned: bool = False,
 ) -> alt.VConcatChart:
     """Stack panels, one above the other, under a "Figure N:" caption.
 
@@ -662,13 +669,19 @@ def figure(
         number: The figure's number on its page.
         title: The finding the figure shows.
         subtitle: Short lines naming the quantity, its scope, and what a dot and a line mean.
+        planned: Whether any row carries `NAMED_SUFFIX`, which adds `PLANNED_NOTE` to the
+            subtitle.
 
     Returns:
         The figure.
     """
     caption = alt.TitleParams(
         wrapped(text=f"Figure {number}: {title}", width=_TITLE_CHARACTERS),
-        subtitle=[line for text in subtitle for line in wrapped(text=text)],
+        subtitle=[
+            line
+            for text in (*subtitle, *((PLANNED_NOTE,) if planned else ()))
+            for line in wrapped(text=text)
+        ],
         anchor="start",
         offset=14,
         subtitleColor=ocf.BLACK_1,

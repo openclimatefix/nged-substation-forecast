@@ -143,12 +143,15 @@ difference between two products is a difference between their irradiance alone.*
   significant at the 5% level. The test covers month-to-month variation in the weather only, not
   variation between generators. The intervals are not corrected for the number of comparisons, so
   among the many exploratory rows some will reach significance by chance.
-- **Four contrasts named before the run.** A contrast is the difference between two products'
-  errors on the same hours. The ranking rests on four contrasts, fixed before any result was seen:
-  CAMS against ICON-D2, ICON-EU against ICON-D2, ICON-EU against UKV, and ICON global against
-  ICON-EU. Every other figure on this page is exploratory. The UKV snapshot rebuilds, the
-  hour-by-hour and by-lead breakdowns, and the split of ICON global by lead were added after the
-  first run.
+- **Four planned contrasts.** A contrast is the difference between two products' errors on the same
+  hours. A comparison is planned when it was written into the study plan before any result existed;
+  every other figure is exploratory, chosen or added after results were seen. The distinction
+  matters because with many comparisons, about 1 in 20 exploratory rows reaches significance at the
+  5% level by chance, so an exploratory result is a lead to follow up rather than a finding. The
+  charts mark each planned row "(planned)". The ranking rests on four planned contrasts: CAMS
+  against ICON-D2, ICON-EU against ICON-D2, ICON-EU against UKV, and ICON global against ICON-EU.
+  Every other figure on this page is exploratory. The UKV snapshot rebuilds, the hour-by-hour and
+  by-lead breakdowns, and the split of ICON global by lead were added after the first run.
 
 **The folds are cut by `studies.cross_validation` and the intervals computed by `studies.bootstrap`,
 both covered by tests.**
@@ -227,13 +230,13 @@ longer leads fall at 10 to 12 and 16 to 18 UTC, so a difference in either model'
 day would show up here as an effect of lead.
 
 **ICON-EU beats Open-Meteo's hourly value for UKV by 0.48 points [0.30, 0.66], one of the four
-contrasts named before the run, and the whole gap disappears once UKV's hour is rebuilt from its own
-snapshots.** Each ICON product's archived value for an hour is a mean over that hour. UKV publishes
-a snapshot each hour, and Open-Meteo builds UKV's hourly value from the snapshot at the hour's end,
-rescaled by the change in the sun's angle. In comparisons added after the first run, averaging UKV's
-snapshots at both ends of the hour cuts UKV's error by 0.60 points, which leaves ICON-EU 0.12 points
-behind [−0.06, +0.30]. Given the two snapshots as separate inputs, UKV is 0.23 points ahead of
-ICON-EU [0.05, 0.41].
+planned contrasts, and the whole gap disappears once UKV's hour is rebuilt from its own snapshots.**
+Each ICON product's archived value for an hour is a mean over that hour. UKV publishes a snapshot
+each hour, and Open-Meteo builds UKV's hourly value from the snapshot at the hour's end, rescaled by
+the change in the sun's angle. In comparisons added after the first run, averaging UKV's snapshots
+at both ends of the hour cuts UKV's error by 0.60 points, which leaves ICON-EU 0.12 points behind
+[−0.06, +0.30]. Given the two snapshots as separate inputs, UKV is 0.23 points ahead of ICON-EU
+[0.05, 0.41].
 
 **Showing a model the neighbouring hours helps both products by about 0.2 points, which is more than
 the gap between them.** A model shown ICON-EU's hourly mean for the hour before and after, as well

@@ -10,6 +10,7 @@ from studies.charts import (
     FAMILY_COLOURS,
     FAMILY_COLOURS_LIGHT,
     LABEL_WIDTH_PX,
+    PLANNED_NOTE,
     PLOT_WIDTH_PX,
     ContrastKey,
     Panel,
@@ -345,12 +346,12 @@ def test_family_colours_map_to_the_brand_theme_swatches():
     }
 
 
-def test_bold_labels_named_before_the_run():
+def test_bold_labels_planned():
     spec = _panel(_rows(["satellite"]))
     (interval,) = [layer for layer in _layer(spec, "rule") if "x2" in layer["encoding"]]
     expr = interval["encoding"]["y"]["axis"]["labelFontWeight"]["expr"]
 
-    assert "(named before the run)" in expr
+    assert "(planned)" in expr
     assert "'bold'" in expr
 
 
@@ -543,3 +544,13 @@ def test_the_zero_label_stays_inside_the_plot(
     ]
 
     assert zero_text["mark"]["align"] == align
+
+
+def test_a_planned_figure_explains_the_label_in_its_subtitle():
+    panels = [_panel_chart(_rows(["satellite", "reanalysis"]))]
+
+    planned = figure(panels=panels, number=1, title="t", subtitle=["s"], planned=True).to_dict()
+    plain = figure(panels=panels, number=1, title="t", subtitle=["s"]).to_dict()
+
+    assert " ".join(planned["title"]["subtitle"]) == f"s {PLANNED_NOTE}"
+    assert plain["title"]["subtitle"] == ["s"]

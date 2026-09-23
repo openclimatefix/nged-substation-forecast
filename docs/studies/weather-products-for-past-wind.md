@@ -26,7 +26,7 @@ variable-resolution model (UKV) describe past wind best of the five products tes
 belongs to the German weather service's (DWD's) Icosahedral Nonhydrostatic (ICON) model family.
 Across the window of this study, August 2024 to September 2026, UKV beats ERA5, the reanalysis of
 the European Centre for Medium-Range Weather Forecasts (ECMWF), by 0.44 points [0.24, 0.63], and
-ICON-D2 beats ERA5 by 0.58 points [0.40, 0.75], in a comparison not named before the run: 6% and 8%
+ICON-D2 beats ERA5 by 0.58 points [0.40, 0.75], in a comparison not written into the plan: 6% and 8%
 of ERA5's error. From October to March only ICON-D2's advantage over ERA5 is statistically
 significant at the 5% level. UKV's lead over ICON-EU is small, 0.13 points [0.01, 0.23], and depends
 on the model's settings.
@@ -131,12 +131,16 @@ nearest grid cell over land.**
   5% level. The test covers month-to-month variation in the weather only, not variation between
   generators. The intervals are not corrected for the number of comparisons, so among the many
   exploratory rows some will reach significance by chance.
-- **Four contrasts named before the first run:** ICON-EU against ERA5, UKV against ERA5, ICON-EU
-  against UKV, and ICON-D2 against ICON-EU. A contrast is the difference between two products'
-  errors on the same hours. Every other figure is exploratory. Every contrast is also rerun with a
-  second hyperparameter setting for the tree. The plan written before the first run gave the model
-  each product's served 100 m wind. After the first run, each ICON product was switched to its 80 m
-  wind. The planned version's results are reported alongside and change no ranking.
+- **Four planned contrasts:** ICON-EU against ERA5, UKV against ERA5, ICON-EU against UKV, and
+  ICON-D2 against ICON-EU. A contrast is the difference between two products' errors on the same
+  hours. A comparison is planned when it was written into the study plan before any result existed;
+  every other figure is exploratory, chosen or added after results were seen. The distinction
+  matters because with many comparisons, about 1 in 20 exploratory rows reaches significance at the
+  5% level by chance, so an exploratory result is a lead to follow up rather than a finding. The
+  charts mark each planned row "(planned)". Every contrast is also rerun with a second
+  hyperparameter setting for the tree. The plan written before the run gave the model each product's
+  served 100 m wind. After the first run, each ICON product was switched to its 80 m wind. The
+  results with the served 100 m wind are reported alongside and change no ranking.
 
 ## UKV and ICON-D2 describe past wind best of the five products tested
 
@@ -176,7 +180,7 @@ attributes to turbine availability the feed does not record.
 generators](assets/wind_per_generator.svg)
 
 **ICON-D2 leads UKV across the window, but not since UKV's upgrade.** Across the window ICON-D2
-leads by 0.14 points [0.03, 0.25], a comparison not named before the run. Before the upgrade ICON-D2
+leads by 0.14 points [0.03, 0.25], an exploratory comparison. Before the upgrade ICON-D2
 led by 0.22 points [0.08, 0.36]. Since the upgrade UKV is 0.06 points ahead [−0.03, +0.19], an
 interval resting on 8 months. ICON-D2's lead is also statistically significant at the 5% level from
 October to March, under the second hyperparameter setting, and with UKV given its 80 m wind.
