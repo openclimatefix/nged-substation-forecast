@@ -15,6 +15,7 @@ dependencies = [
     "polars>=1.38.1",
     "pvlib>=0.11.0",
     "pyproj>=3.6.0",
+    "scipy>=1.18.1",
     "vl-convert-python>=1.8.0",
     "xarray>=2026.1.0",
     "xgboost>=2.1.0",

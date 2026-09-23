@@ -41,9 +41,10 @@ from typing import Final
 import polars as pl
 from build_dataset import POWER_DELTA_URI, _wind_sites
 from fetch_wind_point import PRODUCTS, output_path_for
-from run_experiment import Job, _add_time_features, _run_all
+from run_experiment import Job, _add_time_features, run_all
 from sources import STUDY_DATA_DIR
 from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SENSITIVITY_HYPER_PARAMETERS
+from studies.neighbouring_hours import with_neighbouring_hours
 from studies.power import hourly_from_half_hourly
 from weather_products import (
     CONTRAST_HEADER,
@@ -51,8 +52,8 @@ from weather_products import (
     _contrast_line,
     _mae,
     _scope,
-    _with_eras,
     geometry_lines,
+    with_eras,
 )
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
@@ -201,7 +202,83 @@ def _hub_height_m(*, product: str) -> int:
     return 80 if product.startswith("icon") else 100
 
 
-def _joined(*, sites: pl.DataFrame, centred: bool = True) -> pl.DataFrame:
+HUB_OFFSETS_HOURS: Final[tuple[int, ...]] = (-2, -1, 1, 2)
+"""The neighbouring hours of hub-height speed a context arm is shown."""
+
+SURFACE_OFFSETS_HOURS: Final[tuple[int, ...]] = (-1, 1)
+"""The neighbouring hours of 10 m speed a context arm is shown."""
+
+
+def _offset_label(offset_hours: int) -> str:
+    """Return an offset's name stem, such as `minus2h` or `plus1h`.
+
+    Args:
+        offset_hours: The offset from the row's hour.
+
+    Returns:
+        The stem.
+    """
+    return f"{'minus' if offset_hours < 0 else 'plus'}{abs(offset_hours)}h"
+
+
+def context_columns(*, product: str) -> tuple[str, ...]:
+    """Return one product's neighbouring-hour speed columns, which `with_wind_context` adds.
+
+    Args:
+        product: A key of `PRODUCTS`.
+
+    Returns:
+        The hub-height speed at each of `HUB_OFFSETS_HOURS`, then the 10 m speed at each of
+        `SURFACE_OFFSETS_HOURS`.
+    """
+    return (
+        *(f"speed_hub_{_offset_label(offset)}_{product}" for offset in HUB_OFFSETS_HOURS),
+        *(f"speed_10m_{_offset_label(offset)}_{product}" for offset in SURFACE_OFFSETS_HOURS),
+    )
+
+
+def with_wind_context(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Add every product's hub-height and 10 m speeds in the hours around each row.
+
+    The neighbours are read from each product's own download, not from the scored rows, which
+    exclude hours by the target. Each download is checked to reproduce the frame's own hub-height
+    and 10 m speed columns at offset zero first, so a neighbour cannot come from a series labelled
+    differently.
+
+    Args:
+        frame: The common rows, carrying `speed_hub_<product>` and `speed_10m_<product>` for every
+            product, as `_wind_columns` names them.
+
+    Returns:
+        `frame`, in its own row order, with `context_columns(product=...)` for every product.
+
+    Raises:
+        ValueError: If a download does not reproduce the frame's columns at offset zero.
+    """
+    for product in PRODUCTS:
+        hub = f"wind_speed_{_hub_height_m(product=product)}m"
+        offsets = [(hub, offset) for offset in HUB_OFFSETS_HOURS]
+        offsets += [("wind_speed_10m", offset) for offset in SURFACE_OFFSETS_HOURS]
+        own_hub, _, _, own_surface = _wind_columns(product=product)
+        hub_at_zero, surface_at_zero = f"{own_hub}_at_zero", f"{own_surface}_at_zero"
+        zero_columns = {hub_at_zero: (hub, 0), surface_at_zero: ("wind_speed_10m", 0)}
+        frame = with_neighbouring_hours(
+            frame=frame,
+            source=pl.read_parquet(output_path_for(product=product)),
+            columns={
+                **zero_columns,
+                **dict(zip(context_columns(product=product), offsets, strict=True)),
+            },
+        )
+        for own, at_zero in ((own_hub, hub_at_zero), (own_surface, surface_at_zero)):
+            if not frame[at_zero].cast(pl.Float64).equals(frame[own].cast(pl.Float64)):
+                msg = f"the {product} download does not reproduce {own} at offset zero"
+                raise ValueError(msg)
+        frame = frame.drop(*zero_columns)
+    return frame
+
+
+def joined(*, sites: pl.DataFrame, centred: bool = True) -> pl.DataFrame:
     """Join the hourly power to every product's wind on the site-hours all of them cover.
 
     Args:
@@ -247,7 +324,7 @@ def _joined(*, sites: pl.DataFrame, centred: bool = True) -> pl.DataFrame:
     )
 
 
-def _common_rows(*, frame: pl.DataFrame, drop_zero_hours: bool = True) -> pl.DataFrame:
+def common_rows(*, frame: pl.DataFrame, drop_zero_hours: bool = True) -> pl.DataFrame:
     """Drop the rows no product should be scored on, by rules no product's values decide.
 
     Args:
@@ -269,7 +346,7 @@ def _common_rows(*, frame: pl.DataFrame, drop_zero_hours: bool = True) -> pl.Dat
     ).with_columns(constrained=pl.lit(value=False), cap_mw=pl.lit(None, dtype=pl.Float64))
 
 
-def _jobs() -> list[Job]:
+def jobs() -> list[Job]:
     """Return every product's wind arm at both settings and its served-100 m arm, and the checks.
 
     Returns:
@@ -722,16 +799,14 @@ def main() -> int:
     arguments = parser.parse_args()
 
     sites = _wind_sites()
-    frame = _with_eras(frame=_add_time_features(dataset=_common_rows(frame=_joined(sites=sites))))
+    frame = with_eras(frame=_add_time_features(dataset=common_rows(frame=joined(sites=sites))))
     frames = {
-        "hour_ending": _with_eras(
-            frame=_add_time_features(
-                dataset=_common_rows(frame=_joined(sites=sites, centred=False))
-            )
+        "hour_ending": with_eras(
+            frame=_add_time_features(dataset=common_rows(frame=joined(sites=sites, centred=False)))
         ),
-        "keep_zero_hours": _with_eras(
+        "keep_zero_hours": with_eras(
             frame=_add_time_features(
-                dataset=_common_rows(frame=_joined(sites=sites), drop_zero_hours=False)
+                dataset=common_rows(frame=joined(sites=sites), drop_zero_hours=False)
             )
         ),
     }
@@ -741,16 +816,16 @@ def main() -> int:
     output_dir = STUDY_DATA_DIR / OUTPUT_DIR_NAME
     output_dir.mkdir(parents=True, exist_ok=True)
     path = output_dir / "losses.parquet"
-    jobs = _jobs()
+    all_jobs = jobs()
     saved = pl.read_parquet(path) if arguments.fit_missing else None
     done = set(saved.select("arm", "setting").unique().iter_rows()) if saved is not None else set()
-    missing = [job for job in jobs if (job[0], job[1]) not in done]
-    _LOG.info("fitting %d jobs of %d", len(missing), len(jobs))
+    missing = [job for job in all_jobs if (job[0], job[1]) not in done]
+    _LOG.info("fitting %d jobs of %d", len(missing), len(all_jobs))
     parts = [] if saved is None else [saved]
     for key, dataset in (("main", frame), *frames.items()):
         chosen = [job for job in missing if (job[1] if job[1] in frames else "main") == key]
         if chosen:
-            parts.append(_run_all(dataset=dataset, jobs=chosen))
+            parts.append(run_all(dataset=dataset, jobs=chosen))
     losses = pl.concat(parts)
     losses.write_parquet(path)
 

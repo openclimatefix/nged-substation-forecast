@@ -70,10 +70,10 @@ from wind_products import (
     OUTPUT_DIR_NAME,
     STEP_DATES,
     STEP_SITE,
-    _common_rows,
-    _joined,
     _renamed,
     _scoped,
+    common_rows,
+    joined,
 )
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
@@ -737,7 +737,7 @@ def _models_work_frame() -> pl.DataFrame:
         One row per (site, time) the pooled run scored, carrying `power_mw` and
         `effective_capacity_mw`.
     """
-    return _common_rows(frame=_joined(sites=_wind_sites())).select(
+    return common_rows(frame=joined(sites=_wind_sites())).select(
         "site", "time", "power_mw", "effective_capacity_mw"
     )
 

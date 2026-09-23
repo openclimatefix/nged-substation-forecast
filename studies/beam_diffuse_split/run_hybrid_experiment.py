@@ -43,10 +43,10 @@ from run_experiment import (
     SHARED_FEATURES,
     Job,
     _add_time_features,
-    _run_all,
     dataset_path_for,
     features_for,
     results_dir_for,
+    run_all,
 )
 from run_physics_experiment import _fit, _predict
 from sources import SOURCE_CHOICES, STUDY_DATA_DIR
@@ -205,7 +205,7 @@ def main() -> int:
         (arm, "primary", "power_mw", features_for(arm=arm), PRIMARY_HYPER_PARAMETERS, False)
         for arm in ("C_era5_split", "A_global_only")
     ]
-    losses = _run_all(dataset=dataset, jobs=jobs)
+    losses = run_all(dataset=dataset, jobs=jobs)
 
     # The physical model's own score, on the identical rows, read straight from its per-row losses.
     physics_dir = STUDY_DATA_DIR / f"beam_diffuse_physics_{source}"

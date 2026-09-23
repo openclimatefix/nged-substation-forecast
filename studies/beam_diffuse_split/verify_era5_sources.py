@@ -24,7 +24,7 @@ from pathlib import Path
 from typing import Final
 
 import polars as pl
-from build_dataset import _read_era5
+from build_dataset import read_era5
 from sources import STUDY_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -74,8 +74,8 @@ def _agreement(*, joined: pl.DataFrame, field: str) -> dict[str, float]:
 
 def main() -> int:
     """Join the two downloads over their shared hours and report the agreement."""
-    cds = _read_era5(source="cds")
-    open_meteo = _read_era5(source="open-meteo")
+    cds = read_era5(source="cds")
+    open_meteo = read_era5(source="open-meteo")
     _LOG.info(
         "Copernicus: %d rows to %s; Open-Meteo: %d rows to %s",
         cds.height,

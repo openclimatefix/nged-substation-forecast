@@ -10,6 +10,7 @@ from typing import Final, TypedDict
 
 import numpy as np
 import polars as pl
+from scipy import stats
 
 N_BOOTSTRAP_RESAMPLES: Final[int] = 2000
 """How many resamples each interval is read from."""
@@ -156,6 +157,10 @@ def arm_values(*, losses: pl.DataFrame, arm: str, metric: str) -> tuple[np.ndarr
     Returns:
         An array of shape (n_seeds, n_rows) of the arm's metric values, in seed order, and the
         month label of each row.
+
+    Raises:
+        ValueError: If the seeds do not all hold the same (site, time) rows, which would pair one
+            seed's row with a different row of another seed.
     """
     rows = (
         losses.filter(pl.col("arm") == arm)
@@ -163,9 +168,13 @@ def arm_values(*, losses: pl.DataFrame, arm: str, metric: str) -> tuple[np.ndarr
         .sort("seed", "site", "time")
     )
     by_seed = [
-        rows.filter(pl.col("seed") == seed).select("month", "value")
+        rows.filter(pl.col("seed") == seed).select("site", "time", "month", "value")
         for seed in sorted(rows["seed"].unique().to_list())
     ]
+    first_keys = by_seed[0].select("site", "time")
+    if not all(frame.select("site", "time").equals(first_keys) for frame in by_seed[1:]):
+        msg = f"the seeds of arm {arm!r} do not all hold the same (site, time) rows"
+        raise ValueError(msg)
     values = np.stack([frame["value"].to_numpy() for frame in by_seed])
     return values, by_seed[0]["month"].to_numpy()
 
@@ -228,3 +237,31 @@ def per_fold_differences(
         )
         differences.append(float(paired.mean()))
     return differences
+
+
+def fold_t_interval(*, fold_differences: list[float]) -> tuple[float, float]:
+    """Return a 95% t-interval for the mean of the per-fold differences.
+
+    The month bootstrap treats months as independent and holds each fold's fitted models fixed, so
+    it covers month-to-month weather and the fitting seed only. The folds' spread also carries what
+    one set of trained models, rather than another, contributes. With five folds the interval rests
+    on four degrees of freedom, so it is wide; it is a second view of the spread, not a replacement
+    for the bootstrap.
+
+    Args:
+        fold_differences: One arm-to-arm difference per fold, from `per_fold_differences`.
+
+    Returns:
+        The lower and upper ends of the interval.
+
+    Raises:
+        ValueError: If fewer than two folds are given, which leaves no spread to measure.
+    """
+    if len(fold_differences) < 2:
+        msg = f"a t-interval needs at least two folds, got {len(fold_differences)}"
+        raise ValueError(msg)
+    values = np.asarray(fold_differences, dtype=np.float64)
+    half_width = float(
+        stats.t.ppf(0.975, df=len(values) - 1) * values.std(ddof=1) / np.sqrt(len(values))
+    )
+    return float(values.mean()) - half_width, float(values.mean()) + half_width
