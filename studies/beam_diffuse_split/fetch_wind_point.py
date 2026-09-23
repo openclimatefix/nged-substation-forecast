@@ -48,8 +48,12 @@ WIND_VARIABLES: Final[tuple[str, ...]] = (
 )
 """The columns every product is asked for."""
 
-ICON_VARIABLES: Final[tuple[str, ...]] = ("wind_speed_80m", "wind_direction_80m")
-"""The native hub-height columns the ICON products are asked for as well."""
+EIGHTY_METRE_VARIABLES: Final[tuple[str, ...]] = ("wind_speed_80m", "wind_direction_80m")
+"""The 80 m wind every product but ERA5 is asked for as well.
+
+It is native for the ICON products, and Open-Meteo also serves it for UKV, where it is not a
+rescaling of the 100 m value. ERA5 publishes no 80 m wind.
+"""
 
 FIRST_DATE: Final[str] = "2024-08-12"
 """The first day of the window: when Open-Meteo's own UKV downloader started."""
@@ -86,8 +90,8 @@ def main() -> int:
                 fetch_point_frame(
                     sites=sites,
                     variables=(
-                        (*WIND_VARIABLES, *ICON_VARIABLES)
-                        if product.startswith("icon")
+                        (*WIND_VARIABLES, *EIGHTY_METRE_VARIABLES)
+                        if product != "era5"
                         else WIND_VARIABLES
                     ),
                     models_parameter=models_parameter,

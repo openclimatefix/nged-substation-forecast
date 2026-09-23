@@ -32,5 +32,5 @@ how far it generalises.
   disaggregation — should read.
 - [Which weather product best describes past wind?](weather-products-for-past-wind.md) — at the three
   metered wind farms, the Met Office's UKV and the German weather service's ICON-D2 describe past
-  hub-height wind best and both beat the ERA5 reanalysis; ICON-EU beats ERA5 only when shown its own
-  80 m wind; and ICON global is weakest, for reasons in how it is served rather than its grid.
+  hub-height wind best and both beat the ERA5 reanalysis, mostly in summer; ICON-EU also beats ERA5;
+  and ICON global is weakest, about half of its gap a pair of steps in the wind it is served.

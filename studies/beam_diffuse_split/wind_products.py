@@ -122,16 +122,42 @@ def _wind_columns(*, product: str) -> tuple[str, str, str, str]:
     )
 
 
-def _served_100m_columns(*, product: str) -> tuple[str, str, str]:
-    """Return one product's served 100 m speed and direction feature names.
+def _served_100m_columns(*, product: str) -> tuple[str, str, str, str]:
+    """Return one product's served 100 m speed and direction, and its 10 m speed.
+
+    This is the arm the plan specified before the first run, for every product.
 
     Args:
         product: A key of `PRODUCTS`.
 
     Returns:
-        The 100 m speed and the 100 m direction's sine and cosine.
+        The 100 m speed, the 100 m direction's sine and cosine, and the 10 m speed.
     """
-    return (f"speed_100m_{product}", f"sin_100m_{product}", f"cos_100m_{product}")
+    return (
+        f"speed_100m_{product}",
+        f"sin_100m_{product}",
+        f"cos_100m_{product}",
+        f"speed_10m_{product}",
+    )
+
+
+UKV_80M_COLUMNS: Final[tuple[str, str, str, str]] = (
+    "speed_80m_ukv",
+    "sin_80m_ukv",
+    "cos_80m_ukv",
+    "speed_10m_ukv",
+)
+"""UKV's served 80 m speed and direction and its 10 m speed, for the check arm `ukv_80m`."""
+
+STEP_DATES: Final[tuple[datetime, datetime]] = (
+    datetime(2025, 6, 2, tzinfo=UTC),
+    datetime(2026, 6, 2, tzinfo=UTC),
+)
+"""The two days ICON global's served wind steps at one generator, relative to ICON-EU's.
+
+The `_step` arms are told which of the three periods each hour falls in, which measures how much of
+ICON global's deficit the steps explain.
+"""
 
 
 def _hub_height_m(*, product: str) -> int:
@@ -160,7 +186,7 @@ def _joined(*, sites: pl.DataFrame) -> pl.DataFrame:
     )
     for product in PRODUCTS:
         speed, sine, cosine, surface = _wind_columns(product=product)
-        speed_100m, sine_100m, cosine_100m = _served_100m_columns(product=product)
+        speed_100m, sine_100m, cosine_100m, _ = _served_100m_columns(product=product)
         hub = _hub_height_m(product=product)
         wind = pl.read_parquet(output_path_for(product=product)).select(
             "site",
@@ -174,7 +200,21 @@ def _joined(*, sites: pl.DataFrame) -> pl.DataFrame:
             pl.col("wind_direction_100m").radians().cos().alias(cosine_100m),
         )
         frame = frame.join(wind, on=["site", "time"], how="inner")
-    return frame.sort("site", "time")
+    speed_80m, sine_80m, cosine_80m, _ = UKV_80M_COLUMNS
+    ukv_80m = pl.read_parquet(output_path_for(product="ukv")).select(
+        "site",
+        "time",
+        pl.col("wind_speed_80m").alias(speed_80m),
+        pl.col("wind_direction_80m").radians().sin().alias(sine_80m),
+        pl.col("wind_direction_80m").radians().cos().alias(cosine_80m),
+    )
+    first, second = STEP_DATES
+    step = (pl.col("time") >= first).cast(pl.Int8) + (pl.col("time") >= second).cast(pl.Int8)
+    return (
+        frame.join(ukv_80m, on=["site", "time"], how="inner")
+        .with_columns(step_period=step)
+        .sort("site", "time")
+    )
 
 
 def _common_rows(*, frame: pl.DataFrame) -> pl.DataFrame:
@@ -197,10 +237,10 @@ def _common_rows(*, frame: pl.DataFrame) -> pl.DataFrame:
 
 
 def _jobs() -> list[Job]:
-    """Return every product's wind arm at both settings, and its served-100 m arm.
+    """Return every product's wind arm at both settings and its served-100 m arm, and the checks.
 
     Returns:
-        Three jobs per product.
+        Three jobs per product, plus the UKV 80 m arm and the two step-period arms.
     """
     jobs: list[Job] = []
     for product in PRODUCTS:
@@ -224,6 +264,27 @@ def _jobs() -> list[Job]:
                 False,
             ),
         ]
+    jobs.append(
+        (
+            "ukv_80m",
+            "pooled",
+            "power_mw",
+            (*SHARED_FEATURES, *UKV_80M_COLUMNS),
+            PRIMARY_HYPER_PARAMETERS,
+            False,
+        )
+    )
+    jobs += [
+        (
+            f"{product}_step",
+            "pooled",
+            "power_mw",
+            (*SHARED_FEATURES, *_wind_columns(product=product), "step_period"),
+            PRIMARY_HYPER_PARAMETERS,
+            False,
+        )
+        for product in ("icon_eu", "icon_global")
+    ]
     return jobs
 
 
@@ -274,6 +335,89 @@ def _renamed(*, losses: pl.DataFrame, suffix: str) -> pl.DataFrame:
     )
 
 
+def _check_arms(*, losses: pl.DataFrame, wind: pl.DataFrame, sites: list[str]) -> list[str]:
+    """Report the post hoc checks: UKV at 80 m, lead-matched contrasts, and ICON global's steps.
+
+    Args:
+        losses: The pooled setting's losses, every arm.
+        wind: The `_wind` arms.
+        sites: The site labels.
+
+    Returns:
+        Markdown lines.
+    """
+    ukv_80m = pl.concat(
+        [
+            wind.filter(pl.col("arm") != "ukv_wind"),
+            losses.filter(pl.col("arm") == "ukv_80m").with_columns(arm=pl.lit("ukv_wind")),
+        ],
+        how="diagonal_relaxed",
+    )
+    lines = [
+        "",
+        "#### Checks added after the first run (exploratory)",
+        "",
+        (
+            f"MAE: ukv_80m {_mae(losses=losses, arm='ukv_80m'):.3f}, "
+            f"icon_eu_step {_mae(losses=losses, arm='icon_eu_step'):.3f}, "
+            f"icon_global_step {_mae(losses=losses, arm='icon_global_step'):.3f}."
+        ),
+        "",
+        *CONTRAST_HEADER,
+    ]
+    lines += [
+        _contrast_line(losses=ukv_80m, treatment=t, reference=r, label="UKV at 80 m")
+        for t, r in (("icon_d2_wind", "ukv_wind"), ("icon_eu_wind", "ukv_wind"))
+    ]
+    three_hour = wind.with_columns(icon_lead=pl.col("time").dt.hour() % 3)
+    lines += [
+        _contrast_line(
+            losses=three_hour.filter(pl.col("icon_lead") == lead),
+            treatment=t,
+            reference=r,
+            label=f"ICON lead {lead} h",
+        )
+        for t, r in (("icon_d2_wind", "ukv_wind"), ("icon_eu_wind", "ukv_wind"))
+        for lead in (0, 1, 2)
+    ]
+    six_hour = wind.with_columns(global_lead=pl.col("time").dt.hour() % 6)
+    lines += [
+        _contrast_line(
+            losses=six_hour.filter(condition),
+            treatment="icon_global_wind",
+            reference="icon_eu_wind",
+            label=label,
+        )
+        for label, condition in (
+            ("ICON global lead 0–2 h, equal to ICON-EU's", pl.col("global_lead") < 3),
+            ("ICON global lead 3–5 h", pl.col("global_lead") >= 3),
+        )
+    ]
+    lines += [
+        _contrast_line(
+            losses=wind.filter(pl.col("site") == site),
+            treatment="icon_global_wind",
+            reference="icon_eu_wind",
+            label=f"site {site}",
+        )
+        for site in sites
+    ]
+    step = losses.filter(pl.col("arm").str.ends_with("_step"))
+    lines += [
+        _contrast_line(
+            losses=scoped, treatment="icon_global_step", reference="icon_eu_step", label=label
+        )
+        for label, scoped in (
+            ("told the step period, all sites", step),
+            *(
+                (f"told the step period, site {site}", step.filter(pl.col("site") == site))
+                for site in sites
+            ),
+        )
+    ]
+    return lines
+
+
 def _report(*, frame: pl.DataFrame, losses: pl.DataFrame) -> str:
     """Assemble the markdown report.
 
@@ -297,7 +441,7 @@ def _report(*, frame: pl.DataFrame, losses: pl.DataFrame) -> str:
         "",
         "| Product | Hub height shown | All sites | "
         + " | ".join(sites)
-        + " | Served 100 m only | Second setting |",
+        + " | Served 100 m and 10 m | Second setting |",
         "|---" * (len(sites) + 5) + "|",
     ]
     for product in PRODUCTS:
@@ -340,7 +484,11 @@ def _report(*, frame: pl.DataFrame, losses: pl.DataFrame) -> str:
             losses=_scoped(losses=wind, scope=scope), treatment=t, reference=r, label=scope
         )
         for scope in ("pre", "pre_matched", "post", "winter", "summer")
-        for t, r in (*DECIDING_CONTRASTS, ("icon_d2_wind", "ukv_wind"))
+        for t, r in (
+            *DECIDING_CONTRASTS,
+            ("icon_d2_wind", "ukv_wind"),
+            ("icon_d2_wind", "era5_wind"),
+        )
     ]
     lines += [
         "",
@@ -349,15 +497,16 @@ def _report(*, frame: pl.DataFrame, losses: pl.DataFrame) -> str:
             "under-cover; read its fold-sign counts alongside them."
         ),
         "",
-        "#### Sensitivity: the served 100 m wind alone, and the second hyperparameter setting",
+        "#### Sensitivity: the served 100 m arm the plan specified, and the second setting",
         "",
         *CONTRAST_HEADER,
     ]
-    for label, scoped in (("served 100 m only", served_100m), ("second setting", sensitivity)):
+    for label, scoped in (("served 100 m and 10 m", served_100m), ("second setting", sensitivity)):
         lines += [
             _contrast_line(losses=scoped, treatment=t, reference=r, label=label)
             for t, r in (*DECIDING_CONTRASTS, ("icon_d2_wind", "ukv_wind"))
         ]
+    lines += _check_arms(losses=pooled, wind=wind, sites=sites)
     lines += ["", "#### Other contrasts (exploratory)", "", *CONTRAST_HEADER]
     lines += [
         _contrast_line(losses=wind, treatment=t, reference=r, label="all")
