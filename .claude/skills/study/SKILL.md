@@ -262,10 +262,15 @@ the story without the prose around it. Load the `dataviz` skill before drawing a
 
 - **A headline chart opens every page**, directly under the opening paragraphs, showing the headline
   result with its 95% intervals. Every section whose claim rests on a number gets a chart too.
-- **The title states the finding** ("CAMS describes past sunshine best, by a wide margin"), and
-  matches the heading or bolded lead the chart sits under.
+- **The title states the finding, scoped to the products tested** ("CAMS describes past sunshine
+  best of the six products we tested"), and matches the heading or bolded lead the chart sits under.
+  A bare "ICON global is the weakest" ranks every product in existence on a test of five.
 - **The subtitle names the quantity, the unit, the scope, and what a dot and a line mean**, and says
   which rows are exploratory or post hoc.
+- **Say which direction is better, in words, in the axis title**: "Mean absolute error (% of
+  capacity; smaller is better)", or "Mean absolute error minus ERA5's (points of capacity; more
+  negative is better)". A reader who opens the page at the chart has no other way to know that a
+  lower error is the good end.
 - **A labelled reference rule** at zero says what zero means ("same as ERA5"), and a side label says
   which direction is better.
 - **Show paired differences with their intervals, not each arm's level with an interval.** The arms
