@@ -30,3 +30,7 @@ how far it generalises.
   and UKV cannot be told apart once UKV's hour is rebuilt from its own snapshots. The page says
   which product each offline consumer — capacity estimation, pre-training, historical features, and
   disaggregation — should read.
+- [Which weather product best describes past wind?](weather-products-for-past-wind.md) — at the three
+  metered wind farms, the Met Office's UKV and the German weather service's ICON-D2 describe past
+  hub-height wind best and both beat the ERA5 reanalysis, mostly in summer; ICON-EU also beats ERA5;
+  and ICON global is weakest, about half of its gap a pair of steps in the wind it is served.

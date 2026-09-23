@@ -150,6 +150,8 @@ def fetch_point_frame(
     models_parameter: str,
     first_date: str,
     last_date: str,
+    base_url: str = HISTORICAL_FORECAST_URL,
+    cell_selection: str = "nearest",
 ) -> pl.DataFrame:
     """Fetch one date range at every site's own coordinates, in a single request.
 
@@ -164,6 +166,10 @@ def fetch_point_frame(
         models_parameter: The value of the API's `models=` query parameter.
         first_date: First date to request, as `YYYY-MM-DD`.
         last_date: Last date to request, as `YYYY-MM-DD`.
+        base_url: The endpoint: the historical-forecast API for a weather model, or the archive
+            API for ERA5, which takes the same query.
+        cell_selection: Open-Meteo's choice of grid cell: `nearest`, or `land` to skip a cell
+            the sea influences.
 
     Returns:
         One row per (site, time), with one column per requested variable and no null rows.
@@ -172,12 +178,12 @@ def fetch_point_frame(
         RuntimeError: If the response does not carry one block per site.
     """
     url = (
-        f"{HISTORICAL_FORECAST_URL}"
+        f"{base_url}"
         f"?latitude={','.join(str(value) for value in sites['latitude'])}"
         f"&longitude={','.join(str(value) for value in sites['longitude'])}"
         f"&start_date={first_date}&end_date={last_date}"
         f"&hourly={','.join(variables)}"
-        f"&models={models_parameter}&timezone=UTC&cell_selection=nearest"
+        f"&models={models_parameter}&timezone=UTC&cell_selection={cell_selection}"
     )
     payload = _get_json(url=url)
     blocks = payload if isinstance(payload, list) else [payload]
