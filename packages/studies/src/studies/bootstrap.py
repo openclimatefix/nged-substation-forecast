@@ -53,6 +53,21 @@ class YearInterval(TypedDict):
     enough_months: bool
 
 
+class YearChangeInterval(TypedDict):
+    """The change, from one calendar year to another, in a paired arm-to-arm difference."""
+
+    reference: str
+    year0: int
+    year1: int
+    change: float
+    lower_95: float
+    upper_95: float
+    n_rows_year0: int
+    n_rows_year1: int
+    n_months_year0: int
+    n_months_year1: int
+
+
 class AbsoluteInterval(TypedDict):
     """One arm's absolute metric, its interval, and what the interval rests on."""
 
@@ -62,6 +77,21 @@ class AbsoluteInterval(TypedDict):
     seed_spread: float
     n_rows: int
     n_months: int
+
+
+def _rows_by_month(*, months: np.ndarray) -> list[np.ndarray]:
+    """Group row indices by month label, for drawing whole months in a resample.
+
+    Shared by every bootstrap in this module, so "a month" means the same grouping everywhere.
+
+    Args:
+        months: Each row's month label.
+
+    Returns:
+        One array of row indices per unique month, in the unique months' sorted order.
+    """
+    unique_months, month_index = np.unique(months, return_inverse=True)
+    return [np.flatnonzero(month_index == index) for index in range(len(unique_months))]
 
 
 def _resample_bounds(*, values: np.ndarray, months: np.ndarray) -> tuple[float, float]:
@@ -78,8 +108,7 @@ def _resample_bounds(*, values: np.ndarray, months: np.ndarray) -> tuple[float, 
     Returns:
         The 2.5th and 97.5th percentiles of the resampled mean.
     """
-    unique_months, month_index = np.unique(months, return_inverse=True)
-    rows_by_month = [np.flatnonzero(month_index == index) for index in range(len(unique_months))]
+    rows_by_month = _rows_by_month(months=months)
 
     # The seed draw comes before the month draw in every resample. Swapping them, or vectorising
     # the loop, would change every published interval's digits without changing its definition.
@@ -87,7 +116,7 @@ def _resample_bounds(*, values: np.ndarray, months: np.ndarray) -> tuple[float, 
     resampled = np.empty(N_BOOTSTRAP_RESAMPLES)
     for resample in range(N_BOOTSTRAP_RESAMPLES):
         seed_index = generator.integers(0, values.shape[0])
-        drawn = generator.integers(0, len(unique_months), size=len(unique_months))
+        drawn = generator.integers(0, len(rows_by_month), size=len(rows_by_month))
         rows = np.concatenate([rows_by_month[index] for index in drawn])
         resampled[resample] = values[seed_index, rows].mean()
 
@@ -232,6 +261,34 @@ def bootstrap_absolute(*, losses: pl.DataFrame, arm: str, metric: str) -> Absolu
     }
 
 
+def bootstrap_row_difference(*, values: np.ndarray, months: np.ndarray) -> BootstrapInterval:
+    """Bootstrap the mean of a per-row value that carries no fitting seed, resampling whole months.
+
+    A raw, unfitted comparison — one product's distance from a shared reference minus another's,
+    with no XGBoost model or per-generator recalibration between the columns — has no seed
+    dimension to resample, unlike every other interval in this module. This wraps `_resample_bounds`
+    with a single pseudo-seed so the same month-block resampling design still applies.
+
+    Args:
+        values: One value per row, already the quantity to average (for example, one product's
+            absolute difference from a baseline minus another's).
+        months: Each row's month label, one per entry of `values`.
+
+    Returns:
+        The point estimate, the 2.5th and 97.5th percentiles, and what the estimate rests on.
+        `seed_spread` is always `0.0`, since there is no seed dimension.
+    """
+    lower_95, upper_95 = _resample_bounds(values=values[None, :], months=months)
+    return {
+        "difference": float(values.mean()),
+        "lower_95": lower_95,
+        "upper_95": upper_95,
+        "seed_spread": 0.0,
+        "n_rows": int(values.shape[0]),
+        "n_months": len(np.unique(months)),
+    }
+
+
 def per_fold_differences(
     *, losses: pl.DataFrame, treatment: str, reference: str, metric: str
 ) -> list[float]:
@@ -346,3 +403,88 @@ def bootstrap_difference_by_year(
                 }
             )
     return intervals
+
+
+def bootstrap_year_change(
+    *,
+    losses: pl.DataFrame,
+    treatment: str,
+    reference: str,
+    metric: str,
+    year0: int,
+    year1: int,
+    months: tuple[int, ...] | None = None,
+) -> YearChangeInterval:
+    """Bootstrap the change, from one calendar year to another, in a paired arm-to-arm difference.
+
+    `bootstrap_difference_by_year` intervals each year on its own, so two overlapping intervals do
+    not tell a reader whether the difference itself changed between the years: the same resampled
+    month can move both years' intervals together, which understates how much the difference could
+    have moved. This resamples each year's months **independently of the other year's**, which is
+    the one design choice that distinguishes it from stacking two `bootstrap_difference_by_year`
+    calls. One seed is still drawn per resample, shared across both years, since the fitted models
+    are shared between them.
+
+    Args:
+        losses: Per-row losses at one hyperparameter setting, carrying `arm`, `site`, `time`,
+            `seed` and `month`, and optionally `setting`.
+        treatment: The arm whose metric is being compared.
+        reference: The arm it is compared against.
+        metric: The loss column to difference.
+        year0: The earlier calendar year.
+        year1: The later calendar year.
+        months: When given, restricts both years to these calendar months (1-12) before resampling.
+
+    Returns:
+        `change` is year1's difference minus year0's; `lower_95`/`upper_95` its interval; the row
+        and month counts behind each year.
+
+    Raises:
+        ValueError: If `losses` holds more than one setting, or either year holds no rows.
+    """
+    if "setting" in losses.columns and losses["setting"].n_unique() > 1:
+        msg = f"the losses hold {losses['setting'].n_unique()} settings; filter to one first"
+        raise ValueError(msg)
+    if months is not None:
+        losses = losses.filter(pl.col("time").dt.month().is_in(months))
+
+    by_year: dict[int, tuple[np.ndarray, np.ndarray]] = {}
+    for year in (year0, year1):
+        yearly = losses.filter(pl.col("time").dt.year() == year)
+        if yearly.height == 0:
+            msg = f"no rows for {year}, filtered to months={months}"
+            raise ValueError(msg)
+        differences, month_labels = paired_differences(
+            losses=yearly, treatment=treatment, reference=reference, metric=metric
+        )
+        by_year[year] = (differences, month_labels)
+
+    rows_by_month = {year: _rows_by_month(months=labels) for year, (_, labels) in by_year.items()}
+
+    # The seed draw comes before either year's month draw, and is shared by both years, matching
+    # `_resample_bounds`'s order. Only the month draw is independent between the two years.
+    generator = np.random.default_rng(BOOTSTRAP_SEED)
+    resampled = np.empty(N_BOOTSTRAP_RESAMPLES)
+    for resample in range(N_BOOTSTRAP_RESAMPLES):
+        seed_index = generator.integers(0, by_year[year0][0].shape[0])
+        year_means = {}
+        for year in (year0, year1):
+            differences, _ = by_year[year]
+            month_rows = rows_by_month[year]
+            drawn = generator.integers(0, len(month_rows), size=len(month_rows))
+            rows = np.concatenate([month_rows[index] for index in drawn])
+            year_means[year] = differences[seed_index, rows].mean()
+        resampled[resample] = year_means[year1] - year_means[year0]
+
+    return {
+        "reference": reference,
+        "year0": year0,
+        "year1": year1,
+        "change": float(by_year[year1][0].mean() - by_year[year0][0].mean()),
+        "lower_95": float(np.percentile(resampled, 2.5)),
+        "upper_95": float(np.percentile(resampled, 97.5)),
+        "n_rows_year0": by_year[year0][0].shape[1],
+        "n_rows_year1": by_year[year1][0].shape[1],
+        "n_months_year0": len(np.unique(by_year[year0][1])),
+        "n_months_year1": len(np.unique(by_year[year1][1])),
+    }

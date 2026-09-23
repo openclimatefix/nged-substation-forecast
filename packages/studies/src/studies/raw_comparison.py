@@ -10,6 +10,8 @@ from typing import TypedDict
 
 import polars as pl
 
+from studies.bootstrap import BootstrapInterval, bootstrap_row_difference
+
 
 class RawColumnComparison(TypedDict):
     """The bias, mean absolute difference, and correlation between two columns."""
@@ -47,3 +49,53 @@ def raw_column_comparison(
     return RawColumnComparison(
         bias=float(row["bias"]), mad=float(row["mad"]), correlation=float(row["correlation"])
     )
+
+
+def mean_per_site_correlation(
+    *, frame: pl.DataFrame, column: str, reference: str, site_col: str = "site"
+) -> float:
+    """Return one column's Pearson correlation with a reference column, averaged over each site.
+
+    Correlating every site's rows pooled together can inherit a spurious component from
+    site-to-site differences in scale or in mean level; correlating within each site first, then
+    averaging, removes it. `raw_column_comparison`'s correlation uses CAMS as the reference, which
+    shares SARAH-3's Meteosat inputs; a reference-free check instead correlates each product's raw
+    irradiance with the generator's own measured output, which uses no weather product at all.
+
+    Args:
+        frame: Rows holding `column`, `reference` and `site_col`.
+        column: The column being correlated.
+        reference: The column it is correlated against.
+        site_col: The column identifying each generator.
+
+    Returns:
+        The unweighted mean of each site's own Pearson correlation.
+    """
+    per_site = frame.group_by(site_col).agg(pl.corr(column, reference).alias("r"))
+    return float(per_site.select(pl.col("r").mean()).item())
+
+
+def raw_mad_difference(
+    *, frame: pl.DataFrame, treatment: str, reference: str, baseline: str, month_col: str = "month"
+) -> BootstrapInterval:
+    """Bootstrap one product's mean absolute difference from `baseline` minus another's.
+
+    Resamples whole months (`studies.bootstrap.bootstrap_row_difference`), since these raw values
+    carry no fitting seed to resample alongside the months.
+
+    Args:
+        frame: Rows holding `treatment`, `reference`, `baseline` and `month_col`.
+        treatment: The column being compared.
+        reference: The column it is compared against.
+        baseline: The column both are measured against (for example, CAMS's raw irradiance).
+        month_col: The column carrying each row's month label.
+
+    Returns:
+        The bootstrapped difference between the two products' mean absolute difference from
+        `baseline`, in the columns' own unit.
+    """
+    treatment_absolute = (frame[treatment] - frame[baseline]).abs()
+    reference_absolute = (frame[reference] - frame[baseline]).abs()
+    values = (treatment_absolute - reference_absolute).to_numpy()
+    months = frame[month_col].to_numpy()
+    return bootstrap_row_difference(values=values, months=months)

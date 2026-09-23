@@ -68,9 +68,9 @@ weather model that started a few hours earlier.
   contrasts do, so this is not an artefact of the power model. See [ICON-DREAM-EU beats ERA5 but not
   the ICON weather
   models](#icon-dream-eu-beats-era5-but-not-the-icon-weather-models).
-- **ERA5 trails CAMS by between 3.6 and 4.6 points in each calendar year from 2021 to 2026, and
-  SARAH-3 by between 3.2 and 4.2 points.** See [ERA5's deficit, year by
-  year](#era5s-deficit-year-by-year).
+- **On matched months, January to August, ERA5 trails CAMS by between 3.6 and 4.7 points in each
+  calendar year from 2021 to 2026, and SARAH-3 by between 3.2 and 4.3 points.** See [ERA5's
+  deficit, year by year](#era5s-deficit-year-by-year).
 - **Among the four weather models tested, ICON-D2 (from the German weather service's Icosahedral
   Nonhydrostatic model family) is the best as served, beating ICON-EU by 0.62 points [0.48, 0.76]
   across the record.** In a breakdown added after the first run, ICON-D2's advantage over ICON-EU
@@ -136,16 +136,18 @@ The map also draws AROME France, which this page does not test](../roadmap/asset
 | ICON-EU | DWD model for Europe, nested inside ICON global | 1 to 3 hours | yes | 6.5 km; served at about 7 km | November 2022 | about 3.5 hours |
 | ICON global | DWD global model | 1 to 6 hours | yes | 13 km; served at about 11 km | November 2022 | about 3.5 hours |
 | SARAH-3 | Satellite retrieval from Meteosat images, from EUMETSAT's Satellite Application Facility on Climate Monitoring (CM SAF) | no forecast step | yes | 0.05° grid, about 3.3 km east to west by 5.6 km north to south here; read at the nearest cell | 1983; read here from January 2021 | 2 to 5 days |
-| ICON-DREAM-EU | DWD reanalysis over Europe, built from ICON | 1 to 3 hours | yes | about 6.5 km; read at the nearest cell | 2010; read here from September 2019 | published month by month |
+| ICON-DREAM-EU | DWD reanalysis over Europe, built from ICON | 1 to 3 hours | yes | about 6.5 km; read at the nearest cell | 2010; read here from September 2019 | not established |
 
-**The latencies come from each service's own documentation:** CAMS's [radiation-service
+**Most of the latencies come from each service's own documentation:** CAMS's [radiation-service
 notes](https://confluence.ecmwf.int/x/jOLjDw), the [ERA5 dataset
 page](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels?tab=overview),
-Open-Meteo's [UKV documentation](https://open-meteo.com/en/docs/ukmo-api), the publication times of
-the German weather service's own open-data files, and, for SARAH-3's Interim Climate Data Record,
-the [disaggregation roadmap](../roadmap/disaggregation.md#an-irradiance-nowcast-would-be-a-more-useful-product).
-SARAH-3 is the Surface Solar Radiation Data Set of the European Organisation for the Exploitation of
-Meteorological Satellites (EUMETSAT), available by manual order from CM SAF.
+Open-Meteo's [UKV documentation](https://open-meteo.com/en/docs/ukmo-api), and the publication times
+of the German weather service's own open-data files for ICON-D2, ICON-EU and ICON global. SARAH-3 is
+the Surface Solar Radiation Data Set of the European Organisation for the Exploitation of
+Meteorological Satellites (EUMETSAT), available by manual order from CM SAF; its 2-to-5-day figure
+is this project's own tracking, cross-referenced in the [disaggregation
+roadmap](../roadmap/disaggregation.md#an-irradiance-nowcast-would-be-a-more-useful-product), not a
+figure CM SAF itself publishes. ICON-DREAM-EU's publication cadence is not established here.
 
 **Four more weather models are not yet on this page.** ECMWF's 9 km global model, Météo-France's
 global model on its European grid, and the HARMONIE-AROME models the Danish and the Dutch weather
@@ -171,8 +173,9 @@ the Copernicus original. CAMS comes from the CAMS radiation service. The start d
 models are those of Open-Meteo's archive: DWD has run ICON global and ICON-EU since 2015, and
 ICON-D2 since February 2021. SARAH-3 comes from CM SAF's own gridded files and ICON-DREAM-EU from
 DWD's own gridded files, each read at the grid cell nearest each generator: 0.8 km to 2.8 km away
-for SARAH-3, and 1.6 km to 5.0 km for ICON-DREAM-EU. CAMS and the Open-Meteo products are read at
-the generators' own coordinates.
+for SARAH-3, and 1.6 km to 5.0 km for ICON-DREAM-EU. CAMS is computed for each generator's own
+coordinates. For the Open-Meteo products, Open-Meteo serves the grid cell nearest the coordinates
+requested.
 
 **Neither SARAH-3 nor ICON-DREAM-EU publishes an hourly mean, so each is converted to the mean over
 the hour ending at the label, as every other product serves it.**
@@ -254,19 +257,21 @@ difference between two products is a difference between their irradiance alone.*
   The test covers month-to-month variation in the weather and the fitting seed only, not variation
   between generators. The intervals are not corrected for the number of comparisons, so among the
   many exploratory rows some will reach significance by chance.
-- **Six planned contrasts.** A contrast is the difference between two products' errors on the same
-  hours. A comparison is planned when it was written into the study plan before any result existed;
-  every other figure is exploratory, chosen or added after results were seen. The distinction
-  matters because with many comparisons, about 1 in 20 exploratory rows reaches significance at the
-  5% level by chance, so an exploratory result is a lead to follow up rather than a finding. A chart
-  holding both kinds marks each planned row "(planned)". A chart whose rows are all one kind says so
-  once, in its subtitle. The ranking rests on four planned contrasts: CAMS against ICON-D2, ICON-EU
-  against ICON-D2, ICON-EU against UKV, and ICON global against ICON-EU. Two more were written
-  before SARAH-3 and ICON-DREAM-EU were scored: SARAH-3 against CAMS, and ICON-DREAM-EU against
-  ERA5. Each planned contrast is also refitted with a second set of XGBoost settings, and every one
-  keeps its sign and its statistical significance at the 5% level. Every other figure on this page
-  is exploratory. The UKV snapshot rebuilds, the hour-by-hour and by-lead breakdowns, and the split
-  of ICON global by lead were added after the first run.
+- **Six planned contrasts on this page, and a seventh not yet scored.** A contrast is the
+  difference between two products' errors on the same hours. A comparison is planned when it was
+  written into the study plan before any result existed; every other figure is exploratory, chosen
+  or added after results were seen. The distinction matters because with many comparisons, about 1
+  in 20 exploratory rows reaches significance at the 5% level by chance, so an exploratory result is
+  a lead to follow up rather than a finding. A chart holding both kinds marks each planned row
+  "(planned)". A chart whose rows are all one kind says so once, in its subtitle. The ranking rests
+  on four planned contrasts: CAMS against ICON-D2, ICON-EU against ICON-D2, ICON-EU against UKV,
+  and ICON global against ICON-EU. Two more were written before SARAH-3 and ICON-DREAM-EU were
+  scored: SARAH-3 against CAMS, and ICON-DREAM-EU against ERA5. Each planned contrast is also
+  refitted with a second set of XGBoost settings, and every one keeps its sign and its statistical
+  significance at the 5% level. A seventh, ECMWF's 9 km global model against ICON-EU, was also
+  written into the plan but is not yet scored: see [Limitations](#limitations). Every other figure
+  on this page is exploratory. The UKV snapshot rebuilds, the hour-by-hour and by-lead breakdowns,
+  and the split of ICON global by lead were added after the first run.
 - **A longer record for two questions.** The year-by-year comparison with ERA5 and SARAH-3's
   comparison by satellite use a second row set, built the same way from the four products whose
   records reach back to January 2021: ERA5, CAMS, SARAH-3, and ICON-DREAM-EU. That row set holds
@@ -384,8 +389,9 @@ ERA5 by 0.3](assets/sunshine_new_products.svg)
 generators.** CAMS is computed for each generator's own coordinates. SARAH-3 is read from a 0.05°
 grid cell 0.8 km to 2.8 km from each generator. Across the generators CAMS's margin ranges from 0.03
 to 0.64 points, and at two of them it is not statistically significant at the 5% level. Relative to
-CAMS's own error, SARAH-3's is about 10% larger in broken and overcast hours and 3.5% larger in
-clear ones, in comparisons chosen after the results were seen. That pattern points at how each
+CAMS's own error, SARAH-3's is about 10% larger in broken cloud and 4% to 8% larger in overcast and
+clear hours, binned on a clearness index neither product decides, in comparisons chosen after the
+results were seen. That pattern points at how each
 product handles cloud within the hour: CAMS's hourly value is the service's own integration over the
 hour, and SARAH-3's is the mean of two snapshots. The gap does not follow the distance to SARAH-3's
 grid cell: the generator whose cell is nearest, 0.8 km away, has the largest gap. A steady bias could
@@ -402,10 +408,10 @@ diffuse-fraction model rather than the satellite.
 ### ICON-DREAM-EU beats ERA5 but not the ICON weather models
 
 **ICON-DREAM-EU beats ERA5 by 0.32 points [0.12, 0.52], one of the six planned contrasts, but its
-error of 8.77% is higher than that of each of the three ICON weather models.** The two reanalyses
-are the only products on this page that are consistent records by construction, built with one
-fixed version of each weather model, though the observations each assimilates change over time.
-With the second set of XGBoost settings, ICON-DREAM-EU is 0.33
+error of 8.77% is higher than that of each of the three ICON weather models.** The two reanalyses,
+like SARAH-3, a satellite climate data record, are built to be consistent over time, each with one
+fixed version of its weather model or retrieval, though the observations and satellites each uses
+change over time. With the second set of XGBoost settings, ICON-DREAM-EU is 0.33
 points ahead of ERA5 [0.14, 0.52], and for a generator predicted from its neighbours 0.37 points
 ahead [0.17, 0.58]. Only 4 of the 5 folds agree in sign. On the longer row set from January 2021,
 ICON-DREAM-EU is 0.39 points ahead [0.23, 0.54].
@@ -432,44 +438,60 @@ conversion to hourly means is not the main cause. The gap is 0.49 points [0.34, 
 the power-model contrasts above do, which is why ICON-DREAM-EU's modest lead over ERA5 is not an
 artefact of the power model.** Each product's own served global irradiance, compared row for row
 against CAMS's on the 76,727 daylight generator-hours every product on this page shares — no
-XGBoost model, no per-generator recalibration, no aggregation — orders the products almost exactly
-as the "Global only" MAE column does: SARAH-3 closest to CAMS, then ICON-D2, ICON-EU, ICON global,
-ICON-DREAM-EU, ERA5, with UKV's raw hourly value the furthest from CAMS. The one swap is UKV and
-ERA5: UKV's raw value is the furthest from CAMS by every raw measure here, but its power-model error
-is still lower than ERA5's, because UKV's raw bias, of about −44 W/m² relative to CAMS, comes from
-the [end-of-hour snapshot Open-Meteo rescales into an hourly
-value](#icon-eu-against-icon-global-and-ukv), which a per-generator XGBoost model can correct for
-and a raw comparison cannot. This comparison is exploratory.
+XGBoost model, no per-generator recalibration — orders the products almost exactly as the
+mean-absolute-error table above does: SARAH-3 closest to CAMS, then ICON-D2, ICON-EU, ICON global,
+ICON-DREAM-EU, ERA5, with UKV's raw hourly value the furthest from CAMS. Correlation with measured
+output, which does not use CAMS as the reference, gives the same order. The one swap is UKV and
+ERA5: UKV's raw hourly value is the furthest from CAMS by every raw measure here, but its
+power-model error is lower than ERA5's. Open-Meteo builds UKV's hourly value from the snapshot at
+the hour's end, a timing error that depends on the sun's position, and a per-generator XGBoost model
+given the sun's position can partly undo that error, which a raw comparison cannot. Rebuilt as the
+mean of its two snapshots, UKV's correlation with CAMS rises from 0.889 to 0.912. UKV also reads
+about 40 W/m² below CAMS in either form, a steady bias that each per-generator XGBoost model
+removes. This comparison is exploratory.
 
-| Product | Bias (W/m²) | Mean absolute difference (W/m²) | Correlation with CAMS |
-|---|---|---|---|
-| SARAH-3 | +9.67 | 32.53 | 0.977 |
-| ICON-D2 | −5.32 | 52.46 | 0.935 |
-| ICON-EU | −9.27 | 58.38 | 0.921 |
-| ICON global | −6.68 | 59.01 | 0.919 |
-| ICON-DREAM-EU | −8.47 | 60.57 | 0.915 |
-| ERA5 | −1.28 | 63.27 | 0.904 |
-| UKV | −44.46 | 77.21 | 0.889 |
+| Product | Bias vs CAMS (W/m²) | MAD vs CAMS (W/m²) | Correlation with CAMS | Correlation with output |
+|---|---|---|---|---|
+| CAMS | — | — | — | 0.933 |
+| SARAH-3 | +9.67 | 32.53 | 0.977 | 0.928 |
+| ICON-D2 | −5.32 | 52.46 | 0.935 | 0.889 |
+| ICON-EU | −9.27 | 58.38 | 0.921 | 0.875 |
+| ICON global | −6.68 | 59.01 | 0.919 | 0.873 |
+| ICON-DREAM-EU | −8.47 | 60.57 | 0.915 | 0.868 |
+| UKV | −44.46 | 77.21 | 0.889 | 0.846 |
+| UKV rebuilt from its snapshots | −40.11 | 68.53 | 0.912 | 0.867 |
+| ERA5 | −1.28 | 63.27 | 0.904 | 0.857 |
+
+Correlation with output is the mean of each generator's own Pearson correlation between the
+product's raw global irradiance and its measured output as a fraction of capacity. ICON-DREAM-EU's
+mean absolute difference from CAMS is 2.70 W/m² smaller than ERA5's [−4.36, −0.87], ICON-EU's is
+0.63 W/m² smaller than ICON global's [−0.93, −0.33], and ICON global's is 1.56 W/m² smaller than
+ICON-DREAM-EU's [−2.56, −0.59], each resampling whole months.
 
 ### ERA5's deficit, year by year
 
-**ERA5 trails both satellite retrievals by more than 3 points in every calendar year from 2021 to
-2026, and ICON-DREAM-EU by up to about half a point.** Every figure in this section is exploratory,
-on the longer row set from January 2021, and each year's interval comes from resampling that year's
-months alone. ERA5 trails CAMS by 4.63 points [4.00, 5.12] in 2021 and by 3.62 points [3.12, 3.91]
-in 2026. ERA5 trails SARAH-3 by between 3.21 points (2026) and 4.23 points (2021). ERA5 trails
-ICON-DREAM-EU by about half a point in each year from 2021 to 2024, a gap that is statistically
-significant at the 5% level in each of those years, and by 0.18 points in 2025 and in 2026, where
-the gap is not statistically significant at the 5% level.
+**On matched months, January to August, ERA5 trails both satellite retrievals by more than 3 points
+in every calendar year from 2021 to 2026, and ICON-DREAM-EU by up to about 0.7 points.** Every
+figure in this section is exploratory, on the longer row set from January 2021, and each year's
+interval comes from resampling that year's own January-to-August months alone; restricting every
+year to the same months keeps a partial 2026 from being compared against the other years' full
+twelve. Each year's interval rests on 8 months, so the intervals are likely too narrow. ERA5 trails
+CAMS by between 3.62 points (2026) and 4.74 points (2021). ERA5 trails SARAH-3
+by between 3.21 points (2026) and 4.31 points (2021). ERA5 trails ICON-DREAM-EU by about half a
+point to 0.68 points in each year from 2021 to 2024, a gap that is statistically significant at the
+5% level in each of those years, and by 0.21 points in 2025 and 0.18 points in 2026, where the gap
+is not statistically significant at the 5% level.
 
-**This page does not test whether the gap changes from year to year, and 2026's gaps are also
-smaller because 2026 is an easier year for every product.** 2026 runs from January to August only,
-so its mix of seasons differs from that of the five full years. In 2026 every product's error is
-lower than in 2025, so a gap measured in points is smaller too, whether or not the products' relative
-ranking has moved.
+**No year's gap between ERA5 and ICON-DREAM-EU differs from 2025's by a margin statistically
+significant at the 5% level, and 2026's gaps are also smaller because 2026 is an easier year for
+every product.** Resampling each year's months independently of 2025's, the change from each of
+2021 to 2024 to 2025 is −0.26 to −0.36 points, and every interval includes zero, so a reader should
+not conclude that ICON-DREAM-EU's gap to ERA5 has genuinely narrowed rather than moved within the
+noise. In 2026 every product's error is lower than in 2025, so a gap measured in points is smaller
+too, whether or not the products' relative ranking has moved.
 
-![Figure 8: ERA5 trails both satellite retrievals by more than 3 points in every year from 2021 to
-2026](assets/sunshine_era5_by_year.svg)
+![Figure 8: On matched months, ERA5 trails both satellite retrievals by more than 3 points in every
+year from 2021 to 2026](assets/sunshine_era5_by_year.svg)
 
 ### ICON-D2 is the best weather model tested, and its advantage shrinks within hours of each run
 
@@ -581,10 +603,9 @@ which is about as large as UKV's. For CAMS and ERA5 the own-beam effects agree w
 beam/diffuse study](beam-diffuse-split.md), which tested whether the published beam carries
 information or merely encodes the total differently. SARAH-3 is not tested, because its direct beam
 is modelled from its own global irradiance, as described under [SARAH-3 is second to CAMS under
-every satellite](#sarah-3-is-second-to-cams-under-every-satellite). ICON-DREAM-EU's own-beam gain,
-0.034 points [0.010, 0.059], is not statistically significant at the 5% level on the record panel's
-longer and more varied row set, −0.005 points [−0.027, +0.018], so this result should not be read as
-settled.
+every satellite](#sarah-3-is-second-to-cams-under-every-satellite). ICON-DREAM-EU's own-beam gain of
+0.034 points [0.010, 0.059] disappears on the record panel's longer row set, where it is −0.005
+points [−0.027, +0.018], so this result should not be read as settled.
 
 ![Figure 12: Every product with its own direct beam, except ERA5, gains 0.03 to 0.10 points from
 it](assets/sunshine_own_beam.svg)
@@ -697,11 +718,10 @@ single weather product?](blending-weather-products.md#solar-a-blend-beats-cams-g
   wind?](weather-products-for-past-wind.md).
 - **The intervals describe these six generators only.** The intervals resample months, not
   generators, so they say nothing about how a generator elsewhere would rank the products.
-- **SARAH-3 and ICON-DREAM-EU are read at a grid cell, the other six products at each generator's
-  coordinates.** SARAH-3's nearest cell sits 0.8 km to 2.8 km from each generator and
-  ICON-DREAM-EU's 1.6 km to 5.0 km. A cell that misses a generator's own clouds handicaps the
-  product read from it, so both products' errors here may be slightly larger than at the
-  generators' own coordinates.
+- **Every product except CAMS is read at a grid cell, not at the generator.** ERA5 at its nearest
+  0.25° cell, the Open-Meteo weather models at the cell Open-Meteo serves, SARAH-3 at a cell 0.8 km
+  to 2.8 km away, and ICON-DREAM-EU at a cell 1.6 km to 5.0 km away. A cell that misses a
+  generator's own clouds handicaps the product read from it.
 - **Four weather models are not yet scored.** ECMWF's 9 km global model, Météo-France's ARPEGE on
   its European grid, and the Danish and Dutch HARMONIE-AROME models are not on this page, and the
   ranking says nothing about them.

@@ -503,7 +503,8 @@ NEW_PRODUCTS_TITLE: Final[str] = (
 """Figure 7's title, which states the finding."""
 
 ERA5_BY_YEAR_TITLE: Final[str] = (
-    "ERA5 trails both satellite retrievals by more than 3 points in every year from 2021 to 2026"
+    "On matched months, ERA5 trails both satellite retrievals by more than 3 points in every year "
+    "from 2021 to 2026"
 )
 """Figure 8's title, which states the finding."""
 
@@ -880,8 +881,9 @@ def _era5_by_year() -> alt.VConcatChart:
     """Draw CAMS, SARAH-3 and ICON-DREAM-EU against ERA5 in each calendar year from 2021.
 
     Reads the `record` panel's `era5_by_year.parquet`, which `weather_products.py` wrote on the
-    four products whose records start by 2021. A year of too few months carries no interval and is
-    left out.
+    four products whose records start by 2021, restricted to January to August of each year so a
+    partial 2026 compares against the same months of the complete years before it. A year of too
+    few months carries no interval and is left out.
 
     Returns:
         Figure 8.
@@ -920,8 +922,10 @@ def _era5_by_year() -> alt.VConcatChart:
         title=ERA5_BY_YEAR_TITLE,
         subtitle=[
             (
-                "Each product's mean absolute error minus ERA5's within one calendar year, on the "
-                "hours all four products cover; 2026 runs to August."
+                "Each product's mean absolute error minus ERA5's, on January to August of one "
+                "calendar year, on the hours all four products cover. Every year is restricted to "
+                "the same months so a partial 2026 compares against the same months of the "
+                "complete years before it."
             ),
             f"{DOTS} {CAPACITY}",
             RECORD_SCOPE,

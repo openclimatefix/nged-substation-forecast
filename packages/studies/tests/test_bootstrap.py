@@ -7,6 +7,8 @@ from studies.bootstrap import (
     bootstrap_absolute,
     bootstrap_difference,
     bootstrap_difference_by_year,
+    bootstrap_row_difference,
+    bootstrap_year_change,
     fold_t_interval,
     per_fold_differences,
 )
@@ -281,3 +283,165 @@ def test_no_months_filter_keeps_the_full_year():
     )
 
     assert [interval["n_months"] for interval in intervals] == [12, 12]
+
+
+def _year_records(*, year: int, month_values: dict[int, float]) -> list[dict]:
+    records = []
+    for month, value in month_values.items():
+        for seed in (0, 1):
+            for arm, loss in (("treatment", value), ("reference", 0.0)):
+                records.append(
+                    {
+                        "arm": arm,
+                        "site": "A",
+                        "time": datetime(year, month, 1, tzinfo=UTC),
+                        "seed": seed,
+                        "month": f"{year}-{month:02d}",
+                        "loss": loss,
+                        "setting": "pooled",
+                    }
+                )
+    return records
+
+
+def test_change_is_year1_difference_minus_year0_difference():
+    # 2024's difference is a constant 1.0 across its 4 months; 2025's alternates 0.0/2.0 across 12
+    # months, which also averages to 1.0, so the point change is exactly 0 despite the two years
+    # having very different within-year spread.
+    losses = pl.DataFrame(
+        [
+            *_year_records(year=2024, month_values={1: 1.0, 2: 1.0, 3: 1.0, 4: 1.0}),
+            *_year_records(
+                year=2025,
+                month_values={m: (0.0 if m % 2 else 2.0) for m in range(1, 13)},
+            ),
+        ]
+    )
+
+    result = bootstrap_year_change(
+        losses=losses,
+        treatment="treatment",
+        reference="reference",
+        metric="loss",
+        year0=2024,
+        year1=2025,
+    )
+
+    assert result["change"] == pytest.approx(0.0)
+    assert result["n_months_year0"] == 4
+    assert result["n_months_year1"] == 12
+
+
+def test_change_direction_is_year1_minus_year0():
+    # 2024 is a constant 1.0, 2025 a constant 3.0, so the true change is unambiguous: +2.0 if
+    # computed year1 minus year0, and -2.0 the other way around. A bug that swapped the order, or
+    # that attributed 2025's rows to year0's slot, would flip this value's sign.
+    losses = pl.DataFrame(
+        [
+            *_year_records(year=2024, month_values={1: 1.0, 2: 1.0}),
+            *_year_records(year=2025, month_values={1: 3.0, 2: 3.0}),
+        ]
+    )
+
+    result = bootstrap_year_change(
+        losses=losses,
+        treatment="treatment",
+        reference="reference",
+        metric="loss",
+        year0=2024,
+        year1=2025,
+    )
+
+    assert result["change"] == pytest.approx(2.0)
+
+
+def test_months_filter_applies_to_both_years():
+    # 2024 holds 1.0 in January and 5.0 in February; 2025 holds 1.0 in January and 9.0 in
+    # February. Restricting to January alone must drop both years' February rows, leaving the
+    # change at 1.0 - 1.0 = 0.0 rather than 1.0 - 5.0 (unfiltered, treating only 2024) or some
+    # other mix.
+    losses = pl.DataFrame(
+        [
+            *_year_records(year=2024, month_values={1: 1.0, 2: 5.0}),
+            *_year_records(year=2025, month_values={1: 1.0, 2: 9.0}),
+        ]
+    )
+
+    result = bootstrap_year_change(
+        losses=losses,
+        treatment="treatment",
+        reference="reference",
+        metric="loss",
+        year0=2024,
+        year1=2025,
+        months=(1,),
+    )
+
+    assert result["n_months_year0"] == 1
+    assert result["n_months_year1"] == 1
+    assert result["change"] == pytest.approx(0.0)
+
+
+def test_a_year_with_no_rows_after_the_months_filter_raises():
+    losses = pl.DataFrame(
+        [
+            *_year_records(year=2024, month_values={1: 1.0}),
+            *_year_records(year=2025, month_values={1: 1.0}),
+        ]
+    )
+
+    with pytest.raises(ValueError, match="no rows"):
+        bootstrap_year_change(
+            losses=losses,
+            treatment="treatment",
+            reference="reference",
+            metric="loss",
+            year0=2024,
+            year1=2025,
+            months=(12,),
+        )
+
+
+def test_year_change_losses_at_two_settings_raise():
+    losses = pl.DataFrame(
+        [
+            *_year_records(year=2024, month_values={1: 1.0}),
+            *_year_records(year=2025, month_values={1: 1.0}),
+        ]
+    )
+    both = pl.concat([losses, losses.with_columns(setting=pl.lit("sensitivity"))])
+
+    with pytest.raises(ValueError, match="settings"):
+        bootstrap_year_change(
+            losses=both,
+            treatment="treatment",
+            reference="reference",
+            metric="loss",
+            year0=2024,
+            year1=2025,
+        )
+
+
+def test_bootstrap_row_difference_is_the_mean_of_the_values():
+    values = np.array([1.0, 2.0, 3.0, 4.0])
+    months = np.array(["2024-01", "2024-01", "2024-02", "2024-02"])
+
+    result = bootstrap_row_difference(values=values, months=months)
+
+    assert result["difference"] == pytest.approx(2.5)
+    assert result["n_months"] == 2
+    assert result["n_rows"] == 4
+    assert result["seed_spread"] == 0.0
+
+
+def test_bootstrap_row_difference_interval_collapses_with_no_month_spread():
+    # Every month holds the same value, so a whole-month resample can never draw anything but 5.0.
+    # A bug that resampled individual rows, or that pulled in a seed dimension that does not exist
+    # here, would not collapse this interval to the point estimate.
+    values = np.array([5.0] * 20)
+    months = np.array([f"2024-{m:02d}" for m in range(1, 11) for _ in range(2)])
+
+    result = bootstrap_row_difference(values=values, months=months)
+
+    assert result["lower_95"] == pytest.approx(5.0)
+    assert result["upper_95"] == pytest.approx(5.0)

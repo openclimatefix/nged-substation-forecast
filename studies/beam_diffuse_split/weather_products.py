@@ -104,9 +104,11 @@ from studies.bootstrap import (
     BOOTSTRAP_SEED,
     MIN_MONTHS_FOR_INTERVAL,
     N_BOOTSTRAP_RESAMPLES,
+    YearChangeInterval,
     YearInterval,
     bootstrap_difference,
     bootstrap_difference_by_year,
+    bootstrap_year_change,
     per_fold_differences,
 )
 from studies.cross_validation import (
@@ -119,7 +121,11 @@ from studies.cross_validation import (
 )
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.neighbouring_hours import with_neighbouring_hours
-from studies.raw_comparison import raw_column_comparison
+from studies.raw_comparison import (
+    mean_per_site_correlation,
+    raw_column_comparison,
+    raw_mad_difference,
+)
 from studies.solar import extraterrestrial_horizontal, zenith
 
 _LOG = logging.getLogger(__name__)
@@ -410,6 +416,11 @@ LEAVE_ONE_SITE_OUT_SEED: Final[int] = SEEDS[0]
 
 METRIC: Final[str] = "absolute_error_capped_fraction_of_capacity"
 """The loss every table reports: each row's clamped error over its own generator's capacity."""
+
+ERA5_BY_YEAR_MONTHS: Final[tuple[int, ...]] = tuple(range(1, 9))
+"""January to August: 2026's record stops in August, so every year-by-year table is restricted to
+these months, matching a partial final year against the same months of the complete years before it.
+"""
 
 SEASONS: Final[dict[int, str]] = {
     12: "winter",
@@ -1334,12 +1345,33 @@ RAW_IRRADIANCE_PRODUCTS: Final[tuple[tuple[str, str], ...]] = (
     ("icon_global", "ICON global"),
     ("icon_dream", "ICON-DREAM-EU"),
     ("ukv", "UKV"),
+    ("ukv_trap", "UKV rebuilt from its snapshots"),
     ("era5", "ERA5"),
 )
 """The products `_raw_irradiance_vs_cams_lines` compares against CAMS, as (arm prefix, display
-name). UKV is its Open-Meteo hourly value as scored elsewhere on this page, not rebuilt from its
-snapshots.
+name). UKV is its Open-Meteo hourly value as scored elsewhere on this page; the "ukv_trap" row
+reads `ghi_trap_ukv`, the mean of UKV's two snapshots, to check whether the end-of-hour snapshot
+explains UKV's raw distance from CAMS.
 """
+
+RAW_MAD_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("icon_dream", "era5"),
+    ("icon_eu", "icon_global"),
+    ("icon_global", "icon_dream"),
+)
+"""The pairs `_raw_irradiance_vs_cams_lines` intervals for a difference in raw MAD from CAMS."""
+
+
+def _raw_ghi_column(*, product: str) -> str:
+    """Return a product's raw global-irradiance column name, `RAW_IRRADIANCE_PRODUCTS`'s keys.
+
+    Args:
+        product: An arm prefix from `RAW_IRRADIANCE_PRODUCTS`, or a plain product key.
+
+    Returns:
+        `ghi_trap_ukv` for `"ukv_trap"`, else `_named("ghi_w_m2", product)`.
+    """
+    return "ghi_trap_ukv" if product == "ukv_trap" else _named("ghi_w_m2", product)
 
 
 def _raw_irradiance_vs_cams_lines(*, frame: pl.DataFrame) -> list[str]:
@@ -1350,33 +1382,74 @@ def _raw_irradiance_vs_cams_lines(*, frame: pl.DataFrame) -> list[str]:
     served irradiance values directly, row for row, on the daylight hours `frame` holds (`frame` is
     already the `long` panel's common rows, so every listed product's column is present on every
     row). It exists to check whether the raw irradiance already ranks the products the way the
-    power-model contrasts do, or whether the model is doing the ranking.
+    power-model contrasts do, or whether the model is doing the ranking. The correlation with each
+    generator's own measured output is a second, reference-free check: CAMS shares SARAH-3's
+    Meteosat inputs, so a product's correlation with CAMS alone could inherit some of that
+    resemblance.
 
     Args:
-        frame: The panel's common rows, holding `ghi_cams` and each product's own `ghi_<product>`.
+        frame: The panel's common rows, holding `ghi_cams`, each product's own `ghi_<product>`,
+            `power_mw` and `effective_capacity_mw`.
 
     Returns:
-        Markdown lines: one row per product.
+        Markdown lines: a table of one row per product, then a table of MAD-difference intervals
+        for `RAW_MAD_CONTRASTS`.
     """
-    daylight = frame.filter(pl.col("solar_elevation_deg") > 0.0)
+    daylight = frame.filter(pl.col("solar_elevation_deg") > 0.0).with_columns(
+        power_fraction=pl.col("power_mw") / pl.col("effective_capacity_mw")
+    )
     lines = [
         "#### Raw global irradiance against CAMS's, before any power model (exploratory)",
         "",
         (
             f"On the {daylight.height:,} daylight generator-hours every listed product shares "
-            "with CAMS. Positive bias: the product reads higher than CAMS."
+            "with CAMS. Positive bias: the product reads higher than CAMS. Correlation with "
+            "output does not use CAMS as the reference, and is the mean of each generator's own "
+            "correlation."
         ),
         "",
-        "| Product | Bias (W/m²) | Mean absolute difference (W/m²) | Correlation with CAMS |",
-        "|---|---|---|---|",
+        (
+            "| Product | Bias vs CAMS (W/m²) | MAD vs CAMS (W/m²) | Correlation with CAMS "
+            "| Correlation with output |"
+        ),
+        "|---|---|---|---|---|",
     ]
+    cams_output_correlation = mean_per_site_correlation(
+        frame=daylight, column="ghi_cams", reference="power_fraction"
+    )
+    lines.append(f"| CAMS | — | — | — | {cams_output_correlation:.3f} |")
     for product, name in RAW_IRRADIANCE_PRODUCTS:
-        comparison = raw_column_comparison(
-            frame=daylight, treatment=_named("ghi_w_m2", product), reference="ghi_cams"
+        column = _raw_ghi_column(product=product)
+        comparison = raw_column_comparison(frame=daylight, treatment=column, reference="ghi_cams")
+        output_correlation = mean_per_site_correlation(
+            frame=daylight, column=column, reference="power_fraction"
         )
         lines.append(
             f"| {name} | {comparison['bias']:+.2f} | {comparison['mad']:.2f} "
-            f"| {comparison['correlation']:.3f} |"
+            f"| {comparison['correlation']:.3f} | {output_correlation:.3f} |"
+        )
+    lines += [
+        "",
+        (
+            "Bootstrapped difference in mean absolute difference from CAMS, resampling whole "
+            "months (no fitting seed): positive means the first product's raw MAD is the larger."
+        ),
+        "",
+        "| Products | MAD difference (W/m²) | 95% interval |",
+        "|---|---|---|",
+    ]
+    for treatment, reference in RAW_MAD_CONTRASTS:
+        result = raw_mad_difference(
+            frame=daylight,
+            treatment=_raw_ghi_column(product=treatment),
+            reference=_raw_ghi_column(product=reference),
+            baseline="ghi_cams",
+        )
+        treatment_name = dict(RAW_IRRADIANCE_PRODUCTS)[treatment]
+        reference_name = dict(RAW_IRRADIANCE_PRODUCTS)[reference]
+        lines.append(
+            f"| {treatment_name} − {reference_name} | {result['difference']:+.2f} "
+            f"| [{result['lower_95']:+.2f}, {result['upper_95']:+.2f}] |"
         )
     return lines
 
@@ -1392,14 +1465,17 @@ broken-cloud, and clear skies, for `_sarah_cams_breakdown_lines`.
 
 
 def _sarah_cams_breakdown_lines(*, frame: pl.DataFrame, losses: pl.DataFrame) -> list[str]:
-    """Report SARAH-3's error against CAMS, per generator and by CAMS's clearness index.
+    """Report SARAH-3's error against CAMS, per generator and by clearness index.
 
     Neither breakdown is a planned contrast, so both are exploratory. The clearness index `kt` is
-    CAMS's own global irradiance over the extraterrestrial irradiance at the same site and time,
-    which does not depend on the weather product read for the metric.
+    the mean of CAMS's and SARAH-3's own global irradiance over the extraterrestrial irradiance at
+    the same site and time, rather than CAMS's alone: binning on one product's own clearness tilts
+    the comparison towards that product's mistakes falling in whichever band its own retrieval
+    called clear or overcast.
 
     Args:
-        frame: The panel's common rows, holding `ghi_cams` and `extraterrestrial_horizontal_w_m2`.
+        frame: The panel's common rows, holding `ghi_cams`, `ghi_sarah3` and
+            `extraterrestrial_horizontal_w_m2`.
         losses: The pooled losses, holding `sarah3_global` and `cams_global`.
 
     Returns:
@@ -1409,7 +1485,10 @@ def _sarah_cams_breakdown_lines(*, frame: pl.DataFrame, losses: pl.DataFrame) ->
         "site",
         "time",
         kt=pl.when(pl.col("extraterrestrial_horizontal_w_m2") > 0)
-        .then(pl.col("ghi_cams") / pl.col("extraterrestrial_horizontal_w_m2"))
+        .then(
+            ((pl.col("ghi_cams") + pl.col("ghi_sarah3")) / 2)
+            / pl.col("extraterrestrial_horizontal_w_m2")
+        )
         .otherwise(None),
     )
     keyed = losses.join(kt, on=["site", "time"], how="left")
@@ -1424,19 +1503,18 @@ def _sarah_cams_breakdown_lines(*, frame: pl.DataFrame, losses: pl.DataFrame) ->
         for site in sorted(keyed["site"].unique().to_list())
     ]
     clearness_heading = (
-        "#### SARAH-3 against CAMS, by CAMS's clearness index (exploratory, chosen after the "
-        "results were seen)"
+        "#### SARAH-3 against CAMS, by the mean of the two products' clearness index (exploratory, "
+        "chosen after the results were seen)"
     )
     lines += ["", clearness_heading, "", *CONTRAST_HEADER]
-    lines += [
-        _contrast_line(
-            losses=keyed.filter(pl.col("kt").is_between(low, high, closed="left")),
-            treatment="sarah3_global",
-            reference="cams_global",
-            label=name,
+    for name, low, high in CLEARNESS_BANDS:
+        band = keyed.filter(pl.col("kt").is_between(low, high, closed="left"))
+        label = f"{name}, CAMS's own error {_mae(losses=band, arm='cams_global'):.3f}%"
+        lines.append(
+            _contrast_line(
+                losses=band, treatment="sarah3_global", reference="cams_global", label=label
+            )
         )
-        for name, low, high in CLEARNESS_BANDS
-    ]
     return lines
 
 
@@ -1445,7 +1523,8 @@ def _icon_dream_icon_eu_by_year_lines(*, losses: pl.DataFrame) -> list[str]:
 
     Shows whether ICON-DREAM-EU's gap to ICON-EU drifts from year to year, so a reader who sees
     every product's lead over ERA5 shrink in 2025 and 2026 can check whether ICON-DREAM-EU is
-    getting worse relative to a weather model rather than only relative to ERA5's reanalysis.
+    getting worse relative to a weather model rather than only relative to ERA5's reanalysis. Every
+    year is restricted to `ERA5_BY_YEAR_MONTHS`, matching `era5_difference_by_year`'s own table.
 
     Args:
         losses: The pooled losses, holding `icon_dream_global` and `icon_eu_global`.
@@ -1458,13 +1537,15 @@ def _icon_dream_icon_eu_by_year_lines(*, losses: pl.DataFrame) -> list[str]:
         treatment="icon_dream_global",
         references=("icon_eu_global",),
         metric=METRIC,
+        months=ERA5_BY_YEAR_MONTHS,
     )
     lines = [
         "#### ICON-DREAM-EU against ICON-EU, by year (exploratory)",
         "",
         (
             "Positive: ICON-DREAM-EU's error is the larger. A year of fewer than "
-            f"{MIN_MONTHS_FOR_INTERVAL} months gets no interval."
+            f"{MIN_MONTHS_FOR_INTERVAL} months gets no interval. Every year is restricted to "
+            "January to August."
         ),
         "",
         "| Year | ICON-DREAM-EU − ICON-EU (pp of capacity) | 95% interval | Months | Rows |",
@@ -1479,6 +1560,53 @@ def _icon_dream_icon_eu_by_year_lines(*, losses: pl.DataFrame) -> list[str]:
             f"| {row['year']} | {difference:+.3f} | {interval} | {row['n_months']} "
             f"| {row['n_rows']:,} |"
         )
+    return lines
+
+
+ICON_DREAM_ERA5_CHANGE_EARLIER_YEARS: Final[tuple[int, ...]] = (2021, 2022, 2023, 2024)
+"""The earlier years `_icon_dream_era5_year_change_lines` each tests against 2025."""
+
+
+def _icon_dream_era5_year_change_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Report whether 2025's gap between ERA5 and ICON-DREAM-EU differs from each earlier year's.
+
+    2025 is the first year on the record panel where ICON-DREAM-EU's lead over ERA5 narrows to
+    where it is no longer statistically significant at the 5% level. This checks whether that
+    narrower gap is itself a statistically significant change from each of the four full years
+    before it, resampling each year's months independently
+    (`studies.bootstrap.bootstrap_year_change`). Every year here is a complete calendar year, so no
+    `months` restriction is needed.
+
+    Args:
+        losses: The record panel's pooled losses, holding `era5_global` and `icon_dream_global`.
+
+    Returns:
+        Markdown lines: one row per earlier year, each against 2025.
+    """
+    lines = [
+        "#### ERA5 against ICON-DREAM-EU, change from an earlier year to 2025 (exploratory)",
+        "",
+        (
+            "Positive: ERA5's error grew relative to ICON-DREAM-EU, from the earlier year to "
+            "2025. Each year's months are resampled independently of the other year's."
+        ),
+        "",
+        "| Earlier year | Change to 2025 (pp of capacity) | 95% interval |",
+        "|---|---|---|",
+    ]
+    for year0 in ICON_DREAM_ERA5_CHANGE_EARLIER_YEARS:
+        result = bootstrap_year_change(
+            losses=losses,
+            treatment="era5_global",
+            reference="icon_dream_global",
+            metric=METRIC,
+            year0=year0,
+            year1=2025,
+        )
+        change, lower, upper = (
+            result[key] * PERCENTAGE_POINTS for key in ("change", "lower_95", "upper_95")
+        )
+        lines.append(f"| {year0} | {change:+.3f} | [{lower:+.3f}, {upper:+.3f}] |")
     return lines
 
 
@@ -1514,6 +1642,42 @@ def _icon_dream_icon_eu_lead_lines(*, losses: pl.DataFrame) -> list[str]:
             label=f"both at lead {lead} h, {label}",
         )
         for lead in (1, 2, 3)
+    ]
+    return lines
+
+
+ICON_DREAM_OTHER_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("icon_dream_global", "icon_d2_global"),
+    ("icon_dream_global", "icon_global_global"),
+    ("icon_dream_global", "ukv_global"),
+)
+"""The pairings `_icon_dream_other_products_lines` prints, none of which this page's planned
+contrasts test.
+"""
+
+
+def _icon_dream_other_products_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Report ICON-DREAM-EU against ICON-D2, ICON global, and Open-Meteo's hourly UKV (exploratory).
+
+    None of these pairings is a planned contrast or tested at matched served leads elsewhere on
+    this page; they are printed so a reader sees the interval behind a point estimate rather than
+    a bare number.
+
+    Args:
+        losses: The pooled losses, holding `icon_dream_global`, `icon_d2_global`,
+            `icon_global_global` and `ukv_global`.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        "#### ICON-DREAM-EU against ICON-D2, ICON global, and UKV (exploratory)",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    lines += [
+        _contrast_line(losses=losses, treatment=treatment, reference=reference, label="all")
+        for treatment, reference in ICON_DREAM_OTHER_CONTRASTS
     ]
     return lines
 
@@ -1714,6 +1878,81 @@ def era5_by_year_lines(*, by_year: pl.DataFrame, months_note: str | None = None)
         lines.append(
             f"| {row['arm']} | {row['year']} | {difference:+.3f} | {interval} | {verdict} "
             f"| {row['n_months']} | {row['n_rows']:,} |"
+        )
+    return lines
+
+
+def era5_year_change(
+    *,
+    losses: pl.DataFrame,
+    era5_arm: str,
+    other_arms: tuple[str, ...],
+    year0: int,
+    year1: int,
+    months: tuple[int, ...] | None = None,
+) -> pl.DataFrame:
+    """Return the change in ERA5's error minus each other arm's, from `year0` to `year1`.
+
+    Each year's months are resampled independently, by `studies.bootstrap.bootstrap_year_change`,
+    so the interval tests whether the year-by-year difference itself moved, which two overlapping
+    `era5_difference_by_year` intervals cannot show.
+
+    Args:
+        losses: Per-row losses at one setting, carrying `time`, `month`, `site`, `seed` and `arm`.
+        era5_arm: ERA5's arm, the treatment in every difference.
+        other_arms: The arms ERA5 is compared against.
+        year0: The earlier calendar year.
+        year1: The later calendar year.
+        months: When given, restricts both years to these calendar months (1-12) before resampling.
+
+    Returns:
+        One row per arm with `year0`, `year1`, `change`, its interval, and the row and month counts
+        behind each year. A positive change means ERA5's error grew relative to the arm (the arm's
+        lead over ERA5 grew).
+    """
+    changes: list[YearChangeInterval] = [
+        bootstrap_year_change(
+            losses=losses,
+            treatment=era5_arm,
+            reference=other,
+            metric=METRIC,
+            year0=year0,
+            year1=year1,
+            months=months,
+        )
+        for other in other_arms
+    ]
+    return pl.DataFrame(changes).rename({"reference": "arm"})
+
+
+def era5_year_change_lines(*, changes: pl.DataFrame) -> list[str]:
+    """Render `era5_year_change`'s table as markdown.
+
+    Args:
+        changes: The output of `era5_year_change`.
+
+    Returns:
+        Markdown lines: one row per arm.
+    """
+    lines = [
+        "#### ERA5 against every other product, change from one year to the next (exploratory)",
+        "",
+        (
+            "Positive: ERA5's error grew relative to the product, so the product's lead over ERA5 "
+            "grew. Each year's months are resampled independently of the other year's, so this "
+            "tests whether the difference itself changed."
+        ),
+        "",
+        "| Against | Years | Change (pp of capacity) | 95% interval | Rows (year0, year1) |",
+        "|---|---|---|---|---|",
+    ]
+    for row in changes.iter_rows(named=True):
+        change, lower, upper = (
+            row[key] * PERCENTAGE_POINTS for key in ("change", "lower_95", "upper_95")
+        )
+        lines.append(
+            f"| {row['arm']} | {row['year0']}→{row['year1']} | {change:+.3f} "
+            f"| [{lower:+.3f}, {upper:+.3f}] | {row['n_rows_year0']:,}, {row['n_rows_year1']:,} |"
         )
     return lines
 
@@ -1946,9 +2185,16 @@ def _report(
     if {"icon_dream", "icon_eu"} <= set(panel.products):
         lines += ["", *_icon_dream_icon_eu_by_year_lines(losses=pooled)]
         lines += ["", *_icon_dream_icon_eu_lead_lines(losses=pooled)]
-    if {product for product, _ in RAW_IRRADIANCE_PRODUCTS} <= set(panel.products):
+    if {"icon_dream", "icon_d2", "icon_global", "ukv"} <= set(panel.products):
+        lines += ["", *_icon_dream_other_products_lines(losses=pooled)]
+    raw_irradiance_products = {
+        product for product, _ in RAW_IRRADIANCE_PRODUCTS if product != "ukv_trap"
+    }
+    if raw_irradiance_products <= set(panel.products):
         lines += ["", *_raw_irradiance_vs_cams_lines(frame=frame)]
-    lines += ["", *era5_by_year_lines(by_year=by_year)]
+    if name == "record" and {"era5", "icon_dream"} <= set(panel.products):
+        lines += ["", *_icon_dream_era5_year_change_lines(losses=pooled)]
+    lines += ["", *era5_by_year_lines(by_year=by_year, months_note="January to August")]
     lines += ["", *geometry_lines(sites=_pv_sites(), noun="solar farms")]
     return "\n".join(lines) + "\n"
 
@@ -2082,6 +2328,7 @@ def run_panel(
         losses=losses.pooled,
         era5_arm=f"{BASE_PRODUCT}_global",
         other_arms=tuple(f"{p}_global" for p in panel.products if p != BASE_PRODUCT),
+        months=ERA5_BY_YEAR_MONTHS,
     )
     report = _report(name=name, panel=panel, frame=frame, losses=losses, by_year=by_year)
     by_year.write_parquet(output_dir / "era5_by_year.parquet")

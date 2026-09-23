@@ -1,6 +1,10 @@
 import polars as pl
 import pytest
-from studies.raw_comparison import raw_column_comparison
+from studies.raw_comparison import (
+    mean_per_site_correlation,
+    raw_column_comparison,
+    raw_mad_difference,
+)
 
 
 def test_bias_is_treatment_minus_reference():
@@ -38,3 +42,53 @@ def test_correlation_of_unrelated_columns_is_near_zero():
     result = raw_column_comparison(frame=frame, treatment="treatment", reference="reference")
 
     assert abs(result["correlation"]) < 0.5
+
+
+def test_mean_per_site_correlation_averages_each_sites_own_correlation():
+    # Site A is a perfect positive relationship, site B a perfect negative one. Pooling both
+    # sites' rows before correlating would not average to 0 in general (it depends on each site's
+    # scale and offset); correlating within each site first and then averaging always does, for
+    # two sites whose own correlations are +1 and -1.
+    frame = pl.DataFrame(
+        {
+            "site": ["A", "A", "A", "B", "B", "B"],
+            "column": [1.0, 2.0, 3.0, 1.0, 2.0, 3.0],
+            "reference": [1.0, 2.0, 3.0, 3.0, 2.0, 1.0],
+        }
+    )
+
+    result = mean_per_site_correlation(frame=frame, column="column", reference="reference")
+
+    assert result == pytest.approx(0.0)
+
+
+def test_mean_per_site_correlation_of_one_site_is_that_sites_own_correlation():
+    frame = pl.DataFrame(
+        {"site": ["A", "A", "A"], "column": [1.0, 2.0, 3.0], "reference": [2.0, 4.0, 6.0]}
+    )
+
+    result = mean_per_site_correlation(frame=frame, column="column", reference="reference")
+
+    assert result == pytest.approx(1.0)
+
+
+def test_raw_mad_difference_is_treatment_mad_minus_reference_mad():
+    # Treatment is always 4 away from baseline; reference is always 1 away. A bug that computed
+    # reference minus treatment, or that dropped the absolute value before differencing, would not
+    # give +3 here.
+    frame = pl.DataFrame(
+        {
+            "treatment": [4.0, -4.0, 4.0, -4.0],
+            "reference": [1.0, -1.0, 1.0, -1.0],
+            "baseline": [0.0, 0.0, 0.0, 0.0],
+            "month": ["2024-01", "2024-01", "2024-02", "2024-02"],
+        }
+    )
+
+    result = raw_mad_difference(
+        frame=frame, treatment="treatment", reference="reference", baseline="baseline"
+    )
+
+    assert result["difference"] == pytest.approx(3.0)
+    assert result["n_months"] == 2
+    assert result["n_rows"] == 4

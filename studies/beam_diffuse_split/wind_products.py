@@ -58,6 +58,8 @@ from weather_products import (
     _scope,
     era5_by_year_lines,
     era5_difference_by_year,
+    era5_year_change,
+    era5_year_change_lines,
     geometry_lines,
     with_eras,
 )
@@ -805,29 +807,49 @@ every year to the same months keeps the year-to-year comparison paired on season
 """
 
 
+ERA5_YEAR_CHANGE_YEARS: Final[tuple[int, int]] = (2025, 2026)
+"""The two years `write_era5_by_year` tests for a change in ERA5's deficit, on matched months."""
+
+
 def write_era5_by_year() -> None:
     """Write ERA5's error against every other product, year by year, from the saved losses.
 
     Reads the main setting's losses the full run saved, and fits nothing. Every year is restricted
     to `ERA5_BY_YEAR_MONTHS`, January to September, so a partial final year does not skew the
-    comparison against the complete years before it.
+    comparison against the complete years before it. Also writes whether the year-by-year
+    difference itself changed between `ERA5_YEAR_CHANGE_YEARS`, resampling each year's months
+    independently, which two overlapping by-year intervals cannot show.
     """
     losses = pl.read_parquet(STUDY_DATA_DIR / OUTPUT_DIR_NAME / "losses.parquet").filter(
         pl.col("setting") == "pooled"
     )
     paths = [ERA5_BY_YEAR_DIR / "era5_by_year.parquet", ERA5_BY_YEAR_DIR / "era5_by_year.md"]
-    refuse_to_overwrite(paths=paths)
+    change_paths = [
+        ERA5_BY_YEAR_DIR / "era5_year_change.parquet",
+        ERA5_BY_YEAR_DIR / "era5_year_change.md",
+    ]
+    refuse_to_overwrite(paths=[*paths, *change_paths])
+    other_arms = tuple(f"{product}_wind" for product in PRODUCTS if product != "era5")
     by_year = era5_difference_by_year(
+        losses=losses, era5_arm="era5_wind", other_arms=other_arms, months=ERA5_BY_YEAR_MONTHS
+    )
+    year0, year1 = ERA5_YEAR_CHANGE_YEARS
+    changes = era5_year_change(
         losses=losses,
         era5_arm="era5_wind",
-        other_arms=tuple(f"{product}_wind" for product in PRODUCTS if product != "era5"),
+        other_arms=other_arms,
+        year0=year0,
+        year1=year1,
         months=ERA5_BY_YEAR_MONTHS,
     )
     ERA5_BY_YEAR_DIR.mkdir(parents=True, exist_ok=True)
     lines = era5_by_year_lines(by_year=by_year, months_note="January to September")
+    change_lines = era5_year_change_lines(changes=changes)
     by_year.write_parquet(paths[0])
     paths[1].write_text("\n".join(lines) + "\n")
-    sys.stdout.write("\n".join(lines) + "\n")
+    changes.write_parquet(change_paths[0])
+    change_paths[1].write_text("\n".join(change_lines) + "\n")
+    sys.stdout.write("\n".join(lines) + "\n" + "\n".join(change_lines) + "\n")
 
 
 def main() -> int:
