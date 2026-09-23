@@ -376,3 +376,33 @@ printed rows above, and the verification below.
   any row it cannot read, so a format change fails loudly. The cleaner long-term design is for each
   study script to write its intervals to a table that the report and the charts both read. That
   needs a re-run of both studies, which belongs to the directory restructuring in #829.
+
+## Departures during implementation
+
+- **`interval_chart` is two functions, `interval_panel` and `figure`.** Every chart has one to four
+  panels, so the panel (dots, lines, zero rule, direction label, named-row marking, colour scale)
+  and the caption (the "Figure N:" title, the subtitle, the warm-grey rule) are drawn separately
+  and composed. A public `ticks` sets round tick values, because an explicit domain with
+  `nice=False` otherwise gives ticks such as −4.5, −3.5.
+- **`flip_contrast` takes a frame of rows (`contrasts`), and `report_errors` takes a `column`.** The
+  solar report's error column is "Global only" and the wind report's is "All sites".
+- **The condition key is a small chart of its own.** A Vega-Lite shape legend draws every symbol
+  alike, so it cannot show that the second condition is hollow.
+- **The 2px surface ring on dots is dropped.** At this dot size it cut every short interval line in
+  two, which read as a dashed line.
+- **Solar chart 3's two panels share the x scale, not a y axis.** The two panels hold different
+  rows (hours, and contrasts).
+- **Solar chart 8 has one small multiple per product.** The plotted quantity is pooled over
+  generators, so a panel per generator is not possible. Its title is "CAMS's implied capacity
+  swings the most with the seasons", which makes no claim about which product is right.
+- **The script reproduces the whole implied-capacity table**, line for line, not only December.
+- **The wind charts are numbered in page order.** The per-generator chart (plan's wind 5) supports
+  the same paragraph as the half-year chart, so it is Figure 3; ICON-D2 against UKV is Figure 4,
+  and the steps chart Figure 5.
+- **Wind chart 4's left panel draws the other two generators in mid-grey** (`ocf.ENSEMBLE_LINE`) as
+  a de-emphasised comparison, on a stroke scale kept apart from the family colour scale. The script
+  asserts the three period ratios at each height that the corrected sentence rests on.
+- **Row labels round each product's error half up** (8.975 to 8.98), as the page does; Python's
+  `format` would give 8.97.
+- **`packages/studies/README.md` lists the new `charts` module**, and its ownership sentence now says
+  the package owns the chart form but not which charts a page draws.

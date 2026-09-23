@@ -21,6 +21,8 @@ variable-resolution model (UKV) cannot be told apart once UKV's hour is rebuilt 
 snapshots.** The evidence is six metered solar farms inside one 25 km by 23 km box in Lincolnshire,
 and 79,384 generator-hours from December 2022 to September 2026.
 
+![Figure 1: CAMS describes past sunshine best, by a wide margin](assets/sunshine_headline.svg)
+
 ## The six products
 
 **The products differ in how far ahead each value was forecast and in what area they cover, as well
@@ -114,6 +116,8 @@ Across the six generators, CAMS's lead over ICON-D2 ranges from 2.28 to 3.36 poi
 ranges from 1.80 points in winter to 3.02 in autumn, and in each calendar year from 2023 to 2026
 (2026 to 10 September) it lies between 2.58 and 2.84.
 
+![Figure 2: CAMS's lead over ICON-D2 holds at every generator, in every season, and every year](assets/sunshine_cams_breakdown.svg)
+
 **The gap is not an artefact of lead or of reading CAMS in full.** On the
 hours ICON-D2 is served 1 hour after its run started, CAMS still beats it by 2.23 points. On the
 hours CAMS rates as reliable, its lead over ERA5 widens from 3.92 to 4.36 points, which is why the
@@ -132,6 +136,8 @@ at that hour is lead-matched.
 | ICON-D2 − ICON-EU (points) | −0.35 | −1.27 | −0.69 | −0.23 | −1.44 | −0.72 | −0.43 | −0.94 |
 
 Hours 09 to 16 UTC are shown; the lead figures above use 07 to 19 UTC.
+
+![Figure 3: ICON-D2's advantage over ICON-EU fades within hours of each run](assets/sunshine_icon_d2_leads.svg)
 
 **The time of day does not explain the pattern around noon.** The hours 12 and 13 UTC sit on either
 side of solar noon, yet
@@ -165,6 +171,8 @@ scores a little ahead of ICON-EU, but UKV is served at T+0 and ICON-EU 1 to 3 ho
 leads would if anything favour ICON-EU. On the 8 months after UKV's upgrade alone, ICON-EU is 0.01
 points behind rebuilt UKV [−0.36, +0.36].
 
+![Figure 4: ICON-EU beats ICON global and UKV as served, but not UKV rebuilt from its snapshots](assets/sunshine_icon_eu_rivals.svg)
+
 **UKV against ERA5 is unresolved.** Across the record UKV is 0.19 points ahead [0.03, 0.36], but UKV
 is served at T+0 and ERA5 at 1 to 12 hours, so the shorter-lead product wins, and equalising the
 leads could narrow the gap. On the hours since Open-Meteo's own UKV downloader started in August
@@ -172,6 +180,8 @@ leads could narrow the gap. On the hours since Open-Meteo's own UKV downloader s
 conflicts. The pooled model scores UKV 0.18 points worse than ERA5 [+0.05, +0.42], while models
 fitted on the post-upgrade months alone find UKV 0.11 points ahead [−0.21, +0.45]. Eight months
 cannot settle which is better after the upgrade.
+
+![Figure 5: UKV against ERA5 is unresolved](assets/sunshine_ukv_against_era5.svg)
 
 ## A product's own direct beam adds little
 
@@ -183,6 +193,8 @@ global irradiance. CAMS improves by 0.08 points and UKV by 0.11. The three ICON 
 difference between products except ICON global against ICON-EU. For CAMS and ERA5 they agree with
 [the beam/diffuse study](beam-diffuse-split.md), which tested whether the published beam carries
 information or merely encodes the total differently.
+
+![Figure 6: Every product except ERA5 gains 0.03 to 0.11 points from its own direct beam](assets/sunshine_own_beam.svg)
 
 ## The ranking holds for a generator trained on its neighbours
 
@@ -196,6 +208,8 @@ training generators all sit within 25 km of the held-out one, so the cost here i
 a generator elsewhere. For disaggregation, the result supports the ranking but not the size of the
 error.
 
+![Figure 7: The ranking holds for a generator trained on its neighbours](assets/sunshine_neighbours.svg)
+
 ## Implied capacity from month to month
 
 **Once the seasonal cycle is removed, CAMS's implied capacity is the steadiest from month to month,
@@ -205,6 +219,8 @@ each calendar month's average removed, CAMS's month-to-month spread is 6.5%, aga
 for the weather models and ERA5. For each of them the interval on the difference excludes zero. In
 December, however, CAMS implies a capacity 23% below its annual mean, against 4% to 11% for the
 weather models and ERA5. This study cannot say which product is right about December.
+
+![Figure 8: CAMS's implied capacity swings the most with the seasons](assets/sunshine_implied_capacity.svg)
 
 ## Which product each consumer should read
 

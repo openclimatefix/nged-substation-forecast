@@ -9,11 +9,12 @@ It owns the pieces that more than one study needs and that fail silently when wr
 out-of-fold XGBoost loop and the paired bootstrap every comparison is read through, solar geometry,
 the checks that establish what temporal object a downloaded column holds, the half-hourly-to-hourly
 power aggregation, the mapping from a meter to an anonymous label, sampling a projected weather grid
-at a set of coordinates, and the Fractions Skill Score.
+at a set of coordinates, the Fractions Skill Score, and the dot-and-interval chart form the study
+pages share, with the parser that reads a study report's contrast tables into it.
 
-It does not own the question, the arms, the charts, or the write-up. Those stay in the study, as
-scripts, because a one-off comparison is not a library and should not be dressed as one. It does not
-own downloads either: a fetcher needs the network to exercise, which is what the `--run-network`
+It does not own the question, the arms, which charts a page draws, or the write-up. Those stay in
+the study, as scripts, because a one-off comparison is not a library and should not be dressed as
+one. It does not own downloads either: a fetcher needs the network to exercise, which is what the `--run-network`
 gate covers, so the fetchers stay in the study alongside the arms they serve.
 
 Two neighbouring packages own things a reader might look for here. `geo` owns H3 indexing, including
@@ -38,3 +39,5 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
 - `grid_sampling` — the nearest grid cell's value at each site, on a projected grid.
 - `fractions_skill_score` — a timing-tolerant score, which asks whether a forecast put a threshold
   exceedance near the right hour rather than exactly on it.
+- `charts` — the dot-and-interval chart panel, the figure caption, the colour of each product
+  family, and the parser that reads a study report's contrast tables.

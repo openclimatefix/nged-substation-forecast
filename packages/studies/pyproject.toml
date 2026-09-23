@@ -1,18 +1,21 @@
 [project]
 name = "studies"
 version = "0.2.0"
-description = "Tested machinery the one-off studies under studies/ call: the out-of-fold fit loop, the paired bootstrap, solar geometry, served-column checks, power aggregation, anonymisation, grid sampling, and the Fractions Skill Score"
+description = "Tested machinery the one-off studies under studies/ call: the out-of-fold fit loop, the paired bootstrap, solar geometry, served-column checks, power aggregation, anonymisation, grid sampling, the Fractions Skill Score, and the dot-and-interval chart form"
 readme = "README.md"
 authors = [
     { name = "Jack Kelly", email = "jack@openclimatefix.org" }
 ]
 requires-python = ">=3.14"
 dependencies = [
+    "altair>=6.0.0",
     "contracts",
     "numpy>=1.24",
+    "plotting",
     "polars>=1.38.1",
     "pvlib>=0.11.0",
     "pyproj>=3.6.0",
+    "vl-convert-python>=1.8.0",
     "xarray>=2026.1.0",
     "xgboost>=2.1.0",
 ]
