@@ -69,6 +69,7 @@ one, the mistake is already written.
 | `literature-review` | researching, writing or reviewing a literature review or state-of-the-art section that an outside party will publish |
 | `study` | planning, running, re-running, charting, writing up, or reviewing a study under `studies/`, or changing `packages/studies/` |
 | `data-download` | writing or resuming a bulk-download script (e.g. `studies/*/fetch_*.py`) that makes more than a handful of requests |
+| `data-validation` | after any download or data build finishes, before trusting its output — gaps, duplicates, nulls, implausible values, orientation, timezone convention |
 
 ## Docs
 
