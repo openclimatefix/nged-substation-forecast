@@ -1,6 +1,6 @@
 [project]
 name = "contracts"
-version = "0.2.0"
+version = "0.2.1"
 description = "Data contracts for the NGED substation forecast project"
 requires-python = ">=3.14"
 dependencies = [
