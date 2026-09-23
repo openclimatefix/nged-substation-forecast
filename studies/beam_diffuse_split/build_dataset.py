@@ -49,7 +49,13 @@ from sources import (
     SourceType,
     point_output_path_for,
 )
-from studies.anonymise import SITE_LABELS, site_labels_for
+from studies.anonymise import (
+    LABEL_PERMUTATION_SEED,
+    SITE_LABELS,
+    WIND_LABEL_PERMUTATION_SEED,
+    WIND_SITE_LABELS,
+    site_labels_for,
+)
 from studies.power import hourly_from_half_hourly
 from studies.solar import azimuth, extraterrestrial_horizontal, zenith
 
@@ -78,7 +84,7 @@ def output_path_for(*, dataset_name: str) -> Path:
 
 
 MIN_YEARS_OF_READINGS: Final[float] = 1.0
-"""A PV series with less than this much history is dropped.
+"""A series with less than this much history is dropped.
 
 The roster holds seven PV series, one of which is a single row; the threshold exists to drop that
 one without naming it.
@@ -354,7 +360,34 @@ def _pv_sites() -> pl.DataFrame:
         One row per site with `time_series_id`, `site`, `latitude`, `longitude` and
         `effective_capacity_mw`.
     """
-    metadata = pl.read_parquet(METADATA_PATH).filter(pl.col("time_series_type") == "PV")
+    return _roster(time_series_type="PV", labels=SITE_LABELS, seed=LABEL_PERMUTATION_SEED)
+
+
+def _wind_sites() -> pl.DataFrame:
+    """Return the usable wind sites, labelled `W1`–`W3`.
+
+    Returns:
+        One row per site with `time_series_id`, `site`, `latitude`, `longitude` and
+        `effective_capacity_mw`.
+    """
+    return _roster(
+        time_series_type="Wind", labels=WIND_SITE_LABELS, seed=WIND_LABEL_PERMUTATION_SEED
+    )
+
+
+def _roster(*, time_series_type: str, labels: tuple[str, ...], seed: int) -> pl.DataFrame:
+    """Return the series of one technology with enough history, labelled anonymously.
+
+    Args:
+        time_series_type: The metadata's technology, such as `PV` or `Wind`.
+        labels: The anonymous labels to shuffle onto the series.
+        seed: The seed paired with those labels.
+
+    Returns:
+        One row per site with `time_series_id`, `site`, `latitude`, `longitude` and
+        `effective_capacity_mw`.
+    """
+    metadata = pl.read_parquet(METADATA_PATH).filter(pl.col("time_series_type") == time_series_type)
     row_counts = (
         pl.scan_delta(POWER_DELTA_URI)
         .group_by("time_series_id")
@@ -377,9 +410,11 @@ def _pv_sites() -> pl.DataFrame:
         .filter(pl.col("n_rows") >= min_rows)
         .sort("time_series_id")
     )
-    labels = site_labels_for(eligible_ids=sites["time_series_id"].to_list())
+    mapping = site_labels_for(
+        eligible_ids=sites["time_series_id"].to_list(), labels=labels, seed=seed
+    )
     return sites.with_columns(
-        site=pl.col("time_series_id").replace_strict(labels, return_dtype=pl.Utf8)
+        site=pl.col("time_series_id").replace_strict(mapping, return_dtype=pl.Utf8)
     ).drop("n_rows")
 
 
