@@ -141,6 +141,18 @@ def test_bootstrap_absolute_ignores_the_other_arm():
     assert interval["n_rows"] == 14
 
 
+def test_bootstrap_absolute_raises_when_the_seeds_hold_different_rows():
+    # Same row count in every seed, so only a check on the rows themselves catches the mismatch.
+    losses = _losses(seeds=(0, 1)).with_columns(
+        time=pl.when((pl.col("seed") == 1) & (pl.col("time").dt.day() == 1))
+        .then(pl.col("time") + pl.duration(days=20))
+        .otherwise(pl.col("time"))
+    )
+
+    with pytest.raises(ValueError, match="same \\(site, time\\) rows"):
+        bootstrap_absolute(losses=losses, arm="T", metric="loss")
+
+
 def test_per_fold_differences_give_one_value_per_fold_in_fold_order():
     losses = _losses(seeds=(0, 1), difference=0.25).with_columns(
         loss=pl.when(pl.col("fold") == 1).then(pl.col("loss") * 2).otherwise(pl.col("loss"))

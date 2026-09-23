@@ -157,6 +157,10 @@ def arm_values(*, losses: pl.DataFrame, arm: str, metric: str) -> tuple[np.ndarr
     Returns:
         An array of shape (n_seeds, n_rows) of the arm's metric values, in seed order, and the
         month label of each row.
+
+    Raises:
+        ValueError: If the seeds do not all hold the same (site, time) rows, which would pair one
+            seed's row with a different row of another seed.
     """
     rows = (
         losses.filter(pl.col("arm") == arm)
@@ -164,9 +168,13 @@ def arm_values(*, losses: pl.DataFrame, arm: str, metric: str) -> tuple[np.ndarr
         .sort("seed", "site", "time")
     )
     by_seed = [
-        rows.filter(pl.col("seed") == seed).select("month", "value")
+        rows.filter(pl.col("seed") == seed).select("site", "time", "month", "value")
         for seed in sorted(rows["seed"].unique().to_list())
     ]
+    first_keys = by_seed[0].select("site", "time")
+    if not all(frame.select("site", "time").equals(first_keys) for frame in by_seed[1:]):
+        msg = f"the seeds of arm {arm!r} do not all hold the same (site, time) rows"
+        raise ValueError(msg)
     values = np.stack([frame["value"].to_numpy() for frame in by_seed])
     return values, by_seed[0]["month"].to_numpy()
 
