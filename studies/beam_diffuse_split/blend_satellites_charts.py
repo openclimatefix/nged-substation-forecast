@@ -25,9 +25,9 @@ from typing import Final
 import altair as alt
 import polars as pl
 from blend_satellites import (
-    DERIVED_ARMS,
+    EXPLORATORY_METHOD_CONTRASTS,
     METRIC,
-    NEGATIVE_CONTROL,
+    NEGATIVE_CONTROLS,
     OUTPUT_DIR,
     PERCENTAGE_POINTS,
     PLANNED_CONTRASTS,
@@ -51,21 +51,27 @@ ASSETS_DIR: Final[Path] = Path(__file__).resolve().parents[2] / "docs" / "studie
 NAMES: Final[dict[str, str]] = {
     "cams": "CAMS",
     "sarah3": "SARAH-3",
-    "cams_sarah3_xgb": "CAMS + SARAH-3 (XGBoost)",
-    "cams_sarah3_control": "CAMS + SARAH-3 (climatology control)",
+    "cams_split": "CAMS (split)",
+    "cams_split_sarah3_xgb": "CAMS (split) + SARAH-3 (XGBoost)",
+    "cams_split_sarah3_control": "CAMS (split) + SARAH-3 (climatology control)",
+    "cams_sarah3_xgb": "CAMS + SARAH-3, both global (XGBoost)",
+    "cams_sarah3_control": "CAMS + SARAH-3, both global (climatology control)",
     "cams_sarah3_mean": "CAMS + SARAH-3 (mean)",
     "cams_sarah3_stack": "CAMS + SARAH-3 (stack)",
     "cams_sarah3_equal": "CAMS + SARAH-3 (equal weight)",
     "cams_cams_noise_xgb": "CAMS + noised CAMS (negative control)",
+    "cams_cams_noise5_xgb": "CAMS + noised CAMS, 5 W/m2 (negative control)",
 }
 """Each arm's name as the page writes it. Every blend names both products it reads."""
 
 SECTION_PLANNED: Final[str] = "Planned contrasts"
 SECTION_SENSITIVITY: Final[str] = "Planned contrasts at the second hyperparameter setting"
 SECTION_NEGATIVE_CONTROL: Final[str] = (
-    "Negative control: CAMS plus a noised copy of itself, against CAMS alone"
+    "Negative controls: CAMS plus a noised copy of itself, against CAMS alone"
 )
-SECTION_METHODS: Final[str] = "Exploratory: the mean, stack and equal blends against CAMS"
+SECTION_METHODS: Final[str] = (
+    "Exploratory: the all-global blend, and the mean, stack and equal blends, against CAMS"
+)
 
 CAPACITY: Final[str] = "Capacity is each generator's 99th-percentile output."
 DOTS: Final[str] = "Dot: estimate. Line: 95% interval from resampling whole months and a seed."
@@ -73,11 +79,30 @@ SCOPE: Final[str] = "Six solar farms in Lincolnshire, January 2021 to August 202
 LEADERBOARD_X_TITLE: Final[str] = "Mean absolute error (% of capacity; smaller is better)"
 CONTRAST_X_TITLE: Final[str] = "Difference in mean absolute error (points of capacity)"
 
-LEADERBOARD_DOMAIN: Final[tuple[float, float]] = (5.0, 10.0)
-"""The x range of the leaderboard, covering every arm's 95% interval with a small margin."""
+LEADERBOARD_DOMAIN_MARGIN_FRACTION: Final[float] = 0.1
+"""The margin added on each side of the leaderboard's data-derived x domain, as a fraction of the
+span every arm's 95% interval covers, so no dot or line touches the axis edge."""
 
 CONTRAST_DOMAIN: Final[tuple[float, float]] = (-0.6, 0.6)
 """The x range shared by the contrast panels."""
+
+
+def _leaderboard_domain(*, rows: pl.DataFrame) -> tuple[float, float]:
+    """Return an x domain covering every row's 95% interval, with a margin either side.
+
+    Derived from the data rather than fixed by hand, so a change to the arms fitted, or to their
+    errors, can never clip a dot or an interval line off the edge of the axis.
+
+    Args:
+        rows: The leaderboard rows, carrying `lower_95` and `upper_95`.
+
+    Returns:
+        The domain, its lower bound never below 0 since this axis is an absolute error.
+    """
+    lower = float(rows.select(pl.col("lower_95").min()).item())
+    upper = float(rows.select(pl.col("upper_95").max()).item())
+    margin = (upper - lower) * LEADERBOARD_DOMAIN_MARGIN_FRACTION
+    return max(0.0, lower - margin), upper + margin
 
 
 def _leaderboard_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
@@ -114,7 +139,9 @@ def _leaderboard(*, losses: pl.DataFrame) -> alt.VConcatChart:
         Figure 1.
     """
     rows = _leaderboard_rows(losses=losses)
-    panel = leaderboard_panel(rows=rows, x_domain=LEADERBOARD_DOMAIN, x_title=LEADERBOARD_X_TITLE)
+    panel = leaderboard_panel(
+        rows=rows, x_domain=_leaderboard_domain(rows=rows), x_title=LEADERBOARD_X_TITLE
+    )
     return figure(
         panels=[panel],
         number=1,
@@ -182,7 +209,9 @@ def _headline(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
 
 
 def _exploratory(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
-    """Draw the mean, stack and equal blends and the negative control, all against CAMS.
+    """Draw the all-global blend, the mean, stack and equal blends, and both negative controls.
+
+    All against CAMS.
 
     Args:
         contrasts: Every contrast row in the report.
@@ -190,20 +219,19 @@ def _exploratory(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     Returns:
         Figure 3.
     """
-    method_pairs = [(arm, "cams") for arm in ("cams_sarah3_mean", *DERIVED_ARMS)]
     methods = select_contrasts(
         contrasts=contrasts,
-        wanted=[ContrastKey(SECTION_METHODS, "all", t, r) for t, r in method_pairs],
+        wanted=[ContrastKey(SECTION_METHODS, "all", t, r) for t, r in EXPLORATORY_METHOD_CONTRASTS],
     )
-    control = select_contrasts(
+    controls = select_contrasts(
         contrasts=contrasts,
-        wanted=[ContrastKey(SECTION_NEGATIVE_CONTROL, "all", *NEGATIVE_CONTROL)],
+        wanted=[ContrastKey(SECTION_NEGATIVE_CONTROL, "all", t, r) for t, r in NEGATIVE_CONTROLS],
     )
-    labels = [f"{NAMES[t]} − {NAMES[r]}" for t, r in method_pairs] + [
-        f"{NAMES[NEGATIVE_CONTROL[0]]} − {NAMES[NEGATIVE_CONTROL[1]]}"
+    labels = [
+        f"{NAMES[t]} − {NAMES[r]}" for t, r in (*EXPLORATORY_METHOD_CONTRASTS, *NEGATIVE_CONTROLS)
     ]
     rows = (
-        pl.concat([methods, control])
+        pl.concat([methods, controls])
         .select("difference", "lower_95", "upper_95")
         .with_columns(
             label=pl.Series(labels), family=pl.lit("satellite"), planned=pl.lit(value=False)
@@ -221,12 +249,12 @@ def _exploratory(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         panels=[panel],
         number=3,
         figure_planning="exploratory",
-        title="A simple mean or a linear stack against CAMS, and the negative control",
+        title="The all-global blend, a simple mean or a linear stack, and both negative controls",
         subtitle=[
             DOTS,
             (
-                "The negative control adds a noised copy of CAMS's own column, which should carry "
-                "almost no independent information."
+                "Each negative control adds a noised copy of CAMS's own column, which should "
+                "carry almost no independent information."
             ),
             CAPACITY,
             SCOPE,

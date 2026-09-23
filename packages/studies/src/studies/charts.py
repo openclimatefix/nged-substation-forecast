@@ -602,10 +602,10 @@ def interval_panel(
     ]
     points = [
         alt.Chart(data.filter(first))
-        .mark_point(filled=True, size=_POINT_SIZE, opacity=1, clip=True)
+        .mark_point(filled=True, size=_POINT_SIZE, opacity=1, clip=True, aria=False)
         .encode(x=x, tooltip=tooltip, **encodings),  # ty: ignore[unresolved-attribute]
         alt.Chart(data.filter(~first))
-        .mark_point(filled=False, size=_POINT_SIZE, strokeWidth=2, opacity=1, clip=True)
+        .mark_point(filled=False, size=_POINT_SIZE, strokeWidth=2, opacity=1, clip=True, aria=False)
         .encode(x=x, tooltip=tooltip, **encodings),  # ty: ignore[unresolved-attribute]
     ]
     reference = _reference_layers(
