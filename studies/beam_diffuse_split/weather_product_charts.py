@@ -504,7 +504,7 @@ def _ukv_against_era5(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     scopes = {
         "all": "All hours",
         "ukv_live": "Since August 2024",
-        "post": "After the upgrade: one model for both sides",
+        "post": "After the upgrade: XGBoost models trained on both sides",
     }
     wanted = []
     for scope in scopes:
@@ -514,7 +514,7 @@ def _ukv_against_era5(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         ]
     wanted.append(ContrastKey(SECTION_POST_ONLY, "post", "ukv_global", "era5_global"))
     labels = [label for label in scopes.values() for _ in conditions]
-    labels.append("After the upgrade: models on those 8 months")
+    labels.append("After the upgrade: XGBoost models trained on those 8 months")
     rows = _rows(
         contrasts=select_contrasts(contrasts=contrasts, wanted=wanted), labels=labels
     ).with_columns(condition=pl.Series([*conditions * len(scopes), conditions[0]]))
@@ -630,7 +630,7 @@ def _neighbours(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         zero_label="no difference",
         better_label="first product better",
         conditions=conditions,
-        condition_title="Model",
+        condition_title="XGBoost model",
         figure_planning=figure_planning,
     )
     return figure(
@@ -640,8 +640,8 @@ def _neighbours(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         title="The ranking holds for a generator predicted from its neighbours",
         subtitle=[
             (
-                "Hollow, and exploratory: the same contrast from a model trained on the other "
-                "five generators, with the scored months withheld everywhere."
+                "Hollow, and exploratory: the same contrast from an XGBoost model trained on the "
+                "other five generators, with the scored months withheld everywhere."
             ),
             f"{DOTS} {CAPACITY}",
             SCOPE,

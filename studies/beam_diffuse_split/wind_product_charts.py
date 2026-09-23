@@ -296,7 +296,7 @@ def _icon_d2_against_ukv(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         "Other settings": [
             (SECTION_SENSITIVITY, "served 100 m and 10 m", "Served 100 m wind and 10 m speed"),
             (SECTION_SENSITIVITY, "second setting", "Second hyperparameter setting"),
-            (SECTION_CHECKS, "UKV at 80 m", "UKV shown its 80 m wind"),
+            (SECTION_CHECKS, "UKV at 80 m", "UKV given its 80 m wind"),
         ],
         "Hours into ICON-D2's run (UKV is always at T+0)": [
             (SECTION_CHECKS, f"ICON lead {lead} h", f"{lead} h into the run") for lead in (0, 1, 2)
@@ -536,7 +536,7 @@ def _steps(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatChart:
         better_label="ICON-EU better",
         better_direction="positive",
         conditions=conditions,
-        condition_title="The model is",
+        condition_title="The XGBoost model is",
         panel_title="How much the steps add to ICON global's error",
         figure_planning=figure_planning,
     )
