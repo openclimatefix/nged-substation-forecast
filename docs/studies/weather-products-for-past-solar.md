@@ -270,6 +270,11 @@ ranges from 1.80 points in winter to 3.02 in autumn, and in each calendar year f
 
 ![Figure 6: CAMS's margin over ICON-D2 holds at every generator, in every season, and every year](assets/sunshine_cams_breakdown.svg)
 
+**ERA5 has the largest error of the six products, and [Why ERA5 describes past sunshine and wind
+worse than most current weather
+products](../roadmap/data-sources.md#why-era5-describes-past-sunshine-and-wind-worse-than-most-current-weather-products)
+sets out ERA5's documented weaknesses.**
+
 **The gap is not an artefact of lead or of reading CAMS in full.** On the hours ICON-D2 is served 1
 hour after its run started, CAMS still beats it by 2.23 points [1.99, 2.45]. Reading CAMS in full is
 the conservative choice: on the 71,279 hours CAMS rates as reliable, CAMS's margin over ERA5 widens
