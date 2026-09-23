@@ -139,4 +139,3 @@ uv run python studies/beam_diffuse_split/wind_products.py
 ```
 
 The report lands in `data/studies/beam_diffuse_split/beam_diffuse_wind_products/report.md`.
-
