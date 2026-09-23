@@ -10,6 +10,7 @@ own fill colour. Every other swatch's fill matches its label, so where the two d
 constant takes the fill, and its docstring records the printed label.
 """
 
+import math
 from typing import Final, Literal, LiteralString
 
 import altair as alt
@@ -42,7 +43,7 @@ GREY_2: Final[LiteralString] = "#F0ECE8"
 """Brand guidelines: Grey 2."""
 
 GREY_3: Final[LiteralString] = "#D9D0CA"
-"""The guidelines print this swatch as "Grey 2" a second time, a typo; Grey 3 here."""
+"""The guidelines print this swatch as "Grey 2" a second time; this module names it Grey 3."""
 
 # Main data colours: "electric contrasting colours for easy visual separation", each with a light
 # shade for comparing two conditions in one hue.
@@ -69,8 +70,8 @@ DATA_PURPLE_LIGHT: Final[LiteralString] = "#EFC8FF"
 """Brand guidelines: Data Purple Light."""
 
 DATA_GREEN_LIGHT: Final[LiteralString] = "#B8F5DB"
-"""Brand guidelines: Data Green Light. The guidelines label this swatch "Data Purple Light
-#EFC8FF" a second time, but fill it with ``#B8F5DB``."""
+"""Brand guidelines: Data Green Light. The colour overview page labels this swatch correctly,
+but the data-colour pages label it "Data Purple Light #EFC8FF" a second time."""
 
 DATA_COLOURS: Final[tuple[LiteralString, ...]] = (
     DATA_BLUE,
@@ -107,10 +108,10 @@ DATA_BURNT_ORANGE: Final[LiteralString] = "#BF4F04"
 """Brand guidelines: Data Burnt Orange."""
 
 ADDITIONAL_DATA_COLOURS: Final[tuple[LiteralString, ...]] = (
-    DATA_AMBER,
-    DATA_DEEP_TEAL,
-    DATA_MAGENTA,
     DATA_BURNT_ORANGE,
+    DATA_AMBER,
+    DATA_MAGENTA,
+    DATA_DEEP_TEAL,
 )
 """The four coloured additional data colours, in the guidelines' printed order."""
 
@@ -163,25 +164,25 @@ VISUALISATION_COLOURS_LIGHT: Final[tuple[LiteralString, ...]] = (
 # Chart roles.
 
 PALETTE: Final[tuple[LiteralString, ...]] = (
-    BRAND_ORANGE,
-    DATA_BLUE,
-    DATA_GREEN,
-    DATA_PURPLE,
-    DATA_SKY,
+    *DATA_COLOURS[2:],
+    *DATA_COLOURS[:2],
     *ADDITIONAL_DATA_COLOURS,
 )
 """The theme's categorical colours: the main data colours, then the additional data colours.
 
-The main data colours are reordered from the guidelines' printed order so that no two neighbours
-are hard to tell apart under colour-vision deficiency. In the printed order, Data Purple and Data
-Blue sit next to each other and are about 2 ΔE apart under deuteranopia.
+Both groups keep the guidelines' printed order, with the main data colours rotated to start at
+Brand Orange. Under the `dataviz` skill's validator, the closest neighbouring pair is 21.5 ΔE apart
+under colour-vision deficiency within the main five, and 16.1 ΔE across all nine. Data Blue and Data
+Purple are not neighbours, but are only about 2 ΔE apart under deuteranopia, so a chart that shows
+both needs direct labels. The guidelines reserve the additional data colours, the sixth to ninth
+entries, for internal use.
 """
 
 BACKGROUND: Final[LiteralString] = GREY_1
 """Chart background colour."""
 
 TEXT: Final[LiteralString] = BLACK_1
-"""Colour of every piece of chart text, and of axis lines and ticks."""
+"""Colour of chart text, and of axis lines and ticks."""
 
 GRID: Final[LiteralString] = "#EAEAEA"
 """Axis grid line colour."""
@@ -245,10 +246,10 @@ def font_size(*, style: TypeScaleStyleType, body_px: float) -> int:
         body_px: The body text size, in pixels, that every other style is a multiple of.
 
     Returns:
-        The style's size in pixels, rounded to the nearest whole number as the guidelines
-        themselves prescribe ("round up/down to the nearest number for ease of use").
+        The style's size in pixels, rounded to the nearest whole number, halves up, as the
+        guidelines themselves prescribe ("round up/down to the nearest number for ease of use").
     """
-    return round(TYPE_SCALE[style] * body_px)
+    return math.floor(TYPE_SCALE[style] * body_px + 0.5)
 
 
 def hex_to_rgb(hex_color: str) -> list[int]:
@@ -263,6 +264,12 @@ def hex_to_rgb(hex_color: str) -> list[int]:
     value = hex_color.removeprefix("#")
     return [int(value[i : i + 2], 16) for i in (0, 2, 4)]
 
+
+_SEQUENTIAL: Final[tuple[LiteralString, ...]] = (
+    VISUALISATION_BLUE,
+    VISUALISATION_TEAL,
+    VISUALISATION_YELLOW,
+)
 
 _BODY_PX: Final[float] = 11
 """Vega-Lite's default axis-title font size, taken as the type scale's body size."""
@@ -285,18 +292,26 @@ def _ocf_theme() -> alt.theme.ThemeConfig:
             },
             "range": {
                 "category": list(PALETTE),
-                # Ordered data takes the cool-to-warm gradient, which Vega-Lite interpolates when
-                # there are more than five levels.
-                "ordinal": list(VISUALISATION_COLOURS),
-                "ramp": list(VISUALISATION_COLOURS),
+                # Continuous colour scales interpolate between these three visualisation colours,
+                # which run cool to warm with lightness rising at every step. The five
+                # visualisation colours together do not: Yellow is lighter than Orange.
+                "ramp": list(_SEQUENTIAL),
+                "heatmap": list(_SEQUENTIAL),
             },
             "title": {
                 "color": TEXT,
                 "font": FONT_TEXT,
                 "fontSize": title_px,
-                # The guidelines set headlines in the regular weight, where Vega-Lite defaults
-                # to bold.
+                # Vega-Lite defaults every title to bold, which the guidelines' type specimens
+                # never use.
                 "fontWeight": "normal",
+                "subtitleColor": TEXT,
+                "subtitleFont": FONT_TEXT,
+                "subtitleFontSize": body_px,
+            },
+            "header": {
+                "labelColor": TEXT,
+                "titleColor": TEXT,
             },
             "axis": {
                 "domainColor": TEXT,
@@ -308,6 +323,7 @@ def _ocf_theme() -> alt.theme.ThemeConfig:
                 "titleColor": TEXT,
                 "titleFont": FONT_TEXT,
                 "titleFontSize": body_px,
+                "titleFontWeight": "normal",
             },
             "legend": {
                 "labelColor": TEXT,
@@ -316,6 +332,7 @@ def _ocf_theme() -> alt.theme.ThemeConfig:
                 "titleColor": TEXT,
                 "titleFont": FONT_TEXT,
                 "titleFontSize": body_px,
+                "titleFontWeight": "normal",
                 # Legend swatches must stay fully opaque whatever opacity the marks draw at.
                 # In a layered chart Vega-Lite derives swatch opacity from the layers' marks
                 # (washing the swatches out) and ignores a per-legend ``symbolOpacity`` — only
