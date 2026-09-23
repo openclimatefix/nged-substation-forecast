@@ -80,6 +80,9 @@ model given the best single product and its neighbouring hours](assets/blend_hea
   worse.](#an-xgboost-blend-beats-a-linear-stack-and-simple-averages)**
 - **[A known small signal, sized to about the solar headline gain, is recovered in
   full.](#a-known-small-signal-is-recovered-in-full)**
+- **[CAMS's split beats SARAH-3 alone, but blending the two beats CAMS's own split by 0.20 points,
+  and the gain survives a climatology
+  control.](#blending-cams-with-sarah-3-beats-camss-own-split)**
 
 ## Introduction
 
@@ -389,6 +392,91 @@ points [2.64, 3.08] (exploratory).
 
 ![Figure 11: A known small signal is recovered in full](assets/blend_synthetic.svg)
 
+### Blending CAMS with SARAH-3 beats CAMS's own split
+
+**An XGBoost model given CAMS's split plus SARAH-3's global irradiance beats an XGBoost model given
+CAMS's split alone by 0.20 points [0.17, 0.22], and the gain survives a climatology control.** [Which
+weather product best describes past
+sunshine?](weather-products-for-past-solar.md#sarah-3-is-second-to-cams-under-every-satellite) found
+CAMS the best single product and SARAH-3 the best of the rest, about 0.40 points behind, for a reason
+the page could not identify. The two retrievals build their hourly value differently — CAMS
+integrates over the hour itself, while SARAH-3 here is the mean of two 30-minute snapshots — and read
+different satellite instruments' cloud retrievals, so SARAH-3 might still carry weather CAMS misses
+even though SARAH-3 is the weaker product alone, the same way ICON-EU added information to CAMS
+above despite being a weaker single product for solar. This section tests that directly.
+
+**The rows are the past-solar page's [record
+panel](weather-products-for-past-solar.md#how-the-comparison-was-made): 115,594 common site-hours at
+the same 6 solar farms, labelled A to F, from 1 January 2021 to 31 August 2026, the longer row set
+that page uses for its SARAH-3 comparison.** This row set is not the 77,616-row set the rest of this
+page scores: it holds four products only — CAMS, SARAH-3, ERA5, and ICON-DREAM-EU — starting in
+January 2021 rather than December 2022, so none of the numbers in this section are comparable in
+absolute terms to the headline results above. Before any blend was fitted, refits of CAMS's split,
+CAMS alone, and SARAH-3 alone were checked row for row against the past-solar page's own saved
+errors on this row set, and matched them bit for bit on all 346,782 scored rows (115,594 rows times
+three fitting seeds).
+
+**Every comparison reads the record panel's calendar and sun-position columns plus one set of weather
+columns.** CAMS's split with SARAH-3 carries CAMS's global, direct-beam and diffuse irradiance plus
+SARAH-3's global irradiance; its climatology control carries the same columns with SARAH-3's global
+irradiance permuted within a generator, a calendar month, and an hour of day, which keeps each
+month's climatology at each hour but removes SARAH-3's hour-by-hour weather. Two more comparisons
+repeat the same blend and control on CAMS's and SARAH-3's global irradiance alone, without CAMS's
+split, so the two products contribute the same kind of column (exploratory): a matched comparison,
+but one that cannot say whether a blend beats CAMS's own split. A mean, a linear stack, and an
+equal-weight average of CAMS's and SARAH-3's single-product predictions are also exploratory, built
+on the two products' global irradiance only, since SARAH-3 has no split of its own to combine with
+CAMS's. Two negative controls pair CAMS with a noised copy of itself: one noised at 48.2 W/m2, the
+measured root-mean-square difference between CAMS's and SARAH-3's global irradiance on these rows,
+so its two columns differ from each other about as much as the two products genuinely do; the other
+noised at a fixed 5 W/m2, close to a duplicate column.
+
+**Two comparisons were written into the study's design before this run, as the git history shows:**
+CAMS's split with SARAH-3 against CAMS's split alone, and against the climatology control. Both are
+refitted at a second, more heavily regularised XGBoost setting to check the result is not an accident
+of one choice of settings. Every other number in this section is exploratory.
+
+**Both planned comparisons are statistically significant at the 5% level, at both settings.** CAMS's
+split with SARAH-3 beats CAMS's split alone by 0.20 points [0.17, 0.22] at the main setting and 0.19
+points [0.17, 0.22] at the second setting, and beats the climatology control by 0.21 points [0.19,
+0.24] and 0.21 points [0.18, 0.23]. Since the blend beats its own control by about as much as it
+beats CAMS's split, most of the gain comes from SARAH-3's hour-by-hour weather rather than from the
+extra column alone.
+
+![Every single product and blend tested here, ranked by its own mean absolute error, with CAMS's
+split plus SARAH-3 ranked first](assets/satellite_blend_leaderboard.svg)
+
+![Both planned comparisons: CAMS's split with SARAH-3 against CAMS's split alone, and against the
+climatology control, agreeing at both hyperparameter settings](assets/satellite_blend_headline.svg)
+
+**The gain holds at every generator, grows with clearness, and holds in every year since 2021,
+though its size varies.** Broken down by generator, CAMS's split with SARAH-3 beats CAMS's split by
+0.10 to 0.48 points, largest at generator D; every one of these 6 breakdowns is statistically
+significant at the 5% level. Broken down by CAMS's and SARAH-3's mean clearness index, the gain is
+0.15 points [0.12, 0.19] in overcast hours, 0.20 points [0.17, 0.23] in broken cloud, and 0.24 points
+[0.19, 0.28] in clear hours: the blend helps most when the sky is clearest. Broken down by calendar
+year, restricted to January–August so a partial 2026 compares against the same months of every
+complete year, the gain ranges from 0.18 to 0.28 points and is statistically significant every year.
+These breakdowns share hours and XGBoost models with the whole-record result and with one another, so
+they are not independent tests.
+
+**Blending the two products' global irradiance alone, without CAMS's split, also beats CAMS by more
+than CAMS's split with SARAH-3 does, but that comparison cannot say whether a blend beats CAMS's own
+split.** CAMS with SARAH-3, both global, beats CAMS alone by 0.24 points [0.21, 0.27] and its own
+climatology control by 0.26 points [0.23, 0.29] (exploratory): a larger gap than CAMS's split gives
+CAMS on its own, so part of this gain likely restates the beam/diffuse split rather than adding new
+information. The mean of the two products' global irradiance beats CAMS by 0.12 points [0.09, 0.16],
+the linear stack by 0.18 points [0.16, 0.21], and the equal-weight average by 0.13 points [0.10,
+0.17], all exploratory and all smaller than the XGBoost blend's gain.
+
+**Both negative controls show the pipeline does not manufacture a gain from an uninformative second
+column.** CAMS paired with a copy of itself noised to match the measured CAMS/SARAH-3 gap is 0.01
+points worse than CAMS alone [0.00, 0.01] — statistically significant, but two orders of magnitude
+smaller than the 0.20-point gain CAMS's split gets from SARAH-3, and in the wrong direction to
+explain it. CAMS paired with a copy of itself noised at a fixed 5 W/m2, close to a duplicate column,
+is not statistically significant at the 5% level (0.00 points [−0.00, +0.01]). Neither control comes
+close to the size or the sign of the gain SARAH-3 itself adds.
+
 ## What to use
 
 **A blend waits for its slowest product, plus one hour (solar) or two hours (wind) for its own
@@ -425,7 +513,10 @@ over less than 4 years for solar and 2 years for wind.**
   and CAMS with ICON-EU by 0.10 points, both post hoc. For wind, all five products beat enriched UKV
   by 0.48 points (post hoc), but UKV's hub-height wind starts only in August 2024, so the wind
   blends say nothing about training history before that. CAMS with ERA5 reaches back to 2004 for a
-  gain of 0.07 points (exploratory), measured only from December 2022.
+  gain of 0.07 points (exploratory), measured only from December 2022. CAMS with SARAH-3 also gains
+  0.20 points over CAMS's own split (planned), on a different, narrower row set from January 2021,
+  so the two results are not on the same rows and do not say which of the two blends is better; the
+  CAMS-with-SARAH-3 result shows only that a training-history blend needs no weather model at all.
 - **Capacity estimation and disaggregation: no recommendation.** Both have to read a product's
   weather without an XGBoost model fitted to the generator's own output, and every gain here exists
   only after an XGBoost model is fitted to that generator's output. The single-product
@@ -475,3 +566,16 @@ The report lands in `data/studies/beam_diffuse_split/blend_products/report.md`, 
 `reproduction.md`, the per-hour errors and out-of-fold predictions of every XGBoost model, the stack
 weights, and every interval as a table. `blend_products.py --resume` reuses the fits a crashed run
 left behind. The chart script checks each chart's numbers against the report before drawing.
+
+The CAMS-with-SARAH-3 section needs the past-solar page's `record` panel written first, then:
+
+```bash
+uv run python studies/beam_diffuse_split/weather_products.py --panel record
+uv run python studies/beam_diffuse_split/blend_satellites.py
+uv run python studies/beam_diffuse_split/blend_satellites_charts.py
+```
+
+The report lands in `data/studies/beam_diffuse_split/satellite_blend/report.md`, beside
+`reproduction.md` and `losses.parquet`. `blend_satellites.py --resume` reuses the fits a crashed run
+left behind; `--report-only` rebuilds `report.md` from `losses.parquet` and `reproduction.md` already
+on disk.
