@@ -47,7 +47,9 @@ Run it with `uv run python studies/beam_diffuse_split/blend_products.py`, after 
 studies have been run. `--resume` reuses the per-arm fits a previous run left in `fits/`.
 `--report-only` rebuilds `report.md` from `losses.parquet`, `stack_weights.parquet` and
 `intervals.parquet` already on disk, fitting nothing; move the current `report.md` to a
-`superseded/` subfolder first, since this overwrites it.
+`superseded/` subfolder first, since this overwrites it. `--report-only` needs `--power-version`,
+the power Delta table version the fits on disk read, which the replaced report prints: the table may
+have gained versions since, so its current version is not the one the results rest on.
 """
 
 import argparse
@@ -59,7 +61,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from itertools import pairwise
 from pathlib import Path
-from typing import Final, Literal, TypedDict, cast
+from typing import Final, Literal, NamedTuple, TypedDict, cast
 
 import numpy as np
 import polars as pl
@@ -176,6 +178,22 @@ context's furthest forward offset for wind (`with_wind_context`, `HUB_OFFSETS_HO
 
 HISTORY_ONLY_PRODUCTS: Final[frozenset[str]] = frozenset({"cams", "era5"})
 """Products too late for a live service: CAMS arrives about a day late and ERA5 about 5 days."""
+
+
+def live_great_britain_wide(*, products: tuple[str, ...]) -> bool:
+    """Return whether a live service anywhere in Great Britain could read every one of `products`.
+
+    A product is out if it arrives too late for a live service (`HISTORY_ONLY_PRODUCTS`), or if
+    it does not cover the whole of Great Britain, as ICON-D2 does not.
+
+    Args:
+        products: The products a single-product arm or a blend reads.
+
+    Returns:
+        Whether every product is both live and Great-Britain-wide.
+    """
+    return not (HISTORY_ONLY_PRODUCTS & set(products)) and "icon_d2" not in products
+
 
 USABLE_FROM: Final[dict[DomainType, dict[str, str]]] = {
     "solar": {
@@ -867,6 +885,7 @@ class LeaderboardRow(TypedDict):
     kind: LeaderboardKind
     name: str
     variant: VariantType
+    live_gb: bool
     mae_pp: float
     lower_95_pp: float
     upper_95_pp: float
@@ -875,14 +894,24 @@ class LeaderboardRow(TypedDict):
 
 LEADERBOARD_HEADER: Final[tuple[str, str]] = (
     (
-        "| Arm | Kind | Set or product | Variant | MAE (pp of capacity) | 95% interval, months "
-        "and seed |"
+        "| Arm | Kind | Set or product | Variant | Live, Great-Britain-wide? "
+        "| MAE (pp of capacity) | 95% interval, months and seed |"
     ),
-    "|---|---|---|---|---|---|",
+    "|---|---|---|---|---|---|---|",
 )
 
 
-def _leaderboard_arms(*, domain: Domain) -> list[tuple[str, LeaderboardKind, str, VariantType]]:
+class LeaderboardArm(NamedTuple):
+    """One arm Figure 1's leaderboard ranks, and what the arm reads."""
+
+    arm: str
+    kind: LeaderboardKind
+    name: str
+    variant: VariantType
+    products: tuple[str, ...]
+
+
+def _leaderboard_arms(*, domain: Domain) -> list[LeaderboardArm]:
     """Return every arm Figure 1's leaderboard ranks: each single product and each blend, twice.
 
     Args:
@@ -890,15 +919,16 @@ def _leaderboard_arms(*, domain: Domain) -> list[tuple[str, LeaderboardKind, str
 
     Returns:
         For each row: the arm name, whether it is a single product or a blend, the product or set
-        name, and plain or enriched.
+        name, plain or enriched, and the products it reads.
     """
-    arms: list[tuple[str, LeaderboardKind, str, VariantType]] = []
+    arms: list[LeaderboardArm] = []
     for product in domain.products:
-        arms.append((domain.single(product), "single", product, "plain"))
-        arms.append((rich(product), "single", product, "rich"))
+        arms.append(LeaderboardArm(domain.single(product), "single", product, "plain", (product,)))
+        arms.append(LeaderboardArm(rich(product), "single", product, "rich", (product,)))
     for blend in domain.sets:
-        arms.append((_arm(blend.name, "plain", "xgb"), "blend", blend.name, "plain"))
-        arms.append((_arm(blend.name, "rich", "xgb"), "blend", blend.name, "rich"))
+        name, products = blend.name, blend.products
+        arms.append(LeaderboardArm(_arm(name, "plain", "xgb"), "blend", name, "plain", products))
+        arms.append(LeaderboardArm(_arm(name, "rich", "xgb"), "blend", name, "rich", products))
     return arms
 
 
@@ -914,7 +944,7 @@ def _leaderboard_rows(*, losses: pl.DataFrame, domain: Domain) -> list[Leaderboa
     """
     pooled = losses.filter(pl.col("setting") == "pooled")
     rows: list[LeaderboardRow] = []
-    for arm, kind, name, variant in _leaderboard_arms(domain=domain):
+    for arm, kind, name, variant, products in _leaderboard_arms(domain=domain):
         interval = bootstrap_absolute(losses=pooled, arm=arm, metric=METRIC)
         rows.append(
             {
@@ -922,6 +952,7 @@ def _leaderboard_rows(*, losses: pl.DataFrame, domain: Domain) -> list[Leaderboa
                 "kind": kind,
                 "name": name,
                 "variant": variant,
+                "live_gb": live_great_britain_wide(products=products),
                 "mae_pp": interval["value"] * PERCENTAGE_POINTS,
                 "lower_95_pp": interval["lower_95"] * PERCENTAGE_POINTS,
                 "upper_95_pp": interval["upper_95"] * PERCENTAGE_POINTS,
@@ -949,17 +980,20 @@ def _leaderboard_lines(*, rows: list[LeaderboardRow], domain: Domain) -> list[st
         "",
         (
             "Each arm's own absolute mean error, with its own 95% interval from resampling whole "
-            "months and a seed. Unlike the paired contrasts below, a leaderboard row has no arm to "
-            "pair against, so its interval carries the full month-to-month weather noise that "
-            "neighbouring generators share; a paired difference's interval is narrower because "
-            "pairing cancels that shared noise."
+            "months and a seed. The interval is wide mainly because every arm's error rises and "
+            "falls together from month to month, and resampling whole months carries that shared "
+            "swing into each arm's own interval. A paired contrast below resamples the same months "
+            "for both arms, which cancels the shared swing, so its interval is much narrower. "
+            "Live, Great-Britain-wide: every product the arm reads is available within hours and "
+            "covers all of Great Britain, as the latency table below sets out."
         ),
         "",
         *LEADERBOARD_HEADER,
     ]
     lines += [
         f"| {row['arm']} | {row['kind']} | {row['name']} | {row['variant']} "
-        f"| {row['mae_pp']:.3f} | [{row['lower_95_pp']:.3f}, {row['upper_95_pp']:.3f}] |"
+        f"| {'yes' if row['live_gb'] else 'no'} | {row['mae_pp']:.3f} "
+        f"| [{row['lower_95_pp']:.3f}, {row['upper_95_pp']:.3f}] |"
         for row in rows
     ]
     return lines
@@ -1649,7 +1683,7 @@ def _coverage_lines(*, frames: dict[DomainType, pl.DataFrame]) -> list[str]:
             slowest = max(LATENCY_HOURS[p] for p in blend.products) + context
             history_only = bool(HISTORY_ONLY_PRODUCTS & set(blend.products))
             regional = "icon_d2" in blend.products
-            live_gb = not history_only and not regional
+            live_gb = live_great_britain_wide(products=blend.products)
             latency = _latency_label(hours=slowest)
             lines.append(
                 f"| {domain.name} | {blend.name} | {', '.join(blend.products)} | {latency} "
@@ -2153,6 +2187,9 @@ def _report(
         lines += _gap_lines(losses=outputs[domain.name]["losses"], domain=domain)
     exploratory = [r for r in records if r["section"] == "exploratory"]
     splits = [r for r in records if r["section"] == "exploratory_split"]
+    against_control = [r for r in splits if r["reference"].endswith("_control")]
+    against_best = [r for r in splits if not r["reference"].endswith("_control")]
+    post_months = {r["domain"]: r["n_months"] for r in splits if r["scope"] == "era post"}
     lines += [
         "",
         "#### Exploratory contrasts",
@@ -2172,10 +2209,15 @@ def _report(
         "",
         (
             f"{len(splits)} intervals, of which {sum(r['excludes_zero'] for r in splits)} exclude "
-            "zero. The splits reuse the rows of the whole-record contrasts, and the seasons and "
-            "eras share each generator's models, so they are not independent tests of anything. "
-            "The post era holds eight months, so its intervals rest on eight clusters and "
-            "under-cover; read its fold-sign counts alongside them."
+            f"zero: {len(against_best)} of a blend against its best single, of which "
+            f"{sum(r['excludes_zero'] for r in against_best)} exclude zero, and "
+            f"{len(against_control)} of a blend against its control, of which "
+            f"{sum(r['excludes_zero'] for r in against_control)} exclude zero. The splits reuse "
+            "the rows of the whole-record contrasts, and the seasons and eras share each "
+            "generator's models, so they are not independent tests of anything. The post era holds "
+            + " and ".join(f"{n} months for {d}" for d, n in post_months.items())
+            + ", so its intervals rest on so few clusters that they under-cover; read its "
+            "fold-sign counts alongside them."
         ),
         "",
         *CONTRAST_HEADER,
@@ -2231,11 +2273,21 @@ def main() -> int:
             "already on disk, with no refit. Move the current report.md aside first."
         ),
     )
+    parser.add_argument(
+        "--power-version",
+        type=int,
+        help=(
+            "With --report-only, the power Delta table version the fits on disk read, as the "
+            "replaced report prints it."
+        ),
+    )
     arguments = parser.parse_args()
+    if arguments.report_only != (arguments.power_version is not None):
+        parser.error("--power-version goes with --report-only, and --report-only needs it")
     resume = arguments.resume
     started = datetime.now(tz=UTC)
 
-    power_version = _power_version()
+    power_version = arguments.power_version if arguments.report_only else _power_version()
     frames: dict[DomainType, pl.DataFrame] = {"solar": _solar_frame(), "wind": _wind_frame()}
     for name, frame in frames.items():
         _LOG.info("%s common rows: %d", name, frame.height)

@@ -651,7 +651,17 @@ def interval_panel(
 
 
 def leaderboard_panel(
-    *, rows: pl.DataFrame, x_domain: tuple[float, float], x_title: str, width: int = PLOT_WIDTH_PX
+    *,
+    rows: pl.DataFrame,
+    x_domain: tuple[float, float],
+    x_title: str,
+    width: int = PLOT_WIDTH_PX,
+    conditions: Sequence[str] = (),
+    condition_title: str = "",
+    kinds: Sequence[str] = (),
+    kind_title: str = "",
+    panel_title: str = "",
+    keys: bool = True,
 ) -> alt.LayerChart | alt.VConcatChart:
     """Draw one product per row, best first, as a dot at its own error with a 95% interval.
 
@@ -659,18 +669,41 @@ def leaderboard_panel(
     reference arm, so it draws no zero rule and no "better than" direction label: the axis title
     states the direction in words instead, as `x_title` already must.
 
+    Each row is coloured by its family, unless `conditions` is given: then each row is coloured by
+    its `condition` from `CONDITION_COLOURS`, with the first condition's point filled and every
+    other condition's hollow, so the distinction survives without colour. Where `kinds` is given,
+    each row's point takes its `kind`'s shape from `CONDITION_SHAPES`. The keys sit in a row above
+    the plot: the family key only where the panel holds more than one family and no `conditions`,
+    the condition key where `conditions` is given, and the kind key where `kinds` is given.
+
     Args:
         rows: One row per product, with `label`, `family` (a `ProductFamily`), `value`,
-            `lower_95` and `upper_95`, in the order to draw them top to bottom (best first).
+            `lower_95` and `upper_95`, `condition` if `conditions` is given, and `kind` if `kinds`
+            is given, in the order to draw them top to bottom (best first).
         x_domain: The x axis's range, set explicitly so the panel and any panel sharing its scale
             agree.
         x_title: The x axis's title, naming the quantity, its unit, and which direction is
             better, such as "Mean absolute error (% of capacity; smaller is better)".
         width: The plot's width in pixels.
+        conditions: The values of `condition`, in key order, at most as many as
+            `CONDITION_COLOURS` holds; the first is drawn filled.
+        condition_title: The key title for `condition`.
+        kinds: The values of `kind`, in key order, at most as many as `CONDITION_SHAPES` holds.
+        kind_title: The key title for `kind`.
+        panel_title: A title above this panel alone.
+        keys: Whether to draw the keys, which a panel stacked under another that already carries
+            them can leave out.
 
     Returns:
-        The panel, under its family key where it holds more than one family.
+        The panel, under its keys where it has any.
+
+    Raises:
+        ValueError: If `conditions` holds more values than `CONDITION_COLOURS`, or `kinds` more
+            than `CONDITION_SHAPES`.
     """
+    if len(conditions) > len(CONDITION_COLOURS) or len(kinds) > len(CONDITION_SHAPES):
+        msg = f"too many conditions ({len(conditions)}) or kinds ({len(kinds)}) to draw apart"
+        raise ValueError(msg)
     families = [family for family in FAMILY_COLOURS if family in set(rows["family"].to_list())]
     data = rows.with_columns(pl.col("value", "lower_95", "upper_95").round(3))
     labels = data["label"].to_list()
@@ -689,10 +722,31 @@ def leaderboard_panel(
             domain=False,
         ),
     )
-    colour = alt.Color(
-        "family:N",
-        scale=alt.Scale(domain=list(FAMILY_COLOURS), range=list(FAMILY_COLOURS.values())),
-        legend=None,
+    colour = (
+        alt.Color(
+            "condition:N",
+            scale=alt.Scale(
+                domain=list(conditions), range=list(CONDITION_COLOURS[: len(conditions)])
+            ),
+            legend=None,
+        )
+        if conditions
+        else alt.Color(
+            "family:N",
+            scale=alt.Scale(domain=list(FAMILY_COLOURS), range=list(FAMILY_COLOURS.values())),
+            legend=None,
+        )
+    )
+    shape: dict[str, alt.Shape] = (
+        {
+            "shape": alt.Shape(
+                "kind:N",
+                scale=alt.Scale(domain=list(kinds), range=list(CONDITION_SHAPES[: len(kinds)])),
+                legend=None,
+            )
+        }
+        if kinds
+        else {}
     )
     x_title_lines = wrapped(text=x_title, width=_AXIS_TITLE_CHARACTERS)
     x_scale = alt.Scale(domain=list(x_domain), nice=False, zero=False)
@@ -713,31 +767,69 @@ def leaderboard_panel(
             color=colour,
         )
     )
-    point = (
-        alt.Chart(data)
-        .mark_point(filled=True, size=_POINT_SIZE, opacity=1, clip=True, aria=False)
+    # The first condition's points are filled and every other condition's hollow, drawn as two
+    # layers because a mark's fill is not an encoding channel.
+    groups = [(data, True)]
+    if conditions:
+        first = pl.col("condition") == conditions[0]
+        groups = [(data.filter(first), True), (data.filter(~first), False)]
+    points = [
+        alt.Chart(frame)
+        .mark_point(
+            filled=filled,
+            size=_POINT_SIZE,
+            opacity=1,
+            clip=True,
+            aria=False,
+            strokeWidth=alt.Undefined if filled else 2,
+        )
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("value:Q", scale=x_scale, title=x_title_lines, axis=x_axis),
             y=y,
             color=colour,
             tooltip=tooltip,
+            **shape,
         )
-    )
+        for frame, filled in groups
+    ]
     panel = alt.LayerChart(
-        layer=[interval, point],
+        layer=[interval, *points],
         width=width,
         height=alt.Step(_ROW_STEP_PX * max(len(line) for line in lines.values())),
+        title=alt.TitleParams(panel_title, anchor="start", frame="group", fontSize=_PANEL_TITLE_PX),
     )
-    if len(families) <= 1:
-        return panel
-    key = _key(
-        title="Product type",
-        labels=families,
-        shapes=["circle"] * len(families),
-        filled=[True] * len(families),
-        colours=[FAMILY_COLOURS[family] for family in families],
-    )
-    return alt.vconcat(key, panel, spacing=8)
+    drawn_keys = []
+    if keys and not conditions and len(families) > 1:
+        drawn_keys.append(
+            _key(
+                title="Product type",
+                labels=families,
+                shapes=["circle"] * len(families),
+                filled=[True] * len(families),
+                colours=[FAMILY_COLOURS[family] for family in families],
+            )
+        )
+    if keys and conditions:
+        drawn_keys.append(
+            _key(
+                title=condition_title,
+                labels=conditions,
+                shapes=["circle"] * len(conditions),
+                filled=[index == 0 for index in range(len(conditions))],
+                colours=CONDITION_COLOURS[: len(conditions)],
+            )
+        )
+    if keys and kinds:
+        drawn_keys.append(
+            _key(
+                title=kind_title,
+                labels=kinds,
+                shapes=CONDITION_SHAPES[: len(kinds)],
+                filled=[True] * len(kinds),
+                colours=[ocf.BLACK_1] * len(kinds),
+            )
+        )
+    return alt.vconcat(*drawn_keys, panel, spacing=8) if drawn_keys else panel
 
 
 def ticks(*, x_domain: tuple[float, float]) -> list[float]:

@@ -51,8 +51,8 @@ from weather_products import (
     METRIC,
     OUTPUT_DIR_NAME,
     PERCENTAGE_POINTS,
-    _common_rows,
-    _joined,
+    common_rows,
+    joined,
 )
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
@@ -1206,7 +1206,7 @@ def _models_work_frame() -> pl.DataFrame:
         One row per (site, time) the pooled run scored, carrying `power_mw`,
         `effective_capacity_mw`, and `extraterrestrial_horizontal_w_m2`.
     """
-    return _common_rows(frame=_joined()).select(
+    return common_rows(frame=joined()).select(
         "site", "time", "power_mw", "effective_capacity_mw", "extraterrestrial_horizontal_w_m2"
     )
 

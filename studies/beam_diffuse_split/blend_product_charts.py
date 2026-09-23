@@ -47,9 +47,17 @@ from studies.charts import (
     CONTENT_WIDTH_PX,
     figure,
     interval_panel,
+    leaderboard_panel,
     wrapped,
 )
-from weather_product_charts import ASSETS_DIR, CAPACITY, DOTS, NAMES, X_TITLE, _two_places
+from weather_product_charts import (
+    ASSETS_DIR,
+    CAPACITY,
+    LEADERBOARD_X_TITLE,
+    NAMES,
+    X_TITLE,
+    _two_places,
+)
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -75,6 +83,8 @@ SITES: Final[dict[DomainType, tuple[str, ...]]] = {
 }
 """The anonymous generator labels."""
 
+DOMAIN_NAMES: Final[tuple[DomainType, DomainType]] = ("solar", "wind")
+
 SCOPES: Final[dict[DomainType, str]] = {
     "solar": "Six solar farms in Lincolnshire, December 2022 to September 2026.",
     "wind": "Three wind farms in Lincolnshire, August 2024 to September 2026.",
@@ -87,6 +97,12 @@ SEASONS: Final[tuple[tuple[str, str], ...]] = (
     ("season autumn", "September to November"),
 )
 """The report's season scopes, and the months each covers."""
+
+ERAS: Final[tuple[tuple[str, str], ...]] = (
+    ("era pre", "Before UKV's upgrade on 21 January 2026"),
+    ("era post", "After UKV's upgrade"),
+)
+"""The report's era scopes, either side of the Met Office's upgrade of UKV."""
 
 SINGLE_NAMES: Final[dict[str, str]] = {
     "cams_rich": "CAMS",
@@ -136,7 +152,13 @@ SET_NAMES: Final[dict[DomainType, dict[str, str]]] = {
 LEADERBOARD_TITLE: Final[str] = (
     "leaderboard, every single product and blend, plain and enriched (main XGBoost settings)"
 )
-LEADERBOARD_CONDITIONS: Final[tuple[str, str]] = ("Blend", "Single product")
+LEADERBOARD_KINDS: Final[tuple[str, str]] = ("Blend", "Single product")
+LEADERBOARD_LIVE: Final[tuple[str, str]] = ("Yes", "No: history only, or ICON-D2's area only")
+"""Whether a live service anywhere in Great Britain can read every product a row reads."""
+
+DOTS: Final[str] = (
+    "Dot: estimate. Line: 95% interval from resampling whole months and a fitting seed."
+)
 LEADERBOARD_DOMAIN: Final[dict[DomainType, tuple[float, float]]] = {
     "solar": (4.0, 9.5),
     "wind": (4.5, 9.0),
@@ -178,6 +200,12 @@ MIN_HOURS_PER_DAY: Final[dict[DomainType, int]] = {"solar": 4, "wind": 12}
 WEEK_PANEL_HEIGHT_PX: Final[int] = 58
 WEEK_SPACING_PX: Final[int] = 8
 WEEK_ROW_LABEL_PX: Final[int] = 112
+
+
+def _signed(value: object) -> str:
+    """Write a report number to two places with its sign, as the page writes an interval bound."""
+    number = float(str(value))
+    return f"{'−' if number < 0 else '+'}{_two_places(abs(number))}"
 
 
 def _cells(line: str) -> list[str]:
@@ -453,29 +481,34 @@ def _leaderboard_rows(
         domain: `solar` or `wind`.
 
     Returns:
-        One row per arm, sorted with the lowest error first, with `label`, `family`, `condition`
-        (`Single product` or `Blend`), `difference` (the arm's own mean absolute error), `lower_95`
-        and `upper_95`.
+        One row per arm, sorted with the lowest error first, with `label`, `family`, `kind`
+        (`Blend` or `Single product`), `condition` (whether a live service anywhere in Great
+        Britain can read it), `value` (the arm's own mean absolute error), `lower_95` and
+        `upper_95`.
     """
     rows = []
     for row in tables[f"{domain.capitalize()}: {LEADERBOARD_TITLE}"]:
         lower, upper = _bounds(text=row["95% interval, months and seed"])
         single = row["Kind"] == "single"
-        base = NAMES[row["Set or product"]] if single else SET_NAMES[domain][row["Set or product"]]
-        label = f"An XGBoost model given {base}"
+        name = NAMES[row["Set or product"]] if single else SET_NAMES[domain][row["Set or product"]]
+        # A set name opening with a common word is lower-cased mid-label; a product name is not.
+        label = name if single or name.split()[0].isupper() else name[0].lower() + name[1:]
         if row["Variant"] == "rich":
             label += ", enriched"
         rows.append(
             {
                 "label": label,
                 "family": "weather model",
-                "condition": "Single product" if single else "Blend",
-                "difference": float(row["MAE (pp of capacity)"]),
+                "kind": LEADERBOARD_KINDS[1] if single else LEADERBOARD_KINDS[0],
+                "condition": LEADERBOARD_LIVE[
+                    0 if row["Live, Great-Britain-wide?"] == "yes" else 1
+                ],
+                "value": float(row["MAE (pp of capacity)"]),
                 "lower_95": lower,
                 "upper_95": upper,
             }
         )
-    return pl.DataFrame(rows).sort("difference")
+    return pl.DataFrame(rows).sort("value")
 
 
 def _leaderboard(*, tables: dict[str, list[dict[str, str]]]) -> alt.VConcatChart:
@@ -487,40 +520,54 @@ def _leaderboard(*, tables: dict[str, list[dict[str, str]]]) -> alt.VConcatChart
     Returns:
         Figure 1.
     """
+    rows = {domain: _leaderboard_rows(tables=tables, domain=domain) for domain in DOMAIN_NAMES}
+    best_live = {
+        domain: rows[domain].filter(pl.col("condition") == LEADERBOARD_LIVE[0]).row(0, named=True)
+        for domain in DOMAIN_NAMES
+    }
     panels = [
-        interval_panel(
-            rows=_leaderboard_rows(tables=tables, domain=domain),
+        leaderboard_panel(
+            rows=rows[domain],
             x_domain=LEADERBOARD_DOMAIN[domain],
-            x_title="Mean absolute error (percentage of capacity)" if domain == "wind" else "",
-            zero_label="a perfect forecast",
-            better_label="smaller is better",
-            conditions=LEADERBOARD_CONDITIONS,
-            condition_title="Kind",
+            x_title=LEADERBOARD_X_TITLE,
+            conditions=LEADERBOARD_LIVE,
+            condition_title="Can a live service anywhere in Great Britain read it?",
+            kinds=LEADERBOARD_KINDS,
+            kind_title="Blend or single product",
             panel_title=domain.capitalize(),
-            reference_labels=False,
-            family_key=False,
+            keys=domain == "solar",
         )
-        for domain in ("solar", "wind")
+        for domain in DOMAIN_NAMES
     ]
     return figure(
         panels=panels,
         number=1,
         title=(
-            "An XGBoost model given several weather products has the lowest error of every "
-            "single product and blend tested"
+            "An XGBoost model given several weather products has the lowest error of all the "
+            "single products and blends tested"
         ),
         subtitle=[
             (
-                "Every single product and every named blend, plain and enriched, at the main "
-                "XGBoost settings, ranked best first."
+                "Each row is an XGBoost model given the named product or blend of products, at "
+                "the main XGBoost settings, ranked best first. Enriched: each product is also "
+                "given the hours either side, and CAMS its beam split."
+            ),
+            (
+                "The best row a live service anywhere in Great Britain can read: "
+                + "; ".join(
+                    f"{domain}, {best_live[domain]['label']} "
+                    f"({_two_places(best_live[domain]['value'])}%)"
+                    for domain in DOMAIN_NAMES
+                )
+                + "."
             ),
             f"{DOTS} {CAPACITY}",
             f"{SCOPES['solar']} {SCOPES['wind']}",
             (
-                "Each arm's own interval, with no arm-to-arm pairing, so it carries the full "
-                "month-to-month weather noise that these generators share. Figure 2's paired "
-                "differences cancel that shared noise, which is why two arms can overlap here "
-                "and still differ significantly there."
+                "The intervals are wide mainly because every row's error rises and falls together "
+                "from month to month. Figure 2 compares two XGBoost models on the same months, "
+                "which cancels that shared swing, so two rows can overlap here and still differ "
+                "significantly there."
             ),
         ],
         figure_planning=None,
@@ -570,8 +617,7 @@ def _headline(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         number=2,
         title=(
             "At these nine farms, an XGBoost model given several weather products beats an XGBoost "
-            "model given "
-            "the best single product, enriched"
+            "model given the best single product and its neighbouring hours"
         ),
         subtitle=[
             (
@@ -579,7 +625,7 @@ def _headline(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
                 "product is given its neighbouring hours, and CAMS its beam split, as the blend's "
                 "products are."
             ),
-            f"{DOTS[:-1]}, and one of the three fitting seeds. {CAPACITY}",
+            f"{DOTS} {CAPACITY}",
             f"{SCOPES['solar']} {SCOPES['wind']}",
             ALL_POST_HOC,
         ],
@@ -618,7 +664,7 @@ def _decomposition(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         x_domain=(-0.7, 0.2),
         x_title=X_TITLE,
         zero_label="no difference",
-        better_label="first XGBoost model better",
+        better_label="first-named XGBoost model better",
         conditions=conditions,
         condition_title="Each blend's gain, split in two",
     )
@@ -653,12 +699,8 @@ def _splits(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     """
     panels = []
     for domain in ("solar", "wind"):
-        named = [
-            named
-            for named in NAMED_SETS
-            if named.domain == domain and named.blend != "cams_icon_eu"
-        ]
-        conditions = tuple(f"{n.name}, against {SINGLE_NAMES[n.best]}" for n in named)
+        named = [named for named in NAMED_SETS if named.domain == domain]
+        conditions = tuple(n.name for n in named)
         scopes = [(f"site {site}", f"Generator {site}") for site in SITES[domain]]
         marks = [
             (
@@ -673,7 +715,7 @@ def _splits(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
                 ),
                 condition,
             )
-            for scope, label in [*scopes, *SEASONS]
+            for scope, label in [*scopes, *SEASONS, *ERAS]
             for n, condition in zip(named, conditions, strict=True)
         ]
         panels.append(
@@ -685,7 +727,10 @@ def _splits(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
                 better_label="blend better",
                 conditions=conditions,
                 condition_title=f"{domain.capitalize()} blend",
-                panel_title=f"{domain.capitalize()}: each generator, then each season",
+                panel_title=(
+                    f"{domain.capitalize()}: each generator, each season, and each side of UKV's "
+                    "upgrade"
+                ),
                 reference_labels=domain == "solar",
                 family_key=False,
             )
@@ -694,19 +739,21 @@ def _splits(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         panels=panels,
         number=7,
         title=(
-            "Each named blend beats its best single product at every generator and in every season"
+            "Each named blend beats its best single product at every generator, in every season, "
+            "and on each side of UKV's upgrade"
         ),
         subtitle=[
             (
                 "Enriched blend's mean absolute error minus the enriched best single product's, "
-                "main XGBoost settings. The splits share rows and XGBoost models, so they are not "
-                "independent tests."
+                "main XGBoost settings. The best single product is CAMS for the solar blends "
+                "holding CAMS, ICON-D2 for the four weather models, and UKV for wind. The splits "
+                "share hours and XGBoost models, so they are not independent tests."
             ),
             f"{DOTS} {CAPACITY}",
             f"{SCOPES['solar']} {SCOPES['wind']}",
         ],
         figure_planning="exploratory",
-    )
+    ).resolve_scale(color="independent", shape="independent")
 
 
 def _methods(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
@@ -724,6 +771,14 @@ def _methods(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         ("mean", "XGBoost given the products' mean"),
         ("equal", "Equal-weight mean of the predictions"),
     )
+    close = _pick(
+        contrasts=contrasts,
+        section=SECTION_EXPLORATORY,
+        domain="wind",
+        treatment="live_gb_rich_stack",
+        reference="live_gb_rich_xgb",
+    )
+    lead = _two_places(abs(float(str(close["difference"]))))
     panels = []
     for index, named in enumerate(NAMED_SETS):
         marks = []
@@ -753,8 +808,8 @@ def _methods(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         panels=panels,
         number=9,
         title=(
-            "An XGBoost model given every product's columns has the lowest error of the four "
-            "blends in every named set but one"
+            "Given every product's columns, an XGBoost model has the lowest error of the four "
+            "blends in every named set"
         ),
         subtitle=[
             (
@@ -763,8 +818,10 @@ def _methods(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
                 "XGBoost models' predictions, fitted per generator on the other folds."
             ),
             (
-                "For UKV with ICON-EU, the XGBoost blend leads the linear stack by 0.01 points, a "
-                "gap this study does not test for significance."
+                "For UKV with ICON-EU, the XGBoost blend leads the linear stack by "
+                f"{lead} points [{_signed(close['lower_95'])}, "
+                f"{_signed(close['upper_95'])}], not statistically significant at the 5% level "
+                "(exploratory)."
             ),
             f"{DOTS} {CAPACITY}",
             SOME_POST_HOC,
@@ -828,7 +885,7 @@ def _synthetic(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
                 x_domain=HEADLINE_DOMAIN,
                 x_title=X_TITLE if index == 1 else "",
                 zero_label="no difference",
-                better_label="first XGBoost model better",
+                better_label="first-named XGBoost model better",
                 panel_title=domain.capitalize(),
                 reference_labels=index == 0,
             )
@@ -1190,7 +1247,7 @@ def _weeks_figure(
             (
                 "Hourly output as a percentage of capacity, measured and as predicted out of fold "
                 "by each XGBoost model, averaged over its three fitting seeds. One row per "
-                "generator; gaps are hours outside the common rows."
+                "generator; gaps are hours not covered by every product."
             ),
             (
                 "Weeks chosen by rule from the weeks in which every generator has at least "
@@ -1224,7 +1281,7 @@ def _per_generator_errors(
     Raises:
         ValueError: If a generator's difference does not reproduce the report's per-site row.
     """
-    pairs = [named for named in NAMED_SETS if named.blend != "cams_icon_eu"]
+    pairs = NAMED_SETS
     x_scale = alt.Scale(domain=[2, 10], nice=False)
     panels = []
     for index, named in enumerate(pairs):

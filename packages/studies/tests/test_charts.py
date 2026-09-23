@@ -394,6 +394,55 @@ def test_leaderboard_of_two_families_draws_the_family_key():
     assert "layer" in panel
 
 
+def _conditioned_leaderboard(**overrides: object) -> dict:
+    rows = _leaderboard_rows(["satellite", "weather model"]).with_columns(
+        condition=pl.Series(["live", "history"]), kind=pl.Series(["blend", "single"])
+    )
+    arguments = {
+        "rows": rows,
+        "x_domain": (4.0, 9.0),
+        "x_title": "% of capacity",
+        "conditions": ("live", "history"),
+        "condition_title": "Available",
+        "kinds": ("blend", "single"),
+        "kind_title": "Kind",
+    } | overrides
+    return leaderboard_panel(**arguments).to_dict()  # ty: ignore[invalid-argument-type]
+
+
+def test_leaderboard_conditions_colour_and_fill_the_points_and_replace_the_family_key():
+    spec = _conditioned_leaderboard()
+    condition_key, kind_key, panel = spec["vconcat"]
+    filled, hollow = _layer(panel, "point")
+
+    assert [row["label"] for row in _values(spec, filled)] == ["row 0"]
+    assert [row["label"] for row in _values(spec, hollow)] == ["row 1"]
+    assert (filled["mark"]["filled"], hollow["mark"]["filled"]) == (True, False)
+    assert filled["encoding"]["color"]["field"] == "condition"
+    assert filled["encoding"]["color"]["scale"]["range"] == list(CONDITION_COLOURS)
+    assert filled["encoding"]["shape"]["field"] == "kind"
+    assert [row["label"] for row in _values(spec, _layer(condition_key, "text")[0])] == [
+        "live",
+        "history",
+    ]
+    assert [row["label"] for row in _values(spec, _layer(kind_key, "text")[0])] == [
+        "blend",
+        "single",
+    ]
+
+
+def test_leaderboard_keys_false_draws_no_key():
+    spec = _conditioned_leaderboard(keys=False, panel_title="Solar")
+
+    assert "vconcat" not in spec
+    assert spec["title"]["text"] == "Solar"
+
+
+def test_leaderboard_rejects_more_conditions_than_colours():
+    with pytest.raises(ValueError, match="too many conditions"):
+        _conditioned_leaderboard(conditions=("a", "b", "c"))
+
+
 def test_family_colours_map_to_the_brand_theme_swatches():
     assert FAMILY_COLOURS == {
         "satellite": ocf.BRAND_ORANGE,
