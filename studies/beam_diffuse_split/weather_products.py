@@ -1,4 +1,4 @@
-"""Score six weather products as descriptions of past sunshine, on one common row set.
+"""Score weather products as descriptions of past sunshine, each panel on one common row set.
 
 One-off throwaway script for the study in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/809>. The write-up is
@@ -35,10 +35,30 @@ archive holds the T+0 analysis; ICON-D2 and ICON-EU hold 1-to-3-hour forecasts; 
 tables compare ICON-D2 with ICON-EU at matched served leads, and split ICON global against ICON-EU
 by ICON global's lead.
 
+**The products are scored in panels, and a panel never mixes periods.** A panel is a set of
+products scored on the site-hours every one of them covers, so adding a product with a shorter
+record shortens the whole panel rather than giving that product easier or harder months
+(`PANELS`):
+
+- `published`: the six products above, December 2022 to September 2026, as the first write-up
+  reported them. Its outputs are the first round's, which other studies read, so it is never re-run
+  over them.
+- `long`: the six plus SARAH-3 (a second satellite retrieval) and ICON-DREAM-EU (a second
+  reanalysis), over the same span cut to ICON-DREAM's last month. It runs every analysis the
+  `published` panel runs. The panel spans Open-Meteo's change of UKV source on 12 August 2024 and
+  treats it as the first round did, with the `ukv_live` scope.
+- `all`: all twelve products, adding the four fetched per site from Open-Meteo (ECMWF-IFS-HRES,
+  ARPEGE Europe, and the two HARMONIE-AROME models), from September 2024.
+- `record`: the four products with records from 2021, which is SARAH-3's start: ERA5, CAMS,
+  SARAH-3 and ICON-DREAM-EU. It exists for the year-by-year table of ERA5's error against every
+  other product, which every panel prints for its own years.
+
 Run it with `uv run python studies/beam_diffuse_split/weather_products.py`, after
-`build_dataset.py` has been run for `open-meteo`, `ukv`, `icon-d2`, `icon-eu`, `icon-global`, and
-for `cams` with `--min-cams-reliability 0 --suffix _allhours`. With `--report-only` it skips the
-fits and rebuilds the report from the losses a full run saved.
+`build_dataset.py` has been run for `open-meteo`, `ukv`, `icon-d2`, `icon-eu`, `icon-global`, the
+six added products, and for `cams` with `--min-cams-reliability 0 --suffix _allhours`. `--panel`
+chooses the panels, `long`, `all` and `record` by default. With `--report-only` it skips the fits
+and rebuilds the report from the losses a full run saved. Neither mode overwrites a file: move an
+existing output to a `superseded/` subfolder first.
 """
 
 import argparse
@@ -49,7 +69,8 @@ import logging
 import math
 import sys
 from datetime import UTC, datetime
-from typing import Final
+from pathlib import Path
+from typing import Final, Literal, NamedTuple
 
 import numpy as np
 import polars as pl
@@ -71,21 +92,40 @@ from run_experiment import (
     dataset_path_for,
     run_all,
 )
-from sources import STUDY_DATA_DIR, SourceType, point_output_path_for
+from sources import (
+    OPEN_METEO_MODELS,
+    STUDY_DATA_DIR,
+    UNSCORED_EXTRACTED_SPLITS,
+    UPDATE_OUTPUT_DIR,
+    SourceType,
+    point_output_path_for,
+)
 from studies.bootstrap import (
     BOOTSTRAP_SEED,
+    MIN_MONTHS_FOR_INTERVAL,
     N_BOOTSTRAP_RESAMPLES,
+    YearChangeInterval,
+    YearInterval,
     bootstrap_difference,
+    bootstrap_difference_by_year,
+    bootstrap_year_change,
     per_fold_differences,
 )
 from studies.cross_validation import (
     PRIMARY_HYPER_PARAMETERS,
     SEEDS,
+    SENSITIVITY_HYPER_PARAMETERS,
     assign_folds,
     clamp_to_cap,
     fit_one_fold,
 )
+from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.neighbouring_hours import with_neighbouring_hours
+from studies.raw_comparison import (
+    mean_per_site_correlation,
+    raw_column_comparison,
+    raw_mad_difference,
+)
 from studies.solar import extraterrestrial_horizontal, zenith
 
 _LOG = logging.getLogger(__name__)
@@ -93,7 +133,10 @@ _LOG = logging.getLogger(__name__)
 PERCENTAGE_POINTS: Final[float] = 100.0
 
 OUTPUT_DIR_NAME: Final[str] = "beam_diffuse_weather_products"
-"""The results directory under `STUDY_DATA_DIR`."""
+"""The first round's results directory under `STUDY_DATA_DIR`, which the `published` panel names.
+
+The blending study and the chart script read the first round's losses and report from here.
+"""
 
 PRODUCTS: Final[dict[str, str]] = {
     "cams": "cams_allhours",
@@ -119,13 +162,66 @@ SERVED_LEAD: Final[dict[str, str]] = {
     "icon_d2": "1 to 3 hours",
     "icon_eu": "1 to 3 hours",
     "icon_global": "1 to 6 hours",
+    "sarah3": "no forecast step (satellite retrieval)",
+    "icon_dream": "1 to 3 hours (its own forecasts from 3-hourly analyses)",
+    "ifs_hres": "not yet measured (see product_checks.md)",
+    "arpege": "not yet measured (see product_checks.md)",
+    "dmi_harmonie": "not yet measured (see product_checks.md)",
+    "knmi_harmonie": "not yet measured (see product_checks.md)",
 }
-"""How far ahead each product's served hourly value was forecast, as the archive holds it."""
+"""How far ahead each product's served hourly value was forecast, as the archive holds it.
 
-RUN_INTERVAL_HOURS: Final[dict[str, int]] = {"icon_d2": 3, "icon_eu": 3, "icon_global": 6}
+The four forecast models the second round adds are fetched from the same archive as UKV and the
+ICON products, so their leads follow their run cycles; `check_new_products.py` prints where each
+one's hour-to-hour jumps fall, which is where the cycle is read from.
+"""
+
+RUN_INTERVAL_HOURS: Final[dict[str, int]] = {
+    "icon_d2": 3,
+    "icon_eu": 3,
+    "icon_global": 6,
+    "icon_dream": 3,
+}
 """The run cadence of each ICON product, which fixes its served lead at each label hour.
 
 The evidence for the mapping is on the write-up page.
+"""
+
+SARAH_SATELLITE_ERAS: Final[tuple[tuple[str, datetime, datetime], ...]] = (
+    (
+        "Meteosat-11, January 2022 (includes a fortnight from Meteosat-9)",
+        datetime(2022, 1, 1, tzinfo=UTC),
+        datetime(2022, 2, 1, tzinfo=UTC),
+    ),
+    (
+        "Meteosat-11, 2021",
+        datetime(2021, 1, 1, tzinfo=UTC),
+        datetime(2022, 1, 1, tzinfo=UTC),
+    ),
+    (
+        "Meteosat-11, February 2022 to 20 March 2023",
+        datetime(2022, 2, 1, tzinfo=UTC),
+        datetime(2023, 3, 21, tzinfo=UTC),
+    ),
+    (
+        "Meteosat-10, from 21 March 2023",
+        datetime(2023, 3, 21, tzinfo=UTC),
+        datetime(2027, 1, 1, tzinfo=UTC),
+    ),
+)
+"""The satellite behind SARAH-3's retrieval over each span, as (label, start, end before).
+
+SARAH-3's European disc moved from Meteosat-11 to Meteosat-10 on 21 March 2023, and Meteosat-9
+stood in for a fortnight, 17 to 31 January 2022, which is therefore a span of its own, left out of
+both Meteosat-11 spans. The report prints SARAH-3's error against CAMS in each span; no era feature
+enters the fit.
+
+**Each span still holds a few days served by a different satellite than its label names**, read
+from the SIS variable's `platform` attribute in SARAH-3's own files: Meteosat-9 also stands in for
+19 to 20 December 2021, inside the "Meteosat-11, 2021" span, and Meteosat-11 stands in for 17 to 20
+August 2024, 11 to 12 November 2025, and 24 to 28 April 2026, inside the "Meteosat-10, from 21 March
+2023" span. No arm reads which satellite an hour comes from, so these few-day mismatches are not
+expected to move the per-span contrasts by much, and the write-up says so.
 """
 
 LEAD_TABLE_HOURS: Final[tuple[int, int]] = (7, 19)
@@ -169,6 +265,136 @@ against the regional one; which Great-Britain-wide weather model is better; and 
 ICON costs against the European one. Every other contrast in the report is exploratory.
 """
 
+NEW_PRODUCTS: Final[dict[str, str]] = {
+    "sarah3": "sarah-3",
+    "icon_dream": "icon-dream-eu",
+    "ifs_hres": "ecmwf-ifs-hres",
+    "arpege": "arpege-europe",
+    "dmi_harmonie": "dmi-harmonie-arome",
+    "knmi_harmonie": "knmi-harmonie-arome",
+}
+"""The six products the second round adds, by arm prefix, as `PRODUCTS` lists the first six."""
+
+ALL_PRODUCTS: Final[dict[str, str]] = PRODUCTS | NEW_PRODUCTS
+"""Every product either round scores, by arm prefix."""
+
+UNUSABLE_SPLITS: Final[frozenset[str]] = frozenset(
+    prefix
+    for prefix, source in NEW_PRODUCTS.items()
+    if source in UNSCORED_EXTRACTED_SPLITS
+    or (source in OPEN_METEO_MODELS and not OPEN_METEO_MODELS[source].split_scored)
+)
+"""Products whose own split no arm reads, so they get neither a split arm nor an Erbs arm.
+
+Read from `sources.OPEN_METEO_MODELS` and `sources.UNSCORED_EXTRACTED_SPLITS`, which say why for
+each: DMI's served direct flux is zero in 48% of daytime hours, ARPEGE's and KNMI's is a separation
+model's output, and SARAH-3's is modelled from its own global flux. A split arm would
+measure the defect or the separation model, not the weather model, and an Erbs arm exists only as
+the split arm's reference.
+"""
+
+NEW_PLANNED_CONTRASTS: Final[dict[str, tuple[tuple[str, str], ...]]] = {
+    "long": (
+        ("sarah3_global", "cams_global"),
+        ("icon_dream_global", "era5_global"),
+    ),
+    "all": (
+        ("ifs_hres_global", "icon_eu_global"),
+        ("knmi_harmonie_global", "icon_eu_global"),
+        ("dmi_harmonie_global", "icon_d2_global"),
+    ),
+}
+"""The five contrasts the second round names before its run, by the panel each is measured on.
+
+Whether the second satellite retrieval matches CAMS; whether the second reanalysis beats ERA5;
+whether ECMWF's global model beats the Great-Britain-wide ICON, measured on the `all` panel because
+ECMWF's model is one of the four fetched from Open-Meteo; whether KNMI's 5.5 km
+HARMONIE-AROME model over Europe beats the Great-Britain-wide ICON; and whether the Danish 2 km
+model matches the German one. Every other contrast involving a new product is exploratory.
+
+**How an unequal served lead biases three of them, written down before any lead is measured.** An
+archive value served at a longer lead is a worse description of the hour, so the product with the
+longer lead is handicapped, and a contrast between two leads is part model, part lead:
+
+- ECMWF-IFS-HRES − ICON-EU: ECMWF runs every 6 hours, or every 12 for its longest forecasts, where
+  ICON-EU runs every 3, so IFS-HRES's served lead is expected to be the longer. The bias is against
+  IFS-HRES: a win for it survives equal leads, and a loss may be the lead's.
+- KNMI HARMONIE-AROME − ICON-EU and DMI HARMONIE-AROME − ICON-D2: HARMONIE-AROME configurations
+  typically run every 1 to 3 hours, so their served lead is expected to be as short as ICON's or
+  shorter. The bias, if any, is in their favour: a loss for them survives equal leads, and a win may
+  be the lead's.
+
+Once `check_new_products.py` has measured each model's run interval, the interval goes into
+`RUN_INTERVAL_HOURS`, and the report prints each planned contrast within the rows where both
+products sit at the same served lead, beside the rows where they do not.
+"""
+
+PanelType = Literal["published", "long", "all", "record"]
+"""Which set of products is scored together, on the site-hours all of them cover."""
+
+
+class Panel(NamedTuple):
+    """One set of products scored together, and what is run and reported on it.
+
+    Attributes:
+        products: The arm prefixes scored, keys of `ALL_PRODUCTS`.
+        output_dir: Where the panel's losses and report are written.
+        full_analysis: Whether to run the analyses the first write-up reports beyond the
+            leaderboard: UKV rebuilt from its snapshots, the post-upgrade fit, leave one site out,
+            the lead tables, and every scope. Each needs UKV and the ICON products.
+        planned: The contrasts named before the run, as (treatment, reference) arm pairs. Each is
+            also fitted at the second hyperparameter setting, except on the `published` panel,
+            which reproduces the first round as it ran.
+        first_time: The first hour the panel scores, or `None` to start where its products'
+            records first overlap.
+    """
+
+    products: tuple[str, ...]
+    output_dir: Path
+    full_analysis: bool
+    planned: tuple[tuple[str, str], ...]
+    first_time: datetime | None = None
+
+
+PANELS: Final[dict[PanelType, Panel]] = {
+    "published": Panel(
+        products=tuple(PRODUCTS),
+        output_dir=STUDY_DATA_DIR / OUTPUT_DIR_NAME,
+        full_analysis=True,
+        planned=DECIDING_CONTRASTS,
+    ),
+    "long": Panel(
+        products=(*PRODUCTS, "sarah3", "icon_dream"),
+        output_dir=UPDATE_OUTPUT_DIR / "solar_long",
+        full_analysis=True,
+        planned=(*DECIDING_CONTRASTS, *NEW_PLANNED_CONTRASTS["long"]),
+    ),
+    "all": Panel(
+        products=tuple(ALL_PRODUCTS),
+        output_dir=UPDATE_OUTPUT_DIR / "solar_all",
+        full_analysis=False,
+        planned=NEW_PLANNED_CONTRASTS["all"],
+        first_time=datetime(2024, 9, 1, tzinfo=UTC),
+    ),
+    "record": Panel(
+        products=("era5", "cams", "sarah3", "icon_dream"),
+        output_dir=UPDATE_OUTPUT_DIR / "solar_record",
+        full_analysis=False,
+        planned=(),
+    ),
+}
+"""Every panel. The `published` panel's directory is the first round's; every other panel's sits
+under `sources.UPDATE_OUTPUT_DIR`.
+
+The `all` panel starts on 1 September 2024 rather than when HARMONIE-AROME's archive does, in July
+2024, because Open-Meteo's UKV before 12 August 2024 is a backfill from a source it does not name:
+a change of source is an era boundary, and a panel of 26 months has no room to cut folds on both
+sides of one. The first whole month after the change is the start.
+"""
+
+DEFAULT_PANELS: Final[tuple[PanelType, ...]] = ("long", "all", "record")
+"""The panels a run fits unless told otherwise: the second round's."""
+
 UKV_SNAPSHOT_ARMS: Final[dict[str, tuple[str, ...]]] = {
     "ukv_trap_global": ("ghi_trap_ukv",),
     "ukv_pair_global": ("ghi_instant_previous_ukv", "ghi_instant_ukv"),
@@ -190,6 +416,11 @@ LEAVE_ONE_SITE_OUT_SEED: Final[int] = SEEDS[0]
 
 METRIC: Final[str] = "absolute_error_capped_fraction_of_capacity"
 """The loss every table reports: each row's clamped error over its own generator's capacity."""
+
+ERA5_BY_YEAR_MONTHS: Final[tuple[int, ...]] = tuple(range(1, 9))
+"""January to August: 2026's record stops in August, so every year-by-year table is restricted to
+these months, matching a partial final year against the same months of the complete years before it.
+"""
 
 SEASONS: Final[dict[int, str]] = {
     12: "winter",
@@ -307,33 +538,44 @@ def _named(column: str, product: str) -> str:
     return f"{column.removesuffix('_w_m2')}_{product}"
 
 
-def joined() -> pl.DataFrame:
+def joined(*, products: tuple[str, ...] = tuple(PRODUCTS)) -> pl.DataFrame:
     """Inner-join every product on the site-hours all of them cover.
 
+    Args:
+        products: The arm prefixes to join, keys of `ALL_PRODUCTS`, which must include
+            `BASE_PRODUCT`. The default is the first round's six.
+
     Returns:
-        One row per common site-hour on which UKV's snapshots and ICON-EU's neighbouring hours also
-        exist, carrying `ghi_<p>`, `bhi_<p>`, `dhi_<p>`, `erbs_bhi_<p>`, and `erbs_dhi_<p>` for
-        every product `p`, and the base product's power, geometry, and temperature.
+        One row per common site-hour, carrying `ghi_<p>`, `bhi_<p>`, `dhi_<p>`, `erbs_bhi_<p>`, and
+        `erbs_dhi_<p>` for every product `p`, and the base product's power, geometry, and
+        temperature. Where the products include UKV, the rows are those on which UKV's snapshots
+        also exist, and where they include ICON-EU, those on which ICON-EU's neighbouring hours do.
+
+    Raises:
+        ValueError: If `products` leaves out `BASE_PRODUCT`, whose power every row takes.
     """
+    if BASE_PRODUCT not in products:
+        msg = f"every panel needs {BASE_PRODUCT}, whose power and temperature the rows take"
+        raise ValueError(msg)
     irradiance = ("ghi_w_m2", "bhi_w_m2", "dhi_w_m2", "erbs_bhi_w_m2", "erbs_dhi_w_m2")
-    base = pl.read_parquet(dataset_path_for(source=PRODUCTS[BASE_PRODUCT]))
+    base = pl.read_parquet(dataset_path_for(source=ALL_PRODUCTS[BASE_PRODUCT]))
     frame = base.with_columns(
         pl.col(column).alias(_named(column, BASE_PRODUCT)) for column in irradiance
     ).drop(*irradiance)
-    for product, source in PRODUCTS.items():
+    for product in products:
         if product == BASE_PRODUCT:
             continue
-        other = pl.read_parquet(dataset_path_for(source=source)).select(
+        other = pl.read_parquet(dataset_path_for(source=ALL_PRODUCTS[product])).select(
             "site",
             "time",
             *(pl.col(column).alias(_named(column, product)) for column in irradiance),
         )
         frame = frame.join(other, on=["site", "time"], how="inner")
-    return (
-        frame.join(_ukv_snapshots(), on=["site", "time"], how="inner")
-        .join(_icon_eu_context(), on=["site", "time"], how="inner")
-        .sort("site", "time")
-    )
+    if "ukv" in products:
+        frame = frame.join(_ukv_snapshots(), on=["site", "time"], how="inner")
+    if "icon_eu" in products:
+        frame = frame.join(_icon_eu_context(), on=["site", "time"], how="inner")
+    return frame.sort("site", "time")
 
 
 def _neighbours(*, frame: pl.DataFrame, column: str, prefix: str, product: str) -> pl.DataFrame:
@@ -574,41 +816,94 @@ def with_eras(*, frame: pl.DataFrame) -> pl.DataFrame:
     return assign_folds(dataset=labelled, by=("site", "era"))
 
 
-def jobs() -> list[Job]:
+def _arm_columns(
+    *, products: tuple[str, ...], with_snapshot_arms: bool
+) -> dict[str, tuple[str, ...]]:
+    """Return every pooled arm's irradiance columns: three per product, and the UKV snapshot arms.
+
+    Args:
+        products: The arm prefixes, keys of `ALL_PRODUCTS`.
+        with_snapshot_arms: Whether to add `UKV_SNAPSHOT_ARMS`, which need UKV and ICON-EU.
+
+    Returns:
+        Each arm's irradiance columns, in the order the arms are fitted.
+    """
+    arms: dict[str, tuple[str, ...]] = {}
+    for product in products:
+        ghi = _named("ghi_w_m2", product)
+        arms[f"{product}_global"] = (ghi,)
+        if product in UNUSABLE_SPLITS:
+            continue
+        arms[f"{product}_split"] = (ghi, _named("bhi_w_m2", product), _named("dhi_w_m2", product))
+        arms[f"{product}_erbs"] = (
+            ghi,
+            _named("erbs_bhi_w_m2", product),
+            _named("erbs_dhi_w_m2", product),
+        )
+    if with_snapshot_arms:
+        arms |= UKV_SNAPSHOT_ARMS
+    return arms
+
+
+def jobs(
+    *, products: tuple[str, ...] = tuple(PRODUCTS), with_snapshot_arms: bool = True
+) -> list[Job]:
     """Return the three arms per product: global only, its own split, and Erbs on its own global.
+
+    A product in `UNUSABLE_SPLITS` gets its global arm alone.
+
+    Args:
+        products: The arm prefixes, keys of `ALL_PRODUCTS`. The default is the first round's six.
+        with_snapshot_arms: Whether to add `UKV_SNAPSHOT_ARMS`, which need UKV and ICON-EU.
 
     Returns:
         One job per arm, every arm shown the shared features and the era.
     """
     shared = (*SHARED_FEATURES, "era_code")
-    jobs: list[Job] = []
-    for product in PRODUCTS:
-        ghi = _named("ghi_w_m2", product)
-        arms = {
-            f"{product}_global": (ghi,),
-            f"{product}_split": (ghi, _named("bhi_w_m2", product), _named("dhi_w_m2", product)),
-            f"{product}_erbs": (
-                ghi,
-                _named("erbs_bhi_w_m2", product),
-                _named("erbs_dhi_w_m2", product),
-            ),
-        }
-        jobs += [
-            (arm, "pooled", "power_mw", (*shared, *columns), PRIMARY_HYPER_PARAMETERS, False)
-            for arm, columns in arms.items()
-        ]
-    jobs += [
+    return [
         (arm, "pooled", "power_mw", (*shared, *columns), PRIMARY_HYPER_PARAMETERS, False)
-        for arm, columns in UKV_SNAPSHOT_ARMS.items()
+        for arm, columns in _arm_columns(
+            products=products, with_snapshot_arms=with_snapshot_arms
+        ).items()
     ]
-    return jobs
 
 
-def _post_only_losses(*, frame: pl.DataFrame) -> pl.DataFrame:
+def sensitivity_jobs(*, panel: Panel) -> list[Job]:
+    """Return every arm in a panel's planned contrasts, at the second hyperparameter setting.
+
+    A second setting shows whether an ordering belongs to the features or to the settings.
+
+    Args:
+        panel: The panel whose planned contrasts are refitted.
+
+    Returns:
+        One job per arm, named as in `jobs`, under the setting `sensitivity`.
+    """
+    columns = _arm_columns(products=panel.products, with_snapshot_arms=panel.full_analysis)
+    shared = (*SHARED_FEATURES, "era_code")
+    arms = dict.fromkeys(arm for contrast in panel.planned for arm in contrast)
+    return [
+        (
+            arm,
+            "sensitivity",
+            "power_mw",
+            (*shared, *columns[arm]),
+            SENSITIVITY_HYPER_PARAMETERS,
+            False,
+        )
+        for arm in arms
+    ]
+
+
+def _post_only_losses(
+    *, frame: pl.DataFrame, products: tuple[str, ...], max_workers: int
+) -> pl.DataFrame:
     """Fit every global arm on the post-upgrade rows alone, as the separate-era sensitivity check.
 
     Args:
         frame: The common rows with `era`.
+        products: The arm prefixes to fit.
+        max_workers: How many fits run at once.
 
     Returns:
         Losses for every global arm, scored on the post-upgrade rows by models trained on them only.
@@ -623,12 +918,14 @@ def _post_only_losses(*, frame: pl.DataFrame) -> pl.DataFrame:
             PRIMARY_HYPER_PARAMETERS,
             False,
         )
-        for product in PRODUCTS
+        for product in products
     ]
-    return run_all(dataset=post, jobs=jobs)
+    return run_all(dataset=post, jobs=jobs, max_workers=max_workers)
 
 
-def _leave_one_site_out_losses(*, frame: pl.DataFrame) -> pl.DataFrame:
+def _leave_one_site_out_losses(
+    *, frame: pl.DataFrame, products: tuple[str, ...], max_workers: int
+) -> pl.DataFrame:
     """Train on five sites' capacity-normalised power and score the sixth, one fold at a time.
 
     The scored site is never trained on, and neither are the scored fold's calendar months at any
@@ -639,6 +936,8 @@ def _leave_one_site_out_losses(*, frame: pl.DataFrame) -> pl.DataFrame:
 
     Args:
         frame: The common rows, carrying `fold`, `month`, `constrained` and `cap_mw`.
+        products: The arm prefixes to fit.
+        max_workers: How many fits run at once.
 
     Returns:
         One row per (site, time, arm) with the capped error as a fraction of capacity.
@@ -672,17 +971,19 @@ def _leave_one_site_out_losses(*, frame: pl.DataFrame) -> pl.DataFrame:
         )
 
     outputs: list[pl.DataFrame] = []
-    with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_CONCURRENT_FITS) as pool:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
         futures = [
             pool.submit(_one, product=product, site=site, fold=fold)
-            for product in PRODUCTS
+            for product in products
             for site, fold in folds
         ]
         outputs.extend(future.result() for future in concurrent.futures.as_completed(futures))
     return pl.concat(outputs)
 
 
-def _log_capacity_by_month(*, frame: pl.DataFrame) -> dict[str, pl.DataFrame]:
+def _log_capacity_by_month(
+    *, frame: pl.DataFrame, products: tuple[str, ...]
+) -> dict[str, pl.DataFrame]:
     """Return each product's log implied capacity per site and month, split into season and noise.
 
     A month's implied capacity is the metered output divided by what a fixed panel model predicts
@@ -694,6 +995,7 @@ def _log_capacity_by_month(*, frame: pl.DataFrame) -> dict[str, pl.DataFrame]:
 
     Args:
         frame: The common rows.
+        products: The arm prefixes to measure, which must include `cams`, the reference.
 
     Returns:
         Per product, one row per (site, month) with `log_capacity`, `calendar`, `seasonal`, and
@@ -702,7 +1004,7 @@ def _log_capacity_by_month(*, frame: pl.DataFrame) -> dict[str, pl.DataFrame]:
     daylight = frame.filter(~pl.col("constrained") & (pl.col("solar_elevation_deg") > 10.0))
     zenith = np.radians(daylight["solar_zenith_deg"].to_numpy())
     log_by_product: dict[str, pl.DataFrame] = {}
-    for product in PRODUCTS:
+    for product in products:
         geometry = Geometry(
             cos_zenith=np.maximum(np.cos(zenith), MIN_COS_ZENITH),
             sin_zenith=np.sin(zenith),
@@ -945,6 +1247,444 @@ def _served_lead(*, product: str) -> pl.Expr:
     return ((hour - 1) % RUN_INTERVAL_HOURS[product]) + 1
 
 
+def _matched_lead_lines(*, panel: Panel, losses: pl.DataFrame) -> list[str]:
+    """Split each planned contrast by whether its two products sit at the same served lead.
+
+    Only a contrast whose two products both have an entry in `RUN_INTERVAL_HOURS` can be split;
+    the others are listed as waiting for a measured run interval.
+
+    Args:
+        panel: The panel reported.
+        losses: The pooled losses.
+
+    Returns:
+        Markdown lines.
+    """
+    first, last = LEAD_TABLE_HOURS
+    hour = pl.col("time").dt.hour().cast(pl.Int32)
+    daytime = losses.filter(hour.is_between(first, last))
+    lines = ["#### Planned contrasts at matched and unmatched served leads", "", *CONTRAST_HEADER]
+    waiting: list[str] = []
+    for treatment, reference in panel.planned:
+        products = [arm.removesuffix("_global") for arm in (treatment, reference)]
+        if not all(product in RUN_INTERVAL_HOURS for product in products):
+            waiting.append(f"{treatment} − {reference}")
+            continue
+        treatment_lead, reference_lead = (_served_lead(product=product) for product in products)
+        for label, condition in (
+            ("same lead", treatment_lead == reference_lead),
+            (f"{products[0]} shorter", treatment_lead < reference_lead),
+            (f"{products[0]} longer", treatment_lead > reference_lead),
+        ):
+            rows = daytime.filter(condition)
+            if rows.height:
+                lines.append(
+                    _contrast_line(
+                        losses=rows,
+                        treatment=treatment,
+                        reference=reference,
+                        label=f"{label}, {first:02d}–{last:02d} UTC",
+                    )
+                )
+    if waiting:
+        lines += [
+            "",
+            (
+                "Not split, because a product has no entry in RUN_INTERVAL_HOURS (a retrieval, a "
+                "reanalysis, UKV's analysis, or a run interval not yet measured): "
+                f"{', '.join(waiting)}."
+            ),
+        ]
+    return lines
+
+
+def _sarah_era_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Report SARAH-3's error against CAMS in each span of `SARAH_SATELLITE_ERAS`.
+
+    A span of fewer than `studies.bootstrap.MIN_MONTHS_FOR_INTERVAL` months is listed under the
+    table with its estimate and no interval, so the table holds only rows with an interval.
+
+    Args:
+        losses: The pooled losses, holding `sarah3_global` and `cams_global`.
+
+    Returns:
+        Markdown lines: the table, then any span too short for an interval.
+    """
+    lines = [
+        "#### SARAH-3 against CAMS, by the satellite behind SARAH-3 (exploratory)",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    short: list[str] = []
+    for label, start, end in SARAH_SATELLITE_ERAS:
+        rows = losses.filter(pl.col("time").is_between(start, end, closed="left"))
+        if not rows.height:
+            continue
+        months = rows["month"].n_unique()
+        if months >= MIN_MONTHS_FOR_INTERVAL:
+            lines.append(
+                _contrast_line(
+                    losses=rows, treatment="sarah3_global", reference="cams_global", label=label
+                )
+            )
+            continue
+        difference = _mae(losses=rows, arm="sarah3_global") - _mae(losses=rows, arm="cams_global")
+        short.append(
+            f"- {label}: sarah3_global − cams_global {difference:+.3f} on {months} months, too "
+            "few for an interval."
+        )
+    if short:
+        lines += ["", *short]
+    return lines
+
+
+RAW_IRRADIANCE_PRODUCTS: Final[tuple[tuple[str, str], ...]] = (
+    ("sarah3", "SARAH-3"),
+    ("icon_d2", "ICON-D2"),
+    ("icon_eu", "ICON-EU"),
+    ("icon_global", "ICON global"),
+    ("icon_dream", "ICON-DREAM-EU"),
+    ("ukv", "UKV"),
+    ("ukv_trap", "UKV rebuilt from its snapshots"),
+    ("era5", "ERA5"),
+)
+"""The products `_raw_irradiance_vs_cams_lines` compares against CAMS, as (arm prefix, display
+name). UKV is its Open-Meteo hourly value as scored elsewhere on this page; the "ukv_trap" row
+reads `ghi_trap_ukv`, the mean of UKV's two snapshots, to check whether the end-of-hour snapshot
+explains UKV's raw distance from CAMS.
+"""
+
+RAW_MAD_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("icon_dream", "era5"),
+    ("icon_eu", "icon_global"),
+    ("icon_global", "icon_dream"),
+)
+"""The pairs `_raw_irradiance_vs_cams_lines` intervals for a difference in raw MAD from CAMS."""
+
+
+def _raw_ghi_column(*, product: str) -> str:
+    """Return a product's raw global-irradiance column name, `RAW_IRRADIANCE_PRODUCTS`'s keys.
+
+    Args:
+        product: An arm prefix from `RAW_IRRADIANCE_PRODUCTS`, or a plain product key.
+
+    Returns:
+        `ghi_trap_ukv` for `"ukv_trap"`, else `_named("ghi_w_m2", product)`.
+    """
+    return "ghi_trap_ukv" if product == "ukv_trap" else _named("ghi_w_m2", product)
+
+
+def _raw_irradiance_vs_cams_lines(*, frame: pl.DataFrame) -> list[str]:
+    """Report each product's raw global irradiance against CAMS's, with no power model involved.
+
+    Every forecast contrast on this page passes each product's irradiance through an XGBoost model
+    fitted per generator, which recalibrates a steady bias away. This table instead compares the
+    served irradiance values directly, row for row, on the daylight hours `frame` holds (`frame` is
+    already the `long` panel's common rows, so every listed product's column is present on every
+    row). It exists to check whether the raw irradiance already ranks the products the way the
+    power-model contrasts do, or whether the model is doing the ranking. The correlation with each
+    generator's own measured output is a second, reference-free check: CAMS shares SARAH-3's
+    Meteosat inputs, so a product's correlation with CAMS alone could inherit some of that
+    resemblance.
+
+    Args:
+        frame: The panel's common rows, holding `ghi_cams`, each product's own `ghi_<product>`,
+            `power_mw` and `effective_capacity_mw`.
+
+    Returns:
+        Markdown lines: a table of one row per product, then a table of MAD-difference intervals
+        for `RAW_MAD_CONTRASTS`.
+    """
+    daylight = frame.filter(pl.col("solar_elevation_deg") > 0.0).with_columns(
+        power_fraction=pl.col("power_mw") / pl.col("effective_capacity_mw")
+    )
+    lines = [
+        "#### Raw global irradiance against CAMS's, before any power model (exploratory)",
+        "",
+        (
+            f"On the {daylight.height:,} daylight generator-hours every listed product shares "
+            "with CAMS. Positive bias: the product reads higher than CAMS. Correlation with "
+            "output does not use CAMS as the reference, and is the mean of each generator's own "
+            "correlation."
+        ),
+        "",
+        (
+            "| Product | Bias vs CAMS (W/m²) | MAD vs CAMS (W/m²) | Correlation with CAMS "
+            "| Correlation with output |"
+        ),
+        "|---|---|---|---|---|",
+    ]
+    cams_output_correlation = mean_per_site_correlation(
+        frame=daylight, column="ghi_cams", reference="power_fraction"
+    )
+    lines.append(f"| CAMS | — | — | — | {cams_output_correlation:.3f} |")
+    for product, name in RAW_IRRADIANCE_PRODUCTS:
+        column = _raw_ghi_column(product=product)
+        comparison = raw_column_comparison(frame=daylight, treatment=column, reference="ghi_cams")
+        output_correlation = mean_per_site_correlation(
+            frame=daylight, column=column, reference="power_fraction"
+        )
+        lines.append(
+            f"| {name} | {comparison['bias']:+.2f} | {comparison['mad']:.2f} "
+            f"| {comparison['correlation']:.3f} | {output_correlation:.3f} |"
+        )
+    lines += [
+        "",
+        (
+            "Bootstrapped difference in mean absolute difference from CAMS, resampling whole "
+            "months (no fitting seed): positive means the first product's raw MAD is the larger."
+        ),
+        "",
+        "| Products | MAD difference (W/m²) | 95% interval |",
+        "|---|---|---|",
+    ]
+    for treatment, reference in RAW_MAD_CONTRASTS:
+        result = raw_mad_difference(
+            frame=daylight,
+            treatment=_raw_ghi_column(product=treatment),
+            reference=_raw_ghi_column(product=reference),
+            baseline="ghi_cams",
+        )
+        treatment_name = dict(RAW_IRRADIANCE_PRODUCTS)[treatment]
+        reference_name = dict(RAW_IRRADIANCE_PRODUCTS)[reference]
+        lines.append(
+            f"| {treatment_name} − {reference_name} | {result['difference']:+.2f} "
+            f"| [{result['lower_95']:+.2f}, {result['upper_95']:+.2f}] |"
+        )
+    return lines
+
+
+CLEARNESS_BANDS: Final[tuple[tuple[str, float, float], ...]] = (
+    ("overcast kt<0.3", 0.0, 0.3),
+    ("broken 0.3-0.6", 0.3, 0.6),
+    ("clear kt>=0.6", 0.6, 2.0),
+)
+"""CAMS's clearness index `kt` (global irradiance over extraterrestrial), bucketed into overcast,
+broken-cloud, and clear skies, for `_sarah_cams_breakdown_lines`.
+"""
+
+
+def _sarah_cams_breakdown_lines(*, frame: pl.DataFrame, losses: pl.DataFrame) -> list[str]:
+    """Report SARAH-3's error against CAMS, per generator and by clearness index.
+
+    Neither breakdown is a planned contrast, so both are exploratory. The clearness index `kt` is
+    the mean of CAMS's and SARAH-3's own global irradiance over the extraterrestrial irradiance at
+    the same site and time, rather than CAMS's alone: binning on one product's own clearness tilts
+    the comparison towards that product's mistakes falling in whichever band its own retrieval
+    called clear or overcast.
+
+    Args:
+        frame: The panel's common rows, holding `ghi_cams`, `ghi_sarah3` and
+            `extraterrestrial_horizontal_w_m2`.
+        losses: The pooled losses, holding `sarah3_global` and `cams_global`.
+
+    Returns:
+        Markdown lines: one table per generator, then one per clearness band.
+    """
+    kt = frame.select(
+        "site",
+        "time",
+        kt=pl.when(pl.col("extraterrestrial_horizontal_w_m2") > 0)
+        .then(
+            ((pl.col("ghi_cams") + pl.col("ghi_sarah3")) / 2)
+            / pl.col("extraterrestrial_horizontal_w_m2")
+        )
+        .otherwise(None),
+    )
+    keyed = losses.join(kt, on=["site", "time"], how="left")
+    lines = ["#### SARAH-3 against CAMS, by generator (exploratory)", "", *CONTRAST_HEADER]
+    lines += [
+        _contrast_line(
+            losses=keyed.filter(pl.col("site") == site),
+            treatment="sarah3_global",
+            reference="cams_global",
+            label=f"site {site}",
+        )
+        for site in sorted(keyed["site"].unique().to_list())
+    ]
+    clearness_heading = (
+        "#### SARAH-3 against CAMS, by the mean of the two products' clearness index (exploratory, "
+        "chosen after the results were seen)"
+    )
+    lines += ["", clearness_heading, "", *CONTRAST_HEADER]
+    for name, low, high in CLEARNESS_BANDS:
+        band = keyed.filter(pl.col("kt").is_between(low, high, closed="left"))
+        label = f"{name}, CAMS's own error {_mae(losses=band, arm='cams_global'):.3f}%"
+        lines.append(
+            _contrast_line(
+                losses=band, treatment="sarah3_global", reference="cams_global", label=label
+            )
+        )
+    return lines
+
+
+def _icon_dream_icon_eu_by_year_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Report ICON-DREAM-EU's error minus ICON-EU's, in each calendar year (exploratory).
+
+    Shows whether ICON-DREAM-EU's gap to ICON-EU drifts from year to year, so a reader who sees
+    every product's lead over ERA5 shrink in 2025 and 2026 can check whether ICON-DREAM-EU is
+    getting worse relative to a weather model rather than only relative to ERA5's reanalysis. Every
+    year is restricted to `ERA5_BY_YEAR_MONTHS`, matching `era5_difference_by_year`'s own table.
+
+    Args:
+        losses: The pooled losses, holding `icon_dream_global` and `icon_eu_global`.
+
+    Returns:
+        Markdown lines: one row per year. Positive means ICON-DREAM-EU's error is the larger.
+    """
+    by_year = bootstrap_difference_by_year(
+        losses=losses,
+        treatment="icon_dream_global",
+        references=("icon_eu_global",),
+        metric=METRIC,
+        months=ERA5_BY_YEAR_MONTHS,
+    )
+    lines = [
+        "#### ICON-DREAM-EU against ICON-EU, by year (exploratory)",
+        "",
+        (
+            "Positive: ICON-DREAM-EU's error is the larger. A year of fewer than "
+            f"{MIN_MONTHS_FOR_INTERVAL} months gets no interval. Every year is restricted to "
+            "January to August."
+        ),
+        "",
+        "| Year | ICON-DREAM-EU − ICON-EU (pp of capacity) | 95% interval | Months | Rows |",
+        "|---|---|---|---|---|",
+    ]
+    for row in by_year:
+        difference, lower, upper = (
+            row[key] * PERCENTAGE_POINTS for key in ("difference", "lower_95", "upper_95")
+        )
+        interval = f"[{lower:+.3f}, {upper:+.3f}]" if row["enough_months"] else "too few months"
+        lines.append(
+            f"| {row['year']} | {difference:+.3f} | {interval} | {row['n_months']} "
+            f"| {row['n_rows']:,} |"
+        )
+    return lines
+
+
+ICON_DREAM_ERA5_CHANGE_EARLIER_YEARS: Final[tuple[int, ...]] = (2021, 2022, 2023, 2024)
+"""The earlier years `_icon_dream_era5_year_change_lines` each tests against 2025."""
+
+
+def _icon_dream_era5_year_change_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Report whether 2025's gap between ERA5 and ICON-DREAM-EU differs from each earlier year's.
+
+    2025 is the first year on the record panel where ICON-DREAM-EU's lead over ERA5 narrows to
+    where it is no longer statistically significant at the 5% level. This checks whether that
+    narrower gap is itself a statistically significant change from each of the four full years
+    before it, resampling each year's months independently
+    (`studies.bootstrap.bootstrap_year_change`). Every year is restricted to
+    `ERA5_BY_YEAR_MONTHS`, matching the January-to-August restriction the rest of this section
+    uses, so a partial 2026 elsewhere on the page is never compared against a full year here.
+
+    Args:
+        losses: The record panel's pooled losses, holding `era5_global` and `icon_dream_global`.
+
+    Returns:
+        Markdown lines: one row per earlier year, each against 2025.
+    """
+    lines = [
+        "#### ERA5 against ICON-DREAM-EU, change from an earlier year to 2025 (exploratory)",
+        "",
+        (
+            "Positive: ERA5's error grew relative to ICON-DREAM-EU, from the earlier year to "
+            "2025. Each year's months are resampled independently of the other year's, and every "
+            "year is restricted to January to August."
+        ),
+        "",
+        "| Earlier year | Change to 2025 (pp of capacity) | 95% interval |",
+        "|---|---|---|",
+    ]
+    for year0 in ICON_DREAM_ERA5_CHANGE_EARLIER_YEARS:
+        result = bootstrap_year_change(
+            losses=losses,
+            treatment="era5_global",
+            reference="icon_dream_global",
+            metric=METRIC,
+            year0=year0,
+            year1=2025,
+            months=ERA5_BY_YEAR_MONTHS,
+        )
+        change, lower, upper = (
+            result[key] * PERCENTAGE_POINTS for key in ("change", "lower_95", "upper_95")
+        )
+        lines.append(f"| {year0} | {change:+.3f} | [{lower:+.3f}, {upper:+.3f}] |")
+    return lines
+
+
+def _icon_dream_icon_eu_lead_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Compare ICON-DREAM-EU against ICON-EU at matched served leads (exploratory).
+
+    ICON-DREAM-EU and ICON-EU run on the same 3-hourly cycle, so every label hour holds both at the
+    same lead, and the contrast within a lead bucket is lead-matched. This isolates whether the
+    hourly-mean conversion, which needs more de-averaging at a longer lead, explains part of
+    ICON-DREAM-EU's gap to ICON-EU.
+
+    Args:
+        losses: The pooled losses, holding `icon_dream_global` and `icon_eu_global`.
+
+    Returns:
+        Markdown lines.
+    """
+    first, last = LEAD_TABLE_HOURS
+    daytime = losses.filter(
+        pl.col("time").dt.hour().cast(pl.Int32).is_between(first, last)
+    ).with_columns(lead_3h=_served_lead(product="icon_dream"))
+    label = f"{first:02d}–{last:02d} UTC"
+    lines = [
+        "#### ICON-DREAM-EU against ICON-EU at matched served leads (exploratory)",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    lines += [
+        _contrast_line(
+            losses=daytime.filter(pl.col("lead_3h") == lead),
+            treatment="icon_dream_global",
+            reference="icon_eu_global",
+            label=f"both at lead {lead} h, {label}",
+        )
+        for lead in (1, 2, 3)
+    ]
+    return lines
+
+
+ICON_DREAM_OTHER_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("icon_dream_global", "icon_d2_global"),
+    ("icon_dream_global", "icon_global_global"),
+    ("icon_dream_global", "ukv_global"),
+)
+"""The pairings `_icon_dream_other_products_lines` prints, none of which this page's planned
+contrasts test.
+"""
+
+
+def _icon_dream_other_products_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Report ICON-DREAM-EU against ICON-D2, ICON global, and Open-Meteo's hourly UKV (exploratory).
+
+    None of these pairings is a planned contrast or tested at matched served leads elsewhere on
+    this page; they are printed so a reader sees the interval behind a point estimate rather than
+    a bare number.
+
+    Args:
+        losses: The pooled losses, holding `icon_dream_global`, `icon_d2_global`,
+            `icon_global_global` and `ukv_global`.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        "#### ICON-DREAM-EU against ICON-D2, ICON global, and UKV (exploratory)",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    lines += [
+        _contrast_line(losses=losses, treatment=treatment, reference=reference, label="all")
+        for treatment, reference in ICON_DREAM_OTHER_CONTRASTS
+    ]
+    return lines
+
+
 def _lead_tables(*, losses: pl.DataFrame) -> list[str]:
     """Compare ICON products at matched served leads and hour by hour, and break CAMS down.
 
@@ -1066,97 +1806,253 @@ def _lead_tables(*, losses: pl.DataFrame) -> list[str]:
     return lines
 
 
-def _report(
+def era5_difference_by_year(
     *,
-    frame: pl.DataFrame,
-    pooled: pl.DataFrame,
-    post_only: pl.DataFrame,
-    transfer: pl.DataFrame,
-    stability: list[str],
-    monthly: list[str],
-    geometry: list[str],
-) -> str:
-    """Assemble the markdown report.
+    losses: pl.DataFrame,
+    era5_arm: str,
+    other_arms: tuple[str, ...],
+    months: tuple[int, ...] | None = None,
+) -> pl.DataFrame:
+    """Return ERA5's error minus each other arm's, in each calendar year, with its interval.
+
+    Each year is bootstrapped on its own months alone, by
+    `studies.bootstrap.bootstrap_difference_by_year`, which also flags a year holding too few
+    months for its interval to mean anything.
 
     Args:
-        frame: The common rows.
-        pooled: The pooled run's losses.
-        post_only: The post-upgrade-only run's losses.
-        transfer: The leave-one-site-out losses.
-        stability: The implied-capacity table.
-        monthly: The implied capacity in every calendar month.
-        geometry: Where the generators sit.
+        losses: Per-row losses at one setting, carrying `time`, `month`, `site`, `seed` and `arm`.
+        era5_arm: ERA5's arm, the treatment in every difference.
+        other_arms: The arms ERA5 is compared against.
+        months: When given, restricts every year to these calendar months (1-12) before
+            resampling, so a partial year and a full year compare on the same months. `None` keeps
+            every month a year holds.
 
     Returns:
-        The report.
+        One row per (arm, year) with `arm`, `year`, the interval in fractions of capacity, and
+        `enough_months`. A positive difference means ERA5's error is the larger.
+    """
+    intervals: list[YearInterval] = bootstrap_difference_by_year(
+        losses=losses, treatment=era5_arm, references=other_arms, metric=METRIC, months=months
+    )
+    return pl.DataFrame(intervals).rename({"reference": "arm"})
+
+
+def era5_by_year_lines(*, by_year: pl.DataFrame, months_note: str | None = None) -> list[str]:
+    """Render `era5_difference_by_year`'s table as markdown.
+
+    A year holding fewer than `studies.bootstrap.MIN_MONTHS_FOR_INTERVAL` months shows its estimate
+    and no interval: with the month as the resampling unit, its interval would reflect little more
+    than the fitting seed.
+
+    Args:
+        by_year: The output of `era5_difference_by_year`.
+        months_note: When `by_year` was built with a `months` restriction, a short clause naming
+            it, appended to the caption (e.g. "on January to September of each year"). `None` for
+            an unrestricted, full-calendar-year table.
+
+    Returns:
+        Markdown lines: one row per (arm, year).
+    """
+    caption = "Positive: ERA5's error is the larger. A year of fewer than "
+    caption += f"{MIN_MONTHS_FOR_INTERVAL} months gets no interval."
+    if months_note is not None:
+        caption += f" Every year is restricted to the same months, {months_note}."
+    lines = [
+        "#### ERA5 against every other product, year by year (exploratory)",
+        "",
+        caption,
+        "",
+        (
+            "| Against | Year | ERA5 − product (pp of capacity) | 95% interval | Excludes zero? "
+            "| Months | Rows |"
+        ),
+        "|---|---|---|---|---|---|---|",
+    ]
+    for row in by_year.iter_rows(named=True):
+        difference, lower, upper = (
+            row[key] * PERCENTAGE_POINTS for key in ("difference", "lower_95", "upper_95")
+        )
+        if row["enough_months"]:
+            interval = f"[{lower:+.3f}, {upper:+.3f}]"
+            excludes = row["lower_95"] > 0.0 or row["upper_95"] < 0.0
+            verdict = "**yes**" if excludes else "no"
+        else:
+            interval, verdict = "too few months", "—"
+        lines.append(
+            f"| {row['arm']} | {row['year']} | {difference:+.3f} | {interval} | {verdict} "
+            f"| {row['n_months']} | {row['n_rows']:,} |"
+        )
+    return lines
+
+
+def era5_year_change(
+    *,
+    losses: pl.DataFrame,
+    era5_arm: str,
+    other_arms: tuple[str, ...],
+    year0: int,
+    year1: int,
+    months: tuple[int, ...] | None = None,
+) -> pl.DataFrame:
+    """Return the change in ERA5's error minus each other arm's, from `year0` to `year1`.
+
+    Each year's months are resampled independently, by `studies.bootstrap.bootstrap_year_change`,
+    so the interval tests whether the year-by-year difference itself moved, which two overlapping
+    `era5_difference_by_year` intervals cannot show.
+
+    Args:
+        losses: Per-row losses at one setting, carrying `time`, `month`, `site`, `seed` and `arm`.
+        era5_arm: ERA5's arm, the treatment in every difference.
+        other_arms: The arms ERA5 is compared against.
+        year0: The earlier calendar year.
+        year1: The later calendar year.
+        months: When given, restricts both years to these calendar months (1-12) before resampling.
+
+    Returns:
+        One row per arm with `year0`, `year1`, `change`, its interval, and the row and month counts
+        behind each year. A positive change means ERA5's error grew relative to the arm (the arm's
+        lead over ERA5 grew).
+    """
+    changes: list[YearChangeInterval] = [
+        bootstrap_year_change(
+            losses=losses,
+            treatment=era5_arm,
+            reference=other,
+            metric=METRIC,
+            year0=year0,
+            year1=year1,
+            months=months,
+        )
+        for other in other_arms
+    ]
+    return pl.DataFrame(changes).rename({"reference": "arm"})
+
+
+def era5_year_change_lines(*, changes: pl.DataFrame) -> list[str]:
+    """Render `era5_year_change`'s table as markdown.
+
+    Args:
+        changes: The output of `era5_year_change`.
+
+    Returns:
+        Markdown lines: one row per arm.
     """
     lines = [
-        (
-            f"### Six weather products on {frame.height:,} common site-hours "
-            f"({frame['time'].min():%Y-%m-%d} to {frame['time'].max():%Y-%m-%d})"
-        ),
+        "#### ERA5 against every other product, change from one year to the next (exploratory)",
         "",
         (
-            "| Product | Served lead | Global only | Own split | Erbs on own global "
-            "| Leave one site out |"
+            "Positive: ERA5's error grew relative to the product, so the product's lead over ERA5 "
+            "grew. Each year's months are resampled independently of the other year's, so this "
+            "tests whether the difference itself changed."
         ),
-        "|---|---|---|---|---|---|",
+        "",
+        "| Against | Years | Change (pp of capacity) | 95% interval | Rows (year0, year1) |",
+        "|---|---|---|---|---|",
     ]
-    lines += [
-        f"| {product} | {SERVED_LEAD[product]} "
-        f"| {_mae(losses=pooled, arm=f'{product}_global'):.3f} "
-        f"| {_mae(losses=pooled, arm=f'{product}_split'):.3f} "
-        f"| {_mae(losses=pooled, arm=f'{product}_erbs'):.3f} "
-        f"| {_mae(losses=transfer, arm=f'{product}_global'):.3f} |"
-        for product in PRODUCTS
-    ]
-    lines += ["", "Mean absolute error as a percentage of each site's P99 output.", ""]
-    lines += ["#### Deciding contrasts, named before the run", "", *CONTRAST_HEADER]
-    lines += [
-        _contrast_line(losses=pooled, treatment=treatment, reference=reference, label="all")
-        for treatment, reference in DECIDING_CONTRASTS
-    ]
-    lines += ["", "#### Every product against ERA5, by scope (exploratory)", "", *CONTRAST_HEADER]
-    for scope in SCOPES:
-        scoped = _scope(losses=pooled, scope=scope)
-        lines += [
-            _contrast_line(
-                losses=scoped, treatment=f"{product}_global", reference="era5_global", label=scope
-            )
-            for product in PRODUCTS
-            if product != BASE_PRODUCT
+    for row in changes.iter_rows(named=True):
+        change, lower, upper = (
+            row[key] * PERCENTAGE_POINTS for key in ("change", "lower_95", "upper_95")
+        )
+        lines.append(
+            f"| {row['arm']} | {row['year0']}→{row['year1']} | {change:+.3f} "
+            f"| [{lower:+.3f}, {upper:+.3f}] | {row['n_rows_year0']:,}, {row['n_rows_year1']:,} |"
+        )
+    return lines
+
+
+class PanelLosses(NamedTuple):
+    """Every set of losses one panel's report reads.
+
+    Attributes:
+        pooled: Every arm at the main hyperparameter setting, on the common rows.
+        sensitivity: The planned contrasts' arms at the second setting; empty where none ran.
+        post_only: The global arms fitted on the post-upgrade rows alone, or `None` where the panel
+            runs no full analysis.
+        transfer: The leave-one-site-out losses, or `None` likewise.
+    """
+
+    pooled: pl.DataFrame
+    sensitivity: pl.DataFrame
+    post_only: pl.DataFrame | None
+    transfer: pl.DataFrame | None
+
+
+def _leaderboard_lines(*, panel: Panel, losses: PanelLosses) -> list[str]:
+    """Return every product's error in each arm, and every arm's feature columns.
+
+    Args:
+        panel: The panel reported.
+        losses: The panel's losses.
+
+    Returns:
+        Markdown lines.
+    """
+    transfer = losses.transfer
+    header = "| Product | Served lead | Global only | Own split | Erbs on own global |"
+    rule = "|---|---|---|---|---|"
+    if transfer is not None:
+        header += " Leave one site out |"
+        rule += "---|"
+    lines = [header, rule]
+    for product in panel.products:
+        cells = [f"{_mae(losses=losses.pooled, arm=f'{product}_global'):.3f}"]
+        cells += [
+            "—" if product in UNUSABLE_SPLITS else f"{_mae(losses=losses.pooled, arm=arm):.3f}"
+            for arm in (f"{product}_split", f"{product}_erbs")
         ]
+        if transfer is not None:
+            cells.append(f"{_mae(losses=transfer, arm=f'{product}_global'):.3f}")
+        lines.append(f"| {product} | {SERVED_LEAD[product]} | " + " | ".join(cells) + " |")
+    lines += ["", "Mean absolute error as a percentage of each site's P99 output.", ""]
+    lines += ["#### Every arm's feature columns, beyond the shared features and the era", ""]
     lines += [
-        "",
-        (
-            "The post scope holds eight months, so its intervals rest on eight clusters and "
-            "under-cover; read its fold-sign counts alongside them."
-        ),
-        "",
+        f"- `{arm}`: {', '.join(f'`{column}`' for column in columns)}"
+        for arm, columns in _arm_columns(
+            products=panel.products, with_snapshot_arms=panel.full_analysis
+        ).items()
+    ]
+    return lines
+
+
+def _full_analysis_lines(*, panel: Panel, losses: PanelLosses) -> list[str]:
+    """Return the first write-up's analyses beyond the leaderboard, which need UKV and ICON.
+
+    Args:
+        panel: The panel reported, one with `full_analysis`.
+        losses: The panel's losses, with `post_only` and `transfer`.
+
+    Returns:
+        Markdown lines.
+
+    Raises:
+        ValueError: If the post-upgrade or the leave-one-site-out losses are missing.
+    """
+    if losses.post_only is None or losses.transfer is None:
+        msg = "a full analysis needs the post-upgrade and the leave-one-site-out losses"
+        raise ValueError(msg)
+    pooled = losses.pooled
+    lines = [
         "#### The post scope, fitted on post-upgrade rows alone",
         "",
         *CONTRAST_HEADER,
     ]
     lines += [
-        _contrast_line(losses=post_only, treatment=treatment, reference=reference, label="post")
-        for treatment, reference in (*DECIDING_CONTRASTS, ("ukv_global", "era5_global"))
-    ]
-    lines += ["", "#### A product's own split against Erbs on its own global", "", *CONTRAST_HEADER]
-    lines += [
         _contrast_line(
-            losses=pooled, treatment=f"{product}_split", reference=f"{product}_erbs", label="all"
+            losses=losses.post_only, treatment=treatment, reference=reference, label="post"
         )
-        for product in PRODUCTS
+        for treatment, reference in (*panel.planned, ("ukv_global", "era5_global"))
     ]
     lines += [
         "",
-        "#### Leave one site out, the scored months withheld everywhere: the deciding contrasts",
+        "#### Leave one site out, the scored months withheld everywhere: the planned contrasts",
         "",
         *CONTRAST_HEADER,
     ]
     lines += [
-        _contrast_line(losses=transfer, treatment=treatment, reference=reference, label="all")
-        for treatment, reference in DECIDING_CONTRASTS
+        _contrast_line(
+            losses=losses.transfer, treatment=treatment, reference=reference, label="all"
+        )
+        for treatment, reference in panel.planned
     ]
     lines += [
         "",
@@ -1185,66 +2081,291 @@ def _report(
             f"MAE: ukv_trap_global {_mae(losses=pooled, arm='ukv_trap_global'):.3f}, "
             f"ukv_pair_global {_mae(losses=pooled, arm='ukv_pair_global'):.3f}."
         ),
+    ]
+    return lines
+
+
+def _report(
+    *,
+    name: PanelType,
+    panel: Panel,
+    frame: pl.DataFrame,
+    losses: PanelLosses,
+    by_year: pl.DataFrame,
+) -> str:
+    """Assemble one panel's markdown report.
+
+    Args:
+        name: The panel's name.
+        panel: The panel reported.
+        frame: The panel's common rows.
+        losses: The panel's losses.
+        by_year: The output of `era5_difference_by_year`.
+
+    Returns:
+        The report.
+    """
+    pooled = losses.pooled
+    lines = [
+        (
+            f"### The {name} panel: {len(panel.products)} weather products on {frame.height:,} "
+            f"common site-hours ({frame['time'].min():%Y-%m-%d} to "
+            f"{frame['time'].max():%Y-%m-%d})"
+        ),
+        "",
+        *_leaderboard_lines(panel=panel, losses=losses),
+    ]
+    if panel.planned:
+        lines += ["", "#### Planned contrasts, named before the run", "", *CONTRAST_HEADER]
+        lines += [
+            _contrast_line(losses=pooled, treatment=treatment, reference=reference, label="all")
+            for treatment, reference in panel.planned
+        ]
+    if losses.sensitivity.height > 0:
+        lines += [
+            "",
+            "#### Planned contrasts at the second hyperparameter setting",
+            "",
+            *CONTRAST_HEADER,
+        ]
+        lines += [
+            _contrast_line(
+                losses=losses.sensitivity,
+                treatment=treatment,
+                reference=reference,
+                label="sensitivity",
+            )
+            for treatment, reference in panel.planned
+        ]
+    scopes = SCOPES if panel.full_analysis else ("all",)
+    lines += ["", "#### Every product against ERA5, by scope (exploratory)", "", *CONTRAST_HEADER]
+    for scope in scopes:
+        scoped = _scope(losses=pooled, scope=scope)
+        lines += [
+            _contrast_line(
+                losses=scoped, treatment=f"{product}_global", reference="era5_global", label=scope
+            )
+            for product in panel.products
+            if product != BASE_PRODUCT
+        ]
+    if panel.full_analysis:
+        post_months = _scope(losses=pooled, scope="post")["month"].n_unique()
+        lines += [
+            "",
+            (
+                f"The post scope holds {post_months} months, so its intervals rest on "
+                f"{post_months} clusters and under-cover; read its fold-sign counts alongside them."
+            ),
+        ]
+    lines += ["", "#### A product's own split against Erbs on its own global", "", *CONTRAST_HEADER]
+    lines += [
+        _contrast_line(
+            losses=pooled, treatment=f"{product}_split", reference=f"{product}_erbs", label="all"
+        )
+        for product in panel.products
+        if product not in UNUSABLE_SPLITS
+    ]
+    if panel.full_analysis:
+        lines += ["", *_full_analysis_lines(panel=panel, losses=losses)]
+    log_by_product = _log_capacity_by_month(frame=frame, products=panel.products)
+    lines += [
         "",
         "#### Implied capacity: month-to-month spread and seasonal swing",
         "",
-        *stability,
-    ]
-    lines += [
+        *_implied_capacity(log_by_product=log_by_product),
         "",
         "#### Implied capacity by calendar month against the annual mean (%)",
         "",
-        *monthly,
+        *_implied_capacity_by_month(log_by_product=log_by_product),
     ]
-    lines += ["", *_lead_tables(losses=pooled)]
-    lines += ["", *geometry]
+    if panel.full_analysis:
+        lines += ["", *_lead_tables(losses=pooled)]
+    if panel.planned:
+        lines += ["", *_matched_lead_lines(panel=panel, losses=pooled)]
+    if {"sarah3", "cams"} <= set(panel.products):
+        lines += ["", *_sarah_era_lines(losses=pooled)]
+        lines += ["", *_sarah_cams_breakdown_lines(frame=frame, losses=pooled)]
+    if {"icon_dream", "icon_eu"} <= set(panel.products):
+        lines += ["", *_icon_dream_icon_eu_by_year_lines(losses=pooled)]
+        lines += ["", *_icon_dream_icon_eu_lead_lines(losses=pooled)]
+    if {"icon_dream", "icon_d2", "icon_global", "ukv"} <= set(panel.products):
+        lines += ["", *_icon_dream_other_products_lines(losses=pooled)]
+    raw_irradiance_products = {
+        product for product, _ in RAW_IRRADIANCE_PRODUCTS if product != "ukv_trap"
+    }
+    if raw_irradiance_products <= set(panel.products):
+        lines += ["", *_raw_irradiance_vs_cams_lines(frame=frame)]
+    if name == "record" and {"era5", "icon_dream"} <= set(panel.products):
+        lines += ["", *_icon_dream_era5_year_change_lines(losses=pooled)]
+    lines += ["", *era5_by_year_lines(by_year=by_year, months_note="January to August")]
+    lines += ["", *geometry_lines(sites=_pv_sites(), noun="solar farms")]
     return "\n".join(lines) + "\n"
 
 
+def _panel_jobs(*, name: PanelType, panel: Panel) -> list[Job]:
+    """Return every pooled fit a panel runs: its arms, and its planned contrasts' second setting.
+
+    Args:
+        name: The panel's name; the `published` panel reproduces the first round, which ran no
+            second setting.
+        panel: The panel.
+
+    Returns:
+        The jobs.
+
+    Raises:
+        ValueError: If a panel other than `published` names planned contrasts but no second-setting
+            job, which would leave its report without the sensitivity table.
+    """
+    extra = sensitivity_jobs(panel=panel) if name != "published" else []
+    if name != "published" and panel.planned and not extra:
+        msg = f"the {name} panel plans contrasts but fits none at the second setting"
+        raise ValueError(msg)
+    return jobs(products=panel.products, with_snapshot_arms=panel.full_analysis) + extra
+
+
+def _panel_frame(*, panel: Panel, panel_jobs: list[Job]) -> pl.DataFrame:
+    """Build a panel's common rows, with the era, the folds, the time features and the export cap.
+
+    Every column any job is shown is checked for a missing value, because the inner joins that make
+    the rows common are what keep every arm's input present on every row.
+
+    Args:
+        panel: The panel.
+        panel_jobs: Every job the panel fits, whose feature columns are checked.
+
+    Returns:
+        The rows every arm of the panel is fitted and scored on.
+    """
+    rows = common_rows(frame=joined(products=panel.products))
+    if panel.first_time is not None:
+        rows = rows.filter(pl.col("time") >= panel.first_time)
+    frame = with_export_cap(dataset=with_eras(frame=_add_time_features(dataset=rows)))
+    check_no_missing(frame=frame, columns=[column for job in panel_jobs for column in job[3]])
+    return frame
+
+
+def _fit_panel(
+    *, panel: Panel, panel_jobs: list[Job], frame: pl.DataFrame, max_workers: int
+) -> PanelLosses:
+    """Fit every arm a panel reports.
+
+    Args:
+        panel: The panel.
+        panel_jobs: The pooled fits, from `_panel_jobs`.
+        frame: The panel's common rows.
+        max_workers: How many fits run at once.
+
+    Returns:
+        The panel's losses.
+    """
+    losses = run_all(dataset=frame, jobs=panel_jobs, max_workers=max_workers)
+    return PanelLosses(
+        pooled=losses.filter(pl.col("setting") == "pooled"),
+        sensitivity=losses.filter(pl.col("setting") == "sensitivity"),
+        post_only=(
+            _post_only_losses(frame=frame, products=panel.products, max_workers=max_workers)
+            if panel.full_analysis
+            else None
+        ),
+        transfer=(
+            _leave_one_site_out_losses(
+                frame=frame, products=panel.products, max_workers=max_workers
+            )
+            if panel.full_analysis
+            else None
+        ),
+    )
+
+
+def run_panel(
+    *, name: PanelType, report_only: bool, max_workers: int = MAX_CONCURRENT_FITS
+) -> None:
+    """Fit one panel, or read its saved losses, and write its report and year-by-year table.
+
+    Args:
+        name: The panel to run.
+        report_only: Whether to read the losses a full run saved instead of fitting.
+        max_workers: How many fits run at once.
+    """
+    panel = PANELS[name]
+    panel_jobs = _panel_jobs(name=name, panel=panel)
+    frame = _panel_frame(panel=panel, panel_jobs=panel_jobs)
+    by_site = frame.group_by("site", "era").agg(pl.len(), pl.col("month").n_unique()).sort("site")
+    _LOG.info("%s panel common rows: %d\n%s", name, frame.height, by_site)
+
+    output_dir = panel.output_dir
+    loss_paths = {
+        key: output_dir / f"{key}.parquet"
+        for key in ("losses", "post_only_losses", "leave_one_site_out_losses")
+    }
+    written = [output_dir / "report.md", output_dir / "era5_by_year.parquet"]
+    if report_only:
+        refuse_to_overwrite(paths=written)
+        saved = pl.read_parquet(loss_paths["losses"])
+        losses = PanelLosses(
+            pooled=saved.filter(pl.col("setting") == "pooled"),
+            sensitivity=saved.filter(pl.col("setting") == "sensitivity"),
+            post_only=(
+                pl.read_parquet(loss_paths["post_only_losses"]) if panel.full_analysis else None
+            ),
+            transfer=(
+                pl.read_parquet(loss_paths["leave_one_site_out_losses"])
+                if panel.full_analysis
+                else None
+            ),
+        )
+    else:
+        refuse_to_overwrite(paths=[*loss_paths.values(), *written])
+        output_dir.mkdir(parents=True, exist_ok=True)
+        losses = _fit_panel(
+            panel=panel, panel_jobs=panel_jobs, frame=frame, max_workers=max_workers
+        )
+        pl.concat([losses.pooled, losses.sensitivity]).write_parquet(loss_paths["losses"])
+        if losses.post_only is not None:
+            losses.post_only.write_parquet(loss_paths["post_only_losses"])
+        if losses.transfer is not None:
+            losses.transfer.write_parquet(loss_paths["leave_one_site_out_losses"])
+
+    by_year = era5_difference_by_year(
+        losses=losses.pooled,
+        era5_arm=f"{BASE_PRODUCT}_global",
+        other_arms=tuple(f"{p}_global" for p in panel.products if p != BASE_PRODUCT),
+        months=ERA5_BY_YEAR_MONTHS,
+    )
+    report = _report(name=name, panel=panel, frame=frame, losses=losses, by_year=by_year)
+    by_year.write_parquet(output_dir / "era5_by_year.parquet")
+    (output_dir / "report.md").write_text(report)
+    sys.stdout.write(report)
+
+
 def main() -> int:
-    """Fit every arm, bootstrap every contrast, and write the report."""
+    """Run every panel named on the command line."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--panel",
+        nargs="+",
+        choices=tuple(PANELS),
+        default=list(DEFAULT_PANELS),
+        help="The panels to run.",
+    )
     parser.add_argument(
         "--report-only",
         action="store_true",
         help="Rebuild the report from the losses already on disk instead of refitting.",
     )
+    parser.add_argument(
+        "--concurrent-fits",
+        type=int,
+        default=MAX_CONCURRENT_FITS,
+        help="How many fits run at once, each on 4 cores; lower it to share the machine.",
+    )
     arguments = parser.parse_args()
-
-    frame = with_export_cap(
-        dataset=with_eras(frame=_add_time_features(dataset=common_rows(frame=joined())))
-    )
-    by_site = frame.group_by("site", "era").agg(pl.len(), pl.col("month").n_unique()).sort("site")
-    _LOG.info("common rows: %d\n%s", frame.height, by_site)
-
-    output_dir = STUDY_DATA_DIR / OUTPUT_DIR_NAME
-    output_dir.mkdir(parents=True, exist_ok=True)
-    paths = {
-        name: output_dir / f"{name}.parquet"
-        for name in ("losses", "post_only_losses", "leave_one_site_out_losses")
-    }
-    if arguments.report_only:
-        pooled, post_only, transfer = (pl.read_parquet(path) for path in paths.values())
-    else:
-        pooled = run_all(dataset=frame, jobs=jobs())
-        post_only = _post_only_losses(frame=frame)
-        transfer = _leave_one_site_out_losses(frame=frame)
-        for losses, path in zip((pooled, post_only, transfer), paths.values(), strict=True):
-            losses.write_parquet(path)
-
-    log_by_product = _log_capacity_by_month(frame=frame)
-    report = _report(
-        frame=frame,
-        pooled=pooled,
-        post_only=post_only,
-        transfer=transfer,
-        stability=_implied_capacity(log_by_product=log_by_product),
-        monthly=_implied_capacity_by_month(log_by_product=log_by_product),
-        geometry=geometry_lines(sites=_pv_sites(), noun="solar farms"),
-    )
-    (output_dir / "report.md").write_text(report)
-    sys.stdout.write(report)
+    for name in arguments.panel:
+        run_panel(
+            name=name, report_only=arguments.report_only, max_workers=arguments.concurrent_fits
+        )
     return 0
 
 

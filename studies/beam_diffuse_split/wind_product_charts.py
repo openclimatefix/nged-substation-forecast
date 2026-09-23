@@ -1,4 +1,4 @@
-"""Draw the eight anonymised charts for the write-up on which weather product best describes wind.
+"""Draw the nine anonymised charts for the write-up on which weather product best describes wind.
 
 One-off throwaway script for the charts in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/830>. The write-up is
@@ -9,7 +9,8 @@ so a chart cannot disagree with the page. The step chart's fortnightly wind-spee
 from the downloads `fetch_wind_point.py` wrote, and its period means from the report. Three charts
 also draw numbers the report does not print, computed from `losses.parquet` without refitting any
 model: the leaderboard's intervals, and the two "models work" charts' out-of-fold predictions and
-per-generator errors.
+per-generator errors. The ERA5-by-year chart reads the table `wind_products.py --era5-by-year`
+wrote.
 
 Generators appear only as `W1` to `W3`. Only the "models work" time series plots output, as a
 percentage of capacity on days 1 to 7 of a week, with no calendar date. The ratio of two products'
@@ -64,9 +65,11 @@ from weather_product_charts import (
     _reconstruct_predicted,
     _rows,
     _two_places,
+    era5_by_year_rows,
 )
 from weather_products import METRIC, PERCENTAGE_POINTS, _contrast_line
 from wind_products import (
+    ERA5_BY_YEAR_DIR,
     OUTPUT_DIR_NAME,
     STEP_DATES,
     STEP_SITE,
@@ -703,6 +706,53 @@ def _per_generator(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     )
 
 
+def _era5_by_year() -> alt.VConcatChart:
+    """Draw each product's error minus ERA5's, on the same months of 2025 and of 2026.
+
+    Reads `wind_products.py --era5-by-year`'s table, which restricts every year to January to
+    September so a partial 2026 compares against the same months of the complete years before it.
+    August to December 2024, five months of a partial year even under that restriction, is too few
+    for an interval and is left out.
+
+    Returns:
+        Figure 10.
+    """
+    by_year = pl.read_parquet(ERA5_BY_YEAR_DIR / "era5_by_year.parquet")
+    rows = era5_by_year_rows(
+        by_year=by_year, products=("icon_d2", "ukv", "icon_eu", "icon_global"), suffix="_wind"
+    )
+    years = tuple(sorted(rows["condition"].unique().to_list()))
+    figure_planning = planning(rows=[rows])
+    panel = interval_panel(
+        rows=rows,
+        x_domain=(-1.2, 1.0),
+        x_title="Mean absolute error minus ERA5's (points of capacity)",
+        zero_label="same as ERA5",
+        better_label="better than ERA5",
+        conditions=years,
+        condition_title="Calendar year",
+        figure_planning=figure_planning,
+    )
+    return figure(
+        panels=[panel],
+        number=10,
+        figure_planning=figure_planning,
+        title=(
+            "On January to September of each year, UKV's lead over ERA5 grew in 2026; ICON-EU's "
+            "and ICON-D2's did not"
+        ),
+        subtitle=[
+            (
+                "Each product's mean absolute error minus ERA5's, on January to September of one "
+                "calendar year. August to December 2024, five months, is too short for an "
+                "interval and is left out."
+            ),
+            f"{DOTS} {CAPACITY}",
+            SCOPE,
+        ],
+    )
+
+
 MODELS_WORK_PRODUCTS: Final[tuple[str, str]] = ("icon_d2", "era5")
 """The products whose XGBoost models the "models work" time series draws: ICON-D2, which has the
 lowest pooled mean absolute error in the report, and ERA5, the reference every product is measured
@@ -817,7 +867,7 @@ def _wind_models_work(
 
 
 def main() -> int:
-    """Read the report, compute the new numbers, and write the eight SVGs."""
+    """Read the report, compute the new numbers, and write the nine SVGs."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     argparse.ArgumentParser(description=__doc__).parse_args()
     report_path = RESULTS_DIR / "report.md"
@@ -836,6 +886,7 @@ def main() -> int:
         "wind_icon_d2_against_ukv": _icon_d2_against_ukv(contrasts=contrasts),
         "wind_icon_global_steps": _steps(contrasts=contrasts, report_text=report_text),
         "wind_per_generator": _per_generator(contrasts=contrasts),
+        "wind_era5_by_year": _era5_by_year(),
     }
     for name, chart in charts.items():
         path = ASSETS_DIR / f"{name}.svg"

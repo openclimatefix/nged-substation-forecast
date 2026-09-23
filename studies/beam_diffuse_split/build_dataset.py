@@ -39,6 +39,7 @@ import pvlib
 import xarray as xr
 from era5_grid import LAST_DATE
 from sources import (
+    EXTRACTED_SOURCES,
     OPEN_METEO_MODELS,
     PER_SITE_SOURCES,
     REPO_DATA_DIR,
@@ -252,13 +253,14 @@ def _read_cams(*, min_reliability: float) -> pl.DataFrame:
 
 
 def _read_open_meteo_point(*, source: SourceType, temporal: PointTemporalType) -> pl.DataFrame:
-    """Read one per-site frame `fetch_open_meteo_point.py` wrote.
+    """Read one per-site frame `fetch_open_meteo_point.py` or `extract_site_series.py` wrote.
 
     Every model the fetcher serves writes the same two default columns under the same names, so one
-    reader covers them; only the path differs, and `point_output_path_for` owns that. Only a model
-    whose own radiation is instantaneous also carries the `_instant` pair, because for an
-    accumulated model the hourly column is the native quantity and a snapshot reconstructed from it
-    would carry no information the hourly column lacks.
+    reader covers them; only the path differs, and `point_output_path_for` owns that. The extractor
+    writes the same two columns for the gridded products it cuts. Only a model whose own radiation
+    is instantaneous also carries the `_instant` pair, because for an accumulated model the hourly
+    column is the native quantity and a snapshot reconstructed from it would carry no information
+    the hourly column lacks.
 
     Args:
         source: Which model's download to read.
@@ -271,18 +273,22 @@ def _read_open_meteo_point(*, source: SourceType, temporal: PointTemporalType) -
 
     Raises:
         FileNotFoundError: If that model has not been downloaded.
-        ValueError: If `instant` columns are asked of a model that publishes accumulated
-            radiation, which has none.
+        ValueError: If `instant` columns are asked of a source that has none: a model that
+            publishes accumulated radiation, or an extracted gridded product.
     """
-    if temporal == "instant" and OPEN_METEO_MODELS[source].native_radiation != "instantaneous":
-        msg = (
-            f"{source} publishes accumulated radiation, so its download carries no _instant "
-            f"columns; build it with --point-temporal hourly"
-        )
+    if temporal == "instant" and (
+        source in EXTRACTED_SOURCES or OPEN_METEO_MODELS[source].native_radiation != "instantaneous"
+    ):
+        msg = f"{source} carries no _instant columns; build it with --point-temporal hourly"
         raise ValueError(msg)
     path = point_output_path_for(source=source)
     if not path.exists():
-        msg = f"{path} missing; run fetch_open_meteo_point.py --model {source} first"
+        writer = (
+            f"extract_site_series.py --product {source}"
+            if source in EXTRACTED_SOURCES
+            else f"fetch_open_meteo_point.py --model {source}"
+        )
+        msg = f"{path} missing; run {writer} first"
         raise FileNotFoundError(msg)
     suffix = "_instant" if temporal == "instant" else ""
     frame = pl.read_parquet(path)

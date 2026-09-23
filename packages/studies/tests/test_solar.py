@@ -8,6 +8,7 @@ from studies.solar import (
     cos_zenith,
     cos_zenith_hour_mean,
     extraterrestrial_horizontal,
+    midpoint_zenith,
     zenith,
 )
 
@@ -84,3 +85,15 @@ def test_the_azimuth_swings_from_east_through_south_to_west(hour: int, expected_
     angles = azimuth(stamps=_stamps([hour]), latitude=LATITUDE, longitude=LONGITUDE)
 
     assert angles[0] == pytest.approx(expected_deg, abs=0.5)
+
+
+def test_the_midpoint_zenith_is_the_sun_half_an_hour_before_the_stamp():
+    # In the morning the sun is climbing, so the hour's midpoint sun sits lower than at its end.
+    stamps = _stamps([8])
+
+    midpoint = midpoint_zenith(stamps=stamps, latitude=LATITUDE, longitude=LONGITUDE)
+
+    assert midpoint[0] == pytest.approx(
+        zenith(stamps=stamps.dt.offset_by("-30m"), latitude=LATITUDE, longitude=LONGITUDE)[0]
+    )
+    assert midpoint[0] > zenith(stamps=stamps, latitude=LATITUDE, longitude=LONGITUDE)[0] + 3.0

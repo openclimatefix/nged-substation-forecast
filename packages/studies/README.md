@@ -9,7 +9,8 @@ It owns the pieces that more than one study needs and that fail silently when wr
 out-of-fold XGBoost loop and the paired bootstrap every comparison is read through, solar geometry,
 the checks that establish what temporal object a downloaded column holds, the half-hourly-to-hourly
 power aggregation, the mapping from a meter to an anonymous label, sampling a projected weather grid
-at a set of coordinates, the Fractions Skill Score, the control and the stack a blend of weather
+at a set of coordinates, turning a product's native time steps into hourly means and checking the
+result against the sun, the Fractions Skill Score, the control and the stack a blend of weather
 products is measured with, a product's neighbouring hours, and the dot-and-interval chart form the
 study pages share, with the parser that reads a study report's contrast tables into it.
 
@@ -27,7 +28,8 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
 - `cross_validation` — per-site, out-of-fold XGBoost fits and their per-row losses, with the fold
   scheme and the fixed hyperparameters they use.
 - `bootstrap` — the paired arm-to-arm difference and its interval, resampling whole months and a
-  seed, and a t-interval across the folds' own differences.
+  seed, within each calendar year as well as overall, and a t-interval across the folds' own
+  differences.
 - `blending` — combining several weather products: the climatology-permuted control columns a
   blend is compared against, and a linear stack of single-product models cross-fitted per generator,
   seed and fold.
@@ -42,7 +44,15 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
   carries information a separation model applied to the total would not.
 - `power` — the half-hourly-to-hourly aggregation, on the period-ending convention
   `contracts.PowerTimeSeries` states.
-- `grid_sampling` — the nearest grid cell's value at each site, on a projected grid.
+- `grid_sampling` — the nearest grid cell's value at each site on a projected grid, and the nearest
+  of a set of cell centres by great-circle distance.
+- `hourly_means` — turning a product's native time steps, running means since a forecast start or
+  instantaneous snapshots, into the mean over the hour ending at each label, with SARAH-3's and
+  ICON-DREAM-EU's own conventions.
+- `guards` — refusing to overwrite a study's outputs, and refusing to score an arm on rows where
+  its input is missing.
+- `timestamp_checks` — which instant an irradiance series' timestamps describe, measured against
+  the sun alone.
 - `fractions_skill_score` — a timing-tolerant score, which asks whether a forecast put a threshold
   exceedance near the right hour rather than exactly on it.
 - `charts` — the dot-and-interval chart panel, the figure caption, the colour of each product

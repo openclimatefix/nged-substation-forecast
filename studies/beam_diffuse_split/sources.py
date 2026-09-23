@@ -16,7 +16,21 @@ from typing import Final, Literal, NamedTuple
 
 from contracts.settings import PROJECT_ROOT
 
-SourceType = Literal["cds", "open-meteo", "cams", "ukv", "icon-d2", "icon-eu", "icon-global"]
+SourceType = Literal[
+    "cds",
+    "open-meteo",
+    "cams",
+    "ukv",
+    "icon-d2",
+    "icon-eu",
+    "icon-global",
+    "sarah-3",
+    "icon-dream-eu",
+    "ecmwf-ifs-hres",
+    "arpege-europe",
+    "dmi-harmonie-arome",
+    "knmi-harmonie-arome",
+]
 """Which irradiance download to build from.
 
 `open-meteo` is the reanalysis route the experiment runs on, because it serves the same fields in
@@ -51,9 +65,21 @@ for the whole of Great Britain has to use one of these two. All three ICON domai
 one downloader, `DownloadIconCommand`, which de-averages a field according to its GRIB step type,
 and DWD publishes the surface radiation of every domain as an average since the run started.
 
-Each of `cams`, `ukv`, `icon-d2`, `icon-eu`, and `icon-global` takes its air temperature from the
-Open-Meteo ERA5 frame, because the temperature feature is shared by every arm and a source must
-differ from ERA5 only in its irradiance columns.
+`sarah-3` is EUMETSAT's SARAH-3 satellite retrieval from CM SAF, a second satellite product beside
+CAMS, on a 0.05° latitude-longitude grid. `icon-dream-eu` is the German weather service's ICON-DREAM
+reanalysis over Europe, a second reanalysis beside ERA5, at about 6.5 km. Both are read from gridded
+downloads at each site's nearest cell by `extract_site_series.py`, which also turns their native
+time steps into hourly means.
+
+`ecmwf-ifs-hres`, `arpege-europe`, `dmi-harmonie-arome`, and `knmi-harmonie-arome` are four more
+forecast models from Open-Meteo's historical-forecast archive, fetched at each site's own
+coordinates by `fetch_open_meteo_point.py` like UKV and the ICON products: ECMWF's 9 km global
+model, Météo-France's global model on its European grid, and the HARMONIE-AROME models the Danish
+and the Dutch weather services run over Europe.
+
+Each of the per-site sources takes its air temperature from the Open-Meteo ERA5 frame, because the
+temperature feature is shared by every arm and a source must differ from ERA5 only in its irradiance
+columns.
 """
 
 SOURCE_CHOICES: Final[tuple[SourceType, ...]] = (
@@ -64,6 +90,12 @@ SOURCE_CHOICES: Final[tuple[SourceType, ...]] = (
     "icon-d2",
     "icon-eu",
     "icon-global",
+    "sarah-3",
+    "icon-dream-eu",
+    "ecmwf-ifs-hres",
+    "arpege-europe",
+    "dmi-harmonie-arome",
+    "knmi-harmonie-arome",
 )
 """Every source name, as `argparse` `choices` for the scripts that take `--source`."""
 
@@ -73,11 +105,29 @@ PER_SITE_SOURCES: Final[tuple[SourceType, ...]] = (
     "icon-d2",
     "icon-eu",
     "icon-global",
+    "sarah-3",
+    "icon-dream-eu",
+    "ecmwf-ifs-hres",
+    "arpege-europe",
+    "dmi-harmonie-arome",
+    "knmi-harmonie-arome",
 )
-"""Sources downloaded at each meter's own coordinates rather than on the ERA5 grid.
+"""Sources read at each meter's own coordinates, or its nearest cell, rather than on the ERA5 grid.
 
 A build from one of these still reads the gridded ERA5 frame, for the air temperature every arm
 shares, and then replaces only the two irradiance columns.
+"""
+
+EXTRACTED_SOURCES: Final[tuple[SourceType, ...]] = ("sarah-3", "icon-dream-eu")
+"""Per-site sources `extract_site_series.py` cuts from a gridded download, rather than fetched."""
+
+UNSCORED_EXTRACTED_SPLITS: Final[frozenset[SourceType]] = frozenset({"sarah-3"})
+"""Extracted sources whose direct flux is modelled from their own global flux, so no arm reads it.
+
+CM SAF computes SARAH-3's direct flux (SID) from its global flux (SIS) with a diffuse-fraction
+model, and the whole record fails `check_direct_is_not_a_separation_model`: the direct fraction's
+median spread within a bin is 0.041, against a threshold of 0.05. The fetched models carry the same
+judgement as `OpenMeteoModel.split_scored`.
 """
 
 NativeRadiationType = Literal["instantaneous", "accumulated", "unmeasured"]
@@ -120,6 +170,9 @@ class OpenMeteoModel(NamedTuple):
             before this date was backfilled from a source Open-Meteo does not name, so it is a
             different product until measurement says otherwise — see `verify_ukv_lineage.py`.
         native_radiation: What the upstream model publishes, before Open-Meteo's conversion.
+        split_scored: Whether the served direct flux is the model's own, so a split arm may read
+            it. `False` where the served direct flux is defective or is a separation model's
+            output, which `fetch_open_meteo_point.py` then reports on rather than raising.
     """
 
     source: SourceType
@@ -127,6 +180,7 @@ class OpenMeteoModel(NamedTuple):
     archive_starts: str
     live_ingest_starts: str | None
     native_radiation: NativeRadiationType
+    split_scored: bool = True
 
 
 OPEN_METEO_MODELS: Final[dict[str, OpenMeteoModel]] = {
@@ -158,6 +212,37 @@ OPEN_METEO_MODELS: Final[dict[str, OpenMeteoModel]] = {
         live_ingest_starts=None,
         native_radiation="accumulated",
     ),
+    "ecmwf-ifs-hres": OpenMeteoModel(
+        source="ecmwf-ifs-hres",
+        models_parameter="ecmwf_ifs_hres",
+        archive_starts="2017-01-01",
+        live_ingest_starts=None,
+        native_radiation="accumulated",
+    ),
+    "arpege-europe": OpenMeteoModel(
+        source="arpege-europe",
+        models_parameter="meteofrance_arpege_europe",
+        archive_starts="2024-01-02",
+        live_ingest_starts=None,
+        native_radiation="accumulated",
+        split_scored=False,
+    ),
+    "dmi-harmonie-arome": OpenMeteoModel(
+        source="dmi-harmonie-arome",
+        models_parameter="dmi_harmonie_arome_europe",
+        archive_starts="2024-07-01",
+        live_ingest_starts=None,
+        native_radiation="accumulated",
+        split_scored=False,
+    ),
+    "knmi-harmonie-arome": OpenMeteoModel(
+        source="knmi-harmonie-arome",
+        models_parameter="knmi_harmonie_arome_europe",
+        archive_starts="2024-07-01",
+        live_ingest_starts=None,
+        native_radiation="accumulated",
+        split_scored=False,
+    ),
 }
 """Every model `fetch_open_meteo_point.py` can download, keyed by its `--model` name.
 
@@ -170,6 +255,34 @@ from 2022-11-23 07:00 UTC, ICON global from 2022-11-16 08:00 UTC.
 values there run about three hours early, reaching 150 W m⁻² at 03:00 UTC, where ICON global and
 ICON-D2 read zero. No other hour in either wide-domain download disagrees with its siblings that
 way.
+
+**The four models added for issue #809's second round were first downloaded on a coarse grid of
+points across the trial area**, by the issue #841 downloader, whose `lineage.json` files record the
+`models=` values used here. Those grids hold 49 points about 0.15° apart, not the 0.05° the lineage
+files state, so the nearest point sits 0.7 km to 5.3 km from a solar farm; fetching at each site's
+own coordinates removes that handicap, which would fall hardest on DMI's 2 km model. KNMI's
+HARMONIE-AROME over Europe runs at 5.5 km.
+
+- `ecmwf-ifs-hres`: fetched as `ecmwf_ifs_hres`, Open-Meteo's documented name for ECMWF's 9 km
+  model. The grid download was requested as `ecmwf_ifs04`, the 0.4° open-data name, yet serves
+  values from 2017-01-01 at 37 distinct series among 49 points 0.15° apart, which a 0.4° grid could
+  not produce. The first per-site fetch is checked against that grid download over one week at one
+  site before anything is built from it.
+- `arpege-europe`: both fluxes step up at 2024-01-01 against ECMWF-IFS-HRES, by about 20% for the
+  global and 40% for the direct flux, and both are null for 35 hours from 2023-12-31 07:00 UTC to
+  2024-01-01 17:00 UTC. The archive before the step is treated as a different product and not
+  fetched; the start is the first whole day after the gap.
+- `dmi-harmonie-arome`: the served direct flux is zero in 48% of daytime hours, and exceeds the
+  global flux in 74 hours, so the model's split is unusable and only its global flux is scored.
+- `arpege-europe` and `knmi-harmonie-arome`: the served direct flux fails
+  `check_direct_is_not_a_separation_model` on the grid downloads, with a within-bin spread of the
+  direct fraction of 0.018 against a threshold of 0.05, so it is a separation model's output rather
+  than the model's own beam. Only their global flux is scored.
+- `native_radiation` for all four is `accumulated` on the models' published GRIB conventions, not on
+  a measurement: ECMWF's `ssrd` is accumulated since the run started, as is the surface radiation of
+  the ALADIN code family that ARPEGE and both HARMONIE-AROME configurations belong to. No upstream
+  file has been compared with the archive, as `verify_icon_lineage.py` does for ICON; the timing
+  that matters to the arms is checked instead against the sun by `check_new_products.py`.
 
 Adding a model means adding an entry and measuring what goes in it. `native_radiation` in
 particular is a claim about the upstream model, and `unmeasured` is the honest value until somebody
@@ -237,7 +350,8 @@ reads and does not own.
 
 WEATHER_DATA_DIR: Final[Path] = STUDIES_DATA_DIR / "weather"
 """Where downloaded weather lands, one subdirectory per product (`ERA5`, `CAMS`, `ENS`, `UKV`,
-`ICON-D2`, `ICON-EU`, `ICON-GLOBAL`).
+`ICON-D2`, `ICON-EU`, `ICON-GLOBAL`, `SARAH-3`, `ICON-DREAM-EU`, `ECMWF-IFS-HRES`, `ARPEGE-EUROPE`,
+`DMI-HARMONIE-AROME`, `KNMI-HARMONIE-AROME`).
 
 Kept apart from any one study's outputs because a download is an input a later study can reuse, and
 some take most of a night to fetch again.
@@ -251,6 +365,16 @@ beside the export-cap parquet `anm_setpoints.py` derives from each.
 STUDY_DATA_DIR: Final[Path] = STUDIES_DATA_DIR / "beam_diffuse_split"
 """Where everything this study builds from its inputs lives: the joined datasets, each arm's
 results, and the figures.
+"""
+
+
+UPDATE_OUTPUT_DIR: Final[Path] = STUDY_DATA_DIR / "past_weather_v2"
+"""Where every output of the second round of the past-weather studies is written.
+
+The second round adds six products to the sunshine study and the ERA5 year-by-year tables to both
+studies. Its outputs live apart from the first round's `beam_diffuse_weather_products` and
+`beam_diffuse_wind_products`, which the published pages quote and the blending study and the ENS
+forecast study read as their reference rows, so no run of the second round can overwrite them.
 """
 
 
