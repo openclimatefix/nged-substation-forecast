@@ -30,7 +30,10 @@
 # <https://openclimatefix.github.io/nged-substation-forecast/live_service/operations/>.
 #
 # The build never contacts MLflow. The build only COPYs data/production_model/ into the image, so
-# the build stays hermetic. Step 3's `promoted_model` asset populates that directory. The
+# the build stays hermetic. Step 3's `promoted_model` asset populates that directory. The directory
+# is passed as the named build context `production_model`, resolved with `realpath`, so the build
+# still finds the model when data/ is a symlink to another disk. The main build context would send
+# the symlink itself, and the COPY would fail with "/data/production_model: not found". The
 # MODEL_RUN_ID and GIT_SHA build args become Open Container Initiative (OCI) labels purely for
 # traceability (inspect with `docker inspect`).
 #
@@ -104,6 +107,7 @@ fi
 echo "==> Building ${IMAGE} for linux/arm64  (MODEL_RUN_ID=${RUN_ID})"
 docker build \
   --platform linux/arm64 \
+  --build-context production_model="$(realpath data/production_model)" \
   --build-arg MODEL_RUN_ID="$RUN_ID" \
   --build-arg GIT_SHA="$(git rev-parse HEAD)" \
   -t "$IMAGE" .

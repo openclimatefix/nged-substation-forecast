@@ -504,8 +504,9 @@ about this decision couples it to Dagster.
 
 **The image build is hermetic and depends on the asset only through the filesystem.** A researcher
 materialises `promoted_model` on their laptop first — the candidate models live in the laptop's
-local MLflow file store — which populates `data/production_model/`. The Dockerfile then `COPY`s that
-directory straight out of the build context and never contacts MLflow itself. So the build needs no
+local MLflow file store — which populates `data/production_model/`. The build script hands that
+directory to `docker build` as a named build context, `production_model`, and the Dockerfile `COPY`s
+the model from that build context; the build never contacts MLflow itself. So the build needs no
 MLflow credentials and no reachable tracking server — only the base images and the package index `uv
 sync` resolves against. The model in the image is exactly the artifact set the promotion
 materialisation recorded. `docker build` stays outside Dagster too: it only ever runs on a laptop
