@@ -175,7 +175,10 @@ def bootstrap_absolute(*, losses: pl.DataFrame, arm: str, metric: str) -> Absolu
 
     Draws from the same random stream shape as `bootstrap_difference`, so a leaderboard figure's
     absolute-error interval rests on the same resampling design as the paired-contrast figure that
-    follows it.
+    follows it. The absolute interval is much the wider of the two, mainly because every arm's
+    error rises and falls together from month to month: resampling whole months carries that
+    shared swing into this interval, and pairing cancels it from a difference. Neighbouring
+    generators sharing their weather keeps the months, not the rows, as the unit of resampling.
 
     Args:
         losses: Per-row losses for the arm, already restricted to the scope wanted.

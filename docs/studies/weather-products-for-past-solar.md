@@ -19,16 +19,19 @@ is the Met Office's UK variable-resolution model (UKV) with its hourly value reb
 snapshots. The evidence is six metered solar farms inside one 25 km by 23 km box in Lincolnshire,
 and 79,384 generator-hours from December 2022 to September 2026.
 
-![Figure 1: CAMS describes past sunshine best of the six products tested](assets/sunshine_leaderboard.svg)
+![Figure 1: CAMS has the lowest error of the six products tested, and ERA5 the highest](assets/sunshine_leaderboard.svg)
 
-![Figure 2: CAMS describes past sunshine best of the six products tested, by a wide margin](assets/sunshine_headline.svg)
+![Figure 2: CAMS beats the next best product, ICON-D2, by more than 2 points of
+capacity](assets/sunshine_headline.svg)
 
-Figure 1 ranks every product by its own error, with a 95% interval. Shared weather noise
-widens each product's own interval more than it widens a paired difference, so two products whose
-intervals overlap in Figure 1 can still differ. Figure 2 tests each gap directly, pairing the two
-products on the same hours. In Figure 2 the top panel's intervals are against ERA5, so two products
-whose intervals overlap there may still differ; the bottom panel compares the named pairs
-directly.
+**Figure 1's intervals are wide mainly because every product's error rises and falls together from
+month to month.** Some months are harder to describe than others for every product, and resampling
+whole months carries that shared swing into each product's own interval. The six generators also
+share their weather, so each interval rests on 46 months rather than on thousands of independent
+hours. Figure 2 pairs two products on the same hours, which cancels the shared swing. Two products
+whose intervals overlap in Figure 1, or in the top panel of Figure 2, can therefore still differ by
+a margin that is statistically significant at the 5% level. Only a contrast pairing those two
+products tests them directly, and the bottom panel of Figure 2 holds the four planned ones.
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
@@ -207,28 +210,33 @@ both covered by tests.**
 
 ### The XGBoost models work
 
-**Before any contrast is worth reading, the XGBoost models have to be shown producing a sane
-forecast.** Figure 3 plots out-of-fold predictions against measured power at every generator, given
-CAMS (the best product) and given ERA5, across three weeks: the clearest, the most variable, and the
-dullest. The three weeks are chosen from measured power alone, pooled across every generator and
-restricted to April to September so a short midwinter day cannot dominate the choice: the clearest is
-the week whose generators produced the most output relative to their own capacity, the dullest the
-least, and the most variable the week whose daily totals swing the most from day to day. No weather
-product's own values enter that choice, so the choice cannot favour CAMS or ERA5.
+**Given CAMS, the XGBoost model tracks measured power closely at every generator, in a clear, a
+variable, and a dull week.** Given ERA5, the XGBoost model still follows the shape of each day, but
+runs further from the measured line, most visibly in the dullest week. Figure 3 plots both XGBoost
+models' out-of-fold predictions against measured power, each prediction held to the export cap as
+every score on this page is.
+
+**The three weeks are chosen by a rule that reads measured power alone, so the choice cannot favour
+CAMS or ERA5.** The rule pools the six generators and considers only April to September, so that a
+short midwinter day cannot dominate the choice. The clearest week is the one in which the
+generators produced the most output relative to their own capacity, and the dullest week the one in
+which they produced the least. The most variable week is the one whose daily output swings the most
+from day to day. Figure 3 shows each week as days 1 to 7, with no calendar dates, so that a
+generator's hourly output cannot be matched against public generation data.
 
 ![Figure 3: An XGBoost model given CAMS tracks measured power at every generator, across a clear,
 a variable, and a dull week](assets/sunshine_models_work_timeseries.svg)
 
-**Given CAMS, the XGBoost model tracks measured power closely at every generator and in every week,
-including the most variable week's sharp day-to-day swings; given ERA5, it still follows the shape of
-each day but runs further from the measured line, most visibly on the dullest week.** Figure 4 plots
-every product's mean absolute error at each of the six generators separately, one dot per product per
-generator: CAMS's six dots all sit below 6.5% of capacity, ERA5's six all sit above 8.6%, and the four
-weather models fall between the two without overlapping either, so the ranking in [CAMS describes past
-sunshine best](#cams-describes-past-sunshine-best-of-the-six-products-tested-by-a-wide-margin) holds
-generator by generator rather than resting on a pooled average that one generator could dominate.
+**CAMS has the lowest error at each of the six generators, and ICON-D2 the second lowest.** Figure 4
+plots every product's mean absolute error at each generator separately, one dot per product per
+generator. The other four products reorder between generators: at two generators, for instance,
+Open-Meteo's hourly UKV scores worse than ERA5. The lead of CAMS and then ICON-D2, described in
+[CAMS describes past sunshine
+best](#cams-describes-past-sunshine-best-of-the-six-products-tested-by-a-wide-margin), therefore
+holds generator by generator, rather than resting on a pooled average that one generator could
+dominate.
 
-![Figure 4: Every product's error ranks the same way at each of the six generators](assets/sunshine_models_work_error.svg)
+![Figure 4: CAMS has the lowest error at each of the six generators, and ICON-D2 the second lowest](assets/sunshine_models_work_error.svg)
 
 ### CAMS describes past sunshine best of the six products tested, by a wide margin
 
@@ -474,7 +482,9 @@ uv run python studies/beam_diffuse_split/weather_products.py
 The report lands in `data/studies/beam_diffuse_split/beam_diffuse_weather_products/report.md`, and
 `weather_products.py --report-only` rebuilds it from the saved losses without refitting. The report
 also prints the distances between the generators and to ICON-D2's edge, the ERA5 cells they fall in,
-and every number the charts draw. The charts come from `uv run python
-studies/beam_diffuse_split/weather_product_charts.py`. The served-lead check runs with `uv run
+and every number the charts share with it. The charts come from `uv run python
+studies/beam_diffuse_split/weather_product_charts.py`, which computes the numbers the report does
+not print, the leaderboard's intervals and Figures 3 and 4, from the saved losses without refitting
+any XGBoost model. The served-lead check runs with `uv run
 --with cfgrib python studies/beam_diffuse_split/verify_icon_lineage.py --model icon-eu`, against the
 runs the German weather service still publishes, which cover about one day.

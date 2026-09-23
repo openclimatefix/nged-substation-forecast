@@ -370,8 +370,13 @@ def test_leaderboard_plots_the_input_numbers_best_first():
 def test_leaderboard_draws_no_zero_rule_or_direction_label():
     spec = _leaderboard(_leaderboard_rows(["satellite"]))
 
-    assert "layer" in spec
-    assert all(layer["mark"]["type"] in ("rule", "point") for layer in spec["layer"])
+    assert [layer["mark"]["type"] for layer in spec["layer"]] == ["rule", "point"]
+
+
+def test_leaderboard_marks_carry_no_aria_text():
+    spec = _leaderboard(_leaderboard_rows(["satellite"]))
+
+    assert [layer["mark"]["aria"] for layer in spec["layer"]] == [False, False]
 
 
 def test_leaderboard_of_one_family_draws_no_family_key():

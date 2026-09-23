@@ -7,15 +7,15 @@ One-off throwaway script for the charts in
 **Every number a chart shares with the page is read from the report `wind_products.py` wrote**,
 so a chart cannot disagree with the page. The step chart's fortnightly wind-speed ratios are read
 from the downloads `fetch_wind_point.py` wrote, and its period means from the report. Three charts
-are a further exception, and none refits a model: the leaderboard bootstraps each product's
-absolute-error interval straight from `losses.parquet`, since the report prints only its point
-estimate, and the two "models work" charts reconstruct out-of-fold predictions and per-generator
-errors the same way, because neither is printed in the report.
+also draw numbers the report does not print, computed from `losses.parquet` without refitting any
+model: the leaderboard's intervals, and the two "models work" charts' out-of-fold predictions and
+per-generator errors.
 
-Generators appear only as `W1` to `W3`, and no chart plots output. The one per-generator time
-series, the ratio of two products' wind speeds at the generator with the steps, carries no
-generator label, because the steps are a fingerprint a public ICON archive could match to a grid
-cell.
+Generators appear only as `W1` to `W3`. Only the "models work" time series plots output, as a
+percentage of capacity on days 1 to 7 of a week, with no calendar date. The ratio of two products'
+wind speeds at the generator with the steps carries no generator label, and the per-generator error
+chart leaves ICON global out, because the steps are a fingerprint a public ICON archive could match
+to a grid cell.
 
 Run it with `uv run python studies/beam_diffuse_split/wind_product_charts.py`, after
 `wind_products.py`. Optimise each SVG with `npx svgo@4 --multipass --precision=1
@@ -52,11 +52,11 @@ from weather_product_charts import (
     CAPACITY,
     DOTS,
     FAMILIES,
+    LEADERBOARD_WIDTH,
     LEADERBOARD_X_TITLE,
     NAMES,
     X_TITLE,
     _contrast_name,
-    _display_order,
     _models_work_error_chart,
     _models_work_long_frame,
     _models_work_timeseries,
@@ -185,9 +185,7 @@ def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
     records = []
     for product in order:
         arm = f"{product}_wind"
-        interval = bootstrap_absolute(
-            losses=losses.filter(pl.col("arm") == arm), arm=arm, metric=METRIC
-        )
+        interval = bootstrap_absolute(losses=losses, arm=arm, metric=METRIC)
         value = interval["value"] * PERCENTAGE_POINTS
         if round(value, 3) != errors[product]:
             msg = f"{product}: bootstrapped {value:.3f} but the report says {errors[product]}"
@@ -207,14 +205,14 @@ def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         panels=[panel],
         number=1,
         figure_planning=None,
-        title="UKV and ICON-D2 describe past wind best of the five products tested",
+        title=(
+            "ICON-D2 and UKV have the lowest errors of the five products tested, and ICON global "
+            "the highest"
+        ),
         subtitle=[
-            (
-                "Each product's own mean absolute error, sorted best first. Figure 2 shows the "
-                "paired contrasts, which test whether a gap is statistically significant: shared "
-                "weather noise makes these intervals overlap more than a paired difference does."
-            ),
-            "Dot: estimate. Line: 95% interval from resampling whole months.",
+            "Each product's own mean absolute error, sorted best first.",
+            DOTS,
+            LEADERBOARD_WIDTH,
             CAPACITY,
             SCOPE,
         ],
@@ -294,7 +292,10 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         panels=[left, right],
         number=2,
         figure_planning=figure_planning,
-        title="UKV and ICON-D2 describe past wind best of the five products tested",
+        title=(
+            "UKV, ICON-D2, and ICON-EU each beat ERA5 by a margin statistically significant at "
+            "the 5% level"
+        ),
         subtitle=[
             (
                 "Top: each product against ERA5; each label gives the product's own error. The "
@@ -702,9 +703,10 @@ def _per_generator(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     )
 
 
-MODELS_WORK_BEST_PRODUCT: Final[str] = "icon_d2"
-"""ICON-D2 has the lowest pooled mean absolute error in the report, so it is the product drawn
-beside ERA5 in the "models work" figures.
+MODELS_WORK_PRODUCTS: Final[tuple[str, str]] = ("icon_d2", "era5")
+"""The products whose XGBoost models the "models work" time series draws: ICON-D2, which has the
+lowest pooled mean absolute error in the report, and ERA5, the reference every product is measured
+against.
 """
 
 MODELS_WORK_MIN_HOURS: Final[int] = 20
@@ -740,37 +742,23 @@ def _models_work_frame() -> pl.DataFrame:
     )
 
 
-def _wind_models_work(*, errors: dict[str, float]) -> tuple[alt.VConcatChart, alt.VConcatChart]:
-    """Draw the wind "models work" figures.
-
-    Predicted against measured power, and per-generator error.
+def _wind_models_work(
+    *, losses: pl.DataFrame, errors: dict[str, float]
+) -> tuple[alt.VConcatChart, alt.VConcatChart]:
+    """Draw the wind "models work" figures: the out-of-fold time series, and error per generator.
 
     Args:
+        losses: The pooled setting's losses, every arm.
         errors: Each product's pooled mean absolute error.
 
     Returns:
         Figures 3 and 4.
     """
     measured = _models_work_frame()
-    losses = _wind_losses()
-    best_label = NAMES[MODELS_WORK_BEST_PRODUCT]
-    predicted = (
-        (
-            _reconstruct_predicted(
-                losses=losses.filter(pl.col("arm") == f"{MODELS_WORK_BEST_PRODUCT}_wind"),
-                measured=measured,
-                arm=f"{MODELS_WORK_BEST_PRODUCT}_wind",
-            ),
-            f"XGBoost model given {best_label}",
-        ),
-        (
-            _reconstruct_predicted(
-                losses=losses.filter(pl.col("arm") == "era5_wind"),
-                measured=measured,
-                arm="era5_wind",
-            ),
-            "XGBoost model given ERA5",
-        ),
+    order = ("Measured", *(f"XGBoost model given {NAMES[p]}" for p in MODELS_WORK_PRODUCTS))
+    predicted = tuple(
+        (_reconstruct_predicted(losses=losses, measured=measured, arm=f"{product}_wind"), label)
+        for product, label in zip(MODELS_WORK_PRODUCTS, order[1:], strict=True)
     )
     hourly = measured.with_columns(
         output_frac=pl.col("power_mw").cast(pl.Float64) / pl.col("effective_capacity_mw")
@@ -783,30 +771,23 @@ def _wind_models_work(*, errors: dict[str, float]) -> tuple[alt.VConcatChart, al
         .with_columns(week=pl.col("time").dt.truncate("1w"))
         .join(weeks, on="week", how="inner")
     )
-    order = ("Measured", f"XGBoost model given {best_label}", "XGBoost model given ERA5")
-    colours = (
-        ocf.TEXT,
-        FAMILY_COLOURS[FAMILIES[MODELS_WORK_BEST_PRODUCT]],
-        FAMILY_COLOURS["reanalysis"],
-    )
-    week_order = tuple(_display_order(weeks=weeks, order=WIND_WEEK_DISPLAY_ORDER))
     timeseries = _models_work_timeseries(
         long_frame=long_frame,
         sites=SITES,
-        site_noun="Generator",
-        week_order=week_order,
+        week_order=WIND_WEEK_DISPLAY_ORDER,
         order=order,
-        colours=colours,
+        colours=(ocf.TEXT, *(FAMILY_COLOURS[FAMILIES[p]] for p in MODELS_WORK_PRODUCTS)),
         number=3,
         title=(
-            f"An XGBoost model given {best_label} tracks measured power at every generator, "
-            "across a windy, a variable, and a calm week"
+            "An XGBoost model given ICON-D2 follows measured power at every generator, across a "
+            "windy, a variable, and a calm week"
         ),
         subtitle=[
+            "Out-of-fold power as a percentage of the generator's own capacity.",
             (
-                "Power as a percentage of the generator's own capacity, out of fold. Weeks "
-                "are chosen from measured power alone, never from a weather product, so the "
-                'choice cannot favour one; see "Data and methods".'
+                "Weeks are picked from measured power alone, pooled over the three generators: "
+                "the windiest has the highest mean output, the calmest the lowest, and the most "
+                "variable the largest swing in daily mean output."
             ),
             CAPACITY,
             SCOPE,
@@ -817,12 +798,17 @@ def _wind_models_work(*, errors: dict[str, float]) -> tuple[alt.VConcatChart, al
         arm_suffix="_wind",
         sites=SITES,
         names=NAMES,
-        families=FAMILIES,
-        errors=errors,
+        errors={product: error for product, error in errors.items() if product != "icon_global"},
+        x_domain=(5.0, 9.0),
         number=4,
-        title="Every product's error ranks close to the same way at each of the three generators",
+        title=(
+            "ICON-D2, UKV, ICON-EU, and ERA5 rank in the same order at each of the three generators"
+        ),
         subtitle=[
-            "Each dot is one generator's mean absolute error given one product.",
+            (
+                "Each dot is one generator's mean absolute error given one product. ICON global "
+                "is left out, because its served wind steps at one generator (Figure 8)."
+            ),
             CAPACITY,
             SCOPE,
         ],
@@ -840,7 +826,7 @@ def main() -> int:
     errors = report_errors(report_path=report_path, column="All sites")
     pooled = _wind_losses()
     _reproduce(pooled=pooled, report_text=report_text)
-    models_work_timeseries, models_work_error = _wind_models_work(errors=errors)
+    models_work_timeseries, models_work_error = _wind_models_work(losses=pooled, errors=errors)
     charts = {
         "wind_leaderboard": _leaderboard(losses=pooled, errors=errors),
         "wind_headline": _headline(contrasts=contrasts, errors=errors),

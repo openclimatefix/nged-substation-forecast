@@ -708,7 +708,7 @@ def leaderboard_panel(
     )
     point = (
         alt.Chart(data)
-        .mark_point(filled=True, size=_POINT_SIZE, opacity=1, clip=True)
+        .mark_point(filled=True, size=_POINT_SIZE, opacity=1, clip=True, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("value:Q", scale=x_scale, title=x_title_lines, axis=x_axis),
             y=y,

@@ -273,9 +273,11 @@ the story without the prose around it. Load the `dataviz` skill before drawing a
 - **Where a study ranks products, Figure 1 is a leaderboard.** The leaderboard shows each
   product's own mean absolute error on the rows every product shares, sorted best first, with its
   95% interval, "smaller is better" in the axis text, and the unit. The paired contrasts follow
-  directly as Figure 2. Shared weather noise widens an absolute interval more than it widens a
-  paired difference, so two products whose intervals overlap in Figure 1 can still differ. Figure 2
-  is the test that shows which of those gaps is statistically significant, and the page says so.
+  directly as Figure 2. Every product's error rises and falls together from month to month, and
+  that shared swing, which pairing cancels, is the main reason an absolute interval is far wider
+  than a paired difference's. Two products whose intervals overlap in Figure 1 can therefore still
+  differ. Figure 2 is the test that shows which of those gaps is statistically significant, and the
+  page says so, once.
   Where a study asks whether one input helps, rather than ranking products (the beam/diffuse
   study), the contrast stays the headline chart and the page carries no leaderboard.
   `studies.charts.leaderboard_panel` draws one, and `studies.bootstrap.bootstrap_absolute` intervals

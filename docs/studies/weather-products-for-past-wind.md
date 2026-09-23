@@ -19,16 +19,19 @@ history are two of the parts of this project that read past weather, described i
 makes no recommendation. The evidence is three wind farms in flat Lincolnshire, and 50,734
 generator-hours from August 2024 to September 2026.
 
-![Figure 1: UKV and ICON-D2 describe past wind best of the five products tested](assets/wind_leaderboard.svg)
+![Figure 1: ICON-D2 and UKV have the lowest errors of the five products tested, and ICON global the highest](assets/wind_leaderboard.svg)
 
-![Figure 2: UKV and ICON-D2 describe past wind best of the five products tested](assets/wind_headline.svg)
+![Figure 2: UKV, ICON-D2, and ICON-EU each beat ERA5 by a margin statistically significant at the
+5% level](assets/wind_headline.svg)
 
-Figure 1 ranks every product by its own error, with a 95% interval. Shared weather noise
-widens each product's own interval more than it widens a paired difference, so two products whose
-intervals overlap in Figure 1 can still differ. Figure 2 tests each gap directly, pairing the two
-products on the same hours. In Figure 2 the top panel's intervals are against ERA5, so two products
-whose intervals overlap there may still differ; the bottom panel compares the named pairs
-directly.
+**Figure 1's intervals are wide mainly because every product's error rises and falls together from
+month to month.** Some months are harder to describe than others for every product, and resampling
+whole months carries that shared swing into each product's own interval. The three generators also
+share their weather, so each interval rests on 26 months rather than on thousands of independent
+hours. Figure 2 pairs two products on the same hours, which cancels the shared swing. Two products
+whose intervals overlap in Figure 1, or in the top panel of Figure 2, can therefore still differ by
+a margin that is statistically significant at the 5% level. Only a contrast pairing those two
+products tests them directly, and the bottom panel of Figure 2 holds the four planned ones.
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
@@ -188,30 +191,34 @@ nearest grid cell over land.**
 
 ### The XGBoost models work
 
-**Before any contrast is worth reading, the XGBoost models have to be shown producing a sane
-forecast.** Figure 3 plots out-of-fold predictions against measured power at every generator, given
-ICON-D2 (the best product) and given ERA5, across three weeks: the windiest, the most variable, and
-the calmest. The three weeks are chosen from measured power alone, pooled across every generator: the
-windiest is the week whose generators produced the most output relative to their own capacity, the
-calmest the least, and the most variable the week whose daily totals swing the most from day to day.
-No weather product's own values enter that choice, so the choice cannot favour ICON-D2 or ERA5.
+**Given either ICON-D2 or ERA5, the XGBoost model follows the shape of measured power at every
+generator, in a windy, a variable, and a calm week.** The two predictions run close together,
+because ICON-D2's advantage over ERA5 is a small fraction of the error. Figure 3 plots both XGBoost
+models' out-of-fold predictions against measured power. At Generator W3 both predictions run well
+above measured power for days at a time, most visibly in the windiest week. Generator W3's output
+swings for months at a time with turbine availability that no product records, as described in
+[UKV and ICON-D2 describe past wind
+best](#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested).
 
-![Figure 3: An XGBoost model given ICON-D2 tracks measured power at every generator, across a
+**The three weeks are chosen by a rule that reads measured power alone, so the choice cannot favour
+ICON-D2 or ERA5.** The rule pools the three generators. The windiest week is the one in which the
+generators' mean output was highest relative to their own capacity, and the calmest week the one in
+which it was lowest. The most variable week is the one whose daily mean output swings the most from
+day to day. Figure 3 shows each week as days 1 to 7, with no calendar dates, so that a generator's
+hourly output cannot be matched against public generation data.
+
+![Figure 3: An XGBoost model given ICON-D2 follows measured power at every generator, across a
 windy, a variable, and a calm week](assets/wind_models_work_timeseries.svg)
 
-**Given either product, the XGBoost model follows the shape of measured power at every generator in
-every week, and the two predictions run close together because ICON-D2's advantage over ERA5 is a
-small fraction of the error.** At Generator W3 both predictions run well above measured power for
-days at a time, most visibly in the windiest week: this is the generator whose output swings for
-months at a time with turbine availability no product records, described in [UKV and ICON-D2
-describe past wind
-best](#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested).
-Figure 4 plots every product's mean absolute error at each of the three generators separately, one
-dot per product per generator: ICON-D2 has the lowest error at all three, but the ranking is not
-otherwise fixed. ERA5 beats ICON global, the weakest product overall, at two of the three generators,
-but not at the third, where ICON global's error is fractionally the smaller of the two.
+**ICON-D2, UKV, ICON-EU, and ERA5 rank in the same order at each of the three generators.** Figure 4
+plots each product's mean absolute error at each generator separately, one dot per product per
+generator. ICON global is left out of Figure 4, because its dots would show which generator carries
+the steps in ICON global's served wind, described in [About half of ICON global's gap to ICON-EU is
+a pair of steps in its served
+wind](#about-half-of-icon-globals-gap-to-icon-eu-is-a-pair-of-steps-in-its-served-wind), and this
+page does not name that generator.
 
-![Figure 4: Every product's error ranks close to the same way at each of the three generators](assets/wind_models_work_error.svg)
+![Figure 4: ICON-D2, UKV, ICON-EU, and ERA5 rank in the same order at each of the three generators](assets/wind_models_work_error.svg)
 
 ### UKV and ICON-D2 describe past wind best of the five products tested
 
