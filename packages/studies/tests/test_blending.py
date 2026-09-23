@@ -215,3 +215,16 @@ def test_a_fold_with_nothing_to_fit_on_raises():
 
     with pytest.raises(ValueError, match="no rows to fit"):
         _stack(inputs)
+
+
+def test_a_second_suffix_keeps_the_first_permutation():
+    first = climatology_permutation(
+        frame=_weather(), column_groups=[("ghi",)], by=("site", "hour"), seed=1
+    )
+
+    both = climatology_permutation(
+        frame=first, column_groups=[("ghi",)], by=("site", "hour"), seed=9, suffix="_other"
+    )
+
+    assert both["ghi_shuffled"].equals(first["ghi_shuffled"])
+    assert (both["ghi_other"] != both["ghi_shuffled"]).any()

@@ -33,7 +33,12 @@ the fitted sum misses 1 by about one part in 10⁸, and the weights are renormal
 
 
 def climatology_permutation(
-    *, frame: pl.DataFrame, column_groups: Sequence[Sequence[str]], by: Sequence[str], seed: int
+    *,
+    frame: pl.DataFrame,
+    column_groups: Sequence[Sequence[str]],
+    by: Sequence[str],
+    seed: int,
+    suffix: str = PERMUTED_SUFFIX,
 ) -> pl.DataFrame:
     """Add a copy of each column with its values permuted among the rows sharing the `by` columns.
 
@@ -51,9 +56,11 @@ def climatology_permutation(
         column_groups: The columns to permute, one group per permutation.
         by: The columns whose shared values define the rows a value may move between.
         seed: The first group's permutation seed.
+        suffix: Appended to each column's name to name its permuted copy, so two sets of groups
+            sharing a column can each be permuted without one overwriting the other.
 
     Returns:
-        `frame`, in its own row order, with `<column>_shuffled` for every column in `column_groups`.
+        `frame`, in its own row order, with `<column><suffix>` for every column in `column_groups`.
     """
     row = "__climatology_permutation_row"
     indexed = frame.with_columns(pl.int_range(pl.len(), dtype=pl.UInt32).alias(row))
@@ -62,7 +69,7 @@ def climatology_permutation(
         for index in range(len(column_groups))
     )
     return permuted.with_columns(
-        pl.col(column).gather(pl.col(f"{row}_{index}")).alias(f"{column}{PERMUTED_SUFFIX}")
+        pl.col(column).gather(pl.col(f"{row}_{index}")).alias(f"{column}{suffix}")
         for index, group in enumerate(column_groups)
         for column in group
     ).drop(row, *(f"{row}_{index}" for index in range(len(column_groups))))

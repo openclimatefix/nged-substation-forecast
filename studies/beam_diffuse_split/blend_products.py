@@ -4,35 +4,44 @@ One-off throwaway script for the study in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/836>. It builds on the two
 weather-product studies, `weather_products.py` (solar) and `wind_products.py` (wind), and refits
 their single-product arms on their own common rows, folds and seeds, so every contrast here is
-paired with theirs.
+paired with theirs. It imports their column-building functions and never writes to their output
+directories.
 
-**The single-product arms must reproduce the published losses row for row before any blend runs.**
-The refitted `<product>_global` (solar) and `<product>_wind` (wind) arms are compared against the
-two studies' `losses.parquet`: the same (site, time, fold, seed) keys and a bit-identical
-`signed_error_capped_mw`. If they differ, the rows or the folds have changed, and the script stops.
+**Every published single-product arm must reproduce the published losses row for row before any
+blend runs.** Each refitted arm is compared against its study's `losses.parquet`: the same (site,
+time, fold, seed) keys and a bit-identical `signed_error_capped_mw`. If any differs, the rows or the
+folds have changed, and the script stops.
 
-**Each set of products is blended four ways**, each against the set's best single product, which is
-fixed from the published tables:
+**Each set of products is blended twice: from each product's plain columns, and from its enriched
+columns.** The enriched single-product arm, `<product>_rich`, adds what the published solar page
+found helps one product on its own: the neighbouring hours for every product, CAMS's own beam split,
+and UKV's hour rebuilt from the snapshots at both ends. For wind it adds each product's hub-height
+speed at ±1 h and ±2 h and its 10 m speed at ±1 h. The enriched contrasts are the deciding ones.
+They were added after the first run, when the first science review found that much of each plain
+blend's gain was available from one product with those additions.
 
-- `<set>_xgb`: XGBoost shown every product's columns, with column subsampling at 1.
-- `<set>_mean`: XGBoost shown the mean of the products' values, as many columns as one product.
-- `<set>_stack`: a linear stack of the single-product models' out-of-fold predictions, with
-  non-negative weights summing to 1, cross-fitted per generator, seed and fold by
+**The enriched best single of a set is the best single-product arm measured**, chosen by mean error
+on the common rows at each hyperparameter setting, among every published single-product arm and
+every enriched arm of the set's products. The plain contrasts keep the best single fixed in advance
+from the published tables, as the plan named them.
+
+**Each set is blended four ways**, from its plain or its enriched columns:
+
+- `<set>_xgb`, `<set>_rich_xgb`: XGBoost shown every product's columns, column subsampling at 1.
+- `<set>_mean`, `<set>_rich_mean`: XGBoost shown the mean of the products' values.
+- `<set>_stack`, `<set>_rich_stack`: a linear stack of the single-product models' out-of-fold
+  predictions, with non-negative weights summing to 1, cross-fitted per generator, seed and fold by
   `studies.blending.stacked_errors`.
-- `<set>_equal`: the equal-weight mean of the single-product predictions.
+- `<set>_equal`, `<set>_rich_equal`: the equal-weight mean of the single-product predictions.
 
-**Every XGBoost blend has a climatology control, `<set>_control`.** The control holds the best
-single product's real columns and every other product's columns permuted among the rows sharing a
-site, a month and an hour of day, one permutation per product, so it has the blend's column count
-and none of the other products' weather.
+**Every XGBoost blend has a climatology control**, `<set>_control` or `<set>_rich_control`. The
+control holds the best single's real columns and every other product's columns permuted among the
+rows sharing a site, a month and an hour of day, one permutation per product.
 
-**Every blend uses ICON global's wind as served, without the wind study's step indicator.** The
-indicator acts as a date-regime feature, which the single-product arms and the stack do not get.
-The one exploratory arm `everything_xgb_step` adds it back.
-
-The deciding contrasts, named before the run, are built by `_deciding_contrasts` from each domain's
-`named_sets` and `STACK_AGAINST_XGB`. The positive control is `POSITIVE_CONTROL`, and every other
-contrast in the report is exploratory.
+**A synthetic product measures how small a gain the pipeline can detect.** `synthetic_xgb` is the
+best single of the `everything` set shown one more column: the generator's own output as a fraction
+of capacity, plus Gaussian noise large enough that the column carries only part of the target.
+`synthetic_control` is shown the same column permuted within site, month and hour of day.
 
 Run it with `uv run python studies/beam_diffuse_split/blend_products.py`, after both weather-product
 studies have been run. `--resume` reuses the per-arm fits a previous run left in `fits/`.
@@ -44,6 +53,8 @@ import shutil
 import sys
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
+from datetime import UTC, datetime
+from itertools import pairwise
 from pathlib import Path
 from typing import Final, Literal, TypedDict
 
@@ -58,7 +69,7 @@ from run_experiment import SHARED_FEATURES as SOLAR_SHARED_FEATURES
 from run_experiment import Job, _add_time_features, _run_all
 from sources import STUDY_DATA_DIR
 from studies.blending import PERMUTED_SUFFIX, climatology_permutation, stacked_errors
-from studies.bootstrap import bootstrap_difference, per_fold_differences
+from studies.bootstrap import bootstrap_difference, fold_t_interval, per_fold_differences
 from studies.cross_validation import (
     PRIMARY_HYPER_PARAMETERS,
     SENSITIVITY_HYPER_PARAMETERS,
@@ -77,8 +88,26 @@ them after a crash, and deleted once every output is on disk."""
 PERMUTATION_SEED: Final[int] = 20260923
 """The first product's climatology permutation seed; product `i` in a domain's order uses `+ i`."""
 
+RICH_PERMUTATION_SEED: Final[int] = 20260924
+"""The same, for each product's enriched columns, which are permuted as one group per product."""
+
+RICH_PERMUTED_SUFFIX: Final[str] = "_rich_shuffled"
+"""Names an enriched column's permuted copy, apart from the plain column's `_shuffled` copy."""
+
 PERMUTATION_GROUPS: Final[tuple[str, ...]] = ("site", "month", "hour_of_day")
 """The rows a control column's value may move between: one site, one month, one hour of day."""
+
+SYNTHETIC_COLUMN: Final[str] = "synthetic_product"
+"""The synthetic product: the generator's output as a fraction of capacity, plus noise."""
+
+SYNTHETIC_SEED: Final[int] = 20260925
+"""Seeds the synthetic product's noise, drawn once per row in the common rows' order."""
+
+SYNTHETIC_PERMUTATION_SEED: Final[int] = 20260926
+"""Seeds the synthetic product's climatology permutation."""
+
+SYNTHETIC_ARMS: Final[tuple[str, str]] = ("synthetic_xgb", "synthetic_control")
+"""The sensitivity positive control's arm and its climatology control."""
 
 PERCENTAGE_POINTS: Final[float] = 100.0
 
@@ -94,6 +123,11 @@ SETTINGS: Final[dict[SettingType, HyperParameters]] = {
 }
 
 DomainType = Literal["solar", "wind"]
+
+VariantType = Literal["plain", "rich"]
+"""Whether a blend is built from each product's plain columns or from its enriched columns."""
+
+VARIANTS: Final[tuple[VariantType, ...]] = ("plain", "rich")
 
 KEY_COLUMNS: Final[tuple[str, ...]] = (
     "site",
@@ -115,10 +149,54 @@ LOSS_COLUMNS: Final[tuple[str, ...]] = (
 )
 """The columns `losses.parquet` keeps for every arm, fitted or derived."""
 
+LATENCY_HOURS: Final[dict[str, float]] = {
+    "cams": 24.0,
+    "era5": 120.0,
+    "ukv": 4.0,
+    "icon_d2": 1.5,
+    "icon_eu": 3.5,
+    "icon_global": 3.5,
+}
+"""How long after an hour each product's value for it is available, from the solar page's table."""
+
+HISTORY_ONLY_PRODUCTS: Final[frozenset[str]] = frozenset({"cams", "era5"})
+"""Products too late for a live service: CAMS arrives about a day late and ERA5 about 5 days."""
+
+USABLE_FROM: Final[dict[DomainType, dict[str, str]]] = {
+    "solar": {
+        "cams": "2004-01",
+        "era5": "1940-01",
+        "ukv": "2022-03",
+        "icon_d2": "2022-12",
+        "icon_eu": "2022-11",
+        "icon_global": "2022-11",
+    },
+    "wind": {
+        "era5": "1940-01",
+        "ukv": "2024-08",
+        "icon_d2": "2022-12",
+        "icon_eu": "2022-11",
+        "icon_global": "2022-11",
+    },
+}
+"""The first month each product's archive serves, from the two published pages.
+
+UKV's solar archive before August 2024 is a backfill from a source Open-Meteo does not name, and its
+hub-height wind starts on 12 August 2024.
+"""
+
+OUTPUT_BANDS: Final[tuple[float, ...]] = (0.0, 0.1, 0.3, 0.5, 0.7, 0.9)
+"""The lower edges of the measured-output bands, as fractions of capacity, for the wind table."""
+
+HOURS_PER_DAY: Final[float] = 24.0
+
+MOST_IMPROVED_SHARE: Final[float] = 0.05
+"""The share of rows, the most improved first, whose part of the total gain the report prints."""
+
 
 @dataclass(frozen=True)
 class BlendSet:
-    """A set of products blended together, and the single product it has to beat."""
+    """A set of products blended together, and the plain single product it has to beat."""
 
     name: str
     products: tuple[str, ...]
@@ -135,13 +213,17 @@ class Domain:
     sets: tuple[BlendSet, ...]
     shared_features: tuple[str, ...]
     columns: Callable[[str], tuple[str, ...]]
+    rich_columns: Callable[[str], tuple[str, ...]]
+    rich_mean_width: int
     single_suffix: str
     named_sets: tuple[str, ...]
     published_losses: Path
-    published_settings: tuple[SettingType, ...]
+    published_jobs: tuple[Job, ...]
+    rich_published: dict[str, str]
+    synthetic_noise: float
 
     def single(self, product: str) -> str:
-        """Return a product's single-product arm, named as the published study names it.
+        """Return a product's plain single-product arm, named as the published study names it.
 
         Args:
             product: The product.
@@ -162,9 +244,32 @@ class Domain:
         """
         return next(blend for blend in self.sets if blend.name == name)
 
+    def product_of(self, arm: str) -> str:
+        """Return the product a single-product arm reads.
+
+        Args:
+            arm: A published single-product arm or an enriched arm.
+
+        Returns:
+            The longest product name the arm starts with.
+        """
+        return max((p for p in self.products if arm.startswith(f"{p}_")), key=len)
+
+
+def rich(product: str) -> str:
+    """Return a product's enriched single-product arm.
+
+    Args:
+        product: The product.
+
+    Returns:
+        The arm name.
+    """
+    return f"{product}_rich"
+
 
 def _solar_columns(product: str) -> tuple[str]:
-    """Return a solar product's one feature column: its global horizontal irradiance.
+    """Return a solar product's one plain feature column: its global horizontal irradiance.
 
     Args:
         product: A key of `weather_products.PRODUCTS`.
@@ -175,8 +280,28 @@ def _solar_columns(product: str) -> tuple[str]:
     return (f"ghi_{product}",)
 
 
+def _solar_rich_columns(product: str) -> tuple[str, ...]:
+    """Return a solar product's enriched columns: the hour before, the hour, the hour after, more.
+
+    The first three columns are always the hour before, the hour and the hour after, which the
+    enriched mean arm averages across products. UKV's three are its hour rebuilt from the snapshots
+    at both ends, as the published `ukv_trap_ctx_global` arm reads them; ICON-EU's are the published
+    `icon_eu_ctx_global` arm's. CAMS adds its own beam split, which the published page found helps.
+
+    Args:
+        product: A key of `weather_products.PRODUCTS`.
+
+    Returns:
+        The column names.
+    """
+    if product == "ukv":
+        return ("ghi_trap_previous_ukv", "ghi_trap_ukv", "ghi_trap_next_ukv")
+    context = (f"ghi_previous_{product}", f"ghi_{product}", f"ghi_next_{product}")
+    return (*context, "bhi_cams", "dhi_cams") if product == "cams" else context
+
+
 def _wind_columns(product: str) -> tuple[str, str, str, str]:
-    """Return a wind product's four feature columns, as the wind study names them.
+    """Return a wind product's four plain feature columns, as the wind study names them.
 
     Args:
         product: A key of `fetch_wind_point.PRODUCTS`.
@@ -185,6 +310,42 @@ def _wind_columns(product: str) -> tuple[str, str, str, str]:
         The hub-height speed, that height's direction as sine and cosine, and the 10 m speed.
     """
     return wind_products._wind_columns(product=product)
+
+
+def _wind_rich_columns(product: str) -> tuple[str, ...]:
+    """Return a wind product's enriched columns: its plain four, then its neighbouring hours.
+
+    Args:
+        product: A key of `fetch_wind_point.PRODUCTS`.
+
+    Returns:
+        The column names.
+    """
+    return (*_wind_columns(product), *wind_products.context_columns(product=product))
+
+
+def _solar_published_jobs() -> tuple[Job, ...]:
+    """Return the published solar study's pooled arms, less the two the enriched arms reproduce.
+
+    Returns:
+        The jobs, as `weather_products._jobs` builds them.
+    """
+    return tuple(
+        job
+        for job in weather_products._jobs()
+        if job[0] not in ("icon_eu_ctx_global", "ukv_trap_ctx_global")
+    )
+
+
+def _wind_published_jobs() -> tuple[Job, ...]:
+    """Return the published wind study's arms, less the ones told ICON global's step period.
+
+    The step indicator works as a date-regime feature, so an arm carrying it is not a fair single.
+
+    Returns:
+        The jobs, as `wind_products._jobs` builds them.
+    """
+    return tuple(job for job in wind_products._jobs() if not job[0].endswith("_step"))
 
 
 SOLAR: Final[Domain] = Domain(
@@ -205,10 +366,14 @@ SOLAR: Final[Domain] = Domain(
     ),
     shared_features=(*SOLAR_SHARED_FEATURES, "era_code"),
     columns=_solar_columns,
+    rich_columns=_solar_rich_columns,
+    rich_mean_width=3,
     single_suffix="_global",
     named_sets=("everything", "cams_icon_eu", "live_all"),
     published_losses=STUDY_DATA_DIR / weather_products.OUTPUT_DIR_NAME / "losses.parquet",
-    published_settings=("pooled",),
+    published_jobs=_solar_published_jobs(),
+    rich_published={"icon_eu_rich": "icon_eu_ctx_global", "ukv_rich": "ukv_trap_ctx_global"},
+    synthetic_noise=0.3,
 )
 
 WIND: Final[Domain] = Domain(
@@ -232,16 +397,17 @@ WIND: Final[Domain] = Domain(
     ),
     shared_features=wind_products.SHARED_FEATURES,
     columns=_wind_columns,
+    rich_columns=_wind_rich_columns,
+    rich_mean_width=10,
     single_suffix="_wind",
     named_sets=("everything", "live_gb"),
     published_losses=STUDY_DATA_DIR / wind_products.OUTPUT_DIR_NAME / "losses.parquet",
-    published_settings=("pooled", "sensitivity"),
+    published_jobs=_wind_published_jobs(),
+    rich_published={},
+    synthetic_noise=0.45,
 )
 
 DOMAINS: Final[tuple[Domain, ...]] = (SOLAR, WIND)
-
-STACK_AGAINST_XGB: Final[tuple[str, str]] = ("everything_stack", "everything_xgb")
-"""The deciding stack contrast in each domain: a linear stack against XGBoost on every column."""
 
 POSITIVE_CONTROL: Final[tuple[str, str]] = ("cams_icon_d2_xgb", "icon_d2_global")
 """Solar, where a large gain must appear: ICON-D2 with CAMS against ICON-D2 alone."""
@@ -249,110 +415,244 @@ POSITIVE_CONTROL: Final[tuple[str, str]] = ("cams_icon_d2_xgb", "icon_d2_global"
 STEP_ARM: Final[str] = "everything_xgb_step"
 """The one exploratory wind arm shown ICON global's step indicator, `step_period`."""
 
+BestType = dict[tuple[str, SettingType], str]
+"""Each (set, setting)'s enriched best single: the lowest-error single-product arm measured."""
 
-def _mean_columns(*, domain: Domain, blend: BlendSet) -> tuple[str, ...]:
-    """Return a set's mean-of-inputs columns, as many as one product's.
+
+def _prefix(variant: VariantType) -> str:
+    """Return the infix an arm name carries for a variant.
+
+    Args:
+        variant: Plain or enriched.
+
+    Returns:
+        `""` or `"rich_"`.
+    """
+    return "rich_" if variant == "rich" else ""
+
+
+def _arm(blend: str, variant: VariantType, method: str) -> str:
+    """Return a blend arm's name, such as `everything_rich_xgb`.
+
+    Args:
+        blend: The set's name.
+        variant: Plain or enriched.
+        method: `xgb`, `control`, `mean`, `stack`, `stack_in_sample`, or `equal`.
+
+    Returns:
+        The arm name.
+    """
+    return f"{blend}_{_prefix(variant)}{method}"
+
+
+def _mean_columns(*, domain: Domain, blend: BlendSet, variant: VariantType) -> tuple[str, ...]:
+    """Return a set's mean-of-inputs columns.
 
     Args:
         domain: The domain.
         blend: The set.
+        variant: Plain or enriched.
 
     Returns:
-        One column per column of a single product, named `<stem>_mean_<set>`.
+        One column per position averaged, named `<stem>_mean_<set>` for plain blends and
+        `rich_mean_<position>_<set>` for enriched ones.
     """
+    if variant == "rich":
+        return tuple(
+            f"rich_mean_{position}_{blend.name}" for position in range(domain.rich_mean_width)
+        )
     return tuple(
         f"{column.removesuffix(f'_{blend.best_single}')}_mean_{blend.name}"
         for column in domain.columns(blend.best_single)
     )
 
 
-def _with_blend_columns(*, frame: pl.DataFrame, domain: Domain) -> pl.DataFrame:
-    """Add every set's mean columns and every product's climatology-permuted columns.
-
-    The mean of the wind products' direction sines and of their cosines together give the circular
-    mean direction. Neither step reorders the rows, which the reproduction check relies on.
+def _product_columns(*, domain: Domain, variant: VariantType) -> Callable[[str], tuple[str, ...]]:
+    """Return the function naming a product's columns in one variant.
 
     Args:
-        frame: The domain's common rows.
+        domain: The domain.
+        variant: Plain or enriched.
+
+    Returns:
+        `domain.columns` or `domain.rich_columns`.
+    """
+    return domain.rich_columns if variant == "rich" else domain.columns
+
+
+def _with_synthetic(*, frame: pl.DataFrame, domain: Domain) -> pl.DataFrame:
+    """Add the synthetic product: each row's output over capacity, plus Gaussian noise.
+
+    Args:
+        frame: The domain's common rows, in their fixed order.
+        domain: The domain, which sets the noise's standard deviation.
+
+    Returns:
+        `frame` with `SYNTHETIC_COLUMN`.
+    """
+    noise = np.random.default_rng(SYNTHETIC_SEED).normal(
+        scale=domain.synthetic_noise, size=frame.height
+    )
+    fraction = pl.col("power_mw").cast(pl.Float64) / pl.col("effective_capacity_mw")
+    return frame.with_columns((fraction + pl.Series(noise)).alias(SYNTHETIC_COLUMN))
+
+
+def _with_blend_columns(*, frame: pl.DataFrame, domain: Domain) -> pl.DataFrame:
+    """Add every set's mean columns, the synthetic product, and every climatology-permuted column.
+
+    The mean of the wind products' direction sines and of their cosines together give the circular
+    mean direction. No step reorders the rows, which the reproduction check relies on.
+
+    Args:
+        frame: The domain's common rows, with the enriched columns.
         domain: The domain.
 
     Returns:
-        `frame` with the mean and the `_shuffled` columns added.
+        `frame` with the mean, the synthetic, and the permuted columns added.
     """
     means = [
         pl.mean_horizontal(
             *(domain.columns(product)[position] for product in blend.products)
         ).alias(name)
         for blend in domain.sets
-        for position, name in enumerate(_mean_columns(domain=domain, blend=blend))
+        for position, name in enumerate(_mean_columns(domain=domain, blend=blend, variant="plain"))
     ]
-    return climatology_permutation(
-        frame=frame.with_columns(means),
+    means += [
+        pl.mean_horizontal(
+            *(domain.rich_columns(product)[position] for product in blend.products)
+        ).alias(name)
+        for blend in domain.sets
+        for position, name in enumerate(_mean_columns(domain=domain, blend=blend, variant="rich"))
+    ]
+    plain = climatology_permutation(
+        frame=_with_synthetic(frame=frame.with_columns(means), domain=domain),
         column_groups=[domain.columns(product) for product in domain.products],
         by=PERMUTATION_GROUPS,
         seed=PERMUTATION_SEED,
     )
+    enriched = climatology_permutation(
+        frame=plain,
+        column_groups=[domain.rich_columns(product) for product in domain.products],
+        by=PERMUTATION_GROUPS,
+        seed=RICH_PERMUTATION_SEED,
+        suffix=RICH_PERMUTED_SUFFIX,
+    )
+    return climatology_permutation(
+        frame=enriched,
+        column_groups=[(SYNTHETIC_COLUMN,)],
+        by=PERMUTATION_GROUPS,
+        seed=SYNTHETIC_PERMUTATION_SEED,
+    )
 
 
-def _arm_features(*, domain: Domain) -> dict[str, tuple[str, ...]]:
-    """Return every fitted arm's feature columns, in the order the model sees them.
+def _single_features(*, domain: Domain) -> dict[str, tuple[str, ...]]:
+    """Return every single-product arm's feature columns: the published arms and the enriched ones.
 
     Args:
         domain: The domain.
 
     Returns:
-        Arm name to feature columns, singles first.
+        Arm name to feature columns.
+    """
+    arms = {job[0]: job[3] for job in domain.published_jobs}
+    arms |= {rich(p): (*domain.shared_features, *domain.rich_columns(p)) for p in domain.products}
+    return arms
+
+
+def _blend_features(*, domain: Domain, best: BestType) -> dict[str, tuple[str, ...]]:
+    """Return every fitted blend arm's feature columns, in the order the model sees them.
+
+    Args:
+        domain: The domain.
+        best: Each set's enriched best single, which the enriched control keeps real.
+
+    Returns:
+        Arm name to feature columns.
     """
     shared = domain.shared_features
-    arms = {
-        domain.single(product): (*shared, *domain.columns(product)) for product in domain.products
-    }
-    for blend in domain.sets:
-        every = tuple(column for product in blend.products for column in domain.columns(product))
-        permuted = tuple(
-            f"{column}{PERMUTED_SUFFIX}"
-            for product in blend.products
-            if product != blend.best_single
-            for column in domain.columns(product)
-        )
-        arms[f"{blend.name}_xgb"] = (*shared, *every)
-        arms[f"{blend.name}_control"] = (*shared, *domain.columns(blend.best_single), *permuted)
-        arms[f"{blend.name}_mean"] = (*shared, *_mean_columns(domain=domain, blend=blend))
+    singles = _single_features(domain=domain)
+    arms: dict[str, tuple[str, ...]] = {}
+    for variant in VARIANTS:
+        columns = _product_columns(domain=domain, variant=variant)
+        suffix = RICH_PERMUTED_SUFFIX if variant == "rich" else PERMUTED_SUFFIX
+        for blend in domain.sets:
+            if variant == "rich":
+                reference = best[blend.name, "pooled"]
+                real = singles[reference][len(shared) :]
+                kept = domain.product_of(reference)
+            else:
+                real, kept = domain.columns(blend.best_single), blend.best_single
+            permuted = tuple(
+                f"{column}{suffix}" for p in blend.products if p != kept for column in columns(p)
+            )
+            every = tuple(column for p in blend.products for column in columns(p))
+            arms[_arm(blend.name, variant, "xgb")] = (*shared, *every)
+            arms[_arm(blend.name, variant, "control")] = (*shared, *real, *permuted)
+            arms[_arm(blend.name, variant, "mean")] = (
+                *shared,
+                *_mean_columns(domain=domain, blend=blend, variant=variant),
+            )
+    reference = singles[best["everything", "pooled"]]
+    synthetic, synthetic_control = SYNTHETIC_ARMS
+    arms[synthetic] = (*reference, SYNTHETIC_COLUMN)
+    arms[synthetic_control] = (*reference, f"{SYNTHETIC_COLUMN}{PERMUTED_SUFFIX}")
     if domain.name == "wind":
         arms[STEP_ARM] = (*arms["everything_xgb"], "step_period")
     return arms
 
 
-def _sensitivity_arms(*, domain: Domain) -> tuple[str, ...]:
-    """Return the arms fitted at the second setting: every single, and each named blend and control.
+def _single_jobs(*, domain: Domain) -> list[Job]:
+    """Return the fits every single-product arm needs, at the settings it is used at.
 
-    Every single is fitted so that every stack can be formed at the second setting too.
-
-    Args:
-        domain: The domain.
-
-    Returns:
-        The arm names.
-    """
-    return (
-        *(domain.single(product) for product in domain.products),
-        *(f"{name}_{kind}" for name in domain.named_sets for kind in ("xgb", "control")),
-    )
-
-
-def _jobs(*, domain: Domain, arms: Iterable[str], setting: SettingType) -> list[Job]:
-    """Return one fit job per arm at one setting.
+    Every published arm is refitted at the settings its study used, so each can be checked. Every
+    enriched arm and every plain `<product><suffix>` arm is fitted at both settings, so that the
+    stacks and the best single can be formed at both.
 
     Args:
         domain: The domain.
-        arms: The arms to fit.
-        setting: The hyperparameter setting.
 
     Returns:
         The jobs `run_experiment._run_all` takes.
     """
-    features = _arm_features(domain=domain)
-    return [(arm, setting, "power_mw", features[arm], SETTINGS[setting], False) for arm in arms]
+    jobs = list(domain.published_jobs)
+    published = {(job[0], job[1]) for job in jobs}
+    features = _single_features(domain=domain)
+    for product in domain.products:
+        for arm in (domain.single(product), rich(product)):
+            jobs += [
+                (arm, setting, "power_mw", features[arm], SETTINGS[setting], False)
+                for setting in SETTINGS
+                if (arm, setting) not in published
+            ]
+    return jobs
+
+
+def _blend_jobs(*, domain: Domain, best: BestType) -> list[Job]:
+    """Return every blend fit: each arm at the primary setting, the named ones at the second too.
+
+    Args:
+        domain: The domain.
+        best: Each set's enriched best single.
+
+    Returns:
+        The jobs `run_experiment._run_all` takes.
+    """
+    features = _blend_features(domain=domain, best=best)
+    jobs: list[Job] = [
+        (arm, "pooled", "power_mw", columns, SETTINGS["pooled"], False)
+        for arm, columns in features.items()
+    ]
+    second = [
+        _arm(name, variant, method)
+        for name in domain.named_sets
+        for variant in VARIANTS
+        for method in ("xgb", "control")
+    ]
+    jobs += [
+        (arm, "sensitivity", "power_mw", features[arm], SETTINGS["sensitivity"], False)
+        for arm in second
+    ]
+    return jobs
 
 
 def _fit_path(*, domain: Domain, arm: str, setting: str) -> Path:
@@ -379,13 +679,14 @@ def _fitted(*, frame: pl.DataFrame, domain: Domain, jobs: list[Job], resume: boo
         resume: Whether to reuse a fit a previous run left on disk.
 
     Returns:
-        Every job's losses, one row per (site, time, seed, arm, setting), sorted.
+        Every job's losses in `LOSS_COLUMNS`, one row per (site, time, seed, arm, setting).
     """
     missing = [
         job
         for job in jobs
         if not (resume and _fit_path(domain=domain, arm=job[0], setting=job[1]).exists())
     ]
+    _LOG.info("%s: %d of %d fits to run", domain.name, len(missing), len(jobs))
     if missing:
         fresh = _run_all(dataset=frame, jobs=missing)
         for arm, setting, *_ in missing:
@@ -395,17 +696,18 @@ def _fitted(*, frame: pl.DataFrame, domain: Domain, jobs: list[Job], resume: boo
                 "site", "time", "seed"
             ).write_parquet(path)
     return pl.concat(
-        pl.read_parquet(_fit_path(domain=domain, arm=arm, setting=setting))
+        pl.read_parquet(_fit_path(domain=domain, arm=arm, setting=setting)).select(LOSS_COLUMNS)
         for arm, setting, *_ in jobs
     )
 
 
 class ReproductionRow(TypedDict):
-    """One single-product arm's comparison against the published losses."""
+    """One refitted single-product arm's comparison against the published losses."""
 
     domain: str
     setting: str
     arm: str
+    published_arm: str
     rows: int
     published_rows: int
     keys_equal: bool
@@ -413,8 +715,26 @@ class ReproductionRow(TypedDict):
     max_abs_difference_mw: float
 
 
+def _reproduction_pairs(*, domain: Domain) -> list[tuple[str, str, SettingType]]:
+    """Return every (refitted arm, published arm, setting) the reproduction check compares.
+
+    Args:
+        domain: The domain.
+
+    Returns:
+        The published jobs under their own names, and each enriched arm that repeats a published
+        arm's columns under that arm's name.
+    """
+    pairs: list[tuple[str, str, SettingType]] = [
+        (job[0], job[0], "sensitivity" if job[1] == "sensitivity" else "pooled")
+        for job in domain.published_jobs
+    ]
+    pairs += [(ours, theirs, "pooled") for ours, theirs in domain.rich_published.items()]
+    return pairs
+
+
 def _reproduction(*, fitted: pl.DataFrame, domain: Domain) -> list[ReproductionRow]:
-    """Compare every refitted single-product arm with the published study's losses.
+    """Compare every refitted published arm with the published study's losses.
 
     Args:
         fitted: The refitted single-product arms' losses.
@@ -424,47 +744,44 @@ def _reproduction(*, fitted: pl.DataFrame, domain: Domain) -> list[ReproductionR
         One row per arm and published setting.
     """
     published = pl.read_parquet(domain.published_losses)
+    keys = ["site", "time", "fold", "seed"]
     rows: list[ReproductionRow] = []
-    for setting in domain.published_settings:
-        for product in domain.products:
-            arm = domain.single(product)
-            ours, theirs = (
-                losses.filter(pl.col("arm") == arm, pl.col("setting") == setting)
-                .sort("site", "time", "fold", "seed")
-                .select("site", "time", "fold", "seed", "signed_error_capped_mw")
-                for losses in (fitted, published)
-            )
-            keys = ["site", "time", "fold", "seed"]
-            keys_equal = ours.height == theirs.height and ours.select(keys).equals(
-                theirs.select(keys)
-            )
-            identical = keys_equal and ours["signed_error_capped_mw"].equals(
-                theirs["signed_error_capped_mw"]
-            )
-            difference = (
-                float(
-                    np.max(
-                        np.abs(
-                            ours["signed_error_capped_mw"].to_numpy()
-                            - theirs["signed_error_capped_mw"].to_numpy()
-                        )
+    for ours_arm, theirs_arm, setting in _reproduction_pairs(domain=domain):
+        ours, theirs = (
+            losses.filter(pl.col("arm") == arm, pl.col("setting") == setting)
+            .sort(keys)
+            .select(*keys, "signed_error_capped_mw")
+            for losses, arm in ((fitted, ours_arm), (published, theirs_arm))
+        )
+        keys_equal = ours.height == theirs.height and ours.select(keys).equals(theirs.select(keys))
+        identical = keys_equal and ours["signed_error_capped_mw"].equals(
+            theirs["signed_error_capped_mw"]
+        )
+        difference = (
+            float(
+                np.max(
+                    np.abs(
+                        ours["signed_error_capped_mw"].to_numpy()
+                        - theirs["signed_error_capped_mw"].to_numpy()
                     )
                 )
-                if keys_equal
-                else float("nan")
             )
-            rows.append(
-                {
-                    "domain": domain.name,
-                    "setting": setting,
-                    "arm": arm,
-                    "rows": ours.height,
-                    "published_rows": theirs.height,
-                    "keys_equal": keys_equal,
-                    "bit_identical": identical,
-                    "max_abs_difference_mw": difference,
-                }
-            )
+            if keys_equal
+            else float("nan")
+        )
+        rows.append(
+            {
+                "domain": domain.name,
+                "setting": setting,
+                "arm": ours_arm,
+                "published_arm": theirs_arm,
+                "rows": ours.height,
+                "published_rows": theirs.height,
+                "keys_equal": keys_equal,
+                "bit_identical": identical,
+                "max_abs_difference_mw": difference,
+            }
+        )
     return rows
 
 
@@ -479,18 +796,65 @@ def _reproduction_lines(*, rows: list[ReproductionRow]) -> list[str]:
     """
     lines = [
         (
-            "| Domain | Setting | Arm | Rows | Published rows | Keys equal | Bit-identical "
-            "`signed_error_capped_mw` | Largest difference (MW) |"
+            "| Domain | Setting | Refitted arm | Published arm | Rows | Published rows "
+            "| Keys equal | Bit-identical `signed_error_capped_mw` | Largest difference (MW) |"
         ),
-        "|---|---|---|---|---|---|---|---|",
+        "|---|---|---|---|---|---|---|---|---|",
     ]
     lines += [
-        f"| {row['domain']} | {row['setting']} | {row['arm']} | {row['rows']:,} "
-        f"| {row['published_rows']:,} | {'yes' if row['keys_equal'] else '**no**'} "
+        f"| {row['domain']} | {row['setting']} | {row['arm']} | {row['published_arm']} "
+        f"| {row['rows']:,} | {row['published_rows']:,} "
+        f"| {'yes' if row['keys_equal'] else '**no**'} "
         f"| {'yes' if row['bit_identical'] else '**no**'} | {row['max_abs_difference_mw']:.3g} |"
         for row in rows
     ]
     return lines
+
+
+def _mae(*, losses: pl.DataFrame, arm: str) -> float:
+    """Return one arm's mean error, in percentage points of capacity.
+
+    Args:
+        losses: Per-row losses at one setting.
+        arm: The arm.
+
+    Returns:
+        The mean, or NaN if the arm is absent.
+    """
+    rows = losses.filter(pl.col("arm") == arm)
+    if rows.is_empty():
+        return float("nan")
+    return float(rows.select(pl.col(METRIC).mean()).item()) * PERCENTAGE_POINTS
+
+
+def _best_singles(*, losses: pl.DataFrame, domain: Domain) -> BestType:
+    """Choose each set's enriched best single at each setting, by mean error on the common rows.
+
+    The candidates are every single-product arm of the set's products fitted at that setting: at the
+    primary setting every published arm and every enriched arm, and at the second setting the plain
+    and the enriched arms.
+
+    Args:
+        losses: The single-product arms' losses, at both settings.
+        domain: The domain.
+
+    Returns:
+        The lowest-error arm per (set, setting).
+    """
+    mae = {
+        (arm, setting): value * PERCENTAGE_POINTS
+        for arm, setting, value in losses.group_by("arm", "setting")
+        .agg(pl.col(METRIC).mean())
+        .rows()
+    }
+    best: BestType = {}
+    for blend in domain.sets:
+        for setting in SETTINGS:
+            candidates = [
+                arm for arm, at in mae if at == setting and domain.product_of(arm) in blend.products
+            ]
+            best[blend.name, setting] = min(candidates, key=lambda arm: mae[arm, setting])
+    return best
 
 
 def _wide_errors(
@@ -563,57 +927,92 @@ def _weights_frame(
     )
 
 
+def _models(*, domain: Domain, blend: BlendSet, variant: VariantType) -> list[str]:
+    """Return the single-product arms a set's stack and equal-weight mean combine.
+
+    Args:
+        domain: The domain.
+        blend: The set.
+        variant: Plain or enriched.
+
+    Returns:
+        One arm per product.
+    """
+    return [rich(p) if variant == "rich" else domain.single(p) for p in blend.products]
+
+
 def _stacks(
     *, losses: pl.DataFrame, domain: Domain, setting: SettingType
 ) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Stack, in-sample stack and equal-weight-average every set's single-product models.
 
     Args:
-        losses: The fitted losses, carrying every single-product arm at `setting`.
+        losses: The fitted losses, carrying every plain and enriched single at `setting`.
         domain: The domain.
         setting: The setting.
 
     Returns:
         The derived arms' losses, and every stack's weights.
     """
-    singles = [domain.single(product) for product in domain.products]
+    singles = [arm for p in domain.products for arm in (domain.single(p), rich(p))]
     wide = _wide_errors(losses=losses, arms=singles, setting=setting)
     derived: list[pl.DataFrame] = []
     weights: list[pl.DataFrame] = []
-    for blend in domain.sets:
-        models = [domain.single(product) for product in blend.products]
-        errors = wide.select(models).to_numpy()
-        for suffix, cross_fitted in (("stack", True), ("stack_in_sample", False)):
-            result = stacked_errors(
-                errors=errors,
-                sites=wide["site"].to_numpy(),
-                folds=wide["fold"].to_numpy(),
-                seeds=wide["seed"].to_numpy(),
-                fit_rows=~wide["constrained"].to_numpy(),
-                cross_fitted=cross_fitted,
-            )
-            arm = f"{blend.name}_{suffix}"
+    for variant in VARIANTS:
+        for blend in domain.sets:
+            models = _models(domain=domain, blend=blend, variant=variant)
+            errors = wide.select(models).to_numpy()
+            for method, cross_fitted in (("stack", True), ("stack_in_sample", False)):
+                result = stacked_errors(
+                    errors=errors,
+                    sites=wide["site"].to_numpy(),
+                    folds=wide["fold"].to_numpy(),
+                    seeds=wide["seed"].to_numpy(),
+                    fit_rows=~wide["constrained"].to_numpy(),
+                    cross_fitted=cross_fitted,
+                )
+                arm = _arm(blend.name, variant, method)
+                derived.append(
+                    _derived_losses(keys=wide, errors=result.errors, arm=arm, setting=setting)
+                )
+                weights.append(
+                    _weights_frame(
+                        keys=wide,
+                        weights=result.weights,
+                        models=models,
+                        labels={"domain": domain.name, "setting": setting, "arm": arm},
+                    )
+                )
             derived.append(
-                _derived_losses(keys=wide, errors=result.errors, arm=arm, setting=setting)
-            )
-            weights.append(
-                _weights_frame(
+                _derived_losses(
                     keys=wide,
-                    weights=result.weights,
-                    models=models,
-                    labels={"domain": domain.name, "setting": setting, "arm": arm},
+                    errors=errors.mean(axis=1),
+                    arm=_arm(blend.name, variant, "equal"),
+                    setting=setting,
                 )
             )
-        derived.append(
-            _derived_losses(
-                keys=wide, errors=errors.mean(axis=1), arm=f"{blend.name}_equal", setting=setting
-            )
-        )
     return pl.concat(derived), pl.concat(weights)
 
 
-def _seed_stacks(*, losses: pl.DataFrame, domain: Domain) -> tuple[pl.DataFrame, pl.DataFrame]:
-    """Stack each best single product's three seeds, which measures what ensembling alone gives.
+def _seed_stack_arms(*, domain: Domain, best: BestType) -> list[str]:
+    """Return the single-product arms whose seeds are stacked: every plain and enriched best single.
+
+    Args:
+        domain: The domain.
+        best: Each set's enriched best single.
+
+    Returns:
+        The arms, sorted.
+    """
+    plain = {domain.single(blend.best_single) for blend in domain.sets}
+    enriched = {arm for (_, setting), arm in best.items() if setting == "pooled"}
+    return sorted(plain | enriched)
+
+
+def _seed_stacks(
+    *, losses: pl.DataFrame, domain: Domain, arms: list[str]
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Stack each named single's three seeds, which measures what ensembling alone gives.
 
     The stacked error is one value per row, repeated under each seed so the paired bootstrap can
     draw a seed for the reference arm as it always does.
@@ -621,14 +1020,14 @@ def _seed_stacks(*, losses: pl.DataFrame, domain: Domain) -> tuple[pl.DataFrame,
     Args:
         losses: The fitted losses at the primary setting.
         domain: The domain.
+        arms: The single-product arms to stack the seeds of.
 
     Returns:
         The `<single>_seed_stack` arms' losses, and their weights.
     """
     derived: list[pl.DataFrame] = []
     weights: list[pl.DataFrame] = []
-    for product in sorted({blend.best_single for blend in domain.sets}):
-        single = domain.single(product)
+    for single in arms:
         by_seed = (
             losses.filter(pl.col("arm") == single, pl.col("setting") == "pooled")
             .with_columns(seed_name=pl.format("seed_{}", pl.col("seed")))
@@ -681,12 +1080,43 @@ class IntervalRecord(TypedDict):
     difference_pp: float
     lower_95_pp: float
     upper_95_pp: float
+    fold_lower_95_pp: float
+    fold_upper_95_pp: float
+    site_lowest_pp: float
+    site_highest_pp: float
     seed_spread_pp: float
     excludes_zero: bool
     folds_agreeing: int
     n_folds: int
     n_rows: int
     n_months: int
+
+
+def _site_range(*, pair: pl.DataFrame, treatment: str, reference: str) -> tuple[float, float]:
+    """Return the lowest and highest per-generator difference, averaged over rows and seeds.
+
+    Args:
+        pair: Losses holding both arms.
+        treatment: The treatment arm.
+        reference: The reference arm.
+
+    Returns:
+        The lowest and the highest generator's difference, as fractions of capacity.
+    """
+    by_site = (
+        pair.filter(pl.col("arm") == treatment)
+        .select("site", "time", "seed", treatment=pl.col(METRIC))
+        .join(
+            pair.filter(pl.col("arm") == reference).select(
+                "site", "time", "seed", reference=pl.col(METRIC)
+            ),
+            on=["site", "time", "seed"],
+        )
+        .group_by("site")
+        .agg(difference=(pl.col("treatment") - pl.col("reference")).mean())
+    )
+    differences = by_site["difference"].to_numpy()
+    return float(differences.min()), float(differences.max())
 
 
 def _interval(
@@ -698,7 +1128,7 @@ def _interval(
     section: str,
     scope: str = "all",
 ) -> IntervalRecord:
-    """Bootstrap one paired contrast and count the folds agreeing with its sign.
+    """Bootstrap one paired contrast, count the folds agreeing, and add the fold and site spreads.
 
     Args:
         losses: Losses holding both arms, restricted to the scope.
@@ -719,6 +1149,10 @@ def _interval(
     folds = per_fold_differences(
         losses=pair, treatment=treatment, reference=reference, metric=METRIC
     )
+    fold_lower, fold_upper = (
+        fold_t_interval(fold_differences=folds) if len(folds) > 1 else (np.nan, np.nan)
+    )
+    site_lowest, site_highest = _site_range(pair=pair, treatment=treatment, reference=reference)
     return {
         "domain": domain.name,
         "setting": setting,
@@ -729,6 +1163,10 @@ def _interval(
         "difference_pp": interval["difference"] * PERCENTAGE_POINTS,
         "lower_95_pp": interval["lower_95"] * PERCENTAGE_POINTS,
         "upper_95_pp": interval["upper_95"] * PERCENTAGE_POINTS,
+        "fold_lower_95_pp": fold_lower * PERCENTAGE_POINTS,
+        "fold_upper_95_pp": fold_upper * PERCENTAGE_POINTS,
+        "site_lowest_pp": site_lowest * PERCENTAGE_POINTS,
+        "site_highest_pp": site_highest * PERCENTAGE_POINTS,
         "seed_spread_pp": interval["seed_spread"] * PERCENTAGE_POINTS,
         "excludes_zero": interval["lower_95"] > 0.0 or interval["upper_95"] < 0.0,
         "folds_agreeing": sum(np.sign(value) == np.sign(interval["difference"]) for value in folds),
@@ -740,8 +1178,17 @@ def _interval(
 
 CONTRAST_HEADER: Final[tuple[str, str]] = (
     (
-        "| Domain | Setting | Scope | Contrast | ΔMAE (pp of capacity) | 95% interval "
-        "| Excludes zero? | Folds agreeing | Rows |"
+        "| Domain | Setting | Scope | Contrast | ΔMAE (pp of capacity) | 95% interval, months "
+        "and seed | Excludes zero? | Folds agreeing | Rows |"
+    ),
+    "|---|---|---|---|---|---|---|---|---|",
+)
+
+HEADLINE_HEADER: Final[tuple[str, str]] = (
+    (
+        "| Domain | Setting | Contrast | ΔMAE (pp of capacity) | 95% interval, months and seed "
+        "| 95% t-interval across the 5 folds | Generators, lowest to highest | Excludes zero? "
+        "| Folds agreeing |"
     ),
     "|---|---|---|---|---|---|---|---|---|",
 )
@@ -765,8 +1212,32 @@ def _line(record: IntervalRecord) -> str:
     )
 
 
+def _headline_line(record: IntervalRecord) -> str:
+    """Render one headline interval with its fold spread and its range across generators.
+
+    Args:
+        record: The interval.
+
+    Returns:
+        The row.
+    """
+    return (
+        f"| {record['domain']} | {record['setting']} "
+        f"| {record['treatment']} − {record['reference']} | {record['difference_pp']:+.3f} "
+        f"| [{record['lower_95_pp']:+.3f}, {record['upper_95_pp']:+.3f}] "
+        f"| [{record['fold_lower_95_pp']:+.3f}, {record['fold_upper_95_pp']:+.3f}] "
+        f"| {record['site_lowest_pp']:+.3f} to {record['site_highest_pp']:+.3f} "
+        f"| {'**yes**' if record['excludes_zero'] else 'no'} "
+        f"| {record['folds_agreeing']} of {record['n_folds']} |"
+    )
+
+
 def _section_lines(
-    *, records: list[IntervalRecord], section: str, setting: str | None = None
+    *,
+    records: list[IntervalRecord],
+    section: str,
+    setting: str | None = None,
+    render: Callable[[IntervalRecord], str] = _line,
 ) -> list[str]:
     """Render every interval in one section of the report, optionally at one setting only.
 
@@ -774,66 +1245,110 @@ def _section_lines(
         records: Every interval.
         section: The section to render.
         setting: The setting to keep, or `None` for both.
+        render: How to render one row.
 
     Returns:
         Markdown rows.
     """
     return [
-        _line(record)
+        render(record)
         for record in records
         if record["section"] == section and setting in (None, record["setting"])
     ]
 
 
-def _deciding_contrasts(*, domain: Domain) -> list[tuple[str, str]]:
-    """Return a domain's deciding contrasts, and blend against single beside each pair.
+def _named_contrasts(
+    *, domain: Domain, variant: VariantType, reference: Callable[[str], str]
+) -> list[tuple[str, str]]:
+    """Return per named set: blend against control, control against single, blend against single.
 
     Args:
         domain: The domain.
+        variant: Plain or enriched.
+        reference: Each set's best single, by set name.
 
     Returns:
-        (treatment, reference) pairs: per named set, blend against control, control against single,
-        and blend against single; then the stack against XGBoost on every column.
+        (treatment, reference) pairs, then the stack against XGBoost on every column.
     """
     contrasts: list[tuple[str, str]] = []
     for name in domain.named_sets:
-        single = domain.single(domain.blend_set(name).best_single)
-        contrasts += [
-            (f"{name}_xgb", f"{name}_control"),
-            (f"{name}_control", single),
-            (f"{name}_xgb", single),
-        ]
-    return [*contrasts, STACK_AGAINST_XGB]
+        xgb, control = _arm(name, variant, "xgb"), _arm(name, variant, "control")
+        contrasts += [(xgb, control), (control, reference(name)), (xgb, reference(name))]
+    return [*contrasts, (_arm("everything", variant, "stack"), _arm("everything", variant, "xgb"))]
 
 
-def _exploratory_contrasts(*, domain: Domain) -> list[tuple[str, str]]:
-    """Return every set's method contrasts not already deciding, and the step arm's.
+def _deciding_contrasts(
+    *, domain: Domain, best: BestType, setting: SettingType
+) -> list[tuple[str, str]]:
+    """Return the deciding contrasts: every named set's enriched blend against its best single.
 
     Args:
         domain: The domain.
+        best: Each set's enriched best single.
+        setting: The setting, which sets the best single.
 
     Returns:
         (treatment, reference) pairs.
     """
-    deciding = set(_deciding_contrasts(domain=domain))
+    return _named_contrasts(
+        domain=domain, variant="rich", reference=lambda name: best[name, setting]
+    )
+
+
+def _plain_contrasts(*, domain: Domain) -> list[tuple[str, str]]:
+    """Return the contrasts the plan named before the first run, now secondary.
+
+    Args:
+        domain: The domain.
+
+    Returns:
+        (treatment, reference) pairs, each against the best single fixed from the published tables.
+    """
+    return _named_contrasts(
+        domain=domain,
+        variant="plain",
+        reference=lambda name: domain.single(domain.blend_set(name).best_single),
+    )
+
+
+def _exploratory_contrasts(*, domain: Domain, best: BestType) -> list[tuple[str, str]]:
+    """Return every set's method contrasts not already reported, and the enriched singles' gains.
+
+    Args:
+        domain: The domain.
+        best: Each set's enriched best single.
+
+    Returns:
+        (treatment, reference) pairs.
+    """
+    reported = {
+        *_deciding_contrasts(domain=domain, best=best, setting="pooled"),
+        *_plain_contrasts(domain=domain),
+    }
     contrasts: list[tuple[str, str]] = []
-    for blend in domain.sets:
-        single = domain.single(blend.best_single)
-        name = blend.name
-        contrasts += [
-            pair
-            for pair in (
-                (f"{name}_xgb", f"{name}_control"),
-                (f"{name}_control", single),
-                (f"{name}_xgb", single),
-                (f"{name}_mean", single),
-                (f"{name}_stack", single),
-                (f"{name}_equal", single),
-                (f"{name}_stack", f"{name}_xgb"),
-                (f"{name}_stack", f"{single}_seed_stack"),
+    for variant in VARIANTS:
+        for blend in domain.sets:
+            single = (
+                best[blend.name, "pooled"]
+                if variant == "rich"
+                else domain.single(blend.best_single)
             )
-            if pair not in deciding
-        ]
+            name = blend.name
+            contrasts += [
+                pair
+                for pair in (
+                    (_arm(name, variant, "xgb"), _arm(name, variant, "control")),
+                    (_arm(name, variant, "control"), single),
+                    (_arm(name, variant, "xgb"), single),
+                    (_arm(name, variant, "mean"), single),
+                    (_arm(name, variant, "stack"), single),
+                    (_arm(name, variant, "equal"), single),
+                    (_arm(name, variant, "stack"), _arm(name, variant, "xgb")),
+                    (_arm(name, variant, "stack"), f"{single}_seed_stack"),
+                )
+                if pair not in reported
+            ]
+    contrasts += [(rich(p), domain.single(p)) for p in domain.products]
     if domain.name == "wind":
         contrasts += [(STEP_ARM, "everything_xgb"), (STEP_ARM, domain.single("icon_d2"))]
     return contrasts
@@ -866,24 +1381,8 @@ def _split_scopes(*, losses: pl.DataFrame) -> list[tuple[str, pl.DataFrame]]:
     return scopes
 
 
-def _mae(*, losses: pl.DataFrame, arm: str) -> float:
-    """Return one arm's mean error, in percentage points of capacity.
-
-    Args:
-        losses: Per-row losses at one setting.
-        arm: The arm.
-
-    Returns:
-        The mean, or NaN if the arm is absent.
-    """
-    rows = losses.filter(pl.col("arm") == arm)
-    if rows.is_empty():
-        return float("nan")
-    return float(rows.select(pl.col(METRIC).mean()).item()) * PERCENTAGE_POINTS
-
-
-def _error_tables(*, losses: pl.DataFrame, domain: Domain) -> list[str]:
-    """Render every arm's absolute error, at both settings.
+def _single_table(*, losses: pl.DataFrame, domain: Domain) -> list[str]:
+    """Render every single-product arm's error at both settings.
 
     Args:
         losses: The domain's losses.
@@ -894,80 +1393,239 @@ def _error_tables(*, losses: pl.DataFrame, domain: Domain) -> list[str]:
     """
     by_setting = {s: losses.filter(pl.col("setting") == s) for s in SETTINGS}
     lines = [
-        f"#### {domain.name.capitalize()}: single products",
+        f"#### {domain.name.capitalize()}: every single-product arm, each a candidate best single",
         "",
         "| Product | Arm | MAE, primary setting | MAE, second setting |",
         "|---|---|---|---|",
     ]
-    for product in domain.products:
-        arm = domain.single(product)
+    for arm in sorted(_single_features(domain=domain), key=domain.product_of):
+        second = _mae(losses=by_setting["sensitivity"], arm=arm)
         lines.append(
-            f"| {product} | {arm} | {_mae(losses=by_setting['pooled'], arm=arm):.3f} "
-            f"| {_mae(losses=by_setting['sensitivity'], arm=arm):.3f} |"
+            f"| {domain.product_of(arm)} | {arm} "
+            f"| {_mae(losses=by_setting['pooled'], arm=arm):.3f} "
+            f"| {'–' if np.isnan(second) else f'{second:.3f}'} |"
         )
+    return lines
+
+
+def _blend_table(
+    *, losses: pl.DataFrame, domain: Domain, variant: VariantType, best: BestType
+) -> list[str]:
+    """Render every set's blends in one variant, primary setting with the second in brackets.
+
+    Args:
+        losses: The domain's losses.
+        domain: The domain.
+        variant: Plain or enriched.
+        best: Each set's enriched best single.
+
+    Returns:
+        Markdown lines.
+    """
+    by_setting = {s: losses.filter(pl.col("setting") == s) for s in SETTINGS}
     methods = ("xgb", "control", "mean", "stack", "equal")
-    lines += [
+    label = "enriched columns" if variant == "rich" else "plain columns"
+    lines = [
+        f"#### {domain.name.capitalize()}: blends of {label}, primary setting (second in brackets)",
         "",
-        f"#### {domain.name.capitalize()}: blends, primary setting (second setting in brackets)",
-        "",
-        "| Set | Products | Consumer | Best single | "
+        "| Set | Products | Best single, primary | Best single, second | "
         + " | ".join(f"`{m}`" for m in methods)
         + " |",
         "|---" * (4 + len(methods)) + "|",
     ]
     for blend in domain.sets:
-        best = domain.single(blend.best_single)
+        if variant == "rich":
+            firsts = best[blend.name, "pooled"], best[blend.name, "sensitivity"]
+        else:
+            firsts = (domain.single(blend.best_single),) * 2
+        best_cells = [
+            f"{arm} {_mae(losses=by_setting[setting], arm=arm):.3f}"
+            for arm, setting in zip(firsts, SETTINGS, strict=True)
+        ]
         cells = []
         for method in methods:
-            arm = f"{blend.name}_{method}"
+            arm = _arm(blend.name, variant, method)
             second = _mae(losses=by_setting["sensitivity"], arm=arm)
             cell = f"{_mae(losses=by_setting['pooled'], arm=arm):.3f}"
             cells.append(cell if np.isnan(second) else f"{cell} ({second:.3f})")
         lines.append(
-            f"| {blend.name} | {', '.join(blend.products)} | {blend.consumer} "
-            f"| {best} {_mae(losses=by_setting['pooled'], arm=best):.3f} | "
+            f"| {blend.name} | {', '.join(blend.products)} | "
+            + " | ".join(best_cells)
+            + " | "
             + " | ".join(cells)
             + " |"
         )
-    seed_stacks = sorted({blend.best_single for blend in domain.sets})
-    lines += [
-        "",
-        "Seed-ensemble stack, primary setting: "
-        + ", ".join(
-            f"{domain.single(p)}_seed_stack "
-            f"{_mae(losses=by_setting['pooled'], arm=f'{domain.single(p)}_seed_stack'):.3f}"
-            for p in seed_stacks
-        )
-        + ".",
-    ]
-    if domain.name == "wind":
-        lines += ["", f"MAE: {STEP_ARM} {_mae(losses=by_setting['pooled'], arm=STEP_ARM):.3f}."]
     return lines
 
 
-def _feature_lines(*, domain: Domain) -> list[str]:
-    """Render every fitted arm's feature columns, and which settings it was fitted at.
+def _usable_from(*, domain: Domain, blend: BlendSet) -> str:
+    """Return the first month every product in a set serves, the latest of their starts.
 
     Args:
         domain: The domain.
+        blend: The set.
+
+    Returns:
+        The month, as `YYYY-MM`.
+    """
+    return max(USABLE_FROM[domain.name][p] for p in blend.products)
+
+
+def _latency_label(*, hours: float) -> str:
+    """Return a latency in words, in days once it reaches one.
+
+    Args:
+        hours: The latency.
+
+    Returns:
+        Such as `about 3.5 h` or `about 5 days`.
+    """
+    days = hours / HOURS_PER_DAY
+    if days < 1.0:
+        return f"about {hours:g} h"
+    return f"about {days:g} day{'s' if days > 1.0 else ''}"
+
+
+def _coverage_lines(*, frames: dict[DomainType, pl.DataFrame]) -> list[str]:
+    """Render each set's latency, whether a live service could use it, and its coverage.
+
+    Args:
+        frames: Each domain's common rows, for the date the scored rows start.
 
     Returns:
         Markdown lines.
     """
-    sensitivity = set(_sensitivity_arms(domain=domain))
+    lines = [
+        (
+            "| Domain | Set | Products | Available after (slowest input) "
+            "| Live, Great-Britain-wide? | History only (CAMS or ERA5)? "
+            "| Needs ICON-D2's domain? | Archive serves every product from | Scored rows start |"
+        ),
+        "|---|---|---|---|---|---|---|---|---|",
+    ]
+    for domain in DOMAINS:
+        first_row = f"{frames[domain.name]['time'].min():%Y-%m-%d}"
+        for blend in domain.sets:
+            slowest = max(LATENCY_HOURS[p] for p in blend.products)
+            history_only = bool(HISTORY_ONLY_PRODUCTS & set(blend.products))
+            regional = "icon_d2" in blend.products
+            live_gb = not history_only and not regional
+            latency = _latency_label(hours=slowest)
+            lines.append(
+                f"| {domain.name} | {blend.name} | {', '.join(blend.products)} | {latency} "
+                f"| {'yes' if live_gb else 'no'} | {'yes' if history_only else 'no'} "
+                f"| {'yes' if regional else 'no'} | {_usable_from(domain=domain, blend=blend)} "
+                f"| {first_row} |"
+            )
+    return lines
+
+
+def _band_lines(
+    *, losses: pl.DataFrame, frame: pl.DataFrame, contrasts: list[tuple[str, str]]
+) -> list[str]:
+    """Break each contrast's gain down by measured output, and find the most-improved rows' share.
+
+    Each row's difference is averaged over the seeds first.
+
+    Args:
+        losses: The domain's primary-setting losses.
+        frame: The domain's common rows, for the measured output.
+        contrasts: The (treatment, reference) pairs to break down.
+
+    Returns:
+        Markdown lines.
+    """
+    labels = [f"{low:.1f} to {high:.1f}" for low, high in pairwise(OUTPUT_BANDS)]
+    labels.append(f"{OUTPUT_BANDS[-1]:.1f} and above")
+    band = pl.lit(labels[0])
+    for low, label in zip(OUTPUT_BANDS[1:], labels[1:], strict=True):
+        band = pl.when(pl.col("fraction") >= low).then(pl.lit(label)).otherwise(band)
+    output = frame.select(
+        "site",
+        "time",
+        fraction=pl.col("power_mw").cast(pl.Float64) / pl.col("effective_capacity_mw"),
+    ).with_columns(band=band)
+    lines = [
+        (
+            "| Contrast | Measured output, fraction of capacity | Share of rows | Reference MAE "
+            "| ΔMAE within the band | Share of the whole gain |"
+        ),
+        "|---|---|---|---|---|---|",
+    ]
+    shares: list[str] = []
+    for treatment, reference in contrasts:
+        rows = (
+            losses.filter(pl.col("arm") == treatment)
+            .select("site", "time", "seed", treatment=pl.col(METRIC))
+            .join(
+                losses.filter(pl.col("arm") == reference).select(
+                    "site", "time", "seed", reference=pl.col(METRIC)
+                ),
+                on=["site", "time", "seed"],
+            )
+            .group_by("site", "time")
+            .agg(pl.col("treatment").mean(), pl.col("reference").mean())
+            .with_columns(difference=pl.col("treatment") - pl.col("reference"))
+            .join(output, on=["site", "time"])
+        )
+        total = float(rows["difference"].sum())
+        by_band = (
+            rows.group_by("band")
+            .agg(
+                share=pl.len() / rows.height,
+                reference=pl.col("reference").mean(),
+                difference=pl.col("difference").mean(),
+                of_gain=pl.col("difference").sum() / total,
+                low=pl.col("fraction").min(),
+            )
+            .sort("low")
+        )
+        lines += [
+            f"| {treatment} − {reference} | {row['band']} | {row['share']:.1%} "
+            f"| {row['reference'] * PERCENTAGE_POINTS:.3f} "
+            f"| {row['difference'] * PERCENTAGE_POINTS:+.3f} | {row['of_gain']:.0%} |"
+            for row in by_band.iter_rows(named=True)
+        ]
+        ordered = np.sort(rows["difference"].to_numpy())
+        top = ordered[: int(len(ordered) * MOST_IMPROVED_SHARE)]
+        shares.append(
+            f"{treatment} − {reference}: the most-improved {MOST_IMPROVED_SHARE:.0%} of rows "
+            f"carry {top.sum() / total:.0%} of the whole gain, and "
+            f"{(ordered < 0).mean():.0%} of rows improve. A share above 100% means the other "
+            "rows are worse in total."
+        )
+    return [*lines, "", *(f"- {share}" for share in shares)]
+
+
+def _feature_lines(*, domain: Domain, best: BestType) -> list[str]:
+    """Render every fitted arm's feature columns, and which settings it was fitted at.
+
+    Args:
+        domain: The domain.
+        best: Each set's enriched best single.
+
+    Returns:
+        Markdown lines.
+    """
+    settings: dict[str, list[str]] = {}
+    for arm, setting, *_ in (
+        *_single_jobs(domain=domain),
+        *_blend_jobs(domain=domain, best=best),
+    ):
+        settings.setdefault(arm, []).append("primary" if setting == "pooled" else "second")
+    features = _single_features(domain=domain) | _blend_features(domain=domain, best=best)
     lines = [
         f"#### {domain.name.capitalize()}: every fitted arm's feature columns",
         "",
         "| Arm | Settings | Columns | Feature columns |",
         "|---|---|---|---|",
     ]
-    for arm, features in _arm_features(domain=domain).items():
-        settings = "primary, second" if arm in sensitivity else "primary"
-        lines.append(
-            f"| {arm} | {settings} | {len(features)} | "
-            + ", ".join(f"`{f}`" for f in features)
-            + " |"
-        )
+    lines += [
+        f"| {arm} | {', '.join(settings[arm])} | {len(features[arm])} | "
+        + ", ".join(f"`{f}`" for f in features[arm])
+        + " |"
+        for arm in settings
+    ]
     return lines
 
 
@@ -1025,13 +1683,16 @@ def _gap_lines(*, losses: pl.DataFrame, domain: Domain) -> list[str]:
     lines: list[str] = []
     for setting in SETTINGS:
         at_setting = losses.filter(pl.col("setting") == setting)
-        for blend in domain.sets:
-            cross = _mae(losses=at_setting, arm=f"{blend.name}_stack")
-            in_sample = _mae(losses=at_setting, arm=f"{blend.name}_stack_in_sample")
-            lines.append(
-                f"| {domain.name} | {setting} | {blend.name} | {cross:.3f} | {in_sample:.3f} "
-                f"| {in_sample - cross:+.4f} |"
-            )
+        for variant in VARIANTS:
+            for blend in domain.sets:
+                cross = _mae(losses=at_setting, arm=_arm(blend.name, variant, "stack"))
+                in_sample = _mae(
+                    losses=at_setting, arm=_arm(blend.name, variant, "stack_in_sample")
+                )
+                lines.append(
+                    f"| {domain.name} | {setting} | {_arm(blend.name, variant, 'stack')} "
+                    f"| {cross:.3f} | {in_sample:.3f} | {in_sample - cross:+.4f} |"
+                )
     return lines
 
 
@@ -1048,7 +1709,7 @@ def _solar_frame() -> pl.DataFrame:
     """Build the solar study's common rows exactly as `weather_products.main` builds them.
 
     Returns:
-        The rows, with every blend column added.
+        The rows, with the enriched columns and every blend column added.
     """
     frame = with_export_cap(
         dataset=weather_products._with_eras(
@@ -1057,21 +1718,23 @@ def _solar_frame() -> pl.DataFrame:
             )
         )
     )
-    return _with_blend_columns(frame=frame, domain=SOLAR)
+    return _with_blend_columns(
+        frame=weather_products.with_irradiance_context(frame=frame), domain=SOLAR
+    )
 
 
 def _wind_frame() -> pl.DataFrame:
     """Build the wind study's common rows exactly as `wind_products.main` builds them.
 
     Returns:
-        The rows, with every blend column added.
+        The rows, with the enriched columns and every blend column added.
     """
     frame = weather_products._with_eras(
         frame=_add_time_features(
             dataset=wind_products._common_rows(frame=wind_products._joined(sites=_wind_sites()))
         )
     )
-    return _with_blend_columns(frame=frame, domain=WIND)
+    return _with_blend_columns(frame=wind_products.with_wind_context(frame=frame), domain=WIND)
 
 
 class _Outputs(TypedDict):
@@ -1080,36 +1743,32 @@ class _Outputs(TypedDict):
     losses: pl.DataFrame
     weights: pl.DataFrame
     predictions: pl.DataFrame
+    best: BestType
 
 
 def _run_domain(
     *, domain: Domain, frame: pl.DataFrame, singles: pl.DataFrame, resume: bool
 ) -> _Outputs:
-    """Fit every remaining arm, derive the stacks, and assemble the domain's outputs.
+    """Choose the best singles, fit every blend, derive the stacks, and assemble the outputs.
 
     Args:
         domain: The domain.
         frame: The domain's common rows.
-        singles: The single-product arms already fitted at the published settings.
+        singles: Every single-product arm, already fitted.
         resume: Whether to reuse fits already on disk.
 
     Returns:
-        The losses of every arm, the stacks' weights, and every arm's predictions.
+        The losses of every arm, the stacks' weights, every arm's predictions, and the best singles.
     """
-    features = _arm_features(domain=domain)
-    single_arms = {domain.single(product) for product in domain.products}
-    jobs = _jobs(
-        domain=domain, arms=[a for a in features if a not in single_arms], setting="pooled"
-    )
-    jobs += _jobs(domain=domain, arms=_sensitivity_arms(domain=domain), setting="sensitivity")
-    done = {(arm, setting) for arm, setting in singles.select("arm", "setting").unique().rows()}
+    best = _best_singles(losses=singles, domain=domain)
+    _LOG.info("%s best singles: %s", domain.name, best)
     fitted = pl.concat(
         [
             singles,
             _fitted(
                 frame=frame,
                 domain=domain,
-                jobs=[job for job in jobs if (job[0], job[1]) not in done],
+                jobs=_blend_jobs(domain=domain, best=best),
                 resume=resume,
             ),
         ]
@@ -1120,10 +1779,12 @@ def _run_domain(
         stack_losses, stack_weights = _stacks(losses=fitted, domain=domain, setting=setting)
         derived.append(stack_losses)
         weights.append(stack_weights)
-    seed_losses, seed_weights = _seed_stacks(losses=fitted, domain=domain)
-    losses = pl.concat(
-        [fitted.select(LOSS_COLUMNS), *derived, seed_losses], how="vertical_relaxed"
-    ).with_columns(domain=pl.lit(domain.name))
+    seed_losses, seed_weights = _seed_stacks(
+        losses=fitted, domain=domain, arms=_seed_stack_arms(domain=domain, best=best)
+    )
+    losses = pl.concat([fitted, *derived, seed_losses], how="vertical_relaxed").with_columns(
+        domain=pl.lit(domain.name)
+    )
     predictions = losses.join(
         frame.select("site", "time", "power_mw"), on=["site", "time"], how="left"
     ).select(
@@ -1142,62 +1803,60 @@ def _run_domain(
         "losses": losses,
         "weights": pl.concat([*weights, seed_weights]),
         "predictions": predictions,
+        "best": best,
     }
 
 
-def _intervals(*, losses: pl.DataFrame, domain: Domain) -> list[IntervalRecord]:
+def _intervals(*, losses: pl.DataFrame, domain: Domain, best: BestType) -> list[IntervalRecord]:
     """Bootstrap every contrast the report prints for one domain.
 
     Args:
         losses: The domain's losses, every arm and setting.
         domain: The domain.
+        best: Each set's enriched best single.
 
     Returns:
         Every interval, labelled by section.
     """
-    pooled = losses.filter(pl.col("setting") == "pooled")
-    second = losses.filter(pl.col("setting") == "sensitivity")
+    by_setting = {s: losses.filter(pl.col("setting") == s) for s in SETTINGS}
+    pooled = by_setting["pooled"]
     records: list[IntervalRecord] = []
-    deciding = _deciding_contrasts(domain=domain)
-    for setting, at_setting in (("pooled", pooled), ("sensitivity", second)):
-        records += [
-            _interval(
-                losses=at_setting, contrast=pair, domain=domain, setting=setting, section="deciding"
-            )
-            for pair in deciding
-        ]
-    if domain.name == "solar":
-        records.append(
-            _interval(
-                losses=pooled,
-                contrast=POSITIVE_CONTROL,
-                domain=domain,
-                setting="pooled",
-                section="positive_control",
-            )
-        )
-    records += [
-        _interval(
-            losses=pooled,
-            contrast=(f"{domain.single(product)}_seed_stack", domain.single(product)),
-            domain=domain,
-            setting="pooled",
-            section="seed_stack_control",
-        )
-        for product in sorted({blend.best_single for blend in domain.sets})
+    for setting, at_setting in by_setting.items():
+        for section, contrasts in (
+            ("deciding", _deciding_contrasts(domain=domain, best=best, setting=setting)),
+            ("plain", _plain_contrasts(domain=domain)),
+        ):
+            records += [
+                _interval(
+                    losses=at_setting,
+                    contrast=pair,
+                    domain=domain,
+                    setting=setting,
+                    section=section,
+                )
+                for pair in contrasts
+            ]
+    controls: list[tuple[str, tuple[str, str]]] = [
+        ("sensitivity_control", (SYNTHETIC_ARMS[0], best["everything", "pooled"])),
+        ("sensitivity_control", SYNTHETIC_ARMS),
     ]
+    if domain.name == "solar":
+        controls.append(("positive_control", POSITIVE_CONTROL))
+    controls += [
+        ("seed_stack_control", (f"{arm}_seed_stack", arm))
+        for arm in _seed_stack_arms(domain=domain, best=best)
+    ]
+    controls += [("exploratory", pair) for pair in _exploratory_contrasts(domain=domain, best=best)]
     records += [
-        _interval(
-            losses=pooled, contrast=pair, domain=domain, setting="pooled", section="exploratory"
-        )
-        for pair in _exploratory_contrasts(domain=domain)
+        _interval(losses=pooled, contrast=pair, domain=domain, setting="pooled", section=section)
+        for section, pair in controls
     ]
     named_pairs = [
         pair
         for name in domain.named_sets
         for pair in (
-            (f"{name}_xgb", f"{name}_control"),
-            (f"{name}_xgb", domain.single(domain.blend_set(name).best_single)),
+            (_arm(name, "rich", "xgb"), _arm(name, "rich", "control")),
+            (_arm(name, "rich", "xgb"), best[name, "pooled"]),
         )
     ]
     for scope, rows in _split_scopes(losses=pooled):
@@ -1227,7 +1886,7 @@ def _report(
 
     Args:
         frames: Each domain's common rows.
-        outputs: Each domain's losses, weights and predictions.
+        outputs: Each domain's losses, weights, predictions and best singles.
         reproduction: The reproduction check.
         records: Every interval.
         power_version: The power Delta table's version.
@@ -1241,43 +1900,79 @@ def _report(
         f"{frame['time'].min():%Y-%m-%d} to {frame['time'].max():%Y-%m-%d}."
         for name, frame in frames.items()
     ]
-    lines += [f"- Power Delta table version {power_version}.", ""]
     lines += [
+        f"- Power Delta table version {power_version}.",
+        (
+            f"- Synthetic product noise, standard deviation as a fraction of capacity: solar "
+            f"{SOLAR.synthetic_noise}, wind {WIND.synthetic_noise}."
+        ),
+        "",
         (
             "Mean absolute error as a percentage of each site's P99 output. A negative ΔMAE means "
-            "the treatment's error is lower."
+            "the treatment's error is lower. Every 95% interval resamples whole months and one of "
+            "the three fitting seeds, so it covers month-to-month weather and the fitting seed "
+            "only; the t-interval across the five folds adds what one set of trained models, "
+            "rather than another, contributes."
         ),
         "",
         "#### Reproduction check: refitted single-product arms against the published losses",
         "",
         *_reproduction_lines(rows=reproduction),
         "",
-    ]
-    for domain in DOMAINS:
-        lines += [*_feature_lines(domain=domain), ""]
-    for domain in DOMAINS:
-        lines += [*_error_tables(losses=outputs[domain.name]["losses"], domain=domain), ""]
-    lines += [
-        "#### Deciding contrasts, named before the run",
+        "#### Deciding contrasts: each named set's enriched blend against its enriched best single",
         "",
         (
-            "Per named set: blend against its control, control against the best single, and "
-            "blend against the best single beside them; then the stack against XGBoost on every "
-            "column."
+            "Added after the first run (post hoc). Per named set: the enriched blend against its "
+            "climatology control, the control against the best single, and the blend against the "
+            "best single; then the enriched stack against the enriched XGBoost blend. The best "
+            "single is chosen at each setting, by mean error on the common rows."
         ),
         "",
-        *CONTRAST_HEADER,
-        *_section_lines(records=records, section="deciding", setting="pooled"),
+        *HEADLINE_HEADER,
+        *_section_lines(records=records, section="deciding", render=_headline_line),
         "",
-        "#### The deciding contrasts at the second hyperparameter setting",
+        "#### Secondary: the plain contrasts named before the first run",
         "",
-        *CONTRAST_HEADER,
-        *_section_lines(records=records, section="deciding", setting="sensitivity"),
+        *HEADLINE_HEADER,
+        *_section_lines(records=records, section="plain", render=_headline_line),
+        "",
+        "#### Sensitivity positive control: a synthetic product carrying part of the target",
+        "",
+        *HEADLINE_HEADER,
+        *_section_lines(records=records, section="sensitivity_control", render=_headline_line),
         "",
         "#### Positive control: CAMS with ICON-D2 against ICON-D2 alone",
         "",
         *CONTRAST_HEADER,
         *_section_lines(records=records, section="positive_control"),
+        "",
+        "#### Latency and coverage of each set",
+        "",
+        *_coverage_lines(frames=frames),
+        "",
+    ]
+    for domain in DOMAINS:
+        losses = outputs[domain.name]["losses"]
+        best = outputs[domain.name]["best"]
+        lines += [*_single_table(losses=losses, domain=domain), ""]
+        for variant in ("rich", "plain"):
+            lines += [
+                *_blend_table(losses=losses, domain=domain, variant=variant, best=best),
+                "",
+            ]
+    wind_best = outputs["wind"]["best"]
+    band_contrasts = [
+        (_arm(name, "rich", "xgb"), wind_best[name, "pooled"]) for name in WIND.named_sets
+    ]
+    band_contrasts.append(("everything_xgb", WIND.single("icon_d2")))
+    lines += [
+        "#### Wind: where the gain comes from, by measured output (primary setting)",
+        "",
+        *_band_lines(
+            losses=outputs["wind"]["losses"].filter(pl.col("setting") == "pooled"),
+            frame=frames["wind"],
+            contrasts=band_contrasts,
+        ),
         "",
         "#### Seed-ensemble stack control: each best single's three seeds, stacked",
         "",
@@ -1294,36 +1989,48 @@ def _report(
         "",
         "#### In-sample against cross-fitted stack weights (point estimates)",
         "",
-        "| Domain | Setting | Set | Cross-fitted MAE | In-sample MAE | In-sample − cross-fitted |",
+        (
+            "| Domain | Setting | Stack | Cross-fitted MAE | In-sample MAE "
+            "| In-sample − cross-fitted |"
+        ),
         "|---|---|---|---|---|---|",
     ]
     for domain in DOMAINS:
         lines += _gap_lines(losses=outputs[domain.name]["losses"], domain=domain)
-    exploratory = [r for r in records if r["section"].startswith("exploratory")]
-    excluding = sum(r["excludes_zero"] for r in exploratory)
+    exploratory = [r for r in records if r["section"] == "exploratory"]
+    splits = [r for r in records if r["section"] == "exploratory_split"]
     lines += [
         "",
         "#### Exploratory contrasts",
         "",
         (
-            f"{len(exploratory)} exploratory intervals, of which {excluding} exclude zero. About 1 "
-            f"in 20, so about {len(exploratory) / 20:.0f}, would exclude zero by chance alone."
+            f"{len(exploratory)} exploratory intervals, of which "
+            f"{sum(r['excludes_zero'] for r in exploratory)} exclude zero. Many compare arms "
+            "expected to differ, such as a blend against its own control, and they share rows and "
+            "models with one another, so they are not independent tests and no count of chance "
+            "exclusions is quoted."
         ),
         "",
         *CONTRAST_HEADER,
         *_section_lines(records=records, section="exploratory"),
         "",
-        "#### The named blends by site, season and era (exploratory)",
+        "#### The named enriched blends by site, season and era (exploratory)",
         "",
         (
+            f"{len(splits)} intervals, of which {sum(r['excludes_zero'] for r in splits)} exclude "
+            "zero. The splits reuse the rows of the whole-record contrasts, and the seasons and "
+            "eras share each generator's models, so they are not independent tests of anything. "
             "The post era holds eight months, so its intervals rest on eight clusters and "
             "under-cover; read its fold-sign counts alongside them."
         ),
         "",
         *CONTRAST_HEADER,
         *_section_lines(records=records, section="exploratory_split"),
+        "",
     ]
-    return "\n".join(lines) + "\n"
+    for domain in DOMAINS:
+        lines += [*_feature_lines(domain=domain, best=outputs[domain.name]["best"]), ""]
+    return "\n".join(lines)
 
 
 def main() -> int:
@@ -1334,6 +2041,7 @@ def main() -> int:
         "--resume", action="store_true", help="Reuse per-arm fits a previous run left on disk."
     )
     resume = parser.parse_args().resume
+    started = datetime.now(tz=UTC)
 
     power_version = _power_version()
     frames: dict[DomainType, pl.DataFrame] = {"solar": _solar_frame(), "wind": _wind_frame()}
@@ -1344,17 +2052,11 @@ def main() -> int:
     singles: dict[DomainType, pl.DataFrame] = {}
     reproduction: list[ReproductionRow] = []
     for domain in DOMAINS:
-        jobs = [
-            job
-            for setting in domain.published_settings
-            for job in _jobs(
-                domain=domain,
-                arms=[domain.single(product) for product in domain.products],
-                setting=setting,
-            )
-        ]
         singles[domain.name] = _fitted(
-            frame=frames[domain.name], domain=domain, jobs=jobs, resume=resume
+            frame=frames[domain.name],
+            domain=domain,
+            jobs=_single_jobs(domain=domain),
+            resume=resume,
         )
         reproduction += _reproduction(fitted=singles[domain.name], domain=domain)
     gate = "\n".join(_reproduction_lines(rows=reproduction)) + "\n"
@@ -1380,7 +2082,9 @@ def main() -> int:
     records = [
         record
         for domain in DOMAINS
-        for record in _intervals(losses=outputs[domain.name]["losses"], domain=domain)
+        for record in _intervals(
+            losses=outputs[domain.name]["losses"], domain=domain, best=outputs[domain.name]["best"]
+        )
     ]
     pl.DataFrame(records).write_parquet(OUTPUT_DIR / "intervals.parquet")
     report = _report(
@@ -1393,6 +2097,7 @@ def main() -> int:
     (OUTPUT_DIR / "report.md").write_text(report)
     shutil.rmtree(OUTPUT_DIR / FITS_DIR_NAME)
     sys.stdout.write(report)
+    _LOG.info("finished in %s", datetime.now(tz=UTC) - started)
     return 0
 
 

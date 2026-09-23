@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 import numpy as np
 import polars as pl
 import pytest
-from studies.bootstrap import bootstrap_difference, per_fold_differences
+from studies.bootstrap import bootstrap_difference, fold_t_interval, per_fold_differences
 
 # Months hold unequal numbers of rows, so a resample that lost the pairing on `seed`, or drew rows
 # rather than whole months, would land on a different interval.
@@ -111,3 +111,16 @@ def test_per_fold_differences_give_one_value_per_fold_in_fold_order():
     assert per_fold_differences(
         losses=losses, treatment="T", reference="R", metric="loss"
     ) == pytest.approx([0.25, 0.5])
+
+
+def test_the_fold_t_interval_matches_the_textbook_formula():
+    # Five folds: mean 2, sample standard deviation sqrt(2.5), t(0.975, 4) = 2.7764451.
+    lower, upper = fold_t_interval(fold_differences=[0.0, 1.0, 2.0, 3.0, 4.0])
+
+    half_width = 2.7764451052 * np.sqrt(2.5) / np.sqrt(5.0)
+    assert (lower, upper) == pytest.approx((2.0 - half_width, 2.0 + half_width))
+
+
+def test_a_single_fold_has_no_t_interval():
+    with pytest.raises(ValueError, match="at least two folds"):
+        fold_t_interval(fold_differences=[1.0])

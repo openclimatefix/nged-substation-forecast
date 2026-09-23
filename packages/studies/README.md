@@ -9,8 +9,8 @@ It owns the pieces that more than one study needs and that fail silently when wr
 out-of-fold XGBoost loop and the paired bootstrap every comparison is read through, solar geometry,
 the checks that establish what temporal object a downloaded column holds, the half-hourly-to-hourly
 power aggregation, the mapping from a meter to an anonymous label, sampling a projected weather grid
-at a set of coordinates, the Fractions Skill Score, and the control and the stack a blend of weather
-products is measured with.
+at a set of coordinates, the Fractions Skill Score, the control and the stack a blend of weather
+products is measured with, and a product's neighbouring hours.
 
 It does not own the question, the arms, the charts, or the write-up. Those stay in the study, as
 scripts, because a one-off comparison is not a library and should not be dressed as one. It does not
@@ -26,10 +26,12 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
 - `cross_validation` — per-site, out-of-fold XGBoost fits and their per-row losses, with the fold
   scheme and the fixed hyperparameters they use.
 - `bootstrap` — the paired arm-to-arm difference and its interval, resampling whole months and a
-  seed.
+  seed, and a t-interval across the folds' own differences.
 - `blending` — combining several weather products: the climatology-permuted control columns a
   blend is compared against, and a linear stack of single-product models cross-fitted per generator,
   seed and fold.
+- `neighbouring_hours` — a weather product's value in the hours around each scored hour, read
+  from the product's own download so that the rows dropped from scoring cannot leak into it.
 - `anonymise` — the one mapping from a meter's `time_series_id` to the anonymous label a chart or a
   write-up may carry.
 - `solar` — solar position and the extraterrestrial flux, for a series of timestamps at one

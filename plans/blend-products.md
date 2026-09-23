@@ -310,3 +310,65 @@ The mutation pass then checks each test fails on the bug it targets.
   them after a crash. The directory is deleted once every output is on disk.
 - **The output directory is `blend_products/`**, as the plan names it, not `beam_diffuse_*` like its
   neighbours.
+
+## Changes after the first science review
+
+**The enriched arms and every contrast built on them were added post hoc, after the first run.**
+The first science review found no leakage, an exact reproduction, and a real and broad wind gain.
+It also found that every "blend beats the best single product" figure was measured against the
+published pages' plain single-product arms, which the solar page itself already beats with the
+beam split, the neighbouring hours, or UKV rebuilt from both snapshots. In the reviewer's post-hoc
+checks much of each headline gain was available from one product with those additions: solar
+`everything_xgb − cams_split` was −0.085 points against the headline −0.205, and wind
+`everything_ctx − icon_d2_ctx` was −0.522 against the headline −0.822. The deciding question is
+whether blending beats the best single product we can build, so the re-run measures that, and the
+page labels every enriched figure post hoc.
+
+- **Enriched single-product arms, `<product>_rich`.** Solar: every product with the hour before
+  and the hour after, CAMS with its own beam split as well, and UKV rebuilt from both snapshots.
+  UKV's and ICON-EU's enriched arms repeat the published `ukv_trap_ctx_global` and
+  `icon_eu_ctx_global` columns in the same order, and must reproduce them bit for bit. Wind: every
+  product's four plain columns plus its hub-height speed at ±1 h and ±2 h and its 10 m speed at
+  ±1 h. ERA5 and ICON global get the same neighbouring hours as the others, so the enriched
+  `everything` blend is built from every product's enriched columns.
+- **The neighbouring hours come from each product's own download, not from the scored rows.** The
+  scored rows exclude every hour holding a zero half-hour of metered power, so a neighbour read from
+  them would be missing exactly where the target was zero next door. The tested
+  `studies.neighbouring_hours.with_neighbouring_hours` does the join; `weather_products.py` and
+  `wind_products.py` gain `with_irradiance_context` and `with_wind_context`, which call it, and the
+  solar one checks that each download reproduces the frame's own column at offset zero.
+- **The enriched best single is the best single-product arm measured**, chosen by mean error on
+  the common rows at each setting. At the primary setting the candidates are every published
+  single-product arm of the set's products (global, own split, Erbs, UKV's snapshot arms, and for
+  wind the served 100 m and UKV 80 m arms), all refitted here and each reproduced bit for bit, and
+  every enriched arm. At the second setting they are the plain and enriched arms. ICON global's
+  `_step` arms stay out, because the step indicator acts as a date-regime feature.
+- **Enriched blends of every set, four methods each**, with the enriched XGBoost blend's
+  climatology control holding the best single's real columns and every other product's enriched
+  columns permuted, one group per product. The enriched mean arm averages the positions every
+  product shares: the hour before, the hour, and the hour after for solar, and all ten wind columns.
+  The live blends read UKV rebuilt from both snapshots.
+- **The deciding contrasts become the enriched ones**, per named set and at both settings:
+  enriched blend against its control, control against the enriched best single, blend against the
+  enriched best single, and the enriched stack against the enriched XGBoost blend. The plain
+  contrasts named before the first run stay, as secondary.
+- **A sensitivity positive control.** The existing positive control shows a 2.8-point gain, which
+  says nothing about whether the pipeline would see a gain the size of the enriched contrasts. The
+  synthetic product is each row's measured output as a fraction of capacity plus Gaussian noise,
+  drawn once with a fixed seed, with a standard deviation of 0.30 of capacity for solar and 0.45 for
+  wind. `synthetic_xgb` is the `everything` set's enriched best single shown that one extra column,
+  and `synthetic_control` is shown the column permuted within site, month and hour of day. The noise
+  was sized on a pilot fit in scratch: against the enriched best single, solar gained 0.19 points at
+  0.25 and 0.07 at 0.40, and wind 0.31 at 0.30 and 0.14 at 0.45. The report and the page label the
+  arm synthetic.
+- **The report adds** each headline contrast's range across generators and its t-interval across
+  the five folds, with a sentence saying the month bootstrap covers month-to-month weather and the
+  fitting seed only; a latency and coverage table for every set; the wind gain by measured-output
+  band, with the share of the gain carried by the most-improved 5% of rows; and a corrected
+  exploratory count, which no longer quotes a number of chance exclusions and says the site, season
+  and era splits are not independent tests.
+- **`climatology_permutation` takes a `suffix`**, so the enriched columns' permuted copies do not
+  overwrite the plain ones', and **`studies.bootstrap.fold_t_interval`** is new, both tested.
+- **Every published single-product arm is refitted and reproduced**, not only the plain global and
+  wind arms: 22 solar and 16 wind (arm, setting) pairs, all bit-identical. The whole re-run, 149
+  fitted arms, took about 31 minutes on this machine.

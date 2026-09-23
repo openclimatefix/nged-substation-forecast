@@ -43,6 +43,7 @@ from fetch_wind_point import PRODUCTS, output_path_for
 from run_experiment import Job, _add_time_features, _run_all
 from sources import STUDY_DATA_DIR
 from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SENSITIVITY_HYPER_PARAMETERS
+from studies.neighbouring_hours import with_neighbouring_hours
 from studies.power import hourly_from_half_hourly
 from weather_products import (
     CONTRAST_HEADER,
@@ -175,6 +176,65 @@ def _hub_height_m(*, product: str) -> int:
         80 for the ICON products, whose native heights are 80 m and 120 m, and 100 otherwise.
     """
     return 80 if product.startswith("icon") else 100
+
+
+HUB_OFFSETS_HOURS: Final[tuple[int, ...]] = (-2, -1, 1, 2)
+"""The neighbouring hours of hub-height speed a context arm is shown."""
+
+SURFACE_OFFSETS_HOURS: Final[tuple[int, ...]] = (-1, 1)
+"""The neighbouring hours of 10 m speed a context arm is shown."""
+
+
+def _offset_label(offset_hours: int) -> str:
+    """Return an offset's name stem, such as `minus2h` or `plus1h`.
+
+    Args:
+        offset_hours: The offset from the row's hour.
+
+    Returns:
+        The stem.
+    """
+    return f"{'minus' if offset_hours < 0 else 'plus'}{abs(offset_hours)}h"
+
+
+def context_columns(*, product: str) -> tuple[str, ...]:
+    """Return one product's neighbouring-hour speed columns, which `with_wind_context` adds.
+
+    Args:
+        product: A key of `PRODUCTS`.
+
+    Returns:
+        The hub-height speed at each of `HUB_OFFSETS_HOURS`, then the 10 m speed at each of
+        `SURFACE_OFFSETS_HOURS`.
+    """
+    return (
+        *(f"speed_hub_{_offset_label(offset)}_{product}" for offset in HUB_OFFSETS_HOURS),
+        *(f"speed_10m_{_offset_label(offset)}_{product}" for offset in SURFACE_OFFSETS_HOURS),
+    )
+
+
+def with_wind_context(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Add every product's hub-height and 10 m speeds in the hours around each row.
+
+    The neighbours are read from each product's own download, not from the scored rows, which
+    exclude hours by the target.
+
+    Args:
+        frame: The common rows.
+
+    Returns:
+        `frame`, in its own row order, with `context_columns(product=...)` for every product.
+    """
+    for product in PRODUCTS:
+        hub = f"wind_speed_{_hub_height_m(product=product)}m"
+        offsets = [(hub, offset) for offset in HUB_OFFSETS_HOURS]
+        offsets += [("wind_speed_10m", offset) for offset in SURFACE_OFFSETS_HOURS]
+        frame = with_neighbouring_hours(
+            frame=frame,
+            source=pl.read_parquet(output_path_for(product=product)),
+            columns=dict(zip(context_columns(product=product), offsets, strict=True)),
+        )
+    return frame
 
 
 def _joined(*, sites: pl.DataFrame) -> pl.DataFrame:

@@ -49,7 +49,7 @@ from typing import Final
 
 import numpy as np
 import polars as pl
-from build_dataset import _hourly_power, _pv_sites
+from build_dataset import CAMS_PATH, _hourly_power, _nearest_era5_cell, _pv_sites, _read_era5
 from commissioning import drop_commissioning_ramp
 from export_cap import with_export_cap
 from physics_model import (
@@ -67,7 +67,7 @@ from run_experiment import (
     _run_all,
     dataset_path_for,
 )
-from sources import STUDY_DATA_DIR, point_output_path_for
+from sources import STUDY_DATA_DIR, SourceType, point_output_path_for
 from studies.bootstrap import (
     BOOTSTRAP_SEED,
     N_BOOTSTRAP_RESAMPLES,
@@ -81,6 +81,7 @@ from studies.cross_validation import (
     clamp_to_cap,
     fit_one_fold,
 )
+from studies.neighbouring_hours import with_neighbouring_hours
 
 _LOG = logging.getLogger(__name__)
 
@@ -314,6 +315,77 @@ def _icon_eu_context() -> pl.DataFrame:
         "site", "time", "ghi_w_m2"
     )
     return _neighbours(frame=download, column="ghi_w_m2", prefix="ghi", product="icon_eu")
+
+
+CONTEXT_PRODUCTS: Final[tuple[str, ...]] = ("cams", "era5", "icon_d2", "icon_global")
+"""The products `with_irradiance_context` adds neighbouring hours for.
+
+UKV's and ICON-EU's neighbouring hours are already in `_joined`'s frame, as `ghi_trap_previous_ukv`,
+`ghi_trap_next_ukv`, `ghi_previous_icon_eu`, and `ghi_next_icon_eu`.
+"""
+
+
+CONTEXT_SOURCES: Final[dict[str, SourceType]] = {"icon_d2": "icon-d2", "icon_global": "icon-global"}
+"""The downloads the per-site weather models' neighbouring hours are read from."""
+
+
+def _irradiance_download(*, product: str) -> pl.DataFrame:
+    """Return one product's served global irradiance at every site and hour it was downloaded.
+
+    ERA5 is gridded, so each site reads its nearest cell, as `build_dataset.py` does.
+
+    Args:
+        product: A key of `CONTEXT_PRODUCTS`.
+
+    Returns:
+        One row per (site, time) with `ghi_w_m2`.
+    """
+    if product == "era5":
+        gridded = _read_era5(source="open-meteo")
+        cells = _nearest_era5_cell(sites=_pv_sites(), era5=gridded)
+        return cells.join(
+            gridded,
+            left_on=["cell_latitude", "cell_longitude"],
+            right_on=["latitude", "longitude"],
+        ).select("site", "time", "ghi_w_m2")
+    path = (
+        CAMS_PATH if product == "cams" else point_output_path_for(source=CONTEXT_SOURCES[product])
+    )
+    return pl.read_parquet(path).select("site", "time", "ghi_w_m2")
+
+
+def with_irradiance_context(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Add the hour before and the hour after each row for every product in `CONTEXT_PRODUCTS`.
+
+    The neighbours are read from each product's own download, not from the scored rows, which
+    exclude hours by the target. Each download is checked to reproduce the frame's own column at
+    offset zero first, so a neighbour cannot come from a series labelled differently.
+
+    Args:
+        frame: The common rows, carrying `ghi_<product>` for every product.
+
+    Returns:
+        `frame`, in its own row order, with `ghi_previous_<product>` and `ghi_next_<product>`.
+
+    Raises:
+        ValueError: If a download does not reproduce the frame's column at offset zero.
+    """
+    for product in CONTEXT_PRODUCTS:
+        own = f"ghi_{product}"
+        frame = with_neighbouring_hours(
+            frame=frame,
+            source=_irradiance_download(product=product),
+            columns={
+                f"{own}_at_zero": ("ghi_w_m2", 0),
+                f"ghi_previous_{product}": ("ghi_w_m2", -1),
+                f"ghi_next_{product}": ("ghi_w_m2", 1),
+            },
+        )
+        if not frame[f"{own}_at_zero"].cast(pl.Float64).equals(frame[own].cast(pl.Float64)):
+            msg = f"the {product} download does not reproduce {own} at offset zero"
+            raise ValueError(msg)
+        frame = frame.drop(f"{own}_at_zero")
+    return frame
 
 
 def _common_rows(*, frame: pl.DataFrame) -> pl.DataFrame:
