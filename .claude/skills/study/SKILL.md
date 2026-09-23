@@ -63,8 +63,7 @@ page only after a committed script prints it into the report.
 2. **Name the deciding contrasts in the plan, before any result exists.** Name two to five contrasts
    that answer the question: the planned contrasts, labelled "(planned)" on the page, never "named
    before the run". Every other number the study produces is exploratory, and is labelled so on the
-   page. An analysis added after the first run is post hoc, and is labelled so
-   too.
+   page. An analysis added after the first run is post hoc, and is labelled so too.
 3. **Build the datasets, run, and write the report.** Print every arm's feature columns into the
    report (see "An arm can silently lose a column", below).
 4. **First Opus scientific-validity review**, of the design and the first results. Triage it, fix,
@@ -268,8 +267,9 @@ sets out the rule and the products the rule covers.
 reading any text.** Each chart, with its title, subtitle, axis labels, and legend, tells its part of
 the story without the prose around it. Load the `dataviz` skill before drawing any chart.
 
-- **A headline chart opens every page**, directly under the summary, showing the headline result
-  with its 95% intervals. Every section whose claim rests on a number gets a chart too.
+- **A headline chart opens every page**, directly under the summary and before the disclaimer,
+  showing the headline result with its 95% intervals. Every section whose claim rests on a number
+  gets a chart too.
 - **Show the method working before any contrast.** A contrast of a tenth of a point means nothing
   unless the model produces a sane forecast. Plot out-of-fold predictions against the measured
   output for every anonymised generator, across a few weeks chosen by a stated rule rather than by
@@ -346,12 +346,13 @@ Every study page takes this outline:
    and every other scope a reader might over-read, such as equal leads.
 9. **Reproducing the figures.**
 
-**Every study page carries this disclaimer, as a blockquote after the summary:**
+**Every study page carries this disclaimer, as a blockquote after the summary and before the key
+findings:**
 
 > **How this page was made.** The research question came from a human. Everything else — the code
-> behind every result, the analysis, the figures and the text — was written by Claude, Anthropic's
-> AI model (for this page, MODEL). A human has reviewed the figures and the text, and several
-> independent Claude reviewers have checked the method, the evidence and the prose adversarially.
+> behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
+> AI model (for this page, MODEL). A human has reviewed the figures, and the text, and several
+> independent Claude reviewers have checked the method, the evidence, and the prose adversarially.
 
 Take MODEL from the `Co-Authored-By` trailers of the commits that touch the page and the study
 code behind it, including the shared code in `packages/studies/` and the older study scripts the
@@ -361,7 +362,7 @@ study imports. Name every Claude model that wrote any part of the page or of its
 git log --follow --format=%b -- <file> | grep -o 'Co-Authored-By: Claude[^<]*' | sort | uniq -c
 ```
 
-Leave out the sentence "A human has reviewed the figures and the text" until the maintainer has
+Leave out the sentence "A human has reviewed the figures, and the text" until the maintainer has
 reviewed the page, and add the sentence in the commit that follows that review.
 
 **Define "planned" and "exploratory" once per page, in "Data and methods".** A planned contrast
@@ -374,7 +375,7 @@ page what the month-resampled test covers: the month-to-month weather and the fi
 differences between generators. Say too that, among many exploratory rows, about 1 in 20 reaches
 significance at the 5% level by chance.
 
-**Say what the model was given, and say which kind of model it is.** Write "an XGBoost model given
+**Say what the XGBoost model was given, and name its kind.** Write "an XGBoost model given
 ICON-EU's 80 m wind", never "ICON-EU shown its 80 m wind". A study page can mean a weather model,
 an XGBoost model, a PV model, a linear stack, or Claude by "model". Qualify every "model" by its
 kind. Never write a bare "arm" on a published page without defining it: "arm" is experiment-design

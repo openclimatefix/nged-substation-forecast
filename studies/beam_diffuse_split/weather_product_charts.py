@@ -603,16 +603,24 @@ def _neighbours(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         "Trained on the generator itself",
         "Trained on the other five generators",
     )
+    sections = (SECTION_DECIDING, SECTION_TRANSFER)
     frames = [
         select_contrasts(
             contrasts=contrasts,
             wanted=[ContrastKey(section, "all", t, r) for t, r in DECIDING],
         ).with_columns(condition=pl.lit(condition))
-        for section, condition in zip((SECTION_DECIDING, SECTION_TRANSFER), conditions, strict=True)
+        for section, condition in zip(sections, conditions, strict=True)
     ]
     labels = [_served_contrast_name(treatment=t, reference=r) for t, r in DECIDING]
     rows = pl.concat(
-        [_rows(contrasts=frame, labels=labels, planned=[True] * len(DECIDING)) for frame in frames]
+        [
+            _rows(
+                contrasts=frame,
+                labels=labels,
+                planned=[section == SECTION_DECIDING] * len(DECIDING),
+            )
+            for frame, section in zip(frames, sections, strict=True)
+        ]
     ).sort(pl.col("label").replace_strict({label: i for i, label in enumerate(labels)}))
     figure_planning = planning(rows=[rows])
     panel = interval_panel(

@@ -577,6 +577,11 @@ def test_planning_counts_a_frame_without_the_column_as_exploratory():
     assert planning(rows=[_rows(["satellite"]), _planned_rows([True])]) == "mixed"
 
 
+def test_planning_treats_a_null_planned_value_as_false() -> None:
+    rows = _rows(["satellite"]).with_columns(planned=pl.Series([None], dtype=pl.Boolean))
+    assert planning(rows=[rows]) == "exploratory"
+
+
 def _labels(spec: dict) -> list[str]:
     panel = spec["vconcat"][-1]
     (interval,) = [layer for layer in _layer(panel, "rule") if "x2" in layer["encoding"]]

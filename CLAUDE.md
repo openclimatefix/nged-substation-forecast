@@ -237,10 +237,11 @@ above: there an umbrella noun hides a list of fields, here it hides what is bein
 network using neural networks, so a bare "network" makes the reader stop and work out which one is
 meant. Qualify it on both sides: "electricity network", "distribution network", "network operator"
 for the wires, and "neural network", "graph neural network", "long short-term memory neural network"
-for the model. Where a sentence would otherwise pile up the qualifier, name the specific noun instead
-— "a model trained on the feeders' own history" beats "a model given a network's whole history". A
-bare "model" is just as ambiguous, because the word can mean a weather model, an XGBoost model, a PV
-model, or a large language model: write "weather model" or "XGBoost model", never "model" alone.
+for the machine-learning model. Where a sentence would otherwise pile up the qualifier, name the
+specific noun instead — "an XGBoost model trained on the feeders' own history" beats "an XGBoost
+model given a network's whole history". A bare "model" is just as ambiguous, because the word can
+mean a weather model, an XGBoost model, a PV model, or a large language model: write "weather model"
+or "XGBoost model", never "model" alone.
 Any other word this project uses for two different meanings gets the same treatment.
 
 **Use the internationally recognised engineering term, not a national policy coinage.** Where a UK

@@ -46,11 +46,11 @@ statistically significant at the 5% level. The evidence is three wind farms in f
 and 50,734 generator-hours from August 2024 to September 2026.
 
 > **How this page was made.** The research question came from a human. Everything else — the code
-> behind every result, the analysis, the figures and the text — was written by Claude, Anthropic's
+> behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
 > AI model (for this page, Claude Opus 5.5, reusing the data-preparation and model-fitting code that
 > Claude Opus 5 wrote for the [beam/diffuse study](beam-diffuse-split.md)). A human has reviewed the
-> figures and the text, and several independent Claude reviewers have checked the method, the
-> evidence and the prose adversarially.
+> figures, and the text, and several independent Claude reviewers have checked the method, the
+> evidence, and the prose adversarially.
 
 ![Figure 1: UKV and ICON-D2 describe past wind best of the five products tested](assets/wind_headline.svg)
 
@@ -144,11 +144,11 @@ nearest grid cell over land.**
   every other figure is exploratory, chosen or added after results were seen. The distinction
   matters because with many comparisons, about 1 in 20 exploratory rows reaches significance at the
   5% level by chance, so an exploratory result is a lead to follow up rather than a finding. A chart
-  holding both kinds marks each planned row "(planned)". A chart whose rows are all one kind says
-  so once, in its subtitle. Every contrast is also rerun with a second
-  hyperparameter setting for the tree. The plan written before the run gave the model each product's
-  served 100 m wind. After the first run, each ICON product was switched to its 80 m wind. The
-  results with the served 100 m wind are reported alongside and change no ranking.
+  holding both kinds marks each planned row "(planned)". A chart whose rows are all one kind says so
+  once, in its subtitle. Every contrast is also rerun with a second hyperparameter setting for the
+  tree. The plan written before the run gave the model each product's served 100 m wind. After the
+  first run, each ICON product was switched to its 80 m wind. The results with the served 100 m wind
+  are reported alongside and change no ranking.
 
 ## UKV and ICON-D2 describe past wind best of the five products tested
 

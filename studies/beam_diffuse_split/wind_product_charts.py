@@ -125,8 +125,8 @@ def _reproduce(*, pooled: pl.DataFrame, report_text: str) -> None:
 AFTER_FIRST_RUN_SUFFIX: Final[str] = " (planned; 80 m chosen after the first run)"
 """Ends the label of a named contrast whose ICON arm was switched to 80 m after the first run.
 
-Such a row is not marked `planned`, so its label is not set bold: only an arm exactly as the plan
-specified it is.
+A row carrying this suffix is not marked `planned`, so `NAMED_SUFFIX` does not also bold its label
+in a mixed figure: only a row whose arm is exactly as the plan specified gets that.
 """
 
 
