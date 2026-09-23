@@ -9,8 +9,10 @@ product's values among the rows that share a site, a month, and an hour of day.
 weights that sum to 1.** With weights summing to 1, the stacked prediction's error is the same
 weighted sum of the single-product models' errors, so `stacked_errors` fits and scores the stack
 from the saved signed errors with no refit. Each generator, seed and scored fold gets its own
-weights, fitted on the same generator's other folds, so neither the scored fold's target nor a
-neighbouring generator's target reaches them.
+weights, fitted on the same generator's other folds, so no neighbouring generator's target reaches
+them. The scored fold's own target still reaches them at one remove: the weights are fitted on the
+other folds' out-of-fold errors, and each of those errors comes from a single-product model that was
+itself trained on the scored fold's months, alongside every fold but its own.
 """
 
 from collections.abc import Sequence
@@ -22,14 +24,6 @@ from scipy.optimize import nnls
 
 PERMUTED_SUFFIX: Final[str] = "_shuffled"
 """Appended to a column's name to name its permuted copy."""
-
-SUM_TO_ONE_WEIGHT: Final[float] = 1.0e4
-"""How heavily the sum-to-one row weighs in the least-squares fit, relative to the errors' norm.
-
-`nnls` takes no equality constraint, so the constraint enters as one extra row whose residual is
-this factor times the errors' norm times the weights' departure from summing to 1. At this weight
-the fitted sum misses 1 by about one part in 10⁸, and the weights are renormalised afterwards.
-"""
 
 
 def climatology_permutation(
@@ -78,6 +72,11 @@ def climatology_permutation(
 def simplex_weights(*, errors: np.ndarray) -> np.ndarray:
     """Return the non-negative weights summing to 1 that minimise the squared weighted-sum error.
 
+    `nnls` takes no equality constraint, so the sum-to-one constraint enters as one extra row,
+    weighted the same as every other row, whose target is 1 rather than 0. The signed errors this
+    is fitted on are small next to that target, so the extra row dominates the fit and the weights
+    land close to summing to 1 already; `weights / weights.sum()` then makes the sum exact.
+
     Args:
         errors: One row per observation and one column per model, each entry that model's signed
             error.
@@ -86,10 +85,8 @@ def simplex_weights(*, errors: np.ndarray) -> np.ndarray:
         One weight per column, each at least 0, summing to exactly 1 up to floating-point rounding.
     """
     n_models = errors.shape[1]
-    scale = float(np.sqrt(np.square(errors).sum()))
-    penalty = SUM_TO_ONE_WEIGHT * (scale if scale > 0.0 else 1.0)
-    design = np.vstack([errors, np.full((1, n_models), penalty)])
-    target = np.concatenate([np.zeros(errors.shape[0]), [penalty]])
+    design = np.vstack([errors, np.ones((1, n_models))])
+    target = np.concatenate([np.zeros(errors.shape[0]), [1.0]])
     weights, _ = nnls(design, target)
     return weights / weights.sum()
 
