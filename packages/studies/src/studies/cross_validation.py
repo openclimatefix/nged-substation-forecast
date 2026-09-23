@@ -195,6 +195,7 @@ def fit_one_fold(
     hyper_parameters: HyperParameters,
     seed: int,
     with_quantiles: bool,
+    weight: str | None = None,
 ) -> tuple[np.ndarray, np.ndarray | None]:
     """Fit one point model, optionally one quantile model, and predict the test fold.
 
@@ -206,11 +207,16 @@ def fit_one_fold(
         hyper_parameters: Settings shared by every arm.
         seed: The XGBoost random seed.
         with_quantiles: Whether to fit the quantile model as well.
+        weight: A column of training-row weights, or `None` to weigh every row alike.
 
     Returns:
         The point predictions, and the quantile predictions or `None`.
     """
-    train_matrix = xgb.DMatrix(train.select(features).to_numpy(), label=train[target].to_numpy())
+    train_matrix = xgb.DMatrix(
+        train.select(features).to_numpy(),
+        label=train[target].to_numpy(),
+        weight=None if weight is None else train[weight].to_numpy(),
+    )
     test_matrix = xgb.DMatrix(test.select(features).to_numpy())
     shared = booster_parameters(hyper_parameters=hyper_parameters, seed=seed)
     rounds = hyper_parameters["num_boost_round"]
@@ -237,6 +243,7 @@ def out_of_fold_losses(
     target: str,
     hyper_parameters: HyperParameters,
     with_quantiles: bool,
+    weight: str | None = None,
 ) -> pl.DataFrame:
     """Produce out-of-fold losses for one feature set at one site, one row per (test row, seed).
 
@@ -252,6 +259,7 @@ def out_of_fold_losses(
         target: The column to predict.
         hyper_parameters: The setting to fit at.
         with_quantiles: Whether to score the continuous ranked probability score too.
+        weight: A column of training-row weights, or `None` to weigh every row alike.
 
     Returns:
         One row per (time, seed) with the losses in megawatts and as a fraction of the row's own
@@ -277,6 +285,7 @@ def out_of_fold_losses(
                 hyper_parameters=hyper_parameters,
                 seed=seed,
                 with_quantiles=with_quantiles,
+                weight=weight,
             )
             outputs.append(
                 _losses(test=test, actual=actual, point=point, quantiles=quantiles, seed=seed)
@@ -343,4 +352,102 @@ def _losses(
             absolute_error_capped_fraction_of_capacity=pl.col("absolute_error_capped_mw")
             / pl.col("effective_capacity_mw"),
         )
+    )
+
+
+def out_of_fold_member_forecasts(
+    *,
+    site_rows: pl.DataFrame,
+    features: Sequence[str],
+    target: str,
+    hyper_parameters: HyperParameters,
+) -> pl.DataFrame:
+    """Fit one model on every ensemble member's rows at one site, and forecast each member.
+
+    `site_rows` holds one row per (time, member), each member's weather beside the same measured
+    target, so one model learns one mapping from a member's weather to power and is then applied to
+    every member. The fold label belongs to the time, so every member of a scored month is left out
+    of training together, and the fit loop is `out_of_fold_losses`, which drops curtailed hours
+    from training as it does for every other arm.
+
+    **Each member's row is weighted by one over the number of members, so each hour carries the
+    weight one row carries in a model fitted on one input.** Without the weights an hour counts
+    once per member towards `min_child_weight`, so the same hyperparameters grow finer leaves on the
+    stacked rows than on one row per hour: on one generator over five months, 51 identical copies of
+    the ensemble mean, unweighted, raised the mean absolute error by 0.7 points of capacity over the
+    model fitted on the ensemble mean once.
+
+    Args:
+        site_rows: One site's rows, one per (time, member), carrying `time`, `member`, `fold`,
+            `month`, `cap_mw`, `constrained`, `effective_capacity_mw`, the features, and the
+            target.
+        features: The feature columns to show the model.
+        target: The column to predict.
+        hyper_parameters: The setting to fit at.
+
+    Returns:
+        One row per (site, time, seed), with `forecasts`, the list of the members' uncapped
+        forecasts in member order.
+
+    Raises:
+        ValueError: If the times do not all hold the same number of members.
+    """
+    members = site_rows.group_by("time").len()["len"]
+    if members.n_unique() != 1:
+        msg = "every time must hold the same number of members"
+        raise ValueError(msg)
+    losses = out_of_fold_losses(
+        site_rows=site_rows.sort("time", "member").with_columns(
+            member_weight=pl.lit(1.0 / members[0])
+        ),
+        features=features,
+        target=target,
+        hyper_parameters=hyper_parameters,
+        with_quantiles=False,
+        weight="member_weight",
+    )
+    actual = site_rows.group_by("site", "time").agg(actual=pl.col(target).first().cast(pl.Float64))
+    return (
+        losses.select("site", "time", "seed", "signed_error_mw")
+        .join(actual, on=["site", "time"])
+        .group_by("site", "time", "seed", maintain_order=True)
+        .agg(forecasts=pl.col("signed_error_mw") + pl.col("actual"))
+    )
+
+
+def score_prediction(*, rows: pl.DataFrame, prediction: pl.DataFrame, target: str) -> pl.DataFrame:
+    """Score a prediction per (site, time, seed) as `out_of_fold_losses` scores its own.
+
+    The prediction is held to the export cap in force and its error divided by the row's own
+    generator's capacity, so a forecast made outside the fit loop, such as a reduction of member
+    forecasts or a baseline, is scored exactly as a fitted arm is.
+
+    Args:
+        rows: The scored rows, carrying `site`, `time`, `month`, `fold`, `constrained`,
+            `effective_capacity_mw`, `cap_mw`, and the target.
+        prediction: `site`, `time`, `seed`, and `prediction`, in the target's unit.
+        target: The target column.
+
+    Returns:
+        One row per (site, time, seed) in `prediction`, with `signed_error_capped_mw`,
+        `absolute_error_capped_mw`, and `absolute_error_capped_fraction_of_capacity`.
+    """
+    scored = rows.select(
+        "site", "time", "month", "fold", "constrained", "effective_capacity_mw", "cap_mw", target
+    ).join(prediction, on=["site", "time"])
+    capped = clamp_to_cap(prediction=scored["prediction"].to_numpy(), cap_mw=scored["cap_mw"])
+    actual = scored[target].cast(pl.Float64).to_numpy()
+    return scored.select(
+        "site",
+        "time",
+        "month",
+        "fold",
+        "constrained",
+        "seed",
+        effective_capacity_mw=pl.col("effective_capacity_mw").cast(pl.Float64),
+        signed_error_capped_mw=pl.Series(capped - actual, dtype=pl.Float64),
+        absolute_error_capped_mw=pl.Series(np.abs(capped - actual), dtype=pl.Float64),
+    ).with_columns(
+        absolute_error_capped_fraction_of_capacity=pl.col("absolute_error_capped_mw")
+        / pl.col("effective_capacity_mw")
     )

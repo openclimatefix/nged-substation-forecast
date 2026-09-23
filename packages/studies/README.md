@@ -10,8 +10,9 @@ out-of-fold XGBoost loop and the paired bootstrap every comparison is read throu
 the checks that establish what temporal object a downloaded column holds, the half-hourly-to-hourly
 power aggregation, the mapping from a meter to an anonymous label, sampling a projected weather grid
 at a set of coordinates, the Fractions Skill Score, the control and the stack a blend of weather
-products is measured with, a product's neighbouring hours, and the dot-and-interval chart form the
-study pages share, with the parser that reads a study report's contrast tables into it.
+products is measured with, a product's neighbouring hours, the upsampling of a 3- or 6-hourly
+forecast to hourly values, the no-weather baselines a forecast must beat, and the dot-and-interval
+chart form the study pages share, with the parser that reads a study report's contrast tables into it.
 
 It does not own the question, the arms, which charts a page draws, or the write-up. Those stay in
 the study, as scripts, because a one-off comparison is not a library and should not be dressed as
@@ -25,7 +26,8 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
 ## The modules
 
 - `cross_validation` — per-site, out-of-fold XGBoost fits and their per-row losses, with the fold
-  scheme and the fixed hyperparameters they use.
+  scheme and the fixed hyperparameters they use; one model fitted on every ensemble member's rows
+  and applied to each member; and the scoring of a forecast made outside the fit loop.
 - `bootstrap` — the paired arm-to-arm difference and its interval, resampling whole months and a
   seed, and a t-interval across the folds' own differences.
 - `blending` — combining several weather products: the climatology-permuted control columns a
@@ -43,6 +45,11 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
 - `power` — the half-hourly-to-hourly aggregation, on the period-ending convention
   `contracts.PowerTimeSeries` states.
 - `grid_sampling` — the nearest grid cell's value at each site, on a projected grid.
+- `baselines` — power forecasts that read no weather forecast: persistence, diurnal persistence,
+  clear-sky-index persistence, persistence shrunk towards climatology, and out-of-fold climatology.
+- `resample` — upsampling a forecast's 3- or 6-hourly steps to hourly values: linearly, with a
+  shape-preserving cubic, as wind components, and, for a period-mean radiation field, through the
+  clear-sky index.
 - `fractions_skill_score` — a timing-tolerant score, which asks whether a forecast put a threshold
   exceedance near the right hour rather than exactly on it.
 - `charts` — the dot-and-interval chart panel, the figure caption, the colour of each product
