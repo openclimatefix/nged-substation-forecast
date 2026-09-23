@@ -11,29 +11,32 @@ XGBoost model, a gradient-boosted tree, was fitted per generator to predict hour
 product's sunshine, and scored by its mean absolute error as a percentage of the generator's
 capacity (its 99th percentile of metered output). The error is 5.09% of capacity given the
 Copernicus Atmosphere Monitoring Service's satellite retrieval (CAMS), and 5.49% given SARAH-3,
-EUMETSAT's satellite retrieval. The error is 7.76% given ICON-D2, the best of the four weather models
+the satellite climate data record from EUMETSAT's Satellite Application Facility on Climate
+Monitoring (CM SAF). The error is 7.76% given ICON-D2, the best of the four weather models
 tested. It is 8.77% given ICON-DREAM-EU, the German weather service's reanalysis, and 9.08% given
-ERA5, the reanalysis from the European Centre for Medium-Range Weather Forecasts (ECMWF). ICON-D2 is
-the German weather service's model for Germany and neighbouring countries. A satellite observes the
-clouds of the hour itself, where every weather model and reanalysis simulates them, so a large gap is
-expected.
+ERA5, the reanalysis from the European Centre for Medium-Range Weather Forecasts (ECMWF). ICON-D2
+is the German weather service's model for Germany and neighbouring countries. A satellite observes
+the clouds of the hour itself, where every weather model and reanalysis simulates them from a run
+started before the hour, so a large gap is expected.
 
-**For capacity estimation, training history, and disaggregation the page recommends CAMS where its
-one-day delay allows, and for historical features in the live service ICON-EU or rebuilt UKV.**
+**For training history and disaggregation the page recommends CAMS where its one-day delay allows,
+and for capacity estimation CAMS provisionally. For historical features in the live service it
+recommends ICON-EU or rebuilt UKV, because ICON-D2, the more accurate weather model here, does not
+cover South West England or South Wales.**
 These four consumers of past weather are parts of this project, described in the
 [introduction](#introduction). ICON-EU is the German weather service's European model. Rebuilt UKV
 is the Met Office's UK variable-resolution model (UKV) with its hourly value rebuilt from its own
 snapshots. The evidence is six metered solar farms inside one 25 km by 23 km box in Lincolnshire,
-and 76,727 generator-hours from December 2022 to August 2026. Hours near sunrise where UKV's
-archive holds a physically impossible value are left out for every product; see
+and 76,727 generator-hours from December 2022 to August 2026. Hours near sunrise where Open-Meteo's
+UKV archive holds a physically impossible value are left out for every product; see
 [Limitations](#limitations). Four more weather models, available from Open-Meteo's archive, are not
 yet scored on this page.
 
 ![Figure 1: CAMS has the lowest error of the eight products tested, SARAH-3 the second lowest, and
 ERA5 the highest](assets/sunshine_leaderboard.svg)
 
-![Figure 2: CAMS beats SARAH-3 by 0.4 points and the best weather model, ICON-D2, by more than
-2](assets/sunshine_headline.svg)
+![Figure 2: CAMS beats SARAH-3 by 0.4 points, and ICON-D2, the best of the four weather models
+tested, by more than 2 points](assets/sunshine_headline.svg)
 
 **Figure 1's intervals are wide mainly because every product's error rises and falls together from
 month to month.** Some months are harder to describe than others for every product, and resampling
@@ -62,19 +65,20 @@ weather model that started a few hours earlier.
   gap holds at every generator, in every season, and in each calendar year from 2023 to 2026.** See
   [CAMS describes past sunshine
   best](#cams-describes-past-sunshine-best-of-the-eight-products-tested-by-a-wide-margin).
-- **CAMS beats SARAH-3, the second satellite retrieval, by 0.40 points [0.29, 0.50], and by about
-  as much under each satellite SARAH-3 has used since 2021.** SARAH-3's error is the second lowest
-  at each of the six generators, but CAMS's margin over SARAH-3 varies widely between them, from
-  0.03 to 0.64 points. See [SARAH-3 is second to CAMS under every
-  satellite](#sarah-3-is-second-to-cams-under-every-satellite).
-- **ICON-DREAM-EU, the German weather service's reanalysis, beats ERA5 by 0.32 points [0.12, 0.52],
-  but trails all three ICON weather models.** Each product's raw irradiance, compared directly
-  against CAMS's with no power model involved, ranks the products almost exactly as the power-model
-  contrasts do, so this is not an artefact of the power model. See [ICON-DREAM-EU beats ERA5 but not
-  the ICON weather
+- **CAMS beats SARAH-3, the second satellite retrieval, by 0.40 points [0.29, 0.50], and, in an
+  exploratory comparison, by about as much under each satellite SARAH-3 has used since 2021.**
+  SARAH-3's error is the second lowest at each of the six generators, but CAMS's margin over
+  SARAH-3 varies widely between them, from 0.03 to 0.64 points. See [SARAH-3 is second to CAMS
+  under every satellite](#sarah-3-is-second-to-cams-under-every-satellite).
+- **ICON-DREAM-EU, the German weather service's reanalysis, beats ERA5 by 0.32 points [0.12,
+  0.52], but trails all three ICON weather models.** In an exploratory comparison, each product's
+  raw irradiance, compared directly against CAMS's with no power model involved, ranks the
+  products almost exactly as the power-model contrasts do, so this is not an artefact of the power
+  model. See [ICON-DREAM-EU beats ERA5 but not the ICON weather
   models](#icon-dream-eu-beats-era5-but-not-the-icon-weather-models).
-- **On matched months, January to August, ERA5 trails CAMS by between 3.6 and 4.7 points in each
-  calendar year from 2021 to 2026, and SARAH-3 by between 3.2 and 4.3 points.** See [ERA5's
+- **In an exploratory comparison on matched months, January to August, ERA5 trails CAMS by between
+  3.6 and 4.7 points in each calendar year from 2021 to 2026, and SARAH-3 by between 3.2 and 4.3
+  points.** See [ERA5's
   deficit, year by year](#era5s-deficit-year-by-year).
 - **Among the four weather models tested, ICON-D2 (from the German weather service's Icosahedral
   Nonhydrostatic model family) is the best as served, beating ICON-EU by 0.62 points [0.48, 0.76]
@@ -103,9 +107,10 @@ weather model that started a few hours earlier.
 - **An XGBoost model trained on five generators and applied to the sixth ranks the products the
   same way, with errors 0.10 to 0.20 points larger.** See [The ranking holds for a generator
   predicted from its neighbours](#the-ranking-holds-for-a-generator-predicted-from-its-neighbours).
-- **Once the seasonal cycle is removed, the implied capacities of CAMS and SARAH-3 are the steadiest
-  of the eight products from month to month, but both satellite retrievals swing the most with the
-  seasons.** A product's implied capacity is the ratio of metered output to what a fixed
+- **In an exploratory measure, once the seasonal cycle is removed, the implied capacities of CAMS
+  and SARAH-3 are the steadiest of the eight products from month to month, but both satellite
+  retrievals swing the most with the seasons.** A product's implied capacity is the ratio of metered
+  output to what a fixed
   south-facing panel predicts from the product. See [Implied capacity from month to
   month](#implied-capacity-from-month-to-month).
 
@@ -134,25 +139,27 @@ The map also draws AROME France, which this page does not test](../roadmap/asset
 
 | Product | What it is | Served lead | Covers all of Great Britain? | Grid spacing, native and as served | Start of the archive read here | Available after |
 |---|---|---|---|---|---|---|
-| CAMS | Satellite retrieval from Meteosat images | no forecast step | yes | point values, from satellite pixels about 5 km across | 2004 | about 1 day |
-| ERA5 | ECMWF reanalysis, a consistent record back to 1940 | 1 to 12 hours | yes | about 31 km | 1940 | about 5 days |
+| CAMS | Satellite retrieval from Meteosat images, with clear-sky irradiance from CAMS's modelled aerosol, water vapour and ozone | no forecast step | yes | point values, interpolated to each requested location from the satellite pixels, about 5 km across here | 2004 | about 1 day |
+| ERA5 | ECMWF reanalysis, a consistent record back to 1940 | 1 to 12 hours | yes | about 31 km; served on a 0.25° grid | 1940 | about 5 days |
 | UKV | Met Office model for the UK | T+0, the analysis | yes | 1.5 km over the UK, coarsening to 4 km at the domain's edges; served at 2 km | March 2022, which Open-Meteo backfilled from a source it does not name until August 2024 | about 4 hours |
 | ICON-D2 | German weather service (DWD) model for Germany and neighbouring countries | 1 to 3 hours | no | 2.2 km; served at about 2 km | December 2022 | about 1.5 hours |
 | ICON-EU | DWD model for Europe, nested inside ICON global | 1 to 3 hours | yes | 6.5 km; served at about 7 km | November 2022 | about 3.5 hours |
 | ICON global | DWD global model | 1 to 6 hours | yes | 13 km; served at about 11 km | November 2022 | about 3.5 hours |
-| SARAH-3 | Satellite retrieval from Meteosat images, from EUMETSAT's Satellite Application Facility on Climate Monitoring (CM SAF) | no forecast step | yes | 0.05° grid, about 3.3 km east to west by 5.6 km north to south here; read at the nearest cell | 1983; read here from January 2021 | 2 to 5 days |
+| SARAH-3 | Satellite climate data record from Meteosat images, from EUMETSAT's Satellite Application Facility on Climate Monitoring (CM SAF); the years read here, from 2021, are from its Interim Climate Data Record | no forecast step | yes | 0.05° grid, about 3.3 km east to west by 5.6 km north to south here; read at the nearest cell | 1983; read here from January 2021 | 2 to 5 days |
 | ICON-DREAM-EU | DWD reanalysis over Europe, built from ICON | 1 to 3 hours | yes | about 6.5 km; read at the nearest cell | 2010; read here from September 2019 | not established |
 
 **Most of the latencies come from each service's own documentation:** CAMS's [radiation-service
 notes](https://confluence.ecmwf.int/x/jOLjDw), the [ERA5 dataset
 page](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels?tab=overview),
 Open-Meteo's [UKV documentation](https://open-meteo.com/en/docs/ukmo-api), and the publication times
-of the German weather service's own open-data files for ICON-D2, ICON-EU and ICON global. SARAH-3 is
-the Surface Solar Radiation Data Set of the European Organisation for the Exploitation of
-Meteorological Satellites (EUMETSAT), available by manual order from CM SAF; its 2-to-5-day figure
-is this project's own tracking, cross-referenced in the [disaggregation
-roadmap](../roadmap/disaggregation.md#an-irradiance-nowcast-would-be-a-more-useful-product), not a
-figure CM SAF itself publishes. ICON-DREAM-EU's publication cadence is not established here.
+of the German weather service's own open-data files for ICON-D2, ICON-EU and ICON global.
+SARAH-3 is CM SAF's [Surface Solar Radiation Data Set – Heliosat, Edition
+3](https://doi.org/10.5676/EUM_SAF_CM/SARAH/V003), published by the European Organisation for
+the Exploitation of Meteorological Satellites (EUMETSAT) and available by manual order from CM
+SAF; its 2-to-5-day figure is this project's own tracking, cross-referenced in the
+[disaggregation
+roadmap](../roadmap/disaggregation.md#an-irradiance-nowcast-would-be-a-more-useful-product), not
+a figure CM SAF itself publishes. ICON-DREAM-EU's publication cadence is not established here.
 
 **Four more weather models are not yet on this page.** ECMWF's 9 km global model, Météo-France's
 global model on its European grid, and the HARMONIE-AROME models the Danish and the Dutch weather
@@ -232,9 +239,10 @@ difference between two products is a difference between their irradiance alone.*
   the end of August 2026, where ICON-DREAM-EU's download stops. An hour is dropped if either of its
   two half-hours of metered power reads zero, whatever any product says about that hour. Two
   products' own values also decide which hours are scored, and both reject only a missing or
-  physically impossible reading rather than an inaccurate one. An hour is dropped where UKV's own
-  snapshot at either end of the hour, or at a neighbouring hour, exceeds what the sun's geometry
-  allows (see [Limitations](#limitations)). An hour is also dropped where SARAH-3 marks either of
+  physically impossible reading rather than an inaccurate one. An hour is dropped where the UKV
+  snapshot recovered from Open-Meteo's archive at either end of the hour, or at a neighbouring
+  hour, exceeds what the sun's geometry allows (see [Limitations](#limitations)). An hour is also
+  dropped where SARAH-3 marks either of
   its two snapshots as unusable, which removes 426 of the 300,960 generator-hours SARAH-3's files
   cover (0.14%), all of them in daylight. CAMS is read in full, not only on the hours it
   rates as reliable.
@@ -388,19 +396,21 @@ standing in for 19 to 20 December 2021, inside the "Meteosat-11, 2021" span, and
 standing in for a few days in 2024, 2025 and 2026, inside the "Meteosat-10" span.
 
 ![Figure 7: CAMS beats SARAH-3 by about 0.4 points under every satellite, and ICON-DREAM-EU beats
-ERA5 by 0.3](assets/sunshine_new_products.svg)
+ERA5 by 0.3 points](assets/sunshine_new_products.svg)
 
-**Why CAMS beats SARAH-3 is not identified, but the gap sits in cloudy hours and at four of the six
-generators.** CAMS is computed for each generator's own coordinates. SARAH-3 is read from a 0.05°
-grid cell 0.8 km to 2.8 km from each generator. Across the generators CAMS's margin ranges from 0.03
-to 0.64 points, and at two of them it is not statistically significant at the 5% level. Relative to
-CAMS's own error, SARAH-3's is about 7.1% larger in overcast hours, 10.7% larger in broken cloud,
-and 4.3% larger in clear hours, binned on a clearness index neither product decides, in comparisons
-chosen after the results were seen. That pattern points at how each
-product handles cloud within the hour: CAMS's hourly value is the service's own integration over the
-hour, and SARAH-3's is the mean of two snapshots. The gap does not follow the distance to SARAH-3's
-grid cell: the generator whose cell is nearest, 0.8 km away, has the largest gap. A steady bias could
-not explain the gap either, because the XGBoost model fitted to each generator corrects one.
+**Why CAMS beats SARAH-3 is not identified, but the gap is largest in broken cloud and sits at
+four of the six generators.** CAMS is computed for each generator's own coordinates. SARAH-3 is
+read from a 0.05° grid cell 0.8 km to 2.8 km from each generator. Across the generators CAMS's
+margin ranges from 0.03 to 0.64 points, and at two of them it is not statistically significant at
+the 5% level. Relative to CAMS's own error, SARAH-3's is about 7.1% larger in overcast hours,
+10.7% larger in broken cloud, and 4.3% larger in clear hours, binned on the mean of CAMS's and
+SARAH-3's own clearness index, so that neither product alone decides the bins, in comparisons
+chosen after the results were seen. That pattern points at how each hourly value is built: CAMS's
+hourly value is the service's own integration over the hour, while SARAH-3's is this study's mean
+of two of SARAH-3's 30-minute snapshots. Another construction, such as a weighted mean of the
+snapshots stamped 11:00, 11:30, and 12:00, was not tested, so part of the gap may belong to this
+study's conversion rather than to SARAH-3. A steady bias could not explain the gap either, because
+the XGBoost model fitted to each generator corrects a steady bias.
 
 **SARAH-3's direct beam is modelled from its own global irradiance, so this page scores SARAH-3's
 global irradiance alone.** CM SAF derives SARAH-3's direct irradiance from its global irradiance
@@ -422,7 +432,8 @@ ahead [0.17, 0.58]. Only 4 of the 5 folds agree in sign. On the longer row set f
 ICON-DREAM-EU is 0.39 points ahead [0.23, 0.54].
 
 **Since August 2024, ICON-DREAM-EU's advantage over ERA5 is not statistically significant at the 5%
-level, but every product's lead over ERA5 is smaller in 2025 and in 2026 than in 2024.**
+level. But every product's lead over ERA5 is smaller in 2025 and in 2026 than in 2024, in point
+estimate.**
 ICON-DREAM-EU is 0.16 points ahead on those hours [−0.09, +0.38], and 0.23 points ahead after UKV's
 upgrade [−0.22, +0.57], on 7 months. In the same years CAMS's lead over ERA5 falls from 4.50 points
 in 2024 to 3.69 in 2026, and ICON-EU's from 1.13 to 0.47, while ICON-DREAM-EU's gap to ICON-EU shows
@@ -437,10 +448,11 @@ to 12 hours after 06 and 18 UTC. Equal leads would favour ERA5 relative to what 
 an exploratory comparison, ICON-DREAM-EU trails ICON-D2 by 1.00 points [0.82, 1.17], trails ICON
 global by 0.28 points [0.17, 0.39], and is not statistically significantly different from
 Open-Meteo's hourly UKV, at −0.10 points [−0.27, +0.09].
-ICON-DREAM-EU trails ICON-EU by 0.38 points at equal leads, in an exploratory comparison. The gap is
-0.34 points [0.20, 0.47] on hours 1 hour into a run, where no de-averaging is needed, so the
-conversion to hourly means is not the main cause. The gap is 0.49 points [0.34, 0.63] at 2 hours and
-0.39 points [0.25, 0.54] at 3 hours.
+ICON-DREAM-EU trails ICON-EU by 0.38 points at equal leads, in an exploratory comparison, and the
+gap is statistically significant at the 5% level at each lead: 0.34 points [0.20, 0.47] on hours 1
+hour into a run, where no de-averaging is needed, so the conversion to hourly means is not the
+main cause. The gap is 0.49 points [0.34, 0.63] at 2 hours and 0.39 points [0.25, 0.54] at 3
+hours.
 
 **Before any power model sees it, the raw irradiance already ranks the products almost exactly as
 the power-model contrasts above do, which is why ICON-DREAM-EU's modest lead over ERA5 is not an
@@ -448,15 +460,18 @@ artefact of the power model.** Each product's own served global irradiance, comp
 against CAMS's on the 76,727 daylight generator-hours every product on this page shares — no
 XGBoost model, no per-generator recalibration — orders the products almost exactly as the
 mean-absolute-error table above does: SARAH-3 closest to CAMS, then ICON-D2, ICON-EU, ICON global,
-ICON-DREAM-EU, ERA5, with UKV's raw hourly value the furthest from CAMS. Correlation with measured
-output, which does not use CAMS as the reference, gives the same order. The one swap is UKV and
-ERA5: UKV's raw hourly value is the furthest from CAMS by every raw measure here, but its
-power-model error is lower than ERA5's. Open-Meteo builds UKV's hourly value from the snapshot at
-the hour's end, a timing error that depends on the sun's position, and a per-generator XGBoost model
-given the sun's position can partly undo that error, which a raw comparison cannot. Rebuilt as the
-mean of its two snapshots, UKV's correlation with CAMS rises from 0.889 to 0.912. UKV also reads
-about 40 W/m² below CAMS in either form, a steady bias that each per-generator XGBoost model
-removes. This comparison is exploratory.
+ICON-DREAM-EU, ERA5, with Open-Meteo's hourly value for UKV the furthest from CAMS. Correlation
+with measured output, which does not use CAMS as the reference, gives the same order. Two swaps
+stand out. Open-Meteo's hourly value for UKV is the furthest from CAMS by every raw measure here,
+but its power-model error is lower than ERA5's. Rebuilt UKV is further from CAMS than ICON-EU,
+ICON global, ICON-DREAM-EU, and ERA5 by mean absolute difference (68.53 W/m² against 58.38 to
+63.27 W/m²), and correlates less with output than ICON-EU, ICON global, and ICON-DREAM-EU, yet its
+power-model error, 8.18%, is lower than all four. Open-Meteo builds UKV's hourly value from the
+snapshot at the hour's end, a timing error that depends on the sun's position, and a per-generator
+XGBoost model given the sun's position can partly undo that error, which a raw comparison cannot.
+Rebuilt as the mean of its two snapshots, UKV's correlation with CAMS rises from 0.889 to 0.912.
+UKV also reads about 40 W/m² below CAMS in either form, a steady bias that each per-generator
+XGBoost model removes. This comparison is exploratory.
 
 | Product | Bias vs CAMS (W/m²) | MAD vs CAMS (W/m²) | Correlation with CAMS | Correlation with output |
 |---|---|---|---|---|
@@ -466,7 +481,7 @@ removes. This comparison is exploratory.
 | ICON-EU | −9.27 | 58.38 | 0.921 | 0.875 |
 | ICON global | −6.68 | 59.01 | 0.919 | 0.873 |
 | ICON-DREAM-EU | −8.47 | 60.57 | 0.915 | 0.868 |
-| UKV | −44.46 | 77.21 | 0.889 | 0.846 |
+| UKV, Open-Meteo's hourly value | −44.46 | 77.21 | 0.889 | 0.846 |
 | UKV rebuilt from its snapshots | −40.11 | 68.53 | 0.912 | 0.867 |
 | ERA5 | −1.28 | 63.27 | 0.904 | 0.857 |
 
@@ -483,21 +498,18 @@ in every calendar year from 2021 to 2026, and ICON-DREAM-EU by up to about 0.7 p
 figure in this section is exploratory, on the longer row set from January 2021, and each year's
 interval comes from resampling that year's own January-to-August months alone; restricting every
 year to the same months keeps a partial 2026 from being compared against the other years' full
-twelve. Each year's interval rests on 8 months, so the intervals are likely too narrow. ERA5 trails
-CAMS by between 3.62 points (2026) and 4.74 points (2021). ERA5 trails SARAH-3
+12 months. Each year's interval rests on 8 months, so the intervals are likely too narrow. ERA5
+trails CAMS by between 3.62 points (2026) and 4.74 points (2021). ERA5 trails SARAH-3
 by between 3.21 points (2026) and 4.31 points (2021). ERA5 trails ICON-DREAM-EU by about half a
 point to 0.68 points in each year from 2021 to 2024, a gap that is statistically significant at the
 5% level in each of those years, and by 0.21 points in 2025 and 0.18 points in 2026, where the gap
 is not statistically significant at the 5% level.
 
-**No year's gap between ERA5 and ICON-DREAM-EU differs from 2025's by a margin statistically
-significant at the 5% level, and 2026's gaps are also smaller because 2026 is an easier year for
-every product.** Resampling each year's months independently of 2025's, and restricting every year
-to January to August, the change from each of 2021 to 2024 to 2025 is −0.27 to −0.47 points, and
-every interval includes zero, so a reader should
-not conclude that ICON-DREAM-EU's gap to ERA5 has genuinely narrowed rather than moved within the
-noise. In 2026 every product's error is lower than in 2025, so a gap measured in points is smaller
-too, whether or not the products' relative ranking has moved.
+**No year from 2021 to 2024 has a gap between ERA5 and ICON-DREAM-EU that differs from 2025's by a
+margin statistically significant at the 5% level.** Resampling each year's months independently of
+2025's, and restricting every year to January to August, the change from each of 2021 to 2024 to
+2025 is −0.27 to −0.47 points, and every interval includes zero, so a reader should not conclude
+that ICON-DREAM-EU's gap to ERA5 has genuinely narrowed rather than moved within the noise.
 
 ![Figure 8: On matched months, ERA5 trails both satellite retrievals by more than 3 points in every
 year from 2021 to 2026](assets/sunshine_era5_by_year.svg)
@@ -524,7 +536,8 @@ the sun low, the pattern weakens: 1 hour into a run, ICON-D2's advantage is only
 side of solar noon, yet ICON-D2's advantage is 0.20 points at 12 UTC, 3 hours into a run, against
 1.48 points at 13 UTC, 1 hour in. ICON-EU shows no such pattern with lead. Against UKV rebuilt from
 its snapshots, which is always served at T+0, ICON-EU is 0.20 to 0.24 points behind at every lead
-from 1 to 3 hours into its runs, in a comparison added after the first run.
+from 1 to 3 hours into its runs, in a comparison added after the first run; only the 1-hour gap is
+statistically significant at the 5% level (2 h: 0.21 [−0.01, +0.44]; 3 h: 0.20 [−0.02, +0.42]).
 
 **The mechanism is not identified, and the rate of decay may not hold elsewhere.** ICON-D2 takes the
 weather at its boundaries from ICON-EU. The six generators sit about 160 to 200 km east of ICON-D2's
@@ -542,10 +555,10 @@ weather models for UK power forecasting.
 further ahead.** ICON global runs every 6 hours, so half its hours are served 4 to 6 hours after the
 run started, where ICON-EU is at 1 to 3 hours. On those hours ICON global is 0.19 points behind
 [0.09, 0.30]. On the hours where the two leads are equal ICON global is 0.02 points behind [−0.03,
-+0.08]. So the effect of the coarser grid is not statistically significant at the 5% level, though
-an effect as large as 0.08 points is not excluded. The split also divides the hours of the day: the
-longer leads fall at 10 to 12 and 16 to 18 UTC, so a difference in either weather model's skill by
-time of day would show up here as an effect of lead.
++0.08]. So at equal leads the difference between ICON global and ICON-EU is not statistically
+significant at the 5% level, though a difference as large as 0.08 points is not excluded. The split
+also divides the hours of the day: the longer leads fall at 10 to 12 and 16 to 18 UTC, so a
+difference in either weather model's skill by time of day would show up here as an effect of lead.
 
 **ICON-EU beats Open-Meteo's hourly value for UKV by 0.48 points [0.29, 0.65], one of the six
 planned contrasts, but UKV is ahead of ICON-EU, by a margin close to the 5% threshold, once UKV's
@@ -554,8 +567,7 @@ over that hour. UKV publishes a snapshot each hour, and Open-Meteo builds UKV's 
 the snapshot at the hour's end, rescaled by the change in the sun's angle. In comparisons added
 after the first run, averaging UKV's snapshots at both ends of the hour cuts UKV's error by 0.68
 points, which puts UKV 0.21 points ahead of ICON-EU [0.03, 0.38]. The interval's lower end, 0.03
-points, is about the size of the change that refitting on a slightly different set of hours makes
-to every product's error, so this result should not be read as settled. An XGBoost model given the
+points, is close to zero, so this result should not be read as settled. An XGBoost model given the
 two snapshots as separate inputs puts UKV 0.26 points ahead of ICON-EU [0.09, 0.43].
 
 **Giving each XGBoost model the neighbouring hours improves both products by about 0.2 points, and
@@ -657,8 +669,8 @@ therefore come from the retrieval or from the assumption that every panel faces 
 which this page does not verify. Removing the seasonal cycle also needs several years of each
 calendar month, which a capacity estimator run on a short window does not have.
 
-![Figure 14: Of the eight products tested, CAMS's implied capacity swings the most with the
-seasons](assets/sunshine_implied_capacity.svg)
+![Figure 14: Of the eight products tested, CAMS and SARAH-3 imply the steadiest capacity from
+month to month but swing the most with the seasons](assets/sunshine_implied_capacity.svg)
 
 ## What to use
 
@@ -678,12 +690,19 @@ against availability and coverage.**
 - **Training history: CAMS, with a caveat.** CAMS gives the most accurate description of past
   sunshine of the eight products, and SARAH-3, 0.40 points behind, the second most accurate. A
   forecasting model pre-trained on CAMS and then run on a weather forecast meets a different product
-  at inference. This page does not measure how much that mismatch changes forecast accuracy.
+  at inference. This page does not measure how much that mismatch changes forecast accuracy, nor
+  whether pre-training on ICON-DREAM-EU, which is built from the same ICON weather model as the ICON
+  forecasts and reaches back to 2010, narrows the mismatch.
   ICON-DREAM-EU beats ERA5 as a reanalysis, but by less than any of the three ICON weather models
   does.
-- **Historical features in the live service: ICON-EU, or UKV with its two snapshots averaged; with
-  either product, include the neighbouring hours.** CAMS arrives a day late and ERA5 about 5 days
-  late, so neither can supply the last few hours at run time. ICON-D2 was more accurate at the six
+- **Historical features in the live service: ICON-EU, or UKV with its two snapshots averaged;
+  with either product, include the neighbouring hours.** Rebuilding UKV's hour from Open-Meteo's
+  snapshots produces physically impossible values in the first hours after sunrise (see
+  [Limitations](#limitations)), mostly before the January 2026 upgrade, so a service reading
+  rebuilt UKV has to screen those values as this study did. Since the upgrade, the difference
+  between rebuilt UKV and ICON-EU is not statistically significant at the 5% level [−0.23,
+  +0.57]. CAMS arrives a day late and ERA5 about 5 days late, so neither can supply the last few
+  hours at run time. ICON-D2 was more accurate at the six
   generators, all of which sit inside its domain. Reading ICON-D2 at generators east of ICON-D2's
   western edge, and ICON-EU elsewhere, is therefore an option, though a forecasting model trained on
   the result would mix two products across generators. Open-Meteo's UKV archive has three stretches:
@@ -704,22 +723,23 @@ single weather product?](blending-weather-products.md#solar-a-blend-beats-cams-g
 
 ## Limitations
 
-- **Hours where UKV's archive holds a physically impossible sunrise value are dropped for every
-  product.** Open-Meteo stores UKV's hourly value rounded to 1 W m⁻² and serves each snapshot by
-  undoing the rescaling for the sun's angle described under [ICON-EU against ICON global and
-  UKV](#icon-eu-against-icon-global-and-ukv). In the first hours after sunrise that rescaling ratio
-  can reach the hundreds, so undoing it turns the stored mean, and its rounding, into a value with
-  no physical meaning — up to 16,537 W m⁻² against a real GHI ceiling of about 1,400 W m⁻². The
+- **Hours where Open-Meteo's UKV archive holds a physically impossible sunrise value are dropped
+  for every product.** Open-Meteo stores UKV's hourly value rounded to 1 W m⁻² and serves each
+  snapshot by undoing the rescaling for the sun's angle described under [ICON-EU against ICON
+  global and UKV](#icon-eu-against-icon-global-and-ukv). In the first hours after sunrise that
+  rescaling ratio can reach the hundreds, so undoing it turns the stored mean, and its rounding,
+  into a value with no physical meaning — up to 16,537 W m⁻² against a real GHI ceiling of about
+  1,400 W m⁻². The
   study drops each snapshot that exceeds 1.1 times the top-of-atmosphere flux at its own instant,
   1,554 of 238,320 hourly snapshots from March 2022 to September 2026, together with every hour
   built from one. Every dropped hour falls between 05:00 and 10:00 UTC, and almost all of them
   predate UKV's January 2026 upgrade — 2.8% of pre-upgrade hours against 0.1% after it, and none
   from April 2026 onwards. Because every product is scored on one shared row set, dropping these
   snapshots removes 1,768 generator-hours (2.3%) from every product's figures on this page, not
-  only UKV's, leaving 76,727 common rows. Two smaller defects in UKV's archive are not corrected
-  here: at 318 raw hours (186 of the 76,727 scored rows) UKV's beam exceeds its global irradiance,
-  which is physically impossible and bears on the own-beam figure above, and UKV's wind file has a
-  94-hour gap, which does not bear on this page.
+  only UKV's, leaving 76,727 common rows. Two smaller defects in Open-Meteo's UKV archive are not
+  corrected here: at 318 raw hours (186 of the 76,727 scored rows) the served UKV beam exceeds the
+  served global irradiance, which is physically impossible and bears on the own-beam figure above,
+  and Open-Meteo's UKV wind file has a 94-hour gap, which does not bear on this page.
 - **The evidence is regional.** All six generators sit in one 25 km by 23 km box, inside ICON-D2's
   domain, about 160 to 200 km east of its western edge, and in only two ERA5 grid cells. The ranking
   is untested elsewhere in Great Britain, and nothing here measures a site near ICON-D2's edge or

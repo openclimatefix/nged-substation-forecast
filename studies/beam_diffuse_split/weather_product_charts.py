@@ -498,7 +498,7 @@ X_TITLE: Final[str] = "Difference in mean absolute error (points of capacity)"
 LEADERBOARD_X_TITLE: Final[str] = "Mean absolute error (% of capacity; smaller is better)"
 NEW_PRODUCTS_TITLE: Final[str] = (
     "CAMS beats SARAH-3 by about 0.4 points under every satellite, and ICON-DREAM-EU beats ERA5 by "
-    "0.3"
+    "0.3 points"
 )
 """Figure 7's title, which states the finding."""
 
@@ -646,6 +646,10 @@ def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
             LEADERBOARD_WIDTH,
             CAPACITY,
             SCOPE,
+            (
+                "UKV rebuilt from its snapshots, the page's live-service recommendation, scores "
+                "8.18% (post hoc; not drawn)."
+            ),
         ],
     )
 
@@ -713,7 +717,8 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         number=2,
         figure_planning=figure_planning,
         title=(
-            "CAMS beats SARAH-3 by 0.4 points and the best weather model, ICON-D2, by more than 2"
+            "CAMS beats SARAH-3 by 0.4 points, and ICON-D2, the best of the four weather models "
+            "tested, by more than 2 points"
         ),
         subtitle=[
             (
@@ -722,6 +727,10 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
             ),
             f"{DOTS} {CAPACITY}",
             SCOPE,
+            (
+                "UKV rebuilt from its snapshots, the page's live-service recommendation, scores "
+                "8.18% (post hoc; not drawn)."
+            ),
         ],
     )
 
@@ -1374,7 +1383,8 @@ def _implied_capacity_chart(*, report_text: str) -> alt.VConcatChart:
         number=14,
         figure_planning=None,
         title=(
-            "Of the eight products tested, CAMS's implied capacity swings the most with the seasons"
+            "Of the eight products tested, CAMS and SARAH-3 imply the steadiest capacity from "
+            "month to month but swing the most with the seasons"
         ),
         subtitle=[
             (
