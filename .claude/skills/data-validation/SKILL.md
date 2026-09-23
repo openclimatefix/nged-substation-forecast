@@ -66,7 +66,9 @@ dtype = frame.schema[time_col]  # match precision/tz, or pl.datetime_range raise
 expected = pl.datetime_range(start, end, interval="3h", time_unit=dtype.time_unit, eager=True)
 locations = frame.select(location_cols).unique()
 expected_grid = locations.join(expected.to_frame(time_col), how="cross")
-missing = expected_grid.join(frame.select([*location_cols, time_col]), on=[*location_cols, time_col], how="anti")
+missing = expected_grid.join(
+    frame.select([*location_cols, time_col]), on=[*location_cols, time_col], how="anti"
+)
 ```
 
 A gap that lines up with a known outage or a product's own publication schedule is expected and
