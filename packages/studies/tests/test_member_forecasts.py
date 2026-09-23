@@ -182,7 +182,8 @@ def test_the_summary_takes_the_mean_and_the_median_of_the_members():
     assert summary["mean"] == 4.0
     assert summary["median"] == 2.0
     assert summary["members"] == 5
-    assert summary["p10"] <= 1.0 < summary["p90"]
+    assert summary["p10"] == pytest.approx(0.0)
+    assert summary["p90"] == pytest.approx(14.0)
 
 
 def test_a_model_trained_on_one_input_forecasts_every_member_and_never_its_scored_months():

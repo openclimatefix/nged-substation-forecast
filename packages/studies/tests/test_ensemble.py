@@ -37,10 +37,14 @@ def test_two_runs_on_one_hour_are_refused():
         check_one_run_per_hour(hourly=both, members=3)
 
 
-def test_a_missing_or_repeated_member_is_refused():
-    missing = _members(run=RUN, members=range(2))
-    repeated = pl.concat([missing, _members(run=RUN, members=range(1))])
+def test_a_missing_member_is_refused():
+    with pytest.raises(ValueError, match="exactly once"):
+        check_one_run_per_hour(hourly=_members(run=RUN, members=range(2)), members=3)
 
-    for hourly in (missing, repeated):
-        with pytest.raises(ValueError, match="exactly once"):
-            check_one_run_per_hour(hourly=hourly, members=3)
+
+def test_a_repeated_member_is_refused_even_with_the_right_row_count_elsewhere():
+    # Members 0, 1, 2, 0: every member is present, but one twice, so only the row count betrays it.
+    repeated = pl.concat([_members(run=RUN, members=range(3)), _members(run=RUN, members=range(1))])
+
+    with pytest.raises(ValueError, match="exactly once"):
+        check_one_run_per_hour(hourly=repeated, members=3)

@@ -407,3 +407,43 @@ def test_the_shrinkage_weight_is_found_to_the_hundredth():
     weights = shrunk_persistence(frame=frame, persisted="persisted")["weight"]
 
     assert set(weights.to_list()) == {0.37}
+
+
+def _two_a_month(*, power: list[list[float]], persisted: list[list[float]]) -> pl.DataFrame:
+    """Return one generator's rows: one month per fold, two noon rows a month."""
+    return pl.DataFrame(
+        [
+            {
+                "site": "A",
+                "time": datetime(2025, fold + 1, day + 1, 12, tzinfo=UTC),
+                "fold": fold,
+                "constrained": False,
+                "power_mw": power[fold][day],
+                "persisted": persisted[fold][day],
+            }
+            for fold in range(5)
+            for day in range(2)
+        ]
+    )
+
+
+def test_the_weight_is_fitted_against_a_climatology_that_never_saw_the_scored_fold():
+    # A fit against each training row's own out-of-fold climatology, which is built from folds
+    # that include the one being scored, chooses 0.33 and 0.6 here where the right weights are 0
+    # and 0.2.
+    frame = _two_a_month(
+        power=[[3.0, 2.0], [2.0, 1.0], [1.0, 0.0], [0.0, 0.0], [0.0, 3.0]],
+        persisted=[[2.0, 3.0], [2.0, 2.0], [3.0, 2.0], [2.0, 2.0], [2.0, 3.0]],
+    )
+
+    weights = shrunk_persistence(frame=frame, persisted="persisted")["weight"].to_list()
+
+    assert weights == pytest.approx([0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.2, 0.2, 0.0, 0.0])
+
+
+def test_the_scored_fold_is_forecast_with_a_climatology_of_the_other_folds():
+    frame = _two_a_month(power=[[10.0, 10.0]] * 4 + [[30.0, 30.0]], persisted=[[0.0, 0.0]] * 5)
+
+    blended = shrunk_persistence(frame=frame, persisted="persisted").filter(frame["fold"] == 4)
+
+    assert blended["shrunk"].to_list() == [10.0, 10.0]

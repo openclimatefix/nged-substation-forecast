@@ -2000,7 +2000,10 @@ def check_shared_rows(*, losses: pl.DataFrame) -> None:
         if keys.height != reference.height or not keys.sort(pl.all()).equals(
             reference.sort(pl.all())
         ):
-            msg = f"{arm} at {setting} scores {keys.height:,} rows, not {reference.height:,}"
+            msg = (
+                f"{arm} at {setting} scores a different set of (site, time, seed) rows from "
+                f"climatology: {keys.height:,} rows against {reference.height:,}"
+            )
             raise ValueError(msg)
 
 
