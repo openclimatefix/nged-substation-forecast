@@ -550,8 +550,8 @@ would perform in the west. **A limited-area model from a neighbouring country ca
 a blend over part of the licence area, and cannot be the single source feeding all of it.**
 
 ![ICON-D2 has no data west of a line running from 1.8°W at 49.9°N to 3.9°W at 57.3°N, and AROME
-France has none north of 55.4°N. The map draws Great Britain only, because the repository holds no
-boundary for Northern Ireland](assets/weather_product_domains.svg)
+France has none north of 55.4°N. The UK is drawn in dark grey, and Ireland in light grey for
+context](assets/weather_product_domains.svg)
 
 **Two limited-area weather models cover only part of the UK, and every other weather product this
 page names covers all of it.** ICON-D2 misses South West England, Wales, the western edge of

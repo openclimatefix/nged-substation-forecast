@@ -1,11 +1,11 @@
-"""Draw the map of which parts of Great Britain the ICON-D2 and AROME France domains leave out.
+"""Draw the map of which parts of the UK the ICON-D2 and AROME France domains leave out.
 
 One-off script for the map on
 <https://openclimatefix.github.io/nged-substation-forecast/roadmap/data-sources/#weather-data>.
 Every other weather product that page names covers the whole UK, so the map draws only these two
-limited-area models' domains over Great Britain.
+limited-area models' domains over the UK, with Ireland drawn lighter for context.
 
-The three outlines sit in `domains/` beside this script, rounded to 0.01°, with every exterior ring
+The five outlines sit in `domains/` beside this script, rounded to 0.01°, with every exterior ring
 wound clockwise: Vega's map projection reads a counter-clockwise ring as the whole globe minus the
 polygon. Vega also joins consecutive vertices by great-circle arcs rather than along parallels, so a
 rectangle's edges are densified to 0.5° steps before they are stored.
@@ -31,16 +31,26 @@ DomainProductType = Literal["ICON-D2", "AROME France"]
 """The limited-area weather models whose domains the map draws."""
 
 DOMAINS_DIR: Final[Path] = Path(__file__).resolve().parent / "domains"
-"""Where the three GeoJSON outlines live."""
+"""Where the five GeoJSON outlines live."""
 
 GREAT_BRITAIN_PATH: Final[Path] = DOMAINS_DIR / "great_britain.geojson"
 """England, Scotland, and Wales, from `england_scotland_wales.geojson` in the `geo` package.
 
 The `geo` package's file is the boundary the `h3_grid_weights` asset clips the NWP grid to. The
 outline here is that boundary dissolved into one shape, simplified to a 0.02° tolerance, and
-stripped of islands smaller than 0.003 square degrees. The repository holds no boundary for
-Northern Ireland, so the map does not draw Northern Ireland.
+stripped of islands smaller than 0.003 square degrees.
 """
+
+# The Northern Ireland and Ireland outlines come from Natural Earth 5.1.1's public-domain 1:10m
+# Admin 0 map units (`ne_10m_admin_0_map_units`, <https://www.naturalearthdata.com>), which split
+# the UK into its four countries. Each outline is clipped to 11.5°W to 4.5°E and 48.5°N to 61.5°N,
+# simplified to a 0.01° tolerance, and stripped of islands smaller than 0.001 square degrees.
+
+NORTHERN_IRELAND_PATH: Final[Path] = DOMAINS_DIR / "northern_ireland.geojson"
+"""Northern Ireland, from Natural Earth's `Northern Ireland` map unit."""
+
+IRELAND_PATH: Final[Path] = DOMAINS_DIR / "ireland.geojson"
+"""Ireland, from Natural Earth's `Ireland` map unit, drawn lighter than the UK for context."""
 
 DOMAIN_PATHS: Final[dict[DomainProductType, Path]] = {
     "ICON-D2": DOMAINS_DIR / "icon_d2.geojson",
@@ -76,7 +86,7 @@ DOMAIN_DASHES: Final[dict[DomainProductType, list[int]]] = {
 
 DOMAIN_LABELS: Final[tuple[tuple[DomainProductType, float, float, str], ...]] = (
     ("ICON-D2", 0.3, 56.9, "ICON-D2 covers\nthe area east of\nthe blue line"),
-    ("AROME France", -8.6, 53.3, "AROME France\ncovers the area\nsouth of 55.4°N"),
+    ("AROME France", -8.4, 51.0, "AROME France\ncovers the area\nsouth of 55.4°N"),
 )
 """Each product's direct label: the product, the label's longitude and latitude, and its text."""
 
@@ -202,7 +212,11 @@ def domain_map() -> alt.LayerChart:
         _feature(path=path, properties={"product": product})
         for product, path in DOMAIN_PATHS.items()
     ]
-    great_britain = _feature(path=GREAT_BRITAIN_PATH, properties={"name": "Great Britain"})
+    united_kingdom = [
+        _feature(path=GREAT_BRITAIN_PATH, properties={"name": "Great Britain"}),
+        _feature(path=NORTHERN_IRELAND_PATH, properties={"name": "Northern Ireland"}),
+    ]
+    ireland = _feature(path=IRELAND_PATH, properties={"name": "Ireland"})
     colour_scale = alt.Scale(domain=products, range=[DOMAIN_COLOURS[p] for p in products])
     dash_scale = alt.Scale(domain=products, range=[DOMAIN_DASHES[p] for p in products])
     legend = alt.Legend(
@@ -214,7 +228,10 @@ def domain_map() -> alt.LayerChart:
             extent=[[WEST - 1, SOUTH - 1], [EAST + 1, NORTH + 1]], step=[GRATICULE_STEP_DEGREES] * 2
         )
     ).mark_geoshape(filled=False, stroke=ocf.GREY_3, strokeWidth=0.75, clip=True)
-    land = alt.Chart(alt.Data(values=[great_britain])).mark_geoshape(
+    context_land = alt.Chart(alt.Data(values=[ireland])).mark_geoshape(
+        fill=ocf.GREY_2, stroke=ocf.GREY_3, strokeWidth=0.5, clip=True
+    )
+    land = alt.Chart(alt.Data(values=united_kingdom)).mark_geoshape(
         fill=ocf.GREY_3, stroke=ocf.TEXT, strokeWidth=0.5, clip=True
     )
     domains_layer = (
@@ -239,11 +256,12 @@ def domain_map() -> alt.LayerChart:
         .encode(longitude="lon:Q", latitude="lat:Q", text="text:N")  # ty: ignore[unresolved-attribute]
     )
     return (
-        # `graticule` and `land` carry no `.encode()` to hang the usual suppression on, so ty's
-        # loss of the chart type after `mark_geoshape()` (astral-sh/ty#2520) surfaces here.
-        # `graticule` and `land` carry no `.encode()` to hang the usual suppression on, so ty's
-        # loss of the chart type after `mark_geoshape()` (astral-sh/ty#2520) surfaces here.
-        alt.LayerChart(layer=[graticule, land, domains_layer, labels, _graticule_labels()])  # ty: ignore[invalid-argument-type]
+        # `graticule` and the two land layers carry no `.encode()` to hang the usual suppression
+        # on, so ty's loss of the chart type after `mark_geoshape()` (astral-sh/ty#2520) surfaces
+        # here.
+        alt.LayerChart(
+            layer=[graticule, context_land, land, domains_layer, labels, _graticule_labels()]  # ty: ignore[invalid-argument-type]
+        )
         .project(
             type="conicConformal",
             parallels=[50, 60],
@@ -254,10 +272,10 @@ def domain_map() -> alt.LayerChart:
             width=WIDTH_PX,
             height=HEIGHT_PX,
             title=alt.Title(
-                text="ICON-D2 and AROME France each leave out part of Great Britain",
+                text="ICON-D2 and AROME France each leave out part of the UK",
                 subtitle=[
-                    "Shaded: the area each weather model's data covers. Grey: Great Britain",
-                    "(England, Scotland, and Wales; the map does not draw Northern Ireland).",
+                    "Shaded: the area each weather model's data covers.",
+                    "Dark grey: the UK. Light grey: Ireland, for context.",
                 ],
                 anchor="start",
             ),
