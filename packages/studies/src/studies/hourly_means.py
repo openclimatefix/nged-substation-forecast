@@ -17,6 +17,33 @@ import polars as pl
 KEY_COLUMN: Final[str] = "key"
 """The column naming which series a row belongs to: a site label, or a grid cell's identifier."""
 
+NEGATIVE_LIMIT_W_M2: Final[float] = -1.0
+"""A de-averaged hourly mean below this counts as negative, rather than as rounding noise."""
+
+MAX_NEGATIVE_FRACTION: Final[float] = 0.001
+"""The largest share of de-averaged values allowed below `NEGATIVE_LIMIT_W_M2`.
+
+De-averaging on the wrong phase subtracts running means over different windows, which throws
+negative hourly means at every sunrise and sunset. Measured on ICON-DREAM-EU's download, the right
+phase leaves 223 of about 1.1 million values below -1 W m⁻², and a phase one hour off leaves about
+100,000, so a limit of one in a thousand separates the two by a wide margin either way.
+"""
+
+SARAH_SLOT_OFFSETS_MINUTES: Final[tuple[int, int]] = (-60, -30)
+"""Which SARAH-3 snapshots, relative to the label, make up the hour ending at the label.
+
+SEVIRI scans the Earth from south to north over about 12 minutes from each slot's nominal time, so
+Great Britain is observed some minutes after its stamp, and the snapshots stamped 60 and 30 minutes
+before the label straddle the hour's midpoint more closely than the snapshots at 30 and 0 minutes
+do. On 48 days spread through 2025 at six solar farms, the hourly means from the earlier pair track
+the sun best 30 minutes before the label (`studies.timestamp_checks`), as a mean over the hour
+ending at the label should and as CAMS's hourly values do at 35 minutes; the later pair peaks at the
+label itself. Against CAMS the earlier pair correlates at 0.977 and the later at 0.961.
+"""
+
+ICON_DREAM_CYCLE_HOURS: Final[int] = 3
+"""ICON-DREAM's forecasts start every 3 hours from 00 UTC, and its radiation averages since then."""
+
 
 def hourly_from_running_means(
     *, frame: pl.DataFrame, value_column: str, cycle_hours: int
@@ -30,9 +57,11 @@ def hourly_from_running_means(
     earlier, the mean over the hour ending at `h` is `k * A_k - (k - 1) * A_{k-1}`. At `k = 1` it
     is `A_1` itself.
 
-    **Negative results are clipped at zero.** De-averaging subtracts two nearly equal numbers at
-    sunrise and sunset, and the upstream averaging leaves them a few W m⁻² apart the wrong way; a
-    negative flux is not a physical value.
+    **Negative results are clipped at zero, but only a few are allowed.** De-averaging subtracts
+    two nearly equal numbers at sunrise and sunset, and the upstream averaging leaves them a few
+    W m⁻² apart the wrong way; a negative flux is not a physical value. More than
+    `MAX_NEGATIVE_FRACTION` of values below `NEGATIVE_LIMIT_W_M2` means the phase is wrong, and
+    raises rather than being clipped away.
 
     Args:
         frame: One row per (`key`, `time`), with `time` a UTC datetime on the hour and
@@ -48,7 +77,7 @@ def hourly_from_running_means(
 
     Raises:
         ValueError: If a (`key`, `time`) appears twice once the padding is dropped, which would
-            make the previous hour ambiguous.
+            make the previous hour ambiguous, or if too many de-averaged values are negative.
     """
     real = frame.filter(pl.col(value_column).is_not_nan() & pl.col(value_column).is_not_null())
     if real.select(KEY_COLUMN, "time").is_duplicated().any():
@@ -61,7 +90,7 @@ def hourly_from_running_means(
     )
     hour = pl.col("time").dt.hour().cast(pl.Int32)
     step = (hour + cycle_hours - 1) % cycle_hours + 1
-    return (
+    de_averaged = (
         real.join(previous, on=[KEY_COLUMN, "time"], how="left")
         .with_columns(step=step)
         .filter((pl.col("step") == 1) | pl.col("previous").is_not_null())
@@ -71,9 +100,19 @@ def hourly_from_running_means(
             .otherwise(
                 pl.col("step") * pl.col(value_column) - (pl.col("step") - 1) * pl.col("previous")
             )
-            .clip(lower_bound=0.0)
             .alias(value_column)
         )
+    )
+    negative = de_averaged.filter(pl.col(value_column) < NEGATIVE_LIMIT_W_M2).height
+    if negative > MAX_NEGATIVE_FRACTION * de_averaged.height:
+        msg = (
+            f"{negative} of {de_averaged.height} de-averaged {value_column} values are below "
+            f"{NEGATIVE_LIMIT_W_M2} W m-2, more than {MAX_NEGATIVE_FRACTION:.1%}: the forecast "
+            "starts are probably not on the phase assumed"
+        )
+        raise ValueError(msg)
+    return (
+        de_averaged.with_columns(pl.col(value_column).clip(lower_bound=0.0))
         .select(KEY_COLUMN, "time", value_column)
         .sort(KEY_COLUMN, "time")
     )
@@ -137,3 +176,54 @@ def hourly_from_snapshots(
             for column in value_columns
         ),
     ).sort(KEY_COLUMN, "time")
+
+
+def sarah_hourly(*, snapshots: pl.DataFrame) -> pl.DataFrame:
+    """Return SARAH-3's hourly global and direct irradiance from its half-hourly snapshots.
+
+    Args:
+        snapshots: One row per (`key`, `time`) with `ghi_w_m2` and `bhi_w_m2`, each a snapshot, and
+            not-a-number where the slot is unusable.
+
+    Returns:
+        One row per (`key`, `time`) with `ghi_w_m2` and `bhi_w_m2`, each the mean over the hour
+        ending at `time`, from the snapshots `SARAH_SLOT_OFFSETS_MINUTES` names.
+    """
+    return hourly_from_snapshots(
+        frame=snapshots,
+        value_columns=("ghi_w_m2", "bhi_w_m2"),
+        slot_offsets_minutes=SARAH_SLOT_OFFSETS_MINUTES,
+    )
+
+
+def icon_dream_hourly(*, direct: pl.DataFrame, diffuse: pl.DataFrame) -> pl.DataFrame:
+    """Return ICON-DREAM-EU's hourly global and direct irradiance from its two running means.
+
+    The global flux is the direct plus the diffuse flux, which is how DWD splits the surface
+    shortwave radiation.
+
+    Args:
+        direct: One row per (`key`, `time`) with `value`, the direct flux's running mean.
+        diffuse: The same for the diffuse flux.
+
+    Returns:
+        One row per (`key`, `time`) at which both fluxes could be de-averaged, with `ghi_w_m2` and
+        `bhi_w_m2`, each the mean over the hour ending at `time`.
+    """
+    hourly = {
+        part: hourly_from_running_means(
+            frame=frame, value_column="value", cycle_hours=ICON_DREAM_CYCLE_HOURS
+        )
+        for part, frame in (("direct", direct), ("diffuse", diffuse))
+    }
+    return (
+        hourly["direct"]
+        .join(hourly["diffuse"], on=[KEY_COLUMN, "time"], suffix="_diffuse")
+        .select(
+            KEY_COLUMN,
+            "time",
+            ghi_w_m2=pl.col("value") + pl.col("value_diffuse"),
+            bhi_w_m2=pl.col("value"),
+        )
+        .sort(KEY_COLUMN, "time")
+    )

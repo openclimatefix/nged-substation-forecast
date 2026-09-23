@@ -87,3 +87,46 @@ def nearest_cells(*, sites: pl.DataFrame, cells: pl.DataFrame) -> pl.DataFrame:
             "distance_km": distance_km[np.arange(sites.height), nearest],
         }
     )
+
+
+def nearest_grid_indices(
+    *, sites: pl.DataFrame, latitudes: np.ndarray, longitudes: np.ndarray
+) -> pl.DataFrame:
+    """Return the indices into a regular latitude-longitude grid's two axes of each site's cell.
+
+    The grid is flattened latitude-major and handed to `nearest_cells`, and each flat index is
+    split back into its two axis indices. **A split that swapped the axes would still return
+    plausible distances**, so the result is checked against the cells it names before it is
+    returned.
+
+    Args:
+        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        latitudes: The grid's latitude axis, in degrees.
+        longitudes: The grid's longitude axis, in degrees.
+
+    Returns:
+        One row per site with `site`, `lat_index`, `lon_index` and `distance_km`.
+
+    Raises:
+        ValueError: If a returned index pair does not name the cell `nearest_cells` chose.
+    """
+    lat_grid, lon_grid = np.meshgrid(latitudes, longitudes, indexing="ij")
+    cells = pl.DataFrame(
+        {"latitude": lat_grid.ravel(), "longitude": lon_grid.ravel()}
+    ).with_row_index(name="cell_id")
+    nearest = nearest_cells(sites=sites, cells=cells).join(
+        cells.rename({"latitude": "cell_latitude", "longitude": "cell_longitude"}), on="cell_id"
+    )
+    indices = nearest.with_columns(
+        lat_index=pl.col("cell_id") // len(longitudes),
+        lon_index=pl.col("cell_id") % len(longitudes),
+    )
+    lat_index = indices["lat_index"].to_numpy()
+    lon_index = indices["lon_index"].to_numpy()
+    if not (
+        np.array_equal(latitudes[lat_index], indices["cell_latitude"].to_numpy())
+        and np.array_equal(longitudes[lon_index], indices["cell_longitude"].to_numpy())
+    ):
+        msg = "an axis index does not name the cell chosen"
+        raise ValueError(msg)
+    return indices.select("site", "lat_index", "lon_index", "distance_km").sort("site")

@@ -6,6 +6,7 @@ import pytest
 from studies.bootstrap import (
     bootstrap_absolute,
     bootstrap_difference,
+    bootstrap_difference_by_year,
     fold_t_interval,
     per_fold_differences,
 )
@@ -174,3 +175,54 @@ def test_the_fold_t_interval_matches_the_textbook_formula():
 def test_a_single_fold_has_no_t_interval():
     with pytest.raises(ValueError, match="at least two folds"):
         fold_t_interval(fold_differences=[1.0])
+
+
+def _yearly_losses(*, months_2024: int) -> pl.DataFrame:
+    # ERA5 is worse by 0.5 in every row, over `months_2024` months of 2024 and all 12 of 2025.
+    records = []
+    for year, months in ((2024, months_2024), (2025, 12)):
+        for month in range(1, months + 1):
+            for seed in (0, 1):
+                for arm, loss in (("era5", 1.0), ("other", 0.5)):
+                    records.append(
+                        {
+                            "arm": arm,
+                            "site": "A",
+                            "time": datetime(year, month, 1, tzinfo=UTC),
+                            "seed": seed,
+                            "month": f"{year}-{month:02d}",
+                            "loss": loss,
+                            "setting": "pooled",
+                        }
+                    )
+    return pl.DataFrame(records)
+
+
+def test_the_yearly_difference_is_treatment_minus_reference():
+    intervals = bootstrap_difference_by_year(
+        losses=_yearly_losses(months_2024=12),
+        treatment="era5",
+        references=("other",),
+        metric="loss",
+    )
+
+    assert [interval["year"] for interval in intervals] == [2024, 2025]
+    assert [interval["difference"] for interval in intervals] == pytest.approx([0.5, 0.5])
+
+
+def test_a_year_of_fewer_than_six_months_is_flagged():
+    intervals = bootstrap_difference_by_year(
+        losses=_yearly_losses(months_2024=5), treatment="era5", references=("other",), metric="loss"
+    )
+
+    assert [(i["n_months"], i["enough_months"]) for i in intervals] == [(5, False), (12, True)]
+
+
+def test_losses_at_two_settings_raise():
+    losses = _yearly_losses(months_2024=12)
+    both = pl.concat([losses, losses.with_columns(setting=pl.lit("sensitivity"))])
+
+    with pytest.raises(ValueError, match="settings"):
+        bootstrap_difference_by_year(
+            losses=both, treatment="era5", references=("other",), metric="loss"
+        )

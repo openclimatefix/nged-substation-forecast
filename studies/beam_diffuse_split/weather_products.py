@@ -91,11 +91,20 @@ from run_experiment import (
     dataset_path_for,
     run_all,
 )
-from sources import STUDY_DATA_DIR, UPDATE_OUTPUT_DIR, SourceType, point_output_path_for
+from sources import (
+    OPEN_METEO_MODELS,
+    STUDY_DATA_DIR,
+    UPDATE_OUTPUT_DIR,
+    SourceType,
+    point_output_path_for,
+)
 from studies.bootstrap import (
     BOOTSTRAP_SEED,
+    MIN_MONTHS_FOR_INTERVAL,
     N_BOOTSTRAP_RESAMPLES,
+    YearInterval,
     bootstrap_difference,
+    bootstrap_difference_by_year,
     per_fold_differences,
 )
 from studies.cross_validation import (
@@ -106,6 +115,7 @@ from studies.cross_validation import (
     clamp_to_cap,
     fit_one_fold,
 )
+from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.neighbouring_hours import with_neighbouring_hours
 
 _LOG = logging.getLogger(__name__)
@@ -162,6 +172,31 @@ RUN_INTERVAL_HOURS: Final[dict[str, int]] = {"icon_d2": 3, "icon_eu": 3, "icon_g
 The evidence for the mapping is on the write-up page.
 """
 
+SARAH_SATELLITE_ERAS: Final[tuple[tuple[str, datetime, datetime], ...]] = (
+    (
+        "Meteosat-11, January 2022 (includes a fortnight from Meteosat-9)",
+        datetime(2022, 1, 1, tzinfo=UTC),
+        datetime(2022, 2, 1, tzinfo=UTC),
+    ),
+    (
+        "Meteosat-11, to 20 March 2023",
+        datetime(2021, 1, 1, tzinfo=UTC),
+        datetime(2023, 3, 21, tzinfo=UTC),
+    ),
+    (
+        "Meteosat-10, from 21 March 2023",
+        datetime(2023, 3, 21, tzinfo=UTC),
+        datetime(2027, 1, 1, tzinfo=UTC),
+    ),
+)
+"""The satellite behind SARAH-3's retrieval over each span, as (label, start, end before).
+
+SARAH-3's European disc moved from Meteosat-11 to Meteosat-10 on 21 March 2023, and Meteosat-9
+stood in for a fortnight in January 2022. The report prints SARAH-3's error against CAMS in each
+span; no era feature enters the fit. The Meteosat-11 row includes January 2022, which also has a row
+of its own.
+"""
+
 LEAD_TABLE_HOURS: Final[tuple[int, int]] = (7, 19)
 """The first and last UTC label hours the lead tables use.
 
@@ -216,12 +251,17 @@ NEW_PRODUCTS: Final[dict[str, str]] = {
 ALL_PRODUCTS: Final[dict[str, str]] = PRODUCTS | NEW_PRODUCTS
 """Every product either round scores, by arm prefix."""
 
-UNUSABLE_SPLITS: Final[frozenset[str]] = frozenset({"dmi_harmonie"})
+UNUSABLE_SPLITS: Final[frozenset[str]] = frozenset(
+    prefix
+    for prefix, source in NEW_PRODUCTS.items()
+    if source in OPEN_METEO_MODELS and not OPEN_METEO_MODELS[source].split_scored
+)
 """Products whose own split no arm reads, so they get neither a split arm nor an Erbs arm.
 
-DMI's served direct flux is zero in 48% of daytime hours and exceeds the global flux in 74 hours
-(see `sources.OPEN_METEO_MODELS`). A split arm would measure that defect, not the model's physics,
-and an Erbs arm exists only as the split arm's reference.
+Read from `sources.OPEN_METEO_MODELS`, which says why for each: DMI's served direct flux is zero in
+48% of daytime hours, and ARPEGE's and KNMI's is a separation model's output. A split arm would
+measure the defect or the separation model, not the weather model, and an Erbs arm exists only as
+the split arm's reference.
 """
 
 NEW_PLANNED_CONTRASTS: Final[dict[str, tuple[tuple[str, str], ...]]] = {
@@ -238,9 +278,25 @@ NEW_PLANNED_CONTRASTS: Final[dict[str, tuple[tuple[str, str], ...]]] = {
 """The five contrasts the second round names before its run, by the panel each is measured on.
 
 Whether the second satellite retrieval matches CAMS; whether the second reanalysis beats ERA5;
-whether ECMWF's global model beats the Great-Britain-wide ICON; whether a HARMONIE-AROME model
-over Europe beats the Great-Britain-wide ICON; and whether the Danish 2 km model matches the
-German one. Every other contrast involving a new product is exploratory.
+whether ECMWF's global model beats the Great-Britain-wide ICON; whether KNMI's 5.5 km
+HARMONIE-AROME model over Europe beats the Great-Britain-wide ICON; and whether the Danish 2 km
+model matches the German one. Every other contrast involving a new product is exploratory.
+
+**How an unequal served lead biases three of them, written down before any lead is measured.** An
+archive value served at a longer lead is a worse description of the hour, so the product with the
+longer lead is handicapped, and a contrast between two leads is part model, part lead:
+
+- ECMWF-IFS-HRES − ICON-EU: ECMWF runs every 6 hours, or every 12 for its longest forecasts, where
+  ICON-EU runs every 3, so IFS-HRES's served lead is expected to be the longer. The bias is against
+  IFS-HRES: a win for it survives equal leads, and a loss may be the lead's.
+- KNMI HARMONIE-AROME − ICON-EU and DMI HARMONIE-AROME − ICON-D2: HARMONIE-AROME configurations
+  typically run every 1 to 3 hours, so their served lead is expected to be as short as ICON's or
+  shorter. The bias, if any, is in their favour: a loss for them survives equal leads, and a win may
+  be the lead's.
+
+Once `check_new_products.py` has measured each model's run interval, the interval goes into
+`RUN_INTERVAL_HOURS`, and the report prints each planned contrast within the rows where both
+products sit at the same served lead, beside the rows where they do not.
 """
 
 PanelType = Literal["published", "long", "all", "record"]
@@ -259,12 +315,15 @@ class Panel(NamedTuple):
         planned: The contrasts named before the run, as (treatment, reference) arm pairs. Each is
             also fitted at the second hyperparameter setting, except on the `published` panel,
             which reproduces the first round as it ran.
+        first_time: The first hour the panel scores, or `None` to start where its products'
+            records first overlap.
     """
 
     products: tuple[str, ...]
     output_dir: Path
     full_analysis: bool
     planned: tuple[tuple[str, str], ...]
+    first_time: datetime | None = None
 
 
 PANELS: Final[dict[PanelType, Panel]] = {
@@ -285,6 +344,7 @@ PANELS: Final[dict[PanelType, Panel]] = {
         output_dir=UPDATE_OUTPUT_DIR / "solar_all",
         full_analysis=False,
         planned=NEW_PLANNED_CONTRASTS["all"],
+        first_time=datetime(2024, 9, 1, tzinfo=UTC),
     ),
     "record": Panel(
         products=("era5", "cams", "sarah3", "icon_dream", "ifs_hres"),
@@ -294,7 +354,13 @@ PANELS: Final[dict[PanelType, Panel]] = {
     ),
 }
 """Every panel. The `published` panel's directory is the first round's; every other panel's sits
-under `sources.UPDATE_OUTPUT_DIR`."""
+under `sources.UPDATE_OUTPUT_DIR`.
+
+The `all` panel starts on 1 September 2024 rather than when HARMONIE-AROME's archive does, in July
+2024, because Open-Meteo's UKV before 12 August 2024 is a backfill from a source it does not name:
+a change of source is an era boundary, and a panel of 26 months has no room to cut folds on both
+sides of one. The first whole month after the change is the start.
+"""
 
 DEFAULT_PANELS: Final[tuple[PanelType, ...]] = ("long", "all", "record")
 """The panels a run fits unless told otherwise: the second round's."""
@@ -1076,6 +1142,82 @@ def _served_lead(*, product: str) -> pl.Expr:
     return ((hour - 1) % RUN_INTERVAL_HOURS[product]) + 1
 
 
+def _matched_lead_lines(*, panel: Panel, losses: pl.DataFrame) -> list[str]:
+    """Split each planned contrast by whether its two products sit at the same served lead.
+
+    Only a contrast whose two products both have an entry in `RUN_INTERVAL_HOURS` can be split;
+    the others are listed as waiting for a measured run interval.
+
+    Args:
+        panel: The panel reported.
+        losses: The pooled losses.
+
+    Returns:
+        Markdown lines.
+    """
+    first, last = LEAD_TABLE_HOURS
+    hour = pl.col("time").dt.hour().cast(pl.Int32)
+    daytime = losses.filter(hour.is_between(first, last))
+    lines = ["#### Planned contrasts at matched and unmatched served leads", "", *CONTRAST_HEADER]
+    waiting: list[str] = []
+    for treatment, reference in panel.planned:
+        products = [arm.removesuffix("_global") for arm in (treatment, reference)]
+        if not all(product in RUN_INTERVAL_HOURS for product in products):
+            waiting.append(f"{treatment} − {reference}")
+            continue
+        treatment_lead, reference_lead = (_served_lead(product=product) for product in products)
+        for label, condition in (
+            ("same lead", treatment_lead == reference_lead),
+            (f"{products[0]} shorter", treatment_lead < reference_lead),
+            (f"{products[0]} longer", treatment_lead > reference_lead),
+        ):
+            rows = daytime.filter(condition)
+            if rows.height:
+                lines.append(
+                    _contrast_line(
+                        losses=rows,
+                        treatment=treatment,
+                        reference=reference,
+                        label=f"{label}, {first:02d}–{last:02d} UTC",
+                    )
+                )
+    if waiting:
+        lines += [
+            "",
+            (
+                "Not split, because a product has no entry in RUN_INTERVAL_HOURS (a retrieval, a "
+                "reanalysis, UKV's analysis, or a run interval not yet measured): "
+                f"{', '.join(waiting)}."
+            ),
+        ]
+    return lines
+
+
+def _sarah_era_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Report SARAH-3's error against CAMS in each span of `SARAH_SATELLITE_ERAS`.
+
+    Args:
+        losses: The pooled losses, holding `sarah3_global` and `cams_global`.
+
+    Returns:
+        Markdown lines, one row per span that holds rows.
+    """
+    lines = [
+        "#### SARAH-3 against CAMS, by the satellite behind SARAH-3 (exploratory)",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    for label, start, end in SARAH_SATELLITE_ERAS:
+        rows = losses.filter(pl.col("time").is_between(start, end, closed="left"))
+        if rows.height:
+            lines.append(
+                _contrast_line(
+                    losses=rows, treatment="sarah3_global", reference="cams_global", label=label
+                )
+            )
+    return lines
+
+
 def _lead_tables(*, losses: pl.DataFrame) -> list[str]:
     """Compare ICON products at matched served leads and hour by hour, and break CAMS down.
 
@@ -1202,8 +1344,9 @@ def era5_difference_by_year(
 ) -> pl.DataFrame:
     """Return ERA5's error minus each other arm's, in each calendar year, with its interval.
 
-    Each year is bootstrapped on its own months alone, so a year's interval rests on at most 12
-    months and a part-year's on fewer.
+    Each year is bootstrapped on its own months alone, by
+    `studies.bootstrap.bootstrap_difference_by_year`, which also flags a year holding too few
+    months for its interval to mean anything.
 
     Args:
         losses: Per-row losses at one setting, carrying `time`, `month`, `site`, `seed` and `arm`.
@@ -1211,30 +1354,21 @@ def era5_difference_by_year(
         other_arms: The arms ERA5 is compared against.
 
     Returns:
-        One row per (arm, year) with `arm`, `year`, and the fields of
-        `studies.bootstrap.BootstrapInterval` in fractions of capacity. A positive difference means
-        ERA5's error is the larger.
+        One row per (arm, year) with `arm`, `year`, the interval in fractions of capacity, and
+        `enough_months`. A positive difference means ERA5's error is the larger.
     """
-    years = sorted(losses["time"].dt.year().unique().to_list())
-    records = [
-        {
-            "arm": arm,
-            "year": year,
-            **bootstrap_difference(
-                losses=losses.filter(pl.col("time").dt.year() == year),
-                treatment=era5_arm,
-                reference=arm,
-                metric=METRIC,
-            ),
-        }
-        for arm in other_arms
-        for year in years
-    ]
-    return pl.DataFrame(records)
+    intervals: list[YearInterval] = bootstrap_difference_by_year(
+        losses=losses, treatment=era5_arm, references=other_arms, metric=METRIC
+    )
+    return pl.DataFrame(intervals).rename({"reference": "arm"})
 
 
 def era5_by_year_lines(*, by_year: pl.DataFrame) -> list[str]:
     """Render `era5_difference_by_year`'s table as markdown.
+
+    A year holding fewer than `studies.bootstrap.MIN_MONTHS_FOR_INTERVAL` months shows its estimate
+    and no interval: with the month as the resampling unit, its interval would reflect little more
+    than the fitting seed.
 
     Args:
         by_year: The output of `era5_difference_by_year`.
@@ -1245,7 +1379,10 @@ def era5_by_year_lines(*, by_year: pl.DataFrame) -> list[str]:
     lines = [
         "#### ERA5 against every other product, year by year (exploratory)",
         "",
-        "Positive: ERA5's error is the larger.",
+        (
+            "Positive: ERA5's error is the larger. A year of fewer than "
+            f"{MIN_MONTHS_FOR_INTERVAL} months gets no interval."
+        ),
         "",
         (
             "| Against | Year | ERA5 − product (pp of capacity) | 95% interval | Excludes zero? "
@@ -1257,10 +1394,15 @@ def era5_by_year_lines(*, by_year: pl.DataFrame) -> list[str]:
         difference, lower, upper = (
             row[key] * PERCENTAGE_POINTS for key in ("difference", "lower_95", "upper_95")
         )
-        excludes = row["lower_95"] > 0.0 or row["upper_95"] < 0.0
+        if row["enough_months"]:
+            interval = f"[{lower:+.3f}, {upper:+.3f}]"
+            excludes = row["lower_95"] > 0.0 or row["upper_95"] < 0.0
+            verdict = "**yes**" if excludes else "no"
+        else:
+            interval, verdict = "too few months", "—"
         lines.append(
-            f"| {row['arm']} | {row['year']} | {difference:+.3f} | [{lower:+.3f}, {upper:+.3f}] "
-            f"| {'**yes**' if excludes else 'no'} | {row['n_months']} | {row['n_rows']:,} |"
+            f"| {row['arm']} | {row['year']} | {difference:+.3f} | {interval} | {verdict} "
+            f"| {row['n_months']} | {row['n_rows']:,} |"
         )
     return lines
 
@@ -1337,11 +1479,6 @@ def _full_analysis_lines(*, panel: Panel, losses: PanelLosses) -> list[str]:
         raise ValueError(msg)
     pooled = losses.pooled
     lines = [
-        (
-            "The post scope holds eight months, so its intervals rest on eight clusters and "
-            "under-cover; read its fold-sign counts alongside them."
-        ),
-        "",
         "#### The post scope, fitted on post-upgrade rows alone",
         "",
         *CONTRAST_HEADER,
@@ -1458,6 +1595,15 @@ def _report(
             for product in panel.products
             if product != BASE_PRODUCT
         ]
+    if panel.full_analysis:
+        post_months = _scope(losses=pooled, scope="post")["month"].n_unique()
+        lines += [
+            "",
+            (
+                f"The post scope holds {post_months} months, so its intervals rest on "
+                f"{post_months} clusters and under-cover; read its fold-sign counts alongside them."
+            ),
+        ]
     lines += ["", "#### A product's own split against Erbs on its own global", "", *CONTRAST_HEADER]
     lines += [
         _contrast_line(
@@ -1481,60 +1627,70 @@ def _report(
     ]
     if panel.full_analysis:
         lines += ["", *_lead_tables(losses=pooled)]
+    if panel.planned:
+        lines += ["", *_matched_lead_lines(panel=panel, losses=pooled)]
+    if {"sarah3", "cams"} <= set(panel.products):
+        lines += ["", *_sarah_era_lines(losses=pooled)]
     lines += ["", *era5_by_year_lines(by_year=by_year)]
     lines += ["", *geometry_lines(sites=_pv_sites(), noun="solar farms")]
     return "\n".join(lines) + "\n"
 
 
-def refuse_to_overwrite(*, paths: list[Path]) -> None:
-    """Raise if any output a run is about to write already exists.
-
-    Args:
-        paths: Every file the run writes.
-
-    Raises:
-        FileExistsError: Naming the first file that exists, which has to be moved to a
-            `superseded/` subfolder first, because a merged page may quote it.
-    """
-    for path in paths:
-        if path.exists():
-            msg = f"{path} exists; move it to a superseded/ subfolder before re-running"
-            raise FileExistsError(msg)
-
-
-def _panel_frame(*, panel: Panel) -> pl.DataFrame:
-    """Build a panel's common rows, with the era, the folds, the time features and the export cap.
-
-    Args:
-        panel: The panel.
-
-    Returns:
-        The rows every arm of the panel is fitted and scored on.
-    """
-    return with_export_cap(
-        dataset=with_eras(
-            frame=_add_time_features(dataset=common_rows(frame=joined(products=panel.products)))
-        )
-    )
-
-
-def _fit_panel(*, name: PanelType, panel: Panel, frame: pl.DataFrame) -> PanelLosses:
-    """Fit every arm a panel reports.
+def _panel_jobs(*, name: PanelType, panel: Panel) -> list[Job]:
+    """Return every pooled fit a panel runs: its arms, and its planned contrasts' second setting.
 
     Args:
         name: The panel's name; the `published` panel reproduces the first round, which ran no
             second setting.
         panel: The panel.
+
+    Returns:
+        The jobs.
+
+    Raises:
+        ValueError: If a panel other than `published` names planned contrasts but no second-setting
+            job, which would leave its report without the sensitivity table.
+    """
+    extra = sensitivity_jobs(panel=panel) if name != "published" else []
+    if name != "published" and panel.planned and not extra:
+        msg = f"the {name} panel plans contrasts but fits none at the second setting"
+        raise ValueError(msg)
+    return jobs(products=panel.products, with_snapshot_arms=panel.full_analysis) + extra
+
+
+def _panel_frame(*, panel: Panel, panel_jobs: list[Job]) -> pl.DataFrame:
+    """Build a panel's common rows, with the era, the folds, the time features and the export cap.
+
+    Every column any job is shown is checked for a missing value, because the inner joins that make
+    the rows common are what keep every arm's input present on every row.
+
+    Args:
+        panel: The panel.
+        panel_jobs: Every job the panel fits, whose feature columns are checked.
+
+    Returns:
+        The rows every arm of the panel is fitted and scored on.
+    """
+    rows = common_rows(frame=joined(products=panel.products))
+    if panel.first_time is not None:
+        rows = rows.filter(pl.col("time") >= panel.first_time)
+    frame = with_export_cap(dataset=with_eras(frame=_add_time_features(dataset=rows)))
+    check_no_missing(frame=frame, columns=[column for job in panel_jobs for column in job[3]])
+    return frame
+
+
+def _fit_panel(*, panel: Panel, panel_jobs: list[Job], frame: pl.DataFrame) -> PanelLosses:
+    """Fit every arm a panel reports.
+
+    Args:
+        panel: The panel.
+        panel_jobs: The pooled fits, from `_panel_jobs`.
         frame: The panel's common rows.
 
     Returns:
         The panel's losses.
     """
-    extra = sensitivity_jobs(panel=panel) if name != "published" else []
-    losses = run_all(
-        dataset=frame,
-        jobs=jobs(products=panel.products, with_snapshot_arms=panel.full_analysis) + extra,
-    )
+    losses = run_all(dataset=frame, jobs=panel_jobs)
     return PanelLosses(
         pooled=losses.filter(pl.col("setting") == "pooled"),
         sensitivity=losses.filter(pl.col("setting") == "sensitivity"),
@@ -1557,7 +1713,8 @@ def run_panel(*, name: PanelType, report_only: bool) -> None:
         report_only: Whether to read the losses a full run saved instead of fitting.
     """
     panel = PANELS[name]
-    frame = _panel_frame(panel=panel)
+    panel_jobs = _panel_jobs(name=name, panel=panel)
+    frame = _panel_frame(panel=panel, panel_jobs=panel_jobs)
     by_site = frame.group_by("site", "era").agg(pl.len(), pl.col("month").n_unique()).sort("site")
     _LOG.info("%s panel common rows: %d\n%s", name, frame.height, by_site)
 
@@ -1585,7 +1742,7 @@ def run_panel(*, name: PanelType, report_only: bool) -> None:
     else:
         refuse_to_overwrite(paths=[*loss_paths.values(), *written])
         output_dir.mkdir(parents=True, exist_ok=True)
-        losses = _fit_panel(name=name, panel=panel, frame=frame)
+        losses = _fit_panel(panel=panel, panel_jobs=panel_jobs, frame=frame)
         pl.concat([losses.pooled, losses.sensitivity]).write_parquet(loss_paths["losses"])
         if losses.post_only is not None:
             losses.post_only.write_parquet(loss_paths["post_only_losses"])

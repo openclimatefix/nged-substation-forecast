@@ -77,3 +77,42 @@ def test_stamps_and_values_of_different_lengths_raise():
         correlation_by_offset(
             times=_stamps()[:3], ghi=np.ones(2), latitude=LATITUDE, longitude=LONGITUDE
         )
+
+
+def _peaking_at(offset: int) -> dict[int, float]:
+    return {candidate: 0.5 - abs(candidate - offset) / 1000 for candidate in range(-60, 65, 5)}
+
+
+@pytest.mark.parametrize("offset", [-45, -15])
+def test_a_peak_15_minutes_from_the_hour_ending_offset_passes(offset: int):
+    check_hour_ending(correlations=_peaking_at(offset), name="synthetic")
+
+
+@pytest.mark.parametrize("offset", [-50, -10])
+def test_a_peak_20_minutes_from_the_hour_ending_offset_fails(offset: int):
+    with pytest.raises(ValueError, match="settle which window"):
+        check_hour_ending(correlations=_peaking_at(offset), name="synthetic")
+
+
+def test_undefined_correlations_are_ignored_rather_than_read_as_the_first_offset():
+    correlations = _peaking_at(-30) | {-60: float("nan")}
+
+    assert best_offset_minutes(correlations=correlations) == -30
+
+
+def test_a_series_with_no_defined_correlation_fails_the_check():
+    stamps = _stamps()[:48]
+
+    correlations = correlation_by_offset(
+        times=stamps, ghi=np.zeros(48), latitude=LATITUDE, longitude=LONGITUDE
+    )
+
+    with pytest.raises(ValueError, match="no offset"):
+        check_hour_ending(correlations=correlations, name="synthetic")
+
+
+def test_fewer_than_two_hours_raise():
+    with pytest.raises(ValueError, match="at least two"):
+        correlation_by_offset(
+            times=_stamps()[:1], ghi=np.ones(1), latitude=LATITUDE, longitude=LONGITUDE
+        )

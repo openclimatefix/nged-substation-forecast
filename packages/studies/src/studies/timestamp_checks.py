@@ -67,32 +67,50 @@ def correlation_by_offset(
         raise ValueError(msg)
     values = np.asarray(ghi, dtype=np.float64)
     return {
-        offset: float(
-            np.corrcoef(
-                values,
-                cos_zenith(
-                    zenith_deg=zenith(
-                        stamps=times.dt.offset_by(f"{offset}m"),
-                        latitude=latitude,
-                        longitude=longitude,
-                    )
-                ),
-            )[0, 1]
+        offset: _correlation(
+            first=values,
+            second=cos_zenith(
+                zenith_deg=zenith(
+                    stamps=times.dt.offset_by(f"{offset}m"), latitude=latitude, longitude=longitude
+                )
+            ),
         )
         for offset in offsets_minutes
     }
 
 
+def _correlation(*, first: np.ndarray, second: np.ndarray) -> float:
+    """Return the Pearson correlation, or not-a-number where either series is constant.
+
+    Args:
+        first: One series.
+        second: The other, of the same length.
+
+    Returns:
+        The correlation, not-a-number where it is undefined.
+    """
+    if np.std(first) == 0.0 or np.std(second) == 0.0:
+        return float("nan")
+    return float(np.corrcoef(first, second)[0, 1])
+
+
 def best_offset_minutes(*, correlations: dict[int, float]) -> int:
-    """Return the offset at which the correlation peaks.
+    """Return the offset at which the correlation peaks, ignoring undefined correlations.
 
     Args:
         correlations: The output of `correlation_by_offset`.
 
     Returns:
         The offset, in minutes, with the highest correlation.
+
+    Raises:
+        ValueError: If no offset has a defined correlation, as for a series of constant values.
     """
-    return max(correlations, key=lambda offset: correlations[offset])
+    finite = {offset: value for offset, value in correlations.items() if np.isfinite(value)}
+    if not finite:
+        msg = "no offset has a defined correlation"
+        raise ValueError(msg)
+    return max(finite, key=lambda offset: finite[offset])
 
 
 def check_hour_ending(*, correlations: dict[int, float], name: str) -> None:
@@ -104,7 +122,7 @@ def check_hour_ending(*, correlations: dict[int, float], name: str) -> None:
 
     Raises:
         ValueError: If the peak sits more than `MAX_OFFSET_ERROR_MINUTES` from
-            `HOUR_ENDING_OFFSET_MINUTES`.
+            `HOUR_ENDING_OFFSET_MINUTES`, or no offset has a defined correlation.
     """
     best = best_offset_minutes(correlations=correlations)
     if abs(best - HOUR_ENDING_OFFSET_MINUTES) > MAX_OFFSET_ERROR_MINUTES:

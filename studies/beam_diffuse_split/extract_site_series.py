@@ -9,10 +9,16 @@ One-off throwaway script for the second round of the study in
 serves.** The two products store something else:
 
 - **SARAH-3** stores instantaneous satellite snapshots every 30 minutes. The hour labelled `T` is
-  the mean of the snapshots stamped `T - 60 min` and `T - 30 min` (`SARAH_SLOT_OFFSETS_MINUTES`).
+  the mean of the snapshots stamped `T - 60 min` and `T - 30 min`
+  (`studies.hourly_means.sarah_hourly`).
 - **ICON-DREAM-EU** stores the mean since the most recent 3-hourly forecast start, which
-  `studies.hourly_means.hourly_from_running_means` de-averages. The global flux is the direct plus
-  the diffuse flux, which is how DWD splits it.
+  `studies.hourly_means.icon_dream_hourly` de-averages, raising if the phase is wrong. The
+  global flux is the direct plus the diffuse flux, which is how DWD splits it.
+
+**SARAH-3's unusable slots decide which hours every product is scored on**, because a panel keeps
+only the hours all its products cover. A void slot with the sun below the horizon at the site is
+therefore set to zero, the value SARAH-3 stores for every other night slot, so night-time voids
+cannot remove an hour. The script logs how many hours are still lost, by hour of day.
 
 `check_new_products.py` checks both conventions against the sun before any build reads them.
 
@@ -39,8 +45,9 @@ import polars as pl
 import xarray as xr
 from build_dataset import _pv_sites
 from sources import WEATHER_DATA_DIR, point_output_path_for
-from studies.grid_sampling import nearest_cells
-from studies.hourly_means import KEY_COLUMN, hourly_from_running_means, hourly_from_snapshots
+from studies.grid_sampling import nearest_cells, nearest_grid_indices
+from studies.hourly_means import KEY_COLUMN, icon_dream_hourly, sarah_hourly
+from studies.solar import zenith
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("extract_site_series")
@@ -50,20 +57,6 @@ ExtractedProductType = Literal["sarah-3", "icon-dream-eu"]
 
 SARAH_DIR: Final[Path] = WEATHER_DATA_DIR / "SARAH-3"
 """Holds `SIS/` (global) and `SID/` (direct) daily files from the CM SAF orders."""
-
-SARAH_SLOT_OFFSETS_MINUTES: Final[tuple[int, int]] = (-60, -30)
-"""Which snapshots, relative to the label, make up the hour ending at the label.
-
-SEVIRI scans the Earth from south to north over about 12 minutes from each slot's nominal time, so
-the trial area is observed some minutes after its stamp. The snapshots stamped 60 and 30 minutes
-before the label therefore straddle the hour's midpoint more closely than the snapshots at 30 and 0
-minutes do. Two measurements agree, on 48 days spread through 2025 at the six solar farms. Against
-the sun (`studies.timestamp_checks`), the hourly means from the earlier pair track it best 30
-minutes before the label at every farm, as a mean over the hour ending at the label should and as
-CAMS's hourly values do at 35 minutes; the later pair peaks at the label itself. Against CAMS, the
-earlier pair correlates at 0.977 and the later at 0.961. `check_new_products.py` repeats the first
-measurement on the whole record.
-"""
 
 SARAH_GOOD_RECORD: Final[int] = 0
 """The `record_status` of a usable slot; 1 is void and 2 is bad quality."""
@@ -81,9 +74,6 @@ ICON_DREAM_VALUE_COLUMNS: Final[dict[str, str]] = {
     "direct": "aswdir_s_w_m2",
     "diffuse": "aswdifd_s_w_m2",
 }
-
-ICON_DREAM_CYCLE_HOURS: Final[int] = 3
-"""ICON-DREAM's forecasts start every 3 hours from 00 UTC, and its radiation averages since then."""
 
 ICON_DREAM_GRID_URL: Final[str] = (
     "https://opendata.dwd.de/climate_environment/REA/ICON-DREAM-EU/invariant/ICON-DREAM-EU_grid.nc"
@@ -127,15 +117,7 @@ def _sarah_cells(*, path: Path, sites: pl.DataFrame) -> pl.DataFrame:
     with xr.open_dataset(path) as dataset:
         latitudes = dataset["lat"].to_numpy().astype(np.float64)
         longitudes = dataset["lon"].to_numpy().astype(np.float64)
-    lat_grid, lon_grid = np.meshgrid(latitudes, longitudes, indexing="ij")
-    cells = pl.DataFrame(
-        {"latitude": lat_grid.ravel(), "longitude": lon_grid.ravel()}
-    ).with_row_index(name="cell_id")
-    nearest = nearest_cells(sites=sites, cells=cells)
-    return nearest.with_columns(
-        lat_index=pl.col("cell_id") // len(longitudes),
-        lon_index=pl.col("cell_id") % len(longitudes),
-    ).drop("cell_id")
+    return nearest_grid_indices(sites=sites, latitudes=latitudes, longitudes=longitudes)
 
 
 def _sarah_day(*, sis: Path, sid: Path, cells: pl.DataFrame) -> pl.DataFrame:
@@ -199,14 +181,64 @@ def extract_sarah(*, sites: pl.DataFrame, first: date, last: date) -> pl.DataFra
         raise ValueError(msg)
     cells = _sarah_cells(path=next(iter(sis_files.values())), sites=sites)
     _log_distances(product="SARAH-3", nearest=cells)
-    snapshots = pl.concat(
-        _sarah_day(sis=sis_files[day], sid=sid_files[day], cells=cells) for day in sorted(sis_files)
+    snapshots = _night_voids_to_zero(
+        snapshots=pl.concat(
+            _sarah_day(sis=sis_files[day], sid=sid_files[day], cells=cells)
+            for day in sorted(sis_files)
+        ),
+        sites=sites,
     )
-    return hourly_from_snapshots(
-        frame=snapshots,
-        value_columns=("ghi_w_m2", "bhi_w_m2"),
-        slot_offsets_minutes=SARAH_SLOT_OFFSETS_MINUTES,
-    ).rename({KEY_COLUMN: "site"})
+    hourly = sarah_hourly(snapshots=snapshots).rename({KEY_COLUMN: "site"})
+    _log_lost_hours(snapshots=snapshots, hourly=hourly)
+    return hourly
+
+
+def _night_voids_to_zero(*, snapshots: pl.DataFrame, sites: pl.DataFrame) -> pl.DataFrame:
+    """Set every unusable slot with the sun below the horizon at its site to zero.
+
+    Args:
+        snapshots: One row per (site, slot), not-a-number where the slot is unusable.
+        sites: The roster, carrying `site`, `latitude` and `longitude`.
+
+    Returns:
+        `snapshots`, with night-time gaps filled by the zero SARAH-3 stores for every other night.
+    """
+    parts: list[pl.DataFrame] = []
+    for row in sites.iter_rows(named=True):
+        rows = snapshots.filter(pl.col(KEY_COLUMN) == row["site"])
+        night = pl.Series(
+            zenith(stamps=rows["time"], latitude=row["latitude"], longitude=row["longitude"])
+            >= 90.0
+        )
+        parts.append(
+            rows.with_columns(
+                pl.when(night & pl.col(column).is_nan()).then(0.0).otherwise(pl.col(column))
+                for column in ("ghi_w_m2", "bhi_w_m2")
+            )
+        )
+    return pl.concat(parts)
+
+
+def _log_lost_hours(*, snapshots: pl.DataFrame, hourly: pl.DataFrame) -> None:
+    """Log how many hours SARAH-3's unusable slots remove, by UTC hour of the label.
+
+    Args:
+        snapshots: The snapshots the hours were built from.
+        hourly: The hours built.
+    """
+    labels = snapshots.select(
+        KEY_COLUMN, time=pl.col("time").dt.truncate("1h").dt.offset_by("1h")
+    ).unique()
+    lost = labels.join(
+        hourly.select(pl.col("site").alias(KEY_COLUMN), "time"), on=[KEY_COLUMN, "time"], how="anti"
+    )
+    by_hour = lost.group_by(hour=pl.col("time").dt.hour()).len().sort("hour")
+    _LOG.info(
+        "SARAH-3: %d of %d site-hours lost to unusable slots; by UTC hour: %s",
+        lost.height,
+        labels.height,
+        dict(by_hour.iter_rows()),
+    )
 
 
 def _icon_dream_cell_centres(*, cache: Path, cell_ids: list[int]) -> pl.DataFrame:
@@ -264,27 +296,17 @@ def extract_icon_dream(
     )
     _log_distances(product="ICON-DREAM-EU", nearest=nearest)
     wanted = nearest["cell_id"].unique().to_list()
-    hourly = {
-        part: hourly_from_running_means(
-            frame=frame.filter(
-                pl.col(KEY_COLUMN).is_in(wanted),
-                pl.col("time").dt.date().is_between(first, last),
-            ),
-            value_column="value",
-            cycle_hours=ICON_DREAM_CYCLE_HOURS,
+    kept = {
+        part: frame.filter(
+            pl.col(KEY_COLUMN).is_in(wanted), pl.col("time").dt.date().is_between(first, last)
         )
         for part, frame in raw.items()
     }
-    fluxes = hourly["direct"].join(hourly["diffuse"], on=[KEY_COLUMN, "time"], suffix="_diffuse")
+    fluxes = icon_dream_hourly(direct=kept["direct"], diffuse=kept["diffuse"])
     return (
         nearest.select("site", **{KEY_COLUMN: pl.col("cell_id")})
         .join(fluxes, on=KEY_COLUMN)
-        .select(
-            "site",
-            "time",
-            ghi_w_m2=pl.col("value") + pl.col("value_diffuse"),
-            bhi_w_m2=pl.col("value"),
-        )
+        .select("site", "time", "ghi_w_m2", "bhi_w_m2")
         .sort("site", "time")
     )
 

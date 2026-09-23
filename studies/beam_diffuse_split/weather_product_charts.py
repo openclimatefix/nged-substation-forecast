@@ -446,12 +446,12 @@ def _models_work_error_chart(
     )
 
 
-SECTION_DECIDING: Final[str] = "Deciding contrasts, named before the run"
+SECTION_DECIDING: Final[str] = "Planned contrasts, named before the run"
 SECTION_AGAINST_ERA5: Final[str] = "Every product against ERA5, by scope (exploratory)"
 SECTION_POST_ONLY: Final[str] = "The post scope, fitted on post-upgrade rows alone"
 SECTION_SPLIT: Final[str] = "A product's own split against Erbs on its own global"
 SECTION_TRANSFER: Final[str] = (
-    "Leave one site out, the scored months withheld everywhere: the deciding contrasts"
+    "Leave one site out, the scored months withheld everywhere: the planned contrasts"
 )
 SECTION_SNAPSHOTS: Final[str] = (
     "UKV's served hour against the mean of its own two snapshots (post hoc)"

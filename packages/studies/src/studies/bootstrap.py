@@ -30,6 +30,29 @@ class BootstrapInterval(TypedDict):
     n_months: int
 
 
+MIN_MONTHS_FOR_INTERVAL: Final[int] = 6
+"""The fewest months a subset's interval is read from before it counts as evidence.
+
+The resampling unit is the calendar month. A subset holding one month resamples only the fitting
+seed, so its interval is as narrow as the seed-to-seed spread and can exclude zero on a difference
+the weather could easily reverse; a part-year of a few months is barely better.
+"""
+
+
+class YearInterval(TypedDict):
+    """A paired difference within one calendar year, and whether it rests on enough months."""
+
+    reference: str
+    year: int
+    difference: float
+    lower_95: float
+    upper_95: float
+    seed_spread: float
+    n_rows: int
+    n_months: int
+    enough_months: bool
+
+
 class AbsoluteInterval(TypedDict):
     """One arm's absolute metric, its interval, and what the interval rests on."""
 
@@ -265,3 +288,51 @@ def fold_t_interval(*, fold_differences: list[float]) -> tuple[float, float]:
         stats.t.ppf(0.975, df=len(values) - 1) * values.std(ddof=1) / np.sqrt(len(values))
     )
     return float(values.mean()) - half_width, float(values.mean()) + half_width
+
+
+def bootstrap_difference_by_year(
+    *, losses: pl.DataFrame, treatment: str, references: tuple[str, ...], metric: str
+) -> list[YearInterval]:
+    """Bootstrap one arm's paired difference from each reference arm, within each calendar year.
+
+    Each year is resampled on its own months alone. A year holding fewer than
+    `MIN_MONTHS_FOR_INTERVAL` months still gets its interval, flagged by `enough_months`, so a
+    caller can print the estimate without reading significance into it.
+
+    Args:
+        losses: Per-row losses at one hyperparameter setting, carrying `arm`, `site`, `time`,
+            `seed` and `month`, and optionally `setting`.
+        treatment: The arm whose metric is being compared, such as ERA5's.
+        references: The arms it is compared against.
+        metric: The loss column to difference.
+
+    Returns:
+        One interval per (reference, year), treatment minus reference, in reference then year
+        order.
+
+    Raises:
+        ValueError: If `losses` holds more than one setting, which would pair each row with rows
+            fitted at another setting.
+    """
+    if "setting" in losses.columns and losses["setting"].n_unique() > 1:
+        msg = f"the losses hold {losses['setting'].n_unique()} settings; filter to one first"
+        raise ValueError(msg)
+    years = sorted(losses["time"].dt.year().unique().to_list())
+    intervals: list[YearInterval] = []
+    for reference in references:
+        for year in years:
+            interval = bootstrap_difference(
+                losses=losses.filter(pl.col("time").dt.year() == year),
+                treatment=treatment,
+                reference=reference,
+                metric=metric,
+            )
+            intervals.append(
+                {
+                    "reference": reference,
+                    "year": year,
+                    **interval,
+                    "enough_months": interval["n_months"] >= MIN_MONTHS_FOR_INTERVAL,
+                }
+            )
+    return intervals

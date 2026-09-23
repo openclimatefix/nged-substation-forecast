@@ -39,9 +39,9 @@ from typing import Final
 import numpy as np
 import polars as pl
 from build_dataset import CAMS_PATH, _pv_sites
-from sources import UPDATE_OUTPUT_DIR, SourceType, point_output_path_for
+from sources import OPEN_METEO_MODELS, UPDATE_OUTPUT_DIR, SourceType, point_output_path_for
 from studies.served_column_checks import check_direct_is_not_a_separation_model
-from studies.solar import extraterrestrial_horizontal, zenith
+from studies.solar import extraterrestrial_horizontal, midpoint_zenith
 from studies.timestamp_checks import (
     HOUR_ENDING_OFFSET_MINUTES,
     best_offset_minutes,
@@ -86,10 +86,8 @@ def _with_geometry(*, frame: pl.DataFrame, sites: pl.DataFrame) -> pl.DataFrame:
     parts: list[pl.DataFrame] = []
     for row in sites.iter_rows(named=True):
         rows = frame.filter(pl.col("site") == row["site"]).sort("time")
-        midpoint = zenith(
-            stamps=rows["time"].dt.offset_by("-30m"),
-            latitude=row["latitude"],
-            longitude=row["longitude"],
+        midpoint = midpoint_zenith(
+            stamps=rows["time"], latitude=row["latitude"], longitude=row["longitude"]
         )
         extraterrestrial = extraterrestrial_horizontal(stamps=rows["time"], zenith_deg=midpoint)
         parts.append(
@@ -108,15 +106,20 @@ def _with_geometry(*, frame: pl.DataFrame, sites: pl.DataFrame) -> pl.DataFrame:
     return pl.concat(parts)
 
 
-def _timing_lines(*, frames: dict[SourceType, pl.DataFrame], sites: pl.DataFrame) -> list[str]:
+def _timing_lines(
+    *, frames: dict[SourceType, pl.DataFrame], sites: pl.DataFrame
+) -> tuple[list[str], list[str]]:
     """Report where each product's correlation with the sun peaks, per site.
+
+    A site whose correlation is undefined at every offset, or which holds fewer than two hours,
+    shows `n/a` and counts as a failure.
 
     Args:
         frames: Each product's per-site frame.
         sites: The roster, carrying `site`, `latitude` and `longitude`.
 
     Returns:
-        Markdown lines, the last naming every failure, if any.
+        Markdown lines, ending with every failure, and the failures themselves.
     """
     labels = sites["site"].to_list()
     lines = [
@@ -132,20 +135,27 @@ def _timing_lines(*, frames: dict[SourceType, pl.DataFrame], sites: pl.DataFrame
         cells: list[str] = []
         for row in sites.iter_rows(named=True):
             rows = frame.filter(pl.col("site") == row["site"]).sort("time")
-            correlations = correlation_by_offset(
-                times=rows["time"],
-                ghi=rows["ghi_w_m2"].to_numpy(),
-                latitude=row["latitude"],
-                longitude=row["longitude"],
-            )
-            cells.append(f"{best_offset_minutes(correlations=correlations):+d}")
+            name = f"{source} at site {row['site']}"
             try:
-                check_hour_ending(correlations=correlations, name=f"{source} at site {row['site']}")
+                correlations = correlation_by_offset(
+                    times=rows["time"],
+                    ghi=rows["ghi_w_m2"].to_numpy(),
+                    latitude=row["latitude"],
+                    longitude=row["longitude"],
+                )
+                best = best_offset_minutes(correlations=correlations)
+            except ValueError as failure:
+                cells.append("n/a")
+                failures.append(f"{name}: {failure}")
+                continue
+            cells.append(f"{best:+d}")
+            try:
+                check_hour_ending(correlations=correlations, name=name)
             except ValueError as failure:
                 failures.append(str(failure))
         lines.append(f"| {source} | " + " | ".join(cells) + " |")
     lines += ["", *(f"- FAIL: {failure}" for failure in failures)]
-    return lines
+    return lines, failures
 
 
 def _separation_lines(*, frames: dict[SourceType, pl.DataFrame]) -> list[str]:
@@ -159,12 +169,14 @@ def _separation_lines(*, frames: dict[SourceType, pl.DataFrame]) -> list[str]:
     """
     lines = ["#### Is the published direct flux more than a separation model?", ""]
     for source, frame in frames.items():
+        scored = source not in OPEN_METEO_MODELS or OPEN_METEO_MODELS[source].split_scored
+        note = "" if scored else " (split not scored)"
         try:
             check_direct_is_not_a_separation_model(frame=frame)
         except ValueError as failure:
-            lines.append(f"- {source}: fails: {failure}")
+            lines.append(f"- {source}{note}: fails: {failure}")
         else:
-            lines.append(f"- {source}: passes")
+            lines.append(f"- {source}{note}: passes")
     return lines
 
 
@@ -280,7 +292,7 @@ def main() -> int:
         frames[source] = _with_geometry(frame=frame, sites=sites)
         _LOG.info("%s: %d rows from %s", source, frame.height, path)
 
-    timing = _timing_lines(frames=frames, sites=sites)
+    timing, failures = _timing_lines(frames=frames, sites=sites)
     lines = [
         *timing,
         "",
@@ -293,7 +305,7 @@ def main() -> int:
     arguments.output.parent.mkdir(parents=True, exist_ok=True)
     arguments.output.write_text("\n".join(lines) + "\n")
     sys.stdout.write("\n".join(lines) + "\n")
-    if any(line.startswith("- FAIL") for line in timing):
+    if failures:
         msg = f"a gating check failed; see {arguments.output}"
         raise ValueError(msg)
     return 0

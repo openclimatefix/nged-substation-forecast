@@ -47,6 +47,7 @@ from fetch_wind_point import PRODUCTS, output_path_for
 from run_experiment import Job, _add_time_features, run_all
 from sources import STUDY_DATA_DIR, UPDATE_OUTPUT_DIR
 from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SENSITIVITY_HYPER_PARAMETERS
+from studies.guards import refuse_to_overwrite
 from studies.neighbouring_hours import with_neighbouring_hours
 from studies.power import hourly_from_half_hourly
 from weather_products import (
@@ -58,7 +59,6 @@ from weather_products import (
     era5_by_year_lines,
     era5_difference_by_year,
     geometry_lines,
-    refuse_to_overwrite,
     with_eras,
 )
 

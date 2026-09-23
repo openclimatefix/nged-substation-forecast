@@ -3,7 +3,7 @@ import polars as pl
 import pytest
 import xarray as xr
 from pyproj import CRS, Transformer
-from studies.grid_sampling import nearest_cells, sample_nearest_cell
+from studies.grid_sampling import nearest_cells, nearest_grid_indices, sample_nearest_cell
 
 # A Lambert azimuthal equal-area grid centred on Great Britain, the projection UKV is served on. The
 # grid is deliberately not square, and its x and y ranges differ, so a sampler that swapped the axes
@@ -76,3 +76,18 @@ def test_no_cells_raises():
 
     with pytest.raises(ValueError, match="no cells"):
         nearest_cells(sites=sites, cells=empty)
+
+
+def test_grid_indices_name_each_sites_cell_on_a_grid_that_is_not_square():
+    # Five latitudes and eight longitudes, so a split of the flat index that swapped the axes would
+    # land on another cell, or off the grid.
+    latitudes = np.array([52.0, 52.1, 52.2, 52.3, 52.4])
+    longitudes = np.array([-0.7, -0.6, -0.5, -0.4, -0.3, -0.2, -0.1, 0.0])
+    sites = pl.DataFrame(
+        {"site": ["A", "B"], "latitude": [52.31, 52.02], "longitude": [-0.1, -0.69]}
+    )
+
+    indices = nearest_grid_indices(sites=sites, latitudes=latitudes, longitudes=longitudes)
+
+    assert indices["lat_index"].to_list() == [3, 0]
+    assert indices["lon_index"].to_list() == [6, 0]

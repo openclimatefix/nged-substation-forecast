@@ -58,6 +58,23 @@ def azimuth(*, stamps: pl.Series, latitude: float, longitude: float) -> np.ndarr
     return position["azimuth"].to_numpy().astype(np.float64)
 
 
+def midpoint_zenith(*, stamps: pl.Series, latitude: float, longitude: float) -> np.ndarray:
+    """Return the solar zenith angle at the midpoint of the hour *ending* at each stamp.
+
+    An hourly irradiance value labelled `T` averages the hour from `T - 1 h` to `T`, so the sun
+    that represents it is the sun at `T - 30 min`, not at `T`.
+
+    Args:
+        stamps: The instants each hour ends at, as a UTC datetime series.
+        latitude: Degrees north.
+        longitude: Degrees east.
+
+    Returns:
+        One angle per stamp, in degrees from the vertical.
+    """
+    return zenith(stamps=stamps.dt.offset_by("-30m"), latitude=latitude, longitude=longitude)
+
+
 def cos_zenith(*, zenith_deg: np.ndarray) -> np.ndarray:
     """Return the cosine of the solar zenith angle, clipped at zero below the horizon.
 

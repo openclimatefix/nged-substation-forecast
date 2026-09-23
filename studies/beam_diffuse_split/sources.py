@@ -161,6 +161,9 @@ class OpenMeteoModel(NamedTuple):
             before this date was backfilled from a source Open-Meteo does not name, so it is a
             different product until measurement says otherwise — see `verify_ukv_lineage.py`.
         native_radiation: What the upstream model publishes, before Open-Meteo's conversion.
+        split_scored: Whether the served direct flux is the model's own, so a split arm may read
+            it. `False` where the served direct flux is defective or is a separation model's
+            output, which `fetch_open_meteo_point.py` then reports on rather than raising.
     """
 
     source: SourceType
@@ -168,6 +171,7 @@ class OpenMeteoModel(NamedTuple):
     archive_starts: str
     live_ingest_starts: str | None
     native_radiation: NativeRadiationType
+    split_scored: bool = True
 
 
 OPEN_METEO_MODELS: Final[dict[str, OpenMeteoModel]] = {
@@ -201,7 +205,7 @@ OPEN_METEO_MODELS: Final[dict[str, OpenMeteoModel]] = {
     ),
     "ecmwf-ifs-hres": OpenMeteoModel(
         source="ecmwf-ifs-hres",
-        models_parameter="ecmwf_ifs04",
+        models_parameter="ecmwf_ifs_hres",
         archive_starts="2017-01-01",
         live_ingest_starts=None,
         native_radiation="accumulated",
@@ -212,6 +216,7 @@ OPEN_METEO_MODELS: Final[dict[str, OpenMeteoModel]] = {
         archive_starts="2024-01-02",
         live_ingest_starts=None,
         native_radiation="accumulated",
+        split_scored=False,
     ),
     "dmi-harmonie-arome": OpenMeteoModel(
         source="dmi-harmonie-arome",
@@ -219,6 +224,7 @@ OPEN_METEO_MODELS: Final[dict[str, OpenMeteoModel]] = {
         archive_starts="2024-07-01",
         live_ingest_starts=None,
         native_radiation="accumulated",
+        split_scored=False,
     ),
     "knmi-harmonie-arome": OpenMeteoModel(
         source="knmi-harmonie-arome",
@@ -226,6 +232,7 @@ OPEN_METEO_MODELS: Final[dict[str, OpenMeteoModel]] = {
         archive_starts="2024-07-01",
         live_ingest_starts=None,
         native_radiation="accumulated",
+        split_scored=False,
     ),
 }
 """Every model `fetch_open_meteo_point.py` can download, keyed by its `--model` name.
@@ -244,17 +251,24 @@ way.
 points across the trial area**, by the issue #841 downloader, whose `lineage.json` files record the
 `models=` values used here. Those grids hold 49 points about 0.15° apart, not the 0.05° the lineage
 files state, so the nearest point sits 0.7 km to 5.3 km from a solar farm; fetching at each site's
-own coordinates removes that handicap, which would fall hardest on the 2 km HARMONIE-AROME models.
+own coordinates removes that handicap, which would fall hardest on DMI's 2 km model. KNMI's
+HARMONIE-AROME over Europe runs at 5.5 km.
 
-- `ecmwf-ifs-hres`: the grid download under `ecmwf_ifs04` serves values from 2017-01-01 at 37
-  distinct series among 49 points 0.15° apart, which a 0.4° grid could not produce, so the archive
-  behind the name is ECMWF's 9 km model.
+- `ecmwf-ifs-hres`: fetched as `ecmwf_ifs_hres`, Open-Meteo's documented name for ECMWF's 9 km
+  model. The grid download was requested as `ecmwf_ifs04`, the 0.4° open-data name, yet serves
+  values from 2017-01-01 at 37 distinct series among 49 points 0.15° apart, which a 0.4° grid could
+  not produce. The first per-site fetch is checked against that grid download over one week at one
+  site before anything is built from it.
 - `arpege-europe`: both fluxes step up at 2024-01-01 against ECMWF-IFS-HRES, by about 20% for the
   global and 40% for the direct flux, and both are null for 35 hours from 2023-12-31 07:00 UTC to
   2024-01-01 17:00 UTC. The archive before the step is treated as a different product and not
   fetched; the start is the first whole day after the gap.
 - `dmi-harmonie-arome`: the served direct flux is zero in 48% of daytime hours, and exceeds the
   global flux in 74 hours, so the model's split is unusable and only its global flux is scored.
+- `arpege-europe` and `knmi-harmonie-arome`: the served direct flux fails
+  `check_direct_is_not_a_separation_model` on the grid downloads, with a within-bin spread of the
+  direct fraction of 0.018 against a threshold of 0.05, so it is a separation model's output rather
+  than the model's own beam. Only their global flux is scored.
 - `native_radiation` for all four is `accumulated` on the models' published GRIB conventions, not on
   a measurement: ECMWF's `ssrd` is accumulated since the run started, as is the surface radiation of
   the ALADIN code family that ARPEGE and both HARMONIE-AROME configurations belong to. No upstream

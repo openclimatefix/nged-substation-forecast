@@ -1,8 +1,14 @@
+import math
 from datetime import UTC, datetime, timedelta
 
 import polars as pl
 import pytest
-from studies.hourly_means import hourly_from_running_means, hourly_from_snapshots
+from studies.hourly_means import (
+    hourly_from_running_means,
+    hourly_from_snapshots,
+    icon_dream_hourly,
+    sarah_hourly,
+)
 
 START = datetime(2025, 6, 1, tzinfo=UTC)
 
@@ -56,7 +62,8 @@ def test_starts_off_the_assumed_phase_give_different_hours():
 
 
 def test_midnight_is_the_third_step_of_the_run_starting_at_21_utc():
-    # 00 UTC is where a truncating modulo would put step 0 rather than step 3.
+    # 00 UTC closes the run that started at 21 UTC the day before, so a step count that did not
+    # wrap round midnight would take the wrong window here.
     evening = datetime(2025, 5, 31, 20, tzinfo=UTC)
     means = _hourly_means(hours=6)
     stored = _running_means(means=means, cycle_hours=3, first_start_hour=0, start=evening)
@@ -95,18 +102,55 @@ def test_padding_rows_are_dropped_before_de_averaging():
     assert recovered["value"].to_list() == pytest.approx(means)
 
 
-def test_a_negative_de_averaged_value_is_clipped_to_zero():
+def test_a_slightly_negative_de_averaged_value_is_clipped_to_zero():
+    # 2 * 4.8 - 10 = -0.4 W m-2: rounding noise, above the limit, so clipped rather than counted.
     stored = pl.DataFrame(
         {
             "key": ["cell", "cell"],
             "time": [START + timedelta(hours=1), START + timedelta(hours=2)],
-            "value": [10.0, 4.0],
+            "value": [10.0, 4.8],
         }
     )
 
     recovered = hourly_from_running_means(frame=stored, value_column="value", cycle_hours=3)
 
     assert recovered["value"].to_list() == [10.0, 0.0]
+
+
+def _daylight_means(*, days: int) -> list[float]:
+    # A sunrise-to-sunset curve for the hours ending 01:00 onwards, so a de-averaging window that
+    # straddles sunrise or sunset on the wrong phase comes out negative.
+    return [
+        500.0 * max(0.0, math.sin(math.pi * (((hour + 1) % 24) - 6.5) / 12.0))
+        for hour in range(24 * days)
+    ]
+
+
+def test_de_averaging_on_the_wrong_phase_raises():
+    stored = _running_means(means=_daylight_means(days=5), cycle_hours=3, first_start_hour=1)
+
+    with pytest.raises(ValueError, match="phase"):
+        hourly_from_running_means(frame=stored, value_column="value", cycle_hours=3)
+
+
+def test_de_averaging_on_the_right_phase_passes_the_negative_gate():
+    means = _daylight_means(days=5)
+    stored = _running_means(means=means, cycle_hours=3, first_start_hour=0)
+
+    recovered = hourly_from_running_means(frame=stored, value_column="value", cycle_hours=3)
+
+    assert recovered["value"].to_list() == pytest.approx(means)
+
+
+def test_icon_dream_global_is_direct_plus_diffuse():
+    means = _hourly_means(hours=6)
+    direct = _running_means(means=means, cycle_hours=3, first_start_hour=0)
+    diffuse = direct.with_columns(value=pl.col("value") / 4)
+
+    hourly = icon_dream_hourly(direct=direct, diffuse=diffuse)
+
+    assert hourly["bhi_w_m2"].to_list() == pytest.approx(means)
+    assert hourly["ghi_w_m2"].to_list() == pytest.approx([1.25 * mean for mean in means])
 
 
 def test_a_duplicated_hour_raises():
@@ -162,3 +206,23 @@ def test_snapshots_need_at_least_one_offset():
         hourly_from_snapshots(
             frame=_snapshots(hours=2), value_columns=("ghi",), slot_offsets_minutes=()
         )
+
+
+def test_a_duplicated_snapshot_raises():
+    snapshots = _snapshots(hours=2)
+
+    with pytest.raises(ValueError, match="more than one row"):
+        hourly_from_snapshots(
+            frame=pl.concat([snapshots, snapshots.head(1)]),
+            value_columns=("ghi",),
+            slot_offsets_minutes=(-60, -30),
+        )
+
+
+def test_sarah_takes_the_two_snapshots_before_the_label():
+    snapshots = _snapshots(hours=24).rename({"ghi": "ghi_w_m2", "bhi": "bhi_w_m2"})
+
+    hourly = sarah_hourly(snapshots=snapshots)
+
+    # 11:00 and 11:30 are minutes 660 and 690; 11:30 and 12:00 would give 705.
+    assert hourly.filter(pl.col("time") == START + timedelta(hours=12))["ghi_w_m2"].item() == 675.0
