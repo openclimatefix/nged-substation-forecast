@@ -490,7 +490,7 @@ of capacity, the German weather service's ICON-D2 7.71%, ICON-EU 8.30%, ICON glo
 Office's UKV 8.79%, and ERA5 8.98%. ICON-D2's advantage fades within hours of each run, and ICON-EU
 and UKV cannot be told apart once UKV's hour is rebuilt from its own snapshots. The write-up, with
 what each offline consumer should read, is [Which weather product best describes past
-sunshine?](../studies/weather-products-for-the-past.md).
+sunshine?](../studies/weather-products-for-past-solar.md).
 
 **Figures measured on different row sets do not compose into a ranking.** Scored pair by pair, UKV
 does not beat ERA5 at all, and ERA5 scores 8.28% on its pair with ICON-D2 against 8.98% on the

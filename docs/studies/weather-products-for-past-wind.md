@@ -1,7 +1,7 @@
 # Which weather product best describes past wind?
 
 This page is the wind counterpart of [Which weather product best describes past
-sunshine?](weather-products-for-the-past.md). It measures how well five weather products describe
+sunshine?](weather-products-for-past-solar.md). It measures how well five weather products describe
 past hub-height wind at the three metered wind farms in the trial area. It also says which product
 the two consumers that can use the result should read: training history, and historical features in
 the live service.

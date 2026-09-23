@@ -2,7 +2,7 @@
 
 One-off throwaway script for the study in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/809>. The write-up is
-<https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-the-past/>.
+<https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-solar/>.
 
 **Every product is shown to the same booster, on the same rows, with the same temperature.** Each
 arm differs from the others only in its irradiance columns, so a contrast between two arms is a

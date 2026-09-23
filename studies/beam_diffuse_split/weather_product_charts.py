@@ -2,7 +2,7 @@
 
 One-off throwaway script for the charts in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/830>. The write-up is
-<https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-the-past/>.
+<https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-solar/>.
 
 **Almost every number is read from the report `weather_products.py` wrote**, so a chart cannot
 disagree with the page. Two charts need numbers the report lacks. The hour-by-hour chart needs an

@@ -2,7 +2,7 @@
 
 **Problem.** The two weather-product study pages give their results only as tables and prose:
 [Which weather product best describes past
-sunshine?](https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-the-past/)
+sunshine?](https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-solar/)
 and [Which weather product best describes past
 wind?](https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-wind/).
 Many technical readers skim a page's charts before reading any text. On these two pages that reader
@@ -116,7 +116,7 @@ headline chart therefore has a second panel beside it holding the page's named c
 paired intervals, and its subtitle says: "Intervals are against ERA5. Overlapping intervals do not
 mean two products are indistinguishable; the right-hand panel compares them directly."
 
-### Solar page (`weather-products-for-the-past.md`)
+### Solar page (`weather-products-for-past-solar.md`)
 
 1. **Headline, under the opening paragraphs.**
     - **Left panel:** one row per product, ordered by mean absolute error, best at the top. Each
