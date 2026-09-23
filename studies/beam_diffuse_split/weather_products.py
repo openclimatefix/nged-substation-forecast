@@ -86,6 +86,7 @@ from studies.cross_validation import (
     fit_one_fold,
 )
 from studies.neighbouring_hours import with_neighbouring_hours
+from studies.solar import extraterrestrial_horizontal, zenith
 
 _LOG = logging.getLogger(__name__)
 
@@ -358,22 +359,86 @@ def _neighbours(*, frame: pl.DataFrame, column: str, prefix: str, product: str) 
     return previous.join(following, on=["site", "time"], how="inner")
 
 
+MAX_INSTANT_OVER_TOA: Final[float] = 1.1
+"""How far `ghi_instant_w_m2` may exceed the top-of-atmosphere flux at its own instant before the
+row is dropped as a sunrise spike.
+
+Open-Meteo serves the `_instant` columns by multiplying its stored hourly mean by the
+instantaneous-over-hour-mean cosine of the solar zenith angle, computed without refraction
+(`verify_ukv_lineage.GEOMETRY_FACTOR_RANGE` names and bounds the same factor, for a different,
+stricter purpose — picking instants clean enough to compare against the Met Office's own files,
+not identifying which served values are unusable). Near sunrise that factor departs from one on
+most hours without producing an implausible value, so filtering on the factor's range would drop
+more than half of every product's rows. What actually makes a row unusable is the factor's size:
+in the first hours after sunrise it can reach the hundreds, and the stored mean at those hours is
+still small (1 to 28 W/m2 at the rows this rule drops), so multiplying the two produces a value
+with no physical meaning — measured at up to 16,537 W/m2 in this archive, against a real GHI
+ceiling of about 1,400 W/m2. The stored mean's own 1 W/m2 rounding is a minor contributor,
+explaining the excess over the ceiling in only about one row in ten. The row is instead flagged
+directly against the physical ceiling: the flux a horizontal surface receives with no atmosphere
+at all, from `studies.solar.extraterrestrial_horizontal`, evaluated with pvlib's apparent
+(refracted) solar zenith angle. Near the horizon that refracted angle allows more flux than
+Open-Meteo's refraction-free geometry does, and the 10% margin is a tolerance for that mismatch,
+not for a physical process such as cloud enhancement: every row this rule drops has the sun below
+4.5 degrees of apparent elevation.
+"""
+
+
+MIN_TOP_OF_ATMOSPHERE_W_M2: Final[float] = 1e-6
+"""Floors the top-of-atmosphere flux so a true night-side instant gets a ceiling of (near) zero
+rather than exactly zero, which any served value above zero then correctly fails."""
+
+
+def _without_sunrise_spikes(*, frame: pl.DataFrame, sites: pl.DataFrame) -> pl.DataFrame:
+    """Drop the rows where `ghi_instant_w_m2` exceeds what is physically possible at that instant.
+
+    Args:
+        frame: Rows carrying `site`, `time`, and `ghi_instant_ukv`, one row per (site, time).
+        sites: The roster, carrying `site`, `latitude`, and `longitude`.
+
+    Returns:
+        `frame`, with every row whose `ghi_instant_ukv` exceeds `MAX_INSTANT_OVER_TOA` times the
+        top-of-atmosphere flux at that instant removed.
+    """
+    coordinates = {
+        str(row["site"]): (float(row["latitude"]), float(row["longitude"]))
+        for row in sites.to_dicts()
+    }
+    kept: list[pl.DataFrame] = []
+    for (site,), rows in frame.sort("site", "time").group_by(["site"], maintain_order=True):
+        latitude, longitude = coordinates[str(site)]
+        stamps = rows["time"]
+        angle = zenith(stamps=stamps, latitude=latitude, longitude=longitude)
+        top_of_atmosphere = extraterrestrial_horizontal(stamps=stamps, zenith_deg=angle)
+        ceiling = MAX_INSTANT_OVER_TOA * np.maximum(top_of_atmosphere, MIN_TOP_OF_ATMOSPHERE_W_M2)
+        plausible = rows["ghi_instant_ukv"].to_numpy() <= ceiling
+        kept.append(rows.filter(pl.Series(plausible)))
+    return pl.concat(kept)
+
+
 def _ukv_snapshots() -> pl.DataFrame:
     """Return UKV's instantaneous global irradiance at both ends of each hour, and their mean.
 
+    Every row whose `ghi_instant_ukv` exceeds what solar geometry allows at that instant (see
+    `_without_sunrise_spikes`) is dropped before the trapezoid mean and the neighbouring-hour
+    context are built from it, so a dropped instant also drops the hour that would have averaged
+    it in and the neighbouring hour that would have used it as context.
+
     Returns:
         One row per (site, time) with `ghi_instant_previous_ukv`, `ghi_instant_ukv` and
-        `ghi_trap_ukv`, for every hour whose both snapshots were served.
+        `ghi_trap_ukv`, for every hour whose both snapshots were served and neither was a sunrise
+        spike.
     """
     download = pl.read_parquet(point_output_path_for(source="ukv")).select(
         "site", "time", ghi_instant_ukv=pl.col("ghi_instant_w_m2")
     )
-    previous = download.select(
+    clean = _without_sunrise_spikes(frame=download, sites=_pv_sites())
+    previous = clean.select(
         "site",
         time=pl.col("time").dt.offset_by("1h"),
         ghi_instant_previous_ukv=pl.col("ghi_instant_ukv"),
     )
-    snapshots = download.join(previous, on=["site", "time"], how="inner").with_columns(
+    snapshots = clean.join(previous, on=["site", "time"], how="inner").with_columns(
         ghi_trap_ukv=(pl.col("ghi_instant_previous_ukv") + pl.col("ghi_instant_ukv")) / 2.0
     )
     context = _neighbours(frame=snapshots, column="ghi_trap_ukv", prefix="ghi_trap", product="ukv")
