@@ -26,9 +26,9 @@ ProductFamily = Literal["satellite", "reanalysis", "weather model"]
 """The three kinds of weather product the study pages compare."""
 
 FAMILY_COLOURS: Final[dict[ProductFamily, str]] = {
-    "satellite": ocf.ORANGE_RED,
-    "reanalysis": ocf.SKY_BLUE,
-    "weather model": ocf.BLUE,
+    "satellite": ocf.BRAND_ORANGE,
+    "reanalysis": ocf.DATA_SKY,
+    "weather model": ocf.DATA_BLUE,
 }
 """Each family's colour, from the main data colours OCF's brand guidelines allow in published work.
 
@@ -37,9 +37,9 @@ labelled on the axis.
 """
 
 FAMILY_COLOURS_LIGHT: Final[dict[ProductFamily, str]] = {
-    "satellite": ocf.ORANGE_RED_LIGHT,
-    "reanalysis": ocf.SKY_BLUE_LIGHT,
-    "weather model": ocf.BLUE_LIGHT,
+    "satellite": ocf.BRAND_ORANGE_LIGHT,
+    "reanalysis": ocf.DATA_SKY_LIGHT,
+    "weather model": ocf.DATA_BLUE_LIGHT,
 }
 """The light shade of each family's colour, for a second condition of the same row.
 

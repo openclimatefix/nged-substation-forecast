@@ -436,7 +436,7 @@ def _ratio_panel(*, ratios: pl.DataFrame, height: str) -> alt.LayerChart:
     # interval panel beside it uses.
     colour = alt.Stroke(
         "group:N",
-        scale=alt.Scale(domain=groups, range=[ocf.BLUE, ocf.ENSEMBLE_LINE]),
+        scale=alt.Scale(domain=groups, range=[ocf.DATA_BLUE, ocf.ENSEMBLE_LINE]),
         legend=alt.Legend(title="Fortnightly mean speed ratio", labelLimit=400),
     )
     line = alt.Chart(data).mark_line(strokeWidth=2).encode(x=x, y=y, stroke=colour)  # ty: ignore[unresolved-attribute]
@@ -460,7 +460,7 @@ def _ratio_panel(*, ratios: pl.DataFrame, height: str) -> alt.LayerChart:
     )
     period_means = (
         alt.Chart(periods)
-        .mark_rule(color=ocf.BLUE, strokeWidth=3, opacity=0.5)
+        .mark_rule(color=ocf.DATA_BLUE, strokeWidth=3, opacity=0.5)
         .encode(x="start:T", x2="end:T", y="ratio:Q")  # ty: ignore[unresolved-attribute]
     )
     return alt.LayerChart(

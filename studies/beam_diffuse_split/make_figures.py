@@ -426,7 +426,7 @@ def _sky_chart(*, source: str) -> alt.Chart:
         x=alt.X("difference:Q")
     )
     zero = (
-        alt.Chart(intervals).mark_rule(strokeDash=[4, 4], color="#292B2B").encode(x=alt.datum(0))  # ty: ignore[unresolved-attribute]
+        alt.Chart(intervals).mark_rule(strokeDash=[4, 4], color=ocf.TEXT).encode(x=alt.datum(0))  # ty: ignore[unresolved-attribute]
     )
     return (zero + rule + point).properties(
         width=430,
