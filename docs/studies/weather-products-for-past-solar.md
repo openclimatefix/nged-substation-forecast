@@ -394,9 +394,9 @@ ERA5 by 0.3](assets/sunshine_new_products.svg)
 generators.** CAMS is computed for each generator's own coordinates. SARAH-3 is read from a 0.05°
 grid cell 0.8 km to 2.8 km from each generator. Across the generators CAMS's margin ranges from 0.03
 to 0.64 points, and at two of them it is not statistically significant at the 5% level. Relative to
-CAMS's own error, SARAH-3's is about 10% larger in broken cloud and 4% to 8% larger in overcast and
-clear hours, binned on a clearness index neither product decides, in comparisons chosen after the
-results were seen. That pattern points at how each
+CAMS's own error, SARAH-3's is about 7.1% larger in overcast hours, 10.7% larger in broken cloud,
+and 4.3% larger in clear hours, binned on a clearness index neither product decides, in comparisons
+chosen after the results were seen. That pattern points at how each
 product handles cloud within the hour: CAMS's hourly value is the service's own integration over the
 hour, and SARAH-3's is the mean of two snapshots. The gap does not follow the distance to SARAH-3's
 grid cell: the generator whose cell is nearest, 0.8 km away, has the largest gap. A steady bias could
@@ -422,18 +422,21 @@ ahead [0.17, 0.58]. Only 4 of the 5 folds agree in sign. On the longer row set f
 ICON-DREAM-EU is 0.39 points ahead [0.23, 0.54].
 
 **Since August 2024, ICON-DREAM-EU's advantage over ERA5 is not statistically significant at the 5%
-level, but every product's lead over ERA5 is smaller in 2025 and in 2026.** ICON-DREAM-EU is 0.16
-points ahead on those hours [−0.09, +0.38], and 0.23 points ahead after UKV's upgrade [−0.22,
-+0.57], on 7 months. In the same years CAMS's lead over ERA5 falls from 4.35 points in 2024 to 3.69
-in 2026, and ICON-EU's from 0.88 to 0.47, while ICON-DREAM-EU's gap to ICON-EU shows no trend across
-those years. The smaller advantage over ERA5 is therefore not evidence that ICON-DREAM-EU got worse;
-every product's lead over ERA5 narrows together. All of these comparisons are exploratory.
+level, but every product's lead over ERA5 is smaller in 2025 and in 2026 than in 2024.**
+ICON-DREAM-EU is 0.16 points ahead on those hours [−0.09, +0.38], and 0.23 points ahead after UKV's
+upgrade [−0.22, +0.57], on 7 months. In the same years CAMS's lead over ERA5 falls from 4.50 points
+in 2024 to 3.69 in 2026, and ICON-EU's from 1.13 to 0.47, while ICON-DREAM-EU's gap to ICON-EU shows
+no trend across those years. The smaller advantage over ERA5 is therefore not evidence that
+ICON-DREAM-EU got worse; every product's lead over ERA5 narrows together. All of these comparisons
+are exploratory.
 
 **ICON-DREAM-EU and ERA5 are served at different leads, but ICON-DREAM-EU and ICON-EU can be
 compared at equal leads, because both run on the same 3-hourly cycle.** ICON-DREAM-EU's radiation
 comes from its own forecasts 1 to 3 hours after each 3-hourly analysis, and ERA5's from forecasts 1
-to 12 hours after 06 and 18 UTC. Equal leads would favour ERA5 relative to what is measured here.
-ICON-DREAM-EU trails ICON-D2 by 1.00 points in point estimate, a pairing this page does not test.
+to 12 hours after 06 and 18 UTC. Equal leads would favour ERA5 relative to what is measured here. In
+an exploratory comparison, ICON-DREAM-EU trails ICON-D2 by 1.00 points [0.82, 1.17], trails ICON
+global by 0.28 points [0.17, 0.39], and is not statistically significantly different from
+Open-Meteo's hourly UKV, at −0.10 points [−0.27, +0.09].
 ICON-DREAM-EU trails ICON-EU by 0.38 points at equal leads, in an exploratory comparison. The gap is
 0.34 points [0.20, 0.47] on hours 1 hour into a run, where no de-averaging is needed, so the
 conversion to hourly means is not the main cause. The gap is 0.49 points [0.34, 0.63] at 2 hours and
@@ -489,8 +492,9 @@ is not statistically significant at the 5% level.
 
 **No year's gap between ERA5 and ICON-DREAM-EU differs from 2025's by a margin statistically
 significant at the 5% level, and 2026's gaps are also smaller because 2026 is an easier year for
-every product.** Resampling each year's months independently of 2025's, the change from each of
-2021 to 2024 to 2025 is −0.26 to −0.36 points, and every interval includes zero, so a reader should
+every product.** Resampling each year's months independently of 2025's, and restricting every year
+to January to August, the change from each of 2021 to 2024 to 2025 is −0.27 to −0.47 points, and
+every interval includes zero, so a reader should
 not conclude that ICON-DREAM-EU's gap to ERA5 has genuinely narrowed rather than moved within the
 noise. In 2026 every product's error is lower than in 2025, so a gap measured in points is smaller
 too, whether or not the products' relative ranking has moved.

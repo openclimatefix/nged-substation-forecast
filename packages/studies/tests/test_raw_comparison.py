@@ -62,6 +62,27 @@ def test_mean_per_site_correlation_averages_each_sites_own_correlation():
     assert result == pytest.approx(0.0)
 
 
+def test_mean_per_site_correlation_differs_from_the_pooled_correlation():
+    # Both sites are perfectly, positively correlated within themselves (each site's own r is
+    # +1.0), so the per-site mean is +1.0. But site A sits at a low column level paired with a
+    # high reference level, and site B at a high column level paired with a low reference level,
+    # so pooling every row before correlating picks up that between-site trend instead: the
+    # pooled correlation here is about -0.95. A bug that pooled all sites' rows into one
+    # correlation, rather than averaging each site's own, would report a large negative number
+    # instead of +1.0.
+    frame = pl.DataFrame(
+        {
+            "site": ["A", "A", "A", "B", "B", "B"],
+            "column": [1.0, 2.0, 3.0, 11.0, 12.0, 13.0],
+            "reference": [9.0, 10.0, 11.0, -1.0, 0.0, 1.0],
+        }
+    )
+
+    result = mean_per_site_correlation(frame=frame, column="column", reference="reference")
+
+    assert result == pytest.approx(1.0)
+
+
 def test_mean_per_site_correlation_of_one_site_is_that_sites_own_correlation():
     frame = pl.DataFrame(
         {"site": ["A", "A", "A"], "column": [1.0, 2.0, 3.0], "reference": [2.0, 4.0, 6.0]}

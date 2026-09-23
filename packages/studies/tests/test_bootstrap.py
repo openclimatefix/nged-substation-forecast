@@ -422,6 +422,35 @@ def test_year_change_losses_at_two_settings_raise():
         )
 
 
+def test_year_change_interval_resamples_each_year_independently_of_the_other():
+    # Both years hold the same two month values (0.0 and 10.0), with one seed, so a correct
+    # resample draws year0's months and year1's months independently: the change can range from
+    # -10.0 (year0 draws only the 10.0 month, year1 only the 0.0 month) to +10.0 (the reverse).
+    # A bug that dropped year0 from the resampled change (using year1's resampled mean alone)
+    # gives [0.0, 10.0] on this fixture, and a bug that drew the same months for both years ties
+    # each resample's year0 and year1 means together and collapses the interval to [0.0, 0.0].
+    # Both mutants therefore disagree with the pinned bounds below.
+    losses = pl.DataFrame(
+        [
+            *_year_records(year=2024, month_values={1: 0.0, 2: 10.0}),
+            *_year_records(year=2025, month_values={1: 0.0, 2: 10.0}),
+        ]
+    )
+
+    result = bootstrap_year_change(
+        losses=losses,
+        treatment="treatment",
+        reference="reference",
+        metric="loss",
+        year0=2024,
+        year1=2025,
+    )
+
+    assert result["change"] == pytest.approx(0.0)
+    assert result["lower_95"] == pytest.approx(-10.0)
+    assert result["upper_95"] == pytest.approx(10.0)
+
+
 def test_bootstrap_row_difference_is_the_mean_of_the_values():
     values = np.array([1.0, 2.0, 3.0, 4.0])
     months = np.array(["2024-01", "2024-01", "2024-02", "2024-02"])
@@ -434,10 +463,25 @@ def test_bootstrap_row_difference_is_the_mean_of_the_values():
     assert result["seed_spread"] == 0.0
 
 
+def test_bootstrap_row_difference_resamples_whole_months_not_individual_rows():
+    # Two months, twenty rows each, at two very different levels (0.0 and 10.0). A whole-month
+    # resample can only draw each month whole, so the resampled mean can only be 0.0 (both draws
+    # land on the 0.0 month), 10.0 (both land on the 10.0 month), or 5.0 (one of each) — the 2.5th
+    # and 97.5th percentiles land inside the 0.0 and 10.0 clusters (each a quarter of the draws),
+    # so the interval is exactly [0.0, 10.0]. A bug that resampled individual rows instead would
+    # draw from the pooled 0.0/10.0 values row by row, which the central limit theorem pulls
+    # toward the 5.0 mean, giving a much narrower interval that does not reach 0.0 or 10.0.
+    values = np.array([0.0] * 20 + [10.0] * 20)
+    months = np.array(["2024-01"] * 20 + ["2024-02"] * 20)
+
+    result = bootstrap_row_difference(values=values, months=months)
+
+    assert result["lower_95"] == pytest.approx(0.0)
+    assert result["upper_95"] == pytest.approx(10.0)
+
+
 def test_bootstrap_row_difference_interval_collapses_with_no_month_spread():
     # Every month holds the same value, so a whole-month resample can never draw anything but 5.0.
-    # A bug that resampled individual rows, or that pulled in a seed dimension that does not exist
-    # here, would not collapse this interval to the point estimate.
     values = np.array([5.0] * 20)
     months = np.array([f"2024-{m:02d}" for m in range(1, 11) for _ in range(2)])
 

@@ -1574,8 +1574,9 @@ def _icon_dream_era5_year_change_lines(*, losses: pl.DataFrame) -> list[str]:
     where it is no longer statistically significant at the 5% level. This checks whether that
     narrower gap is itself a statistically significant change from each of the four full years
     before it, resampling each year's months independently
-    (`studies.bootstrap.bootstrap_year_change`). Every year here is a complete calendar year, so no
-    `months` restriction is needed.
+    (`studies.bootstrap.bootstrap_year_change`). Every year is restricted to
+    `ERA5_BY_YEAR_MONTHS`, matching the January-to-August restriction the rest of this section
+    uses, so a partial 2026 elsewhere on the page is never compared against a full year here.
 
     Args:
         losses: The record panel's pooled losses, holding `era5_global` and `icon_dream_global`.
@@ -1588,7 +1589,8 @@ def _icon_dream_era5_year_change_lines(*, losses: pl.DataFrame) -> list[str]:
         "",
         (
             "Positive: ERA5's error grew relative to ICON-DREAM-EU, from the earlier year to "
-            "2025. Each year's months are resampled independently of the other year's."
+            "2025. Each year's months are resampled independently of the other year's, and every "
+            "year is restricted to January to August."
         ),
         "",
         "| Earlier year | Change to 2025 (pp of capacity) | 95% interval |",
@@ -1602,6 +1604,7 @@ def _icon_dream_era5_year_change_lines(*, losses: pl.DataFrame) -> list[str]:
             metric=METRIC,
             year0=year0,
             year1=2025,
+            months=ERA5_BY_YEAR_MONTHS,
         )
         change, lower, upper = (
             result[key] * PERCENTAGE_POINTS for key in ("change", "lower_95", "upper_95")
