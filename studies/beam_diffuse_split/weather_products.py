@@ -119,6 +119,7 @@ from studies.cross_validation import (
 )
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.neighbouring_hours import with_neighbouring_hours
+from studies.raw_comparison import raw_column_comparison
 from studies.solar import extraterrestrial_horizontal, zenith
 
 _LOG = logging.getLogger(__name__)
@@ -1326,6 +1327,60 @@ def _sarah_era_lines(*, losses: pl.DataFrame) -> list[str]:
     return lines
 
 
+RAW_IRRADIANCE_PRODUCTS: Final[tuple[tuple[str, str], ...]] = (
+    ("sarah3", "SARAH-3"),
+    ("icon_d2", "ICON-D2"),
+    ("icon_eu", "ICON-EU"),
+    ("icon_global", "ICON global"),
+    ("icon_dream", "ICON-DREAM-EU"),
+    ("ukv", "UKV"),
+    ("era5", "ERA5"),
+)
+"""The products `_raw_irradiance_vs_cams_lines` compares against CAMS, as (arm prefix, display
+name). UKV is its Open-Meteo hourly value as scored elsewhere on this page, not rebuilt from its
+snapshots.
+"""
+
+
+def _raw_irradiance_vs_cams_lines(*, frame: pl.DataFrame) -> list[str]:
+    """Report each product's raw global irradiance against CAMS's, with no power model involved.
+
+    Every forecast contrast on this page passes each product's irradiance through an XGBoost model
+    fitted per generator, which recalibrates a steady bias away. This table instead compares the
+    served irradiance values directly, row for row, on the daylight hours `frame` holds (`frame` is
+    already the `long` panel's common rows, so every listed product's column is present on every
+    row). It exists to check whether the raw irradiance already ranks the products the way the
+    power-model contrasts do, or whether the model is doing the ranking.
+
+    Args:
+        frame: The panel's common rows, holding `ghi_cams` and each product's own `ghi_<product>`.
+
+    Returns:
+        Markdown lines: one row per product.
+    """
+    daylight = frame.filter(pl.col("solar_elevation_deg") > 0.0)
+    lines = [
+        "#### Raw global irradiance against CAMS's, before any power model (exploratory)",
+        "",
+        (
+            f"On the {daylight.height:,} daylight generator-hours every listed product shares "
+            "with CAMS. Positive bias: the product reads higher than CAMS."
+        ),
+        "",
+        "| Product | Bias (W/m²) | Mean absolute difference (W/m²) | Correlation with CAMS |",
+        "|---|---|---|---|",
+    ]
+    for product, name in RAW_IRRADIANCE_PRODUCTS:
+        comparison = raw_column_comparison(
+            frame=daylight, treatment=_named("ghi_w_m2", product), reference="ghi_cams"
+        )
+        lines.append(
+            f"| {name} | {comparison['bias']:+.2f} | {comparison['mad']:.2f} "
+            f"| {comparison['correlation']:.3f} |"
+        )
+    return lines
+
+
 CLEARNESS_BANDS: Final[tuple[tuple[str, float, float], ...]] = (
     ("overcast kt<0.3", 0.0, 0.3),
     ("broken 0.3-0.6", 0.3, 0.6),
@@ -1891,6 +1946,8 @@ def _report(
     if {"icon_dream", "icon_eu"} <= set(panel.products):
         lines += ["", *_icon_dream_icon_eu_by_year_lines(losses=pooled)]
         lines += ["", *_icon_dream_icon_eu_lead_lines(losses=pooled)]
+    if {product for product, _ in RAW_IRRADIANCE_PRODUCTS} <= set(panel.products):
+        lines += ["", *_raw_irradiance_vs_cams_lines(frame=frame)]
     lines += ["", *era5_by_year_lines(by_year=by_year)]
     lines += ["", *geometry_lines(sites=_pv_sites(), noun="solar farms")]
     return "\n".join(lines) + "\n"

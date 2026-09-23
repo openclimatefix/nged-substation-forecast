@@ -63,7 +63,10 @@ weather model that started a few hours earlier.
   0.03 to 0.64 points. See [SARAH-3 is second to CAMS under every
   satellite](#sarah-3-is-second-to-cams-under-every-satellite).
 - **ICON-DREAM-EU, the German weather service's reanalysis, beats ERA5 by 0.32 points [0.12, 0.52],
-  but trails all three ICON weather models.** See [ICON-DREAM-EU beats ERA5 but not the ICON weather
+  but trails all three ICON weather models.** Each product's raw irradiance, compared directly
+  against CAMS's with no power model involved, ranks the products almost exactly as the power-model
+  contrasts do, so this is not an artefact of the power model. See [ICON-DREAM-EU beats ERA5 but not
+  the ICON weather
   models](#icon-dream-eu-beats-era5-but-not-the-icon-weather-models).
 - **ERA5 trails CAMS by between 3.6 and 4.6 points in each calendar year from 2021 to 2026, and
   SARAH-3 by between 3.2 and 4.2 points.** See [ERA5's deficit, year by
@@ -424,6 +427,29 @@ ICON-DREAM-EU trails ICON-EU by 0.38 points at equal leads, in an exploratory co
 0.34 points [0.20, 0.47] on hours 1 hour into a run, where no de-averaging is needed, so the
 conversion to hourly means is not the main cause. The gap is 0.49 points [0.34, 0.63] at 2 hours and
 0.39 points [0.25, 0.54] at 3 hours.
+
+**Before any power model sees it, the raw irradiance already ranks the products almost exactly as
+the power-model contrasts above do, which is why ICON-DREAM-EU's modest lead over ERA5 is not an
+artefact of the power model.** Each product's own served global irradiance, compared row for row
+against CAMS's on the 76,727 daylight generator-hours every product on this page shares — no
+XGBoost model, no per-generator recalibration, no aggregation — orders the products almost exactly
+as the "Global only" MAE column does: SARAH-3 closest to CAMS, then ICON-D2, ICON-EU, ICON global,
+ICON-DREAM-EU, ERA5, with UKV's raw hourly value the furthest from CAMS. The one swap is UKV and
+ERA5: UKV's raw value is the furthest from CAMS by every raw measure here, but its power-model error
+is still lower than ERA5's, because UKV's raw bias, of about −44 W/m² relative to CAMS, comes from
+the [end-of-hour snapshot Open-Meteo rescales into an hourly
+value](#icon-eu-against-icon-global-and-ukv), which a per-generator XGBoost model can correct for
+and a raw comparison cannot. This comparison is exploratory.
+
+| Product | Bias (W/m²) | Mean absolute difference (W/m²) | Correlation with CAMS |
+|---|---|---|---|
+| SARAH-3 | +9.67 | 32.53 | 0.977 |
+| ICON-D2 | −5.32 | 52.46 | 0.935 |
+| ICON-EU | −9.27 | 58.38 | 0.921 |
+| ICON global | −6.68 | 59.01 | 0.919 |
+| ICON-DREAM-EU | −8.47 | 60.57 | 0.915 |
+| ERA5 | −1.28 | 63.27 | 0.904 |
+| UKV | −44.46 | 77.21 | 0.889 |
 
 ### ERA5's deficit, year by year
 
