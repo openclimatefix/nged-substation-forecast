@@ -234,3 +234,50 @@ def test_a_year_of_exactly_six_months_is_enough():
     )
 
     assert (intervals[0]["n_months"], intervals[0]["enough_months"]) == (6, True)
+
+
+def _yearly_losses_with_a_late_year_jump() -> pl.DataFrame:
+    # ERA5's deficit is 0.5 from January to September, and jumps to 5.0 from October to December,
+    # in both years. Restricting to months 1-9 must drop the October-December rows entirely.
+    records = []
+    for year in (2024, 2025):
+        for month in range(1, 13):
+            difference = 0.5 if month <= 9 else 5.0
+            for seed in (0, 1):
+                for arm, loss in (("era5", difference), ("other", 0.0)):
+                    records.append(
+                        {
+                            "arm": arm,
+                            "site": "A",
+                            "time": datetime(year, month, 1, tzinfo=UTC),
+                            "seed": seed,
+                            "month": f"{year}-{month:02d}",
+                            "loss": loss,
+                            "setting": "pooled",
+                        }
+                    )
+    return pl.DataFrame(records)
+
+
+def test_months_restricts_every_year_to_the_given_calendar_months():
+    intervals = bootstrap_difference_by_year(
+        losses=_yearly_losses_with_a_late_year_jump(),
+        treatment="era5",
+        references=("other",),
+        metric="loss",
+        months=(1, 2, 3, 4, 5, 6, 7, 8, 9),
+    )
+
+    assert [interval["n_months"] for interval in intervals] == [9, 9]
+    assert [interval["difference"] for interval in intervals] == pytest.approx([0.5, 0.5])
+
+
+def test_no_months_filter_keeps_the_full_year():
+    intervals = bootstrap_difference_by_year(
+        losses=_yearly_losses_with_a_late_year_jump(),
+        treatment="era5",
+        references=("other",),
+        metric="loss",
+    )
+
+    assert [interval["n_months"] for interval in intervals] == [12, 12]

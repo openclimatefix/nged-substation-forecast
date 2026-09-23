@@ -707,10 +707,12 @@ def _per_generator(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
 
 
 def _era5_by_year() -> alt.VConcatChart:
-    """Draw each product's error minus ERA5's, in 2025 and in 2026.
+    """Draw each product's error minus ERA5's, on the same months of 2025 and of 2026.
 
-    Reads `wind_products.py --era5-by-year`'s table. August to December 2024 is five months, too
-    few for an interval, and is left out.
+    Reads `wind_products.py --era5-by-year`'s table, which restricts every year to January to
+    September so a partial 2026 compares against the same months of the complete years before it.
+    August to December 2024, five months of a partial year even under that restriction, is too few
+    for an interval and is left out.
 
     Returns:
         Figure 10.
@@ -736,13 +738,13 @@ def _era5_by_year() -> alt.VConcatChart:
         number=10,
         figure_planning=figure_planning,
         title=(
-            "ERA5's deficit to UKV was twice as large in 2026 as in 2025; its deficit to ICON-EU "
-            "was the same"
+            "On January to September of each year, UKV's lead over ERA5 grew in 2026; ICON-EU's "
+            "and ICON-D2's did not"
         ),
         subtitle=[
             (
-                "Each product's mean absolute error minus ERA5's, within one calendar year; 2026 "
-                "runs to September. August to December 2024, five months, is too short for an "
+                "Each product's mean absolute error minus ERA5's, on January to September of one "
+                "calendar year. August to December 2024, five months, is too short for an "
                 "interval and is left out."
             ),
             f"{DOTS} {CAPACITY}",

@@ -291,7 +291,12 @@ def fold_t_interval(*, fold_differences: list[float]) -> tuple[float, float]:
 
 
 def bootstrap_difference_by_year(
-    *, losses: pl.DataFrame, treatment: str, references: tuple[str, ...], metric: str
+    *,
+    losses: pl.DataFrame,
+    treatment: str,
+    references: tuple[str, ...],
+    metric: str,
+    months: tuple[int, ...] | None = None,
 ) -> list[YearInterval]:
     """Bootstrap one arm's paired difference from each reference arm, within each calendar year.
 
@@ -305,6 +310,9 @@ def bootstrap_difference_by_year(
         treatment: The arm whose metric is being compared, such as ERA5's.
         references: The arms it is compared against.
         metric: The loss column to difference.
+        months: When given, restricts every year to these calendar months (1-12) before
+            resampling, so years of unequal length compare on the same months. `None` keeps every
+            month a year holds, which can compare a full year against a partial one.
 
     Returns:
         One interval per (reference, year), treatment minus reference, in reference then year
@@ -317,6 +325,8 @@ def bootstrap_difference_by_year(
     if "setting" in losses.columns and losses["setting"].n_unique() > 1:
         msg = f"the losses hold {losses['setting'].n_unique()} settings; filter to one first"
         raise ValueError(msg)
+    if months is not None:
+        losses = losses.filter(pl.col("time").dt.month().is_in(months))
     years = sorted(losses["time"].dt.year().unique().to_list())
     intervals: list[YearInterval] = []
     for reference in references:

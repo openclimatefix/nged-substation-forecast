@@ -838,7 +838,7 @@ def _new_products(*, contrasts: pl.DataFrame, record_contrasts: pl.DataFrame) ->
     )
     titles = (
         "SARAH-3 − CAMS, December 2022 to August 2026",
-        "SARAH-3 − CAMS by the satellite behind SARAH-3, January 2021 to August 2026",
+        "SARAH-3 − CAMS by satellite, 2021 to August 2026",
         "ICON-DREAM-EU − ERA5, December 2022 to August 2026",
     )
     pairs = (sarah, sarah, dream)

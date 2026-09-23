@@ -796,10 +796,21 @@ def _report(*, frame: pl.DataFrame, losses: pl.DataFrame, sites_roster: pl.DataF
     return "\n".join(lines) + "\n"
 
 
+ERA5_BY_YEAR_MONTHS: Final[tuple[int, ...]] = (1, 2, 3, 4, 5, 6, 7, 8, 9)
+"""January to September: the months 2026 shares with every other year in the record.
+
+2026's record stops in September, so comparing full calendar years would compare a partial 2026
+against a complete 2025 and let the missing October-December months change the answer. Restricting
+every year to the same months keeps the year-to-year comparison paired on season as well as on site.
+"""
+
+
 def write_era5_by_year() -> None:
     """Write ERA5's error against every other product, year by year, from the saved losses.
 
-    Reads the main setting's losses the full run saved, and fits nothing.
+    Reads the main setting's losses the full run saved, and fits nothing. Every year is restricted
+    to `ERA5_BY_YEAR_MONTHS`, January to September, so a partial final year does not skew the
+    comparison against the complete years before it.
     """
     losses = pl.read_parquet(STUDY_DATA_DIR / OUTPUT_DIR_NAME / "losses.parquet").filter(
         pl.col("setting") == "pooled"
@@ -810,9 +821,10 @@ def write_era5_by_year() -> None:
         losses=losses,
         era5_arm="era5_wind",
         other_arms=tuple(f"{product}_wind" for product in PRODUCTS if product != "era5"),
+        months=ERA5_BY_YEAR_MONTHS,
     )
     ERA5_BY_YEAR_DIR.mkdir(parents=True, exist_ok=True)
-    lines = era5_by_year_lines(by_year=by_year)
+    lines = era5_by_year_lines(by_year=by_year, months_note="January to September")
     by_year.write_parquet(paths[0])
     paths[1].write_text("\n".join(lines) + "\n")
     sys.stdout.write("\n".join(lines) + "\n")

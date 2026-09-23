@@ -169,7 +169,12 @@ ICON products, so their leads follow their run cycles; `check_new_products.py` p
 one's hour-to-hour jumps fall, which is where the cycle is read from.
 """
 
-RUN_INTERVAL_HOURS: Final[dict[str, int]] = {"icon_d2": 3, "icon_eu": 3, "icon_global": 6}
+RUN_INTERVAL_HOURS: Final[dict[str, int]] = {
+    "icon_d2": 3,
+    "icon_eu": 3,
+    "icon_global": 6,
+    "icon_dream": 3,
+}
 """The run cadence of each ICON product, which fixes its served lead at each label hour.
 
 The evidence for the mapping is on the write-up page.
@@ -200,9 +205,16 @@ SARAH_SATELLITE_ERAS: Final[tuple[tuple[str, datetime, datetime], ...]] = (
 """The satellite behind SARAH-3's retrieval over each span, as (label, start, end before).
 
 SARAH-3's European disc moved from Meteosat-11 to Meteosat-10 on 21 March 2023, and Meteosat-9
-stood in for a fortnight in January 2022, which is therefore a span of its own, left out of both
-Meteosat-11 spans. The report prints SARAH-3's error against CAMS in each span; no era feature
+stood in for a fortnight, 17 to 31 January 2022, which is therefore a span of its own, left out of
+both Meteosat-11 spans. The report prints SARAH-3's error against CAMS in each span; no era feature
 enters the fit.
+
+**Each span still holds a few days served by a different satellite than its label names**, read
+from the SIS variable's `platform` attribute in SARAH-3's own files: Meteosat-9 also stands in for
+19 to 20 December 2021, inside the "Meteosat-11, 2021" span, and Meteosat-11 stands in for 17 to 20
+August 2024, 11 to 12 November 2025, and 24 to 28 April 2026, inside the "Meteosat-10, from 21 March
+2023" span. No arm reads which satellite an hour comes from, so these few-day mismatches are not
+expected to move the per-span contrasts by much, and the write-up says so.
 """
 
 LEAD_TABLE_HOURS: Final[tuple[int, int]] = (7, 19)
@@ -1314,6 +1326,143 @@ def _sarah_era_lines(*, losses: pl.DataFrame) -> list[str]:
     return lines
 
 
+CLEARNESS_BANDS: Final[tuple[tuple[str, float, float], ...]] = (
+    ("overcast kt<0.3", 0.0, 0.3),
+    ("broken 0.3-0.6", 0.3, 0.6),
+    ("clear kt>=0.6", 0.6, 2.0),
+)
+"""CAMS's clearness index `kt` (global irradiance over extraterrestrial), bucketed into overcast,
+broken-cloud, and clear skies, for `_sarah_cams_breakdown_lines`.
+"""
+
+
+def _sarah_cams_breakdown_lines(*, frame: pl.DataFrame, losses: pl.DataFrame) -> list[str]:
+    """Report SARAH-3's error against CAMS, per generator and by CAMS's clearness index.
+
+    Neither breakdown is a planned contrast, so both are exploratory. The clearness index `kt` is
+    CAMS's own global irradiance over the extraterrestrial irradiance at the same site and time,
+    which does not depend on the weather product read for the metric.
+
+    Args:
+        frame: The panel's common rows, holding `ghi_cams` and `extraterrestrial_horizontal_w_m2`.
+        losses: The pooled losses, holding `sarah3_global` and `cams_global`.
+
+    Returns:
+        Markdown lines: one table per generator, then one per clearness band.
+    """
+    kt = frame.select(
+        "site",
+        "time",
+        kt=pl.when(pl.col("extraterrestrial_horizontal_w_m2") > 0)
+        .then(pl.col("ghi_cams") / pl.col("extraterrestrial_horizontal_w_m2"))
+        .otherwise(None),
+    )
+    keyed = losses.join(kt, on=["site", "time"], how="left")
+    lines = ["#### SARAH-3 against CAMS, by generator (exploratory)", "", *CONTRAST_HEADER]
+    lines += [
+        _contrast_line(
+            losses=keyed.filter(pl.col("site") == site),
+            treatment="sarah3_global",
+            reference="cams_global",
+            label=f"site {site}",
+        )
+        for site in sorted(keyed["site"].unique().to_list())
+    ]
+    clearness_heading = (
+        "#### SARAH-3 against CAMS, by CAMS's clearness index (exploratory, chosen after the "
+        "results were seen)"
+    )
+    lines += ["", clearness_heading, "", *CONTRAST_HEADER]
+    lines += [
+        _contrast_line(
+            losses=keyed.filter(pl.col("kt").is_between(low, high, closed="left")),
+            treatment="sarah3_global",
+            reference="cams_global",
+            label=name,
+        )
+        for name, low, high in CLEARNESS_BANDS
+    ]
+    return lines
+
+
+def _icon_dream_icon_eu_by_year_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Report ICON-DREAM-EU's error minus ICON-EU's, in each calendar year (exploratory).
+
+    Shows whether ICON-DREAM-EU's gap to ICON-EU drifts from year to year, so a reader who sees
+    every product's lead over ERA5 shrink in 2025 and 2026 can check whether ICON-DREAM-EU is
+    getting worse relative to a weather model rather than only relative to ERA5's reanalysis.
+
+    Args:
+        losses: The pooled losses, holding `icon_dream_global` and `icon_eu_global`.
+
+    Returns:
+        Markdown lines: one row per year. Positive means ICON-DREAM-EU's error is the larger.
+    """
+    by_year = bootstrap_difference_by_year(
+        losses=losses,
+        treatment="icon_dream_global",
+        references=("icon_eu_global",),
+        metric=METRIC,
+    )
+    lines = [
+        "#### ICON-DREAM-EU against ICON-EU, by year (exploratory)",
+        "",
+        (
+            "Positive: ICON-DREAM-EU's error is the larger. A year of fewer than "
+            f"{MIN_MONTHS_FOR_INTERVAL} months gets no interval."
+        ),
+        "",
+        "| Year | ICON-DREAM-EU − ICON-EU (pp of capacity) | 95% interval | Months | Rows |",
+        "|---|---|---|---|---|",
+    ]
+    for row in by_year:
+        difference, lower, upper = (
+            row[key] * PERCENTAGE_POINTS for key in ("difference", "lower_95", "upper_95")
+        )
+        interval = f"[{lower:+.3f}, {upper:+.3f}]" if row["enough_months"] else "too few months"
+        lines.append(
+            f"| {row['year']} | {difference:+.3f} | {interval} | {row['n_months']} "
+            f"| {row['n_rows']:,} |"
+        )
+    return lines
+
+
+def _icon_dream_icon_eu_lead_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Compare ICON-DREAM-EU against ICON-EU at matched served leads (exploratory).
+
+    ICON-DREAM-EU and ICON-EU run on the same 3-hourly cycle, so every label hour holds both at the
+    same lead, and the contrast within a lead bucket is lead-matched. This isolates whether the
+    hourly-mean conversion, which needs more de-averaging at a longer lead, explains part of
+    ICON-DREAM-EU's gap to ICON-EU.
+
+    Args:
+        losses: The pooled losses, holding `icon_dream_global` and `icon_eu_global`.
+
+    Returns:
+        Markdown lines.
+    """
+    first, last = LEAD_TABLE_HOURS
+    daytime = losses.filter(
+        pl.col("time").dt.hour().cast(pl.Int32).is_between(first, last)
+    ).with_columns(lead_3h=_served_lead(product="icon_dream"))
+    label = f"{first:02d}–{last:02d} UTC"
+    lines = [
+        "#### ICON-DREAM-EU against ICON-EU at matched served leads (exploratory)",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    lines += [
+        _contrast_line(
+            losses=daytime.filter(pl.col("lead_3h") == lead),
+            treatment="icon_dream_global",
+            reference="icon_eu_global",
+            label=f"both at lead {lead} h, {label}",
+        )
+        for lead in (1, 2, 3)
+    ]
+    return lines
+
+
 def _lead_tables(*, losses: pl.DataFrame) -> list[str]:
     """Compare ICON products at matched served leads and hour by hour, and break CAMS down.
 
@@ -1436,7 +1585,11 @@ def _lead_tables(*, losses: pl.DataFrame) -> list[str]:
 
 
 def era5_difference_by_year(
-    *, losses: pl.DataFrame, era5_arm: str, other_arms: tuple[str, ...]
+    *,
+    losses: pl.DataFrame,
+    era5_arm: str,
+    other_arms: tuple[str, ...],
+    months: tuple[int, ...] | None = None,
 ) -> pl.DataFrame:
     """Return ERA5's error minus each other arm's, in each calendar year, with its interval.
 
@@ -1448,18 +1601,21 @@ def era5_difference_by_year(
         losses: Per-row losses at one setting, carrying `time`, `month`, `site`, `seed` and `arm`.
         era5_arm: ERA5's arm, the treatment in every difference.
         other_arms: The arms ERA5 is compared against.
+        months: When given, restricts every year to these calendar months (1-12) before
+            resampling, so a partial year and a full year compare on the same months. `None` keeps
+            every month a year holds.
 
     Returns:
         One row per (arm, year) with `arm`, `year`, the interval in fractions of capacity, and
         `enough_months`. A positive difference means ERA5's error is the larger.
     """
     intervals: list[YearInterval] = bootstrap_difference_by_year(
-        losses=losses, treatment=era5_arm, references=other_arms, metric=METRIC
+        losses=losses, treatment=era5_arm, references=other_arms, metric=METRIC, months=months
     )
     return pl.DataFrame(intervals).rename({"reference": "arm"})
 
 
-def era5_by_year_lines(*, by_year: pl.DataFrame) -> list[str]:
+def era5_by_year_lines(*, by_year: pl.DataFrame, months_note: str | None = None) -> list[str]:
     """Render `era5_difference_by_year`'s table as markdown.
 
     A year holding fewer than `studies.bootstrap.MIN_MONTHS_FOR_INTERVAL` months shows its estimate
@@ -1468,17 +1624,21 @@ def era5_by_year_lines(*, by_year: pl.DataFrame) -> list[str]:
 
     Args:
         by_year: The output of `era5_difference_by_year`.
+        months_note: When `by_year` was built with a `months` restriction, a short clause naming
+            it, appended to the caption (e.g. "on January to September of each year"). `None` for
+            an unrestricted, full-calendar-year table.
 
     Returns:
         Markdown lines: one row per (arm, year).
     """
+    caption = "Positive: ERA5's error is the larger. A year of fewer than "
+    caption += f"{MIN_MONTHS_FOR_INTERVAL} months gets no interval."
+    if months_note is not None:
+        caption += f" Every year is restricted to the same months, {months_note}."
     lines = [
         "#### ERA5 against every other product, year by year (exploratory)",
         "",
-        (
-            "Positive: ERA5's error is the larger. A year of fewer than "
-            f"{MIN_MONTHS_FOR_INTERVAL} months gets no interval."
-        ),
+        caption,
         "",
         (
             "| Against | Year | ERA5 − product (pp of capacity) | 95% interval | Excludes zero? "
@@ -1727,6 +1887,10 @@ def _report(
         lines += ["", *_matched_lead_lines(panel=panel, losses=pooled)]
     if {"sarah3", "cams"} <= set(panel.products):
         lines += ["", *_sarah_era_lines(losses=pooled)]
+        lines += ["", *_sarah_cams_breakdown_lines(frame=frame, losses=pooled)]
+    if {"icon_dream", "icon_eu"} <= set(panel.products):
+        lines += ["", *_icon_dream_icon_eu_by_year_lines(losses=pooled)]
+        lines += ["", *_icon_dream_icon_eu_lead_lines(losses=pooled)]
     lines += ["", *era5_by_year_lines(by_year=by_year)]
     lines += ["", *geometry_lines(sites=_pv_sites(), noun="solar farms")]
     return "\n".join(lines) + "\n"

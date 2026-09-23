@@ -68,9 +68,9 @@ from the freshest run of that weather model that Open-Meteo's archive holds for 
   steps fall, the difference between ICON global and ERA5 is not statistically significant at the 5%
   level. See [About half of ICON global's gap to ICON-EU is a pair of steps in its served
   wind](#about-half-of-icon-globals-gap-to-icon-eu-is-a-pair-of-steps-in-its-served-wind).
-- **ERA5's deficit to UKV was about twice as large in 2026 as in 2025, and its deficit to ICON-EU
-  was the same in both years.** See [ERA5's deficit, year by
-  year](#era5s-deficit-year-by-year).
+- **On the same months of each year, January to September, UKV's lead over ERA5 grew from 0.46
+  points in 2025 to 0.75 in 2026, while ICON-EU's and ICON-D2's leads did not grow.** See [ERA5's
+  deficit, year by year](#era5s-deficit-year-by-year).
 
 ## Introduction
 
@@ -360,16 +360,19 @@ which may handicap ICON global there.
 
 ### ERA5's deficit, year by year
 
-**ERA5's deficit to UKV was about twice as large in 2026 as in 2025, and its deficit to ICON-EU was
-the same in both years.** Each comparison below is exploratory, and each year's interval comes from
-resampling that year's months alone. UKV beat ERA5 by 0.37 points [0.18, 0.56] in 2025 and by 0.75
-points [0.59, 0.93] in 2026, which ran to September. The larger 2026 figure is in step with UKV's
-January 2026 upgrade, described in [UKV and ICON-D2 describe past wind
-best](#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested). ICON-EU beat ERA5 by
-0.36 points in each year: [0.17, 0.55] in 2025 and [0.20, 0.52] in 2026. ICON-D2 beat ERA5 by 0.61
-points [0.34, 0.84] in 2025 and by 0.71 points [0.59, 0.83] in 2026. This page does not test whether
-two years differ from each other. August to December 2024 holds five months, too few for an
-interval, and is left out.
+**On the same months of each year, January to September, UKV's lead over ERA5 grew from 0.46 points
+in 2025 to 0.75 in 2026, while ICON-EU's and ICON-D2's leads did not grow.** Each comparison below is
+exploratory, and each year's interval comes from resampling that year's months alone, restricted to
+January to September so a partial 2026 compares against the same months of the earlier years rather
+than against their full twelve. UKV beat ERA5 by 0.46 points [0.22, 0.64] in 2025 and by 0.75 points
+[0.59, 0.93] in 2026. The larger 2026 figure is in step with UKV's January 2026 upgrade, and lines up
+with the post-upgrade contrast in [UKV and ICON-D2 describe past wind
+best](#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested), 0.79 points [0.63, 0.97]
+since the upgrade against 0.53 points [0.29, 0.72] over the same months a year earlier. ICON-EU beat
+ERA5 by 0.49 points [0.33, 0.66] in 2025 and by 0.36 points [0.20, 0.52] in 2026. ICON-D2 beat ERA5
+by 0.77 points [0.60, 0.97] in 2025 and by 0.71 points [0.59, 0.83] in 2026. This page does not test
+whether two years differ from each other. August to December 2024 holds five months, too few for an
+interval even before the January-to-September restriction, and is left out.
 
 **ICON global's two years are not comparable with each other.** The pair of steps in ICON global's
 served wind at one generator, described in [About half of ICON global's gap to ICON-EU is a pair of
@@ -378,8 +381,8 @@ wind](#about-half-of-icon-globals-gap-to-icon-eu-is-a-pair-of-steps-in-its-serve
 early June 2025 and early June 2026, so each year holds part of the stepped period. In neither year
 is ICON global's difference from ERA5 statistically significant at the 5% level.
 
-![Figure 10: ERA5's deficit to UKV was twice as large in 2026 as in 2025; its deficit to ICON-EU was
-the same](assets/wind_era5_by_year.svg)
+![Figure 10: On January to September of each year, UKV's lead over ERA5 grew in 2026; ICON-EU's and
+ICON-D2's did not](assets/wind_era5_by_year.svg)
 
 ## What to use
 
