@@ -28,9 +28,10 @@ best-estimate, not a guarantee.
   metrics (flexibility procurement and curtailment), the equal-risk method that avoids needing a
   price for a network breach, their limitations, and the open questions for NGED.
 - [Data sources](data-sources.md) — NGED power data + supporting files, network topology, and the
-  weather datasets (ECMWF ENS, ERA5, CAMS).
+  weather datasets (ECMWF ENS, ERA5, CAMS), with the dated list of upgrades to each weather model.
 - [Live service](live-service.md) — the AWS deployment: the `live_forecasts` inference asset, the
-  champion-model container, the costed AWS architecture options, and production monitoring.
+  champion-model container, the costed AWS architecture options, production monitoring, and the
+  handling of NWP model upgrades.
 - [Handover to NGED](handover.md) — the operating model after the Network Innovation Allowance (NIA)
   project ends (the working assumption is that NGED runs the service on its own AWS account): the
   operator-contract design constraint, and the handover workstreams (runbooks, alert-on-absence,
@@ -388,6 +389,14 @@ leaderboard experiment or controlled ad-hoc ablation, so we keep the result eith
   has ~1–2 complete years of history. See [Evaluating a data source whose history is shorter than
   the
   folds](../ml_experimentation/cross-validation-folds.md#evaluating-a-data-source-whose-history-is-shorter-than-the-folds).
+- **Handle NWP model upgrades**
+  ([#851](https://github.com/openclimatefix/nged-substation-forecast/issues/851)): an upgraded
+  weather model arrives on time and passes validation, so nothing in the live service notices it,
+  yet the promoted model was trained on the old version. The plan records the NWP model cycle on
+  every row, keeps a dated list of upgrades, treats an upgrade as a degradation that widens the
+  uncertainty bands, and retrains early. It starts with an experiment measuring how fast a model
+  recovers after the Met Office's January 2026 upgrade of UKV. See [Live service → NWP model
+  upgrades](live-service.md#nwp-model-upgrades).
 
 ---
 
