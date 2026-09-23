@@ -666,7 +666,7 @@ def _cams_breakdown(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 5.
+        Figure 6.
     """
     groups = {
         "Whole record": [("all", "All hours", SECTION_DECIDING)],
@@ -710,7 +710,7 @@ def _cams_breakdown(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     ]
     return figure(
         panels=panels,
-        number=5,
+        number=6,
         figure_planning=figure_planning,
         title=(
             "CAMS's margin over ICON-D2 holds at every generator, in every season, and every year"
@@ -760,7 +760,7 @@ def _icon_d2_leads(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatC
         report_text: The report.
 
     Returns:
-        Figure 6.
+        Figure 7.
     """
     domain = (-2.0, 0.5)
     hourly_rows = _hourly_rows(contrasts=contrasts)
@@ -810,7 +810,7 @@ def _icon_d2_leads(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatC
     )
     return figure(
         panels=[hourly, summary],
-        number=6,
+        number=7,
         figure_planning=figure_planning,
         title="ICON-D2's advantage over ICON-EU shrinks within hours of each run",
         subtitle=[
@@ -835,7 +835,7 @@ def _icon_eu_rivals(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 7.
+        Figure 8.
     """
     icon_global = select_contrasts(
         contrasts=contrasts,
@@ -906,7 +906,7 @@ def _icon_eu_rivals(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     ]
     return figure(
         panels=panels,
-        number=7,
+        number=8,
         figure_planning=figure_planning,
         title=(
             "ICON-EU does not beat UKV rebuilt from its snapshots, but beats ICON global and "
@@ -930,7 +930,7 @@ def _ukv_against_era5(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 8.
+        Figure 9.
     """
     conditions = ("Open-Meteo's hourly value", "Rebuilt from its snapshots")
     scopes = {
@@ -963,7 +963,7 @@ def _ukv_against_era5(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     )
     return figure(
         panels=[panel],
-        number=8,
+        number=9,
         figure_planning=figure_planning,
         title="UKV rebuilt from its snapshots beats ERA5; Open-Meteo's hourly UKV against ERA5 is "
         "unresolved",
@@ -986,7 +986,7 @@ def _own_beam(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         errors: Each product's mean absolute error, which sets the row order.
 
     Returns:
-        Figure 9.
+        Figure 10.
     """
     order = sorted(errors, key=errors.__getitem__)
     rows = _rows(
@@ -1008,7 +1008,7 @@ def _own_beam(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
     )
     return figure(
         panels=[panel],
-        number=9,
+        number=10,
         figure_planning=figure_planning,
         title="Every product except ERA5 gains 0.03 to 0.11 points from its own direct beam",
         subtitle=[
@@ -1029,7 +1029,7 @@ def _neighbours(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 10.
+        Figure 11.
     """
     conditions = (
         "Trained on the generator itself",
@@ -1067,7 +1067,7 @@ def _neighbours(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     )
     return figure(
         panels=[panel],
-        number=10,
+        number=11,
         figure_planning=figure_planning,
         title="The ranking holds for a generator predicted from its neighbours",
         subtitle=[
@@ -1119,7 +1119,7 @@ def _implied_capacity_chart(*, report_text: str) -> alt.VConcatChart:
         report_text: The report.
 
     Returns:
-        Figure 11.
+        Figure 12.
     """
     rows = _implied_capacity_rows(report_text=report_text).with_columns(
         family=pl.col("product").replace_strict(FAMILIES),
@@ -1160,7 +1160,7 @@ def _implied_capacity_chart(*, report_text: str) -> alt.VConcatChart:
     grid = [alt.hconcat(*panels[i : i + 2], spacing=24) for i in (0, 2, 4)]
     return figure(
         panels=grid,
-        number=11,
+        number=12,
         figure_planning=None,
         title=(
             "Of the six products tested, CAMS's implied capacity swings the most with the seasons"
@@ -1221,7 +1221,7 @@ def _solar_models_work(
         errors: Each product's pooled mean absolute error.
 
     Returns:
-        Figures 3 and 4.
+        Figures 4 and 5.
     """
     measured = _models_work_frame()
     order = ("Measured", *(f"XGBoost model given {NAMES[p]}" for p in MODELS_WORK_PRODUCTS))
@@ -1252,7 +1252,7 @@ def _solar_models_work(
         week_order=SOLAR_WEEK_DISPLAY_ORDER,
         order=order,
         colours=(ocf.TEXT, *(FAMILY_COLOURS[FAMILIES[p]] for p in MODELS_WORK_PRODUCTS)),
-        number=3,
+        number=4,
         title=(
             "An XGBoost model given CAMS tracks measured power at every generator, across a "
             "clear, a variable, and a dull week"
@@ -1278,7 +1278,7 @@ def _solar_models_work(
         names={product: _served_name(product) for product in NAMES},
         errors=errors,
         x_domain=(4.0, 11.5),
-        number=4,
+        number=5,
         title=(
             "CAMS has the lowest error at each of the six generators, and ICON-D2 the second lowest"
         ),
