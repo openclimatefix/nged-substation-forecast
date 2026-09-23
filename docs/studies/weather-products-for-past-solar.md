@@ -25,7 +25,7 @@ better than any of the weather models tested or the reanalysis.** The Copernicus
 Monitoring Service's retrieval (CAMS) has a mean absolute error of 5.05% of capacity, against 7.71%
 for the best of the weather models tested, ICON-D2, and 8.98% for ERA5, the reanalysis of the
 European Centre for Medium-Range Weather Forecasts (ECMWF). The satellite observes the clouds of the
-hour itself, where every weather model forecasts them, so a large gap is expected.
+hour itself, where every weather model simulates them, so a large gap is expected.
 
 **Among the four weather models tested, the German weather service's ICON-D2 (from its Icosahedral
 Nonhydrostatic model family) is the best as served, and its advantage over ICON-EU, the same
