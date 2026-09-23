@@ -1,4 +1,4 @@
-"""Draw the five anonymised charts for the write-up on which weather product best describes wind.
+"""Draw the seven anonymised charts for the write-up on which weather product best describes wind.
 
 One-off throwaway script for the charts in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/830>. The write-up is
@@ -6,7 +6,9 @@ One-off throwaway script for the charts in
 
 **Every number a chart shares with the page is read from the report `wind_products.py` wrote**,
 so a chart cannot disagree with the page. The step chart's fortnightly wind-speed ratios are read
-from the downloads `fetch_wind_point.py` wrote, and its period means from the report.
+from the downloads `fetch_wind_point.py` wrote, and its period means from the report. The two
+"models work" charts are a further exception: they reconstruct out-of-fold predictions and
+per-generator errors straight from `losses.parquet`, because neither is printed in the report.
 
 Generators appear only as `W1` to `W3`, and no chart plots output. The one per-generator time
 series, the ratio of two products' wind speeds at the generator with the steps, carries no
@@ -27,9 +29,11 @@ from typing import Final
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
+from build_dataset import _wind_sites
 from fetch_wind_point import output_path_for
 from sources import STUDY_DATA_DIR
 from studies.charts import (
+    FAMILY_COLOURS,
     PLOT_WIDTH_PX,
     ContrastKey,
     figure,
@@ -43,14 +47,29 @@ from weather_product_charts import (
     ASSETS_DIR,
     CAPACITY,
     DOTS,
+    FAMILIES,
     NAMES,
     X_TITLE,
     _contrast_name,
+    _display_order,
+    _models_work_error_chart,
+    _models_work_long_frame,
+    _models_work_timeseries,
+    _pick_weeks,
+    _reconstruct_predicted,
     _rows,
     _two_places,
 )
 from weather_products import _contrast_line
-from wind_products import OUTPUT_DIR_NAME, STEP_DATES, STEP_SITE, _renamed, _scoped
+from wind_products import (
+    OUTPUT_DIR_NAME,
+    STEP_DATES,
+    STEP_SITE,
+    _common_rows,
+    _joined,
+    _renamed,
+    _scoped,
+)
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -212,7 +231,7 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
     )
     return figure(
         panels=[left, right],
-        number=1,
+        number=3,
         figure_planning=figure_planning,
         title="UKV and ICON-D2 describe past wind best of the five products tested",
         subtitle=[
@@ -267,7 +286,7 @@ def _half_years(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     )
     return figure(
         panels=[panel],
-        number=2,
+        number=4,
         figure_planning=figure_planning,
         title="UKV's and ICON-D2's advantage over ERA5 is larger from April to September",
         subtitle=[DOTS, f"{CAPACITY} {SCOPE}"],
@@ -331,7 +350,7 @@ def _icon_d2_against_ukv(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     ]
     return figure(
         panels=panels,
-        number=4,
+        number=6,
         figure_planning=figure_planning,
         title="ICON-D2 leads UKV across the window, but not since UKV's upgrade",
         subtitle=[
@@ -548,7 +567,7 @@ def _steps(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatChart:
             ),
             right,
         ],
-        number=5,
+        number=7,
         figure_planning=figure_planning,
         title="About half of ICON global's gap to ICON-EU is a pair of steps in its served wind at "
         "one generator",
@@ -609,7 +628,7 @@ def _per_generator(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     ]
     return figure(
         panels=panels,
-        number=3,
+        number=5,
         figure_planning=figure_planning,
         title=(
             "UKV's advantage over ERA5 is statistically significant at the 5% level at two of the "
@@ -622,8 +641,136 @@ def _per_generator(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     )
 
 
+MODELS_WORK_BEST_PRODUCT: Final[str] = "icon_d2"
+"""ICON-D2 has the lowest pooled mean absolute error in the report, so it is the product drawn
+beside ERA5 in the "models work" figures.
+"""
+
+MODELS_WORK_MIN_HOURS: Final[int] = 20
+"""A (generator, day) needs at least this many hours to count towards week selection."""
+
+WIND_WEEK_CRITERIA: Final[tuple[tuple[str, str, bool], ...]] = (
+    ("Windiest week", "mean_output", True),
+    ("Calmest week", "mean_output", False),
+    ("Most variable week", "spread", True),
+)
+"""Wind weeks are picked in this order, each excluding the weeks already picked."""
+
+WIND_WEEK_DISPLAY_ORDER: Final[tuple[str, ...]] = (
+    "Windiest week",
+    "Most variable week",
+    "Calmest week",
+)
+"""Wind weeks are drawn easiest to hardest, left to right."""
+
+
+def _models_work_frame() -> pl.DataFrame:
+    """Rebuild the exact rows and measured power `wind_products.py` scored, without refitting.
+
+    Calls the same row-building functions `wind_products.py`'s own `main` calls, so the rows match
+    the study exactly; nothing here fits a model.
+
+    Returns:
+        One row per (site, time) the pooled run scored, carrying `power_mw` and
+        `effective_capacity_mw`.
+    """
+    return _common_rows(frame=_joined(sites=_wind_sites())).select(
+        "site", "time", "power_mw", "effective_capacity_mw"
+    )
+
+
+def _wind_models_work(*, errors: dict[str, float]) -> tuple[alt.VConcatChart, alt.VConcatChart]:
+    """Draw the wind "models work" figures.
+
+    Predicted against measured power, and per-generator error.
+
+    Args:
+        errors: Each product's pooled mean absolute error.
+
+    Returns:
+        Figures 1 and 2.
+    """
+    measured = _models_work_frame()
+    losses = _wind_losses()
+    best_label = NAMES[MODELS_WORK_BEST_PRODUCT]
+    predicted = (
+        (
+            _reconstruct_predicted(
+                losses=losses.filter(pl.col("arm") == f"{MODELS_WORK_BEST_PRODUCT}_wind"),
+                measured=measured,
+                arm=f"{MODELS_WORK_BEST_PRODUCT}_wind",
+            ),
+            f"XGBoost model given {best_label}",
+        ),
+        (
+            _reconstruct_predicted(
+                losses=losses.filter(pl.col("arm") == "era5_wind"),
+                measured=measured,
+                arm="era5_wind",
+            ),
+            "XGBoost model given ERA5",
+        ),
+    )
+    hourly = measured.with_columns(
+        output_frac=pl.col("power_mw").cast(pl.Float64) / pl.col("effective_capacity_mw")
+    )
+    weeks = _pick_weeks(
+        hourly=hourly, min_hours=MODELS_WORK_MIN_HOURS, agg="mean", criteria=WIND_WEEK_CRITERIA
+    )
+    long_frame = (
+        _models_work_long_frame(measured=measured, predicted=predicted)
+        .with_columns(week=pl.col("time").dt.truncate("1w"))
+        .join(weeks, on="week", how="inner")
+    )
+    order = ("Measured", f"XGBoost model given {best_label}", "XGBoost model given ERA5")
+    colours = (
+        ocf.TEXT,
+        FAMILY_COLOURS[FAMILIES[MODELS_WORK_BEST_PRODUCT]],
+        FAMILY_COLOURS["reanalysis"],
+    )
+    week_order = tuple(_display_order(weeks=weeks, order=WIND_WEEK_DISPLAY_ORDER))
+    timeseries = _models_work_timeseries(
+        long_frame=long_frame,
+        sites=SITES,
+        site_noun="Generator",
+        week_order=week_order,
+        order=order,
+        colours=colours,
+        number=1,
+        title=(
+            f"An XGBoost model given {best_label} tracks measured power at every generator, "
+            "across a windy, a variable, and a calm week"
+        ),
+        subtitle=[
+            (
+                "Power as a percentage of the generator's own capacity, out of fold. Weeks "
+                "are chosen from measured power alone, never from a weather product, so the "
+                'choice cannot favour one; see "Data and methods".'
+            ),
+            CAPACITY,
+            SCOPE,
+        ],
+    )
+    error = _models_work_error_chart(
+        losses=losses,
+        arm_suffix="_wind",
+        sites=SITES,
+        names=NAMES,
+        families=FAMILIES,
+        errors=errors,
+        number=2,
+        title="Every product's error ranks close to the same way at each of the three generators",
+        subtitle=[
+            "Each dot is one generator's mean absolute error given one product.",
+            CAPACITY,
+            SCOPE,
+        ],
+    )
+    return timeseries, error
+
+
 def main() -> int:
-    """Read the report, compute the new numbers, and write the five SVGs."""
+    """Read the report, compute the new numbers, and write the seven SVGs."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     argparse.ArgumentParser(description=__doc__).parse_args()
     report_path = RESULTS_DIR / "report.md"
@@ -632,7 +779,10 @@ def main() -> int:
     errors = report_errors(report_path=report_path, column="All sites")
     pooled = _wind_losses()
     _reproduce(pooled=pooled, report_text=report_text)
+    models_work_timeseries, models_work_error = _wind_models_work(errors=errors)
     charts = {
+        "wind_models_work_timeseries": models_work_timeseries,
+        "wind_models_work_error": models_work_error,
         "wind_headline": _headline(contrasts=contrasts, errors=errors),
         "wind_half_years": _half_years(contrasts=contrasts),
         "wind_icon_d2_against_ukv": _icon_d2_against_ukv(contrasts=contrasts),

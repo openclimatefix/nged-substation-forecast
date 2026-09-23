@@ -19,9 +19,9 @@ is the Met Office's UK variable-resolution model (UKV) with its hourly value reb
 snapshots. The evidence is six metered solar farms inside one 25 km by 23 km box in Lincolnshire,
 and 79,384 generator-hours from December 2022 to September 2026.
 
-![Figure 1: CAMS describes past sunshine best of the six products tested, by a wide margin](assets/sunshine_headline.svg)
+![Figure 3: CAMS describes past sunshine best of the six products tested, by a wide margin](assets/sunshine_headline.svg)
 
-In Figure 1 the top panel's intervals are against ERA5, so two products whose intervals overlap
+In Figure 3 the top panel's intervals are against ERA5, so two products whose intervals overlap
 there may still differ; the bottom panel compares the named pairs directly.
 
 > **How this page was made.** The research question came from a human. Everything else — the code
@@ -199,6 +199,31 @@ both covered by tests.**
 
 ## Results
 
+### The XGBoost models work
+
+**Before any contrast is worth reading, the XGBoost models have to be shown producing a sane
+forecast.** Figure 1 plots out-of-fold predictions against measured power at every generator, given
+CAMS (the best product) and given ERA5, across three weeks: the clearest, the most variable, and the
+dullest. The three weeks are chosen from measured power alone, pooled across every generator and
+restricted to April to September so a short midwinter day cannot dominate the choice: the clearest is
+the week whose generators produced the most output relative to their own capacity, the dullest the
+least, and the most variable the week whose daily totals swing the most from day to day. No weather
+product's own values enter that choice, so the choice cannot favour CAMS or ERA5.
+
+![Figure 1: An XGBoost model given CAMS tracks measured power at every generator, across a clear,
+a variable, and a dull week](assets/sunshine_models_work_timeseries.svg)
+
+**Given CAMS, the XGBoost model tracks measured power closely at every generator and in every week,
+including the most variable week's sharp day-to-day swings; given ERA5, it still follows the shape of
+each day but runs further from the measured line, most visibly on the dullest week.** Figure 2 plots
+every product's mean absolute error at each of the six generators separately, one dot per product per
+generator: CAMS's six dots all sit below 6.5% of capacity, ERA5's six all sit above 8.6%, and the four
+weather models fall between the two without overlapping either, so the ranking in [CAMS describes past
+sunshine best](#cams-describes-past-sunshine-best-of-the-six-products-tested-by-a-wide-margin) holds
+generator by generator rather than resting on a pooled average that one generator could dominate.
+
+![Figure 2: Every product's error ranks the same way at each of the six generators](assets/sunshine_models_work_error.svg)
+
 ### CAMS describes past sunshine best of the six products tested, by a wide margin
 
 **The satellite retrieval beats the best of the weather models tested by 2.65 points [2.42, 2.88],
@@ -220,7 +245,7 @@ Across the six generators, CAMS's margin over ICON-D2 ranges from 2.28 to 3.36 p
 ranges from 1.80 points in winter to 3.02 in autumn, and in each calendar year from 2023 to 2026
 (2026 to 10 September) it lies between 2.58 and 2.84.
 
-![Figure 2: CAMS's margin over ICON-D2 holds at every generator, in every season, and every year](assets/sunshine_cams_breakdown.svg)
+![Figure 4: CAMS's margin over ICON-D2 holds at every generator, in every season, and every year](assets/sunshine_cams_breakdown.svg)
 
 **The gap is not an artefact of lead or of reading CAMS in full.** On the hours ICON-D2 is served 1
 hour after its run started, CAMS still beats it by 2.23 points [1.99, 2.45]. Reading CAMS in full is
@@ -243,7 +268,7 @@ The table shows hours 09 to 16 UTC. Each hour is labelled by its end, so 12 UTC 
 the sun low, the pattern weakens: 1 hour into a run, ICON-D2's advantage is only 0.32 points at
 07 UTC and 0.06 points at 19 UTC.
 
-![Figure 3: ICON-D2's advantage over ICON-EU shrinks within hours of each run](assets/sunshine_icon_d2_leads.svg)
+![Figure 5: ICON-D2's advantage over ICON-EU shrinks within hours of each run](assets/sunshine_icon_d2_leads.svg)
 
 **The time of day does not explain the pattern around noon.** The hours 12 and 13 UTC sit on either
 side of solar noon, yet ICON-D2's advantage is 0.23 points at 12 UTC, 3 hours into a run, against
@@ -294,7 +319,7 @@ equal leads would if anything favour ICON-EU. On the 8 months after UKV's upgrad
 0.01 points behind rebuilt UKV [−0.36, +0.36], with only 2 of 5 folds agreeing in sign. That
 interval rests on 8 months and is likely too narrow.
 
-![Figure 4: ICON-EU beats ICON global and Open-Meteo's hourly UKV, but not UKV rebuilt from its snapshots](assets/sunshine_icon_eu_rivals.svg)
+![Figure 6: ICON-EU beats ICON global and Open-Meteo's hourly UKV, but not UKV rebuilt from its snapshots](assets/sunshine_icon_eu_rivals.svg)
 
 ### UKV rebuilt from its snapshots beats ERA5
 
@@ -316,7 +341,7 @@ upgrade. No XGBoost model for rebuilt UKV was trained on the post-upgrade months
 **Every UKV contrast with ERA5 mixes the products with their leads.** UKV is served at T+0 and ERA5
 at 1 to 12 hours, and equalising the leads could narrow the gap.
 
-![Figure 5: UKV rebuilt from its snapshots beats ERA5; Open-Meteo's hourly UKV against ERA5 is unresolved](assets/sunshine_ukv_against_era5.svg)
+![Figure 7: UKV rebuilt from its snapshots beats ERA5; Open-Meteo's hourly UKV against ERA5 is unresolved](assets/sunshine_ukv_against_era5.svg)
 
 ### A product's own direct beam adds little
 
@@ -330,7 +355,7 @@ effects are smaller than every difference between products except ICON global ag
 CAMS and ERA5 the own-beam effects agree with [the beam/diffuse study](beam-diffuse-split.md), which
 tested whether the published beam carries information or merely encodes the total differently.
 
-![Figure 6: Every product except ERA5 gains 0.03 to 0.11 points from its own direct beam](assets/sunshine_own_beam.svg)
+![Figure 8: Every product except ERA5 gains 0.03 to 0.11 points from its own direct beam](assets/sunshine_own_beam.svg)
 
 ### The ranking holds for a generator predicted from its neighbours
 
@@ -346,7 +371,7 @@ the held-out generator. The increase in error is therefore likely smaller here t
 further from its neighbours, which this page does not measure. For disaggregation, the result
 supports the ranking but not the size of the error.
 
-![Figure 7: The ranking holds for a generator predicted from its neighbours](assets/sunshine_neighbours.svg)
+![Figure 9: The ranking holds for a generator predicted from its neighbours](assets/sunshine_neighbours.svg)
 
 ### Implied capacity from month to month
 
@@ -359,7 +384,7 @@ the weather models and ERA5. For each of those five products, the difference bet
 CAMS's is statistically significant at the 5% level. CAMS, however, implies a capacity 8%, 23%, and
 10% below its annual mean in November, December, and January. No other product strays more than 11%
 from its annual mean in any of those three months. December's figure rests on four Decembers, 22
-generator-months at generators that share their weather, and Figure 8 draws no interval.
+generator-months at generators that share their weather, and Figure 10 draws no interval.
 
 **This study cannot say which product is right about December.** December's sun stays low all day,
 which is where a satellite retrieval and this page's assumed panel geometry are both at their least
@@ -368,7 +393,7 @@ faces south at 30° tilt, which this page does not verify. Removing the seasonal
 several years of each calendar month, which a capacity estimator run on a short window does not
 have.
 
-![Figure 8: Of the six products tested, CAMS's implied capacity swings the most with the seasons](assets/sunshine_implied_capacity.svg)
+![Figure 10: Of the six products tested, CAMS's implied capacity swings the most with the seasons](assets/sunshine_implied_capacity.svg)
 
 ## What to use
 
@@ -380,7 +405,7 @@ against availability and coverage.**
   each generator's own metered output, and that fit absorbs any steady bias in a product. Capacity
   estimation cannot make that correction, so the evidence for capacity estimation is the
   implied-capacity measure alone. That measure assumes every panel faces south at 30° tilt, and the
-  November-to-January rule was chosen after seeing Figure 8. The implied-capacity measure is not the
+  November-to-January rule was chosen after seeing Figure 10. The implied-capacity measure is not the
   project's capacity estimator. Running that estimator with each product over rolling windows, and
   scoring it against known capacity, would test this recommendation directly.
 - **Training history: CAMS, with a caveat.** CAMS gives the most accurate description of past
