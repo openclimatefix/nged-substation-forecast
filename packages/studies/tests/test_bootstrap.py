@@ -3,7 +3,7 @@ from datetime import UTC, datetime
 import numpy as np
 import polars as pl
 import pytest
-from studies.bootstrap import bootstrap_difference, per_fold_differences
+from studies.bootstrap import bootstrap_absolute, bootstrap_difference, per_fold_differences
 
 # Months hold unequal numbers of rows, so a resample that lost the pairing on `seed`, or drew rows
 # rather than whole months, would land on a different interval.
@@ -101,6 +101,39 @@ def test_one_seed_is_enough():
 
     assert interval["difference"] == pytest.approx(0.25)
     assert interval["seed_spread"] == 0.0
+
+
+def test_bootstrap_absolute_reproduces_the_published_random_stream():
+    # Pinned from the implementation every published leaderboard interval was computed with.
+    interval = bootstrap_absolute(losses=_losses(seeds=(0, 1, 2)), arm="T", metric="loss")
+
+    assert interval == {
+        "value": -0.21010131421631167,
+        "lower_95": -1.1626544831593595,
+        "upper_95": 0.4557367201731675,
+        "seed_spread": 0.32966017229876704,
+        "n_rows": 14,
+        "n_months": 4,
+    }
+
+
+def test_bootstrap_absolute_does_not_depend_on_the_order_of_the_rows():
+    shuffled = _losses(seeds=(0, 1, 2)).sample(fraction=1.0, shuffle=True, seed=3)
+
+    assert bootstrap_absolute(losses=shuffled, arm="T", metric="loss") == bootstrap_absolute(
+        losses=_losses(seeds=(0, 1, 2)), arm="T", metric="loss"
+    )
+
+
+def test_bootstrap_absolute_ignores_the_other_arm():
+    losses = _losses(seeds=(0, 1, 2), difference=0.25)
+
+    interval = bootstrap_absolute(losses=losses, arm="T", metric="loss")
+
+    assert interval["value"] == pytest.approx(0.25)
+    assert interval["lower_95"] == pytest.approx(0.25)
+    assert interval["upper_95"] == pytest.approx(0.25)
+    assert interval["n_rows"] == 14
 
 
 def test_per_fold_differences_give_one_value_per_fold_in_fold_order():

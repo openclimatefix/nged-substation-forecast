@@ -1,13 +1,16 @@
-"""Draw the eight anonymised charts for the write-up on which product best describes sunshine.
+"""Draw the eleven anonymised charts for the write-up on which product best describes sunshine.
 
 One-off throwaway script for the charts in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/830>. The write-up is
 <https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-solar/>.
 
-**Every number is read from the report `weather_products.py` wrote**, so a chart cannot disagree
-with the page.
+**Every number a chart shares with the report is read from the report `weather_products.py`
+wrote**, so a chart cannot disagree with the page. Three charts also draw numbers the report does
+not print, computed from `losses.parquet` without refitting any model: the leaderboard's intervals,
+and the two "models work" charts' out-of-fold predictions and per-generator errors.
 
-Generators appear only as `A` to `F`, and no chart plots output.
+Generators appear only as `A` to `F`. No chart plots output in megawatts or carries a calendar date
+beside a generator's output.
 
 Run it with `uv run python studies/beam_diffuse_split/weather_product_charts.py`, after
 `weather_products.py`. Optimise each SVG with `npx svgo@4 --multipass --precision=1
@@ -26,21 +29,30 @@ import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 from sources import STUDY_DATA_DIR
+from studies.bootstrap import bootstrap_absolute
 from studies.charts import (
     CONTENT_WIDTH_PX,
     FAMILY_COLOURS,
+    LABEL_WIDTH_PX,
+    PLOT_WIDTH_PX,
     ContrastKey,
     ProductFamily,
     figure,
     flip_contrast,
     interval_panel,
+    leaderboard_panel,
     planning,
     report_contrasts,
     report_errors,
     select_contrasts,
+    ticks,
 )
 from weather_products import (
+    METRIC,
     OUTPUT_DIR_NAME,
+    PERCENTAGE_POINTS,
+    _common_rows,
+    _joined,
 )
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
@@ -71,6 +83,369 @@ FAMILIES: Final[dict[str, ProductFamily]] = {
 }
 """Each product's family, which sets its colour."""
 
+PANEL_WIDTH_PX: Final[int] = (CONTENT_WIDTH_PX - 32) // 3
+"""One "models work" time-series panel's width: 3 weeks side by side, 16 px apart."""
+
+PANEL_HEIGHT_PX: Final[int] = 110
+"""One "models work" time-series panel's height."""
+
+MINUTES_PER_DAY: Final[int] = 24 * 60
+
+MODELS_WORK_MONTHS: Final[tuple[int, ...]] = (4, 5, 6, 7, 8, 9)
+"""Solar week selection is restricted to these months, as `make_figures.py` does for the
+beam/diffuse study: a midwinter week has too few daylight hours to tell a clear day from a dull
+one.
+"""
+
+SOLAR_WEEK_CRITERIA: Final[tuple[tuple[str, str, bool], ...]] = (
+    ("Clearest week", "mean_output", True),
+    ("Dullest week", "mean_output", False),
+    ("Most variable week", "spread", True),
+)
+"""Solar weeks are picked in this order, each excluding the weeks already picked."""
+
+SOLAR_WEEK_DISPLAY_ORDER: Final[tuple[str, ...]] = (
+    "Clearest week",
+    "Most variable week",
+    "Dullest week",
+)
+"""Solar weeks are drawn easiest to hardest, left to right."""
+
+
+def _reconstruct_predicted(
+    *, losses: pl.DataFrame, measured: pl.DataFrame, arm: str
+) -> pl.DataFrame:
+    """Reconstruct one arm's scored out-of-fold prediction, averaged over its three fitting seeds.
+
+    `signed_error_capped_mw` is the prediction, held to the export cap as every score on the page
+    holds it, minus the measured value (`studies.cross_validation._losses`), so adding it back to
+    the measured value recovers the scored prediction. `losses` carries no measured value of its
+    own, so it is joined from the rows the study actually scored.
+
+    Args:
+        losses: Rows from `losses.parquet`, holding `arm`.
+        measured: One row per (site, time) with `power_mw`, from the rows the study scored.
+        arm: The arm being reconstructed.
+
+    Returns:
+        One row per (site, time) with `predicted_mw`.
+
+    Raises:
+        ValueError: If a loss row has no matching measured row.
+    """
+    arm_losses = losses.filter(pl.col("arm") == arm)
+    joined = arm_losses.select("site", "time", "signed_error_capped_mw").join(
+        measured.select("site", "time", "power_mw"), on=["site", "time"], how="inner"
+    )
+    if joined.height != arm_losses.height:
+        msg = (
+            f"{arm}: {arm_losses.height} loss rows but only {joined.height} matched a measured row"
+        )
+        raise ValueError(msg)
+    return joined.group_by("site", "time").agg(
+        predicted_mw=(pl.col("power_mw") + pl.col("signed_error_capped_mw")).mean()
+    )
+
+
+def _models_work_long_frame(
+    *, measured: pl.DataFrame, predicted: tuple[tuple[pl.DataFrame, str], ...]
+) -> pl.DataFrame:
+    """Join measured and predicted power into one long frame, as a percentage of capacity.
+
+    Args:
+        measured: One row per (site, time) with `power_mw` and `effective_capacity_mw`.
+        predicted: (predictions, series label) pairs, each from `_reconstruct_predicted`.
+
+    Returns:
+        One row per (site, time, series) with `percent`.
+    """
+    capacity = measured.select("site", "time", "effective_capacity_mw")
+    rows = [
+        measured.select(
+            "site",
+            "time",
+            percent=pl.col("power_mw").cast(pl.Float64) / pl.col("effective_capacity_mw") * 100,
+        ).with_columns(series=pl.lit("Measured"))
+    ]
+    rows.extend(
+        frame.join(capacity, on=["site", "time"], how="inner")
+        .select(
+            "site", "time", percent=pl.col("predicted_mw") / pl.col("effective_capacity_mw") * 100
+        )
+        .with_columns(series=pl.lit(label))
+        for frame, label in predicted
+    )
+    return pl.concat(rows)
+
+
+def _pick_weeks(
+    *,
+    hourly: pl.DataFrame,
+    min_hours: int,
+    agg: str,
+    criteria: tuple[tuple[str, str, bool], ...],
+) -> pl.DataFrame:
+    """Pick distinct weeks from an hourly output-fraction frame, pooled across every generator.
+
+    No weather product's own values enter this choice, so it cannot favour one: `output_frac` is
+    measured power over the generator's own capacity. A week is a candidate only if every
+    generator has a full 7 days of eligible hours in it.
+
+    Args:
+        hourly: One row per (site, time) with `output_frac`, already restricted to the hours and
+            months eligible for selection.
+        min_hours: The minimum eligible hours a (site, day) needs to count towards that day.
+        agg: `"sum"` for a daily total (solar) or `"mean"` for a daily average (wind).
+        criteria: (name, column, descending) triples, each picked in turn, excluding weeks already
+            picked, so every pick is distinct. `column` is `mean_output` or `spread`.
+
+    Returns:
+        One row per chosen week, with `week` and `label`, the criterion's name. The label carries
+        no date, so a published chart cannot be matched against public generation data.
+
+    Raises:
+        ValueError: If fewer candidate weeks exist than `criteria` has entries.
+    """
+    n_sites = hourly["site"].n_unique()
+    daily_agg = pl.col("output_frac").sum() if agg == "sum" else pl.col("output_frac").mean()
+    daily = (
+        hourly.with_columns(day=pl.col("time").dt.date())
+        .group_by("site", "day")
+        .agg(daily_output=daily_agg, hours=pl.len())
+        .filter(pl.col("hours") >= min_hours)
+    )
+    pooled = (
+        daily.group_by("day")
+        .agg(mean_daily=pl.col("daily_output").mean(), sites=pl.col("site").n_unique())
+        .filter(pl.col("sites") == n_sites)
+        .with_columns(week=pl.col("day").cast(pl.Datetime("us", "UTC")).dt.truncate("1w"))
+    )
+    complete = (
+        pooled.group_by("week")
+        .agg(
+            days=pl.len(),
+            mean_output=pl.col("mean_daily").mean(),
+            spread=pl.col("mean_daily").std(),
+        )
+        .filter(pl.col("days") == 7)
+    )
+    if complete.height < len(criteria):
+        msg = f"only {complete.height} candidate weeks for {len(criteria)} criteria"
+        raise ValueError(msg)
+    chosen: list[object] = []
+    picks: list[pl.DataFrame] = []
+    for name, column, descending in criteria:
+        row = (
+            complete.filter(~pl.col("week").is_in(chosen))
+            .sort(column, descending=descending)
+            .head(1)
+        )
+        chosen.append(row["week"][0])
+        picks.append(row.select("week", label=pl.lit(name)))
+    return pl.concat(picks)
+
+
+def _models_work_panel(
+    *,
+    long_frame: pl.DataFrame,
+    site: str,
+    week_label: str,
+    order: tuple[str, ...],
+    colours: tuple[str, ...],
+    show_legend: bool,
+    show_x_title: bool,
+) -> alt.Chart:
+    """Draw one generator's measured and predicted power across one chosen week.
+
+    The x axis counts days 1 to 7 of the week rather than showing calendar dates, and the lines
+    carry no ARIA text, so the published SVG holds no date and no per-point value that could match
+    a generator's series against public generation data.
+
+    Args:
+        long_frame: The output of `_models_work_long_frame`, joined to each row's chosen `week`
+            and its `label`.
+        site: The anonymised generator label to draw.
+        week_label: Which chosen week to draw.
+        order: The series in legend order, `Measured` first.
+        colours: One colour per entry of `order`.
+        show_legend: Whether this panel carries the shared legend.
+        show_x_title: Whether this panel names its x axis, which only the bottom row does.
+
+    Returns:
+        One panel.
+    """
+    rows = (
+        long_frame.filter((pl.col("site") == site) & (pl.col("label") == week_label))
+        .with_columns(
+            day_of_week=(pl.col("time") - pl.col("week")).dt.total_minutes() / MINUTES_PER_DAY
+        )
+        .with_columns(day=pl.col("day_of_week").floor())
+    )
+    return (
+        alt.Chart(rows)
+        .mark_line(strokeWidth=1.3, clip=True, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X(
+                "day_of_week:Q",
+                title="Day of the week" if show_x_title else None,
+                scale=alt.Scale(domain=(0, 7), nice=False, zero=False),
+                # One label at the middle of each day, numbered 1 to 7.
+                axis=alt.Axis(
+                    values=[day + 0.5 for day in range(7)],
+                    labelExpr="datum.value + 0.5",
+                    grid=False,
+                ),
+            ),
+            # One line per day, so a night the model was never scored on does not join two days.
+            detail=alt.Detail("day:Q"),
+            y=alt.Y(
+                "percent:Q", title=None, scale=alt.Scale(domain=(0, 120), clamp=True, nice=False)
+            ),
+            color=alt.Color(
+                "series:N",
+                sort=order,
+                scale=alt.Scale(domain=order, range=colours),
+                legend=(
+                    alt.Legend(orient="bottom", direction="horizontal", labelLimit=0, title=None)
+                    if show_legend
+                    else None
+                ),
+            ),
+            strokeDash=alt.StrokeDash("series:N", sort=order, legend=None),
+        )
+        .properties(
+            width=PANEL_WIDTH_PX,
+            height=PANEL_HEIGHT_PX,
+            title=alt.TitleParams(f"Generator {site}: {week_label}", anchor="start", fontSize=11),
+        )
+    )
+
+
+def _models_work_timeseries(
+    *,
+    long_frame: pl.DataFrame,
+    sites: tuple[str, ...],
+    week_order: tuple[str, ...],
+    order: tuple[str, ...],
+    colours: tuple[str, ...],
+    number: int,
+    title: str,
+    subtitle: list[str],
+) -> alt.VConcatChart:
+    """Draw predicted against measured power, one row per generator, one column per chosen week.
+
+    Args:
+        long_frame: The output of `_models_work_long_frame`, joined to each row's chosen `week`
+            and its `label`.
+        sites: The anonymised generator labels, in row order.
+        week_order: The chosen weeks' labels, in column order.
+        order: The series in legend order, `Measured` first.
+        colours: One colour per entry of `order`.
+        number: The figure's number on the page.
+        title: The finding the figure shows.
+        subtitle: Short lines naming the quantity, its scope, and what a line means.
+
+    Returns:
+        The figure.
+    """
+    rows = [
+        alt.hconcat(
+            *(
+                _models_work_panel(
+                    long_frame=long_frame,
+                    site=site,
+                    week_label=week_label,
+                    order=order,
+                    colours=colours,
+                    show_legend=row_index == 0 and week_index == 0,
+                    show_x_title=row_index == len(sites) - 1,
+                )
+                for week_index, week_label in enumerate(week_order)
+            ),
+            spacing=16,
+        )
+        for row_index, site in enumerate(sites)
+    ]
+    return figure(panels=rows, number=number, figure_planning=None, title=title, subtitle=subtitle)
+
+
+def _models_work_error_chart(
+    *,
+    losses: pl.DataFrame,
+    arm_suffix: str,
+    sites: tuple[str, ...],
+    names: dict[str, str],
+    errors: dict[str, float],
+    x_domain: tuple[float, float],
+    number: int,
+    title: str,
+    subtitle: list[str],
+) -> alt.VConcatChart:
+    """Draw each product's mean absolute error at each generator, one dot per (product, generator).
+
+    The dots carry no ARIA text, so the SVG does not say which dot is which generator.
+
+    Args:
+        losses: Every arm's rows from `losses.parquet`, already restricted to the setting that
+            `errors` was computed on.
+        arm_suffix: The suffix that turns a product key into its arm name, such as `_global`.
+        sites: The anonymised generator labels, in offset order.
+        names: Each product's name as the page writes it.
+        errors: The pooled mean absolute error of each product to draw, which sets the row order.
+        x_domain: The x axis's range.
+        number: The figure's number on the page.
+        title: The finding the figure shows.
+        subtitle: Short lines naming the quantity and what a dot means.
+
+    Returns:
+        The figure.
+    """
+    order = sorted(errors, key=errors.__getitem__)
+    per_site = (
+        losses.filter(pl.col("arm").is_in([f"{product}{arm_suffix}" for product in order]))
+        .group_by("arm", "site")
+        .agg(mae_percent=pl.col(METRIC).mean() * PERCENTAGE_POINTS)
+        .with_columns(product=pl.col("arm").str.strip_suffix(arm_suffix))
+        .with_columns(
+            name=pl.col("product").replace_strict(names),
+            family=pl.col("product").replace_strict(FAMILIES),
+        )
+    )
+    families = [family for family in FAMILY_COLOURS if family in set(per_site["family"])]
+    panel = (
+        alt.Chart(per_site)
+        .mark_point(filled=True, size=70, opacity=0.85, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            y=alt.Y(
+                "name:N",
+                sort=[names[product] for product in order],
+                title=None,
+                axis=alt.Axis(
+                    labelLimit=LABEL_WIDTH_PX, minExtent=LABEL_WIDTH_PX, maxExtent=LABEL_WIDTH_PX
+                ),
+            ),
+            x=alt.X(
+                "mae_percent:Q",
+                title="Mean absolute error (% of capacity; smaller is better)",
+                scale=alt.Scale(domain=list(x_domain), nice=False, zero=False),
+                axis=alt.Axis(values=ticks(x_domain=x_domain), format=".1f"),
+            ),
+            yOffset=alt.YOffset("site:N", sort=list(sites)),
+            color=alt.Color(
+                "family:N",
+                scale=alt.Scale(
+                    domain=families, range=[FAMILY_COLOURS[family] for family in families]
+                ),
+                legend=alt.Legend(title="Product type", orient="bottom"),
+            ),
+        )
+        .properties(width=PLOT_WIDTH_PX, height=len(order) * (6 * len(sites) + 14))
+    )
+    return figure(
+        panels=[panel], number=number, figure_planning=None, title=title, subtitle=subtitle
+    )
+
+
 SECTION_DECIDING: Final[str] = "Deciding contrasts, named before the run"
 SECTION_AGAINST_ERA5: Final[str] = "Every product against ERA5, by scope (exploratory)"
 SECTION_POST_ONLY: Final[str] = "The post scope, fitted on post-upgrade rows alone"
@@ -98,10 +473,18 @@ DECIDING: Final[tuple[tuple[str, str], ...]] = (
 HEADLINE_DOMAIN: Final[tuple[float, float]] = (-4.5, 1.0)
 """The x range of the headline's left panel."""
 
+LEADERBOARD_DOMAIN: Final[tuple[float, float]] = (4.0, 9.5)
+"""The x range of the leaderboard, covering every product's 95% interval with a small margin."""
+
 CAPACITY: Final[str] = "Capacity is each generator's 99th-percentile output."
 DOTS: Final[str] = "Dot: estimate. Line: 95% interval from resampling whole months."
 SCOPE: Final[str] = "Six solar farms in Lincolnshire, December 2022 to September 2026."
 X_TITLE: Final[str] = "Difference in mean absolute error (points of capacity)"
+LEADERBOARD_X_TITLE: Final[str] = "Mean absolute error (% of capacity; smaller is better)"
+LEADERBOARD_WIDTH: Final[str] = (
+    "The intervals are wide mainly because every product's error swings together from month to "
+    "month, a swing that Figure 2's paired contrasts cancel."
+)
 
 
 def _product(arm: str) -> str:
@@ -151,6 +534,55 @@ def _served_contrast_name(*, treatment: str, reference: str) -> str:
     return name.replace("UKV", "Open-Meteo's hourly UKV")
 
 
+def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
+    """Draw every product's own mean absolute error, best first, with its 95% interval.
+
+    Bootstraps each product's absolute error from `losses.parquet` directly, the same
+    month-and-seed resampling `weather_products.py` uses for every contrast, because the report
+    prints only each product's point estimate, not its interval. No model is refitted.
+
+    Args:
+        losses: Every arm's rows from `losses.parquet`.
+        errors: Each product's pooled mean absolute error, read from the report.
+
+    Returns:
+        Figure 1.
+    """
+    order = sorted(errors, key=errors.__getitem__)
+    records = []
+    for product in order:
+        arm = f"{product}_global"
+        interval = bootstrap_absolute(losses=losses, arm=arm, metric=METRIC)
+        value = interval["value"] * PERCENTAGE_POINTS
+        if round(value, 3) != errors[product]:
+            msg = f"{product}: bootstrapped {value:.3f} but the report says {errors[product]}"
+            raise ValueError(msg)
+        records.append(
+            {
+                "label": _served_name(product),
+                "family": FAMILIES[product],
+                "value": value,
+                "lower_95": interval["lower_95"] * PERCENTAGE_POINTS,
+                "upper_95": interval["upper_95"] * PERCENTAGE_POINTS,
+            }
+        )
+    rows = pl.DataFrame(records)
+    panel = leaderboard_panel(rows=rows, x_domain=LEADERBOARD_DOMAIN, x_title=LEADERBOARD_X_TITLE)
+    return figure(
+        panels=[panel],
+        number=1,
+        figure_planning=None,
+        title="CAMS has the lowest error of the six products tested, and ERA5 the highest",
+        subtitle=[
+            "Each product's own mean absolute error, sorted best first.",
+            DOTS,
+            LEADERBOARD_WIDTH,
+            CAPACITY,
+            SCOPE,
+        ],
+    )
+
+
 def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
     """Draw every product against ERA5 above the four planned contrasts.
 
@@ -159,7 +591,7 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         errors: Each product's mean absolute error.
 
     Returns:
-        Figure 1.
+        Figure 2.
     """
     order = sorted(errors, key=errors.__getitem__)
     against_era5 = select_contrasts(
@@ -211,9 +643,9 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
     )
     return figure(
         panels=[left, right],
-        number=1,
+        number=2,
         figure_planning=figure_planning,
-        title="CAMS describes past sunshine best of the six products tested, by a wide margin",
+        title="CAMS beats the next best product, ICON-D2, by more than 2 points of capacity",
         subtitle=[
             (
                 "Top: each product against ERA5 (exploratory); each label gives the product's own "
@@ -234,7 +666,7 @@ def _cams_breakdown(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 2.
+        Figure 5.
     """
     groups = {
         "Whole record": [("all", "All hours", SECTION_DECIDING)],
@@ -278,7 +710,7 @@ def _cams_breakdown(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     ]
     return figure(
         panels=panels,
-        number=2,
+        number=5,
         figure_planning=figure_planning,
         title=(
             "CAMS's margin over ICON-D2 holds at every generator, in every season, and every year"
@@ -328,7 +760,7 @@ def _icon_d2_leads(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatC
         report_text: The report.
 
     Returns:
-        Figure 3.
+        Figure 6.
     """
     domain = (-2.0, 0.5)
     hourly_rows = _hourly_rows(contrasts=contrasts)
@@ -378,7 +810,7 @@ def _icon_d2_leads(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatC
     )
     return figure(
         panels=[hourly, summary],
-        number=3,
+        number=6,
         figure_planning=figure_planning,
         title="ICON-D2's advantage over ICON-EU shrinks within hours of each run",
         subtitle=[
@@ -403,7 +835,7 @@ def _icon_eu_rivals(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 4.
+        Figure 7.
     """
     icon_global = select_contrasts(
         contrasts=contrasts,
@@ -474,7 +906,7 @@ def _icon_eu_rivals(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     ]
     return figure(
         panels=panels,
-        number=4,
+        number=7,
         figure_planning=figure_planning,
         title=(
             "ICON-EU does not beat UKV rebuilt from its snapshots, but beats ICON global and "
@@ -498,7 +930,7 @@ def _ukv_against_era5(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 5.
+        Figure 8.
     """
     conditions = ("Open-Meteo's hourly value", "Rebuilt from its snapshots")
     scopes = {
@@ -531,7 +963,7 @@ def _ukv_against_era5(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     )
     return figure(
         panels=[panel],
-        number=5,
+        number=8,
         figure_planning=figure_planning,
         title="UKV rebuilt from its snapshots beats ERA5; Open-Meteo's hourly UKV against ERA5 is "
         "unresolved",
@@ -554,7 +986,7 @@ def _own_beam(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         errors: Each product's mean absolute error, which sets the row order.
 
     Returns:
-        Figure 6.
+        Figure 9.
     """
     order = sorted(errors, key=errors.__getitem__)
     rows = _rows(
@@ -576,7 +1008,7 @@ def _own_beam(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
     )
     return figure(
         panels=[panel],
-        number=6,
+        number=9,
         figure_planning=figure_planning,
         title="Every product except ERA5 gains 0.03 to 0.11 points from its own direct beam",
         subtitle=[
@@ -597,7 +1029,7 @@ def _neighbours(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 7.
+        Figure 10.
     """
     conditions = (
         "Trained on the generator itself",
@@ -635,7 +1067,7 @@ def _neighbours(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     )
     return figure(
         panels=[panel],
-        number=7,
+        number=10,
         figure_planning=figure_planning,
         title="The ranking holds for a generator predicted from its neighbours",
         subtitle=[
@@ -687,7 +1119,7 @@ def _implied_capacity_chart(*, report_text: str) -> alt.VConcatChart:
         report_text: The report.
 
     Returns:
-        Figure 8.
+        Figure 11.
     """
     rows = _implied_capacity_rows(report_text=report_text).with_columns(
         family=pl.col("product").replace_strict(FAMILIES),
@@ -728,7 +1160,7 @@ def _implied_capacity_chart(*, report_text: str) -> alt.VConcatChart:
     grid = [alt.hconcat(*panels[i : i + 2], spacing=24) for i in (0, 2, 4)]
     return figure(
         panels=grid,
-        number=8,
+        number=11,
         figure_planning=None,
         title=(
             "Of the six products tested, CAMS's implied capacity swings the most with the seasons"
@@ -751,16 +1183,132 @@ def _implied_capacity_chart(*, report_text: str) -> alt.VConcatChart:
     )
 
 
+MODELS_WORK_SITES: Final[tuple[str, ...]] = tuple("ABCDEF")
+"""The six anonymised solar generator labels, in the order every "models work" panel lists them."""
+
+MODELS_WORK_PRODUCTS: Final[tuple[str, str]] = ("cams", "era5")
+"""The products whose XGBoost models the "models work" time series draws: CAMS, which has the lowest
+pooled mean absolute error in the report, and ERA5, the reference every product is measured
+against.
+"""
+
+MODELS_WORK_MIN_DAYLIGHT_HOURS: Final[int] = 8
+"""A (generator, day) needs at least this many daylight hours to count towards week selection."""
+
+
+def _models_work_frame() -> pl.DataFrame:
+    """Rebuild the exact rows and measured power `weather_products.py` scored, without refitting.
+
+    Calls the row-building functions `weather_products.py`'s own `main` calls, so the rows match
+    the study exactly; nothing here fits a model.
+
+    Returns:
+        One row per (site, time) the pooled run scored, carrying `power_mw`,
+        `effective_capacity_mw`, and `extraterrestrial_horizontal_w_m2`.
+    """
+    return _common_rows(frame=_joined()).select(
+        "site", "time", "power_mw", "effective_capacity_mw", "extraterrestrial_horizontal_w_m2"
+    )
+
+
+def _solar_models_work(
+    *, losses: pl.DataFrame, errors: dict[str, float]
+) -> tuple[alt.VConcatChart, alt.VConcatChart]:
+    """Draw the solar "models work" figures: the out-of-fold time series, and error per generator.
+
+    Args:
+        losses: Every arm's rows from `losses.parquet`.
+        errors: Each product's pooled mean absolute error.
+
+    Returns:
+        Figures 3 and 4.
+    """
+    measured = _models_work_frame()
+    order = ("Measured", *(f"XGBoost model given {NAMES[p]}" for p in MODELS_WORK_PRODUCTS))
+    predicted = tuple(
+        (_reconstruct_predicted(losses=losses, measured=measured, arm=f"{product}_global"), label)
+        for product, label in zip(MODELS_WORK_PRODUCTS, order[1:], strict=True)
+    )
+    hourly = measured.filter(
+        (pl.col("extraterrestrial_horizontal_w_m2") > 0)
+        & pl.col("time").dt.month().is_in(MODELS_WORK_MONTHS)
+    ).with_columns(
+        output_frac=pl.col("power_mw").cast(pl.Float64) / pl.col("effective_capacity_mw")
+    )
+    weeks = _pick_weeks(
+        hourly=hourly,
+        min_hours=MODELS_WORK_MIN_DAYLIGHT_HOURS,
+        agg="sum",
+        criteria=SOLAR_WEEK_CRITERIA,
+    )
+    long_frame = (
+        _models_work_long_frame(measured=measured, predicted=predicted)
+        .with_columns(week=pl.col("time").dt.truncate("1w"))
+        .join(weeks, on="week", how="inner")
+    )
+    timeseries = _models_work_timeseries(
+        long_frame=long_frame,
+        sites=MODELS_WORK_SITES,
+        week_order=SOLAR_WEEK_DISPLAY_ORDER,
+        order=order,
+        colours=(ocf.TEXT, *(FAMILY_COLOURS[FAMILIES[p]] for p in MODELS_WORK_PRODUCTS)),
+        number=3,
+        title=(
+            "An XGBoost model given CAMS tracks measured power at every generator, across a "
+            "clear, a variable, and a dull week"
+        ),
+        subtitle=[
+            (
+                "Out-of-fold power as a percentage of the generator's own capacity, each "
+                "prediction held to the export cap as the scores are."
+            ),
+            (
+                "Weeks are picked from measured power alone, pooled over the six generators, "
+                "April to September: the clearest has the most output, the dullest the least, and "
+                "the most variable the largest swing in daily output."
+            ),
+            CAPACITY,
+            SCOPE,
+        ],
+    )
+    error = _models_work_error_chart(
+        losses=losses,
+        arm_suffix="_global",
+        sites=MODELS_WORK_SITES,
+        names={product: _served_name(product) for product in NAMES},
+        errors=errors,
+        x_domain=(4.0, 11.5),
+        number=4,
+        title=(
+            "CAMS has the lowest error at each of the six generators, and ICON-D2 the second lowest"
+        ),
+        subtitle=[
+            (
+                "Each dot is one generator's mean absolute error given one product. The other "
+                "four products reorder between generators."
+            ),
+            CAPACITY,
+            SCOPE,
+        ],
+    )
+    return timeseries, error
+
+
 def main() -> int:
-    """Read the report, compute the new numbers, and write the eight SVGs."""
+    """Read the report, compute the new numbers, and write the eleven SVGs."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     argparse.ArgumentParser(description=__doc__).parse_args()
     report_path = RESULTS_DIR / "report.md"
     report_text = report_path.read_text()
     contrasts = report_contrasts(report_path=report_path)
     errors = report_errors(report_path=report_path, column="Global only")
+    losses = pl.read_parquet(RESULTS_DIR / "losses.parquet")
+    models_work_timeseries, models_work_error = _solar_models_work(losses=losses, errors=errors)
     charts = {
+        "sunshine_leaderboard": _leaderboard(losses=losses, errors=errors),
         "sunshine_headline": _headline(contrasts=contrasts, errors=errors),
+        "sunshine_models_work_timeseries": models_work_timeseries,
+        "sunshine_models_work_error": models_work_error,
         "sunshine_cams_breakdown": _cams_breakdown(contrasts=contrasts),
         "sunshine_icon_d2_leads": _icon_d2_leads(contrasts=contrasts, report_text=report_text),
         "sunshine_icon_eu_rivals": _icon_eu_rivals(contrasts=contrasts),

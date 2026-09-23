@@ -643,6 +643,96 @@ def interval_panel(
     return alt.vconcat(*keys, panel, spacing=8) if keys else panel
 
 
+def leaderboard_panel(
+    *, rows: pl.DataFrame, x_domain: tuple[float, float], x_title: str, width: int = PLOT_WIDTH_PX
+) -> alt.LayerChart | alt.VConcatChart:
+    """Draw one product per row, best first, as a dot at its own error with a 95% interval.
+
+    Unlike `interval_panel`, a leaderboard row is an absolute quantity, not a difference from a
+    reference arm, so it draws no zero rule and no "better than" direction label: the axis title
+    states the direction in words instead, as `x_title` already must.
+
+    Args:
+        rows: One row per product, with `label`, `family` (a `ProductFamily`), `value`,
+            `lower_95` and `upper_95`, in the order to draw them top to bottom (best first).
+        x_domain: The x axis's range, set explicitly so the panel and any panel sharing its scale
+            agree.
+        x_title: The x axis's title, naming the quantity, its unit, and which direction is
+            better, such as "Mean absolute error (% of capacity; smaller is better)".
+        width: The plot's width in pixels.
+
+    Returns:
+        The panel, under its family key where it holds more than one family.
+    """
+    families = [family for family in FAMILY_COLOURS if family in set(rows["family"].to_list())]
+    data = rows.with_columns(pl.col("value", "lower_95", "upper_95").round(3))
+    labels = data["label"].to_list()
+    lines = {label: wrapped(text=label, width=_LABEL_CHARACTERS) for label in labels}
+    y = alt.Y(
+        "label:N",
+        sort=labels,
+        title=None,
+        axis=alt.Axis(
+            labelExpr=f"{json.dumps(lines)}[datum.value]",
+            labelLimit=LABEL_WIDTH_PX,
+            minExtent=LABEL_WIDTH_PX,
+            maxExtent=LABEL_WIDTH_PX,
+            labelPadding=6,
+            ticks=False,
+            domain=False,
+        ),
+    )
+    colour = alt.Color(
+        "family:N",
+        scale=alt.Scale(domain=list(FAMILY_COLOURS), range=list(FAMILY_COLOURS.values())),
+        legend=None,
+    )
+    x_title_lines = wrapped(text=x_title, width=_AXIS_TITLE_CHARACTERS)
+    x_scale = alt.Scale(domain=list(x_domain), nice=False, zero=False)
+    x_axis = alt.Axis(values=ticks(x_domain=x_domain), format=".2~f")
+    tooltip = [
+        alt.Tooltip("label:N", title="Product"),
+        alt.Tooltip("value:Q", title="Mean absolute error"),
+        alt.Tooltip("lower_95:Q", title="Lower 95%"),
+        alt.Tooltip("upper_95:Q", title="Upper 95%"),
+    ]
+    interval = (
+        alt.Chart(data)
+        .mark_rule(strokeWidth=2, clip=True, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("lower_95:Q", scale=x_scale, title=x_title_lines, axis=x_axis),
+            x2="upper_95:Q",
+            y=y,
+            color=colour,
+        )
+    )
+    point = (
+        alt.Chart(data)
+        .mark_point(filled=True, size=_POINT_SIZE, opacity=1, clip=True, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("value:Q", scale=x_scale, title=x_title_lines, axis=x_axis),
+            y=y,
+            color=colour,
+            tooltip=tooltip,
+        )
+    )
+    panel = alt.LayerChart(
+        layer=[interval, point],
+        width=width,
+        height=alt.Step(_ROW_STEP_PX * max(len(line) for line in lines.values())),
+    )
+    if len(families) <= 1:
+        return panel
+    key = _key(
+        title="Product type",
+        labels=families,
+        shapes=["circle"] * len(families),
+        filled=[True] * len(families),
+        colours=[FAMILY_COLOURS[family] for family in families],
+    )
+    return alt.vconcat(key, panel, spacing=8)
+
+
 def ticks(*, x_domain: tuple[float, float]) -> list[float]:
     """Return round tick values inside an x range, 4 to 10 of them.
 

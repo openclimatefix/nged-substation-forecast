@@ -19,10 +19,19 @@ history are two of the parts of this project that read past weather, described i
 makes no recommendation. The evidence is three wind farms in flat Lincolnshire, and 50,734
 generator-hours from August 2024 to September 2026.
 
-![Figure 1: UKV and ICON-D2 describe past wind best of the five products tested](assets/wind_headline.svg)
+![Figure 1: ICON-D2 and UKV have the lowest errors of the five products tested, and ICON global the highest](assets/wind_leaderboard.svg)
 
-In Figure 1 the top panel's intervals are against ERA5, so two products whose intervals overlap
-there may still differ; the bottom panel compares the named pairs directly.
+![Figure 2: UKV, ICON-D2, and ICON-EU each beat ERA5 by a margin statistically significant at the
+5% level](assets/wind_headline.svg)
+
+**Figure 1's intervals are wide mainly because every product's error rises and falls together from
+month to month.** Some months are harder to describe than others for every product, and resampling
+whole months carries that shared swing into each product's own interval. The three generators also
+share their weather, so each interval rests on 26 months rather than on thousands of independent
+hours. Figure 2 pairs two products on the same hours, which cancels the shared swing. Two products
+whose intervals overlap in Figure 1, or in the top panel of Figure 2, can therefore still differ by
+a margin that is statistically significant at the 5% level. Only a contrast pairing those two
+products tests them directly, and the bottom panel of Figure 2 holds the four planned ones.
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
@@ -180,6 +189,37 @@ nearest grid cell over land.**
 
 ## Results
 
+### The XGBoost models work
+
+**Given either ICON-D2 or ERA5, the XGBoost model follows the shape of measured power at every
+generator, in a windy, a variable, and a calm week.** The two predictions run close together,
+because ICON-D2's advantage over ERA5 is a small fraction of the error. Figure 3 plots both XGBoost
+models' out-of-fold predictions against measured power. At Generator W3 both predictions run well
+above measured power for days at a time, most visibly in the windiest week. Generator W3's output
+swings for months at a time with turbine availability that no product records, as described in
+[UKV and ICON-D2 describe past wind
+best](#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested).
+
+**The three weeks are chosen by a rule that reads measured power alone, so the choice cannot favour
+ICON-D2 or ERA5.** The rule pools the three generators. The windiest week is the one in which the
+generators' mean output was highest relative to their own capacity, and the calmest week the one in
+which it was lowest. The most variable week is the one whose daily mean output swings the most from
+day to day. Figure 3 shows each week as days 1 to 7, with no calendar dates, so that a generator's
+hourly output cannot be matched against public generation data.
+
+![Figure 3: An XGBoost model given ICON-D2 follows measured power at every generator, across a
+windy, a variable, and a calm week](assets/wind_models_work_timeseries.svg)
+
+**ICON-D2, UKV, ICON-EU, and ERA5 rank in the same order at each of the three generators.** Figure 4
+plots each product's mean absolute error at each generator separately, one dot per product per
+generator. ICON global is left out of Figure 4, because its dots would show which generator carries
+the steps in ICON global's served wind, described in [About half of ICON global's gap to ICON-EU is
+a pair of steps in its served
+wind](#about-half-of-icon-globals-gap-to-icon-eu-is-a-pair-of-steps-in-its-served-wind), and this
+page does not name that generator.
+
+![Figure 4: ICON-D2, UKV, ICON-EU, and ERA5 rank in the same order at each of the three generators](assets/wind_models_work_error.svg)
+
 ### UKV and ICON-D2 describe past wind best of the five products tested
 
 **UKV beats ERA5 by 0.44 points [0.24, 0.63] across the window, and ICON-D2 beats ERA5 by 0.58
@@ -201,7 +241,7 @@ ICON-D2 beats ERA5 by 0.77 points [0.63, 0.90] from April to September and by 0.
 0.64] from October to March. The seasonal split rests on parts of three summers and two winters, and
 its cause was not examined.
 
-![Figure 2: UKV's and ICON-D2's advantage over ERA5 is larger from April to September](assets/wind_half_years.svg)
+![Figure 5: UKV's and ICON-D2's advantage over ERA5 is larger from April to September](assets/wind_half_years.svg)
 
 **UKV's advantage over ERA5 is larger since its upgrade, and ICON-D2's is not.** Since the upgrade
 UKV beats ERA5 by 0.79 points [0.63, 0.97], against 0.53 points [0.29, 0.72] over the same months of
@@ -214,7 +254,7 @@ generators.** At the third generator the advantage is not statistically signific
 That generator's output swings for months at a time against every product's wind, which this page
 attributes to turbine availability the feed does not record.
 
-![Figure 3: UKV's advantage over ERA5 is statistically significant at the 5% level at two of the three
+![Figure 6: UKV's advantage over ERA5 is statistically significant at the 5% level at two of the three
 generators](assets/wind_per_generator.svg)
 
 ### ICON-D2 leads UKV across the window, but not since UKV's upgrade
@@ -241,7 +281,7 @@ every comparison in this paragraph was chosen after the first run.
 weather at its boundaries from ICON-EU, and the three farms sit about 150 to 200 km east of
 ICON-D2's western boundary.
 
-![Figure 4: ICON-D2 leads UKV across the window, but not since UKV's upgrade](assets/wind_icon_d2_against_ukv.svg)
+![Figure 7: ICON-D2 leads UKV across the window, but not since UKV's upgrade](assets/wind_icon_d2_against_ukv.svg)
 
 ### ICON-EU beats ERA5 at 80 m and at 100 m, mostly from April to September
 
@@ -272,7 +312,7 @@ of the three periods each hour falls in cuts ICON global's deficit to ICON-EU at
 same flag lowers ICON-EU's error by 0.06 points and ERA5's by 0.07, so every comparison with the
 flag gives the flag to both products.
 
-![Figure 5: About half of ICON global's gap to ICON-EU is a pair of steps in its served wind at one
+![Figure 8: About half of ICON global's gap to ICON-EU is a pair of steps in its served wind at one
 generator](assets/wind_icon_global_steps.svg)
 
 **The steps may belong to the archive rather than to ICON global, and their cause is not
