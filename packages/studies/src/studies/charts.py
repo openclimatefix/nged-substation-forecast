@@ -129,7 +129,13 @@ _ZERO_LABEL_ROOM: Final[float] = 0.25
 
 _INTERVAL: Final[re.Pattern[str]] = re.compile(r"^\[(\S+), (\S+)\]$")
 _FOLDS: Final[re.Pattern[str]] = re.compile(r"^(\d+) of (\d+)$")
-_ROW_STEP_PX: Final[int] = 22
+_ROW_STEP_PX: Final[int] = 40
+"""Each y-axis label's height, fixed rather than scaled by any row's wrapped label, which
+multiplying by the panel's longest label inflated every row to the tallest one's height.
+
+Where a label carries more than one condition, offset side by side, Vega-Lite's step size is the
+height of one (label, condition) position, not one label, so `interval_panel` divides this by the
+number of conditions sharing a label, and the conditions' bands add back up to this height."""
 _POINT_SIZE: Final[int] = 70
 _PANEL_TITLE_PX: Final[int] = ocf.font_size(style="Body Large", body_px=11)
 _KEY_TITLE_PX: Final[int] = ocf.font_size(style="Body", body_px=11)
@@ -609,10 +615,11 @@ def interval_panel(
         better_direction=better_direction,
         labelled=reference_labels,
     )
+    offset_positions = len(conditions) if "yOffset" in encodings else 1
     panel = alt.LayerChart(
         layer=[*reference, interval, *points],
         width=width,
-        height=alt.Step(_ROW_STEP_PX * max(len(line) for line in lines.values())),
+        height=alt.Step(_ROW_STEP_PX / offset_positions),
         title=alt.TitleParams(panel_title, anchor="start", frame="group", fontSize=_PANEL_TITLE_PX),
     )
     keys = []

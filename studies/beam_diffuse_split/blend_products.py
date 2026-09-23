@@ -45,6 +45,9 @@ of capacity, plus Gaussian noise large enough that the column carries only part 
 
 Run it with `uv run python studies/beam_diffuse_split/blend_products.py`, after both weather-product
 studies have been run. `--resume` reuses the per-arm fits a previous run left in `fits/`.
+`--report-only` rebuilds `report.md` from `losses.parquet`, `stack_weights.parquet` and
+`intervals.parquet` already on disk, fitting nothing; move the current `report.md` to a
+`superseded/` subfolder first, since this overwrites it.
 """
 
 import argparse
@@ -56,7 +59,7 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from itertools import pairwise
 from pathlib import Path
-from typing import Final, Literal, TypedDict
+from typing import Final, Literal, TypedDict, cast
 
 import numpy as np
 import polars as pl
@@ -66,7 +69,7 @@ from build_dataset import POWER_DELTA_URI, _wind_sites
 from deltalake import DeltaTable
 from export_cap import with_export_cap
 from run_experiment import SHARED_FEATURES as SOLAR_SHARED_FEATURES
-from run_experiment import Job, _add_time_features, _run_all
+from run_experiment import Job, _add_time_features, run_all
 from sources import STUDY_DATA_DIR
 from studies.blending import PERMUTED_SUFFIX, climatology_permutation, stacked_errors
 from studies.bootstrap import bootstrap_difference, fold_t_interval, per_fold_differences
@@ -158,6 +161,13 @@ LATENCY_HOURS: Final[dict[str, float]] = {
     "icon_global": 3.5,
 }
 """How long after an hour each product's value for it is available, from the solar page's table."""
+
+ENRICHED_LATENCY_HOURS: Final[dict[DomainType, float]] = {"solar": 1.0, "wind": 2.0}
+"""How much later than its slowest product an enriched blend needs its neighbouring hours.
+
+The recommended blends are enriched, and each reads the hour after the scored hour as well: the
+irradiance context's furthest forward offset for solar (`with_irradiance_context`), and the wind
+context's furthest forward offset for wind (`with_wind_context`, `HUB_OFFSETS_HOURS`)."""
 
 HISTORY_ONLY_PRODUCTS: Final[frozenset[str]] = frozenset({"cams", "era5"})
 """Products too late for a live service: CAMS arrives about a day late and ERA5 about 5 days."""
@@ -328,11 +338,11 @@ def _solar_published_jobs() -> tuple[Job, ...]:
     """Return the published solar study's pooled arms, less the two the enriched arms reproduce.
 
     Returns:
-        The jobs, as `weather_products._jobs` builds them.
+        The jobs, as `weather_products.jobs` builds them.
     """
     return tuple(
         job
-        for job in weather_products._jobs()
+        for job in weather_products.jobs()
         if job[0] not in ("icon_eu_ctx_global", "ukv_trap_ctx_global")
     )
 
@@ -345,11 +355,11 @@ def _wind_published_jobs() -> tuple[Job, ...]:
     left out too.
 
     Returns:
-        The jobs, as `wind_products._jobs` builds them.
+        The jobs, as `wind_products.jobs` builds them.
     """
     return tuple(
         job
-        for job in wind_products._jobs()
+        for job in wind_products.jobs()
         if not job[0].endswith("_step") and job[1] not in wind_products.ROW_SET_SETTINGS
     )
 
@@ -592,8 +602,16 @@ def _blend_features(*, domain: Domain, best: BestType) -> dict[str, tuple[str, .
                 f"{column}{suffix}" for p in blend.products if p != kept for column in columns(p)
             )
             every = tuple(column for p in blend.products for column in columns(p))
-            arms[_arm(blend.name, variant, "xgb")] = (*shared, *every)
-            arms[_arm(blend.name, variant, "control")] = (*shared, *real, *permuted)
+            xgb_arm = _arm(blend.name, variant, "xgb")
+            control_arm = _arm(blend.name, variant, "control")
+            arms[xgb_arm] = (*shared, *every)
+            arms[control_arm] = (*shared, *real, *permuted)
+            if variant == "rich" and len(arms[control_arm]) != len(arms[xgb_arm]):
+                msg = (
+                    f"{control_arm} has {len(arms[control_arm])} columns, {xgb_arm} has "
+                    f"{len(arms[xgb_arm])}: the control must keep every column the blend has"
+                )
+                raise ValueError(msg)
             arms[_arm(blend.name, variant, "mean")] = (
                 *shared,
                 *_mean_columns(domain=domain, blend=blend, variant=variant),
@@ -618,7 +636,7 @@ def _single_jobs(*, domain: Domain) -> list[Job]:
         domain: The domain.
 
     Returns:
-        The jobs `run_experiment._run_all` takes.
+        The jobs `run_experiment.run_all` takes.
     """
     jobs = list(domain.published_jobs)
     published = {(job[0], job[1]) for job in jobs}
@@ -641,7 +659,7 @@ def _blend_jobs(*, domain: Domain, best: BestType) -> list[Job]:
         best: Each set's enriched best single.
 
     Returns:
-        The jobs `run_experiment._run_all` takes.
+        The jobs `run_experiment.run_all` takes.
     """
     features = _blend_features(domain=domain, best=best)
     jobs: list[Job] = [
@@ -694,7 +712,7 @@ def _fitted(*, frame: pl.DataFrame, domain: Domain, jobs: list[Job], resume: boo
     ]
     _LOG.info("%s: %d of %d fits to run", domain.name, len(missing), len(jobs))
     if missing:
-        fresh = _run_all(dataset=frame, jobs=missing)
+        fresh = run_all(dataset=frame, jobs=missing)
         for arm, setting, *_ in missing:
             path = _fit_path(domain=domain, arm=arm, setting=setting)
             path.parent.mkdir(parents=True, exist_ok=True)
@@ -1478,15 +1496,15 @@ def _usable_from(*, domain: Domain, blend: BlendSet) -> str:
 
 
 def _latency_label(*, hours: float) -> str:
-    """Return a latency in words, in days once it reaches one.
+    """Return a latency in words, in days once it reaches one, rounded to one decimal place.
 
     Args:
         hours: The latency.
 
     Returns:
-        Such as `about 3.5 h` or `about 5 days`.
+        Such as `about 3.5 h` or `about 5.1 days`.
     """
-    days = hours / HOURS_PER_DAY
+    days = round(hours / HOURS_PER_DAY, 1)
     if days < 1.0:
         return f"about {hours:g} h"
     return f"about {days:g} day{'s' if days > 1.0 else ''}"
@@ -1503,7 +1521,8 @@ def _coverage_lines(*, frames: dict[DomainType, pl.DataFrame]) -> list[str]:
     """
     lines = [
         (
-            "| Domain | Set | Products | Available after (slowest input) "
+            "| Domain | Set | Products | Available after (slowest input, plus the enriched "
+            "blend's own neighbouring hours) "
             "| Live, Great-Britain-wide? | History only (CAMS or ERA5)? "
             "| Needs ICON-D2's domain? | Archive serves every product from | Scored rows start |"
         ),
@@ -1512,7 +1531,8 @@ def _coverage_lines(*, frames: dict[DomainType, pl.DataFrame]) -> list[str]:
     for domain in DOMAINS:
         first_row = f"{frames[domain.name]['time'].min():%Y-%m-%d}"
         for blend in domain.sets:
-            slowest = max(LATENCY_HOURS[p] for p in blend.products)
+            context = ENRICHED_LATENCY_HOURS[domain.name]
+            slowest = max(LATENCY_HOURS[p] for p in blend.products) + context
             history_only = bool(HISTORY_ONLY_PRODUCTS & set(blend.products))
             regional = "icon_d2" in blend.products
             live_gb = not history_only and not regional
@@ -1594,11 +1614,14 @@ def _band_lines(
         ]
         ordered = np.sort(rows["difference"].to_numpy())
         top = ordered[: int(len(ordered) * MOST_IMPROVED_SHARE)]
+        peak_share = float(np.cumsum(ordered).min()) / total
         shares.append(
             f"{treatment} − {reference}: the most-improved {MOST_IMPROVED_SHARE:.0%} of rows "
             f"carry {top.sum() / total:.0%} of the whole gain, and "
-            f"{(ordered < 0).mean():.0%} of rows improve. A share above 100% means the other "
-            "rows are worse in total."
+            f"{(ordered < 0).mean():.0%} of rows improve. The running sum peaks at "
+            f"{peak_share:.0%} of the net gain where the improving hours end, before the "
+            "worsening hours bring it back down. A share above 100% means the other rows are "
+            "worse in total."
         )
     return [*lines, "", *(f"- {share}" for share in shares)]
 
@@ -1718,9 +1741,9 @@ def _solar_frame() -> pl.DataFrame:
         The rows, with the enriched columns and every blend column added.
     """
     frame = with_export_cap(
-        dataset=weather_products._with_eras(
+        dataset=weather_products.with_eras(
             frame=_add_time_features(
-                dataset=weather_products._common_rows(frame=weather_products._joined())
+                dataset=weather_products.common_rows(frame=weather_products.joined())
             )
         )
     )
@@ -1735,9 +1758,9 @@ def _wind_frame() -> pl.DataFrame:
     Returns:
         The rows, with the enriched columns and every blend column added.
     """
-    frame = weather_products._with_eras(
+    frame = weather_products.with_eras(
         frame=_add_time_features(
-            dataset=wind_products._common_rows(frame=wind_products._joined(sites=_wind_sites()))
+            dataset=wind_products.common_rows(frame=wind_products.joined(sites=_wind_sites()))
         )
     )
     return _with_blend_columns(frame=wind_products.with_wind_context(frame=frame), domain=WIND)
@@ -1884,7 +1907,7 @@ def _report(
     *,
     frames: dict[DomainType, pl.DataFrame],
     outputs: dict[DomainType, _Outputs],
-    reproduction: list[ReproductionRow],
+    reproduction_lines: list[str],
     records: list[IntervalRecord],
     power_version: int,
 ) -> str:
@@ -1893,7 +1916,8 @@ def _report(
     Args:
         frames: Each domain's common rows.
         outputs: Each domain's losses, weights, predictions and best singles.
-        reproduction: The reproduction check.
+        reproduction_lines: The reproduction check's rendered lines, from `_reproduction_lines` or
+            re-read from a previous run's `reproduction.md`.
         records: Every interval.
         power_version: The power Delta table's version.
 
@@ -1923,7 +1947,7 @@ def _report(
         "",
         "#### Reproduction check: refitted single-product arms against the published losses",
         "",
-        *_reproduction_lines(rows=reproduction),
+        *reproduction_lines,
         "",
         "#### Deciding contrasts: each named set's enriched blend against its enriched best single",
         "",
@@ -1972,7 +1996,7 @@ def _report(
     ]
     band_contrasts.append(("everything_xgb", WIND.single("icon_d2")))
     lines += [
-        "#### Wind: where the gain comes from, by measured output (primary setting)",
+        "#### Wind: where the gain comes from, by measured output (main XGBoost settings)",
         "",
         *_band_lines(
             losses=outputs["wind"]["losses"].filter(pl.col("setting") == "pooled"),
@@ -2039,6 +2063,35 @@ def _report(
     return "\n".join(lines)
 
 
+def _report_only_outputs(*, frame: pl.DataFrame, domain: Domain) -> _Outputs:
+    """Rebuild one domain's outputs from `losses.parquet` and `stack_weights.parquet`, with no fit.
+
+    `frame` is only the domain's common rows, built by reading data already on disk; no arm is
+    fitted. `best` is recomputed from the saved losses, which is a deterministic lookup, not a fit.
+
+    Args:
+        frame: Unused; kept so this function's signature matches `_run_domain`'s callers, and
+            `frame.height` can be logged the same way in both modes.
+        domain: The domain.
+
+    Returns:
+        The domain's losses and weights as saved, an empty predictions frame (the report does not
+        read it), and the best singles recomputed from the saved losses.
+    """
+    del frame
+    losses = pl.read_parquet(OUTPUT_DIR / "losses.parquet").filter(pl.col("domain") == domain.name)
+    weights = pl.read_parquet(OUTPUT_DIR / "stack_weights.parquet").filter(
+        pl.col("domain") == domain.name
+    )
+    singles = losses.filter(pl.col("arm").is_in(list(_single_features(domain=domain))))
+    return {
+        "losses": losses,
+        "weights": weights,
+        "predictions": pl.DataFrame(),
+        "best": _best_singles(losses=singles, domain=domain),
+    }
+
+
 def main() -> int:
     """Refit the single products, check them, fit and stack every blend, and write the report."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -2046,7 +2099,16 @@ def main() -> int:
     parser.add_argument(
         "--resume", action="store_true", help="Reuse per-arm fits a previous run left on disk."
     )
-    resume = parser.parse_args().resume
+    parser.add_argument(
+        "--report-only",
+        action="store_true",
+        help=(
+            "Rebuild report.md from losses.parquet, stack_weights.parquet and intervals.parquet "
+            "already on disk, with no refit. Move the current report.md aside first."
+        ),
+    )
+    arguments = parser.parse_args()
+    resume = arguments.resume
     started = datetime.now(tz=UTC)
 
     power_version = _power_version()
@@ -2055,53 +2117,67 @@ def main() -> int:
         _LOG.info("%s common rows: %d", name, frame.height)
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
-    singles: dict[DomainType, pl.DataFrame] = {}
-    reproduction: list[ReproductionRow] = []
-    for domain in DOMAINS:
-        singles[domain.name] = _fitted(
-            frame=frames[domain.name],
-            domain=domain,
-            jobs=_single_jobs(domain=domain),
-            resume=resume,
+    if arguments.report_only:
+        reproduction_lines = (OUTPUT_DIR / "reproduction.md").read_text().splitlines()
+        outputs = {
+            domain.name: _report_only_outputs(frame=frames[domain.name], domain=domain)
+            for domain in DOMAINS
+        }
+        records = cast(
+            "list[IntervalRecord]", pl.read_parquet(OUTPUT_DIR / "intervals.parquet").to_dicts()
         )
-        reproduction += _reproduction(fitted=singles[domain.name], domain=domain)
-    gate = "\n".join(_reproduction_lines(rows=reproduction)) + "\n"
-    (OUTPUT_DIR / "reproduction.md").write_text(gate)
-    sys.stdout.write(gate)
-    if not all(row["bit_identical"] for row in reproduction):
-        _LOG.error("the single-product arms do not reproduce the published losses; stopping")
-        return 1
+    else:
+        singles: dict[DomainType, pl.DataFrame] = {}
+        reproduction: list[ReproductionRow] = []
+        for domain in DOMAINS:
+            singles[domain.name] = _fitted(
+                frame=frames[domain.name],
+                domain=domain,
+                jobs=_single_jobs(domain=domain),
+                resume=resume,
+            )
+            reproduction += _reproduction(fitted=singles[domain.name], domain=domain)
+        gate = "\n".join(_reproduction_lines(rows=reproduction)) + "\n"
+        (OUTPUT_DIR / "reproduction.md").write_text(gate)
+        sys.stdout.write(gate)
+        if not all(row["bit_identical"] for row in reproduction):
+            _LOG.error("the single-product arms do not reproduce the published losses; stopping")
+            return 1
+        reproduction_lines = gate.splitlines()
 
-    outputs = {
-        domain.name: _run_domain(
-            domain=domain,
-            frame=frames[domain.name],
-            singles=singles[domain.name],
-            resume=resume,
-        )
-        for domain in DOMAINS
-    }
-    for key in ("losses", "weights", "predictions"):
-        pl.concat([outputs[d.name][key] for d in DOMAINS], how="vertical_relaxed").write_parquet(
-            OUTPUT_DIR / f"{'stack_weights' if key == 'weights' else key}.parquet"
-        )
-    records = [
-        record
-        for domain in DOMAINS
-        for record in _intervals(
-            losses=outputs[domain.name]["losses"], domain=domain, best=outputs[domain.name]["best"]
-        )
-    ]
-    pl.DataFrame(records).write_parquet(OUTPUT_DIR / "intervals.parquet")
+        outputs = {
+            domain.name: _run_domain(
+                domain=domain,
+                frame=frames[domain.name],
+                singles=singles[domain.name],
+                resume=resume,
+            )
+            for domain in DOMAINS
+        }
+        for key in ("losses", "weights", "predictions"):
+            pl.concat(
+                [outputs[d.name][key] for d in DOMAINS], how="vertical_relaxed"
+            ).write_parquet(OUTPUT_DIR / f"{'stack_weights' if key == 'weights' else key}.parquet")
+        records = [
+            record
+            for domain in DOMAINS
+            for record in _intervals(
+                losses=outputs[domain.name]["losses"],
+                domain=domain,
+                best=outputs[domain.name]["best"],
+            )
+        ]
+        pl.DataFrame(records).write_parquet(OUTPUT_DIR / "intervals.parquet")
+        shutil.rmtree(OUTPUT_DIR / FITS_DIR_NAME)
+
     report = _report(
         frames=frames,
         outputs=outputs,
-        reproduction=reproduction,
+        reproduction_lines=reproduction_lines,
         records=records,
         power_version=power_version,
     )
     (OUTPUT_DIR / "report.md").write_text(report)
-    shutil.rmtree(OUTPUT_DIR / FITS_DIR_NAME)
     sys.stdout.write(report)
     _LOG.info("finished in %s", datetime.now(tz=UTC) - started)
     return 0

@@ -45,7 +45,6 @@ from blend_products import (
 )
 from studies.charts import (
     CONTENT_WIDTH_PX,
-    NAMED_SUFFIX,
     figure,
     interval_panel,
     wrapped,
@@ -66,7 +65,9 @@ SECTION_SYNTHETIC: Final[str] = (
 )
 SECTION_EXPLORATORY: Final[str] = "Exploratory contrasts"
 SECTION_SPLITS: Final[str] = "The named enriched blends by site, season and era (exploratory)"
-SECTION_BANDS: Final[str] = "Wind: where the gain comes from, by measured output (primary setting)"
+SECTION_BANDS: Final[str] = (
+    "Wind: where the gain comes from, by measured output (main XGBoost settings)"
+)
 
 SITES: Final[dict[DomainType, tuple[str, ...]]] = {
     "solar": ("A", "B", "C", "D", "E", "F"),
@@ -114,18 +115,24 @@ NAMED_SETS: Final[tuple[NamedSet, ...]] = (
 """The sets behind the deciding contrasts, in the order the page gives them."""
 
 HEADLINE_DOMAIN: Final[tuple[float, float]] = (-0.7, 0.1)
-SETTING_CONDITIONS: Final[tuple[str, str]] = ("Primary setting", "Second setting")
-ALL_PLANNED: Final[str] = (
-    "Every row is a planned comparison, written into the study plan after the first science "
-    "review and before the re-run that measured it."
+SETTING_CONDITIONS: Final[tuple[str, str]] = (
+    "Main XGBoost settings",
+    "Shallower XGBoost settings (a check)",
 )
-"""The subtitle line of a figure whose rows are all planned."""
+POST_HOC_SUFFIX: Final[str] = " (post hoc)"
+"""Ends the label of a deciding-contrast row drawn beside exploratory rows in the same figure."""
 
-SOME_PLANNED: Final[str] = (
-    "Planned: a comparison written into the study plan after the first science review and before "
-    "the re-run that measured it. Every other row is exploratory."
+ALL_POST_HOC: Final[str] = (
+    "Every row is post hoc: chosen after the first run's results, and fixed before the re-run "
+    "that produced the numbers on this page."
 )
-"""The subtitle line of a figure whose rows ending in `NAMED_SUFFIX` are planned."""
+"""The subtitle line of a figure whose rows are all post hoc."""
+
+SOME_POST_HOC: Final[str] = (
+    "Post hoc: chosen after the first run's results, and fixed before the re-run that produced "
+    "the numbers on this page. Every other row is exploratory."
+)
+"""The subtitle line of a figure whose rows ending in `POST_HOC_SUFFIX` are post hoc."""
 
 MEASURED_COLOUR: Final[str] = ocf.BLACK_1
 SINGLE_COLOUR: Final[str] = ocf.DATA_BLUE
@@ -459,10 +466,11 @@ def _headline(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
                 "product is given its neighbouring hours, and CAMS its beam split, as the blend's "
                 "products are."
             ),
-            f"{DOTS} {CAPACITY}",
+            f"{DOTS[:-1]}, and one of the three fitting seeds. {CAPACITY}",
             f"{SCOPES['solar']} {SCOPES['wind']}",
-            ALL_PLANNED,
+            ALL_POST_HOC,
         ],
+        figure_planning=None,
     )
 
 
@@ -515,8 +523,9 @@ def _decomposition(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
             ),
             f"{DOTS} {CAPACITY}",
             f"{SCOPES['solar']} {SCOPES['wind']}",
-            ALL_PLANNED,
+            ALL_POST_HOC,
         ],
+        figure_planning=None,
     )
 
 
@@ -577,12 +586,13 @@ def _splits(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         subtitle=[
             (
                 "Enriched blend's mean absolute error minus the enriched best single product's, "
-                "primary setting. Exploratory: the splits share rows and XGBoost models, so they "
-                "are not independent tests."
+                "main XGBoost settings. The splits share rows and XGBoost models, so they are not "
+                "independent tests."
             ),
             f"{DOTS} {CAPACITY}",
             f"{SCOPES['solar']} {SCOPES['wind']}",
         ],
+        figure_planning="exploratory",
     )
 
 
@@ -612,7 +622,7 @@ def _methods(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
                 treatment=f"{named.blend}_rich_{method}",
                 reference=named.best,
             )
-            marks.append((label + (NAMED_SUFFIX if method == "xgb" else ""), row, ""))
+            marks.append((label + (POST_HOC_SUFFIX if method == "xgb" else ""), row, ""))
         panels.append(
             interval_panel(
                 rows=_panel_rows(rows=marks),
@@ -631,17 +641,22 @@ def _methods(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         number=8,
         title=(
             "An XGBoost model given every product's columns has the lowest error of the four "
-            "blends in each named set"
+            "blends in every named set but one"
         ),
         subtitle=[
             (
                 "Each enriched blend's mean absolute error minus the enriched best single "
-                "product's, primary setting. A linear stack weights the single-product XGBoost "
-                "models' predictions, fitted per generator on the other folds."
+                "product's, main XGBoost settings. A linear stack weights the single-product "
+                "XGBoost models' predictions, fitted per generator on the other folds."
+            ),
+            (
+                "For UKV with ICON-EU, the XGBoost blend leads the linear stack by 0.01 points, a "
+                "gap this study does not test for significance."
             ),
             f"{DOTS} {CAPACITY}",
-            SOME_PLANNED,
+            SOME_POST_HOC,
         ],
+        figure_planning=None,
     )
 
 
@@ -683,7 +698,7 @@ def _synthetic(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
                 "",
             ),
             (
-                f"For scale: {everything.name.lower()}, against {name}{NAMED_SUFFIX}",
+                f"For scale: {everything.name.lower()}, against {name}{POST_HOC_SUFFIX}",
                 _pick(
                     contrasts=contrasts,
                     section=SECTION_DECIDING,
@@ -708,20 +723,18 @@ def _synthetic(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     return figure(
         panels=panels,
         number=9,
-        title=(
-            "The comparison detects a synthetic gain of 0.13 to 0.14 points, the size of the "
-            "solar blend's gain"
-        ),
+        title="A known small signal is recovered in full",
         subtitle=[
             (
-                "The synthetic product is each hour's measured output plus random noise, so it "
-                "carries part of the answer by construction. It exists only to show that a gain of "
-                "this size is detectable."
+                "The synthetic product is each hour's measured output plus random noise, sized so "
+                "the synthetic gain would be about the size of the solar headline gain. The "
+                "comparison recovers that known gain: 0.13 points for solar and 0.14 for wind."
             ),
             f"{DOTS} {CAPACITY}",
             f"{SCOPES['solar']} {SCOPES['wind']}",
-            SOME_PLANNED,
+            SOME_POST_HOC,
         ],
+        figure_planning=None,
     )
 
 
@@ -1079,6 +1092,7 @@ def _weeks_figure(
             ),
             f"{CAPACITY} {SCOPES[domain]}",
         ],
+        figure_planning=None,
     )
 
 
@@ -1199,14 +1213,14 @@ def _per_generator_errors(
         title="Each blend's error is lower than its best single product's at every generator",
         subtitle=[
             (
-                "Mean absolute error per generator, primary setting, averaged over the three "
-                "fitting seeds; each panel title gives the whole-record errors. Computed for this "
-                "chart "
-                "from the saved per-hour errors, and checked against the report's per-generator "
-                "differences."
+                "Mean absolute error per generator, main XGBoost settings, averaged over the "
+                "three fitting seeds; each panel title gives the whole-record errors. Computed "
+                "for this chart from the saved per-hour errors, and checked against the report's "
+                "per-generator differences."
             ),
             f"{CAPACITY} {SCOPES['solar']} {SCOPES['wind']}",
         ],
+        figure_planning=None,
     )
 
 
@@ -1308,6 +1322,7 @@ def _wind_bands(*, tables: dict[str, list[dict[str, str]]], report_text: str) ->
                 "band_label:N",
                 sort=band_order,
                 title=None,
+                axis=alt.Axis(minExtent=210, maxExtent=210),
             ),
             yOffset=alt.YOffset("blend:N", sort=names),
             x=alt.X(
@@ -1324,7 +1339,7 @@ def _wind_bands(*, tables: dict[str, list[dict[str, str]]], report_text: str) ->
             color=colour,
         )
         .properties(
-            width=CONTENT_WIDTH_PX - 270,
+            width=CONTENT_WIDTH_PX - 210,
             height=alt.Step(12),
             title=alt.TitleParams(
                 "The gain within each band of measured output, as a fraction of capacity",
@@ -1378,7 +1393,7 @@ def _wind_bands(*, tables: dict[str, list[dict[str, str]]], report_text: str) ->
     ]
     lower = alt.LayerChart(
         layer=[references, five, curve, *labels],
-        width=CONTENT_WIDTH_PX - 270,
+        width=CONTENT_WIDTH_PX - 210,
         height=200,
         title=alt.TitleParams(
             "Hours sorted from most improved to most worsened", anchor="start", fontSize=14
@@ -1387,7 +1402,7 @@ def _wind_bands(*, tables: dict[str, list[dict[str, str]]], report_text: str) ->
     return figure(
         panels=[
             _line_key(
-                labels=names, colours=[BLEND_COLOUR, SINGLE_COLOUR], width=CONTENT_WIDTH_PX - 270
+                labels=names, colours=[BLEND_COLOUR, SINGLE_COLOUR], width=CONTENT_WIDTH_PX - 210
             ),
             bars,
             lower,
@@ -1405,8 +1420,9 @@ def _wind_bands(*, tables: dict[str, list[dict[str, str]]], report_text: str) ->
                 "The bottom curves rise above 100% because the hours that improve gain more than "
                 "the net; the hours that worsen then bring the sum back down to 100%."
             ),
-            f"Exploratory. {CAPACITY} {SCOPES['wind']}",
+            f"{CAPACITY} {SCOPES['wind']}",
         ],
+        figure_planning="exploratory",
     )
 
 
