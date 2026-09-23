@@ -37,6 +37,7 @@ from ens_forecast_horizons import (
     METRIC,
     OUTPUT_DIR,
     PERCENTAGE_POINTS,
+    PLANNED,
     baseline_arm,
     ens_arm,
     upsampling_arm,
@@ -738,6 +739,21 @@ def against_baselines(
         )
         for domain in DOMAINS
     )
+    # The best baseline at day 7 is chosen after the run, but the day-7 ensemble-mean-against-
+    # climatology contrast is itself one of `PLANNED`. Where that baseline turns out to be
+    # climatology, the mark it draws here is planned, not exploratory, and the subtitle says so.
+    planned_domains = [
+        domain for domain in DOMAINS if (ens_arm(way="mean", day=7), best[domain][7]) in PLANNED
+    ]
+    plan_note = (
+        "All marks are exploratory."
+        if not planned_domains
+        else (
+            "Planned: the ensemble mean against climatology at day 7, for "
+            + " and ".join(planned_domains)
+            + "; every other mark is exploratory."
+        )
+    )
     return figure(
         panels=panels,
         number=10,
@@ -746,7 +762,60 @@ def against_baselines(
             (
                 "Mean absolute error of an XGBoost model given ENS minus that of the no-weather "
                 "baseline with the lowest error at the same horizon, chosen after the run: "
-                f"{named}. All marks are exploratory."
+                f"{named}. {plan_note}"
+            ),
+            f"{DOTS} {CAPACITY}",
+            f"{SCOPES['solar']} {SCOPES['wind']}",
+        ],
+        figure_planning=None,
+    )
+
+
+def calendar_contrast(*, contrasts: pl.DataFrame, title: str) -> alt.VConcatChart:
+    """Draw Figure 11: the ensemble mean against the calendar-only arm, at every horizon.
+
+    `calendar_only` is a post hoc arm added after the first science review: the same XGBoost model
+    given the ENS arms' non-weather columns and no weather at all, so a contrast against it tells
+    apart ENS running out of skill from the model overfitting the calendar columns.
+
+    Args:
+        contrasts: Every interval.
+        title: The figure's title.
+
+    Returns:
+        The figure.
+    """
+    pairs = [
+        (
+            "Ensemble mean minus calendar-only",
+            [(ens_arm(way="mean", day=day), "calendar_only") for day in BAND_DAYS],
+        )
+    ]
+    panels = []
+    for domain in DOMAINS:
+        triples = [(domain, t, r) for _, per_day in pairs for t, r in per_day]
+        panels.append(
+            _contrast_panel(
+                contrasts=contrasts,
+                domain=domain,
+                pairs=pairs,
+                days=BAND_DAYS,
+                x_domain=_x_domain(contrasts=contrasts, pairs=triples),
+                zero_label="same as calendar-only",
+                better_label="ENS better",
+                condition_title="Contrast",
+                keys=domain == "solar",
+            )
+        )
+    return figure(
+        panels=panels,
+        number=11,
+        title=title,
+        subtitle=[
+            (
+                "Mean absolute error of an XGBoost model given ENS's ensemble mean minus the same "
+                "model given no weather at all, only the ENS arms' calendar and sun-geometry "
+                "columns. All marks are post hoc: added after the first science review."
             ),
             f"{DOTS} {CAPACITY}",
             f"{SCOPES['solar']} {SCOPES['wind']}",
@@ -1382,6 +1451,9 @@ def main() -> int:
         "ens_horizons_against_baselines": against_baselines(
             contrasts=contrasts, best=best, title=TITLES["baselines"]
         ),
+        "ens_horizons_against_calendar": calendar_contrast(
+            contrasts=contrasts, title=TITLES["calendar"]
+        ),
         "ens_upsampling_days": days_chart,
         "ens_upsampling_solar": upsampling_contrasts(
             contrasts=contrasts, domain="solar", number=7, title=TITLES["upsampling_solar"]
@@ -1416,7 +1488,11 @@ TITLES: Final[dict[str, str]] = {
     ),
     "baselines": (
         "The ENS ensemble mean beats the best no-weather baseline by several points to day 5, "
-        "and loses to it by day 14"
+        "and by day 14 climatology is ahead"
+    ),
+    "calendar": (
+        "The ensemble mean beats the same XGBoost model given no weather at all to day 10, and is "
+        "not significantly different from it by day 14"
     ),
     "example_days": (
         "The clear-sky index keeps the solar day's shape, where linear interpolation shifts it late"

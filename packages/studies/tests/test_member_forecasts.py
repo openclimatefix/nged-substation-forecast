@@ -125,6 +125,36 @@ def test_a_prediction_is_held_to_the_cap_and_divided_by_its_own_capacity():
     assert scored["absolute_error_capped_fraction_of_capacity"].to_list() == [0.1, 0.25]
 
 
+def test_a_forecast_that_under_reads_the_actual_scores_a_positive_fraction():
+    # A negative signed error (the forecast under-reads the actual) must still score a positive
+    # fraction of capacity: dividing the signed error instead of the absolute error would give -0.1.
+    rows = pl.DataFrame(
+        {
+            "site": ["C"],
+            "time": [datetime(2025, 6, 1, tzinfo=UTC)],
+            "month": ["2025-06"],
+            "fold": [0],
+            "constrained": [False],
+            "effective_capacity_mw": [10.0],
+            "cap_mw": [None],
+            "power_mw": [2.0],
+        }
+    )
+    prediction = pl.DataFrame(
+        {
+            "site": ["C"],
+            "time": [datetime(2025, 6, 1, tzinfo=UTC)],
+            "seed": [0],
+            "prediction": [1.0],
+        }
+    )
+
+    scored = score_prediction(rows=rows, prediction=prediction, target="power_mw")
+
+    assert scored["signed_error_capped_mw"].to_list() == [-1.0]
+    assert scored["absolute_error_capped_fraction_of_capacity"].to_list() == [0.1]
+
+
 def test_identical_members_give_the_forecast_one_row_per_hour_gives():
     # Weighting each member by one over their number makes 51 copies of a row count as one row, so
     # with row subsampling off the stacked model is the one-row model, split for split.

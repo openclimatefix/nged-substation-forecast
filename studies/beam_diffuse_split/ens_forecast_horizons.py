@@ -272,6 +272,44 @@ NO_SUBSAMPLE_DAY: Final[int] = 1
 EMULATED_DAY: Final[int] = 1
 """The band whose ensemble mean is also given 6-hourly stamps only, to cost the step width."""
 
+CALENDAR_ONLY: Final[str] = "calendar_only"
+"""A post hoc arm: the ensemble arms' non-weather columns only, no weather at all, one fit per
+technology, scored on the same rows every ensemble-mean arm is scored on. Added after the first
+science review, to tell apart ENS running out of skill from the model overfitting the calendar
+columns."""
+
+CALENDAR_ONLY_MONTH: Final[str] = "calendar_only_month"
+"""`CALENDAR_ONLY`, refit with `day_of_year` replaced by `MONTH_FEATURE`, a post hoc sensitivity
+check."""
+
+MONTH_FEATURE: Final[str] = "month_of_year"
+"""The calendar month, 1 to 12, used in place of `day_of_year` by the month sensitivity refit."""
+
+
+def month_ens_arm(*, day: int) -> str:
+    """Return the name of the ensemble-mean arm's month-sensitivity refit at one band.
+
+    Args:
+        day: The band's day.
+
+    Returns:
+        The arm name, such as `ens_mean_month_day1`.
+    """
+    return f"ens_mean_month_day{day}"
+
+
+def _with_month(*, features: tuple[str, ...]) -> tuple[str, ...]:
+    """Return `features` with `day_of_year` replaced by `MONTH_FEATURE`.
+
+    Args:
+        features: A feature tuple that includes `day_of_year`.
+
+    Returns:
+        The same tuple, `day_of_year` replaced by `MONTH_FEATURE`.
+    """
+    return tuple(MONTH_FEATURE if feature == "day_of_year" else feature for feature in features)
+
+
 SPAN: Final[tuple[datetime, datetime]] = (
     datetime(2024, 3, 25, tzinfo=UTC),
     datetime(2026, 10, 15, tzinfo=UTC),
@@ -924,7 +962,7 @@ def _complete(*, frame: pl.DataFrame, columns: list[str]) -> pl.DataFrame:
     """
     kept = frame.drop_nulls(columns).drop("era", "era_code", "fold").sort("site", "time")
     _LOG.info("kept %d of %d rows with every arm's input", kept.height, frame.height)
-    return with_eras(frame=kept)
+    return with_eras(frame=kept).with_columns(month_of_year=pl.col("time").dt.month())
 
 
 # --- Fitting -----------------------------------------------------------------------------------
@@ -1494,7 +1532,42 @@ def fitted_features(*, domain: Domain) -> dict[str, tuple[str, ...]]:
             arms[arm] = (*shared, *ens_columns(arm=arm, domain=domain.name))
     emulated = ens_arm(way="mean6", day=EMULATED_DAY)
     arms[emulated] = (*shared, *ens_columns(arm=emulated, domain=domain.name))
-    return arms | reference_features(domain=domain)
+    return arms | reference_features(domain=domain) | calendar_features(domain=domain)
+
+
+def calendar_features(*, domain: Domain) -> dict[str, tuple[str, ...]]:
+    """Return the post hoc calendar-only and month-sensitivity arms, with their feature columns.
+
+    Args:
+        domain: The domain.
+
+    Returns:
+        `CALENDAR_ONLY` and `CALENDAR_ONLY_MONTH`'s features, and each band's
+        `month_ens_arm`'s features: the ensemble-mean arm's own features with `day_of_year`
+        replaced by `MONTH_FEATURE`.
+    """
+    shared = shared_features(domain=domain)
+    arms = {CALENDAR_ONLY: shared, CALENDAR_ONLY_MONTH: _with_month(features=shared)}
+    for day in BAND_DAYS:
+        mean_arm = ens_arm(way="mean", day=day)
+        mean_features = (*shared, *ens_columns(arm=mean_arm, domain=domain.name))
+        arms[month_ens_arm(day=day)] = _with_month(features=mean_features)
+    return arms
+
+
+def calendar_jobs(*, domain: Domain) -> list[Job]:
+    """Return the post hoc calendar-only and month-sensitivity fits, at the primary setting.
+
+    Args:
+        domain: The domain.
+
+    Returns:
+        The jobs `--fit-missing` runs, and a fresh full run runs alongside every other arm.
+    """
+    return [
+        (arm, "pooled", "power_mw", columns, SETTINGS["pooled"], False)
+        for arm, columns in calendar_features(domain=domain).items()
+    ]
 
 
 def jobs(*, domain: Domain) -> list[Job]:
@@ -1658,6 +1731,14 @@ def contrasts(*, decisions: list[Decision], best: dict[int, str]) -> list[Contra
             ens_arm(way="mean", day=EMULATED_DAY),
         ),
     ]
+    wanted += [
+        ("calendar", "pooled", ens_arm(way="mean", day=day), CALENDAR_ONLY) for day in BAND_DAYS
+    ]
+    wanted += [
+        ("calendar sensitivity", "pooled", month_ens_arm(day=day), ens_arm(way="mean", day=day))
+        for day in BAND_DAYS
+    ]
+    wanted.append(("calendar sensitivity", "pooled", CALENDAR_ONLY_MONTH, CALENDAR_ONLY))
     planned = {contrast[1:] for contrast in wanted if contrast[0] == "planned"}
     unique: list[Contrast] = []
     for contrast in wanted:
@@ -1734,7 +1815,8 @@ def arm_order(*, domain: DomainType) -> list[str]:
 
     Returns:
         The native and upsampling arms, then each band's ways, the exploratory arm trained on the
-        mean, and the baselines, then climatology, the emulation, and the references.
+        mean, the baselines, and the month-sensitivity refit of the mean, then climatology, the
+        emulation, the references, and the two calendar-only arms.
     """
     order = [
         upsampling_arm(method=method, day=day)
@@ -1744,7 +1826,14 @@ def arm_order(*, domain: DomainType) -> list[str]:
     for day in BAND_DAYS:
         order += [ens_arm(way=way, day=day) for way in (*WAYS, APPLIED)]
         order += [baseline_arm(name=name, day=day) for name in BASELINES]
-    order += ["climatology", ens_arm(way="mean6", day=EMULATED_DAY), *REFERENCES]
+        order.append(month_ens_arm(day=day))
+    order += [
+        "climatology",
+        ens_arm(way="mean6", day=EMULATED_DAY),
+        *REFERENCES,
+        CALENDAR_ONLY,
+        CALENDAR_ONLY_MONTH,
+    ]
     return order
 
 
@@ -2066,28 +2155,99 @@ def _paths(*, domain: DomainType) -> dict[str, Path]:
     }
 
 
-def run_domain(*, domain: Domain, report_only: bool) -> Outputs:
+def _read_saved(*, domain: DomainType) -> Outputs:
+    """Read one technology's outputs from disk, choosing the method from the saved losses.
+
+    Args:
+        domain: `solar` or `wind`.
+
+    Returns:
+        The outputs, `frame` carrying `MONTH_FEATURE`.
+    """
+    paths = _paths(domain=domain)
+    losses = pl.read_parquet(paths["losses"])
+    method, decisions = choose_method(losses=losses, domain=domain)
+    frame = pl.read_parquet(paths["rows"]).with_columns(
+        **{MONTH_FEATURE: pl.col("time").dt.month()}
+    )
+    return Outputs(
+        frame=frame,
+        losses=losses,
+        summary=pl.read_parquet(paths["member_summary"]),
+        weights=pl.read_parquet(paths["weights"]),
+        method=method,
+        decisions=decisions,
+    )
+
+
+def _fit_missing(*, domain: Domain) -> Outputs:
+    """Fit only the arms missing from the saved losses, and read every other output from disk.
+
+    Currently the only arms this can add are `calendar_jobs`: the post hoc calendar-only and
+    month-sensitivity arms added after the first science review. Re-running with these arms
+    already fitted is a no-op. Rebuilds the full frame (`build_inputs` and `main_frame`, at the
+    method the saved losses already chose) rather than reading the saved `rows` parquet, because
+    that file keeps only the columns the report itself needs and drops every weather column the
+    new arms are shown; rebuilding it is cheap, since it does no fitting.
+
+    Args:
+        domain: The domain.
+
+    Returns:
+        The saved outputs with the missing arms' losses merged in.
+    """
+    saved = _read_saved(domain=domain.name)
+    fitted = set(saved.losses["arm"].unique().to_list())
+    new_jobs = [job for job in calendar_jobs(domain=domain) if job[0] not in fitted]
+    if not new_jobs:
+        _LOG.info("%s: every calendar arm is already fitted", domain.name)
+        return saved
+    inputs = build_inputs(domain=domain.name)
+    inputs = main_frame(inputs=inputs, method=saved.method, domain=domain.name)
+    frame = inputs.frame
+    keep = [
+        "site",
+        "time",
+        "month",
+        "fold",
+        "seed",
+        "arm",
+        "setting",
+        METRIC,
+        "signed_error_capped_mw",
+    ]
+    new_losses = run_all(dataset=frame, jobs=new_jobs).select(keep)
+    losses = pl.concat([saved.losses, new_losses])
+    check_shared_rows(losses=losses)
+    return Outputs(
+        frame=saved.frame,
+        losses=losses,
+        summary=saved.summary,
+        weights=saved.weights,
+        method=saved.method,
+        decisions=saved.decisions,
+    )
+
+
+def run_domain(*, domain: Domain, report_only: bool, fit_missing: bool = False) -> Outputs:
     """Build one technology's inputs, choose the upsampling, fit every arm, and score the baselines.
 
     Args:
         domain: The domain.
         report_only: Whether to read the saved outputs instead of fitting.
+        fit_missing: Whether to fit only the arms missing from the saved losses (`_fit_missing`),
+            reading everything else from disk. Ignored if `report_only` is set.
 
     Returns:
         The outputs.
     """
     paths = _paths(domain=domain.name)
     if report_only:
-        losses = pl.read_parquet(paths["losses"])
-        method, decisions = choose_method(losses=losses, domain=domain.name)
-        return Outputs(
-            frame=pl.read_parquet(paths["rows"]),
-            losses=losses,
-            summary=pl.read_parquet(paths["member_summary"]),
-            weights=pl.read_parquet(paths["weights"]),
-            method=method,
-            decisions=decisions,
-        )
+        return _read_saved(domain=domain.name)
+    if fit_missing:
+        outputs = _fit_missing(domain=domain)
+        outputs.losses.write_parquet(paths["losses"])
+        return outputs
     inputs = build_inputs(domain=domain.name)
     inputs.inputs.join(
         inputs.frame.select("site", "time", "power_mw", "effective_capacity_mw"),
@@ -2196,6 +2356,14 @@ def main() -> int:
         default="both",
         help="Refit only this technology, reading the other's outputs from disk.",
     )
+    parser.add_argument(
+        "--fit-missing",
+        action="store_true",
+        help=(
+            "Fit only the arms missing from the saved losses (currently the post hoc "
+            "calendar-only and month-sensitivity arms), reading every other arm from disk."
+        ),
+    )
     arguments = parser.parse_args()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -2203,8 +2371,16 @@ def main() -> int:
     records: list[IntervalRecord] = []
     boards: list[dict[str, object]] = []
     for domain in (SOLAR, WIND):
-        refit = arguments.refit in (domain.name, "both") and not arguments.report_only
-        outputs = run_domain(domain=domain, report_only=not refit)
+        refit = (
+            arguments.refit in (domain.name, "both")
+            and not arguments.report_only
+            and not arguments.fit_missing
+        )
+        outputs = run_domain(
+            domain=domain,
+            report_only=not refit and not arguments.fit_missing,
+            fit_missing=arguments.fit_missing,
+        )
         best = best_baselines(losses=outputs.losses)
         domain_records = _intervals(
             losses=outputs.losses,

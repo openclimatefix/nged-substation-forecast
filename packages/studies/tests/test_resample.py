@@ -109,6 +109,19 @@ def test_a_step_with_no_daylight_on_its_side_takes_the_other_side():
     np.testing.assert_allclose(filled, [[0.4, 0.4, 0.4]])
 
 
+def test_a_gap_with_a_daylight_step_on_both_sides_takes_its_own_side():
+    # Both a morning and an afternoon daylight step exist here, with different index values, so a
+    # gap that took the wrong side would read the wrong value: swapping which side each gap prefers
+    # would give position 1 (a morning gap) the afternoon's 0.8 and position 2 (an afternoon gap)
+    # the morning's 0.2, instead of each gap's own side.
+    index = np.array([[0.2, np.nan, np.nan, 0.8]])
+    morning = np.array([True, True, False, False])
+
+    filled = hold_flat_outside_daylight(index=index, morning=morning)
+
+    np.testing.assert_allclose(filled, [[0.2, 0.8, 0.2, 0.8]])
+
+
 def _clear_sky_day() -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     """Return a symmetric clear-sky day: hourly means, and their 3-hour step means and midpoints."""
     hours = np.arange(24)

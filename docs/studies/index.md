@@ -46,6 +46,8 @@ how far it generalises.
 - [How accurate is a power forecast driven by ECMWF ENS at each
   horizon?](ens-forecast-horizons.md) — at the six solar farms and three wind farms, an XGBoost model
   given the ENS ensemble mean beats every forecast that reads no weather forecast to day 5 for solar
-  and day 7 for wind, and loses to climatology by day 14. The ensemble mean beats the control member
-  and beats training on every member, and rebuilding solar radiation through the clear-sky index
-  beats the straight-line resample the live service uses today.
+  and day 7 for wind; by day 14 climatology is ahead, but the same model given no weather at all is
+  not significantly behind ENS either, so the crossover reflects how the model uses its calendar
+  columns rather than ENS running out of skill. The ensemble mean beats the control member and beats
+  training on every member, and rebuilding solar radiation through the clear-sky index beats the
+  straight-line resample the live service uses today.
