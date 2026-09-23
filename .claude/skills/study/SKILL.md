@@ -262,6 +262,13 @@ the story without the prose around it. Load the `dataviz` skill before drawing a
 
 - **A headline chart opens every page**, directly under the opening paragraphs, showing the headline
   result with its 95% intervals. Every section whose claim rests on a number gets a chart too.
+- **Show the method working before any contrast.** A contrast of a tenth of a point means nothing
+  unless the model produces a sane forecast. Plot out-of-fold predictions against the measured
+  output for every anonymised generator, across a few weeks chosen by a stated rule rather than by
+  eye, such as the clearest, most variable, and dullest weeks. Then plot each arm's absolute error
+  per generator. [Beam and diffuse irradiance as model
+  inputs](https://openclimatefix.github.io/nged-substation-forecast/studies/beam-diffuse-split/#the-models-work)
+  is the pattern.
 - **The title states the finding, scoped to the products tested** ("CAMS describes past sunshine
   best of the six products we tested"), and matches the heading or bolded lead the chart sits under.
   A bare "ICON global is the weakest" ranks every product in existence on a test of five.
