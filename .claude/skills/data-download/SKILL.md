@@ -20,12 +20,14 @@ already fetched when one chunk fails.** A DWD ICON-DREAM-EU backfill script ran 
 whole-domain GRIB downloads and cropping, one month at a time, and called `write_parquet` only after
 every month had succeeded. The 85th month 404'd — DWD had not published it yet — the script
 crashed, and the first 84 months' work vanished with it, because none of it had touched disk. This
-skill turns that incident into a general checklist; see the `study` skill for where a download's
-output lives (`data/studies/weather/<PRODUCT>/`) and for the CDS and anonymisation rules it already
-owns, which this skill does not repeat, and see the `data-validation` skill — run once a fetch
-finishes — for the checklist that catches a wrong download a clean run and a passing review both
-missed (a running mean stored as an hourly one, a dropped chunk-boundary timestamp, a wrong scale
-factor: none of the three in this skill's own history raised an exception).
+skill turns that incident into a general checklist.
+
+See the `study` skill for where a download's output lives (`data/studies/weather/<PRODUCT>/`) and
+for the CDS and anonymisation rules it already owns, which this skill does not repeat. See the
+`data-validation` skill for the checklist to run once a fetch finishes — a clean run is not evidence
+the data it wrote is right, and this project's own download history has already produced a running
+mean stored as an hourly one, a dropped chunk-boundary timestamp, and a wrong scale factor, none of
+which raised an exception.
 
 ## Checkpoint every chunk to disk immediately, and resume by skipping what is cached
 
