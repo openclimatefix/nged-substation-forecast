@@ -36,7 +36,9 @@ need some numbers the reports lack, and each such number is labelled below.
 review and the first diff review are also briefed to judge whether any chart misleads. Study code
 is not reviewed by humans, and a misleading chart is the scientific failure a chart can commit.
 
-**Departures from the issue:** one addition. The correctness review found that the wind page misstates the size of the steps in ICON global's served wind, which the step chart would contradict, so this PR corrects that sentence. The issue asks for "several" charts through each body, and this
+**Departures from the issue:** one addition. The correctness review found that the wind page
+misstates the size of the steps in ICON global's served wind, which the step chart would contradict,
+so this PR corrects that sentence. The issue asks for "several" charts through each body, and this
 plan names them.
 
 ## Every chart stands alone
