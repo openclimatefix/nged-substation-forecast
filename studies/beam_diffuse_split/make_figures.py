@@ -71,7 +71,8 @@ SETUP_COLOURS: Final[tuple[str, ...]] = (
     ocf.DATA_BLUE,
     ocf.DATA_DEEP_TEAL,
 )
-"""One hue per setup, in `SETUPS` order: orange-red for ERA5, purple for UKV, blue for CAMS.
+"""One hue per setup, in `SETUPS` order: Brand Orange for ERA5, Data Purple for UKV, Data Blue for
+CAMS.
 
 The three-colour set was checked for colour-vision deficiency rather than chosen by eye. Purple has
 not been through `dataviz`'s `validate_palette.js`, which lives in another repository, so the
