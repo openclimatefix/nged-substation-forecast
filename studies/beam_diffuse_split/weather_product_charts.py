@@ -1010,7 +1010,7 @@ def _own_beam(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         panels=[panel],
         number=10,
         figure_planning=figure_planning,
-        title="Every product except ERA5 gains 0.03 to 0.11 points from its own direct beam",
+        title="Every product except ERA5 gains 0.03 to 0.12 points from its own direct beam",
         subtitle=[
             (
                 "Each product with its own published beam and diffuse, minus with the Erbs split "
