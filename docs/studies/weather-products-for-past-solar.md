@@ -1,5 +1,10 @@
 # Which weather product best describes past sunshine?
 
+> **This study uses only Flexpectation's own data, and its purpose is to inform Flexpectation's
+> choices.** The study scores each weather product only at the solar farms in Flexpectation's trial
+> area in Lincolnshire. The study does not compare results across many regions or climates, so a
+> result on this page may not hold elsewhere.
+
 **At six metered solar farms in Lincolnshire, two satellite retrievals describe past sunshine far
 better than any of the weather models or reanalyses tested.** For each of eight weather products, an
 XGBoost model, a gradient-boosted tree, was fitted per generator to predict hourly output from that

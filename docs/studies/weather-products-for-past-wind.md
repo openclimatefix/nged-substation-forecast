@@ -1,5 +1,10 @@
 # Which weather product best describes past wind?
 
+> **This study uses only Flexpectation's own data, and its purpose is to inform Flexpectation's
+> choices.** The study scores each weather product only at the wind farms in Flexpectation's trial
+> area in Lincolnshire. The study does not compare results across many regions or climates, so a
+> result on this page may not hold elsewhere.
+
 **At three wind farms in Lincolnshire, the German weather service's ICON-D2 and the Met Office's UK
 variable-resolution model (UKV) describe past wind best of the five products tested.** ICON-D2
 belongs to the German weather service's (DWD's) Icosahedral Nonhydrostatic (ICON) model family. For
