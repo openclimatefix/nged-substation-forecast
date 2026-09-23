@@ -1,12 +1,14 @@
 import re
 from pathlib import Path
 
+import plotting.ocf_theme as ocf
 import polars as pl
 import pytest
 from studies.charts import (
     FAMILY_COLOURS,
     FAMILY_COLOURS_LIGHT,
     ContrastKey,
+    figure,
     flip_contrast,
     interval_panel,
     report_contrasts,
@@ -126,6 +128,19 @@ def test_report_contrasts_raises_on_a_row_it_cannot_read(tmp_path: Path) -> None
         report_contrasts(report_path=path)
 
 
+def test_report_contrasts_raises_when_excludes_zero_is_neither_yes_nor_no(
+    tmp_path: Path,
+) -> None:
+    path = tmp_path / "report.md"
+    path.write_text(
+        HEADER + "| all | cams_global − icon_d2_global | -2.651 | [-2.877, -2.420] "
+        "| maybe | 5 of 5 | 79,384 |\n"
+    )
+
+    with pytest.raises(ValueError, match="line 3 is not a contrast row"):
+        report_contrasts(report_path=path)
+
+
 def test_report_errors_reads_one_column_of_the_first_table(report: Path) -> None:
     assert report_errors(report_path=report, column="Global only") == {"cams": 5.054, "era5": 8.975}
 
@@ -160,6 +175,22 @@ def test_select_contrasts_names_every_missing_and_ambiguous_key(report: Path) ->
     expected = f"{ambiguous} matches 2 rows; {missing} matches 0 rows"
     with pytest.raises(ValueError, match=re.escape(expected)):
         select_contrasts(contrasts=duplicated, wanted=[ambiguous, missing])
+
+
+@pytest.mark.parametrize("field", ["section", "treatment", "reference"])
+def test_select_contrasts_filters_on_each_field(report: Path, field: str) -> None:
+    contrasts = report_contrasts(report_path=report)
+    real = {
+        "section": "Deciding contrasts, named before the run",
+        "scope": "all",
+        "treatment": "cams_global",
+        "reference": "icon_d2_global",
+    }
+    wrong = real | {field: "not a real value"}
+    key = ContrastKey(wrong["section"], wrong["scope"], wrong["treatment"], wrong["reference"])
+
+    with pytest.raises(ValueError, match=re.escape(f"{key} matches 0 rows")):
+        select_contrasts(contrasts=contrasts, wanted=[key])
 
 
 def test_flip_contrast_negates_the_estimate_and_swaps_the_bounds():
@@ -259,3 +290,142 @@ def test_the_direction_label_points_the_better_way(
 def test_ticks_are_round_and_inside_the_range():
     assert ticks(x_domain=(-4.5, 1.0)) == [-4.0, -3.0, -2.0, -1.0, 0.0, 1.0]
     assert ticks(x_domain=(-0.6, 0.4)) == [-0.6, -0.4, -0.2, 0.0, 0.2, 0.4]
+
+
+def test_ticks_returns_at_most_ten_values():
+    assert len(ticks(x_domain=(0.0, 0.45))) == 10
+
+
+def test_the_difference_is_rounded_to_three_decimal_places():
+    rows = pl.DataFrame(
+        {
+            "label": ["row"],
+            "family": ["satellite"],
+            "difference": [0.12345],
+            "lower_95": [0.0],
+            "upper_95": [0.25],
+        }
+    )
+    spec = _panel(rows)
+    (interval,) = [layer for layer in _layer(spec, "rule") if "x2" in layer["encoding"]]
+
+    assert _values(spec, interval)[0]["difference"] == 0.123
+
+
+def test_family_colours_map_to_the_brand_theme_swatches():
+    assert FAMILY_COLOURS == {
+        "satellite": ocf.BRAND_ORANGE,
+        "reanalysis": ocf.DATA_SKY,
+        "weather model": ocf.DATA_BLUE,
+    }
+    assert FAMILY_COLOURS_LIGHT == {
+        "satellite": ocf.BRAND_ORANGE_LIGHT,
+        "reanalysis": ocf.DATA_SKY_LIGHT,
+        "weather model": ocf.DATA_BLUE_LIGHT,
+    }
+
+
+def test_bold_labels_named_before_the_run():
+    spec = _panel(_rows(["satellite"]))
+    (interval,) = [layer for layer in _layer(spec, "rule") if "x2" in layer["encoding"]]
+    expr = interval["encoding"]["y"]["axis"]["labelFontWeight"]["expr"]
+
+    assert "(named before the run)" in expr
+    assert "'bold'" in expr
+
+
+def test_reference_labels_false_omits_the_text_layers():
+    spec = _panel(_rows(["satellite"]), reference_labels=False)
+
+    assert _layer(spec, "text") == []
+
+
+@pytest.mark.parametrize(
+    ("direction", "expected_align"), [("negative", "left"), ("positive", "right")]
+)
+def test_the_zero_label_aligns_away_from_the_better_direction(
+    direction: str, expected_align: str
+) -> None:
+    spec = _panel(_rows(["satellite"]), better_direction=direction)
+    (zero_text,) = [
+        layer
+        for layer in _layer(spec, "text")
+        if layer["encoding"]["text"]["value"] == "same as ERA5"
+    ]
+
+    assert zero_text["mark"]["align"] == expected_align
+
+
+def test_the_interval_draws_to_the_upper_bound():
+    spec = _panel(_rows(["satellite"]))
+    (interval,) = [layer for layer in _layer(spec, "rule") if "x2" in layer["encoding"]]
+
+    assert interval["encoding"]["x2"]["field"] == "upper_95"
+
+
+def test_condition_encoding_shades_shapes_and_offsets_a_second_condition():
+    rows = pl.DataFrame(
+        {
+            "label": ["row", "row"],
+            "family": ["weather model", "weather model"],
+            "difference": [-1.5, -1.0],
+            "lower_95": [-2.0, -1.5],
+            "upper_95": [-1.0, -0.5],
+            "condition": ["a", "b"],
+        }
+    )
+    spec = _panel(rows, conditions=("a", "b"))
+    panel = spec["hconcat"][0]
+    key = spec["hconcat"][1]
+    (interval,) = [
+        layer
+        for layer in panel["layer"]
+        if layer["mark"]["type"] == "rule" and "x2" in layer["encoding"]
+    ]
+    points = [layer for layer in panel["layer"] if layer["mark"]["type"] == "point"]
+    filled = next(layer for layer in points if layer["mark"]["filled"])
+    hollow = next(layer for layer in points if not layer["mark"]["filled"])
+    (key_text,) = [layer for layer in key["layer"] if layer["mark"]["type"] == "text"]
+
+    assert [row["shade"] for row in _values(spec, interval)] == [
+        "weather model",
+        "weather model, light",
+    ]
+    assert [row["shade"] for row in _values(spec, filled)] == ["weather model"]
+    assert [row["shade"] for row in _values(spec, hollow)] == ["weather model, light"]
+    assert filled["encoding"]["shape"]["scale"]["range"] == ["circle", "diamond"]
+    assert "yOffset" in interval["encoding"]
+    assert [row["filled"] for row in _values(spec, key_text)] == [True, False]
+
+
+def test_figure_shares_the_colour_scale_across_panels():
+    rows_a = pl.DataFrame(
+        {
+            "label": ["a"],
+            "family": ["satellite"],
+            "difference": [-1.0],
+            "lower_95": [-1.5],
+            "upper_95": [-0.5],
+        }
+    )
+    rows_b = pl.DataFrame(
+        {
+            "label": ["b"],
+            "family": ["reanalysis"],
+            "difference": [0.2],
+            "lower_95": [0.0],
+            "upper_95": [0.4],
+        }
+    )
+    panels = [
+        interval_panel(
+            rows=rows_a, x_domain=(-2.0, 1.0), x_title="x", zero_label="z", better_label="b"
+        ),
+        interval_panel(
+            rows=rows_b, x_domain=(-2.0, 1.0), x_title="x", zero_label="z", better_label="b"
+        ),
+    ]
+
+    spec = figure(panels=panels, number=1, title="t", subtitle=["s"], width=400).to_dict()
+
+    assert spec["resolve"]["scale"]["color"] == "shared"

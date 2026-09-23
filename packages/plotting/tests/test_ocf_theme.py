@@ -28,21 +28,20 @@ def test_legend_swatches_are_fully_opaque() -> None:
     assert _ocf_theme()["config"]["legend"]["symbolOpacity"] == 1
 
 
-def test_data_colours_light_pairs_with_data_colours() -> None:
-    assert ocf_theme.DATA_COLOURS == (
-        ocf_theme.DATA_BLUE,
-        ocf_theme.DATA_SKY,
+def test_theme_uses_palette_in_its_checked_order() -> None:
+    # The order was checked for colour-vision separation between neighbours; see PALETTE.
+    assert ocf_theme.PALETTE == (
         ocf_theme.BRAND_ORANGE,
         ocf_theme.DATA_PURPLE,
         ocf_theme.DATA_GREEN,
+        ocf_theme.DATA_BLUE,
+        ocf_theme.DATA_SKY,
+        ocf_theme.DATA_BURNT_ORANGE,
+        ocf_theme.DATA_AMBER,
+        ocf_theme.DATA_MAGENTA,
+        ocf_theme.DATA_DEEP_TEAL,
     )
-    assert ocf_theme.DATA_COLOURS_LIGHT == (
-        ocf_theme.DATA_BLUE_LIGHT,
-        ocf_theme.DATA_SKY_LIGHT,
-        ocf_theme.BRAND_ORANGE_LIGHT,
-        ocf_theme.DATA_PURPLE_LIGHT,
-        ocf_theme.DATA_GREEN_LIGHT,
-    )
+    assert _ocf_theme()["config"]["range"]["category"] == list(ocf_theme.PALETTE)
 
 
 def test_no_unintended_duplicate_colour_constants() -> None:
@@ -66,6 +65,7 @@ def test_font_size() -> None:
     assert font_size(style="Body", body_px=11) == 11
     assert font_size(style="Headline 1", body_px=11) == 18  # 11 * 1.65 = 18.15, rounds to 18
     assert font_size(style="Label", body_px=10) == 9  # 10 * 0.88 = 8.8 rounds up, not down
+    assert font_size(style="Body Large", body_px=10) == 13  # 12.5 rounds half up, not to even
 
 
 def test_theme_config_sets_brand_fonts_and_sizes() -> None:
