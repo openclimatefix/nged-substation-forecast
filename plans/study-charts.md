@@ -60,47 +60,41 @@ The markdown alt text repeats the title, and the page's tables stay as the chart
 ## The colour rule
 
 **Colour marks what kind of product a row is (satellite retrieval, reanalysis, or weather model),
-not which product it is.** The product's name is always on the axis, so identity never depends on
-colour. The obvious rule, one OCF hue per product, fails the `dataviz` skill's colour-vision
-validator (`validate_palette.js`, run against the OCF background `#FFFBF5`):
+not which product it is.** The product's name is always on the axis beside its marks, so identity
+never depends on colour. The colours come from the "main data colours" in OCF's 2025 brand
+guidelines, which are the colours those guidelines allow in published material. The guidelines'
+additional data colours, among them the dark green `#009C75` and the amber `#FC9700`, are marked
+for internal use only, so no study chart uses them.
 
-| Palette | Result |
+| Palette, checked with the `dataviz` skill's `validate_palette.js` against the OCF background `#FFFBF5` | Result |
 |---|---|
-| Six OCF hues, one per solar product (blue, orange-red, purple, dark green, sky blue, mustard) | **Fails.** Purple and blue sit 2.0 ΔE apart under deuteranopia, below the floor of 8. Mustard and orange-red sit 15.0 apart for normal vision, at the floor. Sky blue and mustard fall below 3:1 contrast. |
-| Blue (satellite), orange-red (reanalysis), dark green (weather model) | **Passes every check.** The worst colour-vision pair is 12.6 ΔE apart. |
+| One main data colour per solar product | **Fails.** Data Purple `#B701FF` and Data Blue `#306BFF` sit 2.0 ΔE apart under deuteranopia, below the floor of 8. |
+| Brand Orange `#FF4901` (satellite), Data Sky `#10C5F7` (reanalysis), Data Blue `#306BFF` (weather model) | **Passes every check,** with a worst colour-vision pair of 19.0 ΔE. Data Sky has only 2.0:1 contrast with the background, which the validator accepts when every mark is labelled, as every row here is. |
 
-The three family colours are `plotting.ocf_theme.BLUE`, `ORANGE_RED`, and `DARK_GREEN`. Where a
-chart must also tell two conditions apart, such as two halves of the year or three leads, it uses
-facets or point shape rather than a new hue, so each hue keeps one meaning on both pages.
+**The satellite retrieval is in Brand Orange because it is the product that stands apart on the
+solar page.** The weather models, which fill most rows on both pages, share Data Blue.
 
-### What OCF's slide template adds
+**Two conditions of one product use the colour and its light shade, plus a second point shape.**
+The guidelines give each main data colour a lighter shade "to create mono-coloured comparative
+graphs": Blue Light `#9CB6E1`, Sky Blue Light `#A3D6E0`, and Brand Orange Light `#FF8F73`. The
+validator fails a light shade as a stand-alone series colour, for low chroma or for sitting under 15
+ΔE from its parent for normal vision. So a light shade never carries a distinction alone: it always
+comes with a hollow point where the parent colour's point is filled.
 
-**OCF's slide template (slides 17 to 19) draws its example charts in the same palette as
-`plotting.ocf_theme`, with a warmer grid and its own fonts.** The template was measured by rendering
-the slides and sampling their pixels:
+**Typography follows the brand guidelines through `plotting.ocf_theme`.** A separate PR adds the
+brand's colours and typography to the theme: Matter XH for text, Matter Semi Mono for labels and
+data, and the brand's type-size scale. Each font falls back to DM Sans or Roboto Mono, which OCF's
+slide template uses in place of the commercial Matter fonts. The study charts inherit all of this
+from the theme and set no font themselves. That PR lands first, and this one is rebased on it.
 
-- **Background:** `#FFFBF5`, the theme's `BACKGROUND`.
-- **Series pairs:** orange-red `#FF4901` with blue `#306BFF`; blue with sky blue `#10C5F7`; and
-  orange-red with a salmon tint `#FF8F73`.
-- **Grid lines and rules:** a warm grey, `#D9D0CA`, where the theme uses `#EAEAEA`.
-- **Text:** ink `#292B2B`, the theme's text colour, with `#666666` for secondary text.
-- **Fonts:** DM Sans for text. The figure caption sits above the chart, under a thin rule, as
-  "Figure 1:" and a title in Roboto Mono.
+**The one style the charts set themselves is the slide template's figure caption.** OCF's slide
+template (slides 17 to 19) sets "Figure 1:" and the chart title above the chart, under a thin rule in
+the guidelines' warm grey `#D9D0CA`. `interval_chart` draws the title and subtitle the same way. The
+theme's own grid colour stays as it is, which #833 tracks.
 
-**The study charts follow the template's grid colour, fonts, and caption style.** `interval_chart`
-sets them in its own chart config, so the dashboards are not touched. Each SVG names DM Sans first
-and falls back to a sans-serif font where DM Sans is not installed. The salmon tint is not used as a
-series colour, because the validator fails it against orange-red: the two sit 13.2 ΔE apart for
-normal vision, below the floor of 15, and the tint has only 2.2:1 contrast with the background.
-Blue with sky blue passes as a pair, at 23.8 ΔE, but sky blue also has under 3:1 contrast, so it may
-only appear where every mark is directly labelled.
-
-**Also out of scope, but reported:** `plotting.ocf_theme` differs from the template in its grid colour
-and its fonts. Aligning the theme would change every dashboard chart, so it belongs in its own issue.
-
-**Out of scope, but reported:** the beam/diffuse page's `make_figures.py` draws UKV in purple beside
-CAMS in blue, and its docstring says the four-colour set was never measured. The validator measures
-that pair at 2.0 ΔE under deuteranopia. That figure belongs in its own issue.
+**Out of scope, but reported:** the beam/diffuse page's `make_figures.py` draws UKV in Data Purple
+beside CAMS in Data Blue, the pair that fails above, and colours a fourth setup in the internal-only
+dark green. Issue #832 tracks the fix.
 
 ## The charts
 
@@ -159,7 +153,7 @@ on both pages. "From the report" means the rows are parsed from that study's `re
 4. **"ICON global is the weakest product": the steps in ICON global's served wind.** Two panels.
     - **Left:** the monthly mean ratio of ICON global's 80 m speed to ICON-EU's, one line per
       generator (W1 to W3), with a vertical rule at each date in `STEP_DATES`. The generator with the
-      steps is drawn in the weather-model green, the other two in the theme's grey
+      steps is drawn in the weather-model Data Blue, the other two in the theme's grey
       (`ENSEMBLE_LINE`). **New:** the ratios, read from `wind_icon_global.parquet` and
       `wind_icon_eu.parquet`. The chart shows wind speeds only, never output.
     - **Right:** ICON global − ICON-EU per generator, with and without the model being told which
@@ -178,7 +172,8 @@ produces a sane forecast.
   studies now draw dot-and-interval charts: `make_chart.py` and `make_figures.py` each write the
   form inline, and this change adds two more scripts that need it.
     - `ProductFamily = Literal["satellite", "reanalysis", "weather model"]`.
-    - `FAMILY_COLOURS: Final[dict[ProductFamily, str]]`: the three OCF hues above.
+    - `FAMILY_COLOURS: Final[dict[ProductFamily, str]]` and `FAMILY_COLOURS_LIGHT`: the three
+      main data colours above and their light shades, read from `plotting.ocf_theme`.
     - `interval_chart(*, intervals, category, title, subtitle, x_title, reference_label,
       better_direction, colour=None, shape=None, facet=None)`: the dots, the interval lines, the
       labelled zero rule, the direction label, and the fixed colour domain, drawn from a Polars
@@ -227,7 +222,7 @@ wind-speed ratios.
   whose inline data holds exactly those values, in the given row order.
 - **Colour follows the family, not the rank.** The colour scale's domain and range are
   `FAMILY_COLOURS` in full, even when the input holds only one family. Without that, a chart holding
-  only weather models would repaint green as blue.
+  only weather models would repaint blue as orange.
 - **The zero rule sits at zero**, and the direction label points the way `better_direction` says.
 
 The chart scripts, like the study scripts, are not unit-tested. Their check is the verification
