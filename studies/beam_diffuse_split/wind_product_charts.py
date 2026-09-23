@@ -331,7 +331,6 @@ def _fortnightly_ratios() -> pl.DataFrame:
     Returns:
         One row per (fortnight, height, group) with `ratio`, where `group` is the generator with
         the steps or the other two generators pooled.
-
     """
     heights = (10, 80)
     speeds = [f"wind_speed_{height}m" for height in heights]
