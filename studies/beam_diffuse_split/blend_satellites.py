@@ -61,11 +61,12 @@ and ICON-DREAM-EU, 2021 to August 2026, with the same folds, eras, seeds, export
 
 Run it with `uv run python studies/beam_diffuse_split/blend_satellites.py`, after
 `weather_products.py` has written the `record` panel (`--panel record`). `--resume` reuses the
-per-arm fits a previous run left in `fits/`, refusing to reuse one whose rows, feature columns or
-seeds have since changed (checked against a fingerprint saved beside each fit). `--report-only`
-rebuilds `report.md` from `losses.parquet` and `reproduction.md` already on disk, fitting nothing,
-and stops if the rebuilt rows do not match the keys `losses.parquet` was fitted on; move the current
-outputs to a `superseded/` subfolder first, since neither mode overwrites a file.
+per-arm fits a previous run left in `fits/`, refusing to reuse one whose rows, feature-column
+values, fold assignment, target or hyperparameters have since changed (checked against a
+fingerprint saved beside each fit). `--report-only` rebuilds `report.md` from `losses.parquet` and
+`reproduction.md` already on disk, fitting nothing, and stops if the rebuilt rows do not match the
+keys `losses.parquet` was fitted on; move the current outputs to a `superseded/` subfolder first,
+since neither mode overwrites a file.
 """
 
 import argparse
@@ -87,11 +88,17 @@ from sources import STUDY_DATA_DIR
 from studies.blending import climatology_permutation, stacked_errors
 from studies.bootstrap import (
     YearInterval,
+    bootstrap_absolute,
     bootstrap_difference,
     bootstrap_difference_by_year,
     per_fold_differences,
 )
-from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SEEDS, SENSITIVITY_HYPER_PARAMETERS
+from studies.cross_validation import (
+    PRIMARY_HYPER_PARAMETERS,
+    SEEDS,
+    SENSITIVITY_HYPER_PARAMETERS,
+    HyperParameters,
+)
 from studies.guards import check_no_missing, refuse_to_overwrite
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
@@ -320,7 +327,7 @@ def _check_control_permutation(*, frame: pl.DataFrame) -> None:
             of its real ones, or if the permuted column matches the real one on
             `PERMUTED_UNCHANGED_FRACTION_LIMIT` or more of the rows.
     """
-    groups = frame.group_by(*PERMUTATION_GROUPS).agg(
+    groups = frame.group_by("site", "month", "hour_of_day").agg(
         is_permutation=(pl.col("ghi_sarah3").sort() == pl.col("ghi_sarah3_shuffled").sort()).all()
     )
     if not bool(groups["is_permutation"].all()):
@@ -427,24 +434,33 @@ def _fingerprint_path(*, arm: str, setting: str) -> Path:
     return _fit_path(arm=arm, setting=setting).with_suffix(".fingerprint")
 
 
-def _fingerprint(*, frame: pl.DataFrame, columns: tuple[str, ...]) -> str:
-    """Return a hash of a job's rows, feature columns and seeds.
+def _fingerprint(
+    *, frame: pl.DataFrame, columns: tuple[str, ...], target: str, hyperparameters: HyperParameters
+) -> str:
+    """Return a hash of a job's rows, feature-column values, fold, target and hyperparameters.
 
     `--resume` compares this against the fingerprint saved beside a previous run's fit, so a run
-    whose rows, an arm's columns, or `SEEDS` have since changed refuses to reuse the stale fit
-    rather than silently mixing it into a report the code no longer matches.
+    whose rows, an arm's feature-column values, fold assignment, target or hyperparameters have
+    since changed refuses to reuse the stale fit rather than silently mixing it into a report the
+    code no longer matches.
 
     Args:
         frame: The rows the job is fitted on.
         columns: The job's feature columns, in fit order.
+        target: The column the job predicts.
+        hyperparameters: The hyperparameters the job fits at.
 
     Returns:
         A hex digest, independent of the frame's row order.
     """
-    row_hashes = frame.select("site", "time").hash_rows(seed=0).sort().to_numpy().tobytes()
+    row_hashes = (
+        frame.select("site", "time", "fold", *columns).hash_rows(seed=0).sort().to_numpy().tobytes()
+    )
     digest = hashlib.sha256(row_hashes)
     digest.update("|".join(columns).encode())
     digest.update(str(SEEDS).encode())
+    digest.update(target.encode())
+    digest.update(str(hyperparameters).encode())
     return digest.hexdigest()
 
 
@@ -461,19 +477,23 @@ def _fitted(*, frame: pl.DataFrame, jobs: list[Job], resume: bool) -> pl.DataFra
 
     Raises:
         ValueError: If `--resume` finds a fit on disk whose saved fingerprint does not match this
-            run's rows, columns or seeds.
+            run's rows, feature-column values, fold assignment, target or hyperparameters.
     """
     missing: list[Job] = []
     for job in jobs:
-        arm, setting, _target, columns, *_ = job
+        arm, setting, target, columns, hyperparameters, *_ = job
         path = _fit_path(arm=arm, setting=setting)
         if resume and path.exists():
             fingerprint_path = _fingerprint_path(arm=arm, setting=setting)
             saved = fingerprint_path.read_text().strip() if fingerprint_path.exists() else None
-            if saved != _fingerprint(frame=frame, columns=columns):
+            fingerprint = _fingerprint(
+                frame=frame, columns=columns, target=target, hyperparameters=hyperparameters
+            )
+            if saved != fingerprint:
                 msg = (
-                    f"--resume: {path} was fitted on different rows, columns or seeds than this "
-                    "run would use; move it to a superseded/ subfolder or re-run without --resume"
+                    f"--resume: {path} was fitted on different rows, columns, fold assignment, "
+                    "target or hyperparameters than this run would use; move it to a superseded/ "
+                    "subfolder or re-run without --resume"
                 )
                 raise ValueError(msg)
         else:
@@ -481,14 +501,16 @@ def _fitted(*, frame: pl.DataFrame, jobs: list[Job], resume: bool) -> pl.DataFra
     _LOG.info("%d of %d fits to run", len(missing), len(jobs))
     if missing:
         fresh = run_all(dataset=frame, jobs=missing)
-        for arm, setting, _target, columns, *_ in missing:
+        for arm, setting, target, columns, hyperparameters, *_ in missing:
             path = _fit_path(arm=arm, setting=setting)
             path.parent.mkdir(parents=True, exist_ok=True)
             fresh.filter(pl.col("arm") == arm, pl.col("setting") == setting).sort(
                 "site", "time", "seed"
             ).write_parquet(path)
             _fingerprint_path(arm=arm, setting=setting).write_text(
-                _fingerprint(frame=frame, columns=columns)
+                _fingerprint(
+                    frame=frame, columns=columns, target=target, hyperparameters=hyperparameters
+                )
             )
     return pl.concat(
         pl.read_parquet(_fit_path(arm=arm, setting=setting)).select(LOSS_COLUMNS)
@@ -700,20 +722,24 @@ def _assert_rows_match_losses(
         raise ValueError(msg)
 
 
-def _mae(*, losses: pl.DataFrame, arm: str) -> float:
-    """Return one arm's mean error, in percentage points of capacity.
+def _absolute_cell(*, losses: pl.DataFrame, arm: str) -> str:
+    """Render one arm's own absolute error and its 95% interval, in points of capacity.
 
     Args:
         losses: Per-row losses, already restricted to one setting.
         arm: The arm.
 
     Returns:
-        The mean, or NaN if the arm is absent.
+        `"MAE [lower, upper]"`, bootstrapped with `studies.bootstrap.bootstrap_absolute`, or `"–"`
+        if the arm was not fitted at this setting.
     """
-    rows = losses.filter(pl.col("arm") == arm)
-    if rows.is_empty():
-        return float("nan")
-    return float(rows.select(pl.col(METRIC).mean()).item()) * PERCENTAGE_POINTS
+    if losses.filter(pl.col("arm") == arm).is_empty():
+        return "–"
+    interval = bootstrap_absolute(losses=losses, arm=arm, metric=METRIC)
+    value, lower, upper = (
+        interval[key] * PERCENTAGE_POINTS for key in ("value", "lower_95", "upper_95")
+    )
+    return f"{value:.2f} [{lower:.2f}, {upper:.2f}]"
 
 
 def _contrast_line(*, losses: pl.DataFrame, treatment: str, reference: str, label: str) -> str:
@@ -760,16 +786,23 @@ def _arms_table(*, losses: pl.DataFrame) -> list[str]:
     lines = [
         "#### Every arm's mean absolute error",
         "",
-        "| Arm | MAE, primary setting | MAE, second setting |",
+        (
+            "Each arm's own absolute error, with its own 95% interval from resampling whole "
+            "months and a seed (`studies.bootstrap.bootstrap_absolute`). The interval is wide "
+            "mainly because every arm's error rises and falls together from month to month; the "
+            "paired contrasts below resample the same months for both arms, which cancels that "
+            "shared swing."
+        ),
+        "",
+        "| Arm | MAE, primary setting (95% interval) | MAE, second setting (95% interval) |",
         "|---|---|---|",
     ]
     arms = (*_arm_columns(), *DERIVED_ARMS)
-    for arm in arms:
-        second = _mae(losses=sensitivity, arm=arm)
-        lines.append(
-            f"| {arm} | {_mae(losses=pooled, arm=arm):.2f} "
-            f"| {'–' if np.isnan(second) else f'{second:.2f}'} |"
-        )
+    lines += [
+        f"| {arm} | {_absolute_cell(losses=pooled, arm=arm)} "
+        f"| {_absolute_cell(losses=sensitivity, arm=arm)} |"
+        for arm in arms
+    ]
     return lines
 
 
@@ -1065,7 +1098,8 @@ def main() -> int:
         action="store_true",
         help=(
             "Reuse per-arm fits a previous run left on disk, refusing one whose saved fingerprint "
-            "no longer matches this run's rows, columns or seeds."
+            "no longer matches this run's rows, columns, fold assignment, target or "
+            "hyperparameters."
         ),
     )
     parser.add_argument(
@@ -1090,6 +1124,7 @@ def main() -> int:
         refuse_to_overwrite(paths=[report_path])
         losses = pl.read_parquet(loss_path)
         _assert_rows_match_losses(frame=frame, losses=losses, loss_path=loss_path)
+        _assert_arms_share_keys(losses=losses)
         reproduction_lines = reproduction_path.read_text().splitlines()
     else:
         refuse_to_overwrite(paths=[loss_path, reproduction_path, report_path])
@@ -1109,10 +1144,10 @@ def main() -> int:
         fitted = pl.concat([guard_fitted, rest_fitted])
         derived = stack_and_equal(fitted=fitted)
         losses = pl.concat([fitted, derived], how="vertical_relaxed")
+        _assert_arms_share_keys(losses=losses)
         losses.write_parquet(loss_path)
         shutil.rmtree(OUTPUT_DIR / FITS_DIR_NAME, ignore_errors=True)
 
-    _assert_arms_share_keys(losses=losses)
     report = build_report(
         frame=frame,
         losses=losses,

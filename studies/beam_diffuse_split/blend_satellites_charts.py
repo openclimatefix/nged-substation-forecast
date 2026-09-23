@@ -83,8 +83,30 @@ LEADERBOARD_DOMAIN_MARGIN_FRACTION: Final[float] = 0.1
 """The margin added on each side of the leaderboard's data-derived x domain, as a fraction of the
 span every arm's 95% interval covers, so no dot or line touches the axis edge."""
 
-CONTRAST_DOMAIN: Final[tuple[float, float]] = (-0.6, 0.6)
-"""The x range shared by the contrast panels."""
+CONTRAST_DOMAIN_MARGIN_FRACTION: Final[float] = 0.1
+"""The margin added on each side of a contrast panel's data-derived x domain, as a fraction of the
+largest interval bound, so no dot or line touches the axis edge."""
+
+
+def _contrast_domain(*, rows: pl.DataFrame) -> tuple[float, float]:
+    """Return a symmetric x domain covering every row's 95% interval, with a margin either side.
+
+    Derived from the data rather than fixed by hand, so a change to the contrasts fitted, or to
+    their intervals, can never clip a dot or an interval line off the edge of the axis.
+
+    Args:
+        rows: The contrast rows, carrying `lower_95` and `upper_95`.
+
+    Returns:
+        A domain symmetric about zero, so "same as the reference arm" sits at the axis centre.
+    """
+    largest = float(
+        rows.select(
+            pl.max_horizontal(pl.col("lower_95").abs(), pl.col("upper_95").abs()).max()
+        ).item()
+    )
+    bound = largest * (1 + CONTRAST_DOMAIN_MARGIN_FRACTION)
+    return -bound, bound
 
 
 def _leaderboard_domain(*, rows: pl.DataFrame) -> tuple[float, float]:
@@ -191,7 +213,7 @@ def _headline(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     )
     panel = interval_panel(
         rows=rows,
-        x_domain=CONTRAST_DOMAIN,
+        x_domain=_contrast_domain(rows=rows),
         x_title=CONTRAST_X_TITLE,
         zero_label="same as the reference arm",
         better_label="lower error than the reference arm",
@@ -239,7 +261,7 @@ def _exploratory(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     )
     panel = interval_panel(
         rows=rows,
-        x_domain=CONTRAST_DOMAIN,
+        x_domain=_contrast_domain(rows=rows),
         x_title=CONTRAST_X_TITLE,
         zero_label="same as CAMS",
         better_label="lower error than CAMS",
