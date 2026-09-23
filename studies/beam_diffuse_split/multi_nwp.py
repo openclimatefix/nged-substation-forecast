@@ -40,6 +40,7 @@ from commissioning import drop_commissioning_ramp
 from export_cap import with_export_cap
 from run_experiment import SHARED_FEATURES, _add_time_features, dataset_path_for
 from sources import STUDY_DATA_DIR
+from studies.blending import climatology_permutation
 from studies.bootstrap import bootstrap_difference
 from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, assign_folds, out_of_fold_losses
 
@@ -134,10 +135,11 @@ def _with_shuffled_second_product(*, dataset: pl.DataFrame) -> pl.DataFrame:
     Returns:
         `dataset` with `ghi_w_m2_ukv_shuffled`.
     """
-    return dataset.with_columns(
-        ghi_w_m2_ukv_shuffled=pl.col("ghi_w_m2_ukv")
-        .shuffle(seed=SHUFFLE_SEED)
-        .over(["site", "month", "hour_of_day"])
+    return climatology_permutation(
+        frame=dataset,
+        column_groups=[("ghi_w_m2_ukv",)],
+        by=("site", "month", "hour_of_day"),
+        seed=SHUFFLE_SEED,
     )
 
 

@@ -283,3 +283,30 @@ The mutation pass then checks each test fails on the bug it targets.
   `equal` on the method chart.
 - **Accepted with a different fix:** least squares against least absolute deviation. The plan keeps
   least squares, which `nnls` solves directly, and the page reports the 0.01-point difference.
+
+## Departures during implementation
+
+- **`stacked_errors` takes `cross_fitted`.** Setting it to `False` fits each fold's weights on
+  every fold, the scored one included, which is what the in-sample against cross-fitted gap needs.
+  Keeping that fit in the tested package, rather than in the script, lets a test show the in-sample
+  fit does see the scored fold.
+- **`climatology_permutation` adds `<column>_shuffled` copies and leaves the originals in place**,
+  and group `i` uses seed `seed + i`. A single one-column group reproduces `multi_nwp.py`'s old
+  `pl.col(...).shuffle(seed).over(...)` exactly, which a test pins.
+- **`multi_nwp.py` was checked against its own previous output, not against a published report.**
+  Its only report sits under `superseded/` and was built on an earlier dataset build, so its single
+  arms (which the permutation cannot touch) already differ in the third decimal place. The check
+  that matters passed instead: on today's datasets the frame `multi_nwp.py` fits on, permuted
+  column included, is bit-identical before and after the move, and the refactored script runs end
+  to end.
+- **Every single product is fitted at the second setting, not only the deciding arms**, so that
+  every stack, and the deciding `everything_stack − everything_xgb`, can be formed at that setting.
+- **One more exploratory contrast per set, `<set>_stack − <best>_seed_stack`**, which reads the
+  stack's gain beside the seed-ensemble control.
+- **The per-season split uses the four meteorological seasons** for both domains; the wind study's
+  own report uses two halves of the year.
+- **`scipy` is a new dependency of `packages/studies`**, for `nnls`. It was already in the lock file.
+- **The script keeps per-arm fits in `fits/` until the report is written**, and `--resume` reuses
+  them after a crash. The directory is deleted once every output is on disk.
+- **The output directory is `blend_products/`**, as the plan names it, not `beam_diffuse_*` like its
+  neighbours.
