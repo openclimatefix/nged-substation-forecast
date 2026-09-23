@@ -19,6 +19,7 @@ from studies.charts import (
     figure,
     flip_contrast,
     interval_panel,
+    leaderboard_panel,
     planning,
     report_contrasts,
     report_errors,
@@ -334,6 +335,58 @@ def test_the_difference_is_rounded_to_three_decimal_places():
     (interval,) = [layer for layer in _layer(spec, "rule") if "x2" in layer["encoding"]]
 
     assert _values(spec, interval)[0]["difference"] == 0.123
+
+
+def _leaderboard_rows(families: list[str]) -> pl.DataFrame:
+    return pl.DataFrame(
+        {
+            "label": [f"row {index}" for index in range(len(families))],
+            "family": families,
+            "value": [5.05, 7.71][: len(families)],
+            "lower_95": [4.90, 7.50][: len(families)],
+            "upper_95": [5.20, 7.90][: len(families)],
+        }
+    )
+
+
+def _leaderboard(rows: pl.DataFrame) -> dict:
+    return leaderboard_panel(rows=rows, x_domain=(4.0, 9.0), x_title="% of capacity").to_dict()
+
+
+def test_leaderboard_plots_the_input_numbers_best_first():
+    spec = _leaderboard(_leaderboard_rows(["satellite", "weather model"]))
+    panel = spec["vconcat"][-1] if "vconcat" in spec else spec
+    (point,) = _layer(panel, "point")
+
+    plotted = _values(spec, panel)
+
+    assert [(row["label"], row["value"], row["lower_95"], row["upper_95"]) for row in plotted] == [
+        ("row 0", 5.05, 4.9, 5.2),
+        ("row 1", 7.71, 7.5, 7.9),
+    ]
+    assert point["encoding"]["y"]["sort"] == ["row 0", "row 1"]
+
+
+def test_leaderboard_draws_no_zero_rule_or_direction_label():
+    spec = _leaderboard(_leaderboard_rows(["satellite"]))
+
+    assert "layer" in spec
+    assert all(layer["mark"]["type"] in ("rule", "point") for layer in spec["layer"])
+
+
+def test_leaderboard_of_one_family_draws_no_family_key():
+    spec = _leaderboard(_leaderboard_rows(["weather model", "weather model"]))
+
+    assert "vconcat" not in spec
+
+
+def test_leaderboard_of_two_families_draws_the_family_key():
+    spec = _leaderboard(_leaderboard_rows(["satellite", "weather model"]))
+    key, panel = spec["vconcat"]
+    (text,) = _layer(key, "text")
+
+    assert [row["label"] for row in _values(spec, text)] == ["satellite", "weather model"]
+    assert "layer" in panel
 
 
 def test_family_colours_map_to_the_brand_theme_swatches():

@@ -1,13 +1,15 @@
-"""Draw the ten anonymised charts for the write-up on which product best describes sunshine.
+"""Draw the eleven anonymised charts for the write-up on which product best describes sunshine.
 
 One-off throwaway script for the charts in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/830>. The write-up is
 <https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-solar/>.
 
 **Every number the report prints is read from the report `weather_products.py` wrote**, so a chart
-cannot disagree with the page. The two "models work" charts are the exception: they reconstruct
-out-of-fold predictions and per-generator errors straight from `losses.parquet`, because neither is
-printed anywhere in the report.
+cannot disagree with the page. Two charts are the exception, and neither refits a model: the
+leaderboard bootstraps each product's absolute-error interval straight from `losses.parquet`, since
+the report prints only its point estimate, and the two "models work" charts reconstruct out-of-fold
+predictions and per-generator errors the same way, because neither is printed anywhere in the
+report.
 
 Generators appear only as `A` to `F`, and no chart plots output in megawatts.
 
@@ -30,6 +32,7 @@ import polars as pl
 from export_cap import with_export_cap
 from run_experiment import _add_time_features
 from sources import STUDY_DATA_DIR
+from studies.bootstrap import bootstrap_absolute
 from studies.charts import (
     CONTENT_WIDTH_PX,
     FAMILY_COLOURS,
@@ -38,6 +41,7 @@ from studies.charts import (
     figure,
     flip_contrast,
     interval_panel,
+    leaderboard_panel,
     planning,
     report_contrasts,
     report_errors,
@@ -46,6 +50,7 @@ from studies.charts import (
 from weather_products import (
     METRIC,
     OUTPUT_DIR_NAME,
+    PERCENTAGE_POINTS,
     _common_rows,
     _joined,
     _with_eras,
@@ -444,10 +449,14 @@ DECIDING: Final[tuple[tuple[str, str], ...]] = (
 HEADLINE_DOMAIN: Final[tuple[float, float]] = (-4.5, 1.0)
 """The x range of the headline's left panel."""
 
+LEADERBOARD_DOMAIN: Final[tuple[float, float]] = (4.0, 9.5)
+"""The x range of the leaderboard, covering every product's 95% interval with a small margin."""
+
 CAPACITY: Final[str] = "Capacity is each generator's 99th-percentile output."
 DOTS: Final[str] = "Dot: estimate. Line: 95% interval from resampling whole months."
 SCOPE: Final[str] = "Six solar farms in Lincolnshire, December 2022 to September 2026."
 X_TITLE: Final[str] = "Difference in mean absolute error (points of capacity)"
+LEADERBOARD_X_TITLE: Final[str] = "Mean absolute error (% of capacity; smaller is better)"
 
 
 def _product(arm: str) -> str:
@@ -497,6 +506,60 @@ def _served_contrast_name(*, treatment: str, reference: str) -> str:
     return name.replace("UKV", "Open-Meteo's hourly UKV")
 
 
+def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
+    """Draw every product's own mean absolute error, best first, with its 95% interval.
+
+    Bootstraps each product's absolute error from `losses.parquet` directly, the same
+    month-and-seed resampling `weather_products.py` uses for every contrast, because the report
+    prints only each product's point estimate, not its interval. No model is refitted.
+
+    Args:
+        losses: Every arm's rows from `losses.parquet`.
+        errors: Each product's pooled mean absolute error, read from the report.
+
+    Returns:
+        Figure 1.
+    """
+    order = sorted(errors, key=errors.__getitem__)
+    records = []
+    for product in order:
+        arm = f"{product}_global"
+        interval = bootstrap_absolute(
+            losses=losses.filter(pl.col("arm") == arm), arm=arm, metric=METRIC
+        )
+        value = interval["value"] * PERCENTAGE_POINTS
+        if round(value, 3) != errors[product]:
+            msg = f"{product}: bootstrapped {value:.3f} but the report says {errors[product]}"
+            raise ValueError(msg)
+        records.append(
+            {
+                "label": _served_name(product),
+                "family": FAMILIES[product],
+                "value": value,
+                "lower_95": interval["lower_95"] * PERCENTAGE_POINTS,
+                "upper_95": interval["upper_95"] * PERCENTAGE_POINTS,
+            }
+        )
+    rows = pl.DataFrame(records)
+    panel = leaderboard_panel(rows=rows, x_domain=LEADERBOARD_DOMAIN, x_title=LEADERBOARD_X_TITLE)
+    return figure(
+        panels=[panel],
+        number=1,
+        figure_planning=None,
+        title="CAMS describes past sunshine best of the six products tested",
+        subtitle=[
+            (
+                "Each product's own mean absolute error, sorted best first. Figure 2 shows the "
+                "paired contrasts, which test whether a gap is statistically significant: shared "
+                "weather noise makes these intervals overlap more than a paired difference does."
+            ),
+            "Dot: estimate. Line: 95% interval from resampling whole months.",
+            CAPACITY,
+            SCOPE,
+        ],
+    )
+
+
 def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
     """Draw every product against ERA5 above the four planned contrasts.
 
@@ -505,7 +568,7 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         errors: Each product's mean absolute error.
 
     Returns:
-        Figure 1.
+        Figure 2.
     """
     order = sorted(errors, key=errors.__getitem__)
     against_era5 = select_contrasts(
@@ -557,7 +620,7 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
     )
     return figure(
         panels=[left, right],
-        number=1,
+        number=2,
         figure_planning=figure_planning,
         title="CAMS describes past sunshine best of the six products tested, by a wide margin",
         subtitle=[
@@ -580,7 +643,7 @@ def _cams_breakdown(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 2.
+        Figure 5.
     """
     groups = {
         "Whole record": [("all", "All hours", SECTION_DECIDING)],
@@ -624,7 +687,7 @@ def _cams_breakdown(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     ]
     return figure(
         panels=panels,
-        number=4,
+        number=5,
         figure_planning=figure_planning,
         title=(
             "CAMS's margin over ICON-D2 holds at every generator, in every season, and every year"
@@ -674,7 +737,7 @@ def _icon_d2_leads(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatC
         report_text: The report.
 
     Returns:
-        Figure 3.
+        Figure 6.
     """
     domain = (-2.0, 0.5)
     hourly_rows = _hourly_rows(contrasts=contrasts)
@@ -724,7 +787,7 @@ def _icon_d2_leads(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatC
     )
     return figure(
         panels=[hourly, summary],
-        number=5,
+        number=6,
         figure_planning=figure_planning,
         title="ICON-D2's advantage over ICON-EU shrinks within hours of each run",
         subtitle=[
@@ -749,7 +812,7 @@ def _icon_eu_rivals(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 4.
+        Figure 7.
     """
     icon_global = select_contrasts(
         contrasts=contrasts,
@@ -820,7 +883,7 @@ def _icon_eu_rivals(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     ]
     return figure(
         panels=panels,
-        number=6,
+        number=7,
         figure_planning=figure_planning,
         title=(
             "ICON-EU does not beat UKV rebuilt from its snapshots, but beats ICON global and "
@@ -844,7 +907,7 @@ def _ukv_against_era5(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 5.
+        Figure 8.
     """
     conditions = ("Open-Meteo's hourly value", "Rebuilt from its snapshots")
     scopes = {
@@ -877,7 +940,7 @@ def _ukv_against_era5(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     )
     return figure(
         panels=[panel],
-        number=7,
+        number=8,
         figure_planning=figure_planning,
         title="UKV rebuilt from its snapshots beats ERA5; Open-Meteo's hourly UKV against ERA5 is "
         "unresolved",
@@ -900,7 +963,7 @@ def _own_beam(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         errors: Each product's mean absolute error, which sets the row order.
 
     Returns:
-        Figure 6.
+        Figure 9.
     """
     order = sorted(errors, key=errors.__getitem__)
     rows = _rows(
@@ -922,7 +985,7 @@ def _own_beam(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
     )
     return figure(
         panels=[panel],
-        number=8,
+        number=9,
         figure_planning=figure_planning,
         title="Every product except ERA5 gains 0.03 to 0.11 points from its own direct beam",
         subtitle=[
@@ -943,7 +1006,7 @@ def _neighbours(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 7.
+        Figure 10.
     """
     conditions = (
         "Trained on the generator itself",
@@ -981,7 +1044,7 @@ def _neighbours(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     )
     return figure(
         panels=[panel],
-        number=9,
+        number=10,
         figure_planning=figure_planning,
         title="The ranking holds for a generator predicted from its neighbours",
         subtitle=[
@@ -1033,7 +1096,7 @@ def _implied_capacity_chart(*, report_text: str) -> alt.VConcatChart:
         report_text: The report.
 
     Returns:
-        Figure 8.
+        Figure 11.
     """
     rows = _implied_capacity_rows(report_text=report_text).with_columns(
         family=pl.col("product").replace_strict(FAMILIES),
@@ -1074,7 +1137,7 @@ def _implied_capacity_chart(*, report_text: str) -> alt.VConcatChart:
     grid = [alt.hconcat(*panels[i : i + 2], spacing=24) for i in (0, 2, 4)]
     return figure(
         panels=grid,
-        number=10,
+        number=11,
         figure_planning=None,
         title=(
             "Of the six products tested, CAMS's implied capacity swings the most with the seasons"
@@ -1135,7 +1198,7 @@ def _solar_models_work(*, errors: dict[str, float]) -> tuple[alt.VConcatChart, a
         errors: Each product's pooled mean absolute error.
 
     Returns:
-        Figures 1 and 2.
+        Figures 3 and 4.
     """
     measured = _models_work_frame()
     losses = pl.read_parquet(RESULTS_DIR / "losses.parquet")
@@ -1189,7 +1252,7 @@ def _solar_models_work(*, errors: dict[str, float]) -> tuple[alt.VConcatChart, a
         week_order=week_order,
         order=order,
         colours=colours,
-        number=2,
+        number=3,
         title=(
             f"An XGBoost model given {best_label} tracks measured power at every generator, "
             "across a clear, a variable, and a dull week"
@@ -1211,7 +1274,7 @@ def _solar_models_work(*, errors: dict[str, float]) -> tuple[alt.VConcatChart, a
         names=NAMES,
         families=FAMILIES,
         errors=errors,
-        number=3,
+        number=4,
         title="Every product's error ranks the same way at each of the six generators",
         subtitle=[
             "Each dot is one generator's mean absolute error given one product.",
@@ -1223,18 +1286,20 @@ def _solar_models_work(*, errors: dict[str, float]) -> tuple[alt.VConcatChart, a
 
 
 def main() -> int:
-    """Read the report, compute the new numbers, and write the ten SVGs."""
+    """Read the report, compute the new numbers, and write the eleven SVGs."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     argparse.ArgumentParser(description=__doc__).parse_args()
     report_path = RESULTS_DIR / "report.md"
     report_text = report_path.read_text()
     contrasts = report_contrasts(report_path=report_path)
     errors = report_errors(report_path=report_path, column="Global only")
+    losses = pl.read_parquet(RESULTS_DIR / "losses.parquet")
     models_work_timeseries, models_work_error = _solar_models_work(errors=errors)
     charts = {
+        "sunshine_leaderboard": _leaderboard(losses=losses, errors=errors),
+        "sunshine_headline": _headline(contrasts=contrasts, errors=errors),
         "sunshine_models_work_timeseries": models_work_timeseries,
         "sunshine_models_work_error": models_work_error,
-        "sunshine_headline": _headline(contrasts=contrasts, errors=errors),
         "sunshine_cams_breakdown": _cams_breakdown(contrasts=contrasts),
         "sunshine_icon_d2_leads": _icon_d2_leads(contrasts=contrasts, report_text=report_text),
         "sunshine_icon_eu_rivals": _icon_eu_rivals(contrasts=contrasts),
