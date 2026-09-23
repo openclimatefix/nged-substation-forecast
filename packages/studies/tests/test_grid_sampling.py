@@ -1,8 +1,9 @@
 import numpy as np
 import polars as pl
+import pytest
 import xarray as xr
 from pyproj import CRS, Transformer
-from studies.grid_sampling import sample_nearest_cell
+from studies.grid_sampling import nearest_cells, sample_nearest_cell
 
 # A Lambert azimuthal equal-area grid centred on Great Britain, the projection UKV is served on. The
 # grid is deliberately not square, and its x and y ranges differ, so a sampler that swapped the axes
@@ -36,3 +37,42 @@ def test_each_site_reads_the_cell_it_sits_in():
     sampled = sample_nearest_cell(field=_field(), sites=pl.DataFrame(rows), crs=CRS_LAEA)
 
     assert sampled == {site: row * 1000.0 + column for site, (row, column) in cells.items()}
+
+
+def test_the_nearest_cell_is_nearest_on_the_ground_not_in_degrees():
+    # At 53°N a degree of longitude is about 67 km and a degree of latitude about 111 km. The site
+    # sits 0.06° north of one cell and 0.08° east of the other: nearer the first in degrees, but
+    # nearer the second on the ground (about 5.4 km against 6.7 km).
+    cells = pl.DataFrame({"cell_id": [7, 9], "latitude": [53.06, 53.0], "longitude": [0.0, 0.08]})
+    sites = pl.DataFrame({"site": ["A"], "latitude": [53.0], "longitude": [0.0]})
+
+    nearest = nearest_cells(sites=sites, cells=cells)
+
+    assert nearest["cell_id"].to_list() == [9]
+    assert nearest["distance_km"].item() == pytest.approx(5.35, abs=0.05)
+
+
+def test_each_site_gets_its_own_nearest_cell():
+    latitudes, longitudes = np.meshgrid(np.arange(52.0, 54.0, 0.05), np.arange(-1.0, 1.0, 0.05))
+    cells = pl.DataFrame(
+        {"latitude": latitudes.ravel(), "longitude": longitudes.ravel()}
+    ).with_row_index(name="cell_id")
+    sites = pl.DataFrame(
+        {"site": ["A", "B"], "latitude": [52.51, 53.49], "longitude": [0.49, -0.74]}
+    )
+
+    nearest = nearest_cells(sites=sites, cells=cells).join(cells, on="cell_id").sort("site")
+
+    assert nearest["latitude"].to_list() == pytest.approx([52.5, 53.5])
+    assert nearest["longitude"].to_list() == pytest.approx([0.5, -0.75])
+
+
+def test_no_cells_raises():
+    empty = pl.DataFrame(
+        {"cell_id": [], "latitude": [], "longitude": []},
+        schema={"cell_id": pl.Int64, "latitude": pl.Float64, "longitude": pl.Float64},
+    )
+    sites = pl.DataFrame({"site": ["A"], "latitude": [53.0], "longitude": [0.0]})
+
+    with pytest.raises(ValueError, match="no cells"):
+        nearest_cells(sites=sites, cells=empty)

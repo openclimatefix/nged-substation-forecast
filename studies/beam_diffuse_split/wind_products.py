@@ -29,20 +29,23 @@ under-sampled; dropping no rows at all moves every contrast by 0.03 points or le
 
 Run it with `uv run python studies/beam_diffuse_split/wind_products.py`, after
 `fetch_wind_point.py`. With `--fit-missing` it keeps the losses a full run saved and fits only the
-arms they lack.
+arms they lack. With `--era5-by-year` it fits nothing: it reads the saved losses and writes ERA5's
+error against every other product, year by year, under `sources.UPDATE_OUTPUT_DIR`, leaving this
+study's own directory untouched.
 """
 
 import argparse
 import logging
 import sys
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Final
 
 import polars as pl
 from build_dataset import POWER_DELTA_URI, _wind_sites
 from fetch_wind_point import PRODUCTS, output_path_for
 from run_experiment import Job, _add_time_features, run_all
-from sources import STUDY_DATA_DIR
+from sources import STUDY_DATA_DIR, UPDATE_OUTPUT_DIR
 from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SENSITIVITY_HYPER_PARAMETERS
 from studies.neighbouring_hours import with_neighbouring_hours
 from studies.power import hourly_from_half_hourly
@@ -52,7 +55,10 @@ from weather_products import (
     _contrast_line,
     _mae,
     _scope,
+    era5_by_year_lines,
+    era5_difference_by_year,
     geometry_lines,
+    refuse_to_overwrite,
     with_eras,
 )
 
@@ -60,6 +66,9 @@ _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
 OUTPUT_DIR_NAME: Final[str] = "beam_diffuse_wind_products"
 """The results directory under `STUDY_DATA_DIR`."""
+
+ERA5_BY_YEAR_DIR: Final[Path] = UPDATE_OUTPUT_DIR / "wind"
+"""Where `--era5-by-year` writes, apart from the published losses it reads."""
 
 SHARED_FEATURES: Final[tuple[str, ...]] = ("hour_of_day", "day_of_year", "era_code")
 """Features every arm gets, on top of its product's wind."""
@@ -787,6 +796,28 @@ def _report(*, frame: pl.DataFrame, losses: pl.DataFrame, sites_roster: pl.DataF
     return "\n".join(lines) + "\n"
 
 
+def write_era5_by_year() -> None:
+    """Write ERA5's error against every other product, year by year, from the saved losses.
+
+    Reads the main setting's losses the full run saved, and fits nothing.
+    """
+    losses = pl.read_parquet(STUDY_DATA_DIR / OUTPUT_DIR_NAME / "losses.parquet").filter(
+        pl.col("setting") == "pooled"
+    )
+    paths = [ERA5_BY_YEAR_DIR / "era5_by_year.parquet", ERA5_BY_YEAR_DIR / "era5_by_year.md"]
+    refuse_to_overwrite(paths=paths)
+    by_year = era5_difference_by_year(
+        losses=losses,
+        era5_arm="era5_wind",
+        other_arms=tuple(f"{product}_wind" for product in PRODUCTS if product != "era5"),
+    )
+    ERA5_BY_YEAR_DIR.mkdir(parents=True, exist_ok=True)
+    lines = era5_by_year_lines(by_year=by_year)
+    by_year.write_parquet(paths[0])
+    paths[1].write_text("\n".join(lines) + "\n")
+    sys.stdout.write("\n".join(lines) + "\n")
+
+
 def main() -> int:
     """Fit every arm, bootstrap every contrast, and write the report."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -796,7 +827,15 @@ def main() -> int:
         action="store_true",
         help="Keep the losses already on disk and fit only the jobs they lack.",
     )
+    parser.add_argument(
+        "--era5-by-year",
+        action="store_true",
+        help="Fit nothing; write ERA5's error against every product, year by year.",
+    )
     arguments = parser.parse_args()
+    if arguments.era5_by_year:
+        write_era5_by_year()
+        return 0
 
     sites = _wind_sites()
     frame = with_eras(frame=_add_time_features(dataset=common_rows(frame=joined(sites=sites))))

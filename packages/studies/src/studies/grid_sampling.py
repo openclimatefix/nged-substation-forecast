@@ -1,8 +1,14 @@
-"""Sample a projected weather grid at a set of coordinates, by nearest cell."""
+"""Find the grid cell nearest each site, on a projected grid or among a set of cell centres."""
 
+from typing import Final
+
+import numpy as np
 import polars as pl
 import xarray as xr
 from pyproj import CRS, Transformer
+
+EARTH_RADIUS_KM: Final[float] = 6371.0
+"""The mean radius of the Earth, which turns an angle on the sphere into a distance."""
 
 
 def sample_nearest_cell(*, field: xr.DataArray, sites: pl.DataFrame, crs: CRS) -> dict[str, float]:
@@ -36,3 +42,48 @@ def sample_nearest_cell(*, field: xr.DataArray, sites: pl.DataFrame, crs: CRS) -
             ).item()
         )
     return sampled
+
+
+def nearest_cells(*, sites: pl.DataFrame, cells: pl.DataFrame) -> pl.DataFrame:
+    """Return the cell whose centre is nearest each site, by great-circle distance.
+
+    **Distance is measured on the sphere, never in degrees.** At the trial area's latitude a degree
+    of longitude is about 0.6 of a degree of latitude, so the nearest cell in degrees can be a cell
+    further away on the ground. The cells can be any set of centres: a regular latitude-longitude
+    grid flattened to one row per cell, or an unstructured grid such as ICON's triangles.
+
+    **A site outside the cells' extent still gets a cell**, the nearest edge cell, so a caller whose
+    sites might fall outside the extent reads `distance_km` before trusting the result.
+
+    Args:
+        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        cells: One row per cell, carrying `cell_id`, `latitude` and `longitude`.
+
+    Returns:
+        One row per site with `site`, the nearest `cell_id`, and `distance_km` to its centre.
+
+    Raises:
+        ValueError: If `cells` is empty, which leaves no cell to choose.
+    """
+    if cells.height == 0:
+        msg = "no cells to choose from"
+        raise ValueError(msg)
+    cell_latitude = np.radians(cells["latitude"].to_numpy().astype(np.float64))
+    cell_longitude = np.radians(cells["longitude"].to_numpy().astype(np.float64))
+    site_latitude = np.radians(sites["latitude"].to_numpy().astype(np.float64))[:, None]
+    site_longitude = np.radians(sites["longitude"].to_numpy().astype(np.float64))[:, None]
+    half_chord = (
+        np.sin((cell_latitude - site_latitude) / 2.0) ** 2
+        + np.cos(site_latitude)
+        * np.cos(cell_latitude)
+        * np.sin((cell_longitude - site_longitude) / 2.0) ** 2
+    )
+    distance_km = 2.0 * EARTH_RADIUS_KM * np.arcsin(np.sqrt(np.clip(half_chord, 0.0, 1.0)))
+    nearest = distance_km.argmin(axis=1)
+    return pl.DataFrame(
+        {
+            "site": sites["site"],
+            "cell_id": cells["cell_id"].gather(nearest),
+            "distance_km": distance_km[np.arange(sites.height), nearest],
+        }
+    )
