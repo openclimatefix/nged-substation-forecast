@@ -145,9 +145,10 @@ observations of the time. CAMS infers cloud from satellite images.
 | ERA5 via Open-Meteo's mirror | The same reanalysis, the same two fields, served in about a minute rather than most of a night | as above | identical grid and hours | yes | as above | as above |
 | CAMS radiation service | The Copernicus Atmosphere Monitoring Service's satellite retrieval: cloud inferred from the Meteosat geostationary satellites, published at each meter's own coordinates | no forecast step | ~5 km cloud field, point delivery | yes | September 2019 to September 2026; archive from 2004 | about 1 day |
 
-The lead, archive start, and delay columns are taken from the [sunshine study's product
-table](weather-products-for-past-solar.md#the-six-products), which cites each service's own
-documentation.
+The lead, archive start, and delay columns are taken from the
+[sunshine study's product
+table](weather-products-for-past-solar.md#where-each-product-comes-from-and-its-served-lead),
+which cites each service's own documentation.
 
 **The reanalysis and the satellite retrieval are different measurement systems rather than two
 routes to one answer**, which is why the beam question is asked separately on each. ERA5 averages
