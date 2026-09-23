@@ -8,7 +8,8 @@ description: >-
   provider's real parameter names before submitting a request, size each chunk to the provider's own
   constraints, and get a fresh adversarial review before the script's first real run. Run the
   `data-validation` skill's checklist once the fetch completes — a clean run is not evidence the
-  data is right. Load before writing or resuming any bulk-download script (e.g.
+  data is right — and write a generated README alongside the lineage note, for the human reader the
+  lineage note isn't for. Load before writing or resuming any bulk-download script (e.g.
   `studies/*/fetch_*.py`) that makes more than a handful of requests, and before running any such
   script for the first time.
 ---
@@ -229,6 +230,37 @@ respectively, comparing a measured field count against an expectation, a small r
 returned values inspected for physical plausibility, and a local repro of ambiguous library behaviour
 — the same techniques the "Measure one chunk" and "Look up the provider's real parameter names"
 sections above already recommend, applied by a reader with no reason to assume the request is right.
+
+## Write a README alongside the lineage note, for the human reader the JSON isn't for
+
+**`lineage.json` is machine-oriented — where the data came from and what was requested — and
+answers none of the questions a human picking up the directory cold actually has.** A later reader
+(a study author, a reviewer, a future session) needs to know what each column means, its unit, how a
+missing value is represented, what traps this product has, and how to get the data again — none of
+which a JSON blob answers quickly. Write a `README.md` (or `README_<variable>.md`, matching the
+per-variable lineage-note split for a product fetched one variable at a time) alongside every
+product's lineage note, covering:
+
+- **A link to the source** — the product's own web page or API documentation, not the raw request
+  URL (that belongs in `lineage.json`'s `source_address`).
+- **The script that produced this directory's data**, so a reader can re-run it.
+- **Every column**, with its unit and what it means — not only the value columns; a reader who does
+  not know what `y_index` or `model_level` means cannot use the file at all.
+- **How a missing value is represented** — `NaN`, Polars null, both, or neither, and what causes it.
+- **Every gotcha this skill's checklist or the `data-validation` skill's checklist turned up** — an
+  upstream data defect, a label convention that is easy to get backwards, a value that needs
+  clipping or de-averaging before use. Keep each to a sentence or two and point at `lineage.json`'s
+  `note` field for the full numbers, rather than duplicating them — the numbers drift out of sync
+  with the README if a fact is corrected in only one place.
+- **Further reading** — the product's own technical documentation, or a paper describing the model,
+  for anything this README only summarises.
+
+Generate the README from code, the same way `lineage.json` is generated, rather than writing it by
+hand once and letting it go stale: `lineage.write_readme` (alongside `write_lineage_note` in the
+same module) takes these fields as arguments and formats them consistently, and a re-run of the
+fetch script regenerates the README along with the lineage note, so a fix to a gotcha's wording
+never has to be applied in two places. A README hand-written once, separately from the fetch script,
+is exactly the kind of fact that drifts the moment the data is re-fetched or a gotcha is corrected.
 
 ## Two traps from this repo's own conventions worth restating here
 
