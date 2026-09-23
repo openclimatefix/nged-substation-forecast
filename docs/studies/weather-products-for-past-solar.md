@@ -221,8 +221,14 @@ CAMS or ERA5.** The rule pools the six generators and considers only April to Se
 short midwinter day cannot dominate the choice. The clearest week is the one in which the
 generators produced the most output relative to their own capacity, and the dullest week the one in
 which they produced the least. The most variable week is the one whose daily output swings the most
-from day to day. Figure 3 shows each week as days 1 to 7, with no calendar dates, so that a
-generator's hourly output cannot be matched against public generation data.
+from day to day. The clearest week and the most variable week both fell in May 2026, and the
+dullest week in July 2025.
+
+**Figure 3 shows each week as days 1 to 7, with no calendar dates, because a dated hourly series
+would identify the solar farm.** With only 6 solar farms in the study, a generator's hourly
+output on known dates could be matched against publicly available generation data. That match
+would undo the anonymisation that names the generators only as Generator A to F. The page
+therefore gives each week's month and year in the text and no finer date.
 
 ![Figure 3: An XGBoost model given CAMS tracks measured power at every generator, across a clear,
 a variable, and a dull week](assets/sunshine_models_work_timeseries.svg)

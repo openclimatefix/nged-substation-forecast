@@ -204,8 +204,14 @@ best](#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested).
 ICON-D2 or ERA5.** The rule pools the three generators. The windiest week is the one in which the
 generators' mean output was highest relative to their own capacity, and the calmest week the one in
 which it was lowest. The most variable week is the one whose daily mean output swings the most from
-day to day. Figure 3 shows each week as days 1 to 7, with no calendar dates, so that a generator's
-hourly output cannot be matched against public generation data.
+day to day. The windiest week fell in December 2024, the most variable week in February 2025, and
+the calmest week ran from July into August 2026.
+
+**Figure 3 shows each week as days 1 to 7, with no calendar dates, because a dated hourly series
+would identify the wind farm.** With only 3 wind farms in the study, a generator's hourly
+output on known dates could be matched against publicly available generation data. That match
+would undo the anonymisation that names the generators only as Generator W1 to W3. The page
+therefore gives each week's month and year in the text and no finer date.
 
 ![Figure 3: An XGBoost model given ICON-D2 follows measured power at every generator, across a
 windy, a variable, and a calm week](assets/wind_models_work_timeseries.svg)

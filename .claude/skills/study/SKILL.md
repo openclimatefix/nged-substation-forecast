@@ -290,6 +290,12 @@ the story without the prose around it. Load the `dataviz` skill before drawing a
   per generator. [Does a weather product's beam/diffuse split help a PV
   forecast?](https://openclimatefix.github.io/nged-substation-forecast/studies/beam-diffuse-split/#the-models-work)
   is the pattern.
+- **Put no calendar dates on the axis of a metered generator's time series.** With only a handful
+  of generators in a study, an hourly series on known dates can be matched against publicly
+  available generation data, which identifies the generator behind its anonymised label. Count the
+  days of the week on the axis (days 1 to 7), and give each plotted period's month and year in the
+  page's text, never the day. Turn off per-point accessibility text (`aria=False` on the mark),
+  because Vega otherwise writes each point's date and value into the SVG's ARIA labels.
 - **The title states the finding, scoped to the products tested** ("CAMS describes past sunshine
   best of the six products we tested"), and matches the heading or bolded lead the chart sits under.
   A bare "ICON global is the weakest" ranks every product in existence on a test of five.
