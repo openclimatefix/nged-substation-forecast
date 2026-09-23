@@ -9,12 +9,16 @@
 # Graviton, so an amd64 image cannot run anywhere in the deployment; on an x86 host this
 # needs QEMU registered, which scripts/deploy/build_and_verify_image.sh checks for):
 #   docker build --platform linux/arm64 \
+#     --build-context production_model="$(realpath data/production_model)" \
 #     --build-arg MODEL_RUN_ID=<id> --build-arg GIT_SHA=$(git rev-parse HEAD) \
 #     -t nged-forecast:<id-short> .
 #
 # The champion model must already be promoted to data/production_model/ (via the
 # `promoted_model` Dagster asset) before running this build — the build itself never talks to
-# MLflow, so it copies that directory from the build context hermetically.
+# MLflow, so it copies that directory hermetically. The model arrives as the named build context
+# `production_model` rather than through the main context, because the main context sends a
+# symlinked data/ as the link itself and the COPY then finds nothing; `realpath` resolves the
+# link before Docker sees the path.
 
 FROM ghcr.io/astral-sh/uv:python3.14-bookworm-slim AS builder
 
@@ -58,7 +62,7 @@ WORKDIR /app
 # can run in-container.
 COPY --from=builder /app/.venv /app/.venv
 COPY uv.lock ./
-COPY data/production_model/ data/production_model/
+COPY --from=production_model . data/production_model/
 COPY conf/ conf/
 
 ENTRYPOINT ["dagster"]
