@@ -136,8 +136,9 @@ nearest grid cell over land.**
   hours. A comparison is planned when it was written into the study plan before any result existed;
   every other figure is exploratory, chosen or added after results were seen. The distinction
   matters because with many comparisons, about 1 in 20 exploratory rows reaches significance at the
-  5% level by chance, so an exploratory result is a lead to follow up rather than a finding. The
-  charts mark each planned row "(planned)". Every contrast is also rerun with a second
+  5% level by chance, so an exploratory result is a lead to follow up rather than a finding. A chart
+  holding both kinds marks each planned row "(planned)". A chart whose rows are all one kind says
+  so once, in its subtitle. Every contrast is also rerun with a second
   hyperparameter setting for the tree. The plan written before the run gave the model each product's
   served 100 m wind. After the first run, each ICON product was switched to its 80 m wind. The
   results with the served 100 m wind are reported alongside and change no ranking.

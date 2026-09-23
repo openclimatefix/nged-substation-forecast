@@ -147,8 +147,9 @@ difference between two products is a difference between their irradiance alone.*
   hours. A comparison is planned when it was written into the study plan before any result existed;
   every other figure is exploratory, chosen or added after results were seen. The distinction
   matters because with many comparisons, about 1 in 20 exploratory rows reaches significance at the
-  5% level by chance, so an exploratory result is a lead to follow up rather than a finding. The
-  charts mark each planned row "(planned)". The ranking rests on four planned contrasts: CAMS
+  5% level by chance, so an exploratory result is a lead to follow up rather than a finding. A chart
+  holding both kinds marks each planned row "(planned)". A chart whose rows are all one kind says
+  so once, in its subtitle. The ranking rests on four planned contrasts: CAMS
   against ICON-D2, ICON-EU against ICON-D2, ICON-EU against UKV, and ICON global against ICON-EU.
   Every other figure on this page is exploratory. The UKV snapshot rebuilds, the hour-by-hour and
   by-lead breakdowns, and the split of ICON global by lead were added after the first run.
