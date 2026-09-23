@@ -33,6 +33,7 @@ import plotting.ocf_theme as ocf
 import polars as pl
 from ens_forecast_horizons import (
     BAND_DAYS,
+    CALENDAR_ONLY_MONTH,
     EMULATED_DAY,
     METRIC,
     OUTPUT_DIR,
@@ -40,6 +41,7 @@ from ens_forecast_horizons import (
     PLANNED,
     baseline_arm,
     ens_arm,
+    month_ens_arm,
     upsampling_arm,
 )
 from studies.bootstrap import bootstrap_absolute
@@ -603,11 +605,14 @@ def against_day0(*, contrasts: pl.DataFrame, title: str) -> alt.VConcatChart:
         The figure.
     """
     days = BAND_DAYS[1:]
+    # The ensemble mean is the planned arm, so it takes the first, fully-shaded condition; the
+    # control member and member-by-member are exploratory here and take the light shade.
+    emphasis_order = ("mean", "control", "members")
     panels = []
     for domain in DOMAINS:
         pairs = [
-            (name, [(ens_arm(way=way, day=day), ens_arm(way=way, day=0)) for day in days])
-            for way, name in WAY_NAMES.items()
+            (WAY_NAMES[way], [(ens_arm(way=way, day=day), ens_arm(way=way, day=0)) for day in days])
+            for way in emphasis_order
         ]
         triples = [(domain, t, r) for _, per_day in pairs for t, r in per_day]
         panels.append(
@@ -787,9 +792,13 @@ def calendar_contrast(*, contrasts: pl.DataFrame, title: str) -> alt.VConcatChar
     """
     pairs = [
         (
-            "Ensemble mean minus calendar-only",
+            "Day of year",
             [(ens_arm(way="mean", day=day), "calendar_only") for day in BAND_DAYS],
-        )
+        ),
+        (
+            "Calendar month",
+            [(month_ens_arm(day=day), CALENDAR_ONLY_MONTH) for day in BAND_DAYS],
+        ),
     ]
     panels = []
     for domain in DOMAINS:
@@ -803,7 +812,7 @@ def calendar_contrast(*, contrasts: pl.DataFrame, title: str) -> alt.VConcatChar
                 x_domain=_x_domain(contrasts=contrasts, pairs=triples),
                 zero_label="same as calendar-only",
                 better_label="ENS better",
-                condition_title="Contrast",
+                condition_title="Calendar column both arms use",
                 keys=domain == "solar",
             )
         )
@@ -815,7 +824,8 @@ def calendar_contrast(*, contrasts: pl.DataFrame, title: str) -> alt.VConcatChar
             (
                 "Mean absolute error of an XGBoost model given ENS's ensemble mean minus the same "
                 "model given no weather at all, only the ENS arms' calendar and sun-geometry "
-                "columns. All marks are post hoc: added after the first science review."
+                "columns, with the day-of-year column and with calendar month instead. All marks "
+                "are post hoc: added after the first and second science reviews."
             ),
             f"{DOTS} {CAPACITY}",
             f"{SCOPES['solar']} {SCOPES['wind']}",
@@ -1045,7 +1055,7 @@ def _day_panels(
         alt.Chart(measured)
         .mark_line(
             strokeWidth=1.8,
-            point=alt.OverlayMarkDef(size=20, filled=True),
+            point=alt.OverlayMarkDef(size=20, filled=True, aria=False),
             color=MEASURED_COLOUR,
             aria=False,
         )
@@ -1491,8 +1501,8 @@ TITLES: Final[dict[str, str]] = {
         "and by day 14 climatology is ahead"
     ),
     "calendar": (
-        "The ensemble mean beats the same XGBoost model given no weather at all to day 10, and is "
-        "not significantly different from it by day 14"
+        "The ensemble mean beats the same model given no weather to day 7; after that it does "
+        "not, whichever calendar column both use"
     ),
     "example_days": (
         "The clear-sky index keeps the solar day's shape, where linear interpolation shifts it late"

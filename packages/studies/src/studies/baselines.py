@@ -36,8 +36,12 @@ Four baselines:
 - **Climatology**: the median power at each generator in each calendar month and hour of day, over
   the training folds only, curtailed hours left out as the study's XGBoost models leave them out.
   The median rather than the mean, because the score is the mean absolute error, which the median
-  minimises. Where a month and hour have no training rows, the generator's median at that hour over
-  every training month is used.
+  minimises. **Fallback rule, chosen before looking at any result it would affect:** where a month
+  and hour have no training rows — a fold cut within a UKV era can leave a calendar month's rows all
+  on the scored side, which happens for June and July at the wind farms and for the shortest-history
+  solar farm — the median of the two neighbouring calendar months at that hour, over the training
+  folds, is used instead. Where even that is empty, the generator's median at that hour over every
+  training month is used.
 """
 
 from datetime import datetime, timedelta
@@ -256,6 +260,11 @@ def hourly_grid(*, hourly: pl.DataFrame) -> pl.DataFrame:
     return grid.join(hourly.select("site", "time", "power_mw"), on=["site", "time"], how="left")
 
 
+def _mod_month(expr: pl.Expr) -> pl.Expr:
+    """Return `expr` wrapped back into the 1-to-12 calendar-month range."""
+    return ((expr - 1) % 12) + 1
+
+
 def _climatology_from(*, train: pl.DataFrame, rows: pl.DataFrame) -> pl.Series:
     """Return each of `rows`' median training power at its generator, calendar month, and hour.
 
@@ -264,21 +273,37 @@ def _climatology_from(*, train: pl.DataFrame, rows: pl.DataFrame) -> pl.Series:
         rows: The rows to forecast, with `site` and `time`.
 
     Returns:
-        The median, one per row of `rows` in its order: the month-and-hour median, or where the
-        training rows hold no such month and hour, the generator's median at that hour.
+        The median, one per row of `rows` in its order: the month-and-hour median; or, where the
+        training rows hold no such month and hour, the median of the two neighbouring calendar
+        months at that hour; or, where even that is empty, the generator's median at that hour over
+        every training month.
     """
     keys = {"calendar_month": pl.col("time").dt.month(), "hour": pl.col("time").dt.hour()}
     kept = train.filter(~pl.col("constrained")).with_columns(**keys)
     by_month = kept.group_by("site", "calendar_month", "hour").agg(
         month_median=pl.col("power_mw").median()
     )
+    neighbour_pool = pl.concat(
+        [
+            kept.with_columns(calendar_month=_mod_month(pl.col("calendar_month") + 1)),
+            kept.with_columns(calendar_month=_mod_month(pl.col("calendar_month") - 1)),
+        ]
+    )
+    by_neighbour = neighbour_pool.group_by("site", "calendar_month", "hour").agg(
+        neighbour_median=pl.col("power_mw").median()
+    )
     by_hour = kept.group_by("site", "hour").agg(hour_median=pl.col("power_mw").median())
     return (
         rows.select("site", "time")
         .with_columns(**keys)
         .join(by_month, on=["site", "calendar_month", "hour"], how="left", maintain_order="left")
+        .join(
+            by_neighbour, on=["site", "calendar_month", "hour"], how="left", maintain_order="left"
+        )
         .join(by_hour, on=["site", "hour"], how="left", maintain_order="left")
-        .select(climatology=pl.coalesce("month_median", "hour_median"))["climatology"]
+        .select(climatology=pl.coalesce("month_median", "neighbour_median", "hour_median"))[
+            "climatology"
+        ]
     )
 
 

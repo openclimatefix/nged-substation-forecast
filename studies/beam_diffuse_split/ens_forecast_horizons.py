@@ -1735,10 +1735,25 @@ def contrasts(*, decisions: list[Decision], best: dict[int, str]) -> list[Contra
         ("calendar", "pooled", ens_arm(way="mean", day=day), CALENDAR_ONLY) for day in BAND_DAYS
     ]
     wanted += [
+        ("calendar", "pooled", ens_arm(way="members", day=day), CALENDAR_ONLY) for day in BAND_DAYS
+    ]
+    wanted += [
         ("calendar sensitivity", "pooled", month_ens_arm(day=day), ens_arm(way="mean", day=day))
         for day in BAND_DAYS
     ]
     wanted.append(("calendar sensitivity", "pooled", CALENDAR_ONLY_MONTH, CALENDAR_ONLY))
+    wanted += [
+        ("calendar (month)", "pooled", month_ens_arm(day=day), CALENDAR_ONLY_MONTH)
+        for day in BAND_DAYS
+    ]
+    wanted += [
+        ("calendar (month)", "pooled", month_ens_arm(day=day), "climatology") for day in BAND_DAYS
+    ]
+    wanted += [
+        ("calendar (month)", "pooled", CALENDAR_ONLY, "climatology"),
+        ("calendar (month)", "pooled", CALENDAR_ONLY_MONTH, "climatology"),
+    ]
+    wanted.append(("references", "pooled", ens_arm(way="control", day=0), "era5"))
     planned = {contrast[1:] for contrast in wanted if contrast[0] == "planned"}
     unique: list[Contrast] = []
     for contrast in wanted:
@@ -2066,6 +2081,73 @@ def _spread_lines(*, summary: pl.DataFrame, frame: pl.DataFrame) -> list[str]:
     return [*lines, ""]
 
 
+def _response_diagnostics_lines(*, domain: DomainType) -> list[str]:
+    """Describe how far each arm's forecast moves against how far the measured output moves.
+
+    Added for the second science review of #858 (S5, S6): the member-by-member arm's 10th-to-90th
+    coverage against the measured output is not valid evidence on its own, because each of the 51
+    forecasts is a conditional median that leaves out the power's own scatter. This table gives the
+    direct test instead: each arm's forecast anomaly against the day's climatology forecast,
+    regressed against the measured output's own anomaly against that same climatology forecast, so
+    a slope of 1.0 means the arm moves exactly as far as the truth does on average, and a slope
+    below 1.0 means the arm under-responds to the weather.
+
+    Args:
+        domain: `solar` or `wind`.
+
+    Returns:
+        Markdown lines.
+    """
+    paths = _paths(domain=domain)
+    rows = pl.read_parquet(paths["rows"]).select("site", "time", "effective_capacity_mw")
+    predictions = pl.scan_parquet(paths["predictions"]).filter(pl.col("setting") == "pooled")
+    labels = {
+        "mean": "ensemble mean",
+        "members": "member by member",
+        APPLIED: "trained on the mean, applied to each member",
+        "control": "control member",
+    }
+    lines = [
+        f"#### {domain.capitalize()}: response to the weather, against a climatology anomaly",
+        "",
+        (
+            "Each arm's forecast anomaly against the day's climatology forecast, regressed "
+            "against the measured output's own anomaly against that climatology forecast. Slope: "
+            "1.0 tracks the truth exactly, below 1.0 under-responds. SD: the forecast anomaly's "
+            "standard deviation, in percentage points of capacity."
+        ),
+        "",
+        "| Band | Arm | Slope | Forecast anomaly SD (pp) |",
+        "|---|---|---|---|",
+    ]
+    for day in BAND_DAYS:
+        arms = {way: ens_arm(way=way, day=day) for way in labels}
+        scored = (
+            predictions.filter(pl.col("arm").is_in([*arms.values(), "climatology"]))
+            .group_by("site", "time", "arm")
+            .agg(pl.col("prediction_mw").mean(), pl.col("power_mw").first())
+            .collect()
+            .join(rows, on=["site", "time"])
+            .with_columns(
+                f=pl.col("prediction_mw") / pl.col("effective_capacity_mw"),
+                y=pl.col("power_mw") / pl.col("effective_capacity_mw"),
+            )
+        )
+        clim = scored.filter(pl.col("arm") == "climatology").select("site", "time", c="f")
+        anomaly = scored.join(clim, on=["site", "time"]).with_columns(
+            fa=pl.col("f") - pl.col("c"), ya=pl.col("y") - pl.col("c")
+        )
+        diagnostics = anomaly.group_by("arm").agg(
+            slope=pl.cov("ya", "fa") / pl.col("fa").var(),
+            sd_pred=pl.col("fa").std() * PERCENTAGE_POINTS,
+        )
+        by_arm = dict(zip(diagnostics["arm"], diagnostics.iter_rows(named=True), strict=True))
+        for way, label in labels.items():
+            row = by_arm[arms[way]]
+            lines.append(f"| day {day} | {label} | {row['slope']:.3f} | {row['sd_pred']:.3f} |")
+    return [*lines, ""]
+
+
 def _weight_lines(*, weights: pl.DataFrame) -> list[str]:
     """Describe the wind smart persistence's fitted weight on persistence, per band.
 
@@ -2101,7 +2183,9 @@ def check_shared_rows(*, losses: pl.DataFrame) -> None:
     """Stop unless every arm but the native ones scores the same (site, time, seed) rows.
 
     A contrast pairs its two arms by an inner join on those keys, so an arm missing rows would
-    silently shrink every contrast it enters rather than fail.
+    silently shrink every contrast it enters rather than fail. This compares row keys only, not
+    `power_mw`, `cap_mw`, or `fold`, so it would not catch two arms scoring the same rows against
+    different targets.
 
     Args:
         losses: Every arm's losses.
@@ -2229,7 +2313,59 @@ def _fit_missing(*, domain: Domain) -> Outputs:
     )
 
 
-def run_domain(*, domain: Domain, report_only: bool, fit_missing: bool = False) -> Outputs:
+def _fit_baselines(*, domain: Domain) -> Outputs:
+    """Re-score every baseline, and read every fitted arm's losses from disk unchanged.
+
+    None of `_baseline_losses`' four baselines uses XGBoost, so this needs no refit. It exists to
+    re-run `studies.baselines.climatology`'s fallback rule after a fix, without refitting the
+    XGBoost arms the fallback plays no part in. Rebuilds the full frame (`build_inputs` and
+    `main_frame`, at the method the saved losses already chose), the same way `_fit_missing` does,
+    because the saved `rows` parquet keeps only the columns the report needs.
+
+    Args:
+        domain: The domain.
+
+    Returns:
+        The saved outputs with every baseline's losses replaced, and the wind smart-persistence
+        weights replaced for wind.
+    """
+    saved = _read_saved(domain=domain.name)
+    inputs = build_inputs(domain=domain.name)
+    inputs = main_frame(inputs=inputs, method=saved.method, domain=domain.name)
+    frame = inputs.frame
+    keep = [
+        "site",
+        "time",
+        "month",
+        "fold",
+        "seed",
+        "arm",
+        "setting",
+        METRIC,
+        "signed_error_capped_mw",
+    ]
+    baseline_arms = {
+        "climatology",
+        *(baseline_arm(name=name, day=day) for day in BAND_DAYS for name in BASELINES),
+    }
+    baselines, weights = _baseline_losses(frame=frame, domain=domain.name)
+    losses = pl.concat(
+        [saved.losses.filter(~pl.col("arm").is_in(baseline_arms)), baselines.select(keep)]
+    )
+    check_shared_rows(losses=losses)
+    return Outputs(
+        frame=saved.frame,
+        losses=losses,
+        summary=saved.summary,
+        weights=weights if not weights.is_empty() else saved.weights,
+        method=saved.method,
+        decisions=saved.decisions,
+    )
+
+
+def run_domain(
+    *, domain: Domain, report_only: bool, fit_missing: bool = False, fit_baselines: bool = False
+) -> Outputs:
     """Build one technology's inputs, choose the upsampling, fit every arm, and score the baselines.
 
     Args:
@@ -2237,6 +2373,8 @@ def run_domain(*, domain: Domain, report_only: bool, fit_missing: bool = False) 
         report_only: Whether to read the saved outputs instead of fitting.
         fit_missing: Whether to fit only the arms missing from the saved losses (`_fit_missing`),
             reading everything else from disk. Ignored if `report_only` is set.
+        fit_baselines: Whether to re-score only the four no-weather baselines (`_fit_baselines`),
+            reading every fitted arm from disk. Ignored if `report_only` or `fit_missing` is set.
 
     Returns:
         The outputs.
@@ -2247,6 +2385,11 @@ def run_domain(*, domain: Domain, report_only: bool, fit_missing: bool = False) 
     if fit_missing:
         outputs = _fit_missing(domain=domain)
         outputs.losses.write_parquet(paths["losses"])
+        return outputs
+    if fit_baselines:
+        outputs = _fit_baselines(domain=domain)
+        outputs.losses.write_parquet(paths["losses"])
+        outputs.weights.write_parquet(paths["weights"])
         return outputs
     inputs = build_inputs(domain=domain.name)
     inputs.inputs.join(
@@ -2364,6 +2507,15 @@ def main() -> int:
             "calendar-only and month-sensitivity arms), reading every other arm from disk."
         ),
     )
+    parser.add_argument(
+        "--fit-baselines",
+        action="store_true",
+        help=(
+            "Re-score only the four no-weather baselines (persistence, diurnal persistence, "
+            "smart persistence, climatology), reading every fitted XGBoost arm from disk. No "
+            "XGBoost refit runs."
+        ),
+    )
     arguments = parser.parse_args()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -2375,11 +2527,13 @@ def main() -> int:
             arguments.refit in (domain.name, "both")
             and not arguments.report_only
             and not arguments.fit_missing
+            and not arguments.fit_baselines
         )
         outputs = run_domain(
             domain=domain,
-            report_only=not refit and not arguments.fit_missing,
+            report_only=not refit and not arguments.fit_missing and not arguments.fit_baselines,
             fit_missing=arguments.fit_missing,
+            fit_baselines=arguments.fit_baselines,
         )
         best = best_baselines(losses=outputs.losses)
         domain_records = _intervals(
@@ -2405,6 +2559,7 @@ def main() -> int:
             *_leaderboard_lines(board=board, domain=domain.name),
             *_contrast_lines(records=domain_records),
             *_spread_lines(summary=outputs.summary, frame=outputs.frame),
+            *_response_diagnostics_lines(domain=domain.name),
             *(_weight_lines(weights=outputs.weights) if domain.name == "wind" else []),
             *_per_site_lines(losses=outputs.losses, domain=domain.name),
         ]

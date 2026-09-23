@@ -298,6 +298,29 @@ def test_climatology_keys_on_the_calendar_month():
     assert climatology(frame=frame).to_list()[3] == 2.0
 
 
+def test_the_calendar_fallback_is_the_two_neighbouring_months_median():
+    # No training row shares the target's own calendar month, so the fallback cannot use the
+    # month-and-hour median. The whole-year hour fallback and the neighbouring-month fallback
+    # disagree here (100 against 150), so only the neighbouring-month rule gives 150.
+    hour = 12
+    frame = pl.DataFrame(
+        {
+            "site": ["A"] * 4,
+            "time": [
+                datetime(2025, 6, 15, hour, tzinfo=UTC),  # target: June, scored fold
+                datetime(2025, 5, 15, hour, tzinfo=UTC),  # neighbour: May
+                datetime(2025, 7, 15, hour, tzinfo=UTC),  # neighbour: July
+                datetime(2025, 12, 15, hour, tzinfo=UTC),  # not a neighbour: December
+            ],
+            "fold": [0, 1, 1, 1],
+            "constrained": [False] * 4,
+            "power_mw": [0.0, 100.0, 200.0, 5.0],
+        }
+    )
+
+    assert climatology(frame=frame).to_list()[0] == 150.0
+
+
 def test_the_hourly_fallback_is_a_median():
     times = [datetime(2025, month, 3, 12, tzinfo=UTC) for month in (1, 2, 3)]
     frame = pl.DataFrame(
