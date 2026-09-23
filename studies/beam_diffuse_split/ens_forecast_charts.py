@@ -500,7 +500,7 @@ def leaderboard(
                 "No-weather baselines read the telemetry up to 09:00 UTC on the run's own day, "
                 "when the live service can first read the run, or up to 00 UTC for day 0. "
                 "Climatology does not depend on the horizon. The two light blue rules are not "
-                "forecasts: ERA5, and the best past-weather input a live service can read, scored "
+                "forecasts: ERA5, and the best of the inputs the blending page compared, scored "
                 "on the same hours."
             ),
             f"{DOTS} {CAPACITY}",
@@ -1501,8 +1501,8 @@ TITLES: Final[dict[str, str]] = {
         "and by day 14 climatology is ahead"
     ),
     "calendar": (
-        "The ensemble mean beats the same model given no weather to day 7; after that it does "
-        "not, whichever calendar column both use"
+        "The ensemble mean beats the same model given no weather to day 10 with a day-of-year "
+        "calendar column, and to day 7 with calendar month"
     ),
     "example_days": (
         "The clear-sky index keeps the solar day's shape, where linear interpolation shifts it late"

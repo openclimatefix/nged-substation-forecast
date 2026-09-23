@@ -13,7 +13,8 @@ at a set of coordinates, turning a product's native time steps into hourly means
 result against the sun, the Fractions Skill Score, the control and the stack a blend of weather
 products is measured with, a product's neighbouring hours, the upsampling of a 3- or 6-hourly
 forecast to hourly values, the no-weather baselines a forecast must beat, and the dot-and-interval
-chart form the study pages share, with the parser that reads a study report's contrast tables into it.
+chart form the study pages share, with the parser that reads a study report's contrast tables into
+it.
 
 It does not own the question, the arms, which charts a page draws, or the write-up. Those stay in
 the study, as scripts, because a one-off comparison is not a library and should not be dressed as

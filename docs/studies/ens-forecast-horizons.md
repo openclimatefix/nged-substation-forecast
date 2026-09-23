@@ -73,7 +73,7 @@ forecast "beats" another, the difference is statistically significant at the 5% 
   columns; the rest is ENS adding little skill at that
   lead.](#where-ens-stops-beating-the-no-weather-baselines)**
 - **[At day 1 the ensemble mean beats ERA5 for solar and loses to it for wind, and loses to the best
-  past-weather input a live service can read.](#ens-against-past-weather)**
+  of the inputs the blending page compared.](#ens-against-past-weather)**
 
 ## Introduction
 
@@ -292,17 +292,17 @@ is why member by member loses there; this page does not establish why it also lo
 day 10, where the loss is larger.** At day 1, each member's weather is a noisier guess at the hour
 than the mean, and a model trained on noisy inputs learns to respond less to them: regressing the
 measured output's own anomaly against a climatology forecast onto each arm's forecast anomaly gives a
-slope of 1.08 for member by member against 0.92 for the ensemble mean at day 1 for solar, and 1.18
-against 0.96 for wind — member by member moves further than the truth on average, where the ensemble
-mean moves less far. The forecast anomaly's own spread points the same way: 14.5 points against 17.3
-for solar, and 18.2 against 22.3 for wind, member by member narrower than the mean in both. The loss
-survives turning off row subsampling, which drops member rows rather than hours: 0.47 points [0.33,
-0.62] for solar and 0.72 points [0.50, 0.95] for wind at day 1. By day 10 member by member has nearly
-stopped responding to the weather at all — for solar, the 51 forecasts' own standard deviation is
-down to 0.55 points at day 10 and 0.28 points at day 14 — yet it still beats the same model given no
-weather at all, by a small but statistically significant margin: 0.08 points [0.01, 0.13] for solar
-and 0.34 points [0.20, 0.49] for wind at day 10, evidence that even a flattened response still carries
-some weather information.
+slope of 1.11 for member by member against 0.92 for the ensemble mean at day 1 for solar, and 1.18
+against 0.96 for wind — member by member is the flatter forecast, moving less than the truth on
+average, where the ensemble mean moves slightly further. The forecast anomaly's own spread points the
+same way: 13.8 points against 16.8 for solar, and 18.3 against 22.4 for wind, member by member
+narrower than the mean in both. The loss survives turning off row subsampling, which drops member
+rows rather than hours: 0.47 points [0.33, 0.62] for solar and 0.72 points [0.50, 0.95] for wind at
+day 1. By day 10 member by member has nearly stopped responding to the weather at all — for solar,
+the 51 forecasts' own standard deviation is down to 0.55 points at day 10 and 0.28 points at day 14 —
+yet it still beats the same model given no weather at all, by a small but statistically significant
+margin: 0.08 points [0.01, 0.13] for solar and 0.34 points [0.20, 0.49] for wind at day 10, evidence
+that even a flattened response still carries some weather information.
 
 **In an exploratory check, a model trained on the ensemble mean and applied to each member does no
 worse than the ensemble mean.** For solar it is ahead at every horizon, by 0.06 points [0.02, 0.10]
@@ -311,11 +311,12 @@ ahead at day 10 by 0.73 points [0.15, 1.40] and at day 14 by 0.57 points [0.23, 
 may happen: training on the mean and scoring on each member damps a forecast that over-reacts to the
 weather at long lead, where training on each member does not. At day 10, regressing measured output's
 anomaly onto forecast anomaly gives a slope of 0.76 for the model trained on the mean and applied to
-each member, against 0.49 for the model trained and scored on the mean, for wind, and 0.55 against
-0.46 for solar — the applied arm moves further with each member's weather than the mean arm does with
-its own, at a lead where both arms' response is already weak. This is a possible mechanism, not a
-tested one. Training on the mean and applying to each member also breaks the rule of training on the
-input scored, so it is a lead rather than a result.
+each member, against 0.49 for the model trained and scored on the mean, for wind, and 0.49 against
+0.39 for solar — the arm trained on the mean and applied to each member is the damped one, its slope
+closer to 1 and so closer to tracking the truth's own swings, where the arm trained and scored on the
+mean over-reacts more strongly, at a lead where both arms' response is already weak. This is a
+possible mechanism, not a tested one. Training on the mean and applying to each member also breaks
+the rule of training on the input scored, so it is a lead rather than a result.
 
 ### Where ENS stops beating the no-weather baselines
 
@@ -332,11 +333,7 @@ persistence at day 0. Solar persistence at day 0 holds the last reading before t
 start, which for many issues is a pre-dawn or overnight reading close to zero output; that baseline's
 apparent strength at day 0 is closer to a forecast of zero than to a tracked forecast, and should be
 read with that in mind. Climatology's own fallback, for a generator and calendar month with no
-training rows at that hour, is the median of the two neighbouring calendar months, decided before
-this run and applied after the second science review fixed an earlier version that instead fell back
-to the generator's whole-year median at that hour — a version that had inflated one solar farm's
-climatology to 24% of capacity for its first two months on record, and moved every climatology figure
-on this page.
+training rows at that hour, is the median of the two neighbouring calendar months.
 
 ![Figure 10: The ENS ensemble mean beats the best no-weather baseline by 1.4 points at day 5 for
 solar and 4.0 points for wind, and by day 14 climatology is
@@ -356,8 +353,8 @@ day 14, comparing the ensemble mean directly with `calendar_only` is therefore n
 way about whether ENS itself carries skill at that lead — the interval is wide enough to miss a real
 difference, not narrow enough to rule one out.
 
-![Figure 11: The ensemble mean beats the same model given no weather to day 7; after that it does
-not, whichever calendar column both use](assets/ens_horizons_against_calendar.svg)
+![Figure 11: The ensemble mean beats the same model given no weather to day 10 with a day-of-year
+calendar column, and to day 7 with calendar month](assets/ens_horizons_against_calendar.svg)
 
 **Part of climatology's lead at day 14 comes from how the XGBoost model uses its calendar columns,
 and the rest from ENS adding little skill at that lead.** Given no weather, the model with day of
@@ -378,18 +375,10 @@ technologies: at day 14 it is 0.11 points [-0.14, 0.38] behind for solar (not si
 points [0.31, 1.29] behind for wind (statistically significant — with month controlled for, ENS makes
 the wind forecast worse, not better, at day 14). Against climatology itself, the month-based ensemble
 mean is also significantly behind at day 14: by 0.53 points [0.06, 0.99] for solar and 0.77 points
-[0.25, 1.30] for wind. On this evidence, the ensemble mean carries no usable point-forecast skill at
-day 14 for either technology, and for wind it costs skill once the calendar feature is controlled
-for. Whether ENS's probability distribution carries skill at that lead is a question this page does
-not test.
-
-**The climatology fallback fix changed two of these month-based comparisons from not statistically
-significant to significant, both for solar: `calendar_only_month` against climatology, and the
-month-based ensemble mean against climatology at day 14.** Before the fix, climatology's fallback
-inflated one solar farm's error and widened its interval enough to blur both comparisons; after the
-fix neither the direction nor the qualitative story changes, but a reader comparing this page against
-an earlier version, or against the first Opus review that preceded the fix, will see numbers move and
-two results cross the significance threshold.
+[0.25, 1.30] for wind. On this evidence, the ensemble mean carries no statistically significant
+point-forecast skill at day 14 for either technology, and for wind it is significantly worse than the
+no-weather model once the calendar feature is controlled for. Whether ENS's probability distribution
+carries skill at that lead is a question this page does not test.
 
 ### ENS against past weather
 

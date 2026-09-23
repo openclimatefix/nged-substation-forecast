@@ -2084,13 +2084,13 @@ def _spread_lines(*, summary: pl.DataFrame, frame: pl.DataFrame) -> list[str]:
 def _response_diagnostics_lines(*, domain: DomainType) -> list[str]:
     """Describe how far each arm's forecast moves against how far the measured output moves.
 
-    Added for the second science review of #858 (S5, S6): the member-by-member arm's 10th-to-90th
-    coverage against the measured output is not valid evidence on its own, because each of the 51
-    forecasts is a conditional median that leaves out the power's own scatter. This table gives the
-    direct test instead: each arm's forecast anomaly against the day's climatology forecast,
-    regressed against the measured output's own anomaly against that same climatology forecast, so
-    a slope of 1.0 means the arm moves exactly as far as the truth does on average, and a slope
-    below 1.0 means the arm under-responds to the weather.
+    The member-by-member arm's 10th-to-90th coverage against the measured output is not valid
+    evidence on its own, because each of the 51 forecasts is a conditional median that leaves out
+    the power's own scatter. This table gives the direct test instead: the measured output's own
+    anomaly against the day's climatology forecast, regressed onto each arm's forecast anomaly
+    against that same climatology forecast, so a slope of 1.0 means the arm moves exactly as far as
+    the truth does on average, a slope below 1.0 means the arm over-reacts to the weather (moves
+    further than the truth does), and a slope above 1.0 means the arm under-reacts (is too flat).
 
     Args:
         domain: `solar` or `wind`.
@@ -2099,7 +2099,16 @@ def _response_diagnostics_lines(*, domain: DomainType) -> list[str]:
         Markdown lines.
     """
     paths = _paths(domain=domain)
-    rows = pl.read_parquet(paths["rows"]).select("site", "time", "effective_capacity_mw")
+    all_rows = pl.read_parquet(paths["rows"])
+    rows = all_rows.select("site", "time", "effective_capacity_mw")
+    # Rebuilt from `rows` rather than read from the `climatology` arm's saved predictions: a
+    # `--fit-baselines` rerun rewrites the losses but not the predictions parquet, which would
+    # otherwise leave this table comparing against a stale climatology.
+    clim = (
+        all_rows.select("site", "time", "effective_capacity_mw")
+        .with_columns(climatology_mw=climatology(frame=all_rows))
+        .select("site", "time", c=pl.col("climatology_mw") / pl.col("effective_capacity_mw"))
+    )
     predictions = pl.scan_parquet(paths["predictions"]).filter(pl.col("setting") == "pooled")
     labels = {
         "mean": "ensemble mean",
@@ -2111,10 +2120,10 @@ def _response_diagnostics_lines(*, domain: DomainType) -> list[str]:
         f"#### {domain.capitalize()}: response to the weather, against a climatology anomaly",
         "",
         (
-            "Each arm's forecast anomaly against the day's climatology forecast, regressed "
-            "against the measured output's own anomaly against that climatology forecast. Slope: "
-            "1.0 tracks the truth exactly, below 1.0 under-responds. SD: the forecast anomaly's "
-            "standard deviation, in percentage points of capacity."
+            "The measured output's own anomaly against the day's climatology forecast, regressed "
+            "onto each arm's forecast anomaly against that climatology forecast. Slope: 1.0 tracks "
+            "the truth exactly, below 1.0 over-reacts, above 1.0 under-reacts (is too flat). SD: "
+            "the forecast anomaly's standard deviation, in percentage points of capacity."
         ),
         "",
         "| Band | Arm | Slope | Forecast anomaly SD (pp) |",
@@ -2123,7 +2132,7 @@ def _response_diagnostics_lines(*, domain: DomainType) -> list[str]:
     for day in BAND_DAYS:
         arms = {way: ens_arm(way=way, day=day) for way in labels}
         scored = (
-            predictions.filter(pl.col("arm").is_in([*arms.values(), "climatology"]))
+            predictions.filter(pl.col("arm").is_in(list(arms.values())))
             .group_by("site", "time", "arm")
             .agg(pl.col("prediction_mw").mean(), pl.col("power_mw").first())
             .collect()
@@ -2133,7 +2142,6 @@ def _response_diagnostics_lines(*, domain: DomainType) -> list[str]:
                 y=pl.col("power_mw") / pl.col("effective_capacity_mw"),
             )
         )
-        clim = scored.filter(pl.col("arm") == "climatology").select("site", "time", c="f")
         anomaly = scored.join(clim, on=["site", "time"]).with_columns(
             fa=pl.col("f") - pl.col("c"), ya=pl.col("y") - pl.col("c")
         )

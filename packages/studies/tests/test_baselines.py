@@ -321,6 +321,31 @@ def test_the_calendar_fallback_is_the_two_neighbouring_months_median():
     assert climatology(frame=frame).to_list()[0] == 150.0
 
 
+def test_the_calendar_fallback_wraps_across_the_year_boundary():
+    # December and February are January's neighbours only if the neighbour month wraps: December
+    # is month 0 before wrapping (0 -> 12), and this target has no row at its own month and hour, so
+    # the January estimate depends entirely on the wrap. A March row is not a neighbour of January
+    # either way and must not be picked up. Without the wrap, only February's row (shifted from 2 to
+    # 1) matches, giving a median of 200 rather than the neighbouring-months median of 150.
+    hour = 12
+    frame = pl.DataFrame(
+        {
+            "site": ["A"] * 4,
+            "time": [
+                datetime(2025, 1, 15, hour, tzinfo=UTC),  # target: January, scored fold
+                datetime(2025, 12, 15, hour, tzinfo=UTC),  # neighbour: December
+                datetime(2025, 2, 15, hour, tzinfo=UTC),  # neighbour: February
+                datetime(2025, 3, 15, hour, tzinfo=UTC),  # not a neighbour: March
+            ],
+            "fold": [0, 1, 1, 1],
+            "constrained": [False] * 4,
+            "power_mw": [0.0, 100.0, 200.0, 5.0],
+        }
+    )
+
+    assert climatology(frame=frame).to_list()[0] == 150.0
+
+
 def test_the_hourly_fallback_is_a_median():
     times = [datetime(2025, month, 3, 12, tzinfo=UTC) for month in (1, 2, 3)]
     frame = pl.DataFrame(
