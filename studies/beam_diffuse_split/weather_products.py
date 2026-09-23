@@ -94,6 +94,7 @@ from run_experiment import (
 from sources import (
     OPEN_METEO_MODELS,
     STUDY_DATA_DIR,
+    UNSCORED_EXTRACTED_SPLITS,
     UPDATE_OUTPUT_DIR,
     SourceType,
     point_output_path_for,
@@ -259,12 +260,14 @@ ALL_PRODUCTS: Final[dict[str, str]] = PRODUCTS | NEW_PRODUCTS
 UNUSABLE_SPLITS: Final[frozenset[str]] = frozenset(
     prefix
     for prefix, source in NEW_PRODUCTS.items()
-    if source in OPEN_METEO_MODELS and not OPEN_METEO_MODELS[source].split_scored
+    if source in UNSCORED_EXTRACTED_SPLITS
+    or (source in OPEN_METEO_MODELS and not OPEN_METEO_MODELS[source].split_scored)
 )
 """Products whose own split no arm reads, so they get neither a split arm nor an Erbs arm.
 
-Read from `sources.OPEN_METEO_MODELS`, which says why for each: DMI's served direct flux is zero in
-48% of daytime hours, and ARPEGE's and KNMI's is a separation model's output. A split arm would
+Read from `sources.OPEN_METEO_MODELS` and `sources.UNSCORED_EXTRACTED_SPLITS`, which say why for
+each: DMI's served direct flux is zero in 48% of daytime hours, ARPEGE's and KNMI's is a separation
+model's output, and SARAH-3's is modelled from its own global flux. A split arm would
 measure the defect or the separation model, not the weather model, and an Erbs arm exists only as
 the split arm's reference.
 """

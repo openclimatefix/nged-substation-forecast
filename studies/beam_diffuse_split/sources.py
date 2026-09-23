@@ -121,6 +121,15 @@ shares, and then replaces only the two irradiance columns.
 EXTRACTED_SOURCES: Final[tuple[SourceType, ...]] = ("sarah-3", "icon-dream-eu")
 """Per-site sources `extract_site_series.py` cuts from a gridded download, rather than fetched."""
 
+UNSCORED_EXTRACTED_SPLITS: Final[frozenset[SourceType]] = frozenset({"sarah-3"})
+"""Extracted sources whose direct flux is modelled from their own global flux, so no arm reads it.
+
+CM SAF computes SARAH-3's direct flux (SID) from its global flux (SIS) with a diffuse-fraction
+model, and the whole record fails `check_direct_is_not_a_separation_model`: the direct fraction's
+median spread within a bin is 0.041, against a threshold of 0.05. The fetched models carry the same
+judgement as `OpenMeteoModel.split_scored`.
+"""
+
 NativeRadiationType = Literal["instantaneous", "accumulated", "unmeasured"]
 """What a model's own output holds before Open-Meteo converts it to an hourly value.
 

@@ -39,7 +39,13 @@ from typing import Final
 import numpy as np
 import polars as pl
 from build_dataset import CAMS_PATH, _pv_sites
-from sources import OPEN_METEO_MODELS, UPDATE_OUTPUT_DIR, SourceType, point_output_path_for
+from sources import (
+    OPEN_METEO_MODELS,
+    UNSCORED_EXTRACTED_SPLITS,
+    UPDATE_OUTPUT_DIR,
+    SourceType,
+    point_output_path_for,
+)
 from studies.served_column_checks import check_direct_is_not_a_separation_model
 from studies.solar import extraterrestrial_horizontal, midpoint_zenith
 from studies.timestamp_checks import (
@@ -169,7 +175,9 @@ def _separation_lines(*, frames: dict[SourceType, pl.DataFrame]) -> list[str]:
     """
     lines = ["#### Is the published direct flux more than a separation model?", ""]
     for source, frame in frames.items():
-        scored = source not in OPEN_METEO_MODELS or OPEN_METEO_MODELS[source].split_scored
+        scored = source not in UNSCORED_EXTRACTED_SPLITS and (
+            source not in OPEN_METEO_MODELS or OPEN_METEO_MODELS[source].split_scored
+        )
         note = "" if scored else " (split not scored)"
         try:
             check_direct_is_not_a_separation_model(frame=frame)
