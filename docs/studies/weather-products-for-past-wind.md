@@ -173,4 +173,3 @@ uv run python studies/beam_diffuse_split/wind_products.py
 The report lands in `data/studies/beam_diffuse_split/beam_diffuse_wind_products/report.md`. The
 hour-offset scan, the run that drops no rows, and the step, jump, and archive-start diagnostics were
 one-off checks during review, and are not in the report.
-
