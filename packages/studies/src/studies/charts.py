@@ -65,13 +65,24 @@ BetterDirectionType = Literal["negative", "positive"]
 """Which sign of difference is the better one."""
 
 NAMED_SUFFIX: Final[str] = " (planned)"
-"""Ends the label of a row whose contrast was written into the study plan, which is set bold."""
+"""Ends the label of a planned row in a figure that also holds exploratory rows, set bold."""
 
-PLANNED_NOTE: Final[str] = (
-    "Planned: one of the comparisons written into the study plan before any result existed. "
-    "Every other row is exploratory."
-)
-"""The subtitle line `figure` adds to any figure whose rows carry `NAMED_SUFFIX`."""
+PlanningType = Literal["planned", "exploratory", "mixed"]
+"""Whether a figure's rows are all planned, all exploratory, or a mix of the two."""
+
+PLANNING_NOTES: Final[dict[PlanningType, str]] = {
+    "planned": "All rows are planned: written into the study plan before any result existed.",
+    "exploratory": "All rows are exploratory.",
+    "mixed": (
+        "Planned: one of the comparisons written into the study plan before any result existed. "
+        "Every other row is exploratory."
+    ),
+}
+"""The subtitle line `figure` adds, saying once which rows are planned.
+
+Only a figure that mixes the two kinds labels each planned row with `NAMED_SUFFIX`: where every
+row shares one kind, a label on each would repeat what one subtitle line says.
+"""
 
 CONDITION_SHAPES: Final[tuple[str, ...]] = ("circle", "diamond", "square")
 """The point shape of each condition, in the order the conditions are given."""
@@ -291,6 +302,59 @@ def flip_contrast(*, contrasts: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def planning(*, rows: Sequence[pl.DataFrame]) -> PlanningType:
+    """Work out whether a figure's rows are all planned, all exploratory, or a mix.
+
+    Args:
+        rows: The rows of every interval panel in the figure. A row is planned where its
+            Boolean `planned` column is true; a frame without the column is all exploratory.
+
+    Returns:
+        `exploratory` where no row is planned, which includes a figure with no rows, `planned`
+        where every row is, and `mixed` otherwise.
+    """
+    flags = [
+        flag
+        for frame in rows
+        for flag in (
+            frame["planned"].fill_null(value=False).to_list()
+            if "planned" in frame.columns
+            else [False] * frame.height
+        )
+    ]
+    if not any(flags):
+        return "exploratory"
+    return "planned" if all(flags) else "mixed"
+
+
+def _labelled(*, rows: pl.DataFrame, figure_planning: PlanningType) -> pl.DataFrame:
+    """Append `NAMED_SUFFIX` to each planned row's label, only in a figure of mixed rows.
+
+    Args:
+        rows: A panel's rows, with a Boolean `planned` column or without one.
+        figure_planning: What `planning` returns for the figure the panel belongs to.
+
+    Returns:
+        The rows, with `NAMED_SUFFIX` on each planned row's label where `figure_planning` is
+        `mixed`.
+
+    Raises:
+        ValueError: If the panel's own rows contradict `figure_planning`, such as a planned row in
+            a figure said to be all exploratory.
+    """
+    panel_planning = planning(rows=[rows])
+    if figure_planning not in ("mixed", panel_planning):
+        msg = f"the figure is said to be all {figure_planning}, but this panel is {panel_planning}"
+        raise ValueError(msg)
+    if figure_planning != "mixed" or "planned" not in rows.columns:
+        return rows
+    return rows.with_columns(
+        label=pl.when(pl.col("planned"))
+        .then(pl.col("label") + NAMED_SUFFIX)
+        .otherwise(pl.col("label"))
+    )
+
+
 def _shade_scale() -> alt.Scale:
     """Return the colour scale every panel shares: each family, then each family's light shade."""
     return alt.Scale(
@@ -410,25 +474,27 @@ def interval_panel(
     reference_labels: bool = True,
     family_key: bool = True,
     width: int = PLOT_WIDTH_PX,
+    figure_planning: PlanningType = "mixed",
 ) -> alt.LayerChart | alt.VConcatChart:
     """Draw one panel of dots and 95% interval lines beside a labelled zero rule.
 
     The row labels take a column `LABEL_WIDTH_PX` wide, wrapped onto more lines where they are
     longer, so the labels and a plot of the default width fill the docs page's text column. Each
-    row's colour is its family's. A row with a `condition` other than the first in
-    `conditions` is drawn in the light shade of that colour, with a hollow point of a second
-    shape, and where a label carries more than one condition the rows are offset vertically. A
-    label ending in `NAMED_SUFFIX` is set bold. The colour scale's domain is every family, so a
-    family keeps its colour whichever families a panel holds, and the legend lists only the
-    families present. The keys sit in a row above the plot, inside the text column: the family
-    key only where the panel holds more than one family, and the condition key where `conditions`
-    is given. A panel of one family, with no more conditions than `CONDITION_COLOURS` holds,
-    colours its conditions with those colours instead of a light shade, still with a hollow point
-    of a second shape.
+    row's colour is its family's. A row with a `condition` other than the first in `conditions`
+    is drawn in the light shade of that colour, with a hollow point of a second shape, and where
+    a label carries more than one condition the rows are offset vertically. In a figure of mixed
+    rows, each planned row's label ends in `NAMED_SUFFIX` and is set bold. The colour scale's
+    domain is every family, so a family keeps its colour whichever families a panel holds, and
+    the legend lists only the families present. The keys sit in a row above the plot, inside the
+    text column: the family key only where the panel holds more than one family, and the
+    condition key where `conditions` is given. A panel of one family, with no more conditions
+    than `CONDITION_COLOURS` holds, colours its conditions with those colours instead of a light
+    shade, still with a hollow point of a second shape.
 
     Args:
         rows: One row per mark, with `label`, `family` (a `ProductFamily`), `difference`,
-            `lower_95` and `upper_95`, and `condition` if `conditions` is given. Rows are drawn
+            `lower_95` and `upper_95`, `condition` if `conditions` is given, and a Boolean
+            `planned` if any row is planned. Rows sharing a label share `planned`. Rows are drawn
             top to bottom in the order given.
         x_domain: The x axis's range, set explicitly so two panels can share it.
         x_title: The x axis's title, naming the quantity and its unit. The better direction is
@@ -444,10 +510,13 @@ def interval_panel(
         family_key: Whether to draw the family key, which a panel stacked under another that
             already carries it can leave out.
         width: The plot's width in pixels, `PLOT_WIDTH_PX` unless the panel shares a row.
+        figure_planning: What `planning` returns for every panel in the figure, which decides
+            whether a planned row's label carries `NAMED_SUFFIX`.
 
     Returns:
         The panel, under its keys where it has any.
     """
+    rows = _labelled(rows=rows, figure_planning=figure_planning)
     families = [family for family in FAMILY_COLOURS if family in set(rows["family"].to_list())]
     colour_conditions = 0 < len(conditions) <= len(CONDITION_COLOURS) and len(families) == 1
     shade = pl.col("family")
@@ -656,7 +725,7 @@ def figure(
     number: int,
     title: str,
     subtitle: Sequence[str],
-    planned: bool = False,
+    figure_planning: PlanningType | None,
 ) -> alt.VConcatChart:
     """Stack panels, one above the other, under a "Figure N:" caption.
 
@@ -669,8 +738,9 @@ def figure(
         number: The figure's number on its page.
         title: The finding the figure shows.
         subtitle: Short lines naming the quantity, its scope, and what a dot and a line mean.
-        planned: Whether any row carries `NAMED_SUFFIX`, which adds `PLANNED_NOTE` to the
-            subtitle.
+        figure_planning: What `planning` returns for the figure's rows, which adds the matching
+            `PLANNING_NOTES` line to the subtitle, or `None` for a figure with no planned or
+            exploratory rows to describe.
 
     Returns:
         The figure.
@@ -679,7 +749,10 @@ def figure(
         wrapped(text=f"Figure {number}: {title}", width=_TITLE_CHARACTERS),
         subtitle=[
             line
-            for text in (*subtitle, *((PLANNED_NOTE,) if planned else ()))
+            for text in (
+                *subtitle,
+                *(() if figure_planning is None else (PLANNING_NOTES[figure_planning],)),
+            )
             for line in wrapped(text=text)
         ],
         anchor="start",

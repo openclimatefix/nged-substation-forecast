@@ -10,13 +10,16 @@ from studies.charts import (
     FAMILY_COLOURS,
     FAMILY_COLOURS_LIGHT,
     LABEL_WIDTH_PX,
-    PLANNED_NOTE,
+    NAMED_SUFFIX,
+    PLANNING_NOTES,
     PLOT_WIDTH_PX,
     ContrastKey,
     Panel,
+    PlanningType,
     figure,
     flip_contrast,
     interval_panel,
+    planning,
     report_contrasts,
     report_errors,
     select_contrasts,
@@ -470,7 +473,9 @@ def test_figure_shares_the_colour_scale_across_panels():
         ),
     ]
 
-    spec = figure(panels=panels, number=1, title="t", subtitle=["s"]).to_dict()
+    spec = figure(
+        panels=panels, number=1, title="t", subtitle=["s"], figure_planning=None
+    ).to_dict()
 
     assert spec["resolve"]["scale"]["color"] == "shared"
 
@@ -503,7 +508,9 @@ def test_the_axis_title_says_which_direction_is_better(
 def test_figure_stacks_panels_to_fill_the_text_column():
     panels = [_panel_chart(_rows(["satellite", "reanalysis"])) for _ in range(2)]
 
-    spec = figure(panels=panels, number=1, title="t", subtitle=["s"]).to_dict()
+    spec = figure(
+        panels=panels, number=1, title="t", subtitle=["s"], figure_planning=None
+    ).to_dict()
     first_panel = spec["vconcat"][0]["vconcat"][-1]
     (interval,) = [
         layer
@@ -546,11 +553,78 @@ def test_the_zero_label_stays_inside_the_plot(
     assert zero_text["mark"]["align"] == align
 
 
-def test_a_planned_figure_explains_the_label_in_its_subtitle():
+def _planned_rows(planned: list[bool]) -> pl.DataFrame:
+    return _rows(["satellite", "reanalysis"][: len(planned)]).with_columns(
+        planned=pl.Series(planned)
+    )
+
+
+@pytest.mark.parametrize(
+    ("planned", "expected"),
+    [
+        ([[True], [True, True]], "planned"),
+        ([[False], [False, False]], "exploratory"),
+        ([[True], [False, False]], "mixed"),
+        ([[True, False]], "mixed"),
+    ],
+)
+def test_planning_reads_every_row_of_every_panel(planned: list[list[bool]], expected: str) -> None:
+    assert planning(rows=[_planned_rows(flags) for flags in planned]) == expected
+
+
+def test_planning_counts_a_frame_without_the_column_as_exploratory():
+    assert planning(rows=[_rows(["satellite"])]) == "exploratory"
+    assert planning(rows=[_rows(["satellite"]), _planned_rows([True])]) == "mixed"
+
+
+def test_planning_treats_a_null_planned_value_as_false() -> None:
+    rows = _rows(["satellite"]).with_columns(planned=pl.Series([None], dtype=pl.Boolean))
+    assert planning(rows=[rows]) == "exploratory"
+
+
+def _labels(spec: dict) -> list[str]:
+    panel = spec["vconcat"][-1]
+    (interval,) = [layer for layer in _layer(panel, "rule") if "x2" in layer["encoding"]]
+    return [row["label"] for row in _values(spec, interval)]
+
+
+def test_a_mixed_figure_labels_each_planned_row():
+    spec = _panel(_planned_rows([True, False]), figure_planning="mixed")
+
+    assert _labels(spec) == [f"row 0{NAMED_SUFFIX}", "row 1"]
+
+
+def test_a_figure_of_one_kind_labels_no_row():
+    spec = _panel(_planned_rows([True, True]), figure_planning="planned")
+
+    assert _labels(spec) == ["row 0", "row 1"]
+
+
+def test_a_panel_contradicting_its_figure_raises():
+    with pytest.raises(ValueError, match="all exploratory, but this panel is mixed"):
+        _panel(_planned_rows([True, False]), figure_planning="exploratory")
+
+
+@pytest.mark.parametrize("figure_planning", ["planned", "exploratory", "mixed"])
+def test_a_figure_states_its_planning_once_in_its_subtitle(
+    figure_planning: PlanningType,
+) -> None:
     panels = [_panel_chart(_rows(["satellite", "reanalysis"]))]
 
-    planned = figure(panels=panels, number=1, title="t", subtitle=["s"], planned=True).to_dict()
-    plain = figure(panels=panels, number=1, title="t", subtitle=["s"]).to_dict()
+    spec = figure(
+        panels=panels,
+        number=1,
+        title="t",
+        subtitle=["s"],
+        figure_planning=figure_planning,
+    ).to_dict()
 
-    assert " ".join(planned["title"]["subtitle"]) == f"s {PLANNED_NOTE}"
-    assert plain["title"]["subtitle"] == ["s"]
+    assert " ".join(spec["title"]["subtitle"]) == f"s {PLANNING_NOTES[figure_planning]}"
+
+
+def test_a_figure_without_planning_adds_no_note():
+    panels = [_panel_chart(_rows(["satellite", "reanalysis"]))]
+
+    spec = figure(panels=panels, number=1, title="t", subtitle=["s"], figure_planning=None)
+
+    assert spec.to_dict()["title"]["subtitle"] == ["s"]
