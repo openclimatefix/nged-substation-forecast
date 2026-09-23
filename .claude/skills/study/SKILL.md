@@ -266,20 +266,23 @@ the story without the prose around it. Load the `dataviz` skill before drawing a
   unless the model produces a sane forecast. Plot out-of-fold predictions against the measured
   output for every anonymised generator, across a few weeks chosen by a stated rule rather than by
   eye, such as the clearest, most variable, and dullest weeks. Then plot each arm's absolute error
-  per generator. [Beam and diffuse irradiance as model
-  inputs](https://openclimatefix.github.io/nged-substation-forecast/studies/beam-diffuse-split/#the-models-work)
+  per generator. [Does a weather product's beam/diffuse split help a PV
+  forecast?](https://openclimatefix.github.io/nged-substation-forecast/studies/beam-diffuse-split/#the-models-work)
   is the pattern.
 - **The title states the finding, scoped to the products tested** ("CAMS describes past sunshine
   best of the six products we tested"), and matches the heading or bolded lead the chart sits under.
   A bare "ICON global is the weakest" ranks every product in existence on a test of five.
-- **The subtitle names the quantity, the unit, the scope, and what a dot and a line mean**, and says
-  which rows are exploratory or post hoc.
-- **Say which direction is better, in words, in the axis title**: "Mean absolute error (% of
-  capacity; smaller is better)", or "Mean absolute error minus ERA5's (points of capacity; more
-  negative is better)". A reader who opens the page at the chart has no other way to know that a
-  lower error is the good end.
-- **A labelled reference rule** at zero says what zero means ("same as ERA5"), and a side label says
-  which direction is better.
+- **Put the basics in the chart's own text, because many readers see the chart and nothing else.**
+  A reader landing on a chart must be able to answer every one of these questions from its title,
+  subtitle, axis titles, and legend alone:
+    - what is plotted, and in what unit;
+    - which direction is better, in words: "Mean absolute error (% of capacity; smaller is
+      better)", or "Mean absolute error minus ERA5's (points of capacity; more negative is better)";
+    - what zero means, on a labelled reference rule ("same as ERA5");
+    - what a dot, a line, and a shade mean ("Dot: estimate. Line: 95% interval from resampling whole
+      months");
+    - the scope: which generators, which region, and which period;
+    - which rows are exploratory or post hoc.
 - **Show paired differences with their intervals, not each arm's level with an interval.** The arms
   share their rows, so level intervals overlap even where the paired difference clearly excludes
   zero, and a reader takes the overlap to mean no difference. Put each arm's absolute error in its
