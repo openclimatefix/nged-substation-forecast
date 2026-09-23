@@ -1,15 +1,15 @@
 # Which weather product best describes past sunshine?
 
 **At six metered solar farms in Lincolnshire, a satellite retrieval describes past sunshine far
-better than any of the weather models tested or the reanalysis.** For each weather product, an
+better than any of the weather models tested or ERA5, the reanalysis.** For each weather product, an
 XGBoost model, a gradient-boosted tree, was fitted per generator to predict hourly output from that
 product's sunshine, and scored by its mean absolute error as a percentage of the generator's
-capacity. The error is 5.05% of capacity given the Copernicus Atmosphere Monitoring Service's
-satellite retrieval (CAMS). The error is 7.71% given ICON-D2, the best of the four weather models
-tested, and 8.98% given ERA5, the reanalysis of the European Centre for Medium-Range Weather
-Forecasts (ECMWF). ICON-D2 is the German weather service's model for Germany and neighbouring
-countries. The satellite observes the clouds of the hour itself, where every weather model simulates
-them, so a large gap is expected.
+capacity (its 99th percentile of metered output). The error is 5.05% of capacity given the
+Copernicus Atmosphere Monitoring Service's satellite retrieval (CAMS). The error is 7.71% given
+ICON-D2, the best of the four weather models tested, and 8.98% given ERA5, from the European Centre
+for Medium-Range Weather Forecasts (ECMWF). ICON-D2 is the German weather service's model for
+Germany and neighbouring countries. The satellite observes the clouds of the hour itself, where
+every weather model simulates them, so a large gap is expected.
 
 **For capacity estimation, training history, and disaggregation the page recommends CAMS where its
 one-day delay allows, and for historical features in the live service ICON-EU or rebuilt UKV.**
@@ -67,9 +67,10 @@ weather model that started a few hours earlier.
 - **An XGBoost model trained on five generators and applied to the sixth ranks the products the
   same way, with errors 0.06 to 0.18 points larger.** See [The ranking holds for a generator
   predicted from its neighbours](#the-ranking-holds-for-a-generator-predicted-from-its-neighbours).
-- **Once the seasonal cycle is removed, CAMS's implied capacity is the steadiest of the six products
-  from month to month, but CAMS swings the most of the six with the seasons.** See [Implied capacity
-  from month to month](#implied-capacity-from-month-to-month).
+- **Once the seasonal cycle is removed, CAMS's implied capacity, the ratio of metered output to what
+  a fixed south-facing panel predicts from the product, is the steadiest of the six products from
+  month to month, but CAMS swings the most of the six with the seasons.** See [Implied capacity from
+  month to month](#implied-capacity-from-month-to-month).
 
 ## Introduction
 
@@ -84,14 +85,12 @@ sunshine at six metered solar farms, and says which product each consumer should
 
 **The products differ in how far ahead each value was forecast and in what area they cover, as well
 as in accuracy, and both properties matter to a consumer.** A weather model run is one of the
-forecasts each weather model starts every few hours, and the archive's value for an hour comes from
-a run that started up to a few hours earlier. The page calls a product's value as the archive holds
-it the value "as served". How many hours earlier the served value was forecast is the served lead.
-A lead of zero, written T+0, is the run's analysis: the weather model's best estimate of the weather
-at the moment the run starts. ICON-D2 does not cover South West England or South Wales, which are
-inside the licence area of National Grid Electricity Distribution (NGED), the distribution network
-operator this project forecasts for. ICON-D2's western edge runs from about 2°W on the south coast
-to about 2.5°W in the Midlands.
+forecasts each weather model starts every few hours. How many hours before the hour it describes a
+product's value as served was forecast is the served lead. A lead of zero, written T+0, is the run's
+analysis: the weather model's best estimate of the weather at the moment the run starts. ICON-D2
+does not cover South West England or South Wales, which are inside the licence area of National Grid
+Electricity Distribution (NGED), the distribution network operator this project forecasts for.
+ICON-D2's western edge runs from about 2°W on the south coast to about 2.5°W in the Midlands.
 
 | Product | What it is | Served lead | Covers all of Great Britain? | Grid spacing, native and as served | Start of the archive read here | Available after |
 |---|---|---|---|---|---|---|

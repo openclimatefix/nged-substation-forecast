@@ -442,7 +442,7 @@ def _icon_eu_rivals(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts=ukv,
         labels=[
             "Open-Meteo's hourly value for UKV",
-            "UKV's two snapshots given as a pair",
+            "XGBoost model given UKV's two snapshots as a pair",
             "UKV rebuilt as the mean of its two snapshots",
             "Rebuilt UKV with neighbouring hours, against ICON-EU with them",
         ],
@@ -504,7 +504,7 @@ def _ukv_against_era5(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     scopes = {
         "all": "All hours",
         "ukv_live": "Since August 2024",
-        "post": "After the upgrade: XGBoost models trained on both sides",
+        "post": "After the upgrade: XGBoost models trained on both sides of the upgrade",
     }
     wanted = []
     for scope in scopes:

@@ -5,12 +5,12 @@ variable-resolution model (UKV) describe past wind best of the five products tes
 belongs to the German weather service's (DWD's) Icosahedral Nonhydrostatic (ICON) model family. For
 each weather product, an XGBoost model, a gradient-boosted tree, was fitted per generator to predict
 hourly output from that product's wind, and scored by its mean absolute error as a percentage of the
-generator's capacity. Across the window of this study, August 2024 to September 2026, the XGBoost
+generator's capacity (its 99th percentile of metered output). Each bracketed pair below is a 95%
+interval. Across the window of this study, August 2024 to September 2026, the XGBoost
 model's error given UKV's wind is 0.44 percentage points of capacity [0.24, 0.63] lower than given
 the wind of ERA5, the reanalysis of the European Centre for Medium-Range Weather Forecasts (ECMWF).
 Given ICON-D2's wind, the error is 0.58 points [0.40, 0.75] lower than given ERA5's, in a comparison
-not written into the plan. The two gaps are 6% and 8% of ERA5's error, and each bracketed pair is a
-95% interval.
+chosen after the results were seen. The two gaps are 6% and 8% of ERA5's error.
 
 **For historical features in the live service the page recommends UKV, and for training history
 ICON-D2 where ICON-D2 covers, with ICON-EU or ERA5 elsewhere.** Historical features and training
@@ -80,13 +80,13 @@ run's analysis: the weather model's best estimate of the weather at the moment t
 the Copernicus Atmosphere Monitoring Service's satellite retrieval, describes past sunshine best of
 the six products on the solar page but publishes no wind, so it is not compared here.
 
-| Product | What it is | Grid spacing, native and as served | Wind heights served | Served lead | Covers all of Great Britain? |
-|---|---|---|---|---|---|
-| ERA5 | ECMWF reanalysis, a consistent record back to 1940 | about 31 km | 10 m and 100 m | an hourly analysis | yes |
-| UKV | Met Office model for the UK | 1.5 km over the UK, coarsening to 4 km at the domain's edges; served at 2 km | 100 m (Open-Meteo also serves 50 m and 80 m) | T+0, the analysis | yes |
-| ICON-D2 | DWD model for Germany and neighbouring countries | 2.2 km; served at about 2 km | 80 m and 120 m | 0 to 2 hours | no: its western edge runs from about 2°W on the south coast to about 2.5°W in the Midlands |
-| ICON-EU | DWD model for Europe, nested inside ICON global | 6.5 km; served at about 7 km | 80 m and 120 m | 0 to 2 hours | yes |
-| ICON global | DWD global model | 13 km; served at about 11 km | 80 m and 120 m | 0 to 5 hours | yes |
+| Product | What it is | Grid spacing, native and as served | Wind heights served | Served lead | Covers all of Great Britain? | Start of the hub-height wind archive read here | Available after |
+|---|---|---|---|---|---|---|---|
+| ERA5 | ECMWF reanalysis, a consistent record back to 1940 | about 31 km | 10 m and 100 m | an hourly analysis | yes | 1940 | about 5 days |
+| UKV | Met Office model for the UK | 1.5 km over the UK, coarsening to 4 km at the domain's edges; served at 2 km | 100 m (Open-Meteo also serves 50 m and 80 m) | T+0, the analysis | yes | August 2024 | about 4 hours |
+| ICON-D2 | DWD model for Germany and neighbouring countries | 2.2 km; served at about 2 km | 80 m and 120 m | 0 to 2 hours | no: its western edge runs from about 2°W on the south coast to about 2.5°W in the Midlands | November 2022 | about 1.5 hours |
+| ICON-EU | DWD model for Europe, nested inside ICON global | 6.5 km; served at about 7 km | 80 m and 120 m | 0 to 2 hours | yes | November 2022 | about 3.5 hours |
+| ICON global | DWD global model | 13 km; served at about 11 km | 80 m and 120 m | 0 to 5 hours | yes | November 2022 | about 3.5 hours |
 
 ## Data and methods
 
@@ -159,12 +159,13 @@ nearest grid cell over land.**
   some blocks of whole months and scored on the others; each held-out block is called a fold. The
   folds are cut separately before and after the UKV upgrade, and the rest of January 2026 after the
   upgrade is dropped. Each error is divided by its own generator's capacity. Each 95% interval comes
-  from resampling whole calendar months. This page calls a difference statistically significant at
-  the 5% level when its 95% interval from resampling whole months lies wholly on one side of zero,
-  and not statistically significant at the 5% level when the interval includes zero. The test
-  covers month-to-month variation in the weather only, not variation between generators. The
-  intervals are not corrected for the number of comparisons, so among the many exploratory rows some
-  will reach significance by chance.
+  from resampling whole calendar months, each time also drawing one of three XGBoost fits that
+  differ only in their random seed. This page calls a difference statistically significant at the 5%
+  level when its 95% interval from resampling whole months lies wholly on one side of zero, and not
+  statistically significant at the 5% level when the interval includes zero. The test covers
+  month-to-month variation in the weather and the fitting seed only, not variation between
+  generators. The intervals are not corrected for the number of comparisons, so among the many
+  exploratory rows some will reach significance by chance.
 - **Four planned contrasts:** ICON-EU against ERA5, UKV against ERA5, ICON-EU against UKV, and
   ICON-D2 against ICON-EU. A contrast is the difference between two products' errors on the same
   hours. A comparison is planned when it was written into the study plan before any result existed;
@@ -319,12 +320,12 @@ which may handicap ICON global there.
   five that beats ERA5 in both halves of the year. ICON-EU's advantage over ERA5 is statistically
   significant at the 5% level only from April to September, so west of ICON-D2's edge this study
   cannot choose between ICON-EU and ERA5 for October to March. ERA5 is a reanalysis built with one
-  fixed version of its weather model, so it has no model upgrade by design, and its record goes back
-  to 1940. UKV is not recommended, because Open-Meteo's archive of its hub-height wind starts only
-  in August 2024. A training history that switches from ERA5 to an ICON product part-way through has
-  to tell the forecasting model which product each hour comes from, as this study tells the XGBoost
-  model which side of the UKV upgrade each hour falls on. Open-Meteo's ICON archives before August
-  2024 have not been screened for steps like the pair in ICON global's served wind.
+  fixed version of its weather model, so it has no weather-model upgrade by design, and its record
+  goes back to 1940. UKV is not recommended, because Open-Meteo's archive of its hub-height wind
+  starts only in August 2024. A training history that switches from ERA5 to an ICON product part-way
+  through has to tell the forecasting model which product each hour comes from, as this study tells
+  the XGBoost model which side of the UKV upgrade each hour falls on. Open-Meteo's ICON archives
+  before August 2024 have not been screened for steps like the pair in ICON global's served wind.
 - **Capacity estimation and disaggregation: no recommendation.** Capacity estimation infers a farm's
   size from how its output tracks the wind, and disaggregation separates hidden generation from
   demand at a substation. Both have to read a product's wind without a fit to the farm's own metered
