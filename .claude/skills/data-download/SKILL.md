@@ -143,6 +143,21 @@ single-levels and height-levels forms both lack one, where ERA5's has it — so 
 whole-domain-then-crop pattern below is needed from the start, not discovered after a request comes
 back uncropped.
 
+**Where a provider publishes no queryable catalogue at all, its own docs page can still be scraped
+for the real values, and a sibling API from the same provider is not a safe substitute.**
+Open-Meteo's Previous Runs API has no `form.json` and no `openapi.json` of its own; its `models=`
+values came from `curl`-ing `https://open-meteo.com/en/docs/previous-runs-api` and reading the
+checkbox `id` attributes the page server-renders into the HTML, since the model picker itself is
+otherwise built client-side by JavaScript a plain `curl` never runs. Open-Meteo's plain `/v1/forecast`
+endpoint publishes a real `openapi/forecast.yml` on GitHub, and reaching for that instead looks like
+the queryable catalogue this section otherwise recommends — but its model list uses different
+identifiers for some of the same underlying models: `icon_d2`/`icon_eu`/`icon_global` there against
+`dwd_icon_d2`/`dwd_icon_eu`/`dwd_icon_global` on the Previous Runs API. Its ECMWF and GFS
+identifiers (`ecmwf_ifs`, `ncep_gfs_seamless`) happen to match, which is exactly the trap: nothing
+in either catalogue flags which model families drift and which do not, so matching one family gives
+no reason to expect another to match. Confirm a parameter name against the exact endpoint about to
+be called, never a sibling endpoint from the same provider, however closely related the two look.
+
 ## Whole-domain-then-crop pattern, for a source with no server-side area subsetting
 
 Where a provider either lacks an `area` parameter (some CDS datasets, e.g. CERRA) or serves an
@@ -281,7 +296,7 @@ variable-and-height combination. Point the README's lineage-file reference at th
 filename(s) passed via `write_readme`'s `lineage_filenames` parameter, rather than guessing a
 `lineage_<variable>.json` pattern that may not match what was written.
 
-## Two traps from this repo's own conventions worth restating here
+## Three traps from this repo's own conventions worth restating here
 
 **Two sessions running the same fetch script share one `data/` folder**, since a git worktree is
 backed by one `data/` directory, so two sessions resuming the same download write to the same
@@ -292,3 +307,13 @@ a grid of coordinates built straight into a request) keeps a caller from leaking
 when it handles that return value carelessly, but a caller that reads the box's raw bounds directly
 is still responsible for never printing or logging them — and a returned coordinate grid is exactly
 as sensitive as the box itself, not already safe to print just because it came out of a helper.
+
+**A free-tier provider's daily call quota is shared by every session on this machine, not budgeted
+per script.** A previous-runs backfill for issue #810 hit Open-Meteo's "Daily API request limit
+exceeded" refusal on its very first real call, minutes after a one-off probe request had succeeded,
+because a concurrent session's unrelated fetch against the same provider had spent the rest of the
+day's shared budget in between. A quota refusal midway through a session is therefore not evidence
+the request itself is wrong, and is not a licence to guess at an alternative parameter to work
+around it — check for another session's fetch against the same provider first, and otherwise treat
+the refusal the same way `_get_json` in `fetch_open_meteo_point.py` already does: stop and resume
+later, never retry it in a loop.
