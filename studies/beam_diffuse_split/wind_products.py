@@ -4,21 +4,25 @@ One-off throwaway script for the study in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/826>. The write-up is
 <https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-wind/>.
 
-**Every product gets one arm with the same four wind columns** — 100 m speed, 100 m direction as
-sine and cosine, and 10 m speed — plus the hour of day, the day of the year, and the UKV era, fitted
-per generator by the tested out-of-fold loop from `studies.cross_validation`. So a contrast between
-two arms is a contrast between the products' wind. The products are ERA5, UKV, ICON-D2, ICON-EU,
-and ICON global, downloaded by `fetch_wind_point.py`.
+**Every product gets one arm with the same four wind columns** — its native hub-height speed, that
+height's direction as sine and cosine, and its 10 m speed — plus the hour of day, the day of the
+year, and the UKV era, fitted per generator by the tested out-of-fold loop from
+`studies.cross_validation`. The hub height is 100 m for ERA5 and UKV and 80 m for the ICON products,
+whose served 100 m value is their 120 m speed rescaled. So a contrast between two arms is a contrast
+between the products' wind. A second arm per product, shown the served 100 m speed and direction
+alone, and a second hyperparameter setting are sensitivity checks. The products are ERA5, UKV,
+ICON-D2, ICON-EU, and ICON global, downloaded by `fetch_wind_point.py`.
 
 **The power hour is centred on the label, unlike the solar study's.** Open-Meteo's wind is an
 instantaneous value at the label, where its radiation is a mean over the hour ending there, so the
 hour labelled T is built from the half-hours ending at T and at T + 30 min. An offset scan in the
 plan review found every product scoring best with the hour centred this way.
 
-**An hour holding an exactly-zero half-hour is dropped, whatever any product says.** At one
-generator the zeros are disconnections rather than calm: half of them fall where ERA5 reads above
-6 m/s. The rule reads the power column alone, and it also removes some genuine calm hours, so
-behaviour near cut-in is under-sampled.
+**An hour holding an exactly-zero half-hour is dropped, whatever any product says.** From April 2026
+the feed publishes no exact zeros at two of the generators: their calm half-hours are missing
+instead, and `hourly_from_half_hourly` already drops an hour with a missing half-hour. Dropping the
+zeros makes the earlier period match. Most dropped hours are calm, so behaviour near cut-in is
+under-sampled; dropping no rows at all moves every contrast by 0.03 points or less.
 
 **The folds are cut inside each era of the UKV record, and every arm is told the era**, as in
 `weather_products.py`.
@@ -38,7 +42,7 @@ from build_dataset import POWER_DELTA_URI, _wind_sites
 from fetch_wind_point import PRODUCTS, output_path_for
 from run_experiment import Job, _add_time_features, _run_all
 from sources import STUDY_DATA_DIR
-from studies.cross_validation import PRIMARY_HYPER_PARAMETERS
+from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SENSITIVITY_HYPER_PARAMETERS
 from studies.power import hourly_from_half_hourly
 from weather_products import (
     CONTRAST_HEADER,
@@ -71,6 +75,7 @@ contrast in the report is exploratory.
 """
 
 EXPLORATORY_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("icon_d2_wind", "ukv_wind"),
     ("icon_global_wind", "icon_eu_wind"),
     ("icon_d2_wind", "era5_wind"),
     ("icon_global_wind", "era5_wind"),
@@ -107,14 +112,38 @@ def _wind_columns(*, product: str) -> tuple[str, str, str, str]:
         product: A key of `PRODUCTS`.
 
     Returns:
-        The 100 m speed, the 100 m direction's sine and cosine, and the 10 m speed.
+        The hub-height speed, that height's direction as sine and cosine, and the 10 m speed.
     """
     return (
-        f"speed_100m_{product}",
+        f"speed_hub_{product}",
         f"direction_sin_{product}",
         f"direction_cos_{product}",
         f"speed_10m_{product}",
     )
+
+
+def _served_100m_columns(*, product: str) -> tuple[str, str, str]:
+    """Return one product's served 100 m speed and direction feature names.
+
+    Args:
+        product: A key of `PRODUCTS`.
+
+    Returns:
+        The 100 m speed and the 100 m direction's sine and cosine.
+    """
+    return (f"speed_100m_{product}", f"sin_100m_{product}", f"cos_100m_{product}")
+
+
+def _hub_height_m(*, product: str) -> int:
+    """Return the height in metres a product's wind arm is shown: its native one nearest 100 m.
+
+    Args:
+        product: A key of `PRODUCTS`.
+
+    Returns:
+        80 for the ICON products, 100 otherwise.
+    """
+    return 80 if product.startswith("icon") else 100
 
 
 def _joined(*, sites: pl.DataFrame) -> pl.DataFrame:
@@ -131,13 +160,18 @@ def _joined(*, sites: pl.DataFrame) -> pl.DataFrame:
     )
     for product in PRODUCTS:
         speed, sine, cosine, surface = _wind_columns(product=product)
+        speed_100m, sine_100m, cosine_100m = _served_100m_columns(product=product)
+        hub = _hub_height_m(product=product)
         wind = pl.read_parquet(output_path_for(product=product)).select(
             "site",
             "time",
-            pl.col("wind_speed_100m").alias(speed),
-            pl.col("wind_direction_100m").radians().sin().alias(sine),
-            pl.col("wind_direction_100m").radians().cos().alias(cosine),
+            pl.col(f"wind_speed_{hub}m").alias(speed),
+            pl.col(f"wind_direction_{hub}m").radians().sin().alias(sine),
+            pl.col(f"wind_direction_{hub}m").radians().cos().alias(cosine),
             pl.col("wind_speed_10m").alias(surface),
+            pl.col("wind_speed_100m").alias(speed_100m),
+            pl.col("wind_direction_100m").radians().sin().alias(sine_100m),
+            pl.col("wind_direction_100m").radians().cos().alias(cosine_100m),
         )
         frame = frame.join(wind, on=["site", "time"], how="inner")
     return frame.sort("site", "time")
@@ -163,26 +197,38 @@ def _common_rows(*, frame: pl.DataFrame) -> pl.DataFrame:
 
 
 def _jobs() -> list[Job]:
-    """Return one arm per product, every arm shown the same number of columns.
+    """Return every product's wind arm at both settings, and its served-100 m arm.
 
     Returns:
-        One job per product.
+        Three jobs per product.
     """
-    return [
-        (
-            f"{product}_wind",
-            "pooled",
-            "power_mw",
-            (*SHARED_FEATURES, *_wind_columns(product=product)),
-            PRIMARY_HYPER_PARAMETERS,
-            False,
-        )
-        for product in PRODUCTS
-    ]
+    jobs: list[Job] = []
+    for product in PRODUCTS:
+        wind = (*SHARED_FEATURES, *_wind_columns(product=product))
+        jobs += [
+            (f"{product}_wind", "pooled", "power_mw", wind, PRIMARY_HYPER_PARAMETERS, False),
+            (
+                f"{product}_wind",
+                "sensitivity",
+                "power_mw",
+                wind,
+                SENSITIVITY_HYPER_PARAMETERS,
+                False,
+            ),
+            (
+                f"{product}_100m",
+                "pooled",
+                "power_mw",
+                (*SHARED_FEATURES, *_served_100m_columns(product=product)),
+                PRIMARY_HYPER_PARAMETERS,
+                False,
+            ),
+        ]
+    return jobs
 
 
 def _mean_speed_m_s(*, frame: pl.DataFrame, product: str) -> float:
-    """Return one product's mean 100 m wind speed in m/s, from Open-Meteo's km/h.
+    """Return one product's mean hub-height wind speed in m/s, from Open-Meteo's km/h.
 
     Args:
         frame: The common rows.
@@ -191,7 +237,41 @@ def _mean_speed_m_s(*, frame: pl.DataFrame, product: str) -> float:
     Returns:
         The mean speed.
     """
-    return float(frame.select(pl.col(f"speed_100m_{product}").mean()).item()) / 3.6
+    return float(frame.select(pl.col(f"speed_hub_{product}").mean()).item()) / 3.6
+
+
+def _scoped(*, losses: pl.DataFrame, scope: str) -> pl.DataFrame:
+    """Restrict the losses to an era scope from `weather_products`, or to a half of the year.
+
+    Args:
+        losses: Per-row losses carrying `month` and `time`.
+        scope: `winter` (October to March), `summer` (April to September), or a scope
+            `weather_products._scope` accepts.
+
+    Returns:
+        The rows belonging to that scope.
+    """
+    month = pl.col("time").dt.month()
+    if scope == "winter":
+        return losses.filter((month >= 10) | (month <= 3))
+    if scope == "summer":
+        return losses.filter(month.is_between(4, 9))
+    return _scope(losses=losses, scope=scope)
+
+
+def _renamed(*, losses: pl.DataFrame, suffix: str) -> pl.DataFrame:
+    """Rename one family of arms to the `_wind` names the contrasts use.
+
+    Args:
+        losses: Per-row losses for one setting.
+        suffix: The arm suffix to keep, such as `_100m`.
+
+    Returns:
+        Those arms' losses, renamed to end in `_wind`.
+    """
+    return losses.filter(pl.col("arm").str.ends_with(suffix)).with_columns(
+        arm=pl.col("arm").str.replace(f"{suffix}$", "_wind")
+    )
 
 
 def _report(*, frame: pl.DataFrame, losses: pl.DataFrame) -> str:
@@ -199,52 +279,68 @@ def _report(*, frame: pl.DataFrame, losses: pl.DataFrame) -> str:
 
     Args:
         frame: The common rows.
-        losses: The pooled run's losses.
+        losses: Every arm's losses, at both settings.
 
     Returns:
         The report.
     """
     sites = sorted(frame["site"].unique().to_list())
+    pooled = losses.filter(pl.col("setting") == "pooled")
+    wind = _renamed(losses=pooled, suffix="_wind")
+    served_100m = _renamed(losses=pooled, suffix="_100m")
+    sensitivity = losses.filter(pl.col("setting") == "sensitivity")
     lines = [
         (
             f"### Five weather products on {frame.height:,} common site-hours of wind "
             f"({frame['time'].min():%Y-%m-%d} to {frame['time'].max():%Y-%m-%d})"
         ),
         "",
-        "| Product | All sites | " + " | ".join(sites) + " |",
-        "|---" * (len(sites) + 2) + "|",
+        "| Product | Hub height shown | All sites | "
+        + " | ".join(sites)
+        + " | Served 100 m only | Second setting |",
+        "|---" * (len(sites) + 5) + "|",
     ]
     for product in PRODUCTS:
         arm = f"{product}_wind"
         per_site = [
-            f"{_mae(losses=losses.filter(pl.col('site') == site), arm=arm):.3f}" for site in sites
+            f"{_mae(losses=wind.filter(pl.col('site') == site), arm=arm):.3f}" for site in sites
         ]
         lines.append(
-            f"| {product} | {_mae(losses=losses, arm=arm):.3f} | " + " | ".join(per_site) + " |"
+            f"| {product} | {_hub_height_m(product=product)} m "
+            f"| {_mae(losses=wind, arm=arm):.3f} | "
+            + " | ".join(per_site)
+            + f" | {_mae(losses=served_100m, arm=arm):.3f} "
+            f"| {_mae(losses=sensitivity, arm=arm):.3f} |"
         )
     lines += ["", "Mean absolute error as a percentage of each site's P99 output.", ""]
     lines += ["#### Deciding contrasts, named before the run", "", *CONTRAST_HEADER]
-    for treatment, reference in DECIDING_CONTRASTS:
+    for treatment, reference in (*DECIDING_CONTRASTS, ("icon_d2_wind", "ukv_wind")):
         lines.append(
-            _contrast_line(losses=losses, treatment=treatment, reference=reference, label="all")
+            _contrast_line(losses=wind, treatment=treatment, reference=reference, label="all")
         )
         lines += [
             _contrast_line(
-                losses=losses.filter(pl.col("site") == site),
+                losses=wind.filter(pl.col("site") == site),
                 treatment=treatment,
                 reference=reference,
                 label=f"site {site}",
             )
             for site in sites
         ]
-    lines += ["", "#### Exploratory contrasts", "", *CONTRAST_HEADER]
+    lines += [
+        "",
+        "The last block, ICON-D2 against UKV, is exploratory.",
+        "",
+        "#### By era and by half of the year (exploratory)",
+        "",
+        *CONTRAST_HEADER,
+    ]
     lines += [
         _contrast_line(
-            losses=_scope(losses=losses, scope=scope), treatment=t, reference=r, label=scope
+            losses=_scoped(losses=wind, scope=scope), treatment=t, reference=r, label=scope
         )
-        for scope in ("all", "pre", "post")
-        for t, r in (*DECIDING_CONTRASTS, *EXPLORATORY_CONTRASTS)
-        if scope != "all" or (t, r) in EXPLORATORY_CONTRASTS
+        for scope in ("pre", "pre_matched", "post", "winter", "summer")
+        for t, r in (*DECIDING_CONTRASTS, ("icon_d2_wind", "ukv_wind"))
     ]
     lines += [
         "",
@@ -253,7 +349,24 @@ def _report(*, frame: pl.DataFrame, losses: pl.DataFrame) -> str:
             "under-cover; read its fold-sign counts alongside them."
         ),
         "",
-        "Mean wind speed at 100 m, all sites: "
+        "#### Sensitivity: the served 100 m wind alone, and the second hyperparameter setting",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    for label, scoped in (("served 100 m only", served_100m), ("second setting", sensitivity)):
+        lines += [
+            _contrast_line(losses=scoped, treatment=t, reference=r, label=label)
+            for t, r in (*DECIDING_CONTRASTS, ("icon_d2_wind", "ukv_wind"))
+        ]
+    lines += ["", "#### Other contrasts (exploratory)", "", *CONTRAST_HEADER]
+    lines += [
+        _contrast_line(losses=wind, treatment=t, reference=r, label="all")
+        for t, r in EXPLORATORY_CONTRASTS
+        if (t, r) != ("icon_d2_wind", "ukv_wind")
+    ]
+    lines += [
+        "",
+        "Mean wind speed at the hub height shown, all sites: "
         + ", ".join(
             f"{product} {_mean_speed_m_s(frame=frame, product=product):.2f} m/s"
             for product in PRODUCTS

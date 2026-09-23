@@ -232,9 +232,9 @@ accuracy against availability and coverage.
 ## What this does not show
 
 - **The evidence is regional.** All six generators sit in one 25 km by 23 km box, inside ICON-D2's
-  domain and in only two ERA5 grid cells. The ranking is untested elsewhere in Great Britain, and
-  untested for wind, which
-  [#826](https://github.com/openclimatefix/nged-substation-forecast/issues/826) covers.
+  domain and in only two ERA5 grid cells. The ranking is untested elsewhere in Great Britain. Wind
+  is measured separately on [Which weather product best describes past
+  wind?](weather-products-for-past-wind.md).
 - **The comparison is not lead-equal.** The served lead is part of what a consumer receives, so the
   as-served ranking answers the consumer's question. A comparison at a held-equal lead is a forecast
   comparison, and belongs to #810.

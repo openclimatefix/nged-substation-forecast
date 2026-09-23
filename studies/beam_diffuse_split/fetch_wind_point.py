@@ -3,11 +3,16 @@
 One-off throwaway script for the study in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/826>.
 
-**Every product is asked for the same three columns**: the 100 m wind speed and direction and the
-10 m wind speed. ERA5 and UKV publish 100 m wind natively. The three ICON products publish 80 m and
-120 m, and Open-Meteo derives their 100 m value by scaling the 120 m value by about 0.98, which a
-tree cannot tell apart from the 120 m value itself. So one column list serves every product and no
-arm is shown more columns than another.
+**Every product is asked for its 100 m wind speed and direction and its 10 m wind speed, and the
+ICON products for their 80 m wind as well.** ERA5 and UKV publish 100 m wind natively. The three
+ICON products publish 80 m and 120 m, and Open-Meteo's 100 m value for them is the 120 m speed
+scaled by 0.98, which a tree cannot tell apart from the 120 m speed itself. So the study shows each
+ICON product its native 80 m wind as the hub-height column, which keeps every arm to the same number
+of columns, and keeps the 100 m column for a sensitivity check.
+
+**Every product is read from the nearest land cell.** At one wind generator the nearest ICON global
+cell is influenced by the sea, with a 10 m speed 16% higher than the land cell's; every other
+product returns the same values from either choice at all three generators.
 
 **The window starts on 2024-08-12**, when Open-Meteo's own UKV downloader started. UKV's archive
 before that date carries radiation but no hub-height wind. Coordinates are read at run time from
@@ -43,6 +48,9 @@ WIND_VARIABLES: Final[tuple[str, ...]] = (
 )
 """The columns every product is asked for."""
 
+ICON_VARIABLES: Final[tuple[str, ...]] = ("wind_speed_80m", "wind_direction_80m")
+"""The native hub-height columns the ICON products are asked for as well."""
+
 FIRST_DATE: Final[str] = "2024-08-12"
 """The first day of the window: when Open-Meteo's own UKV downloader started."""
 
@@ -77,11 +85,16 @@ def main() -> int:
             pl.concat(
                 fetch_point_frame(
                     sites=sites,
-                    variables=WIND_VARIABLES,
+                    variables=(
+                        (*WIND_VARIABLES, *ICON_VARIABLES)
+                        if product.startswith("icon")
+                        else WIND_VARIABLES
+                    ),
                     models_parameter=models_parameter,
                     first_date=FIRST_DATE if year == first_year else f"{year}-01-01",
                     last_date=LAST_DATE if year == LAST_YEAR else f"{year}-12-31",
                     base_url=base_url,
+                    cell_selection="land",
                 )
                 for year in range(first_year, LAST_YEAR + 1)
             )
