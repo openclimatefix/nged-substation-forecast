@@ -4,8 +4,8 @@ import numpy as np
 import polars as pl
 import pytest
 from studies.bootstrap import (
+    bootstrap_absolute,
     bootstrap_difference,
-    bootstrap_level,
     fold_t_interval,
     per_fold_differences,
 )
@@ -108,12 +108,12 @@ def test_one_seed_is_enough():
     assert interval["seed_spread"] == 0.0
 
 
-def test_bootstrap_level_reproduces_the_published_random_stream():
-    # Pinned from the implementation every published leaderboard row is computed with.
-    interval = bootstrap_level(losses=_losses(seeds=(0, 1, 2)), arm="T", metric="loss")
+def test_bootstrap_absolute_reproduces_the_published_random_stream():
+    # Pinned from the implementation every published leaderboard interval was computed with.
+    interval = bootstrap_absolute(losses=_losses(seeds=(0, 1, 2)), arm="T", metric="loss")
 
     assert interval == {
-        "level": -0.21010131421631167,
+        "value": -0.21010131421631167,
         "lower_95": -1.1626544831593595,
         "upper_95": 0.4557367201731675,
         "seed_spread": 0.32966017229876704,
@@ -122,35 +122,23 @@ def test_bootstrap_level_reproduces_the_published_random_stream():
     }
 
 
-def test_bootstrap_level_does_not_depend_on_the_order_of_the_rows():
+def test_bootstrap_absolute_does_not_depend_on_the_order_of_the_rows():
     shuffled = _losses(seeds=(0, 1, 2)).sample(fraction=1.0, shuffle=True, seed=3)
 
-    assert bootstrap_level(losses=shuffled, arm="T", metric="loss") == bootstrap_level(
+    assert bootstrap_absolute(losses=shuffled, arm="T", metric="loss") == bootstrap_absolute(
         losses=_losses(seeds=(0, 1, 2)), arm="T", metric="loss"
     )
 
 
-def test_a_constant_level_gives_a_zero_width_interval_at_that_value():
+def test_bootstrap_absolute_ignores_the_other_arm():
     losses = _losses(seeds=(0, 1, 2), difference=0.25)
 
-    interval = bootstrap_level(losses=losses, arm="T", metric="loss")
+    interval = bootstrap_absolute(losses=losses, arm="T", metric="loss")
 
-    assert interval["level"] == pytest.approx(0.25)
+    assert interval["value"] == pytest.approx(0.25)
     assert interval["lower_95"] == pytest.approx(0.25)
     assert interval["upper_95"] == pytest.approx(0.25)
-
-
-def test_bootstrap_level_one_seed_is_enough():
-    interval = bootstrap_level(losses=_losses(seeds=(0,), difference=0.25), arm="T", metric="loss")
-
-    assert interval["level"] == pytest.approx(0.25)
-    assert interval["seed_spread"] == 0.0
-
-
-def test_bootstrap_level_reads_rows_for_the_named_arm_only():
-    losses = _losses(seeds=(0, 1, 2), difference=0.25)
-
-    assert bootstrap_level(losses=losses, arm="R", metric="loss")["level"] == pytest.approx(0.0)
+    assert interval["n_rows"] == 14
 
 
 def test_per_fold_differences_give_one_value_per_fold_in_fold_order():

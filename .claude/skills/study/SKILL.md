@@ -270,6 +270,19 @@ the story without the prose around it. Load the `dataviz` skill before drawing a
 - **A headline chart opens every page**, directly under the summary and before the disclaimer,
   showing the headline result with its 95% intervals. Every section whose claim rests on a number
   gets a chart too.
+- **Where a study ranks products, Figure 1 is a leaderboard.** The leaderboard shows each
+  product's own mean absolute error on the rows every product shares, sorted best first, with its
+  95% interval, "smaller is better" in the axis text, and the unit. The paired contrasts follow
+  directly as Figure 2. Every product's error rises and falls together from month to month, and
+  that shared swing, which pairing cancels, is the main reason an absolute interval is far wider
+  than a paired difference's. Two products whose intervals overlap in Figure 1 can therefore still
+  differ. Figure 2 is the test that shows which of those gaps is statistically significant, and the
+  page says so, once.
+  Where a study asks whether one input helps, rather than ranking products (the beam/diffuse
+  study), the contrast stays the headline chart and the page carries no leaderboard.
+  `studies.charts.leaderboard_panel` draws one, and `studies.bootstrap.bootstrap_absolute` intervals
+  a product's absolute error with the same month-and-seed resampling `bootstrap_difference` uses
+  for a contrast, straight from the saved losses, with no refit.
 - **Show the method working before any contrast.** A contrast of a tenth of a point means nothing
   unless the model produces a sane forecast. Plot out-of-fold predictions against the measured
   output for every anonymised generator, across a few weeks chosen by a stated rule rather than by
@@ -331,7 +344,8 @@ The prose rules in `CLAUDE.md` apply, and the `long-form-prose` skill governs th
 Every study page takes this outline:
 
 1. **Summary.** At most two paragraphs stating the headline result, followed by the headline
-   figure. The summary is the page's abstract.
+   figure — the leaderboard and then the paired contrasts, where the study ranks products. The
+   summary is the page's abstract.
 2. **The AI disclaimer** (below).
 3. **Key findings.** The finer conclusions, one bolded sentence each, each linking to its results
    section.

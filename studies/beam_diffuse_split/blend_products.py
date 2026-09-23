@@ -73,8 +73,8 @@ from run_experiment import Job, _add_time_features, run_all
 from sources import STUDY_DATA_DIR
 from studies.blending import PERMUTED_SUFFIX, climatology_permutation, stacked_errors
 from studies.bootstrap import (
+    bootstrap_absolute,
     bootstrap_difference,
-    bootstrap_level,
     fold_t_interval,
     per_fold_differences,
 )
@@ -915,14 +915,14 @@ def _leaderboard_rows(*, losses: pl.DataFrame, domain: Domain) -> list[Leaderboa
     pooled = losses.filter(pl.col("setting") == "pooled")
     rows: list[LeaderboardRow] = []
     for arm, kind, name, variant in _leaderboard_arms(domain=domain):
-        interval = bootstrap_level(losses=pooled, arm=arm, metric=METRIC)
+        interval = bootstrap_absolute(losses=pooled, arm=arm, metric=METRIC)
         rows.append(
             {
                 "arm": arm,
                 "kind": kind,
                 "name": name,
                 "variant": variant,
-                "mae_pp": interval["level"] * PERCENTAGE_POINTS,
+                "mae_pp": interval["value"] * PERCENTAGE_POINTS,
                 "lower_95_pp": interval["lower_95"] * PERCENTAGE_POINTS,
                 "upper_95_pp": interval["upper_95"] * PERCENTAGE_POINTS,
                 "n_months": interval["n_months"],

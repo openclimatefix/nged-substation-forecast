@@ -30,6 +30,47 @@ class BootstrapInterval(TypedDict):
     n_months: int
 
 
+class AbsoluteInterval(TypedDict):
+    """One arm's absolute metric, its interval, and what the interval rests on."""
+
+    value: float
+    lower_95: float
+    upper_95: float
+    seed_spread: float
+    n_rows: int
+    n_months: int
+
+
+def _resample_bounds(*, values: np.ndarray, months: np.ndarray) -> tuple[float, float]:
+    """Resample whole months and a seed 2,000 times, and return the 95% interval of the mean.
+
+    Shared by `bootstrap_difference`, whose `values` are a paired arm-to-arm difference, and
+    `bootstrap_absolute`, whose `values` are one arm's own metric, so a leaderboard's absolute-error
+    interval and a contrast's paired-difference interval rest on the same resampling design.
+
+    Args:
+        values: Per-seed, per-row values, shape (n_seeds, n_rows).
+        months: Each row's month label, one per column of `values`.
+
+    Returns:
+        The 2.5th and 97.5th percentiles of the resampled mean.
+    """
+    unique_months, month_index = np.unique(months, return_inverse=True)
+    rows_by_month = [np.flatnonzero(month_index == index) for index in range(len(unique_months))]
+
+    # The seed draw comes before the month draw in every resample. Swapping them, or vectorising
+    # the loop, would change every published interval's digits without changing its definition.
+    generator = np.random.default_rng(BOOTSTRAP_SEED)
+    resampled = np.empty(N_BOOTSTRAP_RESAMPLES)
+    for resample in range(N_BOOTSTRAP_RESAMPLES):
+        seed_index = generator.integers(0, values.shape[0])
+        drawn = generator.integers(0, len(unique_months), size=len(unique_months))
+        rows = np.concatenate([rows_by_month[index] for index in drawn])
+        resampled[resample] = values[seed_index, rows].mean()
+
+    return float(np.percentile(resampled, 2.5)), float(np.percentile(resampled, 97.5))
+
+
 def paired_differences(
     *, losses: pl.DataFrame, treatment: str, reference: str, metric: str
 ) -> tuple[np.ndarray, np.ndarray]:
@@ -68,35 +109,6 @@ def paired_differences(
     return differences, by_seed[0]["month"].to_numpy()
 
 
-def _resampled_means(*, values: np.ndarray, months: np.ndarray) -> np.ndarray:
-    """Resample whole months and one seed `N_BOOTSTRAP_RESAMPLES` times, and return each mean.
-
-    Shared by `bootstrap_difference` and `bootstrap_level`: both interval a mean over an array of
-    shape (n_seeds, n_rows), one a paired difference and the other one arm's own metric, and the
-    resampling unit is the same for both.
-
-    Args:
-        values: Shape (n_seeds, n_rows), in seed order.
-        months: Each row's month label, in the same row order every seed shares.
-
-    Returns:
-        `N_BOOTSTRAP_RESAMPLES` resampled means.
-    """
-    unique_months, month_index = np.unique(months, return_inverse=True)
-    rows_by_month = [np.flatnonzero(month_index == index) for index in range(len(unique_months))]
-
-    # The seed draw comes before the month draw in every resample. Swapping them, or vectorising
-    # the loop, would change every published interval's digits without changing its definition.
-    generator = np.random.default_rng(BOOTSTRAP_SEED)
-    resampled = np.empty(N_BOOTSTRAP_RESAMPLES)
-    for resample in range(N_BOOTSTRAP_RESAMPLES):
-        seed_index = generator.integers(0, values.shape[0])
-        drawn = generator.integers(0, len(unique_months), size=len(unique_months))
-        rows = np.concatenate([rows_by_month[index] for index in drawn])
-        resampled[resample] = values[seed_index, rows].mean()
-    return resampled
-
-
 def bootstrap_difference(
     *,
     losses: pl.DataFrame,
@@ -122,11 +134,11 @@ def bootstrap_difference(
     differences, months = paired_differences(
         losses=losses, treatment=treatment, reference=reference, metric=metric
     )
-    resampled = _resampled_means(values=differences, months=months)
+    lower_95, upper_95 = _resample_bounds(values=differences, months=months)
     return {
         "difference": float(differences.mean()),
-        "lower_95": float(np.percentile(resampled, 2.5)),
-        "upper_95": float(np.percentile(resampled, 97.5)),
+        "lower_95": lower_95,
+        "upper_95": upper_95,
         "seed_spread": float(differences.mean(axis=1).std()),
         "n_rows": differences.shape[1],
         "n_months": len(np.unique(months)),
@@ -134,16 +146,17 @@ def bootstrap_difference(
 
 
 def arm_values(*, losses: pl.DataFrame, arm: str, metric: str) -> tuple[np.ndarray, np.ndarray]:
-    """Return one arm's per-seed, per-row metric value, and each row's month.
+    """Return one arm's per-seed, per-row metric values, and each row's month.
 
     Args:
         losses: Per-row losses holding the arm, restricted to the scope wanted, carrying `arm`,
             `site`, `time`, `seed` and `month`.
-        arm: The arm to read.
+        arm: The arm whose metric is being read.
         metric: The loss column to read.
 
     Returns:
-        An array of shape (n_seeds, n_rows), in seed order, and the month label of each row.
+        An array of shape (n_seeds, n_rows) of the arm's metric values, in seed order, and the
+        month label of each row.
     """
     rows = (
         losses.filter(pl.col("arm") == arm)
@@ -158,39 +171,30 @@ def arm_values(*, losses: pl.DataFrame, arm: str, metric: str) -> tuple[np.ndarr
     return values, by_seed[0]["month"].to_numpy()
 
 
-class LevelBootstrapInterval(TypedDict):
-    """One arm's absolute level, its interval, and what the interval rests on."""
+def bootstrap_absolute(*, losses: pl.DataFrame, arm: str, metric: str) -> AbsoluteInterval:
+    """Bootstrap one arm's absolute metric, resampling whole months and a seed.
 
-    level: float
-    lower_95: float
-    upper_95: float
-    seed_spread: float
-    n_rows: int
-    n_months: int
-
-
-def bootstrap_level(*, losses: pl.DataFrame, arm: str, metric: str) -> LevelBootstrapInterval:
-    """Bootstrap one arm's absolute mean, resampling whole months and a seed.
-
-    A level interval has no pairing to hold fixed, so it carries the full month-to-month weather
-    noise that neighbouring generators share. A paired difference between two arms cancels that
-    shared noise, which is why two arms' level intervals can overlap while their paired difference
-    is still statistically significant at the 5% level.
+    Draws from the same random stream shape as `bootstrap_difference`, so a leaderboard figure's
+    absolute-error interval rests on the same resampling design as the paired-contrast figure that
+    follows it. The absolute interval is much the wider of the two, mainly because every arm's
+    error rises and falls together from month to month: resampling whole months carries that
+    shared swing into this interval, and pairing cancels it from a difference. Neighbouring
+    generators sharing their weather keeps the months, not the rows, as the unit of resampling.
 
     Args:
-        losses: Per-row losses for one arm, already restricted to the scope wanted.
-        arm: The arm to interval.
-        metric: The loss column to average.
+        losses: Per-row losses for the arm, already restricted to the scope wanted.
+        arm: The arm whose metric is being bootstrapped.
+        metric: The loss column to bootstrap.
 
     Returns:
         The point estimate, the 2.5th and 97.5th percentiles, and what the estimate rests on.
     """
     values, months = arm_values(losses=losses, arm=arm, metric=metric)
-    resampled = _resampled_means(values=values, months=months)
+    lower_95, upper_95 = _resample_bounds(values=values, months=months)
     return {
-        "level": float(values.mean()),
-        "lower_95": float(np.percentile(resampled, 2.5)),
-        "upper_95": float(np.percentile(resampled, 97.5)),
+        "value": float(values.mean()),
+        "lower_95": lower_95,
+        "upper_95": upper_95,
         "seed_spread": float(values.mean(axis=1).std()),
         "n_rows": values.shape[1],
         "n_months": len(np.unique(months)),
