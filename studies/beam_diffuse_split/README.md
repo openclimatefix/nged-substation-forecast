@@ -68,6 +68,8 @@ separation model's estimate of the same split, says what the *published field* b
 | `ens_horizons.py` | Scores the ensemble against ERA5 at each lead band, and four ways of reducing 51 members to one power number. Fits its own booster, so five settings differ from `run_experiment.py`; see its module docstring. |
 | `multi_nwp.py` | Fits XGBoost on two weather models at once, against two negative controls: a duplicated column, which cannot fail, and a column carrying the second product's climatology with its weather permuted away, which can. |
 | `weather_products.py` | Scores six weather products on one common row set with the folds cut inside each UKV era, and answers which product best describes past sunshine. Written up as [Which weather product best describes past sunshine?](https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-the-past/). |
+| `weather_product_charts.py` | Draws the eight anonymised charts on the sunshine write-up from `weather_products.py`'s report, and bootstraps the two sets of numbers the report lacks after reproducing a printed row. Optimise each SVG with `npx svgo@4 --multipass --precision=1 --final-newline` before committing it. |
+| `wind_product_charts.py` | The same for the five charts on [Which weather product best describes past wind?](https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-wind/), from `wind_products.py`'s report. |
 
 ## The arms
 

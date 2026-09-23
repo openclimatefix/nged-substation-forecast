@@ -466,24 +466,22 @@ def _leave_one_site_out_losses(*, frame: pl.DataFrame) -> pl.DataFrame:
     return pl.concat(outputs)
 
 
-def _implied_capacity(*, frame: pl.DataFrame) -> list[str]:
-    """Measure how steady each product's implied capacity is from month to month, and by season.
+def _log_capacity_by_month(*, frame: pl.DataFrame) -> dict[str, pl.DataFrame]:
+    """Return each product's log implied capacity per site and month, split into season and noise.
 
-    Capacity estimation reads a product's irradiance with no model fitted to the generator, so the
-    question is how far one month's implied capacity strays. A month's implied capacity is the
-    metered output divided by what a fixed panel model predicts per megawatt from the product: a
-    south-facing panel at 30° tilt, the Erbs split of the product's own global irradiance, and a
-    -0.4 %/K temperature derate. Only unconstrained hours with the sun above 10° are used. The
-    logarithm is taken per site and month; subtracting each site's mean for that calendar month
-    removes the seasonal cycle, and the spread of what is left is the month-to-month noise. The
-    calendar-month means themselves give the seasonal swing, reported as December's departure
-    from the annual mean.
+    A month's implied capacity is the metered output divided by what a fixed panel model predicts
+    per megawatt from the product: a south-facing panel at 30° tilt, the Erbs split of the
+    product's own global irradiance, and a -0.4 %/K temperature derate. Only unconstrained hours
+    with the sun above 10° are used. The logarithm is taken per site and month. `seasonal` is the
+    site's mean for that calendar month minus the site's overall mean, and `residual` is what is
+    left once the calendar month's mean is subtracted.
 
     Args:
         frame: The common rows.
 
     Returns:
-        Markdown lines: a table of spread, interval against CAMS, and December's departure.
+        Per product, one row per (site, month) with `log_capacity`, `calendar`, `seasonal`, and
+        `residual`.
     """
     daylight = frame.filter(~pl.col("constrained") & (pl.col("solar_elevation_deg") > 10.0))
     zenith = np.radians(daylight["solar_zenith_deg"].to_numpy())
@@ -516,6 +514,24 @@ def _implied_capacity(*, frame: pl.DataFrame) -> list[str]:
                 - pl.col("log_capacity").mean().over("site", "calendar"),
             )
         )
+    return log_by_product
+
+
+def _implied_capacity(*, log_by_product: dict[str, pl.DataFrame]) -> list[str]:
+    """Measure how steady each product's implied capacity is from month to month, and by season.
+
+    Capacity estimation reads a product's irradiance with no model fitted to the generator, so the
+    question is how far one month's implied capacity strays. The spread of
+    `_log_capacity_by_month`'s residual is the month-to-month noise with the seasonal cycle
+    removed. The calendar-month means give the seasonal swing, reported as December's departure
+    from the annual mean.
+
+    Args:
+        log_by_product: The output of `_log_capacity_by_month`.
+
+    Returns:
+        Markdown lines: a table of spread, interval against CAMS, and December's departure.
+    """
     months = sorted(log_by_product["cams"]["month"].unique().to_list())
     generator = np.random.default_rng(BOOTSTRAP_SEED)
     draws = generator.integers(0, len(months), size=(N_BOOTSTRAP_RESAMPLES, len(months)))
@@ -903,7 +919,7 @@ def main() -> int:
         pooled=pooled,
         post_only=post_only,
         transfer=transfer,
-        stability=_implied_capacity(frame=frame),
+        stability=_implied_capacity(log_by_product=_log_capacity_by_month(frame=frame)),
     )
     (output_dir / "report.md").write_text(report)
     sys.stdout.write(report)

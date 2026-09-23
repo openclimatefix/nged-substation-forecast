@@ -16,6 +16,8 @@ percentage of each generator's own 99th percentile of output, which the page cal
 evidence is three wind farms in flat Lincolnshire, and 50,734 generator-hours from August 2024 to
 September 2026.
 
+![Figure 1: UKV and ICON-D2 describe past wind best](assets/wind_headline.svg)
+
 ## The five products
 
 **Each product publishes wind at different heights, and each archive serves a different lead, so the
@@ -93,6 +95,10 @@ since its upgrade: 0.79 points, against 0.53 on the same calendar months before 
 window, UKV's advantage over ERA5 excludes zero at two of the three generators. At the third, whose
 output swings with months of unrecorded turbine availability, the interval includes zero.
 
+![Figure 2: Both leaders' advantage over ERA5 is mostly a summer result](assets/wind_half_years.svg)
+
+![Figure 3: UKV's advantage over ERA5 excludes zero at two of the three generators](assets/wind_per_generator.svg)
+
 **ICON-D2 and UKV cannot be separated robustly.** Across the window ICON-D2 leads by 0.14 points
 [0.03, 0.25]. Before the UKV upgrade it led by 0.22, and since the upgrade UKV is 0.06 points ahead
 [−0.03, +0.19]. With the served 100 m wind and the 10 m speed, as planned before the run, ICON-D2
@@ -102,6 +108,8 @@ leads by 0.07 points [−0.03, +0.17].
 every 3 hours, so at each run hour it is served at T+0, like UKV. On those hours ICON-D2 is 0.30
 points ahead [0.19, 0.41]. An hour into the run ICON-D2 is 0.15 points ahead [0.02, 0.27], and 2
 hours in ICON-D2 and UKV are level. This comparison was made after the run.
+
+![Figure 4: ICON-D2 and UKV cannot be separated robustly](assets/wind_icon_d2_against_ukv.svg)
 
 ## ICON-EU beats the reanalysis at either height
 
@@ -118,11 +126,14 @@ in winter. Since the upgrade UKV is 0.41 points ahead of ICON-EU [0.33, 0.49].
 
 **ICON global is 0.70 points behind ICON-EU [0.48, 0.93]. About half of that gap is a pair of steps
 in ICON global's served wind at one generator, and a smaller part is its longer served lead.** At
-that generator, ICON global's wind relative to ICON-EU's falls by roughly 12% in early June 2025 and
-rises by about as much in early June 2026, at 10 m and at 80 m alike. No other product shows the
+that generator, ICON global's wind relative to ICON-EU's falls by about 15% at 10 m and 8% at 80 m in
+early June 2025, and rises by about as much in early June 2026. No other product shows the
 steps, and their cause is not identified. Telling the model which side of the steps each hour falls
 on cuts ICON global's deficit at that generator from 1.39 to 0.44 points, and the pooled deficit to
 0.38 points [0.27, 0.50].
+
+![Figure 5: ICON global is the weakest product, and half of its gap is a pair of steps in its
+served wind](assets/wind_icon_global_steps.svg)
 
 **ICON global's longer served lead explains a smaller part of its gap.** ICON global runs every 6
 hours, so half its hours are served 3 to 5 hours after the run, where ICON-EU's are 0 to 2 hours. On
