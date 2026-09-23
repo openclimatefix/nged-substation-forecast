@@ -43,3 +43,9 @@ how far it generalises.
   other products' weather rather than from the extra columns, a blend of UKV and ICON-EU that a live
   service could read beats UKV alone, and an XGBoost blend beats a linear stack of single-product
   predictions.
+- [How accurate is a power forecast driven by ECMWF ENS at each
+  horizon?](ens-forecast-horizons.md) — at the six solar farms and three wind farms, an XGBoost model
+  given the ENS ensemble mean beats every forecast that reads no weather forecast to day 5 for solar
+  and day 7 for wind, and loses to climatology by day 14. The ensemble mean beats the control member
+  and beats training on every member, and rebuilding solar radiation through the clear-sky index
+  beats the straight-line resample the live service uses today.

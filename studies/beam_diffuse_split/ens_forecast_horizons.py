@@ -107,7 +107,8 @@ run, so a contrast against it is exploratory as well.
 
 Run it with `uv run python studies/beam_diffuse_split/ens_forecast_horizons.py`, after
 `fetch_ens_forecast_horizons.py` and the three past-weather studies. With `--report-only` it
-rebuilds the report from the losses a full run saved.
+rebuilds the report from the losses a full run saved, and with `--refit solar` or `--refit wind` it
+refits one technology and reads the other's saved outputs.
 """
 
 import argparse
@@ -1852,6 +1853,34 @@ def _row_lines(*, frame: pl.DataFrame, domain: DomainType) -> list[str]:
     return [*lines, ""]
 
 
+def _dropped_lines(*, frame: pl.DataFrame, domain: DomainType) -> list[str]:
+    """Count the past-weather rows every arm lost, and why.
+
+    Rebuilds the past-weather rows and the baselines' inputs, which is cheap, and compares them with
+    the rows the arms scored.
+
+    Args:
+        frame: The rows every arm scored.
+        domain: `solar` or `wind`.
+
+    Returns:
+        Markdown lines.
+    """
+    base = _with_baselines(frame=_base_frame(domain=domain), domain=domain)
+    dropped = base.join(frame.select("site", "time"), on=["site", "time"], how="anti")
+    inputs = [c for c in base.columns if "persistence_day" in c or "clear_sky_index_day" in c]
+    missing = dropped.filter(pl.any_horizontal(pl.col(inputs).is_null())).height
+    early = dropped.filter(pl.col("time") < SPAN[0] + timedelta(days=max(BAND_DAYS) + 7)).height
+    return [
+        (
+            f"Rows dropped from every arm: {dropped.height:,} of {base.height:,}, of which "
+            f"{missing:,} lack a baseline's input and {early:,} fall in the first three weeks of "
+            "the ENS archive."
+        ),
+        "",
+    ]
+
+
 def _feature_lines(*, domain: Domain) -> list[str]:
     """Print every fitted arm's feature columns, so a reviewer can check them against the plan.
 
@@ -2161,6 +2190,12 @@ def main() -> int:
         action="store_true",
         help="Rebuild the report from the outputs already on disk instead of refitting.",
     )
+    parser.add_argument(
+        "--refit",
+        choices=("solar", "wind", "both"),
+        default="both",
+        help="Refit only this technology, reading the other's outputs from disk.",
+    )
     arguments = parser.parse_args()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
@@ -2168,7 +2203,8 @@ def main() -> int:
     records: list[IntervalRecord] = []
     boards: list[dict[str, object]] = []
     for domain in (SOLAR, WIND):
-        outputs = run_domain(domain=domain, report_only=arguments.report_only)
+        refit = arguments.refit in (domain.name, "both") and not arguments.report_only
+        outputs = run_domain(domain=domain, report_only=not refit)
         best = best_baselines(losses=outputs.losses)
         domain_records = _intervals(
             losses=outputs.losses,
@@ -2180,6 +2216,7 @@ def main() -> int:
         boards += board
         lines += [
             *_row_lines(frame=outputs.frame, domain=domain.name),
+            *_dropped_lines(frame=outputs.frame, domain=domain.name),
             f"#### {domain.name.capitalize()}: the upsampling technique chosen: {outputs.method}",
             "",
             *_decision_lines(decisions=outputs.decisions),

@@ -166,6 +166,16 @@ should recover part of the amplitude; how much has not been measured. Temperatur
 effective-temperature, degree-day and `windchill` features. Treat it as a bounded experiment rather
 than a correctness fix, and expect a smaller win than (a) or (b).
 
+**One study has measured (b), (c), and the wind vector on XGBoost models given the ENS ensemble
+mean, at six solar farms and three wind farms in Lincolnshire from 2024 to 2026.** Against
+straight-line interpolation, the clear-sky-index resample lowered the solar error by 0.30 points of
+capacity [0.22, 0.40] at day 1 and 0.16 points [0.02, 0.31] at day 7, and by amounts not
+statistically significant at the 5% level beyond day 7. A shape-preserving cubic for temperature
+moved it by less than 0.02 points, and interpolating the wind as components moved the wind error by
+less than 0.1 points at every horizon. The measurements, and the ENS horizon study they come from,
+are in [How accurate is a power forecast driven by ECMWF ENS at each
+horizon?](../studies/ens-forecast-horizons.md#turning-enss-steps-into-hourly-values).
+
 The synoptic variables need no fix: `pressure_surface`, `pressure_reduced_to_mean_sea_level`, and
 `geopotential_height_500hpa` lose almost nothing at 6-hourly spacing ([MAE/SD
 0.02–0.09](../architecture/nwp-variable-conventions.md#every-variable-and-how-to-read-it)).
@@ -245,6 +255,11 @@ will barely register in the `"all"` aggregate. Arm 1's win should concentrate in
 Plot each changed feature against observed power before trusting any of it: a sign-convention error
 in a wind component or a clear-sky index is invisible to the leaderboard and obvious in the
 [feature-visualisation tool](https://github.com/openclimatefix/nged-substation-forecast/issues/359).
+
+The ENS horizon study measured arms 2 and 3, and the wind vector, outside the pipeline, on hourly
+XGBoost models per generator rather than on the leaderboard: [Turning ENS's steps into hourly
+values](../studies/ens-forecast-horizons.md#turning-enss-steps-into-hourly-values) has the
+figures, by horizon, for its nine farms.
 
 ## Tier 1 — config-level changes (hours each)
 

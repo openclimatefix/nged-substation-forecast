@@ -116,6 +116,10 @@ Repairing all three is scheduled as the first work in v0.5 — see [Before anyth
 else](../roadmap/xgboost-improvements.md#before-anything-else-fix-how-the-nwp-variables-are-interpreted).
 Until that lands, the behaviour described below is what the pipeline does.
 
+The fixes' effect on a power forecast has been measured at nine farms, outside the pipeline, in [How
+accurate is a power forecast driven by ECMWF ENS at each
+horizon?](../studies/ens-forecast-horizons.md#turning-enss-steps-into-hourly-values).
+
 ### Wind direction is interpolated across the 0°/360° wrap
 
 Interpolating 350° → 10° yields 180°: due south for a northerly wind. Measured on the 2026-08-10 00Z

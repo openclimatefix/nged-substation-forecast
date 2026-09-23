@@ -22,6 +22,7 @@ Run it with `uv run python studies/beam_diffuse_split/ens_forecast_charts.py`, a
 
 import logging
 import math
+import re
 import sys
 from collections.abc import Sequence
 from datetime import datetime, timedelta
@@ -95,16 +96,33 @@ METHOD_NAMES: Final[dict[str, str]] = {
     "native": "Native steps",
     "linear": "Linear",
     "clear_sky": "Clear-sky index",
-    "clear_sky_conserving": "Clear-sky index, step mean kept",
+    "clear_sky_conserving": "Clear-sky, step mean kept",
     "linear_pchip": "Linear, shape-preserving temperature",
     "clear_sky_pchip": "Clear-sky index, shape-preserving temperature",
     "clear_sky_conserving_pchip": "Clear-sky index, step mean kept, shape-preserving temperature",
     "direction_components": "Direction from components",
     "speed_components": "Speed from components",
-    "components": "Speed and direction from components",
+    "components": "Both from components",
 }
 """Each upsampling combination's name on a chart, as `ens_forecast_horizons.COMBINATIONS` keys
 them."""
+
+COMPARED: Final[tuple[str, str]] = (
+    "The combination it was judged against",
+    "Linear interpolation",
+)
+"""The two comparisons each upsampling candidate is drawn against, the same in every panel, so the
+colour each takes is the same in every panel of the figure's shared colour scale."""
+
+EXAMPLE_COLOURS: Final[dict[str, str]] = {
+    "native": ocf.BLACK_1,
+    "linear": ocf.BRAND_ORANGE,
+    "clear_sky": ocf.DATA_BLUE,
+    "clear_sky_conserving": ocf.DATA_SKY,
+    "components": ocf.DATA_BLUE,
+}
+"""Each drawn combination's colour. A figure shares one colour scale across its panels, so every
+combination has one colour whichever technology it is drawn for."""
 
 EXAMPLE_METHODS: Final[dict[DomainType, tuple[str, ...]]] = {
     "solar": ("native", "linear", "clear_sky", "clear_sky_conserving"),
@@ -448,12 +466,16 @@ def _key(
 
 
 def leaderboard(
-    *, boards: dict[DomainType, dict[str, dict[str, float]]], title: str
+    *,
+    boards: dict[DomainType, dict[str, dict[str, float]]],
+    chosen: dict[DomainType, str],
+    title: str,
 ) -> alt.VConcatChart:
     """Draw Figure 1.
 
     Args:
         boards: Each technology's leaderboard.
+        chosen: Each technology's chosen upsampling combination, as the chart names it.
         title: The figure's title, stating the finding.
 
     Returns:
@@ -467,20 +489,22 @@ def leaderboard(
             (
                 "Every ENS row is an XGBoost model per generator given ENS at that horizon, three "
                 "ways: the control member; the mean of the 51 members; each member in turn, the 51 "
-                "forecasts averaged. Each is trained on the input it is scored with."
+                "forecasts averaged. Each is trained on the input it is scored with. ENS is "
+                "upsampled to hourly by the combination the rule in Figures 7 and 8 chose: "
+                f"for solar, {chosen['solar']}; for wind, {chosen['wind']}."
             ),
             (
-                "No-weather baselines read only the telemetry up to 09:00 UTC on the run's own "
-                "day, "
-                "when the live service can first read the run. Climatology does not depend on the "
-                "horizon. The two blue rules are not forecasts: ERA5, and the best past-weather "
-                "input a live service can read, scored on the same hours."
+                "No-weather baselines read the telemetry up to 09:00 UTC on the run's own day, "
+                "when the live service can first read the run, or up to 00 UTC for day 0. "
+                "Climatology does not depend on the horizon. The two light blue rules are not "
+                "forecasts: ERA5, and the best past-weather input a live service can read, scored "
+                "on the same hours."
             ),
             f"{DOTS} {CAPACITY}",
             f"{SCOPES['solar']} {SCOPES['wind']}",
             (
                 "The intervals are wide mainly because every row's error rises and falls together "
-                "from month to month; Figures 2 to 4 compare rows on the same months."
+                "from month to month; Figures 2, 9, and 10 compare rows on the same months."
             ),
         ],
         figure_planning=None,
@@ -654,7 +678,7 @@ def ways(*, contrasts: pl.DataFrame, title: str) -> alt.VConcatChart:
         )
     return figure(
         panels=panels,
-        number=3,
+        number=9,
         title=title,
         subtitle=[
             (
@@ -716,7 +740,7 @@ def against_baselines(
     )
     return figure(
         panels=panels,
-        number=4,
+        number=10,
         title=title,
         subtitle=[
             (
@@ -752,15 +776,20 @@ def upsampling_contrasts(
     candidates = dict.fromkeys(
         treatment.split("_day")[0].removeprefix("up_") for treatment in rows["treatment"].to_list()
     )
+    shared_domain = _x_domain(
+        contrasts=contrasts,
+        pairs=[(domain, t, r) for t, r in rows.select("treatment", "reference").iter_rows()],
+    )
     panels = []
     for candidate in candidates:
         compared = rows.filter(
             pl.col("treatment") == upsampling_arm(method=candidate, day=BAND_DAYS[0])
         )["reference"].to_list()
         references = [reference.split("_day")[0].removeprefix("up_") for reference in compared]
+        judged_against = references[0]
         pairs = [
             (
-                f"Against {METHOD_NAMES[reference].lower()}",
+                COMPARED[index],
                 [
                     (
                         upsampling_arm(method=candidate, day=d),
@@ -769,9 +798,8 @@ def upsampling_contrasts(
                     for d in BAND_DAYS
                 ],
             )
-            for reference in references
+            for index, reference in enumerate(references)
         ]
-        triples = [(domain, t, r) for _, per_day in pairs for t, r in per_day]
         panels.append(
             interval_panel(
                 rows=pl.DataFrame(
@@ -791,13 +819,16 @@ def upsampling_contrasts(
                         for day, (treatment, reference) in zip(BAND_DAYS, per_day, strict=True)
                     ]
                 ),
-                x_domain=_x_domain(contrasts=contrasts, pairs=triples),
+                x_domain=shared_domain,
                 x_title=X_TITLE,
                 zero_label="no difference",
                 better_label=f"{METHOD_NAMES[candidate].lower()} better",
-                conditions=[condition for condition, _ in pairs],
+                conditions=list(COMPARED),
                 condition_title="Compared with",
-                panel_title=METHOD_NAMES[candidate],
+                panel_title=(
+                    f"{METHOD_NAMES[candidate]}, judged against "
+                    f"{METHOD_NAMES[judged_against].lower()}"
+                ),
                 family_key=False,
                 figure_planning="exploratory",
             )
@@ -894,7 +925,7 @@ def _day_panels(
     ).with_columns(hour=(pl.col("time") - start).dt.total_minutes() / 60.0)
     methods = list(EXAMPLE_METHODS[domain])
     names = [METHOD_NAMES[m] for m in methods]
-    colours = [ocf.BLACK_1, ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_SKY][: len(methods)]
+    every = list(EXAMPLE_COLOURS)
     series = rows.filter(pl.col("method").is_in(methods)).select(
         "hour",
         value=pl.col(field),
@@ -907,7 +938,13 @@ def _day_panels(
         axis=alt.Axis(values=list(range(0, 25, 6)), format="d"),
         title="Hour of the day (UTC)",
     )
-    colour = alt.Color("name:N", scale=alt.Scale(domain=names, range=colours), legend=None)
+    colour = alt.Color(
+        "name:N",
+        scale=alt.Scale(
+            domain=[METHOD_NAMES[m] for m in every], range=[EXAMPLE_COLOURS[m] for m in every]
+        ),
+        legend=None,
+    )
     weather = (
         alt.Chart(series.filter(pl.col("name") != names[0]))
         .mark_line(strokeWidth=1.8, aria=False)
@@ -974,7 +1011,7 @@ def example_days(
         site, date = _example_day(inputs=inputs[domain], domain=domain)
         months[domain] = f"{date:%B %Y}"
         methods = list(EXAMPLE_METHODS[domain])
-        colours = [ocf.BLACK_1, ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_SKY][: len(methods)]
+        colours = [EXAMPLE_COLOURS[m] for m in methods]
         key = _line_key(labels=[METHOD_NAMES[m] for m in methods], colours=colours)
         pair = alt.hconcat(
             *(
@@ -996,7 +1033,7 @@ def example_days(
     return (
         figure(
             panels=rows,
-            number=5,
+            number=6,
             title=title,
             subtitle=[
                 (
@@ -1080,8 +1117,8 @@ def _seed_mean(*, domain: DomainType, arms: list[str]) -> pl.DataFrame:
             "site",
             "time",
             "arm",
-            measured=pl.col("power_mw") / pl.col("effective_capacity_mw"),
-            predicted=pl.col("prediction_mw") / pl.col("effective_capacity_mw"),
+            measured=(pl.col("power_mw") / pl.col("effective_capacity_mw")).cast(pl.Float64),
+            predicted=(pl.col("prediction_mw") / pl.col("effective_capacity_mw")).cast(pl.Float64),
         )
     )
 
@@ -1286,6 +1323,25 @@ def per_generator(*, title: str, number: int) -> alt.VConcatChart:
     )
 
 
+def _chosen(*, report: str) -> dict[DomainType, str]:
+    """Read each technology's chosen upsampling combination from the report.
+
+    Args:
+        report: The report's text.
+
+    Returns:
+        Each technology's combination, as the charts name it, in lower case.
+    """
+    return {
+        domain: METHOD_NAMES[
+            re.search(
+                rf"{domain.capitalize()}: the upsampling technique chosen: (\w+)", report
+            ).group(1)  # ty: ignore[unresolved-attribute]
+        ].lower()
+        for domain in DOMAINS
+    }
+
+
 # --- Main ---------------------------------------------------------------------------------------
 
 
@@ -1315,10 +1371,12 @@ def main() -> int:
         domain: pl.read_parquet(OUTPUT_DIR / f"{domain}_inputs.parquet") for domain in DOMAINS
     }
     days_chart, day_months = example_days(inputs=inputs, title=TITLES["example_days"])
-    solar_week, solar_month = models_work(domain="solar", number=7, title=TITLES["solar_week"])
-    wind_week, wind_month = models_work(domain="wind", number=8, title=TITLES["wind_week"])
+    solar_week, solar_month = models_work(domain="solar", number=3, title=TITLES["solar_week"])
+    wind_week, wind_month = models_work(domain="wind", number=4, title=TITLES["wind_week"])
     charts = {
-        "ens_horizons_leaderboard": leaderboard(boards=boards, title=TITLES["leaderboard"]),
+        "ens_horizons_leaderboard": leaderboard(
+            boards=boards, chosen=_chosen(report=report), title=TITLES["leaderboard"]
+        ),
         "ens_horizons_against_day0": against_day0(contrasts=contrasts, title=TITLES["day0"]),
         "ens_horizons_ways": ways(contrasts=contrasts, title=TITLES["ways"]),
         "ens_horizons_against_baselines": against_baselines(
@@ -1326,14 +1384,14 @@ def main() -> int:
         ),
         "ens_upsampling_days": days_chart,
         "ens_upsampling_solar": upsampling_contrasts(
-            contrasts=contrasts, domain="solar", number=6, title=TITLES["upsampling_solar"]
+            contrasts=contrasts, domain="solar", number=7, title=TITLES["upsampling_solar"]
         ),
         "ens_upsampling_wind": upsampling_contrasts(
-            contrasts=contrasts, domain="wind", number=7, title=TITLES["upsampling_wind"]
+            contrasts=contrasts, domain="wind", number=8, title=TITLES["upsampling_wind"]
         ),
         "ens_horizons_solar_week": solar_week,
         "ens_horizons_wind_week": wind_week,
-        "ens_horizons_per_generator": per_generator(title=TITLES["per_generator"], number=9),
+        "ens_horizons_per_generator": per_generator(title=TITLES["per_generator"], number=5),
     }
     for name, chart in charts.items():
         path = ASSETS_DIR / f"{name}.svg"
@@ -1347,16 +1405,38 @@ def main() -> int:
 
 
 TITLES: Final[dict[str, str]] = {
-    "leaderboard": "PLACEHOLDER",
-    "day0": "PLACEHOLDER",
-    "ways": "PLACEHOLDER",
-    "baselines": "PLACEHOLDER",
-    "example_days": "PLACEHOLDER",
-    "upsampling_solar": "PLACEHOLDER",
-    "upsampling_wind": "PLACEHOLDER",
-    "solar_week": "PLACEHOLDER",
-    "wind_week": "PLACEHOLDER",
-    "per_generator": "PLACEHOLDER",
+    "leaderboard": (
+        "At these farms, an XGBoost model given the ENS ensemble mean beats every no-weather "
+        "baseline to day 5 for solar and to day 7 for wind"
+    ),
+    "day0": "Forecast error rises with every day of horizon, fastest over the first week",
+    "ways": (
+        "The ensemble mean beats the control member, and beats feeding each member through the "
+        "model, at almost every horizon"
+    ),
+    "baselines": (
+        "The ENS ensemble mean beats the best no-weather baseline by several points to day 5, "
+        "and loses to it by day 14"
+    ),
+    "example_days": (
+        "The clear-sky index keeps the solar day's shape, where linear interpolation shifts it late"
+    ),
+    "upsampling_solar": (
+        "Rebuilding solar radiation through the clear-sky index lowers the error at every horizon "
+        "to day 7"
+    ),
+    "upsampling_wind": (
+        "No way of interpolating ENS's wind moves the wind error by a tenth of a point"
+    ),
+    "solar_week": (
+        "Given the day-1 ensemble mean, the XGBoost model follows the day-to-day swings at every "
+        "solar farm; the day-7 forecast stays close to an average day"
+    ),
+    "wind_week": (
+        "Given the day-1 ensemble mean, the XGBoost model follows the wind farms' swings; the "
+        "day-7 forecast mostly does not"
+    ),
+    "per_generator": "Every generator's error rises between day 1 and day 7",
 }
 """Each figure's title, which states its finding and matches the heading it sits under."""
 
