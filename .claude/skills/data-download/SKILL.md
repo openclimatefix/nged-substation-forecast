@@ -151,11 +151,12 @@ checkbox `id` attributes the page server-renders into the HTML, since the model 
 otherwise built client-side by JavaScript a plain `curl` never runs. Open-Meteo's plain `/v1/forecast`
 endpoint publishes a real `openapi/forecast.yml` on GitHub, and reaching for that instead looks like
 the queryable catalogue this section otherwise recommends — but its model list uses different
-identifiers for the same underlying models: `icon_d2`/`icon_eu`/`icon_global` there against
-`dwd_icon_d2`/`dwd_icon_eu`/`dwd_icon_global` on the Previous Runs API, `gfs_seamless` against
-`ncep_gfs_seamless`, `ecmwf_ifs04` against `ecmwf_ifs`. Confirm a parameter name against the exact
-endpoint about to be called, never a sibling endpoint from the same provider, however closely
-related the two look.
+identifiers for some of the same underlying models: `icon_d2`/`icon_eu`/`icon_global` there against
+`dwd_icon_d2`/`dwd_icon_eu`/`dwd_icon_global` on the Previous Runs API. Its ECMWF and GFS
+identifiers (`ecmwf_ifs`, `ncep_gfs_seamless`) happen to match, which is exactly the trap: nothing
+in either catalogue flags which model families drift and which do not, so matching one family gives
+no reason to expect another to match. Confirm a parameter name against the exact endpoint about to
+be called, never a sibling endpoint from the same provider, however closely related the two look.
 
 ## Whole-domain-then-crop pattern, for a source with no server-side area subsetting
 
@@ -295,7 +296,7 @@ variable-and-height combination. Point the README's lineage-file reference at th
 filename(s) passed via `write_readme`'s `lineage_filenames` parameter, rather than guessing a
 `lineage_<variable>.json` pattern that may not match what was written.
 
-## Two traps from this repo's own conventions worth restating here
+## Three traps from this repo's own conventions worth restating here
 
 **Two sessions running the same fetch script share one `data/` folder**, since a git worktree is
 backed by one `data/` directory, so two sessions resuming the same download write to the same
