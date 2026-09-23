@@ -212,8 +212,12 @@ def _night_voids_to_zero(*, snapshots: pl.DataFrame, sites: pl.DataFrame) -> pl.
         )
         parts.append(
             rows.with_columns(
-                pl.when(night & pl.col(column).is_nan()).then(0.0).otherwise(pl.col(column))
-                for column in ("ghi_w_m2", "bhi_w_m2")
+                **{
+                    column: pl.when(night & pl.col(column).is_nan())
+                    .then(0.0)
+                    .otherwise(pl.col(column))
+                    for column in ("ghi_w_m2", "bhi_w_m2")
+                }
             )
         )
     return pl.concat(parts)
