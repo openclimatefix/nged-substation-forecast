@@ -1,5 +1,10 @@
 # How accurate is a power forecast driven by ECMWF ENS at each horizon?
 
+> **This study uses only Flexpectation's own data, and its purpose is to inform Flexpectation's
+> choices.** The study scores ECMWF's ensemble forecast only at the generators in Flexpectation's
+> trial area in Lincolnshire. The study does not compare results across many regions or climates, so
+> a result on this page may not hold elsewhere.
+
 **At six solar farms and three wind farms in Lincolnshire, an XGBoost model given the ECMWF
 ensemble's mean forecast beats every forecast that reads no weather forecast out to day 5 for solar
 and day 7 for wind, and loses to the best of those by day 14.** ENS is the ensemble forecast of the
