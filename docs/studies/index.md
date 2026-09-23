@@ -36,3 +36,10 @@ how far it generalises.
   from April to September; ICON-EU also beats ERA5; and ICON global has the largest error of the
   five, about half of its gap to ICON-EU a pair of steps in the wind Open-Meteo's archive serves for
   it at one generator.
+- [Does blending weather products beat the best single weather
+  product?](blending-weather-products.md) — at the six solar farms and three wind farms, an XGBoost
+  model given several weather products at once beats one given the best single product with its
+  neighbouring hours: by 0.13 points of capacity for solar and 0.48 for wind. The gain comes from the
+  other products' weather rather than from the extra columns, a blend of UKV and ICON-EU that a live
+  service could read beats UKV alone, and an XGBoost blend beats a linear stack of single-product
+  predictions.
