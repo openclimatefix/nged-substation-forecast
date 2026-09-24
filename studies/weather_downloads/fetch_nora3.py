@@ -23,13 +23,18 @@ The script fetches and checkpoints one whole calendar month at a time (see the `
 skill). It writes each month to `_month_cache/YYYY-MM.parquet` as soon as the month lands and skips
 cached months on the next run. Before a month is written, the script reads the served `time` values
 for that month and asserts that they equal the requested hours exactly, so a time-axis offset or gap
-cannot mislabel rows. A month that extends past the last hour the aggregated dataset serves is
-skipped, because the aggregate ends there; MET Norway publishes later months as individual monthly
-files under `nora3_subset_atmos/wind_hourly_v2/`, which this script does not fetch. A run whose
-range passes the aggregate's end prints a warning and exits 1 after writing everything it could.
-Every other failure aborts the run. The lineage note lists the months combined and the months
-beyond the aggregate. The aggregate's last hour is recorded in `lineage.json` as
-`last_served_hour_utc`.
+cannot mislabel rows.
+
+Two sources feed the one month cache. Months up to the last hour of the aggregated dataset come
+from the aggregate. MET Norway publishes later months as individual monthly files,
+`nora3_subset_atmos/wind_hourly_v2/arome3kmwind_1hr_YYYYMM.nc`, each with the same variables, grid,
+heights, scale factors, and hourly time axis as the aggregate. Each monthly file's own served
+metadata is asserted against the same constants as the aggregate's. A monthly file that does not
+exist yet (HTTP 404) is skipped and reported, and only when no later month in the run was fetched;
+every other failure aborts the run. A run that skips a month prints a warning and exits 1 after
+writing everything it could. The lineage note lists the months combined, the months read from
+monthly files, and the months unavailable. The aggregate's last hour is recorded in `lineage.json`
+as `last_served_hour_utc`.
 
 The combined output is one canonical file, `NORA3_wind.parquet`, rebuilt from every month in the
 month cache on every run, whatever range the run requested. Validate it with `validate_nora3.py`.
@@ -39,10 +44,12 @@ import argparse
 import calendar
 import sys
 from datetime import UTC, datetime
+from pathlib import Path
 from typing import Final
 
 import numpy as np
 import polars as pl
+import requests
 from delta_store.nwp import NWP_SIGNIFICAND_BITS
 from delta_store.precision import round_to_significand_bits
 from lineage import write_lineage_note, write_readme
@@ -53,6 +60,12 @@ from pyproj import Transformer
 CATALOG_URL: Final[str] = (
     "https://thredds.met.no/thredds/dodsC/nora3_subset_atmos/wind_hourly_v2_agg/nora3_wind_hourly.ncml"
 )
+MONTHLY_FILE_URL_TEMPLATE: Final[str] = (
+    "https://thredds.met.no/thredds/dodsC/nora3_subset_atmos/wind_hourly_v2/"
+    "arome3kmwind_1hr_{year}{month:02d}.nc"
+)
+"""One file per calendar month, with the same variables and grid as the aggregate. The `_150m`
+siblings in the same folder hold the 150 m level and are not used."""
 LAMBERT_PROJ4: Final[str] = (
     "+proj=lcc +lat_1=66.3 +lat_2=66.3 +lat_0=66.3 +lon_0=-42.0 +R=6371000 +units=m +no_defs"
 )
@@ -90,8 +103,11 @@ OUTPUT_NAME: Final[str] = "NORA3_wind.parquet"
 files behind."""
 
 
-def _open_dataset() -> object:
-    """Open the OPeNDAP dataset and assert its grid axes and heights match this script's constants.
+def _open_dataset(url: str) -> object:
+    """Open an OPeNDAP dataset and assert its grid axes and heights match this script's constants.
+
+    Args:
+        url: The aggregate's `CATALOG_URL`, or one monthly file's URL.
 
     Returns:
         The opened `pydap` dataset.
@@ -100,7 +116,7 @@ def _open_dataset() -> object:
         RuntimeError: If the dataset's `x`, `y`, or `height` axis, or a variable's `scale_factor`,
             `add_offset`, or `_FillValue`, differs from the constants above.
     """
-    dataset = open_url(CATALOG_URL)
+    dataset = open_url(url)
     x_first = np.asarray(dataset["x"][0:2].data)
     y_first = np.asarray(dataset["y"][0:2].data)
     if not (
@@ -215,15 +231,22 @@ def _read_scaled(*, dataset: object, name: str, slices: tuple, scale_factor: flo
 
 
 def fetch_month(
-    *, dataset: object, year: int, month: int, index_range: tuple[int, int, int, int]
+    *,
+    dataset: object,
+    year: int,
+    month: int,
+    index_range: tuple[int, int, int, int],
+    in_monthly_file: bool,
 ) -> pl.DataFrame:
     """Fetch wind speed and direction at 50 m and 100 m for one calendar month.
 
     Args:
-        dataset: The opened `pydap` dataset.
+        dataset: The opened `pydap` dataset: the aggregate, or the month's own file.
         year: Calendar year.
         month: Calendar month, 1 to 12.
         index_range: `(ix0, ix1, iy0, iy1)` from `_box_index_range`.
+        in_monthly_file: Whether `dataset` is the month's own file, whose time axis starts at the
+            month's first hour, rather than the aggregate, whose time axis starts at the epoch.
 
     Returns:
         One row per (time, height_m, y_index, x_index). `y_index` and `x_index` are the grid's own
@@ -236,7 +259,7 @@ def fetch_month(
     ix0, ix1, iy0, iy1 = index_range
     h0, h1 = HEIGHT_INDICES
     hours = _month_hours(year=year, month=month)
-    t0 = int(hours[0] // 3600)
+    t0 = 0 if in_monthly_file else int(hours[0] // 3600)
     t1 = t0 + len(hours)
     try:
         served_time = np.asarray(dataset["time"][t0:t1].data)  # ty: ignore[not-subscriptable]
@@ -282,6 +305,96 @@ def fetch_month(
     )
 
 
+def _is_not_found(error: requests.exceptions.HTTPError) -> bool:
+    """Return whether an HTTP error is a 404 on the requested file.
+
+    `pydap` re-raises the original error with no `response`, so the status code sits on the error
+    it chained from.
+
+    Args:
+        error: The error raised while opening a monthly file.
+
+    Returns:
+        True when the server answered 404.
+    """
+    cause = error.__cause__
+    response = error.response
+    if response is None and isinstance(cause, requests.exceptions.HTTPError):
+        response = cause.response
+    return response is not None and response.status_code == 404
+
+
+def _fetch_months(
+    *,
+    months: list[tuple[int, int]],
+    month_cache_dir: Path,
+    dataset: object,
+    last_served_hour: float,
+    index_range: tuple[int, int, int, int],
+) -> tuple[list[str], list[str]]:
+    """Fetch and cache every requested month that is not cached yet.
+
+    Args:
+        months: The `(year, month)` pairs to fetch, in chronological order.
+        month_cache_dir: Directory holding one parquet per month.
+        dataset: The opened aggregated dataset.
+        last_served_hour: The aggregate's last hour, in epoch seconds.
+        index_range: `(ix0, ix1, iy0, iy1)` from `_box_index_range`.
+
+    Returns:
+        The labels of the months read from monthly files, and the labels of the months skipped
+        because their monthly file does not exist yet.
+
+    Raises:
+        RuntimeError: If a month is unavailable but a later month exists, if a monthly file's grid
+            size differs from the aggregate's, or if a month's fetch fails.
+    """
+    from_monthly_files: list[str] = []
+    unavailable: list[str] = []
+    for year, month in months:
+        label = f"{year}-{month:02d}"
+        month_path = month_cache_dir / f"{label}.parquet"
+        if month_path.exists():
+            print(f"NORA3 {label}: already cached, skipping")
+            continue
+        in_monthly_file = _month_hours(year=year, month=month)[-1] > last_served_hour
+        if in_monthly_file:
+            try:
+                month_dataset = _open_dataset(
+                    MONTHLY_FILE_URL_TEMPLATE.format(year=year, month=month)
+                )
+            except requests.exceptions.HTTPError as error:
+                if not _is_not_found(error):
+                    raise
+                print(f"NORA3 {label}: monthly file not published yet (404), skipping")
+                unavailable.append(label)
+                continue
+            if unavailable:
+                raise RuntimeError(
+                    f"NORA3 {unavailable[0]} was unavailable but the later month {label} exists"
+                )
+            if (month_dataset["x"].shape, month_dataset["y"].shape) != (  # ty: ignore[not-subscriptable]
+                dataset["x"].shape,  # ty: ignore[not-subscriptable]
+                dataset["y"].shape,  # ty: ignore[not-subscriptable]
+            ):
+                raise RuntimeError(f"NORA3 {label}: the monthly file's grid size differs")
+            from_monthly_files.append(label)
+        else:
+            month_dataset = dataset
+        frame = fetch_month(
+            dataset=month_dataset,
+            year=year,
+            month=month,
+            index_range=index_range,
+            in_monthly_file=in_monthly_file,
+        )
+        partial = month_path.with_suffix(".parquet.partial")
+        frame.write_parquet(partial)
+        partial.rename(month_path)
+        print(f"NORA3 {label}: fetched and cached")
+    return from_monthly_files, unavailable
+
+
 def main() -> int:
     """Fetch the requested months, one at a time, and write the combined file and lineage note.
 
@@ -298,7 +411,7 @@ def main() -> int:
     month_cache_dir.mkdir(parents=True, exist_ok=True)
     months = _months(start_month=arguments.start_month, end_month=arguments.end_month)
 
-    dataset = _open_dataset()
+    dataset = _open_dataset(CATALOG_URL)
     n_time = dataset["time"].shape[0]  # ty: ignore[not-subscriptable]
     last_served_hour = float(np.asarray(dataset["time"][n_time - 1 : n_time].data)[0])  # ty: ignore[not-subscriptable]
     index_range = _box_index_range(
@@ -306,22 +419,13 @@ def main() -> int:
         n_y=dataset["y"].shape[0],  # ty: ignore[not-subscriptable]
     )
 
-    beyond_aggregate: list[str] = []
-    for year, month in months:
-        label = f"{year}-{month:02d}"
-        month_path = month_cache_dir / f"{label}.parquet"
-        if month_path.exists():
-            print(f"NORA3 {label}: already cached, skipping")
-            continue
-        if _month_hours(year=year, month=month)[-1] > last_served_hour:
-            print(f"NORA3 {label}: beyond the end of the aggregated dataset, skipping")
-            beyond_aggregate.append(label)
-            continue
-        frame = fetch_month(dataset=dataset, year=year, month=month, index_range=index_range)
-        partial = month_path.with_suffix(".parquet.partial")
-        frame.write_parquet(partial)
-        partial.rename(month_path)
-        print(f"NORA3 {label}: fetched and cached")
+    from_monthly_files, unavailable = _fetch_months(
+        months=months,
+        month_cache_dir=month_cache_dir,
+        dataset=dataset,
+        last_served_hour=last_served_hour,
+        index_range=index_range,
+    )
 
     labels = sorted(path.stem for path in month_cache_dir.glob("*.parquet"))
     if not labels:
@@ -347,7 +451,8 @@ def main() -> int:
         extra={
             "months_requested": [arguments.start_month, arguments.end_month],
             "months_combined": labels,
-            "months_beyond_aggregate": beyond_aggregate,
+            "months_fetched_from_monthly_files_this_run": from_monthly_files,
+            "months_unavailable": unavailable,
             "last_served_hour_utc": datetime.fromtimestamp(last_served_hour, tz=UTC),
             "heights_m": list(HEIGHTS_M),
             "rows": combined.height,
@@ -376,19 +481,21 @@ def main() -> int:
             "The grid is projected: `x_index` and `y_index` are not longitude and latitude.",
             "Wind direction is circular: average vectors, not degrees.",
             (
-                "The aggregated dataset ends at `last_served_hour_utc` in `lineage.json`. Months "
-                "after it are not fetched and are listed under `months_beyond_aggregate`."
+                "Two MET Norway sources feed the file: the aggregated dataset up to "
+                "`last_served_hour_utc` in `lineage.json`, then one file per month. Both serve "
+                "the same grid, heights, scale factors, and hourly time axis, and their values "
+                "agree on the month they overlap, so the join has no seam. A month whose file is "
+                "not published yet is listed under `months_unavailable`."
             ),
         ],
         external_docs={
             "NORA3 wind dataset paper": "https://doi.org/10.1175/JAMC-D-21-0029.1",
         },
     )
-    if beyond_aggregate:
+    if unavailable:
         print(
-            f"NORA3: WARNING: {len(beyond_aggregate)} requested month(s) lie beyond the end of "
-            f"the aggregated dataset ({beyond_aggregate[0]} onwards) and were NOT fetched. "
-            "Exiting non-zero."
+            f"NORA3: WARNING: {len(unavailable)} requested month(s) ({unavailable[0]} onwards) "
+            "are not published yet and were NOT fetched. Exiting non-zero."
         )
         return 1
     return 0
