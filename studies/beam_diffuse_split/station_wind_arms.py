@@ -840,7 +840,9 @@ def _station_kinds() -> dict[str, int]:
     )
     candidates = set(candidate_stations())
     daily = per_station.filter(pl.col("hours_of_day") == 1)
-    daily_hours = raw.filter(pl.col("src_id").is_in(daily["src_id"]))["time"].dt.hour().unique()
+    daily_hours = (
+        raw.filter(pl.col("src_id").is_in(daily["src_id"].to_list()))["time"].dt.hour().unique()
+    )
     candidate_types = per_station.filter(pl.col("src_id").is_in(candidates))["message_types"]
     return {
         "stations": per_station.height,
