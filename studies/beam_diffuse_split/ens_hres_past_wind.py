@@ -6,8 +6,8 @@ past-wind comparison in `wind_products.py` (ERA5, UKV, ICON-D2, ICON-EU, ICON gl
 ECMWF products: the deterministic IFS HRES forecast, and the mean of the 51-member ENS at day 0.
 The past-solar study already scores both products; the past-wind page scored neither.
 
-**The planned contrasts are in `plans/ens-hres-past-wind.md`, committed as `715681a7` before any fit
-ran.** The three contrasts, and the second hyperparameter setting each is rerun at, are:
+**The planned contrasts are in `plans/ens-hres-past-wind.md`, whose last revision before any fit is
+`83dbbad3`.** The three contrasts, and the second hyperparameter setting each is rerun at, are:
 
 - **P1** `hres_wind − ukv_wind`: does ECMWF's deterministic forecast describe past wind better than
   UKV, the page's product for historical features?
@@ -28,12 +28,13 @@ figure beside it.
 Open-Meteo Previous Runs file (`previous_runs/combined.parquet`, model `ecmwf_ifs`, the bare column
 is the freshest run), not the 342-point grid file, because the Previous Runs file holds wind
 direction and the grid file holds speed only. The fetch set no `cell_selection`, so Open-Meteo's
-default (`land`) applies, and ERA5 is read at the nearest cell. The grid file is used for one
-cross-check: at each farm, some point among the five nearest to it must reproduce the Previous Runs
-speeds at 10 m and 100 m to within 0.05 km/h on every hour, because Open-Meteo picks its own model
-cell, which is not always the nearest point. Both files are Open-Meteo downloads, so a match shows
-that two downloads agree, not that the grid or the served lead is right. ENS day 0 is read from the
-horizons study's saved inputs (`data/studies/ens_forecast_horizons/wind_inputs.parquet`), not from
+default (`land`) applies, as it does to every other product on the page (`fetch_wind_point.py` sets
+`land`). The grid file is used for one cross-check: at each farm, some point among the five nearest
+to it must reproduce the Previous Runs speeds at 10 m and 100 m to within 0.05 km/h on every hour,
+because Open-Meteo picks its own model cell, which is not always the nearest point. Both files are
+Open-Meteo downloads, so a match shows that two downloads agree, not that the grid or the served
+lead is right. ENS day 0 is read from the horizons study's saved inputs
+(`data/studies/ens_forecast_horizons/wind_inputs.parquet`), not from
 the `T+3` wind download, so no new ENS code is written.
 
 **Row set.** `common_rows(joined(sites=sites))` from `wind_products.py`, restricted to 1 December
@@ -96,10 +97,16 @@ they were fitted, and run by `--extra-fits`, which writes `losses_long_rows.parq
 - The long-row-set reconciliation: ERA5, UKV, HRES and ENS refitted on the rows from 2024-08-12,
   under two designs (the horizons study's, and one with an extra era cut at 2024-12-01).
 - The fold-design robustness table for P1 to P3 and ENS-HRES.
-- The HRES served-lead table, now the ratio of each UTC hour's mean absolute hour-to-hour change to
+- The HRES served-lead table: the ratio of each UTC hour's mean absolute hour-to-hour change to
   the mean of its two neighbours' changes, from the saved Previous Runs file.
 - The lead and time-of-day split (labels 00-08 UTC against 10-23 UTC), which mixes ENS lead with
   time of day and does not test whether ENS could be read in time.
+- The calendar-month coverage of every fold design and long-row design, and, for the long rows'
+  extra-cut design, fold numbers rotated so that no calendar month is left without training rows.
+- Control rows in the lead and time-of-day split and the period splits: UKV, HRES and ERA5
+  contrasts that involve no ENS lead, and ERA5, an analysis, has no lead at all.
+- Each product's 10 m speed over ERA5's averaged over August to October of two years, and the
+  Previous Runs file's `_previous_day*` columns before and from the archive-source change.
 
 Run it with `uv run python studies/beam_diffuse_split/ens_hres_past_wind.py`. `refuse_to_overwrite`
 on a fresh run means `losses.parquet`, `losses.fingerprint`, `intervals.parquet`, `report.md` and
@@ -113,34 +120,38 @@ import argparse
 import hashlib
 import importlib.util
 import logging
-import math
 import re
 import subprocess
 import sys
-from dataclasses import dataclass, field
+from collections.abc import Mapping
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Final, TypedDict
+from types import MappingProxyType
+from typing import Final, Protocol, TypedDict
 
 import numpy as np
 import polars as pl
 from build_dataset import _wind_sites
+from ens_past_solar import _arm_columns_lines, _fingerprint
 from run_experiment import Job, _add_time_features, run_all
 from sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from studies.bootstrap import (
-    BOOTSTRAP_SEED,
     N_BOOTSTRAP_RESAMPLES,
     bootstrap_absolute,
     bootstrap_difference,
-    paired_differences,
+    bootstrap_difference_at_level,
     per_fold_differences,
 )
+from studies.charts import CONTRAST_COLUMNS
 from studies.cross_validation import (
     N_FOLDS,
     PRIMARY_HYPER_PARAMETERS,
     SEEDS,
     SENSITIVITY_HYPER_PARAMETERS,
+    HyperParameters,
     assign_folds,
 )
+from studies.grid_sampling import distance_matrix_km
 from studies.guards import refuse_to_overwrite
 from weather_products import METRIC, PERCENTAGE_POINTS, _mae, with_eras
 from wind_products import (
@@ -183,22 +194,45 @@ TRIAL_AREA_PATHS_MODULE: Final[Path] = (
 )
 """The module that holds the trial-area box, loaded by path because `studies/` is not a package."""
 
-ROW_SET_START: Final[pl.Expr] = pl.datetime(2024, 12, 1, time_zone="UTC")
+ROW_SET_START_DATE: Final[datetime] = datetime(2024, 12, 1, tzinfo=UTC)
 """The first hour of the row set: the first whole month after IFS Cycle 49r1 (12 November 2024)."""
 
-EXPECTED_ROWS: Final[dict[str, int]] = {"W1": 14_489, "W2": 14_994, "W3": 14_072}
+ROW_SET_START: Final[pl.Expr] = pl.lit(ROW_SET_START_DATE)
+"""`ROW_SET_START_DATE` as a Polars expression."""
+
+EXPECTED_ROWS: Final[Mapping[str, int]] = MappingProxyType(
+    {"W1": 14_489, "W2": 14_994, "W3": 14_072}
+)
 """The row count per farm the plan fixes; the script raises if the joined row set differs."""
 
-HRES_ARCHIVE_CHANGE: Final[pl.Expr] = pl.datetime(2025, 10, 1, time_zone="UTC")
+HRES_ARCHIVE_CHANGE_DATE: Final[datetime] = datetime(2025, 10, 1, tzinfo=UTC)
 """The date Open-Meteo's ECMWF archive source changes, and the first era boundary."""
 
-IFS_CYCLE_50R1: Final[pl.Expr] = pl.datetime(2026, 5, 12, time_zone="UTC")
+HRES_ARCHIVE_CHANGE: Final[pl.Expr] = pl.lit(HRES_ARCHIVE_CHANGE_DATE)
+"""`HRES_ARCHIVE_CHANGE_DATE` as a Polars expression."""
+
+IFS_CYCLE_50R1_DATE: Final[datetime] = datetime(2026, 5, 12, tzinfo=UTC)
 """The date IFS Cycle 50r1 goes operational, the second period-split boundary."""
 
-ERA_START_MONTHS: Final[tuple[str, str]] = ("2025-10", "2026-02")
+IFS_CYCLE_50R1: Final[pl.Expr] = pl.lit(IFS_CYCLE_50R1_DATE)
+"""`IFS_CYCLE_50R1_DATE` as a Polars expression."""
+
+IFS_CYCLE_50R1_MONTH: Final[str] = f"{IFS_CYCLE_50R1_DATE:%Y-%m}"
+"""The month label holding IFS Cycle 50r1's start, a part-month dropped by the 50r1 fold design."""
+
+FIRST_MONTH_AFTER_50R1: Final[str] = (
+    f"{IFS_CYCLE_50R1_DATE.replace(day=1) + timedelta(days=31):%Y-%m}"
+)
+"""The first whole month after IFS Cycle 50r1, where the 50r1 fold design's extra era begins."""
+
+UKV_UPGRADE_MONTH: Final[str] = "2026-02"
+"""The first month of the second UKV era, the page's own cut, after the Met Office's upgrade of UKV
+on 21 January 2026."""
+
+ERA_START_MONTHS: Final[tuple[str, str]] = (f"{HRES_ARCHIVE_CHANGE_DATE:%Y-%m}", UKV_UPGRADE_MONTH)
 """The first month of the second and third eras, in the page's `%Y-%m` month label."""
 
-ERA_FOLD_OFFSETS: Final[dict[int, int]] = {0: 0, 1: 0, 2: 2}
+ERA_FOLD_OFFSETS: Final[Mapping[int, int]] = MappingProxyType({0: 0, 1: 0, 2: 2})
 """How far each era's fold numbers are rotated, modulo `N_FOLDS`, before any fit.
 
 The calendar-month coverage check (`calendar_month_coverage`) fails with every offset at 0: July
@@ -207,8 +241,29 @@ training row for that season. A rotation of 2 for the third era puts every calen
 occurs in both years into two different folds.
 """
 
+NO_FOLD_OFFSETS: Final[Mapping[int, int]] = MappingProxyType({0: 0, 1: 0, 2: 0})
+"""No rotation of any of the three eras' fold numbers: the design the coverage check rejected."""
+
+ERA_FOLD_OFFSETS_50R1: Final[Mapping[int, int]] = MappingProxyType({0: 0, 1: 0, 2: 2, 3: 4})
+"""The fold rotation of the design with an extra era cut at IFS Cycle 50r1.
+
+Era 3 (June to September 2026) is rotated by 4. Rotations of 0 and 4 both leave 0 uncovered cells;
+4 is kept so that the design's folds, and the figures printed for them, do not move.
+"""
+
+LONG_ROW_FOLD_OFFSETS: Final[Mapping[int, int]] = MappingProxyType({0: 0, 1: 2, 2: 0})
+"""The fold rotation of the long row set's design with an extra era cut at 2024-12-01.
+
+Found by searching every pair of rotations of eras 1 and 2 (era 0 fixed): six of the 25 pairs leave
+0 uncovered cells, and this is the one with a single non-zero rotation, the smaller of the two such
+pairs.
+"""
+
 SPLIT_LABEL_HOURS: Final[tuple[range, range]] = (range(9), range(10, 24))
 """Label hours (UTC) of the lead and time-of-day split: 00-08 and 10-23; label 09 is dropped."""
+
+MAX_ENS_POWER_DIFF_MW: Final[float] = 1e-3
+"""`run_checks` fails if the horizons study's power and this row set's power differ by more."""
 
 JUMP_RATIO_THRESHOLD: Final[float] = 1.10
 """A UTC hour whose mean absolute hour-to-hour change, over the mean of its two neighbouring hours'
@@ -222,15 +277,12 @@ LEAD_VARIABLES: Final[tuple[str, str, str]] = (
 )
 """The Previous Runs columns of the HRES served-lead table."""
 
-LONG_ROW_SET_START: Final[pl.Expr] = pl.datetime(2024, 8, 12, time_zone="UTC")
+LONG_ROW_SET_START: Final[datetime] = datetime(2024, 8, 12, tzinfo=UTC)
 """The first hour of the long row set: the page's own start, the rows common to every product."""
 
-IFS_CYCLE_49R1_CUT_MONTH: Final[str] = "2024-12"
+IFS_CYCLE_49R1_CUT_MONTH: Final[str] = f"{ROW_SET_START_DATE:%Y-%m}"
 """The first whole month after IFS Cycle 49r1 (12 November 2024), where the long row set's extra era
 cut falls."""
-
-UKV_UPGRADE_MONTH: Final[str] = "2026-02"
-"""The first month of the second UKV era, the page's own cut."""
 
 DESIGN_ARMS: Final[tuple[str, ...]] = ("era5", "ukv", "hres", "ens_mean_day0")
 """The four products the planned contrasts and ENS-HRES need, fitted under every extra design."""
@@ -256,14 +308,19 @@ LONG_ROW_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
 )
 """The contrasts printed for each long-row-set design and scope."""
 
-LEAD_PERIODS: Final[tuple[str, str]] = ("before 2025-10-01", "from 2025-10-01")
+LEAD_PERIODS: Final[tuple[str, str]] = (
+    f"before {HRES_ARCHIVE_CHANGE_DATE:%Y-%m-%d}",
+    f"from {HRES_ARCHIVE_CHANGE_DATE:%Y-%m-%d}",
+)
 """The two periods of the HRES served-lead table, split where the archive source changes."""
 
-PLAN_EXPECTED_JUMP_HOURS: Final[dict[str, list[int]]] = {
-    "before 2025-10-01": [1, 13],
-    "from 2025-10-01": [0, 6, 12, 18],
-}
+PLAN_EXPECTED_JUMP_HOURS: Final[Mapping[str, tuple[int, ...]]] = MappingProxyType(
+    {LEAD_PERIODS[0]: (1, 13), LEAD_PERIODS[1]: (0, 6, 12, 18)}
+)
 """The UTC hours at which the plan expected HRES's stitched series to hand over between runs."""
+
+PREVIOUS_DAY_VARIABLE: Final[str] = "wind_speed_100m_previous_day1"
+"""The Previous Runs column of the run one day earlier, whose hour-to-hour jumps are tabulated."""
 
 GRID_NEAREST_RANK: Final[int] = 5
 """How many of the nearest grid points the HRES cross-check tries for each farm."""
@@ -295,12 +352,14 @@ ENS_VARIANT_PRODUCTS: Final[tuple[str, ...]] = (
 SENSITIVITY_PRODUCTS: Final[tuple[str, ...]] = ("hres", "ens_mean_day0", "ukv", "era5")
 """The four products in the planned contrasts, rerun at the second hyperparameter setting."""
 
-ENS_METHODS: Final[dict[str, str]] = {
-    "ens_mean_day0": "components",
-    "ens_mean_day0_speed_components": "speed_components",
-    "ens_mean_day0_direction_components": "direction_components",
-    "ens_mean_day0_linear": "linear",
-}
+ENS_METHODS: Final[Mapping[str, str]] = MappingProxyType(
+    {
+        "ens_mean_day0": "components",
+        "ens_mean_day0_speed_components": "speed_components",
+        "ens_mean_day0_direction_components": "direction_components",
+        "ens_mean_day0_linear": "linear",
+    }
+)
 """Each ENS product key to its method name in the horizons study's `wind_inputs.parquet`."""
 
 ALL_PRODUCTS: Final[tuple[str, ...]] = (*PRIMARY_PRODUCTS, *ENS_VARIANT_PRODUCTS)
@@ -330,6 +389,25 @@ EXPLORATORY_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
 )
 """The two exploratory contrasts between the two new products and the other products."""
 
+SPLIT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("ens_mean_day0_wind", "ukv_wind"),
+    *EXPLORATORY_CONTRASTS,
+    ("hres_wind", "ukv_wind"),
+    ("hres_wind", "era5_wind"),
+    ("ukv_wind", "era5_wind"),
+)
+"""The contrasts of the lead and time-of-day split. The last three involve no ENS lead, and ERA5,
+an analysis, has no lead at all, so they show how much of a change between the halves is time of
+day."""
+
+PERIOD_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    *((treatment, reference) for _, treatment, reference in PLANNED_CONTRASTS),
+    *EXPLORATORY_CONTRASTS,
+    ("ukv_wind", "era5_wind"),
+)
+"""The contrasts of the period splits: the planned ones, the two exploratory ones, and UKV against
+ERA5, because UKV's own upgrade falls in the later period."""
+
 ICON_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("ukv_wind", "era5_wind"),
     ("icon_d2_wind", "era5_wind"),
@@ -344,8 +422,12 @@ ENS_VARIANT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = tuple(
 """Each alternative ENS interpolation against the planned `components` arm, exploratory."""
 
 PERIOD_SPLITS: Final[tuple[tuple[str, str, str], ...]] = (
-    ("HRES archive source", "before 2025-10-01", "from 2025-10-01"),
-    ("IFS Cycle 50r1", "before 2026-05-12", "from 2026-05-12"),
+    ("HRES archive source", *LEAD_PERIODS),
+    (
+        "IFS Cycle 50r1",
+        f"before {IFS_CYCLE_50R1_DATE:%Y-%m-%d}",
+        f"from {IFS_CYCLE_50R1_DATE:%Y-%m-%d}",
+    ),
 )
 """The two period splits: the name of the change, then the labels of the two periods."""
 
@@ -353,13 +435,11 @@ BONFERRONI_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / len(PLANNED_CONTRASTS))
 """The confidence level, in percent, of an interval adjusted for the three planned contrasts."""
 
 CONTRAST_HEADER: Final[tuple[str, str]] = (
-    (
-        "| Scope | Contrast | ΔMAE (pp of capacity) | 95% interval | Excludes zero? "
-        "| Folds agreeing | Rows | Months |"
-    ),
-    "|---|---|---|---|---|---|---|---|",
+    "| " + " | ".join(CONTRAST_COLUMNS) + " |",
+    "|" + "---|" * len(CONTRAST_COLUMNS),
 )
-"""The header of every contrast table in the report."""
+"""The header of every contrast table in the report, the one `studies.charts.report_contrasts`
+reads."""
 
 PUBLISHED_ENS_ERA5_PATTERN: Final[re.Pattern[str]] = re.compile(
     r"^\| wind \| pooled \| all \| ens_mean_day0 − era5 \| ([+-][\d.]+) "
@@ -387,45 +467,51 @@ class IntervalRecord(TypedDict):
     n_folds: int | None
 
 
-@dataclass
-class IntervalLog:
-    """Every interval the report prints, collected as the report is assembled."""
+IntervalLog = list[IntervalRecord]
+"""Every interval the report prints, collected as the report is assembled."""
 
-    records: list[IntervalRecord] = field(default_factory=list)
-
-    def frame(self) -> pl.DataFrame:
-        """Return the collected intervals as one table.
-
-        Returns:
-            One row per interval printed, in the order printed.
-        """
-        return pl.DataFrame(
-            self.records,
-            schema={
-                "section": pl.String,
-                "setting": pl.String,
-                "scope": pl.String,
-                "treatment": pl.String,
-                "reference": pl.String,
-                "value": pl.Float64,
-                "lower": pl.Float64,
-                "upper": pl.Float64,
-                "level": pl.Float64,
-                "n_rows": pl.Int64,
-                "n_months": pl.Int64,
-                "folds_agreeing": pl.Int64,
-                "n_folds": pl.Int64,
-            },
-        )
+INTERVAL_SCHEMA: Final[Mapping[str, type[pl.DataType]]] = MappingProxyType(
+    {
+        "section": pl.String,
+        "setting": pl.String,
+        "scope": pl.String,
+        "treatment": pl.String,
+        "reference": pl.String,
+        "value": pl.Float64,
+        "lower": pl.Float64,
+        "upper": pl.Float64,
+        "level": pl.Float64,
+        "n_rows": pl.Int64,
+        "n_months": pl.Int64,
+        "folds_agreeing": pl.Int64,
+        "n_folds": pl.Int64,
+    }
+)
+"""The columns of `intervals.parquet`, one row per interval the report prints."""
 
 
 class ExtraFits(TypedDict):
     """The post-review fits, read back with the frames they were fitted on."""
 
     long_frame: pl.DataFrame
+    long_designs: dict[str, pl.DataFrame]
     long_losses: pl.DataFrame
+    fold_frames: dict[str, pl.DataFrame]
     design_losses: pl.DataFrame
     commit: str
+
+
+class PreviousDayEvidence(TypedDict):
+    """What the Previous Runs file's `_previous_day*` columns show about the source change."""
+
+    n_columns: int
+    n_cells_before: int
+    non_null_before: int
+    last_non_null_before: str
+    n_cells_from: int
+    non_null_from: int
+    jump_hours_from: list[int]
+    ratios_from: list[float]
 
 
 class ChecksResult(TypedDict):
@@ -436,9 +522,18 @@ class ChecksResult(TypedDict):
     grid_check: dict[str, float]
     ens_power: dict[str, float]
     lead_table: pl.DataFrame
+    previous_day: PreviousDayEvidence
 
 
-def _trial_area_box() -> object:
+class TrialAreaBox(Protocol):
+    """The part of `weather_downloads.paths.TrialAreaBox` this script reads."""
+
+    def grid_points(self, *, spacing_deg: float) -> pl.DataFrame:
+        """Return the grid's `point_id`, `latitude` and `longitude`, one row per point."""
+        ...
+
+
+def _trial_area_box() -> TrialAreaBox:
     """Load the trial-area box from `studies/weather_downloads/paths.py`, held in memory only.
 
     Returns:
@@ -513,7 +608,7 @@ def ens_power_check(*, base: pl.DataFrame) -> dict[str, float]:
     two studies label the hour differently, so the ENS wind would sit an hour away from the power.
 
     Args:
-        base: The row set before the ENS join, carrying `site`, `time` and `power_mw`.
+        base: The row set, carrying `site`, `time` and `power_mw`.
 
     Returns:
         `n_shared_rows` and `max_abs_diff_mw`.
@@ -533,22 +628,6 @@ def ens_power_check(*, base: pl.DataFrame) -> dict[str, float]:
             shared.select((pl.col("ours") - pl.col("theirs")).abs().max()).item()
         ),
     }
-
-
-MAX_ENS_POWER_DIFF_MW: Final[float] = 1e-3
-"""`run_checks` fails if the horizons study's power and this row set's power differ by more."""
-
-
-def _base_rows(*, sites: pl.DataFrame) -> pl.DataFrame:
-    """Return the page's rows from 1 December 2024, before eras and folds are assigned.
-
-    Args:
-        sites: The wind roster.
-
-    Returns:
-        `common_rows(joined(...))` restricted to `ROW_SET_START` onward.
-    """
-    return common_rows(frame=joined(sites=sites)).filter(pl.col("time") >= ROW_SET_START)
 
 
 def _count_by_site(*, frame: pl.DataFrame) -> dict[str, int]:
@@ -577,7 +656,7 @@ def joined_row_set(*, sites: pl.DataFrame) -> tuple[pl.DataFrame, list[tuple[str
     Raises:
         ValueError: If a join loses rows, or the per-farm counts differ from `EXPECTED_ROWS`.
     """
-    frame = _base_rows(sites=sites)
+    frame = common_rows(frame=joined(sites=sites)).filter(pl.col("time") >= ROW_SET_START)
     counts = [("page rows from 2024-12-01", frame.height)]
     per_site = _count_by_site(frame=frame)
     if per_site != EXPECTED_ROWS:
@@ -595,7 +674,7 @@ def joined_row_set(*, sites: pl.DataFrame) -> tuple[pl.DataFrame, list[tuple[str
     return frame.sort("site", "time"), counts
 
 
-def with_three_eras(*, frame: pl.DataFrame, fold_offsets: dict[int, int]) -> pl.DataFrame:
+def with_three_eras(*, frame: pl.DataFrame, fold_offsets: Mapping[int, int]) -> pl.DataFrame:
     """Label each row's era, add the era feature, and cut folds inside each era.
 
     The date filter has already run, so the folds are cut on the row set the arms are fitted on.
@@ -614,9 +693,9 @@ def with_three_eras(*, frame: pl.DataFrame, fold_offsets: dict[int, int]) -> pl.
     labelled = frame.with_columns(era_code=era_code).with_columns(
         era=pl.col("era_code").cast(pl.String)
     )
-    folded = assign_folds(dataset=labelled, by=("site", "era"))
-    rotation = pl.col("era_code").replace_strict(fold_offsets, return_dtype=pl.Int32)
-    return folded.with_columns(fold=(pl.col("fold") + rotation) % N_FOLDS)
+    return _rotate_folds(
+        frame=assign_folds(dataset=labelled, by=("site", "era")), fold_offsets=fold_offsets
+    )
 
 
 def calendar_month_coverage(*, frame: pl.DataFrame) -> pl.DataFrame:
@@ -726,21 +805,12 @@ def _nearest_grid_points(*, sites: pl.DataFrame, points: pl.DataFrame) -> dict[s
     Returns:
         Each site to its `GRID_NEAREST_RANK` nearest `point_id`s.
     """
-    ranked: dict[str, list[int]] = {}
-    for site in sites.iter_rows(named=True):
-        latitude = np.radians(points["latitude"].to_numpy())
-        longitude = np.radians(points["longitude"].to_numpy())
-        site_latitude = math.radians(site["latitude"])
-        site_longitude = math.radians(site["longitude"])
-        haversine = (
-            np.sin((latitude - site_latitude) / 2) ** 2
-            + np.cos(latitude)
-            * math.cos(site_latitude)
-            * np.sin((longitude - site_longitude) / 2) ** 2
-        )
-        order = np.argsort(haversine)[:GRID_NEAREST_RANK]
-        ranked[site["site"]] = points["point_id"].to_numpy()[order].tolist()
-    return ranked
+    order = np.argsort(distance_matrix_km(sites=sites, cells=points), axis=1)
+    point_ids = points["point_id"].to_numpy()
+    return {
+        site: point_ids[order[index, :GRID_NEAREST_RANK]].tolist()
+        for index, site in enumerate(sites["site"].to_list())
+    }
 
 
 def hres_grid_check(*, sites: pl.DataFrame) -> dict[str, float]:
@@ -761,7 +831,7 @@ def hres_grid_check(*, sites: pl.DataFrame) -> dict[str, float]:
     Raises:
         ValueError: If any farm has no matching point among its nearest `GRID_NEAREST_RANK`.
     """
-    points = _trial_area_box().grid_points(spacing_deg=0.05)  # ty: ignore[unresolved-attribute]
+    points = _trial_area_box().grid_points(spacing_deg=0.05)
     ranked = _nearest_grid_points(sites=sites, points=points)
     candidates = sorted({point for ids in ranked.values() for point in ids})
     grid = (
@@ -815,6 +885,64 @@ def hres_grid_check(*, sites: pl.DataFrame) -> dict[str, float]:
     }
 
 
+def _jump_ratios(*, changes: pl.DataFrame) -> list[float]:
+    """Return each UTC hour's mean change over the mean of its two neighbours' means.
+
+    Args:
+        changes: Hour-to-hour changes of one variable in one period, carrying `time` and `change`.
+
+    Returns:
+        24 ratios, hour 0 first, wrapping at midnight, so the neighbours of hour 0 are 23 and 1.
+    """
+    by_hour = changes.group_by(hour=pl.col("time").dt.hour()).agg(
+        mean_abs_change=pl.col("change").mean()
+    )
+    means = by_hour.sort("hour")["mean_abs_change"].to_list()
+    return [means[hour] / ((means[hour - 1] + means[(hour + 1) % 24]) / 2.0) for hour in range(24)]
+
+
+def _hourly_changes(*, previous: pl.DataFrame, variable: str) -> pl.DataFrame:
+    """Return each row's absolute change from the previous hour, for consecutive hours only.
+
+    Args:
+        previous: The Previous Runs rows of the wind roster, sorted by `site` and `time`.
+        variable: The column whose change is measured.
+
+    Returns:
+        Rows with `time`, `change` and `period` (one of `LEAD_PERIODS`).
+    """
+    return (
+        previous.with_columns(
+            change=(pl.col(variable) - pl.col(variable).shift(1).over("site")).abs(),
+            gap=pl.col("time") - pl.col("time").shift(1).over("site"),
+        )
+        .filter(pl.col("gap") == pl.duration(hours=1))
+        .select(
+            "time",
+            "change",
+            period=pl.when(pl.col("time") >= HRES_ARCHIVE_CHANGE)
+            .then(pl.lit(LEAD_PERIODS[1]))
+            .otherwise(pl.lit(LEAD_PERIODS[0])),
+        )
+    )
+
+
+def _previous_runs_rows(*, sites: pl.DataFrame) -> pl.DataFrame:
+    """Return the Previous Runs file's rows for the wind roster from `ROW_SET_START`, sorted.
+
+    Args:
+        sites: The wind roster.
+
+    Returns:
+        The rows, sorted by `site` and `time`.
+    """
+    return (
+        pl.read_parquet(HRES_PREVIOUS_RUNS_PATH)
+        .filter(pl.col("site").is_in(sites["site"].to_list()), pl.col("time") >= ROW_SET_START)
+        .sort("site", "time")
+    )
+
+
 def hres_lead_table(*, sites: pl.DataFrame) -> pl.DataFrame:
     """Measure the hour-to-hour change of HRES's freshest-run series by UTC hour of day.
 
@@ -827,58 +955,100 @@ def hres_lead_table(*, sites: pl.DataFrame) -> pl.DataFrame:
         sites: The wind roster.
 
     Returns:
-        One row per (variable, period, hour) with `mean_abs_change` (in the column's own unit, km/h
-        or degrees Celsius) and `ratio`, that mean over the mean of the previous and the next
-        hour's means, wrapping at midnight.
+        One row per (variable, period, hour) with `ratio`: that hour's mean absolute change over
+        the mean of the previous and the next hour's means, wrapping at midnight.
     """
-    previous = (
-        pl.read_parquet(HRES_PREVIOUS_RUNS_PATH)
-        .filter(pl.col("site").is_in(sites["site"].to_list()), pl.col("time") >= ROW_SET_START)
-        .sort("site", "time")
-    )
+    previous = _previous_runs_rows(sites=sites)
     tables: list[pl.DataFrame] = []
     for variable in LEAD_VARIABLES:
-        changes = (
-            previous.with_columns(
-                change=(pl.col(variable) - pl.col(variable).shift(1).over("site")).abs(),
-                gap=pl.col("time") - pl.col("time").shift(1).over("site"),
-            )
-            .filter(pl.col("gap") == pl.duration(hours=1))
-            .with_columns(
-                period=pl.when(pl.col("time") >= HRES_ARCHIVE_CHANGE)
-                .then(pl.lit("from 2025-10-01"))
-                .otherwise(pl.lit("before 2025-10-01"))
-            )
-        )
-        by_hour = changes.group_by("period", hour=pl.col("time").dt.hour()).agg(
-            mean_abs_change=pl.col("change").mean()
-        )
+        changes = _hourly_changes(previous=previous, variable=variable)
         for period in LEAD_PERIODS:
-            means = (
-                by_hour.filter(pl.col("period") == period).sort("hour")["mean_abs_change"].to_list()
-            )
+            ratios = _jump_ratios(changes=changes.filter(pl.col("period") == period))
             tables.append(
                 pl.DataFrame(
-                    {
-                        "variable": variable,
-                        "period": period,
-                        "hour": list(range(24)),
-                        "mean_abs_change": means,
-                        "ratio": [
-                            means[hour] / ((means[hour - 1] + means[(hour + 1) % 24]) / 2.0)
-                            for hour in range(24)
-                        ],
-                    },
+                    {"variable": variable, "period": period, "hour": range(24), "ratio": ratios},
                     schema={
                         "variable": pl.String,
                         "period": pl.String,
                         "hour": pl.Int32,
-                        "mean_abs_change": pl.Float64,
                         "ratio": pl.Float64,
                     },
                 )
             )
     return pl.concat(tables).sort("variable", "period", "hour")
+
+
+def previous_day_evidence(*, sites: pl.DataFrame) -> PreviousDayEvidence:
+    """Count the `_previous_day*` values before and from the archive-source change, and find jumps.
+
+    Open-Meteo's Previous Runs file holds each variable's freshest-run value and, for each of the
+    previous 7 days, the value the run started that many days earlier had for the hour. A value
+    the source did not serve is null.
+
+    Args:
+        sites: The wind roster.
+
+    Returns:
+        The number of `_previous_day*` columns; how many cells they hold before and from
+        `HRES_ARCHIVE_CHANGE_DATE` and how many of those are not null; the last date before the
+        change on which any is not null; and the UTC hours at which `PREVIOUS_DAY_VARIABLE` jumps
+        from that date, with all 24 ratios.
+    """
+    previous = _previous_runs_rows(sites=sites)
+    columns = [name for name in previous.columns if "_previous_day" in name]
+    before = previous.filter(pl.col("time") < HRES_ARCHIVE_CHANGE)
+    after = previous.filter(pl.col("time") >= HRES_ARCHIVE_CHANGE)
+    non_null_before = before.select(pl.sum_horizontal(pl.col(columns).is_not_null()).sum()).item()
+    last_before = before.filter(pl.any_horizontal(pl.col(columns).is_not_null()))["time"].max()
+    ratios = _jump_ratios(
+        changes=_hourly_changes(previous=previous, variable=PREVIOUS_DAY_VARIABLE).filter(
+            pl.col("period") == LEAD_PERIODS[1]
+        )
+    )
+    return {
+        "n_columns": len(columns),
+        "n_cells_before": before.height * len(columns),
+        "non_null_before": int(non_null_before),
+        "last_non_null_before": f"{last_before:%Y-%m-%d}",
+        "n_cells_from": after.height * len(columns),
+        "non_null_from": int(
+            after.select(pl.sum_horizontal(pl.col(columns).is_not_null()).sum()).item()
+        ),
+        "jump_hours_from": [
+            hour for hour, ratio in enumerate(ratios) if ratio >= JUMP_RATIO_THRESHOLD
+        ],
+        "ratios_from": ratios,
+    }
+
+
+def _previous_day_lines(*, evidence: PreviousDayEvidence) -> list[str]:
+    """Render the `_previous_day*` evidence for the archive-source change as markdown.
+
+    Args:
+        evidence: `previous_day_evidence`'s result.
+
+    Returns:
+        Markdown lines.
+    """
+    ratios = ", ".join(
+        f"{hour:02d}: {ratio:.2f}" for hour, ratio in enumerate(evidence["ratios_from"])
+    )
+    return [
+        "#### The Previous Runs file's `_previous_day*` columns and the archive-source change",
+        "",
+        (
+            f"The wind farms' rows from {ROW_SET_START_DATE:%Y-%m-%d} hold "
+            f"{evidence['n_cells_before']:,} cells in the {evidence['n_columns']} "
+            f"`_previous_day*` columns before {HRES_ARCHIVE_CHANGE_DATE:%Y-%m-%d}, of which "
+            f"{evidence['non_null_before']:,} are not null (the last on "
+            f"{evidence['last_non_null_before']}), and {evidence['n_cells_from']:,} cells from "
+            f"that date, of which {evidence['non_null_from']:,} are not null. From "
+            f"{HRES_ARCHIVE_CHANGE_DATE:%Y-%m-%d} `{PREVIOUS_DAY_VARIABLE}`'s hour-to-hour "
+            "change, over the mean of its two neighbours' changes, reaches "
+            f"{JUMP_RATIO_THRESHOLD:.2f} or more at UTC hours {evidence['jump_hours_from']}. "
+            f"All 24 ratios: {ratios}."
+        ),
+    ]
 
 
 def _lead_lines(*, lead_table: pl.DataFrame) -> list[str]:
@@ -898,8 +1068,8 @@ def _lead_lines(*, lead_table: pl.DataFrame) -> list[str]:
             "hour, over the mean of the same statistic at the previous and the next UTC hour "
             "(wrapping at midnight), for the same variable and period. A ratio well above 1 marks "
             "an hour where one forecast run hands over to the next. Ratios of "
-            f"{JUMP_RATIO_THRESHOLD:.2f} or more are in bold. This statistic replaces the ratio to "
-            "the median across the 24 hours, which the wind's own daily cycle swamps."
+            f"{JUMP_RATIO_THRESHOLD:.2f} or more are in bold. The threshold was chosen after the "
+            "first results."
         ),
         "",
     ]
@@ -926,7 +1096,7 @@ def _lead_lines(*, lead_table: pl.DataFrame) -> list[str]:
             lines.append(f"| {hour:02d} | {cells[0]} | {cells[1]} |")
         lines.append("")
     for period in LEAD_PERIODS:
-        expected = PLAN_EXPECTED_JUMP_HOURS[period]
+        expected = list(PLAN_EXPECTED_JUMP_HOURS[period])
         for variable in LEAD_VARIABLES:
             jump_hours = sorted(
                 lead_table.filter(
@@ -945,14 +1115,17 @@ def _lead_lines(*, lead_table: pl.DataFrame) -> list[str]:
     lines += [
         "",
         (
-            "Lead statement. HRES's served lead is 1 to 12 h before 1 October 2025 and 0 to 5 h "
-            "from it, inferred from where the hour-to-hour jumps fall (not documented by "
-            "Open-Meteo, whose documentation says only that each run's first few hours are "
-            "stitched into a continuous series). The expected jumps before 1 October 2025 are at "
-            "01 and 13 UTC, the arrival hours of the 00 and 12 UTC runs, and from 1 October 2025 "
-            "at 00, 06, 12 and 18 UTC, the four daily runs. An hour that reaches the threshold is "
+            "Lead statement, as the plan wrote it before the first fit and as the script prints "
+            "it whatever the table shows. HRES's served lead is 1 to 12 h before 1 October 2025 "
+            "and 0 to 5 h from it, inferred from where the hour-to-hour jumps fall (not "
+            "documented by Open-Meteo, whose documentation says only that each run's first few "
+            "hours are stitched into a continuous series). The expected jumps before 1 October "
+            "2025 are at 01 and 13 UTC, the arrival hours of the 00 and 12 UTC runs, and from "
+            "1 October 2025 at 00, 06, 12 and 18 UTC, the four daily runs. An hour that "
+            "reaches the threshold is "
             "evidence of a handover, not proof of one, and the table can show further hours above "
-            "the threshold that no run schedule explains."
+            "the threshold that no run schedule explains. The plan fixed the threshold at "
+            "1.15, and 1.10 was chosen after the first results."
         ),
     ]
     return lines
@@ -965,7 +1138,7 @@ def run_checks(
 
     Args:
         sites: The wind roster.
-        frame: The row set with eras and folds.
+        frame: The row set with eras and folds, carrying `power_mw`.
         counts: `joined_row_set`'s row counts.
 
     Returns:
@@ -975,8 +1148,9 @@ def run_checks(
         "row_counts": counts,
         "coverage": calendar_month_coverage(frame=frame),
         "grid_check": hres_grid_check(sites=sites),
-        "ens_power": ens_power_check(base=_base_rows(sites=sites)),
+        "ens_power": ens_power_check(base=frame),
         "lead_table": hres_lead_table(sites=sites),
+        "previous_day": previous_day_evidence(sites=sites),
     }
 
 
@@ -1017,8 +1191,8 @@ def _checks_lines(*, checks: ChecksResult) -> list[str]:
         "#### Checks run before any fit",
         "",
         (
-            "- HRES fetch: no `cell_selection` was set, so Open-Meteo's default (`land`) applies, "
-            "and ERA5 is read at the nearest cell."
+            "- HRES fetch: no `cell_selection` was set, so Open-Meteo's default (`land`) applies. "
+            "`fetch_wind_point.py` sets `land` for every other product, ERA5 included."
         ),
         (
             f"- HRES cross-check against the grid file: at each of the {grid['n_farms']:.0f} "
@@ -1040,64 +1214,59 @@ def _checks_lines(*, checks: ChecksResult) -> list[str]:
     return lines
 
 
+def _arm_jobs(
+    *,
+    products: tuple[str, ...],
+    setting: str,
+    hyper_parameters: HyperParameters,
+) -> list[Job]:
+    """Return one job per product at one hyperparameter setting.
+
+    Args:
+        products: Product keys.
+        setting: `pooled` or `sensitivity`, the label saved with the losses.
+        hyper_parameters: The XGBoost hyperparameters of the setting.
+
+    Returns:
+        One job per product, each with the page's seven columns.
+    """
+    return [
+        (
+            f"{product}_wind",
+            setting,
+            "power_mw",
+            (*SHARED_FEATURES, *_wind_columns(product=product)),
+            hyper_parameters,
+            False,
+        )
+        for product in products
+    ]
+
+
 def jobs() -> list[Job]:
     """Return every arm's job: the primary setting for every product, the second for four.
 
     Returns:
         One job per (arm, setting).
+
+    Raises:
+        ValueError: If two arms hold different numbers of feature columns.
     """
-    job_list: list[Job] = []
-    for product in (*PRIMARY_PRODUCTS, *ENS_VARIANT_PRODUCTS):
-        columns = (*SHARED_FEATURES, *_wind_columns(product=product))
-        job_list.append(
-            (f"{product}_wind", "pooled", "power_mw", columns, PRIMARY_HYPER_PARAMETERS, False)
-        )
-    for product in SENSITIVITY_PRODUCTS:
-        columns = (*SHARED_FEATURES, *_wind_columns(product=product))
-        job_list.append(
-            (
-                f"{product}_wind",
-                "sensitivity",
-                "power_mw",
-                columns,
-                SENSITIVITY_HYPER_PARAMETERS,
-                False,
-            )
-        )
+    job_list = [
+        *_arm_jobs(
+            products=ALL_PRODUCTS, setting="pooled", hyper_parameters=PRIMARY_HYPER_PARAMETERS
+        ),
+        *_arm_jobs(
+            products=SENSITIVITY_PRODUCTS,
+            setting="sensitivity",
+            hyper_parameters=SENSITIVITY_HYPER_PARAMETERS,
+        ),
+    ]
+    counts = {len(features) for _, _, _, features, _, _ in job_list}
+    if len(counts) != 1:
+        msg = f"every arm should carry the same number of feature columns, found counts {counts}"
+        raise ValueError(msg)
     return job_list
-
-
-def _fingerprint(*, frame: pl.DataFrame, job_list: list[Job]) -> str:
-    """Return a hash covering every row's values, every job's columns, and the seeds.
-
-    `--report-only` refuses to reuse a saved `losses.parquet` when this does not match, so a code
-    change that moves the row set, a feature's value, a fold, a column, a seed, or a hyperparameter
-    setting cannot silently mix its fits with a previous run's. Every float column is cast to
-    `Float32` before hashing, so the last-bit noise of a parallel mean over 51 members cannot flip
-    the fingerprint; the saved `losses.parquet` keeps full precision.
-
-    Args:
-        frame: The row set every job is fitted on, including `power_mw` and `fold`.
-        job_list: Every job this run means to fit.
-
-    Returns:
-        A hex digest.
-    """
-    ordered = frame.select(sorted(frame.columns)).sort("site", "time")
-    float_columns = [name for name, dtype in ordered.schema.items() if dtype.is_float()]
-    stable = ordered.cast(dict.fromkeys(float_columns, pl.Float32))
-    row_hashes = stable.hash_rows(seed=0).to_list()
-    payload = repr(
-        (
-            row_hashes,
-            [
-                (arm, setting, target, tuple(features), tuple(sorted(hyper_parameters.items())))
-                for arm, setting, target, features, hyper_parameters, _ in job_list
-            ],
-            SEEDS,
-        )
-    )
-    return hashlib.sha256(payload.encode()).hexdigest()
 
 
 def _designs_fingerprint(*, designs: dict[str, pl.DataFrame], job_list: list[Job]) -> str:
@@ -1114,36 +1283,6 @@ def _designs_fingerprint(*, designs: dict[str, pl.DataFrame], job_list: list[Job
         [(name, _fingerprint(frame=frame, job_list=job_list)) for name, frame in designs.items()]
     )
     return hashlib.sha256(payload.encode()).hexdigest()
-
-
-def _bootstrap_percentiles(
-    *, differences: np.ndarray, months: np.ndarray, percentiles: tuple[float, float]
-) -> tuple[float, float]:
-    """Resample whole months and a seed, as `studies.bootstrap` does, at any two percentiles.
-
-    The random stream has the same shape as `studies.bootstrap._resample_bounds`: a seed draw, then
-    a month draw, per resample, from a stream seeded with `BOOTSTRAP_SEED`. `_bonferroni_lines`
-    asserts that this reproduces `bootstrap_difference`'s own interval at 2.5 and 97.5.
-
-    Args:
-        differences: Per-seed, per-row differences, shape (n_seeds, n_rows).
-        months: Each row's month label.
-        percentiles: The two percentiles to return.
-
-    Returns:
-        The two percentiles of the resampled mean.
-    """
-    unique_months, month_index = np.unique(months, return_inverse=True)
-    rows_by_month = [np.flatnonzero(month_index == index) for index in range(len(unique_months))]
-    generator = np.random.default_rng(BOOTSTRAP_SEED)
-    resampled = np.empty(N_BOOTSTRAP_RESAMPLES)
-    for resample in range(N_BOOTSTRAP_RESAMPLES):
-        seed_index = generator.integers(0, differences.shape[0])
-        drawn = generator.integers(0, len(rows_by_month), size=len(rows_by_month))
-        rows = np.concatenate([rows_by_month[index] for index in drawn])
-        resampled[resample] = differences[seed_index, rows].mean()
-    low, high = np.percentile(resampled, percentiles)
-    return float(low), float(high)
 
 
 def contrast_line(
@@ -1181,7 +1320,7 @@ def contrast_line(
         interval[key] * PERCENTAGE_POINTS for key in ("difference", "lower_95", "upper_95")
     )
     excludes = interval["lower_95"] > 0.0 or interval["upper_95"] < 0.0
-    log.records.append(
+    log.append(
         {
             "section": section,
             "setting": setting,
@@ -1199,9 +1338,9 @@ def contrast_line(
         }
     )
     return (
-        f"| {label} | {treatment} − {reference} | {difference:+.3f} | "
-        f"[{lower:+.3f}, {upper:+.3f}] | {'**yes**' if excludes else 'no'} | "
-        f"{agreeing} of {len(folds)} | {interval['n_rows']:,} | {interval['n_months']} |"
+        f"| {label} | {treatment} − {reference} | {difference:+.4f} | "
+        f"[{lower:+.4f}, {upper:+.4f}] | {'**yes**' if excludes else 'no'} | "
+        f"{agreeing} of {len(folds)} | {interval['n_rows']:,} |"
     )
 
 
@@ -1279,7 +1418,7 @@ def _leaderboard_lines(
         value, lower, upper = (
             interval[key] * PERCENTAGE_POINTS for key in ("value", "lower_95", "upper_95")
         )
-        log.records.append(
+        log.append(
             {
                 "section": section,
                 "setting": setting,
@@ -1297,7 +1436,7 @@ def _leaderboard_lines(
             }
         )
         lines.append(
-            f"| {arm} | {value:.3f} | [{lower:.3f}, {upper:.3f}] | {interval['n_rows']:,} "
+            f"| {arm} | {value:.4f} | [{lower:.4f}, {upper:.4f}] | {interval['n_rows']:,} "
             f"| {interval['n_months']} |"
         )
     return lines
@@ -1306,10 +1445,8 @@ def _leaderboard_lines(
 def _bonferroni_lines(*, losses: pl.DataFrame, setting: str, log: IntervalLog) -> list[str]:
     """Render the planned contrasts with intervals adjusted for testing three at once.
 
-    Each interval is a percentile interval of the same month-and-seed resampling, at the level
-    `BONFERRONI_LEVEL`. The function first asserts that its resampler reproduces
-    `bootstrap_difference`'s own 95% interval on the first contrast, so the two intervals differ
-    only in level.
+    Each interval is a percentile interval of the same month-and-seed resampling as the 95%
+    intervals, at the level `BONFERRONI_LEVEL`.
 
     Args:
         losses: Per-row losses at one setting, holding the arms of the planned contrasts.
@@ -1318,38 +1455,27 @@ def _bonferroni_lines(*, losses: pl.DataFrame, setting: str, log: IntervalLog) -
 
     Returns:
         Markdown lines.
-
-    Raises:
-        ValueError: If the resampler does not reproduce the 95% interval of `bootstrap_difference`.
     """
-    tail = (100.0 - BONFERRONI_LEVEL) / 2.0
     lines = [
         "| Contrast | ΔMAE (pp of capacity) | Adjusted interval | Excludes zero? | Months |",
         "|---|---|---|---|---|",
     ]
-    for index, (name, treatment, reference) in enumerate(PLANNED_CONTRASTS):
-        differences, months = paired_differences(
+    for name, treatment, reference in PLANNED_CONTRASTS:
+        interval = bootstrap_difference(
             losses=losses, treatment=treatment, reference=reference, metric=METRIC
         )
-        if index == 0:
-            reference_interval = bootstrap_difference(
-                losses=losses, treatment=treatment, reference=reference, metric=METRIC
-            )
-            mine = _bootstrap_percentiles(
-                differences=differences, months=months, percentiles=(2.5, 97.5)
-            )
-            expected = (reference_interval["lower_95"], reference_interval["upper_95"])
-            if not np.allclose(mine, expected, rtol=0.0, atol=1e-12):
-                msg = f"the resampler gives {mine}, not bootstrap_difference's {expected}"
-                raise ValueError(msg)
         lower, upper = (
-            value * PERCENTAGE_POINTS
-            for value in _bootstrap_percentiles(
-                differences=differences, months=months, percentiles=(tail, 100.0 - tail)
+            bound * PERCENTAGE_POINTS
+            for bound in bootstrap_difference_at_level(
+                losses=losses,
+                treatment=treatment,
+                reference=reference,
+                metric=METRIC,
+                level=BONFERRONI_LEVEL,
             )
         )
-        difference = float(differences.mean()) * PERCENTAGE_POINTS
-        log.records.append(
+        difference = interval["difference"] * PERCENTAGE_POINTS
+        log.append(
             {
                 "section": "bonferroni",
                 "setting": setting,
@@ -1360,17 +1486,17 @@ def _bonferroni_lines(*, losses: pl.DataFrame, setting: str, log: IntervalLog) -
                 "lower": lower,
                 "upper": upper,
                 "level": BONFERRONI_LEVEL,
-                "n_rows": differences.shape[1],
-                "n_months": len(np.unique(months)),
+                "n_rows": interval["n_rows"],
+                "n_months": interval["n_months"],
                 "folds_agreeing": None,
                 "n_folds": None,
             }
         )
         excludes = lower > 0.0 or upper < 0.0
         lines.append(
-            f"| {name}: {treatment} − {reference} | {difference:+.3f} "
-            f"| [{lower:+.3f}, {upper:+.3f}] | {'**yes**' if excludes else 'no'} "
-            f"| {len(np.unique(months))} |"
+            f"| {name}: {treatment} − {reference} | {difference:+.4f} "
+            f"| [{lower:+.4f}, {upper:+.4f}] | {'**yes**' if excludes else 'no'} "
+            f"| {interval['n_months']} |"
         )
     return lines
 
@@ -1389,7 +1515,6 @@ def _period_lines(*, pooled: pl.DataFrame, log: IntervalLog) -> list[str]:
         "HRES archive source": HRES_ARCHIVE_CHANGE,
         "IFS Cycle 50r1": IFS_CYCLE_50R1,
     }
-    pairs = (*_planned_pairs(), *EXPLORATORY_CONTRASTS)
     lines = [
         "#### Period splits (exploratory)",
         "",
@@ -1421,7 +1546,7 @@ def _period_lines(*, pooled: pl.DataFrame, log: IntervalLog) -> list[str]:
         for label, part in ((before_label, before), (after_label, after)):
             lines += _contrast_table(
                 losses=part,
-                pairs=pairs,
+                pairs=PERIOD_CONTRASTS,
                 label=label,
                 section=f"period: {change}",
                 setting="pooled",
@@ -1446,7 +1571,6 @@ def _lead_and_time_of_day_lines(*, pooled: pl.DataFrame, log: IntervalLog) -> li
     Returns:
         Markdown lines.
     """
-    pairs = (("ens_mean_day0_wind", "ukv_wind"), *EXPLORATORY_CONTRASTS)
     lines = [
         "#### ENS contrasts by label hour, a lead and time-of-day split (exploratory)",
         "",
@@ -1455,8 +1579,9 @@ def _lead_and_time_of_day_lines(*, pooled: pl.DataFrame, log: IntervalLog) -> li
             "separates ENS leads 0 to 8 h from leads 10 to 23 h from the 00 UTC run, and early "
             "hours of the day from late hours, so the two halves differ in lead and in time of "
             "day together. HRES's lead before 1 October 2025 is also mixed into the split. The "
-            "split makes no claim about when a run can be read. Where ENS's deficit against UKV "
-            "and HRES sits in the later hours, those hours are also the longer leads."
+            "split makes no claim about when a run can be read. The last three contrasts involve "
+            "no ENS lead, and ERA5 is an analysis with no lead, so a change of those between the "
+            "halves is a change with time of day."
         ),
         "",
     ]
@@ -1466,7 +1591,7 @@ def _lead_and_time_of_day_lines(*, pooled: pl.DataFrame, log: IntervalLog) -> li
         part = pooled.filter(pl.col("time").dt.hour().is_in(list(hours)))
         lines += _contrast_table(
             losses=part,
-            pairs=pairs,
+            pairs=SPLIT_CONTRASTS,
             label=label,
             section="lead and time of day",
             setting="pooled",
@@ -1476,15 +1601,13 @@ def _lead_and_time_of_day_lines(*, pooled: pl.DataFrame, log: IntervalLog) -> li
     return lines
 
 
-def _horizons_lines(*, pooled: pl.DataFrame, log: IntervalLog) -> list[str]:
-    """Render the ENS-against-ERA5 contrast beside the horizons study's published figure.
-
-    Args:
-        pooled: Per-row losses at the primary setting.
-        log: Where the intervals are recorded.
+def _horizons_lines() -> list[str]:
+    """Render the horizons study's published ENS-against-ERA5 figure.
 
     Returns:
         Markdown lines. The published figure is re-derived from the horizons report's own table.
+        This study's re-estimate of it is the `ens_mean_day0_wind − era5_wind` row of the
+        exploratory table above.
 
     Raises:
         ValueError: If the horizons report holds no day-0 ENS-against-ERA5 wind row.
@@ -1500,16 +1623,8 @@ def _horizons_lines(*, pooled: pl.DataFrame, log: IntervalLog) -> list[str]:
         (
             "The horizons study's report gives `ens_mean_day0 − era5` for wind, pooled setting, "
             f"as {difference} [{lower}, {upper}] pp of capacity on {rows} rows from 2024-08-12. "
-            "The row below re-estimates it on this study's shorter row set."
-        ),
-        "",
-        *_contrast_table(
-            losses=pooled,
-            pairs=(("ens_mean_day0_wind", "era5_wind"),),
-            label="all",
-            section="horizons",
-            setting="pooled",
-            log=log,
+            "The `ens_mean_day0_wind − era5_wind` row of the exploratory table above "
+            "re-estimates it on this study's shorter row set."
         ),
     ]
 
@@ -1530,9 +1645,9 @@ def long_row_frame(*, sites: pl.DataFrame) -> pl.DataFrame:
         ValueError: If a join loses rows, or the rows start before `LONG_ROW_SET_START`.
     """
     frame = common_rows(frame=joined(sites=sites))
-    start = frame["time"].min()
-    if start < pl.select(LONG_ROW_SET_START).item():
-        msg = f"the page's rows start at {start}, before the long row set's start"
+    n_early = frame.filter(pl.col("time") < LONG_ROW_SET_START).height
+    if n_early:
+        msg = f"{n_early} of the page's rows are before the long row set's start"
         raise ValueError(msg)
     n_rows = frame.height
     for product in ("ens_mean_day0", "ens_mean_day0_speed_components"):
@@ -1544,6 +1659,42 @@ def long_row_frame(*, sites: pl.DataFrame) -> pl.DataFrame:
     return _add_time_features(dataset=frame).sort("site", "time")
 
 
+def _rotate_folds(*, frame: pl.DataFrame, fold_offsets: Mapping[int, int]) -> pl.DataFrame:
+    """Rotate each era's fold numbers by an offset, modulo `N_FOLDS`.
+
+    Args:
+        frame: Rows carrying `era_code` and `fold`.
+        fold_offsets: Each `era_code` to how far its fold numbers are rotated.
+
+    Returns:
+        The frame with the rotated `fold`.
+    """
+    rotation = pl.col("era_code").replace_strict(dict(fold_offsets), return_dtype=pl.Int32)
+    return frame.with_columns(fold=(pl.col("fold") + rotation) % N_FOLDS)
+
+
+def _cut_eras(
+    *, frame: pl.DataFrame, first_months: tuple[str, ...], fold_offsets: Mapping[int, int]
+) -> pl.DataFrame:
+    """Label eras that begin at the given months, cut folds inside each, and rotate them.
+
+    Args:
+        frame: Rows carrying `site` and `month`.
+        first_months: The first month of every era after the first.
+        fold_offsets: Each `era_code` to how far its fold numbers are rotated.
+
+    Returns:
+        The frame with `era_code`, `era` and `fold`.
+    """
+    era_code = sum((pl.col("month") >= month).cast(pl.Int8) for month in first_months)
+    labelled = frame.with_columns(era_code=era_code).with_columns(
+        era=pl.col("era_code").cast(pl.String)
+    )
+    return _rotate_folds(
+        frame=assign_folds(dataset=labelled, by=("site", "era")), fold_offsets=fold_offsets
+    )
+
+
 def long_row_designs(*, frame: pl.DataFrame) -> dict[str, pl.DataFrame]:
     """Return the long row set under its two era-and-fold designs.
 
@@ -1551,18 +1702,17 @@ def long_row_designs(*, frame: pl.DataFrame) -> dict[str, pl.DataFrame]:
         frame: `long_row_frame`'s result.
 
     Returns:
-        The horizons study's design (two UKV eras, no cut at IFS Cycle 49r1) and the same rows with
-        one extra era cut at `IFS_CYCLE_49R1_CUT_MONTH`.
+        The horizons study's design (two UKV eras, no cut at IFS Cycle 49r1, its own fold layout)
+        and the same rows with one extra era cut at `IFS_CYCLE_49R1_CUT_MONTH`, whose folds are
+        rotated by `LONG_ROW_FOLD_OFFSETS`.
     """
-    extra_cut = frame.with_columns(
-        era_code=(
-            (pl.col("month") >= IFS_CYCLE_49R1_CUT_MONTH).cast(pl.Int8)
-            + (pl.col("month") >= UKV_UPGRADE_MONTH).cast(pl.Int8)
-        )
-    ).with_columns(era=pl.col("era_code").cast(pl.String))
     return {
         "two UKV eras, no cut at 49r1 (horizons design)": with_eras(frame=frame),
-        "extra era cut at 2024-12-01": assign_folds(dataset=extra_cut, by=("site", "era")),
+        "extra era cut at 2024-12-01": _cut_eras(
+            frame=frame,
+            first_months=(IFS_CYCLE_49R1_CUT_MONTH, UKV_UPGRADE_MONTH),
+            fold_offsets=LONG_ROW_FOLD_OFFSETS,
+        ),
     }
 
 
@@ -1578,48 +1728,18 @@ def fold_designs(*, frame: pl.DataFrame) -> dict[str, pl.DataFrame]:
         the part-month of May 2026 dropped.
     """
     study_folds = with_three_eras(frame=frame, fold_offsets=ERA_FOLD_OFFSETS)
-    rows_without_may = frame.filter(pl.col("month") != "2026-05")
-    cut_50r1 = rows_without_may.with_columns(
-        era_code=sum(
-            (pl.col("month") >= month).cast(pl.Int8) for month in (*ERA_START_MONTHS, "2026-06")
-        )
-    ).with_columns(era=pl.col("era_code").cast(pl.String))
-    folded_50r1 = assign_folds(dataset=cut_50r1, by=("site", "era"))
-    rotation = pl.col("era_code").replace_strict({0: 0, 1: 0, 2: 2, 3: 4}, return_dtype=pl.Int32)
     return {
-        "three eras, no fold rotation": with_three_eras(
-            frame=frame, fold_offsets={0: 0, 1: 0, 2: 0}
-        ),
+        "three eras, no fold rotation": with_three_eras(frame=frame, fold_offsets=NO_FOLD_OFFSETS),
         "two UKV eras (the page's design)": with_eras(frame=frame),
         "study folds, two-valued era_code": study_folds.with_columns(
             era_code=(pl.col("month") >= UKV_UPGRADE_MONTH).cast(pl.Int8)
         ),
-        "extra era cut at IFS 50r1, May 2026 dropped": folded_50r1.with_columns(
-            fold=(pl.col("fold") + rotation) % N_FOLDS
+        "extra era cut at IFS 50r1, May 2026 dropped": _cut_eras(
+            frame=frame.filter(pl.col("month") != IFS_CYCLE_50R1_MONTH),
+            first_months=(*ERA_START_MONTHS, FIRST_MONTH_AFTER_50R1),
+            fold_offsets=ERA_FOLD_OFFSETS_50R1,
         ),
     }
-
-
-def extra_jobs(*, arms: tuple[str, ...]) -> list[Job]:
-    """Return one primary-setting job per arm, for the post-review fits.
-
-    Args:
-        arms: Product keys.
-
-    Returns:
-        One job per arm.
-    """
-    return [
-        (
-            f"{product}_wind",
-            "pooled",
-            "power_mw",
-            (*SHARED_FEATURES, *_wind_columns(product=product)),
-            PRIMARY_HYPER_PARAMETERS,
-            False,
-        )
-        for product in arms
-    ]
 
 
 def fit_designs(*, designs: dict[str, pl.DataFrame], job_list: list[Job]) -> pl.DataFrame:
@@ -1641,11 +1761,124 @@ def fit_designs(*, designs: dict[str, pl.DataFrame], job_list: list[Job]) -> pl.
     )
 
 
-def _long_row_lines(*, frame: pl.DataFrame, losses: pl.DataFrame, log: IntervalLog) -> list[str]:
+def _design_coverage_lines(*, designs: Mapping[str, pl.DataFrame], heading: str) -> list[str]:
+    """Render, for each design, how many folds hold out a calendar month with no training row.
+
+    A design with a non-zero count leaves some (site, fold, calendar month) cell with no training
+    row for a calendar month that occurs in two years (issue #868), so its scores rest on models
+    that have never seen that season.
+
+    Args:
+        designs: Each design's name to its frame, carrying `site`, `fold` and `time`.
+        heading: The heading line above the table.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        heading,
+        "",
+        (
+            "| Design | Cells (site, fold, calendar month) | Cells with no training row for a "
+            "month that occurs in two years | Calendar months affected |"
+        ),
+        "|---|---|---|---|",
+    ]
+    for name, frame in designs.items():
+        coverage = calendar_month_coverage(frame=frame)
+        failing = uncovered_months(coverage=coverage)
+        months = sorted(failing["calendar_month"].unique().to_list())
+        lines.append(f"| {name} | {coverage.height} | {failing.height} | {months or 'none'} |")
+    return lines
+
+
+def _mean_10m_speed_ms(*, product: str) -> pl.Expr:
+    """Return the mean 10 m wind speed of one product, in m/s.
+
+    Args:
+        product: A key of `ALL_PRODUCTS`.
+
+    Returns:
+        An aggregate expression; Open-Meteo's km/h columns are converted.
+    """
+    divisor = KMH_PER_M_S if product in KMH_PRODUCTS else 1.0
+    return pl.col(_wind_columns(product=product)[3]).mean() / divisor
+
+
+RATIO_PRODUCTS: Final[tuple[str, ...]] = ("ens_mean_day0", "hres", "ukv")
+"""The products whose 10 m speed is compared with ERA5's, in the ratio tables' column order."""
+
+RATIO_SEASON_MONTHS: Final[tuple[int, ...]] = (8, 9, 10)
+"""The calendar months of the season-controlled ratio table: August to October."""
+
+
+def _ratio_lines(*, frame: pl.DataFrame) -> list[str]:
+    """Render each product's mean 10 m speed over ERA5's, by month and by August to October.
+
+    Args:
+        frame: The long row set, carrying `month`, `time` and every product's columns.
+
+    Returns:
+        Markdown lines: the monthly table, then the table over August to October of each year.
+    """
+    aggregates = {product: _mean_10m_speed_ms(product=product) for product in RATIO_PRODUCTS}
+    era5 = _mean_10m_speed_ms(product="era5")
+    ratios = [pl.len().alias("n"), *(aggregates[product] / era5 for product in RATIO_PRODUCTS)]
+    names = ["n", *RATIO_PRODUCTS]
+    monthly = frame.group_by("month").agg(ratios).sort("month")
+    seasonal = (
+        frame.filter(pl.col("time").dt.month().is_in(RATIO_SEASON_MONTHS))
+        .group_by(year=pl.col("time").dt.year())
+        .agg(ratios)
+        .sort("year")
+    )
+    lines = [
+        "Monthly ratio of each product's mean 10 m wind speed to ERA5's, on the long row set:",
+        "",
+        "| Month | Rows | ENS / ERA5 | HRES / ERA5 | UKV / ERA5 |",
+        "|---|---|---|---|---|",
+    ]
+    lines += [
+        f"| {row['month']} | {row['n']:,} | "
+        + " | ".join(f"{row[name]:.4f}" for name in names[1:])
+        + " |"
+        for row in monthly.rename(dict(zip(monthly.columns[1:], names, strict=True))).iter_rows(
+            named=True
+        )
+    ]
+    lines += [
+        "",
+        (
+            "Season-controlled ratio of each product's mean 10 m wind speed to ERA5's, pooled over "
+            "August to October of each year, on the long row set:"
+        ),
+        "",
+        "| Months | Rows | ENS / ERA5 | HRES / ERA5 | UKV / ERA5 |",
+        "|---|---|---|---|---|",
+    ]
+    lines += [
+        f"| August to October {row['year']} | {row['n']:,} | "
+        + " | ".join(f"{row[name]:.4f}" for name in names[1:])
+        + " |"
+        for row in seasonal.rename(dict(zip(seasonal.columns[1:], names, strict=True))).iter_rows(
+            named=True
+        )
+    ]
+    return lines
+
+
+def _long_row_lines(
+    *,
+    frame: pl.DataFrame,
+    designs: Mapping[str, pl.DataFrame],
+    losses: pl.DataFrame,
+    log: IntervalLog,
+) -> list[str]:
     """Render the long-row-set reconciliation: contrasts per design and scope, and speed ratios.
 
     Args:
         frame: `long_row_frame`'s result.
+        designs: `long_row_designs`'s result.
         losses: The long-row-set losses, with `design`.
         log: Where the intervals are recorded.
 
@@ -1661,10 +1894,18 @@ def _long_row_lines(*, frame: pl.DataFrame, losses: pl.DataFrame, log: IntervalL
         (
             f"The rows are the page's own, from {frame['time'].min():%Y-%m-%d}: {frame.height:,} "
             f"farm-hours in {frame['month'].n_unique()} calendar months. Design one is the "
-            "horizons study's: two UKV eras and no cut at IFS Cycle 49r1 (12 November 2024). "
-            "Design two adds one era cut at 2024-12-01. `ens_mean_day0` is the `components` "
-            "combination and `ens_mean_day0_speed_components` is the horizons study's own. Each "
-            "design is scored on all rows and on the rows from 2024-12-01 only."
+            "horizons study's: two UKV eras, its own fold layout, and no cut at IFS Cycle 49r1 "
+            "(12 November 2024). Design two adds one era cut at 2024-12-01, and rotates the "
+            f"folds of era 1 by {LONG_ROW_FOLD_OFFSETS[1]} and of era 2 by "
+            f"{LONG_ROW_FOLD_OFFSETS[2]} so that no calendar month is left without training "
+            "rows. `ens_mean_day0` is the `components` combination and "
+            "`ens_mean_day0_speed_components` is the horizons study's own. Each design is scored "
+            "on all rows and on the rows from 2024-12-01 only."
+        ),
+        "",
+        *_design_coverage_lines(
+            designs=designs,
+            heading="Calendar-month coverage of each long-row design, checked before its fit:",
         ),
         "",
     ]
@@ -1689,40 +1930,22 @@ def _long_row_lines(*, frame: pl.DataFrame, losses: pl.DataFrame, log: IntervalL
                 ),
                 "",
             ]
-    ens_speed = _wind_columns(product="ens_mean_day0")[3]
-    monthly = (
-        frame.group_by("month")
-        .agg(
-            n=pl.len(),
-            **{
-                product: pl.col(_wind_columns(product=product)[3]).mean()
-                / (KMH_PER_M_S if product in KMH_PRODUCTS else 1.0)
-                for product in ("era5", "ukv", "hres")
-            },
-            ens=pl.col(ens_speed).mean(),
-        )
-        .sort("month")
-    )
-    lines += [
-        "Monthly ratio of each product's mean 10 m wind speed to ERA5's, on the long row set:",
-        "",
-        "| Month | Rows | ENS / ERA5 | HRES / ERA5 | UKV / ERA5 |",
-        "|---|---|---|---|---|",
-    ]
-    lines += [
-        f"| {row['month']} | {row['n']:,} | {row['ens'] / row['era5']:.3f} "
-        f"| {row['hres'] / row['era5']:.3f} | {row['ukv'] / row['era5']:.3f} |"
-        for row in monthly.iter_rows(named=True)
-    ]
-    return lines
+    return [*lines, *_ratio_lines(frame=frame)]
 
 
 def _fold_design_lines(
-    *, main_pooled: pl.DataFrame, design_losses: pl.DataFrame, log: IntervalLog
+    *,
+    study_frame: pl.DataFrame,
+    fold_frames: Mapping[str, pl.DataFrame],
+    main_pooled: pl.DataFrame,
+    design_losses: pl.DataFrame,
+    log: IntervalLog,
 ) -> list[str]:
     """Render P1 to P3 and ENS-HRES under the study's fold design and four others.
 
     Args:
+        study_frame: The main row set with the study's eras and folds.
+        fold_frames: The other designs' frames, from `fold_designs`.
         main_pooled: The main losses at the primary setting, the study's own design.
         design_losses: The other designs' losses, with `design`.
         log: Where the intervals are recorded.
@@ -1741,15 +1964,23 @@ def _fold_design_lines(
             "P1 is `hres_wind − ukv_wind`, P2 is `ens_mean_day0_wind − ukv_wind`, P3 is "
             "`hres_wind − era5_wind`, and ENS-HRES is `ens_mean_day0_wind − hres_wind`. Each "
             "design refits the four arms at the primary setting. The first two rows come from the "
-            "main losses: the study's design, and the same losses without the rows of May 2026, "
-            "the rows the last design drops."
+            "main losses: the study's design, and the same losses without the rows of "
+            f"{IFS_CYCLE_50R1_MONTH}, the rows the last design drops."
+        ),
+        "",
+        *_design_coverage_lines(
+            designs={"study design": study_frame, **fold_frames},
+            heading="Calendar-month coverage of each fold design, checked before its fit:",
         ),
         "",
     ]
     study = main_pooled.filter(pl.col("arm").is_in(arms))
     scored = [
         ("study design", study),
-        ("study design, May 2026 rows removed", study.filter(pl.col("month") != "2026-05")),
+        (
+            "study design, May 2026 rows removed",
+            study.filter(pl.col("month") != IFS_CYCLE_50R1_MONTH),
+        ),
         *(
             (name, design_losses.filter(pl.col("design") == name))
             for name in design_losses["design"].unique(maintain_order=True).to_list()
@@ -1771,37 +2002,6 @@ def _fold_design_lines(
             ),
             "",
         ]
-    return lines
-
-
-def _arm_columns_lines(*, job_list: list[Job]) -> list[str]:
-    """Render every fitted arm's feature columns and their count, once per arm, as markdown.
-
-    A reviewer checks this against the plan, since an arm can silently lose a column (see the
-    `study` skill). Raises unless every arm holds the same number of columns.
-
-    Args:
-        job_list: Every job `jobs()` returns.
-
-    Returns:
-        Markdown lines.
-
-    Raises:
-        ValueError: If two arms hold different numbers of feature columns.
-    """
-    seen: dict[str, tuple[str, ...]] = {}
-    for arm, _, _, columns, _, _ in job_list:
-        seen.setdefault(arm, columns)
-    counts = {len(columns) for columns in seen.values()}
-    if len(counts) != 1:
-        sizes = {arm: len(columns) for arm, columns in seen.items()}
-        msg = f"arms hold different numbers of feature columns: {sizes}"
-        raise ValueError(msg)
-    lines = ["#### Every arm's feature columns", ""]
-    lines += [
-        f"- `{arm}` ({len(columns)} columns): {', '.join(f'`{column}`' for column in columns)}"
-        for arm, columns in seen.items()
-    ]
     return lines
 
 
@@ -1918,6 +2118,8 @@ def _report(
         *_coverage_lines(coverage=checks["coverage"]),
         "",
         *_lead_lines(lead_table=checks["lead_table"]),
+        "",
+        *_previous_day_lines(evidence=checks["previous_day"]),
         "",
         *_mean_speed_lines(frame=frame),
         "",
@@ -2037,7 +2239,7 @@ def _report(
             log=log,
         ),
         "",
-        *_horizons_lines(pooled=pooled, log=log),
+        *_horizons_lines(),
         "",
         "#### UKV and the ICON products against ERA5, pooled, primary setting (exploratory)",
         "",
@@ -2075,9 +2277,20 @@ def _report(
                 f"`{extras['commit']}`, exploratory (added after the first results)."
             ),
             "",
-            *_long_row_lines(frame=extras["long_frame"], losses=extras["long_losses"], log=log),
+            *_long_row_lines(
+                frame=extras["long_frame"],
+                designs=extras["long_designs"],
+                losses=extras["long_losses"],
+                log=log,
+            ),
             "",
-            *_fold_design_lines(main_pooled=pooled, design_losses=extras["design_losses"], log=log),
+            *_fold_design_lines(
+                study_frame=frame,
+                fold_frames=extras["fold_frames"],
+                main_pooled=pooled,
+                design_losses=extras["design_losses"],
+                log=log,
+            ),
         ]
     lines += [
         *geometry_lines(sites=sites, noun="wind farms"),
@@ -2103,8 +2316,8 @@ Outputs of `studies/beam_diffuse_split/ens_hres_past_wind.py`. Wind farms appear
 - `losses.fingerprint`: a hash of the row set (floats cast to Float32), every arm's columns, the
   seeds and the hyperparameters. `--report-only` refuses to reuse `losses.parquet` if the hash
   changes.
-- `script_commit.txt`: the commit of the script that fitted `losses.parquet`, which a fresh run
-  records after checking the script has no uncommitted changes.
+- `script_commit.txt`: the commit of the script that fitted `losses.parquet`, which the first
+  paragraph of `report.md` names.
 - `intervals.parquet`: every interval `report.md` prints, one row each, with its section, setting,
   scope, arms, value and bounds (percentage points of capacity), level, rows and months.
 - `losses_long_rows.parquet` and `losses_fold_designs.parquet`: the post-review fits
@@ -2182,9 +2395,13 @@ def _extra_fits(*, sites: pl.DataFrame, timed_rows: pl.DataFrame, fit: bool) -> 
     ]
     long_frame = long_row_frame(sites=sites)
     long_designs = long_row_designs(frame=long_frame)
-    long_jobs = extra_jobs(arms=LONG_ROW_ARMS)
+    long_jobs = _arm_jobs(
+        products=LONG_ROW_ARMS, setting="pooled", hyper_parameters=PRIMARY_HYPER_PARAMETERS
+    )
     fold_frames = fold_designs(frame=timed_rows)
-    fold_jobs = extra_jobs(arms=DESIGN_ARMS)
+    fold_jobs = _arm_jobs(
+        products=DESIGN_ARMS, setting="pooled", hyper_parameters=PRIMARY_HYPER_PARAMETERS
+    )
     fingerprints = {
         long_path: _designs_fingerprint(designs=long_designs, job_list=long_jobs),
         design_path: _designs_fingerprint(designs=fold_frames, job_list=fold_jobs),
@@ -2210,7 +2427,9 @@ def _extra_fits(*, sites: pl.DataFrame, timed_rows: pl.DataFrame, fit: bool) -> 
             raise ValueError(msg)
     return {
         "long_frame": long_frame,
+        "long_designs": long_designs,
         "long_losses": pl.read_parquet(long_path),
+        "fold_frames": fold_frames,
         "design_losses": pl.read_parquet(design_path),
         "commit": commit_path.read_text().strip(),
     }
@@ -2263,6 +2482,8 @@ def main() -> int:
                     "",
                     *_lead_lines(lead_table=checks["lead_table"]),
                     "",
+                    *_previous_day_lines(evidence=checks["previous_day"]),
+                    "",
                 ]
             )
         )
@@ -2287,9 +2508,9 @@ def main() -> int:
         )
         if saved_fingerprint != fingerprint:
             msg = (
-                f"--report-only: {path} was fitted on a different row set, column set, seed set, "
-                "feature values or hyperparameter setting than this code now produces; re-run "
-                "without --report-only"
+                f"{path} was fitted on a different row set, column set, seed set, feature values "
+                "or hyperparameter setting than this code now produces; re-run without "
+                "--report-only or --extra-fits"
             )
             raise ValueError(msg)
         losses = pl.read_parquet(path)
@@ -2310,7 +2531,7 @@ def main() -> int:
         commit_path.write_text(script_commit)
 
     extras = _extra_fits(sites=sites, timed_rows=timed_rows, fit=arguments.extra_fits)
-    log = IntervalLog()
+    log: IntervalLog = []
     report = _report(
         frame=frame,
         losses=losses,
@@ -2323,7 +2544,7 @@ def main() -> int:
         extras=extras,
     )
     report_path.write_text(report)
-    log.frame().write_parquet(intervals_path)
+    pl.DataFrame(log, schema=dict(INTERVAL_SCHEMA)).write_parquet(intervals_path)
     readme_path.write_text(_readme_text())
     sys.stdout.write(report)
     return 0
