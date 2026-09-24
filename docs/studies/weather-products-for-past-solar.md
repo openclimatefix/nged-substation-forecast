@@ -133,6 +133,11 @@ weather model that started a few hours earlier.
   its own. None of the four extra Open-Meteo models has a lower error than CAMS or is shown to beat
   ICON-EU. See [The four extra Open-Meteo
   models](#the-four-extra-open-meteo-models).
+- **ECMWF ENS's shortest-available-lead forecast, the `T+3` band, beats ERA5 by 0.877 points [0.677,
+  1.080], but trails CAMS by 3.270 points [2.942, 3.585].** Unlike every other product on this page,
+  ENS's `T+3` band is a genuine forecast rather than a near-zero-lead description of the past. See
+  [ECMWF ENS: a genuine forecast, not a
+  description](#ecmwf-ens-a-genuine-forecast-not-a-description).
 
 ## Introduction
 
@@ -171,6 +176,7 @@ The map also draws AROME France, which this page does not test](../roadmap/asset
 | ARPEGE Europe | Météo-France's global model, a stretched grid finest over France, as distributed on its European 0.1° grid | 1 to 6 hours (4-times-daily cycle) | yes | 0.1°, about 11 km, as Open-Meteo documents | November 2022 in Open-Meteo's archive; read here from November 2024 | not established |
 | DMI HARMONIE-AROME | HARMONIE-AROME run by UWC-West, the collaboration of the Danish, Dutch, Icelandic and Irish weather services, over north-west Europe up to Iceland (the DINI domain), as distributed by the Danish Meteorological Institute (DMI) | 1 to 3 hours; run interval measured at 3 hours, matching the 3-hourly update Open-Meteo documents | yes | 2 km; Open-Meteo documents it at 2 km | July 2024; read here from November 2024 | not established |
 | KNMI HARMONIE-AROME | The same UWC-West HARMONIE-AROME run, as distributed hourly by the Royal Netherlands Meteorological Institute (KNMI) | not measured here; KNMI and Open-Meteo document an hourly update, which would give 1 hour | yes | 2 km model, distributed on a reduced 0.05° grid, about 5.5 km | July 2024; read here from November 2024 | not established |
+| ECMWF ENS (`T+3` band) | ECMWF's 51-member global ensemble forecast, from Dynamical.org's IFS ENS catalogue; a genuine forecast, not a near-zero-lead description of the past like every other product in this table | 3 to 21 hours, its shortest available band in this download | yes | 0.25°, about 28 km at this latitude; read as the area-weighted mean over each generator's H3 resolution-5 cell | April 2024 | not established |
 
 **Most of the latencies come from each service's own documentation:** CAMS's [radiation-service
 notes](https://confluence.ecmwf.int/x/jOLjDw), the [ERA5 dataset
@@ -873,6 +879,64 @@ direct-beam and run-interval checks in `past_weather_v2/product_checks.md`, both
 eight-product report's own directory (see [Reproducing the
 figures](#reproducing-the-figures)).
 
+### ECMWF ENS: a genuine forecast, not a description
+
+**ECMWF ENS's shortest-available-lead forecast beats ERA5 by 0.877 points of capacity [0.677,
+1.080], but trails CAMS, the best product on this page, by 3.270 points [2.942, 3.585].** Every
+other product on this page is a near-zero-lead description of an hour that has already happened:
+UKV's archive holds the analysis, ICON-D2 and ICON-EU read 1 to 3 hours ahead, and even ERA5's
+radiation is only 1 to 12 hours ahead. ECMWF ENS is different in kind. This section scores its
+shortest available lead in the download used here, ECMWF's 51-member ensemble forecast at the `T+3`
+band: leads 3 to 21 hours from each day's 00 UTC run, so the run behind any hour this section scores
+is always the *previous* day's, never the current day's. The gap to CAMS shows how far a genuine
+forecast trails the best available description of the same hours; the result against ERA5 shows
+that, at this lead, ENS's own forecast already beats one of the two reanalyses this page tests.
+
+**The row set is ENS's own, shorter and later than the rest of the page.** ENS's own archive here
+starts 2024-04-01, well inside the main row set's December 2022 start, so this section scores
+54,447 common site-hours from 2024-04-01 to 2026-09-10 — the same shape of caveat the [four extra
+Open-Meteo models](#the-four-extra-open-meteo-models) and [ICON-DREAM-EU](#icon-dream-eu-beats-era5-but-not-the-icon-weather-models)
+sections carry. ERA5 and CAMS are refit here, on this section's own row set, rather than reusing
+their published fits, following this page's shared-rows rule. Every arm — the ENS mean-of-members
+forecast, ERA5, and CAMS — carries eight feature columns: the shared solar geometry and calendar
+features, an era flag, and either the arm's own global irradiance and temperature, or ENS's own
+mean-of-members irradiance and temperature. ENS publishes no direct-beam field, so, like every
+other global-only product on this page, it carries a global-irradiance arm only.
+
+**The `T+3` band already gives one 3-hourly-to-hourly step per calendar hour, so it is rebuilt to a
+genuine hourly series by the clear-sky-index reconstruction the ENS horizon study picked as the best
+technique for ENS's radiation.** Every hour from 3 to 21 hours after each run is scored except the
+last, whose target sits just past the last available step and is held flat at that step's clear-sky
+index rather than extrapolated.
+
+![Figure 17: ENS's own forecast trails CAMS by far, and beats
+ERA5](assets/ens_past_solar_leaderboard.svg)
+
+![Figure 18: ENS beats ERA5 but trails CAMS by more than three
+points](assets/ens_past_solar_planned_contrasts.svg)
+
+**Two contrasts were named before any result existed: ENS's mean-of-members forecast against ERA5,
+and against CAMS.** Both exclude zero at the 5% level. Everything below is exploratory.
+
+**The two planned contrasts hold at every one of the six generators.** ENS beats ERA5 by 0.410 to
+1.355 points across the six generators, and trails CAMS by 2.841 to 3.730 points at every one of
+them. **Averaging the 50 perturbed members over the control member alone is worth 0.240 points
+[0.147, 0.344]:** the control-member-only arm scores 8.507% of capacity against the mean-of-members
+arm's 8.267%.
+
+Reproducing this section's figures:
+
+```bash
+uv run python studies/beam_diffuse_split/ens_past_solar.py
+uv run python studies/beam_diffuse_split/ens_past_solar_charts.py
+```
+
+The report lands in `past_weather_v2/ens_past_solar/report.md`, alongside the ENS-horizon study's
+own directory. `ens_past_solar.py` reads `data/studies/weather/ENS/beam_diffuse_ens.parquet`
+(no fetch needed) and `weather_products.py`'s own saved solar dataset; `--report-only` rebuilds the
+report from the saved losses without refitting, checking a fingerprint against what a fresh run
+would now fit.
+
 ## What to use
 
 **These recommendations rest on six generators in one part of Lincolnshire, and weigh accuracy
@@ -977,6 +1041,15 @@ single weather product?](blending-weather-products.md#solar-a-blend-beats-cams-g
   comparison, and belongs to
   [#810](https://github.com/openclimatefix/nged-substation-forecast/issues/810), the study comparing
   weather models for UK power forecasting.
+- **The ECMWF ENS section is scored on its own shorter, later, and separate row set, and is not a
+  consumer of past weather.** ENS's own archive here starts 2024-04-01, so its 54,447 common
+  site-hours say nothing about the ranking above, from December 2022. ENS is a forecast product, not
+  a description of past sunshine, so it does not compete for any of the four consumers this page's
+  ["What to use"](#what-to-use) section addresses; it is scored here because it is the live service's
+  own forecast product, and this page is where every weather product this project reads gets
+  compared. ENS has no wind data downloaded yet, so this section is solar only. See [ECMWF ENS: a
+  genuine forecast, not a
+  description](#ecmwf-ens-a-genuine-forecast-not-a-description).
 - **Every accuracy figure is recalibrated per generator.** A product with a large but stable bias
   scores well here. The implied-capacity measure is the only evidence on this page about each
   product's uncorrected bias.
