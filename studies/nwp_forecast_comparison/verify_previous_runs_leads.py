@@ -28,11 +28,16 @@ Each product's cycle is read as the `n` in `{1, 3, 6}` whose switch hours (`h mo
 excluded as the fallback) have the highest mean ratio relative to the other hours, and reported as
 "no clear signature" where the best ratio is below 1.3.
 
-**V3.** Reads each product's timestamp convention (instantaneous snapshot or hour-ending mean) from
-the "best fit" line already measured and recorded, at fetch time, in that product's own
-`previous_runs/lineage.json`, and states the height convention already established in
-`studies.study` project documentation (ICON's served "100 m" wind is its native 120 m wind rescaled
-by about 0.98).
+**V3.** Measures each product's radiation timestamp convention (instantaneous snapshot, hour-ending
+mean or hour-beginning mean) from its own `shortwave_radiation_previous_day1` series, by the offset
+at which the series correlates best with the cosine of the solar zenith angle
+(`studies.timestamp_checks`), taking the median of the six solar sites' peaks. For UKV, which
+publishes a snapshot, it also tests every candidate rebuild into an hourly value
+(`V3_REBUILD_CANDIDATES`, through `studies.hourly_means.hourly_from_snapshots`) and names the one
+whose peak sits nearest 30 minutes before the label, the position of a mean over the hour ending at
+the label. It sets that beside the `previous_runs/lineage.json` "best fit" line measured at fetch
+time on the day-0 series, and states the height convention (ICON's served "100 m" wind is its
+native 120 m wind rescaled by about 0.98).
 
 No metered generator's name, identifier or coordinate appears anywhere in this script or its output:
 every weather value already carries only the anonymised `site` label (`A`-`F`, `W1`-`W3`) that the
@@ -48,6 +53,7 @@ import logging
 import os
 import re
 import sys
+from collections.abc import Sequence
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
@@ -55,6 +61,16 @@ from typing import Final
 import numpy as np
 import polars as pl
 from contracts.settings import PROJECT_ROOT
+from studies.hourly_means import hourly_from_snapshots
+from studies.timestamp_checks import (
+    CANDIDATE_OFFSETS_MINUTES,
+    HOUR_ENDING_OFFSET_MINUTES,
+    best_offset_minutes,
+    correlation_by_offset,
+)
+
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
+from build_dataset import _pv_sites  # the private solar roster, for coordinates read at run time
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -485,25 +501,166 @@ def run_v1b(*, output_dir: Path) -> None:
     (output_dir / "v1b_run_switches.md").write_text("\n".join(lines) + "\n")
 
 
+V3_RADIATION_COLUMN: Final[str] = "shortwave_radiation_previous_day1"
+"""The Previous Runs column whose timestamp convention V3 measures, for every product."""
+
+V3_REBUILD_CANDIDATES: Final[tuple[tuple[int, ...], ...]] = (
+    (-60, 0),
+    (0,),
+    (-60,),
+    (0, 60),
+)
+"""The snapshot-slot offsets, in minutes from the label, V3 tests as a rebuild of an hourly value
+from hourly snapshots. The first, `(-60, 0)`, is the rebuild the study uses for UKV."""
+
+V3_FINE_OFFSETS: Final[range] = range(-80, 21)
+"""The offsets, in minutes, UKV's series and its candidate rebuilds are tested at: every minute,
+because the candidates sit close together and a 5-minute grid ties two of them."""
+
+V3_CONVENTION_OFFSETS: Final[dict[str, int]] = {
+    "hour-ending mean": HOUR_ENDING_OFFSET_MINUTES,
+    "snapshot at the label": 0,
+    "hour-beginning mean": -HOUR_ENDING_OFFSET_MINUTES,
+}
+"""Where a series' clear-sky correlation peaks under each timestamp convention, in minutes."""
+
+
+def _median_peak_minutes(
+    *,
+    frame: pl.DataFrame,
+    value_column: str,
+    sites: pl.DataFrame,
+    offsets_minutes: Sequence[int] = CANDIDATE_OFFSETS_MINUTES,
+) -> float:
+    """Return the median over sites of the offset at which a radiation series tracks the sun best.
+
+    Args:
+        frame: Carrying `site`, `time` and `value_column`.
+        value_column: The radiation column, in W m-2.
+        sites: The roster, carrying `site`, `latitude` and `longitude`.
+        offsets_minutes: The offsets to test.
+
+    Returns:
+        The median of the per-site best offsets in minutes; not-a-number if no site has data.
+    """
+    peaks = []
+    for row in sites.iter_rows(named=True):
+        rows = frame.filter(pl.col("site") == row["site"]).drop_nulls(value_column).sort("time")
+        if rows.height < 2:
+            continue
+        correlations = correlation_by_offset(
+            times=rows["time"],
+            ghi=rows[value_column].to_numpy(),
+            latitude=row["latitude"],
+            longitude=row["longitude"],
+            offsets_minutes=offsets_minutes,
+        )
+        peaks.append(best_offset_minutes(correlations=correlations))
+    return float(np.median(peaks)) if peaks else float("nan")
+
+
+def _nearest_convention(*, peak_minutes: float) -> str:
+    """Name the timestamp convention whose clear-sky peak sits nearest `peak_minutes`."""
+    return min(
+        V3_CONVENTION_OFFSETS, key=lambda name: abs(V3_CONVENTION_OFFSETS[name] - peak_minutes)
+    )
+
+
+def ukv_rebuild_lines(
+    *, combined: pl.DataFrame, sites: pl.DataFrame
+) -> tuple[list[str], tuple[int, ...]]:
+    """Test each candidate rebuild of UKV's hourly snapshots against the sun.
+
+    Args:
+        combined: UKV's `previous_runs/combined.parquet`.
+        sites: The solar roster, carrying `site`, `latitude` and `longitude`.
+
+    Returns:
+        Markdown lines, and the candidate whose peak sits nearest a mean over the hour ending at the
+        label (the earliest listed candidate wins a tie).
+    """
+    snapshots = combined.select(
+        key=pl.col("site"), time="time", value=pl.col(V3_RADIATION_COLUMN)
+    ).drop_nulls()
+    lines = [
+        "| Rebuild (snapshot offsets, minutes) | Median peak (minutes) | Convention |",
+        "|---|---|---|",
+    ]
+    peaks: dict[tuple[int, ...], float] = {}
+    for offsets in V3_REBUILD_CANDIDATES:
+        rebuilt = hourly_from_snapshots(
+            frame=snapshots, value_columns=["value"], slot_offsets_minutes=offsets
+        ).rename({"key": "site"})
+        peaks[offsets] = _median_peak_minutes(
+            frame=rebuilt, value_column="value", sites=sites, offsets_minutes=V3_FINE_OFFSETS
+        )
+        convention = _nearest_convention(peak_minutes=peaks[offsets])
+        lines.append(f"| {offsets} | {peaks[offsets]:+.0f} | {convention} |")
+    chosen = min(peaks, key=lambda offsets: abs(peaks[offsets] - HOUR_ENDING_OFFSET_MINUTES))
+    return lines, chosen
+
+
 def run_v3(*, output_dir: Path) -> None:
-    """Read each product's timestamp convention from its lineage note, and state the height rule.
+    """Measure each product's radiation timestamp convention, and state the height rule.
 
     Args:
         output_dir: Where `v3_conventions.md` is written.
     """
+    sites = _pv_sites().select("site", "latitude", "longitude").sort("site")
     lines = [
-        "| Product | Timestamp convention (from lineage.json) |",
-        "|---|---|",
+        (
+            f"Clear-sky check on `{V3_RADIATION_COLUMN}` (median over {sites.height} solar sites "
+            "of the offset, in minutes from the label, at which the series correlates best with "
+            "the cosine of the solar zenith angle). A mean over the hour ending at the label "
+            f"peaks near {HOUR_ENDING_OFFSET_MINUTES:+d}, a snapshot at the label near +0, and a "
+            f"mean over the hour beginning at the label near {-HOUR_ENDING_OFFSET_MINUTES:+d}."
+        ),
+        "",
+        "| Product | Median peak (minutes) | Measured convention | Lineage note (day 0) |",
+        "|---|---|---|---|",
     ]
+    ukv_lines: list[str] = []
+    chosen: tuple[int, ...] | None = None
     for name, dir_name in PRODUCT_DIRS.items():
-        lineage_path = _weather_dir() / dir_name / "previous_runs" / "lineage.json"
-        if not lineage_path.exists():
-            lines.append(f"| {name} | not measured (no lineage.json) |")
+        path = _weather_dir() / dir_name / "previous_runs"
+        combined_path = path / "combined.parquet"
+        if not combined_path.exists():
+            lines.append(f"| {name} | n/a | not measured (no combined.parquet) | n/a |")
             continue
-        note = json.loads(lineage_path.read_text()).get("note", "")
+        combined = pl.read_parquet(combined_path)
+        lineage_path = path / "lineage.json"
+        note = json.loads(lineage_path.read_text()).get("note", "") if lineage_path.exists() else ""
         match = re.search(r"best fit: ([^(.]+)", note)
-        convention = match.group(1).strip() if match else "unmeasured"
-        lines.append(f"| {name} | {convention} |")
+        lineage = match.group(1).strip() if match else "unmeasured"
+        if V3_RADIATION_COLUMN not in combined.columns:
+            lines.append(f"| {name} | n/a | no radiation column | {lineage} |")
+            continue
+        peak = _median_peak_minutes(
+            frame=combined,
+            value_column=V3_RADIATION_COLUMN,
+            sites=sites,
+            offsets_minutes=V3_FINE_OFFSETS if name == "UKV" else CANDIDATE_OFFSETS_MINUTES,
+        )
+        lines.append(
+            f"| {name} | {peak:+.0f} | {_nearest_convention(peak_minutes=peak)} | {lineage} |"
+        )
+        if name == "UKV":
+            ukv_lines, chosen = ukv_rebuild_lines(combined=combined, sites=sites)
+    if chosen is not None:
+        study_rebuild = V3_REBUILD_CANDIDATES[0]
+        verdict = (
+            f"the rebuild {study_rebuild} the study uses agrees with the check"
+            if chosen == study_rebuild
+            else f"the check picks {chosen}, not the {study_rebuild} the study uses"
+        )
+        lines += [
+            "",
+            "UKV, candidate rebuilds of the hourly value from the hourly snapshots:",
+            "",
+            *ukv_lines,
+            "",
+            f"UKV rebuild chosen by the check: {chosen}; {verdict}.",
+        ]
     lines.append(
         '\nHeight convention: ICON\'s served "100 m" wind (ICON-D2, ICON-EU, ICON global) is its '
         "native 120 m wind rescaled by about 0.98, not an independent 100 m level; every other "
@@ -515,7 +672,7 @@ def run_v3(*, output_dir: Path) -> None:
 
 
 def main() -> int:
-    """Run V1 (a gate), V1b and V3, and write their tables under `--output-dir`."""
+    """Run V1 (a gate), V1b and V3, or only V3, and write their tables under `--output-dir`."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -524,8 +681,17 @@ def main() -> int:
         required=True,
         help="Directory the verification tables are written to.",
     )
+    parser.add_argument(
+        "--v3-only",
+        action="store_true",
+        help="Run only V3, the radiation timestamp-convention check.",
+    )
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
+
+    if args.v3_only:
+        run_v3(output_dir=args.output_dir)
+        return 0
 
     gate_pass = run_v1(output_dir=args.output_dir)
     run_v1b(output_dir=args.output_dir)

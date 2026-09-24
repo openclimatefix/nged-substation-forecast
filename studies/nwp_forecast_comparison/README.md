@@ -14,8 +14,11 @@ is in `plans/nwp-forecast-comparison.md` on the study's branch.
   Dynamical.org extract and keeps the best, so no site coordinate is read. V1 fails if nothing is
   scored. V1b gives, per product, field and day, each UTC hour's mean absolute second difference of
   the `previous_dayN` series divided by its mean over all hours, and reads a 3- or 6-hourly run
-  cycle where the switch hours stand out by a ratio of 1.3 or more. V3 reads each product's
-  timestamp convention from its `lineage.json`. Outputs: `v1_wind.md`, `v1_radiation.md`,
+  cycle where the switch hours stand out by a ratio of 1.3 or more. V3 measures each product's
+  radiation timestamp convention from the offset at which its `previous_day1` series tracks the
+  sun best, and tests each candidate rebuild of UKV's hourly value from its snapshots; `--v3-only`
+  runs V3 alone, and the study's `report.md` quotes `v3_conventions.md` from a `verification/`
+  directory beside it. Outputs: `v1_wind.md`, `v1_radiation.md`,
   `v1b_run_switches.md`, `v3_conventions.md`.
 - `check_input_steps.py` (V1c) divides each month's mean day-1 radiation and 100 m wind speed of UKV
   and IFS 0.25° by ICON-EU's at the same site, and flags a month-to-month change of 15% or more.
