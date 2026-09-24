@@ -2,7 +2,8 @@
 
 The check is the only unit-tested piece of the ENS and HRES wind study, so each test below is built
 to fail on the bug it exists for: a page number that no longer matches the report by one digit, a
-sign that disagrees inside a bracketed pair, a section taken from the wrong heading, and a rounding
+sign that disagrees inside a bracketed pair in either direction, a bare magnitude listed for audit,
+a section taken from the wrong heading, and a rounding
 that goes the wrong way at a half.
 """
 
@@ -119,6 +120,43 @@ def test_check_raises_when_a_negative_page_pair_meets_a_positive_report_pair(
     page_path, report_path = _write(directory=tmp_path, page=page)
     with pytest.raises(ValueError, match=r"\[-0\.03, -0\.25\]"):
         CHECK.check_page_numbers(page_path=page_path, report_path=report_path, heading=HEADING)
+
+
+def test_check_raises_when_a_positive_page_pair_meets_a_negative_report_pair(
+    tmp_path: Path,
+) -> None:
+    """The report holds `[-0.310, -0.040]`; a page dropping both minus signs must not pass."""
+    page = "## ECMWF wind\n\nENS beat HRES by 0.13 points [0.31, 0.04].\n"
+    page_path, report_path = _write(directory=tmp_path, page=page)
+    with pytest.raises(ValueError, match=r"\[0\.31, 0\.04\]"):
+        CHECK.check_page_numbers(page_path=page_path, report_path=report_path, heading=HEADING)
+
+
+def test_check_accepts_a_plus_sign_and_signed_negative_pairs(tmp_path: Path) -> None:
+    page = "## ECMWF wind\n\nHRES was [+0.03, +0.25] and ENS [-0.31, -0.04] against it.\n"
+    page_path, report_path = _write(directory=tmp_path, page=page)
+    assert CHECK.check_page_numbers(page_path=page_path, report_path=report_path, heading=HEADING)
+
+
+def test_check_raises_when_a_bare_minus_meets_only_positive_report_numbers(
+    tmp_path: Path,
+) -> None:
+    page_path, report_path = _write(
+        directory=tmp_path, page="## ECMWF wind\n\nHRES changed by -0.14 points.\n"
+    )
+    with pytest.raises(ValueError, match=r"-0\.14"):
+        CHECK.check_page_numbers(page_path=page_path, report_path=report_path, heading=HEADING)
+
+
+def test_bare_magnitude_audit_lists_the_sign_of_the_report_number_matched() -> None:
+    """A bare 0.13 matches the report's -0.125 only, so its listed sign is negative."""
+    section = "The gap was 0.13 points, HRES's was 0.14 points, and UKV's error 7.39."
+    audit = CHECK.bare_magnitude_audit(section=section, report_text=REPORT)
+    assert audit == [
+        "0.13: report signs -",
+        "0.14: report signs +",
+        "7.39: report signs +",
+    ]
 
 
 def test_check_reads_only_the_named_section(tmp_path: Path) -> None:

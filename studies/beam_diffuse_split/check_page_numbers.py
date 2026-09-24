@@ -6,21 +6,33 @@ every decimal number and every bracketed pair from it, and requires each to equa
 report printed, rounded to the precision the page uses.
 
 The report prints signed differences to three decimal places, such as `+0.142 [+0.031, +0.254]`,
-where the page writes `0.14 points [0.03, 0.25]`. The page states the direction in words, so a
-page number matches on its magnitude. A page number carrying an explicit minus sign inside a
-bracketed pair has to agree with the sign the report printed. Rounding is half-up on the printed
-digits, using `decimal`, so a value such as 0.125 does not round to a neighbour by binary
-floating-point error.
+where the page writes `0.14 points [0.03, 0.25]`. The convention for signs:
+
+- **A bracketed pair `[a, b]` matches including sign.** A page end with a minus sign meets a
+  negative report end, and a page end with no sign or a plus sign meets a report end that is not
+  negative. A pair `[0.03, 0.25]` therefore fails against a report pair `[-0.03, -0.25]`. An end
+  that rounds to zero at the page's precision meets either sign.
+- **A bare number matches on its magnitude,** because the page states the direction in words ("0.27
+  points lower"). A bare number with an explicit minus sign has to meet a negative report number.
+  `bare_magnitude_audit` lists every bare number with the signs of the report numbers it matched,
+  and `check_page_numbers` logs the list, so a reviewer can audit each direction claim by hand.
+
+Rounding is half-up on the printed digits, using `decimal`, so a value such as 0.125 does not
+round to a neighbour by binary floating-point error.
 
 The check passes a section only when nothing in it is unaccounted for. It cannot say that a number
 sits against the right label, only that the number exists in the report at the page's precision,
 so a page number that coincides with an unrelated report number still passes.
 """
 
+import argparse
+import logging
 import re
 from decimal import ROUND_HALF_UP, Decimal
 from pathlib import Path
 from typing import Final
+
+_LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
 MINUS_SIGNS: Final[str] = "−–"
 """Unicode minus and en dash, both of which a page may use for a minus sign."""
@@ -135,9 +147,9 @@ def _report_pairs(*, report_text: str) -> list[tuple[str, str]]:
 def _pair_matches(*, page_pair: tuple[str, str], report_pair: tuple[str, str]) -> bool:
     """Return whether one page pair equals one report pair, at the page's precision.
 
-    Both ends must match in magnitude. A page end carrying a minus sign must meet a report end that
-    is negative, and a page end with no sign meets an end of either sign, because the page may
-    state a direction in words.
+    Both ends must match in magnitude and in sign. A page end carrying a minus sign must meet a
+    report end that is negative, and a page end with no sign or a plus sign must meet a report end
+    that is not negative. An end that rounds to zero at the page's precision meets either sign.
 
     Args:
         page_pair: The page's two numbers, with any signs.
@@ -152,7 +164,9 @@ def _pair_matches(*, page_pair: tuple[str, str], report_pair: tuple[str, str]) -
             printed=report_end, decimals=decimals
         ):
             return False
-        if page_end.startswith("-") and not report_end.startswith("-"):
+        if _rounded(printed=page_end, decimals=decimals) and (
+            page_end.startswith("-") != report_end.startswith("-")
+        ):
             return False
     return True
 
@@ -177,14 +191,63 @@ def unaccounted_numbers(*, section: str, report_text: str) -> list[str]:
         if not any(_pair_matches(page_pair=page_pair, report_pair=pair) for pair in report_pairs):
             missing.append(f"[{low}, {high}]")
     without_pairs = PAIR_REGEX.sub(" ", cleaned)
-    for printed in NUMBER_REGEX.findall(without_pairs):
-        decimals = _decimals(printed=printed)
-        wanted = _rounded(printed=printed, decimals=decimals)
-        if not any(
-            _rounded(printed=candidate, decimals=decimals) == wanted for candidate in report_numbers
-        ):
-            missing.append(printed)
+    missing.extend(
+        printed
+        for printed in NUMBER_REGEX.findall(without_pairs)
+        if not _bare_matches(printed=printed, report_numbers=report_numbers)
+    )
     return missing
+
+
+def _bare_matches(*, printed: str, report_numbers: list[str]) -> list[str]:
+    """Return the report numbers a bare page number matches, at the page's precision.
+
+    Args:
+        printed: A page number outside any pair, with any sign.
+        report_numbers: Every number the report printed, with any sign.
+
+    Returns:
+        The matching report numbers. A page number with a minus sign matches only negative ones,
+        unless it rounds to zero. Empty when the page number is unaccounted for.
+    """
+    decimals = _decimals(printed=printed)
+    wanted = _rounded(printed=printed, decimals=decimals)
+    return [
+        candidate
+        for candidate in report_numbers
+        if _rounded(printed=candidate, decimals=decimals) == wanted
+        and (not printed.startswith("-") or not wanted or candidate.startswith("-"))
+    ]
+
+
+def bare_magnitude_audit(*, section: str, report_text: str) -> list[str]:
+    """List every bare number in `section` with the signs of the report numbers it matched.
+
+    A bare number matches on magnitude, so the sign of the report number behind it is the one thing
+    the check does not verify. The list lets a reviewer check each direction claim in the prose
+    ("lower", "higher") against the sign the report printed.
+
+    Args:
+        section: A page section's text.
+        report_text: The report's text.
+
+    Returns:
+        One line per bare number, such as `0.27: report signs -` or `0.14: report signs +, -`;
+        a number matching report numbers of both signs is the one to audit first.
+    """
+    cleaned = _ascii_signs(EXCLUDED_REGEX.sub(" ", section))
+    report_numbers = _report_numbers(report_text=report_text)
+    audit: list[str] = []
+    for printed in NUMBER_REGEX.findall(PAIR_REGEX.sub(" ", cleaned)):
+        signs = sorted(
+            {
+                "-" if candidate.startswith("-") else "+"
+                for candidate in _bare_matches(printed=printed, report_numbers=report_numbers)
+            },
+            reverse=True,
+        )
+        audit.append(f"{printed}: report signs {', '.join(signs) if signs else 'none'}")
+    return audit
 
 
 def check_page_numbers(*, page_path: Path, report_path: Path, heading: str) -> int:
@@ -215,4 +278,29 @@ def check_page_numbers(*, page_path: Path, report_path: Path, heading: str) -> i
     if missing:
         msg = f"{len(missing)} numbers in {heading!r} are not in {report_path.name}: {missing}"
         raise ValueError(msg)
+    for line in bare_magnitude_audit(section=section, report_text=report_text):
+        _LOG.info("bare magnitude, audit its direction by hand: %s", line)
     return checked
+
+
+def main() -> int:
+    """Check one page section against a report, and print the bare-magnitude audit list.
+
+    Returns:
+        0 when every number is accounted for; a `ValueError` is raised otherwise.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("page", type=Path)
+    parser.add_argument("report", type=Path)
+    parser.add_argument("heading", help="The section's heading line, including its # characters.")
+    arguments = parser.parse_args()
+    checked = check_page_numbers(
+        page_path=arguments.page, report_path=arguments.report, heading=arguments.heading
+    )
+    _LOG.info("%d numbers and pairs checked", checked)
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

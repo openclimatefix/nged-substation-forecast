@@ -137,11 +137,12 @@ model absorbs the mismatch. Phase 1 adds no shear extrapolation.
   the choice before the first fit. The page states the fold design as a limitation either way.
 - **Row fingerprint.** Deterministic, floats cast to Float32 before hashing, saved beside the
   losses, and checked on `--report-only`.
-- **Servable-hours split.** Wind power for label T covers T minus 30 minutes to T plus 30 minutes,
-  so labels 00 to 08 UTC (hours ending before about 09:00 UTC, when Dynamical.org's archive has the
-  00 UTC run) are compared with labels 10 to 23, dropping label 09. The split also separates ENS
-  leads 0 to 8 from 10 to 23 and morning from afternoon, so the page does not present it as a clean
-  test of servability. HRES's archive delay is not established, so HRES gets no split.
+- **Lead and time-of-day split (exploratory).** Wind power for label T covers T minus 30 minutes to
+  T plus 30 minutes, so labels 00 to 08 UTC (hours ending by 09:00 UTC) are compared with labels 10
+  to 23, dropping label 09. The split separates ENS leads 0 to 8 from 10 to 23 and early hours from
+  late hours, and HRES's lead before 1 October 2025 is mixed into it, so it is not a test of
+  whether ENS could be read in time. HRES's archive delay is not established, so HRES gets no
+  split.
 - **Period splits (exploratory):** before and after 1 October 2025 (HRES's archive source
   changed), and before and after 12 May 2026 (IFS Cycle 50r1), from the saved losses.
 - **Printed-number guard.** A committed check takes the new section by its heading and every
