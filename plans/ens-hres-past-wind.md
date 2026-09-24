@@ -233,3 +233,46 @@ written.
   rescaling of one column. Mean speeds are printed in m/s for every product.
 - **The report adds a Months column to every contrast table**, so the period splits state how many
   calendar months each interval rests on.
+
+## Post-review additions (exploratory, added after the first results)
+
+Written after the first fit and the first science review, before any of the fits below. Every item
+is post hoc: the review saw the first results, so none of these is a planned contrast, and the page
+labels each "exploratory (added after the first results)". The first-fit outputs (`losses.parquet`
+and its fingerprint) are not refitted or overwritten.
+
+1. **Long-row-set reconciliation.** ERA5, UKV, HRES and ENS (the `components` and
+   `speed_components` combinations) are refitted at the primary setting on the longer row set from
+   2024-08-12, the rows common to all products and the horizons study's start. Two designs: (a) the
+   horizons study's design, two UKV eras and no cut at IFS 49r1, which should reproduce that page's
+   ENS-minus-ERA5 figure; (b) the same rows with one extra era cut at 2024-12-01. Each design
+   prints ENS-ERA5, HRES-ERA5, HRES-UKV, ENS-UKV and ENS-HRES on all rows and on the rows from
+   2024-12-01 only, plus the monthly ratio of each product's 10 m speed to ERA5's, which shows any
+   step in November 2024. The losses go to `losses_long_rows.parquet` with its own fingerprint.
+2. **Fold-design robustness table** for P1 to P3 and ENS-HRES: the study design; three eras with
+   no fold rotation; two UKV eras (the page's `with_eras`); the study's folds with a two-valued
+   `era_code`; and an extra era cut at IFS 50r1 (12 May 2026) that drops the part-month of May 2026.
+   The losses go to `losses_fold_designs.parquet` with its own fingerprint.
+3. **HRES served-lead table.** The statistic is each UTC hour's mean absolute hour-to-hour change
+   over the mean of its two neighbouring hours' changes, for `wind_speed_100m`, `wind_speed_10m` and
+   `temperature_2m`, before and from 2025-10-01. It replaces the median-normalised ratio, which the
+   wind's daily cycle swamps. The lead statement is "1 to 12 h before 1 October 2025 and 0 to 5 h
+   from it, inferred from where the hour-to-hour jumps fall". Open-Meteo does not document the
+   lead: its documentation says only that each run's first few hours are stitched into a continuous
+   series.
+4. **Rename the servable split.** It is a lead and time-of-day split (labels 00-08 UTC against
+   10-23 UTC). No text calls it a test of servability. ENS's deficit against UKV and HRES sits in
+   the later hours, which are also the longer leads.
+5. **Wording fixes.** ENS runs four times a day; the 3-hourly steps after ECMWF's hourly steps to
+   T+90, the single 00 UTC run and the roughly 09:00 UTC read time belong to ECMWF's open-data
+   subset and Dynamical.org's archive, and 09:00 UTC is this repository's
+   `NWP_PUBLICATION_DELAY_HOURS` assumption, not a documented Dynamical.org latency (ECMWF
+   disseminates ENS day 0 at about 06:40 UTC). IFS 50r1 went live with the 06 UTC run of 12 May
+   2026, so the 00 UTC ENS run of that day is still 49r1 and the period split's "from 2026-05-12"
+   holds one day of 49r1 ENS data. The HRES fetch set no `cell_selection`, so Open-Meteo's default
+   ("land") applies, and ERA5 is read at the nearest cell. The grid-file cross-check shows that two
+   Open-Meteo downloads agree, not that the grid or the lead is right.
+6. **Sign-safe printed-number guard.** A page pair `[a, b]` must match a report pair including
+   sign. A bare magnitude may match either sign, and the guard lists every such magnitude so a
+   reviewer can audit it. The page writes a difference as "X points lower" or "X points higher"
+   and, in tables, as a signed value.
