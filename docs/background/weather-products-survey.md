@@ -16,8 +16,8 @@ label such as v0.5 names a [roadmap milestone](../roadmap/index.md#milestones).
 | Product | What it is | Roadmap status | What the project uses it for | Archive read from | Scored in |
 |---|---|---|---|---|---|
 | **ECMWF ENS** | The European Centre for Medium-Range Weather Forecasts' (ECMWF's) 51-member ensemble forecast | [✅ Ingested today](../roadmap/data-sources.md#weather-data) | The live forecast | [Dynamical.org](https://dynamical.org/catalog/ecmwf-ifs-ens-forecast-15-day-0-25-degree/), a non-profit that republishes weather-model archives | Not scored on a study page |
-| **ERA5** | ECMWF's reanalysis: a weather model re-run over the past and pulled towards observations | [🚧 Planned ingestion, milestone v0.5](../roadmap/data-sources.md#weather-data) | Planned: training history and capacity estimation | Open-Meteo's copy, for the studies; the planned ingest route is [still open](../roadmap/data-sources.md#era5-which-access-route) | [Sunshine](../studies/weather-products-for-past-solar.md), [wind](../studies/weather-products-for-past-wind.md) |
-| **CAMS** | The Copernicus Atmosphere Monitoring Service's satellite irradiance | [🚧 Planned ingestion, milestone v0.7](../roadmap/data-sources.md#weather-data) | Planned: offline capacity estimation only | The CAMS Radiation Service point API | [Sunshine](../studies/weather-products-for-past-solar.md) |
+| **ERA5** | ECMWF's reanalysis: a weather model re-run over the past and pulled towards observations | [🚧 Planned ingestion, milestone v0.5](../roadmap/data-sources.md#weather-data) | Planned: training history and capacity estimation ([why ERA5 scores worse than current products](../roadmap/data-sources.md#why-era5-describes-past-sunshine-and-wind-worse-than-most-current-weather-products)) | Open-Meteo's copy, for the studies; the planned ingest route is [still open](../roadmap/data-sources.md#era5-which-access-route) | [Sunshine](../studies/weather-products-for-past-solar.md), [wind](../studies/weather-products-for-past-wind.md) |
+| **CAMS** | The Copernicus Atmosphere Monitoring Service's satellite irradiance | [🚧 Planned ingestion, milestone v0.7](../roadmap/data-sources.md#weather-data) | Planned: offline capacity estimation only ([which CAMS route, and its traps](../roadmap/data-sources.md#cams-use-the-point-api-not-the-gridded-product)) | The CAMS Radiation Service point API | [Sunshine](../studies/weather-products-for-past-solar.md) |
 | **ICON-EU** | The German weather service's (DWD's) ICON model, 6.5 km Europe configuration | [🔬 Research (v0.9, uncertain)](../roadmap/data-sources.md#weather-data), as Dynamical.org's copy | Studies only | Open-Meteo's Historical Forecast archive | [Sunshine](../studies/weather-products-for-past-solar.md), [wind](../studies/weather-products-for-past-wind.md) |
 | **UKV** | The Met Office's 2 km UK model | [🔬 Research (uncertain)](../roadmap/data-sources.md#weather-data), as the Met Office's AWS feed | Studies only | Open-Meteo's Historical Forecast archive | [Sunshine](../studies/weather-products-for-past-solar.md), [wind](../studies/weather-products-for-past-wind.md) |
 | **ICON-D2** | DWD's ICON model, 2 km central-Europe configuration | Not on the roadmap | Studies only | Open-Meteo's Historical Forecast archive | [Sunshine](../studies/weather-products-for-past-solar.md), [wind](../studies/weather-products-for-past-wind.md) |
@@ -75,9 +75,13 @@ conventions apply to every Open-Meteo row:
   2026-09-23. Lincoln stands in for the trial area in the East Midlands, so a start date, a null
   series, or a ratio measured there is a result for that one point. A user elsewhere in Great
   Britain should re-query at their own sites, and the "Covers GB" column says where coverage was
-  checked on the grid rather than at Lincoln. ICON-D2, for example, has data at Lincoln but a
-  western boundary near 2.5°W, leaving South West England and South Wales outside the ICON-D2
-  domain ([Which weather product best describes past wind?](../studies/weather-products-for-past-wind.md)).
+  checked on the grid rather than at Lincoln. ICON-D2, for example, has data at Lincoln but none in
+  the west of Great Britain: the [map of ICON-D2's and AROME France's
+  domains](../roadmap/data-sources.md#what-comparing-four-irradiance-products-on-the-trial-areas-solar-farms-found)
+  on the data sources page shows where.
+- **Open-Meteo's UKV archive is a backfill before 12 August 2024**, so a UKV start date on this page
+  is not the start of UKV's own run history ([what the backfill is and how it changes
+  scores](../roadmap/data-sources.md#open-meteos-ukv-archive-is-the-t0-analysis-and-half-of-it-is-backfill)).
 - **Latency is the time from a run's initialisation to the whole run being available on
   Open-Meteo**, read from that model's `meta.json` for its latest run on the morning of 2026-09-23:
   00 UTC for the 6-hourly models, a later run for AROME, the Danish Meteorological Institute (DMI),
@@ -122,7 +126,7 @@ publishes a fourth kind:
 the other models.** The model `ecmwf_ifs` rejects `run=2024-03-13T00:00` and serves the 2024-03-14
 00 UTC run with 240 hourly steps. Open-Meteo calls the runs from 2024-03-14 "IFS Cycle 49R1
 hindcasts". The March to June 2024 runs sampled are 00 and 12 UTC only, and 06 UTC runs are present
-from 2024-08-10. Runs from 2026-05-12 06 UTC use IFS Cycle 50r1.
+from 2024-08-10. Runs from 2026-05-12 06 UTC use IFS Cycle 50r1 ([what that upgrade changed](../roadmap/data-sources.md#nwp-model-upgrades-since-2019)).
 
 **Dynamical.org stops serving data.dynamical.org on 2026-09-30, so any URL on that host has to move
 to a supported access pattern.** Every Dynamical.org catalogue page carries the notice
@@ -332,7 +336,8 @@ decision to score the product. Ordered by how far back whole runs reach:
 4. **Open-Meteo Single Runs of ECMWF IFS HRES 9 km** (not on the roadmap), from 2024-03-14 — the one
    whole-run archive in this list with a native direct beam. Three caveats apply: Open-Meteo calls
    the early runs hindcasts, the runs sampled from early 2024 are 00 and 12 UTC only, and the model
-   changes to IFS Cycle 50r1 on 2026-05-12.
+   changes to IFS Cycle 50r1 on 2026-05-12, [an upgrade the data sources page
+   describes](../roadmap/data-sources.md#nwp-model-upgrades-since-2019).
 5. **Dynamical.org AIFS Single** (not on the roadmap), with radiation and 100 m wind from the
    2025-02-24 06 UTC run.
 6. **Open-Meteo Previous Runs**, from 2024-01-19 at the earliest — capped at the offsets in the
