@@ -117,6 +117,7 @@ from sources import STUDY_DATA_DIR
 from studies.blending import climatology_permutation, stacked_errors
 from studies.bootstrap import (
     N_BOOTSTRAP_RESAMPLES,
+    BootstrapInterval,
     YearInterval,
     bootstrap_absolute,
     bootstrap_difference,
@@ -266,6 +267,16 @@ SECOND_PRODUCT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
 )
 """Post hoc, added after the second science review (S7): does a second product other than SARAH-3
 help CAMS's split as much? Each blend and its climatology control, against plain `cams_split`."""
+
+DIRECT_PAIRED_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("cams_split_sarah3_xgb", "cams_split_era5_xgb"),
+    ("cams_split_sarah3_xgb", "cams_split_icon_dream_xgb"),
+    ("cams_split", "sarah3"),
+)
+"""Post hoc, added for the final review of this section: does SARAH-3's blend beat the two other
+second-product blends directly, and does CAMS's split beat SARAH-3 alone directly? Scopes 'no
+other second product' to the two products `SECOND_PRODUCT_CONTRASTS` actually tests, rather than
+comparing each blend's point estimate against `cams_split` separately."""
 
 BLEND_PRODUCTS_LOSSES: Final[Path] = STUDY_DATA_DIR / "blend_products" / "losses.parquet"
 """The training-history blend study's saved losses, read only (never refitted) for M1's
@@ -1109,6 +1120,33 @@ def _second_product_lines(*, losses: pl.DataFrame) -> list[str]:
     return lines
 
 
+def _direct_paired_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Render the direct paired contrasts added for the final review.
+
+    SARAH-3's blend against the other two second-product blends, and CAMS's split against SARAH-3
+    alone.
+
+    Args:
+        losses: Every arm's losses, primary setting.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        (
+            "#### Post hoc: direct paired tests against the other second-product blends and "
+            "against SARAH-3 alone"
+        ),
+        "",
+        *CONTRAST_HEADER,
+    ]
+    lines += [
+        _contrast_line(losses=losses, treatment=treatment, reference=reference, label="all")
+        for treatment, reference in DIRECT_PAIRED_CONTRASTS
+    ]
+    return lines
+
+
 HEADLINE_FOLD_HEADER: Final[tuple[str, str]] = (
     (
         "| Scope | Contrast | ΔMAE (pp of capacity) | 95% interval | 95% t-interval across the 5 "
@@ -1475,6 +1513,7 @@ def _generator_resampled_interval(
         .with_columns(difference=pl.col("treatment") - pl.col("reference"))
         .group_by("site")
         .agg(total=pl.col("difference").sum(), n=pl.len())
+        .sort("site")
     )
     totals, counts = by_site["total"].to_numpy(), by_site["n"].to_numpy()
     generator = np.random.default_rng(GENERATOR_RESAMPLE_SEED)
@@ -1564,6 +1603,36 @@ DAYTIME_ZENITH_LIMIT_DEG: Final[float] = 80.0
 so a near-horizon hour with a near-zero irradiance does not dominate the fit."""
 
 
+def _band_interval(
+    *,
+    losses: pl.DataFrame,
+    band: pl.DataFrame,
+    column: str,
+    value: str,
+    treatment: str,
+    reference: str,
+) -> BootstrapInterval:
+    """Bootstrap the paired gain within one quantile band of `column`.
+
+    Args:
+        losses: Every arm's losses, primary setting, holding `treatment` and `reference`.
+        band: `per_row` with `column` added by `qcut`, carrying `site` and `time`.
+        column: The quantile-banded column (`ramp` or `disagreement`).
+        value: The band's label, as `qcut` writes it (`"0"` to `str(RAMP_QUANTILE_BANDS - 1)`).
+        treatment: The arm whose metric is being compared.
+        reference: The arm it is compared against.
+
+    Returns:
+        The band's own paired-difference interval, resampling whole months and a seed within the
+        band's rows only.
+    """
+    band_keys = band.filter(pl.col(column) == value).select("site", "time").unique()
+    band_losses = losses.join(band_keys, on=["site", "time"], how="inner")
+    return bootstrap_difference(
+        losses=band_losses, treatment=treatment, reference=reference, metric=METRIC
+    )
+
+
 def _ramp_disagreement_lines(*, losses: pl.DataFrame, frame: pl.DataFrame) -> list[str]:
     """S6: does the enriched gain track CAMS's own ramp, or where CAMS and SARAH-3 disagree?
 
@@ -1612,6 +1681,22 @@ def _ramp_disagreement_lines(*, losses: pl.DataFrame, frame: pl.DataFrame) -> li
     steepest = float(
         ramp_gain.filter(pl.col("ramp") == str(RAMP_QUANTILE_BANDS - 1))["gain"].item()
     )
+    calmest_interval = _band_interval(
+        losses=losses,
+        band=ramp_band,
+        column="ramp",
+        value="0",
+        treatment=treatment,
+        reference=reference,
+    )
+    steepest_interval = _band_interval(
+        losses=losses,
+        band=ramp_band,
+        column="ramp",
+        value=str(RAMP_QUANTILE_BANDS - 1),
+        treatment=treatment,
+        reference=reference,
+    )
     disagreement_band = per_row.with_columns(
         pl.col("disagreement").qcut(
             RAMP_QUANTILE_BANDS, labels=[str(i) for i in range(RAMP_QUANTILE_BANDS)]
@@ -1625,6 +1710,14 @@ def _ramp_disagreement_lines(*, losses: pl.DataFrame, frame: pl.DataFrame) -> li
             "gain"
         ].item()
     )
+    top_disagreement_interval = _band_interval(
+        losses=losses,
+        band=disagreement_band,
+        column="disagreement",
+        value=str(RAMP_QUANTILE_BANDS - 1),
+        treatment=treatment,
+        reference=reference,
+    )
     day = frame.filter(
         pl.col("solar_zenith_deg") < DAYTIME_ZENITH_LIMIT_DEG,
         pl.col("ghi_previous_cams").is_not_nan(),
@@ -1635,17 +1728,27 @@ def _ramp_disagreement_lines(*, losses: pl.DataFrame, frame: pl.DataFrame) -> li
     target = day["ghi_sarah3"].to_numpy()
     coefficients, *_ = np.linalg.lstsq(design, target, rcond=None)
     previous_coef, current_coef, next_coef, intercept = coefficients
+    # `bootstrap_difference` returns treatment-minus-reference in raw units; the gain above is
+    # reference-minus-treatment in percentage points, so negate and rescale to match its sign.
+    calmest_lower = -calmest_interval["upper_95"] * PERCENTAGE_POINTS
+    calmest_upper = -calmest_interval["lower_95"] * PERCENTAGE_POINTS
+    steepest_lower = -steepest_interval["upper_95"] * PERCENTAGE_POINTS
+    steepest_upper = -steepest_interval["lower_95"] * PERCENTAGE_POINTS
+    top_disagreement_lower = -top_disagreement_interval["upper_95"] * PERCENTAGE_POINTS
+    top_disagreement_upper = -top_disagreement_interval["lower_95"] * PERCENTAGE_POINTS
     return [
         "#### Exploratory: does the gain track CAMS's ramp, or where CAMS and SARAH-3 disagree?",
         "",
         (
             f"- The gain (`{treatment}` − `{reference}`) does not grow with CAMS's hour-to-hour "
-            f"ramp: {calmest:.2f} points in the calmest fifth of hours against {steepest:.2f} "
-            "points in the steepest fifth."
+            f"ramp: {calmest:.2f} points [{calmest_lower:+.2f}, {calmest_upper:+.2f}] in the "
+            f"calmest fifth of hours against {steepest:.2f} points "
+            f"[{steepest_lower:+.2f}, {steepest_upper:+.2f}] in the steepest fifth."
         ),
         (
             "- The gain is concentrated where CAMS and SARAH-3 disagree most: "
-            f"{top_disagreement:.2f} points in the fifth of hours where the two differ most."
+            f"{top_disagreement:.2f} points [{top_disagreement_lower:+.2f}, "
+            f"{top_disagreement_upper:+.2f}] in the fifth of hours where the two differ most."
         ),
         (
             "- A least-squares fit of SARAH-3's global irradiance on CAMS's own hour and its "
@@ -1886,6 +1989,8 @@ def build_report(
         *_planned_lines(losses=losses),
         "",
         *_second_product_lines(losses=pooled),
+        "",
+        *_direct_paired_lines(losses=pooled),
         "",
         *_headline_fold_lines(losses=pooled),
         "",

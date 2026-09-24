@@ -67,10 +67,10 @@ NAMES: Final[dict[str, str]] = {
     "cams_rich": "CAMS (split + neighbouring hours)",
     "cams_rich_sarah3_xgb": "CAMS (split + neighbouring hours) + SARAH-3 (XGBoost)",
     "cams_rich_sarah3_control": "CAMS (split + neighbouring hours) + SARAH-3 (control)",
-    "cams_split_era5_xgb": "CAMS split + ERA5 (XGBoost)",
-    "cams_split_era5_control": "CAMS split + ERA5 (control)",
-    "cams_split_icon_dream_xgb": "CAMS split + ICON-DREAM-EU (XGBoost)",
-    "cams_split_icon_dream_control": "CAMS split + ICON-DREAM-EU (control)",
+    "cams_split_era5_xgb": "CAMS (split) + ERA5 (XGBoost)",
+    "cams_split_era5_control": "CAMS (split) + ERA5 (control)",
+    "cams_split_icon_dream_xgb": "CAMS (split) + ICON-DREAM-EU (XGBoost)",
+    "cams_split_icon_dream_control": "CAMS (split) + ICON-DREAM-EU (control)",
 }
 """Each arm's name as the page writes it. Every blend names both products it reads."""
 
@@ -98,8 +98,8 @@ DOTS: Final[str] = "Dot: estimate. Line: 95% interval from resampling whole mont
 SCOPE: Final[str] = "Six solar farms in Lincolnshire, January 2021 to August 2026."
 LEADERBOARD_X_TITLE: Final[str] = "Mean absolute error (% of capacity; smaller is better)"
 CONTRAST_X_TITLE: Final[str] = "Difference in mean absolute error (points of capacity)"
-ZERO_LABEL: Final[str] = "same as the reference arm"
-BETTER_LABEL: Final[str] = "lower error than the reference arm"
+ZERO_LABEL: Final[str] = "same as the reference model"
+BETTER_LABEL: Final[str] = "lower error than the reference model"
 
 LEADERBOARD_DOMAIN_MARGIN_FRACTION: Final[float] = 0.1
 """The margin added on each side of the leaderboard's data-derived x domain, as a fraction of the
@@ -120,7 +120,7 @@ def _contrast_domain(*, rows: pl.DataFrame) -> tuple[float, float]:
         rows: The contrast rows, carrying `lower_95` and `upper_95`.
 
     Returns:
-        A domain symmetric about zero, so "same as the reference arm" sits at the axis centre.
+        A domain symmetric about zero, so "same as the reference model" sits at the axis centre.
     """
     largest = float(
         rows.select(
@@ -190,7 +190,10 @@ def _leaderboard(*, losses: pl.DataFrame) -> alt.VConcatChart:
         panels=[panel],
         number=12,
         figure_planning=None,
-        title="Every arm's own mean absolute error, CAMS and SARAH-3 and their blends",
+        title=(
+            "CAMS's split plus its own neighbouring hours plus SARAH-3 has the lowest error of "
+            "the single products and blends tested here"
+        ),
         subtitle=[
             "Each arm's own mean absolute error, sorted best first.",
             DOTS,
@@ -260,8 +263,8 @@ def _headline(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         # suppressed here and the subtitle states planned/post hoc itself.
         figure_planning=None,
         title=(
-            "Does CAMS's split plus SARAH-3 beat CAMS's split, with and without CAMS's own "
-            "neighbouring hours, and does the gain survive a climatology control?"
+            "CAMS's split plus SARAH-3 beats CAMS's split, with and without CAMS's own "
+            "neighbouring hours, and beats its climatology control, at both XGBoost settings"
         ),
         subtitle=[
             (
@@ -319,7 +322,7 @@ def _exploratory(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
             "further comparisons among CAMS, CAMS's split, and SARAH-3"
         ),
         subtitle=[
-            "Every row's label names its own treatment and reference arm.",
+            "Every row's label names its own treatment and reference model.",
             DOTS,
             (
                 "Each negative control adds a noised copy of CAMS's own column, which should "
@@ -378,11 +381,14 @@ def _second_product(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         # "exploratory", but the other three rows are post hoc, so the note is suppressed and the
         # subtitle states each row's kind itself.
         figure_planning=None,
-        title="No other second product beats CAMS's split by as much as SARAH-3 does",
+        title=(
+            "Neither ERA5 nor ICON-DREAM-EU, the two other products tested here, adds as much to "
+            "CAMS's split as SARAH-3 does"
+        ),
         subtitle=[
             (
                 "The top row, against plain CAMS (split), is the planned SARAH-3 comparison; the "
-                "other three are post hoc. Each control keeps the second product's climatology "
+                "other four are post hoc. Each control keeps the second product's climatology "
                 "but shuffles its hour-by-hour values."
             ),
             DOTS,

@@ -47,10 +47,9 @@ climates, so a result may not hold elsewhere.
   neighbouring hours: by 0.13 points of capacity for solar and 0.48 for wind. The gain comes from the
   other products' weather rather than from the extra columns, a blend of UKV and ICON-EU that a live
   service could read beats UKV alone, and an XGBoost blend beats a linear stack of single-product
-  predictions. Blending the two satellite retrievals the past-solar study compared, CAMS and
-  SARAH-3, beats CAMS's split with its own neighbouring hours by 0.18 points and plain CAMS's split
-  by 0.20 points, even though both products take their clouds from satellite images rather than
-  from a weather model.
+  predictions. An XGBoost model given CAMS's split plus SARAH-3's global irradiance, the two
+  satellite retrievals the past-solar study compared, beats CAMS's split with its neighbouring hours
+  by 0.18 points and plain CAMS's split by 0.20 points, on a longer row set from January 2021.
 - [How accurate is a power forecast driven by ECMWF ENS at each
   horizon?](ens-forecast-horizons.md) — at the 6 solar farms and 3 wind farms, an XGBoost model
   given the ENS ensemble mean beats every forecast that reads no weather forecast to day 5 for solar
