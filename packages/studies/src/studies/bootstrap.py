@@ -106,13 +106,21 @@ def _resample_bounds(
     Args:
         values: Per-seed, per-row values, shape (n_seeds, n_rows).
         months: Each row's month label, one per column of `values`.
-        level: The interval's coverage in percent, at most 100. The bounds are the percentiles that
-            leave half of the remaining `100 - level` in each tail.
+        level: The interval's coverage in percent, above 1 and below 100 (95.0, never 0.95).
+            The bounds are the percentiles that leave half of the remaining `100 - level` in each
+            tail.
 
     Returns:
         The lower and upper percentiles of the resampled mean; at the default level, the 2.5th and
         97.5th.
+
+    Raises:
+        ValueError: If `level` is not above 1 and below 100. A fraction such as 0.95 is rejected,
+            because it would otherwise give a 0.95% interval.
     """
+    if not 1.0 < level < 100.0:
+        msg = f"level is a coverage in percent, above 1 and below 100 (95.0, not 0.95): {level}"
+        raise ValueError(msg)
     rows_by_month = _rows_by_month(months=months)
 
     # The seed draw comes before the month draw in every resample. Swapping them, or vectorising

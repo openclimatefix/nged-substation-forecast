@@ -10,7 +10,10 @@ of mean errors and a table of differences between those means then subtract exac
 not if one divides per row and the other divides a pooled megawatt difference by a pooled capacity.
 """
 
+import itertools
+import re
 from collections.abc import Mapping, Sequence
+from types import MappingProxyType
 from typing import Final, TypedDict
 
 import numpy as np
@@ -48,6 +51,32 @@ arm, so the approximation cannot favour one.
 
 QUANTILE_LEVEL_SPACING: Final[float] = 0.1
 """The gap between neighbouring `QUANTILE_LEVELS`, which weights each level in the Riemann sum."""
+
+
+UKV_UPGRADE_MONTH: Final[str] = "2026-02"
+"""The first whole month after the Met Office's upgrade of UKV on 21 January 2026, in `%Y-%m` form.
+
+Rows from the upgrade to the end of January carry the earlier month label but the upgraded UKV, so
+each study drops them before cutting eras that begin at this month.
+"""
+
+ERA_START_MONTHS: Final[tuple[str, str]] = ("2025-10", UKV_UPGRADE_MONTH)
+"""The first month of the second and third eras of the ECMWF past-wind study, in `%Y-%m` form.
+
+The second era begins when Open-Meteo's ECMWF archive changes its source (1 October 2025), and the
+third when UKV is upgraded (`UKV_UPGRADE_MONTH`).
+"""
+
+ERA_FOLD_OFFSETS: Final[Mapping[int, int]] = MappingProxyType({0: 0, 1: 0, 2: 2})
+"""How far each era's fold numbers are rotated for the ECMWF past-wind study, modulo `N_FOLDS`.
+
+**These offsets were found for the ENS and HRES wind row set, and no other.** With every offset at
+0, calendar months such as July and September fall in the same fold in 2025 and 2026, so holding
+that fold out leaves no training row for the season. Rotating the third era by 2 puts every
+calendar month that occurs in two years into two different folds. A different row set has different
+month spans, so it needs `search_fold_offsets` to confirm that a candidate design leaves no
+uncovered cell.
+"""
 
 
 class HyperParameters(TypedDict):
@@ -105,6 +134,10 @@ arm ordering is a property of the features or of the settings.
 """
 
 
+_MONTH_LABEL: Final[re.Pattern[str]] = re.compile(r"\d{4}-\d{2}")
+"""A `%Y-%m` month label, the form `month` columns and era boundaries take."""
+
+
 def assign_folds(*, dataset: pl.DataFrame, by: Sequence[str] = ("site",)) -> pl.DataFrame:
     """Cut each group's own span into `N_FOLDS` contiguous blocks of whole months.
 
@@ -139,7 +172,14 @@ def rotate_folds(*, frame: pl.DataFrame, fold_offsets: Mapping[int, int]) -> pl.
 
     Returns:
         The frame with the rotated `fold`.
+
+    Raises:
+        ValueError: Naming the era codes in `frame` that have no entry in `fold_offsets`.
     """
+    missing = sorted(set(frame["era_code"].unique().to_list()) - set(fold_offsets))
+    if missing:
+        msg = f"fold_offsets has no offset for era_code {missing}"
+        raise ValueError(msg)
     rotation = pl.col("era_code").replace_strict(dict(fold_offsets), return_dtype=pl.Int32)
     return frame.with_columns(fold=(pl.col("fold") + rotation) % N_FOLDS)
 
@@ -155,20 +195,76 @@ def cut_eras(
 
     Args:
         frame: Rows carrying `site` and `month`, where `month` is a `%Y-%m` string.
-        first_months: The first month of every era after the first, in ascending order.
+        first_months: The first month of every era after the first, each as `%Y-%m`.
         fold_offsets: Each `era_code` (0 for the first era, counting up) to how far its fold numbers
-            are rotated.
+            are rotated. Its keys must be exactly `range(len(first_months) + 1)`.
 
     Returns:
-        The frame with `era_code`, `era` (`era_code` as a string, for `assign_folds`) and `fold`.
+        The frame with `era_code` (Int8), `era` (`era_code` as a string, for `assign_folds`) and
+        `fold`.
+
+    Raises:
+        ValueError: If a first month is not `%Y-%m`, or if `fold_offsets` lacks an era or holds an
+            era that `first_months` does not create.
     """
-    era_code = sum((pl.col("month") >= month).cast(pl.Int8) for month in first_months)
+    malformed = [month for month in first_months if not _MONTH_LABEL.fullmatch(month)]
+    if malformed:
+        msg = f"first_months must each be a %Y-%m label, got {malformed}"
+        raise ValueError(msg)
+    expected_eras = set(range(len(first_months) + 1))
+    if set(fold_offsets) != expected_eras:
+        msg = (
+            f"fold_offsets must hold exactly the eras {sorted(expected_eras)}: missing "
+            f"{sorted(expected_eras - set(fold_offsets))}, extra "
+            f"{sorted(set(fold_offsets) - expected_eras)}"
+        )
+        raise ValueError(msg)
+    era_code = pl.lit(0, dtype=pl.Int8) + sum(
+        (pl.col("month") >= month).cast(pl.Int8) for month in first_months
+    )
     labelled = frame.with_columns(era_code=era_code).with_columns(
         era=pl.col("era_code").cast(pl.String)
     )
     return rotate_folds(
         frame=assign_folds(dataset=labelled, by=("site", "era")), fold_offsets=fold_offsets
     )
+
+
+def search_fold_offsets(
+    *, frame: pl.DataFrame, first_months: Sequence[str]
+) -> list[Mapping[int, int]]:
+    """Find every fold rotation that leaves no calendar month without a training row.
+
+    Tries every rotation of each era after the first (era 0 stays at 0, because only the rotations
+    relative to it matter) and keeps the designs for which `uncovered_months` is empty. The
+    `ERA_FOLD_OFFSETS` docstring names the row set its offsets were found for; use this function to
+    confirm coverage on another row set.
+
+    Args:
+        frame: The row set, carrying `site`, `month` (a `%Y-%m` string) and `time`.
+        first_months: The first month of every era after the first, each as `%Y-%m`.
+
+    Returns:
+        The offsets that leave no uncovered cell, as read-only mappings from `era_code` to rotation.
+        Those with fewer non-zero rotations come first, then those with the smaller sum of
+        rotations, then by the rotations themselves. The list is empty if no design covers every
+        calendar month.
+    """
+    unrotated = cut_eras(
+        frame=frame,
+        first_months=first_months,
+        fold_offsets=dict.fromkeys(range(len(first_months) + 1), 0),
+    )
+    found: list[tuple[int, ...]] = []
+    for rotations in itertools.product(range(N_FOLDS), repeat=len(first_months)):
+        offsets = dict(enumerate((0, *rotations)))
+        coverage = calendar_month_coverage(
+            frame=rotate_folds(frame=unrotated, fold_offsets=offsets)
+        )
+        if uncovered_months(coverage=coverage).is_empty():
+            found.append(rotations)
+    found.sort(key=lambda rotations: (sum(r != 0 for r in rotations), sum(rotations), rotations))
+    return [MappingProxyType(dict(enumerate((0, *rotations)))) for rotations in found]
 
 
 def calendar_month_coverage(*, frame: pl.DataFrame) -> pl.DataFrame:
@@ -219,7 +315,7 @@ def uncovered_months(*, coverage: pl.DataFrame) -> pl.DataFrame:
 
 
 def raise_on_uncovered_months(*, coverage: pl.DataFrame) -> None:
-    """Raise if a held-out calendar month that occurs in two years has no training row.
+    """Raise if a held-out calendar month that occurs in more than one year has no training row.
 
     Args:
         coverage: `calendar_month_coverage`'s result.
@@ -231,7 +327,8 @@ def raise_on_uncovered_months(*, coverage: pl.DataFrame) -> None:
     if failures.height:
         msg = (
             f"{failures.height} (site, fold, calendar month) cells hold out a calendar month that "
-            f"occurs in two years and leave no training row for it: {failures.head(5).to_dicts()}"
+            f"occurs in more than one year and leave no training row for it: "
+            f"{failures.head(5).to_dicts()}"
         )
         raise ValueError(msg)
 

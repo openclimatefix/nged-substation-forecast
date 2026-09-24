@@ -522,3 +522,13 @@ def test_the_interval_at_a_level_uses_symmetric_tails_of_the_same_resamples():
     )
 
     assert (lower, upper) == pytest.approx((-0.784757575276633, 0.5454459534554414))
+
+
+@pytest.mark.parametrize("level", [0.95, 1.0, 0.0, 100.0, -5.0, 101.0])
+def test_a_level_that_is_not_a_percentage_raises(level: float):
+    # 0.95 is the natural mistake: a fraction where a percentage is expected. Accepted, it would
+    # give an interval between the 49.5th and 50.5th percentiles.
+    with pytest.raises(ValueError, match="percent"):
+        bootstrap_difference_at_level(
+            losses=_losses(seeds=(0,)), treatment="T", reference="R", metric="loss", level=level
+        )
