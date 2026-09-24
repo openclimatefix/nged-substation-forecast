@@ -217,8 +217,9 @@ written.
   November limitation.
 - **The coverage check failed with the era folds unrotated, and the fold numbers are now offset.**
   With no offset, six (site, fold, calendar month) cells failed, across the three farms: July (fold
-  3 in both 2025 and 2026) and September (fold 4 in both). The third era's fold numbers are rotated by 2 (`ERA_FOLD_OFFSETS`), which leaves the folds
-  contiguous within an era and the check with 0 failing cells.
+  3 in both 2025 and 2026) and September (fold 4 in both). The third era's fold numbers are
+  rotated by 2 (`ERA_FOLD_OFFSETS`), which leaves the folds contiguous within an era and the check
+  with 0 failing cells.
 - **The HRES served-lead evidence is read from the data, not assumed.** The script prints the
   hour-to-hour change by UTC hour and lists the hours that reach a ratio of 1.15, and states how
   many of the plan's expected handover hours (01 and 13 before 1 October 2025; 00, 06, 12 and 18
