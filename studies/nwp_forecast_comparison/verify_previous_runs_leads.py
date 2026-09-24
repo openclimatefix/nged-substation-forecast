@@ -295,7 +295,8 @@ def run_v1(*, output_dir: Path) -> bool:
 
     Returns:
         Whether the gate passed: the lowest mean absolute difference is at k = 0, for both N = 1
-        and N = 2, on wind speed.
+        and N = 2, on wind speed, and at least one (N, k) pair was actually scored (an empty
+        extract must fail the gate, not pass it vacuously).
     """
     by_run = _dynamical_gfs_by_run()
     served = pl.read_parquet(_weather_dir() / "GFS-SEAMLESS" / "previous_runs" / "combined.parquet")
@@ -307,6 +308,7 @@ def run_v1(*, output_dir: Path) -> bool:
         "|---|---|---|---|",
     ]
     gate_pass = True
+    any_scored = False
     for n in V1_DAYS_N:
         served_col = f"wind_speed_100m_previous_day{n}"
         rows = served.select("site", "time", value=pl.col(served_col)).drop_nulls()
@@ -326,6 +328,7 @@ def run_v1(*, output_dir: Path) -> bool:
         for k, mad in sorted(mad_by_k.items()):
             wind_lines.append(f"| {n} | {k} | {mad:.4f} | {len(ranks_by_k[k])} |")
         if mad_by_k:
+            any_scored = True
             best_k = min(mad_by_k, key=lambda k: mad_by_k[k])
             gate_pass = gate_pass and best_k == 0
             chosen_ranks = sorted(cell_rank[cell] for cell in ranks_by_k[best_k].values())
@@ -333,6 +336,11 @@ def run_v1(*, output_dir: Path) -> bool:
                 f"\nN={n}: lowest mean absolute difference at k={best_k}. Chosen cell ranks "
                 f"(of {len(cells)}, one per site): {chosen_ranks}.\n"
             )
+        else:
+            wind_lines.append(f"\nN={n}: nothing scored.\n")
+    if not any_scored:
+        gate_pass = False
+        wind_lines.append("\nGate fails: no offset scored any row for any N.\n")
 
     radiation_lines = [
         "| Convention | N | mean of each site's best-cell |served − candidate|, W/m² | sites |",
