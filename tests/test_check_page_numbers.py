@@ -487,3 +487,13 @@ def test_main_raises_when_a_section_number_is_not_in_the_report(
     )
     with pytest.raises(ValueError, match=r"0\.15"):
         CHECK.main()
+
+
+def test_a_section_with_no_numbers_passes_only_when_empty_is_allowed(tmp_path: Path) -> None:
+    page_path, report_path = _write(directory=tmp_path, page="## ECMWF wind\n\nNo numbers.\n")
+    assert (
+        CHECK.check_page_numbers(
+            page_path=page_path, report_path=report_path, heading=HEADING, allow_empty=True
+        )
+        == 0
+    )

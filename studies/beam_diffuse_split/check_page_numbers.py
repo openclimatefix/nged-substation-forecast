@@ -33,9 +33,10 @@ binary floating-point error cannot move a half.
 **A bare number is a weak check.** The report prints hundreds of numbers between 0 and 1, so a bare
 page number that has drifted by 0.01 often still equals some other report number. The check cannot
 say that a number sits against the right label, only that the number exists in the report at the
-page's precision. Perturbing every bare number of the ECMWF results section of the past-wind page
-by 0.01 in each direction, a share of the perturbed numbers is still accepted. The triple and pair
-checks are much stricter, because a whole row has to match.
+page's precision. Shifting each unsigned bare number of the ECMWF results section of the past-wind
+page by 0.01, in each direction, is still accepted for 91 of 130 shifts (70%). Shifting one value
+or one interval end of a triple by 0.01 is still accepted for 12 of 306 shifts (4%), because a whole
+report row has to match.
 """
 
 import argparse
@@ -424,6 +425,7 @@ def check_page_numbers(
     heading: str,
     intervals_path: Path | None = None,
     bullet_prefix: str | None = None,
+    allow_empty: bool = False,
 ) -> int:
     """Raise unless every number in a page section is in the report.
 
@@ -434,13 +436,16 @@ def check_page_numbers(
         intervals_path: The study's `intervals.parquet`, read for full-precision values, or None.
         bullet_prefix: When given, only the one list item of the section that starts with this
             text is checked.
+        allow_empty: Whether a section with no decimal numbers passes, for a section that is
+            checked in case a number is added to it later.
 
     Returns:
         How many triples, pairs and bare numbers were checked.
 
     Raises:
         ValueError: Naming every number or pair the report does not hold, or if the checked text
-            holds none at all, which would mean the heading matched the wrong section.
+            holds none at all and `allow_empty` is False, which would mean the heading matched the
+            wrong section.
     """
     section = section_text(page_text=page_path.read_text(), heading=heading)
     label = heading
@@ -452,7 +457,7 @@ def check_page_numbers(
     missing = unaccounted_numbers(section=section, report_text=report_text, exact=exact)
     triples, pairs, bare = _split_page_numbers(section=section)
     checked = len(triples) + len(pairs) + len(bare)
-    if checked == 0:
+    if checked == 0 and not allow_empty:
         msg = f"section {label!r} holds no decimal numbers to check"
         raise ValueError(msg)
     if missing:
@@ -493,6 +498,11 @@ def main() -> int:
         metavar=("HEADING", "PREFIX"),
         help="A heading, and the start of the one list item in it that is checked.",
     )
+    parser.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help="Pass a section or list item that holds no decimal numbers.",
+    )
     arguments = parser.parse_args()
     if not arguments.section and not arguments.bullet:
         parser.error("give at least one --section or --bullet")
@@ -507,6 +517,7 @@ def main() -> int:
             heading=heading,
             intervals_path=intervals,
             bullet_prefix=prefix,
+            allow_empty=arguments.allow_empty,
         )
         _LOG.info("%s: %d triples, pairs and numbers checked", prefix or heading, checked)
     return 0
