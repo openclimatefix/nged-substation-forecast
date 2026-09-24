@@ -92,12 +92,12 @@ BASELINE_NAMES: Final[dict[str, str]] = {
 
 REFERENCE_NAMES: Final[dict[DomainType, dict[str, str]]] = {
     "solar": {
-        "era5": "ERA5 (not a forecast)",
-        "live_gb_rich_xgb": "UKV + ICON-EU, with ERA5 temperature (not a forecast)",
+        "era5": "ERA5 (analysis proxy)",
+        "live_gb_rich_xgb": "UKV + ICON-EU, with ERA5 temperature (analysis proxy)",
     },
     "wind": {
-        "era5": "ERA5 (not a forecast)",
-        "live_gb_rich_xgb": "UKV + ICON-EU (not a forecast)",
+        "era5": "ERA5 (analysis proxy)",
+        "live_gb_rich_xgb": "UKV + ICON-EU (analysis proxy)",
     },
 }
 """Each reference row's label, per domain: the solar UKV-and-ICON-EU row also reads ERA5's air
@@ -142,14 +142,29 @@ EXAMPLE_METHODS: Final[dict[DomainType, tuple[str, ...]]] = {
 """The combinations the example days draw: for solar each radiation technique, for wind the two
 ways of taking the 100 m speed."""
 
-SHAPES: Final[tuple[str, ...]] = ("circle", "diamond", "square", "triangle-up")
-DASHES: Final[tuple[tuple[int, ...], ...]] = ((1, 0), (6, 3), (2, 2), (8, 2, 2, 2))
-ENS_COLOUR: Final[str] = ocf.DATA_BLUE
-BASELINE_COLOUR: Final[str] = ocf.BRAND_ORANGE
-REFERENCE_COLOUR: Final[str] = ocf.DATA_SKY
-MEASURED_COLOUR: Final[str] = ocf.BLACK_1
-"""Data Blue, Brand Orange, and Data Sky, each a main data colour of OCF's brand guidelines, colour
-the three groups; within a group, shape and dash tell the series apart."""
+WAY_COLOURS: Final[dict[str, str]] = {
+    "control": ocf.DATA_BLUE,
+    "mean": ocf.DATA_SKY,
+    "members": ocf.DATA_SKY_LIGHT,
+}
+"""Figure 1's colour for each way of using ENS, one brand colour per series so identity rests on
+colour alone."""
+
+BASELINE_COLOURS: Final[dict[str, str]] = {
+    "persistence": ocf.BRAND_ORANGE,
+    "diurnal_persistence": ocf.DATA_PURPLE,
+    "smart_persistence": ocf.DATA_GREEN,
+    "climatology": ocf.DATA_AMBER,
+}
+"""Figure 1's colour for each no-weather baseline."""
+
+REFERENCE_COLOUR: Final[str] = ocf.DATA_BURNT_ORANGE
+"""Figure 1's colour for both reference rows. The two reference rows share this colour, so they are
+told apart only by their labels beside the rules, not by colour."""
+
+MEASURED_COLOUR: Final[str] = ocf.DATA_GREEN
+"""The example days' measured-output line, distinct from black (the native-step squares) and from
+every weather technique's colour in `EXAMPLE_COLOURS`."""
 
 TIME_PANEL_HEIGHT_PX: Final[int] = 70
 
@@ -298,8 +313,8 @@ def _series_rows(*, board: dict[str, dict[str, float]]) -> pl.DataFrame:
         board: The technology's leaderboard.
 
     Returns:
-        One row per series and band, with `series`, `group`, `day`, `value`, `lower_95`, and
-        `upper_95`.
+        One row per series and band, with `series`, `group`, `colour`, `day`, `value`,
+        `lower_95`, and `upper_95`.
     """
     rows = []
     for day in BAND_DAYS:
@@ -307,6 +322,7 @@ def _series_rows(*, board: dict[str, dict[str, float]]) -> pl.DataFrame:
             {
                 "series": f"ENS: {name}",
                 "group": "ens",
+                "colour": WAY_COLOURS[way],
                 "day": day,
                 **board[ens_arm(way=way, day=day)],
             }
@@ -317,12 +333,19 @@ def _series_rows(*, board: dict[str, dict[str, float]]) -> pl.DataFrame:
                 {
                     "series": BASELINE_NAMES[baseline],
                     "group": "baseline",
+                    "colour": BASELINE_COLOURS[baseline],
                     "day": day,
                     **board[baseline_arm(name=baseline, day=day)],
                 }
             )
         rows.append(
-            {"series": "Climatology", "group": "baseline", "day": day, **board["climatology"]}
+            {
+                "series": "Climatology",
+                "group": "baseline",
+                "colour": BASELINE_COLOURS["climatology"],
+                "day": day,
+                **board["climatology"],
+            }
         )
     return pl.DataFrame(rows)
 
@@ -342,17 +365,10 @@ def _leaderboard_panel(
     """
     rows = _series_rows(board=board)
     series = rows["series"].unique(maintain_order=True).to_list()
-    colours = [ENS_COLOUR if s.startswith("ENS") else BASELINE_COLOUR for s in series]
+    series_colours = dict(zip(rows["series"].to_list(), rows["colour"].to_list(), strict=True))
+    colours = [series_colours[s] for s in series]
     ens_series = [s for s in series if s.startswith("ENS")]
     baseline_series = [s for s in series if not s.startswith("ENS")]
-    shapes = [
-        SHAPES[ens_series.index(s)] if s in ens_series else SHAPES[baseline_series.index(s)]
-        for s in series
-    ]
-    dashes = [
-        list(DASHES[ens_series.index(s)] if s in ens_series else DASHES[baseline_series.index(s)])
-        for s in series
-    ]
     offsets = {s: (index - (len(series) - 1) / 2) * 0.12 for index, s in enumerate(series)}
     data = rows.with_columns(
         x=pl.col("day") + pl.col("series").replace_strict(offsets, return_dtype=pl.Float64)
@@ -373,13 +389,11 @@ def _leaderboard_panel(
     x = alt.X(
         "x:Q",
         scale=x_scale,
-        title="Horizon: days after the ENS run's own day",
+        title="Forecast horizon in days",
         axis=alt.Axis(values=list(BAND_DAYS), format="d", grid=False),
     )
     y = alt.Y("value:Q", scale=y_scale, title=wrapped(text=MAE_TITLE, width=40))
     colour = alt.Color("series:N", scale=alt.Scale(domain=series, range=colours), legend=None)
-    shape = alt.Shape("series:N", scale=alt.Scale(domain=series, range=shapes), legend=None)
-    dash = alt.StrokeDash("series:N", scale=alt.Scale(domain=series, range=dashes), legend=None)
     reference_rules = (
         alt.Chart(references)
         .mark_rule(color=REFERENCE_COLOUR, strokeWidth=2, aria=False)
@@ -393,7 +407,7 @@ def _leaderboard_panel(
     lines = (
         alt.Chart(data.filter(pl.col("series") != "Climatology"))
         .mark_line(strokeWidth=1.5, aria=False)
-        .encode(x=x, y=y, color=colour, strokeDash=dash, detail="series:N")  # ty: ignore[unresolved-attribute]
+        .encode(x=x, y=y, color=colour, detail="series:N")  # ty: ignore[unresolved-attribute]
     )
     intervals = (
         alt.Chart(data)
@@ -410,7 +424,7 @@ def _leaderboard_panel(
     points = (
         alt.Chart(data)
         .mark_point(filled=True, size=55, opacity=1, aria=False)
-        .encode(x=x, y=y, color=colour, shape=shape, tooltip=tooltip)  # ty: ignore[unresolved-attribute]
+        .encode(x=x, y=y, color=colour, tooltip=tooltip)  # ty: ignore[unresolved-attribute]
     )
     panel = alt.LayerChart(
         layer=[reference_rules, reference_text, lines, intervals, points],
@@ -422,13 +436,15 @@ def _leaderboard_panel(
         return panel
     return alt.vconcat(
         _key(
-            title="ENS forecasts", labels=ens_series, colour=ENS_COLOUR, shapes=SHAPES, width=width
+            title="ENS forecasts",
+            labels=ens_series,
+            colours=[series_colours[s] for s in ens_series],
+            width=width,
         ),
         _key(
             title="No-weather baselines",
             labels=baseline_series,
-            colour=BASELINE_COLOUR,
-            shapes=SHAPES,
+            colours=[series_colours[s] for s in baseline_series],
             width=width,
         ),
         panel,
@@ -436,16 +452,13 @@ def _leaderboard_panel(
     )
 
 
-def _key(
-    *, title: str, labels: list[str], colour: str, shapes: tuple[str, ...], width: int
-) -> alt.LayerChart:
-    """Draw one row of a key: a coloured point of each shape and its label.
+def _key(*, title: str, labels: list[str], colours: list[str], width: int) -> alt.LayerChart:
+    """Draw one row of a key: a coloured point of each series, one shared shape, and its label.
 
     Args:
         title: The row's title.
         labels: Each entry's label.
-        colour: The entries' colour.
-        shapes: Each entry's shape, in order.
+        colours: Each entry's own colour, in the same order as `labels`.
         width: The row's width.
 
     Returns:
@@ -455,14 +468,14 @@ def _key(
     data = pl.DataFrame(
         {
             "label": labels,
-            "shape": list(shapes[: len(labels)]),
+            "colour": colours,
             "x": [6 + index * slot for index in range(len(labels))],
         }
     )
     points = (
         alt.Chart(data)
-        .mark_point(filled=True, size=55, opacity=1, color=colour, aria=False)
-        .encode(x=alt.X("x:Q", scale=None), y=alt.value(8), shape=alt.Shape("shape:N", scale=None))  # ty: ignore[unresolved-attribute]
+        .mark_point(filled=True, size=55, opacity=1, aria=False)
+        .encode(x=alt.X("x:Q", scale=None), y=alt.value(8), color=alt.Color("colour:N", scale=None))  # ty: ignore[unresolved-attribute]
     )
     text = (
         alt.Chart(data)
@@ -508,9 +521,9 @@ def leaderboard(
             (
                 "No-weather baselines read the telemetry up to 09:00 UTC on the run's own day, "
                 "when the live service can first read the run, or up to 00 UTC for day 0. "
-                "Climatology does not depend on the horizon. The two light blue rules are not "
-                "forecasts: ERA5, and UKV with ICON-EU, the best of the inputs the blending page "
-                "compared, scored on the same hours."
+                "Climatology does not depend on the horizon. The two burnt-orange rules are an "
+                "analysis proxy, not a forecast: ERA5, and UKV with ICON-EU, the best of the "
+                "inputs the blending page compared, scored on the same hours."
             ),
             f"{DOTS} {CAPACITY}",
             f"{SCOPES['solar']} {SCOPES['wind']}",
@@ -537,6 +550,7 @@ def _contrast_panel(
     better_label: str,
     condition_title: str,
     keys: bool,
+    condition_colours: Sequence[str] | None = None,
 ) -> alt.LayerChart | alt.VConcatChart:
     """Draw one technology's contrasts, one row per band and one mark per condition.
 
@@ -550,6 +564,8 @@ def _contrast_panel(
         better_label: What the negative direction means.
         condition_title: The key's title.
         keys: Whether to label the zero rule and the better direction.
+        condition_colours: Each condition's own colour, drawn solid with one shared marker shape.
+            Leave unset for `interval_panel`'s default family-and-shade encoding.
 
     Returns:
         The panel.
@@ -574,6 +590,7 @@ def _contrast_panel(
         zero_label=zero_label,
         better_label=better_label,
         conditions=[condition for condition, _ in pairs],
+        condition_colours=condition_colours,
         condition_title=condition_title,
         panel_title=domain.capitalize(),
         reference_labels=keys,
@@ -614,9 +631,10 @@ def against_day0(*, contrasts: pl.DataFrame, title: str) -> alt.VConcatChart:
         The figure.
     """
     days = BAND_DAYS[1:]
-    # The ensemble mean is the planned arm, so it takes the first, fully-shaded condition; the
-    # control member and member-by-member are exploratory here and take the light shade.
+    # The ensemble mean is the planned arm; the control member and member-by-member are
+    # exploratory here. All three are told apart by colour alone, in this order.
     emphasis_order = ("mean", "control", "members")
+    emphasis_colours = (ocf.DATA_BLUE, ocf.DATA_SKY, ocf.BRAND_ORANGE)
     panels = []
     for domain in DOMAINS:
         pairs = [
@@ -635,6 +653,7 @@ def against_day0(*, contrasts: pl.DataFrame, title: str) -> alt.VConcatChart:
                 better_label="better than day 0",
                 condition_title="Way of using ENS",
                 keys=domain == "solar",
+                condition_colours=emphasis_colours,
             )
         )
     return figure(
@@ -1040,7 +1059,7 @@ def _day_panels(
     )
     native_points = (
         alt.Chart(series.filter(pl.col("name") == names[0]))
-        .mark_point(filled=True, size=45, shape="square", aria=False, color=ocf.BLACK_1)
+        .mark_point(filled=True, size=45, shape="square", opacity=1, aria=False, color=ocf.BLACK_1)
         .encode(x=x, y="value:Q")  # ty: ignore[unresolved-attribute]
     )
     top = alt.LayerChart(
@@ -1076,7 +1095,11 @@ def _day_panels(
                 scale=alt.Scale(domain=[0, 110]),
             ),
         )
-        .properties(width=width, height=80)
+        .properties(
+            width=width,
+            height=80,
+            title=alt.TitleParams("Measured output", anchor="start", fontSize=12),
+        )
     )
     return alt.vconcat(top, bottom, spacing=6)
 
@@ -1115,7 +1138,16 @@ def example_days(
                 key,
                 pair,
                 spacing=6,
-                title=alt.TitleParams(domain.capitalize(), anchor="start", fontSize=14),
+                title=alt.TitleParams(
+                    domain.capitalize(),
+                    anchor="start",
+                    fontSize=14,
+                    subtitle=[
+                        "Top: ENS's forecast, upsampled to hourly by each technique.",
+                        "Bottom: what the generator produced that day.",
+                    ],
+                    subtitleFontSize=11,
+                ),
             )
         )
     return (
@@ -1125,11 +1157,10 @@ def example_days(
             title=title,
             subtitle=[
                 (
-                    "Top of each pair: the ensemble mean of one day at one generator, upsampled to "
-                    "hourly each way; squares mark ENS's own steps, each radiation value the mean "
-                    "over the step ending at the square. Bottom: that generator's measured hourly "
-                    "output. The same calendar day at day 1 and day 7."
+                    "Squares mark ENS's own native steps. For solar, each value is the mean "
+                    "radiation over the step ending at that square."
                 ),
+                "Each row pairs the same calendar day at day 1 and at day 7.",
                 (
                     "Days chosen by rule from measured output alone: for solar the April-to-"
                     "September day with the largest mean hour-to-hour change, for wind the day "
@@ -1393,6 +1424,7 @@ def per_generator(*, title: str, number: int) -> alt.VConcatChart:
                 condition_title="Horizon",
                 panel_title=domain.capitalize(),
                 keys=domain == "solar",
+                solid=True,
             )
         )
     return figure(
