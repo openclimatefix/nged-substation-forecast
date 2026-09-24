@@ -186,3 +186,49 @@ artefact for station identifiers and coordinates runs before each push.
 
 Both plan reviews, then both diff reviews, two science reviews, the persona reviews (including a
 Met Office observations-team member), a prose sweep and a pre-merge check of the rendered HTML.
+
+## Decisions made during implementation
+
+These decisions were taken while writing `studies/beam_diffuse_split/station_wind_arms.py`, where
+this plan was silent. They are recorded before the first fit.
+
+- **Bonferroni family.** The plan asks for adjusted intervals for two contrasts. Each contrast is
+  reported at two hyperparameter settings, so the family is 4 planned intervals and the adjusted
+  level is 98.75% (0.05 / 4 in each tail pair), not the 97.5% that two intervals alone would give.
+  The resampler is the month-and-seed resampling of `studies.bootstrap`, and the script asserts that
+  it reproduces `bootstrap_difference`'s 95% interval before using it at the adjusted level.
+- **Pre-fit mode.** The script has a `--checks-only` flag that runs every pre-fit check and prints
+  it, fitting and writing nothing, so the checks can be run and committed before the first fit.
+- **Copied helpers.** The interval log, fingerprint, script-commit check, calendar-month coverage
+  check and the Bonferroni resampler are copied in the smallest form from PR #885's
+  `ens_hres_past_wind.py`, each marked as mirroring it. They are replaced by imports after the
+  rebase onto `main`.
+- **Coverage table is pooled.** The calendar-month coverage table prints rows per (fold, calendar
+  month) summed over the three farms, never per farm, because a per-farm row count would carry the
+  hours a station misses. The raise on an uncovered calendar month uses the per-farm cells.
+- **Per-farm tables carry no counts.** Per-farm error and contrast rows print the error, its
+  interval and the folds agreeing, and no row or month count; `intervals.parquet` stores null counts
+  for per-farm intervals.
+- **k=3 arm.** The mean speed is the mean of the speeds of whichever of the three nearest eligible
+  stations have an observed hour. The direction is that of the mean of the stations' wind vectors
+  (speed times sine and cosine, a calm hour contributing zero), normalised to a unit vector, and
+  sine and cosine are both zero when the mean vector is zero. `station_k3_wind` is compared with
+  `station_wind`, as the only exploratory k=3 contrast.
+- **Exploratory contrasts.** `ukv_station_wind` minus `ukv_wind` is reported at both settings. The
+  k=3 contrast is reported at the primary setting only, since the k=3 arm is not fitted at the
+  second setting.
+- **August-to-December restriction.** S1 and S2 scored on August to December only restrict the
+  scored rows of the fitted arms (models trained on every month), at both settings. This is cheap
+  and exploratory.
+- **Hour-offset sign.** An offset of +1 hour pairs UKV at time `t` with the station reading stamped
+  `t` + 1 hour. The script raises if the correlation of the station's speed with UKV's 10 m speed
+  does not peak at offset 0.
+- **Station-hour join.** A station hour is joined to the farm's hour of the same UTC label, with no
+  shift; the check above is what tests that this is the right alignment.
+- **Shear control.** Farm W1's fold 0, seed 0, at the primary setting, fitted on the raw and the
+  speed scaled by (100 / 10) ^ (1 / 7); the script prints the largest prediction difference in MW.
+- **Station facts printed.** Pooled ranges over the three farms only: distances (nearest and third
+  nearest), coverage, nearer stations skipped, and missing-hour share over eligible (farm, station)
+  pairs, plus the counts of rows before and after the station rule.
+- **Pooled caveat line.** Every pooled table is preceded by "Three wind farms are few independent
+  sites; N rows, M months."
