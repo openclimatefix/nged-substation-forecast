@@ -205,6 +205,15 @@ EXPLORATORY_PRODUCT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
 )
 """ICON-DREAM-EU's wind against the three remaining products, exploratory."""
 
+PRODUCT_RANKING_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("icon_eu_wind", "era5_wind"),
+    ("icon_d2_wind", "icon_eu_wind"),
+    ("icon_eu_wind", "ukv_wind"),
+)
+"""Whether `wind_products.py`'s ranking of the five original products still holds on this study's
+10-day-shorter row set, exploratory. Every one of these five arms is already refit on this row set
+(`jobs()`), so this reuses their existing losses rather than fitting anything new."""
+
 LEVELS_CONTRAST: Final[tuple[str, str]] = (f"{PRODUCT}_levels", f"{PRODUCT}_wind")
 """Whether the two extra levels (shear) add skill over the hub-height-only arm, exploratory.
 
@@ -1187,6 +1196,7 @@ def _report(
             *EXPLORATORY_PRODUCT_CONTRASTS,
             LEVELS_CONTRAST,
             *LEVELS_VS_OTHERS_CONTRASTS,
+            *PRODUCT_RANKING_CONTRASTS,
             *SPEED_ONLY_CONTRASTS,
         )
     ]
