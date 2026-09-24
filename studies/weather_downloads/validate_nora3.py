@@ -4,8 +4,9 @@ One-off throwaway script for
 <https://github.com/openclimatefix/nged-substation-forecast/issues/841>. It reads
 `data/studies/weather/NORA3/NORA3_wind.parquet` and runs the checks in `CHECK_NAMES`: heights, row
 count against hours x heights x cells, duplicate keys, month-by-month contiguity of the hourly time
-axis, the first and last hour, the months against the month cache and the lineage note, null and NaN
-counts, value ranges, and floors that catch double-scaled data.
+axis, the first and last hour against `FIRST_MONTH` and `LAST_MONTH`, the months against the month
+cache and the lineage note, the step across the join between the aggregated dataset and the monthly
+files, null and NaN counts, value ranges, and floors that catch double-scaled data.
 
 **The script prints one PASS or FAIL line per check and no count.** Row, cell, and hour counts
 reveal the size of the private trial-area box, so the measured numbers go only to `validation.json`
@@ -17,7 +18,7 @@ Run it with `uv run python studies/weather_downloads/validate_nora3.py`.
 import calendar
 import json
 import sys
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, Final
 
@@ -27,6 +28,24 @@ from paths import WEATHER_DOWNLOADS_DIR
 PRODUCT_DIR: Final[Path] = WEATHER_DOWNLOADS_DIR / "NORA3"
 KEY_COLUMNS: Final[list[str]] = ["time", "height_m", "y_index", "x_index"]
 HEIGHTS_M: Final[set[int]] = {50, 100}
+FIRST_MONTH: Final[str] = "2015-01"
+LAST_MONTH: Final[str] = "2026-08"
+"""The range the extended download is meant to cover: the canonical file must start at the first
+hour of `FIRST_MONTH` and end at the last hour of `LAST_MONTH`. Edit `LAST_MONTH` when extending."""
+
+SEAM_LAST_HOUR: Final[datetime] = datetime(2025, 1, 31, 23, tzinfo=UTC).replace(tzinfo=None)
+"""The aggregated dataset's last hour. The next hour comes from a monthly file."""
+
+SEAM_WINDOW: Final[tuple[datetime, datetime]] = (
+    datetime(2025, 1, 1, tzinfo=UTC).replace(tzinfo=None),
+    datetime(2025, 2, 28, 23, tzinfo=UTC).replace(tzinfo=None),
+)
+"""Hours around the join over which the ordinary hour-to-hour change is measured."""
+
+SEAM_MAX_RATIO: Final[float] = 1.5
+"""The step across the join may not exceed this multiple of the 99th percentile of the ordinary
+steps in `SEAM_WINDOW`."""
+
 MAX_PLAUSIBLE_SPEED_M_S: Final[float] = 80.0
 """Above any wind speed a 3 km reanalysis serves at 50 m or 100 m over land."""
 
@@ -46,6 +65,7 @@ CHECK_NAMES: Final[tuple[str, ...]] = (
     "time_axis_contiguous_per_month",
     "first_hour",
     "last_hour",
+    "seam_continuity",
     "months_match_cache_and_lineage",
     "no_nulls",
     "nan_fraction",
@@ -98,20 +118,73 @@ def _time_failures(*, frame: pl.DataFrame, hours: pl.Series) -> dict[str, str]:
         )
 
     first = _hour_stamp(hours=hours, index=0)
-    if (first.day, first.hour, first.minute, first.second) != (1, 0, 0, 0):
-        failures["first_hour"] = f"{first} is not midnight on the first of a month"
-    last_year, last_month = int(months_lineage[-1][:4]), int(months_lineage[-1][5:])
+    expected_first = datetime(int(FIRST_MONTH[:4]), int(FIRST_MONTH[5:]), 1, tzinfo=UTC).replace(
+        tzinfo=None
+    )
+    if first != expected_first:
+        failures["first_hour"] = f"{first}, expected {expected_first}"
+    last_year, last_month = int(LAST_MONTH[:4]), int(LAST_MONTH[5:])
     expected_last = datetime(
-        last_year,
-        last_month,
-        calendar.monthrange(last_year, last_month)[1],
-        23,
-        tzinfo=UTC,
+        last_year, last_month, calendar.monthrange(last_year, last_month)[1], 23, tzinfo=UTC
     ).replace(tzinfo=None)
     last = _hour_stamp(hours=hours, index=-1)
     if last != expected_last:
         failures["last_hour"] = f"{last}, expected {expected_last}"
     return failures
+
+
+def _mean_abs_step_by_hour(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Return, per hour, the mean absolute wind speed change from the hour before.
+
+    Args:
+        frame: The combined NORA3 wind rows, restricted to the hours of interest.
+
+    Returns:
+        One row per hour after the first, with `time` and `mean_abs_step`, the mean over cells
+        and heights.
+    """
+    return (
+        frame.sort("time")
+        .with_columns(
+            step=(
+                pl.col("wind_speed_m_s")
+                - pl.col("wind_speed_m_s").shift(1).over("height_m", "y_index", "x_index")
+            ).abs()
+        )
+        .group_by("time")
+        .agg(mean_abs_step=pl.col("step").mean())
+        .sort("time")
+        .drop_nulls()
+    )
+
+
+def _seam_report(*, frame: pl.DataFrame) -> tuple[dict[str, float], dict[str, str]]:
+    """Compare the wind speed step across the aggregate-to-monthly-file join with ordinary steps.
+
+    Args:
+        frame: The combined NORA3 wind rows.
+
+    Returns:
+        The measured steps and a failed check's name mapped to a detail message.
+    """
+    window = frame.filter(pl.col("time").is_between(*SEAM_WINDOW))
+    steps = _mean_abs_step_by_hour(frame=window)
+    seam_hour = SEAM_LAST_HOUR + timedelta(hours=1)
+    seam_step = float(steps.filter(pl.col("time") == seam_hour)["mean_abs_step"].item())
+    ordinary = steps.filter(pl.col("time") != seam_hour)["mean_abs_step"]
+    reference = float(ordinary.quantile(0.99))  # ty: ignore[invalid-argument-type]
+    measured = {
+        "seam_step_m_s": seam_step,
+        "ordinary_step_p99_m_s": reference,
+        "ordinary_step_median_m_s": float(ordinary.median()),  # ty: ignore[invalid-argument-type]
+    }
+    failures: dict[str, str] = {}
+    if seam_step > SEAM_MAX_RATIO * reference:
+        failures["seam_continuity"] = (
+            f"step across the join {seam_step:.3f} m/s exceeds {SEAM_MAX_RATIO} x the ordinary "
+            f"99th percentile step {reference:.3f} m/s"
+        )
+    return measured, failures
 
 
 def _column_failures(*, frame: pl.DataFrame) -> tuple[dict[str, Any], dict[str, str]]:
@@ -183,6 +256,8 @@ def validate(*, frame: pl.DataFrame) -> dict[str, Any]:
     if n_duplicates:
         failures["duplicate_keys"] = f"{n_duplicates} duplicate (time, height, y, x) keys"
     failures |= _time_failures(frame=frame, hours=hours)
+    seam, seam_failures = _seam_report(frame=frame)
+    failures |= seam_failures
     stats, column_failures = _column_failures(frame=frame)
     failures |= column_failures
 
@@ -193,6 +268,7 @@ def validate(*, frame: pl.DataFrame) -> dict[str, Any]:
         "last_hour": str(hours[-1]),
         "cells": n_cells,
         "heights_m": sorted(heights),
+        "seam": seam,
         "columns": stats,
         "duplicate_keys": n_duplicates,
         "failures": failures,
