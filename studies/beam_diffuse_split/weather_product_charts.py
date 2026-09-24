@@ -1495,9 +1495,12 @@ def _all_panel_leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) ->
         panels=[panel],
         number=15,
         figure_planning=None,
-        title="CAMS and SARAH-3 still lead on the all panel's shorter, more recent row set",
+        title="CAMS and SARAH-3 still lead when four more weather models are added",
         subtitle=[
-            "Each product's own mean absolute error, sorted best first, on the all panel.",
+            (
+                "Each product's own mean absolute error, sorted best first, on the 40,243 "
+                "generator-hours all 12 products share."
+            ),
             DOTS,
             (
                 "The intervals are wide mainly because every product's error swings together "
@@ -1549,17 +1552,17 @@ def _all_panel_contrasts(*, contrasts: pl.DataFrame, errors: dict[str, float]) -
         number=16,
         figure_planning="planned",
         title=(
-            "KNMI and DMI HARMONIE-AROME both trail their ICON rival; IFS-HRES against ICON-EU "
-            "is not resolved"
+            "HARMONIE-AROME, as Open-Meteo serves it from DMI's and KNMI's feeds, trails the ICON "
+            "model of similar grid spacing; IFS-HRES against ICON-EU is not resolved"
         ),
         subtitle=[
             "The three contrasts named in the study plan before any result existed.",
             f"{DOTS} {CAPACITY}",
             ALL_PANEL_SCOPE,
             (
-                "DMI's own run interval is measured at 3 hours, matching ICON-D2's cycle, so "
-                "the two run at matched leads throughout. KNMI's own run interval is not "
-                "measured, so its contrast mixes weather-model skill with lead."
+                "DMI's feed updates every 3 hours, as ICON-D2 does, so the two sit at the same "
+                "served lead on every row. KNMI's feed is documented as hourly but not measured "
+                "here, so its contrast mixes weather-model skill with lead."
             ),
         ],
     )
