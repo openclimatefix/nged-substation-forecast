@@ -199,9 +199,11 @@ PLANNED_CONTRASTS: Final[tuple[tuple[str, str, str], ...]] = (
 
 EXPLORATORY_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("ukv_station_wind", "ukv_wind"),
+    ("ukv_padded_wind", "ukv_wind"),
     ("station_k3_wind", "station_wind"),
+    ("station_k3_wind", "era5_10m_wind"),
 )
-"""Exploratory contrasts. The first compares 7 wind columns with 4, so it is not equal-count."""
+"""Exploratory contrasts. The first two compare 7 wind columns with 4, so neither is equal-count."""
 
 POST_REVIEW_SENSITIVITY_ARMS: Final[tuple[str, ...]] = (
     "station_speed_only",
@@ -1934,8 +1936,9 @@ def _report(
         "#### Exploratory results",
         "",
         (
-            "The contrasts below were not planned. `ukv_station_wind − ukv_wind` compares 7 wind "
-            "columns with 4, so it is not an equal-column-count contrast."
+            "The contrasts below were not planned. `ukv_station_wind − ukv_wind` and "
+            "`ukv_padded_wind − ukv_wind` compare 7 wind columns with 4, so neither is an "
+            "equal-column-count contrast."
         ),
         "",
     ]
@@ -1946,7 +1949,7 @@ def _report(
             "",
             *_contrast_table(
                 losses=scope,
-                pairs=EXPLORATORY_CONTRASTS if setting == "pooled" else EXPLORATORY_CONTRASTS[:1],
+                pairs=EXPLORATORY_CONTRASTS if setting == "pooled" else EXPLORATORY_CONTRASTS[:2],
                 section="exploratory",
                 setting=setting,
                 log=log,
