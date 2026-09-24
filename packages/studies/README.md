@@ -47,6 +47,10 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
   carries information a separation model applied to the total would not.
 - `power` — the half-hourly-to-hourly aggregation, on the period-ending convention
   `contracts.PowerTimeSeries` states.
+- `midas` — reading the Met Office's MIDAS Open station files (hourly global irradiance in W m⁻²,
+  named hourly-weather columns, and the station coordinates, held in memory only), repairing the
+  three defects those files carry, and choosing each site's `k` nearest stations that cover enough of
+  the site's hours, by a written rule that reads no score.
 - `grid_sampling` — the nearest grid cell's value at each site on a projected grid, and the nearest
   of a set of cell centres by great-circle distance.
 - `baselines` — power forecasts that read no weather forecast: persistence, diurnal persistence,
