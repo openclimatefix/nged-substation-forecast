@@ -52,8 +52,10 @@ review, because the hours a station misses are public in MIDAS and could be matc
   and the 12 stations that carry no wind at all are never candidates. Quality-control flag 106
   marks whole stations, so no row is ever filtered on a flag, and every candidate is treated alike:
   eligible only by the coverage rule below.
-- Wind columns: `wind_speed_m_s` (knots converted, 10 m; a 10-minute mean ending at `time` by WMO
-  convention, to be verified in the fact check; whole knots, so 0.51 m/s steps, and direction in
+- Wind columns: `wind_speed_m_s` (knots converted, nominal 10 m; the SYNOP 10-minute mean wind is
+  "10-minute average, HH-20 to HH-10" in the Met Office Surface Data Users Guide, so the reading sits
+  about 15 minutes before the centre of the power hour; the averaging window of the AWSHRLY stations
+  is not documented in what was read; whole knots, so 0.51 m/s steps, and direction in
   10-degree steps) and `wind_direction` (degrees, north written as 360, calm as 0). Every wind row
   that carries a unit code has code 4 (anemometer, knots), so no estimated row enters; the report
   prints that check. The calm flag (direction 0) is set before any normalisation of 360 to 0. A calm
@@ -149,9 +151,10 @@ data cannot be had live.
 ## Product facts to verify before writing
 
 A fact check (Sonnet, then an Opus reviewer) verifies from the Met Office and CEDA documentation:
-the MIDAS Open release schedule and why the data end in December 2025, that MIDAS hourly wind is a
-10-minute mean ending at the hour (the wording in the user guide), anemometer height (10 m
-standard), and unit codes. Nothing in the page states a station's identity.
+the MIDAS Open release schedule and why the data end in December 2025, the averaging window of MIDAS
+hourly wind (the user guide says "10-minute average, HH-20 to HH-10" for SYNOP), the anemometer
+height (10 m over open level terrain is the standard exposure, and a station with another exposure
+has an "effective height"), and unit codes. Nothing in the page states a station's identity.
 
 ## Files
 
@@ -232,3 +235,28 @@ this plan was silent. They are recorded before the first fit.
   pairs, plus the counts of rows before and after the station rule.
 - **Pooled caveat line.** Every pooled table is preceded by "Three wind farms are few independent
   sites; N rows, M months."
+
+## Post-review additions (exploratory, added after the first results)
+
+These additions were decided after the first results were seen and the first science review had
+read them, so all of them are post hoc. None replaces a planned contrast. Refits are saved in
+`losses_post_review.parquet`, with its own fingerprint, and `losses.parquet` and its fingerprint
+stay byte-for-byte as they were.
+
+1. **Speed-only pair (refit, both settings).** `station_speed_only` against `era5_10m_speed_only`:
+   the shared columns plus one wind column each, the station's speed and ERA5's 10 m speed. Both
+   arms carry 1 wind column. This tests S1 without either source's direction columns, because
+   ERA5's 100 m direction is a smooth hub-height field and the station's direction is rounded to 10
+   degrees.
+2. **UKV plus ICON-D2 (refit, both settings).** `ukv_icon_d2_wind`: UKV's 4 page wind columns plus
+   ICON-D2's hub speed and the sine and cosine of its hub direction (7 wind columns). The contrast
+   `ukv_station_wind` minus `ukv_icon_d2_wind` has 7 wind columns on each side and asks whether a
+   station adds more than a second forecast product does.
+3. **Report-only additions (no refit).** S1 and S2 scored on January to July beside the August to
+   December rows already reported, with rows and months; a calendar-month-balanced estimate of S1
+   and S2 (the mean over calendar months of each calendar month's mean difference) with a bootstrap
+   interval that resamples months; and a per-calendar-month table of S1 and S2. The report also
+   states the pooled lower bound of the nearest stations' coverage instead of a range, the pooled
+   mean direction disagreement between the station's 10 m direction and ERA5's 100 m direction,
+   the difference `era5_10m_wind` minus `era5_wind`, and the note that product speeds on disk are
+   km/h while station speeds are m/s.
