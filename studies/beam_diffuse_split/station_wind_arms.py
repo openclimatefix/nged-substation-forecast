@@ -2,20 +2,19 @@
 
 One-off throwaway script, phase 2 of the past-wind study
 <https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-wind/>.
-The Met Office's MIDAS Open archive holds hourly 10 m wind from 18 stations in and around the trial
-area. This script gives an XGBoost model per wind farm the nearest wind-reporting station's wind,
-and compares it with ERA5's 10 m wind (S1), and a blend of UKV and the station with UKV padded to
-the same number of columns (S2).
+The Met Office's MIDAS Open archive holds hourly 10 m wind from stations in and around the trial
+area, and `candidate_stations` derives which ones from the download. This script gives an XGBoost
+model per wind farm the nearest wind-reporting station's wind, and compares it with ERA5's 10 m wind
+(S1), and a blend of UKV and the station with UKV padded to the same number of columns (S2).
 
-**Provenance.** The plan `plans/station-wind-arms.md`, which fixes the two planned contrasts S1 and
-S2, the row rule and the controls, was committed (24870b53) before the first fit. The section
-"Decisions made during implementation" in that plan was committed, with this script, before the
-first fit as well. The exploratory items are the k=3 arm, the shear control, the August-to-December
-restriction, and `ukv_station_wind - ukv_wind`.
+**Provenance.** The two planned contrasts S1 and S2, the row rule and the controls were committed
+(7bc23521, revised in 24870b53) before the first fit, and the implementation decisions were
+committed with this script (021d0852) before the first fit as well. The exploratory items are the
+k=3 arm, the shear control, the August-to-December restriction, and `ukv_station_wind - ukv_wind`.
 
-**Post-review additions.** After the first results and the first science review, the plan gained a
-section "Post-review additions (exploratory, added after the first results)", committed before the
-refit. Everything in it is post hoc and exploratory: the arms `station_speed_only`,
+**Post-review additions.** After the first results and the first science review, the exploratory
+additions were written down (750b130d) before the refit, and the script gained them in 72d969b8.
+Everything in them is post hoc and exploratory: the arms `station_speed_only`,
 `era5_10m_speed_only` and `ukv_icon_d2_wind`, fitted at both settings and saved apart from the main
 losses, and the report-only January-to-July, calendar-month-balanced and per-calendar-month
 tables.
@@ -40,6 +39,10 @@ exactly these rows, including every gridded product's wind arm, which is refitte
 read from a published loss. The window holds one UKV era, so `era_code` is constant and is kept so
 that every arm carries the page's columns.
 
+**Candidate stations.** `candidate_stations` returns every station in the MIDAS Open hourly-weather
+file that has at least one wind speed in metres per second. The stations that return one reading a
+day carry no such speed, so they are never candidates.
+
 **Station rule.** `studies.midas.select_nearest_stations` with `k=1` and `min_coverage=0.9` of the
 farm's required hours (the page's rows in the window). The rule reads no score and no target.
 
@@ -54,11 +57,13 @@ farm's required hours (the page's rows in the window). The rule reads no score a
 - `station_k3_wind` (exploratory): the mean speed and the mean-wind-vector direction of the three
   nearest eligible stations.
 
-Run it with `uv run python studies/beam_diffuse_split/station_wind_arms.py`. `--checks-only` runs
-the pre-fit checks and stops. `--fit-post-review` fits only the post-review arms, then rebuilds the
-report. `--report-only` rebuilds `report.md` from the saved `losses.parquet` and
-`losses_post_review.parquet`, and raises if either saved fingerprint no longer matches. A fresh run
-raises on an uncommitted change to this script and refuses to overwrite an output that exists.
+Run it with `uv run python studies/beam_diffuse_split/station_wind_arms.py`, which fits every arm,
+including the three added after the first results. `--checks-only` runs the pre-fit checks and
+stops. `--fit-post-review` only adds those three arms beside main losses fitted earlier, then
+rebuilds the report. `--report-only` fits nothing except the two-fit shear control: it rebuilds
+`report.md` from the saved `losses.parquet` and `losses_post_review.parquet`, and raises if either
+saved fingerprint no longer matches. Every run that writes `report.md` raises on an uncommitted
+change to this script, and a run that fits refuses to overwrite an output that exists.
 """
 
 import argparse
@@ -68,6 +73,7 @@ import math
 import subprocess
 import sys
 from dataclasses import dataclass, field
+from functools import cache
 from pathlib import Path
 from typing import Final, TypedDict
 
@@ -123,33 +129,10 @@ STATION_METADATA_PATH: Final[Path] = (
 )
 """The private hourly-weather station metadata, read in memory only."""
 
-CANDIDATE_STATIONS: Final[tuple[str, ...]] = (
-    "00370",
-    "00373",
-    "00384",
-    "00386",
-    "00393",
-    "00395",
-    "00405",
-    "00409",
-    "00421",
-    "00456",
-    "00461",
-    "00554",
-    "00556",
-    "00583",
-    "00595",
-    "16725",
-    "61986",
-    "62265",
-)
-"""The 18 hourly-weather stations that report wind. The 8 stations with one 09:00 return a day are
-excluded, and the 12 stations that carry no wind are never candidates."""
-
-WINDOW_START: Final[pl.Expr] = pl.datetime(2024, 8, 12, time_zone="UTC")
+WINDOW_START: Final[pl.Expr] = pl.datetime(year=2024, month=8, day=12, time_zone="UTC")
 """The first hour of the row set."""
 
-WINDOW_END_EXCLUSIVE: Final[pl.Expr] = pl.datetime(2026, 1, 1, time_zone="UTC")
+WINDOW_END_EXCLUSIVE: Final[pl.Expr] = pl.datetime(year=2026, month=1, day=1, time_zone="UTC")
 """The row set ends on 2025-12-31, because the MIDAS Open download holds calendar years to 2025."""
 
 MIN_COVERAGE: Final[float] = 0.9
@@ -225,8 +208,11 @@ HEIGHT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
 """ERA5's 10 m arms against the arm that also has the hub-height speed; primary setting only,
 because `era5_wind` is not fitted at the second setting. Neither pair has equal column counts."""
 
-BONFERRONI_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / (2 * len(PLANNED_CONTRASTS)))
-"""The confidence level, in percent, adjusted for 4 planned intervals (2 contrasts, 2 settings)."""
+N_SETTINGS: Final[int] = 2
+"""The hyperparameter settings each planned contrast is fitted at."""
+
+BONFERRONI_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / (N_SETTINGS * len(PLANNED_CONTRASTS)))
+"""The confidence level, in percent, adjusted for every planned interval (contrast and setting)."""
 
 AUGUST_TO_DECEMBER: Final[tuple[int, ...]] = (8, 9, 10, 11, 12)
 """The calendar months that occur in both years of the window."""
@@ -284,7 +270,8 @@ POOLED_CAVEAT: Final[str] = (
 
 
 # ---------------------------------------------------------------------------------------------
-# Helpers that mirror PR #885's `ens_hres_past_wind.py`; replaced by imports after the rebase.
+# Helpers that mirror PR #885's `ens_hres_past_wind.py`; to be replaced by imports once that PR
+# has merged, and untested in `packages/studies` until then.
 # ---------------------------------------------------------------------------------------------
 
 
@@ -426,7 +413,7 @@ def _bootstrap_percentiles(
         drawn = generator.integers(0, len(rows_by_month), size=len(rows_by_month))
         rows = np.concatenate([rows_by_month[index] for index in drawn])
         resampled[resample] = differences[seed_index, rows].mean()
-    low, high = np.percentile(resampled, percentiles)
+    low, high = np.percentile(resampled, q=percentiles)
     return float(low), float(high)
 
 
@@ -485,6 +472,23 @@ def _raise_on_uncovered_months(*, coverage: pl.DataFrame) -> None:
 # ---------------------------------------------------------------------------------------------
 
 
+@cache
+def candidate_stations() -> tuple[str, ...]:
+    """Return every station in the hourly-weather download that has a wind speed, sorted.
+
+    The rule: a station is a candidate if at least one of its rows in the MIDAS Open hourly-weather
+    file holds a wind speed in metres per second. The stations that return one reading a day, and
+    the stations that carry no wind, hold no such row, so neither kind is a candidate.
+
+    Returns:
+        The sorted station identifiers. The identifiers are never printed or saved.
+    """
+    speeds = read_hourly_weather(path=HOURLY_WEATHER_PATH, columns=["wind_speed_m_s"])
+    return tuple(
+        sorted(speeds.filter(pl.col("wind_speed_m_s").is_not_null())["src_id"].unique().to_list())
+    )
+
+
 class StationRows(TypedDict):
     """The station data the row set and the pre-fit checks are built from, all in memory only."""
 
@@ -510,7 +514,7 @@ def station_observations() -> pl.DataFrame:
     raw = read_hourly_weather(
         path=HOURLY_WEATHER_PATH,
         columns=["wind_speed_m_s", "wind_direction", "wind_speed_unit_id"],
-    ).filter(pl.col("src_id").is_in(CANDIDATE_STATIONS))
+    ).filter(pl.col("src_id").is_in(candidate_stations()))
     other_units = raw.filter(
         pl.col("wind_speed_unit_id").is_not_null(),
         pl.col("wind_speed_unit_id") != EXPECTED_UNIT_CODE,
@@ -570,28 +574,20 @@ def choose_stations(
         observed: `station_observations`'s output.
 
     Returns:
-        The k=1 and the k=3 choices, each one row per farm and rank; rank 1 of the k=3 choice is
-        asserted equal to the k=1 choice.
+        The k=1 and the k=3 choices, each one row per farm and rank. The k=1 choice is rank 1 of
+        the k=3 choice.
 
     Raises:
-        ValueError: If a candidate station has no metadata, or the two rank-1 choices differ.
+        ValueError: If a candidate station has no metadata.
     """
     stations = read_station_metadata(path=STATION_METADATA_PATH).filter(
-        pl.col("src_id").is_in(CANDIDATE_STATIONS)
+        pl.col("src_id").is_in(candidate_stations())
     )
-    if stations.height != len(CANDIDATE_STATIONS):
-        msg = f"{stations.height} of {len(CANDIDATE_STATIONS)} candidate stations have metadata"
+    if stations.height != len(candidate_stations()):
+        msg = f"{stations.height} of {len(candidate_stations())} candidate stations have metadata"
         raise ValueError(msg)
     required = window.select("site", "time")
     site_points = sites.select("site", "latitude", "longitude")
-    chosen_k1 = select_nearest_stations(
-        sites=site_points,
-        stations=stations,
-        observed=observed,
-        required=required,
-        k=1,
-        min_coverage=MIN_COVERAGE,
-    )
     chosen_k3 = select_nearest_stations(
         sites=site_points,
         stations=stations,
@@ -600,9 +596,7 @@ def choose_stations(
         k=3,
         min_coverage=MIN_COVERAGE,
     )
-    if not chosen_k1.equals(chosen_k3.filter(pl.col("rank") == 1)):
-        msg = "the k=1 choice differs from rank 1 of the k=3 choice"
-        raise ValueError(msg)
+    chosen_k1 = chosen_k3.filter(pl.col("rank") == 1)
     return chosen_k1, chosen_k3
 
 
@@ -770,6 +764,7 @@ class ChecksResult(TypedDict):
 
     window_rows: int
     frame_rows: int
+    station_kinds: dict[str, int]
     distance_k1: tuple[float, float]
     distance_k3: tuple[float, float]
     coverage_k1: tuple[float, float]
@@ -787,6 +782,33 @@ class ChecksResult(TypedDict):
     coverage: pl.DataFrame
     single_year_months: list[int]
     single_year_share: float
+
+
+def _station_kinds() -> dict[str, int]:
+    """Count the stations in the hourly-weather file by kind, as counts only.
+
+    Returns:
+        `stations` (all), `candidates` (`candidate_stations`), `one_reading_a_day` (stations whose
+        readings all fall at one hour of the day), and `daily_with_wind_and_no_unit_code` (of those,
+        the stations that carry a raw wind speed and no wind-speed unit code).
+    """
+    raw = pl.read_parquet(
+        HOURLY_WEATHER_PATH, columns=["src_id", "time", "wind_speed", "wind_speed_unit_id"]
+    )
+    per_station = raw.group_by("src_id").agg(
+        hours_of_day=pl.col("time").dt.hour().n_unique(),
+        n_wind=pl.col("wind_speed").is_not_null().sum(),
+        n_unit=pl.col("wind_speed_unit_id").is_not_null().sum(),
+    )
+    daily = per_station.filter(pl.col("hours_of_day") == 1)
+    return {
+        "stations": per_station.height,
+        "candidates": len(candidate_stations()),
+        "one_reading_a_day": daily.height,
+        "daily_with_wind_and_no_unit_code": daily.filter(
+            pl.col("n_wind") > 0, pl.col("n_unit") == 0
+        ).height,
+    }
 
 
 def _correlations(
@@ -813,7 +835,7 @@ def _correlations(
         paired = window.select("site", "time", "speed_10m_ukv").join(
             shifted, on=["site", "time"], how="inner"
         )
-        result[offset] = float(paired.select(pl.corr("speed", "speed_10m_ukv")).item())
+        result[offset] = float(paired.select(pl.corr(a="speed", b="speed_10m_ukv")).item())
     return result
 
 
@@ -883,7 +905,7 @@ def run_checks(
     )
     raw_units = read_hourly_weather(
         path=HOURLY_WEATHER_PATH, columns=["wind_speed_m_s", "wind_speed_unit_id"]
-    ).filter(pl.col("src_id").is_in(CANDIDATE_STATIONS), pl.col("wind_speed_m_s").is_not_null())
+    ).filter(pl.col("src_id").is_in(candidate_stations()), pl.col("wind_speed_m_s").is_not_null())
     scored = observed.join(chosen_k1.select("site", "src_id"), on="src_id").join(
         frame.select("site", "time"), on=["site", "time"]
     )
@@ -907,6 +929,7 @@ def run_checks(
     return {
         "window_rows": window.height,
         "frame_rows": frame.height,
+        "station_kinds": _station_kinds(),
         "distance_k1": _range(values=chosen_k1["distance_km"]),
         "distance_k3": _range(values=chosen_k3.filter(pl.col("rank") == 3)["distance_km"]),
         "coverage_k1": _range(values=chosen_k1["coverage"]),
@@ -926,7 +949,10 @@ def run_checks(
             "direction_disagreement_deg": _direction_disagreement(frame=frame),
             "whole_knot_share": float(
                 (
-                    ((observed["speed"] / MS_PER_KNOT).round(0) * MS_PER_KNOT - observed["speed"])
+                    (
+                        (observed["speed"] / MS_PER_KNOT).round(decimals=0) * MS_PER_KNOT
+                        - observed["speed"]
+                    )
                     .abs()
                     .to_numpy()
                     < WHOLE_KNOT_TOLERANCE_M_S
@@ -934,7 +960,9 @@ def run_checks(
             ),
         },
         "unit_rows": {
-            "with_unit_code_4": int(raw_units.filter(pl.col("wind_speed_unit_id") == 4).height),
+            "with_unit_code_4": int(
+                raw_units.filter(pl.col("wind_speed_unit_id") == EXPECTED_UNIT_CODE).height
+            ),
             "with_no_unit_code": int(raw_units["wind_speed_unit_id"].null_count()),
             "with_another_code": int(
                 raw_units.filter(
@@ -971,13 +999,10 @@ def _raise_on_failed_checks(*, checks: ChecksResult, frame: pl.DataFrame) -> Non
         frame: The row set, whose arm columns must hold no missing value.
 
     Raises:
-        ValueError: If a unit code is not 4, a timestamp is off the hour, the station-against-UKV
-            correlation does not peak at zero offset, an uncovered calendar month occurs in two
-            years, or an arm column holds a missing value.
+        ValueError: If a timestamp is off the hour, the station-against-UKV correlation does not
+            peak at zero offset, an uncovered calendar month occurs in two years, or an arm column
+            holds a missing value.
     """
-    if checks["unit_rows"]["with_another_code"]:
-        msg = "a wind row carries a unit code other than 4"
-        raise ValueError(msg)
     if checks["off_the_hour_rows"]:
         msg = f"{checks['off_the_hour_rows']} station rows are stamped off the hour"
         raise ValueError(msg)
@@ -1037,9 +1062,18 @@ def _checks_lines(*, checks: ChecksResult) -> list[str]:
     dropped = checks["window_rows"] - checks["frame_rows"]
     correlations = checks["correlations"]
     facts = checks["direction_facts"]
+    kinds = checks["station_kinds"]
     lines = [
         "#### Row set and station checks, pooled over the three farms, run before any fit",
         "",
+        (
+            "- Candidate-station rule: every station in the MIDAS Open hourly-weather file with at "
+            "least one wind speed in metres per second. "
+            f"Candidates: {kinds['candidates']} of the {kinds['stations']} stations in the file. "
+            f"{kinds['one_reading_a_day']} stations return one reading a day, and "
+            f"{kinds['daily_with_wind_and_no_unit_code']} of those carry a raw wind speed and no "
+            "unit code; none of them is a candidate."
+        ),
         (
             f"- Page rows in the window: {checks['window_rows']:,}. Rows after the station rule: "
             f"{checks['frame_rows']:,}. Rows dropped for want of an observed nearest-station hour: "
@@ -1555,25 +1589,37 @@ def _calendar_month_sums(
     return sums, counts, calendar
 
 
-def _balanced_mean(
-    *, sums: np.ndarray, counts: np.ndarray, calendar: np.ndarray, drawn: np.ndarray
+def _calendar_weights(*, counts: np.ndarray, calendar: np.ndarray) -> np.ndarray:
+    """Weight each `YYYY-MM` month by 1 over the rows of its calendar month in the whole window.
+
+    Args:
+        counts: Each `YYYY-MM` month's row count.
+        calendar: Each month's calendar month (1 to 12).
+
+    Returns:
+        One weight per `YYYY-MM` month. Every row of a calendar month carries the same weight, and
+        the weights of one calendar month's rows sum to 1, so the weights of all rows sum to the
+        number of calendar months.
+    """
+    rows_per_calendar_month = np.bincount(calendar, weights=counts, minlength=13)
+    return 1.0 / rows_per_calendar_month[calendar]
+
+
+def _weighted_mean(
+    *, sums: np.ndarray, counts: np.ndarray, weights: np.ndarray, drawn: np.ndarray
 ) -> float:
-    """Average each calendar month's mean difference, over the calendar months a draw holds.
+    """Return the weighted mean difference over the rows of the drawn months.
 
     Args:
         sums: One seed's per-month difference sums.
         counts: Each month's row count.
-        calendar: Each month's calendar month.
+        weights: `_calendar_weights`'s result.
         drawn: The indices of the months drawn, repeats allowed.
 
     Returns:
-        The mean, over the calendar months that hold a drawn month, of the mean difference over the
-        drawn rows of that calendar month.
+        The sum of the weighted differences over the sum of the weights of the drawn rows.
     """
-    numerator = np.bincount(calendar[drawn], weights=sums[drawn], minlength=13)
-    denominator = np.bincount(calendar[drawn], weights=counts[drawn], minlength=13)
-    present = denominator > 0.0
-    return float((numerator[present] / denominator[present]).mean())
+    return float((sums[drawn] * weights[drawn]).sum() / (counts[drawn] * weights[drawn]).sum())
 
 
 def calendar_balanced_difference(
@@ -1581,12 +1627,17 @@ def calendar_balanced_difference(
 ) -> tuple[float, float, float, int]:
     """Weight each calendar month equally, and interval the result by resampling whole months.
 
-    The estimate is the mean over calendar months (January to December) of each calendar month's
-    mean difference, the mean taken over every row of that calendar month, both years and every
-    seed. The interval draws a seed, then draws whole `YYYY-MM` months with replacement, the same
-    draws as `studies.bootstrap`, and recomputes the estimate. A draw that holds no month of some
-    calendar month averages over the calendar months it does hold. The bounds are the 2.5th and
-    97.5th percentiles of the resampled estimates.
+    Each row carries a fixed weight, 1 over the rows of its calendar month in the whole window.
+    The estimate is the weighted mean of the differences over every row and every seed, which equals
+    the mean over calendar months (January to December) of each calendar month's mean difference.
+    The interval draws a seed, then draws whole `YYYY-MM` months with replacement, the same draws as
+    `studies.bootstrap`, and recomputes the weighted mean over the drawn rows with the same fixed
+    weights. The weights do not change with the draw, so a draw that misses a calendar month is not
+    averaged over fewer calendar months, and the resampled estimates stay centred on the estimate.
+    The bounds are the 2.5th and 97.5th percentiles of the resampled estimates.
+
+    Untested in `packages/studies`, because this function is a copy for one page; the script checks
+    it against a hand-computed case (`_check_calendar_balanced_difference`) on every run.
 
     Args:
         differences: Per-seed, per-row differences, shape (n_seeds, n_rows).
@@ -1596,20 +1647,54 @@ def calendar_balanced_difference(
         The estimate, the lower and upper bounds, and the number of calendar months averaged.
     """
     sums, counts, calendar = _calendar_month_sums(differences=differences, months=months)
-    everything = np.arange(len(counts))
-    estimate = _balanced_mean(
-        sums=sums.mean(axis=0), counts=counts, calendar=calendar, drawn=everything
+    weights = _calendar_weights(counts=counts, calendar=calendar)
+    estimate = _weighted_mean(
+        sums=sums.mean(axis=0), counts=counts, weights=weights, drawn=np.arange(len(counts))
     )
     generator = np.random.default_rng(BOOTSTRAP_SEED)
     resampled = np.empty(N_BOOTSTRAP_RESAMPLES)
     for resample in range(N_BOOTSTRAP_RESAMPLES):
         seed_index = generator.integers(0, differences.shape[0])
         drawn = generator.integers(0, len(counts), size=len(counts))
-        resampled[resample] = _balanced_mean(
-            sums=sums[seed_index], counts=counts, calendar=calendar, drawn=drawn
+        resampled[resample] = _weighted_mean(
+            sums=sums[seed_index], counts=counts, weights=weights, drawn=drawn
         )
-    low, high = np.percentile(resampled, (2.5, 97.5))
+    low, high = np.percentile(resampled, q=(2.5, 97.5))
     return estimate, float(low), float(high), len(np.unique(calendar))
+
+
+def _check_calendar_balanced_difference() -> None:
+    """Check `calendar_balanced_difference` against a case worked by hand, with unequal month sizes.
+
+    One seed, three `YYYY-MM` months. January 2024 holds the differences 1 and 3, January 2025
+    holds 5, 5, 5 and 5, and February 2024 holds 10. January's 6 rows have mean 24 / 6 = 4 and
+    February's one row has mean 10, so the balanced estimate is (4 + 10) / 2 = 7, where the mean
+    over every row is 34 / 7. A draw of January 2024 and February 2024 alone weights January's 2
+    rows by 1/6 and February's row by 1, giving (4/6 + 10) / (2/6 + 1) = 8.
+
+    Raises:
+        ValueError: If the estimate, the draw or the number of calendar months differs from the
+            hand-computed value.
+    """
+    differences = np.array([[1.0, 3.0, 5.0, 5.0, 5.0, 5.0, 10.0]])
+    months = np.array(["2024-01"] * 2 + ["2025-01"] * 4 + ["2024-02"])
+    estimate, low, high, n_calendar = calendar_balanced_difference(
+        differences=differences, months=months
+    )
+    sums, counts, calendar = _calendar_month_sums(differences=differences, months=months)
+    weights = _calendar_weights(counts=counts, calendar=calendar)
+    draw = _weighted_mean(sums=sums[0], counts=counts, weights=weights, drawn=np.array([0, 1]))
+    if not (
+        math.isclose(estimate, 7.0)
+        and math.isclose(draw, 8.0)
+        and n_calendar == 2
+        and low <= estimate <= high
+    ):
+        msg = (
+            f"calendar_balanced_difference gives estimate {estimate}, draw {draw}, "
+            f"{n_calendar} calendar months, not 7, 8 and 2"
+        )
+        raise ValueError(msg)
 
 
 def _calendar_balanced_lines(*, losses: pl.DataFrame, setting: str, log: IntervalLog) -> list[str]:
@@ -1686,6 +1771,9 @@ def _per_calendar_month_lines(*, pooled: pl.DataFrame, sensitivity: pl.DataFrame
             )
             columns.append((differences.mean(axis=0), months))
     months = columns[0][1]
+    if not all(np.array_equal(months, other_months) for _, other_months in columns[1:]):
+        msg = "the four difference columns do not share one row order"
+        raise ValueError(msg)
     calendar = np.array([int(str(label)[-2:]) for label in months])
     lines = [
         "| " + " | ".join(header) + " |",
@@ -1803,12 +1891,15 @@ def _post_review_lines(
             "",
             (
                 "The estimate is the mean, over calendar months, of each calendar month's mean "
-                "difference (over its rows, both years and every seed). The interval draws a seed "
-                "and then draws whole `YYYY-MM` months with replacement, as the other intervals "
-                "do, "
-                "and recomputes the estimate; a draw that holds no month of some calendar month "
-                "averages over the calendar months it does hold. The bounds are the 2.5th and "
-                "97.5th percentiles of the resampled estimates."
+                "difference (over its rows, both years and every seed). Each row carries a fixed "
+                "weight, 1 over the rows of its calendar month in the whole window. The interval "
+                "draws a seed and then draws whole `YYYY-MM` months with replacement, as the other "
+                "intervals do, and recomputes the weighted mean over the drawn rows with the same "
+                "weights. The weights do not change with the draw, so a draw that misses a "
+                "calendar month is not averaged over fewer calendar months, and the resampled "
+                "estimates stay centred on the estimate. The bounds are the 2.5th and 97.5th "
+                "percentiles of the resampled estimates. The script checks the function against a "
+                "hand-computed case on every run."
             ),
             "",
             *_calendar_balanced_lines(losses=scope, setting=setting, log=log),
@@ -1914,8 +2005,9 @@ def _report(
             ),
             "",
             (
-                f"Adjusted for the {2 * len(PLANNED_CONTRASTS)} planned intervals (2 contrasts, "
-                f"2 settings), at the {BONFERRONI_LEVEL:.2f}% level:"
+                f"Adjusted for the {N_SETTINGS * len(PLANNED_CONTRASTS)} planned intervals "
+                f"({len(PLANNED_CONTRASTS)} contrasts, {N_SETTINGS} settings), at the "
+                f"{BONFERRONI_LEVEL:.2f}% level:"
             ),
             "",
             *_bonferroni_lines(losses=scope, setting=setting, log=log),
@@ -1949,7 +2041,11 @@ def _report(
             "",
             *_contrast_table(
                 losses=scope,
-                pairs=EXPLORATORY_CONTRASTS if setting == "pooled" else EXPLORATORY_CONTRASTS[:2],
+                pairs=EXPLORATORY_CONTRASTS
+                if setting == "pooled"
+                else tuple(
+                    pair for pair in EXPLORATORY_CONTRASTS if set(pair) <= set(SENSITIVITY_ARMS)
+                ),
                 section="exploratory",
                 setting=setting,
                 log=log,
@@ -2093,14 +2189,18 @@ def main() -> int:
     """Build the row set, run every check, fit every arm, and write the report.
 
     Every check runs before any arm is fitted, in a fresh run, `--report-only` and `--checks-only`.
-    `--checks-only` prints the checks and stops, fitting and writing nothing.
+    `--checks-only` prints the checks and stops, fitting and writing nothing. Every run that writes
+    `report.md` also requires a committed script and prints the commit the report was built at.
     """
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "--report-only",
         action="store_true",
-        help="Fit nothing; rebuild report.md from both saved loss files, checking fingerprints.",
+        help=(
+            "Fit nothing except the two-fit shear control; rebuild report.md from both saved "
+            "loss files, checking fingerprints."
+        ),
     )
     parser.add_argument(
         "--checks-only",
@@ -2110,7 +2210,10 @@ def main() -> int:
     parser.add_argument(
         "--fit-post-review",
         action="store_true",
-        help="Fit only the post-review arms, then rebuild report.md; main losses stay untouched.",
+        help=(
+            "Fit only the post-review arms beside main losses fitted earlier, then rebuild "
+            "report.md; the main losses stay untouched."
+        ),
     )
     arguments = parser.parse_args()
 
@@ -2141,11 +2244,13 @@ def main() -> int:
     if arguments.checks_only:
         return 0
 
+    _check_calendar_balanced_difference()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     fit_main = not (arguments.report_only or arguments.fit_post_review)
     fit_extra = not arguments.report_only
-    script_commit = _script_commit() if fit_main or fit_extra else ""
+    script_commit = _script_commit()
+    sys.stdout.write(f"report built at commit {script_commit}\n")
     losses, main_commit, fingerprint = _fit_or_load(
         frame=frame,
         job_list=all_jobs,
@@ -2173,7 +2278,8 @@ def main() -> int:
         provenance=(
             f"The main arms were fitted by the script at commit `{main_commit}`, row-set "
             f"fingerprint `{fingerprint}`. The post-review arms were fitted at commit "
-            f"`{extra_commit}`, fingerprint `{extra_fingerprint}`."
+            f"`{extra_commit}`, fingerprint `{extra_fingerprint}`. This report was built by the "
+            f"script at commit `{script_commit}`."
         ),
         log=log,
     )
