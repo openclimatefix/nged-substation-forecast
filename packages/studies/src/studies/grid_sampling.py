@@ -44,6 +44,29 @@ def sample_nearest_cell(*, field: xr.DataArray, sites: pl.DataFrame, crs: CRS) -
     return sampled
 
 
+def distance_matrix_km(*, sites: pl.DataFrame, cells: pl.DataFrame) -> np.ndarray:
+    """Return the great-circle distance in km from every site to every cell centre.
+
+    Args:
+        sites: The roster, carrying `latitude` and `longitude` in degrees.
+        cells: One row per cell, carrying `latitude` and `longitude` in degrees.
+
+    Returns:
+        An array of shape (number of sites, number of cells), in the row order of each frame.
+    """
+    cell_latitude = np.radians(cells["latitude"].to_numpy().astype(np.float64))
+    cell_longitude = np.radians(cells["longitude"].to_numpy().astype(np.float64))
+    site_latitude = np.radians(sites["latitude"].to_numpy().astype(np.float64))[:, None]
+    site_longitude = np.radians(sites["longitude"].to_numpy().astype(np.float64))[:, None]
+    half_chord = (
+        np.sin((cell_latitude - site_latitude) / 2.0) ** 2
+        + np.cos(site_latitude)
+        * np.cos(cell_latitude)
+        * np.sin((cell_longitude - site_longitude) / 2.0) ** 2
+    )
+    return 2.0 * EARTH_RADIUS_KM * np.arcsin(np.sqrt(np.clip(half_chord, 0.0, 1.0)))
+
+
 def nearest_cells(*, sites: pl.DataFrame, cells: pl.DataFrame) -> pl.DataFrame:
     """Return the cell whose centre is nearest each site, by great-circle distance.
 
@@ -68,17 +91,7 @@ def nearest_cells(*, sites: pl.DataFrame, cells: pl.DataFrame) -> pl.DataFrame:
     if cells.height == 0:
         msg = "no cells to choose from"
         raise ValueError(msg)
-    cell_latitude = np.radians(cells["latitude"].to_numpy().astype(np.float64))
-    cell_longitude = np.radians(cells["longitude"].to_numpy().astype(np.float64))
-    site_latitude = np.radians(sites["latitude"].to_numpy().astype(np.float64))[:, None]
-    site_longitude = np.radians(sites["longitude"].to_numpy().astype(np.float64))[:, None]
-    half_chord = (
-        np.sin((cell_latitude - site_latitude) / 2.0) ** 2
-        + np.cos(site_latitude)
-        * np.cos(cell_latitude)
-        * np.sin((cell_longitude - site_longitude) / 2.0) ** 2
-    )
-    distance_km = 2.0 * EARTH_RADIUS_KM * np.arcsin(np.sqrt(np.clip(half_chord, 0.0, 1.0)))
+    distance_km = distance_matrix_km(sites=sites, cells=cells)
     nearest = distance_km.argmin(axis=1)
     return pl.DataFrame(
         {
