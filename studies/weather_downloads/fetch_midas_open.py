@@ -21,6 +21,12 @@ names on disk.
 placed in an exception message. No HTTP redirect is followed, because CEDA answers a bad or expired
 token by redirecting to its login page.
 
+**The station lists are hand-typed.** The rule that reproduces them is: `last_year` 2025 or later
+in the station-metadata CSV, and within 100 km of at least one of the nine anonymised study sites.
+That gives all 10 radiation stations and 37 of the 38 hourly-weather stations; station 24219
+(record ends 2024) is the exception. No other station with `last_year` 2025 is within 100 km of
+any site.
+
 **CEDA's own directory listing decides which files exist.** The station-metadata CSV's
 `first_year` and `last_year` bound a station's record but do not promise a file for every year in
 between: station 00390 has no `uk-hourly-weather-obs` file for 2017 to 2024, for example. So the
@@ -1095,11 +1101,14 @@ _COLUMN_MEANINGS: Final[dict[str, str]] = {
     "wind_speed_unit_id": "MIDAS unit code for `wind_speed`: 0 is estimated and 1 is from an "
     "anemometer, both in metres per second; 3 is estimated and 4 is from an anemometer, both in "
     "knots.",
-    "wind_direction": "Mean wind direction, degrees from true north, at `time`.",
-    "wind_speed": "Mean wind speed at `time`, in the unit `wind_speed_unit_id` gives.",
+    "wind_direction": "Mean wind direction, degrees from true north, over the 10 minutes from 20 "
+    "to 10 minutes before `time`.",
+    "wind_speed": "Mean wind speed over the 10 minutes from 20 to 10 minutes before `time`, in "
+    "the unit `wind_speed_unit_id` gives.",
     "wind_speed_m_s": "Derived by this script: `wind_speed` in metres per second (knots x "
     f"{KNOTS_TO_M_S}); null where `wind_speed_unit_id` is not 0, 1, 3, or 4.",
-    "q10mnt_mxgst_spd": "Maximum gust speed in the 10 minutes before `time`, knots.",
+    "q10mnt_mxgst_spd": "Maximum gust speed over the 10 minutes from 20 to 10 minutes before "
+    "`time`, knots.",
     "air_temperature": "Air temperature at `time`, degC.",
     "dewpoint": "Dew-point temperature at `time`, degC.",
     "rltv_hum": "Relative humidity at `time`, percent.",
@@ -1248,6 +1257,15 @@ def _extra_readme_sections(
     return f"""
 ## Station coverage
 
+**Which stations were fetched.** The station lists were typed by hand and the script did not
+record the rule behind them. The rule below reproduces them from the station-metadata CSVs: a
+station is fetched if its `last_year` is 2025 or later and it lies within 100 km of at least one of
+the nine anonymised study sites. That rule gives exactly the 10 of 241 `uk-radiation-obs` stations
+and 37 of the 38 `uk-hourly-weather-obs` stations. The exception is station 24219, whose record
+ends in 2024 but which was fetched as well. Every other station with `last_year` 2025 lies further
+than 100 km from every site. This README gives no per-station distances, because a distance to a
+study site would help locate that site.
+
 Computed from the tidy parquets and the raw files on disk when this README was written. The
 station-metadata CSVs do not say which variables a station reports or how often, so the last
 columns (the share of the tidy file's rows where the variable is non-null) and the share of hours
@@ -1261,10 +1279,10 @@ with a row are the only record of that.
   `time` T holds the total irradiation over the hour ending at T, in kJ/m2. The hour's mean
   irradiance in W/m2 is the kJ/m2 total divided by 3.6.
 - **Hourly weather:** `time` is an instant (MIDAS `ob_time`); a reading describes the moment of
-  the label. By the WMO observing convention, which the MIDAS files do not state themselves, the
-  wind speed and wind direction are means over the 10 minutes before `time`. The file header
-  calls each sunshine duration an "hour" duration without saying whether the hour ends or starts
-  at `time`.
+  the label. The Met Office Surface Data Users Guide gives the wind speed, wind direction and
+  maximum gust as covering HH-20 to HH-10: the 10 minutes ending 10 minutes before `time`. The
+  file header calls each sunshine duration an "hour" duration without saying whether the hour ends
+  or starts at `time`.
 - **Both:** every `time` is UTC and stored timezone-aware; no naive timestamp is written.
 """
 

@@ -291,6 +291,7 @@ def _models_work_panel(
     colours: tuple[str, ...],
     show_legend: bool,
     show_x_title: bool,
+    panel_width: int = PANEL_WIDTH_PX,
 ) -> alt.Chart:
     """Draw one generator's measured and predicted power across one chosen week.
 
@@ -307,6 +308,7 @@ def _models_work_panel(
         colours: One colour per entry of `order`.
         show_legend: Whether this panel carries the shared legend.
         show_x_title: Whether this panel names its x axis, which only the bottom row does.
+        panel_width: The plot area's width in pixels.
 
     Returns:
         One panel.
@@ -351,7 +353,7 @@ def _models_work_panel(
             strokeDash=alt.StrokeDash("series:N", sort=order, legend=None),
         )
         .properties(
-            width=PANEL_WIDTH_PX,
+            width=panel_width,
             height=PANEL_HEIGHT_PX,
             title=alt.TitleParams(f"Generator {site}: {week_label}", anchor="start", fontSize=11),
         )
@@ -368,6 +370,7 @@ def _models_work_timeseries(
     number: int,
     title: str,
     subtitle: list[str],
+    panel_width: int = PANEL_WIDTH_PX,
 ) -> alt.VConcatChart:
     """Draw predicted against measured power, one row per generator, one column per chosen week.
 
@@ -381,6 +384,7 @@ def _models_work_timeseries(
         number: The figure's number on the page.
         title: The finding the figure shows.
         subtitle: Short lines naming the quantity, its scope, and what a line means.
+        panel_width: Each panel's plot-area width in pixels.
 
     Returns:
         The figure.
@@ -396,6 +400,7 @@ def _models_work_timeseries(
                     colours=colours,
                     show_legend=row_index == 0 and week_index == 0,
                     show_x_title=row_index == len(sites) - 1,
+                    panel_width=panel_width,
                 )
                 for week_index, week_label in enumerate(week_order)
             ),

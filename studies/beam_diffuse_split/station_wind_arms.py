@@ -1,0 +1,2711 @@
+"""Score the nearest weather station's 10 m wind against gridded products for past wind.
+
+One-off throwaway script, phase 2 of the past-wind study
+<https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-wind/>.
+The Met Office's MIDAS Open archive holds hourly 10 m wind from stations in and around the trial
+area, and `candidate_stations` derives which ones from the download. This script gives an XGBoost
+model per wind farm the nearest wind-reporting station's wind, and compares it with ERA5's 10 m wind
+(S1), and a blend of UKV and the station with UKV padded to the same number of columns (S2).
+
+**Provenance.** The two planned contrasts S1 and S2, the row rule and the controls were committed
+(7bc23521, revised in 24870b53) before the first fit, and the implementation decisions were
+committed with this script (021d0852) before the first fit as well. The exploratory items are the
+k=3 arm, the shear control, the August-to-December restriction, and `ukv_station_wind - ukv_wind`.
+
+**Second persona-review additions.** After the persona reviews of the page, the report gained
+exploratory, report-only tables computed from the saved losses with no refit: the differences
+between farms and between the two seasons in S1 with their intervals, a fold-level and a month-level
+t-interval beside the bootstrap interval of each planned contrast, the pooled range of the
+candidates' mean speeds, and counts of the stations by kind and message type. All of it is post hoc.
+
+**Post-review additions.** After the first results and the first science review, the exploratory
+additions were written down (750b130d) before the refit, and the script gained them in 72d969b8.
+Everything in them is post hoc and exploratory: the arms `station_speed_only`,
+`era5_10m_speed_only` and `ukv_icon_d2_wind`, fitted at both settings and saved apart from the main
+losses, and the report-only January-to-July, calendar-month-balanced and per-calendar-month
+tables.
+
+**Station timestamps.** The Met Office Surface Data Users Guide gives the SYNOP 10-minute mean wind
+as "10-minute average, HH-20 to HH-10". A reading stamped `T` is joined to the power row stamped
+`T`, whose hour runs from `T` - 30 minutes to `T` + 30 minutes, so the reading sits about 15
+minutes before the centre of that hour. The standard exposure is 10 m over open level terrain, and
+a station with another exposure has an "effective height", so the height is written "nominal 10 m".
+The averaging window of the AWSHRLY stations is not documented in what was read. Product wind
+speeds on disk are in km/h and station speeds are in m/s, and the two are never compared raw.
+
+**Privacy.** Nothing here writes which station serves which wind farm, a station's coordinates,
+name or identifier, or a per-farm distance, row count, drop count or station coverage. The private
+station metadata is read in memory, and every figure printed about stations, hours or distances is
+pooled over farms. Per-farm tables carry errors only, labelled W1 to W3.
+
+**Row set.** The page's own rows (`common_rows(joined(sites=sites))`) restricted to 2024-08-12 to
+2025-12-31 (17 calendar months, the MIDAS Open download ending in December 2025), then to hours
+where the farm's nearest eligible station has both a speed and a direction. Every arm is fitted on
+exactly these rows, including every gridded product's wind arm, which is refitted here and never
+read from a published loss. The window holds one UKV era, so `era_code` is constant and is kept so
+that every arm carries the page's columns.
+
+**Candidate stations.** `candidate_stations` returns every station in the MIDAS Open hourly-weather
+file that has at least one wind speed row that the download script converted to metres per second.
+MIDAS itself records the speed in knots (unit code 4), so a row has a metres-per-second speed only
+where it carries that unit code. The stations that return one reading a day carry no unit code, and
+other stations carry no wind speed, so neither kind is a candidate.
+
+**Station rule.** `studies.midas.select_nearest_stations` with `k=1` and `min_coverage=0.9` of the
+farm's required hours (the page's rows in the window). The rule reads no score and no target.
+
+**Arms.** Every arm carries `SHARED_FEATURES` plus its wind columns:
+
+- `station_wind`: the station's speed, sine and cosine of its direction (3 columns).
+- `era5_10m_wind`: ERA5's 10 m speed and the sine and cosine of ERA5's 100 m direction (3 columns).
+- `ukv_station_wind`: UKV's page columns plus the station's three (7 columns).
+- `ukv_padded_wind`: UKV's page columns plus UKV's own 80 m speed, and sine and cosine of its 80 m
+  direction (7 columns).
+- `era5_wind`, `ukv_wind`, `icon_d2_wind`, `icon_eu_wind`, `icon_global_wind`: the page's arms.
+- `station_k3_wind` (exploratory): the mean speed and the mean-wind-vector direction of the three
+  nearest eligible stations.
+
+Run it with `uv run python studies/beam_diffuse_split/station_wind_arms.py`, which fits every arm,
+including the three added after the first results. `--checks-only` runs the pre-fit checks and
+stops. `--fit-post-review` only adds those three arms beside main losses fitted earlier, then
+rebuilds the report. `--report-only` fits nothing except the two-fit shear control: it rebuilds
+`report.md` from the saved `losses.parquet` and `losses_post_review.parquet`, and raises if either
+saved fingerprint no longer matches. Every run that writes `report.md` raises on an uncommitted
+change to this script, and a run that fits refuses to overwrite an output that exists.
+"""
+
+import argparse
+import hashlib
+import logging
+import math
+import subprocess
+import sys
+from dataclasses import dataclass, field
+from functools import cache
+from pathlib import Path
+from typing import Final, TypedDict
+
+import numpy as np
+import polars as pl
+from build_dataset import _wind_sites
+from run_experiment import Job, _add_time_features, run_all
+from sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
+from studies.bootstrap import (
+    BOOTSTRAP_SEED,
+    N_BOOTSTRAP_RESAMPLES,
+    bootstrap_absolute,
+    bootstrap_difference,
+    bootstrap_difference_at_level,
+    fold_t_interval,
+    paired_differences,
+    per_fold_differences,
+)
+from studies.cross_validation import (
+    N_FOLDS,
+    PRIMARY_HYPER_PARAMETERS,
+    SEEDS,
+    SENSITIVITY_HYPER_PARAMETERS,
+    calendar_month_coverage,
+    fit_one_fold,
+    raise_on_uncovered_months,
+)
+from studies.guards import check_no_missing, refuse_to_overwrite
+from studies.midas import read_hourly_weather, read_station_metadata, select_nearest_stations
+from weather_products import METRIC, PERCENTAGE_POINTS, with_eras
+from wind_products import (
+    SHARED_FEATURES,
+    UKV_80M_COLUMNS,
+    _wind_columns,
+    common_rows,
+    joined,
+)
+
+_LOG: Final[logging.Logger] = logging.getLogger(__name__)
+
+OUTPUT_DIR_NAME: Final[str] = "station_wind_arms"
+"""The results directory under `sources.STUDY_DATA_DIR / 'past_weather_v2'`."""
+
+OUTPUT_DIR: Final[Path] = STUDY_DATA_DIR / "past_weather_v2" / OUTPUT_DIR_NAME
+"""Where this study writes its outputs, and a `superseded/` folder for re-runs."""
+
+MIDAS_DIR: Final[Path] = WEATHER_DATA_DIR / "MIDAS-OPEN"
+"""The MIDAS Open download."""
+
+HOURLY_WEATHER_PATH: Final[Path] = MIDAS_DIR / "uk_hourly_weather_obs.parquet"
+"""The tidy hourly-weather parquet."""
+
+STATION_METADATA_PATH: Final[Path] = (
+    MIDAS_DIR
+    / "_station_metadata"
+    / "midas-open_uk-hourly-weather-obs_dv-202607_station-metadata.csv"
+)
+"""The private hourly-weather station metadata, read in memory only."""
+
+WINDOW_START: Final[pl.Expr] = pl.datetime(year=2024, month=8, day=12, time_zone="UTC")
+"""The first hour of the row set."""
+
+WINDOW_END_EXCLUSIVE: Final[pl.Expr] = pl.datetime(year=2026, month=1, day=1, time_zone="UTC")
+"""The row set ends on 2025-12-31, because the MIDAS Open download holds calendar years to 2025."""
+
+MIN_COVERAGE: Final[float] = 0.9
+"""The share of a farm's required hours a station must cover to be eligible."""
+
+EXPECTED_UNIT_CODE: Final[int] = 4
+"""The only wind-speed unit code (anemometer, knots) a row may carry."""
+
+SHEAR_EXPONENT: Final[float] = 1.0 / 7.0
+"""A common open-country power-law exponent, chosen a priori, used only by the shear control."""
+
+SHEAR_HEIGHT_RATIO: Final[float] = 100.0 / 10.0
+"""The ratio of 100 m to the station's 10 m height."""
+
+STATION_COLUMNS: Final[tuple[str, str, str]] = ("station_speed", "station_sin", "station_cos")
+"""The nearest station's wind, as a speed and the sine and cosine of its direction."""
+
+K3_COLUMNS: Final[tuple[str, str, str]] = ("k3_speed", "k3_sin", "k3_cos")
+"""The three nearest stations' wind: mean speed, and the direction of the mean wind vector."""
+
+ERA5_10M_COLUMNS: Final[tuple[str, str, str]] = ("speed_10m_era5", "sin_100m_era5", "cos_100m_era5")
+"""ERA5's 10 m speed and the sine and cosine of its 100 m direction (no 10 m direction is held)."""
+
+UKV_PADDING_COLUMNS: Final[tuple[str, ...]] = UKV_80M_COLUMNS[:3]
+"""UKV's served 80 m speed and direction only; `UKV_80M_COLUMNS` also holds the 10 m speed."""
+
+ICON_D2_HUB_COLUMNS: Final[tuple[str, ...]] = _wind_columns(product="icon_d2")[:3]
+"""ICON-D2's hub-height speed and the sine and cosine of its hub-height direction."""
+
+PRODUCTS: Final[tuple[str, ...]] = ("era5", "ukv", "icon_d2", "icon_eu", "icon_global")
+"""The gridded products whose page wind arm is refitted on the station rows."""
+
+SENSITIVITY_ARMS: Final[tuple[str, ...]] = (
+    "station_wind",
+    "era5_10m_wind",
+    "ukv_station_wind",
+    "ukv_padded_wind",
+    "ukv_wind",
+)
+"""The arms refitted at `SENSITIVITY_HYPER_PARAMETERS`."""
+
+PLANNED_CONTRASTS: Final[tuple[tuple[str, str, str], ...]] = (
+    ("S1", "station_wind", "era5_10m_wind"),
+    ("S2", "ukv_station_wind", "ukv_padded_wind"),
+)
+"""The two planned contrasts: (name, first, second), the difference being first minus second."""
+
+EXPLORATORY_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("ukv_station_wind", "ukv_wind"),
+    ("ukv_padded_wind", "ukv_wind"),
+    ("station_k3_wind", "station_wind"),
+    ("station_k3_wind", "era5_10m_wind"),
+)
+"""Exploratory contrasts. The first two compare 7 wind columns with 4, so neither is equal-count."""
+
+POST_REVIEW_SENSITIVITY_ARMS: Final[tuple[str, ...]] = (
+    "station_speed_only",
+    "era5_10m_speed_only",
+    "ukv_icon_d2_wind",
+)
+"""The post-review arms; each is fitted at both settings."""
+
+POST_REVIEW_CONTRASTS: Final[tuple[tuple[str, str, str], ...]] = (
+    ("speed only", "station_speed_only", "era5_10m_speed_only"),
+    ("station or ICON-D2", "ukv_station_wind", "ukv_icon_d2_wind"),
+)
+"""Post-review contrasts with equal column counts: (label, first, second), first minus second."""
+
+HEIGHT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("era5_10m_wind", "era5_wind"),
+    ("era5_10m_speed_only", "era5_wind"),
+)
+"""ERA5's 10 m arms against the arm that also has the hub-height speed; primary setting only,
+because `era5_wind` is not fitted at the second setting. Neither pair has equal column counts."""
+
+N_SETTINGS: Final[int] = 2
+"""The hyperparameter settings each planned contrast is fitted at."""
+
+BONFERRONI_LEVEL: Final[float] = 100.0 * (1.0 - 0.05 / (N_SETTINGS * len(PLANNED_CONTRASTS)))
+"""The confidence level, in percent, adjusted for every planned interval (contrast and setting)."""
+
+AUGUST_TO_DECEMBER: Final[tuple[int, ...]] = (8, 9, 10, 11, 12)
+"""The calendar months that occur in both years of the window."""
+
+JANUARY_TO_JULY: Final[tuple[int, ...]] = (1, 2, 3, 4, 5, 6, 7)
+"""The calendar months that occur in one year of the window only."""
+
+BETWEEN_FARM_PAIRS: Final[tuple[tuple[str, str], ...]] = (("W1", "W3"), ("W1", "W2"), ("W2", "W3"))
+"""The farm pairs whose S1 difference is intervalled: (first, second), first minus second."""
+
+EXPLORATORY_SECTIONS: Final[tuple[str, ...]] = (
+    "exploratory",
+    "august_to_december",
+    "january_to_july",
+    "calendar_balanced",
+    "height",
+    "post_review",
+    "planned_by_farm",
+    "between_farm",
+    "season_difference",
+)
+"""The `intervals.parquet` sections holding exploratory paired-difference intervals.
+
+The report prints the count of those at the primary setting, so the page can say how many would
+exclude zero by chance.
+"""
+
+MS_PER_KNOT: Final[float] = 0.514444
+"""Metres per second in one knot."""
+
+WHOLE_KNOT_TOLERANCE_M_S: Final[float] = 0.01
+"""How far a speed may lie from a whole number of knots and still count as one."""
+
+MAX_DIRECTION_DEG: Final[float] = 360.0
+"""The largest direction a row may carry; north is written as 360 and calm as 0."""
+
+LAG_SCAN_HOURS: Final[tuple[int, ...]] = (-1, 0, 1)
+"""Hour offsets scanned for the station-against-UKV speed correlation."""
+
+CONTRAST_HEADER: Final[tuple[str, str]] = (
+    (
+        "| Scope | Contrast | ΔMAE (pp of capacity) | 95% interval | Excludes zero? "
+        "| Folds agreeing | Rows | Months |"
+    ),
+    "|---|---|---|---|---|---|---|---|",
+)
+"""The header of every pooled contrast table."""
+
+FARM_CONTRAST_HEADER: Final[tuple[str, str]] = (
+    "| Farm | Contrast | ΔMAE (pp of capacity) | 95% interval | Excludes zero? | Folds agreeing |",
+    "|---|---|---|---|---|---|",
+)
+"""The header of a per-farm contrast table, which carries no row count."""
+
+TIMESTAMP_NOTE: Final[str] = (
+    '- Timestamps: the Met Office Surface Data Users Guide gives the SYNOP 10-minute mean wind as "'
+    '10-minute average, HH-20 to HH-10". A reading stamped T is joined to the power row stamped T, '
+    "whose hour runs from T - 30 to T + 30 minutes, so the reading sits about 15 minutes before "
+    "the centre of that hour. The standard exposure is 10 m over open level terrain, and a station "
+    'with another exposure has an "effective height", so the height is nominal 10 m. The '
+    "averaging window of the AWSHRLY stations is not documented in what was read."
+)
+"""The report's and README's account of when the station reading was taken."""
+
+UNIT_NOTE: Final[str] = (
+    "- Units: product wind speeds on disk are in km/h and station speeds are in m/s. The two are "
+    "never compared raw, and a tree model is unaffected by the scale of a column."
+)
+"""The report's and README's note on wind-speed units."""
+
+POOLED_CAVEAT: Final[str] = (
+    "Three wind farms are few independent sites; {rows:,} rows, {months} months."
+)
+"""The line printed under every pooled interval."""
+
+
+# ---------------------------------------------------------------------------------------------
+# The interval log, the row-set fingerprint and the script commit.
+# ---------------------------------------------------------------------------------------------
+
+
+class IntervalRecord(TypedDict):
+    """One interval the report prints, saved to `intervals.parquet`."""
+
+    section: str
+    setting: str
+    scope: str
+    treatment: str
+    reference: str | None
+    value: float
+    lower: float
+    upper: float
+    level: float
+    n_rows: int | None
+    n_months: int | None
+    folds_agreeing: int | None
+    n_folds: int | None
+
+
+@dataclass
+class IntervalLog:
+    """Every interval the report prints, collected as the report is assembled."""
+
+    records: list[IntervalRecord] = field(default_factory=list)
+
+    def frame(self) -> pl.DataFrame:
+        """Return the collected intervals as one table.
+
+        Returns:
+            One row per interval printed, in the order printed.
+        """
+        return pl.DataFrame(
+            self.records,
+            schema={
+                "section": pl.String,
+                "setting": pl.String,
+                "scope": pl.String,
+                "treatment": pl.String,
+                "reference": pl.String,
+                "value": pl.Float64,
+                "lower": pl.Float64,
+                "upper": pl.Float64,
+                "level": pl.Float64,
+                "n_rows": pl.Int64,
+                "n_months": pl.Int64,
+                "folds_agreeing": pl.Int64,
+                "n_folds": pl.Int64,
+            },
+        )
+
+
+def _fingerprint(*, frame: pl.DataFrame, job_list: list[Job]) -> str:
+    """Return a hash covering every row's values, every job's columns, and the seeds.
+
+    Every float column is cast to `Float32` before hashing, so
+    last-bit noise cannot flip the fingerprint; the saved `losses.parquet` keeps full precision.
+
+    Args:
+        frame: The row set every job is fitted on, including `power_mw` and `fold`.
+        job_list: Every job this run means to fit.
+
+    Returns:
+        A hex digest.
+    """
+    ordered = frame.select(sorted(frame.columns)).sort("site", "time")
+    float_columns = [name for name, dtype in ordered.schema.items() if dtype.is_float()]
+    stable = ordered.cast(dict.fromkeys(float_columns, pl.Float32))
+    payload = repr(
+        (
+            stable.hash_rows(seed=0).to_list(),
+            [
+                (arm, setting, target, tuple(features), tuple(sorted(hyper_parameters.items())))
+                for arm, setting, target, features, hyper_parameters, _ in job_list
+            ],
+            SEEDS,
+        )
+    )
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def _script_commit() -> str:
+    """Return the commit the script is at, raising if the script has uncommitted changes.
+
+    Returns:
+        The short hash of the last commit that changed this file.
+
+    Raises:
+        ValueError: If the file differs from its last commit, or no commit has changed it.
+    """
+    script = str(Path(__file__).resolve())
+    directory = Path(__file__).parent
+
+    def git(*arguments: str) -> str:
+        """Run one git command in the script's directory and return its standard output."""
+        return subprocess.run(
+            ["git", *arguments], capture_output=True, text=True, check=True, cwd=directory
+        ).stdout.strip()
+
+    if git("status", "--porcelain", "--", script):
+        msg = "the script has uncommitted changes; commit it before the first fit"
+        raise ValueError(msg)
+    commit = git("log", "-1", "--format=%h", "--", script)
+    if not commit:
+        msg = "the script has no commit; commit it before the first fit"
+        raise ValueError(msg)
+    return commit
+
+
+# ---------------------------------------------------------------------------------------------
+# The row set.
+# ---------------------------------------------------------------------------------------------
+
+
+@cache
+def candidate_stations() -> tuple[str, ...]:
+    """Return every station in the hourly-weather download that has a wind speed, sorted.
+
+    The rule: a station is a candidate if at least one of its rows in the MIDAS Open hourly-weather
+    file holds a wind speed in metres per second, which the download script derives from a speed
+    in knots (MIDAS unit code 4). The stations that return one reading a day carry no unit code, and
+    the stations that carry no wind speed hold no such row, so neither kind is a candidate.
+
+    Returns:
+        The sorted station identifiers. The identifiers are never printed or saved.
+    """
+    speeds = read_hourly_weather(path=HOURLY_WEATHER_PATH, columns=["wind_speed_m_s"])
+    return tuple(
+        sorted(speeds.filter(pl.col("wind_speed_m_s").is_not_null())["src_id"].unique().to_list())
+    )
+
+
+class StationRows(TypedDict):
+    """The station data the row set and the pre-fit checks are built from, all in memory only."""
+
+    observed: pl.DataFrame
+    chosen_k1: pl.DataFrame
+    chosen_k3: pl.DataFrame
+    window: pl.DataFrame
+
+
+def station_observations() -> pl.DataFrame:
+    """Read the candidate stations' wind, keeping the hours where speed and direction both exist.
+
+    The calm flag (direction 0) is set before 360 is normalised to 0, and a calm row enters as sine
+    and cosine both zero. North (360) enters as direction 0 degrees.
+
+    Returns:
+        One row per observed station hour with `src_id`, `time`, `speed`, `direction`, `sin`, `cos`,
+        `calm`, `u` and `v` (the wind vector's components, zero for a calm hour).
+
+    Raises:
+        ValueError: If a row carries a unit code other than 4, or a direction outside 0 to 360.
+    """
+    raw = read_hourly_weather(
+        path=HOURLY_WEATHER_PATH,
+        columns=["wind_speed_m_s", "wind_direction", "wind_speed_unit_id"],
+    ).filter(pl.col("src_id").is_in(candidate_stations()))
+    other_units = raw.filter(
+        pl.col("wind_speed_unit_id").is_not_null(),
+        pl.col("wind_speed_unit_id") != EXPECTED_UNIT_CODE,
+    )
+    if other_units.height:
+        msg = f"{other_units.height} wind rows carry a unit code other than {EXPECTED_UNIT_CODE}"
+        raise ValueError(msg)
+    observed = raw.filter(
+        pl.col("wind_speed_m_s").is_not_null(), pl.col("wind_direction").is_not_null()
+    )
+    out_of_range = observed.filter(
+        (pl.col("wind_direction") < 0.0) | (pl.col("wind_direction") > MAX_DIRECTION_DEG)
+    )
+    if out_of_range.height:
+        msg = f"{out_of_range.height} rows carry a direction outside 0 to {MAX_DIRECTION_DEG}"
+        raise ValueError(msg)
+    calm = pl.col("wind_direction") == 0.0
+    radians = (
+        pl.when(pl.col("wind_direction") == MAX_DIRECTION_DEG)
+        .then(0.0)
+        .otherwise(pl.col("wind_direction"))
+        .radians()
+    )
+    return observed.select(
+        "src_id",
+        "time",
+        speed=pl.col("wind_speed_m_s"),
+        direction=pl.col("wind_direction"),
+        sin=pl.when(calm).then(0.0).otherwise(radians.sin()),
+        cos=pl.when(calm).then(0.0).otherwise(radians.cos()),
+        calm=calm,
+    ).with_columns(u=pl.col("speed") * pl.col("sin"), v=pl.col("speed") * pl.col("cos"))
+
+
+def window_rows(*, sites: pl.DataFrame) -> pl.DataFrame:
+    """Return the page's rows restricted to the window, before the station rule.
+
+    Args:
+        sites: The wind roster.
+
+    Returns:
+        The page's `common_rows(joined(...))` between `WINDOW_START` and `WINDOW_END_EXCLUSIVE`.
+    """
+    return common_rows(frame=joined(sites=sites)).filter(
+        pl.col("time") >= WINDOW_START, pl.col("time") < WINDOW_END_EXCLUSIVE
+    )
+
+
+def choose_stations(
+    *, sites: pl.DataFrame, window: pl.DataFrame, observed: pl.DataFrame
+) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Choose the nearest eligible station (k=1) and the three nearest (k=3) for each farm.
+
+    Args:
+        sites: The wind roster with `site`, `latitude` and `longitude`.
+        window: The page's rows in the window, the hours the coverage rule is scored on.
+        observed: `station_observations`'s output.
+
+    Returns:
+        The k=1 and the k=3 choices, each one row per farm and rank. The k=1 choice is rank 1 of
+        the k=3 choice.
+
+    Raises:
+        ValueError: If a candidate station has no metadata.
+    """
+    stations = read_station_metadata(path=STATION_METADATA_PATH).filter(
+        pl.col("src_id").is_in(candidate_stations())
+    )
+    if stations.height != len(candidate_stations()):
+        msg = f"{stations.height} of {len(candidate_stations())} candidate stations have metadata"
+        raise ValueError(msg)
+    required = window.select("site", "time")
+    site_points = sites.select("site", "latitude", "longitude")
+    chosen_k3 = select_nearest_stations(
+        sites=site_points,
+        stations=stations,
+        observed=observed,
+        required=required,
+        k=3,
+        min_coverage=MIN_COVERAGE,
+    )
+    chosen_k1 = chosen_k3.filter(pl.col("rank") == 1)
+    return chosen_k1, chosen_k3
+
+
+def build_frame(
+    *,
+    window: pl.DataFrame,
+    chosen_k1: pl.DataFrame,
+    chosen_k3: pl.DataFrame,
+    observed: pl.DataFrame,
+) -> pl.DataFrame:
+    """Join the nearest station's wind, and the k=3 wind, onto the window rows.
+
+    A farm-hour with no observed nearest-station hour is dropped from every arm. No station
+    identifier is kept in the frame.
+
+    Args:
+        window: The page's rows in the window.
+        chosen_k1: The nearest eligible station per farm.
+        chosen_k3: The three nearest eligible stations per farm.
+        observed: `station_observations`'s output.
+
+    Returns:
+        The window rows with `STATION_COLUMNS` and `K3_COLUMNS`, time features, eras and folds.
+    """
+    nearest = observed.join(chosen_k1.select("site", "src_id"), on="src_id").select(
+        "site",
+        "time",
+        station_speed=pl.col("speed"),
+        station_sin=pl.col("sin"),
+        station_cos=pl.col("cos"),
+    )
+    three = (
+        observed.join(chosen_k3.select("site", "src_id"), on="src_id")
+        .group_by("site", "time")
+        .agg(
+            k3_speed=pl.col("speed").mean(),
+            mean_u=pl.col("u").mean(),
+            mean_v=pl.col("v").mean(),
+        )
+        .with_columns(magnitude=(pl.col("mean_u") ** 2 + pl.col("mean_v") ** 2).sqrt())
+        .select(
+            "site",
+            "time",
+            "k3_speed",
+            k3_sin=pl.when(pl.col("magnitude") > 0.0)
+            .then(pl.col("mean_u") / pl.col("magnitude"))
+            .otherwise(0.0),
+            k3_cos=pl.when(pl.col("magnitude") > 0.0)
+            .then(pl.col("mean_v") / pl.col("magnitude"))
+            .otherwise(0.0),
+        )
+    )
+    rows = window.join(nearest, on=["site", "time"], how="inner").join(
+        three, on=["site", "time"], how="inner"
+    )
+    return with_eras(frame=_add_time_features(dataset=rows.sort("site", "time")))
+
+
+# ---------------------------------------------------------------------------------------------
+# Jobs.
+# ---------------------------------------------------------------------------------------------
+
+
+def arm_columns() -> dict[str, tuple[str, ...]]:
+    """Return every fitted arm's feature columns.
+
+    Returns:
+        Arm name to its columns: the shared columns followed by the arm's wind columns.
+    """
+    arms: dict[str, tuple[str, ...]] = {
+        "station_wind": (*SHARED_FEATURES, *STATION_COLUMNS),
+        "era5_10m_wind": (*SHARED_FEATURES, *ERA5_10M_COLUMNS),
+        "ukv_station_wind": (*SHARED_FEATURES, *_wind_columns(product="ukv"), *STATION_COLUMNS),
+        "ukv_padded_wind": (*SHARED_FEATURES, *_wind_columns(product="ukv"), *UKV_PADDING_COLUMNS),
+        "station_k3_wind": (*SHARED_FEATURES, *K3_COLUMNS),
+    }
+    arms.update(
+        {
+            f"{product}_wind": (*SHARED_FEATURES, *_wind_columns(product=product))
+            for product in PRODUCTS
+        }
+    )
+    return arms
+
+
+def post_review_arm_columns() -> dict[str, tuple[str, ...]]:
+    """Return the exploratory arms added after the first science review.
+
+    Returns:
+        Arm name to its columns: the shared columns followed by the arm's wind columns.
+    """
+    return {
+        "station_speed_only": (*SHARED_FEATURES, STATION_COLUMNS[0]),
+        "era5_10m_speed_only": (*SHARED_FEATURES, ERA5_10M_COLUMNS[0]),
+        "ukv_icon_d2_wind": (*SHARED_FEATURES, *_wind_columns(product="ukv"), *ICON_D2_HUB_COLUMNS),
+    }
+
+
+def _raise_on_unequal_counts(
+    *, arms: dict[str, tuple[str, ...]], contrasts: tuple[tuple[str, str, str], ...]
+) -> None:
+    """Raise unless both arms of every contrast carry the same number of columns.
+
+    Args:
+        arms: Every arm's columns, at least those the contrasts name.
+        contrasts: Each (name, first, second).
+
+    Raises:
+        ValueError: Naming the contrast and the two counts.
+    """
+    for name, first, second in contrasts:
+        if len(arms[first]) != len(arms[second]):
+            msg = f"{name}: {first} has {len(arms[first])} columns, {second} {len(arms[second])}"
+            raise ValueError(msg)
+
+
+def jobs() -> list[Job]:
+    """Return every arm's job at the primary setting, and the sensitivity arms at the second.
+
+    Returns:
+        One job per arm at `PRIMARY_HYPER_PARAMETERS`, then one per `SENSITIVITY_ARMS`.
+    """
+    arms = arm_columns()
+    _raise_on_unequal_counts(arms=arms, contrasts=PLANNED_CONTRASTS)
+    job_list: list[Job] = [
+        (arm, "pooled", "power_mw", columns, PRIMARY_HYPER_PARAMETERS, False)
+        for arm, columns in arms.items()
+    ]
+    job_list += [
+        (arm, "sensitivity", "power_mw", arms[arm], SENSITIVITY_HYPER_PARAMETERS, False)
+        for arm in SENSITIVITY_ARMS
+    ]
+    return job_list
+
+
+def post_review_jobs() -> list[Job]:
+    """Return the post-review arms' jobs, each at both settings.
+
+    The contrasts' equal column counts are asserted, and every arm's columns are printed by the
+    report.
+
+    Returns:
+        One job per post-review arm at `PRIMARY_HYPER_PARAMETERS`, then one per arm at
+        `SENSITIVITY_HYPER_PARAMETERS`.
+    """
+    arms = {**arm_columns(), **post_review_arm_columns()}
+    _raise_on_unequal_counts(arms=arms, contrasts=POST_REVIEW_CONTRASTS)
+    return [
+        (arm, setting, "power_mw", arms[arm], hyper_parameters, False)
+        for setting, hyper_parameters in (
+            ("pooled", PRIMARY_HYPER_PARAMETERS),
+            ("sensitivity", SENSITIVITY_HYPER_PARAMETERS),
+        )
+        for arm in POST_REVIEW_SENSITIVITY_ARMS
+    ]
+
+
+# ---------------------------------------------------------------------------------------------
+# Pre-fit checks. Every figure about stations is pooled over farms.
+# ---------------------------------------------------------------------------------------------
+
+
+class ChecksResult(TypedDict):
+    """The pre-fit checks' raw results, computed once."""
+
+    window_rows: int
+    frame_rows: int
+    station_kinds: dict[str, int]
+    distance_k1: tuple[float, float]
+    distance_k3: tuple[float, float]
+    coverage_k1: tuple[float, float]
+    skipped_nearer: tuple[float, float]
+    eligible_missing_share: tuple[float, float]
+    n_eligible_pairs: int
+    speed_range: tuple[float, float]
+    speed_mean: float
+    candidate_mean_speed: tuple[float, float]
+    candidate_calm_share: tuple[float, float]
+    direction_facts: dict[str, float]
+    unit_rows: dict[str, int]
+    off_the_hour_rows: int
+    correlations: dict[int, float]
+    fold_months: list[list[str]]
+    same_fold_layout: bool
+    coverage: pl.DataFrame
+    single_year_months: list[int]
+    single_year_share: float
+
+
+def _station_kinds() -> dict[str, int]:
+    """Count the stations in the hourly-weather file by kind and message type, as counts only.
+
+    Returns:
+        `stations` (all), `candidates` (`candidate_stations`), `one_reading_a_day` (stations whose
+        readings all fall at one hour of the day), `daily_with_wind_and_no_unit_code` (of those, the
+        stations that carry a raw wind speed and no wind-speed unit code), `daily_hour_of_day` (the
+        one hour of the day the daily stations report at, or -1 if they differ),
+        `hourly_without_wind` (stations that are neither candidates nor daily and carry no raw wind
+        speed on any row), and `synop_only`, `awshrly_only` and `both_message_types` (the
+        candidates by the message types their rows carry).
+    """
+    raw = pl.read_parquet(
+        HOURLY_WEATHER_PATH,
+        columns=["src_id", "time", "wind_speed", "wind_speed_unit_id", "met_domain_name"],
+    )
+    per_station = raw.group_by("src_id").agg(
+        hours_of_day=pl.col("time").dt.hour().n_unique(),
+        n_wind=pl.col("wind_speed").is_not_null().sum(),
+        n_unit=pl.col("wind_speed_unit_id").is_not_null().sum(),
+        message_types=pl.col("met_domain_name").unique().sort(),
+    )
+    candidates = set(candidate_stations())
+    daily = per_station.filter(pl.col("hours_of_day") == 1)
+    daily_hours = (
+        raw.filter(pl.col("src_id").is_in(daily["src_id"].to_list()))["time"].dt.hour().unique()
+    )
+    candidate_types = per_station.filter(pl.col("src_id").is_in(candidates))["message_types"]
+    return {
+        "stations": per_station.height,
+        "candidates": len(candidates),
+        "one_reading_a_day": daily.height,
+        "daily_with_wind_and_no_unit_code": daily.filter(
+            pl.col("n_wind") > 0, pl.col("n_unit") == 0
+        ).height,
+        "daily_hour_of_day": int(daily_hours[0]) if daily_hours.len() == 1 else -1,
+        "hourly_without_wind": per_station.filter(
+            ~pl.col("src_id").is_in(candidates), pl.col("hours_of_day") > 1, pl.col("n_wind") == 0
+        ).height,
+        "synop_only": sum(types.to_list() == ["SYNOP"] for types in candidate_types),
+        "awshrly_only": sum(types.to_list() == ["AWSHRLY"] for types in candidate_types),
+        "both_message_types": sum(len(types) == 2 for types in candidate_types),
+    }
+
+
+def _correlations(
+    *, window: pl.DataFrame, chosen_k1: pl.DataFrame, observed: pl.DataFrame
+) -> dict[int, float]:
+    """Correlate the nearest station's speed with UKV's 10 m speed at each hour offset, pooled.
+
+    An offset of +1 hour pairs UKV's speed at `t` with the station's reading stamped `t` + 1 hour.
+
+    Args:
+        window: The page's rows in the window.
+        chosen_k1: The nearest eligible station per farm.
+        observed: `station_observations`'s output.
+
+    Returns:
+        Offset to Pearson correlation over every farm-hour with both values.
+    """
+    station = observed.join(chosen_k1.select("site", "src_id"), on="src_id").select(
+        "site", "time", "speed"
+    )
+    result: dict[int, float] = {}
+    for offset in LAG_SCAN_HOURS:
+        shifted = station.with_columns(time=pl.col("time") - pl.duration(hours=offset))
+        paired = window.select("site", "time", "speed_10m_ukv").join(
+            shifted, on=["site", "time"], how="inner"
+        )
+        result[offset] = float(paired.select(pl.corr(a="speed", b="speed_10m_ukv")).item())
+    return result
+
+
+def _direction_disagreement(*, frame: pl.DataFrame) -> float:
+    """Return the mean absolute angle between the station's direction and ERA5's 100 m direction.
+
+    Args:
+        frame: The row set carrying the station's and ERA5's direction sines and cosines.
+
+    Returns:
+        The mean, in degrees, over the non-calm station hours pooled over farms; a calm hour has
+        the station's sine and cosine both zero.
+    """
+    non_calm = frame.filter((pl.col("station_sin") != 0.0) | (pl.col("station_cos") != 0.0))
+    station = np.degrees(
+        np.arctan2(non_calm["station_sin"].to_numpy(), non_calm["station_cos"].to_numpy())
+    )
+    era5 = np.degrees(
+        np.arctan2(non_calm["sin_100m_era5"].to_numpy(), non_calm["cos_100m_era5"].to_numpy())
+    )
+    wrapped = np.abs((station - era5 + 180.0) % 360.0 - 180.0)
+    return float(wrapped.mean())
+
+
+def _range(*, values: pl.Series) -> tuple[float, float]:
+    """Return the smallest and largest value of a series.
+
+    Args:
+        values: A numeric series.
+
+    Returns:
+        The minimum and the maximum.
+    """
+    array = values.to_numpy()
+    return float(array.min()), float(array.max())
+
+
+def _candidate_exposure(
+    *, observed: pl.DataFrame
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Return the pooled range, over the candidates, of each one's mean speed and calm share.
+
+    The window is the row set's window, and only the smallest and largest value over the candidate
+    stations are returned, so no value can be tied to a station.
+
+    Args:
+        observed: `station_observations`'s output.
+
+    Returns:
+        The range of the per-station mean speed in metres per second, and the range of the
+        per-station share of observed hours that are calm.
+    """
+    per_station = (
+        observed.filter(pl.col("time") >= WINDOW_START, pl.col("time") < WINDOW_END_EXCLUSIVE)
+        .group_by("src_id")
+        .agg(mean_speed=pl.col("speed").mean(), calm_share=pl.col("calm").mean())
+    )
+    return _range(values=per_station["mean_speed"]), _range(values=per_station["calm_share"])
+
+
+def run_checks(
+    *,
+    window: pl.DataFrame,
+    frame: pl.DataFrame,
+    chosen_k1: pl.DataFrame,
+    chosen_k3: pl.DataFrame,
+    observed: pl.DataFrame,
+) -> ChecksResult:
+    """Compute every pre-fit check, reporting stations, hours and distances pooled over farms.
+
+    Args:
+        window: The page's rows in the window.
+        frame: The row set every arm is fitted on.
+        chosen_k1: The nearest eligible station per farm.
+        chosen_k3: The three nearest eligible stations per farm.
+        observed: `station_observations`'s output.
+
+    Returns:
+        The results.
+    """
+    required = window.select("site", "time")
+    hours_by_farm = required.group_by("site").agg(n_required=pl.len())
+    per_pair = (
+        required.join(observed.select("src_id", "time"), on="time")
+        .group_by("site", "src_id")
+        .agg(n_covered=pl.len())
+        .join(hours_by_farm, on="site")
+        .with_columns(coverage=pl.col("n_covered") / pl.col("n_required"))
+        .filter(pl.col("coverage") >= MIN_COVERAGE)
+    )
+    raw_units = read_hourly_weather(
+        path=HOURLY_WEATHER_PATH, columns=["wind_speed_m_s", "wind_speed_unit_id"]
+    ).filter(pl.col("src_id").is_in(candidate_stations()), pl.col("wind_speed_m_s").is_not_null())
+    scored = observed.join(chosen_k1.select("site", "src_id"), on="src_id").join(
+        frame.select("site", "time"), on=["site", "time"]
+    )
+    fold_months_by_farm = frame.select("site", "fold", "month").unique()
+    layouts = [
+        sorted(
+            fold_months_by_farm.filter(pl.col("site") == site, pl.col("fold") == fold)[
+                "month"
+            ].to_list()
+        )
+        for site in sorted(frame["site"].unique().to_list())
+        for fold in range(N_FOLDS)
+    ]
+    fold_months = [
+        sorted(fold_months_by_farm.filter(pl.col("fold") == fold)["month"].unique().to_list())
+        for fold in range(N_FOLDS)
+    ]
+    coverage = calendar_month_coverage(frame=frame)
+    single_year = coverage.filter(pl.col("n_years") == 1)
+    speeds = frame["station_speed"]
+    candidate_mean_speed, candidate_calm_share = _candidate_exposure(observed=observed)
+    return {
+        "window_rows": window.height,
+        "frame_rows": frame.height,
+        "station_kinds": _station_kinds(),
+        "distance_k1": _range(values=chosen_k1["distance_km"]),
+        "distance_k3": _range(values=chosen_k3.filter(pl.col("rank") == 3)["distance_km"]),
+        "coverage_k1": _range(values=chosen_k1["coverage"]),
+        "skipped_nearer": _range(values=chosen_k3["skipped_nearer"]),
+        "eligible_missing_share": _range(values=1.0 - per_pair["coverage"]),
+        "n_eligible_pairs": per_pair.height,
+        "speed_range": _range(values=speeds),
+        "speed_mean": float(speeds.to_numpy().mean()),
+        "candidate_mean_speed": candidate_mean_speed,
+        "candidate_calm_share": candidate_calm_share,
+        "direction_facts": {
+            "calm_share": float(scored["calm"].to_numpy().mean()),
+            "calm_rows_with_speed": float(
+                scored.filter(pl.col("calm"), pl.col("speed") > 0.0).height
+            ),
+            "multiples_of_ten_share": float(
+                ((observed.filter(~pl.col("calm"))["direction"] % 10.0) == 0.0).to_numpy().mean()
+            ),
+            "direction_disagreement_deg": _direction_disagreement(frame=frame),
+            "whole_knot_share": float(
+                (
+                    (
+                        (observed["speed"] / MS_PER_KNOT).round(decimals=0) * MS_PER_KNOT
+                        - observed["speed"]
+                    )
+                    .abs()
+                    .to_numpy()
+                    < WHOLE_KNOT_TOLERANCE_M_S
+                ).mean()
+            ),
+        },
+        "unit_rows": {
+            "with_unit_code_4": int(
+                raw_units.filter(pl.col("wind_speed_unit_id") == EXPECTED_UNIT_CODE).height
+            ),
+            "with_no_unit_code": int(raw_units["wind_speed_unit_id"].null_count()),
+            "with_another_code": int(
+                raw_units.filter(
+                    pl.col("wind_speed_unit_id").is_not_null(),
+                    pl.col("wind_speed_unit_id") != EXPECTED_UNIT_CODE,
+                ).height
+            ),
+        },
+        "off_the_hour_rows": int(
+            observed.filter(
+                (pl.col("time").dt.minute() != 0) | (pl.col("time").dt.second() != 0)
+            ).height
+        ),
+        "correlations": _correlations(window=window, chosen_k1=chosen_k1, observed=observed),
+        "fold_months": fold_months,
+        "same_fold_layout": all(
+            layouts[fold] == layouts[fold + index * N_FOLDS]
+            for index in range(1, frame["site"].n_unique())
+            for fold in range(N_FOLDS)
+        ),
+        "coverage": coverage,
+        "single_year_months": sorted(single_year["calendar_month"].unique().to_list()),
+        "single_year_share": float(
+            single_year["n_scored"].to_numpy().sum() / coverage["n_scored"].to_numpy().sum()
+        ),
+    }
+
+
+def _raise_on_failed_checks(*, checks: ChecksResult, frame: pl.DataFrame) -> None:
+    """Raise if a pre-fit check fails, before any arm is fitted.
+
+    Args:
+        checks: `run_checks`'s result.
+        frame: The row set, whose arm columns must hold no missing value.
+
+    Raises:
+        ValueError: If a timestamp is off the hour, the station-against-UKV correlation does not
+            peak at zero offset, an uncovered calendar month occurs in two years, or an arm column
+            holds a missing value.
+    """
+    if checks["off_the_hour_rows"]:
+        msg = f"{checks['off_the_hour_rows']} station rows are stamped off the hour"
+        raise ValueError(msg)
+    correlations = checks["correlations"]
+    if max(correlations, key=correlations.__getitem__) != 0:
+        msg = f"the station-against-UKV correlation does not peak at zero offset: {correlations}"
+        raise ValueError(msg)
+    raise_on_uncovered_months(coverage=checks["coverage"])
+    every_column = {
+        column
+        for columns in (*arm_columns().values(), *post_review_arm_columns().values())
+        for column in columns
+    }
+    check_no_missing(frame=frame, columns=sorted(every_column))
+
+
+def _shear_control(*, frame: pl.DataFrame) -> float:
+    """Fit one fold of one farm on the raw and the 1/7-power-scaled station speed, and compare.
+
+    A tree model is invariant to a monotone rescaling of one column, so the predictions should
+    match. This is a control, not an arm: nothing here enters `losses.parquet`.
+
+    Args:
+        frame: The row set carrying `fold`, `power_mw` and the station columns.
+
+    Returns:
+        The largest absolute difference between the two fits' predictions, in MW.
+    """
+    site = min(frame["site"].unique().to_list())
+    rows = frame.filter(pl.col("site") == site)
+    scale = SHEAR_HEIGHT_RATIO**SHEAR_EXPONENT
+    scaled = rows.with_columns(station_speed=pl.col("station_speed") * scale)
+    predictions = []
+    for source in (rows, scaled):
+        prediction, _ = fit_one_fold(
+            train=source.filter(pl.col("fold") != 0),
+            test=source.filter(pl.col("fold") == 0),
+            features=[*SHARED_FEATURES, *STATION_COLUMNS],
+            target="power_mw",
+            hyper_parameters=PRIMARY_HYPER_PARAMETERS,
+            seed=SEEDS[0],
+            with_quantiles=False,
+        )
+        predictions.append(prediction)
+    return float(np.abs(predictions[0] - predictions[1]).max())
+
+
+def _checks_lines(*, checks: ChecksResult) -> list[str]:
+    """Render the pre-fit checks as markdown, pooled over farms.
+
+    Args:
+        checks: `run_checks`'s result.
+
+    Returns:
+        Markdown lines.
+    """
+    dropped = checks["window_rows"] - checks["frame_rows"]
+    correlations = checks["correlations"]
+    facts = checks["direction_facts"]
+    kinds = checks["station_kinds"]
+    lines = [
+        "#### Row set and station checks, pooled over the three farms, run before any fit",
+        "",
+        (
+            "- Candidate-station rule: every station in the MIDAS Open hourly-weather file with at "
+            "least one wind speed row that the download script converted to metres per second. "
+            "MIDAS records the speed in knots (unit code 4), so a row has a metres-per-second "
+            "speed only where it carries that unit code, and the metres-per-second speed is "
+            "derived, never delivered. "
+            f"Of the file's {kinds['stations']} stations, {kinds['candidates']} are candidates, "
+            f"{kinds['hourly_without_wind']} report no wind speed on any row, and "
+            f"{kinds['one_reading_a_day']} return one reading a day, at hour "
+            f"{kinds['daily_hour_of_day']:02d}:00 UTC. Of those {kinds['one_reading_a_day']}, "
+            f"{kinds['daily_with_wind_and_no_unit_code']} carry a raw wind speed and no unit code, "
+            "so none of the daily stations is a candidate."
+        ),
+        (
+            f"- Candidates by message type: {kinds['synop_only']} carry SYNOP rows only, "
+            f"{kinds['awshrly_only']} carry AWSHRLY rows only, and {kinds['both_message_types']} "
+            "carry rows of both types (counts of stations)."
+        ),
+        (
+            "- Exposure differs between the candidates. Over the window, each candidate's mean "
+            "speed over its own observed hours, range over the candidates: "
+            f"{checks['candidate_mean_speed'][0]:.1f} to {checks['candidate_mean_speed'][1]:.1f} "
+            "m/s. Each candidate's share of observed hours that are calm, range over the "
+            f"candidates: {checks['candidate_calm_share'][0]:.2%} to "
+            f"{checks['candidate_calm_share'][1]:.2%}."
+        ),
+        (
+            f"- Page rows in the window: {checks['window_rows']:,}. Rows after the station rule: "
+            f"{checks['frame_rows']:,}. Rows dropped for want of an observed nearest-station hour: "
+            f"{dropped:,}."
+        ),
+        (
+            f"- Nearest eligible station's distance from its farm, range over the three farms: "
+            f"{checks['distance_k1'][0]:.0f} to {checks['distance_k1'][1]:.0f} km. Third-nearest "
+            f"eligible station: {checks['distance_k3'][0]:.0f} to "
+            f"{checks['distance_k3'][1]:.0f} km."
+        ),
+        (
+            f"- Every nearest eligible station covers at least "
+            f"{math.floor(checks['coverage_k1'][0] * 1000) / 10:.1f}% of its farm's required hours "
+            f"(the rule needs {MIN_COVERAGE:.0%})."
+        ),
+        (
+            f"- Nearer stations skipped for failing the coverage rule, range over farms and ranks: "
+            f"{checks['skipped_nearer'][0]:.0f} to {checks['skipped_nearer'][1]:.0f}."
+        ),
+        (
+            "- Missing share of required hours, range over the "
+            f"{checks['n_eligible_pairs']} eligible (farm, station) pairs: "
+            f"{checks['eligible_missing_share'][0]:.4f} to "
+            f"{checks['eligible_missing_share'][1]:.4f}."
+        ),
+        (
+            f"- Nearest-station wind speed on the scored rows: {checks['speed_range'][0]:.2f} to "
+            f"{checks['speed_range'][1]:.2f} m/s, mean {checks['speed_mean']:.2f} m/s."
+        ),
+        (
+            "- Calm hours (direction 0) on the scored rows: "
+            f"{facts['calm_share']:.4f} of rows; calm rows with a speed above zero: "
+            f"{int(facts['calm_rows_with_speed'])}. A calm row enters as sine and cosine both "
+            "zero; 360 is read as north (0 degrees)."
+        ),
+        (
+            "- Share of station directions, excluding calm rows, that are multiples of 10 degrees: "
+            f"{facts['multiples_of_ten_share']:.4f}. Share of station speeds that are whole knots: "
+            f"{facts['whole_knot_share']:.4f}."
+        ),
+        (
+            "- Mean absolute disagreement between the station's 10 m direction and ERA5's 100 m "
+            f"direction, over non-calm hours pooled over farms: "
+            f"{facts['direction_disagreement_deg']:.1f} degrees."
+        ),
+        TIMESTAMP_NOTE,
+        UNIT_NOTE,
+        (
+            f"- Unit codes, over every candidate station's wind-speed rows: code 4 on "
+            f"{checks['unit_rows']['with_unit_code_4']:,} rows, no code on "
+            f"{checks['unit_rows']['with_no_unit_code']:,} rows, any other code on "
+            f"{checks['unit_rows']['with_another_code']:,} rows."
+        ),
+        f"- Station rows stamped off the hour: {checks['off_the_hour_rows']}.",
+        "- Correlation of the nearest station's speed with UKV's 10 m speed, pooled over farms, "
+        "by hour offset (+1 pairs UKV at t with the station stamped t + 1 hour): "
+        + ", ".join(f"{offset:+d} h: {correlations[offset]:.3f}" for offset in LAG_SCAN_HOURS)
+        + ".",
+        "",
+        "#### Folds and calendar-month coverage, checked before any fit",
+        "",
+        (
+            "Months in each fold (every farm holds the same layout: "
+            f"{'yes' if checks['same_fold_layout'] else 'NO'}):"
+        ),
+        "",
+    ]
+    lines += [
+        f"- Fold {fold}: {len(months)} months, {months[0]} to {months[-1]}"
+        for fold, months in enumerate(checks["fold_months"])
+    ]
+    coverage = checks["coverage"]
+    pooled = (
+        coverage.group_by("fold", "calendar_month")
+        .agg(
+            n_scored=pl.col("n_scored").sum(),
+            n_train=pl.col("n_train").sum(),
+            n_years=pl.col("n_years").max(),
+        )
+        .sort("fold", "calendar_month")
+    )
+    uncovered = coverage.filter(~pl.col("covered"), pl.col("n_years") > 1).height
+    lines += [
+        "",
+        (
+            f"Cells (farm, fold, calendar month) checked: {coverage.height}. Cells with no "
+            "training "
+            f"row for a calendar month that occurs in two years: {uncovered}. Calendar months that "
+            f"occur in one year only: {checks['single_year_months']}, which hold "
+            f"{checks['single_year_share']:.1%} of the scored rows and are scored by models that "
+            "never "
+            "trained on that calendar month, so `day_of_year` extrapolates for every arm."
+        ),
+        "",
+        (
+            "| Fold | Calendar month | Rows scored, three farms | Training rows, three farms "
+            "| Years of that month |"
+        ),
+        "|---|---|---|---|---|",
+    ]
+    lines += [
+        f"| {row['fold']} | {row['calendar_month']} | {row['n_scored']:,} | {row['n_train']:,} "
+        f"| {row['n_years']} |"
+        for row in pooled.iter_rows(named=True)
+    ]
+    return lines
+
+
+# ---------------------------------------------------------------------------------------------
+# Report.
+# ---------------------------------------------------------------------------------------------
+
+
+def _arm_columns_lines(*, job_list: list[Job]) -> list[str]:
+    """Render every fitted arm's feature columns and their count, once per arm.
+
+    Args:
+        job_list: Every job `jobs()` returns.
+
+    Returns:
+        Markdown lines.
+    """
+    seen: dict[str, tuple[str, ...]] = {}
+    for arm, _, _, columns, _, _ in job_list:
+        seen.setdefault(arm, columns)
+    lines = ["#### Every arm's feature columns", ""]
+    lines += [
+        f"- `{arm}` ({len(columns)} columns, {len(columns) - len(SHARED_FEATURES)} wind): "
+        f"{', '.join(f'`{column}`' for column in columns)}"
+        for arm, columns in seen.items()
+    ]
+    return lines
+
+
+def _absolute_record(
+    *,
+    section: str,
+    setting: str,
+    scope: str,
+    arm: str,
+    values: dict[str, float],
+    n_rows: int | None,
+    n_months: int | None,
+) -> IntervalRecord:
+    """Build the log record of one arm's absolute error and its interval.
+
+    Args:
+        section: The report section.
+        setting: `pooled` or `sensitivity`.
+        scope: `all`, or a farm label.
+        arm: The arm.
+        values: `value`, `lower` and `upper`, in percentage points.
+        n_rows: The rows the interval rests on, or `None` for a per-farm interval.
+        n_months: The months the interval rests on, or `None` for a per-farm interval.
+
+    Returns:
+        The record.
+    """
+    return {
+        "section": section,
+        "setting": setting,
+        "scope": scope,
+        "treatment": arm,
+        "reference": None,
+        "value": values["value"],
+        "lower": values["lower"],
+        "upper": values["upper"],
+        "level": 95.0,
+        "n_rows": n_rows,
+        "n_months": n_months,
+        "folds_agreeing": None,
+        "n_folds": None,
+    }
+
+
+def _leaderboard_lines(
+    *, losses: pl.DataFrame, setting: str, arms: list[str], log: IntervalLog
+) -> list[str]:
+    """Render every arm's absolute error, pooled with its 95% interval, then per farm.
+
+    Per-farm rows carry no row count, and the interval rests on whole months and a seed.
+
+    Args:
+        losses: Per-row losses at one setting.
+        setting: `pooled` or `sensitivity`.
+        arms: The arms to show, in order.
+        log: Where the intervals are recorded.
+
+    Returns:
+        Markdown lines.
+    """
+    columns = {
+        arm: len(cols) - len(SHARED_FEATURES)
+        for arm, cols in {**arm_columns(), **post_review_arm_columns()}.items()
+    }
+    lines = [
+        "| Arm | Wind columns | MAE (pp of capacity) | 95% interval | Rows | Months |",
+        "|---|---|---|---|---|---|",
+    ]
+    for arm in arms:
+        interval = bootstrap_absolute(losses=losses, arm=arm, metric=METRIC)
+        value, lower, upper = (
+            interval[key] * PERCENTAGE_POINTS for key in ("value", "lower_95", "upper_95")
+        )
+        log.records.append(
+            _absolute_record(
+                section="leaderboard",
+                setting=setting,
+                scope="all",
+                arm=arm,
+                values={"value": value, "lower": lower, "upper": upper},
+                n_rows=interval["n_rows"],
+                n_months=interval["n_months"],
+            )
+        )
+        lines.append(
+            f"| `{arm}` | {columns[arm]} | {value:.3f} | [{lower:.3f}, {upper:.3f}] "
+            f"| {interval['n_rows']:,} | {interval['n_months']} |"
+        )
+    lines += ["", "Per farm (95% interval from resampling whole months and a seed):", ""]
+    lines += ["| Arm | Farm | MAE (pp of capacity) | 95% interval |", "|---|---|---|---|"]
+    for arm in arms:
+        for site in sorted(losses["site"].unique().to_list()):
+            interval = bootstrap_absolute(
+                losses=losses.filter(pl.col("site") == site), arm=arm, metric=METRIC
+            )
+            value, lower, upper = (
+                interval[key] * PERCENTAGE_POINTS for key in ("value", "lower_95", "upper_95")
+            )
+            log.records.append(
+                _absolute_record(
+                    section="leaderboard",
+                    setting=setting,
+                    scope=site,
+                    arm=arm,
+                    values={"value": value, "lower": lower, "upper": upper},
+                    n_rows=None,
+                    n_months=None,
+                )
+            )
+            lines.append(f"| `{arm}` | {site} | {value:.3f} | [{lower:.3f}, {upper:.3f}] |")
+    return lines
+
+
+def contrast_line(
+    *,
+    losses: pl.DataFrame,
+    treatment: str,
+    reference: str,
+    label: str,
+    section: str,
+    setting: str,
+    log: IntervalLog,
+    per_farm: bool = False,
+) -> str:
+    """Return one markdown contrast row, and record its interval in `log`.
+
+    A per-farm row carries no row or month count.
+
+    Args:
+        losses: Per-row losses holding both arms, restricted to the scope wanted.
+        treatment: The arm whose error is being compared.
+        reference: The arm it is compared against.
+        label: The scope label for the first column.
+        section: The report section, saved with the interval.
+        setting: `pooled` or `sensitivity`, saved with the interval.
+        log: Where the interval is recorded.
+        per_farm: Whether the scope is one farm, in which case no count is printed or saved.
+
+    Returns:
+        The table row.
+    """
+    interval = bootstrap_difference(
+        losses=losses, treatment=treatment, reference=reference, metric=METRIC
+    )
+    folds = per_fold_differences(
+        losses=losses, treatment=treatment, reference=reference, metric=METRIC
+    )
+    agreeing = int(sum(np.sign(value) == np.sign(interval["difference"]) for value in folds))
+    difference, lower, upper = (
+        interval[key] * PERCENTAGE_POINTS for key in ("difference", "lower_95", "upper_95")
+    )
+    excludes = interval["lower_95"] > 0.0 or interval["upper_95"] < 0.0
+    log.records.append(
+        {
+            "section": section,
+            "setting": setting,
+            "scope": label,
+            "treatment": treatment,
+            "reference": reference,
+            "value": difference,
+            "lower": lower,
+            "upper": upper,
+            "level": 95.0,
+            "n_rows": None if per_farm else interval["n_rows"],
+            "n_months": None if per_farm else interval["n_months"],
+            "folds_agreeing": agreeing,
+            "n_folds": len(folds),
+        }
+    )
+    row = (
+        f"| {label} | {treatment} − {reference} | {difference:+.3f} | "
+        f"[{lower:+.3f}, {upper:+.3f}] | {'**yes**' if excludes else 'no'} | "
+        f"{agreeing} of {len(folds)} |"
+    )
+    if per_farm:
+        return row
+    return f"{row} {interval['n_rows']:,} | {interval['n_months']} |"
+
+
+def _contrast_table(
+    *,
+    losses: pl.DataFrame,
+    pairs: tuple[tuple[str, str], ...],
+    section: str,
+    setting: str,
+    log: IntervalLog,
+    by_farm: bool,
+    label: str = "all",
+) -> list[str]:
+    """Render a contrast table over `pairs`, pooled or one row per farm and pair.
+
+    Args:
+        losses: Per-row losses holding every arm the pairs name.
+        pairs: Each (treatment, reference).
+        section: The report section, saved with each interval.
+        setting: `pooled` or `sensitivity`.
+        log: Where the intervals are recorded.
+        by_farm: Whether to print one row per farm and pair, without any row count.
+        label: The scope label of a pooled row.
+
+    Returns:
+        Markdown lines, starting with the caveat line for a pooled table.
+    """
+    if by_farm:
+        rows = [
+            contrast_line(
+                losses=losses.filter(pl.col("site") == site),
+                treatment=treatment,
+                reference=reference,
+                label=site,
+                section=section,
+                setting=setting,
+                log=log,
+                per_farm=True,
+            )
+            for treatment, reference in pairs
+            for site in sorted(losses["site"].unique().to_list())
+        ]
+        return [*FARM_CONTRAST_HEADER, *rows]
+    rows = [
+        contrast_line(
+            losses=losses,
+            treatment=treatment,
+            reference=reference,
+            label=label,
+            section=section,
+            setting=setting,
+            log=log,
+        )
+        for treatment, reference in pairs
+    ]
+    return [*CONTRAST_HEADER, *rows]
+
+
+def _pooled_caveat(*, losses: pl.DataFrame, arm: str) -> str:
+    """Return the caveat line printed under every pooled interval.
+
+    Args:
+        losses: Per-row losses at one setting.
+        arm: An arm whose rows and months the interval rests on.
+
+    Returns:
+        The line, with the pooled row and month counts.
+    """
+    interval = bootstrap_absolute(losses=losses, arm=arm, metric=METRIC)
+    return POOLED_CAVEAT.format(rows=interval["n_rows"], months=interval["n_months"])
+
+
+def _bonferroni_lines(*, losses: pl.DataFrame, setting: str, log: IntervalLog) -> list[str]:
+    """Render the planned contrasts with intervals adjusted for the four planned intervals.
+
+    Each interval is a percentile interval of the same month-and-seed resampling as
+    `bootstrap_difference`, at the level `BONFERRONI_LEVEL`.
+
+    Args:
+        losses: Per-row losses at one setting, holding the arms of the planned contrasts.
+        setting: `pooled` or `sensitivity`.
+        log: Where the intervals are recorded.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        (
+            f"| Contrast | ΔMAE (pp of capacity) | {BONFERRONI_LEVEL:.2f}% interval "
+            "| Excludes zero? "
+            "| Months |"
+        ),
+        "|---|---|---|---|---|",
+    ]
+    for name, treatment, reference in PLANNED_CONTRASTS:
+        differences, months = paired_differences(
+            losses=losses, treatment=treatment, reference=reference, metric=METRIC
+        )
+        lower, upper = (
+            value * PERCENTAGE_POINTS
+            for value in bootstrap_difference_at_level(
+                losses=losses,
+                treatment=treatment,
+                reference=reference,
+                metric=METRIC,
+                level=BONFERRONI_LEVEL,
+            )
+        )
+        difference = float(differences.mean()) * PERCENTAGE_POINTS
+        n_months = len(np.unique(months))
+        log.records.append(
+            {
+                "section": "bonferroni",
+                "setting": setting,
+                "scope": "all",
+                "treatment": treatment,
+                "reference": reference,
+                "value": difference,
+                "lower": lower,
+                "upper": upper,
+                "level": BONFERRONI_LEVEL,
+                "n_rows": differences.shape[1],
+                "n_months": n_months,
+                "folds_agreeing": None,
+                "n_folds": None,
+            }
+        )
+        excludes = lower > 0.0 or upper < 0.0
+        lines.append(
+            f"| {name}: {treatment} − {reference} | {difference:+.3f} "
+            f"| [{lower:+.3f}, {upper:+.3f}] | {'**yes**' if excludes else 'no'} | {n_months} |"
+        )
+    return lines
+
+
+def _season_lines(
+    *,
+    losses: pl.DataFrame,
+    setting: str,
+    log: IntervalLog,
+    months: tuple[int, ...],
+    section: str,
+    label: str,
+) -> list[str]:
+    """Render the planned contrasts scored on some calendar months only (exploratory).
+
+    The models are the same ones fitted on every month. Only the scored rows are restricted.
+
+    Args:
+        losses: Per-row losses at one setting.
+        setting: `pooled` or `sensitivity`.
+        log: Where the intervals are recorded.
+        months: The calendar months (1 to 12) to score.
+        section: The report section, saved with each interval.
+        label: The scope label of each row.
+
+    Returns:
+        Markdown lines.
+    """
+    restricted = losses.filter(pl.col("time").dt.month().is_in(months))
+    return _contrast_table(
+        losses=restricted,
+        pairs=tuple((first, second) for _, first, second in PLANNED_CONTRASTS),
+        section=section,
+        setting=setting,
+        log=log,
+        by_farm=False,
+        label=label,
+    )
+
+
+def _calendar_month_sums(
+    *, differences: np.ndarray, months: np.ndarray
+) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Sum each month's differences, per seed, and count each month's rows.
+
+    Args:
+        differences: Per-seed, per-row differences, shape (n_seeds, n_rows).
+        months: Each row's month label, `YYYY-MM`.
+
+    Returns:
+        The per-seed sums, shape (n_seeds, n_months); each month's row count; and each month's
+        calendar month (1 to 12). Months are in sorted order.
+    """
+    unique_months, month_index = np.unique(months, return_inverse=True)
+    sums = np.stack(
+        [
+            np.bincount(month_index, weights=seed_differences, minlength=len(unique_months))
+            for seed_differences in differences
+        ]
+    )
+    counts = np.bincount(month_index, minlength=len(unique_months)).astype(float)
+    calendar = np.array([int(str(label)[-2:]) for label in unique_months])
+    return sums, counts, calendar
+
+
+def _calendar_weights(*, counts: np.ndarray, calendar: np.ndarray) -> np.ndarray:
+    """Weight each `YYYY-MM` month by 1 over the rows of its calendar month in the whole window.
+
+    Args:
+        counts: Each `YYYY-MM` month's row count.
+        calendar: Each month's calendar month (1 to 12).
+
+    Returns:
+        One weight per `YYYY-MM` month. Every row of a calendar month carries the same weight, and
+        the weights of one calendar month's rows sum to 1, so the weights of all rows sum to the
+        number of calendar months.
+    """
+    rows_per_calendar_month = np.bincount(calendar, weights=counts, minlength=13)
+    return 1.0 / rows_per_calendar_month[calendar]
+
+
+def _weighted_mean(
+    *, sums: np.ndarray, counts: np.ndarray, weights: np.ndarray, drawn: np.ndarray
+) -> float:
+    """Return the weighted mean difference over the rows of the drawn months.
+
+    Args:
+        sums: One seed's per-month difference sums.
+        counts: Each month's row count.
+        weights: `_calendar_weights`'s result.
+        drawn: The indices of the months drawn, repeats allowed.
+
+    Returns:
+        The sum of the weighted differences over the sum of the weights of the drawn rows.
+    """
+    return float((sums[drawn] * weights[drawn]).sum() / (counts[drawn] * weights[drawn]).sum())
+
+
+def calendar_balanced_difference(
+    *, differences: np.ndarray, months: np.ndarray
+) -> tuple[float, float, float, int]:
+    """Weight each calendar month equally, and interval the result by resampling whole months.
+
+    Each row carries a fixed weight, 1 over the rows of its calendar month in the whole window.
+    The estimate is the weighted mean of the differences over every row and every seed, which equals
+    the mean over calendar months (January to December) of each calendar month's mean difference.
+    The interval draws a seed, then draws whole `YYYY-MM` months with replacement, the same draws as
+    `studies.bootstrap`, and recomputes the weighted mean over the drawn rows with the same fixed
+    weights. The weights do not change with the draw, so a draw that misses a calendar month is not
+    averaged over fewer calendar months, and the resampled estimates stay centred on the estimate.
+    The bounds are the 2.5th and 97.5th percentiles of the resampled estimates.
+
+    Untested in `packages/studies`, because this function is a copy for one page; the script checks
+    it against a hand-computed case (`_check_calendar_balanced_difference`) on every run.
+
+    Args:
+        differences: Per-seed, per-row differences, shape (n_seeds, n_rows).
+        months: Each row's month label, `YYYY-MM`.
+
+    Returns:
+        The estimate, the lower and upper bounds, and the number of calendar months averaged.
+    """
+    sums, counts, calendar = _calendar_month_sums(differences=differences, months=months)
+    weights = _calendar_weights(counts=counts, calendar=calendar)
+    estimate = _weighted_mean(
+        sums=sums.mean(axis=0), counts=counts, weights=weights, drawn=np.arange(len(counts))
+    )
+    generator = np.random.default_rng(BOOTSTRAP_SEED)
+    resampled = np.empty(N_BOOTSTRAP_RESAMPLES)
+    for resample in range(N_BOOTSTRAP_RESAMPLES):
+        seed_index = generator.integers(0, differences.shape[0])
+        drawn = generator.integers(0, len(counts), size=len(counts))
+        resampled[resample] = _weighted_mean(
+            sums=sums[seed_index], counts=counts, weights=weights, drawn=drawn
+        )
+    low, high = np.percentile(resampled, q=(2.5, 97.5))
+    return estimate, float(low), float(high), len(np.unique(calendar))
+
+
+def _check_calendar_balanced_difference() -> None:
+    """Check `calendar_balanced_difference` against a case worked by hand, with unequal month sizes.
+
+    One seed, three `YYYY-MM` months. January 2024 holds the differences 1 and 3, January 2025
+    holds 5, 5, 5 and 5, and February 2024 holds 10. January's 6 rows have mean 24 / 6 = 4 and
+    February's one row has mean 10, so the balanced estimate is (4 + 10) / 2 = 7, where the mean
+    over every row is 34 / 7. A draw of January 2024 and February 2024 alone weights January's 2
+    rows by 1/6 and February's row by 1, giving (4/6 + 10) / (2/6 + 1) = 8.
+
+    Raises:
+        ValueError: If the estimate, the draw or the number of calendar months differs from the
+            hand-computed value.
+    """
+    differences = np.array([[1.0, 3.0, 5.0, 5.0, 5.0, 5.0, 10.0]])
+    months = np.array(["2024-01"] * 2 + ["2025-01"] * 4 + ["2024-02"])
+    estimate, low, high, n_calendar = calendar_balanced_difference(
+        differences=differences, months=months
+    )
+    sums, counts, calendar = _calendar_month_sums(differences=differences, months=months)
+    weights = _calendar_weights(counts=counts, calendar=calendar)
+    draw = _weighted_mean(sums=sums[0], counts=counts, weights=weights, drawn=np.array([0, 1]))
+    if not (
+        math.isclose(estimate, 7.0)
+        and math.isclose(draw, 8.0)
+        and n_calendar == 2
+        and low <= estimate <= high
+    ):
+        msg = (
+            f"calendar_balanced_difference gives estimate {estimate}, draw {draw}, "
+            f"{n_calendar} calendar months, not 7, 8 and 2"
+        )
+        raise ValueError(msg)
+
+
+def _calendar_balanced_lines(*, losses: pl.DataFrame, setting: str, log: IntervalLog) -> list[str]:
+    """Render the calendar-month-balanced estimate of each planned contrast, with its interval.
+
+    Args:
+        losses: Per-row losses at one setting.
+        setting: `pooled` or `sensitivity`.
+        log: Where the intervals are recorded.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        (
+            "| Contrast | Balanced ΔMAE (pp of capacity) | 95% interval | Excludes zero? "
+            "| Calendar months averaged | Rows | Months |"
+        ),
+        "|---|---|---|---|---|---|---|",
+    ]
+    for name, treatment, reference in PLANNED_CONTRASTS:
+        differences, months = paired_differences(
+            losses=losses, treatment=treatment, reference=reference, metric=METRIC
+        )
+        estimate, low, high, n_calendar = calendar_balanced_difference(
+            differences=differences, months=months
+        )
+        value, lower, upper = (bound * PERCENTAGE_POINTS for bound in (estimate, low, high))
+        n_months = len(np.unique(months))
+        log.records.append(
+            {
+                "section": "calendar_balanced",
+                "setting": setting,
+                "scope": "all",
+                "treatment": treatment,
+                "reference": reference,
+                "value": value,
+                "lower": lower,
+                "upper": upper,
+                "level": 95.0,
+                "n_rows": differences.shape[1],
+                "n_months": n_months,
+                "folds_agreeing": None,
+                "n_folds": None,
+            }
+        )
+        lines.append(
+            f"| {name}: {treatment} − {reference} | {value:+.3f} | [{lower:+.3f}, {upper:+.3f}] "
+            f"| {'**yes**' if lower > 0.0 or upper < 0.0 else 'no'} | {n_calendar} "
+            f"| {differences.shape[1]:,} | {n_months} |"
+        )
+    return lines
+
+
+def _per_calendar_month_lines(*, pooled: pl.DataFrame, sensitivity: pl.DataFrame) -> list[str]:
+    """Render each planned contrast's mean difference in each calendar month, pooled over farms.
+
+    A calendar month rests on one or two `YYYY-MM` months, so no interval is printed.
+
+    Args:
+        pooled: Per-row losses at the primary setting.
+        sensitivity: Per-row losses at the second setting.
+
+    Returns:
+        Markdown lines.
+    """
+    header = ["Calendar month", "Years", "Rows, three farms"]
+    columns: list[tuple[np.ndarray, np.ndarray]] = []
+    for setting_name, scope in (("primary", pooled), ("second", sensitivity)):
+        for name, treatment, reference in PLANNED_CONTRASTS:
+            header.append(f"{name}, {setting_name} setting")
+            differences, months = paired_differences(
+                losses=scope, treatment=treatment, reference=reference, metric=METRIC
+            )
+            columns.append((differences.mean(axis=0), months))
+    months = columns[0][1]
+    if not all(np.array_equal(months, other_months) for _, other_months in columns[1:]):
+        msg = "the four difference columns do not share one row order"
+        raise ValueError(msg)
+    calendar = np.array([int(str(label)[-2:]) for label in months])
+    lines = [
+        "| " + " | ".join(header) + " |",
+        "|" + "---|" * len(header),
+    ]
+    for calendar_month in sorted(set(calendar.tolist())):
+        selected = calendar == calendar_month
+        years = len(np.unique(months[selected]))
+        means = [f"{values[selected].mean() * PERCENTAGE_POINTS:+.3f}" for values, _ in columns]
+        lines.append(
+            f"| {calendar_month} | {years} | {int(selected.sum()):,} | " + " | ".join(means) + " |"
+        )
+    return lines
+
+
+def _month_group_sums(
+    *, differences: np.ndarray, months: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Sum one group's differences within each month, per seed, and count its rows per month.
+
+    Args:
+        differences: Per-seed, per-row differences, shape (n_seeds, n_rows).
+        months: Each row's month label.
+
+    Returns:
+        The per-seed sums, shape (n_seeds, n_months), and each month's row count. Months are in
+        sorted order.
+    """
+    sums, counts, _ = _calendar_month_sums(differences=differences, months=months)
+    return sums, counts
+
+
+def group_difference_interval(
+    *,
+    first: tuple[np.ndarray, np.ndarray],
+    second: tuple[np.ndarray, np.ndarray],
+    within_groups: bool,
+) -> tuple[float, float, float]:
+    """Interval the difference between two groups' mean differences, resampling whole months.
+
+    Each resample draws one fitting seed, as `studies.bootstrap` does, then whole `YYYY-MM` months
+    with replacement. Where the two groups score the same months (two farms), one draw of months
+    serves both. Where the groups hold different months (two seasons), each group draws its own
+    months from its own months only. The statistic is the first group's mean over the rows of its
+    drawn months minus the second's. The bounds are the 2.5th and 97.5th percentiles.
+
+    Untested in `packages/studies`, because this function is a copy for one page.
+
+    Args:
+        first: The first group's per-seed, per-row differences and each row's month label.
+        second: The second group's, in the same form.
+        within_groups: Whether each group draws months from its own months (seasons) rather than
+            both groups sharing one draw of the same months (farms).
+
+    Returns:
+        The estimate (the first group's mean over all its rows minus the second's), and the lower
+        and upper bounds.
+
+    Raises:
+        ValueError: If the groups are not resampled within themselves and their months differ.
+    """
+    sums_first, counts_first = _month_group_sums(differences=first[0], months=first[1])
+    sums_second, counts_second = _month_group_sums(differences=second[0], months=second[1])
+    if not within_groups and not np.array_equal(np.unique(first[1]), np.unique(second[1])):
+        msg = "two groups that share one draw of months must score the same months"
+        raise ValueError(msg)
+    estimate = float(first[0].mean() - second[0].mean())
+    generator = np.random.default_rng(BOOTSTRAP_SEED)
+    n_first, n_second = len(counts_first), len(counts_second)
+    resampled = np.empty(N_BOOTSTRAP_RESAMPLES)
+    for resample in range(N_BOOTSTRAP_RESAMPLES):
+        seed_index = generator.integers(0, first[0].shape[0])
+        drawn_first = generator.integers(0, n_first, size=n_first)
+        drawn_second = (
+            generator.integers(0, n_second, size=n_second) if within_groups else drawn_first
+        )
+        resampled[resample] = (
+            sums_first[seed_index, drawn_first].sum() / counts_first[drawn_first].sum()
+            - sums_second[seed_index, drawn_second].sum() / counts_second[drawn_second].sum()
+        )
+    low, high = np.percentile(resampled, q=(2.5, 97.5))
+    return estimate, float(low), float(high)
+
+
+def _check_group_difference_interval() -> None:
+    """Check `group_difference_interval` against cases worked by hand.
+
+    Case 1: two groups score the same two months, one seed. The first group's months hold the
+    differences 1 and 3, the second's hold 0 and 2, so every month differs by exactly 1 between the
+    groups. The estimate is 2 - 1 = 1, and because both groups share one draw of months, every
+    resample gives exactly 1, so the interval has no width. Case 2: the same groups resampled
+    within themselves draw their months independently, so the interval must have width. Case 3: a
+    first group of two constant months, 5 and 5, against a second group of one constant month, 2,
+    gives exactly 3 at every resample.
+
+    Raises:
+        ValueError: If an estimate or a bound differs from the hand-computed value.
+    """
+    months = np.array(["2024-01", "2024-02"])
+    first = (np.array([[1.0, 3.0]]), months)
+    second = (np.array([[0.0, 2.0]]), months)
+    shared = group_difference_interval(first=first, second=second, within_groups=False)
+    within = group_difference_interval(first=first, second=second, within_groups=True)
+    constant = group_difference_interval(
+        first=(np.array([[5.0, 5.0]]), months),
+        second=(np.array([[2.0]]), np.array(["2024-03"])),
+        within_groups=True,
+    )
+    if not (
+        all(math.isclose(value, 1.0) for value in shared)
+        and within[1] < 1.0 < within[2]
+        and math.isclose(within[0], 1.0)
+        and all(math.isclose(value, 3.0) for value in constant)
+    ):
+        msg = (
+            f"group_difference_interval gives {shared} shared, {within} within and {constant} "
+            "constant, not (1, 1, 1), a width around 1, and (3, 3, 3)"
+        )
+        raise ValueError(msg)
+
+
+def _group_record(
+    *,
+    section: str,
+    setting: str,
+    scope: str,
+    contrast: tuple[str, str],
+    interval: tuple[float, float, float],
+    counts: tuple[int | None, int | None],
+) -> IntervalRecord:
+    """Build the log record of one between-group interval, in percentage points.
+
+    Args:
+        section: `between_farm` or `season_difference`.
+        setting: `pooled` or `sensitivity`.
+        scope: The groups compared, such as `W1 - W3`.
+        contrast: The (treatment, reference) arms whose difference is compared between groups.
+        interval: The estimate and the lower and upper bounds, as fractions of capacity.
+        counts: The rows and months the interval rests on, or `None` where not printed.
+
+    Returns:
+        The record.
+    """
+    value, lower, upper = (bound * PERCENTAGE_POINTS for bound in interval)
+    return {
+        "section": section,
+        "setting": setting,
+        "scope": scope,
+        "treatment": contrast[0],
+        "reference": contrast[1],
+        "value": value,
+        "lower": lower,
+        "upper": upper,
+        "level": 95.0,
+        "n_rows": counts[0],
+        "n_months": counts[1],
+        "folds_agreeing": None,
+        "n_folds": None,
+    }
+
+
+def _between_group_lines(
+    *, pooled: pl.DataFrame, sensitivity: pl.DataFrame, log: IntervalLog
+) -> list[str]:
+    """Render S1's difference between farms and between the two seasons, exploratory.
+
+    A contrast that is significant at one farm and not at another does not show that the farms
+    differ, so each pair of farms and the two seasons are intervalled directly, with the same
+    resampling of whole months and a seed. Season groups hold different months, so each season
+    resamples its own months.
+
+    Args:
+        pooled: Per-row losses at the primary setting.
+        sensitivity: Per-row losses at the second setting.
+        log: Where the intervals are recorded.
+
+    Returns:
+        Markdown lines.
+    """
+    _, treatment, reference = PLANNED_CONTRASTS[0]
+    lines = [
+        (
+            "| Comparison | Contrast | Difference between groups | 95% interval "
+            "| Excludes zero? | Setting |"
+        ),
+        "|---|---|---|---|---|---|",
+    ]
+    for setting, scope in (("pooled", pooled), ("sensitivity", sensitivity)):
+        heading = "primary" if setting == "pooled" else "second"
+        by_farm = {
+            site: paired_differences(
+                losses=scope.filter(pl.col("site") == site),
+                treatment=treatment,
+                reference=reference,
+                metric=METRIC,
+            )
+            for site in sorted(scope["site"].unique().to_list())
+        }
+        comparisons = [
+            (
+                f"{first_site} - {second_site}",
+                group_difference_interval(
+                    first=by_farm[first_site], second=by_farm[second_site], within_groups=False
+                ),
+                "between_farm",
+                None,
+            )
+            for first_site, second_site in BETWEEN_FARM_PAIRS
+        ]
+        seasons = [
+            paired_differences(
+                losses=scope.filter(pl.col("time").dt.month().is_in(months)),
+                treatment=treatment,
+                reference=reference,
+                metric=METRIC,
+            )
+            for months in (AUGUST_TO_DECEMBER, JANUARY_TO_JULY)
+        ]
+        comparisons.append(
+            (
+                "Aug-Dec minus Jan-Jul",
+                group_difference_interval(first=seasons[0], second=seasons[1], within_groups=True),
+                "season_difference",
+                sum(group[0].shape[1] for group in seasons),
+            )
+        )
+        for label, interval, section, n_rows in comparisons:
+            n_months = (
+                len(np.unique(np.concatenate([group[1] for group in seasons])))
+                if section == "season_difference"
+                else len(np.unique(by_farm["W1"][1]))
+            )
+            log.records.append(
+                _group_record(
+                    section=section,
+                    setting=setting,
+                    scope=label,
+                    contrast=(treatment, reference),
+                    interval=interval,
+                    counts=(n_rows, n_months),
+                )
+            )
+            value, lower, upper = (bound * PERCENTAGE_POINTS for bound in interval)
+            lines.append(
+                f"| {label} | {treatment} − {reference} | {value:+.3f} | "
+                f"[{lower:+.3f}, {upper:+.3f}] "
+                f"| {'**yes**' if lower > 0.0 or upper < 0.0 else 'no'} | {heading} |"
+            )
+    return lines
+
+
+def _month_means(*, differences: np.ndarray, months: np.ndarray) -> list[float]:
+    """Return the mean difference in each `YYYY-MM` month, over its rows and every seed.
+
+    Args:
+        differences: Per-seed, per-row differences, shape (n_seeds, n_rows).
+        months: Each row's month label.
+
+    Returns:
+        One mean per month, in sorted month order.
+    """
+    sums, counts, _ = _calendar_month_sums(
+        differences=differences.mean(axis=0, keepdims=True), months=months
+    )
+    return (sums[0] / counts).tolist()
+
+
+def _t_check_lines(
+    *, pooled: pl.DataFrame, sensitivity: pl.DataFrame, log: IntervalLog
+) -> list[str]:
+    """Render, for each planned contrast, the bootstrap interval beside two t-intervals.
+
+    The bootstrap treats months as independent, and adjacent months' differences are correlated.
+    The fold-level interval is a t-interval on the mean of the per-fold differences (one per
+    held-out block of months), and the month-level interval is a t-interval on the mean of the
+    per-month mean differences. Each is centred on the mean of its own values, which is not the
+    row-weighted estimate.
+
+    Args:
+        pooled: Per-row losses at the primary setting.
+        sensitivity: Per-row losses at the second setting.
+        log: Where the intervals are recorded.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        (
+            "| Contrast | Setting | Row-weighted estimate | Bootstrap 95% interval "
+            "| Fold-level t-interval | Month-level t-interval |"
+        ),
+        "|---|---|---|---|---|---|",
+    ]
+    for setting, scope in (("pooled", pooled), ("sensitivity", sensitivity)):
+        heading = "primary" if setting == "pooled" else "second"
+        for name, treatment, reference in PLANNED_CONTRASTS:
+            boot = bootstrap_difference(
+                losses=scope, treatment=treatment, reference=reference, metric=METRIC
+            )
+            differences, months = paired_differences(
+                losses=scope, treatment=treatment, reference=reference, metric=METRIC
+            )
+            fold_values = per_fold_differences(
+                losses=scope, treatment=treatment, reference=reference, metric=METRIC
+            )
+            month_values = _month_means(differences=differences, months=months)
+            cells: list[str] = []
+            for kind, values in (("fold t", fold_values), ("month t", month_values)):
+                lower, upper = (
+                    bound * PERCENTAGE_POINTS for bound in fold_t_interval(fold_differences=values)
+                )
+                centre = float(np.mean(values)) * PERCENTAGE_POINTS
+                log.records.append(
+                    {
+                        "section": "t_check",
+                        "setting": setting,
+                        "scope": kind,
+                        "treatment": treatment,
+                        "reference": reference,
+                        "value": centre,
+                        "lower": lower,
+                        "upper": upper,
+                        "level": 95.0,
+                        "n_rows": None,
+                        "n_months": len(month_values) if kind == "month t" else None,
+                        "folds_agreeing": None,
+                        "n_folds": len(fold_values) if kind == "fold t" else None,
+                    }
+                )
+                cells.append(f"[{lower:+.3f}, {upper:+.3f}] ({len(values) - 1} df)")
+            lines.append(
+                f"| {name}: {treatment} − {reference} | {heading} "
+                f"| {boot['difference'] * PERCENTAGE_POINTS:+.3f} "
+                f"| [{boot['lower_95'] * PERCENTAGE_POINTS:+.3f}, "
+                f"{boot['upper_95'] * PERCENTAGE_POINTS:+.3f}] | {cells[0]} | {cells[1]} |"
+            )
+    return lines
+
+
+def _relative_size_lines(*, pooled: pl.DataFrame) -> list[str]:
+    """Render each planned contrast's size as a share of its reference arm's own error.
+
+    Args:
+        pooled: Per-row losses at the primary setting.
+
+    Returns:
+        Markdown lines.
+    """
+    lines: list[str] = []
+    for name, treatment, reference in PLANNED_CONTRASTS:
+        difference = bootstrap_difference(
+            losses=pooled, treatment=treatment, reference=reference, metric=METRIC
+        )["difference"]
+        own = bootstrap_absolute(losses=pooled, arm=reference, metric=METRIC)["value"]
+        lines.append(
+            f"- {name}'s difference is {abs(difference) * PERCENTAGE_POINTS:.3f} points, "
+            f"{abs(difference) / own:.1%} of `{reference}`'s own error of "
+            f"{own * PERCENTAGE_POINTS:.3f}% of capacity (primary setting)."
+        )
+    return lines
+
+
+def _persona_lines(
+    *, pooled: pl.DataFrame, sensitivity: pl.DataFrame, log: IntervalLog
+) -> list[str]:
+    """Render the persona-review additions, all exploratory and report-only.
+
+    Args:
+        pooled: Per-row losses at the primary setting, holding every arm.
+        sensitivity: Per-row losses at the second setting.
+        log: Where the intervals are recorded.
+
+    Returns:
+        Markdown lines.
+    """
+    return [
+        "",
+        "### Persona-review additions (exploratory, report-only, added after the persona reviews)",
+        "",
+        (
+            "Nothing below is fitted. Each table reads the saved losses. A contrast that is "
+            "statistically significant at one farm and not at another does not show that the "
+            "farms differ, so S1's difference between two farms, and between the two seasons, is "
+            "intervalled directly. The intervals resample whole calendar months and a fitting "
+            "seed. Two farms share one draw of the same months. The two seasons hold different "
+            "months, so each season resamples its own."
+        ),
+        "",
+        "#### S1's difference between farms and between seasons",
+        "",
+        _pooled_caveat(losses=pooled, arm="station_wind"),
+        "",
+        *_between_group_lines(pooled=pooled, sensitivity=sensitivity, log=log),
+        "",
+        "#### Each planned contrast's size against its reference arm's own error",
+        "",
+        *_relative_size_lines(pooled=pooled),
+        "",
+        "#### Fold-level and month-level t-intervals beside the bootstrap interval",
+        "",
+        (
+            "The bootstrap treats months as independent, and adjacent months' differences are "
+            "correlated. The fold-level interval is a t-interval on the mean of the 5 per-fold "
+            "differences (4 degrees of freedom). The month-level interval is a t-interval on the "
+            "mean of the 17 per-month mean differences (16 degrees of freedom). Each is centred on "
+            "the mean of its own values, not on the row-weighted estimate."
+        ),
+        "",
+        *_t_check_lines(pooled=pooled, sensitivity=sensitivity, log=log),
+    ]
+
+
+def _post_review_lines(
+    *, pooled: pl.DataFrame, sensitivity: pl.DataFrame, log: IntervalLog
+) -> list[str]:
+    """Render the post-review additions, all exploratory.
+
+    Args:
+        pooled: Per-row losses at the primary setting, holding every arm.
+        sensitivity: Per-row losses at the second setting.
+        log: Where the intervals are recorded.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        "",
+        "### Post-review additions (exploratory, added after the first results)",
+        "",
+        (
+            "Everything below was decided after the first results were seen, and none of it "
+            "replaces a planned contrast. The arms `station_speed_only`, `era5_10m_speed_only` and "
+            "`ukv_icon_d2_wind` were refitted, and are saved apart from the main losses."
+        ),
+    ]
+    post_review_pairs = tuple((first, second) for _, first, second in POST_REVIEW_CONTRASTS)
+    for setting, scope in (("pooled", pooled), ("sensitivity", sensitivity)):
+        heading = "primary" if setting == "pooled" else "second"
+        lines += [
+            "",
+            f"#### Leaderboard of the post-review arms, {heading} setting",
+            "",
+            _pooled_caveat(losses=scope, arm="station_wind"),
+            "",
+            *_leaderboard_lines(
+                losses=scope, setting=setting, arms=list(POST_REVIEW_SENSITIVITY_ARMS), log=log
+            ),
+            "",
+            f"#### Post-review contrasts (equal column counts), {heading} setting",
+            "",
+            _pooled_caveat(losses=scope, arm="station_wind"),
+            "",
+            *_contrast_table(
+                losses=scope,
+                pairs=post_review_pairs,
+                section="post_review",
+                setting=setting,
+                log=log,
+                by_farm=False,
+            ),
+        ]
+    lines += [
+        "",
+        "#### What ERA5's hub-height speed adds, primary setting",
+        "",
+        (
+            "`era5_wind` carries ERA5's hub-height speed, the sine and cosine of its hub-height "
+            "direction, and its 10 m speed (4 wind columns). `era5_10m_wind` drops the hub-height "
+            "speed (3 wind columns) and `era5_10m_speed_only` also drops the direction (1 wind "
+            "column), so neither pair has equal column counts. Positive means the arm with fewer "
+            "columns has the larger error."
+        ),
+        "",
+        _pooled_caveat(losses=pooled, arm="station_wind"),
+        "",
+        *_contrast_table(
+            losses=pooled,
+            pairs=HEIGHT_CONTRASTS,
+            section="height",
+            setting="pooled",
+            log=log,
+            by_farm=False,
+        ),
+    ]
+    for setting, scope in (("pooled", pooled), ("sensitivity", sensitivity)):
+        heading = "primary" if setting == "pooled" else "second"
+        lines += [
+            "",
+            f"#### S1 and S2 scored on January to July only, {heading} setting",
+            "",
+            (
+                "The 7 scored months are the calendar months that occur in one year of the window, "
+                "scored by models that never trained on that calendar month. The models are the "
+                "ones fitted on every month."
+            ),
+            "",
+            *_season_lines(
+                losses=scope,
+                setting=setting,
+                log=log,
+                months=JANUARY_TO_JULY,
+                section="january_to_july",
+                label="Jan-Jul",
+            ),
+            "",
+            (
+                "The August to December rows, on the calendar months that occur in both years, "
+                "are printed under the exploratory results above."
+            ),
+            "",
+            f"#### S1 and S2 with each calendar month weighted equally, {heading} setting",
+            "",
+            (
+                "The estimate is the mean, over calendar months, of each calendar month's mean "
+                "difference (over its rows, both years and every seed). Each row carries a fixed "
+                "weight, 1 over the rows of its calendar month in the whole window. The interval "
+                "draws a seed and then draws whole `YYYY-MM` months with replacement, as the other "
+                "intervals do, and recomputes the weighted mean over the drawn rows with the same "
+                "weights. The weights do not change with the draw, so a draw that misses a "
+                "calendar month is not averaged over fewer calendar months, and the resampled "
+                "estimates stay centred on the estimate. The bounds are the 2.5th and 97.5th "
+                "percentiles of the resampled estimates. The script checks the function against a "
+                "hand-computed case on every run."
+            ),
+            "",
+            *_calendar_balanced_lines(losses=scope, setting=setting, log=log),
+        ]
+    lines += [
+        "",
+        "#### S1 and S2 by calendar month, pooled over the three farms",
+        "",
+        (
+            "Mean difference in percentage points of capacity, first minus second. Each calendar "
+            "month rests on one or two `YYYY-MM` months, so no interval is printed."
+        ),
+        "",
+        *_per_calendar_month_lines(pooled=pooled, sensitivity=sensitivity),
+    ]
+    return lines
+
+
+def _report(
+    *,
+    frame: pl.DataFrame,
+    losses: pl.DataFrame,
+    job_list: list[Job],
+    checks: ChecksResult,
+    shear_difference_mw: float,
+    provenance: str,
+    log: IntervalLog,
+) -> str:
+    """Assemble the markdown report.
+
+    Args:
+        frame: The row set.
+        losses: Every arm's losses at every setting, the main and the post-review arms.
+        job_list: Every job `jobs()` and `post_review_jobs()` return.
+        checks: `run_checks`'s result.
+        shear_difference_mw: The shear control's largest prediction difference.
+        provenance: The sentence naming the commits and fingerprints the losses were fitted at.
+        log: Where every printed interval is recorded.
+
+    Returns:
+        The report.
+    """
+    pooled = losses.filter(pl.col("setting") == "pooled")
+    sensitivity = losses.filter(pl.col("setting") == "sensitivity")
+    arms = list(arm_columns())
+    planned_pairs = tuple((first, second) for _, first, second in PLANNED_CONTRASTS)
+    lines = [
+        (
+            f"### Nearest weather station's wind against gridded products, on {frame.height:,} "
+            f"farm-hours ({frame['time'].min():%Y-%m-%d} to {frame['time'].max():%Y-%m-%d})"
+        ),
+        "",
+        (
+            f"{provenance} MAE is the mean absolute error as a percentage of each row's own "
+            "farm capacity, on the capped predictions. Every arm, including each gridded "
+            "product's wind arm, is refitted on "
+            "exactly these rows. Intervals resample whole calendar months and a fitting seed."
+        ),
+        "",
+        *_checks_lines(checks=checks),
+        "",
+        *_arm_columns_lines(job_list=job_list),
+        "",
+        "#### Shear control (not an arm)",
+        "",
+        (
+            "One fold (fold 0) of one farm is fitted on the raw station speed and on the speed "
+            f"scaled by (100 / 10) ^ (1 / 7) = {SHEAR_HEIGHT_RATIO**SHEAR_EXPONENT:.4f}, seed "
+            f"{SEEDS[0]}, at the "
+            "primary setting. Largest absolute difference between the two fits' predictions: "
+            f"{shear_difference_mw:.6g} MW. The exponent is a guess, not a fit."
+        ),
+        "",
+        "#### Leaderboard at the primary setting",
+        "",
+        _pooled_caveat(losses=pooled, arm="station_wind"),
+        "",
+        *_leaderboard_lines(losses=pooled, setting="pooled", arms=arms, log=log),
+        "",
+        "#### Leaderboard at the second setting",
+        "",
+        _pooled_caveat(losses=sensitivity, arm="station_wind"),
+        "",
+        *_leaderboard_lines(
+            losses=sensitivity, setting="sensitivity", arms=list(SENSITIVITY_ARMS), log=log
+        ),
+    ]
+    for setting, scope in (("pooled", pooled), ("sensitivity", sensitivity)):
+        heading = "primary" if setting == "pooled" else "second"
+        lines += [
+            "",
+            f"#### Planned contrasts S1 and S2 at the {heading} setting (first minus second)",
+            "",
+            _pooled_caveat(losses=scope, arm="station_wind"),
+            "",
+            *_contrast_table(
+                losses=scope,
+                pairs=planned_pairs,
+                section="planned",
+                setting=setting,
+                log=log,
+                by_farm=False,
+            ),
+            "",
+            (
+                f"Adjusted for the {N_SETTINGS * len(PLANNED_CONTRASTS)} planned intervals "
+                f"({len(PLANNED_CONTRASTS)} contrasts, {N_SETTINGS} settings, the two settings "
+                f"counted as separate tests), at the {BONFERRONI_LEVEL:.2f}% level. Each bound is "
+                f"a percentile of {N_BOOTSTRAP_RESAMPLES:,} resamples and rests on about "
+                f"{N_BOOTSTRAP_RESAMPLES * (100.0 - BONFERRONI_LEVEL) / 200.0:.0f} of them:"
+            ),
+            "",
+            *_bonferroni_lines(losses=scope, setting=setting, log=log),
+            "",
+            f"By farm, {heading} setting:",
+            "",
+            *_contrast_table(
+                losses=scope,
+                pairs=planned_pairs,
+                section="planned_by_farm",
+                setting=setting,
+                log=log,
+                by_farm=True,
+            ),
+        ]
+    lines += [
+        "",
+        "#### Exploratory results",
+        "",
+        (
+            "The contrasts below were not planned. `ukv_station_wind − ukv_wind` and "
+            "`ukv_padded_wind − ukv_wind` compare 7 wind columns with 4, so neither is an "
+            "equal-column-count contrast."
+        ),
+        "",
+    ]
+    for setting, scope in (("pooled", pooled), ("sensitivity", sensitivity)):
+        heading = "primary" if setting == "pooled" else "second"
+        lines += [
+            f"Exploratory contrasts at the {heading} setting:",
+            "",
+            *_contrast_table(
+                losses=scope,
+                pairs=EXPLORATORY_CONTRASTS
+                if setting == "pooled"
+                else tuple(
+                    pair for pair in EXPLORATORY_CONTRASTS if set(pair) <= set(SENSITIVITY_ARMS)
+                ),
+                section="exploratory",
+                setting=setting,
+                log=log,
+                by_farm=False,
+            ),
+            "",
+            (
+                f"S1 and S2 scored on August to December only, {heading} setting. The 10 scored "
+                "months "
+                "occur in both years of the window; the models are the ones fitted on every month."
+            ),
+            "",
+            *_season_lines(
+                losses=scope,
+                setting=setting,
+                log=log,
+                months=AUGUST_TO_DECEMBER,
+                section="august_to_december",
+                label="Aug-Dec",
+            ),
+            "",
+        ]
+    lines += _post_review_lines(pooled=pooled, sensitivity=sensitivity, log=log)
+    lines += _persona_lines(pooled=pooled, sensitivity=sensitivity, log=log)
+    exploratory_count = sum(
+        record["setting"] == "pooled" and record["section"] in EXPLORATORY_SECTIONS
+        for record in log.records
+    )
+    lines += [
+        "",
+        "#### Count of exploratory intervals at the primary setting",
+        "",
+        (
+            f"The report prints {exploratory_count} exploratory paired-difference intervals at the "
+            "primary setting, in the sections "
+            f"{', '.join(f'`{section}`' for section in EXPLORATORY_SECTIONS)}. At a 5% level, "
+            f"about {exploratory_count * 0.05:.1f} of them would exclude zero by chance alone if "
+            "no difference existed."
+        ),
+    ]
+    return "\n".join(lines) + "\n"
+
+
+def _readme_text() -> str:
+    """Return the text of the README written beside the outputs.
+
+    Returns:
+        Markdown saying what each file holds.
+    """
+    return f"""# Nearby weather-station wind in the past-wind study
+
+Outputs of `studies/beam_diffuse_split/station_wind_arms.py`. Wind farms appear only as `W1` to
+`W3`. Nothing here carries a station identifier, a station coordinate, or a per-farm distance.
+
+- `losses.parquet`: one row per (arm, setting, farm, hour, seed) with the out-of-fold absolute and
+  signed errors in MW and as a fraction of the row's capacity, the fold, the month, and `actual_mw`,
+  the metered power. `setting` is `pooled` (the primary hyperparameters) or `sensitivity` (the
+  second setting).
+- `losses.fingerprint`: a hash of the row set (floats cast to Float32), every arm's columns, the
+  seeds and the hyperparameters. `--report-only` refuses to reuse `losses.parquet` if the hash
+  changes.
+- `losses_post_review.parquet`, `losses_post_review.fingerprint` and
+  `script_commit_post_review.txt`: the same for the exploratory arms added after the first science
+  review (`station_speed_only`, `era5_10m_speed_only`, `ukv_icon_d2_wind`), fitted afterwards and
+  saved apart so that `losses.parquet` is unchanged.
+- `script_commit.txt`: the commit of the script that fitted `losses.parquet`.
+- `intervals.parquet`: every interval `report.md` prints, one row each, with its section, setting,
+  scope, arms, value and bounds (percentage points of capacity), level, rows and months. A per-farm
+  interval carries no row or month count.
+- `report.md`: every table the docs page quotes, printed by the script and never transcribed.
+- `superseded/`: outputs a later run replaced.
+
+Station timestamps and units:
+
+{TIMESTAMP_NOTE}
+{UNIT_NOTE}
+
+`SEEDS` is {list(SEEDS)}, and each interval resamples whole calendar months and one of those seeds
+{N_BOOTSTRAP_RESAMPLES:,} times.
+"""
+
+
+def _with_actual_power(*, fitted: pl.DataFrame, frame: pl.DataFrame) -> pl.DataFrame:
+    """Add the metered power to fitted losses.
+
+    Args:
+        fitted: `run_all`'s losses.
+        frame: The row set carrying `power_mw`.
+
+    Returns:
+        The losses with `actual_mw`.
+    """
+    return fitted.join(
+        frame.select("site", "time", actual_mw=pl.col("power_mw").cast(pl.Float64)),
+        on=["site", "time"],
+        how="left",
+    )
+
+
+def _raise_on_fingerprint_mismatch(*, saved_path: Path, expected: str) -> None:
+    """Raise unless the saved fingerprint equals the one this code produces.
+
+    Args:
+        saved_path: The saved fingerprint file.
+        expected: The fingerprint of the row set and jobs this code now builds.
+
+    Raises:
+        ValueError: If the file is missing or holds another fingerprint.
+    """
+    saved = saved_path.read_text().strip() if saved_path.exists() else None
+    if saved != expected:
+        msg = (
+            f"{saved_path}: the saved losses were fitted on a different row set, column set, seed "
+            "set, feature values or hyperparameter setting than this code now produces, or the "
+            "file is missing; re-run without --report-only"
+        )
+        raise ValueError(msg)
+
+
+def _fit_or_load(
+    *,
+    frame: pl.DataFrame,
+    job_list: list[Job],
+    stem: Path,
+    commit_path: Path,
+    fit: bool,
+    script_commit: str,
+) -> tuple[pl.DataFrame, str, str]:
+    """Fit a set of jobs and save the losses, or load saved losses after checking the fingerprint.
+
+    Args:
+        frame: The row set.
+        job_list: The jobs whose losses are wanted.
+        stem: The losses path without its suffix; `.parquet` holds the losses and `.fingerprint` the
+            fingerprint.
+        commit_path: Where the script's commit is saved.
+        fit: Whether to fit and save, refusing to overwrite; otherwise the saved losses are loaded.
+        script_commit: The commit to save when fitting.
+
+    Returns:
+        The losses, the commit that fitted them, and the fingerprint.
+    """
+    losses_path = stem.with_suffix(".parquet")
+    fingerprint_path = stem.with_suffix(".fingerprint")
+    fingerprint = _fingerprint(frame=frame, job_list=job_list)
+    if not fit:
+        _raise_on_fingerprint_mismatch(saved_path=fingerprint_path, expected=fingerprint)
+        return pl.read_parquet(losses_path), commit_path.read_text().strip(), fingerprint
+    refuse_to_overwrite(paths=[losses_path, fingerprint_path, commit_path])
+    losses = _with_actual_power(fitted=run_all(dataset=frame, jobs=job_list), frame=frame)
+    losses.write_parquet(losses_path)
+    fingerprint_path.write_text(fingerprint)
+    commit_path.write_text(script_commit)
+    return losses, script_commit, fingerprint
+
+
+def main() -> int:
+    """Build the row set, run every check, fit every arm, and write the report.
+
+    Every check runs before any arm is fitted, in a fresh run, `--report-only` and `--checks-only`.
+    `--checks-only` prints the checks and stops, fitting and writing nothing. Every run that writes
+    `report.md` also requires a committed script and prints the commit the report was built at.
+    """
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--report-only",
+        action="store_true",
+        help=(
+            "Fit nothing except the two-fit shear control; rebuild report.md from both saved "
+            "loss files, checking fingerprints."
+        ),
+    )
+    parser.add_argument(
+        "--checks-only",
+        action="store_true",
+        help="Run every check before the fit, print the results, and stop.",
+    )
+    parser.add_argument(
+        "--fit-post-review",
+        action="store_true",
+        help=(
+            "Fit only the post-review arms beside main losses fitted earlier, then rebuild "
+            "report.md; the main losses stay untouched."
+        ),
+    )
+    arguments = parser.parse_args()
+
+    sites = _wind_sites()
+    observed = station_observations()
+    window = window_rows(sites=sites)
+    chosen_k1, chosen_k3 = choose_stations(sites=sites, window=window, observed=observed)
+    frame = build_frame(window=window, chosen_k1=chosen_k1, chosen_k3=chosen_k3, observed=observed)
+    _LOG.info("window rows: %d; rows after the station rule: %d", window.height, frame.height)
+
+    all_jobs = jobs()
+    extra_jobs = post_review_jobs()
+    checks = run_checks(
+        window=window, frame=frame, chosen_k1=chosen_k1, chosen_k3=chosen_k3, observed=observed
+    )
+    if arguments.checks_only:
+        sys.stdout.write(
+            "\n".join(
+                [
+                    *_checks_lines(checks=checks),
+                    "",
+                    *_arm_columns_lines(job_list=[*all_jobs, *extra_jobs]),
+                    "",
+                ]
+            )
+        )
+    _raise_on_failed_checks(checks=checks, frame=frame)
+    if arguments.checks_only:
+        return 0
+
+    _check_calendar_balanced_difference()
+    _check_group_difference_interval()
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+
+    fit_main = not (arguments.report_only or arguments.fit_post_review)
+    fit_extra = not arguments.report_only
+    script_commit = _script_commit()
+    sys.stdout.write(f"report built at commit {script_commit}\n")
+    losses, main_commit, fingerprint = _fit_or_load(
+        frame=frame,
+        job_list=all_jobs,
+        stem=OUTPUT_DIR / "losses",
+        commit_path=OUTPUT_DIR / "script_commit.txt",
+        fit=fit_main,
+        script_commit=script_commit,
+    )
+    extra_losses, extra_commit, extra_fingerprint = _fit_or_load(
+        frame=frame,
+        job_list=extra_jobs,
+        stem=OUTPUT_DIR / "losses_post_review",
+        commit_path=OUTPUT_DIR / "script_commit_post_review.txt",
+        fit=fit_extra,
+        script_commit=script_commit,
+    )
+
+    log = IntervalLog()
+    report = _report(
+        frame=frame,
+        losses=pl.concat([losses, extra_losses]),
+        job_list=[*all_jobs, *extra_jobs],
+        checks=checks,
+        shear_difference_mw=_shear_control(frame=frame),
+        provenance=(
+            f"The main arms were fitted by the script at commit `{main_commit}`, row-set "
+            f"fingerprint `{fingerprint}`. The post-review arms were fitted at commit "
+            f"`{extra_commit}`, fingerprint `{extra_fingerprint}`. This report was built by the "
+            f"script at commit `{script_commit}`."
+        ),
+        log=log,
+    )
+    (OUTPUT_DIR / "report.md").write_text(report)
+    log.frame().write_parquet(OUTPUT_DIR / "intervals.parquet")
+    (OUTPUT_DIR / "README.md").write_text(_readme_text())
+    sys.stdout.write(report)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

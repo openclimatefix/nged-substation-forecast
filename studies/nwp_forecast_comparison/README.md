@@ -34,8 +34,8 @@ is in `plans/nwp-forecast-comparison.md` on the study's branch.
   covers 2024-11 to the month the rows end on, or when `--gefs-window-dir` names a `GEFS_window_*`
   extract.
 - `nwp_forecast_comparison.py` reads those files and takes the rows where the target, the baselines'
-  inputs, and every planned arm's columns are present. It cuts folds with #885's era helper, fits
-  every arm out of fold, scores the no-weather baselines, and writes `report.md`,
+  inputs, and every planned arm's columns are present. It cuts folds with
+  `studies.cross_validation.cut_eras`, fits every arm out of fold, scores the no-weather baselines, and writes `report.md`,
   `<domain>_losses.parquet` and `<domain>_predictions.parquet` under `--output-dir`. Every contrast
   is computed within one hyperparameter setting, and a planned verdict stands only if both settings
   give it. `--dry-run` stops after printing the coverage table and the job list. `--report-only`
@@ -55,10 +55,9 @@ is in `plans/nwp-forecast-comparison.md` on the study's branch.
   error in megawatts and as a fraction of capacity. `<domain>_predictions.parquet` holds the
   capped prediction for the same keys.
 
-## Folds and #885
+## Folds
 
-`assign_folds_with_eras()` and `coverage_table()` import `cut_eras`, `calendar_month_coverage` and
-`raise_on_uncovered_months` from `studies.cross_validation` inside the function body, because PR #885
-adds them and it is not yet on `main`. Each is marked `TODO(#885)`. This study rotates the third
+`assign_folds_with_eras()` and `coverage_table()` use `cut_eras`, `calendar_month_coverage` and
+`raise_on_uncovered_months` from `studies.cross_validation`. This study rotates the third
 era's folds by 3 (`NWP_ERA_FOLD_OFFSETS`), because a rotation of 2 leaves two solar (site, fold,
 calendar month) cells uncovered on these rows.

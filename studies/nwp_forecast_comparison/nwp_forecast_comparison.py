@@ -13,8 +13,7 @@ arm's columns are present. An exploratory arm is fitted on the same rows with it
 left as missing values, which XGBoost routes natively.
 
 **Folds.** `assign_folds_with_eras()` cuts five folds of whole months inside three eras using
-`studies.cross_validation.cut_eras`, which PR #885 adds. TODO(#885): the import lives inside the
-fold-assigning functions until #885 is merged.
+`studies.cross_validation.cut_eras`.
 
 **Arms.** `arm_columns()` gives every arm's feature columns: the calendar columns, the sun-position
 columns for solar, and each named product's own weather fields. `jobs()` builds one `Job` per
@@ -73,7 +72,10 @@ from studies.cross_validation import (
     SEEDS,
     SENSITIVITY_HYPER_PARAMETERS,
     HyperParameters,
+    calendar_month_coverage,
+    cut_eras,
     out_of_fold_losses,
+    raise_on_uncovered_months,
     score_prediction,
 )
 
@@ -120,10 +122,7 @@ it on every run."""
 
 
 def assign_folds_with_eras(*, frame: pl.DataFrame) -> pl.DataFrame:
-    """Cut five folds of whole months inside three eras, using #885's helper.
-
-    TODO(#885): `studies.cross_validation.cut_eras` and its companions are added by PR #885, so
-    the import lives inside this function.
+    """Cut five folds of whole months inside three eras, using `cut_eras`.
 
     Args:
         frame: Rows carrying `site` and `time`.
@@ -131,8 +130,6 @@ def assign_folds_with_eras(*, frame: pl.DataFrame) -> pl.DataFrame:
     Returns:
         `frame` with `month` (`%Y-%m`), `era_code`, `era` and `fold`.
     """
-    from studies.cross_validation import cut_eras
-
     labelled = frame.with_columns(month=pl.col("time").dt.strftime("%Y-%m"))
     return cut_eras(
         frame=labelled, first_months=NWP_ERA_START_MONTHS, fold_offsets=NWP_ERA_FOLD_OFFSETS
@@ -142,16 +139,12 @@ def assign_folds_with_eras(*, frame: pl.DataFrame) -> pl.DataFrame:
 def coverage_table(*, frame: pl.DataFrame) -> pl.DataFrame:
     """Return the (site, fold, calendar month) coverage table, raising on any uncovered month.
 
-    TODO(#885): imports `calendar_month_coverage` and `raise_on_uncovered_months` from #885.
-
     Args:
         frame: Rows carrying `site`, `fold` and `time`.
 
     Returns:
         `studies.cross_validation.calendar_month_coverage`'s result.
     """
-    from studies.cross_validation import calendar_month_coverage, raise_on_uncovered_months
-
     coverage = calendar_month_coverage(frame=frame)
     raise_on_uncovered_months(coverage=coverage)
     return coverage
