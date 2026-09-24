@@ -1189,14 +1189,11 @@ def _example_days_figure(
 ) -> tuple[alt.VConcatChart, str]:
     """Draw Figure 6a (solar) or 6b (wind): one technology's upsampling example day, self-contained.
 
-    `studies.charts.figure` has no built-in support for a lettered sub-figure, so both figures pass
-    `number=6` and carry their letter as a `"{letter}. "` prefix on the title text instead.
-
     Args:
         inputs: The technology's saved inputs.
         domain: `solar` or `wind`.
         letter: `"6a"` or `"6b"`.
-        title: The figure's finding, without the letter prefix.
+        title: The figure's finding.
 
     Returns:
         The figure, and the example day's month and year for the page.
@@ -1205,8 +1202,8 @@ def _example_days_figure(
     return (
         figure(
             panels=[row],
-            number=6,
-            title=f"{letter}. {title}",
+            number=letter,
+            title=title,
             subtitle=[
                 EXAMPLE_SQUARES[domain],
                 (
@@ -1227,7 +1224,7 @@ def example_days_solar(*, inputs: pl.DataFrame, title: str) -> tuple[alt.VConcat
 
     Args:
         inputs: Solar's saved inputs.
-        title: The figure's finding, without the "6a." prefix.
+        title: The figure's finding.
 
     Returns:
         The figure, and the example day's month and year for the page.
@@ -1240,7 +1237,7 @@ def example_days_wind(*, inputs: pl.DataFrame, title: str) -> tuple[alt.VConcatC
 
     Args:
         inputs: Wind's saved inputs.
-        title: The figure's finding, without the "6b." prefix.
+        title: The figure's finding.
 
     Returns:
         The figure, and the example day's month and year for the page.

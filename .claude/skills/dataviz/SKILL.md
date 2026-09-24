@@ -33,8 +33,8 @@ count genuinely needs one.** The ENS-horizons page's leaderboard colours nine se
 ways, four no-weather baselines, and two reference rows — each its own colour rather than sharing a
 colour within a group, so it uses Data Amber and Data Magenta alongside the five main colours. The
 two reference rows first shared Data Burnt Orange, which the maintainer later asked to swap for Data
-Magenta because it clashed with Data Amber; ask before reaching for an internal-use colour, but a
-maintainer request to use one, as here, is itself the approval — don't treat this precedent as
+Magenta because it clashed with Data Amber. Ask before reaching for an internal-use colour — a
+maintainer request to use one, as here, is itself that ask — but don't treat this precedent as
 blanket permission to reach for one unasked.
 
 **Distinguish series by colour first; add a point shape or line style only as a backup, never as the
