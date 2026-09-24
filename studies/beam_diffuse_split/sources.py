@@ -416,7 +416,7 @@ IFS_OPEN_DATA_CUTOVER: Final[datetime] = datetime(2025, 10, 1, tzinfo=UTC)
 """When Open-Meteo's historical-forecast archive switched ECMWF-IFS-HRES to ECMWF's own open-data
 catalogue.
 
-Before this date the archive served IFS-HRES with roughly a two-hour publication delay; from this
+Before this date the archive served IFS-HRES with roughly a one-hour publication delay; from this
 date it serves the native 9 km O1280 HRES hourly to 90 hours with no such delay, following
 [ECMWF's real-time catalogue opening on 2025-10-01](https://openmeteo.substack.com/p/ecmwf-transitions-to-open-data).
 `check_new_products.py`'s night-jump table measures IFS-HRES's run cadence on both sides of this
