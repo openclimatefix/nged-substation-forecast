@@ -307,3 +307,45 @@ def coarsen_to_six_hourly(
                 columns.append(array[:, index])
         coarse[name] = np.stack(columns, axis=1)
     return leads[kept], coarse
+
+
+def gefs_step_means(
+    *, values: np.ndarray, leads: np.ndarray, negative_floor: float = 0.0
+) -> np.ndarray:
+    """Convert GEFS's alternating 3- and 6-hour window-mean radiation to plain 3-hour step means.
+
+    Dynamical.org's GEFS radiation alternates window widths on a 6-hour phase: the step ending at
+    lead `L` is a 3-hour mean (over `[L−3, L]`) when `L mod 6 == 3`, and a 6-hour mean (over
+    `[L−6, L]`) when `L mod 6 == 0`. A 3-hour step's mean is already the quantity wanted. A 6-hour
+    step's mean mixes two 3-hour periods together, so it is inverted against the 3-hour step
+    immediately before it: if `w` is the 6-hour window's mean and `s` is the preceding 3-hour step's
+    mean, the 6-hour window's own second half has mean `2w − s` (the 6-hour window's total, `2w`,
+    less the first half's total, `s`). This runs on a whole run, before `band_steps` slices a day's
+    leads, because a sliced day's first 6-hour step needs the 3-hour step before it, which a slice
+    starting partway through a run may not carry.
+
+    Args:
+        values: Shape (n_series, n_steps), each step's window-mean radiation on GEFS's alternating
+            grid, in lead order.
+        leads: Shape (n_steps,), each step's lead in whole hours, contiguous 3-hour steps starting
+            on a 3-hour window's own end (`leads[0] % 6 == 3`).
+        negative_floor: Radiation cannot be negative; a 6-hour window's inverted second half is
+            clipped to this floor when noise in the two window means would otherwise produce a
+            negative value.
+
+    Returns:
+        Shape (n_series, n_steps), the same steps as plain 3-hour step means.
+
+    Raises:
+        ValueError: If `leads` does not start on a 3-hour window's own end, leaving no preceding
+            step to invert the first 6-hour window against.
+    """
+    leads = np.asarray(leads)
+    if leads.shape[0] == 0 or leads[0] % 6 != 3:
+        msg = f"leads must start on a 3-hour window end (lead % 6 == 3), got {leads[0]!r}"
+        raise ValueError(msg)
+    step_means_array = values.copy()
+    for index in range(1, len(leads)):
+        if int(leads[index]) % 6 == 0:
+            step_means_array[:, index] = 2.0 * values[:, index] - step_means_array[:, index - 1]
+    return np.clip(step_means_array, negative_floor, None)

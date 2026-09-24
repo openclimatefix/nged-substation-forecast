@@ -4,11 +4,13 @@ import numpy as np
 import polars as pl
 import pytest
 from studies.bootstrap import (
+    BootstrapInterval,
     bootstrap_absolute,
     bootstrap_difference,
     bootstrap_difference_by_year,
     bootstrap_row_difference,
     bootstrap_year_change,
+    bracket_verdict,
     fold_t_interval,
     per_fold_differences,
 )
@@ -489,3 +491,44 @@ def test_bootstrap_row_difference_interval_collapses_with_no_month_spread():
 
     assert result["lower_95"] == pytest.approx(5.0)
     assert result["upper_95"] == pytest.approx(5.0)
+
+
+def _interval(*, difference: float, lower_95: float, upper_95: float) -> BootstrapInterval:
+    return {
+        "difference": difference,
+        "lower_95": lower_95,
+        "upper_95": upper_95,
+        "seed_spread": 0.0,
+        "n_rows": 100,
+        "n_months": 10,
+    }
+
+
+def test_bracket_verdict_beats_when_the_lower_side_is_negative_and_significant():
+    lower_side = _interval(difference=-0.5, lower_95=-0.8, upper_95=-0.2)
+    upper_side = _interval(difference=0.1, lower_95=-0.1, upper_95=0.3)
+
+    assert bracket_verdict(lower_side=lower_side, upper_side=upper_side) == "beats"
+
+
+def test_bracket_verdict_loses_when_the_upper_side_is_positive_and_significant():
+    lower_side = _interval(difference=0.3, lower_95=-0.1, upper_95=0.7)
+    upper_side = _interval(difference=0.5, lower_95=0.2, upper_95=0.8)
+
+    assert bracket_verdict(lower_side=lower_side, upper_side=upper_side) == "loses"
+
+
+def test_bracket_verdict_unresolved_when_neither_side_is_significant():
+    lower_side = _interval(difference=-0.1, lower_95=-0.4, upper_95=0.2)
+    upper_side = _interval(difference=0.1, lower_95=-0.2, upper_95=0.4)
+
+    assert bracket_verdict(lower_side=lower_side, upper_side=upper_side) == "unresolved"
+
+
+def test_bracket_verdict_unresolved_when_an_interval_touches_zero():
+    # The lower side's upper bound sits exactly at zero, so it does not clear zero and is not
+    # significant: a `<=` in place of `<` in the function's key line would wrongly say "beats".
+    lower_side = _interval(difference=-0.4, lower_95=-0.8, upper_95=0.0)
+    upper_side = _interval(difference=0.4, lower_95=0.0, upper_95=0.8)
+
+    assert bracket_verdict(lower_side=lower_side, upper_side=upper_side) == "unresolved"

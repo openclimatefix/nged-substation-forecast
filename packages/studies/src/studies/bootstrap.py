@@ -6,11 +6,17 @@ than the number of site-hours. Resampling whole calendar months keeps each episo
 and resampling the *same* months for both arms keeps the comparison paired.
 """
 
-from typing import Final, TypedDict
+from typing import Final, Literal, TypedDict
 
 import numpy as np
 import polars as pl
 from scipy import stats
+
+BracketVerdictType = Literal["beats", "loses", "unresolved"]
+"""Whether a product beats ENS, loses to ENS, or is unresolved at matched lead.
+
+Returned by `bracket_verdict`.
+"""
 
 N_BOOTSTRAP_RESAMPLES: Final[int] = 2000
 """How many resamples each interval is read from."""
@@ -488,3 +494,32 @@ def bootstrap_year_change(
         "n_months_year0": len(np.unique(by_year[year0][1])),
         "n_months_year1": len(np.unique(by_year[year1][1])),
     }
+
+
+def bracket_verdict(
+    *, lower_side: BootstrapInterval, upper_side: BootstrapInterval
+) -> BracketVerdictType:
+    """Turn a bracket's two intervals into a published verdict.
+
+    The bracket sandwiches a Previous Runs product's lead between two ENS leads: the lower side is
+    `product − ENS day N−1` (ENS's shorter lead), and the upper side is `product − ENS day N` (ENS's
+    equal-or-longer lead). "Beats" and "loses" both need the *whole* 95% interval on one side of
+    zero, not just the point estimate, so an interval that merely touches zero is unresolved.
+
+    Args:
+        lower_side: The product-minus-ENS interval at ENS's shorter lead (`product − ENS day N−1`).
+        upper_side: The product-minus-ENS interval at ENS's longer-or-equal lead
+            (`product − ENS day N`).
+
+    Returns:
+        `"beats"` if the lower side is negative and significant (the product beats ENS even at
+        ENS's shorter lead); `"loses"` if the upper side is positive and significant (ENS beats the
+        product even at ENS's longer lead); `"unresolved"` otherwise.
+    """
+    beats = lower_side["upper_95"] < 0.0
+    loses = upper_side["lower_95"] > 0.0
+    if beats:
+        return "beats"
+    if loses:
+        return "loses"
+    return "unresolved"

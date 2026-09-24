@@ -4,6 +4,7 @@ from studies.resample import (
     DEFAULT_DAYLIGHT_FLOOR_W_M2,
     clear_sky_index_resample,
     coarsen_to_six_hourly,
+    gefs_step_means,
     hold_flat_outside_daylight,
     interpolate_linear,
     interpolate_pchip,
@@ -315,3 +316,57 @@ def test_coarsening_drops_a_step_whose_earlier_half_is_missing():
     )
 
     np.testing.assert_allclose(kept, [12.0])
+
+
+def _gefs_windows_from_step_means(*, step_means_array: np.ndarray, leads: np.ndarray) -> np.ndarray:
+    """Turn known 3-hour step means into GEFS-style alternating 3-/6-hour window means.
+
+    The inverse of `gefs_step_means`, built independently of it (arithmetic mean over the pair of
+    steps, rather than the "2w − s" inversion), so the round-trip test below cannot pass merely
+    because both sides share one formula.
+    """
+    windows = step_means_array.copy()
+    for index in range(1, len(leads)):
+        if int(leads[index]) % 6 == 0:
+            windows[:, index] = (step_means_array[:, index - 1] + step_means_array[:, index]) / 2.0
+    return windows
+
+
+def test_gefs_step_means_round_trips_a_known_series_of_3_hour_step_means():
+    leads = np.arange(3, 25, 3, dtype=float)
+    step_means_array = np.array([[5.0, 3.0, 8.0, 2.0, 6.0, 9.0, 1.0, 4.0]])
+    windows = _gefs_windows_from_step_means(step_means_array=step_means_array, leads=leads)
+
+    result = gefs_step_means(values=windows, leads=leads)
+
+    np.testing.assert_allclose(result, step_means_array)
+
+
+def test_gefs_step_means_matches_a_hand_written_expected_array():
+    # Step means [a, b, c, d] ending at 03, 06, 09 and 12 UTC give GEFS-style windows
+    # [a, (a+b)/2, c, (c+d)/2]: the 09 UTC step starts a fresh 3-hour window rather than continuing
+    # the accumulation from 06 UTC. A window-phase error (treating every step as accumulating from
+    # the run's start, say) would pass a same-author round trip but fail this hand-written check.
+    a, b, c, d = 10.0, 40.0, 25.0, 65.0
+    leads = np.array([3.0, 6.0, 9.0, 12.0])
+    windows = np.array([[a, (a + b) / 2.0, c, (c + d) / 2.0]])
+
+    result = gefs_step_means(values=windows, leads=leads)
+
+    np.testing.assert_allclose(result, [[a, b, c, d]])
+
+
+def test_gefs_step_means_refuses_a_series_that_starts_on_a_6_hour_window_end():
+    with pytest.raises(ValueError, match="3-hour window end"):
+        gefs_step_means(values=np.ones((1, 2)), leads=np.array([6.0, 9.0]))
+
+
+def test_gefs_step_means_clips_a_negative_producing_inversion_to_the_floor():
+    # A 3-hour step of 10.0 followed by a 6-hour window mean of only 1.0 inverts to 2*1.0 - 10.0 =
+    # -8.0, which is not a physically possible radiation value.
+    values = np.array([[10.0, 1.0]])
+    leads = np.array([3.0, 6.0])
+
+    result = gefs_step_means(values=values, leads=leads)
+
+    np.testing.assert_allclose(result, [[10.0, 0.0]])
