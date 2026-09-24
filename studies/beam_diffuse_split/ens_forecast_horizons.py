@@ -813,7 +813,7 @@ def _hourly_power(*, domain: DomainType) -> pl.DataFrame:
     return wind_hourly_power(sites=_wind_sites()).select("site", "time", "power_mw")
 
 
-def _base_frame(*, domain: DomainType) -> pl.DataFrame:
+def base_frame(*, domain: DomainType) -> pl.DataFrame:
     """Return the past-weather study's hourly rows, with the references' columns.
 
     Args:
@@ -905,7 +905,7 @@ def build_inputs(*, domain: DomainType) -> Inputs:
         The inputs, with every combination's ensemble-mean columns on the rows every arm and
         baseline can score, the native technique's own rows, and no member rows yet.
     """
-    frame = _with_baselines(frame=_base_frame(domain=domain), domain=domain)
+    frame = _with_baselines(frame=base_frame(domain=domain), domain=domain)
     extract = _members(sites=sorted(frame["site"].unique().to_list()))
     clear_sky = _clear_sky_table(domain=domain)
     native_rows: dict[int, pl.DataFrame] = {}
@@ -1970,7 +1970,7 @@ def _dropped_lines(*, frame: pl.DataFrame, domain: DomainType) -> list[str]:
     Returns:
         Markdown lines.
     """
-    base = _with_baselines(frame=_base_frame(domain=domain), domain=domain)
+    base = _with_baselines(frame=base_frame(domain=domain), domain=domain)
     dropped = base.join(frame.select("site", "time"), on=["site", "time"], how="anti")
     inputs = [c for c in base.columns if "persistence_day" in c or "clear_sky_index_day" in c]
     missing = dropped.filter(pl.any_horizontal(pl.col(inputs).is_null())).height

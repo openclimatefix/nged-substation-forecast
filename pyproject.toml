@@ -366,7 +366,12 @@ exclude = '\.git|\.venv|packages/(notebooks|dashboard)/[^/]+\.py'
 # from a module sitting beside `_nwp_test_data` in `tests/`, and the same import from a package's
 # own test suite — `packages/ml_core/tests`, say — is an `unresolved-import` error even though
 # pytest runs it fine.
-extra-paths = ["tests"]
+#
+# `studies/beam_diffuse_split` is here too: `studies/nwp_forecast_comparison/build_forecast_inputs.py`
+# reuses that study's public functions (`ens_forecast_horizons.base_frame` and others) by inserting
+# that directory onto `sys.path` at runtime, exactly as the `tests` entry above does for pytest.
+# Without this, the same import that runs fine is an `unresolved-import` error under `ty` alone.
+extra-paths = ["tests", "studies/beam_diffuse_split"]
 
 [tool.pytest.ini_options]
 # importlib mode lets test modules in different directories share a basename (e.g.
