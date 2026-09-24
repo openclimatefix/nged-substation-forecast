@@ -3,7 +3,7 @@
 One-off throwaway script for the addition to
 <https://github.com/openclimatefix/nged-substation-forecast/issues/810>, extending
 `weather_products.py`'s comparison with the Met Office's MIDAS Open station observations. The plan
-is `plans/past-solar-stations.md` and was committed before the first fit.
+was committed before the first fit, and stays in the git history after `plans/` is emptied at merge.
 
 **The question.** Instead of estimating the sunshine at a solar farm from a gridded product (CAMS or
 ERA5), what if the nearest Met Office weather station is used, or a blend of a gridded product and a
@@ -31,8 +31,8 @@ every fit uses `colsample_bytree=1`. `jobs()` builds each arm's columns from one
 `_check_column_counts` raises if a contrast's two arms differ in width; the report prints every
 arm's columns.
 
-**Planned contrasts** (`PLANNED_CONTRASTS`, written into `plans/past-solar-stations.md` before the
-first fit): the nearest station's irradiance and temperature against CAMS and against ERA5, and
+**Planned contrasts** (`PLANNED_CONTRASTS`, written into the plan file before the first
+fit): the nearest station's irradiance and temperature against CAMS and against ERA5, and
 CAMS blended with the station against CAMS padded with a climatology-permuted copy of the station's
 irradiance (equal column counts). Each is also run at the second hyperparameter setting. Every
 other contrast is exploratory and labelled so in the report.
