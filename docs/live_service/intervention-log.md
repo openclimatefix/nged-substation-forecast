@@ -87,6 +87,8 @@ counting the good weeks of an excluded window while discounting the bad weeks.
 | Date | Trigger | Cause | Minutes | Runbook? | Notes |
 |---|---|---|---|---|---|
 | 2026-08-13 19:56 | Sentry alarm — but from the pre-v0.2 code on a laptop, not from AWS | `upstream-outage` | <5 | yes | Dynamical.org first published the 2026-08-09 00Z ECMWF run with a variable wholly missing, and v0.1 treated that as fatal, so the partition was re-materialised by hand. Four forecast slots ran on the previous day's run in the meantime. [#493](https://github.com/openclimatefix/nged-substation-forecast/pull/493) added the retry that covers it |
+| 2026-09-23 19:00 | Building the v0.2.1 image failed | `our-bug` | 20 | no | `data/` on the workstation is a symlink to another disk, and the build script's `COPY data/production_model/` sent the symlink itself rather than its target, so the build failed with "not found". Worked around with a worktree holding a real copy of the model, then fixed properly in [#864](https://github.com/openclimatefix/nged-substation-forecast/pull/864), which passes the model to the build as a named build context resolved with `realpath` |
+| 2026-09-23 19:10 | `apt full-upgrade` on the control-plane box lost its SSH session mid-run | `infrastructure` | 15 | no | Upgrading Tailscale restarted `tailscaled`, which carried the SSH session away and left `apt` waiting on a `needrestart` prompt with nobody to answer it. Killed the stuck `needrestart` process, then finished with `dpkg --configure -a` and a `NEEDRESTART_MODE=a apt full-upgrade` inside `tmux`, so a dropped connection can no longer strand the prompt |
 
 ## Periods covered
 
@@ -96,11 +98,12 @@ with no stated period is indistinguishable from a log nobody kept.
 | Period | Version | Scope | Interventions | Scores [T1.1, operability](../design-philosophy/engineering-hypotheses.md#h1-a-service-that-mostly-runs-itself)? |
 |---|---|---|---|---|
 | 2026-07-15 18:00 UTC → 2026-08-14 00:00 UTC | v0.1 | 28 time series, 6-hourly `live_forecasts` on AWS | 1 | No — pre-v1.0 |
-| 2026-08-14 00:00 UTC → ongoing | v0.2 | 31 time series, 6-hourly `live_forecasts` on AWS, with `live_forecasts_are_healthy` reporting on each slot | 0 | No — pre-v1.0 |
+| 2026-08-14 00:00 UTC → 2026-09-23 18:00 UTC | v0.2 | 31 time series, 6-hourly `live_forecasts` on AWS, with `live_forecasts_are_healthy` reporting on each slot | 0 | No — pre-v1.0 |
+| 2026-09-23 18:00 UTC → ongoing | v0.2.1 | 31 time series, 6-hourly `live_forecasts` on AWS, under a champion retrained on corrected NGED timestamps | 2 | No — pre-v1.0 |
 
-Figures below are stated as of **08:00 UTC on 28 August 2026**, after that day's 06:00 UTC slot.
-Every count in this section moves within the day, so the as-of instant is part of the measurement
-rather than a formality.
+Figures for the v0.2 period below are stated as of **08:00 UTC on 28 August 2026**, after that day's
+06:00 UTC slot. Every count in this section moves within the day, so the as-of instant is part of
+the measurement rather than a formality.
 
 ### v0.1 on AWS, 2026-07-15 to 2026-08-13
 
@@ -194,6 +197,38 @@ for an asset that raised, so this is the succeeding-run case: `live_forecasts_ar
 its warning to the Checks view and sends nothing to Sentry, and the slot's check-in reports the
 service healthy regardless, so a degraded run looks like a good one from outside — the gap at
 [#501](https://github.com/openclimatefix/nged-substation-forecast/issues/501).
+
+### v0.2.1 on AWS, from 2026-09-23
+
+v0.2.1 was deployed on the evening of 23 September 2026. Its first `live_forecasts` run was the
+18:00 UTC slot that day, materialised by hand once the power table rebuild below had finished; the
+next two slots, 00:00 and 06:00 UTC on 24 September, ran unattended on `live_forecasts_schedule`.
+
+v0.2.1 corrects NGED's power timestamps, which were 30 minutes late before 26 March 2026 (see
+[correcting late power stamps](../roadmap/data-cleaning.md)). The fix only takes effect on a
+rebuild, so `power_time_series.delta` on S3 was moved aside and `power_time_series_and_metadata`
+re-materialised, re-downloading NGED's full history under the corrected code. The champion was
+retrained on that corrected history — `xgboost_baseline_retrain_790` replaces `xgboost_cv_0003` —
+because every model trained before the fix had learnt the 30-minute offset. NGED have no plans to
+correct their own history at source, so the rebuild carries no risk of double-correcting it.
+
+*Verified by* reading the `power_forecasts` Delta table on S3 for `fold_id = "live"` since
+2026-09-22: each of the three v0.2.1 slots forecasts all 31 time series with all 51 ensemble
+members and no null or NaN values, from NWP between 18 and 30 hours old. No primary key repeats.
+Forecast values, roughly −97 MW to 400 MW across old and new models alike, sit in the expected
+range for these feeders. Ensemble-mean error against the actuals received so far is comparable
+between the outgoing and incoming champions, as expected this soon after a retrain: too few
+actuals have arrived yet to say whether the retrain improved accuracy.
+
+Two script and box issues surfaced while deploying, both logged in [the log](#the-log) above
+rather than repeated here. Neither reached the running service: both were caught and fixed before
+the image was pushed or the box was updated.
+
+One stale series was noticed during verification, not logged as an intervention because nothing
+failed: time series 29's last reading was from 17:30 UTC on 23 September, roughly 15 hours before
+the check, while every other series was current to within a couple of hours. `power_fcst` handles
+this the way it handles any stalled meter — as missing input, degrading rather than raising — so
+no forecast slot was affected. Worth confirming with NGED whether that gap is expected.
 
 ## See also
 
