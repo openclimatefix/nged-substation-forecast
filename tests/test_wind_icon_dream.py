@@ -364,10 +364,12 @@ def test_icon_dream_site_frame_reads_the_hub_level_and_converts_direction(
 def test_icon_dream_common_rows_drops_the_zero_hour_and_matches_on_time(
     synthetic_icon_dream: pl.DataFrame, monkeypatch: pytest.MonkeyPatch
 ) -> None:
-    """`common_rows` still runs: the zero-half-hour row is dropped, not silently kept.
+    """`common_rows` still runs, and the join to ICON-DREAM-EU is an inner join, not a left join.
 
-    Catches `common_rows` being skipped, which would keep all seven hours (or drop the wrong one)
-    instead of the six the `has_zero_half_hour` flag marks for removal.
+    Catches `common_rows` being skipped, which would keep all base hours (or drop the wrong one)
+    instead of the six the `has_zero_half_hour` flag marks for removal, and catches the join to
+    ICON-DREAM-EU becoming a left join, which would keep an hour ICON-DREAM-EU does not cover with
+    its hub-level columns null instead of dropping the row.
 
     Args:
         synthetic_icon_dream: The wind roster, with ICON-DREAM-EU parquets written.
@@ -375,13 +377,15 @@ def test_icon_dream_common_rows_drops_the_zero_hour_and_matches_on_time(
     """
     sites = synthetic_icon_dream
     zero_hour = 3
+    uncovered_hour = max(_HOURS) + 1  # `synthetic_icon_dream` writes no row for this hour.
+    base_hours = (*_HOURS, uncovered_hour)
     base = pl.DataFrame(
         {
-            "site": ["W1"] * len(_HOURS),
-            "time": [_T0 + timedelta(hours=hour) for hour in _HOURS],
-            "power_mw": [float(hour) for hour in _HOURS],
-            "effective_capacity_mw": [10.0] * len(_HOURS),
-            "has_zero_half_hour": [hour == zero_hour for hour in _HOURS],
+            "site": ["W1"] * len(base_hours),
+            "time": [_T0 + timedelta(hours=hour) for hour in base_hours],
+            "power_mw": [float(hour) for hour in base_hours],
+            "effective_capacity_mw": [10.0] * len(base_hours),
+            "has_zero_half_hour": [hour == zero_hour for hour in base_hours],
         },
         schema_overrides={"time": pl.Datetime("us", "UTC")},
     )
@@ -393,6 +397,7 @@ def test_icon_dream_common_rows_drops_the_zero_hour_and_matches_on_time(
     rows = wind_icon_dream.icon_dream_common_rows(sites=sites).sort("time")
 
     assert sorted(t.hour for t in rows["time"]) == [h for h in _HOURS if h != zero_hour]
+    assert uncovered_hour not in {t.hour for t in rows["time"]}
     hub = wind_icon_dream._wind_columns(product=wind_icon_dream.PRODUCT)[0]
     assert rows[hub].to_list() == pytest.approx(
         [_level_speed(level=72, hour=t.hour, cell=1) for t in rows["time"]]
