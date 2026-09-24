@@ -6,10 +6,10 @@ Every horizon in ``HORIZONS`` comes from `docs/roadmap/data-sources.md` itself, 
 `docs/background/weather-products-survey.md`, or from the producer's own documentation, and each
 row's `source` field says which. Where a model's horizon differs by run (UKV reaches 120 hours on
 its 03 and 15 UTC runs and 54 on the rest, for example), the value here is the longest routine run.
-Reanalyses and satellite products carry no forecast horizon and are left out, as are NOAA's GFS and
-GEFS, Météo-France's ARPEGE and AROME, and the HARMONIE-AROME feeds: `data-sources.md` names them
-only once, as products the project does not read or evaluate, and gives none of them the individual
-discussion the charted models get.
+Reanalyses and satellite products carry no forecast horizon and are left out. GFS, GEFS, ARPEGE,
+AROME, and the shared DMI/KNMI HARMONIE-AROME feed are charted even though `data-sources.md`
+discusses them only as products the project does not read or evaluate — their horizons come from
+`weather-products-survey.md`'s product table.
 
 Run it with `uv run python studies/beam_diffuse_split/nwp_horizons.py`, then optimise the SVG with
 `npx svgo@4 --multipass --precision=1 --final-newline` before committing it.
@@ -29,6 +29,21 @@ _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
 HORIZONS: Final[tuple[tuple[str, float, str], ...]] = (
     (
+        "GEFS",
+        35,
+        (
+            'weather-products-survey.md: NOAA GEFS 35-day, "Runs, horizon, step": "00 UTC; '
+            "840 h\" (35 days); NOAA's SCN 20-75 GEFS v12 upgrade notice "
+            '(nwp-model-upgrades.csv) gives the full picture: "16-day range (35 days at 00 '
+            'UTC)" — 16 days on the other three daily cycles'
+        ),
+    ),
+    (
+        "GFS",
+        16,
+        'weather-products-survey.md: NOAA GFS, "Runs, horizon, step": "4 a day; 16 days"',
+    ),
+    (
         "ECMWF ENS",
         15,
         (
@@ -41,8 +56,10 @@ HORIZONS: Final[tuple[tuple[str, float, str], ...]] = (
         "AIFS Single",
         15,
         (
-            "ECMWF's open data documentation: AIFS Single runs the same 00/06/12/18 UTC cycles "
-            "and 0-to-360-hour, 6-hourly step grid as AIFS-ENS"
+            "ECMWF's open data documentation "
+            "(https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+Single+v1): "
+            "AIFS Single runs the same 00/06/12/18 UTC cycles and 0-to-360-hour, 6-hourly step "
+            "grid as AIFS-ENS"
         ),
     ),
     (
@@ -65,8 +82,8 @@ HORIZONS: Final[tuple[tuple[str, float, str], ...]] = (
         "ICON global",
         7.5,
         (
-            "DWD's ICON documentation, via Open-Meteo: the 00 and 12 UTC runs reach 7.5 days "
-            "(06 and 18 UTC reach 120 hours)"
+            "DWD's ICON documentation, via Open-Meteo (https://open-meteo.com/en/docs/dwd-api): "
+            "the 00 and 12 UTC runs reach 7.5 days (06 and 18 UTC reach 120 hours)"
         ),
     ),
     (
@@ -82,9 +99,37 @@ HORIZONS: Final[tuple[tuple[str, float, str], ...]] = (
     ),
     ("ICON-EU", 5, 'data-sources.md: "4 runs a day out to 5 days"'),
     (
+        "ARPEGE",
+        4,
+        (
+            'weather-products-survey.md: Meteo-France ARPEGE Europe and World rows, "Runs, '
+            'horizon, step": "4 a day; 4 days"'
+        ),
+    ),
+    (
+        "HARMONIE-AROME (DMI/KNMI)",
+        2.5,
+        (
+            "data-sources.md: DMI and KNMI serve one shared UWC-West HARMONIE-AROME run; "
+            'weather-products-survey.md gives both "Runs, horizon, step" as 2.5 days ("8 a day; '
+            '2.5 days" for DMI, "Hourly; 2.5 days" for KNMI)'
+        ),
+    ),
+    (
         "ICON-D2",
         2,
-        "DWD's ICON documentation, via Open-Meteo: 8 runs a day, each reaching 2 days",
+        (
+            "DWD's ICON documentation, via Open-Meteo (https://open-meteo.com/en/docs/dwd-api): "
+            "8 runs a day, each reaching 2 days"
+        ),
+    ),
+    (
+        "AROME France",
+        2,
+        (
+            'weather-products-survey.md: Meteo-France AROME France row, "Runs, horizon, '
+            'step": "8 a day; 2 days"'
+        ),
     ),
 )
 """Each charted model's longest routine forecast horizon in days, and where it comes from."""
@@ -93,11 +138,12 @@ NGED_HORIZON_DAYS: Final[int] = 14
 """NGED's forecast horizon, per `docs/roadmap/data-sources.md`'s Met Office discussion: "No Met
 Office model covers NGED's 14-day horizon"."""
 
-X_MAX_DAYS: Final[int] = 15
-"""The x axis's upper bound: the longest horizon any charted model reaches."""
+X_MAX_DAYS: Final[int] = 35
+"""The x axis's upper bound: the longest horizon any charted model reaches (GEFS, on its 00 UTC
+cycle)."""
 
-WIDTH_PX: Final[int] = 560
-HEIGHT_PX: Final[int] = 280
+WIDTH_PX: Final[int] = 620
+HEIGHT_PX: Final[int] = 410
 
 OUTPUT_PATH: Final[Path] = (
     Path(__file__).resolve().parents[2] / "docs" / "roadmap" / "assets" / "nwp_horizons.svg"
@@ -156,7 +202,7 @@ def horizon_chart() -> alt.LayerChart:
         width=WIDTH_PX,
         height=HEIGHT_PX,
         title=alt.Title(
-            text="Only ECMWF's models and WeatherNext 3 reach NGED's 14-day horizon",
+            text=("Only ECMWF's models, WeatherNext 3, GFS, and GEFS reach NGED's 14-day horizon"),
             subtitle=[
                 "Each bar is the model's longest routine run. Where a horizon differs by run,",
                 "the shorter runs are noted in the source list below the chart.",
