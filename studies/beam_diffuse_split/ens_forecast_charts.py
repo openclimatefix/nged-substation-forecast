@@ -90,16 +90,24 @@ BASELINE_NAMES: Final[dict[str, str]] = {
     "climatology": "Climatology",
 }
 
-REFERENCE_NAMES: Final[dict[str, str]] = {
-    "era5": "ERA5 (not a forecast)",
-    "live_gb_rich_xgb": "UKV and ICON-EU (not a forecast)",
+REFERENCE_NAMES: Final[dict[DomainType, dict[str, str]]] = {
+    "solar": {
+        "era5": "ERA5 (not a forecast)",
+        "live_gb_rich_xgb": "UKV + ICON-EU, with ERA5 temperature (not a forecast)",
+    },
+    "wind": {
+        "era5": "ERA5 (not a forecast)",
+        "live_gb_rich_xgb": "UKV + ICON-EU (not a forecast)",
+    },
 }
+"""Each reference row's label, per domain: the solar UKV-and-ICON-EU row also reads ERA5's air
+temperature, which the wind row does not."""
 
 METHOD_NAMES: Final[dict[str, str]] = {
     "native": "Native steps",
     "linear": "Linear",
     "clear_sky": "Clear-sky index",
-    "clear_sky_conserving": "Clear-sky, step mean kept",
+    "clear_sky_conserving": "Clear-sky, mean kept",
     "linear_pchip": "Linear, shape-preserving temperature",
     "clear_sky_pchip": "Clear-sky index, shape-preserving temperature",
     "clear_sky_conserving_pchip": "Clear-sky index, step mean kept, shape-preserving temperature",
@@ -349,8 +357,9 @@ def _leaderboard_panel(
     data = rows.with_columns(
         x=pl.col("day") + pl.col("series").replace_strict(offsets, return_dtype=pl.Float64)
     ).with_columns(pl.col("value", "lower_95", "upper_95").round(3))
+    reference_names = REFERENCE_NAMES[domain]
     references = pl.DataFrame(
-        [{"name": REFERENCE_NAMES[arm], **board[arm]} for arm in REFERENCE_NAMES]
+        [{"name": reference_names[arm], **board[arm]} for arm in reference_names]
     )
     values = [
         *data["lower_95"].to_list(),
@@ -452,7 +461,7 @@ def _key(
     )
     points = (
         alt.Chart(data)
-        .mark_point(filled=True, size=55, opacity=1, color=colour)
+        .mark_point(filled=True, size=55, opacity=1, color=colour, aria=False)
         .encode(x=alt.X("x:Q", scale=None), y=alt.value(8), shape=alt.Shape("shape:N", scale=None))  # ty: ignore[unresolved-attribute]
     )
     text = (
@@ -500,8 +509,8 @@ def leaderboard(
                 "No-weather baselines read the telemetry up to 09:00 UTC on the run's own day, "
                 "when the live service can first read the run, or up to 00 UTC for day 0. "
                 "Climatology does not depend on the horizon. The two light blue rules are not "
-                "forecasts: ERA5, and the best of the inputs the blending page compared, scored "
-                "on the same hours."
+                "forecasts: ERA5, and UKV with ICON-EU, the best of the inputs the blending page "
+                "compared, scored on the same hours."
             ),
             f"{DOTS} {CAPACITY}",
             f"{SCOPES['solar']} {SCOPES['wind']}",
@@ -1156,7 +1165,7 @@ def _line_key(*, labels: Sequence[str], colours: Sequence[str]) -> alt.LayerChar
     )
     segments = (
         alt.Chart(data)
-        .mark_rule(strokeWidth=2.5)
+        .mark_rule(strokeWidth=2.5, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("x:Q", scale=None),
             x2="x2:Q",
@@ -1491,14 +1500,14 @@ TITLES: Final[dict[str, str]] = {
         "At these farms, an XGBoost model given the ENS ensemble mean beats every no-weather "
         "baseline to day 5 for solar and to day 7 for wind"
     ),
-    "day0": "Forecast error rises with every day of horizon, fastest over the first week",
+    "day0": "Forecast error rises with horizon, fastest over the first week",
     "ways": (
         "The ensemble mean beats the control member, and beats feeding each member through the "
         "model, at almost every horizon"
     ),
     "baselines": (
-        "The ENS ensemble mean beats the best no-weather baseline by several points to day 5, "
-        "and by day 14 climatology is ahead"
+        "The ENS ensemble mean beats the best no-weather baseline by 1.4 points at day 5 for "
+        "solar and 4.0 points for wind, and by day 14 climatology is ahead"
     ),
     "calendar": (
         "The ensemble mean beats the same model given no weather to day 10 with a day-of-year "

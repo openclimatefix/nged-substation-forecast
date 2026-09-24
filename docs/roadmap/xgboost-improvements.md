@@ -166,14 +166,16 @@ should recover part of the amplitude; how much has not been measured. Temperatur
 effective-temperature, degree-day and `windchill` features. Treat it as a bounded experiment rather
 than a correctness fix, and expect a smaller win than (a) or (b).
 
-**One study has measured (b), (c), and the wind vector on XGBoost models given the ENS ensemble
-mean, at six solar farms and three wind farms in Lincolnshire from 2024 to 2026.** Against
-straight-line interpolation, the clear-sky-index resample lowered the solar error by 0.30 points of
-capacity [0.22, 0.40] at day 1 and 0.16 points [0.02, 0.31] at day 7, and by amounts not
+**One study has measured (b), (c) inside a solar PV model, and the wind vector on XGBoost models
+given the ENS ensemble mean, at 6 solar farms and 3 wind farms in Lincolnshire from 2024 to 2026.**
+Against straight-line interpolation, the clear-sky-index resample lowered the solar error by 0.30
+points of capacity [0.22, 0.40] at day 1 and 0.16 points [0.02, 0.31] at day 7, and by amounts not
 statistically significant at the 5% level beyond day 7. A shape-preserving cubic for temperature
-moved it by less than 0.02 points, and interpolating the wind as components moved the wind error by
-less than 0.1 points at every horizon. The measurements, and the ENS horizon study they come from,
-are in [How accurate is a power forecast driven by ECMWF ENS at each
+moved the solar error by less than 0.02 points, which says little about (c)'s effect on the demand
+features, because temperature is a weak input to a PV model and the study has no demand target.
+Interpolating the wind as components moved the wind error's estimate by less than 0.1 points at
+every horizon, with intervals reaching 0.2 points at days 10 and 14. The measurements, and the ENS
+horizon study they come from, are in [How accurate is a power forecast driven by ECMWF ENS at each
 horizon?](../studies/ens-forecast-horizons.md#turning-enss-steps-into-hourly-values).
 
 The synoptic variables need no fix: `pressure_surface`, `pressure_reduced_to_mean_sea_level`, and
