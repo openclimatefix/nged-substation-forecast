@@ -1018,23 +1018,37 @@ def _interval_text(*, interval: BootstrapInterval) -> str:
 def horizons_ens_day1_mae(*, domain: DomainType, path: Path) -> float | None:
     """Read the ENS horizons page's day-1 ENS mean error, in percentage points of capacity.
 
+    The row is read from the domain's "every arm's error, pooled setting" leaderboard, because the
+    page's arm-columns table also holds an `ens_mean_day1` row, whose second cell is a column count.
+
     Args:
         domain: `solar` or `wind`.
         path: The horizons page's `report.md`.
 
     Returns:
-        The first `ens_mean_day1` leaderboard row in the domain's section, or `None` if the file
+        The `ens_mean_day1` row's error in the domain's pooled leaderboard, or `None` if the file
         or the row is absent.
+
+    Raises:
+        ValueError: If the row's error cell is not a decimal number, which means the parser has
+            read a different table.
     """
     if not path.exists():
         return None
-    heading = f"### {domain.capitalize()}:"
-    in_section = False
+    section = f"### {domain.capitalize()}:"
+    leaderboard_heading = f"#### {domain.capitalize()}: every arm's error, pooled setting"
+    in_section = in_leaderboard = False
     for line in path.read_text().splitlines():
         if line.startswith("### "):
-            in_section = line.startswith(heading)
-        elif in_section and line.startswith("| ens_mean_day1 |"):
-            return float(line.split("|")[2])
+            in_section, in_leaderboard = line.startswith(section), False
+        elif line.startswith("#### "):
+            in_leaderboard = in_section and line.startswith(leaderboard_heading)
+        elif in_leaderboard and line.startswith("| ens_mean_day1 |"):
+            cell = line.split("|")[2].strip()
+            if "." not in cell:
+                msg = f"{path}: the ens_mean_day1 error {cell!r} is not a decimal number"
+                raise ValueError(msg)
+            return float(cell)
     return None
 
 
@@ -1303,6 +1317,7 @@ def _blend_lines(*, by_setting: dict[str, pl.DataFrame]) -> list[str]:
         return ["The blends are skipped: their product columns are absent."]
     lines = list(CONTRAST_HEADER)
     results: dict[str, BlendResult] = {}
+    worse_controls: list[str] = []
     for setting, losses in by_setting.items():
         result = blend_result(losses=losses)
         results[setting] = result
@@ -1321,18 +1336,19 @@ def _blend_lines(*, by_setting: dict[str, pl.DataFrame]) -> list[str]:
                     interval=interval,
                 )
             )
-        primary = by_setting["primary"]
-        if setting == "primary":
-            lines.extend(
+        for arm in ("blend_p4a_control", "blend_p4b_control", "ifs025_day1"):
+            interval = difference(losses=losses, treatment=arm, reference="ens_mean_day1")
+            lines.append(
                 _contrast_line(
                     identifier=f"X-{arm}",
                     status="exploratory",
                     label=f"{arm} − ENS mean day 1",
-                    setting="primary",
-                    interval=difference(losses=primary, treatment=arm, reference="ens_mean_day1"),
+                    setting=setting,
+                    interval=interval,
                 )
-                for arm in ("blend_p4a_control", "blend_p4b_control")
             )
+            if arm.endswith("_control") and interval["lower_95"] > 0.0:
+                worse_controls.append(f"{arm} at {setting} ({_interval_text(interval=interval)})")
     combined = combine_setting_verdicts(
         primary=results["primary"]["verdict"],
         sensitivity=results["sensitivity"]["verdict"],
@@ -1351,6 +1367,22 @@ def _blend_lines(*, by_setting: dict[str, pl.DataFrame]) -> list[str]:
             f"A gain as large as {bound * PERCENTAGE_POINTS:.3f} points is not excluded "
             "(primary setting, P4b's lower bound)."
         )
+    worse = "; ".join(worse_controls) if worse_controls else "none at either setting"
+    lines += [
+        "",
+        (
+            "The permutation guard is uninformative when its control is itself significantly worse "
+            "than ENS alone, because the blend then beats the control whether or not it adds "
+            f"anything to ENS. Controls significantly worse than ENS alone: {worse}."
+        ),
+        "",
+        (
+            "`X-ifs025_day1` (IFS 0.25° day 1 alone minus ENS day 1) is exploratory. P4a's IFS "
+            "0.25° day-1 value can come from a 06, 12 or 18 UTC run published after the 09:00 UTC "
+            "issue time, so P4a may use weather the live service could not have read, and P4b is "
+            "the deciding contrast. The verdict rule is unchanged."
+        ),
+    ]
     return lines
 
 
@@ -1391,6 +1423,362 @@ def _reconciliation_line(*, domain: DomainType, losses: pl.DataFrame, path: Path
     )
 
 
+# --- Exploratory additions -----------------------------------------------------------------------
+
+BLOCKS: Final[dict[str, str | None]] = {"1 hour": None, "3 hours": "3h", "1 day": "1d"}
+"""The block lengths predictions and measurements are averaged over before scoring, by label."""
+
+BLOCK_PRODUCTS: Final[tuple[str, ...]] = (
+    "ukv_day1",
+    "icon_eu_day1",
+    "icon_d2_day1",
+    "gefs_mean_day1",
+)
+"""The day-1 arms whose gap to ENS day 1 is re-scored over blocks."""
+
+EQUAL_LEAD_HOURS: Final[tuple[int, ...]] = tuple(range(6))
+"""The UTC hours where a 6-hourly product's day-1 lead equals ENS day 1's (`h < 6`)."""
+
+VOIDED_BAND_PRODUCTS: Final[dict[str, str]] = {"ukv_day1": "UKV", "icon_eu_day1": "ICON-EU"}
+"""The planned day-1 arms whose bracket is recomputed without ENS's voided bands, with names."""
+
+GENERATOR_CONTRASTS: Final[dict[str, tuple[str, str]]] = {
+    "P1a": ("ukv_day1", "ens_mean_day1"),
+    "P2a": ("icon_eu_day1", "ens_mean_day1"),
+    "P4b": ("blend_p4b", "ens_mean_day1"),
+}
+"""The planned contrasts re-run one generator at a time: ID to (treatment arm, reference arm)."""
+
+
+SOLAR_LEFT_OFF_LEADERBOARD: Final[tuple[str, ...]] = ("persistence_day0",)
+"""Solar arms the leaderboard leaves out, with the reason printed in the report: day-0
+persistence is cut off at 00 UTC, when the last observed hour is dark."""
+
+
+def _v3_lines(*, path: Path) -> list[str]:
+    """Return `verify_previous_runs_leads.py`'s V3 table, or a note that it has not been run."""
+    if not path.exists():
+        return [f"`{path.name}` is absent: run `verify_previous_runs_leads.py --v3-only`."]
+    return path.read_text().splitlines()
+
+
+def _hours_label(*, hours: tuple[int, ...]) -> str:
+    """Return `hour 00 UTC` for one hour, or `hours 00-05 UTC` for a run of them."""
+    if len(hours) == 1:
+        return f"hour {hours[0]:02d} UTC"
+    return f"hours {hours[0]:02d}-{hours[-1]:02d} UTC"
+
+
+def blocked_losses(
+    *,
+    losses: pl.DataFrame,
+    frame: pl.DataFrame,
+    arms: list[str],
+    every: str | None,
+    domain: DomainType,
+) -> pl.DataFrame:
+    """Score each arm on predictions and measurements averaged over blocks of hours.
+
+    A solar hour labelled `T` covers the hour before `T`, so a solar block starts at the truncation
+    of `T` minus one minute; a wind hour is centred on its label, so a wind block starts at the
+    truncation of `T`. The error is the absolute difference of the block's mean prediction and mean
+    measurement over the generator's capacity. A block holds only the shared rows that fall in it,
+    and a block that starts in a month holding no shared row is dropped.
+
+    Args:
+        losses: Per-row losses at one setting, carrying `signed_error_capped_mw` and
+            `effective_capacity_mw`.
+        frame: The rows, carrying the target and `month`.
+        arms: The arms to score.
+        every: A Polars duration such as `3h`, or `None` for the hour itself.
+        domain: `solar` or `wind`.
+
+    Returns:
+        One row per (arm, site, seed, block) with `time` (the block's start), `month` and `METRIC`.
+    """
+    subset = losses.filter(pl.col("arm").is_in(arms))
+    predictions = predictions_from_losses(losses=subset, frame=frame)
+    capacity = subset.select("site", "time", "effective_capacity_mw").unique(
+        subset=["site", "time"]
+    )
+    joined = predictions.join(frame.select("site", "time", TARGET), on=["site", "time"]).join(
+        capacity, on=["site", "time"]
+    )
+    shift = pl.duration(minutes=1 if domain == "solar" else 0)
+    block = pl.col("time") if every is None else (pl.col("time") - shift).dt.truncate(every)
+    return (
+        joined.group_by("arm", "site", "seed", block.alias("block"))
+        .agg(
+            prediction=pl.col("prediction_capped_mw").mean(),
+            actual=pl.col(TARGET).cast(pl.Float64).mean(),
+            capacity=pl.col("effective_capacity_mw").mean(),
+        )
+        .select(
+            "arm",
+            "site",
+            "seed",
+            time=pl.col("block"),
+            month=pl.col("block").dt.strftime("%Y-%m"),
+            **{METRIC: (pl.col("prediction") - pl.col("actual")).abs() / pl.col("capacity")},
+        )
+        .filter(pl.col("month").is_in(frame["month"].unique().to_list()))
+    )
+
+
+def _block_lines(*, losses: pl.DataFrame, frame: pl.DataFrame, domain: DomainType) -> list[str]:
+    """Return each product's day-1 gap to ENS day 1 when scored over blocks of hours."""
+    arms = [arm for arm in BLOCK_PRODUCTS if arms_present(losses=losses, arms=(arm,))]
+    lines = [
+        (
+            "| Product | Averaged over | Difference from ENS mean day 1 (points) [95% interval] | "
+            "Blocks | Months |"
+        ),
+        "|---|---|---|---|---|",
+    ]
+    for label, every in BLOCKS.items():
+        blocked = blocked_losses(
+            losses=losses, frame=frame, arms=[*arms, "ens_mean_day1"], every=every, domain=domain
+        )
+        for arm in arms:
+            interval = difference(losses=blocked, treatment=arm, reference="ens_mean_day1")
+            lines.append(
+                f"| {arm} | {label} | {_interval_text(interval=interval)} | "
+                f"{interval['n_rows']:,} | {interval['n_months']} |"
+            )
+    return lines
+
+
+def _control_lines(*, losses: pl.DataFrame, domain: DomainType) -> list[str]:
+    """Return every day-1 Previous Runs product's and GEFS's gap to the single ENS control run."""
+    arms = [
+        prefix
+        for prefix in (*_product_prefixes(domain=domain), *_gefs_prefixes(domain=domain))
+        if prefix.endswith("_day1") and arms_present(losses=losses, arms=(prefix,))
+    ]
+    lines = list(CONTRAST_HEADER)
+    lines.extend(
+        _contrast_line(
+            identifier=f"X-ctrl-{arm}",
+            status="exploratory",
+            label=f"{arm} − ENS control run day 1",
+            setting="primary",
+            interval=difference(losses=losses, treatment=arm, reference="ens_control_day1"),
+        )
+        for arm in arms
+    )
+    return lines
+
+
+def _ukv_missing_lines(*, candidates: pl.DataFrame, domain: DomainType) -> list[str]:
+    """Return the candidate rows UKV's day-1 requirement removes, by month and by hour of day."""
+    fields = _weather_fields(domain=domain, prefix="ukv_day1")
+    if not all(column in candidates.columns for column in fields):
+        return ["No UKV day-1 columns."]
+    missing = pl.any_horizontal(pl.col(column).is_null() for column in fields)
+    by_month = (
+        candidates.group_by("month")
+        .agg(removed=missing.sum(), candidate=pl.len())
+        .filter(pl.col("removed") > 0)
+        .sort("month")
+    )
+    by_hour = (
+        candidates.group_by(pl.col("time").dt.hour().alias("hour"))
+        .agg(share=missing.mean())
+        .sort("hour")
+    )
+    return [
+        "| Month | Candidate rows removed by the UKV day-1 requirement | Of the month's rows |",
+        "|---|---|---|",
+        *(
+            f"| {row['month']} | {row['removed']:,} | {row['removed'] / row['candidate']:.1%} |"
+            for row in by_month.iter_rows(named=True)
+        ),
+        "",
+        "UKV day-1 missing share of candidate rows, by UTC hour of day:",
+        "",
+        "| Hour | " + " | ".join(f"{hour:02d}" for hour in by_hour["hour"]) + " |",
+        "|---|" + "---|" * by_hour.height,
+        "| Missing | " + " | ".join(f"{share:.1%}" for share in by_hour["share"]) + " |",
+    ]
+
+
+def _uncovered_lines(*, coverage: pl.DataFrame) -> list[str]:
+    """Return the (site, calendar month) cells no training row covers, and why."""
+    uncovered = coverage.filter(~pl.col("covered"))
+    if uncovered.is_empty():
+        return ["Every (site, fold, calendar month) cell has training rows."]
+    lines = [
+        "| Site | Calendar month | Fold | Scored rows | Years the site's rows hold that month |",
+        "|---|---|---|---|---|",
+        *(
+            f"| {row['site']} | {row['calendar_month']:02d} | {row['fold']} | "
+            f"{row['n_scored']:,} | {row['n_years']} |"
+            for row in uncovered.iter_rows(named=True)
+        ),
+    ]
+    single_year = uncovered.filter(pl.col("n_years") == 1).height
+    lines += [
+        "",
+        (
+            f"{single_year} of the {uncovered.height} cells hold a calendar month that occurs in "
+            "one year only at that site, so no other fold can hold that month and training never "
+            "sees the season; `raise_on_uncovered_months` allows only such cells."
+        ),
+    ]
+    return lines
+
+
+def _exploratory_missing_lines(*, frame: pl.DataFrame, domain: DomainType) -> list[str]:
+    """Return each exploratory arm's share of shared rows with a missing weather value."""
+    planned = set(PLANNED_PREFIXES)
+    prefixes = [
+        prefix
+        for prefix in (
+            *_product_prefixes(domain=domain),
+            *_ens_prefixes(),
+            *_gefs_prefixes(domain=domain),
+        )
+        if prefix not in planned
+    ]
+    lines = ["| Exploratory arm | Shared rows with a missing weather value |", "|---|---|"]
+    for prefix in sorted(prefixes):
+        fields = _weather_fields(domain=domain, prefix=prefix)
+        if not all(column in frame.columns for column in fields):
+            continue
+        share = frame.select(
+            pl.any_horizontal(pl.col(column).is_null() for column in fields).mean()
+        ).item()
+        lines.append(f"| {prefix} | {share:.2%} |")
+    return lines
+
+
+def _equal_lead_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Return ICON-EU day 1 against ENS day 1 on the hours where their leads are equal."""
+    if not arms_present(losses=losses, arms=("icon_eu_day1", "ens_mean_day1")):
+        return ["No ICON-EU day-1 arm."]
+    lines = list(CONTRAST_HEADER)
+    hour = pl.col("time").dt.hour()
+    scopes = [(_hours_label(hours=EQUAL_LEAD_HOURS), losses.filter(hour.is_in(EQUAL_LEAD_HOURS)))]
+    scopes.extend(
+        (
+            f"band {band:02d}-{band + 3:02d} UTC",
+            losses.filter(three_hour_band(hour=hour) == band),
+        )
+        for band in sorted({(h // 3) * 3 for h in EQUAL_LEAD_HOURS})
+    )
+    empty: list[str] = []
+    for label, subset in scopes:
+        if subset.is_empty():
+            empty.append(label)
+            continue
+        lines.append(
+            _contrast_line(
+                identifier="X-equal-lead",
+                status="exploratory",
+                label=f"ICON-EU day 1 − ENS mean day 1 on {label}",
+                setting="primary",
+                interval=difference(
+                    losses=subset, treatment="icon_eu_day1", reference="ens_mean_day1"
+                ),
+            )
+        )
+    present = sorted(set(losses["time"].dt.hour().unique().to_list()) & set(EQUAL_LEAD_HOURS))
+    lines += [
+        "",
+        "Shared rows fall at UTC hours " + ", ".join(f"{hour:02d}" for hour in present) + ".",
+    ]
+    if empty:
+        lines.append(f"No shared rows fall in: {', '.join(empty)}.")
+    return lines
+
+
+def _baseline_floor_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Return climatology as the no-weather floor, and smart persistence's gap to it at day 1."""
+    arms = ("climatology", "smart_persistence_day1")
+    if not arms_present(losses=losses, arms=arms):
+        return ["The climatology or smart-persistence arm is absent."]
+    interval = difference(
+        losses=losses, treatment="smart_persistence_day1", reference="climatology"
+    )
+    if interval["lower_95"] > 0.0:
+        reading = "smart persistence at day 1 is significantly worse than climatology"
+    elif interval["upper_95"] < 0.0:
+        reading = "smart persistence at day 1 is significantly better than climatology"
+    else:
+        reading = "smart persistence at day 1 and climatology are not significantly different"
+    return [
+        *CONTRAST_HEADER,
+        _contrast_line(
+            identifier="X-floor",
+            status="exploratory",
+            label="smart persistence day 1 − climatology (the no-weather floor)",
+            setting="primary",
+            interval=interval,
+        ),
+        "",
+        f"On these rows, {reading}.",
+    ]
+
+
+def _without_voided_band_lines(
+    *,
+    by_setting: dict[str, pl.DataFrame],
+    monotonicity: dict[str, pl.DataFrame],
+) -> list[str]:
+    """Return the planned brackets recomputed on the hours outside ENS's voided bands."""
+    lines = list(CONTRAST_HEADER)
+    notes: list[str] = []
+    for arm, name in VOIDED_BAND_PRODUCTS.items():
+        for setting, losses in by_setting.items():
+            if not arms_present(losses=losses, arms=(arm, "ens_mean_day0", "ens_mean_day1")):
+                continue
+            voided = voided_bands(monotonicity=monotonicity[setting], day=1)
+            if not voided:
+                notes.append(f"{name} at {setting}: no band is voided, so nothing is removed.")
+                continue
+            kept = losses.filter(~three_hour_band(hour=pl.col("time").dt.hour()).is_in(voided))
+            result = bracket(losses=kept, product_arm=arm, day=1)
+            bands = ", ".join(f"{band:02d}-{band + 3:02d}" for band in voided)
+            for side, ens_day in (("upper", 1), ("lower", 0)):
+                lines.append(
+                    _contrast_line(
+                        identifier=f"X-novoid-{arm}-{side}",
+                        status="exploratory",
+                        label=(
+                            f"{name} day 1 − ENS mean day {ens_day} ({side} side) without bands "
+                            f"{bands} UTC; {result['verdict']}"
+                        ),
+                        setting=setting,
+                        interval=result[side],
+                    )
+                )
+    return [*(lines if len(lines) > len(CONTRAST_HEADER) else []), "", *notes]
+
+
+def _generator_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Return P1a, P2a and P4b one generator at a time, at the primary setting."""
+    lines = list(CONTRAST_HEADER)
+    for identifier, (treatment, reference) in GENERATOR_CONTRASTS.items():
+        if not arms_present(losses=losses, arms=(treatment, reference)):
+            continue
+        for site in sorted(losses["site"].unique().to_list()):
+            interval = difference(
+                losses=losses.filter(pl.col("site") == site),
+                treatment=treatment,
+                reference=reference,
+            )
+            lines.append(
+                _contrast_line(
+                    identifier=f"X-{identifier}-{site}",
+                    status="exploratory",
+                    label=f"{identifier}: {treatment} − {reference} at generator {site}",
+                    setting="primary",
+                    interval=interval,
+                )
+            )
+    return lines
+
+
 class DomainInputs(NamedTuple):
     """Everything the report needs about one technology besides its losses."""
 
@@ -1401,8 +1789,21 @@ class DomainInputs(NamedTuple):
     coverage: pl.DataFrame
 
 
-def _domain_lines(*, domain: DomainType, inputs: DomainInputs, losses: pl.DataFrame) -> list[str]:
-    """Return one technology's whole report section."""
+def _domain_lines(
+    *, domain: DomainType, inputs: DomainInputs, losses: pl.DataFrame, verification: Path
+) -> list[str]:
+    """Return one technology's whole report section.
+
+    Args:
+        domain: `solar` or `wind`.
+        inputs: The domain's rows, jobs and coverage.
+        losses: The domain's stacked losses, baselines included.
+        verification: `verify_previous_runs_leads.py`'s `v3_conventions.md`, quoted in the solar
+            section when it exists.
+
+    Returns:
+        The section's markdown lines.
+    """
     by_setting = {setting: losses.filter(pl.col("setting") == setting) for setting in SETTINGS}
     monotonicity = {
         setting: check_ens_monotonicity(
@@ -1412,7 +1813,8 @@ def _domain_lines(*, domain: DomainType, inputs: DomainInputs, losses: pl.DataFr
     }
     uncovered = inputs.coverage.filter(~pl.col("covered")).height
     arms = sorted(losses["arm"].unique().to_list())
-    baselines = [arm for arm in arms if is_baseline_arm(arm=arm)]
+    left_off = SOLAR_LEFT_OFF_LEADERBOARD if domain == "solar" else ()
+    baselines = [arm for arm in arms if is_baseline_arm(arm=arm) and arm not in left_off]
     fitted = [arm for arm in arms if not is_baseline_arm(arm=arm)]
     lines = [
         f"## {domain.capitalize()}",
@@ -1428,6 +1830,16 @@ def _domain_lines(*, domain: DomainType, inputs: DomainInputs, losses: pl.DataFr
             "not covered by training data (`raise_on_uncovered_months` allows only months that "
             "occur in one year)."
         ),
+        "",
+        *_uncovered_lines(coverage=inputs.coverage),
+        "",
+        "### UKV day-1 requirement: rows removed",
+        "",
+        *_ukv_missing_lines(candidates=inputs.candidates, domain=domain),
+        "",
+        "### Exploratory arms: missing weather on the shared rows",
+        "",
+        *_exploratory_missing_lines(frame=inputs.frame, domain=domain),
         "",
         "### Arm columns",
         "",
@@ -1477,7 +1889,7 @@ def _domain_lines(*, domain: DomainType, inputs: DomainInputs, losses: pl.DataFr
                 _contrast_line(
                     identifier=f"X-exact-{arm}",
                     status="exploratory",
-                    label=f"{arm} − ens_mean_day1 on hours {hours[0]:02d}-{hours[-1]:02d} UTC",
+                    label=f"{arm} − ens_mean_day1 on {_hours_label(hours=hours)}",
                     setting="primary",
                     interval=interval,
                 )
@@ -1502,6 +1914,67 @@ def _domain_lines(*, domain: DomainType, inputs: DomainInputs, losses: pl.DataFr
                 ),
             )
         )
+    primary = by_setting["primary"]
+    lines += [
+        "",
+        "### Exploratory: day-1 products against the single ENS control run",
+        "",
+        (
+            "`ens_control_day1` is fitted at the primary setting only, so these contrasts have "
+            "no sensitivity-setting counterpart."
+        ),
+        "",
+        *_control_lines(losses=primary, domain=domain),
+        "",
+        "### Exploratory: ICON-EU day 1 against ENS day 1 on hours 00-05 UTC",
+        "",
+        ("These are the hours where a 6-hourly product's day-1 lead equals ENS day 1's."),
+        "",
+        *_equal_lead_lines(losses=primary),
+        "",
+        "### Exploratory: day-1 gap to ENS day 1 scored over blocks of hours",
+        "",
+        (
+            "Each arm's predictions and the measurements are averaged over the block before the "
+            "error is scored. ENS and GEFS reach the XGBoost model as smoothed 3-hourly fields, "
+            "and ENS is averaged over an H3 cell, whereas the Previous Runs products are read at "
+            "one grid point, so a gap that shrinks as the block lengthens may reflect that "
+            "smoothing rather than forecast skill. Only GEFS shares ENS's lead."
+        ),
+        "",
+        *_block_lines(losses=primary, frame=inputs.frame, domain=domain),
+        "",
+        "### Exploratory: brackets without the hours where ENS's error did not rise",
+        "",
+        *_without_voided_band_lines(by_setting=by_setting, monotonicity=monotonicity),
+        "",
+        "### Exploratory: P1a, P2a and P4b one generator at a time",
+        "",
+        (
+            "Each interval resamples months and fitting seeds within one generator, so it does "
+            "not cover differences between generators."
+        ),
+        "",
+        *_generator_lines(losses=primary),
+        "",
+        "### Exploratory: the no-weather floor",
+        "",
+        *_baseline_floor_lines(losses=primary),
+        "",
+    ]
+    if domain == "solar":
+        lines += [
+            (
+                "Solar `persistence_day0` is left off the leaderboards: it is cut off at the run's "
+                "00 UTC init time, so it repeats the last observed hour, a night-time value near "
+                "zero, across the whole day."
+            ),
+            "",
+            "### UKV radiation timestamp convention (V3)",
+            "",
+            *_v3_lines(path=verification),
+            "",
+        ]
     lines += [
         "",
         _reconciliation_line(
@@ -1538,7 +2011,12 @@ def write_report(
         "",
     ]
     for domain, domain_inputs in inputs.items():
-        lines += _domain_lines(domain=domain, inputs=domain_inputs, losses=losses[domain])
+        lines += _domain_lines(
+            domain=domain,
+            inputs=domain_inputs,
+            losses=losses[domain],
+            verification=output_dir / "verification" / "v3_conventions.md",
+        )
     (output_dir / "report.md").write_text("\n".join(lines) + "\n")
 
 

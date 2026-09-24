@@ -170,13 +170,12 @@ conservative blend below uses.
   49r1, as the past-wind ENS and HRES study, #885, uses) to the rows' last date, 2026-09-10.
 - **One shared row set per technology: the rows where the target and every planned arm's input at
   every scored day are present.** The planned arms are ENS, GEFS, UKV, ICON-EU, IFS 0.25°, and the
-  baselines. UKV's day-1 offset is missing on 4.6% of solar rows and 5.2% of wind rows, mostly about
-  30 whole days between 2026-04-06 and 2026-05-29, so the row set loses about half of the spring
-  after UKV's January 2026 upgrade, and the page says so. Exploratory arms are fitted on the same
-  rows, their missing hours left as missing values (XGBoost routes them natively); the report prints
-  each exploratory arm's missing share (measured from 0.04% to 1.3%). The report prints the rows
-  each
-  planned product drops.
+  baselines. UKV's day-1 offset is missing on 6.8% of solar rows and 11.1% of wind rows, mostly
+  about 30 whole days between 2026-04-06 and 2026-05-29, so the row set loses about half of the
+  spring after UKV's January 2026 upgrade, and the page says so. Exploratory arms are fitted on the
+  same rows, their missing hours left as missing values (XGBoost routes them natively); the report
+  prints each exploratory arm's missing share (measured from 0% to 1.5%). The report prints the
+  rows each planned product drops.
 - **Folds: #885's design, confirmed by the study coordinator, and #885's code.** Five folds of whole
   months, cut inside three eras: before 2025-10-01; 2025-10-01 to the UKV PS47 upgrade on
   2026-01-21; and after it, with the part-month that straddles the upgrade dropped as #885 drops it.
@@ -399,8 +398,8 @@ and
 - **V1b, each product's run switches.** For every Previous Runs product, the second difference of
   each `previous_dayN` series (100 m wind and temperature), per UTC hour, locates where runs switch.
   The plan review found 6-hourly switches for GFS, ICON-EU (so its day-1 lead is 24 to 29 hours),
-  ICON global, and ARPEGE, and 3-hourly switches for UKV, ICON-D2, and DMI HARMONIE-AROME, all on
-  the phase starting at 00 UTC; IFS 0.25° and KNMI show no clear signature. The page says that the
+  ICON global, and ARPEGE, and 3-hourly switches for ICON-D2 and DMI HARMONIE-AROME, all on the
+  phase starting at 00 UTC; UKV, IFS 0.25° and KNMI show no clear signature. The page says that the
   switch pattern fixes each product's cycle but not whether its offset is `24N` or `24N + n`, so for
   products other than GFS the offset rests on Open-Meteo applying one rule to every model.
 - **V1c, steps in the planned inputs.** A monthly ratio per generator of each planned input (ENS,
@@ -477,8 +476,9 @@ A printed-number guard in the chart script checks every figure the page quotes a
 ## Risks and open questions
 
 - **The Previous Runs rule is unverified.** V1 is a gate.
-- **UKV's day-1 radiation from two snapshots** straddles a run change on one hour in three, by the
-  3-hourly cycle V1b found. Recommendation: accept; the later snapshot's lead is at most 27 hours,
+- **UKV's day-1 radiation from two snapshots** straddles a run change on one hour in three if UKV
+  runs 3-hourly and on one hour in six if it runs 6-hourly; V1b found no clear UKV signature, so the
+  report prints both shares. Recommendation: accept; the later snapshot's lead is at most 27 hours,
   which stays within the bracket for every daylight hour from 03 UTC.
 - **A missing run filled by an older one.** If Open-Meteo fills a missing run with an older run
   rather than a null, that row's lead can exceed `24 + h` and break the upper side. V1 cannot rule
@@ -495,8 +495,8 @@ A printed-number guard in the chart script checks every figure the page quotes a
 
 Accepted:
 
-- The 2% rule would have moved UKV, a planned arm, off the shared rows (UKV day 1 is missing on 4.6%
-  of solar and 5.2% of wind rows). The shared rows are now the planned arms' intersection;
+- The 2% rule would have moved UKV, a planned arm, off the shared rows (UKV day 1 is missing on 6.8%
+  of solar and 11.1% of wind rows). The shared rows are now the planned arms' intersection;
   exploratory arms keep their small gaps as missing values.
 - The blend verdict is now read from blend minus ENS alone, the difference the live service sees;
   blend minus control is a guard that must also be negative.
@@ -546,9 +546,22 @@ formula on one run. Accepted:
 - The fold coverage check raises on any uncovered month other than the listed single-year months.
 - A verdict stands only if both hyperparameter settings give it.
 - V1c looks for steps in the planned inputs; the 50r1 evidence is stated as wind-only.
-- The UKV straddle share is predicted (one hour in three), not described as rare.
+- The UKV straddle share is predicted (one hour in three at a 3-hourly cycle), not described as
+  rare.
 - Exact-lead wind hours are reinstated as an exploratory re-read of saved losses, costing no fit.
 - The permutation groups by year-month; each contrast asserts equal rows; `_complete` is not
   reused; ENS day 0 is stated as a bracket side only; the ensemble-mean wind is the mean vector.
 
 Rejected: none.
+
+### Departures from the plan found while running the study
+
+- The ERA5 and CAMS past-weather reference rows the plan's baselines section promises are not
+  fitted, and no planned contrast reads them; the report's no-weather floor is climatology. Should
+  either be fitted later, `speed_hub_era5` is in km/h and needs the same conversion to m/s as the
+  Previous Runs wind columns.
+- UKV day 1 is missing on 6.8% of the solar candidate rows and 11.1% of the wind candidate rows,
+  measured by the report after the study's row-set start; the plan first quoted 4.6% and 5.2%. The
+  measured shares are higher because the requirement drops a row missing any UKV day-1 column: for
+  solar the temperature and the snapshots at both ends of the hour, for wind the 100 m speed, the
+  100 m direction and the 10 m speed.
