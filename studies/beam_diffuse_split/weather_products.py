@@ -185,6 +185,21 @@ RUN_INTERVAL_HOURS: Final[dict[str, int]] = {
 """The run cadence of each ICON product, which fixes its served lead at each label hour.
 
 The evidence for the mapping is on the write-up page.
+
+**No entry is added for the four products the `all` panel adds.** `check_new_products.py`'s
+run-switch table (`UPDATE_OUTPUT_DIR / "product_checks.md"`, "Mean change in clearness index into
+each UTC hour") is the only evidence available -- none of the four has a documented run cadence in
+its own README or in `sources.OPEN_METEO_MODELS`. Read over the daytime hours the table covers
+(08-18 UTC), it does not pin a cadence for any of the four: `ecmwf-ifs-hres` shows one clean spike
+at 13:00 UTC (1.23, against a 0.93-1.03 baseline), which is consistent with a run every 6 hours
+(00, 06, 12, 18 UTC) but equally consistent with a run every 12 hours -- a daytime-only window
+cannot tell the two apart, because both predict a spike only at 13:00 within 08-18. The other three
+show no single hour standing out from noise: `arpege-europe` swings between 0.83 and 1.22 with no
+isolated peak, and `dmi-harmonie-arome` and `knmi-harmonie-arome` both show a broad rise across
+15-18 UTC rather than a one-hour spike, consistent with a short (1-3 hour) run interval too frequent
+for this table to resolve. Guessing an interval for `NEW_PLANNED_CONTRASTS["all"]`'s equal-lead
+rows is worse than leaving them unsplit, so `_matched_lead_lines` reports all three of that panel's
+contrasts as waiting on a measured run interval.
 """
 
 SARAH_SATELLITE_ERAS: Final[tuple[tuple[str, datetime, datetime], ...]] = (
