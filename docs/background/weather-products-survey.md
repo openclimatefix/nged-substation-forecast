@@ -266,8 +266,8 @@ agreed. The ranking, with each product's roadmap status and one reason:
 6. **HelioClim-3** (not on the roadmap) — a second satellite retrieval beside CAMS, but paid after
    2006, and its direct and diffuse are decompositions of global irradiance.
 
-ICON-DREAM-EU, an ICON reanalysis on a 6.5 km grid with native direct and diffuse, has since been
-scored: [ICON-DREAM-EU beats ERA5 but not the ICON weather
+ICON-DREAM-EU, an ICON reanalysis on a 6.5 km grid with native direct and diffuse, is scored in the
+past-sunshine study: [ICON-DREAM-EU beats ERA5 but not the ICON weather
 models](../studies/weather-products-for-past-solar.md#icon-dream-eu-beats-era5-but-not-the-icon-weather-models).
 
 The DMI and KNMI HARMONIE-AROME forecasts would add a further model family, from mid-2024 only,
@@ -300,9 +300,9 @@ product's roadmap status and one reason:
 MERRA-2 earns no wind arm: its highest wind is at 50 m, below both heights the study scores, on a
 ~50 km grid over flat Lincolnshire, so a score would mainly measure grid spacing.
 
-ICON-DREAM-EU has since been scored: [ICON-DREAM-EU does not beat ERA5, and trails
+ICON-DREAM-EU is scored in the past-wind study: [ICON-DREAM-EU does not beat ERA5, and trails
 ICON-EU](../studies/weather-products-for-past-wind.md#icon-dream-eu-does-not-beat-era5-and-trails-icon-eu).
-The study read it at DWD's model level 72, about 96 m, directly, rather than interpolating to a
+The study reads it at DWD's model level 72, about 96 m, directly, rather than interpolating to a
 fixed height.
 
 ## Candidates for comparing forecast models at a fixed lead (issue #810)
