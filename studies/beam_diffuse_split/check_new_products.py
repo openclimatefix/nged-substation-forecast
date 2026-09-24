@@ -280,6 +280,29 @@ def _hourly_curvature_ratio(*, frame: pl.DataFrame, column: str) -> pl.DataFrame
     return by_hour.with_columns(relative=pl.col("s") / pl.col("s").median())
 
 
+def _local_prominence(*, ratio: pl.DataFrame) -> pl.DataFrame:
+    """Return each hour's ratio against the mean of its two circular neighbours.
+
+    `_hourly_curvature_ratio`'s own ratio, against the whole day's median, can sit above 1 for a
+    run of several adjacent hours where the switch itself only lands on one of them, because the
+    median is pulled up by the whole neighbourhood. Dividing each hour by the mean of the hour
+    before and after it isolates a single outsized hour from that drift: a run interval of `n`
+    hours makes every hour divisible by `n` a local peak here, at a value clearly above 1, where
+    the hours in between sit clearly below it.
+
+    Args:
+        ratio: `_hourly_curvature_ratio`'s output, one row per UTC hour (`hour`, `relative`),
+            covering all 24 hours with no gap, so the circular neighbours line up.
+
+    Returns:
+        `hour`, with `relative` replaced by the prominence against its two neighbours.
+    """
+    ordered = ratio.sort("hour")
+    values = ordered["relative"].to_numpy()
+    neighbours = 0.5 * (np.roll(values, 1) + np.roll(values, -1))
+    return ordered.select("hour").with_columns(relative=pl.Series(values / neighbours))
+
+
 def _night_jump_row(*, label: str, ratio: pl.DataFrame, hours: list[int]) -> str:
     """Return one markdown table row: `label`'s ratio at each of `hours`.
 
@@ -303,7 +326,10 @@ def _night_jump_lines() -> list[str]:
     twice, split at `sources.IFS_OPEN_DATA_CUTOVER`, because its cadence is expected to change
     there (see `weather_products.IFS_HRES_RUN_INTERVAL_HOURS`). `POSITIVE_CONTROL_SOURCE` prints
     too, if its own single-site fetch exists on disk, to show the method against a product whose
-    6-hour cadence is already known; otherwise the report says so rather than staying silent.
+    6-hour cadence is already known; otherwise the report says so rather than staying silent. Each
+    product's ratio row is followed by its local-prominence row (`_local_prominence`), so a run
+    interval that repeats every few hours shows as a peak at each of those hours rather than only
+    as a raised plateau across the whole neighbourhood.
 
     Returns:
         Markdown lines.
@@ -318,7 +344,10 @@ def _night_jump_lines() -> list[str]:
         (
             "A run switch shows as a value well above 1 at a fixed hour. Temperature, not "
             "radiation, so every hour of the day counts and there is no diurnal solar cycle to "
-            "swamp the signal."
+            "swamp the signal. Each product's second row is its local prominence, the same ratio "
+            "against the mean of its two neighbouring hours rather than the whole day's median: a "
+            "run interval of a few hours shows here as a peak at every hour that interval divides, "
+            "rather than as a plateau raised across several adjacent hours."
         ),
         "",
         "| Product | " + " | ".join(f"{hour:02d}" for hour in hours) + " |",
@@ -336,9 +365,23 @@ def _night_jump_lines() -> list[str]:
                     frame=frame.filter(condition), column="temperature_2m"
                 )
                 lines.append(_night_jump_row(label=label, ratio=ratio, hours=hours))
+                lines.append(
+                    _night_jump_row(
+                        label=f"{label} (local prominence)",
+                        ratio=_local_prominence(ratio=ratio),
+                        hours=hours,
+                    )
+                )
         else:
             ratio = _hourly_curvature_ratio(frame=frame, column="temperature_2m")
             lines.append(_night_jump_row(label=source, ratio=ratio, hours=hours))
+            lines.append(
+                _night_jump_row(
+                    label=f"{source} (local prominence)",
+                    ratio=_local_prominence(ratio=ratio),
+                    hours=hours,
+                )
+            )
     control_path = temperature_site_b_path_for(source=POSITIVE_CONTROL_SOURCE)
     if control_path.exists():
         control_ratio = _hourly_curvature_ratio(
@@ -348,6 +391,13 @@ def _night_jump_lines() -> list[str]:
             _night_jump_row(
                 label=f"{POSITIVE_CONTROL_SOURCE} (positive control)",
                 ratio=control_ratio,
+                hours=hours,
+            )
+        )
+        lines.append(
+            _night_jump_row(
+                label=f"{POSITIVE_CONTROL_SOURCE} (positive control, local prominence)",
+                ratio=_local_prominence(ratio=control_ratio),
                 hours=hours,
             )
         )
