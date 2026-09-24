@@ -6,8 +6,9 @@ in `wind_icon_dream_charts.py`'s style. **Every number a chart shares with the p
 `intervals.parquet` or `report.md`, both written by `station_wind_arms.py`**, so a chart cannot
 disagree with the page. Before any chart is saved, `Source.verify` requires every interval a chart
 draws, printed the way the report prints it, to be in `report.md`, and `_check_title_numbers`
-requires every decimal number in a chart's title to be a report number rounded to the title's
-precision. The script prints every number each chart draws.
+requires every decimal number in a chart's title to be a value or interval end in
+`intervals.parquet`, rounded half up once from its full precision to the title's precision.
+The script prints every number each chart draws.
 
 Wind farms appear only as `W1` to `W3`. No chart names a weather station, gives a station's
 position or a farm-to-station distance, or plots a station's wind against dates. The month chart's
@@ -26,6 +27,7 @@ import argparse
 import logging
 import re
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from decimal import ROUND_HALF_UP, Decimal
@@ -34,7 +36,7 @@ from typing import Any, Final, cast
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
-from station_wind_arms import OUTPUT_DIR
+from station_wind_arms import OUTPUT_DIR, PLANNED_CONTRASTS
 from studies.charts import (
     CONDITION_COLOURS,
     CONDITION_SHAPES,
@@ -64,28 +66,33 @@ SETTING_CONDITIONS: Final[tuple[str, str]] = (
 DOTS: Final[str] = (
     "Dot: estimate. Line: 95% interval from resampling whole calendar months and a fitting seed."
 )
+"""The subtitle line saying what a dot and a line mean."""
 
 FIGURE_HEADLINE: Final[int] = 21
+"""The headline figure's number on the page."""
+
 FIGURE_SEASON: Final[int] = 22
+"""The season figure's number on the page."""
+
 FIGURE_BY_FARM: Final[int] = 23
-"""The figures' numbers on the page."""
+"""The per-farm figure's number on the page."""
 
-LEADERBOARD_ARMS: Final[dict[str, str]] = {
-    "station_wind": "Nearest station (3)",
-    "era5_10m_wind": "ERA5 10 m (3)",
-    "era5_wind": "ERA5 (4)",
-    "ukv_wind": "UKV (4)",
-    "icon_d2_wind": "ICON-D2 (4)",
-    "icon_eu_wind": "ICON-EU (4)",
-    "icon_global_wind": "ICON global (4)",
-    "ukv_station_wind": "UKV + nearest station (7)",
-    "ukv_padded_wind": "UKV + its own 80 m wind (7)",
-    "station_k3_wind": "Mean of 3 nearest stations (3)",
-    "ukv_icon_d2_wind": "UKV + ICON-D2 (7)",
+LEADERBOARD_ARMS: Final[Mapping[str, str]] = {
+    "station_wind": "Nearest station",
+    "era5_10m_wind": "ERA5 10 m",
+    "era5_wind": "ERA5",
+    "ukv_wind": "UKV",
+    "icon_d2_wind": "ICON-D2",
+    "icon_eu_wind": "ICON-EU",
+    "icon_global_wind": "ICON global",
+    "ukv_station_wind": "UKV + nearest station",
+    "ukv_padded_wind": "UKV + its own 80 m wind",
+    "station_k3_wind": "Mean of 3 nearest stations",
+    "ukv_icon_d2_wind": "UKV + ICON-D2",
 }
-"""Each arm's row label on the leaderboard: its name, then its number of wind columns."""
+"""Each arm's row label on the leaderboard; the chart appends the arm's wind-column count."""
 
-CONTRAST_NAMES: Final[dict[str, str]] = {
+CONTRAST_NAMES: Final[Mapping[str, str]] = {
     "station_wind": "Nearest station",
     "era5_10m_wind": "ERA5 10 m",
     "era5_wind": "ERA5",
@@ -98,12 +105,6 @@ CONTRAST_NAMES: Final[dict[str, str]] = {
     "era5_10m_speed_only": "ERA5 10 m speed alone",
 }
 """How a contrast row names each arm."""
-
-PLANNED: Final[tuple[tuple[str, str, str], ...]] = (
-    ("S1", "station_wind", "era5_10m_wind"),
-    ("S2", "ukv_station_wind", "ukv_padded_wind"),
-)
-"""The two planned contrasts: name, first arm, second arm."""
 
 EXPLORATORY: Final[tuple[tuple[str, str, str, tuple[str, ...]], ...]] = (
     ("post_review", "station_speed_only", "era5_10m_speed_only", SETTINGS),
@@ -197,7 +198,7 @@ class Source:
         if matches.height != 1:
             msg = f"{(section, setting, scope, treatment, reference)} matches {matches.height} rows"
             raise ValueError(msg)
-        row = matches.row(0, named=True)
+        row = matches.row(index=0, named=True)
         self.printed.append(_printed_line(row=row, scope=scope))
         return row
 
@@ -243,35 +244,36 @@ def _printed_line(*, row: dict[str, Any], scope: str) -> str:
     )
 
 
-def _report_numbers(*, report_text: str) -> set[str]:
-    """Return every decimal number in the report, as printed."""
-    return set(re.findall(r"\d+\.\d+", report_text))
-
-
-def _check_title_numbers(*, title: str, report: str) -> None:
-    """Stop unless every decimal number in a title is a report number rounded to the title's places.
+def _check_title_numbers(*, title: str, intervals: pl.DataFrame) -> None:
+    """Stop unless every decimal number in a title is an interval number rounded half up once.
 
     Args:
         title: A chart's title.
-        report: `report.md`'s text.
+        intervals: `intervals.parquet`, whose `value`, `lower` and `upper` are at full precision.
 
     Raises:
-        ValueError: If a decimal number in the title matches no report number.
+        ValueError: If a decimal number in the title matches no interval number.
     """
-    reported = _report_numbers(report_text=report)
+    numbers = {
+        abs(number)
+        for column in ("value", "lower", "upper")
+        for number in intervals[column].drop_nulls().to_list()
+    }
     for printed in re.findall(r"\d+\.\d+", title):
         places = len(printed.split(".")[1])
         step = Decimal(1).scaleb(-places)
-        rounded = {Decimal(number).quantize(step, rounding=ROUND_HALF_UP) for number in reported}
+        rounded = {
+            Decimal(repr(number)).quantize(step, rounding=ROUND_HALF_UP) for number in numbers
+        }
         if Decimal(printed) not in rounded:
-            msg = f"the title number {printed} is not a report number rounded to {places} places"
+            msg = f"the title number {printed} is not an interval number rounded to {places} places"
             raise ValueError(msg)
 
 
 def _round_half_up(*, value: float, places: int = 2) -> str:
-    """Return `abs(value)` rounded half up from its three printed decimals, for a title."""
+    """Return `abs(value)` rounded half up once from its full precision, for a title."""
     step = Decimal(1).scaleb(-places)
-    return str(Decimal(f"{abs(value):.3f}").quantize(step, rounding=ROUND_HALF_UP))
+    return str(Decimal(repr(abs(value))).quantize(step, rounding=ROUND_HALF_UP))
 
 
 def _load() -> Source:
@@ -387,7 +389,7 @@ def _headline(
         row = source.row(section="leaderboard", scope="all", treatment=arm, reference=None)
         records.append(
             {
-                "label": label,
+                "label": f"{label} ({row['n_wind_columns']})",
                 "family": "weather model",
                 "condition": SETTING_CONDITIONS[0],
                 "value": row["value"],
@@ -411,7 +413,7 @@ def _headline(
         row_step_px=30,
     )
     planned_marks = []
-    for name, first, second in PLANNED:
+    for name, first, second in PLANNED_CONTRASTS:
         for setting, condition in zip(SETTINGS, SETTING_CONDITIONS, strict=True):
             row = source.row(
                 section="planned",
@@ -467,6 +469,9 @@ def _headline(
         panels.append(panel if first else _without_key(panel=panel))
     s1 = planned.filter(pl.col("label").str.starts_with("S1"))["difference"][0]
     s2 = planned.filter(pl.col("label").str.starts_with("S2"))["difference"][0]
+    if not (s1 > 0.0 and s2 < 0.0):
+        msg = f"the title says S1 is positive and S2 negative, but S1 is {s1} and S2 is {s2}"
+        raise ValueError(msg)
     title = (
         f"The nearest weather station trails ERA5's 10 m wind by {_round_half_up(value=s1)} "
         f"points, and adding it to UKV lowers UKV's error by {_round_half_up(value=s2)}"
@@ -497,20 +502,17 @@ def _headline(
     )
 
 
-def _season_rows(
-    *, source: Source, first: str, second: str, rows: int, months: int
-) -> pl.DataFrame:
+def _season_rows(*, source: Source, first: str, second: str) -> pl.DataFrame:
     """Return one contrast's season rows: January to July, August to December, balanced, all.
 
     Args:
         source: The saved results.
         first: The first arm of the contrast.
         second: The second arm of the contrast.
-        rows: Rows every arm is scored on.
-        months: Calendar months those rows cover.
 
     Returns:
-        One row per scope and setting, in the order the panel draws them.
+        One row per scope and setting, in the order the panel draws them. The all-months row is
+        the planned contrast, and the other rows are exploratory.
     """
     marks = []
     for section, scope, label in (
@@ -523,17 +525,16 @@ def _season_rows(
             row = source.row(
                 section=section, scope=scope, treatment=first, reference=second, setting=setting
             )
-            counts = (
-                f"{row['n_months']} months, {row['n_rows']:,} rows"
-                if row["n_rows"] is not None
-                else f"{months} months, {rows:,} rows"
-            )
             marks.append(
                 _mark(
-                    label=f"{label} ({counts})" if section != "calendar_balanced" else label,
+                    label=(
+                        label
+                        if section == "calendar_balanced"
+                        else f"{label} ({row['n_months']} months, {row['n_rows']:,} rows)"
+                    ),
                     row=row,
                     condition=condition,
-                    planned=False,
+                    planned=section == "planned",
                 )
             )
     return pl.DataFrame(marks)
@@ -603,7 +604,7 @@ def _month_panel(*, months: pl.DataFrame, contrast: str, title: str) -> alt.Laye
                 (f"{contrast}_second", SETTING_CONDITIONS[1]),
             )
         ]
-    ).with_columns(pl.col("difference").round(3))
+    ).with_columns(pl.col("difference").round(decimals=3))
     values = long["difference"].to_list()
     low = min(0.0, *values) - 0.2
     high = max(0.0, *values) + 0.2
@@ -652,32 +653,30 @@ def _month_panel(*, months: pl.DataFrame, contrast: str, title: str) -> alt.Laye
         layer=[rule, filled, hollow],
         width=PLOT_WIDTH_PX,
         height=MONTH_PANEL_HEIGHT_PX,
-        title=alt.TitleParams(title, anchor="start", frame="group"),
+        title=alt.TitleParams(text=title, anchor="start", frame="group"),
     )
 
 
-def _season(*, source: Source, scope: str, rows: int, months: int) -> tuple[alt.VConcatChart, str]:
+def _season(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
     """Draw S1 and S2 by season, and by calendar month.
 
     Args:
         source: The saved results.
         scope: The scope sentence every chart states.
-        rows: Rows every arm is scored on.
-        months: Calendar months those rows cover.
 
     Returns:
         Figure 22, and its title.
+
+    Raises:
+        ValueError: If S1 is not positive in both halves of the year, so the title's "trails" is
+            wrong.
     """
     panels: list[alt.VConcatChart | alt.LayerChart] = []
     month_table = _month_table(report=source.report)
     january = august = 0.0
-    for index, (name, first, second, contrast) in enumerate(
-        (
-            ("S1", "station_wind", "era5_10m_wind", "s1"),
-            ("S2", "ukv_station_wind", "ukv_padded_wind", "s2"),
-        )
-    ):
-        frame = _season_rows(source=source, first=first, second=second, rows=rows, months=months)
+    for index, (name, first, second) in enumerate(PLANNED_CONTRASTS):
+        contrast = name.lower()
+        frame = _season_rows(source=source, first=first, second=second)
         if name == "S1":
             summer = frame.filter(pl.col("condition") == SETTING_CONDITIONS[0])
             january = summer["difference"][0]
@@ -693,7 +692,7 @@ def _season(*, source: Source, scope: str, rows: int, months: int) -> tuple[alt.
             panel_title=(
                 f"{name}, by season: {CONTRAST_NAMES[first]} minus {CONTRAST_NAMES[second]}"
             ),
-            figure_planning="exploratory",
+            figure_planning="mixed",
         )
         panels += [
             panel if index == 0 else _without_key(panel=panel),
@@ -703,6 +702,9 @@ def _season(*, source: Source, scope: str, rows: int, months: int) -> tuple[alt.
                 title=f"{name}, by calendar month: mean difference over the month's rows",
             ),
         ]
+    if not (january > 0.0 and august > 0.0):
+        msg = f"the title says S1 is positive in both halves of the year: {january}, {august}"
+        raise ValueError(msg)
     title = (
         f"The nearest station trails ERA5's 10 m wind by {_round_half_up(value=january)} points "
         f"in January to July but by {_round_half_up(value=august)} in August to December"
@@ -711,13 +713,12 @@ def _season(*, source: Source, scope: str, rows: int, months: int) -> tuple[alt.
         figure(
             panels=panels,
             number=FIGURE_SEASON,
-            figure_planning=None,
+            figure_planning="mixed",
             title=title,
             subtitle=[
                 (
-                    "First-named arm's mean absolute error minus the second's. S1 and S2 are the "
-                    "planned contrasts; the season rows re-score the models fitted on every month, "
-                    "so every season row is exploratory."
+                    "First-named arm's mean absolute error minus the second's. The season rows "
+                    "re-score the models fitted on every month."
                 ),
                 (
                     "Every calendar month weighted equally: the mean, over the 12 calendar "
@@ -743,13 +744,15 @@ def _by_farm(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
 
     Raises:
         ValueError: If the count of farms at which a contrast is statistically significant at the
-            5% level differs between the two settings, so the title cannot state one count.
+            5% level, in the direction the title states, differs between the two settings, so the
+            title cannot state one count.
     """
     panels = []
     counts: dict[str, set[int]] = {}
-    for index, (name, first, second) in enumerate(PLANNED):
+    for index, (name, first, second) in enumerate(PLANNED_CONTRASTS):
         marks = []
         significant = dict.fromkeys(SETTINGS, 0)
+        title_side = "lower" if name == "S1" else "upper"
         for site in SITES:
             for setting, condition in zip(SETTINGS, SETTING_CONDITIONS, strict=True):
                 row = source.row(
@@ -759,8 +762,10 @@ def _by_farm(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
                     reference=second,
                     setting=setting,
                 )
-                marks.append(_mark(label=site, row=row, condition=condition, planned=True))
-                if row["lower"] > 0.0 or row["upper"] < 0.0:
+                marks.append(_mark(label=site, row=row, condition=condition, planned=False))
+                if (title_side == "lower" and row["lower"] > 0.0) or (
+                    title_side == "upper" and row["upper"] < 0.0
+                ):
                     significant[setting] += 1
         counts[name] = set(significant.values())
         frame = pl.DataFrame(marks)
@@ -775,7 +780,7 @@ def _by_farm(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
             panel_title=(
                 f"{name}, at each farm: {CONTRAST_NAMES[first]} minus {CONTRAST_NAMES[second]}"
             ),
-            figure_planning="planned",
+            figure_planning="exploratory",
         )
         panels.append(panel if index == 0 else _without_key(panel=panel))
     if any(len(values) != 1 for values in counts.values()):
@@ -791,7 +796,7 @@ def _by_farm(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
         figure(
             panels=panels,
             number=FIGURE_BY_FARM,
-            figure_planning="planned",
+            figure_planning="exploratory",
             title=title,
             subtitle=[
                 (
@@ -799,10 +804,7 @@ def _by_farm(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
                     "Statistically significant at the 5% level means the 95% interval lies "
                     "wholly on one side of zero."
                 ),
-                (
-                    "Each farm's interval resamples whole calendar months and a fitting seed. "
-                    "The farms are labelled W1 to W3 and carry no row counts."
-                ),
+                "Each farm's interval resamples whole calendar months and a fitting seed.",
                 f"{DOTS} {CAPACITY}",
                 scope,
             ],
@@ -819,13 +821,13 @@ def main() -> int:
     scope, rows, months = _scope_line(source=source)
     charts: dict[str, tuple[alt.VConcatChart, str]] = {
         "station_wind_headline": _headline(source=source, scope=scope, rows=rows, months=months),
-        "station_wind_season": _season(source=source, scope=scope, rows=rows, months=months),
+        "station_wind_season": _season(source=source, scope=scope),
         "station_wind_by_farm": _by_farm(source=source, scope=scope),
     }
     source.verify()
     _LOG.info("all %d intervals drawn are in report.md as printed", len(source.printed))
     for name, (chart, title) in charts.items():
-        _check_title_numbers(title=title, report=source.report)
+        _check_title_numbers(title=title, intervals=source.intervals)
         path = ASSETS_DIR / f"{name}.svg"
         chart.save(path)
         _LOG.info("wrote %s: %s", path, title)

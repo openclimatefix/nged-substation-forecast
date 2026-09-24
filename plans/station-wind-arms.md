@@ -39,9 +39,10 @@ review, because the hours a station misses are public in MIDAS and could be matc
 - No per-farm row counts, per-farm drop counts, per-farm station coverage or per-farm lag figures
   appear on the page, in a chart or in a PR body; the row count and the number of rows dropped are
   reported pooled over the three farms. Per-farm error tables labelled W1 to W3 are allowed.
-- No station identifier appears in any output. The page states that quality-control flag 106
-  marks whole stations, so no row is filtered on a flag, and names the one candidate station
-  affected (62265) only as the dataset fact the request asked to state, never in relation to a
+- No station identifier appears in any output except one dataset fact the request asked the page
+  to state. The page states that quality-control flag 106 is set on whole stations or on runs of
+  several months, never on isolated hours, so no row is filtered on a flag, and names the one
+  candidate station whose every wind row in the window carries the flag, never in relation to a
   farm and never saying whether it was chosen.
 - No chart plots a station's wind series against dates or under a W label.
 
@@ -50,7 +51,8 @@ review, because the hours a station misses are public in MIDAS and could be matc
 - Stations: the 18 hourly-weather stations that report wind speed, listed in the request; the 8
   stations with one 09:00 return a day and wind estimated on Beaufort-scale midpoints are excluded,
   and the 12 stations that carry no wind at all are never candidates. Quality-control flag 106
-  marks whole stations, so no row is ever filtered on a flag, and every candidate is treated alike:
+  is set on whole stations or on runs of several months, so no row is ever filtered on a flag, and
+  every candidate is treated alike:
   eligible only by the coverage rule below.
 - Wind columns: `wind_speed_m_s` (knots converted, nominal 10 m; the SYNOP 10-minute mean wind is
   "10-minute average, HH-20 to HH-10" in the Met Office Surface Data Users Guide, so the reading sits
@@ -260,3 +262,24 @@ stay byte-for-byte as they were.
    mean direction disagreement between the station's 10 m direction and ERA5's 100 m direction,
    the difference `era5_10m_wind` minus `era5_wind`, and the note that product speeds on disk are
    km/h while station speeds are m/s.
+
+### Second-round changes (after the second code review and the second science review)
+
+The two reviews changed no fitted loss. Every change below re-runs `--report-only` and the chart
+script, and the fingerprints of `losses.parquet` and `losses_post_review.parquet` are unchanged.
+
+1. **Balanced interval with fixed weights.** A resample that missed a calendar month averaged over
+   fewer than 12, which biased the resampled median above the estimate (0.878 against 0.776 for
+   S1). Each row now carries a fixed weight, 1 over the rows of its calendar month in the whole
+   window, and a resample recomputes the weighted mean over its drawn rows. The estimate is
+   unchanged. The script checks the function against a hand-computed case with unequal month sizes
+   on every run.
+2. **Candidate stations derived.** The script derives the 18 candidate stations from the downloaded
+   MIDAS Open file (every station with at least one wind speed in metres per second) instead of
+   listing their identifiers, and the report prints the rule and the counts.
+3. **Report provenance.** Every run that writes `report.md` requires a committed script and prints
+   and records the commit it was built at.
+4. **Page corrections.** Four double-rounded numbers (S1, the speed-only pair, S2's upper end, and
+   S2 at one farm) are rounded once from full precision, the flag 106 wording is corrected, the
+   `k=3` lead is scoped to an exploratory comparison, and the by-farm and season charts label their
+   rows planned or exploratory correctly.
