@@ -176,8 +176,8 @@ the producer's own direct field, as do UKV and MOGREPS-UK on the Met Office's ow
 sources carry which irradiance
 components](../roadmap/data-sources.md#which-sources-carry-which-irradiance-components).
 
-**Among the reanalyses surveyed, CERRA, COSMO-R6G2, and ICON-DREAM-EU carry the producer's own
-direct field, as ERA5, already scored, does.**
+**Among the reanalyses surveyed, CERRA and COSMO-R6G2 carry the producer's own direct field, as
+ERA5 and ICON-DREAM-EU, both already scored, do.**
 
 ### Forecast models
 
@@ -221,7 +221,7 @@ has not been checked against DMI's own files.
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
 | **CERRA** | [🔬 Research (deprioritised)](../roadmap/data-sources.md#weather-data) | Not scored | Copernicus regional reanalysis, HARMONIE-ALADIN with 3D-Var, forced by ERA5 | 5.5 km, 1069 × 1069 points | Yes (European domain) | 1984-09-01 to 2026-06-30 on the CDS on 2026-09-23 | Global and direct native, forecast fields only, accumulated | 10 m; 15, 30, 50, 75, 100, 150 to 500 m | 3-hourly analyses; hourly values from forecast leads 1–3 h | About 12 weeks on 2026-09-23 (the catalogue row gives ~3.5 months) | Copernicus Climate Data Store (CDS); no area cropping, so every field is the whole domain | CC BY 4.0 | [CDS](https://cds.climate.copernicus.eu/datasets/reanalysis-cerra-single-levels), [user guide](https://confluence.ecmwf.int/x/WFQ7E), [Ridal et al. (2024)](https://doi.org/10.1002/qj.4764) |
 | **COSMO-R6G2** | Not on the roadmap | Not scored | DWD, COSMO regional reanalysis forced by ERA5 | 0.055° (~6 km), EURO-CORDEX EUR-11 domain | Yes | 2002-01 to 2025-12 | Global and direct native, hourly means | 10 m; 100, 150, 200 m | Hourly means stamped at :30 | Yearly batches: the 2025 files were posted on 2026-05-11 | HTTPS, monthly NetCDF | CC BY 4.0 | [DWD](https://opendata.dwd.de/climate_environment/REA/COSMO_R6G2/), [paper](https://asr.copernicus.org/articles/22/149/2026/) |
-| **ICON-DREAM-EU** | Not on the roadmap | Not scored | DWD, ICON reanalysis, EU nest | 6.5 km | Expected (ICON's EU nest); grid file not checked | 2010-01 to 2026-08 | Direct and diffuse native, hourly means | 10 m; otherwise model levels only, so a fixed height needs vertical interpolation | Hourly | The August 2026 file was posted on 2026-09-07 (DWD states 2–3 months) | HTTPS, monthly GRIB2 | CC BY 4.0 | [DWD](https://opendata.dwd.de/climate_environment/REA/ICON-DREAM-EU/) |
+| **ICON-DREAM-EU** | Not on the roadmap | Both studies: [sunshine](../studies/weather-products-for-past-solar.md), [wind](../studies/weather-products-for-past-wind.md) | DWD, ICON reanalysis, EU nest | 6.5 km | Expected (ICON's EU nest); grid file not checked | 2010-01 to 2026-08 | Direct and diffuse native, hourly means | 10 m; otherwise model levels only, so a fixed height needs vertical interpolation | Hourly | The August 2026 file was posted on 2026-09-07 (DWD states 2–3 months) | HTTPS, monthly GRIB2 | CC BY 4.0 | [DWD](https://opendata.dwd.de/climate_environment/REA/ICON-DREAM-EU/) |
 | **NORA3** | Not on the roadmap | Not scored | MET Norway, HARMONIE-AROME hindcast downscaling ERA5 | 3 km | Yes, checked on the grid | 1958 to 2026-08-31 | Global only | 10 m; 20, 50, 100, 250, 500, 750 m, as grid-relative components needing rotation | Hourly, from leads 3–9 h of each 6-hourly run | About 3 weeks | THREDDS / OPeNDAP | CC BY 4.0 | [THREDDS](https://thredds.met.no/thredds/catalog/nora3/catalog.html), [Solbrekke et al. (2021)](https://doi.org/10.5194/wes-6-1501-2021) |
 | **MERRA-2** | Not on the roadmap | Not scored | NASA's Global Modeling and Assimilation Office, Goddard Earth Observing System (GEOS) global reanalysis | 0.5° × 0.625° | Yes (global) | 1980 to present | Global only (`SWGDN`) | 2, 10, 50 m | Hourly means stamped at :30 | About 3 weeks after month end | GES DISC, Earthdata login | NASA open data | [radiation](https://disc.gsfc.nasa.gov/datasets/M2T1NXRAD_5.12.4/summary), [wind](https://disc.gsfc.nasa.gov/datasets/M2T1NXSLV_5.12.4/summary) |
 | **ERA5-Land** | Not on the roadmap | Not scored | ECMWF, land component of ERA5 re-run with ERA5 forcing | 0.1° | Yes | 1950 to 2026-09-17 | Global only | 10 m only | Hourly | About 6 days | CDS | CC BY 4.0 | [CDS](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-land) |
@@ -257,17 +257,18 @@ agreed. The ranking, with each product's roadmap status and one reason:
    at December 2025, 9 months short of the study's September 2026 end, so COSMO-R6G2 can only be
    scored on a shorter window. DWD publishes the archive in yearly batches. The hourly means are
    stamped at :30 and need shifting 30 minutes to be period-ending.
-4. **ICON-DREAM-EU** (not on the roadmap) — an ICON reanalysis on a 6.5 km grid with native direct
-   and diffuse, which sets an analysis against the short-range ICON-EU forecast already scored
-   inside one model family.
-5. **GFS (0.11° surface fields)** (not on the roadmap) — a further global centre, from 2021-03-23,
+4. **GFS (0.11° surface fields)** (not on the roadmap) — a further global centre, from 2021-03-23,
    whose diffuse field is visible-band rather than broadband.
-6. **MERRA-2** (not on the roadmap) — an optional arm from the GEOS model family. The ~50 km grid
+5. **MERRA-2** (not on the roadmap) — an optional arm from the GEOS model family. The ~50 km grid
    is coarser than every other arm, so a score cannot separate model family from grid spacing, and
    MERRA-2 has no direct field. The hourly means are stamped at :30 and need shifting 30 minutes to
    be period-ending.
-7. **HelioClim-3** (not on the roadmap) — a second satellite retrieval beside CAMS, but paid after
+6. **HelioClim-3** (not on the roadmap) — a second satellite retrieval beside CAMS, but paid after
    2006, and its direct and diffuse are decompositions of global irradiance.
+
+ICON-DREAM-EU, an ICON reanalysis on a 6.5 km grid with native direct and diffuse, has since been
+scored: [ICON-DREAM-EU beats ERA5 but not the ICON weather
+models](../studies/weather-products-for-past-solar.md#icon-dream-eu-beats-era5-but-not-the-icon-weather-models).
 
 The DMI and KNMI HARMONIE-AROME forecasts would add a further model family, from mid-2024 only,
 but neither adds a direct component the survey could use. KNMI's split is by separation, and the
@@ -297,8 +298,12 @@ product's roadmap status and one reason:
 6. **GFS** (not on the roadmap) — 80 m and 100 m wind, but only from the 0.25° product.
 
 MERRA-2 earns no wind arm: its highest wind is at 50 m, below both heights the study scores, on a
-~50 km grid over flat Lincolnshire, so a score would mainly measure grid spacing. ICON-DREAM-EU
-serves wind only on model levels, so it would need a vertical interpolation no other arm does.
+~50 km grid over flat Lincolnshire, so a score would mainly measure grid spacing.
+
+ICON-DREAM-EU has since been scored: [ICON-DREAM-EU does not beat ERA5, and trails
+ICON-EU](../studies/weather-products-for-past-wind.md#icon-dream-eu-does-not-beat-era5-and-trails-icon-eu).
+The study read it at DWD's model level 72, about 96 m, directly, rather than interpolating to a
+fixed height.
 
 ## Candidates for comparing forecast models at a fixed lead (issue #810)
 
