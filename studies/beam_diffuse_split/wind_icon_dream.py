@@ -213,10 +213,15 @@ PRODUCT_RANKING_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("icon_eu_wind", "era5_wind"),
     ("icon_d2_wind", "icon_eu_wind"),
     ("icon_eu_wind", "ukv_wind"),
+    ("ukv_wind", "era5_wind"),
+    ("icon_d2_wind", "era5_wind"),
 )
 """Whether `wind_products.py`'s ranking of the five original products still holds on this study's
 10-day-shorter row set, exploratory. Every one of these five arms is already refit on this row set
-(`jobs()`), so this reuses their existing losses rather than fitting anything new."""
+(`jobs()`), so this reuses their existing losses rather than fitting anything new. The last two
+pairs, UKV against ERA5 and ICON-D2 against ERA5, were added for the page's Generator W2 paragraph,
+which needs each leading product's all-generator contrast against ERA5 on this section's own row
+set to compare against its per-generator figure."""
 
 LEVELS_CONTRAST: Final[tuple[str, str]] = (f"{PRODUCT}_levels", f"{PRODUCT}_wind")
 """Whether the two extra levels (shear) add skill over the hub-height-only arm, exploratory.
