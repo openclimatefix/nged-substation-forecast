@@ -1418,7 +1418,7 @@ def _domain_lines(*, domain: DomainType, inputs: DomainInputs, losses: pl.DataFr
         for setting in SETTINGS
     }
     uncovered = inputs.coverage.filter(~pl.col("covered")).height
-    arms = losses["arm"].unique(maintain_order=True).to_list()
+    arms = sorted(losses["arm"].unique().to_list())
     baselines = [arm for arm in arms if is_baseline_arm(arm=arm)]
     fitted = [arm for arm in arms if not is_baseline_arm(arm=arm)]
     lines = [
