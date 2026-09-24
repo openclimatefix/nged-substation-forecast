@@ -102,11 +102,12 @@ NWP_ERA_START_MONTHS: Final[tuple[str, ...]] = ("2025-10", "2026-02")
 month. Matches the plan's three-era design, which #885 also uses for its own reasons (HRES's
 archive source changes on 2025-10-01)."""
 
-NWP_ERA_FOLD_OFFSETS: Final[dict[int, int]] = {0: 0, 1: 0, 2: 2}
-"""**Placeholder pending #885's tuned `ERA_FOLD_OFFSETS`.** #885 tunes this rotation on its own
-wind rows so that no calendar month is held out of every era at once; this module does not
-re-derive that search (`studies.cross_validation.search_fold_offsets`, in #885) and instead states
-a plausible rotation, to be replaced by #885's own constant once it is importable. TODO(#885)."""
+NWP_ERA_FOLD_OFFSETS: Final[dict[int, int]] = {0: 0, 1: 0, 2: 3}
+"""How far each era's fold numbers are rotated, so no calendar month is held out of every era at
+once (#868). #885's own rotation, `{0: 0, 1: 0, 2: 2}`, leaves two solar (site, fold, calendar
+month) cells uncovered on this study's rows. `search_fold_offsets` on this study's solar and wind
+rows, which reads only which hours exist and no error, returns this rotation first among those
+that cover every month in both technologies. `coverage_table` re-checks it on every run."""
 
 
 def assign_folds_with_eras(*, frame: pl.DataFrame) -> pl.DataFrame:

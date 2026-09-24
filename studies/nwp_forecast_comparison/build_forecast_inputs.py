@@ -10,10 +10,10 @@ One-off throwaway script for the study in
   anonymised `site` label. UKV's radiation is rebuilt from its two label-adjacent snapshots
   (`studies.hourly_means.hourly_from_snapshots`), because V3 reads UKV as an instantaneous snapshot
   rather than an hour-ending mean; every other product's radiation is used as served.
-- **ECMWF ENS**: `ens_forecast_horizons.build_inputs` and `.main_frame`, at the `linear` upsampling
-  technique. This pass does not re-run `choose_method` (which needs a fit this pass does not run),
-  so `linear` — the technique every combination starts from and the one the production resample
-  already uses — stands in; the report should re-derive the chosen technique once a fit exists.
+- **ECMWF ENS**: `ens_forecast_horizons.build_inputs` and `.main_frame`, at the upsampling
+  combination the ENS horizons page's rule chose before this study existed: `clear_sky` for solar
+  (radiation through the clear-sky index, temperature by straight line) and `speed_components` for
+  wind. This study reads that choice from `UPSAMPLING_METHODS` rather than re-running the rule.
 - **NOAA GEFS**: gated on `data/studies/weather/GEFS/_month_cache/` holding every month from
   2024-11 to the month before today, or on `--gefs-window-dir` for a `GEFS_window_*` test extract
   during development. Neither is complete yet, so this pass writes no GEFS columns.
@@ -54,9 +54,12 @@ DEFAULT_OUTPUT_DIR_NAME: Final[str] = "nwp_forecast_comparison"
 GEFS_FIRST_MONTH: Final[str] = "2024-11"
 """The first month the study reads GEFS from (the plan reads GEFS from 2024-11-30 onwards)."""
 
-UPSAMPLING_METHOD: Final[str] = "linear"
-"""The ENS upsampling technique this pass reads. See the module docstring: `choose_method` needs a
-fit this pass does not run, so `linear` stands in."""
+UPSAMPLING_METHODS: Final[dict[DomainType, str]] = {
+    "solar": "clear_sky",
+    "wind": "speed_components",
+}
+"""The ENS upsampling combination per technology, as the ENS horizons page's report records its rule
+choosing them."""
 
 ENS_DAYS: Final[tuple[int, ...]] = (0, 1, 2, 3)
 """The bands this study reads ENS at (days 5, 7, 10 and 14 are the horizons page's territory)."""
@@ -243,7 +246,7 @@ def _ens_frame(*, keys: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
         computes on the way to the ENS columns.
     """
     inputs = efh.build_inputs(domain=domain)
-    main = efh.main_frame(inputs=inputs, method=UPSAMPLING_METHOD, domain=domain)
+    main = efh.main_frame(inputs=inputs, method=UPSAMPLING_METHODS[domain], domain=domain)
     wanted = [
         column
         for day in ENS_DAYS

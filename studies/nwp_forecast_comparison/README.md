@@ -101,8 +101,8 @@ tested; V2 itself is deferred to a session run after the download completes.
 - `build_forecast_inputs.py`: builds one arm-input parquet per technology — the shared power rows,
   every Previous Runs product's weather columns at its planned day offsets, and ECMWF ENS's mean
   and control-member columns at days 0-3 (through `ens_forecast_horizons.build_inputs` and
-  `.main_frame`, at the `linear` upsampling technique — this pass does not re-run `choose_method`,
-  which needs a fit). Run for both technologies against the scratch output directory; GEFS columns
+  `.main_frame`, at the combination the ENS horizons page's rule chose: `clear_sky` for solar,
+  `speed_components` for wind). Run for both technologies against the scratch output directory; GEFS columns
   are not written (see "GEFS" below).
 - `nwp_forecast_comparison.py`: `rows()` (the shared row set, planned-arm columns required
   complete), `assign_folds_with_eras()` and `coverage_table()` (against #885's not-yet-merged
@@ -163,9 +163,6 @@ this branch). Against that copy:
 - **No XGBoost fit.** `run_jobs()` is written but never called by `main()`; `--fit-missing` and a
   plain run both refuse with a logged error.
 - **GEFS's member-mean build** (see "GEFS" above).
-- **`choose_method`** (ENS's upsampling technique is chosen by a fit-based rule on the ENS-horizons
-  page); this pass reads the `linear` technique instead, documented in
-  `build_forecast_inputs.py`'s module docstring.
 - **The charts** (`nwp_forecast_charts.py` is a skeleton).
 - **The docs page, roadmap update and background-survey correction** the plan's "What changes,
   file by file" section lists — out of scope for a no-fit pass.
