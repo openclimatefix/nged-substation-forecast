@@ -615,7 +615,7 @@ best describes past sunshine?](../studies/weather-products-for-past-solar.md).
 eight-product row set and 8.87% on the shorter row set that adds four more Open-Meteo models: the
 same product and the same generators, because restricting to hours every product covers changes
 which hours are kept. Open-Meteo's hourly UKV beats ERA5 across the whole record by 0.22 points
-[0.06, 0.39], and by 0.14 points since August 2024 [−0.04, +0.35], a difference that is not
+[0.06, 0.39], and by 0.14 points since August 2024 [−0.04, +0.35], the second of which is not
 statistically significant at the 5% level.
 
 **CAMS infers cloud from Meteosat at the hour in question, whereas the weather models simulate it.**
@@ -626,13 +626,12 @@ predict.
 in resolution, so neither ordering is a clean resolution contrast. Open-Meteo's archive stitches
 the first hours of each successive run ([the survey compares Open-Meteo's
 archives](../background/weather-products-survey.md#which-archives-keep-whole-past-forecast-runs)), so
-a product's effective lead follows its run frequency: hourly UKV is the T+0 analysis, while
-3-hourly ICON-D2 carries a lead of 1 to 3 hours, measured against the German weather service's own
-files. ICON-D2 therefore beats UKV while forecasting
-further ahead than it, and the comparison is not analysis against analysis. And CAMS is a retrieval
-rather than a model, so its lead is nil and its win is partly a win for observing cloud rather than
-simulating it. Every measurement is of
-these eight products on this fleet, and none has been shown to hold for every product at those
+a product's effective lead follows its run frequency: hourly UKV is the T+0 analysis, while 3-hourly
+ICON-D2 carries a lead of 1 to 3 hours, measured against the German weather service's own files.
+ICON-D2 therefore beats UKV while forecasting further ahead than it, and the comparison is not
+analysis against analysis. And CAMS is a retrieval rather than a model, so its lead is nil and its
+win is partly a win for observing cloud rather than simulating it. Every measurement is of these
+eight products on this fleet, and none has been shown to hold for every product at those
 resolutions.
 
 **ICON-D2 reaches only the eastern half of NGED's licence area, so its score is not a licence-wide
