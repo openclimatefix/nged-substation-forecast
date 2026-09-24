@@ -9,15 +9,24 @@ hour, by comparing Open-Meteo's served GFS `_previous_dayN` values against the r
 archive on disk in `data/studies/weather/GFS_window_2025-07-01_2025-07-02/`, for a range of
 candidate runs `24N + k` hours before the hour, `k` from 0 to 12. The gate is that the mean absolute
 difference is lowest at `k = 0`, for `N = 1` and `N = 2`, which is what "the freshest run at least
-`24N` hours old" predicts. Wind speed at 100 m compares directly; shortwave radiation additionally
-checks, at hours divisible by 6 (the only hours where the two conventions pick a different run),
-whether Open-Meteo selects the run by the hour's label or by the hour's start.
+`24N` hours old" predicts. **A first pass compared each site's served series with the plain average
+over the extract's 9 grid cells, and the resulting spatial-sampling noise (about 3 km/h) swamped the
+signal at N = 1.** This version instead scores, for each site and each candidate offset, every one
+of the extract's 9 grid cells against that site's own series, and keeps the cell with the lowest
+mean absolute error — no roster coordinate is read, and every offset gets exactly the same freedom
+to pick its best-fitting cell, so a real difference in lead accuracy between offsets survives while
+the noise from not knowing which cell a site truly falls in does not. Wind speed at 100 m compares
+directly; shortwave radiation additionally checks, at hours divisible by 6 (the only hours where the
+two conventions pick a different run), whether Open-Meteo selects the run by the hour's label or by
+the hour's start, with the same per-site best-cell scoring.
 
-**V1b.** For every Previous Runs product, the mean absolute second difference of the
-`_previous_day1` series (100 m wind), grouped by UTC hour of day, locates the hours where a fresh
-run cuts in: those hours carry a materially larger second difference than their neighbours, because
-a run switch is a discontinuity a smooth diurnal signal does not otherwise have. The spacing
-between elevated hours is each product's run cycle.
+**V1b.** For every Previous Runs product, per UTC hour of day, the mean absolute second difference
+of the `_previous_day1` series (100 m wind and 2 m temperature), divided by that statistic's own
+mean over all 24 hours. A run switch is a discontinuity a smooth diurnal signal does not otherwise
+have, so the hours where a fresh run cuts in carry a materially higher ratio than their neighbours.
+Each product's cycle is read as the `n` in `{1, 3, 6}` whose switch hours (`h mod n == 0`, `n = 1`
+excluded as the fallback) have the highest mean ratio relative to the other hours, and reported as
+"no clear signature" where the best ratio is below 1.3.
 
 **V3.** Reads each product's timestamp convention (instantaneous snapshot or hour-ending mean) from
 the "best fit" line already measured and recorded, at fetch time, in that product's own
@@ -34,7 +43,6 @@ Run it with `uv run python studies/nwp_forecast_comparison/verify_previous_runs_
 """
 
 import argparse
-import itertools
 import json
 import logging
 import os
@@ -134,12 +142,19 @@ def _gfs_hourly_mean_since_reset(*, lead: int, value_at_lead: dict[int, float]) 
     return within * at_lead - (within - 1) * before
 
 
-def _dynamical_gfs_by_run() -> dict[datetime, dict[str, dict[int, float]]]:
-    """Load the raw Dynamical.org GFS window extract, averaged over its grid cells, by run.
+GridCellByRun = dict[datetime, dict[int, dict[str, dict[int, float]]]]
+"""Each run's initialisation time to each grid cell id to `{field: {lead: value}}`."""
+
+
+def _dynamical_gfs_by_run() -> GridCellByRun:
+    """Load the raw Dynamical.org GFS window extract, one grid cell at a time, by run.
+
+    The cell axis is kept rather than averaged away, so V1 can score each of the extract's 9 grid
+    cells separately against a site's own series (see `_per_site_best_cell_mad`).
 
     Returns:
-        Each run's initialisation time to `{"wind_speed_100m_kmh": {lead: value}, "ghi_raw": {lead:
-        value}}`, the grid-cell mean at each whole-hour lead the extract covers.
+        Each run's initialisation time to each grid cell id (`lat_index * 10 + lon_index`, never a
+        real coordinate) to `{"wind_speed_100m_kmh": {lead: value}, "ghi_raw": {lead: value}}`.
     """
     path = _weather_dir() / GFS_WINDOW_DIR_NAME / "GFS.parquet"
     frame = (
@@ -149,31 +164,35 @@ def _dynamical_gfs_by_run() -> dict[datetime, dict[str, dict[int, float]]]:
             wind_speed_100m_kmh=(
                 (pl.col("wind_u_100m") ** 2 + pl.col("wind_v_100m") ** 2) ** 0.5 * 3.6
             ),
+            cell=pl.col("lat_index") * 10 + pl.col("lon_index"),
         )
         .filter(pl.col("lead_hours") <= 120)
-        .group_by("init_time", "lead_hours")
+        .group_by("init_time", "lead_hours", "cell")
         .agg(
             pl.col("wind_speed_100m_kmh").mean(),
             pl.col("downward_short_wave_radiation_flux_surface").mean().alias("ghi_raw"),
         )
     )
-    by_run: dict[datetime, dict[str, dict[int, float]]] = {}
+    by_run: GridCellByRun = {}
     for row in frame.iter_rows(named=True):
         run = row["init_time"].replace(tzinfo=UTC)
-        entry = by_run.setdefault(run, {"wind_speed_100m_kmh": {}, "ghi_raw": {}})
-        entry["wind_speed_100m_kmh"][row["lead_hours"]] = row["wind_speed_100m_kmh"]
-        entry["ghi_raw"][row["lead_hours"]] = row["ghi_raw"]
+        cell_entry = by_run.setdefault(run, {}).setdefault(
+            row["cell"], {"wind_speed_100m_kmh": {}, "ghi_raw": {}}
+        )
+        cell_entry["wind_speed_100m_kmh"][row["lead_hours"]] = row["wind_speed_100m_kmh"]
+        cell_entry["ghi_raw"][row["lead_hours"]] = row["ghi_raw"]
     return by_run
 
 
 def _candidate_value(
     *,
-    by_run: dict[datetime, dict[str, dict[int, float]]],
+    by_run: GridCellByRun,
     target: datetime,
     hours_before: int,
     field: str,
+    cell: int,
 ) -> float | None:
-    """Read one candidate run's value for a target hour, `hours_before` hours ahead of the run.
+    """Read one candidate run's value, at one grid cell, for a target hour.
 
     Args:
         by_run: `_dynamical_gfs_by_run`'s result.
@@ -181,22 +200,95 @@ def _candidate_value(
         hours_before: How many hours before `target` the candidate run is floored from.
         field: `"wind_speed_100m_kmh"` (an instantaneous field, read directly) or `"ghi_raw"` (a
             since-reset accumulation, recovered through `_gfs_hourly_mean_since_reset`).
+        cell: The grid cell id to read.
 
     Returns:
-        The candidate's value, or `None` if the run or the lead it needs is not in the extract.
+        The candidate's value, or `None` if the run, the cell, or the lead it needs is not in the
+        extract.
     """
     run = _floor6(target - timedelta(hours=hours_before))
-    run_values = by_run.get(run)
-    if run_values is None:
+    cell_values = by_run.get(run, {}).get(cell)
+    if cell_values is None:
         return None
     lead = int((target - run).total_seconds() // 3600)
     if field == "wind_speed_100m_kmh":
-        return run_values["wind_speed_100m_kmh"].get(lead)
-    return _gfs_hourly_mean_since_reset(lead=lead, value_at_lead=run_values["ghi_raw"])
+        return cell_values["wind_speed_100m_kmh"].get(lead)
+    return _gfs_hourly_mean_since_reset(lead=lead, value_at_lead=cell_values["ghi_raw"])
+
+
+def _per_site_best_cell_mad(
+    *,
+    by_run: GridCellByRun,
+    served_rows: pl.DataFrame,
+    hours_before: int,
+    field: str,
+    cells: list[int],
+) -> tuple[float | None, dict[str, int]]:
+    """Score one candidate offset by the mean, over sites, of each site's lowest-error cell.
+
+    For one candidate offset, this scores every grid cell in the extract against one site's served
+    series independently and keeps the cell with the lowest mean absolute error for that site. This
+    is what lets V1 test the run-selection rule without knowing which cell a site truly falls in:
+    every candidate offset gets exactly the same freedom to pick its own best-fitting cell, so a
+    real difference in lead accuracy between offsets survives while the spatial-sampling noise from
+    an unknown site-to-cell match does not.
+
+    Args:
+        by_run: `_dynamical_gfs_by_run`'s result.
+        served_rows: `site`, `time`, `value` for one served column, nulls already dropped.
+        hours_before: The candidate offset in hours before each target hour.
+        field: Passed to `_candidate_value`.
+        cells: Every grid cell id in the extract.
+
+    Returns:
+        The mean, over sites with at least one scoreable cell, of each site's best-cell mean
+        absolute error (`None` if no site scored), and each scored site's chosen cell id (a raw
+        grid-cell id, never printed as such by the caller — see `run_v1`).
+    """
+    per_site_mad = []
+    chosen: dict[str, int] = {}
+    for site in sorted(served_rows["site"].unique().to_list()):
+        site_rows = served_rows.filter(pl.col("site") == site)
+        targets = site_rows["time"].to_list()
+        values = site_rows["value"].to_list()
+        best_mad: float | None = None
+        best_cell: int | None = None
+        for cell in cells:
+            differences = [
+                abs(value - candidate)
+                for target, value in zip(targets, values, strict=True)
+                if (
+                    candidate := _candidate_value(
+                        by_run=by_run,
+                        target=target,
+                        hours_before=hours_before,
+                        field=field,
+                        cell=cell,
+                    )
+                )
+                is not None
+            ]
+            if not differences:
+                continue
+            mad = float(np.mean(differences))
+            if best_mad is None or mad < best_mad:
+                best_mad, best_cell = mad, cell
+        if best_mad is not None and best_cell is not None:
+            per_site_mad.append(best_mad)
+            chosen[site] = best_cell
+    if not per_site_mad:
+        return None, {}
+    return float(np.mean(per_site_mad)), chosen
 
 
 def run_v1(*, output_dir: Path) -> bool:
     """Check the Previous Runs run-selection rule against the raw Dynamical.org GFS archive.
+
+    Every candidate offset (and, for radiation, every convention) is scored by
+    `_per_site_best_cell_mad`: each site independently picks whichever of the extract's 9 grid
+    cells fits its own series best, so a real difference in lead accuracy between candidates
+    survives while the spatial-sampling noise from not knowing which cell a site truly falls in
+    does not. Only an index rank among the extract's cells is ever printed, never a coordinate.
 
     Args:
         output_dir: Where `v1_wind.md` and `v1_radiation.md` are written.
@@ -207,86 +299,63 @@ def run_v1(*, output_dir: Path) -> bool:
     """
     by_run = _dynamical_gfs_by_run()
     served = pl.read_parquet(_weather_dir() / "GFS-SEAMLESS" / "previous_runs" / "combined.parquet")
+    cells = sorted({cell for cell_map in by_run.values() for cell in cell_map})
+    cell_rank = {cell: rank for rank, cell in enumerate(cells)}
 
-    wind_lines = ["| N | k (h) | mean |served − candidate|, km/h | n |", "|---|---|---|---|"]
+    wind_lines = [
+        "| N | k (h) | mean of each site's best-cell |served − candidate|, km/h | sites |",
+        "|---|---|---|---|",
+    ]
     gate_pass = True
     for n in V1_DAYS_N:
         served_col = f"wind_speed_100m_previous_day{n}"
-        rows = served.select("time", value=pl.col(served_col)).drop_nulls()
-        # Every k is scored on the *same* rows, not on whichever rows happen to have a candidate at
-        # that k: the two 8-run Dynamical.org extract windows only cover a candidate run for a
-        # narrow band of target hours, and that band shifts with k. Scoring each k on its own
-        # (possibly different) available rows would let a difference in *which weather episodes got
-        # compared* masquerade as a difference in lead accuracy.
-        candidates_by_k: dict[int, list[float | None]] = {
-            k: [
-                _candidate_value(
-                    by_run=by_run,
-                    target=target,
-                    hours_before=24 * n + k,
-                    field="wind_speed_100m_kmh",
-                )
-                for target in rows["time"].to_list()
-            ]
-            for k in V1_OFFSETS_K
-        }
-        complete = [
-            index
-            for index in range(rows.height)
-            if all(candidates_by_k[k][index] is not None for k in V1_OFFSETS_K)
-        ]
-        values = rows["value"].to_list()
+        rows = served.select("site", "time", value=pl.col(served_col)).drop_nulls()
         mad_by_k: dict[int, float] = {}
+        ranks_by_k: dict[int, dict[str, int]] = {}
         for k in V1_OFFSETS_K:
-            differences = [abs(values[index] - candidates_by_k[k][index]) for index in complete]
-            if differences:
-                mad_by_k[k] = float(np.mean(differences))
+            mad, chosen = _per_site_best_cell_mad(
+                by_run=by_run,
+                served_rows=rows,
+                hours_before=24 * n + k,
+                field="wind_speed_100m_kmh",
+                cells=cells,
+            )
+            if mad is not None:
+                mad_by_k[k] = mad
+                ranks_by_k[k] = chosen
         for k, mad in sorted(mad_by_k.items()):
-            wind_lines.append(f"| {n} | {k} | {mad:.4f} | {len(complete)} |")
+            wind_lines.append(f"| {n} | {k} | {mad:.4f} | {len(ranks_by_k[k])} |")
         if mad_by_k:
             best_k = min(mad_by_k, key=lambda k: mad_by_k[k])
             gate_pass = gate_pass and best_k == 0
-            wind_lines.append(f"\nN={n}: lowest mean absolute difference at k={best_k}.\n")
+            chosen_ranks = sorted(cell_rank[cell] for cell in ranks_by_k[best_k].values())
+            wind_lines.append(
+                f"\nN={n}: lowest mean absolute difference at k={best_k}. Chosen cell ranks "
+                f"(of {len(cells)}, one per site): {chosen_ranks}.\n"
+            )
 
     radiation_lines = [
-        "| Convention | k=0 mean |served − candidate|, W/m² |",
-        "|---|---|",
+        "| Convention | N | mean of each site's best-cell |served − candidate|, W/m² | sites |",
+        "|---|---|---|---|",
     ]
     conventions = (("label", 0), ("start", -1))
     for n in V1_DAYS_N:
         served_col = f"shortwave_radiation_previous_day{n}"
         rows = (
             served.filter(pl.col("time").dt.hour() % 6 == 0)
-            .select("time", value=pl.col(served_col))
+            .select("site", "time", value=pl.col(served_col))
             .drop_nulls()
         )
-        targets = rows["time"].to_list()
-        values = rows["value"].to_list()
-        # Score both conventions on the rows where *both* have a candidate, for the same reason
-        # the wind loop above fixes its rows across k.
-        candidates_by_convention = {
-            convention: [
-                _candidate_value(
-                    by_run=by_run, target=target, hours_before=24 * n - shift_hours, field="ghi_raw"
-                )
-                for target in targets
-            ]
-            for convention, shift_hours in conventions
-        }
-        complete = [
-            index
-            for index in range(len(targets))
-            if all(candidates_by_convention[c][index] is not None for c, _ in conventions)
-        ]
-        for convention, _ in conventions:
-            differences = [
-                abs(values[index] - candidates_by_convention[convention][index])
-                for index in complete
-            ]
-            if differences:
-                radiation_lines.append(
-                    f"| N={n}, by {convention} | {float(np.mean(differences)):.2f} |"
-                )
+        for convention, shift_hours in conventions:
+            mad, chosen = _per_site_best_cell_mad(
+                by_run=by_run,
+                served_rows=rows,
+                hours_before=24 * n - shift_hours,
+                field="ghi_raw",
+                cells=cells,
+            )
+            if mad is not None:
+                radiation_lines.append(f"| {convention} | {n} | {mad:.2f} | {len(chosen)} |")
 
     (output_dir / "v1_wind.md").write_text("\n".join(wind_lines) + "\n")
     (output_dir / "v1_radiation.md").write_text("\n".join(radiation_lines) + "\n")
@@ -294,17 +363,23 @@ def run_v1(*, output_dir: Path) -> bool:
     return gate_pass
 
 
-def _second_differences(*, series: pl.DataFrame, value_col: str) -> pl.DataFrame:
-    """Return the mean absolute second difference of a series, grouped by UTC hour of day.
+def _switch_ratio_by_hour(*, series: pl.DataFrame, value_col: str) -> pl.DataFrame:
+    """Return each UTC hour's mean absolute second difference, scaled to its own daily mean.
+
+    A run switch is a discontinuity a smooth diurnal signal does not otherwise have, so the hours
+    where a fresh run cuts in carry a second difference well above the statistic's mean over all 24
+    hours; scaling by that mean turns the raw statistic into a ratio comparable across products and
+    fields regardless of each one's own units and variance.
 
     Args:
-        series: Rows carrying `time` and `value_col`, one row per (site, time).
+        series: Rows carrying `site`, `time` and `value_col`, one row per (site, time).
         value_col: The column to difference.
 
     Returns:
-        One row per UTC hour of day, with `mean_abs_second_difference`.
+        One row per UTC hour of day, with `ratio`. Empty if the series' mean second difference is
+        zero (a flat or all-null series).
     """
-    return (
+    diffs = (
         series.sort("site", "time")
         .with_columns(
             second_difference=(
@@ -312,47 +387,93 @@ def _second_differences(*, series: pl.DataFrame, value_col: str) -> pl.DataFrame
             ).over("site")
         )
         .drop_nulls("second_difference")
-        .with_columns(hour=pl.col("time").dt.hour())
-        .group_by("hour")
-        .agg(mean_abs_second_difference=pl.col("second_difference").abs().mean())
-        .sort("hour")
+        .with_columns(hour=pl.col("time").dt.hour(), abs_diff=pl.col("second_difference").abs())
     )
+    overall_mean = diffs["abs_diff"].mean()
+    if not overall_mean:
+        return pl.DataFrame(schema={"hour": pl.Int8, "ratio": pl.Float64})
+    return diffs.group_by("hour").agg(ratio=pl.col("abs_diff").mean() / overall_mean).sort("hour")
 
 
-V1B_COLUMNS: Final[dict[str, str]] = {
-    "wind": "wind_speed_100m_previous_day1",
-    "temperature": "temperature_2m_previous_day1",
+V1B_COLUMN_TEMPLATES: Final[dict[str, str]] = {
+    "wind": "wind_speed_100m_previous_day{day}",
+    "temperature": "temperature_2m_previous_day{day}",
 }
-"""The two day-1 series V1b reads a run-switch pattern from, by field label."""
+"""The two series V1b reads a run-switch pattern from, by field label, templated on the day."""
+
+V1B_DAYS: Final[tuple[int, ...]] = (1, 2)
+"""The `previous_dayN` offsets V1b is checked on."""
+
+V1B_CYCLE_CANDIDATES: Final[tuple[int, ...]] = (3, 6)
+"""The run cycles, in hours, V1b chooses between. `n = 1` is the fallback when neither fits."""
+
+V1B_SIGNATURE_THRESHOLD: Final[float] = 1.3
+"""Below this switch-hour-to-other-hour ratio, V1b reports no clear signature rather than a
+cycle."""
+
+
+def _classify_cycle(*, by_hour: pl.DataFrame) -> tuple[int | None, float]:
+    """Pick the run cycle in `V1B_CYCLE_CANDIDATES` whose switch hours stand out most.
+
+    Args:
+        by_hour: `_switch_ratio_by_hour`'s result.
+
+    Returns:
+        The best-fitting cycle and its score (the switch hours' mean ratio divided by the other
+        hours' mean ratio), or `(None, best_score)` if that score is below
+        `V1B_SIGNATURE_THRESHOLD` ("no clear signature").
+    """
+    best_cycle: int | None = None
+    best_score = 0.0
+    for n in V1B_CYCLE_CANDIDATES:
+        switch = by_hour.filter(pl.col("hour") % n == 0)["ratio"]
+        other = by_hour.filter(pl.col("hour") % n != 0)["ratio"]
+        if switch.is_empty() or other.is_empty() or other.mean() in (0, None):
+            continue
+        score = float(switch.to_numpy().mean()) / float(other.to_numpy().mean())
+        if score > best_score:
+            best_score, best_cycle = score, n
+    if best_score < V1B_SIGNATURE_THRESHOLD:
+        return None, best_score
+    return best_cycle, best_score
 
 
 def run_v1b(*, output_dir: Path) -> None:
-    """Locate each product's run-switch hours from the second difference of its day-1 series.
+    """Locate each product's run cycle from the day-scaled second difference of its series.
 
     Args:
         output_dir: Where `v1b_run_switches.md` is written.
     """
+    hour_headers = [f"h{hour:02d}" for hour in range(24)]
     lines = [
-        "| Product | Field | Hours with elevated second difference | Inferred cycle |",
-        "|---|---|---|---|",
+        "| Product | Field | Day | " + " | ".join(hour_headers) + " | Score | Cycle |",
+        "|---|---|---|" + "---|" * len(hour_headers) + "---|---|",
     ]
     for name, dir_name in PRODUCT_DIRS.items():
         path = _weather_dir() / dir_name / "previous_runs" / "combined.parquet"
         if not path.exists():
             continue
-        for field, column in V1B_COLUMNS.items():
-            frame = pl.read_parquet(path).select("site", "time", value=pl.col(column)).drop_nulls()
-            by_hour = _second_differences(series=frame, value_col="value")
-            if by_hour.is_empty():
-                continue
-            stats = by_hour["mean_abs_second_difference"].to_numpy()
-            threshold = float(stats.mean()) + float(stats.std())
-            elevated = sorted(
-                by_hour.filter(pl.col("mean_abs_second_difference") > threshold)["hour"].to_list()
-            )
-            gaps = sorted({b - a for a, b in itertools.pairwise(elevated)})
-            cycle = gaps[0] if gaps else None
-            lines.append(f"| {name} | {field} | {elevated} | {cycle or 'unclear'}-hourly |")
+        for field, template in V1B_COLUMN_TEMPLATES.items():
+            for day in V1B_DAYS:
+                column = template.format(day=day)
+                combined = pl.read_parquet(path)
+                if column not in combined.columns:
+                    continue
+                frame = combined.select("site", "time", value=pl.col(column)).drop_nulls()
+                by_hour = _switch_ratio_by_hour(series=frame, value_col="value")
+                if by_hour.is_empty():
+                    continue
+                ratio_by_hour = dict(
+                    zip(by_hour["hour"].to_list(), by_hour["ratio"].to_list(), strict=True)
+                )
+                row = [f"{ratio_by_hour.get(hour, float('nan')):.2f}" for hour in range(24)]
+                cycle, score = _classify_cycle(by_hour=by_hour)
+                cycle_label = f"{cycle}-hourly" if cycle is not None else "no clear signature"
+                lines.append(
+                    f"| {name} | {field} | day{day} | "
+                    + " | ".join(row)
+                    + f" | {score:.2f} | {cycle_label} |"
+                )
     (output_dir / "v1b_run_switches.md").write_text("\n".join(lines) + "\n")
 
 
