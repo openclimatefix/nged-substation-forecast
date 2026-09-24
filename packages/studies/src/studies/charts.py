@@ -984,7 +984,7 @@ def _key(
 def figure(
     *,
     panels: Sequence[Panel],
-    number: int,
+    number: int | str,
     title: str,
     subtitle: Sequence[str],
     figure_planning: PlanningType | None,
@@ -997,7 +997,7 @@ def figure(
 
     Args:
         panels: The panels, drawn one above the other.
-        number: The figure's number on its page.
+        number: The figure's number on its page, or a lettered sub-figure such as `"6a"`.
         title: The finding the figure shows.
         subtitle: Short lines naming the quantity, its scope, and what a dot and a line mean.
         figure_planning: What `planning` returns for the figure's rows, which adds the matching

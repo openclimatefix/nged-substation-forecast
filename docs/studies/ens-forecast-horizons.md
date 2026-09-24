@@ -248,11 +248,16 @@ day-7 forecast mostly does not](assets/ens_horizons_wind_week.svg)
 ### Turning ENS's steps into hourly values
 
 **For solar, the clear-sky index keeps the shape of the day where a straight line between steps
-shifts it late and flattens it.** Figure 6 shows one day, in April 2025, at day 1 and day 7, and a
-wind day in September 2025.
+shifts it late and flattens it.** Figure 6a shows one solar day, in April 2025, at day 1 and day 7.
 
-![Figure 6: The clear-sky index keeps the solar day's shape, where linear interpolation shifts it
-late](assets/ens_upsampling_days.svg)
+![Figure 6a: The clear-sky index keeps the solar day's shape, where linear interpolation shifts it
+late](assets/ens_upsampling_days_solar.svg)
+
+**For wind, every upsampling technique reproduces the day's swings almost identically.** Figure 6b
+shows one wind day, in September 2025, at day 1 and day 7.
+
+![Figure 6b: For wind, every upsampling technique tracks the same day almost
+identically](assets/ens_upsampling_days_wind.svg)
 
 **Rebuilding solar radiation through the clear-sky index lowers the error at every horizon to day 7:
 by 0.30 points [0.22, 0.40] at day 1 and 0.16 points [0.02, 0.31] at day 7.** Beyond day 7 the gain

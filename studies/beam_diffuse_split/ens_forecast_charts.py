@@ -92,11 +92,11 @@ BASELINE_NAMES: Final[dict[str, str]] = {
 
 REFERENCE_NAMES: Final[dict[DomainType, dict[str, str]]] = {
     "solar": {
-        "era5": "ERA5 (analysis proxy)",
+        "era5": "ERA5",
         "live_gb_rich_xgb": "UKV + ICON-EU, with ERA5 temperature (analysis proxy)",
     },
     "wind": {
-        "era5": "ERA5 (analysis proxy)",
+        "era5": "ERA5",
         "live_gb_rich_xgb": "UKV + ICON-EU (analysis proxy)",
     },
 }
@@ -113,7 +113,7 @@ METHOD_NAMES: Final[dict[str, str]] = {
     "clear_sky_conserving_pchip": "Clear-sky index, step mean kept, shape-preserving temperature",
     "direction_components": "Direction from components",
     "speed_components": "Speed from components",
-    "components": "Both from components",
+    "components": "Both, from wind components",
 }
 """Each upsampling combination's name on a chart, as `ens_forecast_horizons.COMBINATIONS` keys
 them."""
@@ -158,7 +158,7 @@ BASELINE_COLOURS: Final[dict[str, str]] = {
 }
 """Figure 1's colour for each no-weather baseline."""
 
-REFERENCE_COLOUR: Final[str] = ocf.DATA_BURNT_ORANGE
+REFERENCE_COLOUR: Final[str] = ocf.DATA_MAGENTA
 """Figure 1's colour for both reference rows. The two reference rows share this colour, so they are
 told apart only by their labels beside the rules, not by colour."""
 
@@ -167,6 +167,11 @@ MEASURED_COLOUR: Final[str] = ocf.DATA_GREEN
 every weather technique's colour in `EXAMPLE_COLOURS`."""
 
 TIME_PANEL_HEIGHT_PX: Final[int] = 70
+
+LEADERBOARD_PANEL_HEIGHT_PX: Final[dict[DomainType, int]] = {"solar": 360, "wind": 260}
+"""Figure 1's per-domain panel height. Persistence is such a poor solar forecast that it stretches
+the axis, leaving little headroom to separate the non-persistence forecasts; the solar panel is
+taller than wind's for that reason, not from a different y-axis scale."""
 
 
 def _band_label(day: int) -> str:
@@ -429,7 +434,7 @@ def _leaderboard_panel(
     panel = alt.LayerChart(
         layer=[reference_rules, reference_text, lines, intervals, points],
         width=width,
-        height=260,
+        height=LEADERBOARD_PANEL_HEIGHT_PX[domain],
         title=alt.TitleParams(domain.capitalize(), anchor="start", frame="group", fontSize=14),
     )
     if not keys:
@@ -521,7 +526,7 @@ def leaderboard(
             (
                 "No-weather baselines read the telemetry up to 09:00 UTC on the run's own day, "
                 "when the live service can first read the run, or up to 00 UTC for day 0. "
-                "Climatology does not depend on the horizon. The two burnt-orange rules are an "
+                "Climatology does not depend on the horizon. The two magenta rules are an "
                 "analysis proxy, not a forecast: ERA5, and UKV with ICON-EU, the best of the "
                 "inputs the blending page compared, scored on the same hours."
             ),
@@ -1104,74 +1109,140 @@ def _day_panels(
     return alt.vconcat(top, bottom, spacing=6)
 
 
-def example_days(
-    *, inputs: dict[DomainType, pl.DataFrame], title: str
-) -> tuple[alt.VConcatChart, dict[DomainType, str]]:
-    """Draw the upsampling example days, one row per technology, day 1 beside day 7.
+EXAMPLE_TECHNIQUES: Final[dict[DomainType, str]] = {
+    "solar": (
+        "four techniques: native steps, linear interpolation, the clear-sky index, and the "
+        "clear-sky index with the step's mean kept"
+    ),
+    "wind": (
+        "three techniques: native steps, linear interpolation, and speed and direction both "
+        "taken from the interpolated eastward and northward wind components"
+    ),
+}
+"""Each technology's example-day upsampling techniques, spelled out for Figure 6a and 6b's
+subtitles rather than left as "each technique"."""
+
+EXAMPLE_DAY_RULE: Final[dict[DomainType, str]] = {
+    "solar": "the April-to-September day with the largest mean hour-to-hour change",
+    "wind": "the day with the largest range",
+}
+"""Each technology's rule for choosing Figure 6a and 6b's example day, from measured output
+alone."""
+
+EXAMPLE_SQUARES: Final[dict[DomainType, str]] = {
+    "solar": (
+        "Squares mark ENS's own native steps; each value is the mean radiation over the step "
+        "ending at that square."
+    ),
+    "wind": "Squares mark ENS's own native steps.",
+}
+"""What Figure 6a and 6b's square marks show, per technology: solar's native steps are step means,
+wind's are instantaneous values."""
+
+
+def _example_days_row(*, inputs: pl.DataFrame, domain: DomainType) -> tuple[alt.VConcatChart, str]:
+    """Draw one technology's example-day row: day 1 beside day 7, with a key of its techniques.
 
     Args:
-        inputs: Each technology's saved inputs.
-        title: The figure's title.
+        inputs: The technology's saved inputs.
+        domain: `solar` or `wind`.
 
     Returns:
-        The figure, and each technology's example month and year for the page.
+        The row, and the example day's month and year for the page.
     """
-    rows = []
-    months: dict[DomainType, str] = {}
-    for domain in DOMAINS:
-        site, date = _example_day(inputs=inputs[domain], domain=domain)
-        months[domain] = f"{date:%B %Y}"
-        methods = list(EXAMPLE_METHODS[domain])
-        colours = [EXAMPLE_COLOURS[m] for m in methods]
-        key = _line_key(labels=[METHOD_NAMES[m] for m in methods], colours=colours)
-        pair = alt.hconcat(
-            *(
-                _day_panels(
-                    inputs=inputs[domain], domain=domain, site=site, date=date, day=day, first=True
-                )
-                for day in (1, 7)
-            ),
-            spacing=20,
-        )
-        rows.append(
-            alt.vconcat(
-                key,
-                pair,
-                spacing=6,
-                title=alt.TitleParams(
-                    domain.capitalize(),
-                    anchor="start",
-                    fontSize=14,
-                    subtitle=[
-                        "Top: ENS's forecast, upsampled to hourly by each technique.",
-                        "Bottom: what the generator produced that day.",
-                    ],
-                    subtitleFontSize=11,
+    site, date = _example_day(inputs=inputs, domain=domain)
+    month = f"{date:%B %Y}"
+    methods = list(EXAMPLE_METHODS[domain])
+    colours = [EXAMPLE_COLOURS[m] for m in methods]
+    key = _line_key(labels=[METHOD_NAMES[m] for m in methods], colours=colours)
+    pair = alt.hconcat(
+        *(
+            _day_panels(inputs=inputs, domain=domain, site=site, date=date, day=day, first=True)
+            for day in (1, 7)
+        ),
+        spacing=20,
+    )
+    row = alt.vconcat(
+        key,
+        pair,
+        spacing=6,
+        title=alt.TitleParams(
+            domain.capitalize(),
+            anchor="start",
+            fontSize=14,
+            subtitle=[
+                *wrapped(
+                    text=(
+                        f"Top: ENS's forecast, upsampled to hourly by {EXAMPLE_TECHNIQUES[domain]}."
+                    )
                 ),
-            )
-        )
+                "Bottom: what the generator produced that day.",
+            ],
+            subtitleFontSize=11,
+        ),
+    )
+    return row, month
+
+
+def _example_days_figure(
+    *, inputs: pl.DataFrame, domain: DomainType, letter: str, title: str
+) -> tuple[alt.VConcatChart, str]:
+    """Draw Figure 6a (solar) or 6b (wind): one technology's upsampling example day, self-contained.
+
+    Args:
+        inputs: The technology's saved inputs.
+        domain: `solar` or `wind`.
+        letter: `"6a"` or `"6b"`.
+        title: The figure's finding.
+
+    Returns:
+        The figure, and the example day's month and year for the page.
+    """
+    row, month = _example_days_row(inputs=inputs, domain=domain)
     return (
         figure(
-            panels=rows,
-            number=6,
+            panels=[row],
+            number=letter,
             title=title,
             subtitle=[
+                EXAMPLE_SQUARES[domain],
                 (
-                    "Squares mark ENS's own native steps. For solar, each value is the mean "
-                    "radiation over the step ending at that square."
+                    "The panels pair the same calendar day at day 1 and at day 7, chosen by rule "
+                    f"from measured output alone: {EXAMPLE_DAY_RULE[domain]}. Generator not named."
                 ),
-                "Each row pairs the same calendar day at day 1 and at day 7.",
-                (
-                    "Days chosen by rule from measured output alone: for solar the April-to-"
-                    "September day with the largest mean hour-to-hour change, for wind the day "
-                    "with the largest range. Generator not named."
-                ),
+                SCOPES[domain],
                 CAPACITY,
             ],
             figure_planning=None,
         ),
-        months,
+        month,
     )
+
+
+def example_days_solar(*, inputs: pl.DataFrame, title: str) -> tuple[alt.VConcatChart, str]:
+    """Draw Figure 6a: the solar upsampling example day.
+
+    Args:
+        inputs: Solar's saved inputs.
+        title: The figure's finding.
+
+    Returns:
+        The figure, and the example day's month and year for the page.
+    """
+    return _example_days_figure(inputs=inputs, domain="solar", letter="6a", title=title)
+
+
+def example_days_wind(*, inputs: pl.DataFrame, title: str) -> tuple[alt.VConcatChart, str]:
+    """Draw Figure 6b: the wind upsampling example day.
+
+    Args:
+        inputs: Wind's saved inputs.
+        title: The figure's finding.
+
+    Returns:
+        The figure, and the example day's month and year for the page.
+    """
+    return _example_days_figure(inputs=inputs, domain="wind", letter="6b", title=title)
 
 
 def _line_key(*, labels: Sequence[str], colours: Sequence[str]) -> alt.LayerChart:
@@ -1490,7 +1561,13 @@ def main() -> int:
     inputs = {
         domain: pl.read_parquet(OUTPUT_DIR / f"{domain}_inputs.parquet") for domain in DOMAINS
     }
-    days_chart, day_months = example_days(inputs=inputs, title=TITLES["example_days"])
+    solar_days_chart, solar_day_month = example_days_solar(
+        inputs=inputs["solar"], title=TITLES["example_days_solar"]
+    )
+    wind_days_chart, wind_day_month = example_days_wind(
+        inputs=inputs["wind"], title=TITLES["example_days_wind"]
+    )
+    day_months = {"solar": solar_day_month, "wind": wind_day_month}
     solar_week, solar_month = models_work(domain="solar", number=3, title=TITLES["solar_week"])
     wind_week, wind_month = models_work(domain="wind", number=4, title=TITLES["wind_week"])
     charts = {
@@ -1505,7 +1582,8 @@ def main() -> int:
         "ens_horizons_against_calendar": calendar_contrast(
             contrasts=contrasts, title=TITLES["calendar"]
         ),
-        "ens_upsampling_days": days_chart,
+        "ens_upsampling_days_solar": solar_days_chart,
+        "ens_upsampling_days_wind": wind_days_chart,
         "ens_upsampling_solar": upsampling_contrasts(
             contrasts=contrasts, domain="solar", number=7, title=TITLES["upsampling_solar"]
         ),
@@ -1545,8 +1623,11 @@ TITLES: Final[dict[str, str]] = {
         "The ensemble mean beats the same model given no weather to day 10 with a day-of-year "
         "calendar column, and to day 7 with calendar month"
     ),
-    "example_days": (
+    "example_days_solar": (
         "The clear-sky index keeps the solar day's shape, where linear interpolation shifts it late"
+    ),
+    "example_days_wind": (
+        "For wind, every upsampling technique tracks the same day almost identically"
     ),
     "upsampling_solar": (
         "Rebuilding solar radiation through the clear-sky index lowers the error at every horizon "
