@@ -129,6 +129,10 @@ def _six_month_chunks(*, start_date: str, end_date: str) -> list[tuple[str, str]
     combination — including 2020-09 through 2020-12 and 2019-01 through 2019-02, months nobody
     wanted — so a chunk spanning two years would silently pull two to four times the intended data.
 
+    Args:
+        start_date: First day to cover, `YYYY-MM-DD`.
+        end_date: Last day to cover, `YYYY-MM-DD`.
+
     Returns:
         `(chunk_start, chunk_end)` date strings, in chronological order, each within one year and
         one calendar half.
@@ -309,6 +313,16 @@ def _run_variable(
     window_start_offset_hours: int,
 ) -> dict[str, object] | None:
     """Fetch every chunk for one (variable, height_level) pair, checkpointed, then combine.
+
+    Args:
+        dataset: The CDS dataset name to request from.
+        variable: The CDS variable name to request.
+        height_level: The wind height level to request (e.g. `"100_m"`), or `None` for a
+            surface-level solar variable.
+        unit_column: Name for the value column in the combined frame.
+        chunks: The `(chunk_start, chunk_end)` date pairs to fetch, one request per chunk.
+        output_dir: Where this model's checkpoint cache and combined output live.
+        window_start_offset_hours: Passed through to `crop_one_chunk` — see its docstring.
 
     Returns:
         A summary (`label`, `rows`, `chunks_requested`, `chunks_missing`) for the README's
