@@ -1557,9 +1557,9 @@ def _all_panel_contrasts(*, contrasts: pl.DataFrame, errors: dict[str, float]) -
             f"{DOTS} {CAPACITY}",
             ALL_PANEL_SCOPE,
             (
-                "DMI's own served lead is measured at 3 hours, matching ICON-D2's cycle, so the "
-                "two run at matched leads throughout. KNMI's own served lead is not measured, so "
-                "its contrast mixes weather-model skill with lead."
+                "DMI's own run interval is measured at 3 hours, matching ICON-D2's cycle, so "
+                "the two run at matched leads throughout. KNMI's own run interval is not "
+                "measured, so its contrast mixes weather-model skill with lead."
             ),
         ],
     )
