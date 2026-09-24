@@ -33,33 +33,44 @@ the maintainer asked for.
 **Never write which station serves which wind farm, a station coordinate or name, or a per-farm
 distance** in any chart, page, report, script output, log, PR body, brief or commit message. The
 script reads the private station metadata in memory and reports only pooled distance ranges (the
-minimum and maximum over all farms and ranks together). Per-farm result tables are labelled W1 to
-W3 and never carry a station identifier or distance. Station identifiers never appear in output.
+minimum and maximum over all farms and ranks together). Four further rules follow from the plan
+review, because the hours a station misses are public in MIDAS and could be matched to a farm:
+
+- No per-farm row counts, per-farm drop counts, per-farm station coverage or per-farm lag figures
+  appear on the page, in a chart or in a PR body; the row count and the number of rows dropped are
+  reported pooled over the three farms. Per-farm error tables labelled W1 to W3 are allowed.
+- No station identifier appears in any output. The page states that quality-control flag 106
+  marks whole stations, so no row is filtered on a flag, and names the one candidate station
+  affected (62265) only as the dataset fact the request asked to state, never in relation to a
+  farm and never saying whether it was chosen.
+- No chart plots a station's wind series against dates or under a W label.
 
 ## Data and row set
 
 - Stations: the 18 hourly-weather stations that report wind speed, listed in the request; the 8
   stations with one 09:00 return a day and wind estimated on Beaufort-scale midpoints are excluded,
   and the 12 stations that carry no wind at all are never candidates. Quality-control flag 106
-  marks whole stations, so no row is ever filtered on a flag; station 62265 is affected (almost
-  every wind row), the page says so, and 62265 is treated like every other station: eligible only by
-  the coverage rule below.
-- Wind columns: `wind_speed_m_s` (knots converted, 10 m, instantaneous at `time`) and
-  `wind_direction` (degrees, north written as 360, calm as 0). The report prints the pooled share of
-  rows whose unit code marks the wind as estimated (codes 0
-  and 3); those rows are kept unless the share exceeds 5%, in which case they are excluded and the
-  choice is recorded in this file before the first fit. A row with direction 0 is calm and
-  enters as sine and cosine both zero; 360 is north.
+  marks whole stations, so no row is ever filtered on a flag, and every candidate is treated alike:
+  eligible only by the coverage rule below.
+- Wind columns: `wind_speed_m_s` (knots converted, 10 m; a 10-minute mean ending at `time` by WMO
+  convention, to be verified in the fact check; whole knots, so 0.51 m/s steps, and direction in
+  10-degree steps) and `wind_direction` (degrees, north written as 360, calm as 0). Every wind row
+  that carries a unit code has code 4 (anemometer, knots), so no estimated row enters; the report
+  prints that check. The calm flag (direction 0) is set before any normalisation of 360 to 0. A calm
+  row enters as sine and cosine both zero; 360 is north.
+- "Observed": a station hour counts as observed when speed and direction are both non-null.
 - Nearest station: `studies.midas.select_nearest_stations` with `k=1` and `min_coverage=0.9` of
   the farm's required hours, where the required hours are the page's rows in the window below. The
   rule reads no score and no target. A station hour that is missing drops the farm-hour from every
   arm, so every arm is scored on exactly the same rows.
 - Rows: the page's own rows (`wind_products.common_rows(wind_products.joined(...))`), then
-  restricted to the window 2024-08-12 to 2025-12-31 and to hours where the nearest station has a
-  reading. **The window ends on 2025-12-31 because the MIDAS Open download holds calendar years 2017
-  to 2025** (`dataset-version-202607`; the page states what CEDA holds for 2026 as verified by the
-  fact check). The window holds one UKV era only (the UKV upgrade of January 2026 is outside), so
-  `era_code` is constant and is kept so every arm carries the page's columns.
+  restricted to the window 2024-08-12 to 2025-12-31 (17 calendar months, August 2024 partial) and
+  to hours where the nearest station has a reading. **The window ends on 2025-12-31 because the
+  MIDAS Open download holds calendar years 2017 to 2025** (`dataset-version-202607`; the page states
+  what CEDA holds for 2026 as verified by the fact check). The window holds one UKV era only (the UKV
+  upgrade of January 2026 is outside), so `era_code` is constant and is kept so every arm carries the
+  page's columns. The plan review measured 34,183 page rows in the window and 34,156 after the
+  station rule; the script reports the pooled figures.
 
 ## Planned contrasts (written before any fit)
 
@@ -76,32 +87,39 @@ Every arm carries the shared columns (`hour_of_day`, `day_of_year`, `era_code`) 
 - `ukv_station_wind`: UKV's page columns (100 m speed, sine and cosine of its 100 m direction, 10 m
   speed) plus the station's three columns (7 wind columns).
 - `ukv_padded_wind`: UKV's page columns plus UKV's own served 80 m speed and the sine and cosine
-  of its 80 m direction (7 wind columns), so the blend gains no advantage from column count.
+  of its 80 m direction (7 wind columns), so the blend gains no advantage from column count. Only
+  the three 80 m columns are taken from `UKV_80M_COLUMNS`, which also holds the 10 m speed.
 
-Every contrast is rerun at the second hyperparameter setting.
+Every contrast is rerun at the second hyperparameter setting. Every arm shown "on the same rows",
+including `ukv_wind` and every other product, is refitted on the station rows and never read from
+the published losses, because fold layout alone moves an error by 0.02 to 0.03 points.
 
-**What no planned contrast can separate.** S1 compares a point anemometer at 10 m, tens of
-kilometres from the farm, with a 0.25-degree gridded value; it tests how well a 10 m anemometer
-stands in for a hub-height turbine, and does not separate station distance, height, terrain, the
-station's own siting, and the grid. S2 mixes the station's information with the extra-columns
-control built from UKV's 80 m fields. Three wind farms are few independent sites, and the page
-states that beside every pooled interval.
+**What no planned contrast can separate.** S1 compares a point anemometer at 10 m, 6 to 18 km from
+the farm (the pooled range of the nearest eligible station), with a 0.25-degree gridded value. It
+tests how well a 10 m anemometer stands in for a hub-height turbine, and does not separate station
+distance, height, terrain, the station's own siting, whole-knot and 10-degree quantisation, and the
+grid. S2 mixes the station's information with the extra-columns control built from UKV's 80 m
+fields. Three wind farms are few independent sites, and 17 months are few independent weather
+episodes; the page states both beside every pooled interval. MIDAS Open is a yearly retrospective
+archive, so the page scopes "not a live product" to that archive, and does not claim that station
+data cannot be had live.
 
 ## Exploratory arms (labelled so)
 
-- `station_k3_wind`: the mean of the three nearest eligible stations' speeds (`k=3`), direction
-  from the mean wind vector, on the same rows (the nearest station's hours decide the rows).
-- `station_shear_constant_wind`: the nearest station's speed scaled to 100 m with a power-law
-  exponent of 1/7 (a common open-country value, chosen a priori; it is a guess, not fitted). A tree
-  model is invariant to a monotone rescaling of one column, so the arm is expected to reproduce
-  `station_wind` almost exactly (Float32 rounding may merge nearby values). The report prints the
-  difference, and the page says in one sentence that a fixed exponent cannot help a tree model. An
-  informative shear arm would need an exponent that varies by hour, which imports another product's
-  information, so none is planned.
 - `station_k3_wind`: the mean of the available speeds among the three nearest eligible stations
   (`k=3`), direction from the mean wind vector (calm hours contribute zero components), on the same
   rows (the nearest station's hours decide the rows).
-- `ukv_station_wind` − `ukv_wind` (free: `ukv_wind` is fitted for the leaderboard).
+- **Shear control, not a fitted arm.** A power-law exponent of 1/7 (a common open-country value,
+  chosen a priori; it is a guess, not fitted) scales the nearest station's speed to 100 m. A tree
+  model is invariant to a monotone rescaling of one column, and the plan review confirmed the
+  predictions are bitwise identical. The script therefore fits one fold of one farm on the raw and
+  the scaled speed, prints the maximum difference in predictions into the report, and fits no arm.
+  The page says in one sentence that a fixed exponent cannot help a tree model. An informative
+  shear arm would need an exponent that varies by hour, which imports another product's
+  information, so none is planned.
+- `ukv_station_wind` − `ukv_wind`, with `ukv_wind` refitted on the station rows.
+- Optional, and only if cheap: S1 and S2 restricted to August to December, the calendar months
+  that occur in two years of the window.
 - The station's absolute error beside every product's on the same rows (with the column counts
   stated), by farm (W1 to W3, without any station identity), and the S1 and S2 contrasts by farm.
 - A Bonferroni-adjusted interval for S1 and S2. The window holds one UKV era, so S2 scores UKV
@@ -112,26 +130,28 @@ states that beside every pooled interval.
 ## Fairness and checks
 
 - Equal column counts within each contrast; `colsample_bytree=1`; every arm's column list printed
-  into the report; month-block folds (the date range is short, so the plan states the number of
-  months and the fold count); month-resampled paired bootstrap; a deterministic row fingerprint
-  with floats cast to Float32 before hashing; the printed-number guard from PR #885
-  (`check_page_numbers.py`) run on the new section after the rebase.
-- **Calendar-month coverage check (issue #868):** the report prints, before any fit, whether every
-  scored calendar month has training rows from some other fold, and does not raise. With a 16-month
-  window, each calendar month from
-  August to December occurs in two years and January to July in one, so the report prints which
-  months cannot be covered and the page states it.
-- Station data checks printed into the report: hours missing per eligible station pooled, coverage
-  of the chosen stations, wind speed range, direction bins, the calm rule, and a check that the
-  station's speed correlates with UKV's 10 m speed best at zero hour offset.
+  into the report; month-block folds (one era, so five contiguous blocks per farm of 4, 3, 4, 3 and
+  3 months); month-resampled paired bootstrap; a deterministic row fingerprint with floats cast to
+  Float32 before hashing; the printed-number guard from PR #885 (`check_page_numbers.py`) run on the
+  new section after the rebase.
+- **Calendar-month coverage check (issue #868):** the report prints, before any fit, the months
+  each fold holds and whether every scored calendar month has training rows from some other fold.
+  The script raises on an uncovered calendar month that occurs in two years, as phase 1 does, and
+  prints the single-year months (January to July), which are 42.2% of the scored rows and are
+  scored by models that never trained on that calendar month, so `day_of_year` extrapolates across
+  gaps of up to 4 months for every arm. The page states that figure.
+- Station data checks printed into the report, pooled: hours missing per eligible station,
+  coverage of the chosen stations, wind speed range, direction bins, the calm rule, the unit-code
+  check, and a check that the station's speed correlates with UKV's 10 m speed best at zero hour
+  offset (the plan review found 0.848 at zero, 0.837 at +1 hour, 0.814 at -1 hour).
 - Pooled distance ranges only (see the privacy rule).
 
 ## Product facts to verify before writing
 
 A fact check (Sonnet, then an Opus reviewer) verifies from the Met Office and CEDA documentation:
 the MIDAS Open release schedule and why the data end in December 2025, that MIDAS hourly wind is a
-10-minute mean before the hour or an hourly value (the wording in the user guide), anemometer height
-(10 m standard), and unit codes. Nothing in the page states a station's identity.
+10-minute mean ending at the hour (the wording in the user guide), anemometer height (10 m
+standard), and unit codes. Nothing in the page states a station's identity.
 
 ## Files
 
@@ -157,10 +177,10 @@ artefact for station identifiers and coordinates runs before each push.
 
 ## Risks and open questions
 
-- **A station is a proxy for a hub-height turbine tens of kilometres away**, so a poor result is
-  expected and says little about station data in general. The page says so plainly.
-- **Sixteen months and three farms** give wide intervals and a weak season coverage.
-- **A per-farm view could identify a station.** Only pooled distances are reported.
+- **A station is a proxy for a hub-height turbine 6 to 18 km away**, so a poor result is expected
+  and says little about station data in general. The page says so plainly.
+- **Seventeen months and three farms** give wide intervals and a weak season coverage.
+- **A per-farm view could identify a station.** Only pooled distances and counts are reported.
 
 ## Reviews this plan buys
 
