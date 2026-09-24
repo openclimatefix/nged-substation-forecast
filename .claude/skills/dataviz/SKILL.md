@@ -31,8 +31,11 @@ those, so set every colour explicitly rather than relying on the default order.
 **The maintainer can approve an additional data colour on a published chart when a chart's series
 count genuinely needs one.** The ENS-horizons page's leaderboard colours nine series — three ENS
 ways, four no-weather baselines, and two reference rows — each its own colour rather than sharing a
-colour within a group, so it uses Data Amber and Data Burnt Orange alongside the five main colours.
-Ask before reaching for an internal-use colour; don't treat this precedent as blanket permission.
+colour within a group, so it uses Data Amber and Data Magenta alongside the five main colours. The
+two reference rows first shared Data Burnt Orange, which the maintainer later asked to swap for Data
+Magenta because it clashed with Data Amber; ask before reaching for an internal-use colour, but a
+maintainer request to use one, as here, is itself the approval — don't treat this precedent as
+blanket permission to reach for one unasked.
 
 **Distinguish series by colour first; add a point shape or line style only as a backup, never as the
 only thing distinguishing two series.** A chart that relies on shape or style alone loses its meaning
