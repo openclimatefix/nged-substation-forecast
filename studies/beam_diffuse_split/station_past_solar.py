@@ -46,6 +46,7 @@ agent may run it at a time, because every worktree shares one data folder.
 
 import argparse
 import hashlib
+import json
 import logging
 import re
 import sys
@@ -143,6 +144,8 @@ EXPLORATORY_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("station_mean3", "era5_global"),
     ("station_rank2", STATION_ARM),
     ("station_rank3", STATION_ARM),
+    ("station_rank2", "era5_global"),
+    ("station_rank3", "era5_global"),
     ("station_era5_xgb", "station_era5_control"),
     (BLEND_ARM, "cams_global"),
     (BLEND_CONTROL_ARM, "cams_global"),
@@ -616,8 +619,11 @@ def _files_lines() -> list[str]:
     """
     radiation = read_radiation(path=RADIATION_PATH)
     weather = read_hourly_weather(path=WEATHER_PATH, columns=["air_temperature"])
+    lineage = json.loads((MIDAS_DIR / "lineage.json").read_text())
     return [
         "#### What the MIDAS files hold",
+        "",
+        f"The files are MIDAS Open `{lineage['dataset_version']}`.",
         "",
         "| File | Stations | First hour (UTC) | Last hour (UTC) |",
         "|---|---|---|---|",
@@ -645,13 +651,14 @@ def _row_lines(*, frame: pl.DataFrame, candidates: int, repairs: dict[str, int])
     """
     per_site = frame.group_by("site").agg(n=pl.len()).sort("site")
     dropped = candidates - frame.height
+    months = frame["month"].n_unique()
     return [
         "#### The row set",
         "",
         (
             f"The common rows before {ROW_SET_END:%Y-%m-%d} number {candidates:,}. Keeping only "
             f"the hours where every station input is present leaves {frame.height:,} "
-            f"({dropped:,} dropped, {dropped / candidates:.2%})."
+            f"({dropped:,} dropped, {dropped / candidates:.2%}), spanning {months} calendar months."
         ),
         "",
         "| Generator | Site-hours |",
@@ -698,20 +705,22 @@ def _main_panel_lines(*, pooled: pl.DataFrame, frame: pl.DataFrame) -> list[str]
         (
             f"The main row set holds {match[1]} common site-hours ({match[2]} to {match[3]}); this "
             f"section's row set holds {frame.height:,} ({frame['time'].min():%Y-%m-%d} to "
-            f"{frame['time'].max():%Y-%m-%d}), of which {matched:,} are also in the main row set."
+            f"{frame['time'].max():%Y-%m-%d}), of which {matched:,} are also in the main row set "
+            f"and {frame.height - matched:,} are not."
         ),
         "",
         (
             "| Arm | This section | Main row set | Difference "
-            f"| Main row set's fit, scored on the {matched:,} rows both row sets hold |"
+            f"| Main row set's fit, scored on the {matched:,} rows both row sets hold "
+            "| This section minus that: the shorter training span |"
         ),
-        "|---|---|---|---|---|",
+        "|---|---|---|---|---|---|",
     ]
     for arm, name in (("era5_global", "era5"), ("cams_global", "cams")):
         here = _mae(losses=pooled, arm=arm)
         lines.append(
             f"| {arm} | {here:.3f} | {main[name]:.3f} | {here - main[name]:+.3f} "
-            f"| {_mae(losses=both, arm=arm):.3f} |"
+            f"| {_mae(losses=both, arm=arm):.3f} | {here - _mae(losses=both, arm=arm):+.3f} |"
         )
     return lines
 

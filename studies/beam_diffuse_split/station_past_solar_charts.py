@@ -126,12 +126,12 @@ X_TITLE: Final[str] = "Difference in mean absolute error (points of capacity)"
 DOMAIN_MARGIN: Final[float] = 0.3
 """How far past the lowest and highest value a figure's x domain extends."""
 
-FIGURE_LEADERBOARD: Final[int] = 20
-FIGURE_PLANNED: Final[int] = 21
-FIGURE_MODELS_WORK: Final[int] = 22
+FIGURE_LEADERBOARD: Final[int] = 21
+FIGURE_PLANNED: Final[int] = 22
+FIGURE_MODELS_WORK: Final[int] = 20
 FIGURE_PER_GENERATOR: Final[int] = 23
-FIGURE_STATIONS: Final[int] = 24
-FIGURE_CONTROLS: Final[int] = 25
+FIGURE_STATIONS: Final[int] = 25
+FIGURE_CONTROLS: Final[int] = 24
 
 
 def _check_report(
@@ -327,8 +327,8 @@ def _planned_contrasts(*, contrasts: pl.DataFrame, report: str) -> alt.VConcatCh
         number=FIGURE_PLANNED,
         figure_planning="planned",
         title=(
-            f"The nearest station trails CAMS by {against_cams:.1f} points, beats ERA5 by "
-            f"{against_era5:.1f}, and lowers CAMS's error by {added:.2f}"
+            f"The nearest station trails CAMS by {against_cams:.3f} points, beats ERA5 by "
+            f"{against_era5:.3f}, and lowers CAMS's error by {added:.3f}"
         ),
         subtitle=[
             "Each contrast holds at the second hyperparameter setting.",
@@ -567,11 +567,13 @@ def main() -> int:
                 ("station_rank3", STATION_ARM),
                 ("station_mean3", "cams_global"),
                 ("station_mean3", "era5_global"),
+                ("station_rank2", "era5_global"),
+                ("station_rank3", "era5_global"),
             ],
             number=FIGURE_STATIONS,
             title=(
-                "Averaging three stations beats the nearest station alone, and the second- and "
-                "third-nearest stations score worse"
+                "Averaging three stations beats the nearest station alone, and the third-nearest "
+                "station scores no better than ERA5"
             ),
             subtitle=[
                 (
