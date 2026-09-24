@@ -12,15 +12,30 @@ minutes before the label. An hour-beginning label, or a snapshot read as a mean,
 check over a whole year: over one summer month, afternoon cloud alone pulls the peak about 10
 minutes early.
 
-**Three tables are read by a person, not gated:**
+**Five tables are read by a person, not gated:**
 
 - **Whether the published direct flux carries more than a separation model would**
   (`studies.served_column_checks.check_direct_is_not_a_separation_model`). A product that fails it
   still has a usable global flux; its split arm then measures a derived split, and the page has to
   say so.
-- **Where the hour-to-hour jumps fall.** A forecast archive switches runs at fixed hours of the day,
-  and the switch shows as a larger change in the clearness index between consecutive hours. The
-  hours where the jumps peak give each product's run cycle, and so its served lead.
+- **How often DMI HARMONIE-AROME's published direct beam is zero or exceeds the served global
+  flux** (`_dmi_beam_defect_lines`). DMI passes the separation-model check above, so its direct
+  beam is unusable for a different reason: physically impossible values, not a model applied to its
+  own global irradiance.
+- **Where the hour-to-hour jumps fall, in radiation.** A forecast archive switches runs at fixed
+  hours of the day, and the switch shows as a larger change in the clearness index between
+  consecutive hours. Restricted to daylight, because the clearness index needs a sun high enough to
+  divide by.
+- **Where the hour-to-hour jumps fall, in 2 m temperature.** The same second-difference method, on
+  each of the four models fetched at a single site (`sources.temperature_site_b_path_for`) rather
+  than the panel's whole roster. Temperature is served around the clock, so this table needs no
+  daylight restriction, which is why it resolves a cadence the daylight-only radiation table above
+  cannot. Temperature carries its own diurnal cycle, though: a smooth afternoon warming raises the
+  whole-day-median ratio from 12 to 18 UTC for every product, which can absorb a run switch that
+  falls inside that hump. Each product's row is followed by its local prominence
+  (`_local_prominence`), the same ratio against the mean of its two neighbouring hours, which a
+  smooth diurnal hump does not raise the way a run switch does. IFS-HRES prints twice, split at
+  `sources.IFS_OPEN_DATA_CUTOVER`, because Open-Meteo's own archive for it changed there.
 - **Steps in the served data.** Each product's monthly mean global irradiance against CAMS's, over
   the daylight hours both serve. A month far from the product's usual ratio marks a change of
   source or of model, which needs an era boundary or a shorter record.
@@ -40,11 +55,13 @@ import numpy as np
 import polars as pl
 from build_dataset import CAMS_PATH, _pv_sites
 from sources import (
+    IFS_OPEN_DATA_CUTOVER,
     OPEN_METEO_MODELS,
     UNSCORED_EXTRACTED_SPLITS,
     UPDATE_OUTPUT_DIR,
     SourceType,
     point_output_path_for,
+    temperature_site_b_path_for,
 )
 from studies.served_column_checks import check_direct_is_not_a_separation_model
 from studies.solar import extraterrestrial_horizontal, midpoint_zenith
@@ -67,6 +84,20 @@ NEW_SOURCES: Final[tuple[SourceType, ...]] = (
     "knmi-harmonie-arome",
 )
 """The six products the second round adds to the sunshine study."""
+
+NIGHT_JUMP_SOURCES: Final[tuple[SourceType, ...]] = (
+    "ecmwf-ifs-hres",
+    "arpege-europe",
+    "dmi-harmonie-arome",
+    "knmi-harmonie-arome",
+)
+"""The four `all`-panel products with a single-site hourly temperature fetch, read by
+`_night_jump_lines` (`sources.temperature_site_b_path_for`)."""
+
+POSITIVE_CONTROL_SOURCE: Final[SourceType] = "icon-global"
+"""A product with a documented, already-measured run cadence (6 hours), read by
+`_night_jump_lines` if a single-site temperature fetch for it exists on disk, to show the
+night-jump method finds a cadence it already knows."""
 
 JUMP_MIN_ELEVATION_DEGREES: Final[float] = 15.0
 """Both hours of a pair must have the sun this high for their change in clearness to count.
@@ -188,6 +219,46 @@ def _separation_lines(*, frames: dict[SourceType, pl.DataFrame]) -> list[str]:
     return lines
 
 
+DMI_DEFECT_SOURCE: Final[SourceType] = "dmi-harmonie-arome"
+"""The one product whose published direct beam fails for a reason other than a separation model."""
+
+DMI_DAYTIME_GHI_THRESHOLD_W_M2: Final[float] = 20.0
+"""Below this global irradiance a direct-beam reading of zero is unremarkable, so the defect count
+excludes it, matching the daytime filter `check_direct_is_not_a_separation_model` uses."""
+
+
+def _dmi_beam_defect_lines(*, frames: dict[SourceType, pl.DataFrame]) -> list[str]:
+    """Report how often DMI HARMONIE-AROME's published direct beam is zero or exceeds global flux.
+
+    The page cites both counts (`weather-products-for-past-solar.md`, "The four extra Open-Meteo
+    models"), and the study skill requires every page number to come from a script-printed report
+    rather than a docstring.
+
+    Args:
+        frames: Each product's per-site frame; only `DMI_DEFECT_SOURCE`'s is read.
+
+    Returns:
+        Markdown lines, empty if DMI's frame was not fetched.
+    """
+    frame = frames.get(DMI_DEFECT_SOURCE)
+    if frame is None:
+        return []
+    daytime = frame.filter(pl.col("ghi_w_m2") > DMI_DAYTIME_GHI_THRESHOLD_W_M2)
+    zero_share = float(daytime.select((pl.col("bhi_w_m2") == 0.0).mean()).item())
+    exceeds = int(daytime.select((pl.col("bhi_w_m2") > pl.col("ghi_w_m2")).sum()).item())
+    return [
+        "#### DMI HARMONIE-AROME's published direct beam, on daytime rows (exploratory)",
+        "",
+        (
+            f"Global irradiance above {DMI_DAYTIME_GHI_THRESHOLD_W_M2:.0f} W/m², "
+            f"{daytime.height:,} rows."
+        ),
+        "",
+        f"- exactly zero: {zero_share:.0%}",
+        f"- exceeds the served global flux (physically impossible): {exceeds}",
+    ]
+
+
 def _jump_lines(*, frames: dict[SourceType, pl.DataFrame]) -> list[str]:
     """Report the mean change in clearness index into each UTC hour, relative to the product's mean.
 
@@ -230,6 +301,163 @@ def _jump_lines(*, frames: dict[SourceType, pl.DataFrame]) -> list[str]:
         relative = dict(zip(table["hour"].to_list(), table["relative"].to_list(), strict=True))
         cells = [f"{relative[hour]:.2f}" if hour in relative else "" for hour in hours]
         lines.append(f"| {source} | " + " | ".join(cells) + " |")
+    return lines
+
+
+def _hourly_curvature_ratio(*, frame: pl.DataFrame, column: str) -> pl.DataFrame:
+    """Return, for each UTC hour, the mean absolute second difference of `column` over its median.
+
+    The reviewer's method: a run switch shows as an outsized hour-to-hour change in the column, and
+    a second difference (the change in the change) isolates that from a smooth trend such as a
+    diurnal cycle. Grouping by hour of day and normalising to the whole day's own median turns an
+    absolute jump size, which differs by model and by column, into a comparable ratio: a value near
+    1 is an ordinary hour, and a value well above 1 is where a switch usually lands.
+
+    Args:
+        frame: One product's hourly single-site frame, with `time` and `column`.
+        column: The column to test.
+
+    Returns:
+        One row per UTC hour (`hour`), with the ratio (`relative`).
+    """
+    diffs = frame.sort("time").with_columns(d=pl.col(column).diff())
+    curvature = diffs.with_columns(
+        s=(pl.col("d") - 0.5 * (pl.col("d").shift(1) + pl.col("d").shift(-1))).abs()
+    )
+    by_hour = curvature.group_by(hour=pl.col("time").dt.hour()).agg(pl.col("s").mean()).sort("hour")
+    return by_hour.with_columns(relative=pl.col("s") / pl.col("s").median())
+
+
+def _local_prominence(*, ratio: pl.DataFrame) -> pl.DataFrame:
+    """Return each hour's ratio against the mean of its two circular neighbours.
+
+    `_hourly_curvature_ratio`'s own ratio, against the whole day's median, can sit above 1 for a
+    run of several adjacent hours where the switch itself only lands on one of them, because the
+    median is pulled up by the whole neighbourhood. Dividing each hour by the mean of the hour
+    before and after it isolates a single outsized hour from that drift: a run interval of `n`
+    hours makes every hour divisible by `n` a local peak here, at a value clearly above 1, where
+    the hours in between sit clearly below it.
+
+    Args:
+        ratio: `_hourly_curvature_ratio`'s output, one row per UTC hour (`hour`, `relative`),
+            covering all 24 hours with no gap, so the circular neighbours line up.
+
+    Returns:
+        `hour`, with `relative` replaced by the prominence against its two neighbours.
+    """
+    ordered = ratio.sort("hour")
+    values = ordered["relative"].to_numpy()
+    neighbours = 0.5 * (np.roll(values, 1) + np.roll(values, -1))
+    return ordered.select("hour").with_columns(relative=pl.Series(values / neighbours))
+
+
+def _night_jump_row(*, label: str, ratio: pl.DataFrame, hours: list[int]) -> str:
+    """Return one markdown table row: `label`'s ratio at each of `hours`.
+
+    Args:
+        label: The row's first-column text.
+        ratio: `_hourly_curvature_ratio`'s output.
+        hours: Every UTC hour the table's header lists, in order.
+
+    Returns:
+        The table row.
+    """
+    relative = dict(zip(ratio["hour"].to_list(), ratio["relative"].to_list(), strict=True))
+    cells = [f"{relative[hour]:.2f}" if hour in relative else "" for hour in hours]
+    return f"| {label} | " + " | ".join(cells) + " |"
+
+
+def _night_jump_lines() -> list[str]:
+    """Report each `all`-panel product's run switch in its own single-site 2 m temperature.
+
+    Reads `NIGHT_JUMP_SOURCES`' `sources.temperature_site_b_path_for` fetches. IFS-HRES prints
+    twice, split at `sources.IFS_OPEN_DATA_CUTOVER`, because its cadence is expected to change
+    there (see `weather_products.IFS_HRES_RUN_INTERVAL_HOURS`). `POSITIVE_CONTROL_SOURCE` prints
+    too, if its own single-site fetch exists on disk, to show the method against a product whose
+    6-hour cadence is already known; otherwise the report says so rather than staying silent. Each
+    product's ratio row is followed by its local-prominence row (`_local_prominence`), so a run
+    interval that repeats every few hours shows as a peak at each of those hours rather than only
+    as a raised plateau across the whole neighbourhood.
+
+    Returns:
+        Markdown lines.
+    """
+    hours = list(range(24))
+    lines = [
+        (
+            "#### Mean absolute second difference of 2 m temperature into each UTC hour, over "
+            "the product's own median"
+        ),
+        "",
+        (
+            "A run switch shows as a value well above 1 at a fixed hour. Temperature, not "
+            "radiation, so every hour of the day counts, but temperature carries its own diurnal "
+            "cycle, a smooth afternoon warming that raises this ratio from 12 to 18 UTC for every "
+            "product. Each product's second row is its local prominence, the same ratio against "
+            "the mean of its two neighbouring hours rather than the whole day's median: a run "
+            "interval of a few hours shows here as a peak at every hour that interval divides, "
+            "where the whole-day median can bury it inside the afternoon hump."
+        ),
+        "",
+        "| Product | " + " | ".join(f"{hour:02d}" for hour in hours) + " |",
+        "|---" * (len(hours) + 1) + "|",
+    ]
+    cutover_date = f"{IFS_OPEN_DATA_CUTOVER:%Y-%m-%d}"
+    for source in NIGHT_JUMP_SOURCES:
+        frame = pl.read_parquet(temperature_site_b_path_for(source=source))
+        if source == "ecmwf-ifs-hres":
+            for label, condition in (
+                (f"{source} (before {cutover_date})", pl.col("time") < IFS_OPEN_DATA_CUTOVER),
+                (f"{source} (on/after {cutover_date})", pl.col("time") >= IFS_OPEN_DATA_CUTOVER),
+            ):
+                ratio = _hourly_curvature_ratio(
+                    frame=frame.filter(condition), column="temperature_2m"
+                )
+                lines.append(_night_jump_row(label=label, ratio=ratio, hours=hours))
+                lines.append(
+                    _night_jump_row(
+                        label=f"{label} (local prominence)",
+                        ratio=_local_prominence(ratio=ratio),
+                        hours=hours,
+                    )
+                )
+        else:
+            ratio = _hourly_curvature_ratio(frame=frame, column="temperature_2m")
+            lines.append(_night_jump_row(label=source, ratio=ratio, hours=hours))
+            lines.append(
+                _night_jump_row(
+                    label=f"{source} (local prominence)",
+                    ratio=_local_prominence(ratio=ratio),
+                    hours=hours,
+                )
+            )
+    control_path = temperature_site_b_path_for(source=POSITIVE_CONTROL_SOURCE)
+    if control_path.exists():
+        control_ratio = _hourly_curvature_ratio(
+            frame=pl.read_parquet(control_path), column="temperature_2m"
+        )
+        lines.append(
+            _night_jump_row(
+                label=f"{POSITIVE_CONTROL_SOURCE} (positive control)",
+                ratio=control_ratio,
+                hours=hours,
+            )
+        )
+        lines.append(
+            _night_jump_row(
+                label=f"{POSITIVE_CONTROL_SOURCE} (positive control, local prominence)",
+                ratio=_local_prominence(ratio=control_ratio),
+                hours=hours,
+            )
+        )
+    else:
+        lines += [
+            "",
+            (
+                f"No positive control: no single-site temperature fetch for "
+                f"{POSITIVE_CONTROL_SOURCE} on disk."
+            ),
+        ]
     return lines
 
 
@@ -306,7 +534,11 @@ def main() -> int:
         "",
         *_separation_lines(frames=frames),
         "",
+        *_dmi_beam_defect_lines(frames=frames),
+        "",
         *_jump_lines(frames=frames),
+        "",
+        *_night_jump_lines(),
         "",
         *_step_lines(frames=frames, cams=pl.read_parquet(CAMS_PATH)),
     ]

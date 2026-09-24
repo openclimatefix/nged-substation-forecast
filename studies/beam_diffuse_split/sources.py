@@ -11,6 +11,7 @@ scripts before its results are charted. The download and the dataset build need 
 """
 
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, Literal, NamedTuple
 
@@ -260,8 +261,12 @@ way.
 points across the trial area**, by the issue #841 downloader, whose `lineage.json` files record the
 `models=` values used here. Those grids hold 49 points about 0.15° apart, not the 0.05° the lineage
 files state, so the nearest point sits 0.7 km to 5.3 km from a solar farm; fetching at each site's
-own coordinates removes that handicap, which would fall hardest on DMI's 2 km model. KNMI's
-HARMONIE-AROME over Europe runs at 5.5 km.
+own coordinates removes that handicap, which would fall hardest on DMI's 2 km model. DMI's and
+KNMI's HARMONIE-AROME feeds both carry the same 2 km run that the United Weather Centres-West
+(UWC-West) collaboration of the Danish, Dutch, Icelandic and Irish weather services operates over
+north-west Europe up to Iceland; KNMI distributes it on a reduced 0.05° grid, about 5.5 km
+(<https://english.knmidata.nl/open-data/harmonie>,
+<https://open-meteo.com/en/docs/dmi-api>, <https://open-meteo.com/en/docs/knmi-api>).
 
 - `ecmwf-ifs-hres`: fetched as `ecmwf_ifs`, not `ecmwf_ifs_hres` — the API rejects `ecmwf_ifs_hres`
   outright with "Cannot initialize MultiDomains from invalid String value". The grid download was
@@ -273,8 +278,9 @@ HARMONIE-AROME over Europe runs at 5.5 km.
   global and 40% for the direct flux, and both are null for 35 hours from 2023-12-31 07:00 UTC to
   2024-01-01 17:00 UTC. The archive before the step is treated as a different product and not
   fetched; the start is the first whole day after the gap.
-- `dmi-harmonie-arome`: the served direct flux is zero in 48% of daytime hours, and exceeds the
-  global flux in 74 hours, so the model's split is unusable and only its global flux is scored.
+- `dmi-harmonie-arome`: the served direct flux is exactly zero or exceeds the served global flux on
+  a share of daytime hours `check_new_products.py` prints into `product_checks.md`
+  (`_dmi_beam_defect_lines`), so the model's split is unusable and only its global flux is scored.
 - `arpege-europe` and `knmi-harmonie-arome`: the served direct flux fails
   `check_direct_is_not_a_separation_model` on the grid downloads, with a within-bin spread of the
   direct fraction of 0.018 against a threshold of 0.05, so it is a separation model's output rather
@@ -392,6 +398,36 @@ def point_output_path_for(*, source: SourceType) -> Path:
         The parquet path holding that source's per-site fluxes.
     """
     return WEATHER_DATA_DIR / source.upper() / f"beam_diffuse_{source}.parquet"
+
+
+def temperature_site_b_path_for(*, source: SourceType) -> Path:
+    """Return where one model's single-site 2 m temperature fetch is written.
+
+    A throwaway download, one site (B) only, for `check_new_products.py`'s night-jump table:
+    `time` and `temperature_2m`, hourly. Temperature rather than radiation, because it is served
+    around the clock, so a night-time reading isolates a run switch from the diurnal solar cycle
+    that swamps the same measure on radiation.
+
+    Args:
+        source: Which model's download to locate.
+
+    Returns:
+        The parquet path holding that model's single-site hourly temperature.
+    """
+    return WEATHER_DATA_DIR / source.upper() / "temperature_2m_site_b.parquet"
+
+
+IFS_OPEN_DATA_CUTOVER: Final[datetime] = datetime(2025, 10, 1, tzinfo=UTC)
+"""When Open-Meteo's historical-forecast archive switched ECMWF-IFS-HRES to ECMWF's own open-data
+catalogue.
+
+Before this date the archive served IFS-HRES with roughly a one-hour publication delay; from this
+date it serves the native 9 km O1280 HRES hourly to 90 hours with no such delay, following
+[ECMWF's real-time catalogue opening on 2025-10-01](https://openmeteo.substack.com/p/ecmwf-transitions-to-open-data).
+`check_new_products.py`'s night-jump table measures IFS-HRES's run cadence on both sides of this
+date separately, because the switch to a faster catalogue is expected to change how often a new
+run appears in the archive as well as how quickly.
+"""
 
 
 HISTORICAL_FORECAST_URL: Final[str] = "https://historical-forecast-api.open-meteo.com/v1/forecast"

@@ -1,4 +1,4 @@
-"""Draw the thirteen anonymised charts for the write-up on which product best describes sunshine.
+"""Draw the fifteen anonymised charts for the write-up on which product best describes sunshine.
 
 One-off throwaway script for the charts in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/830>. The write-up is
@@ -7,9 +7,10 @@ One-off throwaway script for the charts in
 **Every number a chart shares with the report is read from the report `weather_products.py`
 wrote for the `long` panel**, so a chart cannot disagree with the page. Figure 8 and the satellite
 rows of Figure 7 read the `record` panel's report and table instead, because only that panel reaches
-back to 2021. Three charts also draw numbers the report does
-not print, computed from `losses.parquet` without refitting any model: the leaderboard's intervals,
-and the two "models work" charts' out-of-fold predictions and per-generator errors.
+back to 2021. Figures 15 and 16 read the `all` panel's own report and table, because that panel's
+row set is shorter and starts later, from November 2024. Three charts also draw numbers the report
+does not print, computed from `losses.parquet` without refitting any model: the leaderboard's
+intervals, and the two "models work" charts' out-of-fold predictions and per-generator errors.
 
 Generators appear only as `A` to `F`. No chart plots output in megawatts or carries a calendar date
 beside a generator's output.
@@ -67,6 +68,9 @@ RESULTS_DIR: Final[Path] = PANELS["long"].output_dir
 RECORD_DIR: Final[Path] = PANELS["record"].output_dir
 """Where `weather_products.py` wrote the `record` panel's ERA5-by-year table."""
 
+ALL_DIR: Final[Path] = PANELS["all"].output_dir
+"""Where `weather_products.py` wrote the `all` panel's report and losses, from November 2024."""
+
 ASSETS_DIR: Final[Path] = Path(__file__).resolve().parents[2] / "docs" / "studies" / "assets"
 """Where the write-up's images live."""
 
@@ -80,7 +84,12 @@ NAMES: Final[dict[str, str]] = {
     "sarah3": "SARAH-3",
     "icon_dream": "ICON-DREAM-EU",
 }
-"""Each product's name as the page writes it."""
+"""Each `long`-panel product's name as the page writes it.
+
+Exactly the `long` panel's eight products, no more: `_implied_capacity_rows` reads exactly
+`len(NAMES)` lines from that panel's own report table, and `_implied_capacity_chart` draws one
+panel per key. `ALL_PANEL_NAMES` is the `all` panel's own, separate registry.
+"""
 
 FAMILIES: Final[dict[str, ProductFamily]] = {
     "cams": "satellite",
@@ -92,7 +101,24 @@ FAMILIES: Final[dict[str, ProductFamily]] = {
     "sarah3": "satellite",
     "icon_dream": "reanalysis",
 }
-"""Each product's family, which sets its colour."""
+"""Each `long`-panel product's family, which sets its colour. See `NAMES`."""
+
+ALL_PANEL_NAMES: Final[dict[str, str]] = NAMES | {
+    "ifs_hres": "ECMWF-IFS-HRES",
+    "arpege": "ARPEGE Europe",
+    "dmi_harmonie": "DMI HARMONIE-AROME",
+    "knmi_harmonie": "KNMI HARMONIE-AROME",
+}
+"""Every `all`-panel product's name: `NAMES` plus the four Open-Meteo models only that panel
+scores."""
+
+ALL_PANEL_FAMILIES: Final[dict[str, ProductFamily]] = FAMILIES | {
+    "ifs_hres": "weather model",
+    "arpege": "weather model",
+    "dmi_harmonie": "weather model",
+    "knmi_harmonie": "weather model",
+}
+"""Every `all`-panel product's family. See `ALL_PANEL_NAMES`."""
 
 PANEL_WIDTH_PX: Final[int] = (CONTENT_WIDTH_PX - 32) // 3
 """One "models work" time-series panel's width: 3 weeks side by side, 16 px apart."""
@@ -1404,6 +1430,144 @@ def _implied_capacity_chart(*, report_text: str) -> alt.VConcatChart:
     )
 
 
+ALL_PANEL_LEADERBOARD_DOMAIN: Final[tuple[float, float]] = (4.5, 10.0)
+"""The x range of the `all`-panel leaderboard, covering every product's 95% interval.
+
+A tighter domain risks clipping a product's own interval: on this panel's twelve products, CAMS's
+lower bound and ARPEGE's upper bound sit closest to the edges, at 4.74 and 9.90.
+"""
+
+ALL_PANEL_SCOPE: Final[str] = "Six solar farms in Lincolnshire, November 2024 to August 2026."
+"""The `all` panel's row set is shorter than the other figures', which start December 2022."""
+
+
+def _all_product(arm: str) -> str:
+    """Return the `all`-panel product an arm belongs to, such as `ifs_hres` for `ifs_hres_split`.
+
+    Mirrors `_product`, against `ALL_PANEL_NAMES` rather than `NAMES`, because the `all` panel
+    scores four products `NAMES` does not carry.
+    """
+    return max((product for product in ALL_PANEL_NAMES if arm.startswith(f"{product}_")), key=len)
+
+
+def _all_served_name(product: str) -> str:
+    """Return an `all`-panel product's name, as `_served_name` does, against `ALL_PANEL_NAMES`."""
+    return "UKV, Open-Meteo's hourly value" if product == "ukv" else ALL_PANEL_NAMES[product]
+
+
+def _all_panel_leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
+    """Draw all twelve `all`-panel products' own mean absolute error, best first, with intervals.
+
+    Mirrors `_leaderboard`, on the `all` panel's own shorter row set (from November 2024), which
+    is what lets the four Open-Meteo models fetched at each site's own coordinates join the other
+    eight.
+
+    Args:
+        losses: Every arm's rows from the `all` panel's `losses.parquet`.
+        errors: Each product's pooled mean absolute error, read from the `all` panel's report.
+
+    Returns:
+        Figure 15.
+    """
+    order = sorted(errors, key=errors.__getitem__)
+    records = []
+    for product in order:
+        arm = f"{product}_global"
+        interval = bootstrap_absolute(losses=losses, arm=arm, metric=METRIC)
+        value = interval["value"] * PERCENTAGE_POINTS
+        if round(value, 3) != errors[product]:
+            msg = f"{product}: bootstrapped {value:.3f} but the report says {errors[product]}"
+            raise ValueError(msg)
+        records.append(
+            {
+                "label": _all_served_name(product),
+                "family": ALL_PANEL_FAMILIES[product],
+                "value": value,
+                "lower_95": interval["lower_95"] * PERCENTAGE_POINTS,
+                "upper_95": interval["upper_95"] * PERCENTAGE_POINTS,
+            }
+        )
+    rows = pl.DataFrame(records)
+    panel = leaderboard_panel(
+        rows=rows, x_domain=ALL_PANEL_LEADERBOARD_DOMAIN, x_title=LEADERBOARD_X_TITLE
+    )
+    return figure(
+        panels=[panel],
+        number=15,
+        figure_planning=None,
+        title="CAMS and SARAH-3 still lead when four more weather models are added",
+        subtitle=[
+            (
+                "Each product's own mean absolute error, sorted best first, on the 40,243 "
+                "generator-hours all 12 products share."
+            ),
+            DOTS,
+            (
+                "The intervals are wide mainly because every product's error swings together "
+                "from month to month, a swing Figure 16's paired contrasts cancel."
+            ),
+            CAPACITY,
+            ALL_PANEL_SCOPE,
+        ],
+    )
+
+
+def _all_panel_contrasts(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
+    """Draw the `all` panel's three planned contrasts, named before the run.
+
+    Args:
+        contrasts: Every contrast row in the `all` panel's report.
+        errors: Each product's mean absolute error, for each row's label.
+
+    Returns:
+        Figure 16.
+    """
+    planned = NEW_PLANNED_CONTRASTS["all"]
+    named = select_contrasts(
+        contrasts=contrasts,
+        wanted=[ContrastKey(SECTION_DECIDING, "all", t, r) for t, r in planned],
+    )
+    labels = [
+        f"{ALL_PANEL_NAMES[_all_product(t)]} − {ALL_PANEL_NAMES[_all_product(r)]} "
+        f"({_two_places(errors[_all_product(t)])}% vs {_two_places(errors[_all_product(r)])}%)"
+        for t, r in planned
+    ]
+    rows = named.with_columns(
+        label=pl.Series(labels),
+        family=pl.Series([ALL_PANEL_FAMILIES[_all_product(arm)] for arm in named["treatment"]]),
+        planned=pl.Series([True] * len(planned), dtype=pl.Boolean),
+    )
+    panel = interval_panel(
+        rows=rows,
+        x_domain=(-0.5, 1.5),
+        x_title=X_TITLE,
+        zero_label="no difference",
+        better_label="first product better",
+        panel_title="The three planned contrasts",
+        family_key=False,
+        figure_planning="planned",
+    )
+    return figure(
+        panels=[panel],
+        number=16,
+        figure_planning="planned",
+        title=(
+            "HARMONIE-AROME, as Open-Meteo serves it from DMI's and KNMI's feeds, trails the ICON "
+            "model of similar grid spacing; IFS-HRES against ICON-EU is not resolved"
+        ),
+        subtitle=[
+            "The three contrasts named in the study plan before any result existed.",
+            f"{DOTS} {CAPACITY}",
+            ALL_PANEL_SCOPE,
+            (
+                "DMI's feed updates every 3 hours, as ICON-D2 does, so the two sit at the same "
+                "served lead on every row. KNMI's feed is documented as hourly but not measured "
+                "here, so its contrast mixes weather-model skill with lead."
+            ),
+        ],
+    )
+
+
 MODELS_WORK_SITES: Final[tuple[str, ...]] = tuple("ABCDEF")
 """The six anonymised solar generator labels, in the order every "models work" panel lists them."""
 
@@ -1517,7 +1681,7 @@ def _solar_models_work(
 
 
 def main() -> int:
-    """Read the reports, compute the new numbers, and write the thirteen SVGs."""
+    """Read the reports, compute the new numbers, and write the fifteen SVGs."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     argparse.ArgumentParser(description=__doc__).parse_args()
     report_path = RESULTS_DIR / "report.md"
@@ -1527,6 +1691,10 @@ def main() -> int:
     # The saved losses hold the second hyperparameter setting's arms too, under the same names.
     losses = pl.read_parquet(RESULTS_DIR / "losses.parquet").filter(pl.col("setting") == "pooled")
     models_work_timeseries, models_work_error = _solar_models_work(losses=losses, errors=errors)
+    all_report_path = ALL_DIR / "report.md"
+    all_contrasts = report_contrasts(report_path=all_report_path)
+    all_errors = report_errors(report_path=all_report_path, column="Global only")
+    all_losses = pl.read_parquet(ALL_DIR / "losses.parquet").filter(pl.col("setting") == "pooled")
     charts = {
         "sunshine_leaderboard": _leaderboard(losses=losses, errors=errors),
         "sunshine_headline": _headline(contrasts=contrasts, errors=errors),
@@ -1544,6 +1712,8 @@ def main() -> int:
         "sunshine_own_beam": _own_beam(contrasts=contrasts, errors=errors),
         "sunshine_neighbours": _neighbours(contrasts=contrasts),
         "sunshine_implied_capacity": _implied_capacity_chart(report_text=report_text),
+        "sunshine_all_leaderboard": _all_panel_leaderboard(losses=all_losses, errors=all_errors),
+        "sunshine_all_contrasts": _all_panel_contrasts(contrasts=all_contrasts, errors=all_errors),
     }
     for name, chart in charts.items():
         path = ASSETS_DIR / f"{name}.svg"

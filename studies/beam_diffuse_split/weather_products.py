@@ -48,7 +48,7 @@ record shortens the whole panel rather than giving that product easier or harder
   `published` panel runs. The panel spans Open-Meteo's change of UKV source on 12 August 2024 and
   treats it as the first round did, with the `ukv_live` scope.
 - `all`: all twelve products, adding the four fetched per site from Open-Meteo (ECMWF-IFS-HRES,
-  ARPEGE Europe, and the two HARMONIE-AROME models), from September 2024.
+  ARPEGE Europe, and the two HARMONIE-AROME models), from November 2024.
 - `record`: the four products with records from 2021, which is SARAH-3's start: ERA5, CAMS,
   SARAH-3 and ICON-DREAM-EU. It exists for the year-by-year table of ERA5's error against every
   other product, which every panel prints for its own years.
@@ -93,6 +93,7 @@ from run_experiment import (
     run_all,
 )
 from sources import (
+    IFS_OPEN_DATA_CUTOVER,
     OPEN_METEO_MODELS,
     STUDY_DATA_DIR,
     UNSCORED_EXTRACTED_SPLITS,
@@ -164,9 +165,11 @@ SERVED_LEAD: Final[dict[str, str]] = {
     "icon_global": "1 to 6 hours",
     "sarah3": "no forecast step (satellite retrieval)",
     "icon_dream": "1 to 3 hours (its own forecasts from 3-hourly analyses)",
-    "ifs_hres": "not yet measured (see product_checks.md)",
-    "arpege": "not yet measured (see product_checks.md)",
-    "dmi_harmonie": "not yet measured (see product_checks.md)",
+    "ifs_hres": (
+        "1 to 12 hours before 1 October 2025 (12-hour cycle); 1 to 6 hours from it (6-hour cycle)"
+    ),
+    "arpege": "1 to 6 hours (4-times-daily cycle)",
+    "dmi_harmonie": "1 to 3 hours (run interval measured at 3 hours, matching ICON-D2's cycle)",
     "knmi_harmonie": "not yet measured (see product_checks.md)",
 }
 """How far ahead each product's served hourly value was forecast, as the archive holds it.
@@ -181,10 +184,43 @@ RUN_INTERVAL_HOURS: Final[dict[str, int]] = {
     "icon_eu": 3,
     "icon_global": 6,
     "icon_dream": 3,
+    "arpege": 6,
+    "dmi_harmonie": 3,
 }
-"""The run cadence of each ICON product, which fixes its served lead at each label hour.
+"""The run cadence of each product with one interval for its whole record.
 
-The evidence for the mapping is on the write-up page.
+The evidence for the ICON products is on the write-up page. `arpege` (Météo-France's ARPEGE Europe)
+is added from `check_new_products.py`'s night-jump table (`UPDATE_OUTPUT_DIR / "product_checks.md"`,
+"Mean absolute second difference of 2 m temperature into each UTC hour"), which reads a single-site
+hourly temperature fetch rather than the daytime-only radiation used for the ICON products: ARPEGE's
+values peak clearly at 00, 06, 12 and 18 UTC, against a flat baseline between them, matching its
+publicly documented four-times-daily cycle.
+
+**`dmi_harmonie` (DMI HARMONIE-AROME) is also read from the night-jump table, using its local
+prominence rather than its whole-day-median ratio.** Temperature's own diurnal cycle, a smooth
+afternoon warming, raises the whole-day-median ratio from 12 to 18 UTC for every product in the
+table, which hides a 3-hourly plateau inside that hump rather than against it. Local prominence,
+each hour against the mean of its two neighbours, shows every hour divisible by 3 as a peak of
+1.07 to 1.29, matching ICON-D2's own 3-hourly cycle.
+
+**`ecmwf-ifs-hres` (IFS-HRES) is not in this dict because its cadence changes mid-record** --
+see `IFS_HRES_RUN_INTERVAL_HOURS` and `_served_lead`. **`knmi_harmonie` stays unset.** Its
+local-prominence row shows no hour standing out from a flat baseline, consistent with a run
+interval too short (an hour or a few) for this table to resolve. Guessing an interval for it is
+worse than leaving it unsplit, so `_matched_lead_lines` reports the `knmi_harmonie` planned
+contrast as waiting on a measured run interval.
+"""
+
+IFS_HRES_RUN_INTERVAL_HOURS: Final[tuple[int, int]] = (12, 6)
+"""IFS-HRES's run cadence before, and on or after, `sources.IFS_OPEN_DATA_CUTOVER`.
+
+Read from `check_new_products.py`'s night-jump table, which shows IFS-HRES's temperature peaking
+at 01:00 and 13:00 UTC before the cutover -- 12 hours apart, one hour after each of the two runs a
+day (00 and 12 UTC) the historical-forecast archive served with roughly a one-hour delay -- and at
+00:00, 06:00, 12:00 and 18:00 UTC from the cutover, matching the four-times-daily cycle of the
+native open-data feed it switched to. `_served_lead` reads this pair through
+`IFS_OPEN_DATA_CUTOVER` rather than through `RUN_INTERVAL_HOURS`, because that dict holds one
+interval per product for its whole record.
 """
 
 SARAH_SATELLITE_ERAS: Final[tuple[tuple[str, datetime, datetime], ...]] = (
@@ -287,10 +323,14 @@ UNUSABLE_SPLITS: Final[frozenset[str]] = frozenset(
 """Products whose own split no arm reads, so they get neither a split arm nor an Erbs arm.
 
 Read from `sources.OPEN_METEO_MODELS` and `sources.UNSCORED_EXTRACTED_SPLITS`, which say why for
-each: DMI's served direct flux is zero in 48% of daytime hours, ARPEGE's and KNMI's is a separation
-model's output, and SARAH-3's is modelled from its own global flux. A split arm would
-measure the defect or the separation model, not the weather model, and an Erbs arm exists only as
-the split arm's reference.
+each: DMI's served direct flux is exactly zero or exceeds its own global flux on a share of daytime
+hours `check_new_products.py` prints into `product_checks.md`, and Open-Meteo derives ARPEGE's and
+KNMI's direct beam from each model's own global irradiance
+with a separation model, which it documents for both
+(<https://open-meteo.com/en/docs/meteofrance-api>, <https://open-meteo.com/en/docs/knmi-api>), as it
+does for SARAH-3's, modelled by CM SAF from SARAH-3's own global flux. A split arm would measure the
+defect or the separation model, not the weather model, and an Erbs arm exists only as the split
+arm's reference.
 """
 
 NEW_PLANNED_CONTRASTS: Final[dict[str, tuple[tuple[str, str], ...]]] = {
@@ -374,7 +414,7 @@ PANELS: Final[dict[PanelType, Panel]] = {
         output_dir=UPDATE_OUTPUT_DIR / "solar_all",
         full_analysis=False,
         planned=NEW_PLANNED_CONTRASTS["all"],
-        first_time=datetime(2024, 9, 1, tzinfo=UTC),
+        first_time=datetime(2024, 11, 1, tzinfo=UTC),
     ),
     "record": Panel(
         products=("era5", "cams", "sarah3", "icon_dream"),
@@ -386,10 +426,17 @@ PANELS: Final[dict[PanelType, Panel]] = {
 """Every panel. The `published` panel's directory is the first round's; every other panel's sits
 under `sources.UPDATE_OUTPUT_DIR`.
 
-The `all` panel starts on 1 September 2024 rather than when HARMONIE-AROME's archive does, in July
-2024, because Open-Meteo's UKV before 12 August 2024 is a backfill from a source it does not name:
-a change of source is an era boundary, and a panel of 26 months has no room to cut folds on both
-sides of one. The first whole month after the change is the start.
+The `all` panel starts on 1 November 2024 rather than when HARMONIE-AROME's archive does, in July
+2024, because two changes of source sit in between, each an era boundary a panel this short has no
+room to cut folds on both sides of. Open-Meteo's UKV before 12 August 2024 is a backfill from a
+source it does not name. Météo-France's cycle 48t1, on 15 October 2024, replaced ARPEGE's
+radiation scheme with an ecRad-derived one, [Météo-France's own report of the
+change](https://www.umr-cnrm.fr/old/IMG/pdf/r_r_2024-gb_web_2.pdf). ARPEGE's ratio to CAMS, read
+from its own longer build (`_arpege_ifs_ratio_lines`), runs 0.94 to 1.07 from January to October
+2024 and 1.01 to 1.32 from November 2024, higher in 8 of the 10 calendar months both sides of the
+change share, consistent with the documented date; its ratio to ECMWF-IFS-HRES cannot confirm this
+on its own, because ECMWF's own Cycle 49r1 went operational on 12 November 2024, inside the same
+window. The first whole month after the later of the two changes is the start.
 """
 
 DEFAULT_PANELS: Final[tuple[PanelType, ...]] = ("long", "all", "record")
@@ -1230,6 +1277,19 @@ def _contrast_line(*, losses: pl.DataFrame, treatment: str, reference: str, labe
     )
 
 
+def _measured_run_interval(*, product: str) -> bool:
+    """Return whether a product's run cadence is known well enough to split a lead table by it.
+
+    Args:
+        product: An arm prefix, as `_served_lead` takes.
+
+    Returns:
+        `True` for a key of `RUN_INTERVAL_HOURS`, or for `ifs_hres`, whose cadence is measured but
+        changes mid-record (`IFS_HRES_RUN_INTERVAL_HOURS`) rather than living in that flat dict.
+    """
+    return product in RUN_INTERVAL_HOURS or product == "ifs_hres"
+
+
 def _served_lead(*, product: str) -> pl.Expr:
     """Return the served lead in hours of a product's value at each row's label hour.
 
@@ -1238,20 +1298,29 @@ def _served_lead(*, product: str) -> pl.Expr:
     run: 1, 2 or 3 hours for a 3-hourly model, 1 to 6 for a 6-hourly one.
 
     Args:
-        product: A key of `RUN_INTERVAL_HOURS`.
+        product: A key of `RUN_INTERVAL_HOURS`, or `ifs_hres`.
 
     Returns:
         The lead, as an integer expression.
     """
     hour = pl.col("time").dt.hour().cast(pl.Int32)
-    return ((hour - 1) % RUN_INTERVAL_HOURS[product]) + 1
+    if product == "ifs_hres":
+        before, after = IFS_HRES_RUN_INTERVAL_HOURS
+        interval = (
+            pl.when(pl.col("time") < IFS_OPEN_DATA_CUTOVER)
+            .then(pl.lit(before))
+            .otherwise(pl.lit(after))
+        )
+    else:
+        interval = pl.lit(RUN_INTERVAL_HOURS[product])
+    return ((hour - 1) % interval) + 1
 
 
 def _matched_lead_lines(*, panel: Panel, losses: pl.DataFrame) -> list[str]:
     """Split each planned contrast by whether its two products sit at the same served lead.
 
-    Only a contrast whose two products both have an entry in `RUN_INTERVAL_HOURS` can be split;
-    the others are listed as waiting for a measured run interval.
+    Only a contrast whose two products both have a measured run interval can be split (see
+    `_measured_run_interval`); the others are listed as waiting for one.
 
     Args:
         panel: The panel reported.
@@ -1267,7 +1336,7 @@ def _matched_lead_lines(*, panel: Panel, losses: pl.DataFrame) -> list[str]:
     waiting: list[str] = []
     for treatment, reference in panel.planned:
         products = [arm.removesuffix("_global") for arm in (treatment, reference)]
-        if not all(product in RUN_INTERVAL_HOURS for product in products):
+        if not all(_measured_run_interval(product=product) for product in products):
             waiting.append(f"{treatment} − {reference}")
             continue
         treatment_lead, reference_lead = (_served_lead(product=product) for product in products)
@@ -1290,11 +1359,47 @@ def _matched_lead_lines(*, panel: Panel, losses: pl.DataFrame) -> list[str]:
         lines += [
             "",
             (
-                "Not split, because a product has no entry in RUN_INTERVAL_HOURS (a retrieval, a "
+                "Not split, because a product has no measured run interval (a retrieval, a "
                 "reanalysis, UKV's analysis, or a run interval not yet measured): "
                 f"{', '.join(waiting)}."
             ),
         ]
+    return lines
+
+
+def _ifs_cutover_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Report ECMWF-IFS-HRES against ICON-EU before and on or after `IFS_OPEN_DATA_CUTOVER`.
+
+    Open-Meteo switched IFS-HRES to ECMWF's native open-data feed at the cutover, changing its run
+    cadence (`IFS_HRES_RUN_INTERVAL_HOURS`) and its own source, a change of source inside the row
+    set. No fold or feature here is cut at the cutover, so this split is exploratory, not a second
+    fit.
+
+    Args:
+        losses: The pooled losses, holding `ifs_hres_global` and `icon_eu_global`.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        "#### ECMWF-IFS-HRES against ICON-EU, before and after Open-Meteo's ECMWF feed change",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    for label, condition in (
+        (f"before {IFS_OPEN_DATA_CUTOVER:%Y-%m-%d}", pl.col("time") < IFS_OPEN_DATA_CUTOVER),
+        (f"on/after {IFS_OPEN_DATA_CUTOVER:%Y-%m-%d}", pl.col("time") >= IFS_OPEN_DATA_CUTOVER),
+    ):
+        rows = losses.filter(condition)
+        if rows.height:
+            lines.append(
+                _contrast_line(
+                    losses=rows,
+                    treatment="ifs_hres_global",
+                    reference="icon_eu_global",
+                    label=label,
+                )
+            )
     return lines
 
 
@@ -1681,6 +1786,276 @@ def _icon_dream_other_products_lines(*, losses: pl.DataFrame) -> list[str]:
     lines += [
         _contrast_line(losses=losses, treatment=treatment, reference=reference, label="all")
         for treatment, reference in ICON_DREAM_OTHER_CONTRASTS
+    ]
+    return lines
+
+
+FIRST_HOUR_AFTER_RUN_LABEL: Final[str] = "first hour after each run (hour % 3 == 1)"
+OTHER_HOURS_LABEL: Final[str] = "other hours"
+
+
+def _dmi_knmi_first_hour_lines(*, frame: pl.DataFrame, losses: pl.DataFrame) -> list[str]:
+    """Report DMI's and KNMI's losses split by the first served hour after each run (exploratory).
+
+    Found after the results, in the second science review of this page (M1): DMI's and KNMI's
+    archives serve almost the same global irradiance as each other at the first hour after ICON-D2's
+    and ICON-EU's own 3-hourly cycle (`hour % 3 == 1`), and DMI's loss against ICON-D2 is about
+    twice as large at those hours as at the rest of the day. A model that loses most at its
+    freshest hour, where its archive nearly copies another centre's, points to how Open-Meteo builds
+    that hour rather than to either centre's own model. This split was not named in the study's
+    plan, so every number here is exploratory, printed to show whether the planned DMI and KNMI
+    contrasts above still hold outside the shared first hour.
+
+    Args:
+        frame: The panel's common rows, holding `ghi_dmi_harmonie`, `ghi_knmi_harmonie` and
+            `ghi_icon_d2`.
+        losses: The pooled losses, holding `dmi_harmonie_global`, `icon_d2_global`,
+            `knmi_harmonie_global` and `icon_eu_global`.
+
+    Returns:
+        Markdown lines: the split contrast, DMI's and KNMI's raw agreement by hour group, DMI's
+        loss by month, and DMI's loss by generator.
+    """
+    first, last = LEAD_TABLE_HOURS
+    hour = pl.col("time").dt.hour().cast(pl.Int32)
+    daytime = hour.is_between(first, last)
+    first_hour = daytime & ((hour % 3) == 1)
+    other_daytime_hours = daytime & ((hour % 3) != 1)
+    daytime_label = f"{first:02d}–{last:02d} UTC"
+    lines = [
+        (
+            "#### DMI's and KNMI's losses, split by the first served hour after each run "
+            "(exploratory, found after the results)"
+        ),
+        "",
+        *CONTRAST_HEADER,
+    ]
+    for treatment, reference in (
+        ("dmi_harmonie_global", "icon_d2_global"),
+        ("knmi_harmonie_global", "icon_eu_global"),
+    ):
+        for label, condition in (
+            (f"{FIRST_HOUR_AFTER_RUN_LABEL}, {daytime_label}", first_hour),
+            (f"{OTHER_HOURS_LABEL}, {daytime_label}", other_daytime_hours),
+        ):
+            lines.append(
+                _contrast_line(
+                    losses=losses.filter(condition),
+                    treatment=treatment,
+                    reference=reference,
+                    label=label,
+                )
+            )
+
+    lit = frame.filter((pl.col("ghi_icon_d2") > 20) & daytime).with_columns(
+        first_hour=(hour % 3) == 1,
+        agreement=pl.col("ghi_dmi_harmonie") - pl.col("ghi_knmi_harmonie"),
+    )
+    lines += [
+        "",
+        (
+            "How close DMI's and KNMI's archives sit to each other, on daytime rows "
+            f"({daytime_label}) where ICON-D2's global irradiance exceeds 20 W/m²:"
+        ),
+        "",
+        "| Hours | Rows | Within 2 W/m² | Mean absolute difference (W/m²) | Exactly equal |",
+        "|---|---|---|---|---|",
+    ]
+    for label, condition in (
+        (FIRST_HOUR_AFTER_RUN_LABEL, pl.col("first_hour")),
+        (OTHER_HOURS_LABEL, ~pl.col("first_hour")),
+    ):
+        rows = lit.filter(condition)
+        within_2 = (rows["agreement"].abs() <= 2).mean()
+        mad = rows["agreement"].abs().mean()
+        exactly_equal = (rows["agreement"] == 0).mean()
+        lines.append(
+            f"| {label} | {rows.height:,} | {within_2:.0%} | {mad:.1f} | {exactly_equal:.0%} |"
+        )
+
+    monthly = (
+        losses.filter(pl.col("arm").is_in(["dmi_harmonie_global", "icon_d2_global"]))
+        .group_by("month", "arm")
+        .agg(pl.col(METRIC).mean())
+        .pivot(on="arm", index="month", values=METRIC)
+        .with_columns(
+            difference=(
+                (pl.col("dmi_harmonie_global") - pl.col("icon_d2_global")) * PERCENTAGE_POINTS
+            )
+        )
+        .sort("month")
+    )
+    positive_months = monthly.filter(pl.col("difference") > 0).height
+    lines += [
+        "",
+        (
+            f"DMI HARMONIE-AROME's loss against ICON-D2 is positive in {positive_months} of "
+            f"{monthly.height} months (pp of capacity, point estimate, no interval):"
+        ),
+        "",
+        "| Month | DMI − ICON-D2 |",
+        "|---|---|",
+    ]
+    lines += [
+        f"| {row['month']} | {row['difference']:+.3f} |" for row in monthly.iter_rows(named=True)
+    ]
+
+    lines += ["", "#### DMI HARMONIE-AROME against ICON-D2, by generator (exploratory)", ""]
+    lines += CONTRAST_HEADER
+    lines += [
+        _contrast_line(
+            losses=losses.filter(pl.col("site") == site),
+            treatment="dmi_harmonie_global",
+            reference="icon_d2_global",
+            label=f"site {site}",
+        )
+        for site in sorted(losses["site"].unique().to_list())
+    ]
+    return lines
+
+
+def _arpege_ifs_ratio_lines() -> list[str]:
+    """Report ARPEGE's monthly irradiance ratio to ECMWF-IFS-HRES and to CAMS, from its own start.
+
+    Found after the results, in the second science review of this page (M2): the `all` panel's own
+    row set starts in November 2024, so it cannot show whether Météo-France's cycle 48t1 change on
+    15 October 2024 left a step in ARPEGE's served irradiance, because no row before that date is
+    in the panel. ARPEGE's own per-site build reaches back to January 2024, so this table reads
+    that build directly, joined to ECMWF-IFS-HRES's and CAMS's own builds on the same site-hours,
+    rather than the panel's common rows. Also appends `_arpege_cams_year_over_year_lines`, added
+    after the final builders' review, which pairs the same calendar month a year apart to isolate
+    the change from ARPEGE's ordinary month-to-month spread.
+
+    Returns:
+        Markdown lines: one row per month from ARPEGE's own start, then the year-over-year pairing.
+    """
+    daylight = pl.col("ifs") > 20.0
+
+    def load(*, source: SourceType, tag: str) -> pl.DataFrame:
+        return pl.read_parquet(dataset_path_for(source=source)).select(
+            "site", "time", pl.col("ghi_w_m2").alias(tag)
+        )
+
+    joined_raw = (
+        load(source="arpege-europe", tag="arp")
+        .join(load(source="ecmwf-ifs-hres", tag="ifs"), on=["site", "time"])
+        .join(load(source="cams", tag="cams"), on=["site", "time"], how="left")
+        .filter(pl.col("time").dt.year().is_between(2024, 2025) & daylight)
+    )
+    monthly = (
+        joined_raw.group_by(month=pl.col("time").dt.strftime("%Y-%m"))
+        .agg(
+            pl.len().alias("rows"),
+            (pl.col("arp").sum() / pl.col("ifs").sum()).alias("arp_ifs"),
+            (pl.col("arp").sum() / pl.col("cams").sum()).alias("arp_cams"),
+        )
+        .sort("month")
+    )
+    lines = [
+        (
+            "#### ARPEGE Europe's monthly irradiance ratio to ECMWF-IFS-HRES and CAMS, from "
+            "ARPEGE's own start (exploratory)"
+        ),
+        "",
+        (
+            "On daylight rows where ECMWF-IFS-HRES's global irradiance exceeds 20 W/m², read "
+            "from each product's own per-site build rather than the panel's common rows, so the "
+            "table reaches back to ARPEGE's own start rather than only to the `all` panel's."
+        ),
+        "",
+        "| Month | Rows | ARPEGE / ECMWF-IFS-HRES | ARPEGE / CAMS |",
+        "|---|---|---|---|",
+    ]
+    lines += [
+        f"| {row['month']} | {row['rows']:,} | {row['arp_ifs']:.2f} | {row['arp_cams']:.2f} |"
+        for row in monthly.iter_rows(named=True)
+    ]
+    lines += ["", *_arpege_cams_year_over_year_lines(monthly=monthly)]
+    return lines
+
+
+def _arpege_cams_year_over_year_lines(*, monthly: pl.DataFrame) -> list[str]:
+    """Compare ARPEGE's monthly ratio to CAMS in the same calendar month a year apart.
+
+    Found after the results, in the final builders' review of this page: a month-by-month reading
+    alone cannot date cycle 48t1, because September 2024's dip sits outside the ordinary spread of
+    the months around it. Pairing each of the 10 calendar months from January to October, both
+    fully before the 15 October 2024 change in 2024 and fully after it in 2025, isolates the change
+    from ARPEGE's ordinary month-to-month spread. November and December are left out of the pairing
+    because both years fall after the change, so pairing them tests nothing about the change.
+
+    Args:
+        monthly: `_arpege_ifs_ratio_lines`'s own monthly table, carrying `month` and `arp_cams`.
+
+    Returns:
+        Markdown lines: one row per paired month, and how many pairs are higher in 2025.
+    """
+    ratios = dict(zip(monthly["month"].to_list(), monthly["arp_cams"].to_list(), strict=True))
+    paired = [
+        (f"{month:02d}", ratios.get(f"2024-{month:02d}"), ratios.get(f"2025-{month:02d}"))
+        for month in range(1, 11)
+    ]
+    paired = [(month, before, after) for month, before, after in paired if before and after]
+    higher = sum(1 for _, before, after in paired if after > before)
+    equal = sum(1 for _, before, after in paired if after == before)
+    lines = [
+        (
+            "#### ARPEGE's ratio to CAMS, the same calendar month a year apart, January to "
+            "October (exploratory)"
+        ),
+        "",
+        (
+            f"Higher in 2025 in {higher} of {len(paired)} paired months, equal in {equal}, lower "
+            "in the rest."
+        ),
+        "",
+        "| Month | 2024 | 2025 | Higher in 2025? |",
+        "|---|---|---|---|",
+    ]
+    lines += [
+        f"| {month} | {before:.2f} | {after:.2f} | "
+        f"{'yes' if after > before else 'equal' if after == before else 'no'} |"
+        for month, before, after in paired
+    ]
+    return lines
+
+
+def _ifs_hres_icon_eu_by_hour_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Report ECMWF-IFS-HRES's loss against ICON-EU, hour by hour (exploratory).
+
+    Found after the results, in the second science review of this page (M3): the lead-matched split
+    above narrows the pooled contrast's interval but leaves both halves unresolved, so this table
+    checks whether a steadier pattern shows up hour by hour instead. Point estimates only, no
+    interval, because a single UTC hour holds too few rows to resample by month.
+
+    Args:
+        losses: The pooled losses, holding `ifs_hres_global` and `icon_eu_global`.
+
+    Returns:
+        Markdown lines: one row per daytime UTC hour.
+    """
+    first, last = LEAD_TABLE_HOURS
+    hour = pl.col("time").dt.hour().cast(pl.Int32)
+    by_hour = (
+        losses.filter(hour.is_between(first, last))
+        .filter(pl.col("arm").is_in(["ifs_hres_global", "icon_eu_global"]))
+        .with_columns(hour=hour)
+        .group_by("hour", "arm")
+        .agg(pl.col(METRIC).mean())
+        .pivot(on="arm", index="hour", values=METRIC)
+        .with_columns(
+            difference=(pl.col("ifs_hres_global") - pl.col("icon_eu_global")) * PERCENTAGE_POINTS
+        )
+        .sort("hour")
+    )
+    lines = [
+        "#### ECMWF-IFS-HRES against ICON-EU, by hour of day (exploratory, no interval)",
+        "",
+        "| Hour (UTC) | ECMWF-IFS-HRES − ICON-EU (pp of capacity) |",
+        "|---|---|",
+    ]
+    lines += [
+        f"| {row['hour']:02d} | {row['difference']:+.3f} |" for row in by_hour.iter_rows(named=True)
     ]
     return lines
 
@@ -2180,8 +2555,36 @@ def _report(
     ]
     if panel.full_analysis:
         lines += ["", *_lead_tables(losses=pooled)]
+    lines += _optional_section_lines(name=name, panel=panel, frame=frame, losses=losses)
+    lines += ["", *era5_by_year_lines(by_year=by_year, months_note="January to August")]
+    lines += ["", *geometry_lines(sites=_pv_sites(), noun="solar farms")]
+    return "\n".join(lines) + "\n"
+
+
+def _optional_section_lines(
+    *, name: PanelType, panel: Panel, frame: pl.DataFrame, losses: PanelLosses
+) -> list[str]:
+    """Return every report section that only applies when the panel carries certain products.
+
+    Split out of `_report` to keep its own branch count down; each section here is independent of
+    the others and gated on which products the panel scores.
+
+    Args:
+        name: The panel's name.
+        panel: The panel reported.
+        frame: The panel's common rows.
+        losses: The panel's losses.
+
+    Returns:
+        Markdown lines, empty where the panel carries none of the relevant products.
+    """
+    pooled = losses.pooled
+    lines: list[str] = []
     if panel.planned:
         lines += ["", *_matched_lead_lines(panel=panel, losses=pooled)]
+    if {"ifs_hres", "icon_eu"} <= set(panel.products):
+        lines += ["", *_ifs_cutover_lines(losses=pooled)]
+        lines += ["", *_ifs_hres_icon_eu_by_hour_lines(losses=pooled)]
     if {"sarah3", "cams"} <= set(panel.products):
         lines += ["", *_sarah_era_lines(losses=pooled)]
         lines += ["", *_sarah_cams_breakdown_lines(frame=frame, losses=pooled)]
@@ -2190,6 +2593,10 @@ def _report(
         lines += ["", *_icon_dream_icon_eu_lead_lines(losses=pooled)]
     if {"icon_dream", "icon_d2", "icon_global", "ukv"} <= set(panel.products):
         lines += ["", *_icon_dream_other_products_lines(losses=pooled)]
+    if {"dmi_harmonie", "icon_d2", "knmi_harmonie", "icon_eu"} <= set(panel.products):
+        lines += ["", *_dmi_knmi_first_hour_lines(frame=frame, losses=pooled)]
+    if "arpege" in set(panel.products):
+        lines += ["", *_arpege_ifs_ratio_lines()]
     raw_irradiance_products = {
         product for product, _ in RAW_IRRADIANCE_PRODUCTS if product != "ukv_trap"
     }
@@ -2197,9 +2604,7 @@ def _report(
         lines += ["", *_raw_irradiance_vs_cams_lines(frame=frame)]
     if name == "record" and {"era5", "icon_dream"} <= set(panel.products):
         lines += ["", *_icon_dream_era5_year_change_lines(losses=pooled)]
-    lines += ["", *era5_by_year_lines(by_year=by_year, months_note="January to August")]
-    lines += ["", *geometry_lines(sites=_pv_sites(), noun="solar farms")]
-    return "\n".join(lines) + "\n"
+    return lines
 
 
 def _panel_jobs(*, name: PanelType, panel: Panel) -> list[Job]:
