@@ -137,12 +137,11 @@ model absorbs the mismatch. Phase 1 adds no shear extrapolation.
   the choice before the first fit. The page states the fold design as a limitation either way.
 - **Row fingerprint.** Deterministic, floats cast to Float32 before hashing, saved beside the
   losses, and checked on `--report-only`.
-- **Lead and time-of-day split (exploratory).** Wind power for label T covers T minus 30 minutes to
-  T plus 30 minutes, so labels 00 to 08 UTC (hours ending by 09:00 UTC) are compared with labels 10
-  to 23, dropping label 09. The split separates ENS leads 0 to 8 from 10 to 23 and early hours from
-  late hours, and HRES's lead before 1 October 2025 is mixed into it, so it is not a test of
-  whether ENS could be read in time. HRES's archive delay is not established, so HRES gets no
-  split.
+- **Servable-hours split.** Wind power for label T covers T minus 30 minutes to T plus 30 minutes,
+  so labels 00 to 08 UTC (hours ending before about 09:00 UTC, when Dynamical.org's archive has the
+  00 UTC run) are compared with labels 10 to 23, dropping label 09. The split also separates ENS
+  leads 0 to 8 from 10 to 23 and morning from afternoon, so the page does not present it as a clean
+  test of servability. HRES's archive delay is not established, so HRES gets no split.
 - **Period splits (exploratory):** before and after 1 October 2025 (HRES's archive source
   changed), and before and after 12 May 2026 (IFS Cycle 50r1), from the saved losses.
 - **Printed-number guard.** A committed check takes the new section by its heading and every
@@ -191,8 +190,10 @@ Study scripts are not unit-tested; the report is their check. Any helper moved i
   every hour, and logs only the rank, never a coordinate.
 - **The period after 12 May 2026** holds about 4 months, so intervals there under-cover; the
   page says so.
-- **Day 0 is a best case.** Most day-0 hours end before the 00 UTC run can be read, so the ENS arm
-  is past weather delivered late, as the horizons page says.
+- **Day 0 is a best case.** At this repository's assumed 09:00 UTC read time, only ENS day 0's
+  hours 00 to 08 UTC have passed; hours 09 to 23 are still a forecast up to 14 hours ahead. The ENS
+  day-0 scores are therefore past weather delivered late for the early hours, and the best a 00 UTC
+  archive offers for the rest.
 - **The IFS cycle changes inside the row set** on 12 May 2026.
 
 ## Reviews this plan buys
@@ -271,9 +272,83 @@ and its fingerprint) are not refitted or overwritten.
    disseminates ENS day 0 at about 06:40 UTC). IFS 50r1 went live with the 06 UTC run of 12 May
    2026, so the 00 UTC ENS run of that day is still 49r1 and the period split's "from 2026-05-12"
    holds one day of 49r1 ENS data. The HRES fetch set no `cell_selection`, so Open-Meteo's default
-   ("land") applies, and ERA5 is read at the nearest cell. The grid-file cross-check shows that two
+   ("land") applies, as it does for every other product on the page. The grid-file cross-check shows that two
    Open-Meteo downloads agree, not that the grid or the lead is right.
 6. **Sign-safe printed-number guard.** A page pair `[a, b]` must match a report pair including
    sign. A bare magnitude may match either sign, and the guard lists every such magnitude so a
    reviewer can audit it. The page writes a difference as "X points lower" or "X points higher"
    and, in tables, as a signed value.
+
+## Post-review additions 2 (added after the second science and the code review)
+
+Written after the second science review and the code review, before any of the refits below. Every
+item is post hoc. The first-fit outputs (`losses.parquet` and its fingerprint) are neither refitted
+nor overwritten. Two corrections to this file come first.
+
+**Corrections to this file.**
+
+- **Provenance.** The last revision of this file before any fit is `83dbbad3`. That commit added the
+  implementation decisions above, and `c7f32f95` only re-wrapped them. The first-fit `losses.parquet`
+  was written after both. The page and the script docstring cited `715681a7`, which is an earlier
+  revision, and now cite `83dbbad3`.
+- **The servable-hours split bullet** above holds its wording from before the first fit. Its
+  rename to a lead and time-of-day split is recorded in post-review item 4, not in that bullet.
+- **The Risks sentence "most day-0 hours end before the 00 UTC run can be read" was false.** At the
+  09:00 UTC read time only hours 00 to 08 UTC have passed (9 of 24), and at ECMWF's 06:40 UTC
+  dissemination 7 of 24 have. The bullet now says so.
+- **"ERA5 is read at the nearest cell" (post-review item 5) was false.** `fetch_wind_point.py` sets
+  `cell_selection="land"` for every product it fetches, ERA5 included. The Previous Runs fetch
+  (`fetch_open_meteo_previous_runs.py`) sets no `cell_selection`, so HRES is read at Open-Meteo's
+  default land cell, as every other product on the page is. The report, the script docstring and the
+  page now say that.
+- **The lead threshold changed after the results.** The implementation decisions above fix the
+  hour-to-hour jump threshold at a ratio of 1.15. The script's `JUMP_RATIO_THRESHOLD` became 1.10 in
+  `0b2230e4`, after the first results and without a record here, because at 1.15 the 18 UTC hour
+  (ratio 1.14 from 1 October 2025) does not count. The page states that 1.10 was chosen after the
+  results. The lead statement in the report is the statement written in item 3 above, printed
+  whatever the table shows, and the report now labels it that way.
+- **Item 4's clause "which are also the longer leads" is withdrawn**, because the second science
+  review found the later-hours widening is mostly a time-of-day difference in UKV (addition 3 below).
+
+**Additions.**
+
+1. **Coverage counts for every design (issue #868).** The report prints the number of (site, fold,
+   calendar month) cells with no training row for a month that occurs in two years, for every
+   design in the fold-design table and the long-row table, not only for the main design. Counts
+   found before the refit, with the designs as they stood: main rows, study design 0; three eras
+   without rotation 6 (months 7, 9; intended, that design is the no-rotation control); two UKV eras
+   (the page's design) 12 (months 2, 4, 5, 6); study folds with a two-valued `era_code` 0; extra
+   era cut at IFS 50r1 0. Long rows: horizons design 6 (months 6, 7); extra era cut at 2024-12-01
+   15 (months 2, 4, 5, 6, 11).
+2. **Offsets for the long rows' extra-cut design.** The design has three eras (2024-08 to 2024-11,
+   2024-12 to 2026-01, 2026-02 onward). A search over every pair of offsets for eras 1 and 2 (era 0
+   fixed at 0, modulo 5 folds) finds 6 of 25 pairs with 0 uncovered cells: (1, 3), (1, 4), (2, 0),
+   (2, 4), (3, 0) and (3, 1). The map `{0: 0, 1: 2, 2: 0}` is used, because it has one non-zero
+   offset, the fewest, and of the two such pairs the smaller. The horizons design and the page's own
+   two-UKV-era design stay as they are, because the first has to keep the horizons study's fold
+   layout to reproduce its +0.170 and the second has to be the page's design. Their uncovered counts
+   are printed and the page states them. The extra era cut at IFS 50r1 keeps its offset map
+   `{0: 0, 1: 0, 2: 2, 3: 4}`, which gives 0 uncovered cells (a search over era 3's offset finds 0
+   and 4 both do), so its folds and numbers do not move. Both refits (`losses_long_rows.*` and
+   `losses_fold_designs.*`) are moved to `superseded/` and refitted.
+3. **More rows in the split and period tables.** The lead and time-of-day split adds `ukv_wind −
+   era5_wind`, `hres_wind − era5_wind` and `hres_wind − ukv_wind`, because ERA5 is an analysis with
+   no lead, so its gap to UKV between the halves shows how much of the change is time of day. The
+   period splits add `ukv_wind − era5_wind`, because UKV's own January 2026 upgrade falls in the
+   later period. Figure 19 gets the same control rows.
+4. **The report prints four decimals**, and the printed-number guard reads full precision from
+   `intervals.parquet` wherever a report row has a value there, so a three-decimal print can no
+   longer be rounded a second time by the guard. The guard matches whole triples `X [a, b]`
+   against report rows, enforces a "+" sign as it does a "-", and runs on the results section, the
+   Key-findings bullets and "How ECMWF's ENS and HRES were added". The "dates are excluded" clause of
+   the guard bullet above has no code behind it and is not needed, because a date has no decimal
+   point.
+5. **Season-controlled speed ratios.** The report adds each product's mean 10 m speed over ERA5's,
+   averaged over August to October 2024 and over August to October 2025, computed from the long row
+   set, so the November 2024 step in the monthly ratios is not read from month-to-month noise
+   alone. It also adds, from the Previous Runs file, the share of null `_previous_day*` cells before
+   and from 1 October 2025 and the UTC hours at which `wind_speed_100m_previous_day1` changes most,
+   which independently support the source change.
+6. **Wording.** The threshold, provenance, coverage and cell-selection corrections above; "before 1
+   October 2025" for HRES's served grid; ENS's cadence and dissemination sentences as in the science
+   review; and no work commitment on the page.
