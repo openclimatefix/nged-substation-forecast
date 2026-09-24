@@ -25,10 +25,17 @@ One-off throwaway script for the study in
   `len(ENS_DAYS) * 1`).
 - **NOAA GEFS**: `_gefs_frame` builds the mean of GEFS's 31 members the same way, reusing the same
   `ens_forecast_horizons` functions with `ensemble_size=31` and GEFS's own extract as `source`,
-  gated on `data/studies/weather/GEFS/_month_cache/` holding every month from 2024-11 to the month
-  the study's rows actually end on, or on `--gefs-window-dir` for a `GEFS_window_*` test extract
-  during development, which always writes to the given `--output-dir` rather than the gated
-  production path.
+  gated on `GEFS_MONTH_CACHE_DIR` (the finished `GEFS_window_2024-11-01_None` download's
+  `_month_cache/`) holding every month from 2024-11 to the month the study's rows actually end on,
+  or on `--gefs-window-dir` for a `GEFS_window_*` test extract during development, which always
+  writes to the given `--output-dir` rather than the gated production path.
+  **Partial-month runs**: the download writes the month still being fetched as
+  `<month>.partial.parquet`, and only that last month's partial file is accepted; a partial file
+  for any earlier month does not count as covering it. After loading, every 00 UTC run the rows need
+  (init dates from the rows' first date minus the largest day offset to their last date minus the
+  smallest, clipped to the first cached month) must hold all 31 members at every 3-hourly lead from
+  0 to 95 h at every grid cell, or the build raises with the missing or incomplete runs listed. A
+  run still arriving therefore stops the build instead of turning into null GEFS columns.
 
 Every output row carries only the anonymised `site` label; no generator name, id or coordinate is
 read from the private roster in this script, except inside `studies.grid_sampling` (GEFS's
@@ -43,6 +50,7 @@ import logging
 import os
 import sys
 from collections.abc import Callable
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Final, Literal
 
@@ -373,16 +381,45 @@ def compare_ens_rebuild(*, domain: DomainType) -> float:
     return float(differences.item() or 0.0)
 
 
-def _gefs_months_available() -> list[str]:
-    """Return the calendar months `data/studies/weather/GEFS/_month_cache/` holds.
+GEFS_WINDOW_DIR_NAME: Final[str] = "GEFS_window_2024-11-01_None"
+"""Under `data/studies/weather/`, the finished GEFS download: its `_month_cache/` and
+`_grid_cells.parquet`."""
+
+GEFS_MONTH_CACHE_DIR_NAME: Final[str] = "_month_cache"
+"""Inside a GEFS download directory, where `fetch_dynamical_zarr.py` checkpoints each month."""
+
+GEFS_PARTIAL_SUFFIX: Final[str] = ".partial"
+"""Appended to a month's stem (`<month>.partial.parquet`) while its newest runs still arrive."""
+
+GEFS_REQUIRED_MAX_LEAD_HOURS: Final[int] = 24 * 3 + 23
+"""The last lead the study needs of a run: the end of day 3's band."""
+
+GEFS_REQUIRED_LEAD_STEP_HOURS: Final[int] = 3
+"""GEFS's lead spacing out to `GEFS_STEP_MEAN_MAX_LEAD_HOURS`."""
+
+
+def _gefs_months_available(*, last_month: str) -> dict[str, Path]:
+    """Return each calendar month the GEFS month cache holds, mapped to its file.
+
+    Args:
+        last_month: The last month the study needs, `%Y-%m`. Only this month's
+            `<month>.partial.parquet` is accepted, and only if no complete file exists for it.
 
     Returns:
-        Each cached month's `%Y-%m` label, sorted.
+        Each cached month's `%Y-%m` label to its parquet path, sorted by month.
     """
-    cache_dir = _weather_dir() / "GEFS" / "_month_cache"
+    cache_dir = _weather_dir() / GEFS_WINDOW_DIR_NAME / GEFS_MONTH_CACHE_DIR_NAME
     if not cache_dir.exists():
-        return []
-    return sorted(path.stem for path in cache_dir.glob("*.parquet"))
+        return {}
+    months: dict[str, Path] = {}
+    for path in sorted(cache_dir.glob("*.parquet")):
+        if path.stem.endswith(GEFS_PARTIAL_SUFFIX):
+            month = path.stem.removesuffix(GEFS_PARTIAL_SUFFIX)
+            if month == last_month:
+                months.setdefault(month, path)
+        else:
+            months[path.stem] = path
+    return dict(sorted(months.items()))
 
 
 def _gefs_span_complete(*, last_month: str) -> bool:
@@ -394,7 +431,7 @@ def _gefs_span_complete(*, last_month: str) -> bool:
     Returns:
         Whether every month in that span is cached, with no gap.
     """
-    available = set(_gefs_months_available())
+    available = set(_gefs_months_available(last_month=last_month))
     first_year, first_month = (int(part) for part in GEFS_FIRST_MONTH.split("-"))
     last_year, last_month_number = (int(part) for part in last_month.split("-"))
     expected = pl.date_range(
@@ -488,7 +525,51 @@ def _gefs_step_mean_radiation(*, radiation: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def _gefs_members_frame(*, path: Path, domain: DomainType, sites: list[str]) -> pl.DataFrame:
+def _gefs_missing_runs(*, files: list[Path], first_init: date, last_init: date) -> list[str]:
+    """Return the 00 UTC runs in `first_init` to `last_init` that are absent or incomplete.
+
+    A run is complete when every grid cell holds all `GEFS_ENSEMBLE_SIZE` members at every lead from
+    0 to `GEFS_REQUIRED_MAX_LEAD_HOURS` in steps of `GEFS_REQUIRED_LEAD_STEP_HOURS`.
+
+    Args:
+        files: The month parquets (or the extract's `GEFS.parquet`) to read.
+        first_init: The first init date the study needs.
+        last_init: The last init date the study needs.
+
+    Returns:
+        One `YYYY-MM-DD: <reason>` line per missing or incomplete run, sorted by date.
+    """
+    leads = range(0, GEFS_REQUIRED_MAX_LEAD_HOURS + 1, GEFS_REQUIRED_LEAD_STEP_HOURS)
+    expected = GEFS_ENSEMBLE_SIZE * len(leads)
+    lead_hours = (pl.col("lead_time").dt.total_minutes() / 60).cast(pl.Int32)
+    present = (
+        pl.scan_parquet(files)
+        .with_columns(lead_hours=lead_hours, init_date=pl.col("init_time").dt.date())
+        .filter(
+            pl.col("init_time").dt.hour() == 0,
+            pl.col("init_date").is_between(first_init, last_init),
+            pl.col("lead_hours").is_in(list(leads)),
+        )
+        .group_by("init_date", "lat_index", "lon_index")
+        .agg(n=pl.struct("ensemble_member", "lead_hours").n_unique())
+        .group_by("init_date")
+        .agg(worst=pl.col("n").min())
+        .collect()
+    )
+    worst_by_date = dict(
+        zip(present["init_date"].to_list(), present["worst"].to_list(), strict=True)
+    )
+    missing: list[str] = []
+    for day in pl.date_range(first_init, last_init, interval="1d", eager=True):
+        worst = worst_by_date.get(day, 0)
+        if worst < expected:
+            missing.append(f"{day}: {worst} of {expected} member-lead pairs in the sparsest cell")
+    return missing
+
+
+def _gefs_members_frame(
+    *, path: Path, files: list[Path], domain: DomainType, sites: list[str]
+) -> pl.DataFrame:
     """Read one GEFS extract and reshape it to `ens_forecast_horizons.band_steps`'s input shape.
 
     Each site reads its nearest 0.25 degree grid cell. Wind u/v components become speed and
@@ -496,7 +577,9 @@ def _gefs_members_frame(*, path: Path, domain: DomainType, sites: list[str]) -> 
     converted through `_gefs_step_mean_radiation`.
 
     Args:
-        path: The extract's directory, holding `GEFS.parquet` and `_grid_cells.parquet`.
+        path: The download's directory, holding `_grid_cells.parquet`.
+        files: The parquets holding the runs: the extract's `GEFS.parquet`, or the month cache's
+            files.
         domain: `solar` or `wind`.
         sites: The sites to build.
 
@@ -507,7 +590,7 @@ def _gefs_members_frame(*, path: Path, domain: DomainType, sites: list[str]) -> 
     grid_cells = pl.read_parquet(path / "_grid_cells.parquet")
     cell_by_site = _gefs_cell_selection(grid_cells=grid_cells, domain=domain, sites=sites)
     raw = (
-        pl.read_parquet(path / "GEFS.parquet")
+        pl.read_parquet(files)
         .with_columns(
             lead_hours=(pl.col("lead_time").dt.total_minutes() / 60).cast(pl.Int32),
             cell=pl.col("lat_index") * 10 + pl.col("lon_index"),
@@ -569,11 +652,13 @@ def _gefs_members_frame(*, path: Path, domain: DomainType, sites: list[str]) -> 
 def _gefs_frame(*, keys: pl.DataFrame, domain: DomainType, window_dir: Path | None) -> pl.DataFrame:
     """Build NOAA GEFS's mean columns, gated on a complete month cache or a test window extract.
 
-    In production (`window_dir=None`) this only runs once `data/studies/weather/GEFS/_month_cache/`
+    In production (`window_dir=None`) this only runs once `GEFS_WINDOW_DIR_NAME`'s `_month_cache/`
     covers every month from `GEFS_FIRST_MONTH` to the month `keys`'s own rows end on -- not "the
     month before today", which in January gives an invalid `YYYY-00` month and, every other month,
     checks a span the rows may not even reach. With `--gefs-window-dir`, a `GEFS_window_*` test
-    extract is read unconditionally, for development.
+    extract is read unconditionally, for development. In production, `_gefs_missing_runs` must find
+    every needed run complete, or this raises; a test extract is not checked, since it covers only
+    part of the rows' span.
 
     Args:
         keys: `site`, `time` for every row the study might score.
@@ -583,15 +668,19 @@ def _gefs_frame(*, keys: pl.DataFrame, domain: DomainType, window_dir: Path | No
     Returns:
         `keys` with `gefs_mean_day<N>_<field>` for every `N` in `GEFS_DAYS[domain]`, left-joined.
         Unchanged (no GEFS columns) while the production gate does not pass.
+
+    Raises:
+        RuntimeError: If any needed 00 UTC run is missing or incomplete.
     """
+    time_range = keys.select(first=pl.col("time").min(), last=pl.col("time").max()).row(
+        0, named=True
+    )
     if window_dir is None:
-        months = _gefs_months_available()
+        last_needed = time_range["last"].strftime("%Y-%m")
+        months = _gefs_months_available(last_month=last_needed)
         if not months:
-            _LOG.info(
-                "GEFS: data/studies/weather/GEFS/_month_cache/ is empty, no GEFS columns written."
-            )
+            _LOG.info("GEFS: %s holds no months, no GEFS columns written.", GEFS_WINDOW_DIR_NAME)
             return keys
-        last_needed = keys.select(pl.col("time").max().dt.strftime("%Y-%m")).item()
         if not _gefs_span_complete(last_month=last_needed):
             _LOG.info(
                 "GEFS: month cache holds %d months but does not yet cover %s to %s (the rows' "
@@ -601,11 +690,25 @@ def _gefs_frame(*, keys: pl.DataFrame, domain: DomainType, window_dir: Path | No
                 last_needed,
             )
             return keys
-        path = _weather_dir() / "GEFS"
+        path = _weather_dir() / GEFS_WINDOW_DIR_NAME
+        files = list(months.values())
+        first_init = max(
+            time_range["first"].date() - timedelta(days=max(GEFS_DAYS[domain])),
+            date.fromisoformat(f"{GEFS_FIRST_MONTH}-01"),
+        )
+        last_init = time_range["last"].date() - timedelta(days=min(GEFS_DAYS[domain]))
+        missing = _gefs_missing_runs(files=files, first_init=first_init, last_init=last_init)
+        if missing:
+            raise RuntimeError(
+                f"GEFS: {len(missing)} of the 00 UTC runs the rows need are missing or incomplete "
+                "(partial-month gaps would silently become null GEFS columns):\n"
+                + "\n".join(missing)
+            )
     else:
         path = window_dir
+        files = [path / "GEFS.parquet"]
     sites = sorted(keys["site"].unique().to_list())
-    extract = _gefs_members_frame(path=path, domain=domain, sites=sites)
+    extract = _gefs_members_frame(path=path, files=files, domain=domain, sites=sites)
     if extract.is_empty():
         _LOG.warning("GEFS: no rows matched at %s, no GEFS columns written.", path)
         return keys

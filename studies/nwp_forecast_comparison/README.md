@@ -30,9 +30,11 @@ is in `plans/nwp-forecast-comparison.md` on the study's branch.
   for wind) through the public functions of `studies/beam_diffuse_split/ens_forecast_horizons.py`.
   GEFS reads each site's nearest 0.25° cell, converts its alternating 3- and 6-hour radiation
   windows to 3-hour step means (`studies.resample.gefs_step_means`) on whole runs before any band is
-  sliced, and averages the 31 members. It runs only when `data/studies/weather/GEFS/_month_cache/`
-  covers 2024-11 to the month the rows end on, or when `--gefs-window-dir` names a `GEFS_window_*`
-  extract.
+  sliced, and averages the 31 members. It runs only when
+  `data/studies/weather/GEFS_window_2024-11-01_None/_month_cache/` covers 2024-11 to the month the
+  rows end on (the last month may be a `.partial.parquet`), or when `--gefs-window-dir` names a
+  `GEFS_window_*` extract. The build raises if any 00 UTC run the rows need is missing or
+  incomplete.
 - `nwp_forecast_comparison.py` reads those files and takes the rows where the target, the
   baselines' inputs, and every planned arm's columns are present. It cuts folds with
   `studies.cross_validation.cut_eras`, fits every arm out of fold, scores the no-weather
