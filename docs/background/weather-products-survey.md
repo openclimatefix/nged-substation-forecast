@@ -7,27 +7,33 @@ possible source is the catalogue under [Weather data](../roadmap/data-sources.md
 
 ## What the project uses
 
-**The live forecast uses one weather product, ECMWF ENS; two more are planned, and the studies score
-six.** Every other product on this page is surveyed only. "Roadmap status" copies the product's row
-in the [Weather data](../roadmap/data-sources.md#weather-data) catalogue; a version label such as
-v0.5 names a [roadmap milestone](../roadmap/index.md#milestones).
+**The live forecast uses one weather product, ECMWF ENS, and two more are planned.** The studies
+score 13 products in total: the seven products in this table, four more Open-Meteo models from the
+survey below, ICON-DREAM-EU from the reanalysis table below, and SARAH-3, which the
+[catalogue](../roadmap/data-sources.md#weather-data) lists and this page does not. Every other
+product on this page is surveyed only, except where the "Scored in" column says otherwise. "Roadmap
+status" copies the product's row in the [Weather data](../roadmap/data-sources.md#weather-data)
+catalogue; a version label such as v0.5 names a [roadmap milestone](../roadmap/index.md#milestones).
 
 | Product | What it is | Roadmap status | What the project uses it for | Archive read from | Scored in |
 |---|---|---|---|---|---|
-| **ECMWF ENS** | The European Centre for Medium-Range Weather Forecasts' (ECMWF's) 51-member ensemble forecast | [✅ Ingested today](../roadmap/data-sources.md#weather-data) | The live forecast | [Dynamical.org](https://dynamical.org/catalog/ecmwf-ifs-ens-forecast-15-day-0-25-degree/), a non-profit that republishes weather-model archives | Not scored on a study page |
-| **ERA5** | ECMWF's reanalysis: a weather model re-run over the past and pulled towards observations | [🚧 Planned ingestion, milestone v0.5](../roadmap/data-sources.md#weather-data) | Planned: training history and capacity estimation | Open-Meteo's copy, for the studies; the planned ingest route is [still open](../roadmap/data-sources.md#era5-which-access-route) | [Sunshine](../studies/weather-products-for-past-solar.md), [wind](../studies/weather-products-for-past-wind.md) |
-| **CAMS** | The Copernicus Atmosphere Monitoring Service's satellite irradiance | [🚧 Planned ingestion, milestone v0.7](../roadmap/data-sources.md#weather-data) | Planned: offline capacity estimation only | The CAMS Radiation Service point API | [Sunshine](../studies/weather-products-for-past-solar.md) |
+| **ECMWF ENS** | The European Centre for Medium-Range Weather Forecasts' (ECMWF's) 51-member ensemble forecast | [✅ Ingested today](../roadmap/data-sources.md#weather-data) | The live forecast | [Dynamical.org](https://dynamical.org/catalog/ecmwf-ifs-ens-forecast-15-day-0-25-degree/), a non-profit that republishes weather-model archives | [Sunshine](../studies/weather-products-for-past-solar.md#ecmwf-ens-a-longer-lead-forecast-than-any-other-product-on-this-page) |
+| **ERA5** | ECMWF's reanalysis: a weather model re-run over the past and pulled towards observations | [🚧 Planned ingestion, milestone v0.5](../roadmap/data-sources.md#weather-data) | Planned: training history and capacity estimation ([why ERA5 scores worse than current products](../roadmap/data-sources.md#why-era5-describes-past-sunshine-and-wind-worse-than-most-current-weather-products)) | Open-Meteo's copy, for the studies; the planned ingest route is [still open](../roadmap/data-sources.md#era5-which-access-route) | [Sunshine](../studies/weather-products-for-past-solar.md), [wind](../studies/weather-products-for-past-wind.md) |
+| **CAMS** | The Copernicus Atmosphere Monitoring Service's satellite irradiance | [🚧 Planned ingestion, milestone v0.7](../roadmap/data-sources.md#weather-data) | Planned: offline capacity estimation only ([which CAMS route, and its traps](../roadmap/data-sources.md#cams-use-the-point-api-not-the-gridded-product)) | The CAMS Radiation Service point API | [Sunshine](../studies/weather-products-for-past-solar.md) |
 | **ICON-EU** | The German weather service's (DWD's) ICON model, 6.5 km Europe configuration | [🔬 Research (v0.9, uncertain)](../roadmap/data-sources.md#weather-data), as Dynamical.org's copy | Studies only | Open-Meteo's Historical Forecast archive | [Sunshine](../studies/weather-products-for-past-solar.md), [wind](../studies/weather-products-for-past-wind.md) |
 | **UKV** | The Met Office's 2 km UK model | [🔬 Research (uncertain)](../roadmap/data-sources.md#weather-data), as the Met Office's AWS feed | Studies only | Open-Meteo's Historical Forecast archive | [Sunshine](../studies/weather-products-for-past-solar.md), [wind](../studies/weather-products-for-past-wind.md) |
 | **ICON-D2** | DWD's ICON model, 2 km central-Europe configuration | Not on the roadmap | Studies only | Open-Meteo's Historical Forecast archive | [Sunshine](../studies/weather-products-for-past-solar.md), [wind](../studies/weather-products-for-past-wind.md) |
 | **ICON global** | DWD's ICON model, global configuration | Not on the roadmap | Studies only | Open-Meteo's Historical Forecast archive | [Sunshine](../studies/weather-products-for-past-solar.md), [wind](../studies/weather-products-for-past-wind.md) |
 
 **CAMS describes past sunshine best, and UKV and ICON-D2 describe past wind best.** [Which weather
-product best describes past sunshine?](../studies/weather-products-for-past-solar.md) scores December
-2022 to September 2026 and finds CAMS best by a wide margin, and ICON-D2 the best of the weather
-models as served. [Which weather product best describes past
-wind?](../studies/weather-products-for-past-wind.md) scores August 2024 to September 2026 and finds
-UKV and ICON-D2 best. CAMS publishes no wind, so the wind study scores the other five.
+product best describes past sunshine?](../studies/weather-products-for-past-solar.md) scores eight
+products from December 2022 to August 2026 and finds CAMS best by a wide margin, and ICON-D2 the
+best of the weather models as served. The page also scores four more Open-Meteo models on a shorter
+window, [from November 2024 to August 2026](../studies/weather-products-for-past-solar.md#the-four-extra-open-meteo-models).
+[Which weather product best describes past wind?](../studies/weather-products-for-past-wind.md)
+scores August 2024 to September 2026 and finds UKV and ICON-D2 best. CAMS publishes no wind, so the
+wind study scores five of the products in the table above, and a sixth, ICON-DREAM-EU, on a slightly
+shorter row set.
 
 ## Terms used on this page
 
@@ -71,9 +77,13 @@ conventions apply to every Open-Meteo row:
   2026-09-23. Lincoln stands in for the trial area in the East Midlands, so a start date, a null
   series, or a ratio measured there is a result for that one point. A user elsewhere in Great
   Britain should re-query at their own sites, and the "Covers GB" column says where coverage was
-  checked on the grid rather than at Lincoln. ICON-D2, for example, has data at Lincoln but a
-  western boundary near 2.5°W, leaving South West England and South Wales outside the ICON-D2
-  domain ([Which weather product best describes past wind?](../studies/weather-products-for-past-wind.md)).
+  checked on the grid rather than at Lincoln. ICON-D2, for example, has data at Lincoln but none in
+  the west of Great Britain: the [map of ICON-D2's and AROME France's
+  domains](../roadmap/data-sources.md#what-comparing-four-irradiance-products-on-the-trial-areas-solar-farms-found)
+  on the data sources page shows where.
+- **Open-Meteo's UKV archive is a backfill before 12 August 2024**, so a UKV start date on this page
+  is not the start of UKV's own run history ([what the backfill is and how it changes
+  scores](../roadmap/data-sources.md#open-meteos-ukv-archive-is-the-t0-analysis-and-half-of-it-is-backfill)).
 - **Latency is the time from a run's initialisation to the whole run being available on
   Open-Meteo**, read from that model's `meta.json` for its latest run on the morning of 2026-09-23:
   00 UTC for the 6-hourly models, a later run for AROME, the Danish Meteorological Institute (DMI),
@@ -118,7 +128,7 @@ publishes a fourth kind:
 the other models.** The model `ecmwf_ifs` rejects `run=2024-03-13T00:00` and serves the 2024-03-14
 00 UTC run with 240 hourly steps. Open-Meteo calls the runs from 2024-03-14 "IFS Cycle 49R1
 hindcasts". The March to June 2024 runs sampled are 00 and 12 UTC only, and 06 UTC runs are present
-from 2024-08-10. Runs from 2026-05-12 06 UTC use IFS Cycle 50r1.
+from 2024-08-10. Runs from 2026-05-12 06 UTC use IFS Cycle 50r1 ([what that upgrade changed](../roadmap/data-sources.md#nwp-model-upgrades-since-2019)).
 
 **Dynamical.org stops serving data.dynamical.org on 2026-09-30, so any URL on that host has to move
 to a supported access pattern.** Every Dynamical.org catalogue page carries the notice
@@ -183,20 +193,20 @@ ERA5 and ICON-DREAM-EU, both already scored, do.**
 
 | Product | Roadmap status | Scored in | Producer and method | Grid | Covers GB | Archive start | Solar variables | Wind heights | Runs, horizon, step | Latency | Past runs | Access | Licence | Source |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| **ECMWF IFS ENS** (Dynamical.org) | [✅ Ingested today](../roadmap/data-sources.md#weather-data) | Not scored | ECMWF, 51-member physics ensemble | 9 km (0.25° served) | Yes (global) | 2024-04-01 to present; back-fill in progress ([catalogue row](../roadmap/data-sources.md#weather-data)) | Global only (`ssrd`) | 10, 100 m | 4 a day from ECMWF, Dynamical.org keeps 00 UTC; 360 h; 3-hourly to 144 h, then 6-hourly | Not established | Whole runs | Icechunk (Zarr) | CC BY 4.0 and ECMWF terms | [Dynamical.org](https://dynamical.org/catalog/ecmwf-ifs-ens-forecast-15-day-0-25-degree/) |
+| **ECMWF IFS ENS** (Dynamical.org) | [✅ Ingested today](../roadmap/data-sources.md#weather-data) | [Sunshine](../studies/weather-products-for-past-solar.md#ecmwf-ens-a-longer-lead-forecast-than-any-other-product-on-this-page) only | ECMWF, 51-member physics ensemble | 9 km (0.25° served) | Yes (global) | 2024-04-01 to present; back-fill in progress ([catalogue row](../roadmap/data-sources.md#weather-data)) | Global only (`ssrd`) | 10, 100 m | 4 a day from ECMWF, Dynamical.org keeps 00 UTC; 360 h; 3-hourly to 144 h, then 6-hourly | Not established | Whole runs | Icechunk (Zarr) | CC BY 4.0 and ECMWF terms | [Dynamical.org](https://dynamical.org/catalog/ecmwf-ifs-ens-forecast-15-day-0-25-degree/) |
 | **ECMWF IFS ENS 9 km Europe** (Open-Meteo, `ecmwf_ifs_europe_ensemble`) | Not on the roadmap (the catalogue's ENS row is the Dynamical.org feed) | Not scored | ECMWF, 51-member physics ensemble, European domain | 9 km, O1280 (served natively) | Data at Lincoln | 2026-09-23 01 UTC at Lincoln, asking for 7 past days on 2026-09-23 | Global; direct native (ECMWF's `fdir`, per Open-Meteo's downloader) | Not checked | 00 and 06 UTC; 15 days; hourly to 90 h, 3-hourly to 144 h, then 6-hourly | Not established | None beyond the latest runs | Open-Meteo Ensemble API | CC BY 4.0 ([ECMWF's licence and delivery terms](../roadmap/data-sources.md#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost)) | [Open-Meteo](https://open-meteo.com/en/docs/ensemble-api), [downloader](https://github.com/open-meteo/open-meteo/blob/main/Sources/App/EcmwfEcpds/EcmwfEcpdsVariable.swift) |
-| **ECMWF IFS HRES 9 km** (`ecmwf_ifs`) | Not on the roadmap | Not scored | ECMWF, global physics model | 9 km (served natively) | Yes (global) | 2017-01-01, complete to 2026-09-21 | Global; direct native (ECMWF's `fdir`, per Open-Meteo's downloader); diffuse = global − direct | 10, 80, 100 m | 00 and 12 UTC to 15 days, 06 and 18 UTC to 144 h; hourly to 90 h, 3-hourly to 144 h, then 6-hourly | 7.0 h (Open-Meteo) | Single Runs from 2024-03-14; Previous Runs from 2025-10-01 | Open-Meteo | CC BY 4.0 ([ECMWF's licence and delivery terms](../roadmap/data-sources.md#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost)) | [Open-Meteo](https://open-meteo.com/en/docs/ecmwf-api), [downloader](https://github.com/open-meteo/open-meteo/blob/main/Sources/App/EcmwfEcpds/EcmwfEcpdsVariable.swift) |
+| **ECMWF IFS HRES 9 km** (`ecmwf_ifs`) | Not on the roadmap | [sunshine](../studies/weather-products-for-past-solar.md#the-four-extra-open-meteo-models) only, on a shorter window | ECMWF, global physics model | 9 km (served natively) | Yes (global) | 2017-01-01, complete to 2026-09-21 | Global; direct native (ECMWF's `fdir`, per Open-Meteo's downloader); diffuse = global − direct | 10, 80, 100 m | 00 and 12 UTC to 15 days, 06 and 18 UTC to 144 h; hourly to 90 h, 3-hourly to 144 h, then 6-hourly | 7.0 h (Open-Meteo) | Single Runs from 2024-03-14; Previous Runs from 2025-10-01 | Open-Meteo | CC BY 4.0 ([ECMWF's licence and delivery terms](../roadmap/data-sources.md#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost)) | [Open-Meteo](https://open-meteo.com/en/docs/ecmwf-api), [downloader](https://github.com/open-meteo/open-meteo/blob/main/Sources/App/EcmwfEcpds/EcmwfEcpdsVariable.swift) |
 | **ECMWF IFS 0.25°** (`ecmwf_ifs025`) | Not on the roadmap | Not scored | ECMWF open-data subset of the same run | 9 km (0.25° served) | Yes (global) | Radiation and 100 m wind 2024-03-05; 10 m wind 2024-02-03 | Global; direct and diffuse by separation | 10, 100 m | 00 and 12 UTC to 15 days, 06 and 18 UTC to 144 h; 3-hourly to 144 h, then 6-hourly | 7.8 h (Open-Meteo) | Previous Runs from 2024-03-06; Single Runs from 2026-04-02 | Open-Meteo | CC BY 4.0 | [Open-Meteo](https://open-meteo.com/en/docs/ecmwf-api) |
 | **ECMWF AIFS Single** | Not on the roadmap (the catalogue's AIFS-ENS row is the ensemble) | Not scored | ECMWF, machine-learned deterministic model; v1 operational from the 2025-02-25 06 UTC run, adding `ssrd` and 100 m wind | N320, about 0.25° (0.25° served) | Yes (global) | Open-Meteo 2025-02-17; Dynamical.org radiation from 2025-02-24 06 UTC | Global only (`ssrd`); Open-Meteo's direct is by separation | 10, 100 m | 4 a day; 360 h; 6-hourly | 5.7 h (Open-Meteo) | Whole runs (Dynamical.org); Previous Runs from 2025-02-17 | Open-Meteo; Icechunk (Zarr) | CC BY 4.0 and ECMWF terms | [Dynamical.org](https://dynamical.org/catalog/ecmwf-aifs-single-forecast/), [ECMWF](https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+Single+v1) |
 | **ECMWF AIFS-ENS** | [🔬 Research (v2.1, uncertain)](../roadmap/data-sources.md#weather-data) | Not scored | ECMWF, machine-learned ensemble | 0.25° | Yes (global) | 2025-07-02 | Global only (`ssrd`) | 10, 100 m | 4 a day; 360 h; 6-hourly | Not established | Whole runs | Icechunk (Zarr) | CC BY 4.0 and ECMWF terms | [Dynamical.org](https://dynamical.org/catalog/ecmwf-aifs-ens-forecast/) |
 | **DWD ICON-EU** (Dynamical.org) | [🔬 Research (v0.9, uncertain)](../roadmap/data-sources.md#weather-data) | Both studies, through Open-Meteo's copy ([sunshine](../studies/weather-products-for-past-solar.md), [wind](../studies/weather-products-for-past-wind.md)) | DWD, regional physics model | 6.5 km (0.0625° served) | Yes | 2026-02-10 | Direct and diffuse native | 10 m only in Dynamical.org's store; Open-Meteo serves 80 and 120 m | Every 3 hours on Open-Meteo, Dynamical.org keeps 00, 06, 12, and 18 UTC; 120 h; hourly to 78 h | Not established | Whole runs (Dynamical.org); Previous Runs from 2024-01-19 (Open-Meteo) | Icechunk (Zarr); Open-Meteo | CC BY 4.0 | [Dynamical.org](https://dynamical.org/catalog/dwd-icon-eu-forecast-5-day/), [Open-Meteo](https://open-meteo.com/en/docs/dwd-api) |
 | **NOAA GFS** (`ncep_gfs013` for surface fields, `ncep_gfs025` for 80 and 100 m wind) | Not on the roadmap | Not scored | The National Centers for Environmental Prediction of the US National Oceanic and Atmospheric Administration (NOAA NCEP), global physics model | ~13 km (0.11° served for surface fields, 0.25° for 80 and 100 m wind) | Yes (global) | 2021-03-23 | Global; diffuse from NCEP's visible-band diffuse flux (`VDDSF`), not a broadband field; direct = global − that diffuse | 10, 80, 100 m | 4 a day; 16 days | 5.5 h at 0.11°, 6.5 h at 0.25° (Open-Meteo) | Previous Runs from 2024-01-19; whole runs on Dynamical.org from 2021-05-01 | Open-Meteo; Icechunk (Zarr) | Public domain from NOAA; CC BY 4.0 as served by Dynamical.org and Open-Meteo | [NOAA EMC](https://www.emc.ncep.noaa.gov/emc/pages/numerical_forecast_systems/gfs.php), [Open-Meteo](https://open-meteo.com/en/docs/gfs-api), [downloader](https://github.com/open-meteo/open-meteo/blob/main/Sources/App/Gfs/GfsVariableDownloadable.swift), [Dynamical.org](https://dynamical.org/catalog/noaa-gfs-forecast/) |
 | **NOAA GEFS 35-day** (Dynamical.org) | Not on the roadmap | Not scored | NOAA NCEP, 31-member ensemble | 0.25° to 240 h, 0.5° after | Yes (global) | 2020-10-01 | Global only | 10, 80, 100 m | 00 UTC; 840 h; 3-hourly to 240 h, then 6-hourly | Not established | Whole runs | Icechunk (Zarr) | Public domain from NOAA; CC BY 4.0 on Dynamical.org | [Dynamical.org](https://dynamical.org/catalog/noaa-gefs-forecast-35-day/) |
-| **Météo-France ARPEGE Europe** | Not on the roadmap | Not scored | Météo-France, stretched-grid global model | ~5 km over Europe (0.1° served) | Bounds of the Europe extract not checked; data present at Lincoln | Global irradiance and 10 m wind 2022-11-09; 100 m wind 2023-06-05 | Global; direct and diffuse by separation | 10, 80, 100 m | 4 a day; 4 days | 3.5 h (Open-Meteo) | Previous Runs from 2024-01-19 | Open-Meteo | Météo-France's own licence, per Open-Meteo; CC BY 4.0 on Open-Meteo | [Météo-France](https://meteofrance.com/actualites-et-dossiers/comprendre-la-meteo/les-modeles-de-prevision-meteo), [Open-Meteo](https://open-meteo.com/en/docs/meteofrance-api), [licences](https://open-meteo.com/en/licence) |
+| **Météo-France ARPEGE Europe** | Not on the roadmap | [sunshine](../studies/weather-products-for-past-solar.md#the-four-extra-open-meteo-models) only, on a shorter window | Météo-France, stretched-grid global model | ~5 km over Europe (0.1° served) | Bounds of the Europe extract not checked; data present at Lincoln | Global irradiance and 10 m wind 2022-11-09; 100 m wind 2023-06-05 | Global; direct and diffuse by separation | 10, 80, 100 m | 4 a day; 4 days | 3.5 h (Open-Meteo) | Previous Runs from 2024-01-19 | Open-Meteo | Météo-France's own licence, per Open-Meteo; CC BY 4.0 on Open-Meteo | [Météo-France](https://meteofrance.com/actualites-et-dossiers/comprendre-la-meteo/les-modeles-de-prevision-meteo), [Open-Meteo](https://open-meteo.com/en/docs/meteofrance-api), [licences](https://open-meteo.com/en/licence) |
 | **Météo-France ARPEGE World** | Not on the roadmap | Not scored | The same ARPEGE run, global extract | ~5 km over Europe (0.25° served) | Yes (global) | 2023-12-27 | Global; direct and diffuse by separation | 10, 100 m | 4 a day; 4 days | 4.0 h (Open-Meteo) | Previous Runs from 2024-01-19 | Open-Meteo | As ARPEGE Europe | [Open-Meteo](https://open-meteo.com/en/docs/meteofrance-api) |
 | **Météo-France AROME France** | Not on the roadmap | Not scored | Météo-France, convection-permitting regional model | 1.3 km (0.025° served) | South of 55.4°N only | 2023-12-27 | Global; direct and diffuse by separation | 10, 80, 100 m | 8 a day; 2 days | 2.7 h (Open-Meteo, 03 UTC run) | Previous Runs from 2024-01-19 | Open-Meteo | As ARPEGE Europe | [Open-Meteo](https://open-meteo.com/en/docs/meteofrance-api), [domain](https://api.open-meteo.com/data/meteofrance_arome_france0025/static/meta.json) |
-| **DMI HARMONIE-AROME DINI** | Not on the roadmap | Not scored | The Danish Meteorological Institute (DMI) for the United Weather Centres West (UWC-West) consortium; HARMONIE-AROME is the convection-permitting regional model several European weather services share | 2 km (Open-Meteo's figure) | Yes (39.7–62.7°N, 25.4°W–40.1°E) | 2024-06-28 | Global; a field Open-Meteo serves as direct, probably not DMI's direct beam (note below) | 10, 50, 100, 150, 250, 350, 450 m (Open-Meteo interpolates 80 m) | 8 a day; 2.5 days | 2.8 h (Open-Meteo, 06 UTC run) | Previous Runs from 2024-06-29 | Open-Meteo | CC BY 4.0 | [Open-Meteo](https://open-meteo.com/en/docs/dmi-api), [domain](https://api.open-meteo.com/data/dmi_harmonie_arome_europe/static/meta.json), [downloader](https://github.com/open-meteo/open-meteo/blob/main/Sources/App/Dmi/DmiDownloader.swift) |
-| **KNMI HARMONIE-AROME Europe** | Not on the roadmap | Not scored | The Royal Netherlands Meteorological Institute (KNMI) for UWC-West | 5.5 km, as KNMI publishes the grid | Yes (39.7–62.6°N, 25.2°W–38.8°E) | Global irradiance 2024-06-26; 100 m wind 2024-10-09 | Global; direct and diffuse by separation | 10 to 300 m, including 80 and 100 m | Hourly; 2.5 days | 2.6 h (Open-Meteo, 06 UTC run) | Previous Runs from 2024-06-27 | Open-Meteo | CC BY 4.0 | [Open-Meteo](https://open-meteo.com/en/docs/knmi-api), [domain](https://api.open-meteo.com/data/knmi_harmonie_arome_europe/static/meta.json) |
+| **DMI HARMONIE-AROME DINI** | Not on the roadmap | [sunshine](../studies/weather-products-for-past-solar.md#the-four-extra-open-meteo-models) only, on a shorter window | The Danish Meteorological Institute (DMI) for the United Weather Centres West (UWC-West) consortium; HARMONIE-AROME is the convection-permitting regional model several European weather services share | 2 km (Open-Meteo's figure) | Yes (39.7–62.7°N, 25.4°W–40.1°E) | 2024-06-28 | Global; a field Open-Meteo serves as direct, probably not DMI's direct beam (note below) | 10, 50, 100, 150, 250, 350, 450 m (Open-Meteo interpolates 80 m) | 8 a day; 2.5 days | 2.8 h (Open-Meteo, 06 UTC run) | Previous Runs from 2024-06-29 | Open-Meteo | CC BY 4.0 | [Open-Meteo](https://open-meteo.com/en/docs/dmi-api), [domain](https://api.open-meteo.com/data/dmi_harmonie_arome_europe/static/meta.json), [downloader](https://github.com/open-meteo/open-meteo/blob/main/Sources/App/Dmi/DmiDownloader.swift) |
+| **KNMI HARMONIE-AROME Europe** | Not on the roadmap | [sunshine](../studies/weather-products-for-past-solar.md#the-four-extra-open-meteo-models) only, on a shorter window | The Royal Netherlands Meteorological Institute (KNMI) for UWC-West | 5.5 km, as KNMI publishes the grid | Yes (39.7–62.6°N, 25.2°W–38.8°E) | Global irradiance 2024-06-26; 100 m wind 2024-10-09 | Global; direct and diffuse by separation | 10 to 300 m, including 80 and 100 m | Hourly; 2.5 days | 2.6 h (Open-Meteo, 06 UTC run) | Previous Runs from 2024-06-27 | Open-Meteo | CC BY 4.0 | [Open-Meteo](https://open-meteo.com/en/docs/knmi-api), [domain](https://api.open-meteo.com/data/knmi_harmonie_arome_europe/static/meta.json) |
 | **Met Office global 10 km** (`ukmo_global_deterministic_10km`) | Not on the roadmap ([why no request has been made](../roadmap/data-sources.md#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost)) | Not scored | Met Office Unified Model, global | ~10 km (0.09° served) | Yes (global) | Direct and 10 m wind 2022-03-01; global irradiance from 2025-01-02 | Global; direct native; diffuse = global − direct | 10 m only | 4 a day; 7 days (Open-Meteo) | 8.4 h (Open-Meteo) | Previous Runs from 2025-01-03 | Open-Meteo; AWS | CC BY-SA 4.0 (AWS) | [Open-Meteo](https://open-meteo.com/en/docs/ukmo-api) |
 | **Google WeatherNext 3** | [🔬 Research (after v2, unlikely)](../roadmap/data-sources.md#weather-data) | Not scored | Google DeepMind, machine-learned 64-member ensemble | 0.1° | Yes (global) | 2026-01-01, with 2024 and 2025 being back-filled | Global; direct native (`fdir`); diffuse = global − direct | Not checked | 4 a day to 15 days, plus hourly interim runs to 48 h; hourly | Not established | Not established | Access request; members only in the Cloud Storage Zarr store | CC BY 4.0 once at least 1 h old; real-time data under Google DeepMind's experimental terms | [model specs](https://developers.google.com/weathernext/guides/models), [access](https://developers.google.com/weathernext/guides/access-forecast) |
 | **Google WeatherNext 2** | Not on the roadmap (the catalogue's Google row is WeatherNext 3) | Not scored | Google DeepMind, machine-learned 64-member ensemble; Google marks the data experimental, "not intended, validated, or approved for real world use" | 0.25° | Yes (global) | 2022-01-01 to 2026-09-22 in the Earth Engine catalogue | None | 10, 100 m | 4 a day; 15 days; 6-hourly | About 7.5 h (Google's dissemination schedule) | Whole runs | Earth Engine, BigQuery, Cloud Storage Zarr; all need an access request | CC BY 4.0 for data over 48 h old; real-time data under Google DeepMind's experimental terms | [Earth Engine](https://developers.google.com/earth-engine/datasets/catalog/projects_gcp-public-data-weathernext_assets_weathernext_2_0_0) |
@@ -219,7 +229,7 @@ has not been checked against DMI's own files.
 
 | Product | Roadmap status | Scored in | Producer and method | Grid | Covers GB | Period | Solar variables | Wind heights | Time step | Latency | Access | Licence | Source |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|---|
-| **CERRA** | [🔬 Research (deprioritised)](../roadmap/data-sources.md#weather-data) | Not scored | Copernicus regional reanalysis, HARMONIE-ALADIN with 3D-Var, forced by ERA5 | 5.5 km, 1069 × 1069 points | Yes (European domain) | 1984-09-01 to 2026-06-30 on the CDS on 2026-09-23 | Global and direct native, forecast fields only, accumulated | 10 m; 15, 30, 50, 75, 100, 150 to 500 m | 3-hourly analyses; hourly values from forecast leads 1–3 h | About 12 weeks on 2026-09-23 (the catalogue row gives ~3.5 months) | Copernicus Climate Data Store (CDS); no area cropping, so every field is the whole domain | CC BY 4.0 | [CDS](https://cds.climate.copernicus.eu/datasets/reanalysis-cerra-single-levels), [user guide](https://confluence.ecmwf.int/x/WFQ7E), [Ridal et al. (2024)](https://doi.org/10.1002/qj.4764) |
+| **CERRA** | [🔬 Research (deprioritised)](../roadmap/data-sources.md#weather-data) | Downloaded for the studies, not yet scored | Copernicus regional reanalysis, HARMONIE-ALADIN with 3D-Var, forced by ERA5 | 5.5 km, 1069 × 1069 points | Yes (European domain) | 1984-09-01 to 2026-06-30 on the CDS on 2026-09-23 | Global and direct native, forecast fields only, accumulated | 10 m; 15, 30, 50, 75, 100, 150 to 500 m | 3-hourly analyses; hourly values from forecast leads 1–3 h | About 12 weeks on 2026-09-23 | Copernicus Climate Data Store (CDS); no area cropping, so every field is the whole domain | CC BY 4.0 | [CDS](https://cds.climate.copernicus.eu/datasets/reanalysis-cerra-single-levels), [user guide](https://confluence.ecmwf.int/x/WFQ7E), [Ridal et al. (2024)](https://doi.org/10.1002/qj.4764) |
 | **COSMO-R6G2** | Not on the roadmap | Not scored | DWD, COSMO regional reanalysis forced by ERA5 | 0.055° (~6 km), EURO-CORDEX EUR-11 domain | Yes | 2002-01 to 2025-12 | Global and direct native, hourly means | 10 m; 100, 150, 200 m | Hourly means stamped at :30 | Yearly batches: the 2025 files were posted on 2026-05-11 | HTTPS, monthly NetCDF | CC BY 4.0 | [DWD](https://opendata.dwd.de/climate_environment/REA/COSMO_R6G2/), [paper](https://asr.copernicus.org/articles/22/149/2026/) |
 | **ICON-DREAM-EU** | Not on the roadmap | Both studies: [sunshine](../studies/weather-products-for-past-solar.md), [wind](../studies/weather-products-for-past-wind.md) | DWD, ICON reanalysis, EU nest | 6.5 km | Expected (ICON's EU nest); grid file not checked | 2010-01 to 2026-08 | Direct and diffuse native, hourly means | 10 m; otherwise model levels only, so a fixed height needs vertical interpolation | Hourly | The August 2026 file was posted on 2026-09-07 (DWD states 2–3 months) | HTTPS, monthly GRIB2 | CC BY 4.0 | [DWD](https://opendata.dwd.de/climate_environment/REA/ICON-DREAM-EU/) |
 | **NORA3** | Not on the roadmap | Not scored | MET Norway, HARMONIE-AROME hindcast downscaling ERA5 | 3 km | Yes, checked on the grid | 1958 to 2026-08-31 | Global only | 10 m; 20, 50, 100, 250, 500, 750 m, as grid-relative components needing rotation | Hourly, from leads 3–9 h of each 6-hourly run | About 3 weeks | THREDDS / OPeNDAP | CC BY 4.0 | [THREDDS](https://thredds.met.no/thredds/catalog/nora3/catalog.html), [Solbrekke et al. (2021)](https://doi.org/10.5194/wes-6-1501-2021) |
@@ -236,18 +246,22 @@ has not been checked against DMI's own files.
 
 **Of the products surveyed, ECMWF IFS HRES 9 km, CERRA, and COSMO-R6G2 rank highest for the
 past-sunshine study, because each adds a model family, a grid spacing, or a kind of product the
-study has not scored.** A native direct beam counts for less: the study found that a product's own
-direct beam improves its mean absolute error by 0.03 to 0.11 percentage points of capacity. A place
-in this ranking is not a decision to score the product, and no extension of the study has been
-agreed. The ranking, with each product's roadmap status and one reason:
+study has not scored over the whole window from December 2022.** A native direct beam counts for
+less: the study found that a product's own direct beam improves its mean absolute error by 0.03 to
+0.10 percentage points of capacity. A place in this ranking is not a decision to score the product,
+and no extension of the study has been agreed. The ranking, with each product's roadmap status and
+one reason:
 
 1. **ECMWF IFS HRES 9 km on Open-Meteo** (not on the roadmap) — a 9 km forecast from the IFS model
    behind the 31 km ERA5, from 2017, through the same Open-Meteo interface as the four weather
-   models already scored, with a native direct beam. Before October 2025 the series is Open-Meteo's
-   own assembly of IFS runs "employing the most up-to-date version of IFS" ([Historical Weather
-   API](https://open-meteo.com/en/docs/historical-weather-api)). Open-Meteo does not document the
-   series' served lead. A study using the series has to report both the assembly and the
-   undocumented lead.
+   models on the main row set, with a native direct beam. The study scores it only from November
+   2024, on the [shorter row set of the four extra Open-Meteo
+   models](../studies/weather-products-for-past-solar.md#the-four-extra-open-meteo-models), so the
+   candidate is to score it over the whole window from December 2022. Before October 2025 the series
+   is Open-Meteo's own assembly of IFS runs "employing the most up-to-date version of IFS"
+   ([Historical Weather API](https://open-meteo.com/en/docs/historical-weather-api)). Open-Meteo does
+   not document the series' served lead. A study using the series has to report both the assembly
+   and the undocumented lead.
 2. **CERRA** (🔬 research, deprioritised) — a regional reanalysis on a 5.5 km grid with a native
    direct field, hourly through forecast leads 1 to 3. Its latency is why the catalogue
    deprioritises CERRA for the live service, and is no obstacle for a study of past weather. The
@@ -270,10 +284,12 @@ ICON-DREAM-EU, an ICON reanalysis on a 6.5 km grid with native direct and diffus
 past-sunshine study: [ICON-DREAM-EU beats ERA5 but not the ICON weather
 models](../studies/weather-products-for-past-solar.md#icon-dream-eu-beats-era5-but-not-the-icon-weather-models).
 
-The DMI and KNMI HARMONIE-AROME forecasts would add a further model family, from mid-2024 only,
-but neither adds a direct component the survey could use. KNMI's split is by separation, and the
-field Open-Meteo serves as DMI's direct is probably not DMI's direct beam. Global irradiance alone
-would make either a lower-priority arm.
+The sunshine study scores the DMI and KNMI HARMONIE-AROME forecasts on global irradiance only, on
+[its shorter row set from November 2024](../studies/weather-products-for-past-solar.md#the-four-extra-open-meteo-models).
+It scores neither direct beam. KNMI's direct beam is Open-Meteo's separation of the global
+irradiance. The study finds that the field Open-Meteo serves as DMI's direct beam is exactly zero in
+half of the daytime rows and in some rows exceeds the global irradiance, which supports the reading
+that the field is not DMI's direct beam.
 
 ## Candidates for the past-wind study
 
@@ -324,7 +340,8 @@ decision to score the product. Ordered by how far back whole runs reach:
 4. **Open-Meteo Single Runs of ECMWF IFS HRES 9 km** (not on the roadmap), from 2024-03-14 — the one
    whole-run archive in this list with a native direct beam. Three caveats apply: Open-Meteo calls
    the early runs hindcasts, the runs sampled from early 2024 are 00 and 12 UTC only, and the model
-   changes to IFS Cycle 50r1 on 2026-05-12.
+   changes to IFS Cycle 50r1 on 2026-05-12, [an upgrade the data sources page
+   describes](../roadmap/data-sources.md#nwp-model-upgrades-since-2019).
 5. **Dynamical.org AIFS Single** (not on the roadmap), with radiation and 100 m wind from the
    2025-02-24 06 UTC run.
 6. **Open-Meteo Previous Runs**, from 2024-01-19 at the earliest — capped at the offsets in the
