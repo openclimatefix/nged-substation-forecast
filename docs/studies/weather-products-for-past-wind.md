@@ -205,8 +205,9 @@ nearest grid cell over land.**
   ICON-D2 against ICON-EU. The ICON-DREAM-EU section has two planned contrasts of its own,
   ICON-DREAM-EU against ERA5 and ICON-DREAM-EU against ICON-EU, written into that section's plan
   before ICON-DREAM-EU was fitted but after the five products above had been scored. A contrast is
-  the difference between two products' errors on the same hours. A comparison is planned when it was written into the study plan before any result existed;
-  every other figure is exploratory, chosen or added after results were seen. The distinction
+  the difference between two products' errors on the same hours. A comparison is planned when it
+  was written into the study plan before any result existed; every other figure is exploratory,
+  chosen or added after results were seen. The distinction
   matters because with many comparisons, about 1 in 20 exploratory rows reaches significance at the
   5% level by chance, so an exploratory result is a lead to follow up rather than a finding. A chart
   holding both kinds marks each planned row "(planned)". A chart whose rows are all one kind says so
@@ -583,8 +584,8 @@ set.
 from 2025 to 2026, in a comparison restricted to January to August of each year so a partial 2026
 compares against the same months of 2025.** Against ERA5, ICON-DREAM-EU was 0.075 points ahead
 [−0.097, +0.273] in 2025 and 0.036 points ahead [−0.132, +0.217] in 2026 (signs flipped so ahead is
-positive), a change of +0.039 points [−0.212, +0.297], not statistically significant. Against ICON-EU, the
-gap was 0.416 points [0.312, 0.498] in 2025 and 0.376 points [0.309, 0.430] in 2026, both
+positive), a change of +0.039 points [−0.212, +0.297], not statistically significant. Against
+ICON-EU, the gap was 0.416 points [0.312, 0.498] in 2025 and 0.376 points [0.309, 0.430] in 2026, both
 statistically significant, a change of −0.041 points [−0.145, +0.080], not statistically
 significant.
 
