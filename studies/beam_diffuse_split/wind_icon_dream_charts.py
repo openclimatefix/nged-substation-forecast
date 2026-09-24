@@ -94,7 +94,7 @@ def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         errors: Each product's pooled mean absolute error, read from the report's first table.
 
     Returns:
-        Figure 1.
+        Figure 11.
 
     Raises:
         ValueError: If a bootstrapped point estimate disagrees with the report's own number.
@@ -125,9 +125,9 @@ def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
     panel = leaderboard_panel(rows=rows, x_domain=domain, x_title=LEADERBOARD_X_TITLE)
     return figure(
         panels=[panel],
-        number=1,
+        number=11,
         figure_planning=None,
-        title="ICON-DREAM-EU's own mean absolute error, against the five products already scored",
+        title="ICON-DREAM-EU ties ERA5 and beats only ICON global of the six products tested",
         subtitle=[
             "Each product's own mean absolute error, sorted best first.",
             DOTS,
@@ -144,7 +144,7 @@ def _planned_contrasts(*, report_path: Path) -> alt.VConcatChart:
         report_path: The `report.md` `wind_icon_dream.py` wrote.
 
     Returns:
-        Figure 2.
+        Figure 12.
     """
     contrasts = report_contrasts(report_path=report_path)
     # Order by each row's own `reference` column rather than by position: `treatment` is the same
@@ -184,9 +184,9 @@ def _planned_contrasts(*, report_path: Path) -> alt.VConcatChart:
     )
     return figure(
         panels=[panel],
-        number=2,
+        number=12,
         figure_planning="planned",
-        title="ICON-DREAM-EU against ERA5 and against ICON-EU",
+        title="ICON-DREAM-EU does not beat ERA5, and trails ICON-EU by 0.34 points",
         subtitle=[
             "The two contrasts named in the plan before any result existed.",
             f"{DOTS} {CAPACITY}",
