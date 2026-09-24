@@ -45,6 +45,14 @@ is in `plans/nwp-forecast-comparison.md` on the study's branch.
   `--fit-missing` fits only the (arm, setting) pairs the saved losses lack. `--synthetic-losses`
   fabricates losses instead of fitting, to exercise the report, and refuses to write under
   `data/studies/`.
+- `nwp_forecast_charts.py` reads the saved losses and predictions from `--input-dir` and writes five
+  SVG charts per technology to `--output-dir`, each optimised with `svgo` (skip with `--no-svgo`):
+  the planned contrasts P1a to P4b at both settings, the leaderboard of every arm's absolute error,
+  one chosen week of out-of-fold forecasts against measured output, error by lead day with ENS's
+  day-0 and day-1 intervals shaded, and the blends against ENS alone and their controls. It
+  computes every interval itself with the report's own functions and refuses any site label that is
+  not an anonymised label. It has no default output directory: charts go to `docs/studies/assets/`
+  only once a real report exists.
 
 ## Outputs
 
