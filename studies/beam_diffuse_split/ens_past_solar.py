@@ -654,14 +654,17 @@ def _lead_lines(*, frame: pl.DataFrame) -> list[str]:
     Returns:
         Markdown lines.
     """
-    hour = frame["time"].dt.hour()
-    ens_lead = hour.cast(pl.Float64)
-    era5_lead = ((hour - 1) % ERA5_RUN_INTERVAL_HOURS + 1).cast(pl.Float64)
+    hour = frame["time"].dt.hour().to_numpy().astype(np.float64)
+    ens_lead = hour
+    era5_lead = (hour - 1) % ERA5_RUN_INTERVAL_HOURS + 1
     too_early = int((hour <= FIRST_SERVABLE_HOUR_UTC).sum())
     return [
         "#### Leads of the scored hours",
         "",
-        f"- ENS's lead is {hour.min()} to {hour.max()} hours, mean {ens_lead.mean():.2f}.",
+        (
+            f"- ENS's lead is {ens_lead.min():.0f} to {ens_lead.max():.0f} hours, "
+            f"mean {ens_lead.mean():.2f}."
+        ),
         (
             f"- ERA5's radiation lead is {era5_lead.min():.0f} to {era5_lead.max():.0f} hours, "
             f"mean {era5_lead.mean():.2f}."
