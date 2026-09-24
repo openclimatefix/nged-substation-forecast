@@ -12,6 +12,12 @@ model per wind farm the nearest wind-reporting station's wind, and compares it w
 committed with this script (021d0852) before the first fit as well. The exploratory items are the
 k=3 arm, the shear control, the August-to-December restriction, and `ukv_station_wind - ukv_wind`.
 
+**Second persona-review additions.** After the persona reviews of the page, the report gained
+exploratory, report-only tables computed from the saved losses with no refit: the differences
+between farms and between the two seasons in S1 with their intervals, a fold-level and a month-level
+t-interval beside the bootstrap interval of each planned contrast, the pooled range of the
+candidates' mean speeds, and counts of the stations by kind and message type. All of it is post hoc.
+
 **Post-review additions.** After the first results and the first science review, the exploratory
 additions were written down (750b130d) before the refit, and the script gained them in 72d969b8.
 Everything in them is post hoc and exploratory: the arms `station_speed_only`,
@@ -40,8 +46,10 @@ read from a published loss. The window holds one UKV era, so `era_code` is const
 that every arm carries the page's columns.
 
 **Candidate stations.** `candidate_stations` returns every station in the MIDAS Open hourly-weather
-file that has at least one wind speed in metres per second. The stations that return one reading a
-day carry no such speed, so they are never candidates.
+file that has at least one wind speed row that the download script converted to metres per second.
+MIDAS itself records the speed in knots (unit code 4), so a row has a metres-per-second speed only
+where it carries that unit code. The stations that return one reading a day carry no unit code, and
+other stations carry no wind speed, so neither kind is a candidate.
 
 **Station rule.** `studies.midas.select_nearest_stations` with `k=1` and `min_coverage=0.9` of the
 farm's required hours (the page's rows in the window). The rule reads no score and no target.
@@ -87,6 +95,7 @@ from studies.bootstrap import (
     N_BOOTSTRAP_RESAMPLES,
     bootstrap_absolute,
     bootstrap_difference,
+    fold_t_interval,
     paired_differences,
     per_fold_differences,
 )
@@ -219,6 +228,26 @@ AUGUST_TO_DECEMBER: Final[tuple[int, ...]] = (8, 9, 10, 11, 12)
 
 JANUARY_TO_JULY: Final[tuple[int, ...]] = (1, 2, 3, 4, 5, 6, 7)
 """The calendar months that occur in one year of the window only."""
+
+BETWEEN_FARM_PAIRS: Final[tuple[tuple[str, str], ...]] = (("W1", "W3"), ("W1", "W2"), ("W2", "W3"))
+"""The farm pairs whose S1 difference is intervalled: (first, second), first minus second."""
+
+EXPLORATORY_SECTIONS: Final[tuple[str, ...]] = (
+    "exploratory",
+    "august_to_december",
+    "january_to_july",
+    "calendar_balanced",
+    "height",
+    "post_review",
+    "planned_by_farm",
+    "between_farm",
+    "season_difference",
+)
+"""The `intervals.parquet` sections holding exploratory paired-difference intervals.
+
+The report prints the count of those at the primary setting, so the page can say how many would
+exclude zero by chance.
+"""
 
 MS_PER_KNOT: Final[float] = 0.514444
 """Metres per second in one knot."""
@@ -477,8 +506,9 @@ def candidate_stations() -> tuple[str, ...]:
     """Return every station in the hourly-weather download that has a wind speed, sorted.
 
     The rule: a station is a candidate if at least one of its rows in the MIDAS Open hourly-weather
-    file holds a wind speed in metres per second. The stations that return one reading a day, and
-    the stations that carry no wind, hold no such row, so neither kind is a candidate.
+    file holds a wind speed in metres per second, which the download script derives from a speed
+    in knots (MIDAS unit code 4). The stations that return one reading a day carry no unit code, and
+    the stations that carry no wind speed hold no such row, so neither kind is a candidate.
 
     Returns:
         The sorted station identifiers. The identifiers are never printed or saved.
@@ -773,6 +803,8 @@ class ChecksResult(TypedDict):
     n_eligible_pairs: int
     speed_range: tuple[float, float]
     speed_mean: float
+    candidate_mean_speed: tuple[float, float]
+    candidate_calm_share: tuple[float, float]
     direction_facts: dict[str, float]
     unit_rows: dict[str, int]
     off_the_hour_rows: int
@@ -785,29 +817,45 @@ class ChecksResult(TypedDict):
 
 
 def _station_kinds() -> dict[str, int]:
-    """Count the stations in the hourly-weather file by kind, as counts only.
+    """Count the stations in the hourly-weather file by kind and message type, as counts only.
 
     Returns:
         `stations` (all), `candidates` (`candidate_stations`), `one_reading_a_day` (stations whose
-        readings all fall at one hour of the day), and `daily_with_wind_and_no_unit_code` (of those,
-        the stations that carry a raw wind speed and no wind-speed unit code).
+        readings all fall at one hour of the day), `daily_with_wind_and_no_unit_code` (of those, the
+        stations that carry a raw wind speed and no wind-speed unit code), `daily_hour_of_day` (the
+        one hour of the day the daily stations report at, or -1 if they differ),
+        `hourly_without_wind` (stations that are neither candidates nor daily and carry no raw wind
+        speed on any row), and `synop_only`, `awshrly_only` and `both_message_types` (the
+        candidates by the message types their rows carry).
     """
     raw = pl.read_parquet(
-        HOURLY_WEATHER_PATH, columns=["src_id", "time", "wind_speed", "wind_speed_unit_id"]
+        HOURLY_WEATHER_PATH,
+        columns=["src_id", "time", "wind_speed", "wind_speed_unit_id", "met_domain_name"],
     )
     per_station = raw.group_by("src_id").agg(
         hours_of_day=pl.col("time").dt.hour().n_unique(),
         n_wind=pl.col("wind_speed").is_not_null().sum(),
         n_unit=pl.col("wind_speed_unit_id").is_not_null().sum(),
+        message_types=pl.col("met_domain_name").unique().sort(),
     )
+    candidates = set(candidate_stations())
     daily = per_station.filter(pl.col("hours_of_day") == 1)
+    daily_hours = raw.filter(pl.col("src_id").is_in(daily["src_id"]))["time"].dt.hour().unique()
+    candidate_types = per_station.filter(pl.col("src_id").is_in(candidates))["message_types"]
     return {
         "stations": per_station.height,
-        "candidates": len(candidate_stations()),
+        "candidates": len(candidates),
         "one_reading_a_day": daily.height,
         "daily_with_wind_and_no_unit_code": daily.filter(
             pl.col("n_wind") > 0, pl.col("n_unit") == 0
         ).height,
+        "daily_hour_of_day": int(daily_hours[0]) if daily_hours.len() == 1 else -1,
+        "hourly_without_wind": per_station.filter(
+            ~pl.col("src_id").is_in(candidates), pl.col("hours_of_day") > 1, pl.col("n_wind") == 0
+        ).height,
+        "synop_only": sum(types.to_list() == ["SYNOP"] for types in candidate_types),
+        "awshrly_only": sum(types.to_list() == ["AWSHRLY"] for types in candidate_types),
+        "both_message_types": sum(len(types) == 2 for types in candidate_types),
     }
 
 
@@ -873,6 +921,29 @@ def _range(*, values: pl.Series) -> tuple[float, float]:
     return float(array.min()), float(array.max())
 
 
+def _candidate_exposure(
+    *, observed: pl.DataFrame
+) -> tuple[tuple[float, float], tuple[float, float]]:
+    """Return the pooled range, over the candidates, of each one's mean speed and calm share.
+
+    The window is the row set's window, and only the smallest and largest value over the candidate
+    stations are returned, so no value can be tied to a station.
+
+    Args:
+        observed: `station_observations`'s output.
+
+    Returns:
+        The range of the per-station mean speed in metres per second, and the range of the
+        per-station share of observed hours that are calm.
+    """
+    per_station = (
+        observed.filter(pl.col("time") >= WINDOW_START, pl.col("time") < WINDOW_END_EXCLUSIVE)
+        .group_by("src_id")
+        .agg(mean_speed=pl.col("speed").mean(), calm_share=pl.col("calm").mean())
+    )
+    return _range(values=per_station["mean_speed"]), _range(values=per_station["calm_share"])
+
+
 def run_checks(
     *,
     window: pl.DataFrame,
@@ -926,6 +997,7 @@ def run_checks(
     coverage = calendar_month_coverage(frame=frame)
     single_year = coverage.filter(pl.col("n_years") == 1)
     speeds = frame["station_speed"]
+    candidate_mean_speed, candidate_calm_share = _candidate_exposure(observed=observed)
     return {
         "window_rows": window.height,
         "frame_rows": frame.height,
@@ -938,6 +1010,8 @@ def run_checks(
         "n_eligible_pairs": per_pair.height,
         "speed_range": _range(values=speeds),
         "speed_mean": float(speeds.to_numpy().mean()),
+        "candidate_mean_speed": candidate_mean_speed,
+        "candidate_calm_share": candidate_calm_share,
         "direction_facts": {
             "calm_share": float(scored["calm"].to_numpy().mean()),
             "calm_rows_with_speed": float(
@@ -1068,11 +1142,29 @@ def _checks_lines(*, checks: ChecksResult) -> list[str]:
         "",
         (
             "- Candidate-station rule: every station in the MIDAS Open hourly-weather file with at "
-            "least one wind speed in metres per second. "
-            f"Candidates: {kinds['candidates']} of the {kinds['stations']} stations in the file. "
-            f"{kinds['one_reading_a_day']} stations return one reading a day, and "
-            f"{kinds['daily_with_wind_and_no_unit_code']} of those carry a raw wind speed and no "
-            "unit code; none of them is a candidate."
+            "least one wind speed row that the download script converted to metres per second. "
+            "MIDAS records the speed in knots (unit code 4), so a row has a metres-per-second "
+            "speed only where it carries that unit code, and the metres-per-second speed is "
+            "derived, never delivered. "
+            f"Of the file's {kinds['stations']} stations, {kinds['candidates']} are candidates, "
+            f"{kinds['hourly_without_wind']} report no wind speed on any row, and "
+            f"{kinds['one_reading_a_day']} return one reading a day, at hour "
+            f"{kinds['daily_hour_of_day']:02d}:00 UTC. Of those {kinds['one_reading_a_day']}, "
+            f"{kinds['daily_with_wind_and_no_unit_code']} carry a raw wind speed and no unit code, "
+            "so none of the daily stations is a candidate."
+        ),
+        (
+            f"- Candidates by message type: {kinds['synop_only']} carry SYNOP rows only, "
+            f"{kinds['awshrly_only']} carry AWSHRLY rows only, and {kinds['both_message_types']} "
+            "carry rows of both types."
+        ),
+        (
+            "- Exposure differs between the candidates. Over the window, each candidate's mean "
+            "speed over its own observed hours, range over the candidates: "
+            f"{checks['candidate_mean_speed'][0]:.1f} to {checks['candidate_mean_speed'][1]:.1f} "
+            "m/s. Each candidate's share of observed hours that are calm, range over the "
+            f"candidates: {checks['candidate_calm_share'][0]:.2%} to "
+            f"{checks['candidate_calm_share'][1]:.2%}."
         ),
         (
             f"- Page rows in the window: {checks['window_rows']:,}. Rows after the station rule: "
@@ -1789,6 +1881,376 @@ def _per_calendar_month_lines(*, pooled: pl.DataFrame, sensitivity: pl.DataFrame
     return lines
 
 
+def _month_group_sums(
+    *, differences: np.ndarray, months: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    """Sum one group's differences within each month, per seed, and count its rows per month.
+
+    Args:
+        differences: Per-seed, per-row differences, shape (n_seeds, n_rows).
+        months: Each row's month label.
+
+    Returns:
+        The per-seed sums, shape (n_seeds, n_months), and each month's row count. Months are in
+        sorted order.
+    """
+    sums, counts, _ = _calendar_month_sums(differences=differences, months=months)
+    return sums, counts
+
+
+def group_difference_interval(
+    *,
+    first: tuple[np.ndarray, np.ndarray],
+    second: tuple[np.ndarray, np.ndarray],
+    within_groups: bool,
+) -> tuple[float, float, float]:
+    """Interval the difference between two groups' mean differences, resampling whole months.
+
+    Each resample draws one fitting seed, as `studies.bootstrap` does, then whole `YYYY-MM` months
+    with replacement. Where the two groups score the same months (two farms), one draw of months
+    serves both. Where the groups hold different months (two seasons), each group draws its own
+    months from its own months only. The statistic is the first group's mean over the rows of its
+    drawn months minus the second's. The bounds are the 2.5th and 97.5th percentiles.
+
+    Untested in `packages/studies`, because this function is a copy for one page.
+
+    Args:
+        first: The first group's per-seed, per-row differences and each row's month label.
+        second: The second group's, in the same form.
+        within_groups: Whether each group draws months from its own months (seasons) rather than
+            both groups sharing one draw of the same months (farms).
+
+    Returns:
+        The estimate (the first group's mean over all its rows minus the second's), and the lower
+        and upper bounds.
+
+    Raises:
+        ValueError: If the groups are not resampled within themselves and their months differ.
+    """
+    sums_first, counts_first = _month_group_sums(differences=first[0], months=first[1])
+    sums_second, counts_second = _month_group_sums(differences=second[0], months=second[1])
+    if not within_groups and not np.array_equal(np.unique(first[1]), np.unique(second[1])):
+        msg = "two groups that share one draw of months must score the same months"
+        raise ValueError(msg)
+    estimate = float(first[0].mean() - second[0].mean())
+    generator = np.random.default_rng(BOOTSTRAP_SEED)
+    n_first, n_second = len(counts_first), len(counts_second)
+    resampled = np.empty(N_BOOTSTRAP_RESAMPLES)
+    for resample in range(N_BOOTSTRAP_RESAMPLES):
+        seed_index = generator.integers(0, first[0].shape[0])
+        drawn_first = generator.integers(0, n_first, size=n_first)
+        drawn_second = (
+            generator.integers(0, n_second, size=n_second) if within_groups else drawn_first
+        )
+        resampled[resample] = (
+            sums_first[seed_index, drawn_first].sum() / counts_first[drawn_first].sum()
+            - sums_second[seed_index, drawn_second].sum() / counts_second[drawn_second].sum()
+        )
+    low, high = np.percentile(resampled, q=(2.5, 97.5))
+    return estimate, float(low), float(high)
+
+
+def _check_group_difference_interval() -> None:
+    """Check `group_difference_interval` against cases worked by hand.
+
+    Case 1: two groups score the same two months, one seed. The first group's months hold the
+    differences 1 and 3, the second's hold 0 and 2, so every month differs by exactly 1 between the
+    groups. The estimate is 2 - 1 = 1, and because both groups share one draw of months, every
+    resample gives exactly 1, so the interval has no width. Case 2: the same groups resampled
+    within themselves draw their months independently, so the interval must have width. Case 3: a
+    first group of two constant months, 5 and 5, against a second group of one constant month, 2,
+    gives exactly 3 at every resample.
+
+    Raises:
+        ValueError: If an estimate or a bound differs from the hand-computed value.
+    """
+    months = np.array(["2024-01", "2024-02"])
+    first = (np.array([[1.0, 3.0]]), months)
+    second = (np.array([[0.0, 2.0]]), months)
+    shared = group_difference_interval(first=first, second=second, within_groups=False)
+    within = group_difference_interval(first=first, second=second, within_groups=True)
+    constant = group_difference_interval(
+        first=(np.array([[5.0, 5.0]]), months),
+        second=(np.array([[2.0]]), np.array(["2024-03"])),
+        within_groups=True,
+    )
+    if not (
+        all(math.isclose(value, 1.0) for value in shared)
+        and within[1] < 1.0 < within[2]
+        and math.isclose(within[0], 1.0)
+        and all(math.isclose(value, 3.0) for value in constant)
+    ):
+        msg = (
+            f"group_difference_interval gives {shared} shared, {within} within and {constant} "
+            "constant, not (1, 1, 1), a width around 1, and (3, 3, 3)"
+        )
+        raise ValueError(msg)
+
+
+def _group_record(
+    *,
+    section: str,
+    setting: str,
+    scope: str,
+    contrast: tuple[str, str],
+    interval: tuple[float, float, float],
+    counts: tuple[int | None, int | None],
+) -> IntervalRecord:
+    """Build the log record of one between-group interval, in percentage points.
+
+    Args:
+        section: `between_farm` or `season_difference`.
+        setting: `pooled` or `sensitivity`.
+        scope: The groups compared, such as `W1 - W3`.
+        contrast: The (treatment, reference) arms whose difference is compared between groups.
+        interval: The estimate and the lower and upper bounds, as fractions of capacity.
+        counts: The rows and months the interval rests on, or `None` where not printed.
+
+    Returns:
+        The record.
+    """
+    value, lower, upper = (bound * PERCENTAGE_POINTS for bound in interval)
+    return {
+        "section": section,
+        "setting": setting,
+        "scope": scope,
+        "treatment": contrast[0],
+        "reference": contrast[1],
+        "value": value,
+        "lower": lower,
+        "upper": upper,
+        "level": 95.0,
+        "n_rows": counts[0],
+        "n_months": counts[1],
+        "folds_agreeing": None,
+        "n_folds": None,
+    }
+
+
+def _between_group_lines(
+    *, pooled: pl.DataFrame, sensitivity: pl.DataFrame, log: IntervalLog
+) -> list[str]:
+    """Render S1's difference between farms and between the two seasons, exploratory.
+
+    A contrast that is significant at one farm and not at another does not show that the farms
+    differ, so each pair of farms and the two seasons are intervalled directly, with the same
+    resampling of whole months and a seed. Season groups hold different months, so each season
+    resamples its own months.
+
+    Args:
+        pooled: Per-row losses at the primary setting.
+        sensitivity: Per-row losses at the second setting.
+        log: Where the intervals are recorded.
+
+    Returns:
+        Markdown lines.
+    """
+    _, treatment, reference = PLANNED_CONTRASTS[0]
+    lines = [
+        (
+            "| Comparison | Contrast | Difference between groups | 95% interval "
+            "| Excludes zero? | Setting |"
+        ),
+        "|---|---|---|---|---|---|",
+    ]
+    for setting, scope in (("pooled", pooled), ("sensitivity", sensitivity)):
+        heading = "primary" if setting == "pooled" else "second"
+        by_farm = {
+            site: paired_differences(
+                losses=scope.filter(pl.col("site") == site),
+                treatment=treatment,
+                reference=reference,
+                metric=METRIC,
+            )
+            for site in sorted(scope["site"].unique().to_list())
+        }
+        comparisons = [
+            (
+                f"{first_site} - {second_site}",
+                group_difference_interval(
+                    first=by_farm[first_site], second=by_farm[second_site], within_groups=False
+                ),
+                "between_farm",
+                None,
+            )
+            for first_site, second_site in BETWEEN_FARM_PAIRS
+        ]
+        seasons = [
+            paired_differences(
+                losses=scope.filter(pl.col("time").dt.month().is_in(months)),
+                treatment=treatment,
+                reference=reference,
+                metric=METRIC,
+            )
+            for months in (AUGUST_TO_DECEMBER, JANUARY_TO_JULY)
+        ]
+        comparisons.append(
+            (
+                "Aug-Dec minus Jan-Jul",
+                group_difference_interval(first=seasons[0], second=seasons[1], within_groups=True),
+                "season_difference",
+                sum(group[0].shape[1] for group in seasons),
+            )
+        )
+        for label, interval, section, n_rows in comparisons:
+            n_months = (
+                len(np.unique(np.concatenate([group[1] for group in seasons])))
+                if section == "season_difference"
+                else len(np.unique(by_farm["W1"][1]))
+            )
+            log.records.append(
+                _group_record(
+                    section=section,
+                    setting=setting,
+                    scope=label,
+                    contrast=(treatment, reference),
+                    interval=interval,
+                    counts=(n_rows, n_months),
+                )
+            )
+            value, lower, upper = (bound * PERCENTAGE_POINTS for bound in interval)
+            lines.append(
+                f"| {label} | {treatment} − {reference} | {value:+.3f} | "
+                f"[{lower:+.3f}, {upper:+.3f}] "
+                f"| {'**yes**' if lower > 0.0 or upper < 0.0 else 'no'} | {heading} |"
+            )
+    return lines
+
+
+def _month_means(*, differences: np.ndarray, months: np.ndarray) -> list[float]:
+    """Return the mean difference in each `YYYY-MM` month, over its rows and every seed.
+
+    Args:
+        differences: Per-seed, per-row differences, shape (n_seeds, n_rows).
+        months: Each row's month label.
+
+    Returns:
+        One mean per month, in sorted month order.
+    """
+    sums, counts, _ = _calendar_month_sums(
+        differences=differences.mean(axis=0, keepdims=True), months=months
+    )
+    return (sums[0] / counts).tolist()
+
+
+def _t_check_lines(
+    *, pooled: pl.DataFrame, sensitivity: pl.DataFrame, log: IntervalLog
+) -> list[str]:
+    """Render, for each planned contrast, the bootstrap interval beside two t-intervals.
+
+    The bootstrap treats months as independent, and adjacent months' differences are correlated.
+    The fold-level interval is a t-interval on the mean of the per-fold differences (one per
+    held-out block of months), and the month-level interval is a t-interval on the mean of the
+    per-month mean differences. Each is centred on the mean of its own values, which is not the
+    row-weighted estimate.
+
+    Args:
+        pooled: Per-row losses at the primary setting.
+        sensitivity: Per-row losses at the second setting.
+        log: Where the intervals are recorded.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        (
+            "| Contrast | Setting | Row-weighted estimate | Bootstrap 95% interval "
+            "| Fold-level t-interval | Month-level t-interval |"
+        ),
+        "|---|---|---|---|---|---|",
+    ]
+    for setting, scope in (("pooled", pooled), ("sensitivity", sensitivity)):
+        heading = "primary" if setting == "pooled" else "second"
+        for name, treatment, reference in PLANNED_CONTRASTS:
+            boot = bootstrap_difference(
+                losses=scope, treatment=treatment, reference=reference, metric=METRIC
+            )
+            differences, months = paired_differences(
+                losses=scope, treatment=treatment, reference=reference, metric=METRIC
+            )
+            fold_values = per_fold_differences(
+                losses=scope, treatment=treatment, reference=reference, metric=METRIC
+            )
+            month_values = _month_means(differences=differences, months=months)
+            cells: list[str] = []
+            for kind, values in (("fold t", fold_values), ("month t", month_values)):
+                lower, upper = (
+                    bound * PERCENTAGE_POINTS for bound in fold_t_interval(fold_differences=values)
+                )
+                centre = float(np.mean(values)) * PERCENTAGE_POINTS
+                log.records.append(
+                    {
+                        "section": "t_check",
+                        "setting": setting,
+                        "scope": kind,
+                        "treatment": treatment,
+                        "reference": reference,
+                        "value": centre,
+                        "lower": lower,
+                        "upper": upper,
+                        "level": 95.0,
+                        "n_rows": None,
+                        "n_months": len(month_values) if kind == "month t" else None,
+                        "folds_agreeing": None,
+                        "n_folds": len(fold_values) if kind == "fold t" else None,
+                    }
+                )
+                cells.append(f"[{lower:+.3f}, {upper:+.3f}] ({len(values) - 1} df)")
+            lines.append(
+                f"| {name}: {treatment} − {reference} | {heading} "
+                f"| {boot['difference'] * PERCENTAGE_POINTS:+.3f} "
+                f"| [{boot['lower_95'] * PERCENTAGE_POINTS:+.3f}, "
+                f"{boot['upper_95'] * PERCENTAGE_POINTS:+.3f}] | {cells[0]} | {cells[1]} |"
+            )
+    return lines
+
+
+def _persona_lines(
+    *, pooled: pl.DataFrame, sensitivity: pl.DataFrame, log: IntervalLog
+) -> list[str]:
+    """Render the persona-review additions, all exploratory and report-only.
+
+    Args:
+        pooled: Per-row losses at the primary setting, holding every arm.
+        sensitivity: Per-row losses at the second setting.
+        log: Where the intervals are recorded.
+
+    Returns:
+        Markdown lines.
+    """
+    return [
+        "",
+        "### Persona-review additions (exploratory, report-only, added after the persona reviews)",
+        "",
+        (
+            "Nothing below is fitted. Each table reads the saved losses. A contrast that is "
+            "statistically significant at one farm and not at another does not show that the "
+            "farms differ, so S1's difference between two farms, and between the two seasons, is "
+            "intervalled directly. The intervals resample whole calendar months and a fitting "
+            "seed. Two farms share one draw of the same months. The two seasons hold different "
+            "months, so each season resamples its own."
+        ),
+        "",
+        "#### S1's difference between farms and between seasons",
+        "",
+        _pooled_caveat(losses=pooled, arm="station_wind"),
+        "",
+        *_between_group_lines(pooled=pooled, sensitivity=sensitivity, log=log),
+        "",
+        "#### Fold-level and month-level t-intervals beside the bootstrap interval",
+        "",
+        (
+            "The bootstrap treats months as independent, and adjacent months' differences are "
+            "correlated. The fold-level interval is a t-interval on the mean of the 5 per-fold "
+            "differences (4 degrees of freedom). The month-level interval is a t-interval on the "
+            "mean of the 17 per-month mean differences (16 degrees of freedom). Each is centred on "
+            "the mean of its own values, not on the row-weighted estimate."
+        ),
+        "",
+        *_t_check_lines(pooled=pooled, sensitivity=sensitivity, log=log),
+    ]
+
+
 def _post_review_lines(
     *, pooled: pl.DataFrame, sensitivity: pl.DataFrame, log: IntervalLog
 ) -> list[str]:
@@ -2006,8 +2468,10 @@ def _report(
             "",
             (
                 f"Adjusted for the {N_SETTINGS * len(PLANNED_CONTRASTS)} planned intervals "
-                f"({len(PLANNED_CONTRASTS)} contrasts, {N_SETTINGS} settings), at the "
-                f"{BONFERRONI_LEVEL:.2f}% level:"
+                f"({len(PLANNED_CONTRASTS)} contrasts, {N_SETTINGS} settings, the two settings "
+                f"counted as separate tests), at the {BONFERRONI_LEVEL:.2f}% level. Each bound is "
+                f"a percentile of {N_BOOTSTRAP_RESAMPLES:,} resamples and rests on about "
+                f"{N_BOOTSTRAP_RESAMPLES * (100.0 - BONFERRONI_LEVEL) / 200.0:.0f} of them:"
             ),
             "",
             *_bonferroni_lines(losses=scope, setting=setting, log=log),
@@ -2069,6 +2533,23 @@ def _report(
             "",
         ]
     lines += _post_review_lines(pooled=pooled, sensitivity=sensitivity, log=log)
+    lines += _persona_lines(pooled=pooled, sensitivity=sensitivity, log=log)
+    exploratory_count = sum(
+        record["setting"] == "pooled" and record["section"] in EXPLORATORY_SECTIONS
+        for record in log.records
+    )
+    lines += [
+        "",
+        "#### Count of exploratory intervals at the primary setting",
+        "",
+        (
+            f"The report prints {exploratory_count} exploratory paired-difference intervals at the "
+            "primary setting, in the sections "
+            f"{', '.join(f'`{section}`' for section in EXPLORATORY_SECTIONS)}. At a 5% level, "
+            f"about {exploratory_count * 0.05:.1f} of them would exclude zero by chance alone if "
+            "no difference existed."
+        ),
+    ]
     return "\n".join(lines) + "\n"
 
 
@@ -2245,6 +2726,7 @@ def main() -> int:
         return 0
 
     _check_calendar_balanced_difference()
+    _check_group_difference_interval()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 
     fit_main = not (arguments.report_only or arguments.fit_post_review)
