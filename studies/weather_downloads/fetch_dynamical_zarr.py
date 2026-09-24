@@ -13,17 +13,22 @@ ensemble member (GEFS only), every lead time, and the eight variables in `VARIAB
 cells inside the box.
 
 **The script fetches and checkpoints one calendar month of `init_time` at a time.** Each month is
-written to `_month_cache/<year>-<month>.parquet` as soon as it lands, and a re-run skips every month
-already cached, except the current month, which is re-fetched because its newest runs may not have
-been published. The final file is built from the cached months with `scan_parquet` and
+written to `_month_cache/` as soon as it lands, and a re-run skips every month already cached as
+complete. A month counts as complete only if its last day is earlier than the newest `init_time` in
+the store minus `PUBLICATION_LAG_DAYS`; any other month is written as `<month>.partial.parquet` and
+re-fetched on the next run. The final file is built from this run's months with `scan_parquet` and
 `sink_parquet`, so its peak memory does not depend on the length of the archive. One month of GEFS
 (30 runs, 31 members, 181 lead times) held in memory is under 1 GB, where a year would need tens of
-GB.
+GB. Every month file records a hash of the crop's grid cells in its parquet metadata, and the
+combine step refuses to mix months whose hash differs.
 
 **The Zarr stores are chunked far larger than the box, so the bytes transferred exceed the bytes
 kept.** GFS stores 105 lead times by 121 by 121 grid cells per chunk, and GEFS stores 64 lead times
 by 17 by 16 grid cells (all 31 members in one chunk). Every chunk the box touches is transferred
-whole. `--measure` prints the bytes received during a fetch, for extrapolating the full run.
+whole.
+
+**Row counts, cell counts, and the crop's hash go only to the private lineage note and the parquet
+metadata, never to stdout,** because they reveal the size of the trial-area box.
 
 Run it with `uv run python studies/weather_downloads/fetch_dynamical_zarr.py --dataset
 noaa-gfs-forecast` or `--dataset noaa-gefs-forecast-35-day`. Passing `--start-date` and `--end-date`
@@ -32,10 +37,9 @@ Then check the output with `validate_dynamical_zarr.py`.
 """
 
 import argparse
+import hashlib
 import sys
-from datetime import UTC, datetime
 from pathlib import Path
-from time import monotonic
 from typing import Final
 
 import dynamical_catalog
@@ -67,6 +71,9 @@ DATASETS: Final[dict[str, str]] = {
 KEEP_BITS: Final[int] = 13
 """Significand bits kept in every value column, as in production NWP storage."""
 
+PUBLICATION_LAG_DAYS: Final[int] = 2
+"""A month is complete once its last day is this many days older than the newest `init_time`."""
+
 _BYTES_PER_MB: Final[float] = 1e6
 
 
@@ -85,16 +92,6 @@ def _cropped_dataset(*, dataset_id: str) -> xr.Dataset:
     return dataset.sel(
         latitude=slice(box.lat_max, box.lat_min), longitude=slice(box.lon_min, box.lon_max)
     )
-
-
-def _received_bytes() -> int:
-    """Return the bytes received so far on all network interfaces, from `/proc/net/dev`."""
-    total = 0
-    for line in Path("/proc/net/dev").read_text().splitlines()[2:]:
-        name, counters = line.split(":", maxsplit=1)
-        if name.strip() != "lo":
-            total += int(counters.split()[0])
-    return total
 
 
 def _axis_column(*, values: np.ndarray, axis: int, shape: tuple[int, ...]) -> np.ndarray:
@@ -133,7 +130,9 @@ def _to_long_frame(*, dataset: xr.Dataset) -> pl.DataFrame:
         else:
             columns[dim] = _axis_column(values=values, axis=axis, shape=shape)
     for variable in VARIABLES:
-        columns[variable] = dataset[variable].to_numpy().astype(np.float32).reshape(-1)
+        columns[variable] = (
+            dataset[variable].transpose(*dims).to_numpy().astype(np.float32).reshape(-1)
+        )
     frame = pl.DataFrame(columns)
     return frame.with_columns(
         round_to_significand_bits(pl.col(variable), keep_bits=KEEP_BITS) for variable in VARIABLES
@@ -159,91 +158,103 @@ def _write_grid_cells(*, dataset: xr.Dataset, path: Path) -> None:
     ).write_parquet(path)
 
 
+def _cell_fingerprint(*, dataset: xr.Dataset) -> dict[str, str]:
+    """Return the crop's cell count and a hash of its cell coordinates, as parquet metadata.
+
+    The values stay in the private parquet metadata and are never printed.
+    """
+    digest = hashlib.sha256()
+    digest.update(dataset["latitude"].to_numpy().tobytes())
+    digest.update(dataset["longitude"].to_numpy().tobytes())
+    n_cells = dataset.sizes["latitude"] * dataset.sizes["longitude"]
+    return {"cell_count": str(n_cells), "cell_hash": digest.hexdigest()}
+
+
 def _months(*, init_times: np.ndarray) -> list[str]:
     """Return the distinct `YYYY-MM` labels of `init_times`, in order."""
     return sorted({str(np.datetime64(t, "M")) for t in init_times})
 
 
-def main() -> int:
-    """Fetch one Dynamical.org dataset, cropped to the trial-area box, one month at a time."""
-    parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--dataset", choices=tuple(DATASETS), required=True)
-    parser.add_argument("--start-date", help="First init date to fetch, YYYY-MM-DD (trial run).")
-    parser.add_argument("--end-date", help="Last init date to fetch, YYYY-MM-DD (trial run).")
-    parser.add_argument(
-        "--measure", action="store_true", help="Print seconds and bytes received per month."
-    )
-    arguments = parser.parse_args()
-    label = DATASETS[arguments.dataset]
-    is_window = arguments.start_date is not None or arguments.end_date is not None
+def _month_paths(*, month_cache_dir: Path, month: str) -> tuple[Path, Path]:
+    """Return the (complete, partial) cache paths of one month."""
+    return month_cache_dir / f"{month}.parquet", month_cache_dir / f"{month}.partial.parquet"
 
-    cropped = _cropped_dataset(dataset_id=arguments.dataset)
-    init_slice = slice(arguments.start_date, arguments.end_date)
-    cropped = cropped.sel(init_time=init_slice)
-    months = _months(init_times=cropped["init_time"].to_numpy())
-    print(f"{label}: {len(months)} months to fetch, month by month")
 
-    directory_name = (
-        f"{label}_window_{arguments.start_date}_{arguments.end_date}" if is_window else label
-    )
-    output_dir = WEATHER_DOWNLOADS_DIR / directory_name
-    month_cache_dir = output_dir / "_month_cache"
-    month_cache_dir.mkdir(parents=True, exist_ok=True)
-    _write_grid_cells(dataset=cropped, path=output_dir / "_grid_cells.parquet")
+def _is_complete(*, month: str, newest_init_time: np.datetime64) -> bool:
+    """Return whether every run of `month` should already be published."""
+    next_month = np.datetime64(month, "M") + np.timedelta64(1, "M")
+    last_day = next_month.astype("datetime64[D]") - np.timedelta64(1, "D")
+    newest_day = newest_init_time.astype("datetime64[D]")
+    return bool(last_day < newest_day - np.timedelta64(PUBLICATION_LAG_DAYS, "D"))
 
-    current_month = datetime.now(UTC).strftime("%Y-%m")
-    for month in months:
-        month_path = month_cache_dir / f"{month}.parquet"
-        # The current month is still being ingested, so it is re-fetched on every run.
-        if month_path.exists() and month != current_month:
-            print(f"{label} {month}: already cached, skipping")
-            continue
-        started = monotonic()
-        received_before = _received_bytes()
-        # A string bound is expanded by xarray to the whole month; a `np.datetime64` bound would
-        # be an exact instant and drop later init_times on the last day.
-        month_slice = cropped.sel(init_time=slice(month, month)).load()
-        frame = _to_long_frame(dataset=month_slice)
-        partial = month_path.with_suffix(".parquet.partial")
-        frame.write_parquet(partial, compression="zstd")
-        partial.rename(month_path)
-        message = f"{label} {month}: {frame.height} rows"
-        if arguments.measure:
-            received_mb = (_received_bytes() - received_before) / _BYTES_PER_MB
-            message += f", {monotonic() - started:.0f} s, {received_mb:.0f} MB received"
-            message += f", {month_path.stat().st_size / _BYTES_PER_MB:.1f} MB kept"
-        print(message)
 
-    cached_paths = sorted(month_cache_dir.glob("*.parquet"))
-    output_path = output_dir / f"{label}.parquet"
-    pl.scan_parquet(cached_paths).sink_parquet(output_path, compression="zstd")
-    rows = pl.scan_parquet(output_path).select(pl.len()).collect().item()
-    size_mb = output_path.stat().st_size / _BYTES_PER_MB
-    print(f"{label}: wrote {rows} rows to {output_path}, {size_mb:.1f} MB")
+def _write_documentation(
+    *,
+    output_dir: Path,
+    label: str,
+    dataset_id: str,
+    init_times: np.ndarray,
+    is_window: bool,
+    has_members: bool,
+    used_paths: list[Path],
+    fingerprint: dict[str, str],
+    rows: int,
+    size_mb: float,
+) -> None:
+    """Write the lineage note and the README next to the combined file.
 
+    Args:
+        output_dir: The product directory.
+        label: `GFS` or `GEFS`.
+        dataset_id: The Dynamical.org catalog key.
+        init_times: The `init_time`s this run fetched.
+        is_window: Whether a start or end date restricted the run.
+        has_members: Whether the dataset has an `ensemble_member` dimension.
+        used_paths: The month files combined.
+        fingerprint: The crop's cell count and hash (private, lineage only).
+        rows: Row count of the combined file (private, lineage only).
+        size_mb: Size of the combined file, MB.
+    """
+    first_init = str(init_times.min())
+    last_init = str(init_times.max())
     lineage_filename = "lineage.json"
     lead_step_note = (
         "GFS lead times are hourly to 120 h, then 3-hourly to 384 h."
         if label == "GFS"
         else "GEFS lead times are 3-hourly to 240 h, then 6-hourly to 840 h."
     )
+    averaging_note = (
+        "GFS radiation is the average since the last 6-hourly reset (00, 06, 12, 18 UTC), so a "
+        "lead time labels the END of an averaging window of 1 to 6 hours."
+        if label == "GFS"
+        else "GEFS radiation is the average over the preceding 6-hour period (00, 06, 12, 18 UTC "
+        "valid times) or 3-hour period (03, 09, 15, 21 UTC), and a lead time labels the END of "
+        "that window."
+    )
+    init_scope = (
+        f"every init_time from {first_init} to {last_init}"
+        if is_window
+        else f"every init_time in the store ({first_init} to {last_init})"
+    )
     write_lineage_note(
         product_dir=output_dir,
-        source_address=f"dynamical_catalog dataset '{arguments.dataset}'",
+        source_address=f"dynamical_catalog dataset '{dataset_id}'",
         request_description=(
-            f"{label} whole runs, variables {', '.join(VARIABLES)}, every init_time"
-            + (", every ensemble_member" if "ensemble_member" in cropped.sizes else "")
+            f"{label} whole runs, variables {', '.join(VARIABLES)}, {init_scope}"
+            + (", every ensemble_member" if has_members else "")
             + ", every lead_time, cropped to the trial-area box via .sel() before any array chunk "
             "is requested"
         ),
         variables=list(VARIABLES),
         extra={
-            "months_cached": [path.stem for path in cached_paths],
+            "first_init_time": first_init,
+            "last_init_time": last_init,
+            "months_used": [path.name for path in used_paths],
             "rows": rows,
+            "output_size_mb": round(size_mb, 2),
+            "cell_count": fingerprint["cell_count"],
             "significand_bits_kept": KEEP_BITS,
-            "note": lead_step_note
-            + " The shortwave and longwave fields are averages over the preceding step, so a "
-            "lead time labels the END of its averaging window.",
+            "note": f"{lead_step_note} {averaging_note}",
         },
         filename=lineage_filename,
     )
@@ -260,9 +271,9 @@ def main() -> int:
             "lat_index": "Rank of the cell's latitude in the crop, ascending. Not a coordinate.",
             "lon_index": "Rank of the cell's longitude in the crop, ascending. Not a coordinate.",
             "downward_short_wave_radiation_flux_surface": "Downward shortwave flux at the "
-            "surface, W/m2, mean over the step ending at init_time + lead_time.",
+            "surface, W/m2, averaged over a window ending at init_time + lead_time (see gotchas).",
             "downward_long_wave_radiation_flux_surface": "Downward longwave flux at the "
-            "surface, W/m2, mean over the step ending at init_time + lead_time.",
+            "surface, W/m2, averaged over a window ending at init_time + lead_time (see gotchas).",
             "temperature_2m": "Air temperature at 2 m, degrees Celsius.",
             "wind_u_10m": "Eastward wind at 10 m, m/s.",
             "wind_v_10m": "Northward wind at 10 m, m/s.",
@@ -272,19 +283,21 @@ def main() -> int:
         },
         missing_value_convention=(
             "A missing value is `NaN` in a `Float32` value column. The averaged radiation fields "
-            "have no value at lead_time 0, because no step has elapsed."
+            "have no value at lead_time 0, because no time has elapsed."
         ),
         gotchas=[
-            "The radiation fields are averages over the preceding step, not instantaneous values.",
-            lead_step_note + " The step width changes inside the lead-time axis.",
+            averaging_note,
+            f"{lead_step_note} The step width changes inside the lead-time axis.",
             f"Value columns are rounded to {KEEP_BITS} significand bits (relative error 1.2e-4).",
             (
                 "`_grid_cells.parquet` maps `lat_index` and `lon_index` to coordinates. It is "
                 "private and must never be published."
             ),
             (
-                "The current month is re-fetched on every run of the script, so its newest runs "
-                "may be missing."
+                "A month whose last day is less than "
+                f"{PUBLICATION_LAG_DAYS} days older than the newest run in the store is cached as "
+                "`<month>.partial.parquet` and re-fetched on the next run, so the newest runs of "
+                "the final month may be missing."
             ),
         ],
         external_docs={
@@ -293,6 +306,77 @@ def main() -> int:
                 "https://dynamical.org/catalog/noaa-gefs-forecast-35-day/"
             ),
         },
+    )
+
+
+def main() -> int:
+    """Fetch one Dynamical.org dataset, cropped to the trial-area box, one month at a time."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--dataset", choices=tuple(DATASETS), required=True)
+    parser.add_argument("--start-date", help="First init date to fetch, YYYY-MM-DD (trial run).")
+    parser.add_argument("--end-date", help="Last init date to fetch, YYYY-MM-DD (trial run).")
+    arguments = parser.parse_args()
+    label = DATASETS[arguments.dataset]
+    is_window = arguments.start_date is not None or arguments.end_date is not None
+
+    full = _cropped_dataset(dataset_id=arguments.dataset)
+    newest_init_time = full["init_time"].to_numpy().max()
+    cropped = full.sel(init_time=slice(arguments.start_date, arguments.end_date))
+    init_times = cropped["init_time"].to_numpy()
+    months = _months(init_times=init_times)
+    print(f"{label}: {len(months)} months to fetch, month by month")
+
+    directory_name = (
+        f"{label}_window_{arguments.start_date}_{arguments.end_date}" if is_window else label
+    )
+    output_dir = WEATHER_DOWNLOADS_DIR / directory_name
+    month_cache_dir = output_dir / "_month_cache"
+    month_cache_dir.mkdir(parents=True, exist_ok=True)
+    _write_grid_cells(dataset=cropped, path=output_dir / "_grid_cells.parquet")
+    fingerprint = _cell_fingerprint(dataset=cropped)
+
+    used_paths: list[Path] = []
+    for month in months:
+        complete_path, partial_path = _month_paths(month_cache_dir=month_cache_dir, month=month)
+        complete = _is_complete(month=month, newest_init_time=newest_init_time)
+        if complete and complete_path.exists():
+            print(f"{label} {month}: already cached, skipping")
+            used_paths.append(complete_path)
+            continue
+        # A string bound is expanded by xarray to the whole month; a `np.datetime64` bound would
+        # be an exact instant and drop later init_times on the last day.
+        month_slice = cropped.sel(init_time=slice(month, month)).load()
+        frame = _to_long_frame(dataset=month_slice)
+        target = complete_path if complete else partial_path
+        temporary = target.with_suffix(".parquet.tmp")
+        frame.write_parquet(temporary, compression="zstd", metadata=fingerprint)
+        temporary.rename(target)
+        (partial_path if complete else complete_path).unlink(missing_ok=True)
+        used_paths.append(target)
+        print(f"{label} {month}: fetched" + ("" if complete else " (partial, will be re-fetched)"))
+
+    for path in used_paths:
+        stored = pl.read_parquet_metadata(path)
+        if {key: stored.get(key) for key in fingerprint} != fingerprint:
+            message = f"{path.name} was cropped to different grid cells; delete it and re-run"
+            raise ValueError(message)
+    output_path = output_dir / f"{label}.parquet"
+    pl.scan_parquet(used_paths).sink_parquet(output_path, compression="zstd", metadata=fingerprint)
+    rows = pl.scan_parquet(output_path).select(pl.len()).collect().item()
+    size_mb = output_path.stat().st_size / _BYTES_PER_MB
+    print(f"{label}: wrote {output_path}")
+
+    _write_documentation(
+        output_dir=output_dir,
+        label=label,
+        dataset_id=arguments.dataset,
+        init_times=init_times,
+        is_window=is_window,
+        has_members="ensemble_member" in cropped.sizes,
+        used_paths=used_paths,
+        fingerprint=fingerprint,
+        rows=rows,
+        size_mb=size_mb,
     )
     return 0
 

@@ -2,15 +2,21 @@
 
 One-off throwaway script for
 <https://github.com/openclimatefix/nged-substation-forecast/issues/841>, following the
-`data-validation` skill's checklist. It checks each cached month on its own (so peak memory is one
-month) and then the combined file's row count, and prints one report. A run that raises is not
-evidence the data is right, and neither is a run that prints: a reader compares each printed number
-with what it should be. The report holds counts and ranges only, never a coordinate.
+`data-validation` skill's checklist. It checks each month file on its own (so peak memory is one
+month), then the checks that span months, and prints one PASS, FAIL, or SKIP line per check. A run
+that raises is not evidence the data is right, and neither is a run that prints PASS: a check that
+fails names the months it failed in. **The report never prints a row count, a cell count, or a
+coordinate,** because those reveal the size of the private trial-area box.
 
-Checks per month: the row count equals the product of the axis lengths, no duplicate key, no null,
-the `NaN` count of every variable (only the two averaged radiation fields at lead time 0 may be
-`NaN`), each variable's value range against a physical range, and the lead-time axis (step widths
-and last lead time).
+Checks per month file: every `init_time` falls inside the file's month; runs are regularly spaced
+(6 hours for GFS, 24 hours for GEFS), and a month that is neither the first nor the last has every
+run of every day; the row count equals the product of the axis lengths; no duplicate key; no null;
+`NaN` only in the two radiation fields and only at lead time 0, where those fields are all `NaN`;
+each value inside a physical range; the lead-time axis starts at 0, ends at the model's last lead
+time, and changes step width at the documented lead time and not later; shortwave radiation is near
+zero for night-time valid hours, and positive at midday in April to September (which a valid time
+shifted by one step would break). Checks across months: the months are contiguous, every file
+carries the same grid-cell hash, and the combined file's row count equals the sum of the files.
 
 Run it with `uv run python studies/weather_downloads/validate_dynamical_zarr.py --directory
 <directory under data/studies/weather>`, for example `--directory GEFS`.
@@ -18,6 +24,7 @@ Run it with `uv run python studies/weather_downloads/validate_dynamical_zarr.py 
 
 import argparse
 import sys
+from datetime import UTC, datetime
 from itertools import pairwise
 from pathlib import Path
 from typing import Final
@@ -43,86 +50,186 @@ AVERAGED_FIELDS: Final[tuple[str, ...]] = (
     "downward_short_wave_radiation_flux_surface",
     "downward_long_wave_radiation_flux_surface",
 )
-"""Averaged over the preceding step, so `NaN` at lead time 0."""
+"""Averaged over a window ending at the valid time, so `NaN` at lead time 0."""
 
-LEAD_STEPS_HOURS: Final[dict[str, tuple[set[int], int]]] = {
-    "GFS": ({1, 3}, 384),
-    "GEFS": ({3, 6}, 840),
+SHORTWAVE: Final[str] = AVERAGED_FIELDS[0]
+
+LEAD_AXIS_HOURS: Final[dict[str, tuple[int, int, int, int]]] = {
+    "GFS": (1, 3, 120, 384),
+    "GEFS": (3, 6, 240, 840),
 }
-"""Per model: the step widths (hours) the lead-time axis may contain, and the last lead time."""
+"""Per model: the fine step, the coarse step, the last lead time (hours) on the fine step, and the
+last lead time on the axis."""
+
+RUN_SPACING_HOURS: Final[dict[str, int]] = {"GFS": 6, "GEFS": 24}
+"""Per model: the gap between successive `init_time`s (4 runs a day for GFS, 1 for GEFS)."""
+
+NIGHT_HOURS: Final[tuple[int, ...]] = (1, 2, 3)
+"""UTC valid hours whose averaging window ends before sunrise everywhere in Great Britain."""
+
+NIGHT_MEDIAN_LIMIT_W_M2: Final[float] = 5.0
+MIDDAY_MEAN_MINIMUM_W_M2: Final[float] = 100.0
+SUMMER_MONTHS: Final[tuple[int, ...]] = (4, 5, 6, 7, 8, 9)
+
+Results = dict[str, list[str]]
+"""Check name mapped to the months it failed in (empty if the check passed)."""
+
+_SKIPPED: Final[str] = "skipped"
 
 
-def _validate_month(*, path: Path, label: str) -> list[str]:
-    """Return one problem string per failed check on one cached month (empty if all pass)."""
+def _fail(*, results: Results, check: str, month: str) -> None:
+    """Record that `check` failed in `month`."""
+    results.setdefault(check, []).append(month)
+
+
+def _month_start(month: str) -> datetime:
+    """Return midnight UTC on the first day of `month` (`YYYY-MM`)."""
+    return datetime.strptime(month, "%Y-%m").replace(tzinfo=UTC)
+
+
+def _check_runs(
+    *, frame: pl.DataFrame, month: str, label: str, edge: bool, results: Results
+) -> None:
+    """Check that the `init_time`s sit in `month`, are regularly spaced, and are all present."""
+    start = _month_start(month)
+    end = start.replace(year=start.year + (start.month == 12), month=start.month % 12 + 1)
+    inits = frame["init_time"].unique().sort()
+    outside = inits.filter(
+        (inits < start.replace(tzinfo=None)) | (inits >= end.replace(tzinfo=None))
+    )
+    if outside.len():
+        _fail(results=results, check="init_in_month", month=month)
+    spacing = RUN_SPACING_HOURS[label]
+    if set(inits.diff().drop_nulls().dt.total_hours().to_list()) - {spacing}:
+        _fail(results=results, check="runs_regular", month=month)
+    if not edge and inits.len() != (end - start).days * 24 // spacing:
+        _fail(results=results, check="runs_full_month", month=month)
+
+
+def _check_values(*, frame: pl.DataFrame, month: str, results: Results) -> None:
+    """Check nulls, `NaN`s, and physical ranges of every value column."""
+    for variable in VARIABLES:
+        if frame[variable].null_count():
+            _fail(results=results, check="nulls", month=month)
+        nan_rows = frame.filter(pl.col(variable).is_nan())
+        if variable in AVERAGED_FIELDS:
+            if nan_rows.filter(pl.col("lead_time") > pl.duration(hours=0)).height:
+                _fail(results=results, check="nan", month=month)
+            at_zero = frame.filter(pl.col("lead_time") == pl.duration(hours=0))
+            if not at_zero.select(pl.col(variable).is_nan().all()).item():
+                _fail(results=results, check="radiation_nan_at_lead_0", month=month)
+        elif nan_rows.height:
+            _fail(results=results, check="nan", month=month)
+        low, high = RANGES[variable]
+        observed = frame.filter(pl.col(variable).is_finite()).select(
+            low=pl.col(variable).min(), high=pl.col(variable).max()
+        )
+        observed_low, observed_high = observed.row(0)
+        if observed_low is not None and (observed_low < low or observed_high > high):
+            _fail(results=results, check="ranges", month=month)
+
+
+def _check_lead_axis(*, frame: pl.DataFrame, month: str, label: str, results: Results) -> None:
+    """Check the lead-time axis starts at 0, ends where documented, and changes step on time."""
+    fine, coarse, change_hour, last_lead = LEAD_AXIS_HOURS[label]
+    leads = frame["lead_time"].unique().sort().dt.total_hours().to_list()
+    steps_ok = all(b - a == (fine if b <= change_hour else coarse) for a, b in pairwise(leads))
+    if leads[0] != 0 or leads[-1] != last_lead or not steps_ok:
+        _fail(results=results, check="lead_axis", month=month)
+
+
+def _check_diurnal(*, frame: pl.DataFrame, month: str, results: Results) -> None:
+    """Check shortwave radiation is near zero at night and positive at summer midday."""
+    valid = frame.select(
+        valid_time=pl.col("init_time") + pl.col("lead_time"), value=pl.col(SHORTWAVE)
+    ).filter(pl.col("value").is_not_nan())
+    hour = pl.col("valid_time").dt.hour()
+    night = valid.filter(hour.is_in(NIGHT_HOURS)).select(pl.col("value").median()).item()
+    midday = (
+        valid.filter((hour == 12) & pl.col("valid_time").dt.month().is_in(SUMMER_MONTHS))
+        .select(pl.col("value").mean())
+        .item()
+    )
+    if night is None:
+        results.setdefault("night", []).append(_SKIPPED)
+    elif night >= NIGHT_MEDIAN_LIMIT_W_M2:
+        _fail(results=results, check="night", month=month)
+    if midday is None:
+        results.setdefault("midday", []).append(_SKIPPED)
+    elif midday <= MIDDAY_MEAN_MINIMUM_W_M2:
+        _fail(results=results, check="midday", month=month)
+
+
+def _validate_month(*, path: Path, month: str, label: str, edge: bool, results: Results) -> None:
+    """Run every per-month check on one month file and record failures in `results`."""
     frame = pl.read_parquet(path)
-    problems: list[str] = []
     key = [
         c
         for c in ("init_time", "ensemble_member", "lead_time", "lat_index", "lon_index")
         if c in frame.columns
     ]
-    n_unique = frame.select(pl.struct(key).n_unique()).item()
-    if n_unique != frame.height:
-        problems.append(f"{frame.height - n_unique} duplicate keys")
+    if frame.select(pl.struct(key).n_unique()).item() != frame.height:
+        _fail(results=results, check="keys", month=month)
     expected_rows = 1
     for column in key:
         expected_rows *= frame[column].n_unique()
     if expected_rows != frame.height:
-        problems.append(f"{frame.height} rows, but the axes are {expected_rows} long combined")
-    for variable in VARIABLES:
-        column = frame[variable]
-        if column.null_count():
-            problems.append(f"{variable}: {column.null_count()} nulls")
-        nan_rows = frame.filter(pl.col(variable).is_nan())
-        if variable in AVERAGED_FIELDS:
-            stray = nan_rows.filter(pl.col("lead_time") > pl.duration(hours=0)).height
-            if stray:
-                problems.append(f"{variable}: {stray} NaN rows at lead time above 0")
-        elif nan_rows.height:
-            problems.append(f"{variable}: {nan_rows.height} NaN rows")
-        low, high = RANGES[variable]
-        finite = frame.filter(pl.col(variable).is_finite()).select(
-            low=pl.col(variable).min(), high=pl.col(variable).max()
-        )
-        observed_low, observed_high = finite.row(0)
-        if observed_low is not None and (observed_low < low or observed_high > high):
-            problems.append(f"{variable}: range {observed_low:.4g} to {observed_high:.4g}")
-    leads_hours = frame["lead_time"].unique().sort().dt.total_hours().to_list()
-    allowed_steps, last_lead = LEAD_STEPS_HOURS[label]
-    steps = {b - a for a, b in pairwise(leads_hours)}
-    if leads_hours[0] != 0 or leads_hours[-1] != last_lead or not steps <= allowed_steps:
-        problems.append(f"lead axis {leads_hours[0]} to {leads_hours[-1]} h, steps {sorted(steps)}")
-    print(
-        f"{path.stem}: {frame.height} rows, {frame['init_time'].n_unique()} init_times, "
-        f"lead steps {sorted(steps)} h, up to {leads_hours[-1]} h"
-    )
-    return problems
+        _fail(results=results, check="dense", month=month)
+    _check_runs(frame=frame, month=month, label=label, edge=edge, results=results)
+    _check_values(frame=frame, month=month, results=results)
+    _check_lead_axis(frame=frame, month=month, label=label, results=results)
+    _check_diurnal(frame=frame, month=month, results=results)
 
 
 def main() -> int:
-    """Validate every cached month and the combined file in one product directory."""
+    """Validate every month file and the combined file in one product directory."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", required=True, help="Product directory name.")
     arguments = parser.parse_args()
     product_dir = WEATHER_DOWNLOADS_DIR / arguments.directory
     label = next(name for name in DATASETS.values() if arguments.directory.startswith(name))
-    month_paths = sorted((product_dir / "_month_cache").glob("*.parquet"))
-    all_problems: list[str] = []
-    month_rows = 0
-    for path in month_paths:
-        problems = _validate_month(path=path, label=label)
-        all_problems += [f"{path.stem}: {problem}" for problem in problems]
-        month_rows += pl.scan_parquet(path).select(pl.len()).collect().item()
-    combined_rows = (
-        pl.scan_parquet(product_dir / f"{label}.parquet").select(pl.len()).collect().item()
-    )
-    if combined_rows != month_rows:
-        all_problems.append(f"combined file has {combined_rows} rows, months sum to {month_rows}")
-    print(f"combined: {combined_rows} rows from {len(month_paths)} months")
-    for problem in all_problems:
-        print(f"PROBLEM {problem}")
-    print("validation passed" if not all_problems else f"{len(all_problems)} problems")
-    return 1 if all_problems else 0
+    by_month = {
+        path.name.split(".")[0]: path for path in (product_dir / "_month_cache").glob("*.parquet")
+    }
+    months = sorted(by_month)
+    results: Results = {}
+    row_sum = 0
+    hashes: set[str | None] = set()
+    for index, month in enumerate(months):
+        edge = index in (0, len(months) - 1)
+        _validate_month(path=by_month[month], month=month, label=label, edge=edge, results=results)
+        row_sum += pl.scan_parquet(by_month[month]).select(pl.len()).collect().item()
+        hashes.add(pl.read_parquet_metadata(by_month[month]).get("cell_hash"))
+
+    stamps = [_month_start(month) for month in months]
+    expected = _month_range(stamps[0], stamps[-1]) if months else []
+    results["months_contiguous"] = [] if expected == months else ["all"]
+    results["cell_hash_same"] = [] if len(hashes) == 1 and None not in hashes else ["all"]
+    combined = pl.scan_parquet(product_dir / f"{label}.parquet").select(pl.len()).collect().item()
+    results["combined_rows"] = [] if combined == row_sum else ["all"]
+
+    failed = 0
+    for check, failures in results.items():
+        real = sorted({m for m in failures if m != _SKIPPED})
+        if real:
+            failed += 1
+            print(f"FAIL {check}: {', '.join(real)}")
+        elif failures:
+            print(f"SKIP {check}: no qualifying rows in some months")
+        else:
+            print(f"PASS {check}")
+    print("validation passed" if not failed else f"{failed} checks failed")
+    return 1 if failed else 0
+
+
+def _month_range(first: datetime, last: datetime) -> list[str]:
+    """Return every `YYYY-MM` label from `first` to `last` inclusive."""
+    count = (last.year - first.year) * 12 + last.month - first.month + 1
+    labels = []
+    for offset in range(count):
+        year, month_index = divmod(first.year * 12 + first.month - 1 + offset, 12)
+        labels.append(f"{year}-{month_index + 1:02d}")
+    return labels
 
 
 if __name__ == "__main__":
