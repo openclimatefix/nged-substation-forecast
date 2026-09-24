@@ -1158,7 +1158,7 @@ def _checks_lines(*, checks: ChecksResult) -> list[str]:
         (
             f"- Candidates by message type: {kinds['synop_only']} carry SYNOP rows only, "
             f"{kinds['awshrly_only']} carry AWSHRLY rows only, and {kinds['both_message_types']} "
-            "carry rows of both types."
+            "carry rows of both types (counts of stations)."
         ),
         (
             "- Exposure differs between the candidates. Over the window, each candidate's mean "
