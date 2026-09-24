@@ -40,9 +40,10 @@ products tests them directly, and the bottom panel of Figure 2 holds the four pl
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
-> AI model (for this page, Claude Opus 5.5, reusing the data-preparation and model-fitting code that
-> Claude Opus 5 wrote for the [beam/diffuse study](beam-diffuse-split.md)). Several independent
-> Claude reviewers have checked the method, the evidence, and the prose adversarially.
+> AI model (for this page, Claude Opus 5.5 and Claude Sonnet 5, reusing the data-preparation and
+> model-fitting code that Claude Opus 5 wrote for the [beam/diffuse
+> study](beam-diffuse-split.md)). Several independent Claude reviewers have checked the method, the
+> evidence, and the prose adversarially.
 
 ## Key findings
 
@@ -77,6 +78,10 @@ from the freshest run of that weather model that Open-Meteo's archive holds for 
   from 0.46 points in 2025 to 0.75 points in 2026, a change of 0.30 points [0.04, 0.58] after
   rounding, while ICON-EU's and ICON-D2's leads did not change by a margin statistically
   significant at the 5% level.** See [ERA5's deficit, year by year](#era5s-deficit-year-by-year).
+- **ICON-DREAM-EU, DWD's newer reanalysis, does not beat ERA5, and trails ICON-EU, the operational
+  model it is built on, by 0.34 points [0.27, 0.41] at both hyperparameter settings.** See
+  [ICON-DREAM-EU does not beat ERA5, and trails
+  ICON-EU](#icon-dream-eu-does-not-beat-era5-and-trails-icon-eu).
 
 ## Introduction
 
@@ -96,7 +101,8 @@ many hours after a run started its archived value was forecast. A lead of zero, 
 run's analysis: the weather model's best estimate of the weather at the moment the run starts. CAMS,
 the Copernicus Atmosphere Monitoring Service's satellite retrieval, describes past sunshine best of
 the eight products on the solar page but publishes no wind, so it is not compared here.
-ICON-DREAM-EU, which the solar page scores, is not scored for wind on this page.
+ICON-DREAM-EU, DWD's reanalysis, is scored separately in [ICON-DREAM-EU does not beat ERA5, and
+trails ICON-EU](#icon-dream-eu-does-not-beat-era5-and-trails-icon-eu), on its own row set.
 
 | Product | What it is | Grid spacing, native and as served | Wind heights served | Served lead | Covers all of Great Britain? | Start of the hub-height wind archive read here | Available after |
 |---|---|---|---|---|---|---|---|
@@ -399,6 +405,85 @@ is ICON global's difference from ERA5 statistically significant at the 5% level.
 ![Figure 10: On January to September of each year, UKV's lead over ERA5 grew in 2026; ICON-EU's and
 ICON-D2's did not](assets/wind_era5_by_year.svg)
 
+### ICON-DREAM-EU does not beat ERA5, and trails ICON-EU
+
+**ICON-DREAM-EU, the German Weather Service's reanalysis, does not beat ERA5, and trails ICON-EU,
+the operational European ICON run it is built on, by 0.34 points [0.27, 0.41] at both
+hyperparameter settings.** ICON-DREAM-EU is a newer reanalysis than ERA5, built on the same ICON
+model family as ICON-EU, ICON-D2 and ICON global, the three operational ICON runs already scored
+above. This section asks whether a reanalysis built on a newer model beats ERA5, and whether it
+improves on the operational run it draws its physics from.
+
+**ICON-DREAM-EU is read from a gridded download, at DWD's model level 72, about 96 m, rather than
+fetched at each generator's coordinates.** Its direction comes from its `U` and `V` wind-component
+fields at that level, and its 10 m speed from its own surface field. Each generator reads the
+nearest ICON-DREAM-EU grid cell: 1.9 km for Generator W1, 3.4 km for Generator W2, and 1.3 km for
+Generator W3.
+
+**Every arm, including the five products already scored above, is refitted on ICON-DREAM-EU's own
+row set: 50,041 site-hours from August 2024 to August 2026.** ICON-DREAM-EU's record stops a month
+short of the other five products', so a saved loss from earlier on this page cannot be reused
+without silently mixing two different row sets. This section therefore rests on its own, shorter
+row set than the rest of the page, though the row-build rules — the same power hour, the same
+zero-half-hour drop, the same fold boundary at the UKV upgrade — are otherwise identical.
+
+![Figure 11: ICON-DREAM-EU ties ERA5 and beats only ICON global of the six products
+tested](assets/wind_icon_dream_leaderboard.svg)
+
+**ICON-DREAM-EU's error is statistically indistinguishable from ERA5's.** Across the window
+ICON-DREAM-EU is 0.001 points behind ERA5 [−0.119, +0.131], not statistically significant at the 5%
+level. The sign reverses at the second hyperparameter setting, where ICON-DREAM-EU is 0.047 points
+ahead of ERA5 [−0.163, +0.080], also not statistically significant.
+
+**ICON-DREAM-EU trails ICON-EU by 0.34 points at both hyperparameter settings.** At the primary
+setting the gap is 0.340 points [0.266, 0.405], and at the second setting 0.338 points [0.282,
+0.391]; both are statistically significant at the 5% level, with every fold agreeing.
+
+![Figure 12: ICON-DREAM-EU does not beat ERA5, and trails ICON-EU by 0.34
+points](assets/wind_icon_dream_planned_contrasts.svg)
+
+**The rest of this section is exploratory: chosen after the results were seen, not named in the
+plan.** Giving the XGBoost model two more height levels — level 73, about 42 m, and level 71, about
+167 m — alongside level 72 improves on the primary arm by 0.044 points [0.016, 0.074], statistically
+significant at the 5% level. That arm carries two more feature columns than its reference, and this
+repository's own measurement puts the effect of extra columns alone at up to about 0.4% of mean
+absolute error even at this study's column-subsampling setting, so part of this gain may belong to
+the extra columns rather than to the extra heights.
+
+**Direction adds skill for ICON-DREAM-EU too, in line with every other product tested.** Giving the
+XGBoost model ICON-DREAM-EU's direction and 10 m speed alongside its hub-height speed, rather than
+the hub-height speed alone, cuts its error by 0.305 points [0.204, 0.415]. The same addition cuts
+ERA5's error by 0.616 points [0.454, 0.789], UKV's by 0.388 points [0.280, 0.501], ICON-D2's by
+0.239 points [0.137, 0.344], ICON-EU's by 0.367 points [0.245, 0.496], and ICON global's by 0.541
+points [0.377, 0.744].
+
+**ICON-DREAM-EU's gap to ICON-EU is consistent across all three generators, but its comparison with
+ERA5 is not.** Against ICON-EU, ICON-DREAM-EU trails by 0.403 points [0.324, 0.484] at Generator
+W1, 0.293 points [0.144, 0.438] at Generator W2, and 0.326 points [0.160, 0.462] at Generator W3,
+each statistically significant at the 5% level. Against ERA5, ICON-DREAM-EU trails by 0.164 points
+[0.049, 0.285] at Generator W1, a gap statistically significant at the 5% level, but neither
+Generator W2 (0.225 points ahead [−0.002, +0.449], not statistically significant) nor Generator W3
+(0.074 points behind [−0.083, +0.238], not statistically significant) shows a difference
+distinguishable from zero.
+
+**Neither planned contrast's size changed from 2025 to 2026, in a comparison restricted to
+January to August of each year so a partial 2026 compares against the same months of 2025.** Against
+ERA5, the difference was −0.075 points [−0.273, +0.097] in 2025 and −0.036 points [−0.217, +0.132]
+in 2026, neither statistically significant, a change of +0.039 points [−0.212, +0.297], also not
+statistically significant. Against ICON-EU, the gap was 0.416 points [0.312, 0.498] in 2025 and
+0.376 points [0.309, 0.430] in 2026, both statistically significant, a change of −0.041 points
+[−0.145, +0.080], not statistically significant.
+
+**The pre-fit checks passed before any arm was fitted.** ICON-DREAM-EU's speed from its `U` and `V`
+wind components agrees with its own served scalar speed almost exactly: a median absolute
+difference of 0.0003 m/s at level 72 and 0.0002 m/s at 10 m. ICON-DREAM-EU's direction disagrees
+with ERA5's own 100 m direction by 10.4 degrees mean absolute, consistent across all three
+generators (10.1 to 10.5 degrees), the size of disagreement expected between two different products
+rather than a sign of a wrong meteorological convention. The hour-to-hour correlation between
+ICON-DREAM-EU's and ERA5's speed changes peaks at zero offset (0.436), clearly higher than at plus
+or minus one hour (0.345 and 0.322) or plus or minus two hours (0.194 and 0.181), confirming
+ICON-DREAM-EU's served value carries no timestamp offset relative to ERA5.
+
 ## What to use
 
 **These recommendations rest on three wind farms in one flat part of Lincolnshire, over 2 years.**
@@ -449,6 +534,11 @@ product?](blending-weather-products.md#wind-a-blend-beats-ukv-given-its-neighbou
 - **The figures rest on the capacity table as rebuilt in September 2026.** Each generator's capacity
   is its 99th percentile of output from the `effective_capacity` table, so a rebuilt table would
   move every figure.
+- **ICON-DREAM-EU's own row set.** [ICON-DREAM-EU does not beat ERA5, and trails
+  ICON-EU](#icon-dream-eu-does-not-beat-era5-and-trails-icon-eu) refits every arm, including the
+  five products above, on ICON-DREAM-EU's own, shorter row set (August 2024 to August 2026, a
+  month short of the rest of the page), so its numbers are not directly comparable to the rest of
+  this page's.
 
 ## Reproducing the figures
 
@@ -457,6 +547,8 @@ uv run python studies/beam_diffuse_split/fetch_wind_point.py
 uv run python studies/beam_diffuse_split/wind_products.py
 uv run python studies/beam_diffuse_split/wind_products.py --era5-by-year
 uv run python studies/beam_diffuse_split/wind_product_charts.py
+uv run python studies/beam_diffuse_split/wind_icon_dream.py
+uv run python studies/beam_diffuse_split/wind_icon_dream_charts.py
 ```
 
 The report lands in `data/studies/beam_diffuse_split/beam_diffuse_wind_products/report.md`.
@@ -468,3 +560,6 @@ the grid-cell check, the 100 m rescaling, and when the ICON 80 m wind starts. Th
 diagnostics behind the served leads were one-off checks during review, and are not in either report.
 `wind_products.py --era5-by-year` reads the saved losses, fits nothing, and writes Figure 10's table
 to `data/studies/beam_diffuse_split/past_weather_v2/wind/era5_by_year.md`.
+`wind_icon_dream.py`'s report lands separately, in
+`data/studies/beam_diffuse_split/past_weather_v2/wind_icon_dream/report.md`; `--report-only`
+rebuilds it from a saved `losses.parquet` alone, fitting nothing.
