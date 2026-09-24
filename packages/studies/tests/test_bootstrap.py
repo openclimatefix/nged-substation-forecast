@@ -6,6 +6,7 @@ import pytest
 from studies.bootstrap import (
     bootstrap_absolute,
     bootstrap_difference,
+    bootstrap_difference_at_level,
     bootstrap_difference_by_year,
     bootstrap_row_difference,
     bootstrap_year_change,
@@ -489,3 +490,45 @@ def test_bootstrap_row_difference_interval_collapses_with_no_month_spread():
 
     assert result["lower_95"] == pytest.approx(5.0)
     assert result["upper_95"] == pytest.approx(5.0)
+
+
+def test_the_interval_at_95_percent_equals_the_published_interval():
+    losses = _losses(seeds=(0, 1, 2))
+    interval = bootstrap_difference(losses=losses, treatment="T", reference="R", metric="loss")
+
+    assert bootstrap_difference_at_level(
+        losses=losses, treatment="T", reference="R", metric="loss", level=95.0
+    ) == (interval["lower_95"], interval["upper_95"])
+
+
+def test_a_higher_level_widens_the_interval_on_both_sides():
+    losses = _losses(seeds=(0, 1, 2))
+    lower_95, upper_95 = bootstrap_difference_at_level(
+        losses=losses, treatment="T", reference="R", metric="loss", level=95.0
+    )
+
+    lower, upper = bootstrap_difference_at_level(
+        losses=losses, treatment="T", reference="R", metric="loss", level=99.0
+    )
+
+    assert lower < lower_95
+    assert upper > upper_95
+
+
+def test_the_interval_at_a_level_uses_symmetric_tails_of_the_same_resamples():
+    # Pinned from the implementation: 90% leaves 5% in each tail of the same 2,000 resampled means.
+    lower, upper = bootstrap_difference_at_level(
+        losses=_losses(seeds=(0, 1, 2)), treatment="T", reference="R", metric="loss", level=90.0
+    )
+
+    assert (lower, upper) == pytest.approx((-0.784757575276633, 0.5454459534554414))
+
+
+@pytest.mark.parametrize("level", [0.95, 1.0, 0.0, 100.0, -5.0, 101.0])
+def test_a_level_that_is_not_a_percentage_raises(level: float):
+    # 0.95 is the natural mistake: a fraction where a percentage is expected. Accepted, it would
+    # give an interval between the 49.5th and 50.5th percentiles.
+    with pytest.raises(ValueError, match="percent"):
+        bootstrap_difference_at_level(
+            losses=_losses(seeds=(0,)), treatment="T", reference="R", metric="loss", level=level
+        )

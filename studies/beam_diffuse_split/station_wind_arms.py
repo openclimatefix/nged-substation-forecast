@@ -95,6 +95,7 @@ from studies.bootstrap import (
     N_BOOTSTRAP_RESAMPLES,
     bootstrap_absolute,
     bootstrap_difference,
+    bootstrap_difference_at_level,
     fold_t_interval,
     paired_differences,
     per_fold_differences,
@@ -104,7 +105,9 @@ from studies.cross_validation import (
     PRIMARY_HYPER_PARAMETERS,
     SEEDS,
     SENSITIVITY_HYPER_PARAMETERS,
+    calendar_month_coverage,
     fit_one_fold,
+    raise_on_uncovered_months,
 )
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.midas import read_hourly_weather, read_station_metadata, select_nearest_stations
@@ -299,8 +302,7 @@ POOLED_CAVEAT: Final[str] = (
 
 
 # ---------------------------------------------------------------------------------------------
-# Helpers that mirror PR #885's `ens_hres_past_wind.py`; to be replaced by imports once that PR
-# has merged, and untested in `packages/studies` until then.
+# The interval log, the row-set fingerprint and the script commit.
 # ---------------------------------------------------------------------------------------------
 
 
@@ -324,10 +326,7 @@ class IntervalRecord(TypedDict):
 
 @dataclass
 class IntervalLog:
-    """Every interval the report prints, collected as the report is assembled.
-
-    Mirrors PR #885's `IntervalLog`.
-    """
+    """Every interval the report prints, collected as the report is assembled."""
 
     records: list[IntervalRecord] = field(default_factory=list)
 
@@ -360,7 +359,7 @@ class IntervalLog:
 def _fingerprint(*, frame: pl.DataFrame, job_list: list[Job]) -> str:
     """Return a hash covering every row's values, every job's columns, and the seeds.
 
-    Mirrors PR #885's `_fingerprint`. Every float column is cast to `Float32` before hashing, so
+    Every float column is cast to `Float32` before hashing, so
     last-bit noise cannot flip the fingerprint; the saved `losses.parquet` keeps full precision.
 
     Args:
@@ -389,8 +388,6 @@ def _fingerprint(*, frame: pl.DataFrame, job_list: list[Job]) -> str:
 def _script_commit() -> str:
     """Return the commit the script is at, raising if the script has uncommitted changes.
 
-    Mirrors PR #885's `_script_commit`.
-
     Returns:
         The short hash of the last commit that changed this file.
 
@@ -414,86 +411,6 @@ def _script_commit() -> str:
         msg = "the script has no commit; commit it before the first fit"
         raise ValueError(msg)
     return commit
-
-
-def _bootstrap_percentiles(
-    *, differences: np.ndarray, months: np.ndarray, percentiles: tuple[float, float]
-) -> tuple[float, float]:
-    """Resample whole months and a seed, as `studies.bootstrap` does, at any two percentiles.
-
-    Mirrors PR #885's `_bootstrap_percentiles`. The random stream has the same shape as
-    `studies.bootstrap._resample_bounds`, and `_bonferroni_lines` asserts that this reproduces
-    `bootstrap_difference`'s own 95% interval.
-
-    Args:
-        differences: Per-seed, per-row differences, shape (n_seeds, n_rows).
-        months: Each row's month label.
-        percentiles: The two percentiles to return.
-
-    Returns:
-        The two percentiles of the resampled mean.
-    """
-    unique_months, month_index = np.unique(months, return_inverse=True)
-    rows_by_month = [np.flatnonzero(month_index == index) for index in range(len(unique_months))]
-    generator = np.random.default_rng(BOOTSTRAP_SEED)
-    resampled = np.empty(N_BOOTSTRAP_RESAMPLES)
-    for resample in range(N_BOOTSTRAP_RESAMPLES):
-        seed_index = generator.integers(0, differences.shape[0])
-        drawn = generator.integers(0, len(rows_by_month), size=len(rows_by_month))
-        rows = np.concatenate([rows_by_month[index] for index in drawn])
-        resampled[resample] = differences[seed_index, rows].mean()
-    low, high = np.percentile(resampled, q=percentiles)
-    return float(low), float(high)
-
-
-def calendar_month_coverage(*, frame: pl.DataFrame) -> pl.DataFrame:
-    """Count, for each held-out calendar month, the training rows that carry it.
-
-    Mirrors PR #885's `calendar_month_coverage`.
-
-    Args:
-        frame: The row set carrying `site`, `fold` and `time`.
-
-    Returns:
-        One row per (site, fold, calendar_month) with `n_scored`, `n_train`, `n_years` (how many
-        distinct years of the site's rows carry that calendar month) and `covered`.
-    """
-    rows = frame.select(
-        "site", "fold", calendar_month=pl.col("time").dt.month(), year=pl.col("time").dt.year()
-    )
-    totals = rows.group_by("site", "calendar_month").agg(
-        n_total=pl.len(), n_years=pl.col("year").n_unique()
-    )
-    return (
-        rows.group_by("site", "fold", "calendar_month")
-        .agg(n_scored=pl.len())
-        .join(totals, on=["site", "calendar_month"])
-        .with_columns(n_train=pl.col("n_total") - pl.col("n_scored"))
-        .with_columns(covered=pl.col("n_train") > 0)
-        .drop("n_total")
-        .sort("site", "fold", "calendar_month")
-    )
-
-
-def _raise_on_uncovered_months(*, coverage: pl.DataFrame) -> None:
-    """Raise if a held-out calendar month that occurs in two years has no training row.
-
-    Mirrors PR #885's `_raise_on_uncovered_months`.
-
-    Args:
-        coverage: `calendar_month_coverage`'s result.
-
-    Raises:
-        ValueError: Naming the number of failing cells, without their farm labels' row counts.
-    """
-    failures = coverage.filter(~pl.col("covered"), pl.col("n_years") > 1)
-    if failures.height:
-        months = sorted(failures["calendar_month"].unique().to_list())
-        msg = (
-            f"{failures.height} (farm, fold, calendar month) cells hold out a calendar month that "
-            f"occurs in two years and leave no training row for it; calendar months {months}"
-        )
-        raise ValueError(msg)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -1086,7 +1003,7 @@ def _raise_on_failed_checks(*, checks: ChecksResult, frame: pl.DataFrame) -> Non
     if max(correlations, key=correlations.__getitem__) != 0:
         msg = f"the station-against-UKV correlation does not peak at zero offset: {correlations}"
         raise ValueError(msg)
-    _raise_on_uncovered_months(coverage=checks["coverage"])
+    raise_on_uncovered_months(coverage=checks["coverage"])
     every_column = {
         column
         for columns in (*arm_columns().values(), *post_review_arm_columns().values())
@@ -1426,7 +1343,7 @@ def contrast_line(
 ) -> str:
     """Return one markdown contrast row, and record its interval in `log`.
 
-    Mirrors PR #885's `contrast_line`; a per-farm row carries no row or month count.
+    A per-farm row carries no row or month count.
 
     Args:
         losses: Per-row losses holding both arms, restricted to the scope wanted.
@@ -1551,9 +1468,8 @@ def _pooled_caveat(*, losses: pl.DataFrame, arm: str) -> str:
 def _bonferroni_lines(*, losses: pl.DataFrame, setting: str, log: IntervalLog) -> list[str]:
     """Render the planned contrasts with intervals adjusted for the four planned intervals.
 
-    Each interval is a percentile interval of the same month-and-seed resampling, at the level
-    `BONFERRONI_LEVEL`. The function first asserts that its resampler reproduces
-    `bootstrap_difference`'s own 95% interval on the first contrast.
+    Each interval is a percentile interval of the same month-and-seed resampling as
+    `bootstrap_difference`, at the level `BONFERRONI_LEVEL`.
 
     Args:
         losses: Per-row losses at one setting, holding the arms of the planned contrasts.
@@ -1562,11 +1478,7 @@ def _bonferroni_lines(*, losses: pl.DataFrame, setting: str, log: IntervalLog) -
 
     Returns:
         Markdown lines.
-
-    Raises:
-        ValueError: If the resampler does not reproduce the 95% interval of `bootstrap_difference`.
     """
-    tail = (100.0 - BONFERRONI_LEVEL) / 2.0
     lines = [
         (
             f"| Contrast | ΔMAE (pp of capacity) | {BONFERRONI_LEVEL:.2f}% interval "
@@ -1575,24 +1487,18 @@ def _bonferroni_lines(*, losses: pl.DataFrame, setting: str, log: IntervalLog) -
         ),
         "|---|---|---|---|---|",
     ]
-    for index, (name, treatment, reference) in enumerate(PLANNED_CONTRASTS):
+    for name, treatment, reference in PLANNED_CONTRASTS:
         differences, months = paired_differences(
             losses=losses, treatment=treatment, reference=reference, metric=METRIC
         )
-        if index == 0:
-            own = bootstrap_difference(
-                losses=losses, treatment=treatment, reference=reference, metric=METRIC
-            )
-            mine = _bootstrap_percentiles(
-                differences=differences, months=months, percentiles=(2.5, 97.5)
-            )
-            if not np.allclose(mine, (own["lower_95"], own["upper_95"]), rtol=0.0, atol=1e-12):
-                msg = f"the resampler gives {mine}, not bootstrap_difference's interval"
-                raise ValueError(msg)
         lower, upper = (
             value * PERCENTAGE_POINTS
-            for value in _bootstrap_percentiles(
-                differences=differences, months=months, percentiles=(tail, 100.0 - tail)
+            for value in bootstrap_difference_at_level(
+                losses=losses,
+                treatment=treatment,
+                reference=reference,
+                metric=METRIC,
+                level=BONFERRONI_LEVEL,
             )
         )
         difference = float(differences.mean()) * PERCENTAGE_POINTS

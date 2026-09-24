@@ -116,6 +116,7 @@ from studies.cross_validation import (
     PRIMARY_HYPER_PARAMETERS,
     SEEDS,
     SENSITIVITY_HYPER_PARAMETERS,
+    UKV_UPGRADE_MONTH,
     assign_folds,
     clamp_to_cap,
     fit_one_fold,
@@ -265,9 +266,6 @@ LEAD_TABLE_HOURS: Final[tuple[int, int]] = (7, 19)
 
 Outside these hours the sun is too low for a difference between products to carry signal.
 """
-
-UPGRADE_MONTH: Final[str] = "2026-02"
-"""The first whole month after the Met Office made the PS47 upgrade operational on 2026-01-21."""
 
 UPGRADE_DAY: Final[datetime] = datetime(2026, 1, 21, tzinfo=UTC)
 """The upgrade instant.
@@ -855,7 +853,7 @@ def with_eras(*, frame: pl.DataFrame) -> pl.DataFrame:
     Returns:
         The frame with `era`, `era_code` and `fold`.
     """
-    post = pl.col("month") >= UPGRADE_MONTH
+    post = pl.col("month") >= UKV_UPGRADE_MONTH
     labelled = frame.with_columns(
         era=pl.when(post).then(pl.lit("post")).otherwise(pl.lit("pre")),
         era_code=post.cast(pl.Int8),
@@ -1213,7 +1211,9 @@ def _scope(*, losses: pl.DataFrame, scope: str) -> pl.DataFrame:
         ValueError: If `scope` is not one of `SCOPES`.
     """
     losses = losses.with_columns(
-        era=pl.when(pl.col("month") >= UPGRADE_MONTH).then(pl.lit("post")).otherwise(pl.lit("pre"))
+        era=pl.when(pl.col("month") >= UKV_UPGRADE_MONTH)
+        .then(pl.lit("post"))
+        .otherwise(pl.lit("pre"))
     )
     if scope == "all":
         return losses
