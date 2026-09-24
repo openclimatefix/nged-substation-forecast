@@ -1,6 +1,7 @@
 # Plan: ECMWF ENS and ECMWF IFS HRES wind in the past-wind study (phase 1)
 
-**Problem.** [Which weather product best describes past wind?](../docs/studies/weather-products-for-past-wind.md)
+**Problem.** [Which weather product best describes past wind?](../docs/studies/weather-products-for-
+past-wind.md)
 scores ERA5, UKV, ICON-D2, ICON-EU and ICON global at three wind farms (W1 to W3). The page scores
 no ECMWF IFS HRES (checked: no HRES arm in `wind_products.py`, no HRES text on the page) and no
 ECMWF ENS. The past-solar page has both. The ENS horizons page compares ENS with ERA5 for wind at
@@ -9,8 +10,8 @@ day 0 and day 1, but not with UKV, ICON, or HRES.
 **Solution.** One new study script that reads the page's own row set, adds an HRES arm and an ENS
 ensemble-mean arm, and refits every product on the rows all of them cover. It scores three
 planned contrasts fixed in this file before any fit. It reuses the horizons study's ENS wind
-inputs and the `wind_icon_dream.py` structure, so no new ENS code is written. One results section, one "What to
-use" bullet and one chart script follow.
+inputs and the `wind_icon_dream.py` structure, so no new ENS code is written. One results section,
+one "What to use" bullet and one chart script follow.
 
 ## Verdict, size and the five trigger answers
 
@@ -58,7 +59,8 @@ leads 0 to 23 hours from the 00 UTC run, Dynamical.org's archive, 0.25 degrees, 
 members combined as the horizons study does (`reduce_members`: the mean of the members' speeds, the
 direction of the mean wind vector) after each member's 3-hourly steps are rebuilt to hourly by the
 wind treatment below; HRES as Open-Meteo's freshest-run `ecmwf_ifs` hourly wind; every arm given
-the page's seven columns (`SHARED_FEATURES` plus `_wind_columns`), at hub height 100 m for HRES, ENS,
+the page's seven columns (`SHARED_FEATURES` plus `_wind_columns`), at hub height 100 m for HRES,
+ENS,
 ERA5 and UKV.
 
 | # | Contrast (first minus second) | Question it answers |
@@ -111,7 +113,8 @@ model absorbs the mismatch. Phase 1 adds no shear extrapolation.
   HRES, from 1 December 2024, the first whole month after IFS Cycle 49r1 (12 November 2024), to the
   page's end date (2026-09-10). The date filter runs before eras and folds are assigned, as
   `wind_icon_dream.icon_dream_common_rows` does. The row set holds 43,555 rows (W1 14,489, W2
-  14,994, W3 14,072). The row set starts later than the page's (12 August 2024) because HRES's served
+  14,994, W3 14,072). The row set starts later than the page's (12 August 2024) because HRES's
+  served
   grid before 2025 is not established, as on the solar page. Every product is refit on this row
   set.
 - **Arms.** Every product's wind arm at the primary setting (ERA5, UKV, ICON-D2, ICON-EU, ICON
@@ -120,7 +123,8 @@ model absorbs the mismatch. Phase 1 adds no shear extrapolation.
   m/s).
 - **Fairness.** Every arm has exactly the same rows and seven columns; `colsample_bytree=1`;
   per-arm column lists in the report; folds cut inside each of three eras: before 1 October 2025
-  (HRES's archive source changes), 1 October 2025 to 20 January 2026, and from 1 February 2026 (the UKV upgrade; the rest of January
+  (HRES's archive source changes), 1 October 2025 to 20 January 2026, and from 1 February 2026 (the
+  UKV upgrade; the rest of January
   2026 dropped as on the page), with `era_code` taking three values for every arm, so IFS Cycle
   50r1 on 12 May 2026 is left to the period split below; month-resampled
   paired bootstrap of whole months and seeds.
