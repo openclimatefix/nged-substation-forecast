@@ -116,9 +116,11 @@ weather model that started a few hours earlier.
   month](#implied-capacity-from-month-to-month).
 - **On their own row set, from November 2024, both HARMONIE-AROME models trail their regional ICON
   rival, and ECMWF-IFS-HRES against ICON-EU is not resolved.** KNMI HARMONIE-AROME trails ICON-EU
-  by 0.56 points [0.32, 0.75] and DMI HARMONIE-AROME trails ICON-D2 by 1.02 points [0.73, 1.26];
-  neither HARMONIE-AROME model's own served lead is measured. None of the four extra Open-Meteo
-  models beats the products this page already recommends. See [The four extra Open-Meteo
+  by 0.56 points [0.32, 0.75], and its own served lead is not measured. DMI HARMONIE-AROME trails
+  ICON-D2 by 1.02 points [0.73, 1.26]; DMI's own served lead is measured at 3 hours, matching
+  ICON-D2's cycle, so the two run at matched leads throughout and the loss stands with no lead
+  caveat. None of the four extra Open-Meteo models beats the products this page already
+  recommends. See [The four extra Open-Meteo
   models](#the-four-extra-open-meteo-models).
 
 ## Introduction
@@ -129,7 +131,7 @@ electricity customers. Capacity estimation infers a generator's size from how it
 sunshine. Training history is the years of past weather that pre-training a forecasting model needs.
 Historical features give a forecasting model the weather of hours already past. Disaggregation
 separates hidden solar generation from demand at a substation. Each consumer reads one weather
-product, and the project has to choose which. This page measures how well eight products describe
+product, and the project has to choose which. This page measures how well twelve products describe
 past sunshine at six metered solar farms, and says which product each consumer should read.
 
 **The products differ in how far ahead each value was forecast and in what area they cover, as well
@@ -156,7 +158,7 @@ The map also draws AROME France, which this page does not test](../roadmap/asset
 | ICON-DREAM-EU | DWD reanalysis over Europe, built from ICON | 1 to 3 hours | yes | about 6.5 km; read at the nearest cell | 2010; read here from September 2019 | not established |
 | ECMWF-IFS-HRES | ECMWF's global model | 1 to 12 hours before 1 October 2025 (12-hour cycle); 1 to 6 hours from it (6-hour cycle, after ECMWF opened its real-time catalogue) | yes | 9 km | 2017; read here from November 2024 | not established |
 | ARPEGE Europe | Météo-France's global model on its European grid | 1 to 6 hours (4-times-daily cycle) | yes | not established | January 2024; read here from November 2024 | not established |
-| DMI HARMONIE-AROME | Danish weather service's HARMONIE-AROME model over Europe | not yet measured | yes | 2 km | July 2024; read here from November 2024 | not established |
+| DMI HARMONIE-AROME | Danish weather service's HARMONIE-AROME model over Europe | 1 to 3 hours, measured at 3-hourly | yes | 2 km | July 2024; read here from November 2024 | not established |
 | KNMI HARMONIE-AROME | Dutch weather service's HARMONIE-AROME model over Europe | not yet measured | yes | 5.5 km | July 2024; read here from November 2024 | not established |
 
 **Most of the latencies come from each service's own documentation:** CAMS's [radiation-service
@@ -192,7 +194,7 @@ each product's sunshine says about the output once that XGBoost model has been f
 
 ### Where each product comes from, and its served lead
 
-**The four weather models come from Open-Meteo's historical-forecast archive, and ERA5 from
+**The eight weather models come from Open-Meteo's historical-forecast archive, and ERA5 from
 Open-Meteo's copy of the Copernicus archive.** `verify_era5_sources.py` checked that copy against
 the Copernicus original. CAMS comes from the CAMS radiation service. The start dates for the weather
 models are those of Open-Meteo's archive: DWD has run ICON global and ICON-EU since 2015, and
@@ -697,8 +699,10 @@ generator's own coordinates, the same way as UKV and the three ICON weather mode
 score here on a shorter, later row set: 40,243 common site-hours, November 2024 to August 2026, all
 twelve products sharing every hour. The row set starts later than the rest of this page for two
 reasons: Open-Meteo's UKV archive is a backfill before 12 August 2024, and Météo-France's cycle
-48t1, on 15 October 2024, replaced ARPEGE's radiation scheme, stepping its irradiance against
-ECMWF-IFS-HRES; the first whole month after the later of the two is the start. Two of the four
+48t1, on 15 October 2024, replaced ARPEGE's radiation scheme. The ARPEGE/ECMWF-IFS-HRES irradiance
+ratio moves from about 0.86 to 0.89 in September and October 2024 to about 0.96 to 1.03 from
+November, which matches that date, though the row set does not reach far enough back to date the
+step itself. The first whole month after the later of the two changes is the start. Two of the four
 weather models, DMI's and KNMI's HARMONIE-AROME, cover only from July 2024, which the later start
 already accommodates.
 
@@ -707,28 +711,43 @@ XGBoost setting:**
 
 - **KNMI HARMONIE-AROME trails ICON-EU, its Great-Britain-wide rival, by 0.56 points of capacity
   [0.32, 0.75], and the gap holds at the second XGBoost setting (0.50 points [0.22, 0.73]).**
-- **DMI HARMONIE-AROME trails ICON-D2, its 2 km rival, by 1.02 points [0.73, 1.26], and the gap
-  holds at the second setting (0.94 points [0.66, 1.18]).** Neither HARMONIE-AROME model's own
-  served lead is measured (below), so each of these two contrasts mixes weather-model skill with
+  KNMI's own served lead is not measured (below), so this contrast mixes weather-model skill with
   lead: the plan's own reasoning, written before either result existed, expects HARMONIE-AROME's
-  typical 1-to-3-hour cycle to be as short as ICON's or shorter, which would bias a contrast in
-  HARMONIE-AROME's favour rather than against it.
+  typical 1-to-3-hour cycle to be as short as ICON's or shorter, which would bias the contrast in
+  KNMI's favour rather than against it.
+- **DMI HARMONIE-AROME trails ICON-D2, its 2 km rival, by 1.02 points [0.73, 1.26], and the gap
+  holds at the second setting (0.94 points [0.66, 1.18]).** Unlike KNMI, DMI's own served lead is
+  measured at 3 hours, the same cycle as ICON-D2's (below), so the two run at matched leads on
+  every row: DMI trails ICON-D2 by 1.09 points [0.78, 1.35] on 07–19 UTC, close to the unsplit
+  figure above, so this loss stands with no lead caveat.
 - **ECMWF-IFS-HRES against ICON-EU is not resolved: −0.09 points [−0.37, +0.17], and about 0
-  points [−0.28, +0.27] at the second setting.** IFS-HRES's own served lead is measured (below), and
-  splitting the row set by whether the two products' leads match narrows the gap without
-  resolving it: −0.31 points [−0.69, +0.06] at matched leads, +0.05 points [−0.27, +0.35] where
-  IFS-HRES's lead is the longer of the two. No row fell where IFS-HRES's lead was the shorter.
+  points [−0.28, +0.27] at the second setting.** IFS-HRES's own served lead is measured (below).
+  ECMWF runs IFS-HRES every 6 hours, or every 12 for its longest forecasts, where ICON-EU runs
+  every 3, so the plan's own reasoning, written before either result existed, expected IFS-HRES's
+  longer average lead to bias the pooled contrast against it. Splitting the row set by whether the
+  two products' leads match bears that out: the gap widens to −0.31 points [−0.69, +0.06] at
+  matched leads, in IFS-HRES's favour relative to the pooled figure, and narrows to +0.05 points
+  [−0.27, +0.35] where IFS-HRES's lead is the longer of the two, without resolving either split. No
+  row fell where IFS-HRES's lead was the shorter. The matched-lead and longer-lead rows also differ
+  in hour of day, so the split does not isolate lead on its own.
 
 **How each served lead was measured, or why it was not (exploratory):** `check_new_products.py`
 reads a single-site hourly 2 m temperature fetch for each of the four models and looks for an
 hour where the mean absolute second difference of temperature stands out from the rest of the
-day — a run switch, because temperature is served around the clock and carries no diurnal solar
-cycle to swamp the signal the way radiation does. ECMWF-IFS-HRES's temperature peaks 12 hours
-apart before 1 October 2025 and 6 hours apart from it, when Open-Meteo switched it to ECMWF's
-native open-data feed; ARPEGE's peaks 6 hours apart across its whole record, matching its public
-four-times-daily cycle. Neither HARMONIE-AROME model shows a peak standing out from the rest of
-the day, consistent with a cycle too short (an hour or a few) for this method to resolve, so
-neither gets a measured interval.
+day — a run switch. Temperature carries its own diurnal cycle, a smooth afternoon warming that
+raises this curvature from 12 to 18 UTC for every one of the four models, unlike radiation's sharp
+on/off pattern at sunrise and sunset. A ratio read against the whole day's median absorbs that
+afternoon hump into the baseline, and a run switch that sits inside the hump can then read as
+unremarkable. ECMWF-IFS-HRES's temperature peaks 12 hours apart before 1 October 2025 and 6 hours
+apart from it, when Open-Meteo switched it to ECMWF's native open-data feed; ARPEGE's peaks 6
+hours apart across its whole record, matching its public four-times-daily cycle. Against the whole
+day's median, neither HARMONIE-AROME model shows a single peak standing out clearly enough to read
+a cycle off directly, which is where that afternoon hump hid DMI's own signal. Against each hour's
+two neighbours instead — `check_new_products.py`'s local-prominence row, below the whole-day
+ratio for each product — DMI HARMONIE-AROME peaks at every hour divisible by 3, 1.07 to 1.29 times
+its neighbours, the same phase as ICON-D2's own 3-hourly cycle. KNMI shows no such pattern at any
+phase, consistent with a cycle too short (an hour or a few) for this method to resolve, so it
+alone gets no measured interval.
 
 **Each product's own mean absolute error, exploratory:** CAMS 5.20%, SARAH-3 5.61%, ICON-D2
 7.81%, ECMWF-IFS-HRES 8.29%, ICON-EU 8.38%, ICON global 8.52%, UKV (Open-Meteo's hourly value)
@@ -741,17 +760,20 @@ ARPEGE Europe 9.30%, the highest.
 not resolved](assets/sunshine_all_contrasts.svg)
 
 **ARPEGE's and KNMI HARMONIE-AROME's published direct beam is not scored, because it is a
-separation model's output rather than a retrieval (exploratory).** Read against `sources.py`'s
-check, the direct fraction each publishes varies by only 0.018 inside a bin of similar cloud and
-sun height, against a threshold of 0.05 — the signature of a model applied to the product's own
-global irradiance, carrying no information beyond it. **DMI HARMONIE-AROME's published direct beam
-is not scored either, for a different reason: it is exactly zero in 48% of daytime hours and
-exceeds the global flux, which is physically impossible, in some hours, an upstream defect
-documented in `sources.py` rather than a separation model's signature.** All three get a global
-arm only. ECMWF-IFS-HRES's own direct beam passes both checks and is scored: its own split is 0.08
-points worse than a synthetic Erbs split derived from its own global irradiance alone [0.02,
-0.14], an exploratory result in the same direction as the six-product finding above ([A product's
-own direct beam adds little](#a-products-own-direct-beam-adds-little)).
+separation model's output rather than the weather model's own beam (exploratory).** Read against
+`sources.py`'s check, the direct fraction each publishes varies by only 0.018 inside a bin of
+similar cloud and sun height, against a threshold of 0.05 — the signature of a model applied to
+the product's own global irradiance, carrying no information beyond it. **DMI HARMONIE-AROME's
+published direct beam is not scored either, for a different reason: it is exactly zero in 48% of
+daytime hours and exceeds the global flux, which is physically impossible, in some hours.** This
+page does not establish whether that defect belongs to DMI's model or to how Open-Meteo's archive
+serves it; `sources.py` documents the check, and the pattern is not a separation model's
+signature. All three get a global arm only. ECMWF-IFS-HRES's own direct beam passes both checks
+and is scored: its own split is 0.08 points worse than a synthetic Erbs split derived from its own
+global irradiance alone [0.02, 0.14], an exploratory result in the opposite direction to the
+six-product finding above, with only 2 of the 5 folds agreeing in sign, so not settled ([A
+product's own direct beam adds
+little](#a-products-own-direct-beam-adds-little)).
 
 **Reproducing this section's figures:**
 
@@ -848,8 +870,9 @@ single weather product?](blending-weather-products.md#solar-a-blend-beats-cams-g
   HARMONIE-AROME models are compared against each other and against the three ICON weather models
   and UKV, from November 2024, but the ranking above, from December 2022, says nothing about them.
   Three of the four (all but ECMWF-IFS-HRES) score a global arm only: their published direct beam
-  is either a separation model's output or, for DMI HARMONIE-AROME, an upstream defect, so no split
-  or Erbs arm is fitted for them. See [The four extra Open-Meteo
+  is either a separation model's output or, for DMI HARMONIE-AROME, a defect this page does not
+  attribute to DMI's model or to Open-Meteo's archive of it, so no split or Erbs arm is fitted for
+  them. See [The four extra Open-Meteo
   models](#the-four-extra-open-meteo-models).
 - **The comparison is not lead-equal.** The served lead is part of what a consumer receives, so the
   as-served ranking answers the consumer's question. A comparison at a held-equal lead is a forecast

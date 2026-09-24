@@ -165,9 +165,11 @@ SERVED_LEAD: Final[dict[str, str]] = {
     "icon_global": "1 to 6 hours",
     "sarah3": "no forecast step (satellite retrieval)",
     "icon_dream": "1 to 3 hours (its own forecasts from 3-hourly analyses)",
-    "ifs_hres": "not yet measured (see product_checks.md)",
-    "arpege": "not yet measured (see product_checks.md)",
-    "dmi_harmonie": "not yet measured (see product_checks.md)",
+    "ifs_hres": (
+        "1 to 12 hours before 1 October 2025 (12-hour cycle); 1 to 6 hours from it (6-hour cycle)"
+    ),
+    "arpege": "1 to 6 hours (4-times-daily cycle)",
+    "dmi_harmonie": "1 to 3 hours (measured at 3-hourly, matching ICON-D2's cycle)",
     "knmi_harmonie": "not yet measured (see product_checks.md)",
 }
 """How far ahead each product's served hourly value was forecast, as the archive holds it.
@@ -183,6 +185,7 @@ RUN_INTERVAL_HOURS: Final[dict[str, int]] = {
     "icon_global": 6,
     "icon_dream": 3,
     "arpege": 6,
+    "dmi_harmonie": 3,
 }
 """The run cadence of each product with one interval for its whole record.
 
@@ -193,13 +196,19 @@ hourly temperature fetch rather than the daytime-only radiation used for the ICO
 values peak clearly at 00, 06, 12 and 18 UTC, against a flat baseline between them, matching its
 publicly documented four-times-daily cycle.
 
+**`dmi_harmonie` (DMI HARMONIE-AROME) is also read from the night-jump table, using its local
+prominence rather than its whole-day-median ratio.** Temperature's own diurnal cycle, a smooth
+afternoon warming, raises the whole-day-median ratio from 12 to 18 UTC for every product in the
+table, which hides a 3-hourly plateau inside that hump rather than against it. Local prominence,
+each hour against the mean of its two neighbours, shows every hour divisible by 3 as a peak of
+1.07 to 1.29, matching ICON-D2's own 3-hourly cycle.
+
 **`ecmwf-ifs-hres` (IFS-HRES) is not in this dict because its cadence changes mid-record** --
-see `IFS_HRES_RUN_INTERVAL_HOURS` and `_served_lead`. **`dmi_harmonie` and `knmi_harmonie` stay
-unset.** The same night-jump table shows no single hour standing out from a flat baseline for
-either, consistent with a run interval too short (an hour or a few) for this table, which only
-resolves a switch at least a few hours apart, to read off cleanly. Guessing an interval for either
-is worse than leaving it unsplit, so `_matched_lead_lines` reports the `dmi_harmonie` and
-`knmi_harmonie` planned contrasts as waiting on a measured run interval.
+see `IFS_HRES_RUN_INTERVAL_HOURS` and `_served_lead`. **`knmi_harmonie` stays unset.** Its
+local-prominence row shows no hour standing out from a flat baseline, consistent with a run
+interval too short (an hour or a few) for this table to resolve. Guessing an interval for it is
+worse than leaving it unsplit, so `_matched_lead_lines` reports the `knmi_harmonie` planned
+contrast as waiting on a measured run interval.
 """
 
 IFS_HRES_RUN_INTERVAL_HOURS: Final[tuple[int, int]] = (12, 6)
@@ -207,7 +216,7 @@ IFS_HRES_RUN_INTERVAL_HOURS: Final[tuple[int, int]] = (12, 6)
 
 Read from `check_new_products.py`'s night-jump table, which shows IFS-HRES's temperature peaking
 at 01:00 and 13:00 UTC before the cutover -- 12 hours apart, one hour after each of the two runs a
-day (00 and 12 UTC) the historical-forecast archive served with roughly a two-hour delay -- and at
+day (00 and 12 UTC) the historical-forecast archive served with roughly a one-hour delay -- and at
 00:00, 06:00, 12:00 and 18:00 UTC from the cutover, matching the four-times-daily cycle of the
 native open-data feed it switched to. `_served_lead` reads this pair through
 `IFS_OPEN_DATA_CUTOVER` rather than through `RUN_INTERVAL_HOURS`, because that dict holds one
@@ -417,10 +426,11 @@ The `all` panel starts on 1 November 2024 rather than when HARMONIE-AROME's arch
 2024, because two changes of source sit in between, each an era boundary a panel this short has no
 room to cut folds on both sides of. Open-Meteo's UKV before 12 August 2024 is a backfill from a
 source it does not name. Météo-France's cycle 48t1, on 15 October 2024, replaced ARPEGE's
-radiation scheme with an ecRad-derived one; ARPEGE's irradiance steps at that date against
-ECMWF-IFS-HRES, [Météo-France's own report of the
-change](https://www.umr-cnrm.fr/old/IMG/pdf/r_r_2024-gb_web_2.pdf). The first whole month after
-the later of the two changes is the start.
+radiation scheme with an ecRad-derived one, [Météo-France's own report of the
+change](https://www.umr-cnrm.fr/old/IMG/pdf/r_r_2024-gb_web_2.pdf). The ARPEGE/ECMWF-IFS-HRES
+irradiance ratio moves from about 0.86 to 0.89 in September and October 2024 to about 0.96 to 1.03
+from November, which matches that date, though the row set here does not reach far enough back to
+date the step itself. The first whole month after the later of the two changes is the start.
 """
 
 DEFAULT_PANELS: Final[tuple[PanelType, ...]] = ("long", "all", "record")
@@ -1351,6 +1361,42 @@ def _matched_lead_lines(*, panel: Panel, losses: pl.DataFrame) -> list[str]:
     return lines
 
 
+def _ifs_cutover_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Report ECMWF-IFS-HRES against ICON-EU before and on or after `IFS_OPEN_DATA_CUTOVER`.
+
+    Open-Meteo switched IFS-HRES to ECMWF's native open-data feed at the cutover, changing its run
+    cadence (`IFS_HRES_RUN_INTERVAL_HOURS`) and its own source, a change of source inside the row
+    set. No fold or feature here is cut at the cutover, so this split is exploratory, not a second
+    fit.
+
+    Args:
+        losses: The pooled losses, holding `ifs_hres_global` and `icon_eu_global`.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        "#### ECMWF-IFS-HRES against ICON-EU, before and after Open-Meteo's ECMWF feed change",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    for label, condition in (
+        (f"before {IFS_OPEN_DATA_CUTOVER:%Y-%m-%d}", pl.col("time") < IFS_OPEN_DATA_CUTOVER),
+        (f"on/after {IFS_OPEN_DATA_CUTOVER:%Y-%m-%d}", pl.col("time") >= IFS_OPEN_DATA_CUTOVER),
+    ):
+        rows = losses.filter(condition)
+        if rows.height:
+            lines.append(
+                _contrast_line(
+                    losses=rows,
+                    treatment="ifs_hres_global",
+                    reference="icon_eu_global",
+                    label=label,
+                )
+            )
+    return lines
+
+
 def _sarah_era_lines(*, losses: pl.DataFrame) -> list[str]:
     """Report SARAH-3's error against CAMS in each span of `SARAH_SATELLITE_ERAS`.
 
@@ -2233,8 +2279,35 @@ def _report(
     ]
     if panel.full_analysis:
         lines += ["", *_lead_tables(losses=pooled)]
+    lines += _optional_section_lines(name=name, panel=panel, frame=frame, losses=losses)
+    lines += ["", *era5_by_year_lines(by_year=by_year, months_note="January to August")]
+    lines += ["", *geometry_lines(sites=_pv_sites(), noun="solar farms")]
+    return "\n".join(lines) + "\n"
+
+
+def _optional_section_lines(
+    *, name: PanelType, panel: Panel, frame: pl.DataFrame, losses: PanelLosses
+) -> list[str]:
+    """Return every report section that only applies when the panel carries certain products.
+
+    Split out of `_report` to keep its own branch count down; each section here is independent of
+    the others and gated on which products the panel scores.
+
+    Args:
+        name: The panel's name.
+        panel: The panel reported.
+        frame: The panel's common rows.
+        losses: The panel's losses.
+
+    Returns:
+        Markdown lines, empty where the panel carries none of the relevant products.
+    """
+    pooled = losses.pooled
+    lines: list[str] = []
     if panel.planned:
         lines += ["", *_matched_lead_lines(panel=panel, losses=pooled)]
+    if {"ifs_hres", "icon_eu"} <= set(panel.products):
+        lines += ["", *_ifs_cutover_lines(losses=pooled)]
     if {"sarah3", "cams"} <= set(panel.products):
         lines += ["", *_sarah_era_lines(losses=pooled)]
         lines += ["", *_sarah_cams_breakdown_lines(frame=frame, losses=pooled)]
@@ -2250,9 +2323,7 @@ def _report(
         lines += ["", *_raw_irradiance_vs_cams_lines(frame=frame)]
     if name == "record" and {"era5", "icon_dream"} <= set(panel.products):
         lines += ["", *_icon_dream_era5_year_change_lines(losses=pooled)]
-    lines += ["", *era5_by_year_lines(by_year=by_year, months_note="January to August")]
-    lines += ["", *geometry_lines(sites=_pv_sites(), noun="solar farms")]
-    return "\n".join(lines) + "\n"
+    return lines
 
 
 def _panel_jobs(*, name: PanelType, panel: Panel) -> list[Job]:

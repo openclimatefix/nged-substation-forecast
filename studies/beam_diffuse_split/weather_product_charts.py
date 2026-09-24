@@ -1430,8 +1430,12 @@ def _implied_capacity_chart(*, report_text: str) -> alt.VConcatChart:
     )
 
 
-ALL_PANEL_LEADERBOARD_DOMAIN: Final[tuple[float, float]] = (5.0, 9.5)
-"""The x range of the `all`-panel leaderboard, covering every product's 95% interval."""
+ALL_PANEL_LEADERBOARD_DOMAIN: Final[tuple[float, float]] = (4.5, 10.0)
+"""The x range of the `all`-panel leaderboard, covering every product's 95% interval.
+
+A tighter domain risks clipping a product's own interval: on this panel's twelve products, CAMS's
+lower bound and ARPEGE's upper bound sit closest to the edges, at 4.74 and 9.90.
+"""
 
 ALL_PANEL_SCOPE: Final[str] = "Six solar farms in Lincolnshire, November 2024 to August 2026."
 """The `all` panel's row set is shorter than the other figures', which start December 2022."""
@@ -1553,8 +1557,9 @@ def _all_panel_contrasts(*, contrasts: pl.DataFrame, errors: dict[str, float]) -
             f"{DOTS} {CAPACITY}",
             ALL_PANEL_SCOPE,
             (
-                "DMI's and KNMI's own served leads are not measured, so each of their contrasts "
-                "mixes weather-model skill with lead."
+                "DMI's own served lead is measured at 3 hours, matching ICON-D2's cycle, so the "
+                "two run at matched leads throughout. KNMI's own served lead is not measured, so "
+                "its contrast mixes weather-model skill with lead."
             ),
         ],
     )

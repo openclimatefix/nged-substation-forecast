@@ -25,8 +25,12 @@ minutes early.
 - **Where the hour-to-hour jumps fall, in 2 m temperature.** The same second-difference method, on
   each of the four models fetched at a single site (`sources.temperature_site_b_path_for`) rather
   than the panel's whole roster. Temperature is served around the clock, so this table needs no
-  daylight restriction and carries no diurnal solar cycle to swamp a switch against, which is why
-  it resolves a cadence the radiation table above cannot. IFS-HRES prints twice, split at
+  daylight restriction, which is why it resolves a cadence the daylight-only radiation table above
+  cannot. Temperature carries its own diurnal cycle, though: a smooth afternoon warming raises the
+  whole-day-median ratio from 12 to 18 UTC for every product, which can absorb a run switch that
+  falls inside that hump. Each product's row is followed by its local prominence
+  (`_local_prominence`), the same ratio against the mean of its two neighbouring hours, which a
+  smooth diurnal hump does not raise the way a run switch does. IFS-HRES prints twice, split at
   `sources.IFS_OPEN_DATA_CUTOVER`, because Open-Meteo's own archive for it changed there.
 - **Steps in the served data.** Each product's monthly mean global irradiance against CAMS's, over
   the daylight hours both serve. A month far from the product's usual ratio marks a change of
@@ -343,11 +347,12 @@ def _night_jump_lines() -> list[str]:
         "",
         (
             "A run switch shows as a value well above 1 at a fixed hour. Temperature, not "
-            "radiation, so every hour of the day counts and there is no diurnal solar cycle to "
-            "swamp the signal. Each product's second row is its local prominence, the same ratio "
-            "against the mean of its two neighbouring hours rather than the whole day's median: a "
-            "run interval of a few hours shows here as a peak at every hour that interval divides, "
-            "rather than as a plateau raised across several adjacent hours."
+            "radiation, so every hour of the day counts, but temperature carries its own diurnal "
+            "cycle, a smooth afternoon warming that raises this ratio from 12 to 18 UTC for every "
+            "product. Each product's second row is its local prominence, the same ratio against "
+            "the mean of its two neighbouring hours rather than the whole day's median: a run "
+            "interval of a few hours shows here as a peak at every hour that interval divides, "
+            "where the whole-day median can bury it inside the afternoon hump."
         ),
         "",
         "| Product | " + " | ".join(f"{hour:02d}" for hour in hours) + " |",
