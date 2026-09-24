@@ -173,6 +173,10 @@ def _leaderboard_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
     return pl.DataFrame(records).sort("value")
 
 
+_LEADERBOARD_ROW_STEP_PX: Final[int] = 30
+"""Each leaderboard row's height: room for the longest label, which wraps to two lines."""
+
+
 def _leaderboard(*, losses: pl.DataFrame) -> alt.VConcatChart:
     """Draw every arm's own mean absolute error, best first, with its 95% interval.
 
@@ -184,7 +188,10 @@ def _leaderboard(*, losses: pl.DataFrame) -> alt.VConcatChart:
     """
     rows = _leaderboard_rows(losses=losses)
     panel = leaderboard_panel(
-        rows=rows, x_domain=_leaderboard_domain(rows=rows), x_title=LEADERBOARD_X_TITLE
+        rows=rows,
+        x_domain=_leaderboard_domain(rows=rows),
+        x_title=LEADERBOARD_X_TITLE,
+        row_step_px=_LEADERBOARD_ROW_STEP_PX,
     )
     return figure(
         panels=[panel],
