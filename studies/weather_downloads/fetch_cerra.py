@@ -81,9 +81,10 @@ SOLAR_VARIABLES: Final[tuple[str, ...]] = (
     "time_integrated_surface_direct_short_wave_radiation_flux",
 )
 WIND_VARIABLE: Final[str] = "wind_speed"
-HEIGHT_LEVELS: Final[tuple[str, ...]] = ("50_m", "75_m", "100_m", "150_m")
+HEIGHT_LEVELS: Final[tuple[str, ...]] = ("100_m", "75_m", "50_m", "150_m")
 """A generous band bracketing GB onshore turbine hub heights, not just the issue's original 75/100
-m — see the module docstring."""
+m — see the module docstring. Fetched in this order, 100 m first, so the most useful height lands
+first."""
 
 SOLAR_LEADTIME_HOURS: Final[int] = 3
 """The single value both `_build_request`'s `leadtime_hour` and `crop_one_chunk`'s
@@ -259,6 +260,18 @@ def crop_one_chunk(
             valid_time_array = ds["valid_time"]
             if "step" in valid_time_array.dims:
                 valid_time_array = valid_time_array.squeeze("step", drop=True)
+            # A wind file may carry the single requested height as a size-1 dimension; drop every
+            # size-1 dimension except y/x so the positional crop below sees exactly (time, y, x).
+            data_array = data_array.squeeze(
+                [
+                    dim
+                    for dim in data_array.dims
+                    if dim not in ("y", "x") and data_array.sizes[dim] == 1
+                ],
+                drop=True,
+            )
+            if data_array.ndim != 3 or data_array.dims[-2:] != ("y", "x"):
+                raise ValueError(f"expected dims (time, y, x), got {data_array.dims}")
 
             latitude = ds["latitude"].to_numpy()
             # CERRA's longitude convention was not confirmed against a live file in review;
