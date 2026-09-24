@@ -12,12 +12,16 @@ minutes before the label. An hour-beginning label, or a snapshot read as a mean,
 check over a whole year: over one summer month, afternoon cloud alone pulls the peak about 10
 minutes early.
 
-**Four tables are read by a person, not gated:**
+**Five tables are read by a person, not gated:**
 
 - **Whether the published direct flux carries more than a separation model would**
   (`studies.served_column_checks.check_direct_is_not_a_separation_model`). A product that fails it
   still has a usable global flux; its split arm then measures a derived split, and the page has to
   say so.
+- **How often DMI HARMONIE-AROME's published direct beam is zero or exceeds the served global
+  flux** (`_dmi_beam_defect_lines`). DMI passes the separation-model check above, so its direct
+  beam is unusable for a different reason: physically impossible values, not a model applied to its
+  own global irradiance.
 - **Where the hour-to-hour jumps fall, in radiation.** A forecast archive switches runs at fixed
   hours of the day, and the switch shows as a larger change in the clearness index between
   consecutive hours. Restricted to daylight, because the clearness index needs a sun high enough to
@@ -213,6 +217,46 @@ def _separation_lines(*, frames: dict[SourceType, pl.DataFrame]) -> list[str]:
         else:
             lines.append(f"- {source}{note}: passes")
     return lines
+
+
+DMI_DEFECT_SOURCE: Final[SourceType] = "dmi-harmonie-arome"
+"""The one product whose published direct beam fails for a reason other than a separation model."""
+
+DMI_DAYTIME_GHI_THRESHOLD_W_M2: Final[float] = 20.0
+"""Below this global irradiance a direct-beam reading of zero is unremarkable, so the defect count
+excludes it, matching the daytime filter `check_direct_is_not_a_separation_model` uses."""
+
+
+def _dmi_beam_defect_lines(*, frames: dict[SourceType, pl.DataFrame]) -> list[str]:
+    """Report how often DMI HARMONIE-AROME's published direct beam is zero or exceeds global flux.
+
+    The page cites both counts (`weather-products-for-past-solar.md`, "The four extra Open-Meteo
+    models"), and the study skill requires every page number to come from a script-printed report
+    rather than a docstring.
+
+    Args:
+        frames: Each product's per-site frame; only `DMI_DEFECT_SOURCE`'s is read.
+
+    Returns:
+        Markdown lines, empty if DMI's frame was not fetched.
+    """
+    frame = frames.get(DMI_DEFECT_SOURCE)
+    if frame is None:
+        return []
+    daytime = frame.filter(pl.col("ghi_w_m2") > DMI_DAYTIME_GHI_THRESHOLD_W_M2)
+    zero_share = float(daytime.select((pl.col("bhi_w_m2") == 0.0).mean()).item())
+    exceeds = int(daytime.select((pl.col("bhi_w_m2") > pl.col("ghi_w_m2")).sum()).item())
+    return [
+        "#### DMI HARMONIE-AROME's published direct beam, on daytime rows (exploratory)",
+        "",
+        (
+            f"Global irradiance above {DMI_DAYTIME_GHI_THRESHOLD_W_M2:.0f} W/m², "
+            f"{daytime.height:,} rows."
+        ),
+        "",
+        f"- exactly zero: {zero_share:.0%}",
+        f"- exceeds the served global flux (physically impossible): {exceeds}",
+    ]
 
 
 def _jump_lines(*, frames: dict[SourceType, pl.DataFrame]) -> list[str]:
@@ -489,6 +533,8 @@ def main() -> int:
         *timing,
         "",
         *_separation_lines(frames=frames),
+        "",
+        *_dmi_beam_defect_lines(frames=frames),
         "",
         *_jump_lines(frames=frames),
         "",

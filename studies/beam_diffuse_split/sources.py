@@ -261,8 +261,12 @@ way.
 points across the trial area**, by the issue #841 downloader, whose `lineage.json` files record the
 `models=` values used here. Those grids hold 49 points about 0.15° apart, not the 0.05° the lineage
 files state, so the nearest point sits 0.7 km to 5.3 km from a solar farm; fetching at each site's
-own coordinates removes that handicap, which would fall hardest on DMI's 2 km model. KNMI's
-HARMONIE-AROME over Europe runs at 5.5 km.
+own coordinates removes that handicap, which would fall hardest on DMI's 2 km model. DMI's and
+KNMI's HARMONIE-AROME feeds both carry the same 2 km run that the United Weather Centres-West
+(UWC-West) collaboration of the Danish, Dutch, Icelandic and Irish weather services operates over
+north-west Europe up to Iceland; KNMI distributes it on a reduced 0.05° grid, about 5.5 km
+(<https://english.knmidata.nl/open-data/harmonie>,
+<https://open-meteo.com/en/docs/dmi-api>, <https://open-meteo.com/en/docs/knmi-api>).
 
 - `ecmwf-ifs-hres`: fetched as `ecmwf_ifs`, not `ecmwf_ifs_hres` — the API rejects `ecmwf_ifs_hres`
   outright with "Cannot initialize MultiDomains from invalid String value". The grid download was
@@ -274,8 +278,9 @@ HARMONIE-AROME over Europe runs at 5.5 km.
   global and 40% for the direct flux, and both are null for 35 hours from 2023-12-31 07:00 UTC to
   2024-01-01 17:00 UTC. The archive before the step is treated as a different product and not
   fetched; the start is the first whole day after the gap.
-- `dmi-harmonie-arome`: the served direct flux is zero in 48% of daytime hours, and exceeds the
-  global flux in 74 hours, so the model's split is unusable and only its global flux is scored.
+- `dmi-harmonie-arome`: the served direct flux is exactly zero or exceeds the served global flux on
+  a share of daytime hours `check_new_products.py` prints into `product_checks.md`
+  (`_dmi_beam_defect_lines`), so the model's split is unusable and only its global flux is scored.
 - `arpege-europe` and `knmi-harmonie-arome`: the served direct flux fails
   `check_direct_is_not_a_separation_model` on the grid downloads, with a within-bin spread of the
   direct fraction of 0.018 against a threshold of 0.05, so it is a separation model's output rather

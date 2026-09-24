@@ -323,10 +323,14 @@ UNUSABLE_SPLITS: Final[frozenset[str]] = frozenset(
 """Products whose own split no arm reads, so they get neither a split arm nor an Erbs arm.
 
 Read from `sources.OPEN_METEO_MODELS` and `sources.UNSCORED_EXTRACTED_SPLITS`, which say why for
-each: DMI's served direct flux is zero in 48% of daytime hours, ARPEGE's and KNMI's is a separation
-model's output, and SARAH-3's is modelled from its own global flux. A split arm would
-measure the defect or the separation model, not the weather model, and an Erbs arm exists only as
-the split arm's reference.
+each: DMI's served direct flux is exactly zero or exceeds its own global flux on a share of daytime
+hours `check_new_products.py` prints into `product_checks.md`, and Open-Meteo derives ARPEGE's and
+KNMI's direct beam from each model's own global irradiance
+with a separation model, which it documents for both
+(<https://open-meteo.com/en/docs/meteofrance-api>, <https://open-meteo.com/en/docs/knmi-api>), as it
+does for SARAH-3's, modelled by CM SAF from SARAH-3's own global flux. A split arm would measure the
+defect or the separation model, not the weather model, and an Erbs arm exists only as the split
+arm's reference.
 """
 
 NEW_PLANNED_CONTRASTS: Final[dict[str, tuple[tuple[str, str], ...]]] = {
@@ -427,10 +431,12 @@ The `all` panel starts on 1 November 2024 rather than when HARMONIE-AROME's arch
 room to cut folds on both sides of. Open-Meteo's UKV before 12 August 2024 is a backfill from a
 source it does not name. Météo-France's cycle 48t1, on 15 October 2024, replaced ARPEGE's
 radiation scheme with an ecRad-derived one, [Météo-France's own report of the
-change](https://www.umr-cnrm.fr/old/IMG/pdf/r_r_2024-gb_web_2.pdf). The ARPEGE/ECMWF-IFS-HRES
-irradiance ratio moves from about 0.86 to 0.89 in September and October 2024 to about 0.96 to 1.03
-from November, which matches that date, though the row set here does not reach far enough back to
-date the step itself. The first whole month after the later of the two changes is the start.
+change](https://www.umr-cnrm.fr/old/IMG/pdf/r_r_2024-gb_web_2.pdf). ARPEGE's ratio to CAMS, read
+from its own longer build (`_arpege_ifs_ratio_lines`), runs 0.94 to 1.07 from January to October
+2024 and 1.01 to 1.32 from November 2024, higher in 8 of the 10 calendar months both sides of the
+change share, consistent with the documented date; its ratio to ECMWF-IFS-HRES cannot confirm this
+on its own, because ECMWF's own Cycle 49r1 went operational on 12 November 2024, inside the same
+window. The first whole month after the later of the two changes is the start.
 """
 
 DEFAULT_PANELS: Final[tuple[PanelType, ...]] = ("long", "all", "record")
@@ -1916,10 +1922,12 @@ def _arpege_ifs_ratio_lines() -> list[str]:
     15 October 2024 left a step in ARPEGE's served irradiance, because no row before that date is
     in the panel. ARPEGE's own per-site build reaches back to January 2024, so this table reads
     that build directly, joined to ECMWF-IFS-HRES's and CAMS's own builds on the same site-hours,
-    rather than the panel's common rows.
+    rather than the panel's common rows. Also appends `_arpege_cams_year_over_year_lines`, added
+    after the final builders' review, which pairs the same calendar month a year apart to isolate
+    the change from ARPEGE's ordinary month-to-month spread.
 
     Returns:
-        Markdown lines: one row per month, from ARPEGE's own start.
+        Markdown lines: one row per month from ARPEGE's own start, then the year-over-year pairing.
     """
     daylight = pl.col("ifs") > 20.0
 
@@ -1961,6 +1969,53 @@ def _arpege_ifs_ratio_lines() -> list[str]:
     lines += [
         f"| {row['month']} | {row['rows']:,} | {row['arp_ifs']:.2f} | {row['arp_cams']:.2f} |"
         for row in monthly.iter_rows(named=True)
+    ]
+    lines += ["", *_arpege_cams_year_over_year_lines(monthly=monthly)]
+    return lines
+
+
+def _arpege_cams_year_over_year_lines(*, monthly: pl.DataFrame) -> list[str]:
+    """Compare ARPEGE's monthly ratio to CAMS in the same calendar month a year apart.
+
+    Found after the results, in the final builders' review of this page: a month-by-month reading
+    alone cannot date cycle 48t1, because September 2024's dip sits outside the ordinary spread of
+    the months around it. Pairing each of the 10 calendar months from January to October, both
+    fully before the 15 October 2024 change in 2024 and fully after it in 2025, isolates the change
+    from ARPEGE's ordinary month-to-month spread. November and December are left out of the pairing
+    because both years fall after the change, so pairing them tests nothing about the change.
+
+    Args:
+        monthly: `_arpege_ifs_ratio_lines`'s own monthly table, carrying `month` and `arp_cams`.
+
+    Returns:
+        Markdown lines: one row per paired month, and how many pairs are higher in 2025.
+    """
+    ratios = dict(zip(monthly["month"].to_list(), monthly["arp_cams"].to_list(), strict=True))
+    paired = [
+        (f"{month:02d}", ratios.get(f"2024-{month:02d}"), ratios.get(f"2025-{month:02d}"))
+        for month in range(1, 11)
+    ]
+    paired = [(month, before, after) for month, before, after in paired if before and after]
+    higher = sum(1 for _, before, after in paired if after > before)
+    equal = sum(1 for _, before, after in paired if after == before)
+    lines = [
+        (
+            "#### ARPEGE's ratio to CAMS, the same calendar month a year apart, January to "
+            "October (exploratory)"
+        ),
+        "",
+        (
+            f"Higher in 2025 in {higher} of {len(paired)} paired months, equal in {equal}, lower "
+            "in the rest."
+        ),
+        "",
+        "| Month | 2024 | 2025 | Higher in 2025? |",
+        "|---|---|---|---|",
+    ]
+    lines += [
+        f"| {month} | {before:.2f} | {after:.2f} | "
+        f"{'yes' if after > before else 'equal' if after == before else 'no'} |"
+        for month, before, after in paired
     ]
     return lines
 
