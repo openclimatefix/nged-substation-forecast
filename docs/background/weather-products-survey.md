@@ -79,7 +79,7 @@ conventions apply to every Open-Meteo row:
   Britain should re-query at their own sites, and the "Covers GB" column says where coverage was
   checked on the grid rather than at Lincoln. ICON-D2, for example, has data at Lincoln but none in
   the west of Great Britain: the [map of ICON-D2's and AROME France's
-  domains](../roadmap/data-sources.md#what-comparing-four-irradiance-products-on-the-trial-areas-solar-farms-found)
+  domains](../roadmap/data-sources.md#what-comparing-weather-products-on-the-trial-areas-solar-farms-found)
   on the data sources page shows where.
 - **Open-Meteo's UKV archive is a backfill before 12 August 2024**, so a UKV start date on this page
   is not the start of UKV's own run history ([what the backfill is and how it changes
