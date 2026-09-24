@@ -832,6 +832,10 @@ against availability and coverage.**
   scores the archive's freshest run for each hour. At run time the most recent hours are not yet in
   the archive in that form: UKV arrives about 4 hours and ICON-EU about 3.5 hours after each run
   starts, so the last few hours come from an older run, at a longer lead than any scored here.
+  ECMWF-IFS-HRES, on its own shorter row set, scores level with ICON-EU (−0.09 points [−0.37,
+  +0.17], not resolved) and covers all of Great Britain, so it is a candidate alongside ICON-EU
+  where a service already reads Open-Meteo's ECMWF feed, though this page's evidence for it is
+  thinner: a shorter row set and an own served lead measured only from November 2024.
 - **Disaggregation: CAMS where its one-day delay allows, otherwise ICON-EU or rebuilt UKV.** The
   ranking holds for a generator predicted from its neighbours.
 
