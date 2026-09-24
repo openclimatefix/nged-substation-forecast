@@ -19,7 +19,8 @@ converted to W m⁻²) and air temperature from 38 stations (an instant at `time
 **The selection rule, fixed before any score existed.** `studies.midas.select_nearest_stations`
 with `MIN_COVERAGE`: stations are ranked by great-circle distance (ties to the lower station id) and
 a station is eligible when it has a usable value at no less than `MIN_COVERAGE` of the site's
-candidate hours, the page's common rows before `ROW_SET_END`. The nearest radiation stations and
+candidate hours, the blend study's common rows (`blend_products._solar_frame`) before
+`ROW_SET_END`. The nearest radiation stations and
 the nearest air-temperature stations are chosen independently. Hours where any station input an arm
 needs is missing are dropped from every arm's rows, so every arm scores the same rows. The choice
 frame maps stations to generators, which is sensitive: this script never saves, logs or prints it,
@@ -144,13 +145,23 @@ EXPLORATORY_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("station_rank3", STATION_ARM),
     ("station_era5_xgb", "station_era5_control"),
     (BLEND_ARM, "cams_global"),
+    (BLEND_CONTROL_ARM, "cams_global"),
+    ("station_era5_control", "era5_global"),
 )
 """Every contrast beyond the three planned ones, in the order the report prints them."""
 
 UNEQUAL_COLUMN_CONTRASTS: Final[frozenset[tuple[str, str]]] = frozenset(
-    {(BLEND_ARM, "cams_global")}
+    {
+        (BLEND_ARM, "cams_global"),
+        (BLEND_CONTROL_ARM, "cams_global"),
+        ("station_era5_control", "era5_global"),
+    }
 )
-"""The one contrast whose arms differ in width, descriptive only; the width check allows it."""
+"""The contrasts whose arms differ in width, descriptive only; the width check allows them.
+
+The last two pair a padded control with the plain product, so each measures what a permuted
+station column adds to that product: nothing, if the control is sound.
+"""
 
 ARM_ORDER: Final[tuple[str, ...]] = (
     "cams_global",
@@ -634,6 +645,9 @@ def _row_lines(*, frame: pl.DataFrame, candidates: int, repairs: dict[str, int])
 def _main_panel_lines(*, pooled: pl.DataFrame, frame: pl.DataFrame) -> list[str]:
     """Render how far ERA5 and CAMS refit here differ from the page's main row set.
 
+    The last column scores the main row set's own fits on the `(site, time)` keys both row sets
+    hold, and its heading states how many keys those are.
+
     Args:
         pooled: Every arm's losses at the `pooled` setting.
         frame: This section's row set, whose `(site, time)` keys restrict the main row set's losses.
@@ -648,31 +662,132 @@ def _main_panel_lines(*, pooled: pl.DataFrame, frame: pl.DataFrame) -> list[str]
         msg = f"{path}: cannot read the row count from {heading!r}"
         raise ValueError(msg)
     main = report_errors(report_path=path, column="Global only")
+    main_losses = pl.read_parquet(path.with_name("losses.parquet")).filter(
+        pl.col("setting") == "pooled"
+    )
+    keys = frame.select("site", "time")
+    both = main_losses.join(keys, on=["site", "time"], how="inner")
+    matched = both.select("site", "time").unique().height
     lines = [
         "#### Against the page's main row set",
         "",
         (
             f"The main row set holds {match[1]} common site-hours ({match[2]} to {match[3]}); this "
-            "section's row set is shorter."
+            f"section's row set holds {frame.height:,} ({frame['time'].min():%Y-%m-%d} to "
+            f"{frame['time'].max():%Y-%m-%d}), of which {matched:,} are also in the main row set."
         ),
         "",
         (
-            "| Arm | This section | Main row set | Difference | Main row set's fit, scored on "
-            "this section's rows |"
+            "| Arm | This section | Main row set | Difference "
+            f"| Main row set's fit, scored on the {matched:,} rows both row sets hold |"
         ),
         "|---|---|---|---|---|",
     ]
-    main_losses = pl.read_parquet(path.with_name("losses.parquet")).filter(
-        pl.col("setting") == "pooled"
-    )
-    keys = frame.select("site", "time")
     for arm, name in (("era5_global", "era5"), ("cams_global", "cams")):
         here = _mae(losses=pooled, arm=arm)
-        restricted = _mae(losses=main_losses.join(keys, on=["site", "time"], how="inner"), arm=arm)
         lines.append(
             f"| {arm} | {here:.3f} | {main[name]:.3f} | {here - main[name]:+.3f} "
-            f"| {restricted:.3f} |"
+            f"| {_mae(losses=both, arm=arm):.3f} |"
         )
+    return lines
+
+
+def _shared_rows_lines(*, pooled: pl.DataFrame) -> list[str]:
+    """Render the planned contrasts on the rows this section shares with the main row set.
+
+    Args:
+        pooled: Every arm's losses at the `pooled` setting.
+
+    Returns:
+        Markdown lines.
+    """
+    path = OUTPUT_DIR.parent / "solar_long" / "losses.parquet"
+    main_keys = pl.read_parquet(path, columns=["site", "time"]).unique()
+    shared = pooled.join(main_keys, on=["site", "time"], how="inner")
+    rows = shared.filter(pl.col("arm") == STATION_ARM).select("site", "time").unique().height
+    return [
+        "#### The planned contrasts on the rows the main row set also holds (exploratory)",
+        "",
+        *CONTRAST_HEADER,
+        *(
+            _contrast_line(losses=shared, treatment=t, reference=r, label=f"{rows:,} shared rows")
+            for t, r in PLANNED_CONTRASTS
+        ),
+    ]
+
+
+def _half_year_lines(*, pooled: pl.DataFrame) -> list[str]:
+    """Render the planned contrasts for April to September and for October to March.
+
+    Args:
+        pooled: Every arm's losses at the `pooled` setting.
+
+    Returns:
+        Markdown lines.
+    """
+    summer = pl.col("month").str.slice(5, 2).cast(pl.Int32).is_between(4, 9)
+    lines = [
+        "#### The planned contrasts by half of the year (exploratory, post hoc)",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    for label, condition in (("April to September", summer), ("October to March", ~summer)):
+        lines += [
+            _contrast_line(losses=pooled.filter(condition), treatment=t, reference=r, label=label)
+            for t, r in PLANNED_CONTRASTS
+        ]
+    return lines
+
+
+def _lag_lines(*, frame: pl.DataFrame) -> list[str]:
+    """Render how strongly output tracks the station's and CAMS's irradiance one hour either side.
+
+    Output measured over the hour ending at `time` should track irradiance over the same hour more
+    strongly than the hour before or after; a station stamped an hour off would peak elsewhere.
+
+    Args:
+        frame: This section's row set.
+
+    Returns:
+        Markdown lines.
+    """
+    fraction = frame.select(
+        "site",
+        "time",
+        output=pl.col("power_mw").cast(pl.Float64) / pl.col("effective_capacity_mw"),
+        station=pl.col(GHI.format(rank=1)),
+        cams=pl.col("ghi_cams"),
+    )
+    shifted = fraction.select(
+        "site",
+        (pl.col("time") + pl.duration(hours=1)).alias("time"),
+        station_before=pl.col("station"),
+        cams_before=pl.col("cams"),
+    ).join(
+        fraction.select(
+            "site",
+            (pl.col("time") - pl.duration(hours=1)).alias("time"),
+            station_after=pl.col("station"),
+            cams_after=pl.col("cams"),
+        ),
+        on=["site", "time"],
+        how="inner",
+    )
+    joined = fraction.join(shifted, on=["site", "time"], how="inner")
+    lines = [
+        "#### Output against irradiance one hour before, the same hour, and one hour after",
+        "",
+        f"Correlation on the {joined.height:,} site-hours with both neighbouring hours scored.",
+        "",
+        "| Irradiance from | Hour before | Same hour | Hour after |",
+        "|---|---|---|---|",
+    ]
+    for name in ("station", "cams"):
+        cells = [
+            f"{np.corrcoef(joined['output'].to_numpy(), joined[column].to_numpy())[0, 1]:.3f}"
+            for column in (f"{name}_before", name, f"{name}_after")
+        ]
+        lines.append(f"| {name} | {' | '.join(cells)} |")
     return lines
 
 
@@ -769,6 +884,12 @@ def _report(
         *_agreement_lines(frame=frame),
         "",
         *_main_panel_lines(pooled=pooled, frame=frame),
+        "",
+        *_shared_rows_lines(pooled=pooled),
+        "",
+        *_half_year_lines(pooled=pooled),
+        "",
+        *_lag_lines(frame=frame),
         "",
     ]
     lines += geometry_lines(sites=sites, noun="solar farms")
