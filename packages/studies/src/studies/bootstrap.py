@@ -94,8 +94,10 @@ def _rows_by_month(*, months: np.ndarray) -> list[np.ndarray]:
     return [np.flatnonzero(month_index == index) for index in range(len(unique_months))]
 
 
-def _resample_bounds(*, values: np.ndarray, months: np.ndarray) -> tuple[float, float]:
-    """Resample whole months and a seed 2,000 times, and return the 95% interval of the mean.
+def _resample_bounds(
+    *, values: np.ndarray, months: np.ndarray, level: float = 95.0
+) -> tuple[float, float]:
+    """Resample whole months and a seed 2,000 times, and return an interval of the mean.
 
     Shared by `bootstrap_difference`, whose `values` are a paired arm-to-arm difference, and
     `bootstrap_absolute`, whose `values` are one arm's own metric, so a leaderboard's absolute-error
@@ -104,9 +106,12 @@ def _resample_bounds(*, values: np.ndarray, months: np.ndarray) -> tuple[float, 
     Args:
         values: Per-seed, per-row values, shape (n_seeds, n_rows).
         months: Each row's month label, one per column of `values`.
+        level: The interval's coverage in percent, at most 100. The bounds are the percentiles that
+            leave half of the remaining `100 - level` in each tail.
 
     Returns:
-        The 2.5th and 97.5th percentiles of the resampled mean.
+        The lower and upper percentiles of the resampled mean; at the default level, the 2.5th and
+        97.5th.
     """
     rows_by_month = _rows_by_month(months=months)
 
@@ -120,7 +125,8 @@ def _resample_bounds(*, values: np.ndarray, months: np.ndarray) -> tuple[float, 
         rows = np.concatenate([rows_by_month[index] for index in drawn])
         resampled[resample] = values[seed_index, rows].mean()
 
-    return float(np.percentile(resampled, 2.5)), float(np.percentile(resampled, 97.5))
+    tail = (100.0 - level) / 2.0
+    return float(np.percentile(resampled, tail)), float(np.percentile(resampled, 100.0 - tail))
 
 
 def paired_differences(
@@ -195,6 +201,31 @@ def bootstrap_difference(
         "n_rows": differences.shape[1],
         "n_months": len(np.unique(months)),
     }
+
+
+def bootstrap_difference_at_level(
+    *, losses: pl.DataFrame, treatment: str, reference: str, metric: str, level: float
+) -> tuple[float, float]:
+    """Bound the paired arm-to-arm difference at any coverage, resampling as `bootstrap_difference`.
+
+    `bootstrap_difference` returns a 95% interval. A caller adjusting for several comparisons needs
+    a wider one from the same random stream, which this returns: at `level=95.0` the bounds equal
+    `bootstrap_difference`'s `lower_95` and `upper_95`.
+
+    Args:
+        losses: Per-row losses for both arms, already restricted to the scope wanted.
+        treatment: The arm whose metric is being compared.
+        reference: The arm it is compared against.
+        metric: The loss column to difference.
+        level: The interval's coverage in percent, such as 98.33 for three comparisons.
+
+    Returns:
+        The lower and upper bounds of the interval of the mean paired difference.
+    """
+    differences, months = paired_differences(
+        losses=losses, treatment=treatment, reference=reference, metric=metric
+    )
+    return _resample_bounds(values=differences, months=months, level=level)
 
 
 def arm_values(*, losses: pl.DataFrame, arm: str, metric: str) -> tuple[np.ndarray, np.ndarray]:
