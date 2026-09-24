@@ -12,17 +12,19 @@ current box). Each monthly GRIB is downloaded whole, opened with `cfgrib` (which
 added to `pyproject.toml`), sliced to those cell indices, written as parquet, and the whole-domain
 GRIB is deleted — never kept.
 
-**Wind (`WS`) is far larger than the issue's "tens of GB" estimate, but only in transit, not on
-disk.** One month of `WS` (wind speed on the 10 lowest model levels) is measured at 6.97 GB
-whole-domain, where `ASWDIR_S`/`ASWDIFD_S` (single-level surface radiation) are about 0.2 GB each.
-Network transfer is unmetered here, so the whole-domain bytes passing through and being deleted are
-not a real cost; what matters is the small cropped file that survives. `fetch_one_month` keeps every
-one of the 10 levels (not just a narrow hub-height band) precisely because the cropped output is
-cheap regardless of level count — a few hundred MB for the full range below — and a generous level
-set is what lets a later study compare wind power prediction using more than one vertical level.
+**The multi-level wind variables (`WS`, `U`, `V`) are far larger than the issue's "tens of GB"
+estimate, but only in transit, not on disk.** One month of `WS`/`U`/`V` (each on the 10 lowest model
+levels) is measured at 6.5-7.0 GB whole-domain, where `ASWDIR_S`/`ASWDIFD_S` (single-level surface
+radiation) are about 0.2 GB each and the 10 m wind fields (`WS_10M`/`U_10M`/`V_10M`, single-level)
+are about 0.65-0.71 GB each. Network transfer is unmetered here, so the whole-domain bytes passing
+through and being deleted are not a real cost; what matters is the small cropped file that survives.
+`fetch_one_month` keeps every one of the 10 levels for each multi-level variable (not just a narrow
+hub-height band) precisely because the cropped output is cheap regardless of level count — a few
+hundred MB for the full range below — and a generous level set is what lets a later study compare
+wind power prediction using more than one vertical level.
 
-**Vertical interpolation to a fixed hub height is out of scope here.** `WS` is served on model
-levels, referenced to height-above-ground through `HHL` in
+**Vertical interpolation to a fixed hub height is out of scope here.** `WS`/`U`/`V` are served on
+model levels, referenced to height-above-ground through `HHL` in
 `ICON-DREAM-EU_constant_fields.grb`, and turning that into "wind speed at 100 m" is new, tested code
 that belongs in `packages/studies/`, not in this download script. This script keeps the raw
 per-level values so that interpolation step has every level to work from.
@@ -33,12 +35,22 @@ ICON-DREAM-EU runs 2010-01 to 2026-08, but NGED's metered wind generators only s
 later, once measured) rather than the product's full range — there is no metered wind to compare
 years before that against.
 
+**`--variables` restricts one process to a subset, so two large variables can run concurrently.**
+Each multi-level wind variable takes roughly the same wall-clock time as `WS` (about 6 hours for
+the full range), so fetching `U` and `V` as two separate background processes — each launched with
+`--variables U` / `--variables V` — roughly halves the wall-clock time against fetching them one
+after another in a single process. `_SCRATCH_DIR` is namespaced by PID precisely so this is safe:
+two processes fetching different variables never share a scratch path.
+
 Run it with `uv run --with cfgrib --with eccodes python3 -u
 studies/weather_downloads/fetch_icon_dream.py --start-year-month 201909 --end-year-month 202609`,
-unbuffered (`-u`) so a redirected log stays readable — see the `data-download` skill for why.
+unbuffered (`-u`) so a redirected log stays readable — see the `data-download` skill for why. Add
+`--variables U` (etc.) to restrict a single process to a subset.
 """
 
 import argparse
+import os
+import shutil
 import sys
 from pathlib import Path
 from typing import Final
@@ -55,31 +67,69 @@ BASE_URL: Final[str] = "https://opendata.dwd.de/climate_environment/REA/ICON-DRE
 GRID_URL: Final[str] = f"{BASE_URL}/invariant/ICON-DREAM-EU_grid.nc"
 SOLAR_VARIABLES: Final[tuple[str, ...]] = ("ASWDIR_S", "ASWDIFD_S")
 """Direct and diffuse downward shortwave radiation at the surface, DWD's own GRIB short names."""
-WIND_VARIABLE: Final[str] = "WS"
-"""Wind speed, DWD's own GRIB short name, served on the 10 lowest full model levels."""
+MULTI_LEVEL_WIND_VARIABLES: Final[tuple[str, ...]] = ("WS", "U", "V")
+"""Wind speed and its zonal/meridional components, DWD's own GRIB short names, all three served on
+the same 10 lowest full model levels (65-74), instantaneous."""
+SINGLE_LEVEL_WIND_VARIABLES: Final[tuple[str, ...]] = ("WS_10M", "U_10M", "V_10M")
+"""10 m wind speed and its zonal/meridional components, DWD's own GRIB short names — single-level,
+instantaneous fields (DWD's parameter table lists no averaging for any of the three)."""
+ALL_VARIABLES: Final[tuple[str, ...]] = (
+    *SOLAR_VARIABLES,
+    *MULTI_LEVEL_WIND_VARIABLES,
+    *SINGLE_LEVEL_WIND_VARIABLES,
+)
+"""Every variable this script knows how to fetch; the default for `--variables`."""
 VARIABLE_UNITS: Final[dict[str, str]] = {
     "ASWDIR_S": "aswdir_s_w_m2",
     "ASWDIFD_S": "aswdifd_s_w_m2",
-    WIND_VARIABLE: "ws_m_s",
+    "WS": "ws_m_s",
+    "U": "u_m_s",
+    "V": "v_m_s",
+    "WS_10M": "ws_10m_m_s",
+    "U_10M": "u_10m_m_s",
+    "V_10M": "v_10m_m_s",
 }
 """Each variable's value-column name, shared between the fetch loop and `_write_docs`."""
 NWP_SIGNIFICAND_BITS: Final[int] = 13
 """Same choice `delta_store.nwp` makes for production NWP storage: see that module for the
-measured rationale. Applied here to the two continuous value columns before writing parquet."""
+measured rationale. Applied here to the value column before writing parquet."""
 
-_SCRATCH_DIR: Final[Path] = Path("/tmp/icon_dream_scratch")
+_SCRATCH_DIR: Final[Path] = Path(f"/tmp/icon_dream_scratch/{os.getpid()}")
 """Where a whole-domain GRIB lands transiently before being cropped and deleted. Not under `data/`:
-nothing here is meant to survive the run that downloads it."""
+nothing here is meant to survive the run that downloads it. Namespaced by PID so that two of this
+script's processes fetching different variables concurrently (e.g. `U` and `V` in parallel, to
+roughly halve wall-clock time against DWD's per-variable monthly files) never race on the same
+scratch path — `_cells_in_box` in particular downloads `ICON-DREAM-EU_grid.nc` to a fixed filename
+and deletes it when done, which two processes sharing one scratch directory would corrupt or delete
+out from under each other."""
 
 
 def _download(*, url: str, destination: Path) -> None:
     """Stream one file to disk, overwriting any previous scratch copy."""
     destination.parent.mkdir(parents=True, exist_ok=True)
-    with requests.get(url, stream=True, timeout=300) as response:
-        response.raise_for_status()
-        with destination.open("wb") as handle:
-            for chunk in response.iter_content(chunk_size=1 << 20):
-                handle.write(chunk)
+    try:
+        with requests.get(url, stream=True, timeout=300) as response:
+            response.raise_for_status()
+            with destination.open("wb") as handle:
+                for chunk in response.iter_content(chunk_size=1 << 20):
+                    handle.write(chunk)
+    except BaseException:
+        # A partial multi-GB file must not linger on RAM-backed tmpfs after a dropped transfer.
+        destination.unlink(missing_ok=True)
+        raise
+
+
+def _remove_stale_scratch_dirs() -> None:
+    """Delete sibling per-PID scratch directories left by processes that are no longer running."""
+    for sibling in _SCRATCH_DIR.parent.glob("[0-9]*"):
+        if not sibling.name.isdigit() or int(sibling.name) == os.getpid():
+            continue
+        try:
+            os.kill(int(sibling.name), 0)
+        except ProcessLookupError:
+            shutil.rmtree(sibling, ignore_errors=True)
+        except PermissionError:
+            continue
 
 
 def _cells_in_box() -> np.ndarray:
@@ -95,10 +145,12 @@ def _cells_in_box() -> np.ndarray:
     grid_path = _SCRATCH_DIR / "ICON-DREAM-EU_grid.nc"
     _download(url=GRID_URL, destination=grid_path)
     box = load_trial_area_box()
-    with xr.open_dataset(grid_path) as grid:
-        cell_lon_deg = np.degrees(grid["clon"].to_numpy())
-        cell_lat_deg = np.degrees(grid["clat"].to_numpy())
-    grid_path.unlink()
+    try:
+        with xr.open_dataset(grid_path) as grid:
+            cell_lon_deg = np.degrees(grid["clon"].to_numpy())
+            cell_lat_deg = np.degrees(grid["clat"].to_numpy())
+    finally:
+        grid_path.unlink(missing_ok=True)
     in_box = (
         (cell_lon_deg >= box.lon_min)
         & (cell_lon_deg <= box.lon_max)
@@ -188,14 +240,28 @@ def fetch_one_month(
     )
 
 
+WIND_COMPONENT_DESCRIPTIONS: Final[dict[str, str]] = {
+    "WS": "Wind speed",
+    "U": "Zonal wind speed (positive eastward)",
+    "V": "Meridional wind speed (positive northward)",
+    "WS_10M": "10 m wind speed",
+    "U_10M": "10 m zonal wind speed (positive eastward)",
+    "V_10M": "10 m meridional wind speed (positive northward)",
+}
+"""One phrase per wind variable, shared between the lineage note and the README's column table."""
+
+
 def _write_docs(
     *,
     output_dir: Path,
     variable: str,
     cell_indices: np.ndarray,
-    arguments: argparse.Namespace,
+    first_month: str,
+    last_month: str,
 ) -> None:
     """Write this variable's lineage note and README, given its already-combined parquet."""
+    is_multi_level_wind = variable in MULTI_LEVEL_WIND_VARIABLES
+    is_single_level_wind = variable in SINGLE_LEVEL_WIND_VARIABLES
     write_lineage_note(
         product_dir=output_dir,
         source_address=f"{BASE_URL}/hourly/{variable}/",
@@ -206,25 +272,40 @@ def _write_docs(
             f"ICON-DREAM-EU_grid.nc; the whole-domain file is deleted immediately after "
             f"cropping. Values cast to Float32 and rounded to {NWP_SIGNIFICAND_BITS} "
             f"significand bits before writing, matching delta_store.nwp's production "
-            f"convention. {arguments.start_year_month} to {arguments.end_year_month}"
+            f"convention. {first_month} to {last_month}"
         ),
         variables=[variable],
         filename=f"lineage_{variable}.json",
         extra={
-            "year_month_range_fetched": [arguments.start_year_month, arguments.end_year_month],
+            "year_month_range_fetched": [first_month, last_month],
             "n_cells_in_box": int(cell_indices.size),
             "note": (
-                "All 10 of DWD's served model levels are kept for WS (not narrowed to a "
-                "hub-height band), so a later multi-level wind-power study has every level "
-                "to draw on. model_level is DWD's own generalVerticalLayer value (65-74), "
-                "not a re-numbered 0-9 position and not a height-above-ground; ICON numbers "
-                "levels top-down, so 74 (the LARGEST value) is nearest the surface and 65 "
-                "is the highest of the 10. The combined parquet also carries 3 NaN padding "
-                "rows per (cell, level) per month (cfgrib pads the time x step grid at each "
-                "month boundary): filter with is_not_nan(), not is_not_null(), before any "
-                "join, dedupe, or mean, since a naive unique() can keep the NaN row instead "
-                "of the real one."
-                if variable == WIND_VARIABLE
+                (
+                    f"All 10 of DWD's served model levels are kept for {variable} (not "
+                    "narrowed to a hub-height band), so a later multi-level wind-power "
+                    "study has every level to draw on. model_level is DWD's own "
+                    "generalVerticalLayer value (65-74), not a re-numbered 0-9 position "
+                    "and not a height-above-ground; ICON numbers levels top-down, so 74 "
+                    "(the LARGEST value) is nearest the surface and 65 is the highest of "
+                    "the 10. The combined parquet also carries 3 NaN padding rows per "
+                    "(cell, level) per month (cfgrib pads the time x step grid at each "
+                    "month boundary): filter with is_not_nan(), not is_not_null(), before "
+                    "any join, dedupe, or mean, since a naive unique() can keep the NaN "
+                    "row instead of the real one."
+                )
+                if is_multi_level_wind
+                else (
+                    f"{variable} is a single-level, instantaneous field (DWD's parameter "
+                    "table lists no averaging for it) — so, unlike the solar variables, "
+                    "no de-averaging is needed; the stored value is the analysis value at "
+                    "that hour. The combined parquet still carries 3 NaN padding rows per "
+                    "cell per month (cfgrib pads the time x step grid at each month "
+                    "boundary): filter with is_not_nan(), not is_not_null(), before any "
+                    "join, dedupe, or mean, since a naive unique() can keep the NaN row "
+                    "instead of the real one. valid_time is timezone-naive (implicitly "
+                    "UTC)."
+                )
+                if is_single_level_wind
                 else (
                     "IMPORTANT: the stored value at each hour is a running mean since the "
                     "nearest 00/03/06/.../21 UTC forecast start (DWD stepType=avg, 'mean "
@@ -265,13 +346,24 @@ def _write_docs(
                 "(time, step) value is kept as reported, with no overlap resolved.",
                 "cell_id": "Index into ICON-DREAM-EU's native unstructured grid "
                 "(ICON-DREAM-EU_grid.nc) — not a coordinate.",
-                "model_level": "DWD's own generalVerticalLayer value (65-74 for WS). ICON "
-                "numbers levels top-down, so the LARGEST value (74) is nearest the "
+                "model_level": f"DWD's own generalVerticalLayer value (65-74 for {variable}). "
+                "ICON numbers levels top-down, so the LARGEST value (74) is nearest the "
                 "surface, not the smallest.",
-                "ws_m_s": "Wind speed, m/s, an analysis value (the instant itself, not "
-                "averaged) at each of the 10 model_level values.",
+                VARIABLE_UNITS[variable]: f"{WIND_COMPONENT_DESCRIPTIONS[variable]}, m/s, an "
+                "analysis value (the instant itself, not averaged) at each of the 10 "
+                "model_level values.",
             }
-            if variable == WIND_VARIABLE
+            if is_multi_level_wind
+            else {
+                "valid_time": "Timezone-naive (implicitly UTC). An analysis value (the "
+                "instant itself, not averaged) — no de-averaging needed, unlike the solar "
+                "variables below.",
+                "cell_id": "Index into ICON-DREAM-EU's native unstructured grid "
+                "(ICON-DREAM-EU_grid.nc) — not a coordinate.",
+                VARIABLE_UNITS[variable]: f"{WIND_COMPONENT_DESCRIPTIONS[variable]}, m/s, an "
+                "analysis value (the instant itself, not averaged).",
+            }
+            if is_single_level_wind
             else {
                 "valid_time": "Timezone-naive (implicitly UTC). Marks the END of a running "
                 "mean since the nearest 00/03/06/.../21 UTC forecast start — NOT an hourly "
@@ -300,7 +392,14 @@ def _write_docs(
                     "and not a height-above-ground — see the columns section above."
                 ),
             ]
-            if variable == WIND_VARIABLE
+            if is_multi_level_wind
+            else [
+                (
+                    "This is a single-level, instantaneous analysis value — not a running "
+                    "mean, unlike the solar variables in this same directory."
+                ),
+            ]
+            if is_single_level_wind
             else [
                 (
                     "The stored value is a RUNNING MEAN since the nearest 3-hourly forecast "
@@ -324,30 +423,77 @@ def _write_docs(
     )
 
 
+def _year_months(start_year_month: str, end_year_month: str) -> list[str]:
+    """Return every `YYYYMM` from `start_year_month` to `end_year_month` inclusive, in order."""
+    year, month = int(start_year_month[:4]), int(start_year_month[4:])
+    end = (int(end_year_month[:4]), int(end_year_month[4:]))
+    year_months: list[str] = []
+    while (year, month) <= end:
+        year_months.append(f"{year:04d}{month:02d}")
+        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+    return year_months
+
+
+def _combine_months(
+    *, variable: str, year_months: list[str], month_cache_dir: Path
+) -> tuple[pl.DataFrame, str, str] | None:
+    """Concatenate the cached months this run asked for, refusing a gap inside their span.
+
+    Only months in `year_months` are combined, not every file the cache directory happens to hold:
+    a directory reused across a differently-scoped run must not silently mix in. A month missing
+    at the end of the range is tolerated (not yet published); one missing between two cached
+    months is a real gap and raises.
+
+    Args:
+        variable: The DWD variable name, used in the error message.
+        year_months: Every `YYYYMM` this run asked for, in order.
+        month_cache_dir: Where each month's parquet is cached.
+
+    Returns:
+        The combined frame with the first and last month it holds, or `None` if no month is cached.
+
+    Raises:
+        RuntimeError: If a requested month is missing between the first and last cached month.
+    """
+    cached = [ym for ym in year_months if (month_cache_dir / f"{ym}.parquet").exists()]
+    if not cached:
+        return None
+    missing_inside = [
+        ym for ym in year_months if cached[0] <= ym <= cached[-1] and ym not in cached
+    ]
+    if missing_inside:
+        msg = f"{variable}: months missing inside {cached[0]}..{cached[-1]}: {missing_inside}"
+        raise RuntimeError(msg)
+    frames = [pl.read_parquet(month_cache_dir / f"{ym}.parquet") for ym in cached]
+    return pl.concat(frames), cached[0], cached[-1]
+
+
 def main() -> int:
-    """Fetch every whole month of `SOLAR_VARIABLES` in `[--start-year-month, --end-year-month]`."""
+    """Fetch every whole month of `--variables` in `[--start-year-month, --end-year-month]`."""
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--start-year-month", required=True, help="YYYYMM")
     parser.add_argument("--end-year-month", required=True, help="YYYYMM")
+    parser.add_argument(
+        "--variables",
+        nargs="+",
+        default=list(ALL_VARIABLES),
+        choices=list(ALL_VARIABLES),
+        help=(
+            "Which of ALL_VARIABLES to fetch (space-separated DWD short names); defaults to all "
+            "of them. Restrict this to run a subset (e.g. just U, or just the 10m fields) as its "
+            "own process alongside others, so two large variables can download in parallel — see "
+            "the module docstring for why that roughly halves wall-clock time against DWD."
+        ),
+    )
     arguments = parser.parse_args()
 
+    _remove_stale_scratch_dirs()
     cell_indices = _cells_in_box()
     print(f"{cell_indices.size} ICON-DREAM-EU cells fall inside the trial-area box")
 
-    start_year = int(arguments.start_year_month[:4])
-    start_month = int(arguments.start_year_month[4:])
-    end_year = int(arguments.end_year_month[:4])
-    end_month = int(arguments.end_year_month[4:])
-    year_months: list[str] = []
-    year, month = start_year, start_month
-    while (year, month) <= (end_year, end_month):
-        year_months.append(f"{year:04d}{month:02d}")
-        month += 1
-        if month > 12:
-            month = 1
-            year += 1
+    year_months = _year_months(arguments.start_year_month, arguments.end_year_month)
 
-    for variable in (*SOLAR_VARIABLES, WIND_VARIABLE):
+    for variable in arguments.variables:
         output_dir = WEATHER_DOWNLOADS_DIR / "ICON-DREAM-EU"
         output_dir.mkdir(parents=True, exist_ok=True)
         # Every month is checkpointed to its own parquet as soon as it is cropped, so a crash
@@ -376,20 +522,18 @@ def main() -> int:
                     print(f"{variable} {year_month}: not published yet (404), skipping")
                     continue
                 raise
-            partial = month_path.with_suffix(".parquet.partial")
+            partial = month_path.with_suffix(f".parquet.{os.getpid()}.partial")
             frame.write_parquet(partial)
             partial.rename(month_path)
             print(f"{variable} {year_month}: {frame.height} rows")
-        # Combine only the months this run asked for, not every file the cache directory happens
-        # to hold — a directory reused across a differently-scoped run must not silently mix in.
-        cached_paths = [
-            p for ym in year_months if (p := month_cache_dir / f"{ym}.parquet").exists()
-        ]
-        if not cached_paths:
+        combined_months = _combine_months(
+            variable=variable, year_months=year_months, month_cache_dir=month_cache_dir
+        )
+        if combined_months is None:
             print(f"{variable}: no month succeeded, nothing written")
             continue
-        combined = pl.concat([pl.read_parquet(path) for path in cached_paths])
-        filename = f"{variable}_{arguments.start_year_month}_{arguments.end_year_month}.parquet"
+        combined, first_month, last_month = combined_months
+        filename = f"{variable}_{first_month}_{last_month}.parquet"
         output_path = output_dir / filename
         combined.write_parquet(output_path)
         size_mb = output_path.stat().st_size / 1e6
@@ -399,7 +543,8 @@ def main() -> int:
             output_dir=output_dir,
             variable=variable,
             cell_indices=cell_indices,
-            arguments=arguments,
+            first_month=first_month,
+            last_month=last_month,
         )
     return 0
 
