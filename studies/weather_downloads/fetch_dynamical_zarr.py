@@ -18,9 +18,10 @@ complete. A month counts as complete only if its last day is earlier than the ne
 the store minus `PUBLICATION_LAG_DAYS`; any other month is written as `<month>.partial.parquet` and
 re-fetched on the next run. The final file is built from this run's months with `scan_parquet` and
 `sink_parquet`, so its peak memory does not depend on the length of the archive. One month of GEFS
-(30 runs, 31 members, 181 lead times) held in memory is under 1 GB, where a year would need tens of
-GB. Every month file records a hash of the crop's grid cells in its parquet metadata, and the
-combine step refuses to mix months whose hash differs.
+(30 runs, 31 members, 181 lead times) held in memory needs a few GB of RAM, well within this
+workstation's 61 GB, where a year would need tens of GB. Every month file records a hash of the
+crop's grid cells in its parquet metadata, and the combine step refuses to mix months whose hash
+differs.
 
 **The Zarr stores are chunked far larger than the box, so the bytes transferred exceed the bytes
 kept.** GFS stores 105 lead times by 121 by 121 grid cells per chunk, and GEFS stores 64 lead times
@@ -45,6 +46,7 @@ from typing import Final
 import dynamical_catalog
 import numpy as np
 import polars as pl
+import pyarrow.parquet as pq
 import xarray as xr
 from delta_store.precision import round_to_significand_bits
 from lineage import write_lineage_note, write_readme
@@ -108,7 +110,8 @@ def _to_long_frame(*, dataset: xr.Dataset) -> pl.DataFrame:
     `lon_index` are the rank of each cell's latitude and longitude within the crop, ascending,
     replacing the grid's own coordinates, which locate a generator to within one grid cell.
     Coordinate columns use narrow dtypes (`Int8`, `Int16`, `Datetime`, `Duration`) so that a month
-    of GEFS stays under 1 GB. Value columns are `Float32` rounded to `KEEP_BITS` significand bits.
+    of GEFS stays within a few GB. Value columns are `Float32` rounded to `KEEP_BITS` significand
+    bits.
 
     Args:
         dataset: The already-cropped, already-loaded dataset.
@@ -362,7 +365,7 @@ def main() -> int:
             raise ValueError(message)
     output_path = output_dir / f"{label}.parquet"
     pl.scan_parquet(used_paths).sink_parquet(output_path, compression="zstd", metadata=fingerprint)
-    rows = pl.scan_parquet(output_path).select(pl.len()).collect().item()
+    rows = pq.ParquetFile(output_path).metadata.num_rows
     size_mb = output_path.stat().st_size / _BYTES_PER_MB
     print(f"{label}: wrote {output_path}")
 

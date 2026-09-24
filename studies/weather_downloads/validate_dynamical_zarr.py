@@ -14,9 +14,12 @@ run of every day; the row count equals the product of the axis lengths; no dupli
 `NaN` only in the two radiation fields and only at lead time 0, where those fields are all `NaN`;
 each value inside a physical range; the lead-time axis starts at 0, ends at the model's last lead
 time, and changes step width at the documented lead time and not later; shortwave radiation is near
-zero for night-time valid hours, and positive at midday in April to September (which a valid time
-shifted by one step would break). Checks across months: the months are contiguous, every file
-carries the same grid-cell hash, and the combined file's row count equals the sum of the files.
+zero for night-time valid hours, and positive at midday in April to September (which catches only a
+gross shift such as 12 hours or a timezone error, and does not verify the exact hour convention).
+On a `.partial` month, `NaN` in a value column only warns, because the newest run may still be
+being written. Checks across months: the months are contiguous, every file carries the same
+grid-cell hash, and the combined file's row count equals the sum of the files. Where a complete
+`M.parquet` and a stale `M.partial.parquet` both exist, only the complete file is validated.
 
 Run it with `uv run python studies/weather_downloads/validate_dynamical_zarr.py --directory
 <directory under data/studies/weather>`, for example `--directory GEFS`.
@@ -30,6 +33,7 @@ from pathlib import Path
 from typing import Final
 
 import polars as pl
+import pyarrow.parquet as pq
 from fetch_dynamical_zarr import DATASETS, VARIABLES
 from paths import WEATHER_DOWNLOADS_DIR
 
@@ -106,20 +110,22 @@ def _check_runs(
         _fail(results=results, check="runs_full_month", month=month)
 
 
-def _check_values(*, frame: pl.DataFrame, month: str, results: Results) -> None:
+def _check_values(*, frame: pl.DataFrame, month: str, results: Results, partial: bool) -> None:
     """Check nulls, `NaN`s, and physical ranges of every value column."""
+    # The newest run of a `.partial` month may still be being written, so `NaN` there only warns.
+    nan_check = "nan_partial_month" if partial else "nan"
     for variable in VARIABLES:
         if frame[variable].null_count():
             _fail(results=results, check="nulls", month=month)
         nan_rows = frame.filter(pl.col(variable).is_nan())
         if variable in AVERAGED_FIELDS:
             if nan_rows.filter(pl.col("lead_time") > pl.duration(hours=0)).height:
-                _fail(results=results, check="nan", month=month)
+                _fail(results=results, check=nan_check, month=month)
             at_zero = frame.filter(pl.col("lead_time") == pl.duration(hours=0))
             if not at_zero.select(pl.col(variable).is_nan().all()).item():
                 _fail(results=results, check="radiation_nan_at_lead_0", month=month)
         elif nan_rows.height:
-            _fail(results=results, check="nan", month=month)
+            _fail(results=results, check=nan_check, month=month)
         low, high = RANGES[variable]
         observed = frame.filter(pl.col(variable).is_finite()).select(
             low=pl.col(variable).min(), high=pl.col(variable).max()
@@ -176,7 +182,7 @@ def _validate_month(*, path: Path, month: str, label: str, edge: bool, results: 
     if expected_rows != frame.height:
         _fail(results=results, check="dense", month=month)
     _check_runs(frame=frame, month=month, label=label, edge=edge, results=results)
-    _check_values(frame=frame, month=month, results=results)
+    _check_values(frame=frame, month=month, results=results, partial=".partial." in path.name)
     _check_lead_axis(frame=frame, month=month, label=label, results=results)
     _check_diurnal(frame=frame, month=month, results=results)
 
@@ -188,9 +194,11 @@ def main() -> int:
     arguments = parser.parse_args()
     product_dir = WEATHER_DOWNLOADS_DIR / arguments.directory
     label = next(name for name in DATASETS.values() if arguments.directory.startswith(name))
-    by_month = {
-        path.name.split(".")[0]: path for path in (product_dir / "_month_cache").glob("*.parquet")
-    }
+    by_month: dict[str, Path] = {}
+    # A complete `M.parquet` wins over a stale `M.partial.parquet` of the same month.
+    for path in sorted((product_dir / "_month_cache").glob("*.parquet"), reverse=True):
+        by_month[path.name.split(".")[0]] = path
+    by_month = dict(sorted(by_month.items()))
     months = sorted(by_month)
     results: Results = {}
     row_sum = 0
@@ -198,20 +206,22 @@ def main() -> int:
     for index, month in enumerate(months):
         edge = index in (0, len(months) - 1)
         _validate_month(path=by_month[month], month=month, label=label, edge=edge, results=results)
-        row_sum += pl.scan_parquet(by_month[month]).select(pl.len()).collect().item()
+        row_sum += pq.ParquetFile(by_month[month]).metadata.num_rows
         hashes.add(pl.read_parquet_metadata(by_month[month]).get("cell_hash"))
 
     stamps = [_month_start(month) for month in months]
     expected = _month_range(stamps[0], stamps[-1]) if months else []
     results["months_contiguous"] = [] if expected == months else ["all"]
     results["cell_hash_same"] = [] if len(hashes) == 1 and None not in hashes else ["all"]
-    combined = pl.scan_parquet(product_dir / f"{label}.parquet").select(pl.len()).collect().item()
+    combined = pq.ParquetFile(product_dir / f"{label}.parquet").metadata.num_rows
     results["combined_rows"] = [] if combined == row_sum else ["all"]
 
     failed = 0
     for check, failures in results.items():
         real = sorted({m for m in failures if m != _SKIPPED})
-        if real:
+        if real and check == "nan_partial_month":
+            print(f"WARN {check}: {', '.join(real)}")
+        elif real:
             failed += 1
             print(f"FAIL {check}: {', '.join(real)}")
         elif failures:
