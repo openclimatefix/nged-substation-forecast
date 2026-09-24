@@ -13,8 +13,9 @@ to 20. A live service reading Dynamical.org's archive gets the 00 UTC run from a
 (ECMWF itself disseminates steps 0 to 90 by about 06:55 UTC), so the report counts the scored hours
 that end at or before each time; for those hours ENS reaches the service after the hour has
 ended, so it is past weather delivered late. The planned contrasts do not separate ENS's lead,
-its 3-hourly steps, its grid and its model version from one another; the exploratory arms
-`era5_3h`, `cams_3h` and `era5_3x3` separate two of them.
+its 3-hourly steps, its grid and its model version from one another, and neither do the
+exploratory arms `era5_3h`, `cams_3h` and `era5_3x3`, which test only the 3-hourly steps and the
+area each value averages over.
 
 **Data.** `data/studies/weather/ENS/beam_diffuse_ens.parquet`
 (`data/studies/weather/ENS/README.md`), filtered to `horizon == "T+3"`: seven 3-hour radiation and
@@ -35,7 +36,8 @@ reconstruction `ens_forecast_horizons.py` picked as the best technique for ENS's
 `ens_forecast_horizons._clear_sky_arrays`, `studies.resample.clear_sky_index_resample`, and
 `studies.resample.interpolate_linear` are reused unchanged; only the code that arranges this file's
 own seven fixed leads into a `Steps` object is new, because `ens_forecast_horizons.py`'s own
-`band_steps` assumes the wider, day-numbered grid its own extract holds, which this file does not.
+`band_steps` assumes the wider, day-numbered grid that its own extract holds and this file's data
+does not.
 
 **Arms, refit on this section's own shorter row set.** `ens_mean_t3` is an XGBoost model shown the
 mean of the 51 members' hourly global irradiance and temperature. `era5_global` and `cams_global`
@@ -48,10 +50,10 @@ not CAMS's own temperature, because the CAMS radiation service publishes none. E
 `colsample_bytree=1` (XGBoost's default, never overridden here), so no arm wins on column count
 alone.
 
-**The two planned contrasts.** The brief for the first run named both contrasts, the `T+3` band,
-the member mean and the clear-sky-index reconstruction before the first model was fitted. The brief
-is a working file outside the repository, and this docstring was committed after the first fit, so
-the repository itself does not record that ordering:
+**The two planned contrasts.** The written instructions for the first run named both contrasts,
+the `T+3` band, the member mean and the clear-sky-index reconstruction before the first model was
+fitted. Those instructions are a working file outside the repository, and this docstring was
+committed after the first fit, so the repository itself does not record that ordering:
 
 - `ens_mean_t3 − era5_global`: ENS's own mean-of-members forecast against ERA5, the other
   reanalysis-adjacent product a reader might reach for first.
@@ -65,12 +67,12 @@ after the first science review. `era5_3h` and `cams_3h` average ERA5 and CAMS ov
 ERA5 over the 3 by 3 block of 0.25-degree cells around each generator's nearest cell. Each carries
 eight feature columns and is scored on the same rows as every other arm.
 
-This section carries no member-by-member arm and no year-by-year panel: the 51-way member fit day-1
-the horizon study runs costs 51 times a normal fit, out of proportion to this section's two
-contrasts, and ENS's own coverage here is under 2.5 years, too short for the "too few months"
-year-by-year rule to add much.
+This section carries no member-by-member arm and no year-by-year panel: the 51-way member fit that
+the horizon study runs at day 1 takes 51 times as long as a normal fit, out of proportion to this
+section's two contrasts, and ENS's own coverage here is under 2.5 years, too short for the "too few
+months" year-by-year rule to add much.
 
-**This is solar only.** A wind addition is a separate, future study, not started in this PR.
+**This is solar only.** This script does not cover wind.
 
 Run it with `uv run python studies/beam_diffuse_split/ens_past_solar.py`, after
 `weather_products.py` has built its datasets (`build_dataset.py` for `open-meteo` and `cams
@@ -138,8 +140,8 @@ OUTPUT_DIR: Final[Path] = STUDY_DATA_DIR / "past_weather_v2" / "ens_past_solar"
 `superseded/` folder for re-runs."""
 
 ENS_START: Final[datetime] = datetime(2024, 4, 1, tzinfo=UTC)
-"""ENS's own coverage start (`data/studies/weather/ENS/README.md`), which this section's row set
-never reaches before."""
+"""ENS's own coverage start (`data/studies/weather/ENS/README.md`), before which this section's
+row set holds no rows."""
 
 STEP_LEADS: Final[tuple[int, ...]] = (3, 6, 9, 12, 15, 18, 21)
 """The `T+3` band's seven leads, in hours, each a 3-hour mean ending at the lead."""
@@ -307,8 +309,8 @@ def _t3_steps(*, members: pl.DataFrame) -> Steps:
 def _t3_upsampled(*, steps: Steps, clear_sky: pl.DataFrame) -> dict[str, np.ndarray]:
     """Upsample every member's `T+3` steps to hourly: `clear_sky` for radiation, `linear` for temp.
 
-    The technique `ens_forecast_horizons.py`'s pre-registered choosing rule picked as best for
-    solar's radiation (`COMBINATIONS["solar"]["clear_sky"]`).
+    This is the technique that `ens_forecast_horizons.py`'s pre-registered choosing rule picked as
+    best for solar's radiation (`COMBINATIONS["solar"]["clear_sky"]`).
 
     Args:
         steps: The `T+3` band's steps.

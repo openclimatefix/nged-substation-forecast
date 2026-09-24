@@ -154,11 +154,11 @@ def _ens_lead_range(*, report: str) -> str:
 def _leaderboard(
     *, losses: pl.DataFrame, errors: dict[str, float], report: str, cams_gap: float
 ) -> alt.VConcatChart:
-    """Draw the three headline arms' own mean absolute error, best first, with its 95% interval.
+    """Draw the three headline arms' own mean absolute error, best first, with their 95% intervals.
 
     Bootstraps each arm's absolute error from `losses.parquet` directly, the same month-and-seed
     resampling `ens_past_solar.py`'s own report interval uses, because `leaderboard_panel` needs a
-    `lower_95` and `upper_95` per row and the report's point estimate alone cannot supply one. No
+    `lower_95` and `upper_95` per row and the report's point estimate alone supplies neither. No
     model is refitted.
 
     Args:
@@ -279,7 +279,7 @@ def _planned_contrasts(*, report_path: Path) -> alt.VConcatChart:
             ),
             (
                 "ENS also differs from ERA5 and CAMS in lead, the 3-hourly steps of its open-data "
-                "subset, native and served resolution, and model version."
+                "subset, native resolution, spatial support, and model version."
             ),
             f"{DOTS} {CAPACITY}",
             SCOPE,
@@ -439,7 +439,7 @@ def _verify_numbers(*, report: str, losses: pl.DataFrame, sensitivity: pl.DataFr
 
 
 def main() -> int:
-    """Read the report and write the two SVGs."""
+    """Read the report and write the three SVGs."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     argparse.ArgumentParser(description=__doc__).parse_args()
     report_path = OUTPUT_DIR / "report.md"
