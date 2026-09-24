@@ -42,10 +42,13 @@ W3 and never carry a station identifier or distance. Station identifiers never a
   stations with one 09:00 return a day and wind estimated on Beaufort-scale midpoints are excluded,
   and the 12 stations that carry no wind at all are never candidates. Quality-control flag 106
   marks whole stations, so no row is ever filtered on a flag; station 62265 is affected (almost
-  every wind row), the page says so, and 62265 stays eligible or not only by the coverage rule
-  below.
+  every wind row), the page says so, and 62265 is treated like every other station: eligible only by
+  the coverage rule below.
 - Wind columns: `wind_speed_m_s` (knots converted, 10 m, instantaneous at `time`) and
-  `wind_direction` (degrees, north written as 360, calm as 0). A row with direction 0 is calm and
+  `wind_direction` (degrees, north written as 360, calm as 0). The report prints the pooled share of
+  rows whose unit code marks the wind as estimated (codes 0
+  and 3); those rows are kept unless the share exceeds 5%, in which case they are excluded and the
+  choice is recorded in this file before the first fit. A row with direction 0 is calm and
   enters as sine and cosine both zero; 360 is north.
 - Nearest station: `studies.midas.select_nearest_stations` with `k=1` and `min_coverage=0.9` of
   the farm's required hours, where the required hours are the page's rows in the window below. The
@@ -89,25 +92,33 @@ states that beside every pooled interval.
 - `station_k3_wind`: the mean of the three nearest eligible stations' speeds (`k=3`), direction
   from the mean wind vector, on the same rows (the nearest station's hours decide the rows).
 - `station_shear_constant_wind`: the nearest station's speed scaled to 100 m with a power-law
-  exponent of 1/7 (a common open-country value, chosen a priori and a guess, not fitted). A tree
-  model is invariant to a monotone rescaling of one column, so this arm is expected to reproduce
-  `station_wind` exactly; the report prints whether it does, which makes it a control.
-- `station_shear_era5_wind`: the nearest station's speed multiplied, hour by hour, by ERA5's own
-  100 m to 10 m speed ratio. The exponent here is not chosen by hand, but it imports ERA5's
-  information, so the page reads the arm as station-plus-ERA5-shear, not a station alone.
+  exponent of 1/7 (a common open-country value, chosen a priori; it is a guess, not fitted). A tree
+  model is invariant to a monotone rescaling of one column, so the arm is expected to reproduce
+  `station_wind` almost exactly (Float32 rounding may merge nearby values). The report prints the
+  difference, and the page says in one sentence that a fixed exponent cannot help a tree model. An
+  informative shear arm would need an exponent that varies by hour, which imports another product's
+  information, so none is planned.
+- `station_k3_wind`: the mean of the available speeds among the three nearest eligible stations
+  (`k=3`), direction from the mean wind vector (calm hours contribute zero components), on the same
+  rows (the nearest station's hours decide the rows).
+- `ukv_station_wind` − `ukv_wind` (free: `ukv_wind` is fitted for the leaderboard).
 - The station's absolute error beside every product's on the same rows (with the column counts
   stated), by farm (W1 to W3, without any station identity), and the S1 and S2 contrasts by farm.
-- A Bonferroni-adjusted interval for S1 and S2.
+- A Bonferroni-adjusted interval for S1 and S2. The window holds one UKV era, so S2 scores UKV
+  before its January 2026 upgrade only; the page says so, because the page's UKV recommendation
+  rests largely on later results. S2 tests a station against more UKV columns (the padding also
+  gives UKV its own 80 m to 100 m shear), not against nothing.
 
 ## Fairness and checks
 
 - Equal column counts within each contrast; `colsample_bytree=1`; every arm's column list printed
   into the report; month-block folds (the date range is short, so the plan states the number of
   months and the fold count); month-resampled paired bootstrap; a deterministic row fingerprint
-  with floats cast to Float32 before hashing; the printed-number guard from phase 1
-  (`check_page_numbers.py`) run on the new section.
-- **Calendar-month coverage check (issue #868):** before any fit, every scored calendar month must
-  have training rows from some other fold. With a 16-month window, each calendar month from
+  with floats cast to Float32 before hashing; the printed-number guard from PR #885
+  (`check_page_numbers.py`) run on the new section after the rebase.
+- **Calendar-month coverage check (issue #868):** the report prints, before any fit, whether every
+  scored calendar month has training rows from some other fold, and does not raise. With a 16-month
+  window, each calendar month from
   August to December occurs in two years and January to July in one, so the report prints which
   months cannot be covered and the page states it.
 - Station data checks printed into the report: hours missing per eligible station pooled, coverage
@@ -125,10 +136,15 @@ the MIDAS Open release schedule and why the data end in December 2025, that MIDA
 ## Files
 
 - `studies/beam_diffuse_split/station_wind_arms.py` (new): builds rows, jobs, fingerprint, report,
-  in the structure of `ens_hres_past_wind.py`.
+  in the structure of `wind_icon_dream.py` on `main`, with `wind_products.joined` and
+  `common_rows`, `weather_products.with_eras`, and the MIDAS helpers. The printed-number guard
+  (`check_page_numbers.py`) and the calendar-month coverage check come from PR #885, not yet on
+  `main`: this branch is rebased onto `main` once #885 merges, and shared helpers go into
+  `packages/studies/` with tests if the diff review asks.
 - `studies/beam_diffuse_split/station_wind_arms_charts.py` (new).
-- `docs/studies/weather-products-for-past-wind.md`: one results section, one "What to use" bullet,
-  one Key-findings bullet, "Data and methods" and "Limitations" additions, reproducing commands.
+- `docs/studies/weather-products-for-past-wind.md`: one results section, one short "What to use"
+  bullet, one Key-findings bullet, about two charts, "Data and methods" and "Limitations" additions,
+  reproducing commands.
 - `docs/studies/assets/`: the new SVGs, optimised with svgo.
 - `packages/studies/`: unchanged unless a helper proves reusable.
 
