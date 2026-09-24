@@ -309,8 +309,9 @@ def _ens_frame(*, keys: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
 
     Returns:
         `keys` with `ens_mean_day<N>_<field>` and `ens_control_day<N>_<field>` for every `N` in
-        `ENS_DAYS`, left-joined, plus `persistence_day<N>` and `diurnal_persistence_day<N>` (the
-        no-weather baselines' own inputs), which `with_baselines` computes on the way.
+        `ENS_DAYS`, left-joined, plus `persistence_day<N>` and `diurnal_persistence_day<N>` and, for
+        solar, `clear_sky_index_day<N>` and `clear_sky_w_m2` (the no-weather baselines' own inputs,
+        including smart persistence's), which `with_baselines` computes on the way.
     """
     baselined = efh.with_baselines(frame=efh.base_frame(domain=domain), domain=domain)
     sites = sorted(baselined["site"].unique().to_list())
@@ -328,6 +329,8 @@ def _ens_frame(*, keys: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
         for day in ENS_DAYS
         for name in ("persistence", "diurnal_persistence")
     ]
+    if domain == "solar":
+        baseline_columns += ["clear_sky_w_m2", *(f"clear_sky_index_day{day}" for day in ENS_DAYS)]
     frame = baselined.select("site", "time", *baseline_columns)
     for arm_frame in arms:
         frame = frame.join(arm_frame, on=["site", "time"], how="left")
@@ -644,7 +647,6 @@ def build_domain(*, domain: DomainType, output_dir: Path, gefs_window_dir: Path 
         "effective_capacity_mw",
         "hour_of_day",
         "day_of_year",
-        "month",
         *[column for column in reference_columns if column in base.columns],
     )
     frame = _previous_runs_frame(keys=keys, domain=domain)
