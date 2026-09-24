@@ -10,9 +10,10 @@ read 1 to 3 hours ahead, and CAMS is a satellite retrieval with no forecast step
 available band in the download used here, `T+3`, spans leads 3 to 21 hours from each day's own 00
 UTC run; after this section's row set is joined to the rest of the page's hours, it scores leads 5
 to 20. A live service reads the 00 UTC run from about 09:00 UTC, so the report counts the scored
-hours that end at or before then. The planned contrasts do not separate ENS's lead, its 3-hourly
-steps, its grid and its model version from one another; the exploratory arms `era5_3h`, `cams_3h`
-and `era5_3x3` separate two of them.
+hours that end at or before then; for those hours ENS is readable up to 4 hours after the hour
+ends, so it is past weather delivered late. The planned contrasts do not separate ENS's lead,
+its 3-hourly steps, its grid and its model version from one another; the exploratory arms
+`era5_3h`, `cams_3h` and `era5_3x3` separate two of them.
 
 **Data.** `data/studies/weather/ENS/beam_diffuse_ens.parquet`
 (`data/studies/weather/ENS/README.md`), filtered to `horizon == "T+3"`: seven 3-hour radiation and
@@ -199,8 +200,18 @@ FIRST_SERVABLE_HOUR_UTC: Final[int] = 9
 (`docs/studies/ens-forecast-horizons.md`, "Horizons and issue time")."""
 
 ERA5_RUN_INTERVAL_HOURS: Final[int] = 12
-"""ERA5's radiation is a forecast from a 06 or 18 UTC run, so its lead at an hour labelled `h` is
-`((h - 1) % 12) + 1`, following the `study` skill's formula for a model run every `n` hours."""
+"""ERA5's radiation is a forecast at steps of 1 to 12 hours from the 06 and 18 UTC runs, so
+its lead at an hour labelled `h` (the hour ending at `h` UTC) is `((h - 7) % 12) + 1`: lead 1
+at 07 and 19 UTC, lead 12 at 18 and 06 UTC."""
+
+SERVABLE_HEADING: Final[str] = (
+    "The planned contrasts, split by when the 00 UTC run becomes readable (exploratory, post hoc)"
+)
+"""The report heading above the split by when the run becomes readable."""
+
+ERA5_FIRST_RUN_HOUR_UTC: Final[int] = 6
+"""The hour of day, UTC, of the earlier of ERA5's two daily forecast runs (the other is 12 hours
+later)."""
 
 
 def _t3_members() -> pl.DataFrame:
@@ -616,8 +627,13 @@ def _absolute_table_lines(*, pooled: pl.DataFrame, arms: tuple[str, ...]) -> lis
     return lines
 
 
-def _share_lines(*, pooled: pl.DataFrame) -> list[str]:
-    """Render how much of ENS's gap to CAMS the 3-hourly step accounts for.
+def _servable_lines(*, pooled: pl.DataFrame) -> list[str]:
+    """Render the two planned contrasts on hours split by when the 00 UTC run becomes readable.
+
+    This is a post hoc, exploratory split. Every consumer on this page reads a value after its hour
+    has passed, so for an hour ending at or before `FIRST_SERVABLE_HOUR_UTC` ENS is readable 0 to 8
+    hours after the hour ends: past weather, delivered late, not a forecast. Each contrast is paired
+    within the subset by the same month-and-seed resampling as every other interval.
 
     Args:
         pooled: Every arm's losses at the `pooled` setting.
@@ -625,28 +641,42 @@ def _share_lines(*, pooled: pl.DataFrame) -> list[str]:
     Returns:
         Markdown lines.
     """
-    gap = _mae(losses=pooled, arm=MEAN_ARM) - _mae(losses=pooled, arm="cams_global")
-    step = _mae(losses=pooled, arm=CAMS_3H_ARM) - _mae(losses=pooled, arm="cams_global")
-    remaining = _mae(losses=pooled, arm=MEAN_ARM) - _mae(losses=pooled, arm=CAMS_3H_ARM)
-    return [
-        "#### Share of ENS's gap to CAMS that the 3-hourly step accounts for (exploratory)",
-        "",
+    hour = pl.col("time").dt.hour()
+    subsets = (
+        (f"ends after {FIRST_SERVABLE_HOUR_UTC:02d}:00 UTC", hour > FIRST_SERVABLE_HOUR_UTC),
         (
-            f"The 3-hourly step raises CAMS's error by {step:.3f} points, {step / gap:.0%} of "
-            f"ENS's {gap:.3f}-point gap to CAMS as first measured. The gap that remains is "
-            f"{remaining:.3f} points. The percentage is a ratio of point estimates and carries no "
-            "interval."
+            f"ends at or before {FIRST_SERVABLE_HOUR_UTC:02d}:00 UTC",
+            hour <= FIRST_SERVABLE_HOUR_UTC,
         ),
+    )
+    lines = [
+        f"#### {SERVABLE_HEADING}",
+        "",
+        *CONTRAST_HEADER,
     ]
+    gains = []
+    for name, condition in subsets:
+        subset = pooled.filter(condition)
+        for treatment, reference in DECIDING_CONTRASTS:
+            lines.append(
+                _contrast_line(losses=subset, treatment=treatment, reference=reference, label=name)
+            )
+        era5_error = _mae(losses=subset, arm="era5_global")
+        gain = era5_error - _mae(losses=subset, arm=MEAN_ARM)
+        gains.append(
+            f"- Hours that end {name.removeprefix('ends ')}: ENS's gain over ERA5 is {gain:.3f} "
+            f"points, {gain / era5_error:.1%} of ERA5's error of {era5_error:.3f}."
+        )
+    return [*lines, "", *gains]
 
 
 def _lead_lines(*, frame: pl.DataFrame) -> list[str]:
-    """Render the scored hours' leads, and how many hours a live service could not have served.
+    """Render the scored hours' leads, and how many hours end before the 00 UTC run is readable.
 
     ENS's lead at an hour is the hour of day, because every run starts at 00 UTC. ERA5's radiation
     lead follows `ERA5_RUN_INTERVAL_HOURS`. A live service reads the 00 UTC run from about
-    `FIRST_SERVABLE_HOUR_UTC`, so an hour labelled at or before then (an hour that ends at or before
-    the service can read the run) could not have been served from that run.
+    `FIRST_SERVABLE_HOUR_UTC`, so for an hour labelled at or before then (an hour that ends at or
+    before the run is readable) ENS is past weather delivered up to 4 hours late, not a forecast.
 
     Args:
         frame: This section's row set.
@@ -656,7 +686,7 @@ def _lead_lines(*, frame: pl.DataFrame) -> list[str]:
     """
     hour = frame["time"].dt.hour().to_numpy().astype(np.float64)
     ens_lead = hour
-    era5_lead = (hour - 1) % ERA5_RUN_INTERVAL_HOURS + 1
+    era5_lead = (hour - ERA5_FIRST_RUN_HOUR_UTC - 1) % ERA5_RUN_INTERVAL_HOURS + 1
     too_early = int((hour <= FIRST_SERVABLE_HOUR_UTC).sum())
     return [
         "#### Leads of the scored hours",
@@ -674,6 +704,11 @@ def _lead_lines(*, frame: pl.DataFrame) -> list[str]:
             f"- A live service reads the 00 UTC run from about {FIRST_SERVABLE_HOUR_UTC:02d}:00 "
             f"UTC, so {too_early:,} of {frame.height:,} scored hours "
             f"({too_early / frame.height:.1%}) end at or before that time."
+        ),
+        (
+            "- For those hours the run becomes readable 0 to "
+            f"{int(FIRST_SERVABLE_HOUR_UTC - hour[hour <= FIRST_SERVABLE_HOUR_UTC].min())} hours "
+            "after the hour ends."
         ),
     ]
 
@@ -855,7 +890,7 @@ def _report(
             for t, r in CONFOUND_CONTRASTS
         ),
         "",
-        *_share_lines(pooled=pooled),
+        *_servable_lines(pooled=pooled),
         "",
         *_lead_lines(frame=frame),
         "",

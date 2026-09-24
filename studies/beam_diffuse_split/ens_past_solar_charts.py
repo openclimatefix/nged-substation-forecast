@@ -40,7 +40,7 @@ from ens_past_solar import (
     _generator_lines,
     _lead_lines,
     _main_panel_lines,
-    _share_lines,
+    _servable_lines,
     _t3_members,
     build_rows,
 )
@@ -271,6 +271,10 @@ def _planned_contrasts(*, report_path: Path) -> alt.VConcatChart:
         title="ENS beats ERA5 but trails CAMS by more than three points",
         subtitle=[
             "The two contrasts named in the plan before any result existed.",
+            (
+                "ENS also differs from ERA5 and CAMS in lead, 3-hourly step width, spatial "
+                "support, and model version."
+            ),
             f"{DOTS} {CAPACITY}",
             SCOPE,
         ],
@@ -413,7 +417,7 @@ def _verify_numbers(*, report: str, losses: pl.DataFrame, sensitivity: pl.DataFr
         line
         for lines in (
             _absolute_table_lines(pooled=losses, arms=EXPLORATORY_ARMS),
-            _share_lines(pooled=losses),
+            _servable_lines(pooled=losses),
             _lead_lines(frame=frame),
             _generator_lines(frame=frame, members=_t3_members()),
             _main_panel_lines(pooled=losses),
