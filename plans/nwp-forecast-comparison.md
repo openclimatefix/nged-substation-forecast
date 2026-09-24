@@ -180,8 +180,12 @@ conservative blend below uses.
 - **Folds: #885's design, confirmed by the study coordinator, and #885's code.** Five folds of whole
   months, cut inside three eras: before 2025-10-01; 2025-10-01 to the UKV PS47 upgrade on
   2026-01-21; and after it, with the part-month that straddles the upgrade dropped as #885 drops it.
-  The third era's fold numbers are rotated (`ERA_FOLD_OFFSETS`) so no calendar month is held out of
-  every era at once (#868); a two-era design fails that check on these rows too (February, April,
+  The third era's fold numbers are rotated so no calendar month is held out of every era at once
+  (#868). This study rotates the third era by 3 (`NWP_ERA_FOLD_OFFSETS = {0: 0, 1: 0, 2: 3}`)
+  rather than #885's 2, because #885's rotation leaves two solar (site, fold, calendar month) cells
+  uncovered on these rows; `search_fold_offsets` chose 3 from which hours exist alone, before any
+  fit, as the first rotation covering every month in both technologies; a two-era design fails that
+  check on these rows too (February, April,
   May, and June). Every arm gets the same `era_code` column. Before any fit, the script prints the
   (site, fold, calendar month) coverage table, lists the calendar months that occur in one year
   only (January, because January 2026 is dropped, among them), and raises on any other uncovered
