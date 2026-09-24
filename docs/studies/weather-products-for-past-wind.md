@@ -811,10 +811,10 @@ are the study's design; the same losses without the rows of May 2026 (the row su
 with no fold rotation; two UKV eras, as in the rest of the page; the study's folds with an era code
 of two values; and an extra era cut at IFS Cycle 50r1 with May 2026 dropped. Across them, HRES minus
 UKV runs from +0.15 to +0.21 points, ENS day 0 minus UKV from +0.34 to +0.43, and HRES minus ERA5
-from −0.24 to −0.29. The smallest lower bound is HRES minus UKV's under the two-valued era code,
-+0.15 points [+0.02, +0.28]. An extra era cut at IFS Cycle 50r1 moves none of the three planned
-contrasts, nor ENS day 0 minus HRES, by more than 0.04 points from the study's design (compared on
-the rows without May 2026).
+from −0.24 to −0.29. Among the two positive contrasts, the lowest lower bound is HRES minus UKV's
+under the two-valued era code, +0.15 points [+0.02, +0.28]. An extra era cut at IFS Cycle 50r1 moves
+none of the three planned contrasts, nor ENS day 0 minus HRES, by more than 0.04 points from the
+study's design (compared on the rows without May 2026).
 
 **The three planned contrasts also keep their sign at the second hyperparameter setting, and none of
 the three intervals adjusted for three contrasts includes zero.** At the second hyperparameter
@@ -928,12 +928,12 @@ archive.** ENS day 0 is served by Dynamical.org's archive, independently of Open
 [Newsletter
 181](https://www.ecmwf.int/en/newsletter/181/earth-system-science/ifs-upgrade-improves-near-surface-wind-and-temperature)
 describes IFS Cycle 49r1 as including "a revision of the diagnostic 10 m wind calculation, which
-removes a limiter and modifies the blending height, leading to reduced 10 m wind biases", and
-ECMWF's [implementation
-page](https://confluence.ecmwf.int/display/FCST/Implementation+of+IFS+Cycle+49r1) lists land-surface
-model upgrades among the changes. The step is consistent with the cycle change, and this study does
-not establish that the change is its cause. Neither of those two pages, as read for this study,
-mentions 100 m wind.
+removes a limiter and modifies the blending height, leading to reduced 10 m wind biases". The step
+is consistent with the cycle change, and this study does not establish that the cycle change caused
+the step. Neither that newsletter article nor ECMWF's
+[implementation
+page](https://confluence.ecmwf.int/display/FCST/Implementation+of+IFS+Cycle+49r1), as read for this
+study, mentions 100 m wind.
 
 **At 100 m, the height the XGBoost models are given, the fall against ERA5 is smaller and gradual,
 and HRES's is larger than ENS day 0's.** HRES's ratio to ERA5 is 0.97 in August 2024, 0.96 in
