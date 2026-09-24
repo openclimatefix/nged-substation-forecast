@@ -214,7 +214,7 @@ OPEN_METEO_MODELS: Final[dict[str, OpenMeteoModel]] = {
     ),
     "ecmwf-ifs-hres": OpenMeteoModel(
         source="ecmwf-ifs-hres",
-        models_parameter="ecmwf_ifs_hres",
+        models_parameter="ecmwf_ifs",
         archive_starts="2017-01-01",
         live_ingest_starts=None,
         native_radiation="accumulated",
@@ -263,11 +263,12 @@ files state, so the nearest point sits 0.7 km to 5.3 km from a solar farm; fetch
 own coordinates removes that handicap, which would fall hardest on DMI's 2 km model. KNMI's
 HARMONIE-AROME over Europe runs at 5.5 km.
 
-- `ecmwf-ifs-hres`: fetched as `ecmwf_ifs_hres`, Open-Meteo's documented name for ECMWF's 9 km
-  model. The grid download was requested as `ecmwf_ifs04`, the 0.4° open-data name, yet serves
-  values from 2017-01-01 at 37 distinct series among 49 points 0.15° apart, which a 0.4° grid could
-  not produce. The first per-site fetch is checked against that grid download over one week at one
-  site before anything is built from it.
+- `ecmwf-ifs-hres`: fetched as `ecmwf_ifs`, not `ecmwf_ifs_hres` — the API rejects `ecmwf_ifs_hres`
+  outright with "Cannot initialize MultiDomains from invalid String value". The grid download was
+  requested as `ecmwf_ifs04`, the 0.4° open-data name, yet serves values from 2017-01-01 at 37
+  distinct series among 49 points 0.15° apart, which a 0.4° grid could not produce; a one-week
+  check at the grid point nearest site B confirmed `ecmwf_ifs` and `ecmwf_ifs04` serve identical
+  values there (zero difference, correlation 1.0), so both names reach the same underlying field.
 - `arpege-europe`: both fluxes step up at 2024-01-01 against ECMWF-IFS-HRES, by about 20% for the
   global and 40% for the direct flux, and both are null for 35 hours from 2023-12-31 07:00 UTC to
   2024-01-01 17:00 UTC. The archive before the step is treated as a different product and not
