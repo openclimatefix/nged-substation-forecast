@@ -109,3 +109,12 @@ def test_the_distance_matrix_has_one_row_per_site_and_one_column_per_cell_in_fra
     assert distances[0, 1] == pytest.approx(10007.5, rel=1e-4)
     assert distances[1, 2] == 0.0
     assert distances[1, 0] == pytest.approx(9 * 111.195, rel=1e-4)
+
+
+def test_the_distance_uses_the_sites_latitude_when_both_coordinates_differ():
+    distances = distance_matrix_km(
+        sites=pl.DataFrame({"latitude": [10.0], "longitude": [0.0]}),
+        cells=pl.DataFrame({"latitude": [20.0], "longitude": [10.0]}),
+    )
+
+    assert distances[0, 0] == pytest.approx(1544.76, rel=1e-4)

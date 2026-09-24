@@ -154,7 +154,7 @@ METADATA_CSV = """Conventions,G,BADC-CSV,1
 title,G,invented header text
 data
 src_id,station_name,station_file_name,station_latitude,station_longitude,station_elevation,extra
-00001,ALPHA,alpha,1.5,-2.5,10.0,x,surplus
+00001,ALPHA,alpha,1.5,-2.5,10.0,x
 00002,BETA,beta,3.0,4.0,20.5,y
 end data
 """
@@ -336,9 +336,9 @@ def test_a_tie_in_distance_goes_to_the_lower_station_id_however_the_rows_are_ord
     assert chosen["rank"].to_list() == [1, 2]
 
 
-def test_each_site_takes_its_own_nearest_stations_and_its_own_required_hours():
+def test_each_site_takes_its_own_nearest_stations():
     stations = _stations(("south", -3.0), ("north", 3.0))
-    required = pl.concat([_required("S").head(10), _required("N").head(10)])
+    required = _required("S", "N")
 
     chosen = select_nearest_stations(
         sites=_sites(("S", -2.0), ("N", 2.0)),
@@ -416,3 +416,89 @@ def test_a_site_with_no_required_hours_raises():
             k=1,
             min_coverage=1.0,
         )
+
+
+def test_a_twilight_hour_is_night_and_an_hour_ending_just_after_sunrise_is_not():
+    # At 60 degrees north, 30 degrees west, on 1 June the apparent zenith at 03:00, 04:00 and
+    # 05:00 UTC is 96.9, 94.2 and 89.4 degrees.
+    radiation = pl.DataFrame(
+        {
+            "src_id": ["00001"] * 4,
+            "time": [datetime(2024, 6, 1, hour, tzinfo=UTC) for hour in (2, 3, 4, 5)],
+            "ghi_w_m2": [5.0, 5.1, 6.0, 20.0],
+        }
+    )
+    stations = pl.DataFrame({"src_id": ["00001"], "latitude": [60.0], "longitude": [-30.0]})
+
+    cleaned = null_night_spikes(radiation=radiation, stations=stations)
+
+    assert cleaned["ghi_w_m2"].to_list() == [5.0, None, None, 20.0]
+
+
+def test_coverage_counts_only_the_sites_required_hours():
+    stations = _stations(("near", 1.0), ("far", 5.0))
+    extra = [HOURS[-1] + timedelta(hours=hour) for hour in range(1, 6)]
+    observed = pl.concat(
+        [
+            _observed(stations=["near"], missing={"near": 5}),
+            pl.DataFrame(
+                {"src_id": ["near"] * 5, "time": extra},
+                schema={"src_id": pl.String, "time": pl.Datetime("us", "UTC")},
+            ),
+            _observed(stations=["far"]),
+        ]
+    )
+
+    chosen = select_nearest_stations(
+        sites=_sites(("A", 0.0)),
+        stations=stations,
+        observed=observed,
+        required=_required("A"),
+        k=1,
+        min_coverage=0.9,
+    )
+
+    assert chosen.select("src_id", "skipped_nearer").rows() == [("far", 1)]
+
+
+def test_a_repeated_observation_does_not_inflate_coverage():
+    stations = _stations(("near", 1.0), ("far", 5.0))
+    observed = pl.concat(
+        [
+            _observed(stations=["near"], missing={"near": 1}),
+            _observed(stations=["near"]).tail(1),
+            _observed(stations=["far"]),
+        ]
+    )
+
+    chosen = select_nearest_stations(
+        sites=_sites(("A", 0.0)),
+        stations=stations,
+        observed=observed,
+        required=_required("A"),
+        k=1,
+        min_coverage=1.0,
+    )
+
+    assert chosen["src_id"].to_list() == ["far"]
+
+
+def test_only_relative_humidity_is_clipped(tmp_path: Path):
+    path = _write_weather(
+        path=tmp_path / "weather.parquet",
+        rows=pl.DataFrame(
+            {
+                "src_id": ["00002", "00001"],
+                "time": [datetime(2024, 6, 1), datetime(2024, 6, 1)],
+                "msl_pressure": [1013.2, 998.0],
+                "rltv_hum": [101.0, 50.0],
+            }
+        ),
+    )
+
+    weather = read_hourly_weather(path=path, columns=["msl_pressure", "rltv_hum"])
+
+    assert weather.rows() == [
+        ("00001", datetime(2024, 6, 1, tzinfo=UTC), 998.0, 50.0),
+        ("00002", datetime(2024, 6, 1, tzinfo=UTC), 1013.2, 100.0),
+    ]

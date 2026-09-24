@@ -7,7 +7,7 @@ whole record or none of it. The reader therefore never reads a flag column.
 
 **A station file has three defects the reader repairs, and no others.** Relative humidity reaches
 107.5 % and is clipped at 100. Global irradiation dips slightly below zero in a few hours, and is
-clipped at zero. A pre-dawn spike, where a station reports well over 5 W m⁻² in an hour that starts
+clipped at zero. A pre-dawn spike, where a station reports more than 5 W m⁻² in an hour that starts
 and ends with the sun below the horizon, is set to missing by `null_night_spikes`, which needs the
 station's coordinates and so is a separate call.
 
@@ -36,7 +36,7 @@ NIGHT_SPIKE_THRESHOLD_W_M2: Final[float] = 5.0
 """An hour spent wholly with the sun below the horizon may not report more than this, in W m⁻²."""
 
 HORIZON_ZENITH_DEG: Final[float] = 90.0
-"""The solar zenith angle at which the sun's centre is on the horizon."""
+"""The apparent solar zenith angle at which the sun's centre, refracted, is on the horizon."""
 
 METADATA_COLUMNS: Final[dict[str, str]] = {
     "src_id": "src_id",
@@ -133,7 +133,7 @@ def read_station_metadata(*, path: Path) -> pl.DataFrame:
     start = lines.index("data") + 1
     end = lines.index("end data") if "end data" in lines else len(lines)
     body = "\n".join(lines[start:end])
-    raw = pl.read_csv(body.encode(), infer_schema_length=0, truncate_ragged_lines=True)
+    raw = pl.read_csv(body.encode(), infer_schema_length=0)
     missing = [name for name in METADATA_COLUMNS if name not in raw.columns]
     if missing:
         msg = f"{path} lacks the columns {missing}"
@@ -147,9 +147,9 @@ def read_station_metadata(*, path: Path) -> pl.DataFrame:
 def null_night_spikes(*, radiation: pl.DataFrame, stations: pl.DataFrame) -> pl.DataFrame:
     """Set `ghi_w_m2` to missing where a station reports sunshine in an hour spent wholly at night.
 
-    An hour is "wholly at night" when the sun's centre is on or below the horizon at both the
-    hour's start and its end. A sunrise hour and a sunset hour each have the sun above the horizon
-    at one end, carry real light, and are kept.
+    An hour is "wholly at night" when the sun's centre, refracted, is on or below the horizon at
+    both the hour's start and its end. A sunrise hour and a sunset hour each have the sun above the
+    horizon at one end, carry real light, and are kept.
 
     Args:
         radiation: `read_radiation`'s output.
@@ -199,12 +199,12 @@ def select_nearest_stations(
 ) -> pl.DataFrame:
     """Choose, for each site, the `k` nearest stations that cover enough of the site's hours.
 
-    **The rule, in full.** Stations are ranked by great-circle distance from the site. Distances are
-    compared after rounding to the metre, and a tie is broken by the lower `src_id`. A station is
+    **The rule, in full.** Stations are ranked by great-circle distance from the site. A tie in
+    distance is broken by the lower `src_id`. A station is
     eligible when it has a value at no less than `min_coverage` of the site's `required` hours.
-    The site takes its first `k` eligible stations in rank order. A station nearer than the
-    chosen ones that fails the coverage test is skipped, and stays in the result's
-    `skipped_nearer` count so a caller can report how many were passed over. The rule reads no
+    The site takes its first `k` eligible stations in rank order. A station nearer than a
+    chosen one that fails the coverage test is skipped, and is counted in the `skipped_nearer` of
+    every chosen station beyond it. The rule reads no
     score, no forecast and no target value, so it can be written down before any fit.
 
     **The result is the station-to-site mapping, which is sensitive.** A caller may report only
@@ -221,7 +221,8 @@ def select_nearest_stations(
     Returns:
         One row per site and rank (from 1) with `site`, `rank`, `src_id`, `distance_km`,
         `coverage` (the share of the site's required hours the station covers) and
-        `skipped_nearer`, sorted by `site` and `rank`.
+        `skipped_nearer` (how many stations nearer than this row's station failed the coverage
+        test), sorted by `site` and `rank`.
 
     Raises:
         ValueError: If `k` is below 1, `min_coverage` is outside (0, 1], a site has no required
@@ -234,14 +235,18 @@ def select_nearest_stations(
         msg = f"min_coverage must lie in (0, 1], not {min_coverage}"
         raise ValueError(msg)
     observed_keys = observed.select("src_id", "time").unique()
+    distances = distance_matrix_km(sites=sites, cells=stations)
     chosen = []
-    for site_row in sites.iter_rows(named=True):
-        site = site_row["site"]
+    for site, site_distances in zip(sites["site"], distances, strict=True):
         hours = required.filter(pl.col("site") == site).select("time").unique()
         if hours.height == 0:
             msg = f"site {site} has no required hours"
             raise ValueError(msg)
-        ranked = _rank_by_distance(site_row=site_row, stations=stations)
+        ranked = (
+            stations.select("src_id")
+            .with_columns(distance_km=pl.Series(site_distances))
+            .sort("distance_km", "src_id")
+        )
         covered = (
             hours.join(observed_keys, on="time", how="inner")
             .group_by("src_id")
@@ -265,24 +270,3 @@ def select_nearest_stations(
             )
         )
     return pl.concat(chosen).sort("site", "rank")
-
-
-def _rank_by_distance(*, site_row: dict, stations: pl.DataFrame) -> pl.DataFrame:
-    """Return every station with its distance from one site, nearest first.
-
-    Distances are rounded to the metre before ranking, so two stations that differ by floating-point
-    noise tie, and the lower `src_id` wins.
-    """
-    distance_km = distance_matrix_km(
-        sites=pl.DataFrame(
-            {"latitude": [site_row["latitude"]], "longitude": [site_row["longitude"]]}
-        ),
-        cells=stations,
-    )[0]
-    return (
-        stations.select("src_id")
-        .with_columns(distance_km=pl.Series(distance_km))
-        .with_columns(distance_m=(pl.col("distance_km") * 1000.0).round(0))
-        .sort("distance_m", "src_id")
-        .drop("distance_m")
-    )
