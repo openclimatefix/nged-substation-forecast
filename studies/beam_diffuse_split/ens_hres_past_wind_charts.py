@@ -836,7 +836,7 @@ def _uncovered_cells(*, source: Source, design: str) -> int:
 
     Args:
         source: The saved results.
-        design: The design's name in the report's coverage table, without its `long rows: ` prefix.
+        design: The design's name in the report's coverage table, without the section prefix that begins "long rows".
 
     Returns:
         The count of (site, fold, calendar month) cells with no training row for a calendar month

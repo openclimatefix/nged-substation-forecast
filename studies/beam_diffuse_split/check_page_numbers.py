@@ -128,11 +128,11 @@ def section_text(*, page_text: str, heading: str) -> str:
 def bullet_text(*, section: str, prefix: str) -> str:
     """Return the one list item of a section whose text starts with `prefix`.
 
-    A list item starts at a line beginning `- ` and runs over its indented continuation lines.
+    A list item starts at a line beginning with a hyphen and a space, and runs over its indented continuation lines.
 
     Args:
         section: A section's text, from `section_text`.
-        prefix: The start of the item, including its `- ` marker.
+        prefix: The start of the item, including its hyphen marker.
 
     Returns:
         The item's lines, joined.
