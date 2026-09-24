@@ -48,22 +48,28 @@ interpolation of it.
 - The two planned contrasts, by generator (W1-W3) and by calendar year (the same months in every
   year, the "too few months" rule, `bootstrap_year_change` between 2025 and 2026).
 
-**Before any fit runs**, this script's checks establish: that ICON-DREAM-EU's `U`, `V` and `WS`
-agree (`check_component_speed`), that direction from `U`/`V` agrees with ERA5's 100 m direction
-(`check_direction_against_era5`), that the two products' hour-to-hour changes correlate most at zero
-offset (`check_timestamp_offset`), and each generator's nearest cell and its distance
-(`icon_dream_site_frame`, via `extract_site_series._log_distances`). **The duplicate-key gate is a
-hard stop, not a warning**: DWD assembles ICON-DREAM-EU's hourly series from overlapping short-range
-forecast steps with no overlap resolved, so a `(valid_time, model_level, cell_id)` key held by more
-than one row means a choice between duplicates that needs a design decision, not code silently
-picking one (`raise_on_duplicate_keys`).
+**Before any fit runs**, `run_checks` and `_raise_on_failed_checks` establish, and raise if any
+fails: that ICON-DREAM-EU's `U`, `V` and `WS` agree (`check_component_speed`), that direction from
+`U`/`V` agrees with ERA5's 100 m direction (`check_direction_against_era5`), that the two products'
+hour-to-hour changes correlate most at zero offset (`check_timestamp_offset`), and each generator's
+nearest cell and its distance (`icon_dream_site_frame`, via `extract_site_series._log_distances`).
+**The duplicate-key gate is a hard stop, not a warning**: DWD assembles ICON-DREAM-EU's hourly
+series from overlapping short-range forecast steps with no overlap resolved, so a `(valid_time,
+model_level, cell_id)` key held by more than one row means a choice between duplicates that needs a
+design decision, not code silently picking one (`raise_on_duplicate_keys`).
+
+**The pre-fit checks raise, not just report**, if the offset scan peaks anywhere but zero, if
+either component-speed check's median disagreement exceeds `MAX_COMPONENT_SPEED_MEDIAN_DIFF_M_S`,
+or if the mean absolute direction disagreement against ERA5 exceeds
+`MAX_DIRECTION_MEAN_ABS_DIFF_DEG`. They run before any arm is fitted, in both a fresh run and
+`--report-only`.
 
 Run it with `uv run python studies/beam_diffuse_split/wind_icon_dream.py`, after
-`fetch_wind_point.py`. `--resume` reuses `losses.parquet` if its saved fingerprint (the row set,
-every job's columns, the seeds, and the hyperparameters) still matches this run; a mismatch raises
-rather than mixing stale fits, and `refuse_to_overwrite` on a fresh run means an existing output has
-to move to a `superseded/` subfolder first. `--report-only` rebuilds `report.md` from the saved
-`losses.parquet` alone, fitting nothing.
+`fetch_wind_point.py`. `refuse_to_overwrite` on a fresh run means `losses.parquet`,
+`losses.fingerprint` and `report.md` each have to move to a `superseded/` subfolder before a
+re-run. `--report-only` rebuilds `report.md` from the saved `losses.parquet` alone, fitting
+nothing, but still raises if the saved fingerprint (the row set, every job's columns, the seeds,
+and the hyperparameters) no longer matches what this code would fit.
 """
 
 import argparse
@@ -71,7 +77,7 @@ import hashlib
 import logging
 import sys
 from pathlib import Path
-from typing import Final
+from typing import Final, TypedDict
 
 import numpy as np
 import polars as pl
@@ -84,15 +90,22 @@ from studies.bootstrap import (
     MIN_MONTHS_FOR_INTERVAL,
     YearChangeInterval,
     YearInterval,
+    bootstrap_absolute,
     bootstrap_difference_by_year,
     bootstrap_year_change,
 )
 from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SEEDS, SENSITIVITY_HYPER_PARAMETERS
 from studies.grid_sampling import nearest_cells
 from studies.guards import refuse_to_overwrite
-from weather_products import CONTRAST_HEADER, METRIC, PERCENTAGE_POINTS, _contrast_line, _mae
-from wind_products import (
+from weather_products import (
+    CONTRAST_HEADER,
     ERA5_BY_YEAR_MONTHS,
+    METRIC,
+    PERCENTAGE_POINTS,
+    _contrast_line,
+    _mae,
+)
+from wind_products import (
     SHARED_FEATURES,
     _hub_height_m,
     _wind_columns,
@@ -147,6 +160,9 @@ this points at a generator sitting near or outside the box the download covers.
 PRODUCT: Final[str] = "icon_dream_eu"
 """This study's own product key, matching `wind_products._wind_columns`' naming."""
 
+PRODUCTS: Final[tuple[str, ...]] = ("era5", "ukv", "icon_d2", "icon_eu", "icon_global", PRODUCT)
+"""Every product this study refits, the five original products plus ICON-DREAM-EU."""
+
 HUB_HEIGHT_M: Final[dict[str, int]] = {
     "era5": _hub_height_m(product="era5"),
     "ukv": _hub_height_m(product="ukv"),
@@ -184,8 +200,21 @@ LEVELS_CONTRAST: Final[tuple[str, str]] = (f"{PRODUCT}_levels", f"{PRODUCT}_wind
 the column-count caveat in this module's docstring and the `study` skill.
 """
 
+SPEED_ONLY_CONTRASTS: Final[tuple[tuple[str, str], ...]] = tuple(
+    (f"{product}_wind", f"{product}_speed_only") for product in PRODUCTS
+)
+"""Each product's full arm against its own speed-only arm: what direction adds, exploratory."""
+
 ERA5_YEAR_CHANGE_YEARS: Final[tuple[int, int]] = (2025, 2026)
 """The two years `_by_year_lines` tests for a change in each planned contrast, on matched months."""
+
+MAX_COMPONENT_SPEED_MEDIAN_DIFF_M_S: Final[float] = 0.01
+"""`_raise_on_failed_checks` fails if `sqrt(u^2 + v^2)` disagrees with the served WS by more than
+this, at the median, at either the hub level or the surface."""
+
+MAX_DIRECTION_MEAN_ABS_DIFF_DEG: Final[float] = 30.0
+"""`_raise_on_failed_checks` fails if the direction from `U`/`V` disagrees with ERA5's 100 m
+direction by more than this, mean absolute, pooled over every site."""
 
 
 def filter_nan_padding(*, frame: pl.DataFrame, value_columns: list[str]) -> pl.DataFrame:
@@ -611,9 +640,8 @@ def jobs() -> list[Job]:
         One job per arm; the two deciding contrasts' arms are duplicated at
         `SENSITIVITY_HYPER_PARAMETERS`.
     """
-    products = ("era5", "ukv", "icon_d2", "icon_eu", "icon_global", PRODUCT)
     job_list: list[Job] = []
-    for product in products:
+    for product in PRODUCTS:
         columns = (*SHARED_FEATURES, *_wind_columns(product=product))
         job_list.append(
             (f"{product}_wind", "pooled", "power_mw", columns, PRIMARY_HYPER_PARAMETERS, False)
@@ -638,7 +666,7 @@ def jobs() -> list[Job]:
     job_list.append(
         (f"{PRODUCT}_levels", "pooled", "power_mw", levels_columns, PRIMARY_HYPER_PARAMETERS, False)
     )
-    for product in products:
+    for product in PRODUCTS:
         hub_speed = _wind_columns(product=product)[0]
         job_list.append(
             (
@@ -654,20 +682,24 @@ def jobs() -> list[Job]:
 
 
 def _fingerprint(*, frame: pl.DataFrame, job_list: list[Job]) -> str:
-    """Return a hash covering the row set, every job's columns, and the seeds.
+    """Return a hash covering every row's values, every job's columns, and the seeds.
 
-    `--resume` refuses to reuse a saved `losses.parquet` when this does not match, so a code change
-    that moves the row set, a column, a seed, or a hyperparameter setting cannot silently mix its
-    fits with a previous run's.
+    `--report-only` refuses to reuse a saved `losses.parquet` when this does not match, so a code
+    change that moves the row set, a feature's value, a column, a seed, or a hyperparameter setting
+    cannot silently mix its fits with a previous run's. Hashing every column of `frame`, not only
+    `site` and `time`, is what catches a code change that keeps the same rows and the same column
+    names but recomputes a value differently -- a flipped direction convention, a shifted model
+    level, or a different fold assignment, for example.
 
     Args:
-        frame: The row set every job is fitted on.
+        frame: The row set every job is fitted on, including `power_mw` and `fold`.
         job_list: Every job this run means to fit.
 
     Returns:
         A hex digest.
     """
-    row_hashes = frame.select("site", "time").sort("site", "time").hash_rows(seed=0).to_list()
+    ordered = frame.select(sorted(frame.columns)).sort("site", "time")
+    row_hashes = ordered.hash_rows(seed=0).to_list()
     payload = repr(
         (
             row_hashes,
@@ -700,7 +732,7 @@ def _by_year_lines(*, losses: pl.DataFrame, treatment: str, reference: str) -> l
         months=ERA5_BY_YEAR_MONTHS,
     )
     lines = [
-        f"#### {treatment} − {reference}, year by year, January to September of each year",
+        f"#### {treatment} − {reference}, year by year, January to August of each year",
         "",
         f"A year of fewer than {MIN_MONTHS_FOR_INTERVAL} months gets no interval.",
         "",
@@ -746,30 +778,115 @@ def _by_year_lines(*, losses: pl.DataFrame, treatment: str, reference: str) -> l
     return lines
 
 
-def _checks_lines(*, sites: pl.DataFrame) -> list[str]:
-    """Run every pre-fit check and render its result as markdown.
+class ChecksResult(TypedDict):
+    """Every pre-fit check's raw result, computed once by `run_checks`.
+
+    `_raise_on_failed_checks` validates this and `_checks_lines` renders it, so no check runs
+    twice and a reviewer reading the report sees exactly what the gate before `run_all` judged.
+    """
+
+    hub_component_speed: dict[str, float]
+    surface_component_speed: dict[str, float]
+    direction_vs_era5: dict[str, float]
+    offset_correlations: dict[int, float]
+    cell_distances: pl.DataFrame
+
+
+def _nearest_cells(*, sites: pl.DataFrame) -> pl.DataFrame:
+    """Return every generator's nearest ICON-DREAM-EU cell and its distance.
 
     Args:
         sites: The wind roster.
 
     Returns:
+        One row per site with `site`, `cell_id`, `distance_km`.
+    """
+    ws = _read_level_variable(filename=WS_FILE, value_column="ws_m_s")
+    cell_ids = sorted(ws["cell_id"].unique().to_list())
+    return icon_dream_cells(sites=sites, cell_ids=cell_ids)
+
+
+def run_checks(*, sites: pl.DataFrame) -> ChecksResult:
+    """Run every pre-fit check once, before any arm is fitted.
+
+    Args:
+        sites: The wind roster.
+
+    Returns:
+        Every check's raw result.
+    """
+    return {
+        "hub_component_speed": check_component_speed(level=HUB_LEVEL),
+        "surface_component_speed": check_component_speed_10m(),
+        "direction_vs_era5": check_direction_against_era5(sites=sites),
+        "offset_correlations": check_timestamp_offset(sites=sites),
+        "cell_distances": _nearest_cells(sites=sites),
+    }
+
+
+def _raise_on_failed_checks(*, checks: ChecksResult) -> None:
+    """Raise if any pre-fit check fails, before any arm is fitted on data the checks distrust.
+
+    Args:
+        checks: `run_checks`'s result.
+
+    Raises:
+        ValueError: Naming every failed check and by how much it missed its threshold.
+    """
+    problems: list[str] = []
+    offsets = checks["offset_correlations"]
+    best_offset = max(offsets, key=offsets.__getitem__)
+    if best_offset != 0:
+        problems.append(f"the offset scan peaks at {best_offset:+d} h, not 0: {offsets}")
+    for label, result in (
+        (f"level {HUB_LEVEL}", checks["hub_component_speed"]),
+        ("10 m", checks["surface_component_speed"]),
+    ):
+        diff = result["median_abs_diff_m_s"]
+        if diff > MAX_COMPONENT_SPEED_MEDIAN_DIFF_M_S:
+            problems.append(
+                f"{label} component speed disagrees with served WS by {diff:.4f} m/s median, "
+                f"more than {MAX_COMPONENT_SPEED_MEDIAN_DIFF_M_S} m/s"
+            )
+    direction_all = checks["direction_vs_era5"]["all"]
+    if direction_all > MAX_DIRECTION_MEAN_ABS_DIFF_DEG:
+        problems.append(
+            f"direction disagrees with ERA5 by {direction_all:.1f} degrees mean absolute, more "
+            f"than {MAX_DIRECTION_MEAN_ABS_DIFF_DEG}"
+        )
+    if problems:
+        msg = "; ".join(problems)
+        raise ValueError(msg)
+
+
+def _checks_lines(*, checks: ChecksResult) -> list[str]:
+    """Render every pre-fit check's result as markdown.
+
+    Args:
+        checks: `run_checks`'s result.
+
+    Returns:
         Markdown lines.
     """
-    lines = ["#### Checks run before any fit", ""]
-    for label, level in ((f"level {HUB_LEVEL} (~{LEVEL_HEIGHTS_M[HUB_LEVEL]} m)", HUB_LEVEL),):
-        result = check_component_speed(level=level)
-        lines.append(
-            f"- Component speed vs served WS, {label}: median absolute difference "
-            f"{result['median_abs_diff_m_s']:.4f} m/s, 99th percentile "
-            f"{result['p99_abs_diff_m_s']:.4f} m/s."
-        )
-    surface_result = check_component_speed_10m()
-    lines.append(
-        "- Component speed vs served WS, 10 m: median absolute difference "
-        f"{surface_result['median_abs_diff_m_s']:.4f} m/s, 99th percentile "
-        f"{surface_result['p99_abs_diff_m_s']:.4f} m/s."
-    )
-    direction = check_direction_against_era5(sites=sites)
+    hub = checks["hub_component_speed"]
+    surface = checks["surface_component_speed"]
+    direction = checks["direction_vs_era5"]
+    offsets = checks["offset_correlations"]
+    lines = [
+        "#### Checks run before any fit",
+        "",
+        (
+            f"- Component speed vs served WS, level {HUB_LEVEL} "
+            f"(~{LEVEL_HEIGHTS_M[HUB_LEVEL]} m): median absolute difference "
+            f"{hub['median_abs_diff_m_s']:.4f} m/s, 99th percentile "
+            f"{hub['p99_abs_diff_m_s']:.4f} m/s."
+        ),
+        (
+            "- Component speed vs served WS, 10 m: median absolute difference "
+            f"{surface['median_abs_diff_m_s']:.4f} m/s, 99th percentile "
+            f"{surface['p99_abs_diff_m_s']:.4f} m/s."
+        ),
+    ]
     lines += [
         (
             f"- Direction vs ERA5 100 m, site {site}: mean absolute angle difference "
@@ -777,7 +894,6 @@ def _checks_lines(*, sites: pl.DataFrame) -> list[str]:
         )
         for site in sorted(direction)
     ]
-    offsets = check_timestamp_offset(sites=sites)
     lines += [
         "",
         "| Offset (h) | Correlation of hour-to-hour speed change with ERA5 |",
@@ -787,13 +903,67 @@ def _checks_lines(*, sites: pl.DataFrame) -> list[str]:
     return lines
 
 
-def _report(*, frame: pl.DataFrame, losses: pl.DataFrame, sites: pl.DataFrame) -> str:
+def _cell_distance_lines(*, cell_distances: pl.DataFrame) -> list[str]:
+    """Render each generator's distance to the ICON-DREAM-EU cell it reads, as markdown.
+
+    Args:
+        cell_distances: `run_checks`'s `cell_distances`, one row per site.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        "#### Each generator's ICON-DREAM-EU cell",
+        "",
+        "| Site | Distance (km) |",
+        "|---|---|",
+    ]
+    lines += [
+        f"| {row['site']} | {row['distance_km']:.1f} |"
+        for row in cell_distances.sort("site").iter_rows(named=True)
+    ]
+    return lines
+
+
+def _arm_columns_lines(*, job_list: list[Job]) -> list[str]:
+    """Render every fitted arm's feature columns, once per arm, as markdown.
+
+    A reviewer checks this against the plan, since an arm can silently lose a column (see this
+    module's docstring and the `study` skill).
+
+    Args:
+        job_list: Every job `jobs()` returns.
+
+    Returns:
+        Markdown lines.
+    """
+    seen: dict[str, tuple[str, ...]] = {}
+    for arm, _, _, columns, _, _ in job_list:
+        seen.setdefault(arm, columns)
+    lines = ["#### Every arm's feature columns", ""]
+    lines += [
+        f"- `{arm}`: {', '.join(f'`{column}`' for column in columns)}"
+        for arm, columns in seen.items()
+    ]
+    return lines
+
+
+def _report(
+    *,
+    frame: pl.DataFrame,
+    losses: pl.DataFrame,
+    sites: pl.DataFrame,
+    job_list: list[Job],
+    checks: ChecksResult,
+) -> str:
     """Assemble the markdown report.
 
     Args:
         frame: The common rows.
         losses: Every arm's losses, at every setting.
-        sites: The wind roster, for the distances and the geometry lines.
+        sites: The wind roster, for the geometry lines.
+        job_list: Every job `jobs()` returns, for the feature-column section.
+        checks: `run_checks`'s result, for the checks and cell-distance sections.
 
     Returns:
         The report.
@@ -801,29 +971,37 @@ def _report(*, frame: pl.DataFrame, losses: pl.DataFrame, sites: pl.DataFrame) -
     site_labels = sorted(frame["site"].unique().to_list())
     pooled = losses.filter(pl.col("setting") == "pooled")
     sensitivity = losses.filter(pl.col("setting") == "sensitivity")
-    products = ("era5", "ukv", "icon_d2", "icon_eu", "icon_global", PRODUCT)
     lines = [
         (
             f"### Six weather products on {frame.height:,} common site-hours of wind "
             f"({frame['time'].min():%Y-%m-%d} to {frame['time'].max():%Y-%m-%d})"
         ),
         "",
-        "| Product | Hub height shown | All sites | Speed only |",
-        "|---|---|---|---|",
+        "| Product | Hub height shown | All sites | 95% interval | Speed only |",
+        "|---|---|---|---|---|",
     ]
-    for product in products:
+    for product in PRODUCTS:
         arm = f"{product}_wind"
         speed_only = f"{product}_speed_only"
+        interval = bootstrap_absolute(losses=pooled, arm=arm, metric=METRIC)
+        lower, upper = (interval[key] * PERCENTAGE_POINTS for key in ("lower_95", "upper_95"))
         lines.append(
             f"| {product} | {HUB_HEIGHT_M[product]} m | {_mae(losses=pooled, arm=arm):.3f} "
-            f"| {_mae(losses=pooled, arm=speed_only):.3f} |"
+            f"| [{lower:.3f}, {upper:.3f}] | {_mae(losses=pooled, arm=speed_only):.3f} |"
         )
-    lines.append(f"| {PRODUCT}_levels | | {_mae(losses=pooled, arm=f'{PRODUCT}_levels'):.3f} | |")
+    lines.append(f"| {PRODUCT}_levels | | {_mae(losses=pooled, arm=f'{PRODUCT}_levels'):.3f} | | |")
     lines += [
         "",
-        "Mean absolute error as a percentage of each site's P99 output.",
+        (
+            "Mean absolute error as a percentage of each site's P99 output. The interval is a "
+            "95% bound from resampling whole months and a fitting seed."
+        ),
         "",
-        *_checks_lines(sites=sites),
+        *_arm_columns_lines(job_list=job_list),
+        "",
+        *_cell_distance_lines(cell_distances=checks["cell_distances"]),
+        "",
+        *_checks_lines(checks=checks),
         "",
         "#### Deciding contrasts, named before the run",
         "",
@@ -855,7 +1033,7 @@ def _report(*, frame: pl.DataFrame, losses: pl.DataFrame, sites: pl.DataFrame) -
     lines += ["", "#### Exploratory contrasts", "", *CONTRAST_HEADER]
     lines += [
         _contrast_line(losses=pooled, treatment=t, reference=r, label="all")
-        for t, r in (*EXPLORATORY_PRODUCT_CONTRASTS, LEVELS_CONTRAST)
+        for t, r in (*EXPLORATORY_PRODUCT_CONTRASTS, LEVELS_CONTRAST, *SPEED_ONLY_CONTRASTS)
     ]
     lines.append("")
     for treatment, reference in DECIDING_CONTRASTS:
@@ -865,48 +1043,15 @@ def _report(*, frame: pl.DataFrame, losses: pl.DataFrame, sites: pl.DataFrame) -
     return "\n".join(lines) + "\n"
 
 
-def _refuse_or_resume(
-    *, path: Path, fingerprint_path: Path, fingerprint: str, resume: bool
-) -> pl.DataFrame | None:
-    """Return the saved losses `--resume` may reuse, or refuse to overwrite a fresh run's outputs.
-
-    Args:
-        path: Where `losses.parquet` lives.
-        fingerprint_path: Where the fingerprint beside it lives.
-        fingerprint: This run's own fingerprint.
-        resume: Whether `--resume` was passed.
-
-    Returns:
-        The saved losses to build on, or `None` for a fresh run.
-
-    Raises:
-        ValueError: If `--resume` finds a saved fingerprint that does not match this run's.
-    """
-    if resume and path.exists():
-        saved_fingerprint = (
-            fingerprint_path.read_text().strip() if fingerprint_path.exists() else None
-        )
-        if saved_fingerprint != fingerprint:
-            msg = (
-                f"--resume: {path} was fitted on a different row set, column set, seed set, or "
-                "hyperparameter setting; move it to a superseded/ subfolder or re-run without "
-                "--resume"
-            )
-            raise ValueError(msg)
-        return pl.read_parquet(path)
-    refuse_to_overwrite(paths=[path, fingerprint_path])
-    return None
-
-
 def main() -> int:
-    """Build the row set, fit every arm, bootstrap every contrast, and write the report."""
+    """Build the row set, run every check, fit every arm, and write the report.
+
+    Every check in `run_checks` runs before any arm is fitted, in both a fresh run and
+    `--report-only`, and `_raise_on_failed_checks` raises rather than letting a bad row set reach
+    `run_all`.
+    """
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument(
-        "--resume",
-        action="store_true",
-        help="Reuse losses.parquet if its saved fingerprint still matches this run.",
-    )
     parser.add_argument(
         "--report-only",
         action="store_true",
@@ -923,35 +1068,37 @@ def main() -> int:
         frame["time"].max(),
     )
 
+    checks = run_checks(sites=sites)
+    _raise_on_failed_checks(checks=checks)
+
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     path = OUTPUT_DIR / "losses.parquet"
     fingerprint_path = OUTPUT_DIR / "losses.fingerprint"
+    report_path = OUTPUT_DIR / "report.md"
+
+    all_jobs = jobs()
+    fingerprint = _fingerprint(frame=frame, job_list=all_jobs)
 
     if arguments.report_only:
+        saved_fingerprint = (
+            fingerprint_path.read_text().strip() if fingerprint_path.exists() else None
+        )
+        if saved_fingerprint != fingerprint:
+            msg = (
+                f"--report-only: {path} was fitted on a different row set, column set, seed set, "
+                "feature values or hyperparameter setting than this code now produces; re-run "
+                "without --report-only"
+            )
+            raise ValueError(msg)
         losses = pl.read_parquet(path)
     else:
-        all_jobs = jobs()
-        fingerprint = _fingerprint(frame=frame, job_list=all_jobs)
-        saved = _refuse_or_resume(
-            path=path,
-            fingerprint_path=fingerprint_path,
-            fingerprint=fingerprint,
-            resume=arguments.resume,
-        )
-        done = (
-            set(saved.select("arm", "setting").unique().iter_rows()) if saved is not None else set()
-        )
-        missing = [job for job in all_jobs if (job[0], job[1]) not in done]
-        _LOG.info("fitting %d jobs of %d", len(missing), len(all_jobs))
-        parts = [] if saved is None else [saved]
-        if missing:
-            parts.append(run_all(dataset=frame, jobs=missing))
-        losses = pl.concat(parts)
+        refuse_to_overwrite(paths=[path, fingerprint_path, report_path])
+        losses = run_all(dataset=frame, jobs=all_jobs)
         losses.write_parquet(path)
         fingerprint_path.write_text(fingerprint)
 
-    report = _report(frame=frame, losses=losses, sites=sites)
-    (OUTPUT_DIR / "report.md").write_text(report)
+    report = _report(frame=frame, losses=losses, sites=sites, job_list=all_jobs, checks=checks)
+    report_path.write_text(report)
     sys.stdout.write(report)
     return 0
 
