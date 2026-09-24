@@ -141,8 +141,13 @@ DOMAIN_MARGIN: Final[float] = 0.15
 LEADERBOARD_MARGIN: Final[float] = 0.3
 """How far past the lowest and highest interval end a leaderboard's x domain extends."""
 
-RATIO_MARKER: Final[str] = "Monthly ratio of each product's mean 10 m wind speed to ERA5's"
-"""The text that opens the sentence above the monthly-ratio table in `report.md`."""
+RATIO_MARKERS: Final[Mapping[str, str]] = MappingProxyType(
+    {
+        "10 m": "Monthly ratio of each product's mean 10 m wind speed to ERA5's",
+        "100 m": "Monthly ratio of each product's mean 100 m wind speed to ERA5's",
+    }
+)
+"""The text that opens the sentence above each height's monthly-ratio table in `report.md`."""
 
 RATIO_HEADER: Final[tuple[str, ...]] = ("Month", "Rows", "ENS / ERA5", "HRES / ERA5", "UKV / ERA5")
 """The header of the monthly-ratio table."""
@@ -752,6 +757,12 @@ def _robustness(*, source: Source) -> tuple[alt.VConcatChart, str]:
                 figure_planning="mixed",
             )
         )
+    without_may = source.row(
+        section="fold designs",
+        scope="study design, May 2026 rows removed",
+        treatment="hres_wind",
+        reference="ukv_wind",
+    )
     title = (
         "Each planned contrast keeps its sign and stays statistically significant at the 5% level "
         "under five fold designs and one row subset"
@@ -773,6 +784,11 @@ def _robustness(*, source: Source) -> tuple[alt.VConcatChart, str]:
                     "the blocks are cut and what the XGBoost model is told about each hour's era. "
                     "The second row scores the study's own fits without the rows of May 2026, the "
                     "rows the last design drops."
+                ),
+                (
+                    "The two rows that drop May 2026 (the row subset and the IFS Cycle 50r1 "
+                    f"design) score {without_may['n_rows']:,} farm-hours, and every other row "
+                    "scores the farm-hours counted in the last line."
                 ),
                 f"{DOTS} {CAPACITY}",
                 _scope_line(source=source),
@@ -965,8 +981,8 @@ def _reconciliation(*, source: Source) -> tuple[alt.VConcatChart, str]:
         )
     ]
     title = (
-        "An extra era cut at IFS Cycle 49r1 changes ENS day 0's and HRES's scores against ERA5 far "
-        "more than rotating the folds does"
+        "An extra era cut at 1 December 2024, the first whole month after IFS Cycle 49r1, changes "
+        "ENS day 0's and HRES's scores against ERA5 far more than rotating the folds does"
     )
     late = source.row(
         section=LONG_DESIGNS[0][0],
@@ -994,8 +1010,8 @@ def _reconciliation(*, source: Source) -> tuple[alt.VConcatChart, str]:
             subtitle=[
                 (
                     "ECMWF changed its forecast model, IFS Cycle 49r1, on 12 November 2024. The "
-                    "ENS horizons page's folds do not treat that date as a break; the extra cut "
-                    "does."
+                    "ENS horizons page's folds do not treat that change as a break; the extra "
+                    "cut, at 1 December 2024, does."
                 ),
                 (
                     f"All rows: {all_rows['n_rows']:,} farm-hours in {all_rows['n_months']} "
@@ -1022,11 +1038,12 @@ def _reconciliation(*, source: Source) -> tuple[alt.VConcatChart, str]:
     )
 
 
-def _monthly_ratios(*, report: str) -> pl.DataFrame:
-    """Read the monthly ratio table of 10 m wind speed to ERA5's from `report.md`.
+def _monthly_ratios(*, report: str, height: str) -> pl.DataFrame:
+    """Read one height's monthly ratio table of wind speed to ERA5's from `report.md`.
 
     Args:
         report: `report.md`'s text.
+        height: A key of `RATIO_MARKERS`.
 
     Returns:
         One row per month, with `month` (the middle of the month), `product` and `ratio`.
@@ -1034,9 +1051,10 @@ def _monthly_ratios(*, report: str) -> pl.DataFrame:
     Raises:
         ValueError: If the table is missing or its header changed.
     """
-    start = report.find(RATIO_MARKER)
+    marker = RATIO_MARKERS[height]
+    start = report.find(marker)
     if start < 0:
-        msg = f"report.md has no line starting {RATIO_MARKER!r}"
+        msg = f"report.md has no line starting {marker!r}"
         raise ValueError(msg)
     table = []
     for line in report[start:].splitlines():
@@ -1058,16 +1076,26 @@ def _monthly_ratios(*, report: str) -> pl.DataFrame:
     return pl.DataFrame(records)
 
 
-def _monthly_ratio_chart(*, source: Source) -> tuple[alt.VConcatChart, str]:
-    """Draw each product's monthly mean 10 m wind speed over ERA5's, with IFS Cycle 49r1 marked.
+def _ratio_panel(
+    *,
+    ratios: pl.DataFrame,
+    height: str,
+    domain: tuple[float, float],
+    ticks: list[float],
+    last: bool,
+) -> alt.LayerChart:
+    """Draw one height's monthly ratios, with IFS Cycle 49r1 marked.
 
     Args:
-        source: The saved results.
+        ratios: `_monthly_ratios`'s result.
+        height: `10 m` or `100 m`, for the axis title.
+        domain: The y range.
+        ticks: The y axis tick values.
+        last: Whether this panel carries the x axis title and the legend.
 
     Returns:
-        Figure 18, and its title.
+        The panel.
     """
-    ratios = _monthly_ratios(report=source.report)
     order = ["ECMWF ENS day-0 mean", "ECMWF HRES", "UKV"]
     colours = [ENS_COLOUR, HRES_COLOUR, ocf.BLACK_1]
     dashes = [[1, 0], [6, 3], [2, 2]]
@@ -1079,14 +1107,14 @@ def _monthly_ratio_chart(*, source: Source) -> tuple[alt.VConcatChart, str]:
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X(
                 "month:T",
-                title="Month (points sit mid-month)",
+                title="Month (points sit mid-month)" if last else None,
                 axis=alt.Axis(format="%b %Y", labelAngle=-45, tickCount="month", grid=False),
             ),
             y=alt.Y(
                 "ratio:Q",
-                title=["Mean 10 m wind speed over ERA5's", "(1 means equal)"],
-                scale=alt.Scale(domain=[0.65, 1.0], nice=False, zero=False),
-                axis=alt.Axis(format=".2f", values=[0.7, 0.8, 0.9, 1.0]),
+                title=[f"Mean {height} wind speed over ERA5's", "(1 means equal)"],
+                scale=alt.Scale(domain=list(domain), nice=False, zero=False),
+                axis=alt.Axis(format=".2f", values=ticks),
             ),
             color=alt.Color(
                 "product:N",
@@ -1110,21 +1138,50 @@ def _monthly_ratio_chart(*, source: Source) -> tuple[alt.VConcatChart, str]:
         .mark_text(align="left", baseline="top", dx=4, dy=2, color=ocf.BLACK_1, aria=False)
         .encode(x="date:T", y=alt.value(0), text="text:N")  # ty: ignore[unresolved-attribute]
     )
-    panel = alt.LayerChart(layer=[rule, label, line], width=PLOT_WIDTH_PX, height=230)
+    return alt.LayerChart(layer=[rule, label, line], width=PLOT_WIDTH_PX, height=200)
+
+
+def _monthly_ratio_chart(*, source: Source) -> tuple[alt.VConcatChart, str]:
+    """Draw each product's monthly mean 10 m and 100 m wind speed over ERA5's, with 49r1 marked.
+
+    Args:
+        source: The saved results.
+
+    Returns:
+        Figure 18, and its title.
+    """
+    panels = [
+        _ratio_panel(
+            ratios=_monthly_ratios(report=source.report, height="10 m"),
+            height="10 m",
+            domain=(0.65, 1.0),
+            ticks=[0.7, 0.8, 0.9, 1.0],
+            last=False,
+        ),
+        _ratio_panel(
+            ratios=_monthly_ratios(report=source.report, height="100 m"),
+            height="100 m",
+            domain=(0.85, 1.1),
+            ticks=[0.9, 0.95, 1.0, 1.05],
+            last=True,
+        ),
+    ]
     title = (
         "ENS's and HRES's 10 m wind speeds fall against ERA5's between October and November 2024, "
         "and UKV's does not"
     )
     return (
         figure(
-            panels=[panel],
+            panels=panels,
             number=FIGURE_MONTHLY_RATIO,
             figure_planning=None,
             title=title,
             subtitle=[
                 (
-                    "Each month's mean 10 m wind speed of one product, over ERA5's mean for the "
-                    "same hours, pooled over the three farms."
+                    "Each month's mean wind speed of one product, over ERA5's mean for the same "
+                    "hours, pooled over the three farms. The upper panel is 10 m. The lower panel "
+                    "is 100 m, the height the XGBoost models are given, where the fall is "
+                    "smaller and gradual."
                 ),
                 (
                     "Rows are the page's own from 12 August 2024, before any hour is dropped for "
@@ -1190,21 +1247,37 @@ def _require_split_claims(*, source: Source) -> None:
         raise ValueError(msg)
 
 
-def _require_farm_claims(*, farm_frames: list[tuple[str, str, str, pl.DataFrame]]) -> None:
-    """Stop unless the saved results support Figure 20's title.
+def _change_lines(*, source: Source) -> list[str]:
+    """Return the subtitle lines giving the change of four contrasts between the two halves.
 
     Args:
-        farm_frames: Each planned contrast's rows, P1 to P3 in order, pooled row first.
+        source: The saved results.
 
-    Raises:
-        ValueError: If P3 is significant at other than exactly one farm.
+    Returns:
+        One line, read from the report's `label-hour change` rows.
     """
-    label, _, _, frame = farm_frames[-1]
-    farms = frame.filter(pl.col("label") != "All three farms")
-    at_farms = ((farms["lower_95"] > 0) | (farms["upper_95"] < 0)).sum()
-    if label != "P3" or at_farms != 1:
-        msg = f"{label} is significant at {at_farms} farms, not one"
-        raise ValueError(msg)
+    parts = []
+    for treatment, reference in (
+        ("ens_mean_day0", "ukv"),
+        ("ukv", "era5"),
+        ("ens_mean_day0", "era5"),
+        ("ens_mean_day0", "hres"),
+    ):
+        row = source.row(
+            section="label-hour change",
+            scope="labels 10-23 UTC minus labels 00-08 UTC",
+            treatment=f"{treatment}_wind",
+            reference=f"{reference}_wind",
+        )
+        parts.append(
+            f"{_name_pair(treatment=treatment, reference=reference)} "
+            f"{row['value']:+.2f} [{row['lower']:+.2f}, {row['upper']:+.2f}]"
+        )
+    return [
+        "Change from labels 00-08 UTC to labels 10-23 UTC, in points, exploratory: "
+        + "; ".join(parts)
+        + "."
+    ]
 
 
 def _split_figure(*, source: Source) -> tuple[alt.VConcatChart, str]:
@@ -1264,9 +1337,13 @@ def _split_figure(*, source: Source) -> tuple[alt.VConcatChart, str]:
                     "whether ENS could be read in time."
                 ),
                 (
-                    "HRES against UKV, and UKV against ERA5, involve no ENS lead, and ERA5 is an "
-                    "analysis with no lead, so their change between the halves is time of day."
+                    "UKV against ERA5 involves no forecast lead, but its change between the "
+                    "halves is not time of day alone: HRES's served lead varies with the UTC "
+                    "hour before 1 October 2025, and ERA5's assimilation windows change at 09 to "
+                    "10 and 21 to 22 UTC. The split cannot apportion the widening between ENS "
+                    "lead and time of day."
                 ),
+                *_change_lines(source=source),
                 f"{DOTS} {CAPACITY}",
                 _scope_line(source=source),
             ],
@@ -1303,7 +1380,6 @@ def _farm_figure(*, source: Source) -> tuple[alt.VConcatChart, str]:
                 )
             )
         farm_frames.append((label, treatment, reference, pl.DataFrame(records)))
-    _require_farm_claims(farm_frames=farm_frames)
     farm_domain = _difference_domain(rows=pl.concat(frame for *_, frame in farm_frames))
     panels = [
         interval_panel(
@@ -1320,7 +1396,22 @@ def _farm_figure(*, source: Source) -> tuple[alt.VConcatChart, str]:
         )
         for index, (label, treatment, reference, frame) in enumerate(farm_frames)
     ]
-    title = "HRES beats ERA5 by a statistically significant margin at one farm of three"
+    title = "The three planned contrasts pooled over the three farms and at each farm"
+    between = source.row(
+        section="between farms",
+        scope="W2 minus W1",
+        treatment="hres_wind",
+        reference="era5_wind",
+    )
+    other_between = [
+        source.row(
+            section="between farms",
+            scope=scope,
+            treatment="hres_wind",
+            reference="era5_wind",
+        )
+        for scope in ("W2 minus W3", "W3 minus W1")
+    ]
     return (
         figure(
             panels=panels,
@@ -1332,6 +1423,15 @@ def _farm_figure(*, source: Source) -> tuple[alt.VConcatChart, str]:
                     "Each planned contrast pooled over the three farms, which is the planned "
                     "row, and at each farm. The per-farm rows were not planned, so they are "
                     "exploratory."
+                ),
+                (
+                    "HRES − ERA5 differs between farms by "
+                    f"{between['value']:+.2f} points [{between['lower']:+.2f}, "
+                    f"{between['upper']:+.2f}] for W2 minus W1, "
+                    f"{other_between[0]['value']:+.2f} [{other_between[0]['lower']:+.2f}, "
+                    f"{other_between[0]['upper']:+.2f}] for W2 minus W3, and "
+                    f"{other_between[1]['value']:+.2f} [{other_between[1]['lower']:+.2f}, "
+                    f"{other_between[1]['upper']:+.2f}] for W3 minus W1 (exploratory)."
                 ),
                 f"{DOTS} {CAPACITY}",
                 _scope_line(source=source),
