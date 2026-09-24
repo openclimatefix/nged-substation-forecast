@@ -5,6 +5,7 @@ import polars as pl
 import pytest
 from studies.bootstrap import (
     BootstrapInterval,
+    blend_verdict,
     bootstrap_absolute,
     bootstrap_difference,
     bootstrap_difference_by_year,
@@ -565,3 +566,65 @@ def test_combine_setting_verdicts_uses_the_given_neutral_value():
         )
         == "no detectable difference"
     )
+
+
+def _gain(*, upper_95: float, lower_95: float = -0.9) -> BootstrapInterval:
+    return _interval(difference=(lower_95 + upper_95) / 2.0, lower_95=lower_95, upper_95=upper_95)
+
+
+def test_blend_verdict_lowers_the_error_when_the_conservative_bound_and_its_guard_gain():
+    result = blend_verdict(
+        p4a=_gain(upper_95=-0.1),
+        p4a_guard=_gain(upper_95=-0.1),
+        p4b=_gain(upper_95=-0.1),
+        p4b_guard=_gain(upper_95=-0.1),
+    )
+
+    assert result == {"verdict": "lowers the day-ahead error", "largest_gain_not_excluded": None}
+
+
+def test_blend_verdict_may_lower_the_error_when_only_the_optimistic_bound_gains():
+    result = blend_verdict(
+        p4a=_gain(upper_95=-0.1),
+        p4a_guard=_gain(upper_95=-0.1),
+        p4b=_gain(upper_95=0.2),
+        p4b_guard=_gain(upper_95=-0.1),
+    )
+
+    assert result == {"verdict": "may lower the error", "largest_gain_not_excluded": None}
+
+
+def test_blend_verdict_needs_the_guard_as_well_as_the_gain():
+    # P4b gains but its guard does not: the gain may come from the extra columns, not the weather.
+    result = blend_verdict(
+        p4a=_gain(upper_95=0.3),
+        p4a_guard=_gain(upper_95=0.3),
+        p4b=_gain(upper_95=-0.1),
+        p4b_guard=_gain(upper_95=0.1),
+    )
+
+    assert result["verdict"] == "no detectable difference"
+
+
+def test_blend_verdict_states_the_gain_the_conservative_interval_leaves_open():
+    result = blend_verdict(
+        p4a=_gain(upper_95=0.3),
+        p4a_guard=_gain(upper_95=0.3),
+        p4b=_gain(upper_95=0.2, lower_95=-0.45),
+        p4b_guard=_gain(upper_95=0.2),
+    )
+
+    assert result["verdict"] == "no detectable difference"
+    assert result["largest_gain_not_excluded"] == pytest.approx(0.45)
+
+
+def test_blend_verdict_reports_no_open_gain_when_the_lower_bound_is_positive():
+    # P4b's whole interval sits above zero (the blend is worse): no gain is left open.
+    result = blend_verdict(
+        p4a=_gain(upper_95=0.6, lower_95=0.1),
+        p4a_guard=_gain(upper_95=0.6, lower_95=0.1),
+        p4b=_gain(upper_95=0.6, lower_95=0.1),
+        p4b_guard=_gain(upper_95=0.6, lower_95=0.1),
+    )
+
+    assert result == {"verdict": "no detectable difference", "largest_gain_not_excluded": 0.0}

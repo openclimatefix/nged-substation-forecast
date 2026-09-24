@@ -531,6 +531,57 @@ def bracket_verdict(
     return "unresolved"
 
 
+class BlendVerdict(TypedDict):
+    """A blend's published verdict, and how large a gain its conservative interval leaves open."""
+
+    verdict: str
+    largest_gain_not_excluded: float | None
+
+
+LOWERS_ERROR: Final[str] = "lowers the day-ahead error"
+MAY_LOWER_ERROR: Final[str] = "may lower the error"
+NO_DETECTABLE_DIFFERENCE: Final[str] = "no detectable difference"
+
+
+def blend_verdict(
+    *,
+    p4a: BootstrapInterval,
+    p4a_guard: BootstrapInterval,
+    p4b: BootstrapInterval,
+    p4b_guard: BootstrapInterval,
+) -> BlendVerdict:
+    """Turn a blend's two lead bounds and their two guards into the plan's published verdict.
+
+    Each blend contrast is the blend's error minus ENS alone's, so a negative interval is a gain. A
+    gain counts only if the guard (the blend minus the same blend with the other products' weather
+    permuted) is also negative and significant, which attributes the gain to the other products'
+    weather rather than to the extra columns.
+
+    - **Lowers the day-ahead error**: the conservative bound (P4b) and its guard are both negative
+      and significant, so the gain survives the longest lead a 09:00 UTC service could have.
+    - **May lower the error**: only the optimistic bound (P4a) and its guard are.
+    - **No detectable difference**: neither, with the largest gain P4b's interval leaves open.
+
+    Args:
+        p4a: The optimistic-lead blend minus ENS alone.
+        p4a_guard: The optimistic-lead blend minus its permutation control.
+        p4b: The conservative-lead blend minus ENS alone.
+        p4b_guard: The conservative-lead blend minus its permutation control.
+
+    Returns:
+        The verdict, and, for "no detectable difference" only, the largest gain (a positive number
+        in the metric's unit) that P4b's lower bound does not exclude.
+    """
+    if p4b["upper_95"] < 0.0 and p4b_guard["upper_95"] < 0.0:
+        return {"verdict": LOWERS_ERROR, "largest_gain_not_excluded": None}
+    if p4a["upper_95"] < 0.0 and p4a_guard["upper_95"] < 0.0:
+        return {"verdict": MAY_LOWER_ERROR, "largest_gain_not_excluded": None}
+    return {
+        "verdict": NO_DETECTABLE_DIFFERENCE,
+        "largest_gain_not_excluded": max(0.0, -p4b["lower_95"]),
+    }
+
+
 def combine_setting_verdicts(
     *, primary: str, sensitivity: str, unresolved: str = "unresolved"
 ) -> str:
