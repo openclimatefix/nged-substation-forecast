@@ -398,6 +398,9 @@ class Steps:
     """How many hours each step's radiation averages over."""
     values: dict[str, np.ndarray]
     """Each field's values, shape (n_series, n_steps)."""
+    ensemble_size: int = ENSEMBLE_SIZE
+    """How many members each kept run holds. ENS's 51 by default; a caller building a different
+    ensemble's steps (GEFS's 31, say) passes its own count through `band_steps`."""
 
 
 def _step_width(lead: int) -> int:
@@ -412,33 +415,42 @@ def _step_width(lead: int) -> int:
     return 3 if lead <= FINE_STEP_LAST_LEAD else 6
 
 
-def _members(*, sites: list[str]) -> pl.DataFrame:
-    """Read the extract for some generators.
+def members(*, sites: list[str], source: Path = OUTPUT_PATH) -> pl.DataFrame:
+    """Read one ensemble's extract for some generators.
 
     Args:
         sites: The generator labels.
+        source: The extract's parquet path. Defaults to ENS's `OUTPUT_PATH`; a caller reading a
+            different ensemble (GEFS, say) passes its own extract's path.
 
     Returns:
         One row per generator, run, valid time and member.
     """
-    return pl.read_parquet(OUTPUT_PATH).filter(pl.col("site").is_in(sites))
+    return pl.read_parquet(source).filter(pl.col("site").is_in(sites))
 
 
 def band_steps(
-    *, members: pl.DataFrame, day: int, domain: DomainType, six_hourly: bool = False
+    *,
+    members: pl.DataFrame,
+    day: int,
+    domain: DomainType,
+    six_hourly: bool = False,
+    ensemble_size: int = ENSEMBLE_SIZE,
 ) -> Steps:
     """Arrange one band's members as arrays over the band's native steps and a margin either side.
 
-    A (site, run) is dropped whole where any member lacks any step, so every run kept has all 51
-    members, in member order. With `six_hourly`, `studies.resample.coarsen_to_six_hourly` keeps
-    only the steps at multiples of 6 hours, each pair of 3-hour radiation steps averaged into the
-    6-hour mean it makes up.
+    A (site, run) is dropped whole where any member lacks any step, so every run kept has all
+    `ensemble_size` members, in member order. With `six_hourly`,
+    `studies.resample.coarsen_to_six_hourly` keeps only the steps at multiples of 6 hours, each
+    pair of 3-hour radiation steps averaged into the 6-hour mean it makes up.
 
     Args:
         members: The extract, for one technology's generators.
         day: The band's day.
         domain: `solar` or `wind`, which decides the fields.
         six_hourly: Whether to emulate 6-hourly steps.
+        ensemble_size: How many members a run must hold to be kept. ENS's 51 by default; a caller
+            building a different ensemble's steps (GEFS's 31) passes its own count.
 
     Returns:
         The arrays.
@@ -468,15 +480,15 @@ def band_steps(
     runs = (
         complete.group_by("site", "init_time")
         .len()
-        .filter(pl.col("len") == ENSEMBLE_SIZE)
+        .filter(pl.col("len") == ensemble_size)
         .select("site", "init_time")
     )
     kept = complete.join(runs, on=["site", "init_time"]).sort(
         "site", "init_time", "ensemble_member"
     )
-    expected_members = np.tile(np.arange(ENSEMBLE_SIZE), kept.height // ENSEMBLE_SIZE)
+    expected_members = np.tile(np.arange(ensemble_size), kept.height // ensemble_size)
     if not np.array_equal(kept["ensemble_member"].to_numpy(), expected_members):
-        msg = f"day {day}: a kept run does not hold members 0 to {ENSEMBLE_SIZE - 1} in order"
+        msg = f"day {day}: a kept run does not hold members 0 to {ensemble_size - 1} in order"
         raise ValueError(msg)
     values = {column: kept.select(names[column]).to_numpy() for column in columns}
     step_leads = leads.astype(np.float64)
@@ -494,6 +506,7 @@ def band_steps(
         leads=step_leads,
         widths=widths,
         values=values,
+        ensemble_size=ensemble_size,
     )
 
 
@@ -546,7 +559,7 @@ def _clear_sky_arrays(
         msg = "a run's clear-sky hours are missing from the table"
         raise ValueError(msg)
     per_hour = table["clear_sky_w_m2"].to_numpy().reshape(runs.height, len(hours))
-    run_of_series = np.repeat(np.arange(runs.height), ENSEMBLE_SIZE)
+    run_of_series = np.repeat(np.arange(runs.height), steps.ensemble_size)
     return (
         step_means(
             hourly=per_hour, first_hour=first_hour, step_leads=steps.leads, step_widths=steps.widths
@@ -555,7 +568,7 @@ def _clear_sky_arrays(
     )
 
 
-def _upsampled_fields(
+def upsampled_fields(
     *, steps: Steps, day: int, domain: DomainType, clear_sky: pl.DataFrame
 ) -> dict[str, dict[str, np.ndarray]]:
     """Upsample every member of one band to hourly, every technique for every field.
@@ -720,13 +733,16 @@ def _long(*, steps: Steps, targets: np.ndarray, values: dict[str, np.ndarray]) -
     )
 
 
-def reduce_members(*, hourly: pl.DataFrame, domain: DomainType, way: str) -> pl.DataFrame:
+def reduce_members(
+    *, hourly: pl.DataFrame, domain: DomainType, way: str, ensemble_size: int = ENSEMBLE_SIZE
+) -> pl.DataFrame:
     """Reduce every member's hourly fields to one value per (site, time).
 
     Args:
         hourly: One row per (site, time, member), with `init_time`.
         domain: `solar` or `wind`.
         way: `control` for the control member's own values, `mean` for the ensemble mean.
+        ensemble_size: How many members each (site, time) must hold. ENS's 51 by default.
 
     Returns:
         One row per (site, time), with `fields(domain=domain)`.
@@ -734,7 +750,7 @@ def reduce_members(*, hourly: pl.DataFrame, domain: DomainType, way: str) -> pl.
     Raises:
         ValueError: Unless every (site, time) holds one run and all its members.
     """
-    check_one_run_per_hour(hourly=hourly, members=ENSEMBLE_SIZE)
+    check_one_run_per_hour(hourly=hourly, members=ensemble_size)
     if way == "control":
         return hourly.filter(pl.col("member") == CONTROL_MEMBER).drop("member", "init_time")
     if domain == "solar":
@@ -839,7 +855,7 @@ def _day_start(*, domain: DomainType) -> pl.Expr:
     return time.dt.truncate("1d")
 
 
-def _with_baselines(*, frame: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
+def with_baselines(*, frame: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
     """Add every band-dependent baseline's forecast input.
 
     Args:
@@ -905,14 +921,14 @@ def build_inputs(*, domain: DomainType) -> Inputs:
         The inputs, with every combination's ensemble-mean columns on the rows every arm and
         baseline can score, the native technique's own rows, and no member rows yet.
     """
-    frame = _with_baselines(frame=base_frame(domain=domain), domain=domain)
-    extract = _members(sites=sorted(frame["site"].unique().to_list()))
+    frame = with_baselines(frame=base_frame(domain=domain), domain=domain)
+    extract = members(sites=sorted(frame["site"].unique().to_list()))
     clear_sky = _clear_sky_table(domain=domain)
     native_rows: dict[int, pl.DataFrame] = {}
     chart_inputs = []
     for day in BAND_DAYS:
         steps = band_steps(members=extract, day=day, domain=domain)
-        upsampled = _upsampled_fields(steps=steps, day=day, domain=domain, clear_sky=clear_sky)
+        upsampled = upsampled_fields(steps=steps, day=day, domain=domain, clear_sky=clear_sky)
         for method in COMBINATIONS[domain]:
             mean = reduce_members(
                 hourly=combine(
@@ -932,7 +948,9 @@ def build_inputs(*, domain: DomainType) -> Inputs:
         )
         chart_inputs.append(native_mean.with_columns(day=pl.lit(day), method=pl.lit("native")))
         native_rows[day] = native_mean
-        _LOG.info("%s day %d: %d runs upsampled", domain, day, steps.keys.height // ENSEMBLE_SIZE)
+        _LOG.info(
+            "%s day %d: %d runs upsampled", domain, day, steps.keys.height // steps.ensemble_size
+        )
     required = [
         column
         for day in BAND_DAYS
@@ -1458,14 +1476,14 @@ def main_frame(*, inputs: Inputs, method: MethodType, domain: DomainType) -> Inp
     """
     frame = inputs.frame
     keys = frame.select("site", "time")
-    extract = _members(sites=sorted(frame["site"].unique().to_list()))
+    extract = members(sites=sorted(frame["site"].unique().to_list()))
     clear_sky = _clear_sky_table(domain=domain)
-    members: dict[int, pl.DataFrame] = {}
+    member_rows: dict[int, pl.DataFrame] = {}
     for day in BAND_DAYS:
         steps = band_steps(members=extract, day=day, domain=domain)
         hourly = combine(
             steps=steps,
-            upsampled=_upsampled_fields(steps=steps, day=day, domain=domain, clear_sky=clear_sky),
+            upsampled=upsampled_fields(steps=steps, day=day, domain=domain, clear_sky=clear_sky),
             day=day,
             domain=domain,
             method=method,
@@ -1477,12 +1495,12 @@ def main_frame(*, inputs: Inputs, method: MethodType, domain: DomainType) -> Inp
                 on=["site", "time"],
                 how="left",
             )
-        members[day] = hourly.join(keys, on=["site", "time"], how="semi")
+        member_rows[day] = hourly.join(keys, on=["site", "time"], how="semi")
     emulated = band_steps(members=extract, day=EMULATED_DAY, domain=domain, six_hourly=True)
     emulated_mean = reduce_members(
         hourly=combine(
             steps=emulated,
-            upsampled=_upsampled_fields(
+            upsampled=upsampled_fields(
                 steps=emulated, day=EMULATED_DAY, domain=domain, clear_sky=clear_sky
             ),
             day=EMULATED_DAY,
@@ -1508,7 +1526,7 @@ def main_frame(*, inputs: Inputs, method: MethodType, domain: DomainType) -> Inp
     if missing:
         msg = f"{domain}: {missing} rows lack a main arm's input every combination covered"
         raise ValueError(msg)
-    return Inputs(frame=frame, members=members, native=inputs.native, inputs=inputs.inputs)
+    return Inputs(frame=frame, members=member_rows, native=inputs.native, inputs=inputs.inputs)
 
 
 def fitted_features(*, domain: Domain) -> dict[str, tuple[str, ...]]:
@@ -1970,7 +1988,7 @@ def _dropped_lines(*, frame: pl.DataFrame, domain: DomainType) -> list[str]:
     Returns:
         Markdown lines.
     """
-    base = _with_baselines(frame=base_frame(domain=domain), domain=domain)
+    base = with_baselines(frame=base_frame(domain=domain), domain=domain)
     dropped = base.join(frame.select("site", "time"), on=["site", "time"], how="anti")
     inputs = [c for c in base.columns if "persistence_day" in c or "clear_sky_index_day" in c]
     missing = dropped.filter(pl.any_horizontal(pl.col(inputs).is_null())).height
