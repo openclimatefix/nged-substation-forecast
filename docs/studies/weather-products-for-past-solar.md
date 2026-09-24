@@ -926,6 +926,11 @@ points](assets/ens_past_solar_planned_contrasts.svg)
 and against CAMS.** Both are statistically significant at the 5% level. Everything below is
 exploratory.
 
+**Both planned contrasts hold at the second hyperparameter setting.** ENS beats ERA5 by 0.816
+points [0.612, 1.024] and trails CAMS by 3.244 points [2.912, 3.568], each within a few hundredths
+of a point of the primary setting's own figures above, so neither ordering belongs to the
+hyperparameter setting rather than the features.
+
 **The two planned contrasts hold at every one of the six generators.** ENS beats ERA5 by 0.410 to
 1.355 points across the six generators, and trails CAMS by 2.841 to 3.730 points at every one of
 them. **Averaging the 50 perturbed members over the control member alone is worth 0.240 points
