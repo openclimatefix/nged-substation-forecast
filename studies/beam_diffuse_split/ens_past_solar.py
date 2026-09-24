@@ -4,19 +4,27 @@ One-off throwaway script for the addition to
 <https://github.com/openclimatefix/nged-substation-forecast/issues/810>, extending
 `weather_products.py`'s comparison with ECMWF ENS, the live service's own forecast product.
 
-**This section scores a genuine forecast, not a near-zero-lead description of the past.** Every
-other product on the page reads a short lead: UKV's archive holds the analysis, ICON-D2 and ICON-EU
-1 to 3 hours, and ERA5's radiation 1 to 12 hours. ENS's shortest available lead in the download used
-here, the `T+3` band, is leads 3 to 21 hours from each day's 00 UTC run, so the run behind any hour
-this section scores is always the *previous* day's, not the current day's.
+**This section scores a longer-lead forecast than any other product on this page.** Every other
+product reads a near-zero-lead description of an hour that has already happened: UKV's archive
+holds the analysis, ICON-D2 and ICON-EU read 1 to 3 hours ahead, and ERA5's radiation is 1 to 12
+hours ahead. ENS's shortest available band in the download used here, `T+3`, spans leads 3 to 21
+hours from each day's own 00 UTC run; after this section's row set is joined to the rest of the
+page's hours, it scores leads 5 to 20 — each scored hour is 5 to 20 hours after that run started.
+ECMWF publishes the run several hours after 00 UTC, so a live service could not have used it for
+the morning hours scored here. A longer lead handicaps ENS in the contrasts below, so holding the
+lead equal across products would likely widen ENS's win over ERA5, and the measured gain here is if
+anything an underestimate.
 
 **Data.** `data/studies/weather/ENS/beam_diffuse_ens.parquet`
 (`data/studies/weather/ENS/README.md`), filtered to `horizon == "T+3"`: seven 3-hour radiation and
 temperature steps per generator per run, leads 3, 6, ..., 21, all 51 members. ENS's coverage starts
-2024-04-01, well inside the main row set's December 2022 start, so this section's row set is shorter
+2024-04-01, well after the main row set's December 2022 start, so this section's row set is shorter
 and later than the rest of the page, the same shape of caveat the "four extra Open-Meteo models" and
-ICON-DREAM-EU sections carry. ENS publishes no direct-beam field, so this section, like the page's
-other global-only products, carries a global-irradiance arm only.
+ICON-DREAM-EU sections carry. This section's row set also ends earlier than ENS's own runs allow: it
+is trimmed to `era5_grid.LAST_DATE` (2026-09-10), the date `build_dataset.py` trims every product
+to, even though ENS's own runs go on to 2026-09-22 and the join drops none of the rows inside that
+window. ENS publishes no direct-beam field, so this section, like the page's other global-only
+products, carries a global-irradiance arm only.
 
 **Upsampling to hourly, reusing the study's own tested machinery.** The `T+3` band already gives one
 3-hourly-to-hourly step per calendar hour, not a sparse sample, so it is rebuilt to a genuine hourly
@@ -26,17 +34,16 @@ for ENS's radiation (`COMBINATIONS["solar"]["clear_sky"]` there): `ens_forecast_
 `studies.resample.interpolate_linear` are reused unchanged; only the code that arranges this file's
 own seven fixed leads into a `Steps` object is new, because `ens_forecast_horizons.py`'s own
 `band_steps` assumes the wider, day-numbered grid its own extract holds, which this file does not.
-Every hour from 3 to 21 is scored except the last, whose target midpoint (20.5) falls just past the
-last step midpoint (19.5) and is therefore held flat at that step's clear-sky index, exactly as
-`interpolate_linear` and `clear_sky_index_resample` hold every input flat beyond its own steps.
 
 **Arms, refit on this section's own shorter row set.** `ens_mean_t3` is an XGBoost model shown the
 mean of the 51 members' hourly global irradiance and temperature. `era5_global` and `cams_global`
 (the page's ERA5 and CAMS arms) are refit here because the row set is shorter than the published
-panel's — the `study` skill's shared-rows rule. Every arm carries the same eight feature columns
-(the shared geometry and calendar features, `era_code`, and either the arm's own global irradiance
-plus temperature, or the ensemble's), and every fit uses `colsample_bytree=1` (XGBoost's default,
-never overridden here), so no arm wins on column count alone.
+panel's — the `study` skill's shared-rows rule. Every arm carries the same eight feature columns:
+the shared geometry and calendar features, `era_code`, and either the arm's own global irradiance,
+or the ensemble's own global irradiance and temperature. `era5_global`'s and `cams_global`'s
+temperature column is ERA5's `temp_c`, one of the shared features every arm on this page reads,
+not CAMS's own temperature — CAMS publishes none. Every fit uses `colsample_bytree=1` (XGBoost's
+default, never overridden here), so no arm wins on column count alone.
 
 **The two planned contrasts, named before any result existed:**
 
@@ -53,8 +60,7 @@ study runs costs 51 times a normal fit, out of proportion to this section's two 
 own coverage here is under 2.5 years, too short for the "too few months" year-by-year rule to add
 much.
 
-**This is solar only.** ENS has no wind data downloaded yet; a wind addition is a separate, future
-study once that data lands.
+**This is solar only.** A wind addition is a separate, future study, not started in this PR.
 
 Run it with `uv run python studies/beam_diffuse_split/ens_past_solar.py`, after
 `weather_products.py` has built its datasets (`build_dataset.py` for `open-meteo` and `cams
@@ -90,8 +96,8 @@ from run_experiment import MAX_CONCURRENT_FITS, Job, run_all
 from sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from studies.baselines import hourly_clear_sky
 from studies.bootstrap import bootstrap_absolute
-from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SEEDS
-from studies.guards import refuse_to_overwrite
+from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SEEDS, SENSITIVITY_HYPER_PARAMETERS
+from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.resample import (
     DEFAULT_DAYLIGHT_FLOOR_W_M2,
     clear_sky_index_resample,
@@ -243,6 +249,9 @@ def build_rows() -> pl.DataFrame:
     Returns:
         One row per (site, time), with every arm's feature columns, `power_mw`, `cap_mw`,
         `constrained`, `era`, `era_code` and `fold` recomputed on this restricted row set.
+
+    Raises:
+        ValueError: If a (site, time) is duplicated, or an ENS column holds a missing value.
     """
     sites = _pv_sites()
     base = _solar_frame().filter(pl.col("time") >= ENS_START)
@@ -272,15 +281,32 @@ def build_rows() -> pl.DataFrame:
         .drop("era", "era_code", "fold")
         .sort("site", "time")
     )
+    if joined.select("site", "time").is_duplicated().any():
+        msg = "build_rows: a (site, time) is duplicated"
+        raise ValueError(msg)
+    ens_columns_all = (
+        *ens_columns(arm=MEAN_ARM, domain="solar"),
+        *ens_columns(arm=CONTROL_ARM, domain="solar"),
+    )
+    check_no_missing(frame=joined, columns=ens_columns_all)
     _LOG.info("%d rows in this section's own row set", joined.height)
     return with_eras(frame=joined)
 
 
 def jobs() -> list[Job]:
-    """Return every arm's job: the two ENS arms, and ERA5 and CAMS refit on this row set.
+    """Return every arm's job at `pooled`, plus the two planned contrasts' arms at `sensitivity`.
+
+    The `pooled` jobs are the two ENS arms, and ERA5 and CAMS refit on this row set. The
+    `sensitivity` jobs refit `ens_mean_t3`, `era5_global` and `cams_global` — the arms in
+    `DECIDING_CONTRASTS` — at `SENSITIVITY_HYPER_PARAMETERS`, the `study` skill's rule that every
+    deciding contrast gets a second hyperparameter setting.
 
     Returns:
-        One job per arm, every arm shown eight feature columns.
+        One job per arm at `pooled`, plus one job per planned-contrast arm at `sensitivity`, every
+        arm shown eight feature columns.
+
+    Raises:
+        ValueError: Unless every arm's feature-column count matches.
     """
     ens_features = (*shared_features(domain=SOLAR), *ens_columns(arm=MEAN_ARM, domain="solar"))
     control_features = (
@@ -289,12 +315,34 @@ def jobs() -> list[Job]:
     )
     era5_features = (*SOLAR.shared_features, *SOLAR.columns("era5"))
     cams_features = (*SOLAR.shared_features, *SOLAR.columns("cams"))
-    return [
+    job_list = [
         (MEAN_ARM, "pooled", "power_mw", ens_features, PRIMARY_HYPER_PARAMETERS, False),
         (CONTROL_ARM, "pooled", "power_mw", control_features, PRIMARY_HYPER_PARAMETERS, False),
         ("era5_global", "pooled", "power_mw", era5_features, PRIMARY_HYPER_PARAMETERS, False),
         ("cams_global", "pooled", "power_mw", cams_features, PRIMARY_HYPER_PARAMETERS, False),
+        (MEAN_ARM, "sensitivity", "power_mw", ens_features, SENSITIVITY_HYPER_PARAMETERS, False),
+        (
+            "era5_global",
+            "sensitivity",
+            "power_mw",
+            era5_features,
+            SENSITIVITY_HYPER_PARAMETERS,
+            False,
+        ),
+        (
+            "cams_global",
+            "sensitivity",
+            "power_mw",
+            cams_features,
+            SENSITIVITY_HYPER_PARAMETERS,
+            False,
+        ),
     ]
+    counts = {len(features) for _, _, _, features, _, _ in job_list}
+    if len(counts) != 1:
+        msg = f"every arm should carry the same number of feature columns, found counts {counts}"
+        raise ValueError(msg)
+    return job_list
 
 
 def _fingerprint(*, frame: pl.DataFrame, job_list: list[Job]) -> str:
@@ -302,7 +350,12 @@ def _fingerprint(*, frame: pl.DataFrame, job_list: list[Job]) -> str:
 
     `--report-only` refuses to reuse a saved `losses.parquet` when this does not match, so a code
     change to the row set, a feature, a column, a seed, or a hyperparameter setting cannot silently
-    mix its fits with a previous run's.
+    mix its fits with a previous run's. `reduce_members`'s `group_by().agg(mean())` sums the 51
+    members in a parallel, non-fixed order, so two builds of the same row set differ by up to
+    4.5e-13 in `ens_mean_t3_ghi` and `ens_mean_t3_temp` — real, but far below any meaningful
+    precision. Every float column is cast to `Float32` before hashing so that noise cannot flip the
+    fingerprint; the saved `losses.parquet` itself keeps full precision, because only the
+    fingerprint is affected.
 
     Args:
         frame: The row set every job is fitted on.
@@ -312,7 +365,9 @@ def _fingerprint(*, frame: pl.DataFrame, job_list: list[Job]) -> str:
         A hex digest.
     """
     ordered = frame.select(sorted(frame.columns)).sort("site", "time")
-    row_hashes = ordered.hash_rows(seed=0).to_list()
+    float_columns = [name for name, dtype in ordered.schema.items() if dtype.is_float()]
+    stable = ordered.cast(dict.fromkeys(float_columns, pl.Float32))
+    row_hashes = stable.hash_rows(seed=0).to_list()
     payload = repr(
         (
             row_hashes,
@@ -353,13 +408,15 @@ def _report(
 
     Args:
         frame: This section's own row set.
-        losses: Every arm's losses.
+        losses: Every arm's losses, at both `pooled` and `sensitivity` settings.
         sites: The solar roster, for the geometry lines.
         job_list: Every job `jobs()` returns, for the feature-column section.
 
     Returns:
         The report.
     """
+    pooled = losses.filter(pl.col("setting") == "pooled")
+    sensitivity = losses.filter(pl.col("setting") == "sensitivity")
     site_labels = sorted(frame["site"].unique().to_list())
     arms = (MEAN_ARM, CONTROL_ARM, "era5_global", "cams_global")
     lines = [
@@ -372,9 +429,9 @@ def _report(
         "|---|---|---|",
     ]
     for arm in arms:
-        interval = bootstrap_absolute(losses=losses, arm=arm, metric=METRIC)
+        interval = bootstrap_absolute(losses=pooled, arm=arm, metric=METRIC)
         lower, upper = (interval[key] * PERCENTAGE_POINTS for key in ("lower_95", "upper_95"))
-        lines.append(f"| {arm} | {_mae(losses=losses, arm=arm):.3f} | [{lower:.3f}, {upper:.3f}] |")
+        lines.append(f"| {arm} | {_mae(losses=pooled, arm=arm):.3f} | [{lower:.3f}, {upper:.3f}] |")
     lines += [
         "",
         (
@@ -384,13 +441,25 @@ def _report(
         "",
         *_arm_columns_lines(job_list=job_list),
         "",
-        "#### Deciding contrasts, named before the run",
+        "#### Planned contrasts",
         "",
         *CONTRAST_HEADER,
     ]
     for treatment, reference in DECIDING_CONTRASTS:
         lines.append(
-            _contrast_line(losses=losses, treatment=treatment, reference=reference, label="all")
+            _contrast_line(losses=pooled, treatment=treatment, reference=reference, label="all")
+        )
+    lines += [
+        "",
+        "#### Planned contrasts at the second hyperparameter setting",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    for treatment, reference in DECIDING_CONTRASTS:
+        lines.append(
+            _contrast_line(
+                losses=sensitivity, treatment=treatment, reference=reference, label="sensitivity"
+            )
         )
     lines += [
         "",
@@ -401,7 +470,7 @@ def _report(
     for treatment, reference in DECIDING_CONTRASTS:
         lines += [
             _contrast_line(
-                losses=losses.filter(pl.col("site") == site),
+                losses=pooled.filter(pl.col("site") == site),
                 treatment=treatment,
                 reference=reference,
                 label=f"site {site}",
@@ -410,7 +479,7 @@ def _report(
         ]
     lines += ["", "#### What averaging the members is worth (exploratory)", "", *CONTRAST_HEADER]
     lines += [
-        _contrast_line(losses=losses, treatment=t, reference=r, label="all")
+        _contrast_line(losses=pooled, treatment=t, reference=r, label="all")
         for t, r in EXPLORATORY_CONTRASTS
     ]
     lines.append("")

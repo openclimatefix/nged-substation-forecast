@@ -23,7 +23,14 @@ from typing import Final
 
 import altair as alt
 import polars as pl
-from ens_past_solar import DECIDING_CONTRASTS, MEAN_ARM, OUTPUT_DIR
+from ens_past_solar import (
+    CONTROL_ARM,
+    DECIDING_CONTRASTS,
+    EXPLORATORY_CONTRASTS,
+    MEAN_ARM,
+    OUTPUT_DIR,
+    build_rows,
+)
 from studies.bootstrap import bootstrap_absolute
 from studies.charts import (
     figure,
@@ -32,7 +39,7 @@ from studies.charts import (
     report_contrasts,
     report_errors,
 )
-from weather_products import METRIC, PERCENTAGE_POINTS
+from weather_products import METRIC, PERCENTAGE_POINTS, _contrast_line, _mae
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -53,7 +60,7 @@ FAMILIES: Final[dict[str, str]] = {
 }
 """Every arm's family, which sets its colour in `studies.charts`."""
 
-SECTION_DECIDING: Final[str] = "Deciding contrasts, named before the run"
+SECTION_DECIDING: Final[str] = "Planned contrasts"
 """The report heading `ens_past_solar.py` writes above the two planned contrasts."""
 
 CAPACITY: Final[str] = "Capacity is each generator's 99th-percentile output."
@@ -124,8 +131,8 @@ def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         figure_planning=None,
         title="ENS's own forecast trails CAMS by far, and beats ERA5",
         subtitle=[
-            "ECMWF ENS's T+3 band is a genuine forecast; ERA5 and CAMS are near-zero-lead",
-            "descriptions of the same hours, refit on ENS's shorter row set.",
+            "ECMWF ENS scores leads 5 to 20 h; ERA5 scores 1 to 12 h; CAMS is a satellite",
+            "retrieval with no forecast step. All three refit on ENS's shorter row set.",
             DOTS,
             CAPACITY,
             SCOPE,
@@ -141,6 +148,10 @@ def _planned_contrasts(*, report_path: Path) -> alt.VConcatChart:
 
     Returns:
         The figure.
+
+    Raises:
+        ValueError: If the report does not hold exactly the two planned contrasts, for example
+            because `SECTION_DECIDING` no longer matches a renamed report heading.
     """
     contrasts = report_contrasts(report_path=report_path)
     reference_order = {reference: index for index, (_, reference) in enumerate(DECIDING_CONTRASTS)}
@@ -154,6 +165,12 @@ def _planned_contrasts(*, report_path: Path) -> alt.VConcatChart:
         .with_columns(_order=pl.col("reference").replace_strict(reference_order))
         .sort("_order")
     )
+    if selected.height != len(DECIDING_CONTRASTS):
+        msg = (
+            f"expected {len(DECIDING_CONTRASTS)} planned contrasts under {SECTION_DECIDING!r}, "
+            f"found {selected.height}"
+        )
+        raise ValueError(msg)
     labels = [
         f"{NAMES[MEAN_ARM]} − {NAMES[reference]}" for reference in selected["reference"].to_list()
     ]
@@ -188,14 +205,76 @@ def _planned_contrasts(*, report_path: Path) -> alt.VConcatChart:
     )
 
 
+def _check_printed(*, report: str, texts: list[str]) -> None:
+    """Stop unless every formatted number appears in the report as printed.
+
+    Args:
+        report: The report's text.
+        texts: The table-cell fragments to look for.
+
+    Raises:
+        ValueError: If any fragment is missing.
+    """
+    missing = [text for text in texts if text not in report]
+    if missing:
+        msg = f"{len(missing)} numbers are not in report.md as printed, such as {missing[:3]}"
+        raise ValueError(msg)
+
+
+def _verify_numbers(*, report: str, losses: pl.DataFrame) -> None:
+    """Recompute every number this module's charts and prose rest on, and check each is printed.
+
+    `_leaderboard` already checks the two headline arms `NAMES` covers against a fresh bootstrap;
+    this recomputes the rest directly from `losses.parquet` and `build_rows`, independently of
+    `report_contrasts`'s markdown parsing: the control arm's own error, the two planned contrasts
+    per generator, and the member-averaging contrast.
+
+    Args:
+        report: `report.md`'s text.
+        losses: Every arm's losses, at the `pooled` setting.
+
+    Raises:
+        ValueError: If any recomputed number is not in the report as printed.
+    """
+    site_labels = sorted(losses["site"].unique().to_list())
+    control_interval = bootstrap_absolute(losses=losses, arm=CONTROL_ARM, metric=METRIC)
+    control_lower, control_upper = (
+        control_interval[key] * PERCENTAGE_POINTS for key in ("lower_95", "upper_95")
+    )
+    texts = [
+        (
+            f"| {CONTROL_ARM} | {_mae(losses=losses, arm=CONTROL_ARM):.3f} "
+            f"| [{control_lower:.3f}, {control_upper:.3f}] |"
+        )
+    ]
+    for treatment, reference in DECIDING_CONTRASTS:
+        texts += [
+            _contrast_line(
+                losses=losses.filter(pl.col("site") == site),
+                treatment=treatment,
+                reference=reference,
+                label=f"site {site}",
+            )
+            for site in site_labels
+        ]
+    texts += [
+        _contrast_line(losses=losses, treatment=t, reference=r, label="all")
+        for t, r in EXPLORATORY_CONTRASTS
+    ]
+    texts.append(f"{build_rows().height:,} common site-hours")
+    _check_printed(report=report, texts=texts)
+
+
 def main() -> int:
     """Read the report and write the two SVGs."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     argparse.ArgumentParser(description=__doc__).parse_args()
     report_path = OUTPUT_DIR / "report.md"
+    report = report_path.read_text()
     errors = report_errors(report_path=report_path, column="All sites")
     errors = {arm: errors[arm] for arm in NAMES if arm in errors}
     losses = _pooled_losses()
+    _verify_numbers(report=report, losses=losses)
     charts = {
         "ens_past_solar_leaderboard": _leaderboard(losses=losses, errors=errors),
         "ens_past_solar_planned_contrasts": _planned_contrasts(report_path=report_path),
