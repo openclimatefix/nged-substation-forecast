@@ -4,7 +4,8 @@
 of an hour that has already happened: a reanalysis, a satellite retrieval, or the first hours of an
 NWP run. The live service forecasts power from a day-ahead weather forecast, and a product that wins
 at lead zero can lose at lead 24 hours. The one forecast measured so far, ECMWF ENS on the
-[ENS horizons page](https://openclimatefix.github.io/nged-substation-forecast/studies/ens-forecast-horizons/),
+[ENS horizons
+page](https://openclimatefix.github.io/nged-substation-forecast/studies/ens-forecast-horizons/),
 was only compared with itself, with no-weather baselines, and with past-weather references. Nobody
 has measured whether another forecast model, or a blend of forecast models, beats ENS at the
 day-ahead lead the live service delivers.
@@ -50,7 +51,8 @@ check of the rendered HTML.
 **Departures from the issue body:**
 
 - **Previous Runs is not a fixed-lead instrument, so the plan does not treat it as one.** The issue
-  calls the Previous Runs archive "the instrument this study wants". Each `previous_dayN` value comes
+  calls the Previous Runs archive "the instrument this study wants". Each `previous_dayN` value
+  comes
   from the freshest run initialised at least N × 24 hours before the hour, so for a model run every
   `n` hours its lead is `24N + (h mod n)`, where `h` is the UTC hour. Leads differ between products
   by up to 5 hours, and no Previous Runs value reproduces a fixed daily issue time. The plan matches
@@ -68,6 +70,10 @@ check of the rendered HTML.
 - **The `ens_horizons.py` rewrite the issue comment mentions is out of scope.** This study reads the
   ENS members through `ens_forecast_horizons.py`'s upsampling, which already uses
   `studies.cross_validation`, and never calls `ens_horizons.py`.
+- **The blend's control is a permutation, not duplicated columns.** The issue asks for "the same
+  product's columns duplicated". At `colsample_bytree=1` a duplicated column is exactly neutral, so
+  that control would show nothing; the blending page's permutation control keeps the blend's column
+  count and removes the other products' weather, which is the question the control exists for.
 - **ICON global, ARPEGE, AROME, GFS, and the HARMONIE-AROME models are scored though the issue does
   not name them.** Open-Meteo serves them, so the issue's rule ("the models Open-Meteo serves")
   admits them, and each costs one fit on rows already built. They are exploratory.
@@ -128,21 +134,32 @@ hourly-mean radiation value).
   (h mod n)`; ENS day `N` has lead `24N + h`, at or above the product's. At day 1: ENS day 0 has
   lead `h`, the product 24 to 29 hours, ENS day 1 `24 + h`. If the product's error is below ENS day
   `N − 1`'s, the product beats ENS even though ENS had the shorter lead on every row. If it is above
-  ENS day `N`'s, ENS beats the product even though the product had the shorter or equal lead on every
+  ENS day `N`'s, ENS beats the product even though the product had the shorter or equal lead on
+  every
   row. Anything between is **unresolved at matched lead**, and the page says so rather than choosing
   a side. The bracket needs no knowledge of `n`, only that the archive follows the rule above, which
-  V1 checks.
-- **The bracket assumes error does not fall as lead rises.** The report checks this on the study's
-  own rows: ENS day 0 against day 1 (the horizons page found day 1 worse by 0.61 points for solar and
-  0.75 for wind), and each multi-day Previous Runs product's day 1 against its day 2. If either
-  check fails, the bracket for that product is void and the page says so.
+  V1 checks. The upper side is exact (equal leads) at hours `h < n`.
+- **ENS day 0 is a bracket side only, never a service arm.** A 09:00 UTC service cannot deliver day
+  0, whose early hours are past at issue; the page never offers it as a product.
+- **The bracket assumes only that ENS's error does not fall as ENS's lead rises**: the lower side
+  needs product < ENS at lead `24(N−1) + h` ≤ ENS at the product's lead, and the upper side needs
+  product > ENS at `24N + h` ≥ ENS at the product's lead. The report checks ENS day `N − 1` against
+  day `N` for every N the page uses (0→1, 1→2, 2→3), per technology and per 3-hour band of UTC
+  hours. A point estimate at or below zero in any band voids, in that band, every bracket resting on
+  that pair, and the page says so. The products' own day-to-day errors are reported for information
+  only.
+- **Exact-lead wind hours (exploratory, no extra fit).** At hours `h < n` a product's day-1 lead
+  equals ENS day 1's exactly: 00 to 05 UTC for a 6-hourly product such as ICON-EU, 00 to 02 UTC for
+  UKV. The upper-side contrasts are re-read on those wind rows from the saved losses, which also
+  tests whether the bracket's inference holds where no bracket is needed.
 
 **What a 09:00 UTC service would really get from a Previous Runs product is not measured.** At 09:00
 UTC the freshest UKV or ICON-EU run is a morning run, so for a daylight hour the service's lead is
 longer than the Previous Runs day-1 lead (for example 18 + h from a 06 UTC run, against 24). Day 1
 of Previous Runs therefore flatters those products relative to what the service could deliver for
 most daylight hours, and the page says so beside every Previous Runs result. Day 2 of Previous Runs
-(lead 48 or more) is always staler than the service's lead, which the conservative blend below uses.
+(lead 48 or more) is always staler than the service's lead (at most 47 hours), which the
+conservative blend below uses.
 
 ## Rows, folds, and fairness
 
@@ -157,7 +174,8 @@ most daylight hours, and the page says so beside every Previous Runs result. Day
   30 whole days between 2026-04-06 and 2026-05-29, so the row set loses about half of the spring
   after UKV's January 2026 upgrade, and the page says so. Exploratory arms are fitted on the same
   rows, their missing hours left as missing values (XGBoost routes them natively); the report prints
-  each exploratory arm's missing share (measured from 0.04% to 1.3%). The report prints the rows each
+  each exploratory arm's missing share (measured from 0.04% to 1.3%). The report prints the rows
+  each
   planned product drops.
 - **Folds: #885's design, confirmed by the study coordinator, and #885's code.** Five folds of whole
   months, cut inside three eras: before 2025-10-01; 2025-10-01 to the UKV PS47 upgrade on
@@ -165,8 +183,11 @@ most daylight hours, and the page says so beside every Previous Runs result. Day
   The third era's fold numbers are rotated (`ERA_FOLD_OFFSETS`) so no calendar month is held out of
   every era at once (#868); a two-era design fails that check on these rows too (February, April,
   May, and June). Every arm gets the same `era_code` column. Before any fit, the script prints the
-  (site, fold, calendar month) coverage table and lists the calendar months that occur in one year
-  only. **The 2025-10-01 cut is in the design because #885 needs it** (HRES's archive source changes
+  (site, fold, calendar month) coverage table, lists the calendar months that occur in one year
+  only (January, because January 2026 is dropped, among them), and raises on any other uncovered
+  month, as #885's `_raise_on_uncovered_months` does. `ERA_FOLD_OFFSETS` was tuned on #885's wind
+  rows, so the check is what proves it on this study's solar rows. **The 2025-10-01 cut is in the
+  design because #885 needs it** (HRES's archive source changes
   that day) and the two studies share one fold helper; here it is harmless, and it happens to fall
   a week after DWD's ICON low-cloud change of 2025-09-24. The page says both.
 - **This PR is blocked by #885 for the fold helper** (`with_three_eras`, `ERA_FOLD_OFFSETS`,
@@ -185,13 +206,16 @@ most daylight hours, and the page says so beside every Previous Runs result. Day
 - **No direct-beam columns and no neighbouring-hour columns** for any single-product arm. Some
   products serve a native beam and some a separation-model beam, and the beam/diffuse study found
   the beam moves the error by about 0.1 points; leaving it out keeps the arms equal.
-- **Hub height.** ICON's served "100 m" wind is its 120 m wind times about 0.98, which a per-generator
+- **Hub height.** ICON's served "100 m" wind is its 120 m wind times about 0.98, which a
+per-generator
   tree model treats exactly as the 120 m speed, so ICON arms read 120 m against the others' 100 m;
   the page names this. Every speed is converted to m/s.
 - **Spatial sampling differs by archive and is named, not equalised.** ENS is averaged over each
-  generator's H3 cell (the file on disk); GEFS is read at the nearest 0.25° cell; Open-Meteo products
+  generator's H3 cell (the file on disk); GEFS is read at the nearest 0.25° cell; Open-Meteo
+  products
   at the nearest land cell Open-Meteo picks.
-- **Temporal steps.** ENS and GEFS are 3-hourly, upsampled per member through the clear-sky index for
+- **Temporal steps.** ENS and GEFS are 3-hourly, upsampled per member through the clear-sky index
+for
   radiation (the horizons page's chosen method) and by eastward and northward components for wind
   speed, before any member mean. GEFS radiation alternates 3- and 6-hour averaging windows, so it is
   converted to 3-hour step means first (a new tested function, and verification V2). Open-Meteo
@@ -201,17 +225,26 @@ most daylight hours, and the page says so beside every Previous Runs result. Day
   past-solar page. Both snapshots come from the day-1 column; the report prints the share of hours
   whose two snapshots straddle a run change.
 - **Ensembles.** ENS and GEFS arms read the mean of the members' upsampled fields, the treatment the
-  horizons page found best at day 1. An ENS control-member arm at day 1 (exploratory, on data already
+  horizons page found best at day 1. The mean wind speed is the speed of the mean wind vector and
+  the
+  mean direction its direction, as on the horizons page, for ENS and GEFS alike. An ENS
+  control-member arm at day 1 (exploratory, on data already
   on disk) shows how much of ENS's standing against the single-run products is ensemble averaging.
   Per-member fitting is not repeated (the horizons page settled it for ENS).
 - **XGBoost model.** `studies.cross_validation.out_of_fold_losses`: per generator, absolute-error
   objective, three fitting seeds, curtailed hours left out of training and kept for scoring, the
-  prediction held to the export cap. Each error is divided by its own generator's capacity (99th
+  prediction held to the export cap. The row filter drops nulls only in the target and the planned
+  arms' columns (`ens_forecast_horizons._complete` drops nulls in every column and is not reused).
+  Each error is divided by its own generator's capacity (99th
   percentile of output, from the `effective_capacity` table; the page states which build) before any
   mean or difference.
-- **Intervals.** `studies.bootstrap.bootstrap_difference` and `bootstrap_absolute`: 2,000 resamples of
-  whole calendar months, each drawing one fitting seed.
-- **Absolute skill beside every contrast.** A day-1 leaderboard per technology (every arm's own error
+- **Intervals.** `studies.bootstrap.bootstrap_difference` and `bootstrap_absolute`: 2,000 resamples
+of
+  whole calendar months, each drawing one fitting seed, on every contrast, planned or exploratory.
+  Before each interval the script asserts both arms hold the same rows, because
+  `bootstrap.paired_differences` inner-joins and would silently shrink a contrast's rows.
+- **Absolute skill beside every contrast.** A day-1 leaderboard per technology (every arm's own
+error
   with its interval) and an error-by-day table for every product at days 1 to 3. No-weather
   baselines at each day from `studies.baselines` (climatology and smart persistence, issued at 09:00
   UTC) set the floor; ERA5, and CAMS for solar, are past-weather reference rows that no forecast
@@ -230,7 +263,7 @@ points of capacity, first arm minus second, and also at the second hyperparamete
 | P2a | ICON-EU day 1 − ENS mean day 1 | bracket, upper side | as P1a, for ICON-EU |
 | P2b | ICON-EU day 1 − ENS mean day 0 | bracket, lower side | as P1b, for ICON-EU |
 | P3 | GEFS mean day 1 − ENS mean day 1 | exact | Is the free NOAA ensemble as good as ENS at a 09:00 UTC issue? |
-| P4a | Blend (ENS mean day 1 + ICON-EU day 1 + IFS 0.25° day 1) − ENS mean day 1 | optimistic: the other products' leads are Previous Runs day 1 | Does adding the other open-data forecasts to ENS lower the day-ahead error? |
+| P4a | Blend (ENS mean day 1 + ICON-EU day 1 + IFS 0.25° day 1) − ENS mean day 1 | optimistic on most hours: the other products' leads are Previous Runs day 1, from runs initialised after the 09:00 issue on most hours | Does adding the other open-data forecasts to ENS lower the day-ahead error? |
 | P4b | Blend (ENS mean day 1 + ICON-EU day 2 + IFS 0.25° day 2) − ENS mean day 1 | conservative: every other product's lead is at least what a 09:00 UTC service would have | as P4a, as a lower bound on the gain |
 
 **Why these products.** UKV is the Met Office's convection-permitting UK model, free on AWS. ICON-EU
@@ -241,9 +274,20 @@ products are the open-data forecasts with a day-2 offset in Previous Runs, so th
 products appear at both bounds and only the lead changes between P4a and P4b. UKV has no day-2
 offset, so a blend with UKV (ENS + UKV + ICON-EU + IFS 0.25° at day 1) is exploratory.
 
+**P4a is not a clean upper bound, and part of its gain may be newer ECMWF information.** For wind
+hours before 06 UTC a 09:00 service holds ICON-EU's 06 UTC run, fresher than Previous Runs day 1.
+For later hours IFS 0.25° day 1 comes from ECMWF's 06, 12, or 18 UTC run, all newer than ENS's 00
+UTC run and the later two published after the issue, so a P4a gain can come from a fresher ECMWF
+run rather than from a second model. P4b has neither problem and is the deciding bound.
+
+**Each blend's coverage and delivery.** The page gives, per blend, the area every product in it
+covers (ENS, ICON-EU, and IFS 0.25° all cover Great Britain; UKV covers the UK) and the latest
+publication time among its products' runs, which is when a live service could first run it.
+
 **The blend's guard.** Each blend has a control that keeps ENS's real columns and replaces the other
 products' columns with `studies.blending.climatology_permutation` (shuffled among hours sharing a
-generator, calendar month, and hour of day), so the control has the blend's column count. The blend
+generator, year-month, and hour of day, so no permuted value crosses a fold), so the control has the
+blend's column count. The blend
 minus its control (the other products' weather) is reported beside P4a and P4b, and must also be
 negative for a gain to be attributed to the other products' weather rather than to the extra
 columns.
@@ -255,15 +299,20 @@ columns.
 - A product **loses to ENS at matched lead** only if its upper-side contrast is positive and
   significant.
 - Otherwise the product is **unresolved at matched lead**.
-- A blend **lowers the day-ahead error** if P4b is negative and significant and its guard is negative
+- A blend **lowers the day-ahead error** if P4b is negative and significant and its guard is
+negative
   and significant (the gain survives the conservative lead and comes from the weather).
 - A blend **may lower the error** if only P4a and its guard are negative and significant.
 - Otherwise the blend **makes no detectable difference**, and the interval's bound on the effect is
   stated ("a gain as large as x points is not excluded").
 
-Where the second setting changes a contrast's sign or significance, the page says so.
+**A verdict stands only if both hyperparameter settings give it;** where the two settings disagree,
+the verdict is "unresolved" and the page shows both.
 
-**Exploratory, labelled as such on the page:** the full day-1 leaderboard of every product; every
+**Exploratory, labelled as such on the page:** the full day-1 leaderboard of every product; P1
+split by UKV era (before and after the January 2026 upgrade, the later era short of about 30 spring
+days), because every UKV result has to say which side of the upgrade it was measured on; the
+exact-lead wind hours; every
 product at days 2 and 3 with its bracket against ENS; the ENS control member at day 1; ICON-D2, ICON
 global, IFS 0.25°, GFS, ARPEGE, AROME, and both HARMONIE-AROME models against ENS; the blend with
 UKV; blends at days 2 and 3; each blend's control minus ENS alone; the ENS day-1 reconciliation with
@@ -277,7 +326,8 @@ The page states these beside the results they touch:
 - **Model against resolution and grid.** A product's win may come from its grid spacing, its grid
   cell, or the archive's cell choice rather than its physics.
 - **Ensemble averaging against model quality.** A mean of members is smoother than any one run, and
-  mean absolute error rewards smoothness; the ENS control-member arm shows how much of ENS's standing
+  mean absolute error rewards smoothness; the ENS control-member arm shows how much of ENS's
+  standing
   is averaging.
 - **Archive against producer.** Open-Meteo re-serves each producer's field with its own
   interpolation, cell choice, and 100 m scaling; a gap may belong to the archive.
@@ -286,7 +336,8 @@ The page states these beside the results they touch:
 - **Lead inside a bracket.** An unresolved bracket means the product sits between ENS's day-0 and
   day-1 errors; the study cannot place it more precisely.
 - **What a 09:00 UTC service gets from a Previous Runs product**, as set out above.
-- **Model upgrades inside the row set.** IFS 50r1 on 2026-05-12, DWD's ICON changes of 2025-07-23 and
+- **Model upgrades inside the row set.** IFS 50r1 on 2026-05-12, DWD's ICON changes of 2025-07-23
+and
   2026-09-02, ICON-D2's of 2026-02-18, and GEFS's radiation precision fix of 2026-06-15 are not era
   cuts.
 
@@ -295,13 +346,20 @@ The page states these beside the results they touch:
 - `packages/studies/src/studies/cross_validation.py`: the era-fold helper and
   `calendar_month_coverage` from #885, moved here with tests by whichever PR the coordinator
   chooses (see "Rows, folds, and fairness").
+- `packages/studies/src/studies/bootstrap.py`: add `bracket_verdict(lower_side, upper_side)`,
+  returning "beats", "loses", or "unresolved" from two `BootstrapInterval`s, so the logic that turns
+  intervals into a published verdict is tested. Tests.
 - `packages/studies/src/studies/resample.py`: add `gefs_step_means`, converting GEFS's alternating
   3- and 6-hour window averages to 3-hour step means (the 6-hour step's second half is twice the
-  6-hour window minus the preceding 3-hour window). Tests.
+  6-hour window minus the preceding 3-hour window). It runs on whole runs, before `band_steps`
+  slices a day's leads, because day 1's first sliced lead ends a 6-hour window whose preceding
+  3-hour
+  window lies outside the slice. Tests.
 - `studies/nwp_forecast_comparison/` (new directory, own README):
     - `verify_previous_runs_leads.py`: V1 below.
     - `build_forecast_inputs.py`: per technology, one long parquet of every arm's weather columns at
-      days 0 to 3, with each row's lead where it is known, read from the Previous Runs files, the ENS
+      days 0 to 3, with each row's lead where it is known, read from the Previous Runs files, the
+      ENS
       members, and the GEFS month caches. The ENS and GEFS upsampling reuses
       `ens_forecast_horizons.py`'s functions, generalised to take the member count and the source
       frame as arguments instead of `ENSEMBLE_SIZE` and `OUTPUT_PATH`; if that generalisation needs
@@ -323,12 +381,27 @@ The page states these beside the results they touch:
 
 ## Verification before the first fit
 
-- **V1, Previous Runs run-selection rule (a gate).** Compare Open-Meteo GFS's `previous_dayN`
-  `temperature_2m` (an instantaneous field) with the Dynamical.org GFS runs in
-  `weather/GFS_window_2025-07-01_2025-07-02/`, and report, per UTC hour, which run and lead matches
-  best. The plan's rule predicts the run initialised at `floor6(h − 24N)`. If the archive instead
-  picks runs by publication time, the day-1 lead could exceed `24 + h` at small `h` and break the
-  bracket's upper side; the plan is then revised before any fit.
+- **V1, Previous Runs run-selection rule (a gate).** Compare Open-Meteo GFS's `previous_dayN` 100 m
+  wind speed, and its `shortwave_radiation` at hours divisible by 6 (where selection by the hour's
+  label and by the hour's start differ), with the Dynamical.org GFS runs in
+  `weather/GFS_window_2025-07-01_2025-07-02/`. For offsets k = 0 to 12, compare against the run
+  initialised at `floor6(t − 24N − k)`. The gate: the mean absolute difference over all hours is
+  lowest at k = 0, for N = 1 and N = 2. (`temperature_2m` separates neighbouring runs too weakly to
+  use; the plan review measured it.) The plan review ran this check and it passed: 0.096 km/h at k =
+  0
+  against 0.33 at k = 1 for day 1, and radiation matched by label (8.7 W m⁻²) rather than start
+  (46.7). The committed script reproduces it.
+- **V1b, each product's run switches.** For every Previous Runs product, the second difference of
+  each `previous_dayN` series (100 m wind and temperature), per UTC hour, locates where runs switch.
+  The plan review found 6-hourly switches for GFS, ICON-EU (so its day-1 lead is 24 to 29 hours),
+  ICON global, and ARPEGE, and 3-hourly switches for UKV, ICON-D2, and DMI HARMONIE-AROME, all on
+  the phase starting at 00 UTC; IFS 0.25° and KNMI show no clear signature. The page says that the
+  switch pattern fixes each product's cycle but not whether its offset is `24N` or `24N + n`, so for
+  products other than GFS the offset rests on Open-Meteo applying one rule to every model.
+- **V1c, steps in the planned inputs.** A monthly ratio per generator of each planned input (ENS,
+  GEFS, UKV, ICON-EU, IFS 0.25°) against a sibling product, as #885 did, to find steps such as DWD's
+  2025-07-23 change or GEFS's 2026-06-15 precision fix. #885's IFS 50r1 evidence covers wind only,
+  and the page says the solar side is unchecked unless this ratio shows it.
 - **V2, GEFS radiation.** After converting windows to step means: no negative means beyond a stated
   tolerance, no night-time radiation, and the member mean's correlation with CAMS highest at the
   right window (as the ENS README's check did).
@@ -341,7 +414,8 @@ The page states these beside the results they touch:
 
 ## Charts
 
-Every chart per the `dataviz` and study skills: OCF palette, SVG through `svgo`, `aria=False` on data
+Every chart per the `dataviz` and study skills: OCF palette, SVG through `svgo`, `aria=False` on
+data
 marks, generators labelled A to F and W1 to W3 only, values as % of capacity, time axes showing
 days 1 to 7 with the month and year in text only.
 
@@ -359,6 +433,12 @@ days 1 to 7 with the month and year in text only.
 - `gefs_step_means`: a synthetic series of known 3-hour step means turned into GEFS-style
   alternating 3- and 6-hour window averages and back, exactly; and a negative-producing input
   handled as the function documents. Fails today because the function does not exist.
+- `bracket_verdict`: known answers for both sides, both signs, non-significant intervals, and an
+  interval touching zero.
+- `gefs_step_means`: also a hand-written expected array anchored on valid time (step means `[a, b,
+  c, d]` ending at 03, 06, 09, and 12 UTC give windows `[a, (a+b)/2, c, (c+d)/2]`), which catches a
+  window-phase error a round trip written by the same author would miss, and a series that starts on
+  a 6-hour window end.
 - The fold helper's tests move with it from #885.
 
 Each test must fail when the function's key line is mutated; the mutation pass checks this.
@@ -392,8 +472,15 @@ A printed-number guard in the chart script checks every figure the page quotes a
 ## Risks and open questions
 
 - **The Previous Runs rule is unverified.** V1 is a gate.
-- **UKV's day-1 radiation from two snapshots** may straddle a run change. Recommendation: accept,
-  and report the share of hours where it does.
+- **UKV's day-1 radiation from two snapshots** straddles a run change on one hour in three, by the
+  3-hourly cycle V1b found. Recommendation: accept; the later snapshot's lead is at most 27 hours,
+  which stays within the bracket for every daylight hour from 03 UTC.
+- **A missing run filled by an older one.** If Open-Meteo fills a missing run with an older run
+  rather than a null, that row's lead can exceed `24 + h` and break the upper side. V1 cannot rule
+  this out beyond GFS on two days; the page names it.
+- **The brackets may come out unresolved** for UKV and ICON-EU, because ENS's day-0 and day-1 errors
+  are far apart (0.61 points for solar and 0.75 for wind on the horizons page). "Unresolved at
+  matched lead" is then the finding, with the exact-lead wind hours as the one lead-matched view.
 - **The GEFS download reaches back to 2020, but ENS starts in April 2024**, so the longer history is
   unused.
 
@@ -431,3 +518,32 @@ Rejected:
 - **Cut the ENS control-member arm.** Kept at day 1 only: it costs one fit on data on disk, and it
   is the one arm that shows how much of ENS's standing against the single-run products is ensemble
   averaging on this study's rows.
+
+### Plan review 2 (correctness and testability), Opus
+
+The reviewer confirmed the bracket algebra on every row for solar and wind, confirmed the
+Previous Runs run-selection rule on GFS for wind and radiation, and confirmed the GEFS window
+formula on one run. Accepted:
+
+- V1 now uses 100 m wind and radiation, which separate neighbouring runs; `temperature_2m` did not.
+- V1b measures each product's run-switch pattern (ICON-EU switches 6-hourly, so its day-1 lead is 24
+  to 29 hours), and the page states that the offset rests on one rule applied to every model.
+- The monotonicity check is now on ENS, the only arm the bracket's logic needs, for every day pair
+  used and per 3-hour band, with a stated fail criterion.
+- `bracket_verdict` moves into `packages/studies/bootstrap.py` with tests; the GEFS test gains a
+  valid-time-anchored expected array and a start-on-window-end case; the conversion runs before
+  band slicing.
+- P4a is described as optimistic on most hours and as possibly carrying newer ECMWF information;
+  P4b stays the deciding bound.
+- Departures now name the permutation control in place of duplicated columns; the page gives each
+  blend's coverage and delivery time; P1 is also reported per UKV era; every contrast carries an
+  interval.
+- The fold coverage check raises on any uncovered month other than the listed single-year months.
+- A verdict stands only if both hyperparameter settings give it.
+- V1c looks for steps in the planned inputs; the 50r1 evidence is stated as wind-only.
+- The UKV straddle share is predicted (one hour in three), not described as rare.
+- Exact-lead wind hours are reinstated as an exploratory re-read of saved losses, costing no fit.
+- The permutation groups by year-month; each contrast asserts equal rows; `_complete` is not
+  reused; ENS day 0 is stated as a bracket side only; the ensemble-mean wind is the mean vector.
+
+Rejected: none.
