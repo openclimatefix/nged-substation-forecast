@@ -1,0 +1,53 @@
+# Throwaway downloads: the weather products for the past-weather and forecast studies
+
+Everything in this directory is a one-off. It is not part of the Dagster asset graph, nothing else
+in the repo imports it, it adds no package and it changes no data contract. It downloads the weather
+products the fact-checked survey (`docs/background/weather-products-survey.md`) ranks for the two
+past-weather studies (#809) and the forecast study (#810), recorded in
+[issue 841](https://github.com/openclimatefix/nged-substation-forecast/issues/841). This directory
+covers the downloads only; #809 and #810 read what lands under `data/studies/weather/<PRODUCT>/`
+and are out of scope here.
+
+## The trial-area box
+
+**Every gridded product is cut to a box covering the NGED trial area, with a margin of a few grid
+cells, taken from the private generator roster.** `paths.write_trial_area_box_from_roster` derives
+the box once from `TimeSeriesMetadata` and writes it to
+`data/studies/weather/_trial_area_box.json`, a file under the gitignored `data/` tree that is never
+read outside this process's own working state. `paths.load_trial_area_box` reads it back as a
+`TrialAreaBox`, held in memory only. **Generator locations must never appear in anything
+published**: not a request URL, not a log line, not a filename, not this repository's git history.
+Every fetch script keys its output on an integer index (`point_id`, `cell_id`, `y_index`/`x_index`)
+rather than a coordinate.
+
+## Lineage notes
+
+`lineage.write_lineage_note` writes a lineage JSON file into each product directory
+(`data/studies/weather/<PRODUCT>/lineage.json`, or `lineage_<variable>.json` where a script fetches
+several variables into one directory, as `fetch_cerra.py` and `fetch_icon_dream.py` do). Each note
+records the source address, what was requested, the variables kept, and the retrieval time — the one
+format every fetch script here reuses, per `studies/beam_diffuse_split/sources.py`'s convention.
+
+## Running a fetch script
+
+Each script in this directory is one product (or a small family of related products served the same
+way):
+
+- `fetch_open_meteo_grid.py` — ECMWF IFS HRES 9 km, DMI and KNMI HARMONIE-AROME, and Meteo-France
+  ARPEGE Europe, all served the same way by Open-Meteo's historical-forecast API.
+- `fetch_open_meteo_previous_runs.py` — 11 models' Previous Runs (lead days 0 to 7) at the nine
+  anonymised sites, from Open-Meteo's Previous Runs API.
+- `fetch_cerra.py` — CERRA solar radiation and wind, from the Copernicus Climate Data Store, needs
+  `uv run --with cdsapi --with netCDF4`.
+- `fetch_midas_open.py` and `validate_midas_open.py` — Met Office MIDAS Open station observations.
+- `fetch_icon_dream.py` — DWD's ICON-DREAM-EU, whole-domain monthly GRIB cropped to the box then
+  deleted, needs `uv run --with cfgrib --with eccodes --with requests`.
+
+Every script resolves `data/` the way `sources.REPO_DATA_DIR` does — the main checkout's `data/`,
+shared by every worktree, not a per-worktree copy — so run each script once, from whichever worktree
+is doing the download, and every other worktree sees the result.
+
+## Not covered here
+
+**WeatherNext 3** has no fetch script: whether a colleague's existing archive can be reused instead
+of a fresh access request is a decision for the maintainer.
