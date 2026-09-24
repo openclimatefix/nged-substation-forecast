@@ -24,6 +24,7 @@ from typing import Final
 
 import altair as alt
 import polars as pl
+from studies.bootstrap import bootstrap_absolute
 from studies.charts import (
     figure,
     interval_panel,
@@ -31,6 +32,7 @@ from studies.charts import (
     report_contrasts,
     report_errors,
 )
+from weather_products import METRIC, PERCENTAGE_POINTS
 from wind_icon_dream import DECIDING_CONTRASTS, OUTPUT_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
@@ -66,29 +68,59 @@ DOTS: Final[str] = "Dot: estimate. Line: 95% interval from resampling whole mont
 SCOPE: Final[str] = "Three wind farms in Lincolnshire, August 2024 to August 2026."
 LEADERBOARD_X_TITLE: Final[str] = "Mean absolute error (% of capacity; smaller is better)"
 X_TITLE: Final[str] = "Difference in mean absolute error (points of capacity)"
-LEADERBOARD_MARGIN: Final[float] = 0.3
-"""How far past the lowest and highest product's error the leaderboard's x domain extends."""
+DOMAIN_MARGIN: Final[float] = 0.3
+"""How far past the lowest and highest value a figure's x domain extends, on either chart."""
 
 
-def _leaderboard(*, errors: dict[str, float]) -> alt.VConcatChart:
+def _pooled_losses() -> pl.DataFrame:
+    """Return the pooled setting's losses, every arm.
+
+    Returns:
+        The losses whose `setting` is `pooled`.
+    """
+    return pl.read_parquet(OUTPUT_DIR / "losses.parquet").filter(pl.col("setting") == "pooled")
+
+
+def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
     """Draw every product's own mean absolute error, best first, with its 95% interval.
 
+    Bootstraps each product's absolute error from `losses.parquet` directly, the same
+    month-and-seed resampling `wind_icon_dream.py`'s own report interval uses, because
+    `leaderboard_panel` needs a `lower_95` and `upper_95` per row and the report's point estimate
+    alone cannot supply one. No model is refitted.
+
     Args:
+        losses: The pooled setting's losses, every arm.
         errors: Each product's pooled mean absolute error, read from the report's first table.
 
     Returns:
         Figure 1.
+
+    Raises:
+        ValueError: If a bootstrapped point estimate disagrees with the report's own number.
     """
     order = sorted(errors, key=errors.__getitem__)
+    records = []
+    for product in order:
+        arm = f"{product}_wind"
+        interval = bootstrap_absolute(losses=losses, arm=arm, metric=METRIC)
+        value = interval["value"] * PERCENTAGE_POINTS
+        if round(value, 3) != errors[product]:
+            msg = f"{product}: bootstrapped {value:.3f} but the report says {errors[product]}"
+            raise ValueError(msg)
+        records.append(
+            {
+                "label": NAMES[product],
+                "family": FAMILIES[product],
+                "value": value,
+                "lower_95": interval["lower_95"] * PERCENTAGE_POINTS,
+                "upper_95": interval["upper_95"] * PERCENTAGE_POINTS,
+            }
+        )
+    rows = pl.DataFrame(records)
     domain = (
-        min(errors.values()) - LEADERBOARD_MARGIN,
-        max(errors.values()) + LEADERBOARD_MARGIN,
-    )
-    rows = pl.DataFrame(
-        [
-            {"label": NAMES[product], "family": FAMILIES[product], "value": errors[product]}
-            for product in order
-        ]
+        min(rows["lower_95"].to_list()) - DOMAIN_MARGIN,
+        max(rows["upper_95"].to_list()) + DOMAIN_MARGIN,
     )
     panel = leaderboard_panel(rows=rows, x_domain=domain, x_title=LEADERBOARD_X_TITLE)
     return figure(
@@ -115,26 +147,35 @@ def _planned_contrasts(*, report_path: Path) -> alt.VConcatChart:
         Figure 2.
     """
     contrasts = report_contrasts(report_path=report_path)
-    selected = contrasts.filter(
-        pl.col("section") == SECTION_DECIDING,
-        pl.col("scope") == "all",
-        pl.col("treatment").is_in([treatment for treatment, _ in DECIDING_CONTRASTS]),
-        pl.col("reference").is_in([reference for _, reference in DECIDING_CONTRASTS]),
-    ).sort(
-        pl.col("treatment").replace_strict(
-            {treatment: index for index, (treatment, _) in enumerate(DECIDING_CONTRASTS)}
+    # Order by each row's own `reference` column rather than by position: `treatment` is the same
+    # string ("icon_dream_eu_wind") on both planned rows, so sorting on it ties, and Polars' sort
+    # is not guaranteed stable under a tie -- a label built from DECIDING_CONTRASTS' position
+    # could then be attached to the wrong row.
+    reference_order = {reference: index for index, (_, reference) in enumerate(DECIDING_CONTRASTS)}
+    selected = (
+        contrasts.filter(
+            pl.col("section") == SECTION_DECIDING,
+            pl.col("scope") == "all",
+            pl.col("treatment").is_in([treatment for treatment, _ in DECIDING_CONTRASTS]),
+            pl.col("reference").is_in(list(reference_order)),
         )
+        .with_columns(_order=pl.col("reference").replace_strict(reference_order))
+        .sort("_order")
     )
     labels = [
         f"{NAMES['icon_dream_eu']} − {NAMES[reference.removesuffix('_wind')]}"
-        for _, reference in DECIDING_CONTRASTS
+        for reference in selected["reference"].to_list()
     ]
     rows = selected.select(
         "treatment", "reference", "difference", "lower_95", "upper_95"
     ).with_columns(label=pl.Series(labels), family=pl.lit("reanalysis"), planned=pl.lit(value=True))
+    domain = (
+        min(0.0, *rows["lower_95"].to_list()) - DOMAIN_MARGIN,
+        max(0.0, *rows["upper_95"].to_list()) + DOMAIN_MARGIN,
+    )
     panel = interval_panel(
         rows=rows,
-        x_domain=(-1.0, 0.6),
+        x_domain=domain,
         x_title=X_TITLE,
         zero_label="no difference",
         better_label="ICON-DREAM-EU better",
@@ -161,8 +202,9 @@ def main() -> int:
     report_path = OUTPUT_DIR / "report.md"
     errors = report_errors(report_path=report_path, column="All sites")
     errors = {product: errors[product] for product in NAMES if product in errors}
+    losses = _pooled_losses()
     charts = {
-        "wind_icon_dream_leaderboard": _leaderboard(errors=errors),
+        "wind_icon_dream_leaderboard": _leaderboard(losses=losses, errors=errors),
         "wind_icon_dream_planned_contrasts": _planned_contrasts(report_path=report_path),
     }
     for name, chart in charts.items():
