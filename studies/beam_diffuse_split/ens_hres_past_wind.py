@@ -83,11 +83,11 @@ which a 00 UTC run becomes available belong to ECMWF's open-data subset and Dyna
 not to ENS. ENS's native grid is about 9 km (O1280), served at 0.25 degrees.
 
 Run it with `uv run python studies/beam_diffuse_split/ens_hres_past_wind.py`. `refuse_to_overwrite`
-on a fresh run means `losses.parquet`, `losses.fingerprint`, `intervals.parquet` and `report.md`
-each have to move to a `superseded/` subfolder before a re-run. `--report-only` rebuilds the report
-from the saved `losses.parquet` alone, fitting nothing, but still raises if the saved fingerprint
-(the row set with its Float32-cast floats, every job's columns, the seeds, and the hyperparameters)
-no longer matches what this code would fit.
+on a fresh run means `losses.parquet`, `losses.fingerprint`, `intervals.parquet`, `report.md` and
+`script_commit.txt` each have to move to a `superseded/` subfolder before a re-run. `--report-only`
+rebuilds the report from the saved `losses.parquet` alone, fitting nothing, but still raises if
+the saved fingerprint (the row set with its Float32-cast floats, every job's columns, the seeds,
+and the hyperparameters) no longer matches what this code would fit.
 """
 
 import argparse
@@ -1272,8 +1272,9 @@ def _period_lines(*, pooled: pl.DataFrame, log: IntervalLog) -> list[str]:
         (
             "Each row is a contrast on the rows of one period only, from the saved losses. Folds "
             "were cut before the split, so a period's models were trained on rows of both periods. "
-            "The period from 2026-05-12 holds about 4 months, so its intervals under-cover: "
-            "resampling 4 months cannot represent the month-to-month spread."
+            "The period from 2026-05-12 holds about 4 months of data, in 5 calendar-month labels "
+            "because 12 May and 10 September fall inside months, so its intervals under-cover: "
+            "resampling so few months cannot represent the month-to-month spread."
         ),
         "",
     ]
@@ -1693,6 +1694,8 @@ Outputs of `studies/beam_diffuse_split/ens_hres_past_wind.py`. Wind farms appear
 - `losses.fingerprint`: a hash of the row set (floats cast to Float32), every arm's columns, the
   seeds and the hyperparameters. `--report-only` refuses to reuse `losses.parquet` if the hash
   changes.
+- `script_commit.txt`: the commit of the script that fitted `losses.parquet`, which a fresh run
+  records after checking the script has no uncommitted changes.
 - `intervals.parquet`: every interval `report.md` prints, one row each, with its section, setting,
   scope, arms, value and bounds (percentage points of capacity), level, rows and months.
 - `report.md`: every table the docs page quotes, printed by the script and never transcribed.
@@ -1704,19 +1707,34 @@ Outputs of `studies/beam_diffuse_split/ens_hres_past_wind.py`. Wind farms appear
 
 
 def _script_commit() -> str:
-    """Return the commit the script was committed at before its first fit, from the repository.
+    """Return the commit the script is at, raising if the script has uncommitted changes.
+
+    A fresh run records this hash beside the losses, so the report can say which committed script
+    fitted them.
 
     Returns:
-        The short hash of the last commit that changed this file, or `uncommitted` if none did.
+        The short hash of the last commit that changed this file.
+
+    Raises:
+        ValueError: If the file differs from its last commit, or no commit has changed it.
     """
-    result = subprocess.run(
-        ["git", "log", "-1", "--format=%h", "--", str(Path(__file__).resolve())],
-        capture_output=True,
-        text=True,
-        check=False,
-        cwd=Path(__file__).parent,
-    )
-    return result.stdout.strip() or "uncommitted"
+    script = str(Path(__file__).resolve())
+    directory = Path(__file__).parent
+
+    def git(*arguments: str) -> str:
+        """Run one git command in the script's directory and return its standard output."""
+        return subprocess.run(
+            ["git", *arguments], capture_output=True, text=True, check=True, cwd=directory
+        ).stdout.strip()
+
+    if git("status", "--porcelain", "--", script):
+        msg = "the script has uncommitted changes; commit it before the first fit"
+        raise ValueError(msg)
+    commit = git("log", "-1", "--format=%h", "--", script)
+    if not commit:
+        msg = "the script has no commit; commit it before the first fit"
+        raise ValueError(msg)
+    return commit
 
 
 def main() -> int:
@@ -1770,6 +1788,7 @@ def main() -> int:
     intervals_path = OUTPUT_DIR / "intervals.parquet"
     report_path = OUTPUT_DIR / "report.md"
     readme_path = OUTPUT_DIR / "README.md"
+    commit_path = OUTPUT_DIR / "script_commit.txt"
 
     all_jobs = jobs()
     fingerprint = _fingerprint(frame=frame, job_list=all_jobs)
@@ -1786,8 +1805,12 @@ def main() -> int:
             )
             raise ValueError(msg)
         losses = pl.read_parquet(path)
+        script_commit = commit_path.read_text().strip()
     else:
-        refuse_to_overwrite(paths=[path, fingerprint_path, intervals_path, report_path])
+        refuse_to_overwrite(
+            paths=[path, fingerprint_path, intervals_path, report_path, commit_path]
+        )
+        script_commit = _script_commit()
         fitted = run_all(dataset=frame, jobs=all_jobs)
         losses = fitted.join(
             frame.select("site", "time", actual_mw=pl.col("power_mw").cast(pl.Float64)),
@@ -1796,6 +1819,7 @@ def main() -> int:
         )
         losses.write_parquet(path)
         fingerprint_path.write_text(fingerprint)
+        commit_path.write_text(script_commit)
 
     log = IntervalLog()
     report = _report(
@@ -1806,7 +1830,7 @@ def main() -> int:
         checks=checks,
         fingerprint=fingerprint,
         log=log,
-        script_commit=_script_commit(),
+        script_commit=script_commit,
     )
     report_path.write_text(report)
     log.frame().write_parquet(intervals_path)
