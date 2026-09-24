@@ -220,8 +220,8 @@ written.
 - **The coverage check failed with the era folds unrotated, and the fold numbers are now offset.**
   With no offset, six (site, fold, calendar month) cells failed, across the three farms: July (fold
   3 in both 2025 and 2026) and September (fold 4 in both). The third era's fold numbers are
-  rotated by 2 (`ENS_HRES_WIND_ERA_FOLD_OFFSETS`), which leaves the folds contiguous within an era and the check
-  with 0 failing cells.
+  rotated by 2 (`ENS_HRES_WIND_ERA_FOLD_OFFSETS`), which leaves the folds contiguous within an era
+  and the check with 0 failing cells.
 - **The HRES served-lead evidence is read from the data, not assumed.** The script prints the
   hour-to-hour change by UTC hour and lists the hours that reach a ratio of 1.15, and states how
   many of the plan's expected handover hours (01 and 13 before 1 October 2025; 00, 06, 12 and 18
@@ -371,9 +371,69 @@ matches the package's output.
 
 **Package hardening after the package reviews.** `studies.cross_validation` now validates its
 inputs (`cut_eras` and `rotate_folds` raise on a missing or extra era offset, and `cut_eras` on a
-malformed month label), holds the study's era constants (`UKV_UPGRADE_MONTH`, `ENS_HRES_WIND_ERA_START_MONTHS`,
-`ENS_HRES_WIND_ERA_FOLD_OFFSETS`), and offers `search_fold_offsets` to confirm a fold rotation on a new row set.
+malformed month label), holds the study's era constants (`UKV_UPGRADE_MONTH`,
+`ENS_HRES_WIND_ERA_START_MONTHS`, `ENS_HRES_WIND_ERA_FOLD_OFFSETS`), and offers
+`search_fold_offsets` to confirm a fold rotation on a new row set.
 `studies.bootstrap` rejects an interval level that is not a percentage. The scripts import the
 constants. `--report-only` again reproduces `report.md`, `README.md`, the fingerprints and every
 saved loss file byte for byte and `intervals.parquet` value for value, and every design's saved fold
 column matches the package's.
+
+## Post-review additions 3 (added after the persona reviews)
+
+Written after five persona reviews of the page, and computed from the saved losses and saved inputs
+with no refit. `losses.parquet`, `losses_long_rows.parquet` and `losses_fold_designs.parquet` are
+unchanged (their sha256 digests match the ones before this round). Every item is post hoc and
+exploratory, and the report prints each of them.
+
+**Renamed constants.** The package constants for the ECMWF wind study's eras are
+`ENS_HRES_WIND_ERA_START_MONTHS` and `ENS_HRES_WIND_ERA_FOLD_OFFSETS`, named after the study that
+owns them. All eight designs' fold columns match the saved losses (0 mismatches).
+
+**Additions.**
+
+1. **Paired design differences.** For ENS day 0 minus ERA5 (both ENS combinations) and HRES minus
+   ERA5, each long-row design's contrast minus another design's, on the same rows and seeds, on all
+   rows and on the rows from 2024-12-01: the fold rotation alone, the extra era cut alone, and both.
+   The interval resamples the months and the seed of the per-row difference. The page uses these
+   rows in place of a comparison between one significant and one non-significant interval.
+2. **Change between halves, farms and periods.** The label-hour split's difference-in-differences
+   (labels 10 to 23 UTC minus labels 00 to 08 UTC, one draw of months for both halves), the
+   between-farm differences of P1 to P3 (one draw of months for both farms), and the change of each
+   period-split contrast (each period draws its own months). The page no longer says that the
+   widening between the halves is a time-of-day difference, because ERA5's assimilation windows
+   and HRES's served lead both change at the split.
+3. **The range across designs.** P1 to P3 and ENS-HRES under every design scored on the rows from
+   2024-12-01, so a range drawn from the December-row designs alone is no longer quoted as the
+   whole range.
+4. **The 100 m ratio and the IFS Cycle 49r1 split.** Each product's mean 100 m speed over ERA5's by
+   month and by season, and each product's 100 m and 10 m ratio before and after the first hour of
+   49r1 in its data (06 UTC on 2024-11-12 for HRES, with UKV as a control, and 00 UTC on 2024-11-13
+   for ENS day 0), on all rows and on the 28 days either side.
+5. **Jump-ratio controls.** HRES's 07 UTC jump is compared with the same ratio for ERA5 and UKV,
+   whose values involve no handover between runs, by period and by calendar month. The report also
+   counts the expected handover hours that reach the plan's threshold of 1.15.
+6. **Smaller items.** The fewest training rows in any covered fold cell; `too few months` in place
+   of `yes` or `no` where a subset holds fewer than six calendar months; a note that the
+   Bonferroni family is per table and that each tail rests on about 17 of 2,000 resamples; and the
+   466 farm-hours the horizons inputs hold no power for.
+
+**Departures from the plan, recorded here.**
+
+- **The label-hour split is not evidence about time of day.** Addition 3 of the second round
+  attributed most of the widening to time of day in UKV's favour. The difference-in-differences
+  shows that the change in UKV minus ERA5 is statistically significant and the change in ENS day 0
+  minus ERA5 is not, but the controls are not clean, so the page states that the split cannot
+  apportion the widening.
+- **HRES's lead over ERA5 is described as no longer statistically significant under the horizons
+  design, not as vanished.** The interval on the December rows is [−0.24, +0.15], and no between-farm
+  difference other than W2 minus W1 in HRES minus ERA5, and W2 minus W3 in ENS day 0 minus UKV, is
+  statistically significant.
+- **The 49r1 wording follows ECMWF's pages.** ECMWF's Newsletter 181 describes a revised diagnostic
+  10 m wind calculation that reduces 10 m wind biases, and says nothing about 100 m wind. The
+  page's earlier sentence that ECMWF reported no change in mean speed is withdrawn.
+- **The 06:40 UTC figure is a dissemination time.** ECMWF's dissemination schedule lists the 00 UTC
+  ENS perturbation forecasts' hourly steps 0 to 90 at 06:40 to 06:55 UTC. Open-data publication
+  and Dynamical.org's ingest come later and are not measured.
+- **The request framing is dropped from the page.** The page states where HRES and ENS day 0 come
+  from, and no longer refers to the original request.

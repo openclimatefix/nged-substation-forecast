@@ -604,8 +604,8 @@ def _models_work(*, losses: pl.DataFrame) -> tuple[alt.VConcatChart, str]:
         .join(weeks, on="week", how="inner")
     )
     title = (
-        "XGBoost models given HRES's or ENS day 0's wind follow the shape of measured power at "
-        "every farm, in a windy, a variable, and a calm week"
+        "XGBoost models given HRES's or ENS day 0's wind follow the shape of measured power at W1 "
+        "and W2, and at W3 outside its windiest week"
     )
     return (
         _models_work_timeseries(
