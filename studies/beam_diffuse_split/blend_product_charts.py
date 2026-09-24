@@ -502,6 +502,11 @@ def _blend_errors(*, tables: dict[str, list[dict[str, str]]], domain: DomainType
     return pl.DataFrame(rows)
 
 
+_LEADERBOARD_ROW_STEP_PX: Final[int] = 36
+"""Each leaderboard row's height: room for a two-line label, with the one three-line label
+overhanging into the gap between rows."""
+
+
 def _leaderboard_rows(
     *, tables: dict[str, list[dict[str, str]]], domain: DomainType
 ) -> pl.DataFrame:
@@ -567,6 +572,7 @@ def _leaderboard(*, tables: dict[str, list[dict[str, str]]]) -> alt.VConcatChart
             kind_title="Blend or single product",
             panel_title=domain.capitalize(),
             keys=domain == "solar",
+            row_step_px=_LEADERBOARD_ROW_STEP_PX,
         )
         for domain in DOMAIN_NAMES
     ]
