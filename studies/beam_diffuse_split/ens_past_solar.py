@@ -210,7 +210,7 @@ FIRST_SERVABLE_HOUR_UTC: Final[int] = 9
 """The hour of day, UTC, from which a live service reading Dynamical.org's archive can read the
 00 UTC run: about 09:00 UTC (`docs/studies/ens-forecast-horizons.md`, "Horizons and issue time")."""
 
-FIRST_DISSEMINATED_HOUR_UTC: Final[int] = 6
+LAST_HOUR_BEFORE_DISSEMINATION_UTC: Final[int] = 6
 """The last hour label, UTC, whose hour ends before ECMWF disseminates the 00 UTC run's steps 0 to
 90, at about 06:55 UTC ([ECMWF's dissemination
 schedule](https://confluence.ecmwf.int/display/DAC/Dissemination+schedule)): an hour labelled 06
@@ -722,7 +722,7 @@ def _lead_lines(*, frame: pl.DataFrame) -> list[str]:
     ens_lead = hour
     era5_lead = (hour - ERA5_FIRST_RUN_HOUR_UTC - 1) % ERA5_RUN_INTERVAL_HOURS + 1
     too_early = int((hour <= FIRST_SERVABLE_HOUR_UTC).sum())
-    before_dissemination = int((hour <= FIRST_DISSEMINATED_HOUR_UTC).sum())
+    before_dissemination = int((hour <= LAST_HOUR_BEFORE_DISSEMINATION_UTC).sum())
     extra = float(ens_lead.mean() - era5_lead.mean())
     return [
         "#### Leads of the scored hours",
