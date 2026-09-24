@@ -190,7 +190,7 @@ conservative blend below uses.
   (site, fold, calendar month) coverage table, lists the calendar months that occur in one year
   only (January, because January 2026 is dropped, among them), and raises on any other uncovered
   month, as #885's `_raise_on_uncovered_months` does. `ERA_FOLD_OFFSETS` was tuned on #885's wind
-  rows, so the check is what proves it on this study's solar rows. **The 2025-10-01 cut is in the
+  rows; the coverage check proves this study's own rotation on its rows. **The 2025-10-01 cut is in the
   design because #885 needs it** (HRES's archive source changes
   that day) and the two studies share one fold helper; here it is harmless, and it happens to fall
   a week after DWD's ICON low-cloud change of 2025-09-24. The page says both.
@@ -229,9 +229,10 @@ for
   past-solar page. Both snapshots come from the day-1 column; the report prints the share of hours
   whose two snapshots straddle a run change.
 - **Ensembles.** ENS and GEFS arms read the mean of the members' upsampled fields, the treatment the
-  horizons page found best at day 1. The mean wind speed is the speed of the mean wind vector and
-  the
-  mean direction its direction, as on the horizons page, for ENS and GEFS alike. An ENS
+  horizons page found best at day 1. The mean wind speed is the mean of the members' speeds, and the
+  mean direction is the direction of the mean wind vector, as on the horizons page, for ENS and GEFS
+  alike. ENS's solar temperature is read at the hour's midpoint, as on the horizons page, where the
+  Previous Runs products' temperature is the value at the hour's end; the page names this. An ENS
   control-member arm at day 1 (exploratory, on data already
   on disk) shows how much of ENS's standing against the single-run products is ensemble averaging.
   Per-member fitting is not repeated (the horizons page settled it for ENS).
