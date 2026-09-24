@@ -729,7 +729,13 @@ XGBoost setting:**
   matched leads, in IFS-HRES's favour relative to the pooled figure, and narrows to +0.05 points
   [−0.27, +0.35] where IFS-HRES's lead is the longer of the two, without resolving either split. No
   row fell where IFS-HRES's lead was the shorter. The matched-lead and longer-lead rows also differ
-  in hour of day, so the split does not isolate lead on its own.
+  in hour of day, so the split does not isolate lead on its own. Open-Meteo switched IFS-HRES from
+  its historical-forecast archive to ECMWF's own real-time catalogue on 1 October 2025, a change of
+  source inside this row set as well as a change of cadence, so the contrast is also split before
+  and after that date: −0.06 points [−0.49, +0.30] before, and −0.12 points [−0.49, +0.22] on or
+  after, neither resolved. The served grid is unchanged across the switch. ECMWF's Cycle 49r1 went
+  operational on 12 November 2024, inside this row set, which the panel's own splits do not
+  separate out.
 
 **How each served lead was measured, or why it was not (exploratory):** `check_new_products.py`
 reads a single-site hourly 2 m temperature fetch for each of the four models and looks for an
