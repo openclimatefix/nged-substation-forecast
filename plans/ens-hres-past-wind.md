@@ -128,6 +128,13 @@ model absorbs the mismatch. Phase 1 adds no shear extrapolation.
   2026 dropped as on the page), with `era_code` taking three values for every arm, so IFS Cycle
   50r1 on 12 May 2026 is left to the period split below; month-resampled
   paired bootstrap of whole months and seeds.
+- **Calendar-month coverage check (issue #868).** Cutting folds inside three eras ranks each era's
+  months separately and reuses fold numbers 0 to 4, so one calendar month can be held out of every
+  era at once and leave no training data for that season. Before any fit, the script asserts that
+  for every scored calendar month, in every fold, some training rows carry that calendar month
+  from some era, and prints the table into `report.md`. If the check fails, the script offsets the
+  fold numbers between eras (or assigns folds by calendar month), and this file is updated with
+  the choice before the first fit. The page states the fold design as a limitation either way.
 - **Row fingerprint.** Deterministic, floats cast to Float32 before hashing, saved beside the
   losses, and checked on `--report-only`.
 - **Servable-hours split.** Wind power for label T covers T minus 30 minutes to T plus 30 minutes,
