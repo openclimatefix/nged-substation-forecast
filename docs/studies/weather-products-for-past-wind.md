@@ -125,6 +125,17 @@ from the freshest run of that weather model that Open-Meteo's archive holds for 
   points [−0.27, −0.06] on the rows from 12 August 2024. Three wind farms are few independent sites,
   so these intervals describe these farms and this window only. See [How ECMWF's HRES and ENS day 0
   compare with UKV and ERA5](#how-ecmwfs-hres-and-ens-day-0-compare-with-ukv-and-era5).
+- **At three farms over 17 months (34,156 farm-hours), one nearby 10 m weather station gives a
+  larger error than ERA5's 10 m wind by 0.99 points [0.59, 1.45], and lowers UKV's error by 0.64
+  points [0.46, 0.81] against a control with the same number of columns.** The 0.99 points is
+  about 12% of ERA5's 10 m error, and the 0.64 points is about 8% of the control's error. In
+  exploratory comparisons, the mean of the three nearest stations could not be told apart from
+  ERA5's 10 m wind, −0.09 points [−0.40, +0.27]. Adding ICON-D2's wind to UKV lowered the error
+  more than adding the station did. In exploratory splits, the station's gap to ERA5 was larger in
+  August to December than in January to July, a split confounded with which calendar months the
+  XGBoost models trained on. See [One nearby 10 m weather station trails ERA5's 10 m wind on its
+  own, and lowers UKV's error when added to
+  it](#one-nearby-10-m-weather-station-trails-era5s-10-m-wind-on-its-own-and-lowers-ukvs-error-when-added-to-it).
 
 ## Introduction
 
@@ -369,6 +380,137 @@ After persona reviews, further tables were computed from the saved losses and in
 - each product's 100 m speed over ERA5's
 - each product's 10 m and 100 m speed over ERA5's before and after IFS Cycle 49r1
 - the hour-to-hour jump ratios of ERA5 and UKV as controls
+
+### How nearby weather stations were added
+
+**One section of this page tests how well a 10 m anemometer 6 to 18 km away stands in for the wind
+at a turbine's hub height.** The section adds the wind of the nearest weather station to the
+products above. It uses the same three farms and the same XGBoost model per farm, and it reads
+weather that has already happened, so it says nothing about a live weather-station feed. An arm
+below means one XGBoost model per farm, given one set of feature columns. A farm-hour is one wind
+farm's power in one hour, the same unit as the generator-hours elsewhere on this page.
+
+**The stations come from MIDAS Open, the Met Office's open archive of UK land-station observations,
+and the 18 candidates are the stations in the downloaded hourly-weather file whose wind speeds carry
+a MIDAS unit code.** MIDAS is the Met Office Integrated Data Archive System, and the Centre for
+Environmental Data Analysis (CEDA) publishes MIDAS Open. The unit code is 4, an anemometer reading
+in knots, on every row, and the download script converts the knots to metres per second. The release
+is `dataset-version-202607`, at quality-control version 1.
+
+**Of the file's 38 stations, 18 report an hourly wind speed, 12 report no wind speed at all in this
+file, and 8 return one reading a day, at 09:00.** Of those 8 stations, 7 carry a wind speed with no
+unit code. Their speeds sit on Beaufort-force midpoints, which suggests the wind is estimated. None
+of the daily stations is a candidate. The 12 stations with no wind in this file were not looked up
+in MIDAS Open's other wind datasets, so a nearer anemometer may exist.
+
+**The 38 stations are a list assembled by hand in the download script, so "nearest" means nearest
+among those 38, and a nearer station outside the list is not ruled out.** The download's README
+reconstructs the rule behind the list as a record that runs to 2025 or later and a location within a
+fixed distance of at least one of the studies' sites, with one exception, a station whose record
+ends in 2024. Each farm reads its nearest candidate station whose hours cover at least 90% of the
+farm's hours, and every nearest station covers at least 99.7%. The nearest station lies 6 to 18 km
+from its farm, and the third-nearest 25 to 37 km. A farm-hour is dropped where its nearest station
+has no reading, which removes 27 of the 34,183 farm-hours in the window and leaves the 34,156 that
+every arm in this section is scored on. The rule reads no target and no score.
+
+**Exposure differs widely between the 18 candidates.** Over the window, the candidates' mean 10 m
+speeds run from 2.7 to 6.0 m/s, and each candidate's share of calm hours runs from 0.02% to 1.61%.
+Sheltering usually depends on wind direction, which may be part of what the station's direction
+columns recover.
+
+**The window runs from 12 August 2024 to 31 December 2025, 17 calendar months with August 2024
+partial, because MIDAS Open is released once a year.** CEDA's own guide gives the example that the
+202007 release, in July 2020, holds data to the end of 2019. The release read here,
+`dataset-version-202607`, holds data to the end of 2025. The next annual release, about July 2027 by
+the same pattern, would be expected to add 2026. The window therefore ends before the Met Office's
+upgrade of UKV in January 2026, so this section scores UKV before that upgrade only.
+
+**A reading stamped T is a 10-minute mean from about T − 20 to T − 10 minutes, so it sits about 15
+minutes before the centre of the power hour stamped T.** The [Met Office Surface Data Users
+Guide](https://artefacts.ceda.ac.uk/badc_datadocs/ukmo-midas/ukmo_guide.html) gives the SYNOP
+(surface synoptic observation) 10-minute mean wind as "10-minute average, HH-20 to HH-10". Of the 18
+candidates, 14 carry SYNOP rows only, 3 carry only rows of the automatic-weather-station hourly
+report message type (AWSHRLY), and 1 carries both types. The averaging window of the AWSHRLY reports
+is not documented in what was read. If an AWSHRLY mean ends on the hour, not 10 minutes before it,
+the reading moves by 10 minutes, which is less than hourly data can resolve. The standard exposure
+is 10 m over open level terrain, and a station with another exposure has an "effective height", so
+the 10 m height is nominal.
+
+**A reading is joined to the power row with the same UTC stamp, the alignment at which the nearest
+station's speed correlates most with UKV's 10 m speed.** The correlation of the nearest station's
+speed with UKV's 10 m speed is 0.848 at that alignment, against 0.837 with the station's reading one
+hour later and 0.814 one hour earlier. Hourly data cannot test a shift of less than an hour.
+
+**Speeds are whole knots and directions are in steps of 10 degrees, which the XGBoost model sees as
+they are.** No estimated speed enters, because every wind speed row of the 18 candidates carries
+unit code 4. North is written 360 and a calm hour is written 0. The calm flag is set before 360 is
+mapped to north, and a calm hour enters as sine and cosine both zero.
+
+**No row is filtered on a quality-control flag, although flag 106 covers every wind row of one
+candidate station.** Quality-control flag 106 is set on whole stations or on runs of several months,
+never on isolated hours. In MIDAS's five-digit quality-control code, 106 has status digit 1,
+"observed and suspect (i.e. has failed the latest QC check), or there are strong grounds for
+suspecting the accuracy of the observation", and level digit 6, "final (or only) areal or buddy job
+run and queries processed". The flag is on every wind row in the window at station 62265, one of the
+18 candidates. This page does not say whether that station was chosen. One further candidate carries
+the flag on a run of several months at the end of the window. Whether excluding a flagged station
+moves either planned contrast was not checked.
+
+**The plan for this section was committed before any fit, and only two contrasts were planned.** The
+plan first named the two contrasts in commit `7bc23521`, before any station arm was fitted but after
+the five products above had been scored. The script that fitted the main arms was committed as
+`021d0852` before its first fit. The three arms added after the first results were written down in
+commit `750b130d` and fitted at commit `72d969b8`. Both planned contrasts are between arms with the
+same number of feature columns.
+
+- **S1, planned:** an XGBoost model given the nearest station's speed and the sine and cosine of its
+  direction, against an XGBoost model given ERA5's 10 m speed and the sine and cosine of ERA5's 100
+  m direction. The ERA5 download holds no 10 m direction. Each arm has 3 wind columns.
+- **S2, planned:** an XGBoost model given UKV's four columns from the rest of this page plus the
+  station's three, against an XGBoost model given UKV's four columns plus UKV's own 80 m speed and
+  the sine and cosine of its 80 m direction. Each arm has 7 wind columns, so the second arm is a
+  control for the extra columns.
+
+**Every other figure in this section is exploratory.** The plan named these before any fit:
+
+- the mean of the three nearest stations against the nearest station
+- UKV plus the station against UKV alone
+- S1 and S2 scored on August to December only
+- S1 and S2 at each farm
+- a shear control
+
+These were chosen after the first results were seen:
+
+- the two arms that give each source's speed alone
+- the arm that adds ICON-D2 to UKV
+- S1 and S2 scored on January to July
+- the per-calendar-month means
+- the calendar-month weighting, which gives each calendar month equal weight
+- the contrast of ERA5 with and without its hub-height speed
+- the contrast of S2's control, UKV plus UKV's own 80 m wind, with UKV alone
+- the contrast of the mean of three stations with ERA5's 10 m wind
+- the differences between farms and between seasons
+- the two intervals that do not treat months as independent
+
+**Every arm in this section is refitted on the 34,156 farm-hours, so an error here differs from the
+same product's error above.** That includes each product's wind arm from the rest of this page.
+
+**About one of the 24 exploratory paired-difference intervals at the main setting would be
+statistically significant at the 5% level by chance alone.** The report prints all 24.
+
+**The folds are five blocks of 4, 3, 4, 3, and 3 calendar months, and 42.2% of the scored farm-hours
+fall in calendar months that no XGBoost model trained on.** January to July occur once in the
+window, so an XGBoost model that scores one of them never saw that calendar month. The day-of-year
+column of that model therefore extrapolates.
+
+**Seventeen months are few independent weather episodes, so an interval from a percentile bootstrap
+can run narrower than it should.** The intervals resample 17 calendar months and a fitting seed. The
+results give two intervals that do not treat months as independent, one from the 5 per-fold
+differences and one from the 17 per-month differences. A fold agrees with an estimate when the
+difference, computed from that fold's held-out months alone, has the same sign. The second
+hyperparameter setting is rerun for every planned contrast. The four planned intervals, two
+contrasts at two settings counted as separate tests, are adjusted to the 98.75% level, so each bound
+rests on about 12 of the 2,000 bootstrap resamples.
 
 ## Results
 
@@ -734,13 +876,13 @@ each statistically significant at the 5% level, against 0.340 points [0.193, 0.4
 [0.226, 0.600], and 0.579 points [0.405, 0.742] across all three generators on this section's row
 set.
 
-**Neither planned contrast's size changed by a margin statistically significant at the 5% level
-from 2025 to 2026, in a comparison restricted to January to August of each year so a partial 2026
+**Neither planned contrast's size changed by a margin statistically significant at the 5% level from
+2025 to 2026, in a comparison restricted to January to August of each year so a partial 2026
 compares against the same months of 2025.** Against ERA5, ICON-DREAM-EU was 0.075 points ahead
 [−0.097, +0.273] in 2025 and 0.036 points ahead [−0.132, +0.217] in 2026 (signs flipped so ahead is
 positive), a change of +0.039 points [−0.212, +0.297], not statistically significant. Against
-ICON-EU, the gap was 0.416 points [0.312, 0.498] in 2025 and 0.376 points [0.309, 0.430] in 2026, both
-statistically significant, a change of −0.041 points [−0.145, +0.080], not statistically
+ICON-EU, the gap was 0.416 points [0.312, 0.498] in 2025 and 0.376 points [0.309, 0.430] in 2026,
+both statistically significant, a change of −0.041 points [−0.145, +0.080], not statistically
 significant.
 
 ### How ECMWF's HRES and ENS day 0 compare with UKV and ERA5
@@ -1065,6 +1207,143 @@ describe these farms and this window only.
 calendar-month labels from 12 May 2026, so the report marks the split's change intervals `too few
 months`, and those intervals under-cover.
 
+### One nearby 10 m weather station trails ERA5's 10 m wind on its own, and lowers UKV's error when added to it
+
+**In the two planned contrasts, the nearest station's wind gives a larger error than ERA5's 10 m
+wind, and lowers UKV's error against a control with the same number of columns.** S1, the nearest
+station minus ERA5's 10 m wind, is 0.99 points [0.59, 1.45], with all 5 folds agreeing, and 1.02
+points [0.61, 1.45] at the second hyperparameter setting. S2, UKV plus the station minus UKV plus
+its own 80 m wind, is −0.64 points [−0.81, −0.46] with all 5 folds agreeing, and −0.60 points
+[−0.73, −0.46] at the second setting.
+
+**Both planned contrasts stay statistically significant at the 5% level after adjusting for the four
+planned intervals and, at both settings, under two intervals that do not treat months as
+independent.** Adjusted for the four planned intervals, at the 98.75% level, S1 is [0.51, 1.59] and
+S2 is [−0.87, −0.43]. At the main setting, S1's interval is [0.15, 1.91] from the 5 per-fold
+differences and [0.53, 1.48] from the 17 per-month differences, and S2's interval is [−0.85, −0.39]
+from the per-fold differences and [−0.83, −0.45] from the per-month differences. S1's fold-level
+interval is about twice as wide as its bootstrap interval. Three wind farms are few independent
+sites, so each interval describes these farms only, on 34,156 farm-hours in 17 calendar months.
+
+![Figure 21: The nearest weather station trails ERA5's 10 m wind by 0.99 points, and adding the
+station to UKV lowers UKV's error by 0.64 points against a control with the same number of
+columns](assets/station_wind_headline.svg)
+
+**The nearest station has the largest own error of the 11 arms in Figure 21, at 9.14% of capacity
+[7.98, 10.40], against 8.15% [7.29, 9.09] for ERA5's 10 m wind.** ICON global, at 8.35%, has the
+next largest. S1's 0.99 points is about 12% of ERA5's 10 m error, and S2's 0.64 points is about 8%
+of the control's error of 7.58%. UKV plus the station has the second smallest own error of the 11
+arms, at 6.94% [5.96, 8.08]. The arms' own intervals overlap widely, because every arm's error rises
+and falls with the month, so the paired differences are the test.
+
+**S1 tests how well a 10 m anemometer 6 to 18 km away stands in for the wind at a turbine's hub
+height, and no planned contrast separates the reasons the anemometer does worse.** The station is
+one point instrument, its reading is a 10-minute mean set against a 60-minute power hour, and its
+siting, distance, terrain, and rounding to whole knots and 10 degrees all differ from ERA5's smooth
+0.25° grid value. The page does not say which of those matters most. This page also did not check
+whether ERA5 assimilates land-station 10 m wind, which bears on S1 the same way as UKV's
+assimilation bears on S2.
+
+**S1 compares two 10 m speeds, but the two sources' direction columns are at different heights:
+ERA5's is at 100 m and the station's is at 10 m.** ERA5 given only its 10 m speed and 100 m
+direction is behind ERA5 given its 100 m speed as well by 0.17 points [0.08, 0.26], a comparison of
+4 wind columns with 3. Height alone therefore does not explain S1's 0.99 points. Giving each source
+its speed alone widens the gap: the nearest station's speed alone minus ERA5's 10 m speed alone is
+2.48 points [1.88, 3.07], so the station's direction columns recover part of the deficit. Wind
+usually turns with height, so part of the 21.0 degree mean disagreement between the two sources'
+directions over the hours that are not calm is expected. Rounding to 10 degrees accounts for at most
+5 degrees of that disagreement.
+
+**A second MIDAS Open wind dataset, `uk-mean-wind-obs`, was not tested.** MIDAS Open publishes the
+dataset in the same release, and this page did not read its documentation. Whether the averaging
+period of that dataset suits an hourly power window better, and how its time stamp aligns with the
+power hour, were not checked.
+
+**In an exploratory comparison, the difference between the mean of the three nearest stations and
+ERA5's 10 m wind is not statistically significant at the 5% level.** The mean of the three nearest
+stations' speeds, with the direction of their mean wind vector, has an own error of 8.06% [7.01,
+9.24]. The mean minus the nearest station alone is −1.09 points [−1.32, −0.87], with all 5 folds
+agreeing. The mean minus ERA5's 10 m wind is −0.09 points [−0.40, +0.27], and only 2 of 5 folds
+agree with the sign of that estimate. Both contrasts are exploratory. The interval for the mean
+minus ERA5's 10 m wind is wide, so the comparison is compatible with a single anemometer carrying
+most of S1's deficit but does not show that one does.
+
+**In exploratory splits, S1 is larger in August to December than in January to July, by 1.28 points
+[0.69, 1.84], and the split is confounded with which calendar months the XGBoost models trained
+on.** Figure 22 splits S1 by season. From January to July, 7 months and 14,411 farm-hours, S1 is
+0.26 points [0.05, 0.46] at the main setting, with 2 of 3 folds agreeing, and not statistically
+significant at the 5% level at the second, 0.33 points [−0.01, +0.69]. From August to December, 10
+months and 19,745 farm-hours, S1 is 1.53 points [0.99, 2.05]. The difference between the two seasons
+is 1.28 points [0.69, 1.84] at the main setting and 1.19 points [0.57, 1.77] at the second, with
+each season resampling its own months. The split is confounded with training coverage, because the
+models that score January to July never trained on those calendar months.
+
+**Weighting every calendar month equally gives an S1 of 0.78 points, against 0.99 points with every
+farm-hour weighted equally.** The interval for the 0.78 points is [0.45, 1.22]. The weights are
+fixed for every resample, so a resample that misses a calendar month is not averaged over fewer than
+12 calendar months, and the resampled estimates are not biased by the missing month.
+
+**In exploratory per-calendar-month means, S1 is largest from October to December.** At the main
+setting and with no interval, the mean difference in each calendar month runs from 1.83 to 2.48
+points in October to December, is 0.71 to 0.73 in February and September, and runs from −0.21 to
+0.54 in the other seven months.
+
+**In an exploratory split, S1 is larger at Generator W1 than at Generator W2 or W3, and the
+difference between W2 and W3 is not statistically significant at the 5% level.** Figure 23 splits S1
+by farm. S1 is 1.70 points [1.13, 2.33] at Generator W1 and 0.94 points [0.41, 1.50] at Generator
+W2, both statistically significant at the 5% level, and 0.30 points [−0.36, +0.96] at Generator W3,
+which is not, at either setting. An interval that excludes zero at one farm and not at another does
+not show that the farms differ, so each difference between farms gets its own interval. W1 minus W3
+is 1.40 points [0.63, 2.40] and W1 minus W2 is 0.76 points [0.20, 1.43]. W2 minus W3 is 0.64 points
+[−0.002, +1.321], so the lower bound is only just below zero. At the second setting, W1 minus W3 is
+1.09 points [0.59, 1.70], W1 minus W2 is 0.64 points [0.07, 1.28], and W2 minus W3 is 0.45 points
+[−0.02, +0.98].
+
+![Figure 22: In exploratory splits, the nearest station trails ERA5's 10 m wind by 1.53 points in
+August to December, and by less in January to July (0.26 points at the main XGBoost setting, and not
+statistically significant at the 5% level at the second)](assets/station_wind_season.svg)
+
+![Figure 23: The nearest station's deficit against ERA5's 10 m wind is larger at W1 than at W3, and
+adding it to UKV lowers UKV's error at all three farms](assets/station_wind_by_farm.svg)
+
+**S2 is negative in both halves of the year and at every farm.** From January to July S2 is −0.77
+points [−1.10, −0.41], from August to December −0.54 points [−0.68, −0.38], and with every calendar
+month weighted equally −0.68 points [−0.89, −0.47]. At Generator W1 it is −0.57 points [−0.65,
+−0.48], at Generator W2 −0.66 points [−0.85, −0.46], and at Generator W3 −0.68 points [−1.08,
+−0.27].
+
+**S2's control, UKV plus its own 80 m wind, adds almost nothing to UKV, so the gain in S2 comes from
+the station's readings and not from the extra columns.** UKV plus its own 80 m wind differs from
+UKV's own error by only −0.04 points [−0.08, −0.01], at 7.58% against 7.62%. The three extra UKV
+columns help slightly, and S2 measures the station's gain over that slight help. UKV plus the
+station minus UKV alone is −0.68 points [−0.84, −0.52], a comparison of 7 wind columns against 4
+(exploratory).
+
+**In an exploratory comparison added after the first results, adding ICON-D2's hub-height wind to
+UKV lowers UKV's error by more than adding the station does.** UKV plus ICON-D2's hub-height speed
+and direction has an own error of 6.76% [5.80, 7.85], and UKV plus the station and UKV plus ICON-D2
+each have 7 wind columns. UKV plus the station minus UKV plus ICON-D2 is 0.18 points [0.09, 0.27],
+and 0.17 points [0.10, 0.24] at the second setting, so the station adds less. ICON-D2 enters at hub
+height and at leads of 0 to 2 hours, and the station at 10 m and a lead of 0 hours. No contrast here
+separates the effect of height from the effect of lead. This page did not check whether UKV's own
+data assimilation already reads surface weather-station reports, which would make part of the
+station's readings redundant for UKV.
+
+**The station reading is a same-hour observation, which is fair against ERA5 and UKV and favours the
+station against the ICON products.** ERA5 and UKV are read as analyses, at lead zero. ICON-D2 and
+ICON-EU are served at leads of 0 to 2 hours and ICON global at 0 to 5, so a reading at lead zero
+gives the station an advantage over the ICON products.
+
+**Scaling the station's 10 m speed to 100 m with a fixed power-law exponent of 1/7 cannot help an
+XGBoost model.** An XGBoost tree ignores a monotone rescaling of one column, and fitting one fold of
+one farm on the raw and the scaled speed gave predictions that differ by 0 MW. The exponent is a
+guess.
+
+**This section scores past station readings, so the result bears on training history directly. The
+result bears on historical features in the live service only if a real-time station feed exists,
+which this page did not test.** MIDAS Open is a yearly retrospective archive. The Met Office may
+supply real-time observations by other routes that this page did not check.
+
 ## What to use
 
 **These recommendations rest on three wind farms in one flat part of Lincolnshire, over 2 years.**
@@ -1115,6 +1394,14 @@ months`, and those intervals under-cover.
   the figures elsewhere on this page. The verdicts cover the ENS mean at day 0, from the 00 UTC run
   in Dynamical.org's 3-hourly steps at 0.25°. The ENS control member, the members' spread, the other
   three daily runs, and hourly steps were not tested.
+- **Nearby weather-station wind: worse than ERA5's 10 m wind on its own, and a smaller gain added
+  to UKV than ICON-D2's hub-height wind.** At three farms over 17 months before UKV's January 2026
+  upgrade, the nearest station's 10 m wind alone was worse than ERA5's 10 m wind. Added to UKV,
+  the station lowered the error by 0.64 points [0.46, 0.81] against a control with the same number
+  of columns, but adding ICON-D2's hub-height wind instead lowered it by 0.18 points more [0.09,
+  0.27] (exploratory). Whether a station adds to UKV since its upgrade, or on top of UKV and
+  ICON-D2 together, is untested. MIDAS Open is released once a year, so the archive cannot supply
+  the most recent months.
 - **Capacity estimation and disaggregation: no recommendation.** Capacity estimation infers a farm's
   size from how its output tracks the wind, and disaggregation separates hidden generation from
   demand at a substation. Both have to read a product's wind without a fit to the farm's own metered
@@ -1184,6 +1471,27 @@ product?](blending-weather-products.md#wind-a-blend-beats-ukv-given-its-neighbou
   about 1 in 20 exploratory rows reaches significance at the 5% level by chance. The ENS horizons
   page's figure for ENS day 0 against ERA5 is not like for like with this section's, as the section
   explains.
+- **One anemometer stands in for the wind at a turbine's hub height.** The station arms use a 10 m
+  reading from a single station 6 to 18 km from each farm. The results say nothing about station
+  data in general. In an exploratory comparison, the mean of the three nearest stations, up to 37 km
+  away, could not be told apart from ERA5's 10 m wind: −0.09 points [−0.40, +0.27]. The 38 stations
+  were listed by hand, and the 12 that report no wind in the file were not looked up in MIDAS Open's
+  other wind datasets, so a nearer anemometer may exist.
+- **The station section rests on 17 months and one UKV era.** The window ends on 31 December 2025,
+  so S2 scores UKV before its January 2026 upgrade only, and 42.2% of the scored farm-hours fall
+  in calendar months that no XGBoost model trained on.
+- **The seasonal and per-farm splits are exploratory, and only the seasonal split is confounded.**
+  The season split coincides with which calendar months the fitted models had seen. Generator W3's
+  S1 is not statistically significant at the 5% level, and the difference between the S1 of
+  Generator W2 and the S1 of Generator W3 is not statistically significant at the 5% level either.
+- **The calendar-month-weighted interval is checked only by the study script.** The function that
+  computes the interval is a copy inside the script, checked against one hand-computed case on
+  every run, and no test in the `studies` package covers the function.
+- **The reading's timing and averaging.** A reading is a 10-minute mean about 15 minutes before the
+  centre of the power hour, and the averaging window of the AWSHRLY reports is not documented in what
+  was read. Hourly data cannot test a shift of less than an hour.
+- **Live use is untested.** MIDAS Open is a yearly retrospective archive, so the section does not
+  test a real-time station feed or a station as a lagged input to a live forecast.
 
 ## Reproducing the figures
 
@@ -1266,6 +1574,33 @@ fits nothing, and writes Figure 10's table to
 report lands separately, in
 `data/studies/beam_diffuse_split/past_weather_v2/wind_icon_dream/report.md`; `--report-only`
 rebuilds it from a saved `losses.parquet` alone, fitting nothing.
+
+`station_wind_arms.py` needs the page's own row set, so the first code block above comes first. It
+also needs the MIDAS Open download in `data/studies/weather/MIDAS-OPEN/`. The download script needs
+a `CEDA_TOKEN` in the main checkout's `.env`. The download script fetches `dataset-version-202607`
+of two datasets, `uk-hourly-weather-obs` and `uk-radiation-obs`, at quality-control version 1. The
+station arms read `uk-hourly-weather-obs` only. The report lands in
+`data/studies/beam_diffuse_split/past_weather_v2/station_wind_arms/report.md`. A run that fits
+refuses to overwrite an output that exists, so move earlier outputs aside first.
+
+```bash
+uv run python studies/weather_downloads/fetch_midas_open.py
+uv run python studies/beam_diffuse_split/station_wind_arms.py
+uv run python studies/beam_diffuse_split/station_wind_arms.py --report-only
+uv run python studies/beam_diffuse_split/station_wind_arms_charts.py
+```
+
+The `station_wind_arms.py` command without a flag fits every arm, including the three added after
+the first results. The flag `--fit-post-review` adds only those three arms beside main losses fitted
+earlier. `--report-only` rebuilds `report.md` and `intervals.parquet` from the saved losses, fitting
+nothing except the two-fit shear control. Every command that writes `report.md` requires the script
+to be committed. The chart script reads the report and `intervals.parquet` and fits nothing.
+
+The main arms were fitted at commit `021d0852` and the three added arms at commit `72d969b8`. The
+row-set fingerprint saved beside each loss file covers every row's values, every arm's columns, the
+seeds, and the hyperparameters. Rebuilding `report.md` from the saved losses at the current commit
+reproduces every table the page quotes, from losses whose files are unchanged. No refit was run at
+the current commit, so this page does not say whether a refit reproduces the saved losses exactly.
 
 [ecmwf-results]: #how-ecmwfs-hres-and-ens-day-0-compare-with-ukv-and-era5
 [issue-868]: https://github.com/openclimatefix/nged-substation-forecast/issues/868
