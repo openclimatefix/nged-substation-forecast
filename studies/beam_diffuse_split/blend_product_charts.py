@@ -26,6 +26,7 @@ import argparse
 import logging
 import re
 import sys
+from collections.abc import Sequence
 from datetime import datetime, timedelta
 from typing import Final, Literal, NamedTuple
 
@@ -38,6 +39,7 @@ from blend_products import (
     MOST_IMPROVED_SHARE,
     OUTPUT_DIR,
     PERCENTAGE_POINTS,
+    SOLAR,
     WIND,
     _headline_line,
     _interval,
@@ -111,6 +113,28 @@ SINGLE_NAMES: Final[dict[str, str]] = {
 }
 """The enriched best single products, as the charts name them."""
 
+_DOMAIN_SETS: Final[dict[DomainType, dict[str, tuple[str, ...]]]] = {
+    "solar": {blend_set.name: blend_set.products for blend_set in SOLAR.sets},
+    "wind": {blend_set.name: blend_set.products for blend_set in WIND.sets},
+}
+"""Each domain's blend sets' products, in the order `blend_products.py` lists them."""
+
+
+def _blend_label(*, domain: DomainType, blend: str) -> str:
+    """Name a blend by listing its products, never by their count.
+
+    The maintainer's rule for every chart on this page: a label that names a blend lists the
+    blend's products, so a reader never has to take "all six products" on faith.
+
+    Args:
+        domain: `solar` or `wind`.
+        blend: The blend's key in `blend_products.py`.
+
+    Returns:
+        Each product's display name, in the blend's own order, joined with " + ".
+    """
+    return " + ".join(NAMES[product] for product in _DOMAIN_SETS[domain][blend])
+
 
 class NamedSet(NamedTuple):
     """One named blend set, and the enriched best single product it is judged against."""
@@ -122,10 +146,10 @@ class NamedSet(NamedTuple):
 
 
 NAMED_SETS: Final[tuple[NamedSet, ...]] = (
-    NamedSet("solar", "everything", "All six products", "cams_rich"),
+    NamedSet("solar", "everything", _blend_label(domain="solar", blend="everything"), "cams_rich"),
     NamedSet("solar", "cams_icon_eu", "CAMS and ICON-EU", "cams_rich"),
-    NamedSet("solar", "live_all", "Four weather models", "icon_d2_rich"),
-    NamedSet("wind", "everything", "All five products", "ukv_rich"),
+    NamedSet("solar", "live_all", _blend_label(domain="solar", blend="live_all"), "icon_d2_rich"),
+    NamedSet("wind", "everything", _blend_label(domain="wind", blend="everything"), "ukv_rich"),
     NamedSet("wind", "live_gb", "UKV and ICON-EU", "ukv_rich"),
 )
 """The sets behind the deciding contrasts, in the order the page gives them."""
@@ -136,14 +160,14 @@ SET_NAMES: Final[dict[DomainType, dict[str, str]]] = {
         "cams_icon_eu": "CAMS and ICON-EU",
         "cams_era5": "CAMS and ERA5",
         "live_gb": "UKV and ICON-EU",
-        "live_all": "Four weather models",
-        "everything": "All six products",
+        "live_all": _blend_label(domain="solar", blend="live_all"),
+        "everything": _blend_label(domain="solar", blend="everything"),
     },
     "wind": {
         "best_pair": "ICON-D2 and UKV",
         "live_gb": "UKV and ICON-EU",
-        "live_all": "Four weather models",
-        "everything": "All five products",
+        "live_all": _blend_label(domain="wind", blend="live_all"),
+        "everything": _blend_label(domain="wind", blend="everything"),
     },
 }
 """Every set's name as the "What to use" table gives it, one entry per `Domain.sets` in
@@ -200,6 +224,13 @@ MIN_HOURS_PER_DAY: Final[dict[DomainType, int]] = {"solar": 4, "wind": 12}
 WEEK_PANEL_HEIGHT_PX: Final[int] = 58
 WEEK_SPACING_PX: Final[int] = 8
 WEEK_ROW_LABEL_PX: Final[int] = 112
+
+_GENERATOR_PANEL_TITLE_CHARACTERS: Final[int] = 60
+"""Figure 6's panel-title wrap width: `CONTENT_WIDTH_PX - 100` wide, drawn outside
+`interval_panel`. A full blend's product list can push a title past one line."""
+
+_INTERVAL_PANEL_TITLE_CHARACTERS: Final[int] = 48
+"""Figure 10's panel-title wrap width: `interval_panel`'s narrower `PLOT_WIDTH_PX`."""
 
 
 def _signed(value: object) -> str:
@@ -746,8 +777,9 @@ def _splits(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
             (
                 "Enriched blend's mean absolute error minus the enriched best single product's, "
                 "main XGBoost settings. The best single product is CAMS for the solar blends "
-                "holding CAMS, ICON-D2 for the four weather models, and UKV for wind. The splits "
-                "share hours and XGBoost models, so they are not independent tests."
+                "holding CAMS, ICON-D2 for the "
+                f"{_blend_label(domain='solar', blend='live_all')} blend, and UKV for wind. "
+                "The splits share hours and XGBoost models, so they are not independent tests."
             ),
             f"{DOTS} {CAPACITY}",
             f"{SCOPES['solar']} {SCOPES['wind']}",
@@ -798,8 +830,12 @@ def _methods(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
                 x_title=X_TITLE if index == len(NAMED_SETS) - 1 else "",
                 zero_label="same as the best single product",
                 better_label="blend better",
-                panel_title=(
-                    f"{named.domain.capitalize()}: {named.name}, against {SINGLE_NAMES[named.best]}"
+                panel_title=wrapped(
+                    text=(
+                        f"{named.domain.capitalize()}: {named.name}, "
+                        f"against {SINGLE_NAMES[named.best]}"
+                    ),
+                    width=_INTERVAL_PANEL_TITLE_CHARACTERS,
                 ),
                 reference_labels=index == 0,
             )
@@ -868,7 +904,7 @@ def _synthetic(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
                 "",
             ),
             (
-                f"For scale: {everything.name.lower()}, against {name}{POST_HOC_SUFFIX}",
+                f"For scale: {everything.name}, against {name}{POST_HOC_SUFFIX}",
                 _pick(
                     contrasts=contrasts,
                     section=SECTION_DECIDING,
@@ -1016,9 +1052,13 @@ def _choose_weeks(*, measured: pl.DataFrame, domain: DomainType) -> list[Week]:
 
 
 def _line_key(
-    *, labels: list[str], colours: list[str], width: int = CONTENT_WIDTH_PX
+    *, labels: Sequence[str], colours: Sequence[str], width: int = CONTENT_WIDTH_PX
 ) -> alt.LayerChart:
     """Draw a one-row key of short line segments, above a figure's panels.
+
+    A label too long for its slot wraps onto more lines instead of being cut off with an
+    ellipsis mid-word, the same estimate `_key` in `studies.charts` rests on: about 7 px a
+    character at this text mark's font size.
 
     Args:
         labels: Each line's label.
@@ -1026,13 +1066,16 @@ def _line_key(
         width: The key's width, which a figure whose panels carry row labels narrows.
 
     Returns:
-        A one-row chart.
+        A one-row chart, taller where a label needs more than one line.
     """
     slot = width // len(labels)
+    chars_per_line = max(10, (slot - 30) // 7)
+    wrapped_labels = [wrapped(text=label, width=chars_per_line) for label in labels]
+    lines = max(len(label_lines) for label_lines in wrapped_labels)
     data = pl.DataFrame(
         {
-            "label": labels,
-            "colour": colours,
+            "label": ["\n".join(label_lines) for label_lines in wrapped_labels],
+            "colour": list(colours),
             "x": [index * slot for index in range(len(labels))],
             "x2": [index * slot + 18 for index in range(len(labels))],
         }
@@ -1049,10 +1092,20 @@ def _line_key(
     )
     text = (
         alt.Chart(data)
-        .mark_text(align="left", dx=24, color=ocf.BLACK_1, limit=slot - 30)
+        .mark_text(
+            align="left",
+            baseline="middle",
+            dx=24,
+            dy=8,
+            color=ocf.BLACK_1,
+            lineHeight=13,
+            lineBreak="\n",
+        )
         .encode(x=alt.X("x:Q", scale=None), y=alt.value(8), text="label:N")  # ty: ignore[unresolved-attribute]
     )
-    return alt.LayerChart(layer=[segments, text], width=width, height=16)
+    return alt.LayerChart(
+        layer=[segments, text], width=width, height=16 if lines == 1 else 16 + 13 * (lines - 1)
+    )
 
 
 def _point_key(
@@ -1366,9 +1419,14 @@ def _per_generator_errors(
                 width=CONTENT_WIDTH_PX - 100,
                 height=alt.Step(20),
                 title=alt.TitleParams(
-                    f"{named.domain.capitalize()}: {named.name} "
-                    f"({_two_places(error['xgb'])}%), against {SINGLE_NAMES[named.best]} "
-                    f"({_two_places(error['best_mae'])}%)",
+                    wrapped(
+                        text=(
+                            f"{named.domain.capitalize()}: {named.name} "
+                            f"({_two_places(error['xgb'])}%), against {SINGLE_NAMES[named.best]} "
+                            f"({_two_places(error['best_mae'])}%)"
+                        ),
+                        width=_GENERATOR_PANEL_TITLE_CHARACTERS,
+                    ),
                     anchor="start",
                     fontSize=14,
                 ),
@@ -1469,7 +1527,7 @@ def _wind_bands(*, tables: dict[str, list[dict[str, str]]], report_text: str) ->
         Figure 9.
     """
     contrasts = {
-        "everything_rich_xgb − ukv_rich": "All five products",
+        "everything_rich_xgb − ukv_rich": _blend_label(domain="wind", blend="everything"),
         "live_gb_rich_xgb − ukv_rich": "UKV and ICON-EU",
     }
     names = list(contrasts.values())
@@ -1615,18 +1673,24 @@ def main() -> int:
             domain="solar",
             single="cams_rich",
             blend="everything_rich_xgb",
-            labels=("CAMS, enriched", "All six products"),
+            labels=("CAMS, enriched", _blend_label(domain="solar", blend="everything")),
             number=4,
-            title="XGBoost models given CAMS, or all six products, track measured solar output",
+            title=(
+                "XGBoost models given CAMS, or "
+                f"{_blend_label(domain='solar', blend='everything')}, track measured solar output"
+            ),
             errors=errors["solar"],
         ),
         "blend_wind_weeks": _weeks_figure(
             domain="wind",
             single="ukv_rich",
             blend="everything_rich_xgb",
-            labels=("UKV, enriched", "All five products"),
+            labels=("UKV, enriched", _blend_label(domain="wind", blend="everything")),
             number=5,
-            title="XGBoost models given UKV, or all five products, track measured wind output",
+            title=(
+                "XGBoost models given UKV, or "
+                f"{_blend_label(domain='wind', blend='everything')}, track measured wind output"
+            ),
             errors=errors["wind"],
         ),
         "blend_per_generator": _per_generator_errors(contrasts=contrasts, errors=errors),

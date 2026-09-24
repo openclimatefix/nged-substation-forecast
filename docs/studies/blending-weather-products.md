@@ -124,7 +124,7 @@ which this page does not test](../roadmap/assets/weather_product_domains.svg)
 
 | Set | Solar products | Wind products | Why this set |
 |---|---|---|---|
-| All products | all six | all five | the most any blend can read |
+| All products | CAMS, ERA5, UKV, ICON-D2, ICON-EU, ICON global | ERA5, UKV, ICON-D2, ICON-EU, ICON global | the most any blend can read |
 | CAMS and ICON-D2 | CAMS, ICON-D2 | – | history where ICON-D2 covers |
 | CAMS and ICON-EU | CAMS, ICON-EU | – | history anywhere in Great Britain |
 | CAMS and ERA5 | CAMS, ERA5 | – | history back to 2004 |
@@ -240,11 +240,11 @@ the week with the lowest mean output. Each XGBoost model's prediction is out of 
 it predicts were held out of its training. The prediction shown is the mean over the three fitting
 seeds.
 
-![Figure 4: XGBoost models given CAMS, or all six products, track measured solar
-output](assets/blend_solar_weeks.svg)
+![Figure 4: XGBoost models given CAMS, or CAMS + ERA5 + UKV + ICON-D2 + ICON-EU + ICON global,
+track measured solar output](assets/blend_solar_weeks.svg)
 
-![Figure 5: XGBoost models given UKV, or all five products, track measured wind
-output](assets/blend_wind_weeks.svg)
+![Figure 5: XGBoost models given UKV, or ERA5 + UKV + ICON-D2 + ICON-EU + ICON global, track
+measured wind output](assets/blend_wind_weeks.svg)
 
 **The blend's error is lower than the best single product's at every generator, for every set in
 Figure 6.** The errors range from about 4% of capacity at the best solar farm to about 9% for the

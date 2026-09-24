@@ -489,7 +489,7 @@ def interval_panel(
     better_direction: BetterDirectionType = "negative",
     conditions: Sequence[str] = (),
     condition_title: str = "",
-    panel_title: str = "",
+    panel_title: str | Sequence[str] = "",
     reference_labels: bool = True,
     family_key: bool = True,
     width: int = PLOT_WIDTH_PX,
@@ -523,7 +523,8 @@ def interval_panel(
         better_direction: Which sign of difference is the better one.
         conditions: The values of `condition`, in legend order; the first is drawn filled.
         condition_title: The legend title for `condition`.
-        panel_title: A title above this panel alone.
+        panel_title: A title above this panel alone, or lines a caller has already wrapped
+            (`wrapped`) where the title does not fit on one line at this panel's width.
         reference_labels: Whether to label the zero rule and the better direction, which a panel
             stacked under another that already carries them can leave out.
         family_key: Whether to draw the family key, which a panel stacked under another that
@@ -917,7 +918,15 @@ def _key(
     ]
     text = (
         alt.Chart(data)
-        .mark_text(align="left", baseline="middle", dx=12, dy=8, color=ocf.BLACK_1, lineHeight=13)
+        .mark_text(
+            align="left",
+            baseline="middle",
+            dx=12,
+            dy=8,
+            color=ocf.BLACK_1,
+            lineHeight=13,
+            lineBreak="\n",
+        )
         .encode(x=alt.X("x:Q", scale=None), y=alt.value(8), text="label:N")  # ty: ignore[unresolved-attribute]
     )
     return alt.LayerChart(
