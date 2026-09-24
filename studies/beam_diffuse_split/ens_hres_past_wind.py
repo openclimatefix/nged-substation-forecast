@@ -85,8 +85,10 @@ farm, and, for the ENS-against-HRES contrast, ensemble averaging against a singl
 runs four times a day. The 3-hourly steps after ECMWF's hourly steps to T+90, the single 00 UTC run,
 the missing direct-radiation fields and the roughly 09:00 UTC read time belong to ECMWF's open-data
 subset and Dynamical.org's archive. The 09:00 UTC read time is this repository's
-`NWP_PUBLICATION_DELAY_HOURS` assumption, not a documented Dynamical.org latency (ECMWF disseminates
-ENS day 0 at about 06:40 UTC). ENS's native grid is about 9 km (O1280), served at 0.25 degrees. IFS
+`NWP_PUBLICATION_DELAY_HOURS` assumption, not a documented Dynamical.org latency. ECMWF's
+dissemination schedule lists the 00 UTC ENS perturbation forecasts' hourly steps 0 to 90 at 06:40
+to 06:55 UTC; open-data publication and Dynamical.org's ingest come later, and are not measured
+here. ENS's native grid is about 9 km (O1280), served at 0.25 degrees. IFS
 Cycle 50r1 went live with the 06 UTC run of 12 May 2026, so the 00 UTC ENS run of that day is still
 49r1, and the period split's "from 2026-05-12" holds one day of 49r1 ENS data.
 
@@ -108,6 +110,24 @@ they were fitted, and run by `--extra-fits`, which writes `losses_long_rows.parq
   contrasts that involve no ENS lead, and ERA5, an analysis, has no lead at all.
 - Each product's 10 m speed over ERA5's averaged over August to October of two years, and the
   Previous Runs file's `_previous_day*` columns before and from the archive-source change.
+
+**Further exploratory additions, computed from the saved losses and saved inputs with no refit.**
+
+- Paired design differences: each contrast under one long-row design minus the same contrast under
+  another, on the same rows, so the fold rotation and the era cut can each be separated.
+- The change of each contrast between the early and the late label hours, between two farms, and
+  between the two periods of each split, each interval resampling whole calendar months and one
+  fitting seed (the halves of the day and the farms share one draw of months, and the periods draw
+  their own).
+- The range of P1 to P3 and ENS-HRES across every design scored on the rows from 2024-12-01.
+- The 100 m ratio to ERA5 by month, and each product's ratio before and after the first hour of
+  IFS Cycle 49r1 in its data.
+- The 100 m hour-to-hour jump ratio at 07 and 19 UTC for ERA5, UKV and HRES, and the count of
+  expected handover hours reaching the plan's threshold of 1.15.
+- The fewest training rows in any covered fold cell, and the calendar months in which the long row
+  set holds farm-hours that the horizons study's inputs hold no power for.
+- A subset with fewer than `MIN_MONTHS_FOR_INTERVAL` calendar months prints `too few months` in the
+  `Excludes zero?` column.
 
 Run it with `uv run python studies/beam_diffuse_split/ens_hres_past_wind.py`. `refuse_to_overwrite`
 on a fresh run means `losses.parquet`, `losses.fingerprint`, `intervals.parquet`, `report.md` and
@@ -137,10 +157,13 @@ from ens_past_solar import _arm_columns_lines, _fingerprint
 from run_experiment import Job, _add_time_features, run_all
 from sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from studies.bootstrap import (
+    BOOTSTRAP_SEED,
+    MIN_MONTHS_FOR_INTERVAL,
     N_BOOTSTRAP_RESAMPLES,
     bootstrap_absolute,
     bootstrap_difference,
     bootstrap_difference_at_level,
+    paired_differences,
     per_fold_differences,
 )
 from studies.charts import CONTRAST_COLUMNS
@@ -283,6 +306,15 @@ LONG_ROW_SET_START: Final[datetime] = datetime(2024, 8, 12, tzinfo=UTC)
 IFS_CYCLE_49R1_CUT_MONTH: Final[str] = f"{ROW_SET_START_DATE:%Y-%m}"
 """The first whole month after IFS Cycle 49r1 (12 November 2024), where the long row set's extra era
 cut falls."""
+
+HORIZONS_DESIGN: Final[str] = "two UKV eras, no cut at 49r1 (horizons design)"
+"""The name of the long row set's first design: the horizons study's own eras and folds."""
+
+ROTATED_DESIGN: Final[str] = "two UKV eras, no cut at 49r1, folds rotated"
+"""The name of the long row set's second design: the horizons study's eras, folds rotated."""
+
+CUT_DESIGN: Final[str] = "extra era cut at 2024-12-01"
+"""The name of the long row set's third design: an extra era cut at 2024-12-01."""
 
 DESIGN_ARMS: Final[tuple[str, ...]] = ("era5", "ukv", "hres", "ens_mean_day0")
 """The four products the planned contrasts and ENS-HRES need, fitted under every extra design."""
@@ -674,6 +706,24 @@ def joined_row_set(*, sites: pl.DataFrame) -> tuple[pl.DataFrame, list[tuple[str
     return frame.sort("site", "time"), counts
 
 
+def _fewest_training_rows(*, coverage: pl.DataFrame) -> str:
+    """Describe the covered cell with the fewest training rows.
+
+    Args:
+        coverage: `calendar_month_coverage`'s result.
+
+    Returns:
+        The smallest count of training rows among the cells that have any, with its site, fold and
+        calendar month.
+    """
+    covered = coverage.filter(pl.col("n_train") > 0).sort("n_train", "site", "fold")
+    row = covered.row(0, named=True)
+    return (
+        f"{row['n_train']:,} training rows (site {row['site']}, fold {row['fold']}, calendar "
+        f"month {row['calendar_month']}, where {row['n_scored']:,} rows are scored)"
+    )
+
+
 def _coverage_lines(*, coverage: pl.DataFrame) -> list[str]:
     """Render the calendar-month coverage table as markdown.
 
@@ -692,7 +742,9 @@ def _coverage_lines(*, coverage: pl.DataFrame) -> list[str]:
             f"Cells (site, fold, calendar month) checked: {coverage.height}. Cells with no "
             f"training row for a calendar month that occurs in two years: "
             f"{uncovered_months(coverage=coverage).height}. Calendar months that occur in one "
-            f"year of the row set only, which no fold design can cover: {single_months}."
+            f"year of the row set only, which no fold design can cover: {single_months}. The "
+            f"covered cell with the fewest training rows holds "
+            f"{_fewest_training_rows(coverage=coverage)}."
         ),
         "",
         "| Site | Fold | Calendar month | Rows scored | Training rows | Years of that month |",
@@ -1017,11 +1069,20 @@ def _lead_lines(*, lead_table: pl.DataFrame) -> list[str]:
                 )["hour"].to_list()
             )
             reached = [hour for hour in expected if hour in jump_hours]
+            at_plan_threshold = sorted(
+                lead_table.filter(
+                    pl.col("period") == period,
+                    pl.col("variable") == variable,
+                    pl.col("ratio") >= PLAN_JUMP_RATIO_THRESHOLD,
+                )["hour"].to_list()
+            )
+            reached_at_plan = [hour for hour in expected if hour in at_plan_threshold]
             lines.append(
                 f"- {period}, `{variable}`: UTC hours with a ratio of "
                 f"{JUMP_RATIO_THRESHOLD:.2f} or more: {jump_hours}. Of the expected handover "
                 f"hours, {expected}, {len(reached)} of {len(expected)} reach the threshold: "
-                f"{reached}."
+                f"{reached}. At the plan's threshold of {PLAN_JUMP_RATIO_THRESHOLD:.2f}, "
+                f"{len(reached_at_plan)} of {len(expected)} reach it: {reached_at_plan}."
             )
     lines += [
         "",
@@ -1230,7 +1291,9 @@ def contrast_line(
     difference, lower, upper = (
         interval[key] * PERCENTAGE_POINTS for key in ("difference", "lower_95", "upper_95")
     )
-    excludes = interval["lower_95"] > 0.0 or interval["upper_95"] < 0.0
+    excludes = _excludes_cell(
+        lower=interval["lower_95"], upper=interval["upper_95"], n_months=interval["n_months"]
+    )
     log.append(
         {
             "section": section,
@@ -1250,7 +1313,7 @@ def contrast_line(
     )
     return (
         f"| {label} | {treatment} − {reference} | {difference:+.4f} | "
-        f"[{lower:+.4f}, {upper:+.4f}] | {'**yes**' if excludes else 'no'} | "
+        f"[{lower:+.4f}, {upper:+.4f}] | {excludes} | "
         f"{agreeing} of {len(folds)} | {interval['n_rows']:,} |"
     )
 
@@ -1403,12 +1466,21 @@ def _bonferroni_lines(*, losses: pl.DataFrame, setting: str, log: IntervalLog) -
                 "n_folds": None,
             }
         )
-        excludes = lower > 0.0 or upper < 0.0
+        excludes = _excludes_cell(lower=lower, upper=upper, n_months=interval["n_months"])
         lines.append(
             f"| {name}: {treatment} − {reference} | {difference:+.4f} "
-            f"| [{lower:+.4f}, {upper:+.4f}] | {'**yes**' if excludes else 'no'} "
+            f"| [{lower:+.4f}, {upper:+.4f}] | {excludes} "
             f"| {interval['n_months']} |"
         )
+    tail_draws = N_BOOTSTRAP_RESAMPLES * (100.0 - BONFERRONI_LEVEL) / 200.0
+    lines += [
+        "",
+        (
+            "The adjustment covers the three planned contrasts of this table's own family, not "
+            "every contrast in the report. Each tail of an interval at this level rests on about "
+            f"{tail_draws:.0f} of the {N_BOOTSTRAP_RESAMPLES:,} resamples."
+        ),
+    ]
     return lines
 
 
@@ -1540,6 +1612,684 @@ def _horizons_lines() -> list[str]:
     ]
 
 
+CHANGE_HEADER: Final[tuple[str, str]] = (
+    (
+        "| Scope | Contrast | Change in the contrast (pp of capacity) | 95% interval "
+        "| Excludes zero? | Rows | Months |"
+    ),
+    "|---|---|---|---|---|---|---|",
+)
+"""The header of every table that compares one contrast between two groups of rows."""
+
+CUT_EFFECT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("ens_mean_day0_wind", "era5_wind"),
+    ("ens_mean_day0_speed_components_wind", "era5_wind"),
+    ("hres_wind", "era5_wind"),
+)
+"""The long-row-set contrasts whose dependence on the fold design and the era cut is measured."""
+
+FARM_PAIRS: Final[tuple[tuple[str, str], ...]] = (("W2", "W3"), ("W3", "W1"), ("W2", "W1"))
+"""Each pair of farms, as (first, second): the printed difference is first minus second."""
+
+STEP_SPLITS: Final[tuple[tuple[tuple[str, ...], datetime], ...]] = (
+    (("hres", "ukv"), datetime(2024, 11, 12, 6, tzinfo=UTC)),
+    (("ens_mean_day0",), datetime(2024, 11, 13, 0, tzinfo=UTC)),
+)
+"""Each group of products with the first hour of IFS Cycle 49r1 in its data: the 06 UTC HRES run of
+12 November 2024, and the first 00 UTC ENS run, of 13 November 2024. UKV is a control at the HRES
+split, since IFS Cycle 49r1 does not touch it."""
+
+STEP_WINDOW_DAYS: Final[int] = 28
+"""The days either side of a step split that the season-matched rows of the step table cover."""
+
+JUMP_CONTROL_HOURS: Final[tuple[int, ...]] = (7, 19)
+"""The UTC hours of the jump control: the hour of the jump in HRES's 100 m speed that no run
+schedule explains, and the hour twelve hours later."""
+
+JUMP_CONTROL_PRODUCTS: Final[tuple[str, ...]] = ("era5", "ukv", "hres")
+"""The products whose hour-to-hour jump ratios are compared in the jump control."""
+
+PLAN_JUMP_RATIO_THRESHOLD: Final[float] = 1.15
+"""The jump threshold the plan fixed before the first results."""
+
+DESIGN_RANGE_CONTRASTS: Final[tuple[tuple[str, str, str], ...]] = FOLD_DESIGN_CONTRASTS
+"""The contrasts whose range across every design scored on the rows from 2024-12-01 is printed."""
+
+
+class ChangeInterval(TypedDict):
+    """A difference between the mean of two groups of rows, and its interval."""
+
+    change: float
+    lower: float
+    upper: float
+    n_rows: int
+    n_months: int
+
+
+def _contrast_rows(
+    *, losses: pl.DataFrame, treatment: str, reference: str
+) -> tuple[pl.DataFrame, np.ndarray]:
+    """Return one contrast's per-seed, per-row differences with each row's site, time and month.
+
+    Args:
+        losses: Per-row losses holding both arms.
+        treatment: The arm whose error is being compared.
+        reference: The arm it is compared against.
+
+    Returns:
+        The rows' `site`, `time` and `month`, in the order of the second value's columns, and the
+        differences in percentage points of capacity, shape (n_seeds, n_rows).
+
+    Raises:
+        ValueError: If the keys and the differences disagree on the number of rows.
+    """
+    differences, _ = paired_differences(
+        losses=losses, treatment=treatment, reference=reference, metric=METRIC
+    )
+    first_seed = losses["seed"].min()
+    keys = (
+        losses.filter(pl.col("arm") == reference, pl.col("seed") == first_seed)
+        .select("site", "time", "month")
+        .join(
+            losses.filter(pl.col("arm") == treatment, pl.col("seed") == first_seed).select(
+                "site", "time"
+            ),
+            on=["site", "time"],
+            how="inner",
+        )
+        .sort("site", "time")
+    )
+    if keys.height != differences.shape[1]:
+        msg = f"{keys.height} keyed rows but {differences.shape[1]} paired differences"
+        raise ValueError(msg)
+    return keys, differences * PERCENTAGE_POINTS
+
+
+def _rows_by_month(*, months: np.ndarray, mask: np.ndarray) -> dict[str, np.ndarray]:
+    """Group the masked rows' indices by month label.
+
+    Args:
+        months: Each row's month label.
+        mask: Which rows to keep.
+
+    Returns:
+        Each month label to the indices of its kept rows.
+    """
+    indices = np.flatnonzero(mask)
+    labels = months[indices]
+    return {str(label): indices[labels == label] for label in np.unique(labels)}
+
+
+def _draw_rows(*, by_month: dict[str, np.ndarray], generator: np.random.Generator) -> np.ndarray:
+    """Draw as many whole months as the group holds, with replacement, and return their rows.
+
+    Args:
+        by_month: Each month label to the indices of its rows.
+        generator: The random stream.
+
+    Returns:
+        The concatenated row indices of the drawn months.
+    """
+    labels = sorted(by_month)
+    drawn = generator.integers(0, len(labels), size=len(labels))
+    return np.concatenate([by_month[labels[index]] for index in drawn])
+
+
+def _change_interval(
+    *,
+    values: np.ndarray,
+    months: np.ndarray,
+    minuend: np.ndarray,
+    subtrahend: np.ndarray | None,
+    joint_months: bool,
+) -> ChangeInterval:
+    """Interval the mean of one group of rows minus the mean of another, resampling months.
+
+    Every resample draws one fitting seed and whole calendar months, as `bootstrap_difference`
+    does. With `joint_months`, one draw of months serves both groups, which is right where both
+    groups hold rows of the same months (the two halves of the day, two farms), because the swing
+    the groups share then cancels. Without it, each group draws its own months from its own months
+    alone, which is right where the groups hold different months (two periods). With no `subtrahend`
+    group, the statistic is the mean of the `minuend` group alone.
+
+    Args:
+        values: Per-seed, per-row values, shape (n_seeds, n_rows).
+        months: Each row's month label.
+        minuend: Which rows form the group whose mean is read first.
+        subtrahend: Which rows form the group subtracted from it, or None.
+        joint_months: Whether both groups draw the same months. Both groups are then restricted to
+            the months that both hold.
+
+    Returns:
+        The change, its 2.5th and 97.5th percentiles, and the rows and months it rests on. With two
+        groups drawing their own months, the months are the smaller group's.
+    """
+    if subtrahend is not None and joint_months:
+        shared = set(_rows_by_month(months=months, mask=minuend)) & set(
+            _rows_by_month(months=months, mask=subtrahend)
+        )
+        keep = np.isin(months, sorted(shared))
+        minuend, subtrahend = minuend & keep, subtrahend & keep
+    minuend_rows = _rows_by_month(months=months, mask=minuend)
+    subtrahend_rows = None if subtrahend is None else _rows_by_month(months=months, mask=subtrahend)
+    generator = np.random.default_rng(BOOTSTRAP_SEED)
+    resampled = np.empty(N_BOOTSTRAP_RESAMPLES)
+    for resample in range(N_BOOTSTRAP_RESAMPLES):
+        seed_index = generator.integers(0, values.shape[0])
+        if subtrahend_rows is None:
+            drawn = _draw_rows(by_month=minuend_rows, generator=generator)
+            resampled[resample] = values[seed_index, drawn].mean()
+            continue
+        if joint_months:
+            labels = sorted(minuend_rows)
+            draw = generator.integers(0, len(labels), size=len(labels))
+            minuend_drawn = np.concatenate([minuend_rows[labels[index]] for index in draw])
+            subtrahend_drawn = np.concatenate([subtrahend_rows[labels[index]] for index in draw])
+        else:
+            minuend_drawn = _draw_rows(by_month=minuend_rows, generator=generator)
+            subtrahend_drawn = _draw_rows(by_month=subtrahend_rows, generator=generator)
+        resampled[resample] = (
+            values[seed_index, minuend_drawn].mean() - values[seed_index, subtrahend_drawn].mean()
+        )
+    change = float(values[:, minuend].mean())
+    if subtrahend is not None:
+        change -= float(values[:, subtrahend].mean())
+    n_months = (
+        len(minuend_rows)
+        if subtrahend_rows is None
+        else min(len(minuend_rows), len(subtrahend_rows))
+    )
+    return {
+        "change": change,
+        "lower": float(np.percentile(resampled, 2.5)),
+        "upper": float(np.percentile(resampled, 97.5)),
+        "n_rows": int(minuend.sum() + (0 if subtrahend is None else subtrahend.sum())),
+        "n_months": n_months,
+    }
+
+
+def _excludes_cell(*, lower: float, upper: float, n_months: int) -> str:
+    """Return the "Excludes zero?" cell: `too few months` where the interval rests on too few.
+
+    Args:
+        lower: The interval's lower bound.
+        upper: The interval's upper bound.
+        n_months: The calendar months the interval resamples.
+
+    Returns:
+        `too few months` below `MIN_MONTHS_FOR_INTERVAL` months, else `**yes**` or `no`.
+    """
+    if n_months < MIN_MONTHS_FOR_INTERVAL:
+        return "too few months"
+    return "**yes**" if lower > 0.0 or upper < 0.0 else "no"
+
+
+def _change_line(
+    *,
+    scope: str,
+    contrast: tuple[str, str],
+    interval: ChangeInterval,
+    section: str,
+    log: IntervalLog,
+) -> str:
+    """Return one markdown row of a change table, and record its interval in `log`.
+
+    Args:
+        scope: The scope cell, naming what changes between the two groups.
+        contrast: The (treatment, reference) whose difference changes.
+        interval: `_change_interval`'s result.
+        section: The report section, saved with the interval.
+        log: Where the interval is recorded.
+
+    Returns:
+        The table row.
+    """
+    treatment, reference = contrast
+    log.append(
+        {
+            "section": section,
+            "setting": "pooled",
+            "scope": scope,
+            "treatment": treatment,
+            "reference": reference,
+            "value": interval["change"],
+            "lower": interval["lower"],
+            "upper": interval["upper"],
+            "level": 95.0,
+            "n_rows": interval["n_rows"],
+            "n_months": interval["n_months"],
+            "folds_agreeing": None,
+            "n_folds": None,
+        }
+    )
+    excludes = _excludes_cell(
+        lower=interval["lower"], upper=interval["upper"], n_months=interval["n_months"]
+    )
+    return (
+        f"| {scope} | {treatment} − {reference} | {interval['change']:+.4f} "
+        f"| [{interval['lower']:+.4f}, {interval['upper']:+.4f}] | {excludes} "
+        f"| {interval['n_rows']:,} | {interval['n_months']} |"
+    )
+
+
+def _design_difference_lines(*, losses: pl.DataFrame, log: IntervalLog) -> list[str]:
+    """Render how much the era cut and the fold rotation each move a contrast, from saved losses.
+
+    The rotated-folds design differs from the horizons design only in its folds, and the design
+    with the extra era cut differs from the rotated-folds design only in the cut (and the folds its
+    new eras imply). The change is each contrast's value under one design minus its value under the
+    other, on the same rows, so the interval resamples the months and the seed of that per-row
+    difference. Nothing is refitted.
+
+    Args:
+        losses: The long-row-set losses, with `design`.
+        log: Where the intervals are recorded.
+
+    Returns:
+        Markdown lines.
+    """
+    steps = (
+        ("fold rotation (rotated folds minus horizons folds)", ROTATED_DESIGN, HORIZONS_DESIGN),
+        ("extra era cut (cut design minus rotated folds)", CUT_DESIGN, ROTATED_DESIGN),
+        ("both (cut design minus horizons folds)", CUT_DESIGN, HORIZONS_DESIGN),
+    )
+    lines = [
+        "#### What the fold rotation and the era cut each change (exploratory)",
+        "",
+        (
+            "Each row is a contrast's value under one long-row design minus its value under "
+            "another, on the same rows and the same fitting seeds, from the saved losses, with "
+            "nothing refitted. The interval resamples whole calendar months and one seed of the "
+            "per-row difference. A positive change means the first design gives the larger "
+            "contrast."
+        ),
+        "",
+        *CHANGE_HEADER,
+    ]
+    for scope, cut in (("all rows", None), ("rows from 2024-12-01", ROW_SET_START_DATE)):
+        for treatment, reference in CUT_EFFECT_CONTRASTS:
+            per_design = {}
+            for design in (HORIZONS_DESIGN, ROTATED_DESIGN, CUT_DESIGN):
+                part = losses.filter(pl.col("design") == design)
+                if cut is not None:
+                    part = part.filter(pl.col("time") >= cut)
+                per_design[design] = _contrast_rows(
+                    losses=part, treatment=treatment, reference=reference
+                )
+            for name, plus, minus in steps:
+                keys, values_plus = per_design[plus]
+                keys_minus, values_minus = per_design[minus]
+                if not keys.equals(keys_minus):
+                    msg = f"designs {plus!r} and {minus!r} hold different rows"
+                    raise ValueError(msg)
+                interval = _change_interval(
+                    values=values_plus - values_minus,
+                    months=keys["month"].to_numpy(),
+                    minuend=np.ones(keys.height, dtype=bool),
+                    subtrahend=None,
+                    joint_months=True,
+                )
+                lines.append(
+                    _change_line(
+                        scope=f"{scope}: {name}",
+                        contrast=(treatment, reference),
+                        interval=interval,
+                        section="design differences",
+                        log=log,
+                    )
+                )
+    return lines
+
+
+def _label_hour_change_lines(*, pooled: pl.DataFrame, log: IntervalLog) -> list[str]:
+    """Render each contrast's change between the early and the late label hours, with intervals.
+
+    The rows are the label hours of `SPLIT_LABEL_HOURS`. A contrast's change between the halves is
+    late minus early. The two halves hold the same calendar months, so one draw of months serves
+    both halves.
+
+    Args:
+        pooled: Per-row losses at the primary setting.
+        log: Where the intervals are recorded.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        "#### Change of each contrast between the early and the late label hours (exploratory)",
+        "",
+        (
+            "Each row is a contrast's mean over labels 10 to 23 UTC minus its mean over labels 00 "
+            "to 08 UTC, from the saved losses. One draw of whole calendar months and one fitting "
+            "seed serves both halves, because both halves hold the same months. The controls do "
+            "not isolate time of day: HRES's served lead varies with the UTC hour before "
+            "2025-10-01, and ERA5's assimilation windows change at 09 to 10 and 21 to 22 UTC."
+        ),
+        "",
+        *CHANGE_HEADER,
+    ]
+    early_hours, late_hours = SPLIT_LABEL_HOURS
+    for treatment, reference in SPLIT_CONTRASTS:
+        keys, values = _contrast_rows(losses=pooled, treatment=treatment, reference=reference)
+        hours = keys["time"].dt.hour().to_numpy()
+        interval = _change_interval(
+            values=values,
+            months=keys["month"].to_numpy(),
+            minuend=np.isin(hours, list(late_hours)),
+            subtrahend=np.isin(hours, list(early_hours)),
+            joint_months=True,
+        )
+        lines.append(
+            _change_line(
+                scope="labels 10-23 UTC minus labels 00-08 UTC",
+                contrast=(treatment, reference),
+                interval=interval,
+                section="label-hour change",
+                log=log,
+            )
+        )
+    return lines
+
+
+def _between_farm_lines(*, pooled: pl.DataFrame, log: IntervalLog) -> list[str]:
+    """Render each planned contrast's difference between two farms, with intervals.
+
+    Args:
+        pooled: Per-row losses at the primary setting.
+        log: Where the intervals are recorded.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        "#### Differences between farms in the planned contrasts (exploratory)",
+        "",
+        (
+            "Each row is a contrast's mean at the first farm minus its mean at the second farm, "
+            "from the saved losses. One draw of whole calendar months and one fitting seed serves "
+            "both farms. Three farms make three pairs, and the pairs share farms."
+        ),
+        "",
+        *CHANGE_HEADER,
+    ]
+    for _, treatment, reference in PLANNED_CONTRASTS:
+        keys, values = _contrast_rows(losses=pooled, treatment=treatment, reference=reference)
+        sites = keys["site"].to_numpy()
+        for first_farm, second_farm in FARM_PAIRS:
+            interval = _change_interval(
+                values=values,
+                months=keys["month"].to_numpy(),
+                minuend=sites == first_farm,
+                subtrahend=sites == second_farm,
+                joint_months=True,
+            )
+            lines.append(
+                _change_line(
+                    scope=f"{first_farm} minus {second_farm}",
+                    contrast=(treatment, reference),
+                    interval=interval,
+                    section="between farms",
+                    log=log,
+                )
+            )
+    return lines
+
+
+def _period_change_lines(*, pooled: pl.DataFrame, log: IntervalLog) -> list[str]:
+    """Render each contrast's change between the periods of each split, with intervals.
+
+    The two periods hold different months, so each period draws its own months.
+
+    Args:
+        pooled: Per-row losses at the primary setting.
+        log: Where the intervals are recorded.
+
+    Returns:
+        Markdown lines.
+    """
+    boundaries = {
+        "HRES archive source": HRES_ARCHIVE_CHANGE_DATE,
+        "IFS Cycle 50r1": IFS_CYCLE_50R1_DATE,
+    }
+    lines = [
+        "#### Change of each contrast between the periods of each split (exploratory)",
+        "",
+        (
+            "Each row is a contrast's mean in the later period minus its mean in the earlier "
+            "period, from the saved losses. Each period draws its own whole calendar months, and "
+            "one fitting seed serves both. A period of fewer than "
+            f"{MIN_MONTHS_FOR_INTERVAL} calendar months is marked `too few months`."
+        ),
+        "",
+        *CHANGE_HEADER,
+    ]
+    for change, before_label, after_label in PERIOD_SPLITS:
+        boundary = boundaries[change]
+        for treatment, reference in PERIOD_CONTRASTS:
+            keys, values = _contrast_rows(losses=pooled, treatment=treatment, reference=reference)
+            times = keys["time"].to_numpy()
+            cut = np.datetime64(boundary.replace(tzinfo=None), "us")
+            interval = _change_interval(
+                values=values,
+                months=keys["month"].to_numpy(),
+                minuend=times >= cut,
+                subtrahend=times < cut,
+                joint_months=False,
+            )
+            lines.append(
+                _change_line(
+                    scope=f"{after_label} minus {before_label}",
+                    contrast=(treatment, reference),
+                    interval=interval,
+                    section=f"period change: {change}",
+                    log=log,
+                )
+            )
+    return lines
+
+
+def _jump_control_lines(*, frame: pl.DataFrame) -> list[str]:
+    """Render the hour-to-hour jump ratio at chosen UTC hours for ERA5, UKV and HRES.
+
+    HRES's 100 m speed jumps at 07 UTC by a ratio that no run schedule explains. ERA5 is an hourly
+    analysis and UKV's served value is its analysis, so neither hands over between runs at 07 UTC.
+    The same ratio for them shows how much of a jump at 07 UTC is the morning boundary layer and
+    not a handover. The ratios use the main row set, from 2024-12-01.
+
+    Args:
+        frame: The main row set, carrying `time`, `site` and every product's columns.
+
+    Returns:
+        Markdown lines: the ratio at each control hour by period, then the 07 UTC ratio by
+        calendar month.
+    """
+    changes = {
+        product: _hourly_changes(
+            previous=frame.select("site", "time", variable=_wind_columns(product=product)[0]).sort(
+                "site", "time"
+            ),
+            variable="variable",
+        )
+        for product in JUMP_CONTROL_PRODUCTS
+    }
+    lines = [
+        "#### Jump ratio of the 100 m speed at control hours, by product (exploratory)",
+        "",
+        (
+            "The ratio is the one of the HRES served-lead table: an hour's mean absolute "
+            "hour-to-hour change over the mean of its two neighbours' changes, from the main row "
+            "set. ERA5 and UKV involve no handover between forecast runs, so their ratios show "
+            "what a jump at these hours looks like without one."
+        ),
+        "",
+        "| Product | Period | "
+        + " | ".join(f"{hour:02d} UTC" for hour in JUMP_CONTROL_HOURS)
+        + " |",
+        "|---|---|" + "---|" * len(JUMP_CONTROL_HOURS),
+    ]
+    for product in JUMP_CONTROL_PRODUCTS:
+        for period in LEAD_PERIODS:
+            ratios = _jump_ratios(changes=changes[product].filter(pl.col("period") == period))
+            lines.append(
+                f"| {product} | {period} | "
+                + " | ".join(f"{ratios[hour]:.2f}" for hour in JUMP_CONTROL_HOURS)
+                + " |"
+            )
+    lines += [
+        "",
+        f"The {JUMP_CONTROL_HOURS[0]:02d} UTC ratio by calendar month, all years of the row set:",
+        "",
+        "| Calendar month | " + " | ".join(JUMP_CONTROL_PRODUCTS) + " |",
+        "|---|" + "---|" * len(JUMP_CONTROL_PRODUCTS),
+    ]
+    for calendar_month in range(1, 13):
+        cells = []
+        for product in JUMP_CONTROL_PRODUCTS:
+            ratios = _jump_ratios(
+                changes=changes[product].filter(pl.col("time").dt.month() == calendar_month)
+            )
+            cells.append(f"{ratios[JUMP_CONTROL_HOURS[0]]:.2f}")
+        lines.append(f"| {calendar_month} | " + " | ".join(cells) + " |")
+    return lines
+
+
+def _design_range_lines(*, log: IntervalLog) -> list[str]:
+    """Render P1 to P3 and ENS-HRES under every design scored on the rows from 2024-12-01.
+
+    The designs are the study's own, the four fold designs, and the three long-row designs scored
+    on the rows from 2024-12-01. They share those months, so they are not independent confirmations.
+
+    Args:
+        log: The intervals recorded so far, which must hold the fold-design and long-row rows.
+
+    Returns:
+        Markdown lines: one row per design, then the range of each contrast's estimate and bounds.
+    """
+    scored = [
+        record
+        for record in log
+        if record["section"] == "fold designs"
+        or (
+            record["section"].startswith("long rows: ")
+            and record["scope"] == "rows from 2024-12-01"
+        )
+    ]
+    designs = list(dict.fromkeys((record["section"], record["scope"]) for record in scored))
+    lines = [
+        (
+            "#### P1 to P3 and ENS-HRES under every design scored on the rows from 2024-12-01 "
+            "(exploratory)"
+        ),
+        "",
+        (
+            "Each cell is the estimate and the 95% interval, in percentage points of capacity. "
+            "The designs share their months and their weather, so they are not independent "
+            "confirmations of each other. The long-row designs train on the rows from 2024-08-12 "
+            "and are scored on the rows from 2024-12-01 only. The row-count column gives the "
+            "rows the design scores."
+        ),
+        "",
+        "| Design | Rows | " + " | ".join(name for name, _, _ in DESIGN_RANGE_CONTRASTS) + " |",
+        "|---|---|" + "---|" * len(DESIGN_RANGE_CONTRASTS),
+    ]
+    estimates: dict[str, list[tuple[float, float, float]]] = {
+        name: [] for name, _, _ in DESIGN_RANGE_CONTRASTS
+    }
+    for section, scope in designs:
+        cells = []
+        n_rows = 0
+        for name, treatment, reference in DESIGN_RANGE_CONTRASTS:
+            matches = [
+                record
+                for record in scored
+                if (record["section"], record["scope"]) == (section, scope)
+                and (record["treatment"], record["reference"]) == (treatment, reference)
+            ]
+            if len(matches) != 1:
+                msg = f"{(section, scope, name)} matches {len(matches)} recorded intervals"
+                raise ValueError(msg)
+            record = matches[0]
+            n_rows = record["n_rows"]
+            estimates[name].append((record["value"], record["lower"], record["upper"]))
+            cells.append(f"{record['value']:+.2f} [{record['lower']:+.2f}, {record['upper']:+.2f}]")
+        label = scope if section == "fold designs" else section.removeprefix("long rows: ")
+        lines.append(f"| {label} | {n_rows:,} | " + " | ".join(cells) + " |")
+    lines += [
+        "",
+        (
+            "| Contrast | Smallest estimate | Largest estimate | Lowest lower bound "
+            "| Highest upper bound |"
+        ),
+        "|---|---|---|---|---|",
+    ]
+    for name, values in estimates.items():
+        lines.append(
+            f"| {name} | {min(v[0] for v in values):+.4f} | {max(v[0] for v in values):+.4f} "
+            f"| {min(v[1] for v in values):+.4f} | {max(v[2] for v in values):+.4f} |"
+        )
+    return lines
+
+
+def _step_lines(*, frame: pl.DataFrame) -> list[str]:
+    """Render each product's mean speed over ERA5's before and after IFS Cycle 49r1 first appears.
+
+    The ratio is read at 100 m (the hub-height speed the arms are given) and at 10 m. HRES and UKV
+    split at 06 UTC on 12 November 2024, the first 06 UTC HRES run of IFS Cycle 49r1, and ENS at
+    00 UTC on 13 November 2024, the first ENS run of 49r1 at 00 UTC. UKV is unaffected by the
+    cycle, so it shows what a split at that date does to a product with no cycle change. The first
+    pair of columns uses every row of the long row set on each side, and the second pair uses the
+    `STEP_WINDOW_DAYS` days on each side, so that the season is nearly the same.
+
+    Args:
+        frame: The long row set, carrying `time` and every product's columns.
+
+    Returns:
+        Markdown lines.
+    """
+    era5 = {
+        height: _mean_speed_ms(product="era5", column=column) for height, column in RATIO_HEIGHTS
+    }
+    lines = [
+        "#### Ratio to ERA5's mean speed before and after IFS Cycle 49r1 (exploratory)",
+        "",
+        (
+            "The split is at the first hour of each product's data that comes from a 49r1 run: "
+            "the 06 UTC HRES run of 2024-11-12, and the 00 UTC ENS run of 2024-11-13. UKV, which "
+            "IFS Cycle 49r1 does not touch, is split at the HRES hour as a control. Speeds are "
+            "means over the long row set. The first two ratio columns use every row on each "
+            f"side of the split, and the last two use the {STEP_WINDOW_DAYS} days on each side."
+        ),
+        "",
+        (
+            "| Product | Height | Split (UTC) | Ratio before | Ratio after | "
+            f"Ratio, {STEP_WINDOW_DAYS} days before | Ratio, {STEP_WINDOW_DAYS} days after |"
+        ),
+        "|---|---|---|---|---|---|---|",
+    ]
+    for products, split in STEP_SPLITS:
+        window = timedelta(days=STEP_WINDOW_DAYS)
+        for product in products:
+            for height, column in (("100 m", 0), ("10 m", 3)):
+                ratio = _mean_speed_ms(product=product, column=column) / era5[height]
+                cells = []
+                for low, high in (
+                    (None, split),
+                    (split, None),
+                    (split - window, split),
+                    (split, split + window),
+                ):
+                    part = frame
+                    if low is not None:
+                        part = part.filter(pl.col("time") >= low)
+                    if high is not None:
+                        part = part.filter(pl.col("time") < high)
+                    cells.append(f"{float(part.select(ratio).item()):.4f}")
+                lines.append(
+                    f"| {product} | {height} | {split:%Y-%m-%d %H:%M} | " + " | ".join(cells) + " |"
+                )
+    return lines
+
+
 def long_row_frame(*, sites: pl.DataFrame) -> pl.DataFrame:
     """Return the long row set: the page's own rows from 2024-08-12, joined to ENS and HRES.
 
@@ -1584,11 +2334,11 @@ def long_row_designs(*, frame: pl.DataFrame) -> dict[str, pl.DataFrame]:
         from the third only in the cut.
     """
     return {
-        "two UKV eras, no cut at 49r1 (horizons design)": with_eras(frame=frame),
-        "two UKV eras, no cut at 49r1, folds rotated": rotate_folds(
+        HORIZONS_DESIGN: with_eras(frame=frame),
+        ROTATED_DESIGN: rotate_folds(
             frame=with_eras(frame=frame), fold_offsets=HORIZONS_ROTATED_FOLD_OFFSETS
         ),
-        "extra era cut at 2024-12-01": cut_eras(
+        CUT_DESIGN: cut_eras(
             frame=frame,
             first_months=(IFS_CYCLE_49R1_CUT_MONTH, UKV_UPGRADE_MONTH),
             fold_offsets=LONG_ROW_FOLD_OFFSETS,
@@ -1675,20 +2425,26 @@ def _design_coverage_lines(*, designs: Mapping[str, pl.DataFrame], heading: str)
         failing = uncovered_months(coverage=coverage)
         months = sorted(failing["calendar_month"].unique().to_list())
         lines.append(f"| {name} | {coverage.height} | {failing.height} | {months or 'none'} |")
+    lines += ["", "The covered cell with the fewest training rows, in each design:", ""]
+    lines += [
+        f"- {name}: {_fewest_training_rows(coverage=calendar_month_coverage(frame=frame))}."
+        for name, frame in designs.items()
+    ]
     return lines
 
 
-def _mean_10m_speed_ms(*, product: str) -> pl.Expr:
-    """Return the mean 10 m wind speed of one product, in m/s.
+def _mean_speed_ms(*, product: str, column: int) -> pl.Expr:
+    """Return the mean wind speed of one product at one of its speed columns, in m/s.
 
     Args:
         product: A key of `ALL_PRODUCTS`.
+        column: The index into `_wind_columns`: 0 for the hub-height speed, 3 for the 10 m speed.
 
     Returns:
         An aggregate expression; Open-Meteo's km/h columns are converted.
     """
     divisor = KMH_PER_M_S if product in KMH_PRODUCTS else 1.0
-    return pl.col(_wind_columns(product=product)[3]).mean() / divisor
+    return pl.col(_wind_columns(product=product)[column]).mean() / divisor
 
 
 RATIO_PRODUCTS: Final[tuple[str, ...]] = ("ens_mean_day0", "hres", "ukv")
@@ -1698,62 +2454,108 @@ RATIO_SEASON_MONTHS: Final[tuple[int, ...]] = (8, 9, 10)
 """The calendar months of the season-controlled ratio table: August to October."""
 
 
+RATIO_HEIGHTS: Final[tuple[tuple[str, int], ...]] = (("10 m", 3), ("100 m", 0))
+"""Each height of the ratio tables, with its index into `_wind_columns`. The 10 m table comes first
+because `ens_hres_past_wind_charts.py` reads the first monthly table it finds."""
+
+
 def _ratio_lines(*, frame: pl.DataFrame) -> list[str]:
-    """Render each product's mean 10 m speed over ERA5's, by month and by August to October.
+    """Render each product's mean speed over ERA5's, by month and by August to October.
 
     Args:
         frame: The long row set, carrying `month`, `time` and every product's columns.
 
     Returns:
-        Markdown lines: the monthly table, then the table over August to October of each complete
-        year. The long row set starts on 2024-08-12, so August 2024 is a part-month.
+        Markdown lines: for each height in `RATIO_HEIGHTS`, the monthly table, then the table over
+        August to October of each complete year. The long row set starts on 2024-08-12, so August
+        2024 is a part-month.
     """
-    era5 = _mean_10m_speed_ms(product="era5")
-    ratios = [
-        pl.len().alias("n"),
-        *(
-            (_mean_10m_speed_ms(product=product) / era5).alias(product)
-            for product in RATIO_PRODUCTS
-        ),
-    ]
-    monthly = frame.group_by("month").agg(ratios).sort("month")
-    seasonal = (
-        frame.filter(pl.col("time").dt.month().is_in(RATIO_SEASON_MONTHS))
-        .group_by(year=pl.col("time").dt.year())
-        .agg(*ratios, n_months=pl.col("month").n_unique())
-        .filter(pl.col("n_months") == len(RATIO_SEASON_MONTHS))
-        .sort("year")
-    )
     header = ["| {} | Rows | ENS / ERA5 | HRES / ERA5 | UKV / ERA5 |", "|---|---|---|---|---|"]
-    lines = [
-        "Monthly ratio of each product's mean 10 m wind speed to ERA5's, on the long row set:",
-        "",
-        header[0].format("Month"),
-        header[1],
-    ]
-    lines += [
-        f"| {row['month']} | {row['n']:,} | "
-        + " | ".join(f"{row[product]:.4f}" for product in RATIO_PRODUCTS)
-        + " |"
-        for row in monthly.iter_rows(named=True)
-    ]
-    lines += [
-        "",
-        (
-            "Season-controlled ratio of each product's mean 10 m wind speed to ERA5's, pooled over "
-            "August to October of each year that holds all three months, on the long row set:"
-        ),
-        "",
-        header[0].format("Months"),
-        header[1],
-    ]
-    lines += [
-        f"| August to October {row['year']} | {row['n']:,} | "
-        + " | ".join(f"{row[product]:.4f}" for product in RATIO_PRODUCTS)
-        + " |"
-        for row in seasonal.iter_rows(named=True)
-    ]
-    return lines
+    lines: list[str] = []
+    for height, column in RATIO_HEIGHTS:
+        era5 = _mean_speed_ms(product="era5", column=column)
+        ratios = [
+            pl.len().alias("n"),
+            *(
+                (_mean_speed_ms(product=product, column=column) / era5).alias(product)
+                for product in RATIO_PRODUCTS
+            ),
+        ]
+        monthly = frame.group_by("month").agg(ratios).sort("month")
+        seasonal = (
+            frame.filter(pl.col("time").dt.month().is_in(RATIO_SEASON_MONTHS))
+            .group_by(year=pl.col("time").dt.year())
+            .agg(*ratios, n_months=pl.col("month").n_unique())
+            .filter(pl.col("n_months") == len(RATIO_SEASON_MONTHS))
+            .sort("year")
+        )
+        lines += [
+            "",
+            (
+                f"Monthly ratio of each product's mean {height} wind speed to ERA5's, on the long "
+                "row set:"
+            ),
+            "",
+            header[0].format("Month"),
+            header[1],
+        ]
+        lines += [
+            f"| {row['month']} | {row['n']:,} | "
+            + " | ".join(f"{row[product]:.4f}" for product in RATIO_PRODUCTS)
+            + " |"
+            for row in monthly.iter_rows(named=True)
+        ]
+        lines += [
+            "",
+            (
+                f"Season-controlled ratio of each product's mean {height} wind speed to ERA5's, "
+                "pooled over August to October of each year that holds all three months, on the "
+                "long row set:"
+            ),
+            "",
+            header[0].format("Months"),
+            header[1],
+        ]
+        lines += [
+            f"| August to October {row['year']} | {row['n']:,} | "
+            + " | ".join(f"{row[product]:.4f}" for product in RATIO_PRODUCTS)
+            + " |"
+            for row in seasonal.iter_rows(named=True)
+        ]
+    return lines[1:]
+
+
+def _horizons_row_gap_line(*, frame: pl.DataFrame) -> str:
+    """Say which of the long row set's rows the horizons study's inputs hold no power for.
+
+    The horizons study scores rows that carry power, and the long row set is the page's own rows
+    joined to the same ENS inputs, so the two counts differ by the rows without power there.
+
+    Args:
+        frame: The long row set, carrying `site` and `time`.
+
+    Returns:
+        One sentence with the count and the calendar months of the rows.
+    """
+    scored = (
+        pl.read_parquet(ENS_INPUTS_PATH)
+        .filter(pl.col("day") == 0, pl.col("method") == "speed_components")
+        .drop_nulls("power_mw")
+        .select("site", "time")
+    )
+    missing = frame.select("site", "time").join(scored, on=["site", "time"], how="anti")
+    by_month = (
+        missing.group_by(month=pl.col("time").dt.strftime("%Y-%m"))
+        .agg(n=pl.len())
+        .sort("month")
+        .iter_rows(named=True)
+    )
+    months = ", ".join(f"{row['month']} ({row['n']})" for row in by_month)
+    return (
+        f"The long row set holds {frame.height:,} farm-hours and the horizons study's inputs hold "
+        f"{scored.height:,} farm-hours with power. The {missing.height:,} farm-hours of the long "
+        f"row set that the inputs hold no power for fall in {months}."
+    )
 
 
 def _long_row_lines(
@@ -1792,6 +2594,8 @@ def _long_row_lines(
             "`ens_mean_day0_speed_components` is the horizons study's own. Each design is scored "
             "on all rows and on the rows from 2024-12-01 only."
         ),
+        "",
+        _horizons_row_gap_line(frame=frame),
         "",
         *_design_coverage_lines(
             designs=designs,
@@ -2157,7 +2961,14 @@ def _report(
         ),
         "",
         *_lead_and_time_of_day_lines(pooled=pooled, log=log),
+        *_label_hour_change_lines(pooled=pooled, log=log),
+        "",
         *_period_lines(pooled=pooled, log=log),
+        *_period_change_lines(pooled=pooled, log=log),
+        "",
+        *_between_farm_lines(pooled=pooled, log=log),
+        "",
+        *_jump_control_lines(frame=frame),
     ]
     if extras is not None:
         lines += [
@@ -2174,6 +2985,8 @@ def _report(
                 log=log,
             ),
             "",
+            *_design_difference_lines(losses=extras["long_losses"], log=log),
+            "",
             *_fold_design_lines(
                 study_frame=frame,
                 fold_frames=extras["fold_frames"],
@@ -2181,6 +2994,10 @@ def _report(
                 design_losses=extras["design_losses"],
                 log=log,
             ),
+            "",
+            *_design_range_lines(log=log),
+            "",
+            *_step_lines(frame=extras["long_frame"]),
         ]
     lines += [
         *geometry_lines(sites=sites, noun="wind farms"),
@@ -2216,7 +3033,10 @@ Outputs of `studies/beam_diffuse_split/ens_hres_past_wind.py`. Wind farms appear
   2024-08-12 under three designs, and the second refits them on the main row set under four fold
   designs. Each has its own `.fingerprint` file, and `script_commit_extra_fits.txt` records the
   commit that fitted them. `losses.parquet` is not touched by them.
-- `report.md`: every table the docs page quotes, printed by the script and never transcribed.
+- `report.md`: every table the docs page quotes, printed by the script and never transcribed. The
+  exploratory tables of changes between two groups of rows have their own header, and their
+  intervals are in `intervals.parquet` under the sections `design differences`, `label-hour change`,
+  `between farms` and `period change: ...`, with the change in `value`.
 - `superseded/`: outputs a later run replaced.
 
 `SEEDS` is {list(SEEDS)}, and each interval resamples whole calendar months and one of those seeds
