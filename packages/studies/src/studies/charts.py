@@ -418,9 +418,22 @@ def _reference_layers(
     edge = x_domain[0] if better_direction == "negative" else x_domain[1]
     text = f"← {better_label}" if better_direction == "negative" else f"{better_label} →"
     align = "left" if better_direction == "negative" else "right"
+    # The better-direction label is anchored at the axis edge and reads towards the zero rule, so
+    # it collides with the zero label wherever the edge sits too close to zero for the label's own
+    # text to fit beside it, such as every horizon against day 0, where the difference cannot go
+    # below zero and the edge sits right next to the rule. Stack the better-direction label above
+    # the zero label instead of relying on the horizontal room that keeps them apart elsewhere.
+    room = abs(edge) / (high - low)
+    crowded = room < _ZERO_LABEL_ROOM
     better = (
         alt.Chart(pl.DataFrame({"x": [edge]}))
-        .mark_text(align=align, baseline="bottom", dy=-4, color=ocf.BLACK_1, fontWeight="bold")
+        .mark_text(
+            align=align,
+            baseline="bottom",
+            dy=-16 if crowded else -4,
+            color=ocf.BLACK_1,
+            fontWeight="bold",
+        )
         .encode(x="x:Q", y=alt.value(0), text=alt.value(text))  # ty: ignore[unresolved-attribute]
     )
     return [rule, zero_text, better] if labelled else [rule]
@@ -872,12 +885,19 @@ def _key(
         colours: Each entry's colour.
 
     Returns:
-        A one-row chart `PLOT_WIDTH_PX` wide, aligned with the plot area beneath it.
+        A one-row chart `PLOT_WIDTH_PX` wide, aligned with the plot area beneath it, taller where
+        a label needs a second line.
     """
     slot = PLOT_WIDTH_PX // len(labels)
+    # About 7 px a character at this text mark's font size (the same estimate `_LABEL_CHARACTERS`
+    # rests on for the row-label column): a label that does not fit `slot` in one line wraps onto
+    # a second rather than being cut off with an ellipsis mid-word.
+    chars_per_line = max(10, (slot - 24) // 7)
+    wrapped_labels = [wrapped(text=label, width=chars_per_line) for label in labels]
+    lines = max(len(label_lines) for label_lines in wrapped_labels)
     data = pl.DataFrame(
         {
-            "label": list(labels),
+            "label": ["\n".join(label_lines) for label_lines in wrapped_labels],
             "shape": list(shapes),
             "filled": list(filled),
             "colour": list(colours),
@@ -897,13 +917,13 @@ def _key(
     ]
     text = (
         alt.Chart(data)
-        .mark_text(align="left", dx=12, color=ocf.BLACK_1, limit=slot - 24)
+        .mark_text(align="left", baseline="middle", dx=12, dy=8, color=ocf.BLACK_1, lineHeight=13)
         .encode(x=alt.X("x:Q", scale=None), y=alt.value(8), text="label:N")  # ty: ignore[unresolved-attribute]
     )
     return alt.LayerChart(
         layer=[*points, text],
         width=PLOT_WIDTH_PX,
-        height=16,
+        height=16 if lines == 1 else 16 + 13 * (lines - 1),
         title=alt.TitleParams(title, anchor="start", fontSize=_KEY_TITLE_PX),
     )
 

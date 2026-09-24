@@ -195,6 +195,7 @@ class _RecordingFit:
         hyper_parameters: object,
         seed: int,
         with_quantiles: bool,
+        weight: str | None = None,
     ) -> tuple[np.ndarray, np.ndarray | None]:
         self.calls.append(_Call(train=train, test=test, features=features))
         point = test[target].to_numpy() + self.offset_mw

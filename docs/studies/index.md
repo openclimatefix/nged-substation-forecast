@@ -49,4 +49,13 @@ climates, so a result may not hold elsewhere.
   service could read beats UKV alone, and an XGBoost blend beats a linear stack of single-product
   predictions. Blending the two satellite retrievals the past-solar study compared, CAMS and
   SARAH-3, beats CAMS's split with its own neighbouring hours by 0.18 points and plain CAMS's split
-  by 0.20 points, even though the blend reads no weather model at all.
+  by 0.20 points, even though both products take their clouds from satellite images rather than
+  from a weather model.
+- [How accurate is a power forecast driven by ECMWF ENS at each
+  horizon?](ens-forecast-horizons.md) — at the 6 solar farms and 3 wind farms, an XGBoost model
+  given the ENS ensemble mean beats every forecast that reads no weather forecast to day 5 for solar
+  and day 7 for wind; from day 7 for solar and day 10 for wind it no longer beats climatology, and by
+  day 14 climatology is ahead, with the ensemble mean adding no statistically significant skill, in a
+  post hoc check, over the same model given no weather at all. The ensemble mean beats the control
+  member and beats training on every member, and rebuilding solar radiation through the clear-sky
+  index beats the straight-line resample the live service uses today.
