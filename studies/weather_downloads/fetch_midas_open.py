@@ -195,6 +195,98 @@ QC_FLAGS_URL: Final[str] = "https://dap.ceda.ac.uk/badc/ukmo-midas/metadata/doc/
 USER_GUIDE_URL: Final[str] = "https://help.ceda.ac.uk/article/4982-midas-open-user-guide"
 SCRIPT_PATH: Final[str] = "studies/weather_downloads/fetch_midas_open.py"
 
+VALIDATION_GOTCHAS: Final[tuple[str, ...]] = (
+    (
+        "Validated on 2026-09-24 by `validate_midas_open.py`, which writes `validation.json` "
+        "next to this file. No `(src_id, time)` key repeats in either parquet, and no float column "
+        "holds a NaN. The findings below are that run's."
+    ),
+    (
+        "Only global irradiation is reported: at all 10 radiation stations the diffuse, direct, "
+        "balance, and tilted-plane columns are null on every row (the illuminance column is null "
+        "too, so the tidy file drops it). A study cannot use these stations for a beam or diffuse "
+        "split."
+    ),
+    (
+        "`uk-radiation-obs` has gaps: 3,216 consecutive hours are missing at one station from "
+        "2021-05-14, 840 hours at another from 2018-03-26, and every other gap is 432 hours or "
+        "shorter. Completeness between each station's first and last hour is 94.6% to 99.8%. "
+        "Station 61986 starts on 2017-05-27."
+    ),
+    (
+        "Hourly global irradiation is hour-ending, in UTC: the label that best matches the "
+        "top-of-atmosphere flux is the label itself at all 10 stations, and the daily profile "
+        "peaks at the 12:00 and 13:00 labels. Night-time values are zero, except two rows of "
+        "station 61986 in October 2019 (886 and 123 kJ/m2 at 06:00 UTC, before sunrise), which "
+        "carry flag 6006, the same flag as 5,075 ordinary rows, so the flag does not single them "
+        "out. "
+        "Three rows at station 61986 are negative (the lowest is -41 kJ/m2)."
+    ),
+    (
+        "The 99th percentile of the clearness index (hourly global irradiance divided by the "
+        "top-of-atmosphere flux) is 0.79 to 0.80 at every station, and the daytime rows above 1.0 "
+        "number 45 of 293,149. Annual mean clearness index differs between stations by up to 0.07 "
+        "in a year, and the largest 12-month shift of one station against the others is 0.028, so "
+        "no station shows a step change."
+    ),
+    (
+        "Against ERA5's hourly global irradiance in the cell containing the station (two "
+        "stations, 20,000 daytime hours each), the correlation is 0.87, the mean difference is "
+        "+2.6 and +8.4 W/m2 (station minus ERA5), and the mean absolute difference is 73 to 75 "
+        "W/m2. That is the size of difference expected between a point pyranometer and a 25 km "
+        "cell, so the hour labels and the unit conversion agree."
+    ),
+    (
+        "Only 18 of the 38 hourly-weather stations report a wind speed: 12 stations of message "
+        "type `AWSHRLY` carry no wind in this dataset at all (0% non-null), and 8 stations are "
+        "`DLY3208` daily-only (see above). Air temperature is reported at all 38. The 12 "
+        "wind-less stations may hold wind in another MIDAS Open dataset, which this download does "
+        "not include."
+    ),
+    (
+        "Hourly-weather completeness at the 30 hourly stations is 90.5% to 100.0% of hours in "
+        "the fetched years; the longest gaps are 803 hours at one station from 2018-03-25 and 664 "
+        "at another from 2021-02-03. Two hourly stations start late: 00465 (2022-02-22) and "
+        "62265 (2023-03-31)."
+    ),
+    (
+        "Wind direction runs 0 to 360 and occupies every 10-degree bin. MIDAS writes north as 360 "
+        "(21,889 rows are exactly 360) and calm as 0, so a wind-direction average needs the 360 "
+        "and 0 cases handled: only 2 rows have zero speed and a non-zero direction. Wind speed "
+        "peaks at 24.7 m/s. Only one row has a 10-minute gust more than 0.6 m/s below "
+        "the mean speed."
+    ),
+    (
+        "Air temperature runs from -11.0 to 39.6 degC. The dew point is never more than 0.5 degC "
+        "above it. Relative humidity reaches 107.5%, so clip it at 100 before use. Air "
+        "temperature has no run of 24 identical hours, and wind speed with direction has no "
+        "identical run of 12 non-zero hours."
+    ),
+    (
+        "Against ERA5's 2 m temperature (7 stations, about 55,000 hours each), the correlation is "
+        "0.97 to 0.99, the mean difference (station minus ERA5) is -0.1 to -0.6 degC, and the mean "
+        "absolute difference is 0.6 to 1.1 degC. No gridded ERA5 wind product is on disk, so the "
+        "wind speed and direction were checked for plausibility and steps only, not against "
+        "another product."
+    ),
+    (
+        "The largest 12-month level shift against the other stations is 0.54 degC for air "
+        "temperature and 0.63 m/s (about 12% of that station's mean) for wind speed, at one "
+        "station in February 2018; no other wind shift exceeds 0.45 m/s."
+    ),
+    (
+        "Quality-control flag 106 marks whole stations, not bad hours: it is on almost "
+        "every air-temperature row at stations 00405 and 62216, and on almost every "
+        "wind-speed row at station 62265, and it does not make the values implausible (station "
+        "00405's temperature agrees with ERA5 as closely as flag-6 stations do). Flag 6 is the "
+        "usual value (94.7% of air-temperature rows). Filtering on the flag would drop those "
+        "stations wholesale."
+    ),
+)
+"""Findings of `validate_midas_open.py`, appended to the README's gotchas. Written by hand from
+that script's `validation.json`, so re-run the script and re-check these numbers after any
+re-download."""
+
 
 @dataclass(frozen=True)
 class StationMetadata:
@@ -1275,6 +1367,7 @@ def _write_docs(
                 f"quality-control page, <{QC_FLAGS_URL}>); they are kept as delivered, not "
                 "interpreted, and no row is filtered on them."
             ),
+            *VALIDATION_GOTCHAS,
         ],
         external_docs={
             "MIDAS Open user guide (CEDA)": USER_GUIDE_URL,
