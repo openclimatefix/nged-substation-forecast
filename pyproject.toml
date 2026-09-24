@@ -32,6 +32,7 @@ dependencies = [
     "polars>=1.0.0",
     "pyarrow",
     "pydantic",
+    "python-dotenv",
     "pyyaml",
     "sentry-sdk>=2.66,<3",
     "xgboost_forecaster",

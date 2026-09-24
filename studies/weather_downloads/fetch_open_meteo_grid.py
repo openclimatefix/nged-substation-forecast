@@ -39,6 +39,15 @@ HISTORICAL_FORECAST_URL: Final[str] = (
 )
 """The commercial host once `OPEN_METEO_API_KEY` is set (see `paths.open_meteo_api_key`), which
 lifts the free tier's daily/hourly/minutely rate limits entirely; the free host otherwise."""
+# Printed at import time (never the key itself): `open_meteo_api_key()` reads `.env` from
+# `PROJECT_ROOT` of whichever checkout this script runs in, so a silent fall-back to the free host
+# and its rate limits is otherwise easy to miss when running from a checkout other than the one
+# holding the key.
+print(
+    f"Using {'the commercial' if open_meteo_api_key() else 'the free'} "
+    f"Open-Meteo host: {HISTORICAL_FORECAST_URL}",
+    file=sys.stderr,
+)
 REQUEST_TIMEOUT_SECONDS: Final[float] = 600.0
 MAX_ATTEMPTS: Final[int] = 5
 RADIATION_VARIABLES: Final[tuple[str, ...]] = ("shortwave_radiation", "direct_radiation")
@@ -99,21 +108,13 @@ MODELS: Final[dict[str, OpenMeteoGridModel]] = {
         docs_url="https://www.ecmwf.int/en/forecasts/documentation-and-support",
         hourly_variables=RADIATION_VARIABLES + WIND_VARIABLES,
         known_gotcha=(
-            "`models_parameter` was `ecmwf_ifs04` until this fix — nominally `ECMWF IFS 0.4°` "
-            "(~44 km, global), a different and much coarser product from the label's "
-            "`ECMWF IFS HRES 9 km`. On the **free** host, `ecmwf_ifs04` aliases to the same real "
-            "9 km field as `ecmwf_ifs` — `sources.py`'s own one-week check already confirmed "
-            "zero difference, correlation 1.0, and a fresh point-vs-grid cross-check made while "
-            "investigating this (comparing the free-host `beam_diffuse_ecmwf-ifs-hres.parquet` "
-            "against both the grid file's nearest point and a live customer-host query at the "
-            "same site) also found zero difference — so a file fetched via the free host before "
-            "this change is not wrong and needs no re-fetch. The alias does **not** hold on the "
-            "**commercial customer** host, though: confirmed live, `ecmwf_ifs04` there returns "
-            "`shortwave_radiation` and `wind_speed_100m` as entirely null (every value, every "
-            "point, every hour), while `ecmwf_ifs` returns real data matching the API's own "
-            "unrequested 'best match' default exactly. `ecmwf_ifs` is the identifier to use "
-            "unconditionally going forward — it works on both hosts — and is also what "
-            "`fetch_open_meteo_previous_runs.py` already uses for this same product."
+            "`models_parameter` must be `ecmwf_ifs`, not `ecmwf_ifs04` — `ecmwf_ifs04` nominally "
+            "means `ECMWF IFS 0.4°` (~44 km, global), a different and much coarser product from "
+            "the label's `ECMWF IFS HRES 9 km`. On the **commercial customer** host, `ecmwf_ifs04` "
+            "returns `shortwave_radiation` and `wind_speed_100m` as entirely null (every value, "
+            "every point, every hour), while `ecmwf_ifs` returns real data matching the API's own "
+            "unrequested 'best match' default exactly. `fetch_open_meteo_previous_runs.py` also "
+            "uses `ecmwf_ifs` for this same product."
         ),
     ),
     "dmi-harmonie-arome": OpenMeteoGridModel(

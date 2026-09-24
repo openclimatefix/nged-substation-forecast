@@ -76,6 +76,15 @@ PREVIOUS_RUNS_URL: Final[str] = (
 )
 """The commercial host once `OPEN_METEO_API_KEY` is set (see `paths.open_meteo_api_key`), which
 lifts the free tier's daily/hourly/minutely rate limits entirely; the free host otherwise."""
+# Logged at import time (never the key itself): `open_meteo_api_key()` reads `.env` from
+# `PROJECT_ROOT` of whichever checkout this script runs in, so a silent fall-back to the free host
+# and its rate limits is otherwise easy to miss when running from a checkout other than the one
+# holding the key.
+_LOG.info(
+    "Using %s Open-Meteo host: %s",
+    "the commercial" if open_meteo_api_key() else "the free",
+    PREVIOUS_RUNS_URL,
+)
 REQUEST_TIMEOUT_SECONDS: Final[float] = 600.0
 MAX_ATTEMPTS: Final[int] = 5
 REQUEST_SLEEP_SECONDS: Final[float] = 2.0
@@ -376,13 +385,24 @@ def fetch_previous_runs_frame(
     uncovered = coverage.filter(~pl.col("shortwave_radiation"))["site"].to_list()
     if uncovered:
         msg = f"{models_parameter} returned only nulls for {sorted(uncovered)}; may not cover them"
-        raise RuntimeError(msg)
+        raise NoCoverageError(msg)
     return frame
 
 
 def _year_cache_dir(*, output_dir: Path) -> Path:
     """Return the per-year checkpoint directory for one model's download."""
     return output_dir / "_year_cache"
+
+
+class NoCoverageError(RuntimeError):
+    """A request came back with every site null for the baseline variable.
+
+    Raised only for that specific condition, distinct from the plain `RuntimeError` `_get_json`
+    raises for a transport failure, a quota refusal, or a malformed response —
+    `_first_year_with_data` catches only this subclass, so a quota refusal on the cheap one-month
+    probe propagates as a real failure instead of being treated as "no data yet" and triggering the
+    heavier whole-year probe.
+    """
 
 
 def _first_year_with_data(*, models_parameter: str, sites: pl.DataFrame) -> int:
@@ -397,11 +417,13 @@ def _first_year_with_data(*, models_parameter: str, sites: pl.DataFrame) -> int:
 
     **A model can start mid-year, not just mid-month.** `ecmwf_ifs025`'s archive starts
     2024-02-03: the one-month probe below finds nothing in January, but the year still has 11
-    months of real data. `fetch_previous_runs_frame` itself raises the moment a site comes back
-    all-null, before this function gets to inspect anything, so the one-month probe is wrapped in
-    `try`/`except` and a whole-year probe — the same call weight `_fetch_model_checkpointed`
-    spends on year 1 for real once this returns — is only made if the cheap one-month probe
-    raised that same "returned only nulls" error.
+    months of real data. `fetch_previous_runs_frame` raises `NoCoverageError` the moment a site
+    comes back all-null, before this function gets to inspect anything, so the one-month probe is
+    wrapped in `try`/`except NoCoverageError` and a whole-year probe — the same call weight
+    `_fetch_model_checkpointed` spends on year 1 for real once this returns — is only made if the
+    cheap one-month probe raised that same "returned only nulls" error. Any other `RuntimeError`
+    (a quota refusal, a malformed response) propagates unchanged rather than triggering the
+    whole-year probe.
 
     Args:
         models_parameter: The value of the API's `models=` query parameter.
@@ -420,7 +442,7 @@ def _first_year_with_data(*, models_parameter: str, sites: pl.DataFrame) -> int:
             start_date=FIRST_DATE,
             end_date=f"{FIRST_DATE[:4]}-01-31",
         )
-    except RuntimeError:
+    except NoCoverageError:
         fetch_previous_runs_frame(
             sites=sites,
             models_parameter=models_parameter,
@@ -456,28 +478,36 @@ def _fetch_model_checkpointed(
     cache_dir = _year_cache_dir(output_dir=output_dir)
     cache_dir.mkdir(parents=True, exist_ok=True)
 
-    first_year = _first_year_with_data(models_parameter=model.models_parameter, sites=sites)
+    cached_years = sorted(int(path.stem) for path in cache_dir.glob("[0-9][0-9][0-9][0-9].parquet"))
+    # Once the first cached year is on disk, its existence already answers "does this model's
+    # archive start in or before that year" — re-probing on every resume would throw away a
+    # whole-year request every time for a model like `ecmwf_ifs025` whose one-month probe always
+    # fails and falls back to the heavier whole-year probe.
+    first_year = (
+        cached_years[0]
+        if cached_years
+        else _first_year_with_data(models_parameter=model.models_parameter, sites=sites)
+    )
     last_year = int(_last_date()[:4])
     for year in range(first_year, last_year + 1):
         year_path = cache_dir / f"{year}.parquet"
-        # The final year's own end date is "yesterday", which moves forward on every calendar day
-        # this script is resumed on (the exact scenario a daily-quota refusal creates) — so a cache
-        # hit on that one year is only really complete if the cached rows already reach yesterday's
-        # date. Every earlier year's end date is fixed at its own 31 December and a cache hit there
-        # is unconditionally final.
+        # Every cached year's completeness is checked against its own target end date, not just
+        # assumed from the file's existence: the *current* final year's target is "yesterday",
+        # which moves forward on every calendar day this script is resumed on (the exact scenario a
+        # daily-quota refusal creates), and a year that used to be the final year keeps that same
+        # "yesterday as of its own last run" target once the calendar rolls into a new year — so it
+        # needs the same re-check, not a skip, until its rows reach its fixed 31 December.
+        year_end_target = min(f"{year}-12-31", _last_date())
         if year_path.exists():
-            if year != last_year:
-                _LOG.info("%s %d: already cached, skipping", model.output_dir, year)
-                continue
             cached_max_date = (
                 pl.scan_parquet(year_path).select(pl.col("time").max()).collect().item()
             )
-            if cached_max_date is not None and str(cached_max_date.date()) >= _last_date():
+            if cached_max_date is not None and str(cached_max_date.date()) >= year_end_target:
                 _LOG.info(
                     "%s %d: already cached through %s, skipping",
                     model.output_dir,
                     year,
-                    _last_date(),
+                    year_end_target,
                 )
                 continue
             _LOG.info(
@@ -485,10 +515,10 @@ def _fetch_model_checkpointed(
                 model.output_dir,
                 year,
                 cached_max_date,
-                _last_date(),
+                year_end_target,
             )
         start = FIRST_DATE if year == first_year else f"{year}-01-01"
-        end = _last_date() if year == last_year else f"{year}-12-31"
+        end = year_end_target
         frame = fetch_previous_runs_frame(
             sites=sites, models_parameter=model.models_parameter, start_date=start, end_date=end
         )
@@ -499,9 +529,8 @@ def _fetch_model_checkpointed(
         time.sleep(REQUEST_SLEEP_SECONDS)
 
     # A narrow glob matching only a bare `<year>.parquet` filename, never a `<year>.partial.parquet`
-    # a crash could leave behind between `write_parquet` and the rename above (or an old attempt for
-    # a model since dropped from `--model`): `*.parquet` would match both and double-count that
-    # year's rows into the combined frame.
+    # a crash could leave behind between `write_parquet` and the rename above: `*.parquet` would
+    # match both and double-count that year's rows into the combined frame.
     year_paths = sorted(cache_dir.glob("[0-9][0-9][0-9][0-9].parquet"))
     return pl.concat(pl.read_parquet(path) for path in year_paths).sort("site", "time")
 
@@ -723,9 +752,10 @@ def _write_docs_for_model(
                 "Lead-differencing check (fraction of daytime rows where shortwave_radiation at "
                 "each lead exactly equals day 0 — near-zero is expected, near-1.0 would indicate a "
                 f"lead-mislabelling bug): {lead_diff}. Timestamp-convention check (clear-sky "
-                "correlation against the label itself vs. the label shifted 30 minutes earlier, "
-                "and the fraction of daytime-threshold radiation reported while the sun is below "
-                f"the horizon): {timestamp} — best fit: {variant_label}. Native-step "
+                "correlation against the label itself, the label shifted 30 minutes earlier, and "
+                "the label shifted 30 minutes later, plus the fraction of daytime-threshold "
+                f"radiation reported while the sun is below the horizon): {timestamp} — best fit: "
+                f"{variant_label}. Native-step "
                 "check (fraction of adjacent daytime hours with an exactly repeated "
                 "shortwave_radiation value, per lead — near-zero means a genuine hourly mean, "
                 "materially above zero means the served hourly value is held constant across a "
