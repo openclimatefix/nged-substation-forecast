@@ -33,15 +33,16 @@ is in `plans/nwp-forecast-comparison.md` on the study's branch.
   sliced, and averages the 31 members. It runs only when `data/studies/weather/GEFS/_month_cache/`
   covers 2024-11 to the month the rows end on, or when `--gefs-window-dir` names a `GEFS_window_*`
   extract.
-- `nwp_forecast_comparison.py` reads those files and takes the rows where the target, the baselines'
-  inputs, and every planned arm's columns are present. It cuts folds with
-  `studies.cross_validation.cut_eras`, fits every arm out of fold, scores the no-weather baselines, and writes `report.md`,
-  `<domain>_losses.parquet` and `<domain>_predictions.parquet` under `--output-dir`. Every contrast
-  is computed within one hyperparameter setting, and a planned verdict stands only if both settings
-  give it. `--dry-run` stops after printing the coverage table and the job list. `--report-only`
-  writes the report from the saved losses. `--fit-missing` fits only the (arm, setting) pairs the
-  saved losses lack. `--synthetic-losses` fabricates losses instead of fitting, to exercise the
-  report, and refuses to write under `data/studies/`.
+- `nwp_forecast_comparison.py` reads those files and takes the rows where the target, the
+  baselines' inputs, and every planned arm's columns are present. It cuts folds with
+  `studies.cross_validation.cut_eras`, fits every arm out of fold, scores the no-weather
+  baselines, and writes `report.md`, `<domain>_losses.parquet` and `<domain>_predictions.parquet`
+  under `--output-dir`. Every contrast is computed within one hyperparameter setting, and a
+  planned verdict stands only if both settings give it. `--dry-run` stops after printing the
+  coverage table and the job list. `--report-only` writes the report from the saved losses.
+  `--fit-missing` fits only the (arm, setting) pairs the saved losses lack. `--synthetic-losses`
+  fabricates losses instead of fitting, to exercise the report, and refuses to write under
+  `data/studies/`.
 
 ## Outputs
 
