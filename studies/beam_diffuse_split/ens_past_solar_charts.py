@@ -17,6 +17,7 @@ before committing it.
 
 import argparse
 import logging
+import re
 import sys
 from pathlib import Path
 from typing import Final
@@ -24,11 +25,23 @@ from typing import Final
 import altair as alt
 import polars as pl
 from ens_past_solar import (
+    CAMS_3H_ARM,
+    CONFOUND_CONTRASTS,
+    CONFOUND_HEADING,
     CONTROL_ARM,
     DECIDING_CONTRASTS,
+    ERA5_3H_ARM,
+    ERA5_3X3_ARM,
+    EXPLORATORY_ARMS,
     EXPLORATORY_CONTRASTS,
     MEAN_ARM,
     OUTPUT_DIR,
+    _absolute_table_lines,
+    _generator_lines,
+    _lead_lines,
+    _main_panel_lines,
+    _share_lines,
+    _t3_members,
     build_rows,
 )
 from studies.bootstrap import bootstrap_absolute
@@ -53,10 +66,20 @@ NAMES: Final[dict[str, str]] = {
 }
 """Every arm's public name, as the page writes it."""
 
+EXPLORATORY_NAMES: Final[dict[str, str]] = {
+    ERA5_3H_ARM: "ERA5 on ENS's 3-hourly steps",
+    CAMS_3H_ARM: "CAMS on ENS's 3-hourly steps",
+    ERA5_3X3_ARM: "ERA5 averaged over 3 by 3 cells",
+}
+"""The public names of the exploratory arms, added to `NAMES` for the exploratory chart."""
+
 FAMILIES: Final[dict[str, str]] = {
     "ens_mean_t3": "weather model",
     "era5_global": "reanalysis",
     "cams_global": "satellite",
+    ERA5_3H_ARM: "reanalysis",
+    ERA5_3X3_ARM: "reanalysis",
+    CAMS_3H_ARM: "satellite",
 }
 """Every arm's family, which sets its colour in `studies.charts`."""
 
@@ -73,18 +96,62 @@ DOMAIN_MARGIN: Final[float] = 0.3
 
 FIGURE_LEADERBOARD: Final[int] = 17
 FIGURE_CONTRASTS: Final[int] = 18
+FIGURE_EXPLORATORY: Final[int] = 19
 
 
-def _pooled_losses() -> pl.DataFrame:
-    """Return every arm's losses.
+def _losses(*, setting: str) -> pl.DataFrame:
+    """Return every arm's losses at one hyperparameter setting.
+
+    Args:
+        setting: `pooled` or `sensitivity`.
 
     Returns:
-        `ens_past_solar.py`'s saved losses, every arm at the `pooled` setting.
+        `ens_past_solar.py`'s saved losses at that setting.
     """
-    return pl.read_parquet(OUTPUT_DIR / "losses.parquet").filter(pl.col("setting") == "pooled")
+    return pl.read_parquet(OUTPUT_DIR / "losses.parquet").filter(pl.col("setting") == setting)
 
 
-def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
+def _row_count(*, report: str) -> int:
+    """Read the number of common site-hours from the report's heading.
+
+    Args:
+        report: The report's text.
+
+    Returns:
+        The row count.
+
+    Raises:
+        ValueError: If the heading does not hold a count.
+    """
+    match = re.search(r"on ([\d,]+) common site-hours", report)
+    if match is None:
+        msg = "report.md has no 'on N common site-hours' heading"
+        raise ValueError(msg)
+    return int(match[1].replace(",", ""))
+
+
+def _ens_lead_range(*, report: str) -> str:
+    """Read ENS's lead range, such as `5 to 20`, from the report's lead section.
+
+    Args:
+        report: The report's text.
+
+    Returns:
+        The range, as the report prints it.
+
+    Raises:
+        ValueError: If the report has no ENS lead line.
+    """
+    match = re.search(r"ENS's lead is (\d+ to \d+) hours", report)
+    if match is None:
+        msg = 'report.md has no "ENS\'s lead is N to M hours" line'
+        raise ValueError(msg)
+    return match[1]
+
+
+def _leaderboard(
+    *, losses: pl.DataFrame, errors: dict[str, float], report: str
+) -> alt.VConcatChart:
     """Draw the three headline arms' own mean absolute error, best first, with its 95% interval.
 
     Bootstraps each arm's absolute error from `losses.parquet` directly, the same month-and-seed
@@ -95,6 +162,7 @@ def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
     Args:
         losses: Every arm's losses, at the `pooled` setting.
         errors: Each arm's pooled mean absolute error, read from the report's first table.
+        report: The report's text, for the row count and ENS's leads.
 
     Returns:
         The figure.
@@ -131,8 +199,12 @@ def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         figure_planning=None,
         title="ENS's own forecast trails CAMS by far, and beats ERA5",
         subtitle=[
-            "ECMWF ENS scores leads 5 to 20 h; ERA5 scores 1 to 12 h; CAMS is a satellite",
-            "retrieval with no forecast step. All three refit on ENS's shorter row set.",
+            f"All three products scored on the same {_row_count(report=report):,} site-hours.",
+            (
+                f"ENS is a forecast {_ens_lead_range(report=report)} h ahead from a 00 UTC run; "
+                "ERA5's radiation is 1 to 12 h ahead; CAMS is a satellite retrieval with no "
+                "forecast step."
+            ),
             DOTS,
             CAPACITY,
             SCOPE,
@@ -205,6 +277,71 @@ def _planned_contrasts(*, report_path: Path) -> alt.VConcatChart:
     )
 
 
+def _exploratory_contrasts(*, report_path: Path) -> alt.VConcatChart:
+    """Draw what a 3-hourly step and a wider ERA5 area do to ENS's two gaps.
+
+    Args:
+        report_path: The `report.md` `ens_past_solar.py` wrote.
+
+    Returns:
+        The figure.
+
+    Raises:
+        ValueError: If the report does not hold exactly the `CONFOUND_CONTRASTS`.
+    """
+    names = {**NAMES, **EXPLORATORY_NAMES}
+    contrasts = report_contrasts(report_path=report_path).filter(
+        pl.col("section") == CONFOUND_HEADING, pl.col("scope") == "all"
+    )
+    keys = [f"{treatment} − {reference}" for treatment, reference in CONFOUND_CONTRASTS]
+    selected = contrasts.with_columns(
+        key=pl.col("treatment") + pl.lit(" − ") + pl.col("reference")
+    ).filter(pl.col("key").is_in(keys))
+    if selected.height != len(keys):
+        msg = f"expected {len(keys)} contrasts under {CONFOUND_HEADING!r}, found {selected.height}"
+        raise ValueError(msg)
+    selected = selected.with_columns(
+        order=pl.col("key").replace_strict({k: i for i, k in enumerate(keys)})
+    ).sort("order")
+    rows = selected.select(
+        "treatment",
+        "reference",
+        "difference",
+        "lower_95",
+        "upper_95",
+        label=pl.col("treatment").replace_strict(names)
+        + pl.lit(" − ")
+        + pl.col("reference").replace_strict(names),
+        family=pl.col("treatment").replace_strict(FAMILIES),
+        planned=pl.lit(value=False),
+    )
+    domain = (
+        min(0.0, *rows["lower_95"].to_list()) - DOMAIN_MARGIN,
+        max(0.0, *rows["upper_95"].to_list()) + DOMAIN_MARGIN,
+    )
+    panel = interval_panel(
+        rows=rows,
+        x_domain=domain,
+        x_title=X_TITLE,
+        zero_label="no difference",
+        better_label="first product better",
+        panel_title="Exploratory contrasts",
+        figure_planning="exploratory",
+    )
+    return figure(
+        panels=[panel],
+        number=FIGURE_EXPLORATORY,
+        figure_planning="exploratory",
+        title="Averaging ERA5 and CAMS over ENS's 3-hourly steps narrows both of ENS's gaps",
+        subtitle=[
+            "ERA5 and CAMS averaged over ENS's seven 3-hour steps and rebuilt to hourly values",
+            "by the code that rebuilds ENS's own hours; ERA5 also averaged over 3 by 3 cells.",
+            f"{DOTS} {CAPACITY}",
+            SCOPE,
+        ],
+    )
+
+
 def _check_printed(*, report: str, texts: list[str]) -> None:
     """Stop unless every formatted number appears in the report as printed.
 
@@ -221,17 +358,18 @@ def _check_printed(*, report: str, texts: list[str]) -> None:
         raise ValueError(msg)
 
 
-def _verify_numbers(*, report: str, losses: pl.DataFrame) -> None:
+def _verify_numbers(*, report: str, losses: pl.DataFrame, sensitivity: pl.DataFrame) -> None:
     """Recompute every number this module's charts and prose rest on, and check each is printed.
 
     `_leaderboard` already checks the two headline arms `NAMES` covers against a fresh bootstrap;
     this recomputes the rest directly from `losses.parquet` and `build_rows`, independently of
     `report_contrasts`'s markdown parsing: the control arm's own error, the two planned contrasts
-    per generator, and the member-averaging contrast.
+    per generator, the exploratory contrasts, and each line of the exploratory sections.
 
     Args:
         report: `report.md`'s text.
         losses: Every arm's losses, at the `pooled` setting.
+        sensitivity: Every arm's losses, at the `sensitivity` setting.
 
     Raises:
         ValueError: If any recomputed number is not in the report as printed.
@@ -261,7 +399,28 @@ def _verify_numbers(*, report: str, losses: pl.DataFrame) -> None:
         _contrast_line(losses=losses, treatment=t, reference=r, label="all")
         for t, r in EXPLORATORY_CONTRASTS
     ]
-    texts.append(f"{build_rows().height:,} common site-hours")
+    frame = build_rows()
+    texts.append(f"{frame.height:,} common site-hours")
+    texts += [
+        _contrast_line(losses=losses, treatment=t, reference=r, label="all")
+        for t, r in CONFOUND_CONTRASTS
+    ]
+    texts += [
+        _contrast_line(losses=sensitivity, treatment=t, reference=r, label="sensitivity")
+        for t, r in CONFOUND_CONTRASTS
+    ]
+    texts += [
+        line
+        for lines in (
+            _absolute_table_lines(pooled=losses, arms=EXPLORATORY_ARMS),
+            _share_lines(pooled=losses),
+            _lead_lines(frame=frame),
+            _generator_lines(frame=frame, members=_t3_members()),
+            _main_panel_lines(pooled=losses),
+        )
+        for line in lines
+        if line and not line.startswith("#")
+    ]
     _check_printed(report=report, texts=texts)
 
 
@@ -273,11 +432,12 @@ def main() -> int:
     report = report_path.read_text()
     errors = report_errors(report_path=report_path, column="All sites")
     errors = {arm: errors[arm] for arm in NAMES if arm in errors}
-    losses = _pooled_losses()
-    _verify_numbers(report=report, losses=losses)
+    losses = _losses(setting="pooled")
+    _verify_numbers(report=report, losses=losses, sensitivity=_losses(setting="sensitivity"))
     charts = {
-        "ens_past_solar_leaderboard": _leaderboard(losses=losses, errors=errors),
+        "ens_past_solar_leaderboard": _leaderboard(losses=losses, errors=errors, report=report),
         "ens_past_solar_planned_contrasts": _planned_contrasts(report_path=report_path),
+        "ens_past_solar_exploratory_contrasts": _exploratory_contrasts(report_path=report_path),
     }
     for name, chart in charts.items():
         path = ASSETS_DIR / f"{name}.svg"

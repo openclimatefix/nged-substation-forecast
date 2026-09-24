@@ -4,16 +4,15 @@ One-off throwaway script for the addition to
 <https://github.com/openclimatefix/nged-substation-forecast/issues/810>, extending
 `weather_products.py`'s comparison with ECMWF ENS, the live service's own forecast product.
 
-**This section scores a longer-lead forecast than any other product on this page.** Every other
-product reads a near-zero-lead description of an hour that has already happened: UKV's archive
-holds the analysis, ICON-D2 and ICON-EU read 1 to 3 hours ahead, and ERA5's radiation is 1 to 12
-hours ahead. ENS's shortest available band in the download used here, `T+3`, spans leads 3 to 21
-hours from each day's own 00 UTC run; after this section's row set is joined to the rest of the
-page's hours, it scores leads 5 to 20 — each scored hour is 5 to 20 hours after that run started.
-ECMWF publishes the run several hours after 00 UTC, so a live service could not have used it for
-the morning hours scored here. A longer lead handicaps ENS in the contrasts below, so holding the
-lead equal across products would likely widen ENS's win over ERA5, and the measured gain here is if
-anything an underestimate.
+**This section scores a longer-lead forecast than any other product on this page.** ERA5's
+radiation is a forecast 1 to 12 hours ahead, UKV's archive holds the analysis, ICON-D2 and ICON-EU
+read 1 to 3 hours ahead, and CAMS is a satellite retrieval with no forecast step. ENS's shortest
+available band in the download used here, `T+3`, spans leads 3 to 21 hours from each day's own 00
+UTC run; after this section's row set is joined to the rest of the page's hours, it scores leads 5
+to 20. A live service reads the 00 UTC run from about 09:00 UTC, so the report counts the scored
+hours that end at or before then. The planned contrasts do not separate ENS's lead, its 3-hourly
+steps, its grid and its model version from one another; the exploratory arms `era5_3h`, `cams_3h`
+and `era5_3x3` separate two of them.
 
 **Data.** `data/studies/weather/ENS/beam_diffuse_ens.parquet`
 (`data/studies/weather/ENS/README.md`), filtered to `horizon == "T+3"`: seven 3-hour radiation and
@@ -26,10 +25,10 @@ to, even though ENS's own runs go on to 2026-09-22 and the join drops none of th
 window. ENS publishes no direct-beam field, so this section, like the page's other global-only
 products, carries a global-irradiance arm only.
 
-**Upsampling to hourly, reusing the study's own tested machinery.** The `T+3` band already gives one
-3-hourly-to-hourly step per calendar hour, not a sparse sample, so it is rebuilt to a genuine hourly
-series by the clear-sky-index reconstruction `ens_forecast_horizons.py` picked as the best technique
-for ENS's radiation (`COMBINATIONS["solar"]["clear_sky"]` there): `ens_forecast_horizons.Steps`,
+**Upsampling to hourly, reusing the study's own tested machinery.** The `T+3` band holds seven
+3-hour steps per run, so each run is rebuilt to 19 hourly values by the clear-sky-index
+reconstruction `ens_forecast_horizons.py` picked as the best technique for ENS's radiation
+(`COMBINATIONS["solar"]["clear_sky"]` there): `ens_forecast_horizons.Steps`,
 `ens_forecast_horizons._clear_sky_arrays`, `studies.resample.clear_sky_index_resample`, and
 `studies.resample.interpolate_linear` are reused unchanged; only the code that arranges this file's
 own seven fixed leads into a `Steps` object is new, because `ens_forecast_horizons.py`'s own
@@ -45,20 +44,24 @@ temperature column is ERA5's `temp_c`, one of the shared features every arm on t
 not CAMS's own temperature — CAMS publishes none. Every fit uses `colsample_bytree=1` (XGBoost's
 default, never overridden here), so no arm wins on column count alone.
 
-**The two planned contrasts, named before any result existed:**
+**The two planned contrasts, written into the study plan before any result existed:**
 
 - `ens_mean_t3 − era5_global`: ENS's own mean-of-members forecast against ERA5, the other
   reanalysis-adjacent product a reader might reach for first.
-- `ens_mean_t3 − cams_global`: ENS against CAMS, the best product on the main leaderboard, to show
-  how far a genuine forecast trails the best available description of the same hours.
+- `ens_mean_t3 − cams_global`: ENS against CAMS, the best product on the main leaderboard.
 
-**Exploratory, labelled so in the report:** the two planned contrasts per generator, and
+**Exploratory, labelled so in the report:** the two planned contrasts per generator;
 `ens_mean_t3` against `ens_control_t3` (the control member alone, through its own XGBoost model),
-which shows what averaging the 50 perturbed members over the control member is worth. This section
-carries no member-by-member arm and no year-by-year panel: the 51-way member fit day-1 the horizon
-study runs costs 51 times a normal fit, out of proportion to this section's two contrasts, and ENS's
-own coverage here is under 2.5 years, too short for the "too few months" year-by-year rule to add
-much.
+which shows what averaging all 51 members over the control member is worth; and three arms added
+after the first science review. `era5_3h` and `cams_3h` average ERA5 and CAMS over ENS's seven
+3-hour steps and rebuild hourly values with the code that rebuilds ENS's own. `era5_3x3` averages
+ERA5 over the 3 by 3 block of 0.25-degree cells around each generator's nearest cell. Each carries
+eight feature columns and is scored on the same rows as every other arm.
+
+This section carries no member-by-member arm and no year-by-year panel: the 51-way member fit day-1
+the horizon study runs costs 51 times a normal fit, out of proportion to this section's two
+contrasts, and ENS's own coverage here is under 2.5 years, too short for the "too few months"
+year-by-year rule to add much.
 
 **This is solar only.** A wind addition is a separate, future study, not started in this PR.
 
@@ -73,6 +76,7 @@ Run it with `uv run python studies/beam_diffuse_split/ens_past_solar.py`, after
 import argparse
 import hashlib
 import logging
+import re
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -81,7 +85,7 @@ from typing import Final, cast
 import numpy as np
 import polars as pl
 from blend_products import SOLAR, _solar_frame
-from build_dataset import _pv_sites
+from build_dataset import _pv_sites, _read_cams, nearest_era5_cell, read_era5
 from ens_forecast_horizons import (
     Steps,
     _clear_sky_arrays,
@@ -96,6 +100,7 @@ from run_experiment import MAX_CONCURRENT_FITS, Job, run_all
 from sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
 from studies.baselines import hourly_clear_sky
 from studies.bootstrap import bootstrap_absolute
+from studies.charts import report_errors
 from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SEEDS, SENSITIVITY_HYPER_PARAMETERS
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.resample import (
@@ -147,8 +152,55 @@ DECIDING_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
 )
 """The two contrasts named before any result existed: ENS against ERA5, and ENS against CAMS."""
 
-EXPLORATORY_CONTRASTS: Final[tuple[tuple[str, str], ...]] = ((MEAN_ARM, CONTROL_ARM),)
-"""What averaging the 50 perturbed members over the control member alone is worth."""
+ERA5_3H_ARM: Final[str] = "era5_3h"
+CAMS_3H_ARM: Final[str] = "cams_3h"
+ERA5_3X3_ARM: Final[str] = "era5_3x3"
+EXPLORATORY_ARMS: Final[tuple[str, ...]] = (ERA5_3H_ARM, CAMS_3H_ARM, ERA5_3X3_ARM)
+"""Arms added after the first review, so exploratory: `era5_3h` and `cams_3h` are ERA5 and CAMS
+averaged over ENS's 3-hour steps and rebuilt to hourly values by the same code as ENS's own;
+`era5_3x3` is ERA5 averaged over the 3 by 3 block of 0.25-degree cells around each generator's
+nearest cell. Each carries the same eight feature columns as every other arm."""
+
+EXPLORATORY_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    (MEAN_ARM, CONTROL_ARM),
+    (CONTROL_ARM, "era5_global"),
+)
+"""What averaging all 51 members over the control member alone is worth, and how the control member
+alone compares with ERA5 (`docs/studies/ens-forecast-horizons.md` reports the same comparison at
+its day 0, on its own rows)."""
+
+CONFOUND_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    (ERA5_3H_ARM, "era5_global"),
+    (CAMS_3H_ARM, "cams_global"),
+    (ERA5_3X3_ARM, "era5_global"),
+    (MEAN_ARM, ERA5_3H_ARM),
+    (MEAN_ARM, CAMS_3H_ARM),
+    (MEAN_ARM, ERA5_3X3_ARM),
+)
+"""What the 3-hourly step and the wider area do to ERA5 and CAMS, and what is left of ENS's gap."""
+
+ERA5_3H_COLUMN: Final[str] = "ghi_era5_3h"
+CAMS_3H_COLUMN: Final[str] = "ghi_cams_3h"
+ERA5_3X3_COLUMN: Final[str] = "ghi_era5_3x3"
+EXPLORATORY_COLUMNS: Final[dict[str, str]] = {
+    ERA5_3H_ARM: ERA5_3H_COLUMN,
+    CAMS_3H_ARM: CAMS_3H_COLUMN,
+    ERA5_3X3_ARM: ERA5_3X3_COLUMN,
+}
+"""Each exploratory arm's own irradiance column."""
+
+CONFOUND_HEADING: Final[str] = (
+    "What a 3-hourly step and a wider ERA5 area do to the gap (exploratory)"
+)
+"""The report heading above `CONFOUND_CONTRASTS`, which the chart script reads."""
+
+FIRST_SERVABLE_HOUR_UTC: Final[int] = 9
+"""The hour of day, UTC, from which a live service can read the 00 UTC run: about 09:00 UTC
+(`docs/studies/ens-forecast-horizons.md`, "Horizons and issue time")."""
+
+ERA5_RUN_INTERVAL_HOURS: Final[int] = 12
+"""ERA5's radiation is a forecast from a 06 or 18 UTC run, so its lead at an hour labelled `h` is
+`((h - 1) % 12) + 1`, following the `study` skill's formula for a model run every `n` hours."""
 
 
 def _t3_members() -> pl.DataFrame:
@@ -241,6 +293,145 @@ def _t3_upsampled(*, steps: Steps, clear_sky: pl.DataFrame) -> dict[str, np.ndar
     return {"ghi": ghi, "temp": temp}
 
 
+def _era5_and_cams_hourly() -> dict[str, pl.DataFrame]:
+    """Read the hourly global irradiance ERA5 and CAMS give each generator.
+
+    Both are read the way `build_dataset.py` reads them for the page's main arms: ERA5 at each
+    generator's nearest cell, and CAMS with no reliability filter.
+
+    Returns:
+        `era5` and `cams`, each with `site`, `time` and `ghi_w_m2`.
+    """
+    era5 = read_era5(source="open-meteo")
+    cells = nearest_era5_cell(sites=_pv_sites(), era5=era5).select(
+        "site", latitude="cell_latitude", longitude="cell_longitude"
+    )
+    return {
+        "era5": cells.join(era5, on=["latitude", "longitude"]).select("site", "time", "ghi_w_m2"),
+        "cams": _read_cams(min_reliability=0.0).select("site", "time", "ghi_w_m2"),
+    }
+
+
+def _three_hourly_rebuilt(
+    *, hourly: pl.DataFrame, runs: pl.DataFrame, clear_sky: pl.DataFrame, column: str
+) -> pl.DataFrame:
+    """Give a product ENS's 3-hourly treatment: average it over ENS's steps, then rebuild hourly.
+
+    For each ENS run, the product's hourly values are averaged over the seven 3-hour steps ENS
+    publishes, and the seven steps are turned back into 19 hourly values by the same
+    clear-sky-index code `_t3_upsampled` applies to ENS. Where every daylight hour of a step is
+    present, the step mean is the plain mean; where a daylight hour is missing, the step mean is
+    the mean clear-sky index of the hours present times the step's mean clear-sky irradiance.
+    A run with an unusable step is dropped whole.
+
+    Args:
+        hourly: The product's `site`, `time` and `ghi_w_m2`, the mean over the hour ending at
+            `time`.
+        runs: One row per (site, run), with `site` and `init_time`, sorted.
+        clear_sky: `hourly_clear_sky`'s table, wide enough for every run's leads 1 to 21.
+        column: The name to give the rebuilt hourly irradiance.
+
+    Returns:
+        `site`, `time` and `column`, one row per hour of each kept run.
+    """
+    grid = (
+        runs.join(pl.DataFrame({"lead": list(range(1, STEP_LEADS[-1] + 1))}), how="cross")
+        .with_columns(time=pl.col("init_time") + pl.duration(hours=pl.col("lead")))
+        .join(clear_sky, on=["site", "time"], how="left")
+        .join(hourly, on=["site", "time"], how="left")
+        .with_columns(
+            ghi=pl.when(pl.col("clear_sky_w_m2") <= 0.0).then(0.0).otherwise(pl.col("ghi_w_m2"))
+        )
+        .with_columns(step=((pl.col("lead") + STEP_WIDTH_HOURS - 1) // STEP_WIDTH_HOURS) * 3)
+    )
+    daylight = pl.col("clear_sky_w_m2") > 0
+    step_means = grid.group_by("site", "init_time", "step").agg(
+        clear_sky_index=(pl.col("ghi") / pl.col("clear_sky_w_m2")).filter(daylight).mean(),
+        missing=(pl.col("ghi").is_null() & daylight).sum(),
+        clear_sky=pl.col("clear_sky_w_m2").mean(),
+        mean=pl.col("ghi").mean(),
+    )
+    step_means = step_means.with_columns(
+        value=pl.when(pl.col("missing") == 0)
+        .then(pl.col("mean"))
+        .otherwise(pl.col("clear_sky_index") * pl.col("clear_sky"))
+    )
+    names = [str(lead) for lead in STEP_LEADS]
+    wide = (
+        step_means.pivot(on="step", index=["site", "init_time"], values="value", sort_columns=True)
+        .select("site", "init_time", *names)
+        .sort("site", "init_time")
+    )
+    unusable = pl.any_horizontal(pl.col(names).is_null() | pl.col(names).is_nan())
+    wide = wide.filter(~unusable)
+    keys = wide.select("site", "init_time", ensemble_member=pl.lit(0).cast(pl.Int8))
+    steps = Steps(
+        keys=keys,
+        leads=np.array(STEP_LEADS, dtype=np.float64),
+        widths=np.full(len(STEP_LEADS), STEP_WIDTH_HOURS, dtype=np.float64),
+        values={"ghi_w_m2": wide.select(names).to_numpy().astype(np.float64)},
+    )
+    step_clear_sky, target_clear_sky = _clear_sky_arrays(
+        steps=steps, targets=TARGET_LEADS, clear_sky=clear_sky
+    )
+    # `_clear_sky_arrays` repeats each run once per ENS member; this frame has one series per run.
+    step_clear_sky, target_clear_sky = (
+        step_clear_sky[::ENSEMBLE_SIZE],
+        target_clear_sky[::ENSEMBLE_SIZE],
+    )
+    midpoints = steps.leads - steps.widths / 2.0
+    rebuilt = clear_sky_index_resample(
+        values=steps.values["ghi_w_m2"],
+        step_clear_sky=step_clear_sky,
+        step_midpoints=midpoints,
+        morning=np.mod(midpoints, 24.0) < 12.0,
+        target_clear_sky=target_clear_sky,
+        target_midpoints=TARGET_LEADS - 0.5,
+        daylight_floor_w_m2=DEFAULT_DAYLIGHT_FLOOR_W_M2,
+    )
+    return _long(steps=steps, targets=TARGET_LEADS, values={column: rebuilt}).select(
+        "site", "time", column
+    )
+
+
+def _era5_three_by_three() -> pl.DataFrame:
+    """Average ERA5's global irradiance over the 3 by 3 block of cells around each nearest cell.
+
+    Returns:
+        `site`, `time` and `ghi_era5_3x3`.
+
+    Raises:
+        ValueError: If a generator's block leaves the grid or holds fewer than nine cells.
+    """
+    era5 = read_era5(source="open-meteo")
+    latitudes = np.sort(era5["latitude"].unique().to_numpy())
+    longitudes = np.sort(era5["longitude"].unique().to_numpy())
+    cells = nearest_era5_cell(sites=_pv_sites(), era5=era5)
+    blocks = []
+    for site, latitude, longitude in cells.select(
+        "site", "cell_latitude", "cell_longitude"
+    ).iter_rows():
+        i = int(np.argmin(np.abs(latitudes - latitude)))
+        j = int(np.argmin(np.abs(longitudes - longitude)))
+        if not (1 <= i < len(latitudes) - 1 and 1 <= j < len(longitudes) - 1):
+            msg = f"site {site}: the 3 by 3 block leaves the ERA5 grid"
+            raise ValueError(msg)
+        block = era5.filter(
+            pl.col("latitude").is_in(latitudes[i - 1 : i + 2].tolist()),
+            pl.col("longitude").is_in(longitudes[j - 1 : j + 2].tolist()),
+        )
+        blocks.append(
+            block.group_by("time")
+            .agg(pl.col("ghi_w_m2").mean().alias(ERA5_3X3_COLUMN), cells=pl.len())
+            .with_columns(site=pl.lit(site))
+        )
+    result = pl.concat(blocks)
+    if result["cells"].min() != 9 or result["cells"].max() != 9:
+        msg = "an ERA5 3 by 3 block holds fewer than nine cells"
+        raise ValueError(msg)
+    return result.select("site", "time", ERA5_3X3_COLUMN)
+
+
 def build_rows() -> pl.DataFrame:
     """Build this section's row set.
 
@@ -275,9 +466,20 @@ def build_rows() -> pl.DataFrame:
         arm=CONTROL_ARM,
         domain="solar",
     )
+    runs = steps.keys.select("site", "init_time").unique(maintain_order=True)
+    hourly_products = _era5_and_cams_hourly()
+    rebuilt_era5 = _three_hourly_rebuilt(
+        hourly=hourly_products["era5"], runs=runs, clear_sky=clear_sky, column=ERA5_3H_COLUMN
+    )
+    rebuilt_cams = _three_hourly_rebuilt(
+        hourly=hourly_products["cams"], runs=runs, clear_sky=clear_sky, column=CAMS_3H_COLUMN
+    )
     joined = (
         base.join(mean_frame, on=["site", "time"], how="inner")
         .join(control_frame, on=["site", "time"], how="inner")
+        .join(rebuilt_era5, on=["site", "time"], how="inner")
+        .join(rebuilt_cams, on=["site", "time"], how="inner")
+        .join(_era5_three_by_three(), on=["site", "time"], how="inner")
         .drop("era", "era_code", "fold")
         .sort("site", "time")
     )
@@ -288,7 +490,7 @@ def build_rows() -> pl.DataFrame:
         *ens_columns(arm=MEAN_ARM, domain="solar"),
         *ens_columns(arm=CONTROL_ARM, domain="solar"),
     )
-    check_no_missing(frame=joined, columns=ens_columns_all)
+    check_no_missing(frame=joined, columns=(*ens_columns_all, *EXPLORATORY_COLUMNS.values()))
     _LOG.info("%d rows in this section's own row set", joined.height)
     return with_eras(frame=joined)
 
@@ -315,27 +517,22 @@ def jobs() -> list[Job]:
     )
     era5_features = (*SOLAR.shared_features, *SOLAR.columns("era5"))
     cams_features = (*SOLAR.shared_features, *SOLAR.columns("cams"))
-    job_list = [
+    plain_features = {
+        "era5_global": era5_features,
+        "cams_global": cams_features,
+        **{arm: (*SOLAR.shared_features, column) for arm, column in EXPLORATORY_COLUMNS.items()},
+    }
+    job_list: list[Job] = [
         (MEAN_ARM, "pooled", "power_mw", ens_features, PRIMARY_HYPER_PARAMETERS, False),
         (CONTROL_ARM, "pooled", "power_mw", control_features, PRIMARY_HYPER_PARAMETERS, False),
-        ("era5_global", "pooled", "power_mw", era5_features, PRIMARY_HYPER_PARAMETERS, False),
-        ("cams_global", "pooled", "power_mw", cams_features, PRIMARY_HYPER_PARAMETERS, False),
-        (MEAN_ARM, "sensitivity", "power_mw", ens_features, SENSITIVITY_HYPER_PARAMETERS, False),
-        (
-            "era5_global",
-            "sensitivity",
-            "power_mw",
-            era5_features,
-            SENSITIVITY_HYPER_PARAMETERS,
-            False,
+        *(
+            (arm, "pooled", "power_mw", features, PRIMARY_HYPER_PARAMETERS, False)
+            for arm, features in plain_features.items()
         ),
-        (
-            "cams_global",
-            "sensitivity",
-            "power_mw",
-            cams_features,
-            SENSITIVITY_HYPER_PARAMETERS,
-            False,
+        (MEAN_ARM, "sensitivity", "power_mw", ens_features, SENSITIVITY_HYPER_PARAMETERS, False),
+        *(
+            (arm, "sensitivity", "power_mw", features, SENSITIVITY_HYPER_PARAMETERS, False)
+            for arm, features in plain_features.items()
         ),
     ]
     counts = {len(features) for _, _, _, features, _, _ in job_list}
@@ -401,6 +598,156 @@ def _arm_columns_lines(*, job_list: list[Job]) -> list[str]:
     return lines
 
 
+def _absolute_table_lines(*, pooled: pl.DataFrame, arms: tuple[str, ...]) -> list[str]:
+    """Render each arm's mean absolute error and 95% interval as a markdown table.
+
+    Args:
+        pooled: Every arm's losses at the `pooled` setting.
+        arms: The arms, one row each.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = ["| Arm | All sites | 95% interval |", "|---|---|---|"]
+    for arm in arms:
+        interval = bootstrap_absolute(losses=pooled, arm=arm, metric=METRIC)
+        lower, upper = (interval[key] * PERCENTAGE_POINTS for key in ("lower_95", "upper_95"))
+        lines.append(f"| {arm} | {_mae(losses=pooled, arm=arm):.3f} | [{lower:.3f}, {upper:.3f}] |")
+    return lines
+
+
+def _share_lines(*, pooled: pl.DataFrame) -> list[str]:
+    """Render how much of ENS's gap to CAMS the 3-hourly step accounts for.
+
+    Args:
+        pooled: Every arm's losses at the `pooled` setting.
+
+    Returns:
+        Markdown lines.
+    """
+    gap = _mae(losses=pooled, arm=MEAN_ARM) - _mae(losses=pooled, arm="cams_global")
+    step = _mae(losses=pooled, arm=CAMS_3H_ARM) - _mae(losses=pooled, arm="cams_global")
+    remaining = _mae(losses=pooled, arm=MEAN_ARM) - _mae(losses=pooled, arm=CAMS_3H_ARM)
+    return [
+        "#### Share of ENS's gap to CAMS that the 3-hourly step accounts for (exploratory)",
+        "",
+        (
+            f"The 3-hourly step raises CAMS's error by {step:.3f} points, {step / gap:.0%} of "
+            f"ENS's {gap:.3f}-point gap to CAMS as first measured. The gap that remains is "
+            f"{remaining:.3f} points. The percentage is a ratio of point estimates and carries no "
+            "interval."
+        ),
+    ]
+
+
+def _lead_lines(*, frame: pl.DataFrame) -> list[str]:
+    """Render the scored hours' leads, and how many hours a live service could not have served.
+
+    ENS's lead at an hour is the hour of day, because every run starts at 00 UTC. ERA5's radiation
+    lead follows `ERA5_RUN_INTERVAL_HOURS`. A live service reads the 00 UTC run from about
+    `FIRST_SERVABLE_HOUR_UTC`, so an hour labelled at or before then (an hour that ends at or before
+    the service can read the run) could not have been served from that run.
+
+    Args:
+        frame: This section's row set.
+
+    Returns:
+        Markdown lines.
+    """
+    hour = frame["time"].dt.hour()
+    ens_lead = hour.cast(pl.Float64)
+    era5_lead = ((hour - 1) % ERA5_RUN_INTERVAL_HOURS + 1).cast(pl.Float64)
+    too_early = int((hour <= FIRST_SERVABLE_HOUR_UTC).sum())
+    return [
+        "#### Leads of the scored hours",
+        "",
+        f"- ENS's lead is {hour.min()} to {hour.max()} hours, mean {ens_lead.mean():.2f}.",
+        (
+            f"- ERA5's radiation lead is {era5_lead.min():.0f} to {era5_lead.max():.0f} hours, "
+            f"mean {era5_lead.mean():.2f}."
+        ),
+        f"- ENS's mean lead exceeds ERA5's by {ens_lead.mean() - era5_lead.mean():.2f} hours.",
+        (
+            f"- A live service reads the 00 UTC run from about {FIRST_SERVABLE_HOUR_UTC:02d}:00 "
+            f"UTC, so {too_early:,} of {frame.height:,} scored hours "
+            f"({too_early / frame.height:.1%}) end at or before that time."
+        ),
+    ]
+
+
+def _generator_lines(*, frame: pl.DataFrame, members: pl.DataFrame) -> list[str]:
+    """Render each generator's rows and months, and which generators share one ENS input.
+
+    Two generators in the same H3 resolution-5 cell read the same ENS values, so the six
+    generators carry fewer distinct ENS inputs than six.
+
+    Args:
+        frame: This section's row set.
+        members: `_t3_members`'s output.
+
+    Returns:
+        Markdown lines.
+    """
+    per_site = (
+        frame.group_by("site")
+        .agg(rows=pl.len(), months=pl.col("time").dt.strftime("%Y-%m").n_unique())
+        .sort("site")
+    )
+    control = (
+        members.filter(pl.col("ensemble_member") == 0)
+        .sort("init_time", "lead_hours")
+        .group_by("site", maintain_order=True)
+        .agg(pl.col("ghi_w_m2"))
+    )
+    inputs = dict(zip(control["site"].to_list(), control["ghi_w_m2"].to_list(), strict=True))
+    groups: dict[tuple[float, ...], list[str]] = {}
+    for site in sorted(inputs):
+        groups.setdefault(tuple(inputs[site]), []).append(site)
+    lines = [
+        "#### Rows, months, and ENS inputs per generator",
+        "",
+        "| Site | Rows | Months |",
+        "|---|---|---|",
+    ]
+    lines += [f"| {site} | {rows:,} | {months} |" for site, rows, months in per_site.iter_rows()]
+    lines += ["", f"The six generators carry {len(groups)} distinct ENS inputs:", ""]
+    lines += [f"- {', '.join(sites)}" for sites in groups.values()]
+    return lines
+
+
+def _main_panel_lines(*, pooled: pl.DataFrame) -> list[str]:
+    """Render how far ERA5 and CAMS refit here differ from the page's main row set.
+
+    Args:
+        pooled: Every arm's losses at the `pooled` setting.
+
+    Returns:
+        Markdown lines.
+    """
+    path = OUTPUT_DIR.parent / "solar_long" / "report.md"
+    heading = path.read_text().splitlines()[0]
+    match = re.search(r"on ([\d,]+) common site-hours \(([\d-]+) to ([\d-]+)\)", heading)
+    if match is None:
+        msg = f"{path}: cannot read the row count from {heading!r}"
+        raise ValueError(msg)
+    main = report_errors(report_path=path, column="Global only")
+    lines = [
+        "#### Against the page's main row set",
+        "",
+        (
+            f"The main row set holds {match[1]} common site-hours ({match[2]} to {match[3]}); "
+            "this section's row set is shorter."
+        ),
+        "",
+        "| Arm | This section | Main row set | Difference |",
+        "|---|---|---|---|",
+    ]
+    for arm, name in (("era5_global", "era5"), ("cams_global", "cams")):
+        here = _mae(losses=pooled, arm=arm)
+        lines.append(f"| {arm} | {here:.3f} | {main[name]:.3f} | {here - main[name]:+.3f} |")
+    return lines
+
+
 def _report(
     *, frame: pl.DataFrame, losses: pl.DataFrame, sites: pl.DataFrame, job_list: list[Job]
 ) -> str:
@@ -418,20 +765,16 @@ def _report(
     pooled = losses.filter(pl.col("setting") == "pooled")
     sensitivity = losses.filter(pl.col("setting") == "sensitivity")
     site_labels = sorted(frame["site"].unique().to_list())
-    arms = (MEAN_ARM, CONTROL_ARM, "era5_global", "cams_global")
     lines = [
         (
             f"### ECMWF ENS's `T+3` band on {frame.height:,} common site-hours of solar "
             f"({frame['time'].min():%Y-%m-%d} to {frame['time'].max():%Y-%m-%d})"
         ),
         "",
-        "| Arm | All sites | 95% interval |",
-        "|---|---|---|",
+        *_absolute_table_lines(
+            pooled=pooled, arms=(MEAN_ARM, CONTROL_ARM, "era5_global", "cams_global")
+        ),
     ]
-    for arm in arms:
-        interval = bootstrap_absolute(losses=pooled, arm=arm, metric=METRIC)
-        lower, upper = (interval[key] * PERCENTAGE_POINTS for key in ("lower_95", "upper_95"))
-        lines.append(f"| {arm} | {_mae(losses=pooled, arm=arm):.3f} | [{lower:.3f}, {upper:.3f}] |")
     lines += [
         "",
         (
@@ -477,12 +820,47 @@ def _report(
             )
             for site in site_labels
         ]
-    lines += ["", "#### What averaging the members is worth (exploratory)", "", *CONTRAST_HEADER]
+    lines += [
+        "",
+        "#### The control member alone, against the members' mean and against ERA5 (exploratory)",
+        "",
+        *CONTRAST_HEADER,
+    ]
     lines += [
         _contrast_line(losses=pooled, treatment=t, reference=r, label="all")
         for t, r in EXPLORATORY_CONTRASTS
     ]
-    lines.append("")
+    lines += [
+        "",
+        "#### Exploratory arms added after the first science review",
+        "",
+        *_absolute_table_lines(pooled=pooled, arms=EXPLORATORY_ARMS),
+        "",
+        f"#### {CONFOUND_HEADING}",
+        "",
+        *CONTRAST_HEADER,
+        *(
+            _contrast_line(losses=pooled, treatment=t, reference=r, label="all")
+            for t, r in CONFOUND_CONTRASTS
+        ),
+        "",
+        "#### The same contrasts at the second hyperparameter setting (exploratory)",
+        "",
+        *CONTRAST_HEADER,
+        *(
+            _contrast_line(losses=sensitivity, treatment=t, reference=r, label="sensitivity")
+            for t, r in CONFOUND_CONTRASTS
+        ),
+        "",
+        *_share_lines(pooled=pooled),
+        "",
+        *_lead_lines(frame=frame),
+        "",
+        *_generator_lines(frame=frame, members=_t3_members()),
+        "",
+        *_main_panel_lines(pooled=pooled),
+        "",
+    ]
     lines += geometry_lines(sites=sites, noun="solar farms")
     return "\n".join(lines) + "\n"
 
