@@ -1121,9 +1121,9 @@ XGBoost model given CAMS [1.699, 2.248], and 2.082 points below an XGBoost model
 keeps the station's average irradiance for each month and hour but not its hour-to-hour weather, so
 that any gain cannot come from the XGBoost model merely having one more input column. These are the
 section's three planned contrasts. Each planned contrast is statistically significant at the 5%
-level, has the same sign in all five folds of contiguous whole months for each generator, and keeps
-its sign and significance at the second hyperparameter setting (+1.957 [+1.657, +2.193], −2.084
-[−2.357, −1.828], and −0.321 [−0.401, −0.257]).
+level, has the same sign in all five folds of contiguous whole months when the six generators are
+pooled, and keeps its sign and significance at the second hyperparameter setting (+1.957 [+1.657,
++2.193], −2.084 [−2.357, −1.828], and −0.321 [−0.401, −0.257]).
 
 **All six farms take the same nearest radiation station, 17 to 31 km away, so these results describe
 one station's pyranometer record, from an instrument that measures global horizontal irradiance, set
@@ -1140,15 +1140,16 @@ station arm has a split into direct beam and diffuse light.
 
 **Three contrasts were written down before the first model was fitted, and every other comparison in
 this section is exploratory.** The three planned contrasts were written into the study's plan file,
-in a commit made before the first XGBoost model was fitted: the nearest station's irradiance and
-temperature against CAMS, the same against ERA5, and CAMS with the nearest station against CAMS with
-a shuffled copy of the station's irradiance. The shuffled copy is permuted within each farm, each
-calendar month of each year, and each hour of day, so the shuffled copy keeps the station's monthly
-average at each hour and removes the station's hour-to-hour weather. CAMS with the shuffled copy is
-called the padded control below, and CAMS with the real station column is called the blend below.
-The padded control carries the same nine feature columns as the blend. ERA5's and CAMS's results on
-the main row set were published before this section was planned, so it was known in advance that
-CAMS beats ERA5, though not where the station would fall.
+in a commit made before the first XGBoost model was fitted (the commit stays in the git history of
+the study's pull request after the plan file is deleted at merge): the nearest station's irradiance
+and temperature against CAMS, the same against ERA5, and CAMS with the nearest station against CAMS
+with a shuffled copy of the station's irradiance. The shuffled copy is permuted within each farm,
+each calendar month of each year, and each hour of day, so the shuffled copy keeps the station's
+monthly average at each hour and removes the station's hour-to-hour weather. CAMS with the shuffled
+copy is called the padded control below, and CAMS with the real station column is called the blend
+below. The padded control carries the same nine feature columns as the blend. ERA5's and CAMS's
+results on the main row set were published before this section was planned, so it was known in
+advance that CAMS beats ERA5, though not where the station would fall.
 
 #### What the station files hold, and where they end
 
@@ -1247,11 +1248,11 @@ section's absolute errors are not comparable with the page's main leaderboard.**
 of capacity here against 5.085% on the main row set, and ERA5 9.389% against 9.080%. The XGBoost
 models fitted on the main row set score 5.170% for CAMS and 9.250% for ERA5 on the 59,873 site-hours
 the two row sets share. The remaining 0.129 and 0.139 points are attributed to the shorter training
-span, the folds re-cut on the shorter row set, and the 160 site-hours that only this section's row
-set holds, which the common rows of the [blending study](blending-weather-products.md) include. No
-interval is computed for these two differences, so fitting-seed variation is not separated from
-them. The station arms carry the same shorter-history handicap as the CAMS and ERA5 arms refitted on
-this row set.
+span, the folds re-cut on the shorter row set, and the 160 site-hours that this section's row set
+holds and the main row set lacks, which the common rows of the [blending
+study](blending-weather-products.md) do include. No interval is computed for these two differences,
+so fitting-seed variation is not separated from them. The station arms carry the same
+shorter-history handicap as the CAMS and ERA5 arms refitted on this row set.
 
 **The 160 site-hours that only this section's row set holds do not change what the three planned
 contrasts show (exploratory, post hoc).** On the 59,873 site-hours the two row sets share, the three
@@ -1294,11 +1295,11 @@ nearest-station arm adds over the shuffled arm, and the station's air temperatur
 time-of-day features, and the sun position are not.
 
 **Each planned contrast has the same sign at all six generators, and an interval that excludes zero
-at each.** The nearest station trails CAMS by between 1.174 and 2.656 points at the six farms, and
-beats ERA5 by between 1.555 and 2.528. The blend gains between 0.221 and 0.469 points over its
-padded control. At generator E, which has the fewest site-hours, 4 of 5 folds agree in sign for the
-CAMS contrast and for the blend contrast. The six farms share one nearest station and two ERA5 grid
-cells, so the per-generator results are not independent replications.
+at each (exploratory).** The nearest station trails CAMS by between 1.174 and 2.656 points at the
+six farms, and beats ERA5 by between 1.555 and 2.528. The blend gains between 0.221 and 0.469 points
+over its padded control. At generator E, which has the fewest site-hours, 4 of 5 folds agree in sign
+for the CAMS contrast and for the blend contrast. The six farms share one nearest station and two
+ERA5 grid cells, so the per-generator results are not independent replications.
 
 ![Figure 23: Each planned contrast has the same sign at all six
 generators](assets/station_past_solar_per_generator.svg)
