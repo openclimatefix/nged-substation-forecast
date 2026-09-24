@@ -55,6 +55,7 @@ one, the mistake is already written.
 |---|---|
 | `code-style` | writing or editing **any** Python in this repo |
 | `polars-patito-gotchas` | writing Polars/Patito code that joins, casts, filters a `pt.LazyFrame`, declares a Patito field, or reads/writes Delta |
+| `dataviz` | drawing any chart in this repository — this project's OCF-brand palette, chart sizing, SVG export, and generator anonymisation, on top of the bundled `dataviz` skill's general method |
 | `mkdocs-authoring` | editing markdown MkDocs renders — `docs/`, READMEs, `SKILL.md`, docstrings — especially nested lists, list items with code blocks, or wrapped links |
 | `marimo-notebooks` | creating or editing a Marimo notebook (`packages/dashboard/*.py`, `packages/notebooks/*.py`) |
 | `ty-workarounds` | acting on a `ty` error in Altair chart code or numpy `.view()` code, or adding any `# ty: ignore` |
