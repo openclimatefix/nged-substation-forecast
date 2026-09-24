@@ -301,9 +301,9 @@ nearest grid cell over land.**
 
 ### How ECMWF's ENS and HRES were added
 
-**The ECMWF section rests on a plan committed before its first fit.** The plan,
-`plans/ens-hres-past-wind.md`, holds the three planned contrasts. The plan was committed as
-`9bb0a6f7`, and the plan's last revision before any fit is `83dbbad3`. The script that fitted every
+**The ECMWF section rests on a plan committed before its first fit.** The plan
+holds the three planned contrasts. The plan was committed as `9bb0a6f7`, and the plan's last
+revision before any fit is `83dbbad3`. The script that fitted every
 XGBoost model, `ens_hres_past_wind.py`, was committed as `83dbbad3` before its first fit, and the
 report records that commit.
 

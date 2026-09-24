@@ -6,8 +6,9 @@ past-wind comparison in `wind_products.py` (ERA5, UKV, ICON-D2, ICON-EU, ICON gl
 ECMWF products: the deterministic IFS HRES forecast, and the mean of the 51-member ENS at day 0.
 The past-solar study already scores both products; the past-wind page scored neither.
 
-**The planned contrasts are in `plans/ens-hres-past-wind.md`, whose last revision before any fit is
-`83dbbad3`.** The three contrasts, and the second hyperparameter setting each is rerun at, are:
+**The planned contrasts are in the plan file committed as `9bb0a6f7`, whose last revision before any
+fit is `83dbbad3`.** The three contrasts, and the second hyperparameter setting each is rerun at,
+are:
 
 - **P1** `hres_wind − ukv_wind`: does ECMWF's deterministic forecast describe past wind better than
   UKV, the page's product for historical features?
