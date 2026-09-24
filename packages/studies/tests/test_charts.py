@@ -272,7 +272,7 @@ def test_colour_follows_the_family_and_the_key_lists_only_families_present():
     colour = interval["encoding"]["color"]
     (text,) = _layer(key, "text")
 
-    assert colour["scale"]["domain"][:3] == list(FAMILY_COLOURS)
+    assert colour["scale"]["domain"][: len(FAMILY_COLOURS)] == list(FAMILY_COLOURS)
     assert colour["scale"]["range"] == [*FAMILY_COLOURS.values(), *FAMILY_COLOURS_LIGHT.values()]
     assert colour["legend"] is None
     assert [row["label"] for row in _values(spec, text)] == ["satellite", "reanalysis"]
@@ -448,11 +448,13 @@ def test_family_colours_map_to_the_brand_theme_swatches():
         "satellite": ocf.BRAND_ORANGE,
         "reanalysis": ocf.DATA_SKY,
         "weather model": ocf.DATA_BLUE,
+        "station observations": ocf.DATA_PURPLE,
     }
     assert FAMILY_COLOURS_LIGHT == {
         "satellite": ocf.BRAND_ORANGE_LIGHT,
         "reanalysis": ocf.DATA_SKY_LIGHT,
         "weather model": ocf.DATA_BLUE_LIGHT,
+        "station observations": ocf.DATA_PURPLE_LIGHT,
     }
 
 
@@ -735,3 +737,16 @@ def test_a_figure_without_planning_adds_no_note():
     spec = figure(panels=panels, number=1, title="t", subtitle=["s"], figure_planning=None)
 
     assert spec.to_dict()["title"]["subtitle"] == ["s"]
+
+
+def test_the_station_family_is_purple_and_named_in_the_key():
+    spec = _panel(_rows(["station observations", "satellite"]))
+    key, _ = spec["vconcat"]
+    (text,) = _layer(key, "text")
+
+    assert [row["label"] for row in _values(spec, text)] == ["satellite", "station observations"]
+    assert [row["colour"] for row in _values(spec, text)] == [
+        FAMILY_COLOURS["satellite"],
+        FAMILY_COLOURS["station observations"],
+    ]
+    assert FAMILY_COLOURS["station observations"] == ocf.DATA_PURPLE
