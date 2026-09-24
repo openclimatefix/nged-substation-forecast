@@ -282,10 +282,12 @@ ICON-DREAM-EU, an ICON reanalysis on a 6.5 km grid with native direct and diffus
 past-sunshine study: [ICON-DREAM-EU beats ERA5 but not the ICON weather
 models](../studies/weather-products-for-past-solar.md#icon-dream-eu-beats-era5-but-not-the-icon-weather-models).
 
-The DMI and KNMI HARMONIE-AROME forecasts would add a further model family, from mid-2024 only,
-but neither adds a direct component the survey could use. KNMI's split is by separation, and the
-field Open-Meteo serves as DMI's direct is probably not DMI's direct beam. Global irradiance alone
-would make either a lower-priority arm.
+The sunshine study scores the DMI and KNMI HARMONIE-AROME forecasts on global irradiance only, on
+[its shorter row set from November 2024](../studies/weather-products-for-past-solar.md#the-four-extra-open-meteo-models).
+It scores neither direct beam. KNMI's direct beam is Open-Meteo's separation of the global
+irradiance. The study finds that the field Open-Meteo serves as DMI's direct beam is exactly zero in
+half of the daytime rows and in some rows exceeds the global irradiance, which supports the reading
+that the field is not DMI's direct beam.
 
 ## Candidates for the past-wind study
 
