@@ -272,8 +272,8 @@ and its fingerprint) are not refitted or overwritten.
    disseminates ENS day 0 at about 06:40 UTC). IFS 50r1 went live with the 06 UTC run of 12 May
    2026, so the 00 UTC ENS run of that day is still 49r1 and the period split's "from 2026-05-12"
    holds one day of 49r1 ENS data. The HRES fetch set no `cell_selection`, so Open-Meteo's default
-   ("land") applies, as it does for every other product on the page. The grid-file cross-check shows that two
-   Open-Meteo downloads agree, not that the grid or the lead is right.
+   ("land") applies, as it does for every other product on the page. The grid-file cross-check
+   shows that two Open-Meteo downloads agree, not that the grid or the lead is right.
 6. **Sign-safe printed-number guard.** A page pair `[a, b]` must match a report pair including
    sign. A bare magnitude may match either sign, and the guard lists every such magnitude so a
    reviewer can audit it. The page writes a difference as "X points lower" or "X points higher"
