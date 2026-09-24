@@ -2,13 +2,17 @@
 
 These pin the behaviour a wrong ICON-DREAM-EU build would break silently: `filter_nan_padding` and
 `raise_on_duplicate_keys` are the two gates the module docstring calls hard stops, `speed_at_level`
-is what picks one of DWD's ten model levels, and `wind_direction_degrees` /
+is what picks one of DWD's ten model levels, `wind_direction_degrees` /
 `mean_absolute_angle_difference_deg` are the meteorological-convention arithmetic the pre-fit
-direction check rests on.
+direction check rests on, and `icon_dream_site_frame` / `icon_dream_common_rows` are the row-build
+functions no earlier test covered -- each synthetic fixture below is built so that a wrong level, a
+wrong direction convention, a timestamp shift, a skipped `common_rows`, or a removed NaN/duplicate
+gate changes an assertion's outcome, not just a hidden intermediate value.
 """
 
 import importlib.util
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from types import ModuleType
 from typing import Final
@@ -199,3 +203,197 @@ def test_mean_absolute_angle_difference_deg_is_symmetric() -> None:
     backward = wind_icon_dream.mean_absolute_angle_difference_deg(a_deg=b, b_deg=a)
 
     assert forward == pytest.approx(backward)
+
+
+_T0: Final[datetime] = datetime(2025, 3, 1, tzinfo=UTC)
+"""The first hour every synthetic frame below builds from."""
+
+_HOURS: Final[tuple[int, ...]] = tuple(range(7))
+"""Seven hours, so `icon_dream_common_rows`'s inner join has one hour to drop as a zero hour."""
+
+_CELLS: Final[tuple[int, ...]] = (1, 2)
+"""Two cells; `icon_dream_cells` below always resolves site `W1` to cell 1."""
+
+_UV_BY_LEVEL: Final[dict[int, tuple[float, float]]] = {
+    72: (-5.0, -5.0),  # hub level: a wind from 45 degrees, so a degrees/radians mix-up is visible
+    73: (-8.0, 0.0),  # a different u from level 72's, so reading this level for u is visible
+    71: (5.0, 0.0),
+    74: (0.0, 5.0),
+}
+"""Each level's own `(u, v)`, distinct enough that reading the wrong level changes the direction."""
+
+
+def _level_speed(*, level: int, hour: int, cell: int) -> float:
+    """Return a synthetic level speed with `level` embedded, so a level mix-up is never masked."""
+    return level + hour / 10 + cell * 100
+
+
+def _level_rows(*, kind: str) -> pl.DataFrame:
+    """Build one synthetic multi-level ICON-DREAM-EU variable, plus one colliding NaN-padded row.
+
+    Args:
+        kind: `"ws"`, `"u"`, or `"v"`.
+
+    Returns:
+        `valid_time`, `model_level`, `cell_id`, and that variable's own value column.
+    """
+    rows = []
+    for hour in _HOURS:
+        for level, (u, v) in _UV_BY_LEVEL.items():
+            for cell in _CELLS:
+                value = {"ws": _level_speed(level=level, hour=hour, cell=cell), "u": u, "v": v}[
+                    kind
+                ]
+                rows.append((_T0 + timedelta(hours=hour), level, cell, value))
+    # cfgrib-style NaN padding colliding with a real key, as filter_nan_padding exists to drop.
+    rows.append((_T0, 72, 1, float("nan")))
+    column = {"ws": "ws_m_s", "u": "u_m_s", "v": "v_m_s"}[kind]
+    return pl.DataFrame(
+        rows,
+        schema={
+            "valid_time": pl.Datetime("ns"),
+            "model_level": pl.Int64,
+            "cell_id": pl.Int64,
+            column: pl.Float32,
+        },
+        orient="row",
+    )
+
+
+def _surface_rows(*, kind: str) -> pl.DataFrame:
+    """Build one synthetic single-level (10 m) ICON-DREAM-EU variable, plus one colliding NaN row.
+
+    Args:
+        kind: `"ws"`, `"u"`, or `"v"`.
+
+    Returns:
+        `valid_time`, `cell_id`, and that variable's own value column.
+    """
+    rows = [
+        (
+            _T0 + timedelta(hours=hour),
+            cell,
+            {"ws": 10 + hour / 10 + cell * 100, "u": 0.0, "v": 1.0}[kind],
+        )
+        for hour in _HOURS
+        for cell in _CELLS
+    ]
+    rows.append((_T0, 1, float("nan")))
+    column = {"ws": "ws_10m_m_s", "u": "u_10m_m_s", "v": "v_10m_m_s"}[kind]
+    return pl.DataFrame(
+        rows,
+        schema={"valid_time": pl.Datetime("ns"), "cell_id": pl.Int64, column: pl.Float32},
+        orient="row",
+    )
+
+
+@pytest.fixture
+def synthetic_icon_dream(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> pl.DataFrame:
+    """Write synthetic ICON-DREAM-EU parquets under `tmp_path`, and point the module at them.
+
+    `icon_dream_cells` is replaced so the fixture needs no real cell-centre cache: site `W1`
+    always resolves to cell 1.
+
+    Args:
+        tmp_path: pytest's per-test scratch directory.
+        monkeypatch: pytest's monkeypatch fixture.
+
+    Returns:
+        The one-row wind roster, `site="W1"`.
+    """
+    for kind, name in (
+        ("ws", wind_icon_dream.WS_FILE),
+        ("u", wind_icon_dream.U_FILE),
+        ("v", wind_icon_dream.V_FILE),
+    ):
+        _level_rows(kind=kind).write_parquet(tmp_path / name)
+    for kind, name in (
+        ("ws", wind_icon_dream.WS_10M_FILE),
+        ("u", wind_icon_dream.U_10M_FILE),
+        ("v", wind_icon_dream.V_10M_FILE),
+    ):
+        _surface_rows(kind=kind).write_parquet(tmp_path / name)
+    monkeypatch.setattr(wind_icon_dream, "ICON_DREAM_DIR", tmp_path)
+    monkeypatch.setattr(
+        wind_icon_dream,
+        "icon_dream_cells",
+        lambda *, sites, cell_ids: pl.DataFrame(
+            {"site": ["W1"], "cell_id": [1], "distance_km": [1.0]}
+        ),
+    )
+    return pl.DataFrame({"site": ["W1"]})
+
+
+def test_icon_dream_site_frame_reads_the_hub_level_and_converts_direction(
+    synthetic_icon_dream: pl.DataFrame,
+) -> None:
+    """The hub speed comes from level 72's own `u`, `v` and `ws`, with the direction in radians.
+
+    Catches, each by a different assertion: reading the hub speed or the hub direction's `u` from
+    the wrong level (`HUB_LEVEL` changed, or `u` read from level 73), skipping the
+    degrees-to-radians conversion before `.sin()`, a one-hour timestamp shift, and the NaN filter
+    and the duplicate gate both being removed (which would duplicate rows through the joins).
+    """
+    sites = synthetic_icon_dream
+
+    frame = wind_icon_dream.icon_dream_site_frame(sites=sites).sort("time")
+
+    assert frame.height == len(_HOURS)
+    hub, sin_c, cos_c, surface = wind_icon_dream._wind_columns(product=wind_icon_dream.PRODUCT)
+    hours = [
+        round((t.replace(tzinfo=None) - _T0.replace(tzinfo=None)).total_seconds() / 3600)
+        for t in frame["time"]
+    ]
+    assert hours == list(_HOURS)
+    assert frame[hub].to_list() == pytest.approx(
+        [_level_speed(level=72, hour=hour, cell=1) for hour in hours]
+    )
+    assert frame[surface].to_list() == pytest.approx([10 + hour / 10 + 100 for hour in hours])
+    expected_direction_deg = wind_icon_dream.wind_direction_degrees(
+        u=pl.lit(_UV_BY_LEVEL[72][0]), v=pl.lit(_UV_BY_LEVEL[72][1])
+    )
+    expected_sin, expected_cos = pl.select(
+        sin=expected_direction_deg.radians().sin(), cos=expected_direction_deg.radians().cos()
+    ).row(0)
+    assert frame[sin_c].to_list() == pytest.approx([expected_sin] * frame.height, abs=1e-6)
+    assert frame[cos_c].to_list() == pytest.approx([expected_cos] * frame.height, abs=1e-6)
+    float_columns = [c for c in frame.columns if frame.schema[c] in (pl.Float32, pl.Float64)]
+    assert not any(frame[c].is_nan().any() for c in float_columns)
+
+
+def test_icon_dream_common_rows_drops_the_zero_hour_and_matches_on_time(
+    synthetic_icon_dream: pl.DataFrame, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """`common_rows` still runs: the zero-half-hour row is dropped, not silently kept.
+
+    Catches `common_rows` being skipped, which would keep all seven hours (or drop the wrong one)
+    instead of the six the `has_zero_half_hour` flag marks for removal.
+
+    Args:
+        synthetic_icon_dream: The wind roster, with ICON-DREAM-EU parquets written.
+        monkeypatch: pytest's monkeypatch fixture.
+    """
+    sites = synthetic_icon_dream
+    zero_hour = 3
+    base = pl.DataFrame(
+        {
+            "site": ["W1"] * len(_HOURS),
+            "time": [_T0 + timedelta(hours=hour) for hour in _HOURS],
+            "power_mw": [float(hour) for hour in _HOURS],
+            "effective_capacity_mw": [10.0] * len(_HOURS),
+            "has_zero_half_hour": [hour == zero_hour for hour in _HOURS],
+        },
+        schema_overrides={"time": pl.Datetime("us", "UTC")},
+    )
+    monkeypatch.setattr(wind_icon_dream, "joined", lambda *, sites: base)
+    monkeypatch.setattr(
+        wind_icon_dream, "with_eras", lambda *, frame: frame.with_columns(fold=pl.lit(0))
+    )
+
+    rows = wind_icon_dream.icon_dream_common_rows(sites=sites).sort("time")
+
+    assert sorted(t.hour for t in rows["time"]) == [h for h in _HOURS if h != zero_hour]
+    hub = wind_icon_dream._wind_columns(product=wind_icon_dream.PRODUCT)[0]
+    assert rows[hub].to_list() == pytest.approx(
+        [_level_speed(level=72, hour=t.hour, cell=1) for t in rows["time"]]
+    )
