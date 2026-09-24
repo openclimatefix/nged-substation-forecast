@@ -1095,11 +1095,14 @@ _COLUMN_MEANINGS: Final[dict[str, str]] = {
     "wind_speed_unit_id": "MIDAS unit code for `wind_speed`: 0 is estimated and 1 is from an "
     "anemometer, both in metres per second; 3 is estimated and 4 is from an anemometer, both in "
     "knots.",
-    "wind_direction": "Mean wind direction, degrees from true north, at `time`.",
-    "wind_speed": "Mean wind speed at `time`, in the unit `wind_speed_unit_id` gives.",
+    "wind_direction": "Mean wind direction, degrees from true north, over the 10 minutes from 20 "
+    "to 10 minutes before `time`.",
+    "wind_speed": "Mean wind speed over the 10 minutes from 20 to 10 minutes before `time`, in "
+    "the unit `wind_speed_unit_id` gives.",
     "wind_speed_m_s": "Derived by this script: `wind_speed` in metres per second (knots x "
     f"{KNOTS_TO_M_S}); null where `wind_speed_unit_id` is not 0, 1, 3, or 4.",
-    "q10mnt_mxgst_spd": "Maximum gust speed in the 10 minutes before `time`, knots.",
+    "q10mnt_mxgst_spd": "Maximum gust speed over the 10 minutes from 20 to 10 minutes before "
+    "`time`, knots.",
     "air_temperature": "Air temperature at `time`, degC.",
     "dewpoint": "Dew-point temperature at `time`, degC.",
     "rltv_hum": "Relative humidity at `time`, percent.",
@@ -1261,10 +1264,10 @@ with a row are the only record of that.
   `time` T holds the total irradiation over the hour ending at T, in kJ/m2. The hour's mean
   irradiance in W/m2 is the kJ/m2 total divided by 3.6.
 - **Hourly weather:** `time` is an instant (MIDAS `ob_time`); a reading describes the moment of
-  the label. By the WMO observing convention, which the MIDAS files do not state themselves, the
-  wind speed and wind direction are means over the 10 minutes before `time`. The file header
-  calls each sunshine duration an "hour" duration without saying whether the hour ends or starts
-  at `time`.
+  the label. The Met Office Surface Data Users Guide gives the wind speed, wind direction and
+  maximum gust as covering HH-20 to HH-10: the 10 minutes ending 10 minutes before `time`. The
+  file header calls each sunshine duration an "hour" duration without saying whether the hour ends
+  or starts at `time`.
 - **Both:** every `time` is UTC and stored timezone-aware; no naive timestamp is written.
 """
 
