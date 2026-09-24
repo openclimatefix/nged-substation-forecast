@@ -56,7 +56,7 @@ from typing import Any, Final
 import numpy as np
 import polars as pl
 from lineage import write_lineage_note, write_readme
-from paths import REPO_DATA_DIR, WEATHER_DOWNLOADS_DIR
+from paths import REPO_DATA_DIR, WEATHER_DOWNLOADS_DIR, open_meteo_api_key
 from studies.anonymise import (
     LABEL_PERMUTATION_SEED,
     SITE_LABELS,
@@ -69,7 +69,13 @@ from studies.solar import cos_zenith_hour_mean, extraterrestrial_horizontal, zen
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_open_meteo_previous_runs")
 
-PREVIOUS_RUNS_URL: Final[str] = "https://previous-runs-api.open-meteo.com/v1/forecast"
+PREVIOUS_RUNS_URL: Final[str] = (
+    "https://customer-previous-runs-api.open-meteo.com/v1/forecast"
+    if open_meteo_api_key()
+    else "https://previous-runs-api.open-meteo.com/v1/forecast"
+)
+"""The commercial host once `OPEN_METEO_API_KEY` is set (see `paths.open_meteo_api_key`), which
+lifts the free tier's daily/hourly/minutely rate limits entirely; the free host otherwise."""
 REQUEST_TIMEOUT_SECONDS: Final[float] = 600.0
 MAX_ATTEMPTS: Final[int] = 5
 REQUEST_SLEEP_SECONDS: Final[float] = 2.0
@@ -344,6 +350,9 @@ def fetch_previous_runs_frame(
         f"&hourly={','.join(variables)}"
         f"&models={models_parameter}&timezone=UTC"
     )
+    api_key = open_meteo_api_key()
+    if api_key:
+        url += f"&apikey={api_key}"
     payload = _get_json(url=url)
     blocks = payload if isinstance(payload, list) else [payload]
     if len(blocks) != sites.height:
@@ -386,6 +395,14 @@ def _first_year_with_data(*, models_parameter: str, sites: pl.DataFrame) -> int:
     the same at one-month grain since the Previous Runs archive is documented to start in 2024
     for most models rather than spanning several years like the Historical Forecast archive.
 
+    **A model can start mid-year, not just mid-month.** `ecmwf_ifs025`'s archive starts
+    2024-02-03: the one-month probe below finds nothing in January, but the year still has 11
+    months of real data. `fetch_previous_runs_frame` itself raises the moment a site comes back
+    all-null, before this function gets to inspect anything, so the one-month probe is wrapped in
+    `try`/`except` and a whole-year probe — the same call weight `_fetch_model_checkpointed`
+    spends on year 1 for real once this returns — is only made if the cheap one-month probe
+    raised that same "returned only nulls" error.
+
     Args:
         models_parameter: The value of the API's `models=` query parameter.
         sites: The roster to probe with.
@@ -394,17 +411,31 @@ def _first_year_with_data(*, models_parameter: str, sites: pl.DataFrame) -> int:
         The first year (as an int) with a non-null `shortwave_radiation` reading.
 
     Raises:
-        RuntimeError: If no data is found in `FIRST_DATE`'s year at all.
+        RuntimeError: If no data is found anywhere in `FIRST_DATE`'s year.
     """
-    probe = fetch_previous_runs_frame(
-        sites=sites,
-        models_parameter=models_parameter,
-        start_date=FIRST_DATE,
-        end_date=f"{FIRST_DATE[:4]}-01-31",
-    )
-    if probe["shortwave_radiation"].drop_nulls().is_empty():
-        msg = f"{models_parameter}: no data in {FIRST_DATE[:4]}-01, archive may start later"
-        raise RuntimeError(msg)
+    try:
+        fetch_previous_runs_frame(
+            sites=sites,
+            models_parameter=models_parameter,
+            start_date=FIRST_DATE,
+            end_date=f"{FIRST_DATE[:4]}-01-31",
+        )
+    except RuntimeError:
+        fetch_previous_runs_frame(
+            sites=sites,
+            models_parameter=models_parameter,
+            start_date=FIRST_DATE,
+            end_date=f"{FIRST_DATE[:4]}-12-31",
+        )
+        # The call above raises `RuntimeError` itself if the whole year is also all-null, which
+        # is the genuine "no data" case and propagates with its own message. Reaching this line
+        # means the year has real data even though January did not.
+        _LOG.info(
+            "%s: January %s is all-null, but the rest of %s has data",
+            models_parameter,
+            FIRST_DATE[:4],
+            FIRST_DATE[:4],
+        )
     return int(FIRST_DATE[:4])
 
 
@@ -429,9 +460,33 @@ def _fetch_model_checkpointed(
     last_year = int(_last_date()[:4])
     for year in range(first_year, last_year + 1):
         year_path = cache_dir / f"{year}.parquet"
+        # The final year's own end date is "yesterday", which moves forward on every calendar day
+        # this script is resumed on (the exact scenario a daily-quota refusal creates) — so a cache
+        # hit on that one year is only really complete if the cached rows already reach yesterday's
+        # date. Every earlier year's end date is fixed at its own 31 December and a cache hit there
+        # is unconditionally final.
         if year_path.exists():
-            _LOG.info("%s %d: already cached, skipping", model.output_dir, year)
-            continue
+            if year != last_year:
+                _LOG.info("%s %d: already cached, skipping", model.output_dir, year)
+                continue
+            cached_max_date = (
+                pl.scan_parquet(year_path).select(pl.col("time").max()).collect().item()
+            )
+            if cached_max_date is not None and str(cached_max_date.date()) >= _last_date():
+                _LOG.info(
+                    "%s %d: already cached through %s, skipping",
+                    model.output_dir,
+                    year,
+                    _last_date(),
+                )
+                continue
+            _LOG.info(
+                "%s %d: cached only through %s, refetching to extend to %s",
+                model.output_dir,
+                year,
+                cached_max_date,
+                _last_date(),
+            )
         start = FIRST_DATE if year == first_year else f"{year}-01-01"
         end = _last_date() if year == last_year else f"{year}-12-31"
         frame = fetch_previous_runs_frame(
@@ -443,9 +498,12 @@ def _fetch_model_checkpointed(
         _LOG.info("%s %d: wrote %d rows to %s", model.output_dir, year, frame.height, year_path)
         time.sleep(REQUEST_SLEEP_SECONDS)
 
-    return pl.concat(pl.read_parquet(path) for path in sorted(cache_dir.glob("*.parquet"))).sort(
-        "site", "time"
-    )
+    # A narrow glob matching only a bare `<year>.parquet` filename, never a `<year>.partial.parquet`
+    # a crash could leave behind between `write_parquet` and the rename above (or an old attempt for
+    # a model since dropped from `--model`): `*.parquet` would match both and double-count that
+    # year's rows into the combined frame.
+    year_paths = sorted(cache_dir.glob("[0-9][0-9][0-9][0-9].parquet"))
+    return pl.concat(pl.read_parquet(path) for path in year_paths).sort("site", "time")
 
 
 def _check_lead_differs(*, frame: pl.DataFrame) -> dict[str, float]:
@@ -480,10 +538,15 @@ def _check_timestamp_convention(*, frame: pl.DataFrame, sites: pl.DataFrame) -> 
 
     Also checks that it is non-zero only while the sun is up. Both are measured from the fetched
     data itself rather than assumed to carry over from the Historical Forecast API's convention.
-    For each site, solar geometry is evaluated at the label itself and at the label shifted 30
-    minutes earlier (the hour-ending mid-point `fetch_open_meteo_point._solar_geometry` uses), and
-    the correlation of the clear-sky envelope (`extraterrestrial_horizontal`) against the served
-    value is compared at both. **Reported, not asserted**: whichever shift correlates better in the
+    For each site, solar geometry is evaluated at three candidate midpoints — the label itself (an
+    instantaneous snapshot rather than an hourly mean), the label shifted 30 minutes earlier (the
+    hour-*ending* mid-point `fetch_open_meteo_point._solar_geometry` uses), and the label shifted 30
+    minutes later (the hour-*starting* mid-point) — and the correlation of the clear-sky envelope
+    (`extraterrestrial_horizontal`) against the served value is compared across all three. Testing
+    only the label and the earlier shift would leave the later shift unmeasured, so a served value
+    that is genuinely period-starting could be reported as "hour STARTING" from the label-offset
+    candidate alone even though that candidate is an instantaneous reading, not the true
+    period-starting midpoint. **Reported, not asserted**: whichever candidate correlates best in the
     fetched data is what the lineage note and README record.
 
     Args:
@@ -491,14 +554,16 @@ def _check_timestamp_convention(*, frame: pl.DataFrame, sites: pl.DataFrame) -> 
         sites: The roster, carrying `site`, `latitude`, `longitude`.
 
     Returns:
-        `corr_at_label`, `corr_shifted_30min_earlier`, and `frac_daytime_radiation_at_night`.
+        `corr_at_label`, `corr_shifted_30min_earlier`, `corr_shifted_30min_later`, and
+        `frac_daytime_radiation_at_night`.
     """
     coordinates = {
         str(row["site"]): (float(row["latitude"]), float(row["longitude"]))
         for row in sites.to_dicts()
     }
     at_label: list[np.ndarray] = []
-    shifted: list[np.ndarray] = []
+    shifted_earlier: list[np.ndarray] = []
+    shifted_later: list[np.ndarray] = []
     served: list[np.ndarray] = []
     night_violation = 0
     total = 0
@@ -507,17 +572,17 @@ def _check_timestamp_convention(*, frame: pl.DataFrame, sites: pl.DataFrame) -> 
         stamps = rows["time"]
         values = rows["shortwave_radiation"].fill_null(float("nan")).to_numpy()
         zenith_at_label = zenith(stamps=stamps, latitude=latitude, longitude=longitude)
-        zenith_shifted = zenith(
+        zenith_earlier = zenith(
             stamps=stamps.dt.offset_by("-30m"), latitude=latitude, longitude=longitude
         )
-        extraterrestrial_label = extraterrestrial_horizontal(
-            stamps=stamps, zenith_deg=zenith_at_label
+        zenith_later = zenith(
+            stamps=stamps.dt.offset_by("30m"), latitude=latitude, longitude=longitude
         )
-        extraterrestrial_shifted = extraterrestrial_horizontal(
-            stamps=stamps, zenith_deg=zenith_shifted
+        at_label.append(extraterrestrial_horizontal(stamps=stamps, zenith_deg=zenith_at_label))
+        shifted_earlier.append(
+            extraterrestrial_horizontal(stamps=stamps, zenith_deg=zenith_earlier)
         )
-        at_label.append(extraterrestrial_label)
-        shifted.append(extraterrestrial_shifted)
+        shifted_later.append(extraterrestrial_horizontal(stamps=stamps, zenith_deg=zenith_later))
         served.append(values)
         mask = ~np.isnan(values)
         night_violation += int(
@@ -534,11 +599,14 @@ def _check_timestamp_convention(*, frame: pl.DataFrame, sites: pl.DataFrame) -> 
 
     served_all = np.concatenate(served)
     valid = ~np.isnan(served_all)
-    corr_label = float(np.corrcoef(np.concatenate(at_label)[valid], served_all[valid])[0, 1])
-    corr_shifted = float(np.corrcoef(np.concatenate(shifted)[valid], served_all[valid])[0, 1])
+
+    def _corr(candidate: list[np.ndarray]) -> float:
+        return float(np.corrcoef(np.concatenate(candidate)[valid], served_all[valid])[0, 1])
+
     return {
-        "corr_at_label": corr_label,
-        "corr_shifted_30min_earlier": corr_shifted,
+        "corr_at_label": _corr(at_label),
+        "corr_shifted_30min_earlier": _corr(shifted_earlier),
+        "corr_shifted_30min_later": _corr(shifted_later),
         "frac_daytime_radiation_at_night": night_violation / total if total else float("nan"),
     }
 
@@ -621,8 +689,21 @@ def _write_docs_for_model(
         name: count / frame.height if frame.height else float("nan")
         for name, count in null_counts.items()
     }
-    better_shifted = timestamp["corr_shifted_30min_earlier"] > timestamp["corr_at_label"]
-    variant = "hour ENDING" if better_shifted else "hour STARTING"
+    best_candidate = max(
+        ("corr_at_label", "corr_shifted_30min_earlier", "corr_shifted_30min_later"),
+        key=lambda name: timestamp[name],
+    )
+    # A standalone label for a sentence ("best fit: hour ENDING") and an adjectival phrase for a
+    # sentence that already supplies its own noun ("hour-ending convention") — built separately so
+    # neither reads with a doubled "hour" (e.g. "hour ending hour") or a doubled "convention".
+    variant_label, variant_adjective = {
+        "corr_at_label": (
+            "an instantaneous snapshot at the label (matches neither hourly-mean convention well)",
+            "instantaneous-snapshot",
+        ),
+        "corr_shifted_30min_earlier": ("hour ENDING", "hour-ending"),
+        "corr_shifted_30min_later": ("hour STARTING", "hour-starting"),
+    }[best_candidate]
 
     write_lineage_note(
         product_dir=output_dir,
@@ -644,7 +725,7 @@ def _write_docs_for_model(
                 f"lead-mislabelling bug): {lead_diff}. Timestamp-convention check (clear-sky "
                 "correlation against the label itself vs. the label shifted 30 minutes earlier, "
                 "and the fraction of daytime-threshold radiation reported while the sun is below "
-                f"the horizon): {timestamp} — best fit is the {variant} convention. Native-step "
+                f"the horizon): {timestamp} — best fit: {variant_label}. Native-step "
                 "check (fraction of adjacent daytime hours with an exactly repeated "
                 "shortwave_radiation value, per lead — near-zero means a genuine hourly mean, "
                 "materially above zero means the served hourly value is held constant across a "
@@ -665,7 +746,7 @@ def _write_docs_for_model(
             ),
             "time": (
                 "UTC, timezone-aware. See `lineage.json`'s `note` field for the measured "
-                f"timestamp convention ({variant.lower()} hour, from the clear-sky check below)."
+                f"timestamp convention ({variant_adjective}, from the clear-sky check below)."
             ),
             **{name: _column_description(name=name) for name in _requested_variables()},
         },
@@ -686,7 +767,7 @@ def _write_docs_for_model(
                 "day 0."
             ),
             (
-                f"Timestamp convention measured as {variant.lower()}-hour from the clear-sky "
+                f"Timestamp convention measured as {variant_adjective} from the clear-sky "
                 "check in `lineage.json`'s `note` field — confirm this still holds before "
                 "joining against power readings with a different convention."
             ),

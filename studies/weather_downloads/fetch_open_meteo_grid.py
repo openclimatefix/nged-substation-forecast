@@ -4,7 +4,10 @@ One-off throwaway script for the downloads in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/841>. Covers the three
 Open-Meteo-served products the issue asks for first: ECMWF IFS HRES 9 km, DMI and KNMI
 HARMONIE-AROME, and Meteo-France ARPEGE Europe. A further Open-Meteo model needs only a new entry
-in `MODELS` below.
+in `MODELS` below. Each entry names its own `hourly_variables` — every model defaults to
+`RADIATION_VARIABLES`, and `ecmwf-ifs-hres` also carries `WIND_VARIABLES` for the wind-products
+study, so re-fetching one model never silently starts requesting a variable that has not been
+validated for it.
 
 The trial-area box is never printed, logged, or written into the output: only the grid points'
 `point_id` (a running index) travels into filenames and frames, exactly as
@@ -27,17 +30,47 @@ from typing import Any, Final
 
 import polars as pl
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR, load_trial_area_box
+from paths import WEATHER_DOWNLOADS_DIR, load_trial_area_box, open_meteo_api_key
 
-HISTORICAL_FORECAST_URL: Final[str] = "https://historical-forecast-api.open-meteo.com/v1/forecast"
+HISTORICAL_FORECAST_URL: Final[str] = (
+    "https://customer-historical-forecast-api.open-meteo.com/v1/forecast"
+    if open_meteo_api_key()
+    else "https://historical-forecast-api.open-meteo.com/v1/forecast"
+)
+"""The commercial host once `OPEN_METEO_API_KEY` is set (see `paths.open_meteo_api_key`), which
+lifts the free tier's daily/hourly/minutely rate limits entirely; the free host otherwise."""
 REQUEST_TIMEOUT_SECONDS: Final[float] = 600.0
 MAX_ATTEMPTS: Final[int] = 5
-HOURLY_VARIABLES: Final[tuple[str, ...]] = ("shortwave_radiation", "direct_radiation")
+RADIATION_VARIABLES: Final[tuple[str, ...]] = ("shortwave_radiation", "direct_radiation")
+"""The default `hourly=` set: every model in `MODELS` gets these unless it names its own."""
+WIND_VARIABLES: Final[tuple[str, ...]] = ("wind_speed_10m", "wind_speed_100m")
+"""Added to `ecmwf-ifs-hres`'s own set below, for the wind-products study
+(<https://github.com/openclimatefix/nged-substation-forecast/issues/841>). Kept off every other
+model here: each one's `hourly_variables` is what was actually requested and validated for that
+product, so giving a second model wind it has not been checked for would happen silently the next
+time this script re-fetches it."""
 GRID_SPACING_DEG: Final[float] = 0.05
 """Spacing used for every product here, chosen to land in the "a few dozen points" the issue
 describes across the box, rather than resolving each product at its own native grid spacing. Read
 from this one constant everywhere — the request, the lineage note, and the README all derive from
 it, so it can never drift out of sync with what was actually fetched."""
+
+POINT_ID_COLUMN_DESCRIPTION: Final[str] = (
+    "Running index (0-based) into the trial-area box's regular lat/lon grid at "
+    "`GRID_SPACING_DEG` spacing, in request order — not a coordinate, and not guaranteed to be a "
+    "distinct model grid cell (adjacent points can share a cell where the model's own resolution "
+    "is coarser than the grid spacing)."
+)
+
+VARIABLE_COLUMN_DESCRIPTIONS: Final[dict[str, str]] = {
+    "shortwave_radiation": "Global horizontal irradiance, W/m^2.",
+    "direct_radiation": "Direct (beam) horizontal irradiance, W/m^2.",
+    "wind_speed_10m": "10 m wind speed, km/h (Open-Meteo's default unit), instantaneous at `time`.",
+    "wind_speed_100m": "100 m wind speed, km/h (Open-Meteo's default unit), instantaneous at "
+    "`time`.",
+}
+"""README column description for each variable name that can appear in a model's
+`hourly_variables`. One entry per name `MODELS` can reference."""
 
 
 @dataclass(frozen=True)
@@ -53,14 +86,35 @@ class OpenMeteoGridModel:
     """A finding from the `data-validation` skill's checklist worth every reader knowing, or
     `None` where the check found nothing. Keep it to a sentence or two; the full numbers behind
     the claim live in this product's `lineage.json`."""
+    hourly_variables: tuple[str, ...] = RADIATION_VARIABLES
+    """The `hourly=` variables this model is fetched with. Defaults to the radiation-only set;
+    override per model where a study needs more, as `ecmwf-ifs-hres` does for wind."""
 
 
 MODELS: Final[dict[str, OpenMeteoGridModel]] = {
     "ecmwf-ifs-hres": OpenMeteoGridModel(
         output_dir="ECMWF-IFS-HRES",
-        models_parameter="ecmwf_ifs04",
+        models_parameter="ecmwf_ifs",
         label="ECMWF IFS HRES 9 km",
         docs_url="https://www.ecmwf.int/en/forecasts/documentation-and-support",
+        hourly_variables=RADIATION_VARIABLES + WIND_VARIABLES,
+        known_gotcha=(
+            "`models_parameter` was `ecmwf_ifs04` until this fix — nominally `ECMWF IFS 0.4°` "
+            "(~44 km, global), a different and much coarser product from the label's "
+            "`ECMWF IFS HRES 9 km`. On the **free** host, `ecmwf_ifs04` aliases to the same real "
+            "9 km field as `ecmwf_ifs` — `sources.py`'s own one-week check already confirmed "
+            "zero difference, correlation 1.0, and a fresh point-vs-grid cross-check made while "
+            "investigating this (comparing the free-host `beam_diffuse_ecmwf-ifs-hres.parquet` "
+            "against both the grid file's nearest point and a live customer-host query at the "
+            "same site) also found zero difference — so a file fetched via the free host before "
+            "this change is not wrong and needs no re-fetch. The alias does **not** hold on the "
+            "**commercial customer** host, though: confirmed live, `ecmwf_ifs04` there returns "
+            "`shortwave_radiation` and `wind_speed_100m` as entirely null (every value, every "
+            "point, every hour), while `ecmwf_ifs` returns real data matching the API's own "
+            "unrequested 'best match' default exactly. `ecmwf_ifs` is the identifier to use "
+            "unconditionally going forward — it works on both hosts — and is also what "
+            "`fetch_open_meteo_previous_runs.py` already uses for this same product."
+        ),
     ),
     "dmi-harmonie-arome": OpenMeteoGridModel(
         output_dir="DMI-HARMONIE-AROME",
@@ -129,7 +183,15 @@ def _get_json(*, url: str) -> Any:
     raise RuntimeError(msg)
 
 
-def fetch_grid_frame(
+POINTS_PER_REQUEST: Final[int] = 100
+"""Grid points per GET request. The customer API host's nginx front end refuses a request whose
+URI exceeds its buffer (confirmed: HTTP 414 Request-URI Too Large at the full 342-point URL,
+~13 KB, against `customer-historical-forecast-api.open-meteo.com` — the free host tolerates the
+same URL). 100 points keeps the URL to a few KB, comfortably under that limit, regardless of how
+many points the trial-area box's grid produces."""
+
+
+def _fetch_grid_batch(
     *,
     points: pl.DataFrame,
     variables: tuple[str, ...],
@@ -137,7 +199,7 @@ def fetch_grid_frame(
     start_date: str,
     end_date: str,
 ) -> pl.DataFrame:
-    """Fetch one date range at every grid point, in a single request.
+    """Fetch one date range at up to `POINTS_PER_REQUEST` grid points, in a single request.
 
     Args:
         points: Carries `point_id`, `latitude`, `longitude` (see `TrialAreaBox.grid_points`).
@@ -157,6 +219,9 @@ def fetch_grid_frame(
         f"&hourly={','.join(variables)}"
         f"&models={models_parameter}&timezone=UTC"
     )
+    api_key = open_meteo_api_key()
+    if api_key:
+        url += f"&apikey={api_key}"
     payload = _get_json(url=url)
     blocks = payload if isinstance(payload, list) else [payload]
     if len(blocks) != points.height:
@@ -170,6 +235,38 @@ def fetch_grid_frame(
         )
         for point_id, block in zip(points["point_id"], blocks, strict=True)
     ).with_columns(pl.col("time").str.to_datetime("%Y-%m-%dT%H:%M").dt.replace_time_zone("UTC"))
+
+
+def fetch_grid_frame(
+    *,
+    points: pl.DataFrame,
+    variables: tuple[str, ...],
+    models_parameter: str,
+    start_date: str,
+    end_date: str,
+) -> pl.DataFrame:
+    """Fetch one date range at every grid point, batched to `POINTS_PER_REQUEST` points a request.
+
+    Args:
+        points: Carries `point_id`, `latitude`, `longitude` (see `TrialAreaBox.grid_points`).
+        variables: Open-Meteo's names for the hourly variables to request.
+        models_parameter: The value of the API's `models=` query parameter.
+        start_date: First date to request, as `YYYY-MM-DD`.
+        end_date: Last date to request, as `YYYY-MM-DD`.
+
+    Returns:
+        One row per (point_id, time), with no coordinate column.
+    """
+    return pl.concat(
+        _fetch_grid_batch(
+            points=points[batch_start : batch_start + POINTS_PER_REQUEST],
+            variables=variables,
+            models_parameter=models_parameter,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        for batch_start in range(0, points.height, POINTS_PER_REQUEST)
+    )
 
 
 def _write_docs_for_model(
@@ -200,32 +297,42 @@ def _write_docs_for_model(
         start_date: First date actually fetched, `YYYY-MM-DD`.
         end_date: Last date actually fetched, `YYYY-MM-DD`.
     """
-    null_counts = frame.select(HOURLY_VARIABLES).null_count().row(0, named=True)
+    null_counts = frame.select(model.hourly_variables).null_count().row(0, named=True)
     null_summary = "; ".join(
         f"`{column}`: {count} null{'s' if count != 1 else ''}"
         for column, count in null_counts.items()
     )
     any_nulls = any(count > 0 for count in null_counts.values())
+    has_wind = any(name in model.hourly_variables for name in WIND_VARIABLES)
 
     write_lineage_note(
         product_dir=output_dir,
         source_address=HISTORICAL_FORECAST_URL,
         request_description=(
-            f"{model.label}, models={model.models_parameter}, hourly={','.join(HOURLY_VARIABLES)}, "
+            f"{model.label}, models={model.models_parameter}, "
+            f"hourly={','.join(model.hourly_variables)}, "
             f"{n_points} grid points at {GRID_SPACING_DEG} degree spacing inside the "
             f"trial-area box (a few grid cells' margin around the NGED generator roster's own "
             f"extent)"
         ),
-        variables=list(HOURLY_VARIABLES),
+        variables=list(model.hourly_variables),
         extra={
             "n_points": n_points,
             "grid_spacing_deg": GRID_SPACING_DEG,
             "date_range_fetched": [start_date, end_date],
             "row_count": frame.height,
             "note": (
-                "Each hourly value is a mean over the hour ENDING at its `time` label (confirmed "
-                "against clear-sky irradiance: values track best when shifted 20-30 minutes "
-                f"earlier), and `time` is timezone-aware UTC. Null counts in this fetch — "
+                "Each radiation value is a mean over the hour ENDING at its `time` label "
+                "(confirmed against clear-sky irradiance: values track best when shifted "
+                "20-30 minutes earlier)"
+                + (
+                    "; each wind value is instantaneous at `time` (Open-Meteo's own "
+                    "convention for `wind_speed_10m`/`wind_speed_100m`, unlike its "
+                    "period-ending radiation)"
+                    if has_wind
+                    else ""
+                )
+                + f", and `time` is timezone-aware UTC. Null counts in this fetch — "
                 f"{null_summary}." + (f" {model.known_gotcha}" if model.known_gotcha else "")
             ),
         },
@@ -237,15 +344,17 @@ def _write_docs_for_model(
         script_path="studies/weather_downloads/fetch_open_meteo_grid.py",
         lineage_filenames=["lineage.json"],
         columns={
-            "point_id": "Running index (0-based) into the trial-area box's regular lat/lon grid "
-            "at `GRID_SPACING_DEG` spacing, in request order — not a coordinate, and not "
-            "guaranteed to be a distinct model grid cell (adjacent points can share a cell where "
-            "the model's own resolution is coarser than the grid spacing).",
-            "time": "UTC, timezone-aware. Marks the END of the hour each value averages over "
-            "(confirmed against clear-sky irradiance).",
-            "shortwave_radiation": "Global horizontal irradiance, W/m^2.",
-            "direct_radiation": "Direct (beam) horizontal irradiance, W/m^2.",
-        },
+            "point_id": POINT_ID_COLUMN_DESCRIPTION,
+            "time": (
+                "UTC, timezone-aware. Marks the END of the hour each radiation value averages "
+                "over (confirmed against clear-sky irradiance); wind values at this same `time` "
+                "are instantaneous, not averaged."
+                if has_wind
+                else "UTC, timezone-aware. Marks the END of the hour each value averages over "
+                "(confirmed against clear-sky irradiance)."
+            ),
+        }
+        | {name: VARIABLE_COLUMN_DESCRIPTIONS[name] for name in model.hourly_variables},
         missing_value_convention=(
             f"Polars null. {null_summary} in this fetch"
             + (
@@ -279,7 +388,7 @@ def main() -> int:
 
     frame = fetch_grid_frame(
         points=points,
-        variables=HOURLY_VARIABLES,
+        variables=model.hourly_variables,
         models_parameter=model.models_parameter,
         start_date=arguments.start_date,
         end_date=arguments.end_date,
