@@ -3,7 +3,12 @@ import polars as pl
 import pytest
 import xarray as xr
 from pyproj import CRS, Transformer
-from studies.grid_sampling import nearest_cells, nearest_grid_indices, sample_nearest_cell
+from studies.grid_sampling import (
+    distance_matrix_km,
+    nearest_cells,
+    nearest_grid_indices,
+    sample_nearest_cell,
+)
 
 # A Lambert azimuthal equal-area grid centred on Great Britain, the projection UKV is served on. The
 # grid is deliberately not square, and its x and y ranges differ, so a sampler that swapped the axes
@@ -91,3 +96,16 @@ def test_grid_indices_name_each_sites_cell_on_a_grid_that_is_not_square():
 
     assert indices["lat_index"].to_list() == [3, 0]
     assert indices["lon_index"].to_list() == [6, 0]
+
+
+def test_the_distance_matrix_has_one_row_per_site_and_one_column_per_cell_in_frame_order():
+    sites = pl.DataFrame({"latitude": [0.0, 10.0], "longitude": [0.0, 0.0]})
+    cells = pl.DataFrame({"latitude": [1.0, 0.0, 10.0], "longitude": [0.0, 90.0, 0.0]})
+
+    distances = distance_matrix_km(sites=sites, cells=cells)
+
+    assert distances.shape == (2, 3)
+    assert distances[0, 0] == pytest.approx(111.195, rel=1e-4)
+    assert distances[0, 1] == pytest.approx(10007.5, rel=1e-4)
+    assert distances[1, 2] == 0.0
+    assert distances[1, 0] == pytest.approx(9 * 111.195, rel=1e-4)
