@@ -263,9 +263,10 @@ sets out the rule and the products the rule covers.
 
 ## Charts
 
-**Put plenty of charts in every study page, because many technical readers look at the charts before
-reading any text.** Each chart, with its title, subtitle, axis labels, and legend, tells its part of
-the story without the prose around it. Load the `dataviz` skill before drawing any chart.
+**Load the `dataviz` skill before drawing any chart, then apply the rules below on top of it.** Put
+plenty of charts in every study page, because many technical readers look at the charts before
+reading any text. Each chart, with its title, subtitle, axis labels, and legend, tells its part of
+the story without the prose around it.
 
 - **A headline chart opens every page**, directly under the summary and before the disclaimer,
   showing the headline result with its 95% intervals. Every section whose claim rests on a number
@@ -290,36 +291,14 @@ the story without the prose around it. Load the `dataviz` skill before drawing a
   per generator. [Does a weather product's beam/diffuse split help a PV
   forecast?](https://openclimatefix.github.io/nged-substation-forecast/studies/beam-diffuse-split/#the-models-work)
   is the pattern.
-- **Put no calendar dates on the axis of a metered generator's time series.** With only a handful
-  of generators in a study, an hourly series on known dates can be matched against publicly
-  available generation data, which identifies the generator behind its anonymised label. Count the
-  days of the week on the axis (days 1 to 7), and give each plotted period's month and year in the
-  page's text, never the day. Turn off per-point accessibility text (`aria=False` on the mark),
-  because Vega otherwise writes each point's date and value into the SVG's ARIA labels.
 - **The title states the finding, scoped to the products tested** ("CAMS describes past sunshine
   best of the six products we tested"), and matches the heading or bolded lead the chart sits under.
   A bare "ICON global is the weakest" ranks every product in existence on a test of five.
-- **Put the basics in the chart's own text, because many readers see the chart and nothing else.**
-  A reader landing on a chart must be able to answer every one of these questions from its title,
-  subtitle, axis titles, and legend alone:
-    - what is plotted, and in what unit;
-    - which direction is better, in words: "Mean absolute error (% of capacity; smaller is
-      better)", or "Mean absolute error minus ERA5's (points of capacity; more negative is better)";
-    - what zero means, on a labelled reference rule ("same as ERA5");
-    - what a dot, a line, and a shade mean ("Dot: estimate. Line: 95% interval from resampling whole
-      months");
-    - the scope: which generators, which region, and which period;
-    - which rows are planned, exploratory, or post hoc.
 - **Label a planned row "(planned)" only in a chart that mixes planned and exploratory rows.** Where
   every row of a chart is planned, or every row is exploratory, state the kind once in the subtitle:
   "All rows are planned: written into the study plan before any result existed." or "All rows are
   exploratory." `studies.charts.planning` works out which case a figure is from each row's
   `planned` column, and `figure` writes the matching subtitle line.
-- **Size each chart to the page's text column, so the chart shows at about 1:1 scale.** Stack panels
-  vertically rather than side by side, let the plot area fill the column's width, put every key
-  above the plot, and keep subtitles short. `studies.charts` draws every figure `CONTENT_WIDTH_PX`
-  wide, the width of the text column. Check that the text is legible in the built site, not only
-  in the SVG.
 - **Show paired differences with their intervals, not each arm's level with an interval.** The arms
   share their rows, so level intervals overlap even where the paired difference is statistically
   significant at the 5% level, and a reader takes the overlap to mean no difference. Put each arm's
@@ -328,21 +307,10 @@ the story without the prose around it. Load the `dataviz` skill before drawing a
   planned paired contrasts in a second panel below it.
 - **Take every number a chart shares with the page from the report**, so the chart cannot disagree
   with the page.
-- **Take colours from `plotting.ocf_theme`, which encodes OCF's brand guidelines, and check every set
-  with the `dataviz` skill's `validate_palette.js`.** On a published page use only the guidelines'
-  main data colours: Brand Orange `#FF4901`, Data Blue `#306BFF`, Data Sky `#10C5F7`, Data Purple
-  `#B701FF`, and Data Green `#17E58F`, with their light shades for a second condition of the same
-  series. The guidelines mark the additional data colours, such as the dark teal `#009C75` and the
-  amber `#FC9700`, for internal use only. `PALETTE`'s default order includes both of those, so set
-  every colour explicitly. One colour per product fails the check (Data Purple and Data Blue sit 2.0
-  ΔE apart under deuteranopia), so colour a group of products and put every product's name on the
-  axis.
 - **Show a product-type legend only where a chart holds more than one product type.** Where a chart
-  holds one type, colour the condition instead, such as the half of the year. Keep a different point
-  shape for each condition too, so the chart still reads without colour. `interval_panel` colours
-  the conditions and keeps their shapes on any panel of one product type.
-- **Write SVG, then optimise it** with `npx svgo@4 --multipass --precision=1 --final-newline`, as
-  `CLAUDE.md` requires, and look at every chart rendered to PNG before committing it.
+  holds one type, colour the condition instead, such as the half of the year, and give the condition
+  its own point shape too, per `dataviz`'s colour-first rule. `interval_panel` colours the
+  conditions and keeps their shapes on any panel of one product type.
 
 ## Writing the page
 
