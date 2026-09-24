@@ -545,7 +545,7 @@ def _hour_profile_lines(*, frame: pl.DataFrame) -> list[str]:
         .sort("hour_of_day")
     )
     lines = [
-        "#### Hour-of-day profile: the station, CAMS and ERA5 label their hours alike",
+        "#### Hour-of-day profile of the station, CAMS and ERA5 irradiance",
         "",
         "| Hour ending (UTC) | Rows | Station (W m⁻²) | CAMS (W m⁻²) | ERA5 (W m⁻²) |",
         "|---|---|---|---|---|",
@@ -559,7 +559,13 @@ def _hour_profile_lines(*, frame: pl.DataFrame) -> list[str]:
         name: int(profile.sort(name, descending=True)["hour_of_day"][0])
         for name in ("station", "cams", "era5")
     }
-    lines += ["", f"Peak hours (hour ending, UTC): {peaks}."]
+    lines += [
+        "",
+        (
+            f"Peak hour (hour ending, UTC): station {peaks['station']:02d}:00, "
+            f"CAMS {peaks['cams']:02d}:00, ERA5 {peaks['era5']:02d}:00."
+        ),
+    ]
     return lines
 
 
@@ -625,11 +631,12 @@ def _row_lines(*, frame: pl.DataFrame, candidates: int, repairs: dict[str, int])
     ]
 
 
-def _main_panel_lines(*, pooled: pl.DataFrame) -> list[str]:
+def _main_panel_lines(*, pooled: pl.DataFrame, frame: pl.DataFrame) -> list[str]:
     """Render how far ERA5 and CAMS refit here differ from the page's main row set.
 
     Args:
         pooled: Every arm's losses at the `pooled` setting.
+        frame: This section's row set, whose `(site, time)` keys restrict the main row set's losses.
 
     Returns:
         Markdown lines.
@@ -649,12 +656,23 @@ def _main_panel_lines(*, pooled: pl.DataFrame) -> list[str]:
             "section's row set is shorter."
         ),
         "",
-        "| Arm | This section | Main row set | Difference |",
-        "|---|---|---|---|",
+        (
+            "| Arm | This section | Main row set | Difference | Main row set's fit, scored on "
+            "this section's rows |"
+        ),
+        "|---|---|---|---|---|",
     ]
+    main_losses = pl.read_parquet(path.with_name("losses.parquet")).filter(
+        pl.col("setting") == "pooled"
+    )
+    keys = frame.select("site", "time")
     for arm, name in (("era5_global", "era5"), ("cams_global", "cams")):
         here = _mae(losses=pooled, arm=arm)
-        lines.append(f"| {arm} | {here:.3f} | {main[name]:.3f} | {here - main[name]:+.3f} |")
+        restricted = _mae(losses=main_losses.join(keys, on=["site", "time"], how="inner"), arm=arm)
+        lines.append(
+            f"| {arm} | {here:.3f} | {main[name]:.3f} | {here - main[name]:+.3f} "
+            f"| {restricted:.3f} |"
+        )
     return lines
 
 
@@ -750,7 +768,7 @@ def _report(
         "",
         *_agreement_lines(frame=frame),
         "",
-        *_main_panel_lines(pooled=pooled),
+        *_main_panel_lines(pooled=pooled, frame=frame),
         "",
     ]
     lines += geometry_lines(sites=sites, noun="solar farms")
