@@ -1,0 +1,960 @@
+"""Score ICON-DREAM-EU as a description of past wind, refitting every arm on its own row set.
+
+One-off throwaway script for the study in
+<https://github.com/openclimatefix/nged-substation-forecast/issues/841>, extending
+`wind_products.py`'s five-product comparison (ERA5, UKV, ICON-D2, ICON-EU, ICON global) with the
+German Weather Service's ICON-DREAM reanalysis. ICON-DREAM-EU is not on Open-Meteo, so its wind is
+read from a gridded download (`data/studies/weather/ICON-DREAM-EU/`) rather than fetched at each
+generator's coordinates: `WS`, `U`, `V` at ten model levels (65-74) and `WS_10M`, `U_10M`, `V_10M`
+at the surface, over 126 cells in a box around the trial area, September 2019 to August 2026.
+
+**This design is pre-registered and fixed before any fit runs, per the `study` skill.** The row set,
+the arms, the contrasts, the folds, the seeds and the hyperparameters below are written down before
+any result exists, and are not to be changed after seeing one.
+
+**Row set.** `common_rows(joined(sites=sites))` from `wind_products.py` — the same five products'
+wind, the same power hour (centred on the label, since wind is instantaneous), the same
+zero-half-hour and post-upgrade-tail drops — inner-joined to ICON-DREAM-EU's own columns, at each
+generator's nearest cell. **Every arm below, including the five original products, is refit on this
+row set**: it differs from `wind_products.py`'s own row set because it stops where ICON-DREAM-EU's
+record does (August 2026, a month short of the other five products'), so a saved loss from
+`wind_products.py`'s run cannot be reused without silently comparing two different row sets. The
+folds, eras, seeds, `SHARED_FEATURES` and hyperparameter settings are exactly `wind_products.py`'s.
+
+**Primary arm — `icon_dream_eu_wind`, the same four columns every product gets in the wind study**
+(`_wind_columns` from `wind_products.py`): ICON-DREAM-EU's level-72 speed (about 96 m — DWD's own
+`generalVerticalLayer` numbering, not a 0-based index; see `LEVEL_HEIGHTS_M`), that level's
+direction as sine and cosine from `U` and `V`, and the 10 m speed from `WS_10M`. ERA5 and UKV are
+shown their 100 m wind and the ICON products their 80 m wind, as in `wind_products.py`;
+ICON-DREAM-EU is shown its native level 72 because DWD does not serve an 80 m or 100 m
+interpolation of it.
+
+**Planned contrasts, at both hyperparameter settings — the only ones a recommendation may rest on:**
+
+- `icon_dream_eu_wind − era5_wind`: the two reanalyses.
+- `icon_dream_eu_wind − icon_eu_wind`: the reanalysis against the operational model it is built on.
+
+**Exploratory arms and contrasts, each labelled so in the report:**
+
+- ICON-DREAM-EU's wind against UKV, ICON-D2 and ICON global.
+- `icon_dream_eu_levels`: the four `icon_dream_eu_wind` columns plus the speeds at levels 73 (about
+  42 m) and 71 (about 167 m), against `icon_dream_eu_wind` — whether shear across three heights adds
+  skill. This arm carries two more columns than its reference, so its comparison is read with the
+  column-count caveat the `study` skill states: an arm with more columns can win without carrying
+  more information, and this repository's own measurement puts that effect at up to 10% of mean
+  absolute error at `colsample_bytree` below 1 and about 0.4% even at 1 (this study's setting).
+- A speed-only arm per product (`SHARED_FEATURES` plus one hub-height speed column), showing what
+  the speed alone, with no direction, carries.
+- The two planned contrasts, by generator (W1-W3) and by calendar year (the same months in every
+  year, the "too few months" rule, `bootstrap_year_change` between 2025 and 2026).
+
+**Before any fit runs**, this script's checks establish: that ICON-DREAM-EU's `U`, `V` and `WS`
+agree (`check_component_speed`), that direction from `U`/`V` agrees with ERA5's 100 m direction
+(`check_direction_against_era5`), that the two products' hour-to-hour changes correlate most at zero
+offset (`check_timestamp_offset`), and each generator's nearest cell and its distance
+(`icon_dream_site_frame`, via `extract_site_series._log_distances`). **The duplicate-key gate is a
+hard stop, not a warning**: DWD assembles ICON-DREAM-EU's hourly series from overlapping short-range
+forecast steps with no overlap resolved, so a `(valid_time, model_level, cell_id)` key held by more
+than one row means a choice between duplicates that needs a design decision, not code silently
+picking one (`raise_on_duplicate_keys`).
+
+Run it with `uv run python studies/beam_diffuse_split/wind_icon_dream.py`, after
+`fetch_wind_point.py`. `--resume` reuses `losses.parquet` if its saved fingerprint (the row set,
+every job's columns, the seeds, and the hyperparameters) still matches this run; a mismatch raises
+rather than mixing stale fits, and `refuse_to_overwrite` on a fresh run means an existing output has
+to move to a `superseded/` subfolder first. `--report-only` rebuilds `report.md` from the saved
+`losses.parquet` alone, fitting nothing.
+"""
+
+import argparse
+import hashlib
+import logging
+import sys
+from pathlib import Path
+from typing import Final
+
+import numpy as np
+import polars as pl
+from build_dataset import _wind_sites
+from extract_site_series import ICON_DREAM_CELL_CENTRES, _icon_dream_cell_centres, _log_distances
+from fetch_wind_point import output_path_for
+from run_experiment import Job, _add_time_features, run_all
+from sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
+from studies.bootstrap import (
+    MIN_MONTHS_FOR_INTERVAL,
+    YearChangeInterval,
+    YearInterval,
+    bootstrap_difference_by_year,
+    bootstrap_year_change,
+)
+from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SEEDS, SENSITIVITY_HYPER_PARAMETERS
+from studies.grid_sampling import nearest_cells
+from studies.guards import refuse_to_overwrite
+from weather_products import CONTRAST_HEADER, METRIC, PERCENTAGE_POINTS, _contrast_line, _mae
+from wind_products import (
+    ERA5_BY_YEAR_MONTHS,
+    SHARED_FEATURES,
+    _hub_height_m,
+    _wind_columns,
+    common_rows,
+    geometry_lines,
+    joined,
+    with_eras,
+)
+
+_LOG: Final[logging.Logger] = logging.getLogger(__name__)
+
+OUTPUT_DIR_NAME: Final[str] = "wind_icon_dream"
+"""The results directory under `sources.STUDY_DATA_DIR / 'past_weather_v2'`."""
+
+OUTPUT_DIR: Final[Path] = STUDY_DATA_DIR / "past_weather_v2" / OUTPUT_DIR_NAME
+"""Where this study writes `losses.parquet`, `report.md`, and a `superseded/` folder for re-runs."""
+
+ICON_DREAM_DIR: Final[Path] = WEATHER_DATA_DIR / "ICON-DREAM-EU"
+"""Holds the wind download this script reads: `WS`, `U`, `V`, and their `_10M` siblings."""
+
+WS_FILE: Final[str] = "WS_201909_202608.parquet"
+U_FILE: Final[str] = "U_201909_202608.parquet"
+V_FILE: Final[str] = "V_201909_202608.parquet"
+WS_10M_FILE: Final[str] = "WS_10M_201909_202608.parquet"
+U_10M_FILE: Final[str] = "U_10M_201909_202608.parquet"
+V_10M_FILE: Final[str] = "V_10M_201909_202608.parquet"
+
+LEVEL_HEIGHTS_M: Final[dict[int, int]] = {74: 10, 73: 42, 72: 96, 71: 167, 70: 253}
+"""DWD's `generalVerticalLayer` value to its nominal full-level height in metres.
+
+DWD numbers levels top-down, so 74 (the largest value) is nearest the ground. Read from the
+"Height of the full and half levels" table in DWD's ICON-DREAM parameter table
+(`.claude/worktrees/scratch/icon-dream-check/param_table.txt`, EU column, full levels): level 74 at
+10.000 m, 73 at 42.083 m, 72 at 95.582 m, 71 at 166.626 m, 70 at 253.409 m. The table prints these
+with a comma as the decimal separator, not as a thousands separator.
+"""
+
+HUB_LEVEL: Final[int] = 72
+"""ICON-DREAM-EU's level shown as the study's hub-height wind, about 96 m."""
+
+LEVELS_ARM_EXTRA_LEVELS: Final[tuple[int, int]] = (73, 71)
+"""The two extra levels `icon_dream_eu_levels` is shown, about 42 m and 167 m."""
+
+MAX_PLAUSIBLE_CELL_DISTANCE_KM: Final[float] = 10.0
+"""A generator's nearest ICON-DREAM-EU cell should sit within about 1.5 cell widths.
+
+ICON-DREAM-EU's triangles are about 6.5 km across (`extract_site_series.py`), so a generator well
+inside the download's 126-cell box should read a cell within a few kilometres. A distance beyond
+this points at a generator sitting near or outside the box the download covers.
+"""
+
+PRODUCT: Final[str] = "icon_dream_eu"
+"""This study's own product key, matching `wind_products._wind_columns`' naming."""
+
+HUB_HEIGHT_M: Final[dict[str, int]] = {
+    "era5": _hub_height_m(product="era5"),
+    "ukv": _hub_height_m(product="ukv"),
+    "icon_d2": _hub_height_m(product="icon_d2"),
+    "icon_eu": _hub_height_m(product="icon_eu"),
+    "icon_global": _hub_height_m(product="icon_global"),
+    PRODUCT: LEVEL_HEIGHTS_M[HUB_LEVEL],
+}
+"""Every product's hub height, for the report. `wind_products._hub_height_m` reads `icon_dream_eu`
+as an ICON product (80 m) by its name prefix, which is wrong for this study's own product, so its
+entry is set explicitly from `LEVEL_HEIGHTS_M` instead.
+"""
+
+DECIDING_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    (f"{PRODUCT}_wind", "era5_wind"),
+    (f"{PRODUCT}_wind", "icon_eu_wind"),
+)
+"""The two contrasts the recommendations rest on, named before the run.
+
+Whether the reanalysis beats ERA5, the other reanalysis; and whether it beats the operational model
+it is built on. Every other contrast in the report is exploratory.
+"""
+
+EXPLORATORY_PRODUCT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    (f"{PRODUCT}_wind", "ukv_wind"),
+    (f"{PRODUCT}_wind", "icon_d2_wind"),
+    (f"{PRODUCT}_wind", "icon_global_wind"),
+)
+"""ICON-DREAM-EU's wind against the three remaining products, exploratory."""
+
+LEVELS_CONTRAST: Final[tuple[str, str]] = (f"{PRODUCT}_levels", f"{PRODUCT}_wind")
+"""Whether the two extra levels (shear) add skill over the hub-height-only arm, exploratory.
+
+`{PRODUCT}_levels` carries two more feature columns than `{PRODUCT}_wind`; read this contrast with
+the column-count caveat in this module's docstring and the `study` skill.
+"""
+
+ERA5_YEAR_CHANGE_YEARS: Final[tuple[int, int]] = (2025, 2026)
+"""The two years `_by_year_lines` tests for a change in each planned contrast, on matched months."""
+
+
+def filter_nan_padding(*, frame: pl.DataFrame, value_columns: list[str]) -> pl.DataFrame:
+    """Drop cfgrib's NaN-padded rows, holding not-a-number in any of `value_columns`.
+
+    cfgrib pads the (time, step) grid to a rectangle at each month boundary, leaving three
+    not-a-number rows per (cell[, level]) per month. These are `Float32` `NaN`, not a Polars null,
+    so `is_not_nan()` is what removes them; a naive `unique()` on the raw rows can keep one instead
+    of the real value.
+
+    Args:
+        frame: The raw download, one row per (valid_time[, model_level], cell_id).
+        value_columns: The float columns cfgrib pads with not-a-number.
+
+    Returns:
+        `frame` without any row holding not-a-number in any of `value_columns`.
+    """
+    condition = pl.all_horizontal([pl.col(column).is_not_nan() for column in value_columns])
+    return frame.filter(condition)
+
+
+def duplicate_key_counts(*, frame: pl.DataFrame, key_columns: list[str]) -> pl.DataFrame:
+    """Return every key in `frame` held by more than one row.
+
+    Args:
+        frame: The rows to check, after `filter_nan_padding`.
+        key_columns: The columns that should together identify one row.
+
+    Returns:
+        One row per duplicated key with `n_rows`, sorted by `n_rows` descending; empty if every key
+        is unique.
+    """
+    return (
+        frame.group_by(key_columns)
+        .agg(n_rows=pl.len())
+        .filter(pl.col("n_rows") > 1)
+        .sort("n_rows", descending=True)
+    )
+
+
+def raise_on_duplicate_keys(*, frame: pl.DataFrame, key_columns: list[str], label: str) -> None:
+    """Raise if any key in `frame` is held by more than one row, after the NaN filter.
+
+    A hard gate, not a warning: DWD assembles ICON-DREAM-EU's hourly series from overlapping
+    short-range forecast steps and keeps every (time, step) value as reported, with no overlap
+    resolved, so a duplicated key means a real choice between two published values. Which value to
+    keep is a design decision this script does not make silently.
+
+    Args:
+        frame: The rows to check, after `filter_nan_padding`.
+        key_columns: The columns that should together identify one row.
+        label: What to call `frame` in the error message, such as a filename.
+
+    Raises:
+        ValueError: Naming the duplicate count and a few example keys.
+    """
+    duplicates = duplicate_key_counts(frame=frame, key_columns=key_columns)
+    if duplicates.height:
+        examples = duplicates.head(5).to_dicts()
+        msg = (
+            f"{label}: {duplicates.height} keys of {key_columns} hold more than one row after the "
+            f"NaN filter; examples: {examples}. The choice between duplicates needs a design "
+            "decision, so this is a hard gate rather than a silent dedupe."
+        )
+        raise ValueError(msg)
+
+
+def speed_at_level(*, frame: pl.DataFrame, level: int) -> pl.DataFrame:
+    """Return one model level's rows only, with `model_level` dropped.
+
+    Args:
+        frame: Rows carrying `model_level`, DWD's `generalVerticalLayer` numbering.
+        level: The level to keep, a key of `LEVEL_HEIGHTS_M`.
+
+    Returns:
+        `frame` filtered to `level`, with `model_level` dropped.
+
+    Raises:
+        ValueError: If `level` is not one of `LEVEL_HEIGHTS_M`'s keys.
+    """
+    if level not in LEVEL_HEIGHTS_M:
+        msg = f"level {level} is not one of the served levels {sorted(LEVEL_HEIGHTS_M)}"
+        raise ValueError(msg)
+    return frame.filter(pl.col("model_level") == level).drop("model_level")
+
+
+def wind_direction_degrees(*, u: pl.Expr, v: pl.Expr) -> pl.Expr:
+    """Return the meteorological wind direction, in degrees, that `u` and `v` blow from.
+
+    Meteorological convention: 0 degrees is a wind from the north, 90 from the east, measured
+    clockwise — the direction the wind blows *from*, opposite its own velocity vector. For example,
+    `u=0, v=-5` (blowing due south) is a wind from the north, 0 degrees; `u=5, v=0` (blowing due
+    east) is a wind from the west, 270 degrees.
+
+    Args:
+        u: Eastward wind component, m/s (positive eastward).
+        v: Northward wind component, m/s (positive northward).
+
+    Returns:
+        Direction in degrees, wrapped to [0, 360).
+    """
+    return (pl.arctan2(-u, -v).degrees() + 360.0) % 360.0
+
+
+def mean_absolute_angle_difference_deg(*, a_deg: pl.Series, b_deg: pl.Series) -> float:
+    """Return the mean absolute difference between two series of circular angles.
+
+    Args:
+        a_deg: One series of angles in degrees, 0-360.
+        b_deg: The other series of angles in degrees, 0-360, the same length and row order.
+
+    Returns:
+        The mean of `abs(((a - b + 180) % 360) - 180)`, in degrees, which never exceeds 180.
+    """
+    wrapped = ((a_deg - b_deg + 180.0) % 360.0) - 180.0
+    return float(pl.select(wrapped.abs().mean()).item())
+
+
+def _read_level_variable(*, filename: str, value_column: str) -> pl.DataFrame:
+    """Read one multi-level ICON-DREAM-EU variable, NaN-filtered and duplicate-key-checked.
+
+    Args:
+        filename: One of `WS_FILE`, `U_FILE`, `V_FILE`.
+        value_column: The variable's own value column.
+
+    Returns:
+        `valid_time`, `model_level`, `cell_id`, `value_column`.
+
+    Raises:
+        ValueError: If any `(valid_time, model_level, cell_id)` key holds more than one row.
+    """
+    frame = filter_nan_padding(
+        frame=pl.read_parquet(ICON_DREAM_DIR / filename), value_columns=[value_column]
+    )
+    raise_on_duplicate_keys(
+        frame=frame, key_columns=["valid_time", "model_level", "cell_id"], label=filename
+    )
+    return frame
+
+
+def _read_surface_variable(*, filename: str, value_column: str) -> pl.DataFrame:
+    """Read one single-level (10 m) ICON-DREAM-EU variable, NaN-filtered and duplicate-checked.
+
+    Args:
+        filename: One of `WS_10M_FILE`, `U_10M_FILE`, `V_10M_FILE`.
+        value_column: The variable's own value column.
+
+    Returns:
+        `valid_time`, `cell_id`, `value_column`.
+
+    Raises:
+        ValueError: If any `(valid_time, cell_id)` key holds more than one row.
+    """
+    frame = filter_nan_padding(
+        frame=pl.read_parquet(ICON_DREAM_DIR / filename), value_columns=[value_column]
+    )
+    raise_on_duplicate_keys(frame=frame, key_columns=["valid_time", "cell_id"], label=filename)
+    return frame
+
+
+def _as_time(frame: pl.DataFrame) -> pl.DataFrame:
+    """Cast `valid_time` (naive, implicitly UTC) to a tz-aware `time` column, dropping the old one.
+
+    Args:
+        frame: Rows carrying `valid_time`.
+
+    Returns:
+        `frame` with `valid_time` replaced by `time`, cast to `Datetime("us", "UTC")`.
+    """
+    return frame.with_columns(
+        time=pl.col("valid_time").cast(pl.Datetime("us")).dt.replace_time_zone("UTC")
+    ).drop("valid_time")
+
+
+def icon_dream_cells(*, sites: pl.DataFrame, cell_ids: list[int]) -> pl.DataFrame:
+    """Return each site's nearest ICON-DREAM-EU cell, logging and checking its distance.
+
+    Reuses `extract_site_series._icon_dream_cell_centres` (cached at `ICON_DREAM_CELL_CENTRES`,
+    already written by the solar round's download) and `studies.grid_sampling.nearest_cells`, the
+    same nearest-cell code the solar study's `extract_icon_dream` uses.
+
+    Args:
+        sites: The wind roster, carrying `site`, `latitude`, `longitude`.
+        cell_ids: The cell ids the download holds.
+
+    Returns:
+        One row per site with `site`, `cell_id`, `distance_km`.
+
+    Raises:
+        ValueError: If any site's nearest cell sits further than `MAX_PLAUSIBLE_CELL_DISTANCE_KM`
+            away, which would mean the site sits near or outside the download's box.
+    """
+    centres = _icon_dream_cell_centres(cache=ICON_DREAM_CELL_CENTRES, cell_ids=cell_ids)
+    nearest = nearest_cells(sites=sites, cells=centres)
+    _log_distances(product="ICON-DREAM-EU", nearest=nearest)
+    too_far = nearest.filter(pl.col("distance_km") > MAX_PLAUSIBLE_CELL_DISTANCE_KM)
+    if too_far.height:
+        msg = (
+            f"{too_far.height} site(s) sit more than {MAX_PLAUSIBLE_CELL_DISTANCE_KM} km from "
+            f"their nearest ICON-DREAM-EU cell: {too_far.select('site', 'distance_km').to_dicts()}"
+        )
+        raise ValueError(msg)
+    return nearest
+
+
+def icon_dream_site_frame(*, sites: pl.DataFrame) -> pl.DataFrame:
+    """Return each wind generator's nearest-cell ICON-DREAM-EU wind, hourly.
+
+    Args:
+        sites: The wind roster, carrying `site`, `latitude`, `longitude`.
+
+    Returns:
+        One row per (site, time) with `speed_hub_icon_dream_eu` (level `HUB_LEVEL`, ~96 m),
+        `direction_sin_icon_dream_eu` and `direction_cos_icon_dream_eu` (from `U`/`V` at that
+        level), `speed_10m_icon_dream_eu`, and `speed_73_icon_dream_eu` / `speed_71_icon_dream_eu`
+        for `LEVELS_ARM_EXTRA_LEVELS`.
+    """
+    ws = _read_level_variable(filename=WS_FILE, value_column="ws_m_s")
+    u = _read_level_variable(filename=U_FILE, value_column="u_m_s")
+    v = _read_level_variable(filename=V_FILE, value_column="v_m_s")
+    ws_10m = _as_time(_read_surface_variable(filename=WS_10M_FILE, value_column="ws_10m_m_s"))
+
+    cell_ids = sorted(ws["cell_id"].unique().to_list())
+    nearest = icon_dream_cells(sites=sites, cell_ids=cell_ids)
+    wanted = nearest["cell_id"].unique().to_list()
+
+    speed_name, sine_name, cosine_name, surface_name = _wind_columns(product=PRODUCT)
+
+    hub_u = speed_at_level(frame=u, level=HUB_LEVEL).rename({"u_m_s": "u_hub"})
+    hub_v = speed_at_level(frame=v, level=HUB_LEVEL).rename({"v_m_s": "v_hub"})
+    hub_ws = speed_at_level(frame=ws, level=HUB_LEVEL).rename({"ws_m_s": speed_name})
+    direction_deg = wind_direction_degrees(u=pl.col("u_hub"), v=pl.col("v_hub"))
+    hub = _as_time(
+        hub_u.join(hub_v, on=["valid_time", "cell_id"])
+        .join(hub_ws, on=["valid_time", "cell_id"])
+        .with_columns(
+            **{
+                sine_name: direction_deg.radians().sin(),
+                cosine_name: direction_deg.radians().cos(),
+            }
+        )
+        .drop("u_hub", "v_hub")
+    )
+
+    extra_levels = [
+        _as_time(
+            speed_at_level(frame=ws, level=level).rename({"ws_m_s": f"speed_{level}_{PRODUCT}"})
+        )
+        for level in LEVELS_ARM_EXTRA_LEVELS
+    ]
+
+    frame = hub.join(ws_10m.rename({"ws_10m_m_s": surface_name}), on=["time", "cell_id"])
+    for extra in extra_levels:
+        frame = frame.join(extra, on=["time", "cell_id"])
+
+    return (
+        nearest.select("site", "cell_id")
+        .join(frame.filter(pl.col("cell_id").is_in(wanted)), on="cell_id")
+        .drop("cell_id")
+        .sort("site", "time")
+    )
+
+
+def check_component_speed(*, level: int) -> dict[str, float]:
+    """Compare `sqrt(u^2 + v^2)` with the served wind speed, at one level, over the whole box.
+
+    Args:
+        level: A key of `LEVEL_HEIGHTS_M`.
+
+    Returns:
+        `median_abs_diff_m_s` and `p99_abs_diff_m_s`.
+    """
+    u = speed_at_level(
+        frame=_read_level_variable(filename=U_FILE, value_column="u_m_s"), level=level
+    )
+    v = speed_at_level(
+        frame=_read_level_variable(filename=V_FILE, value_column="v_m_s"), level=level
+    )
+    ws = speed_at_level(
+        frame=_read_level_variable(filename=WS_FILE, value_column="ws_m_s"), level=level
+    )
+    joined_frame = u.join(v, on=["valid_time", "cell_id"]).join(ws, on=["valid_time", "cell_id"])
+    computed = (pl.col("u_m_s") ** 2 + pl.col("v_m_s") ** 2).sqrt()
+    diff = (computed - pl.col("ws_m_s")).abs()
+    result = joined_frame.select(
+        median_abs_diff_m_s=diff.median(), p99_abs_diff_m_s=diff.quantile(0.99)
+    ).row(0, named=True)
+    return {key: float(value) for key, value in result.items()}
+
+
+def check_component_speed_10m() -> dict[str, float]:
+    """Compare `sqrt(u^2 + v^2)` with the served 10 m wind speed, over the whole box.
+
+    Returns:
+        `median_abs_diff_m_s` and `p99_abs_diff_m_s`.
+    """
+    u = _read_surface_variable(filename=U_10M_FILE, value_column="u_10m_m_s")
+    v = _read_surface_variable(filename=V_10M_FILE, value_column="v_10m_m_s")
+    ws = _read_surface_variable(filename=WS_10M_FILE, value_column="ws_10m_m_s")
+    joined_frame = u.join(v, on=["valid_time", "cell_id"]).join(ws, on=["valid_time", "cell_id"])
+    computed = (pl.col("u_10m_m_s") ** 2 + pl.col("v_10m_m_s") ** 2).sqrt()
+    diff = (computed - pl.col("ws_10m_m_s")).abs()
+    result = joined_frame.select(
+        median_abs_diff_m_s=diff.median(), p99_abs_diff_m_s=diff.quantile(0.99)
+    ).row(0, named=True)
+    return {key: float(value) for key, value in result.items()}
+
+
+def check_direction_against_era5(*, sites: pl.DataFrame) -> dict[str, float]:
+    """Return the mean absolute angle difference between ICON-DREAM-EU's and ERA5's directions.
+
+    ICON-DREAM-EU's direction is read at `HUB_LEVEL` (~96 m) from `U` and `V`; ERA5's is its served
+    100 m direction, from `fetch_wind_point.py`'s download. Only the direction columns are used;
+    speed plays no part in this check.
+
+    Args:
+        sites: The wind roster, carrying `site`, `latitude`, `longitude`.
+
+    Returns:
+        One entry per site label, plus `"all"`, of the mean absolute angle difference in degrees.
+    """
+    u = speed_at_level(
+        frame=_read_level_variable(filename=U_FILE, value_column="u_m_s"), level=HUB_LEVEL
+    ).rename({"u_m_s": "u_hub"})
+    v = speed_at_level(
+        frame=_read_level_variable(filename=V_FILE, value_column="v_m_s"), level=HUB_LEVEL
+    ).rename({"v_m_s": "v_hub"})
+    cell_ids = sorted(u["cell_id"].unique().to_list())
+    nearest = icon_dream_cells(sites=sites, cell_ids=cell_ids)
+    directions = _as_time(
+        u.join(v, on=["valid_time", "cell_id"]).with_columns(
+            icon_dream_direction=wind_direction_degrees(u=pl.col("u_hub"), v=pl.col("v_hub"))
+        )
+    )
+    per_site_icon_dream = (
+        nearest.select("site", "cell_id")
+        .join(directions.select("cell_id", "time", "icon_dream_direction"), on="cell_id")
+        .drop("cell_id")
+    )
+    era5 = pl.read_parquet(output_path_for(product="era5")).select(
+        "site", "time", era5_direction=pl.col("wind_direction_100m")
+    )
+    joined_frame = per_site_icon_dream.join(era5, on=["site", "time"], how="inner")
+    results = {
+        row["site"]: mean_absolute_angle_difference_deg(
+            a_deg=joined_frame.filter(pl.col("site") == row["site"])["icon_dream_direction"],
+            b_deg=joined_frame.filter(pl.col("site") == row["site"])["era5_direction"],
+        )
+        for row in sites.select("site").unique().iter_rows(named=True)
+    }
+    results["all"] = mean_absolute_angle_difference_deg(
+        a_deg=joined_frame["icon_dream_direction"], b_deg=joined_frame["era5_direction"]
+    )
+    return results
+
+
+OFFSET_SCAN_HOURS: Final[tuple[int, ...]] = (-2, -1, 0, 1, 2)
+"""The offsets `check_timestamp_offset` scans, in hours."""
+
+
+def check_timestamp_offset(*, sites: pl.DataFrame) -> dict[int, float]:
+    """Correlate ICON-DREAM-EU's and ERA5's hour-to-hour speed changes, at each offset scanned.
+
+    Uses no power data. Each series' hour-to-hour first difference is more sensitive to a timestamp
+    error than the levels themselves, which both products keep inside a narrow physical range
+    regardless of any shift.
+
+    Args:
+        sites: The wind roster, carrying `site`, `latitude`, `longitude`.
+
+    Returns:
+        One Pearson correlation per offset in `OFFSET_SCAN_HOURS`, pooled over every site, of
+        ICON-DREAM-EU's speed change against ERA5's shifted by that many hours.
+    """
+    icon_dream = icon_dream_site_frame(sites=sites).select(
+        "site", "time", speed=pl.col(f"speed_hub_{PRODUCT}")
+    )
+    era5 = pl.read_parquet(output_path_for(product="era5")).select(
+        "site", "time", speed=pl.col("wind_speed_100m")
+    )
+    results: dict[int, float] = {}
+    for offset in OFFSET_SCAN_HOURS:
+        shifted = era5.with_columns(time=pl.col("time").dt.offset_by(f"{-offset}h"))
+        joined_frame = (
+            icon_dream.sort("site", "time")
+            .join(shifted.sort("site", "time"), on=["site", "time"], suffix="_era5")
+            .sort("site", "time")
+            .with_columns(
+                icon_dream_diff=pl.col("speed").diff().over("site"),
+                era5_diff=pl.col("speed_era5").diff().over("site"),
+            )
+            .drop_nulls(["icon_dream_diff", "era5_diff"])
+        )
+        results[offset] = float(
+            np.corrcoef(
+                joined_frame["icon_dream_diff"].to_numpy(), joined_frame["era5_diff"].to_numpy()
+            )[0, 1]
+        )
+    return results
+
+
+def icon_dream_common_rows(*, sites: pl.DataFrame) -> pl.DataFrame:
+    """Return the pre-registered row set: `common_rows(joined(...))` inner-joined to ICON-DREAM-EU.
+
+    Args:
+        sites: The wind roster.
+
+    Returns:
+        One row per common site-hour, carrying the five original products' wind, ICON-DREAM-EU's
+        wind, the power, the capacity, `constrained`, `cap_mw`, `hour_of_day`, `day_of_year`,
+        `month`, `era`, `era_code` and `fold`.
+    """
+    base = common_rows(frame=joined(sites=sites))
+    icon_dream = icon_dream_site_frame(sites=sites)
+    frame = base.join(icon_dream, on=["site", "time"], how="inner")
+    return with_eras(frame=_add_time_features(dataset=frame))
+
+
+def jobs() -> list[Job]:
+    """Return every arm's job: the five products, ICON-DREAM-EU, its levels arm and speed-only arms.
+
+    Returns:
+        One job per arm; the two deciding contrasts' arms are duplicated at
+        `SENSITIVITY_HYPER_PARAMETERS`.
+    """
+    products = ("era5", "ukv", "icon_d2", "icon_eu", "icon_global", PRODUCT)
+    job_list: list[Job] = []
+    for product in products:
+        columns = (*SHARED_FEATURES, *_wind_columns(product=product))
+        job_list.append(
+            (f"{product}_wind", "pooled", "power_mw", columns, PRIMARY_HYPER_PARAMETERS, False)
+        )
+    for product in ("era5", "icon_eu", PRODUCT):
+        columns = (*SHARED_FEATURES, *_wind_columns(product=product))
+        job_list.append(
+            (
+                f"{product}_wind",
+                "sensitivity",
+                "power_mw",
+                columns,
+                SENSITIVITY_HYPER_PARAMETERS,
+                False,
+            )
+        )
+    levels_columns = (
+        *SHARED_FEATURES,
+        *_wind_columns(product=PRODUCT),
+        *(f"speed_{level}_{PRODUCT}" for level in LEVELS_ARM_EXTRA_LEVELS),
+    )
+    job_list.append(
+        (f"{PRODUCT}_levels", "pooled", "power_mw", levels_columns, PRIMARY_HYPER_PARAMETERS, False)
+    )
+    for product in products:
+        hub_speed = _wind_columns(product=product)[0]
+        job_list.append(
+            (
+                f"{product}_speed_only",
+                "pooled",
+                "power_mw",
+                (*SHARED_FEATURES, hub_speed),
+                PRIMARY_HYPER_PARAMETERS,
+                False,
+            )
+        )
+    return job_list
+
+
+def _fingerprint(*, frame: pl.DataFrame, job_list: list[Job]) -> str:
+    """Return a hash covering the row set, every job's columns, and the seeds.
+
+    `--resume` refuses to reuse a saved `losses.parquet` when this does not match, so a code change
+    that moves the row set, a column, a seed, or a hyperparameter setting cannot silently mix its
+    fits with a previous run's.
+
+    Args:
+        frame: The row set every job is fitted on.
+        job_list: Every job this run means to fit.
+
+    Returns:
+        A hex digest.
+    """
+    row_hashes = frame.select("site", "time").sort("site", "time").hash_rows(seed=0).to_list()
+    payload = repr(
+        (
+            row_hashes,
+            [
+                (arm, setting, target, tuple(features), tuple(sorted(hyper_parameters.items())))
+                for arm, setting, target, features, hyper_parameters, _ in job_list
+            ],
+            SEEDS,
+        )
+    )
+    return hashlib.sha256(payload.encode()).hexdigest()
+
+
+def _by_year_lines(*, losses: pl.DataFrame, treatment: str, reference: str) -> list[str]:
+    """Report one contrast's error, year by year on matched months, and its 2025-to-2026 change.
+
+    Args:
+        losses: The pooled setting's losses, holding both arms.
+        treatment: The arm named first in the contrast.
+        reference: The arm it is compared against.
+
+    Returns:
+        Markdown lines: a table of year-by-year differences, then the year-on-year change.
+    """
+    intervals: list[YearInterval] = bootstrap_difference_by_year(
+        losses=losses,
+        treatment=treatment,
+        references=(reference,),
+        metric=METRIC,
+        months=ERA5_BY_YEAR_MONTHS,
+    )
+    lines = [
+        f"#### {treatment} − {reference}, year by year, January to September of each year",
+        "",
+        f"A year of fewer than {MIN_MONTHS_FOR_INTERVAL} months gets no interval.",
+        "",
+        "| Year | Difference (pp of capacity) | 95% interval | Excludes zero? | Months | Rows |",
+        "|---|---|---|---|---|---|",
+    ]
+    for interval in intervals:
+        difference, lower, upper = (
+            interval[key] * PERCENTAGE_POINTS for key in ("difference", "lower_95", "upper_95")
+        )
+        if interval["enough_months"]:
+            interval_text = f"[{lower:+.3f}, {upper:+.3f}]"
+            verdict = (
+                "**yes**" if (interval["lower_95"] > 0.0 or interval["upper_95"] < 0.0) else "no"
+            )
+        else:
+            interval_text, verdict = "too few months", "—"
+        lines.append(
+            f"| {interval['year']} | {difference:+.3f} | {interval_text} | {verdict} "
+            f"| {interval['n_months']} | {interval['n_rows']:,} |"
+        )
+    year0, year1 = ERA5_YEAR_CHANGE_YEARS
+    change: YearChangeInterval = bootstrap_year_change(
+        losses=losses,
+        treatment=treatment,
+        reference=reference,
+        metric=METRIC,
+        year0=year0,
+        year1=year1,
+        months=ERA5_BY_YEAR_MONTHS,
+    )
+    change_diff, change_lower, change_upper = (
+        change[key] * PERCENTAGE_POINTS for key in ("change", "lower_95", "upper_95")
+    )
+    lines += [
+        "",
+        (
+            f"Change in the difference, {year0} to {year1} (positive: {treatment}'s lead over "
+            f"{reference} shrank): {change_diff:+.3f} [{change_lower:+.3f}, {change_upper:+.3f}] "
+            f"pp, on {change['n_rows_year0']:,} and {change['n_rows_year1']:,} rows."
+        ),
+    ]
+    return lines
+
+
+def _checks_lines(*, sites: pl.DataFrame) -> list[str]:
+    """Run every pre-fit check and render its result as markdown.
+
+    Args:
+        sites: The wind roster.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = ["#### Checks run before any fit", ""]
+    for label, level in ((f"level {HUB_LEVEL} (~{LEVEL_HEIGHTS_M[HUB_LEVEL]} m)", HUB_LEVEL),):
+        result = check_component_speed(level=level)
+        lines.append(
+            f"- Component speed vs served WS, {label}: median absolute difference "
+            f"{result['median_abs_diff_m_s']:.4f} m/s, 99th percentile "
+            f"{result['p99_abs_diff_m_s']:.4f} m/s."
+        )
+    surface_result = check_component_speed_10m()
+    lines.append(
+        "- Component speed vs served WS, 10 m: median absolute difference "
+        f"{surface_result['median_abs_diff_m_s']:.4f} m/s, 99th percentile "
+        f"{surface_result['p99_abs_diff_m_s']:.4f} m/s."
+    )
+    direction = check_direction_against_era5(sites=sites)
+    lines += [
+        (
+            f"- Direction vs ERA5 100 m, site {site}: mean absolute angle difference "
+            f"{direction[site]:.1f} degrees."
+        )
+        for site in sorted(direction)
+    ]
+    offsets = check_timestamp_offset(sites=sites)
+    lines += [
+        "",
+        "| Offset (h) | Correlation of hour-to-hour speed change with ERA5 |",
+        "|---|---|",
+    ]
+    lines += [f"| {offset:+d} | {offsets[offset]:.3f} |" for offset in OFFSET_SCAN_HOURS]
+    return lines
+
+
+def _report(*, frame: pl.DataFrame, losses: pl.DataFrame, sites: pl.DataFrame) -> str:
+    """Assemble the markdown report.
+
+    Args:
+        frame: The common rows.
+        losses: Every arm's losses, at every setting.
+        sites: The wind roster, for the distances and the geometry lines.
+
+    Returns:
+        The report.
+    """
+    site_labels = sorted(frame["site"].unique().to_list())
+    pooled = losses.filter(pl.col("setting") == "pooled")
+    sensitivity = losses.filter(pl.col("setting") == "sensitivity")
+    products = ("era5", "ukv", "icon_d2", "icon_eu", "icon_global", PRODUCT)
+    lines = [
+        (
+            f"### Six weather products on {frame.height:,} common site-hours of wind "
+            f"({frame['time'].min():%Y-%m-%d} to {frame['time'].max():%Y-%m-%d})"
+        ),
+        "",
+        "| Product | Hub height shown | All sites | Speed only |",
+        "|---|---|---|---|",
+    ]
+    for product in products:
+        arm = f"{product}_wind"
+        speed_only = f"{product}_speed_only"
+        lines.append(
+            f"| {product} | {HUB_HEIGHT_M[product]} m | {_mae(losses=pooled, arm=arm):.3f} "
+            f"| {_mae(losses=pooled, arm=speed_only):.3f} |"
+        )
+    lines.append(f"| {PRODUCT}_levels | | {_mae(losses=pooled, arm=f'{PRODUCT}_levels'):.3f} | |")
+    lines += [
+        "",
+        "Mean absolute error as a percentage of each site's P99 output.",
+        "",
+        *_checks_lines(sites=sites),
+        "",
+        "#### Deciding contrasts, named before the run",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    for treatment, reference in DECIDING_CONTRASTS:
+        lines.append(
+            _contrast_line(losses=pooled, treatment=treatment, reference=reference, label="all")
+        )
+        lines += [
+            _contrast_line(
+                losses=pooled.filter(pl.col("site") == site),
+                treatment=treatment,
+                reference=reference,
+                label=f"site {site}",
+            )
+            for site in site_labels
+        ]
+    lines += [
+        "",
+        "#### The same two contrasts at the second hyperparameter setting",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    lines += [
+        _contrast_line(losses=sensitivity, treatment=t, reference=r, label="all")
+        for t, r in DECIDING_CONTRASTS
+    ]
+    lines += ["", "#### Exploratory contrasts", "", *CONTRAST_HEADER]
+    lines += [
+        _contrast_line(losses=pooled, treatment=t, reference=r, label="all")
+        for t, r in (*EXPLORATORY_PRODUCT_CONTRASTS, LEVELS_CONTRAST)
+    ]
+    lines.append("")
+    for treatment, reference in DECIDING_CONTRASTS:
+        lines += _by_year_lines(losses=pooled, treatment=treatment, reference=reference)
+        lines.append("")
+    lines += geometry_lines(sites=sites, noun="wind farms")
+    return "\n".join(lines) + "\n"
+
+
+def _refuse_or_resume(
+    *, path: Path, fingerprint_path: Path, fingerprint: str, resume: bool
+) -> pl.DataFrame | None:
+    """Return the saved losses `--resume` may reuse, or refuse to overwrite a fresh run's outputs.
+
+    Args:
+        path: Where `losses.parquet` lives.
+        fingerprint_path: Where the fingerprint beside it lives.
+        fingerprint: This run's own fingerprint.
+        resume: Whether `--resume` was passed.
+
+    Returns:
+        The saved losses to build on, or `None` for a fresh run.
+
+    Raises:
+        ValueError: If `--resume` finds a saved fingerprint that does not match this run's.
+    """
+    if resume and path.exists():
+        saved_fingerprint = (
+            fingerprint_path.read_text().strip() if fingerprint_path.exists() else None
+        )
+        if saved_fingerprint != fingerprint:
+            msg = (
+                f"--resume: {path} was fitted on a different row set, column set, seed set, or "
+                "hyperparameter setting; move it to a superseded/ subfolder or re-run without "
+                "--resume"
+            )
+            raise ValueError(msg)
+        return pl.read_parquet(path)
+    refuse_to_overwrite(paths=[path, fingerprint_path])
+    return None
+
+
+def main() -> int:
+    """Build the row set, fit every arm, bootstrap every contrast, and write the report."""
+    logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--resume",
+        action="store_true",
+        help="Reuse losses.parquet if its saved fingerprint still matches this run.",
+    )
+    parser.add_argument(
+        "--report-only",
+        action="store_true",
+        help="Fit nothing; rebuild report.md from the saved losses.parquet alone.",
+    )
+    arguments = parser.parse_args()
+
+    sites = _wind_sites()
+    frame = icon_dream_common_rows(sites=sites)
+    _LOG.info(
+        "common rows: %d, %s to %s",
+        frame.height,
+        frame["time"].min(),
+        frame["time"].max(),
+    )
+
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    path = OUTPUT_DIR / "losses.parquet"
+    fingerprint_path = OUTPUT_DIR / "losses.fingerprint"
+
+    if arguments.report_only:
+        losses = pl.read_parquet(path)
+    else:
+        all_jobs = jobs()
+        fingerprint = _fingerprint(frame=frame, job_list=all_jobs)
+        saved = _refuse_or_resume(
+            path=path,
+            fingerprint_path=fingerprint_path,
+            fingerprint=fingerprint,
+            resume=arguments.resume,
+        )
+        done = (
+            set(saved.select("arm", "setting").unique().iter_rows()) if saved is not None else set()
+        )
+        missing = [job for job in all_jobs if (job[0], job[1]) not in done]
+        _LOG.info("fitting %d jobs of %d", len(missing), len(all_jobs))
+        parts = [] if saved is None else [saved]
+        if missing:
+            parts.append(run_all(dataset=frame, jobs=missing))
+        losses = pl.concat(parts)
+        losses.write_parquet(path)
+        fingerprint_path.write_text(fingerprint)
+
+    report = _report(frame=frame, losses=losses, sites=sites)
+    (OUTPUT_DIR / "report.md").write_text(report)
+    sys.stdout.write(report)
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
