@@ -488,6 +488,7 @@ def interval_panel(
     better_label: str,
     better_direction: BetterDirectionType = "negative",
     conditions: Sequence[str] = (),
+    condition_colours: Sequence[str] | None = None,
     condition_title: str = "",
     panel_title: str | Sequence[str] = "",
     reference_labels: bool = True,
@@ -510,6 +511,12 @@ def interval_panel(
     than `CONDITION_COLOURS` holds, colours its conditions with those colours instead of a light
     shade, still with a hollow point of a second shape.
 
+    Passing `condition_colours` overrides all of that with the colour-first encoding this
+    project's charts default to: every condition gets its own solid colour, drawn filled with one
+    shared marker shape and no light-shade or hollow second style, so identity rests on colour
+    alone. Use it where `conditions` holds more values than `CONDITION_COLOURS` can tell apart, or
+    where a hollow/filled distinction would only add noise.
+
     Args:
         rows: One row per mark, with `label`, `family` (a `ProductFamily`), `difference`,
             `lower_95` and `upper_95`, `condition` if `conditions` is given, and a Boolean
@@ -521,7 +528,10 @@ def interval_panel(
         zero_label: What a difference of zero means, such as `same as ERA5`.
         better_label: What the better direction means, such as `better than ERA5`.
         better_direction: Which sign of difference is the better one.
-        conditions: The values of `condition`, in legend order; the first is drawn filled.
+        conditions: The values of `condition`, in legend order; the first is drawn filled, unless
+            `condition_colours` is given.
+        condition_colours: Each condition's own colour, in the same order as `conditions`. Leave
+            unset for the default family-and-shade encoding described above.
         condition_title: The legend title for `condition`.
         panel_title: A title above this panel alone, or lines a caller has already wrapped
             (`wrapped`) where the title does not fit on one line at this panel's width.
@@ -538,10 +548,14 @@ def interval_panel(
     """
     rows = _labelled(rows=rows, figure_planning=figure_planning)
     families = [family for family in FAMILY_COLOURS if family in set(rows["family"].to_list())]
+    explicit_colours = condition_colours is not None
     colour_conditions = 0 < len(conditions) <= len(CONDITION_COLOURS) and len(families) == 1
     shade = pl.col("family")
     shade_scale = _shade_scale()
-    if colour_conditions:
+    if explicit_colours:
+        shade = pl.col("condition")
+        shade_scale = alt.Scale(domain=list(conditions), range=list(condition_colours))
+    elif colour_conditions:
         shade = pl.col("condition")
         shade_scale = alt.Scale(
             domain=list(conditions), range=list(CONDITION_COLOURS[: len(conditions)])
@@ -581,7 +595,7 @@ def interval_panel(
     }
     if conditions and data["label"].is_duplicated().any():
         encodings["yOffset"] = alt.YOffset("condition:N", sort=list(conditions))
-    if conditions:
+    if conditions and not explicit_colours:
         encodings["shape"] = alt.Shape(
             "condition:N",
             scale=alt.Scale(
@@ -614,14 +628,24 @@ def interval_panel(
         alt.Tooltip("lower_95:Q", title="Lower 95%"),
         alt.Tooltip("upper_95:Q", title="Upper 95%"),
     ]
-    points = [
-        alt.Chart(data.filter(first))
-        .mark_point(filled=True, size=_POINT_SIZE, opacity=1, clip=True, aria=False)
-        .encode(x=x, tooltip=tooltip, **encodings),  # ty: ignore[unresolved-attribute]
-        alt.Chart(data.filter(~first))
-        .mark_point(filled=False, size=_POINT_SIZE, strokeWidth=2, opacity=1, clip=True, aria=False)
-        .encode(x=x, tooltip=tooltip, **encodings),  # ty: ignore[unresolved-attribute]
-    ]
+    points = (
+        [
+            alt.Chart(data)
+            .mark_point(filled=True, size=_POINT_SIZE, opacity=1, clip=True, aria=False)
+            .encode(x=x, tooltip=tooltip, **encodings)  # ty: ignore[unresolved-attribute]
+        ]
+        if explicit_colours
+        else [
+            alt.Chart(data.filter(first))
+            .mark_point(filled=True, size=_POINT_SIZE, opacity=1, clip=True, aria=False)
+            .encode(x=x, tooltip=tooltip, **encodings),  # ty: ignore[unresolved-attribute]
+            alt.Chart(data.filter(~first))
+            .mark_point(
+                filled=False, size=_POINT_SIZE, strokeWidth=2, opacity=1, clip=True, aria=False
+            )
+            .encode(x=x, tooltip=tooltip, **encodings),  # ty: ignore[unresolved-attribute]
+        ]
+    )
     reference = _reference_layers(
         x_domain=x_domain,
         zero_label=zero_label,
@@ -652,10 +676,20 @@ def interval_panel(
             _key(
                 title=condition_title,
                 labels=conditions,
-                shapes=CONDITION_SHAPES[: len(conditions)],
-                filled=[index == 0 for index in range(len(conditions))],
+                shapes=(
+                    ["circle"] * len(conditions)
+                    if explicit_colours
+                    else CONDITION_SHAPES[: len(conditions)]
+                ),
+                filled=(
+                    [True] * len(conditions)
+                    if explicit_colours
+                    else [index == 0 for index in range(len(conditions))]
+                ),
                 colours=(
-                    CONDITION_COLOURS[: len(conditions)]
+                    list(condition_colours)
+                    if explicit_colours
+                    else CONDITION_COLOURS[: len(conditions)]
                     if colour_conditions
                     else [ocf.BLACK_1] * len(conditions)
                 ),
@@ -676,6 +710,7 @@ def leaderboard_panel(
     kind_title: str = "",
     panel_title: str = "",
     keys: bool = True,
+    solid: bool = False,
 ) -> alt.LayerChart | alt.VConcatChart:
     """Draw one product per row, best first, as a dot at its own error with a 95% interval.
 
@@ -685,10 +720,11 @@ def leaderboard_panel(
 
     Each row is coloured by its family, unless `conditions` is given: then each row is coloured by
     its `condition` from `CONDITION_COLOURS`, with the first condition's point filled and every
-    other condition's hollow, so the distinction survives without colour. Where `kinds` is given,
-    each row's point takes its `kind`'s shape from `CONDITION_SHAPES`. The keys sit in a row above
-    the plot: the family key only where the panel holds more than one family and no `conditions`,
-    the condition key where `conditions` is given, and the kind key where `kinds` is given.
+    other condition's hollow, so the distinction survives without colour, unless `solid` is set.
+    Where `kinds` is given, each row's point takes its `kind`'s shape from `CONDITION_SHAPES`. The
+    keys sit in a row above the plot: the family key only where the panel holds more than one
+    family and no `conditions`, the condition key where `conditions` is given, and the kind key
+    where `kinds` is given.
 
     Args:
         rows: One row per product, with `label`, `family` (a `ProductFamily`), `value`,
@@ -700,13 +736,16 @@ def leaderboard_panel(
             better, such as "Mean absolute error (% of capacity; smaller is better)".
         width: The plot's width in pixels.
         conditions: The values of `condition`, in key order, at most as many as
-            `CONDITION_COLOURS` holds; the first is drawn filled.
+            `CONDITION_COLOURS` holds; the first is drawn filled, unless `solid` is set.
         condition_title: The key title for `condition`.
         kinds: The values of `kind`, in key order, at most as many as `CONDITION_SHAPES` holds.
         kind_title: The key title for `kind`.
         panel_title: A title above this panel alone.
         keys: Whether to draw the keys, which a panel stacked under another that already carries
             them can leave out.
+        solid: Whether every condition's point is drawn filled, with no hollow second style — the
+            colour-first default this project's charts favour when colour alone can carry
+            `conditions`. False keeps the first condition filled and the rest hollow.
 
     Returns:
         The panel, under its keys where it has any.
@@ -782,9 +821,10 @@ def leaderboard_panel(
         )
     )
     # The first condition's points are filled and every other condition's hollow, drawn as two
-    # layers because a mark's fill is not an encoding channel.
+    # layers because a mark's fill is not an encoding channel. `solid` skips the split so every
+    # condition is filled and colour alone carries the distinction.
     groups = [(data, True)]
-    if conditions:
+    if conditions and not solid:
         first = pl.col("condition") == conditions[0]
         groups = [(data.filter(first), True), (data.filter(~first), False)]
     points = [
@@ -829,7 +869,11 @@ def leaderboard_panel(
                 title=condition_title,
                 labels=conditions,
                 shapes=["circle"] * len(conditions),
-                filled=[index == 0 for index in range(len(conditions))],
+                filled=(
+                    [True] * len(conditions)
+                    if solid
+                    else [index == 0 for index in range(len(conditions))]
+                ),
                 colours=CONDITION_COLOURS[: len(conditions)],
             )
         )

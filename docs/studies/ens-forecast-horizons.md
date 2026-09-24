@@ -87,10 +87,11 @@ forecast "beats" another, the difference is statistically significant at the 5% 
 
 **Every weather product this project has compared so far was scored as a description of weather that
 had already happened, which is not the question the live service faces.** The live service forecasts
-power days ahead, from a forecast of the weather. [Issue
-#810](https://github.com/openclimatefix/nged-substation-forecast/issues/810) asks which weather
-model gives the best power forecast at the horizons the live service runs at. This page is the
-first, deliberately small step of that question: it measures how accurate a power forecast driven by
+power days ahead, from a forecast of the weather.
+[Issue #810](https://github.com/openclimatefix/nged-substation-forecast/issues/810) asks which
+weather model gives the best power forecast at the horizons the live service runs at. This page is
+the first, deliberately small step of that question: it measures how accurate a power forecast
+driven by
 ENS, the forecast the live service already reads, is at each horizon, before any other forecast
 product is added.
 
@@ -101,11 +102,12 @@ weather input could be.**
   member through one XGBoost model, the 51 power forecasts then averaged.
 - **No-weather baselines:** persistence, diurnal persistence, smart persistence, and climatology,
   defined under "Data and methods".
-- **References, which are not forecasts:** ERA5, ECMWF's reanalysis of past weather, available about
-  5 days late; and UKV with ICON-EU, each with its neighbouring hours, the best of the inputs [the
-  blending page](blending-weather-products.md) compared. For solar, both reference rows are also
-  given ERA5's air temperature, as on the past-weather pages, so the solar UKV-and-ICON-EU row as
-  scored could not be read until ERA5 is about 5 days late.
+- **References, an analysis proxy for the weather rather than a genuine multi-day-ahead forecast:**
+  ERA5, ECMWF's reanalysis of past weather, available about 5 days late; and UKV with ICON-EU,
+  each with its neighbouring hours, the best of the inputs
+  [the blending page](blending-weather-products.md) compared. For solar, both reference rows are
+  also given ERA5's air temperature, as on the past-weather pages, so the solar UKV-and-ICON-EU row
+  as scored could not be read until ERA5 is about 5 days late.
 
 | Input | What it is | Grid | Steps | When it can be read |
 |---|---|---|---|---|

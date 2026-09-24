@@ -28,6 +28,12 @@ condition of the same series. The guidelines mark the additional data colours, s
 `#009C75` and the amber `#FC9700`, for internal use only. `PALETTE`'s default order includes both of
 those, so set every colour explicitly rather than relying on the default order.
 
+**The maintainer can approve an additional data colour on a published chart when a chart's series
+count genuinely needs one.** The ENS-horizons page's leaderboard colours nine series — three ENS
+ways, four no-weather baselines, and two reference rows — each its own colour rather than sharing a
+colour within a group, so it uses Data Amber and Data Burnt Orange alongside the five main colours.
+Ask before reaching for an internal-use colour; don't treat this precedent as blanket permission.
+
 **Distinguish series by colour first; add a point shape or line style only as a backup, never as the
 only thing distinguishing two series.** A chart that relies on shape or style alone loses its meaning
 in grayscale or under colour blindness; a chart that adds shape on top of colour survives both.
