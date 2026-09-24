@@ -47,5 +47,6 @@ climates, so a result may not hold elsewhere.
   neighbouring hours: by 0.13 points of capacity for solar and 0.48 for wind. The gain comes from the
   other products' weather rather than from the extra columns, a blend of UKV and ICON-EU that a live
   service could read beats UKV alone, and an XGBoost blend beats a linear stack of single-product
-  predictions. Blending the two best satellite retrievals, CAMS and SARAH-3, beats CAMS's own split
-  by 0.20 points even with no weather model in the blend at all.
+  predictions. Blending the two satellite retrievals the past-solar study compared, CAMS and
+  SARAH-3, beats CAMS's split with its own neighbouring hours by 0.18 points and plain CAMS's split
+  by 0.20 points, even though the blend reads no weather model at all.

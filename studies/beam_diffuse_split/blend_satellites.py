@@ -59,14 +59,32 @@ and ICON-DREAM-EU, 2021 to August 2026, with the same folds, eras, seeds, export
   bootstrapped the same way with `studies.bootstrap.bootstrap_absolute`. The report prints every
   figure as a percentage of capacity to 2 decimal places.
 
+**Post hoc, added after the first science review of this section.** The review found that the
+section's reference, plain `cams_split`, was not enriched with CAMS's own neighbouring hours the
+way every other section's single-product reference is, and that a single column averaging CAMS's
+and SARAH-3's irradiance already gains about as much as CAMS's own split does. Three more arms
+answer both: `cams_rich` (CAMS's split plus `ghi_previous_cams` and `ghi_next_cams`, its own
+neighbouring-hour global irradiance from `build_dataset.CAMS_PATH`, read separately from the scored
+rows as `studies.neighbouring_hours.with_neighbouring_hours` requires), `cams_rich_sarah3_xgb`
+(`cams_rich` plus SARAH-3), and `cams_rich_sarah3_control` (`cams_rich` plus SARAH-3's permuted
+column). Both post hoc contrasts, `cams_rich_sarah3_xgb` − `cams_rich` and `cams_rich_sarah3_xgb` −
+`cams_rich_sarah3_control`, are refitted at the second hyperparameter setting too. All three arms
+are fitted, never reused from an earlier run's `cams_split` fit, because `cams_rich` reads columns
+no earlier arm read.
+
 Run it with `uv run python studies/beam_diffuse_split/blend_satellites.py`, after
 `weather_products.py` has written the `record` panel (`--panel record`). `--resume` reuses the
 per-arm fits a previous run left in `fits/`, refusing to reuse one whose rows, feature-column
 values, fold assignment, target or hyperparameters have since changed (checked against a
-fingerprint saved beside each fit). `--report-only` rebuilds `report.md` from `losses.parquet` and
+fingerprint saved beside each fit); `fits/` does not survive a finished run, so `--resume` cannot
+add a new arm to an already-published `losses.parquet`. `--fit-missing OLD_OUTPUT_DIR` is the mode
+for that: it reads `OLD_OUTPUT_DIR/losses.parquet` (a previous run's output, moved to a
+`superseded/` subfolder first) directly, reuses every `(arm, setting)` job already in it, re-checks
+that the reused guard arms still reproduce the record panel's losses bit-for-bit, and fits only the
+jobs missing from it. `--report-only` rebuilds `report.md` from `losses.parquet` and
 `reproduction.md` already on disk, fitting nothing, and stops if the rebuilt rows do not match the
 keys `losses.parquet` was fitted on; move the current outputs to a `superseded/` subfolder first,
-since neither mode overwrites a file.
+since no mode overwrites a file.
 """
 
 import argparse
@@ -81,6 +99,7 @@ from typing import Final, TypedDict
 import numpy as np
 import polars as pl
 import weather_products
+from build_dataset import CAMS_PATH
 from export_cap import with_export_cap
 from run_experiment import SHARED_FEATURES as RUN_SHARED_FEATURES
 from run_experiment import Job, _add_time_features, run_all
@@ -91,6 +110,7 @@ from studies.bootstrap import (
     bootstrap_absolute,
     bootstrap_difference,
     bootstrap_difference_by_year,
+    fold_t_interval,
     per_fold_differences,
 )
 from studies.cross_validation import (
@@ -100,6 +120,7 @@ from studies.cross_validation import (
     HyperParameters,
 )
 from studies.guards import check_no_missing, refuse_to_overwrite
+from studies.neighbouring_hours import with_neighbouring_hours
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -190,12 +211,44 @@ PLANNED_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
 )
 """The only contrasts a recommendation may rest on, named before any result exists."""
 
-SENSITIVITY_ARMS: Final[tuple[str, str, str]] = (
+NEIGHBOUR_ONLY_COLUMNS: Final[tuple[str, str]] = ("ghi_previous_cams", "ghi_next_cams")
+"""CAMS's neighbouring-hour columns, null at the two ends of its download.
+
+`check_no_missing` skips these two, and they are the only columns any arm reads that may
+legitimately hold a value XGBoost treats as missing (`float("nan")`, `xgb.DMatrix`'s default
+missing sentinel), rather than a genuine gap in an arm's input.
+"""
+
+OFFSET_ZERO_TOLERANCE_W_M2: Final[float] = 1e-3
+"""How close `CAMS_PATH`'s own offset-zero value must sit to the record panel's `ghi_cams`.
+
+Both come from the same CAMS download, so any difference should be floating-point noise from an
+independent read and join, not a different source.
+"""
+
+RICH_ARMS: Final[tuple[str, str, str]] = (
+    "cams_rich",
+    "cams_rich_sarah3_xgb",
+    "cams_rich_sarah3_control",
+)
+"""The post hoc arms added after the first science review: CAMS's split plus its own neighbouring
+hours (`cams_rich`), and that enriched CAMS blended with SARAH-3 and its climatology control."""
+
+ENRICHED_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("cams_rich_sarah3_xgb", "cams_rich"),
+    ("cams_rich_sarah3_xgb", "cams_rich_sarah3_control"),
+)
+"""Post hoc: does SARAH-3 still add once CAMS gets its own neighbouring hours, against an enriched
+reference rather than plain `cams_split`?"""
+
+SENSITIVITY_ARMS: Final[tuple[str, ...]] = (
     "cams_split",
     "cams_split_sarah3_xgb",
     "cams_split_sarah3_control",
+    *RICH_ARMS,
 )
-"""The arms refitted at `SENSITIVITY_HYPER_PARAMETERS`, so both planned contrasts can be checked."""
+"""The arms refitted at `SENSITIVITY_HYPER_PARAMETERS`, so both planned contrasts, and both
+enriched-reference contrasts, can be checked."""
 
 NEGATIVE_CONTROLS: Final[tuple[tuple[str, str], ...]] = (
     ("cams_cams_noise_xgb", "cams"),
@@ -213,9 +266,16 @@ EXPLORATORY_METHOD_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("cams_sarah3_mean", "cams"),
     (DERIVED_ARMS[0], "cams"),
     (DERIVED_ARMS[1], "cams"),
+    ("cams_split", "cams"),
+    ("sarah3", "cams"),
+    ("cams_sarah3_xgb", "cams_split"),
+    ("cams_split_sarah3_xgb", "cams_sarah3_xgb"),
 )
 """The all-global blend and its control, and the mean, stack and equal blends, all against `cams`.
-Exploratory: none of these decides whether a blend beats CAMS's own split."""
+The last four give the same-reference comparisons the page's lead needs: CAMS's own split against
+CAMS, SARAH-3 against CAMS, the all-global blend against CAMS's split (both against the split
+rather than plain CAMS), and what CAMS's split adds on top of the all-global blend. Exploratory:
+none of these decides whether a blend beats CAMS's own split."""
 
 CONTRAST_HEADER: Final[tuple[str, str]] = (
     (
@@ -251,6 +311,32 @@ def _arm_columns() -> dict[str, tuple[str, ...]]:
         "cams_sarah3_mean": (*SHARED, MEAN_COLUMN),
         "cams_cams_noise_xgb": (*SHARED, "ghi_cams", NOISE_COLUMN),
         "cams_cams_noise5_xgb": (*SHARED, "ghi_cams", NOISE_COLUMN_NEAR_DUPLICATE),
+        "cams_rich": (
+            *SHARED,
+            "ghi_previous_cams",
+            "ghi_cams",
+            "ghi_next_cams",
+            "bhi_cams",
+            "dhi_cams",
+        ),
+        "cams_rich_sarah3_xgb": (
+            *SHARED,
+            "ghi_previous_cams",
+            "ghi_cams",
+            "ghi_next_cams",
+            "bhi_cams",
+            "dhi_cams",
+            "ghi_sarah3",
+        ),
+        "cams_rich_sarah3_control": (
+            *SHARED,
+            "ghi_previous_cams",
+            "ghi_cams",
+            "ghi_next_cams",
+            "bhi_cams",
+            "dhi_cams",
+            "ghi_sarah3_shuffled",
+        ),
     }
 
 
@@ -365,12 +451,56 @@ def _check_control_arms_read_the_right_column() -> None:
             raise ValueError(msg)
 
 
+def _with_cams_neighbours(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Add CAMS's own neighbouring-hour global irradiance, and check the offset zero matches.
+
+    Reads `CAMS_PATH` (the same download `ghi_cams` was built from) separately from the scored
+    rows, as `studies.neighbouring_hours` requires, so a neighbour is missing only where CAMS's own
+    download served no value, never where a row's target happened to be zero.
+
+    Args:
+        frame: The common rows, carrying `site`, `time` and `ghi_cams`.
+
+    Returns:
+        `frame` plus `ghi_previous_cams` and `ghi_next_cams`, null-filled to `NaN` at CAMS's own
+        record boundaries so XGBoost reads them as missing rather than the run raising on them.
+
+    Raises:
+        ValueError: Naming the row count, if `CAMS_PATH`'s own offset-zero value does not reproduce
+            `ghi_cams` within `OFFSET_ZERO_TOLERANCE_W_M2`.
+    """
+    cams = pl.read_parquet(CAMS_PATH).select("site", "time", "ghi_w_m2")
+    frame = with_neighbouring_hours(
+        frame=frame,
+        source=cams,
+        columns={
+            "_ghi_cams_offset_zero_check": ("ghi_w_m2", 0),
+            "ghi_previous_cams": ("ghi_w_m2", -1),
+            "ghi_next_cams": ("ghi_w_m2", 1),
+        },
+    )
+    mismatched = frame.filter(
+        (pl.col("_ghi_cams_offset_zero_check") - pl.col("ghi_cams")).abs()
+        > OFFSET_ZERO_TOLERANCE_W_M2
+    ).height
+    if mismatched:
+        msg = (
+            f"CAMS_PATH's offset-zero ghi_w_m2 does not reproduce ghi_cams on {mismatched:,} rows; "
+            "the neighbouring-hour download is not the same CAMS series the record panel used"
+        )
+        raise ValueError(msg)
+    return frame.drop("_ghi_cams_offset_zero_check").with_columns(
+        pl.col(*NEIGHBOUR_ONLY_COLUMNS).fill_null(float("nan"))
+    )
+
+
 def build_rows() -> tuple[pl.DataFrame, float]:
     """Build the record panel's common rows, exactly as `weather_products.run_panel` builds them.
 
     Adds the columns this study's arms need beyond the record panel's own: SARAH-3's
-    climatology-permuted copy, two noised copies of CAMS, the mean of CAMS and SARAH-3, and the
-    clearness index the exploratory breakdown bins on.
+    climatology-permuted copy, two noised copies of CAMS, the mean of CAMS and SARAH-3, CAMS's own
+    neighbouring-hour global irradiance (`cams_rich`'s post hoc addition), and the clearness index
+    the exploratory breakdown bins on.
 
     Returns:
         One row per common site-hour, carrying every column `_arm_columns` names, and the measured
@@ -402,8 +532,15 @@ def build_rows() -> tuple[pl.DataFrame, float]:
         .then(pl.col(MEAN_COLUMN) / pl.col("extraterrestrial_horizontal_w_m2"))
         .otherwise(None)
     )
+    frame = _with_cams_neighbours(frame=frame)
     check_no_missing(
-        frame=frame, columns=[column for columns in _arm_columns().values() for column in columns]
+        frame=frame,
+        columns=[
+            column
+            for columns in _arm_columns().values()
+            for column in columns
+            if column not in NEIGHBOUR_ONLY_COLUMNS
+        ],
     )
     return frame, rms_difference
 
@@ -843,6 +980,120 @@ def _planned_lines(*, losses: pl.DataFrame) -> list[str]:
     return lines
 
 
+def _enriched_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Render the two post hoc enriched-reference contrasts at both hyperparameter settings.
+
+    Added after the first science review: does SARAH-3 still add once CAMS gets its own
+    neighbouring hours, against `cams_rich` rather than plain `cams_split`?
+
+    Args:
+        losses: Every arm's losses, both settings.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        "#### Post hoc: CAMS with its own neighbouring hours, against the enriched reference",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    lines += [
+        _contrast_line(
+            losses=losses.filter(pl.col("setting") == "pooled"),
+            treatment=treatment,
+            reference=reference,
+            label="all",
+        )
+        for treatment, reference in ENRICHED_CONTRASTS
+    ]
+    lines += [
+        "",
+        "#### Post hoc, enriched reference, at the second hyperparameter setting",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    lines += [
+        _contrast_line(
+            losses=losses.filter(pl.col("setting") == "sensitivity"),
+            treatment=treatment,
+            reference=reference,
+            label="all",
+        )
+        for treatment, reference in ENRICHED_CONTRASTS
+    ]
+    return lines
+
+
+HEADLINE_FOLD_HEADER: Final[tuple[str, str]] = (
+    (
+        "| Scope | Contrast | ΔMAE (pp of capacity) | 95% interval | 95% t-interval across the 5 "
+        "folds | Excludes zero? | Folds agreeing | Rows |"
+    ),
+    "|---|---|---|---|---|---|---|---|",
+)
+"""One column wider than `CONTRAST_HEADER`, so `studies.charts.report_contrasts` (which matches
+`CONTRAST_COLUMNS` exactly) skips this table; it exists for the page's headline prose only."""
+
+
+def _headline_fold_line(*, losses: pl.DataFrame, treatment: str, reference: str) -> str:
+    """Return one markdown row: the paired difference, its interval, and its fold t-interval.
+
+    Args:
+        losses: Per-row losses holding both arms, primary setting.
+        treatment: The arm whose error is being compared.
+        reference: The arm it is compared against.
+
+    Returns:
+        The table row, matching `HEADLINE_FOLD_HEADER`.
+    """
+    interval = bootstrap_difference(
+        losses=losses, treatment=treatment, reference=reference, metric=METRIC
+    )
+    folds = per_fold_differences(
+        losses=losses, treatment=treatment, reference=reference, metric=METRIC
+    )
+    fold_lower, fold_upper = fold_t_interval(fold_differences=folds)
+    same_sign = sum(np.sign(value) == np.sign(interval["difference"]) for value in folds)
+    difference, lower, upper, fold_lower_pp, fold_upper_pp = (
+        value * PERCENTAGE_POINTS
+        for value in (
+            interval["difference"],
+            interval["lower_95"],
+            interval["upper_95"],
+            fold_lower,
+            fold_upper,
+        )
+    )
+    excludes = interval["lower_95"] > 0.0 or interval["upper_95"] < 0.0
+    return (
+        f"| all | {treatment} − {reference} | {difference:+.2f} "
+        f"| [{lower:+.2f}, {upper:+.2f}] | [{fold_lower_pp:+.2f}, {fold_upper_pp:+.2f}] "
+        f"| {'**yes**' if excludes else 'no'} | {same_sign} of {len(folds)} "
+        f"| {interval['n_rows']:,} |"
+    )
+
+
+def _headline_fold_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Render every headline contrast's fold t-interval, primary setting only.
+
+    Args:
+        losses: Every arm's losses, primary setting.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        "#### Headline contrasts, with the 95% t-interval across the 5 folds",
+        "",
+        *HEADLINE_FOLD_HEADER,
+    ]
+    lines += [
+        _headline_fold_line(losses=losses, treatment=treatment, reference=reference)
+        for treatment, reference in (*PLANNED_CONTRASTS, *ENRICHED_CONTRASTS)
+    ]
+    return lines
+
+
 def _negative_control_lines(*, losses: pl.DataFrame, rms_difference: float) -> list[str]:
     """Render both negative controls against `cams`.
 
@@ -877,10 +1128,11 @@ def _negative_control_lines(*, losses: pl.DataFrame, rms_difference: float) -> l
 
 
 def _method_lines(*, losses: pl.DataFrame) -> list[str]:
-    """Render the all-global blend and its control, and the mean, stack and equal blends.
+    """Render the all-global blend, the mean/stack/equal blends, and the lead's same-reference rows.
 
-    All exploratory, all against `cams`. The mean, stack and equal blends are built on the global
-    columns only, since SARAH-3 has no split.
+    `cams_split` and SARAH-3 each against `cams`, and the all-global blend against `cams_split`.
+    All exploratory. The mean, stack and equal blends are built on the global columns only, since
+    SARAH-3 has no split.
 
     Args:
         losses: Every arm's losses, primary setting.
@@ -890,8 +1142,8 @@ def _method_lines(*, losses: pl.DataFrame) -> list[str]:
     """
     lines = [
         (
-            "#### Exploratory: the all-global blend, and the mean, stack and equal blends, "
-            "against CAMS"
+            "#### Exploratory: the all-global blend, the mean, stack and equal blends, and the "
+            "same-reference comparisons the lead needs"
         ),
         "",
         *CONTRAST_HEADER,
@@ -901,6 +1153,30 @@ def _method_lines(*, losses: pl.DataFrame) -> list[str]:
         for treatment, reference in EXPLORATORY_METHOD_CONTRASTS
     ]
     return lines
+
+
+def _generator_d_share_line(*, losses: pl.DataFrame) -> str:
+    """Return generator D's share of the primary planned contrast's rows and total gain.
+
+    Args:
+        losses: Every arm's losses, primary setting, holding `PLANNED_CONTRASTS[0]`'s two arms.
+
+    Returns:
+        A markdown bullet.
+    """
+    treatment, reference = PLANNED_CONTRASTS[0]
+    wide = losses.filter(pl.col("arm").is_in([treatment, reference])).pivot(
+        on="arm", index=list(KEY_COLUMNS), values=METRIC
+    )
+    gain = wide.with_columns(gain=pl.col(reference) - pl.col(treatment))
+    total_rows, total_gain = gain.height, float(gain["gain"].sum())
+    d_rows_gain = gain.filter(pl.col("site") == GENERATOR_D)
+    rows_share = d_rows_gain.height / total_rows * 100
+    gain_share = float(d_rows_gain["gain"].sum()) / total_gain * 100
+    return (
+        f"- Generator D holds {rows_share:.0f}% of the rows scoring `{treatment}` − "
+        f"`{reference}`, and {gain_share:.0f}% of that contrast's total gain."
+    )
 
 
 def _by_generator_lines(*, losses: pl.DataFrame) -> list[str]:
@@ -921,6 +1197,52 @@ def _by_generator_lines(*, losses: pl.DataFrame) -> list[str]:
             )
             for treatment, reference in PLANNED_CONTRASTS
         ]
+    lines += ["", _generator_d_share_line(losses=losses)]
+    return lines
+
+
+def _clearness_share_line(*, band: pl.DataFrame, name: str) -> str:
+    """Return one band's planned-contrast gain as a share of `cams_split`'s own error in that band.
+
+    Args:
+        band: The rows in one clearness band, holding `cams_split` and `cams_split_sarah3_xgb`.
+        name: The band's name, for the line.
+
+    Returns:
+        A markdown bullet.
+    """
+    reference_mae = bootstrap_absolute(losses=band, arm="cams_split", metric=METRIC)["value"]
+    interval = bootstrap_difference(
+        losses=band, treatment="cams_split_sarah3_xgb", reference="cams_split", metric=METRIC
+    )
+    share = -interval["difference"] / reference_mae * 100
+    return f"- {name}: {share:.1f}% of `cams_split`'s own error in this band."
+
+
+GENERATOR_D: Final[str] = "D"
+"""The generator excluded in `_without_generator_d_lines`, the one that carries a disproportionate
+share of the planned contrasts' gain (finding S5)."""
+
+
+def _without_generator_d_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Render the two planned contrasts with generator D's rows dropped (exploratory).
+
+    Args:
+        losses: Every arm's losses, primary setting.
+
+    Returns:
+        Markdown lines.
+    """
+    without_d = losses.filter(pl.col("site") != GENERATOR_D)
+    lines = [
+        "#### Exploratory: the planned contrasts, excluding generator D",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    lines += [
+        _contrast_line(losses=without_d, treatment=treatment, reference=reference, label="all")
+        for treatment, reference in PLANNED_CONTRASTS
+    ]
     return lines
 
 
@@ -940,12 +1262,24 @@ def _by_clearness_lines(*, losses: pl.DataFrame, frame: pl.DataFrame) -> list[st
         "",
         *CONTRAST_HEADER,
     ]
-    for name, low, high in weather_products.CLEARNESS_BANDS:
-        band = keyed.filter(pl.col("kt").is_between(low, high, closed="left"))
+    bands = [
+        (name, keyed.filter(pl.col("kt").is_between(low, high, closed="left")))
+        for name, low, high in weather_products.CLEARNESS_BANDS
+    ]
+    for name, band in bands:
         lines += [
             _contrast_line(losses=band, treatment=treatment, reference=reference, label=name)
             for treatment, reference in PLANNED_CONTRASTS
         ]
+    lines += [
+        "",
+        (
+            "The gain against `cams_split`, as a share of `cams_split`'s own mean absolute error "
+            "in each band:"
+        ),
+        "",
+    ]
+    lines += [_clearness_share_line(band=band, name=name) for name, band in bands]
     return lines
 
 
@@ -1071,13 +1405,19 @@ def build_report(
         "",
         *_arms_table(losses=losses),
         "",
+        *_enriched_lines(losses=losses),
+        "",
         *_planned_lines(losses=losses),
+        "",
+        *_headline_fold_lines(losses=pooled),
         "",
         *_negative_control_lines(losses=pooled, rms_difference=rms_difference),
         "",
         *_method_lines(losses=pooled),
         "",
         *_by_generator_lines(losses=pooled),
+        "",
+        *_without_generator_d_lines(losses=pooled),
         "",
         *_by_clearness_lines(losses=pooled, frame=frame),
         "",
@@ -1087,6 +1427,62 @@ def build_report(
         "",
     ]
     return "\n".join(lines)
+
+
+def _fit_missing(*, frame: pl.DataFrame, old_output_dir: Path) -> tuple[pl.DataFrame, list[str]]:
+    """Reuse an earlier run's losses for every job it already holds, and fit the rest.
+
+    The small "`--fit-missing`-style mode" M2 asked for where `--resume` cannot help: `--resume`
+    reuses a fit only from `fits/`, which a finished run deletes, so it cannot add a new arm to an
+    already-published `losses.parquet`. This reads that published file directly instead.
+
+    Args:
+        frame: The record panel's common rows, this run's build.
+        old_output_dir: Where the earlier run's `losses.parquet` was moved (its `superseded/`
+            copy), holding every arm this run is not meant to refit.
+
+    Returns:
+        Every arm's losses (guard, blend, sensitivity and derived, both settings), and the
+        reproduction check's rendered lines, re-verified against the reused guard arms.
+
+    Raises:
+        SystemExit: If the reused guard arms no longer reproduce the record panel's losses
+            bit-for-bit, which would mean `old_output_dir`'s `losses.parquet` no longer matches
+            this run's rows.
+    """
+    old_losses = pl.read_parquet(old_output_dir / "losses.parquet")
+    all_jobs = _guard_jobs() + _blend_jobs() + _sensitivity_jobs()
+    wanted = pl.DataFrame(
+        {"arm": [job[0] for job in all_jobs], "setting": [job[1] for job in all_jobs]}
+    )
+    reused = old_losses.join(wanted, on=["arm", "setting"], how="inner").select(LOSS_COLUMNS)
+    have = set(reused.select("arm", "setting").unique().iter_rows())
+    missing_jobs = [job for job in all_jobs if (job[0], job[1]) not in have]
+    _LOG.info(
+        "%d of %d jobs reused from %s, %d to fit",
+        len(all_jobs) - len(missing_jobs),
+        len(all_jobs),
+        old_output_dir,
+        len(missing_jobs),
+    )
+    guard_reused = reused.filter(pl.col("arm").is_in(GUARD_ARMS), pl.col("setting") == "pooled")
+    reproduction_rows, reproduction_lines = check_reproduction(fitted=guard_reused)
+    if not all(row["bit_identical"] for row in reproduction_rows):
+        _LOG.error(
+            "the reused %s no longer reproduce the record panel's losses; stopping",
+            ", ".join(GUARD_ARMS),
+        )
+        raise SystemExit(1)
+    fresh = (
+        run_all(dataset=frame, jobs=missing_jobs).select(LOSS_COLUMNS)
+        if missing_jobs
+        else reused.clear()
+    )
+    fitted = pl.concat([reused, fresh])
+    derived = stack_and_equal(fitted=fitted)
+    losses = pl.concat([fitted, derived], how="vertical_relaxed")
+    _assert_arms_share_keys(losses=losses)
+    return losses, reproduction_lines
 
 
 def main() -> int:
@@ -1110,6 +1506,18 @@ def main() -> int:
             "refit. Move the current outputs aside first."
         ),
     )
+    parser.add_argument(
+        "--fit-missing",
+        type=Path,
+        default=None,
+        metavar="OLD_OUTPUT_DIR",
+        help=(
+            "Reuse a previous run's losses.parquet (its superseded/ copy) for every (arm, "
+            "setting) job it already holds, fitting only the jobs missing from it (M2's cams_rich "
+            "arms). Re-verifies the reused guard arms reproduce the record panel's losses. Move "
+            "the current outputs to superseded/ first, since this mode does not overwrite either."
+        ),
+    )
     arguments = parser.parse_args()
     started = datetime.now(tz=UTC)
 
@@ -1126,6 +1534,14 @@ def main() -> int:
         _assert_rows_match_losses(frame=frame, losses=losses, loss_path=loss_path)
         _assert_arms_share_keys(losses=losses)
         reproduction_lines = reproduction_path.read_text().splitlines()
+    elif arguments.fit_missing is not None:
+        refuse_to_overwrite(paths=[loss_path, reproduction_path, report_path])
+        losses, reproduction_lines = _fit_missing(frame=frame, old_output_dir=arguments.fit_missing)
+        gate = "\n".join(reproduction_lines) + "\n"
+        reproduction_path.write_text(gate)
+        sys.stdout.write(gate)
+        losses.write_parquet(loss_path)
+        shutil.rmtree(OUTPUT_DIR / FITS_DIR_NAME, ignore_errors=True)
     else:
         refuse_to_overwrite(paths=[loss_path, reproduction_path, report_path])
         guard_fitted = _fitted(frame=frame, jobs=_guard_jobs(), resume=arguments.resume)
