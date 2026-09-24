@@ -145,8 +145,8 @@ from studies.bootstrap import (
 )
 from studies.charts import CONTRAST_COLUMNS
 from studies.cross_validation import (
-    ERA_FOLD_OFFSETS,
-    ERA_START_MONTHS,
+    ENS_HRES_WIND_ERA_FOLD_OFFSETS,
+    ENS_HRES_WIND_ERA_START_MONTHS,
     PRIMARY_HYPER_PARAMETERS,
     SEEDS,
     SENSITIVITY_HYPER_PARAMETERS,
@@ -1608,11 +1608,13 @@ def fold_designs(*, frame: pl.DataFrame) -> dict[str, pl.DataFrame]:
         the part-month of May 2026 dropped.
     """
     study_folds = cut_eras(
-        frame=frame, first_months=ERA_START_MONTHS, fold_offsets=ERA_FOLD_OFFSETS
+        frame=frame,
+        first_months=ENS_HRES_WIND_ERA_START_MONTHS,
+        fold_offsets=ENS_HRES_WIND_ERA_FOLD_OFFSETS,
     )
     return {
         "three eras, no fold rotation": cut_eras(
-            frame=frame, first_months=ERA_START_MONTHS, fold_offsets=NO_FOLD_OFFSETS
+            frame=frame, first_months=ENS_HRES_WIND_ERA_START_MONTHS, fold_offsets=NO_FOLD_OFFSETS
         ),
         "two UKV eras (the page's design)": with_eras(frame=frame),
         "study folds, two-valued era_code": study_folds.with_columns(
@@ -1620,7 +1622,7 @@ def fold_designs(*, frame: pl.DataFrame) -> dict[str, pl.DataFrame]:
         ),
         "extra era cut at IFS 50r1, May 2026 dropped": cut_eras(
             frame=frame.filter(pl.col("month") != IFS_CYCLE_50R1_MONTH),
-            first_months=(*ERA_START_MONTHS, FIRST_MONTH_AFTER_50R1),
+            first_months=(*ENS_HRES_WIND_ERA_START_MONTHS, FIRST_MONTH_AFTER_50R1),
             fold_offsets=ERA_FOLD_OFFSETS_50R1,
         ),
     }
@@ -2356,7 +2358,11 @@ def main() -> int:
     sites = _wind_sites()
     rows, counts = joined_row_set(sites=sites)
     timed_rows = _add_time_features(dataset=rows)
-    frame = cut_eras(frame=timed_rows, first_months=ERA_START_MONTHS, fold_offsets=ERA_FOLD_OFFSETS)
+    frame = cut_eras(
+        frame=timed_rows,
+        first_months=ENS_HRES_WIND_ERA_START_MONTHS,
+        fold_offsets=ENS_HRES_WIND_ERA_FOLD_OFFSETS,
+    )
     _LOG.info("common rows: %d, %s to %s", frame.height, frame["time"].min(), frame["time"].max())
 
     checks = run_checks(sites=sites, frame=frame, counts=counts)

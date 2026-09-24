@@ -60,14 +60,14 @@ Rows from the upgrade to the end of January carry the earlier month label but th
 each study drops them before cutting eras that begin at this month.
 """
 
-ERA_START_MONTHS: Final[tuple[str, str]] = ("2025-10", UKV_UPGRADE_MONTH)
+ENS_HRES_WIND_ERA_START_MONTHS: Final[tuple[str, str]] = ("2025-10", UKV_UPGRADE_MONTH)
 """The first month of the second and third eras of the ECMWF past-wind study, in `%Y-%m` form.
 
 The second era begins when Open-Meteo's ECMWF archive changes its source (1 October 2025), and the
 third when UKV is upgraded (`UKV_UPGRADE_MONTH`).
 """
 
-ERA_FOLD_OFFSETS: Final[Mapping[int, int]] = MappingProxyType({0: 0, 1: 0, 2: 2})
+ENS_HRES_WIND_ERA_FOLD_OFFSETS: Final[Mapping[int, int]] = MappingProxyType({0: 0, 1: 0, 2: 2})
 """How far each era's fold numbers are rotated for the ECMWF past-wind study, modulo `N_FOLDS`.
 
 **These offsets were found for the ENS and HRES wind row set, and no other.** With every offset at
@@ -236,9 +236,9 @@ def search_fold_offsets(
     """Find every fold rotation that leaves no calendar month without a training row.
 
     Tries every rotation of each era after the first (era 0 stays at 0, because only the rotations
-    relative to it matter) and keeps the designs for which `uncovered_months` is empty. The
-    `ERA_FOLD_OFFSETS` docstring names the row set its offsets were found for; use this function to
-    confirm coverage on another row set.
+    relative to it matter) and keeps the designs for which `uncovered_months` is empty.
+    The `ENS_HRES_WIND_ERA_FOLD_OFFSETS` docstring names the row set its offsets were found for; use
+    this function to confirm coverage on another row set.
 
     Args:
         frame: The row set, carrying `site`, `month` (a `%Y-%m` string) and `time`.

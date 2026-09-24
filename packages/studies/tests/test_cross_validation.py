@@ -7,8 +7,8 @@ import numpy as np
 import polars as pl
 import pytest
 from studies.cross_validation import (
-    ERA_FOLD_OFFSETS,
-    ERA_START_MONTHS,
+    ENS_HRES_WIND_ERA_FOLD_OFFSETS,
+    ENS_HRES_WIND_ERA_START_MONTHS,
     N_FOLDS,
     PRIMARY_HYPER_PARAMETERS,
     QUANTILE_LEVELS,
@@ -681,11 +681,13 @@ def test_the_search_returns_read_only_mappings():
 
 
 def test_the_study_era_constants_are_read_only_and_consistent():
-    assert ERA_START_MONTHS == ("2025-10", "2026-02")
-    assert dict(ERA_FOLD_OFFSETS) == {0: 0, 1: 0, 2: 2}
-    assert set(ERA_FOLD_OFFSETS) == set(range(len(ERA_START_MONTHS) + 1))
+    assert ENS_HRES_WIND_ERA_START_MONTHS == ("2025-10", "2026-02")
+    assert dict(ENS_HRES_WIND_ERA_FOLD_OFFSETS) == {0: 0, 1: 0, 2: 2}
+    assert set(ENS_HRES_WIND_ERA_FOLD_OFFSETS) == set(
+        range(len(ENS_HRES_WIND_ERA_START_MONTHS) + 1)
+    )
     with pytest.raises(TypeError):
-        ERA_FOLD_OFFSETS[0] = 1  # ty: ignore[invalid-assignment]
+        ENS_HRES_WIND_ERA_FOLD_OFFSETS[0] = 1  # ty: ignore[invalid-assignment]
 
 
 def test_a_covered_design_does_not_raise():
