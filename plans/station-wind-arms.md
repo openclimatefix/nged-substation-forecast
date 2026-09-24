@@ -283,3 +283,26 @@ script, and the fingerprints of `losses.parquet` and `losses_post_review.parquet
    S2 at one farm) are rounded once from full precision, the flag 106 wording is corrected, the
    `k=3` lead is scoped to an exploratory comparison, and the by-farm and season charts label their
    rows planned or exploratory correctly.
+
+### Third-round changes (after the four persona reviews)
+
+The persona reviews changed no fitted loss. Every change below re-runs `--report-only` and the chart
+script, and the sha256 of `losses.parquet` and `losses_post_review.parquet` is unchanged. The
+additions are post hoc and exploratory, and none replaces a planned contrast.
+
+1. **Between-farm and between-season differences of S1**, with intervals that resample whole
+   calendar months and a seed. Two farms share one draw of the same months. The two seasons hold
+   different months, so each season resamples its own. The function is checked against hand-computed
+   cases on every run.
+2. **Two t-intervals beside each planned contrast's bootstrap interval:** one on the 5 per-fold
+   differences and one on the 17 per-month mean differences, at both settings.
+3. **Report wording and counts:** the candidate rule now says the metres-per-second speed is derived
+   from knots (MIDAS unit code 4). The report prints the stations by kind (18 candidates, 12 with no
+   wind speed, 8 with one reading a day) and by message type, the pooled range of the candidates'
+   mean speeds and calm shares, each planned contrast's size against its reference arm's own error,
+   and the count of exploratory intervals at the main setting.
+4. **Page changes:** flag 106 is explained from the MIDAS quality-control documentation, the
+   station list is described as assembled by hand, S1 is no longer described as a height-neutral
+   comparison, "level with ERA5" becomes "not statistically significant", the season and farm
+   claims cite the direct differences, and the exploratory items are split into those the plan named
+   before any fit and those chosen after the first results.
