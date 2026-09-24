@@ -152,13 +152,14 @@ weather model that started a few hours earlier.
   measured here. See [ECMWF ENS: a longer-lead forecast than any other product on this
   page](#ecmwf-ens-a-longer-lead-forecast-than-any-other-product-on-this-page).
 - **At six solar farms in Lincolnshire, an XGBoost model given the nearest Met Office weather
-  station's irradiance and air temperature trails one given CAMS by 2.007 points [1.699, 2.248] and
-  beats one given ERA5 by 2.082 points [1.817, 2.363], but all six farms share one nearest station,
-  17 to 31 km away.** Adding the station's irradiance to CAMS lowers CAMS's error by a further 0.340
-  points [0.277, 0.420], measured against CAMS given a shuffled copy of the station's irradiance.
-  The station files end on 2025-12-31, so this section's row set is shorter than the page's main row
-  set and ends eight months earlier. See [Met Office weather-station observations as a stand-in for
-  a gridded product](#met-office-weather-station-observations-as-a-stand-in-for-a-gridded-product).
+  station's irradiance and air temperature trails an XGBoost model given CAMS by 2.007 points
+  [1.699, 2.248] and beats an XGBoost model given ERA5 by 2.082 points [1.817, 2.363], but all six
+  farms share one nearest station, 17 to 31 km away.** Adding the station's irradiance to CAMS
+  lowers CAMS's error by a further 0.340 points [0.277, 0.420], measured against CAMS given a
+  shuffled copy of the station's irradiance. The station files end on 2025-12-31, so the
+  weather-station section's row set is shorter than the page's main row set and ends eight months
+  earlier. See [Met Office weather-station observations as a stand-in for a gridded
+  product](#met-office-weather-station-observations-as-a-stand-in-for-a-gridded-product).
 
 ## Introduction
 
@@ -198,7 +199,7 @@ The map also draws AROME France, which this page does not test](../roadmap/asset
 | DMI HARMONIE-AROME | HARMONIE-AROME run by UWC-West, the collaboration of the Danish, Dutch, Icelandic and Irish weather services, over north-west Europe up to Iceland (the DINI domain), as distributed by the Danish Meteorological Institute (DMI) | 1 to 3 hours; run interval measured at 3 hours, matching the 3-hourly update Open-Meteo documents | yes | 2 km; Open-Meteo documents it at 2 km | July 2024; read here from November 2024 | not established |
 | KNMI HARMONIE-AROME | The same UWC-West HARMONIE-AROME run, as distributed hourly by the Royal Netherlands Meteorological Institute (KNMI) | not measured here; KNMI and Open-Meteo document an hourly update, which would give 1 hour | yes | 2 km model, distributed on a reduced 0.05° grid, about 5.5 km | July 2024; read here from November 2024 | not established |
 | ECMWF ENS (`T+3` band) | ECMWF's 51-member global ensemble forecast, from Dynamical.org's IFS ENS catalogue, which archives only the 00 UTC run of ENS's four daily runs; a forecast from a 00 UTC run, where ERA5 and ECMWF-IFS-HRES also serve forecast leads of 1 to 12 hours | 3 to 21 hours, its shortest available band in this download; 5 to 20 hours on the hours scored here | yes | about 9 km native (O1280); served on the open-data 0.25° grid, about 28 km north to south here, and read as the overlap-weighted mean of the 0.25° cells that each generator's H3 resolution-5 cell overlaps | April 2024 | about 09:00 UTC on the run's day, from Dynamical.org's archive, as the [ENS horizons study](ens-forecast-horizons.md) finds; ECMWF disseminates the run's steps 0 to 90 by about 06:55 UTC |
-| Met Office weather stations (MIDAS Open) | Observations from Met Office stations, read one station at a time, not as a gridded product: the 10 radiation stations and 38 air-temperature stations downloaded for these studies, a subset of the Met Office's network, some of which report only once a day | no forecast step (an observation of the hour itself) | no: sparse points across the UK, and the nearest radiation station is 17 to 31 km from a farm | point observations at each station | 2017; the files read here end on 2025-12-31 | not established; MIDAS Open `dataset-version-202607` ends on 2025-12-31 |
+| Met Office weather stations (MIDAS Open, the open release of the Met Office Integrated Data Archive System) | Observations from Met Office stations, read one station at a time, not as a gridded product: the 10 radiation stations and 38 air-temperature stations downloaded for these studies, a subset of the Met Office's network of weather stations; some of the air-temperature stations report only once a day | no forecast step (an observation of the hour itself) | no: sparse points across the UK, and the nearest radiation station is 17 to 31 km from a farm | point observations at each station | 2017; the files read here end on 2025-12-31 | not established; MIDAS Open `dataset-version-202607` ends on 2025-12-31 |
 
 **Most of the latencies come from each service's own documentation:** CAMS's [radiation-service
 notes](https://confluence.ecmwf.int/x/jOLjDw), the [ERA5 dataset
@@ -232,9 +233,10 @@ includes all four needs its own row set, from November 2024, separate from the r
 [The four extra Open-Meteo models](#the-four-extra-open-meteo-models).
 
 **Nearby weather-station observations are scored in their own section, on their own shorter row
-set.** The Met Office's MIDAS Open files end on 2025-12-31, so the station arms cannot use the
-page's hours after that date. See [Met Office weather-station observations as a stand-in for a
-gridded product](#met-office-weather-station-observations-as-a-stand-in-for-a-gridded-product).
+set.** The Met Office's MIDAS Open files end on 2025-12-31, so the XGBoost models given station
+observations cannot use the page's hours after that date. See [Met Office weather-station
+observations as a stand-in for a gridded
+product](#met-office-weather-station-observations-as-a-stand-in-for-a-gridded-product).
 
 ## Data and methods
 
@@ -360,9 +362,9 @@ difference between two products is a difference between their irradiance alone.*
   ECMWF ENS against ERA5 and against CAMS, are scored on ENS's own row set: see [ECMWF ENS: a
   longer-lead forecast than any other product on this
   page](#ecmwf-ens-a-longer-lead-forecast-than-any-other-product-on-this-page). Three further planned
-  contrasts, the nearest weather station against CAMS and against ERA5, and CAMS with the station
-  against CAMS with a shuffled copy of the station's irradiance, are scored on the weather-station
-  section's own row set: see [Met Office weather-station observations as a stand-in for a gridded
+  contrasts are scored on the weather-station section's own row set: the nearest weather station
+  against CAMS and against ERA5, and CAMS with the station against CAMS with a shuffled copy of the
+  station's irradiance. See [Met Office weather-station observations as a stand-in for a gridded
   product](#met-office-weather-station-observations-as-a-stand-in-for-a-gridded-product).
 - **A longer record for two questions.** The year-by-year comparison with ERA5 and SARAH-3's
   comparison by satellite use a second row set, built the same way from the four products whose
@@ -1112,14 +1114,16 @@ would now fit.
 ### Met Office weather-station observations as a stand-in for a gridded product
 
 **At six solar farms in Lincolnshire, an XGBoost model given the nearest Met Office weather
-station's irradiance and air temperature has a mean absolute error 2.007 points of capacity above
-one given CAMS [1.699, 2.248], and 2.082 points below one given ERA5 [1.817, 2.363].** Adding the
-station's irradiance to CAMS lowers the error by a further 0.340 points [0.277, 0.420], measured
-against CAMS given a shuffled copy of the station's irradiance, so that both XGBoost models have the
-same number of inputs. These are the section's three planned contrasts. Each is statistically
-significant at the 5% level, has the same sign in all 5 folds (five folds of contiguous whole months
-for each generator), and keeps its sign and significance at the second hyperparameter setting
-(+1.957 [+1.657, +2.193], −2.084 [−2.357, −1.828], and −0.321 [−0.401, −0.257]).
+station's irradiance and air temperature has a mean absolute error 2.007 points of capacity above an
+XGBoost model given CAMS [1.699, 2.248], and 2.082 points below an XGBoost model given ERA5 [1.817,
+2.363].** Adding the station's irradiance to CAMS lowers the error by a further 0.340 points [0.277,
+0.420], measured against CAMS given a shuffled copy of the station's irradiance. The shuffled copy
+keeps the station's average irradiance for each month and hour but not its hour-to-hour weather, so
+that any gain cannot come from the XGBoost model merely having one more input column. These are the
+section's three planned contrasts. Each planned contrast is statistically significant at the 5%
+level, has the same sign in all five folds of contiguous whole months for each generator, and keeps
+its sign and significance at the second hyperparameter setting (+1.957 [+1.657, +2.193], −2.084
+[−2.357, −1.828], and −0.321 [−0.401, −0.257]).
 
 **All six farms take the same nearest radiation station, 17 to 31 km away, so these results describe
 one station's pyranometer record, from an instrument that measures global horizontal irradiance, set
@@ -1129,49 +1133,83 @@ farms also share their ERA5 grid cells, so the six per-generator results are not
 replications.
 
 **The section asks how well a pyranometer some tens of kilometres from a farm stands in for the
-irradiance at the farm, a question about how far a point measurement represents its surroundings,
-not about how accurate the station is.** A station arm is an XGBoost model given the station's
-hourly global horizontal irradiance in place of a gridded product's. In the files read here, the
-diffuse and direct irradiance columns are empty at all 10 stations, so no station arm has a split
-into direct beam and diffuse light.
+irradiance at the farm, not how accurate the station is.** A station arm is an XGBoost model given
+the station's hourly global horizontal irradiance in place of a gridded product's irradiance. In the
+files read here, the diffuse and direct irradiance columns are empty at all 10 stations, so no
+station arm has a split into direct beam and diffuse light.
+
+**Three contrasts were written down before the first model was fitted, and every other comparison in
+this section is exploratory.** The three planned contrasts were written into the study's plan file,
+in a commit made before the first XGBoost model was fitted: the nearest station's irradiance and
+temperature against CAMS, the same against ERA5, and CAMS with the nearest station against CAMS with
+a shuffled copy of the station's irradiance. The shuffled copy is permuted within each farm, each
+calendar month of each year, and each hour of day, so the shuffled copy keeps the station's monthly
+average at each hour and removes the station's hour-to-hour weather. CAMS with the shuffled copy is
+called the padded control below, and CAMS with the real station column is called the blend below.
+The padded control carries the same nine feature columns as the blend. ERA5's and CAMS's results on
+the main row set were published before this section was planned, so it was known in advance that
+CAMS beats ERA5, though not where the station would fall.
 
 #### What the station files hold, and where they end
 
 **The files are the quality-controlled version (`qc-version-1`) of the Met Office's MIDAS Open
-dataset, version 202607: hourly global irradiation from the 10 radiation stations downloaded for
-these studies, and air temperature from the 38 weather stations downloaded, some of which report
-once a day and so cannot meet the coverage rule below, both from 2017-01-01 to 2025-12-31.** MIDAS
-reports each irradiance row as an amount in kJ m⁻² over the hour ending at its label, which this
-section converts to a mean irradiance in W m⁻², in the same hour-ending convention as the page's
-power aggregation. An air-temperature row is a spot reading at its label. Because the last hour in
-the files is 2025-12-31 23:00 UTC, and this page does not establish how often the Met Office
-releases a new version, this section's row set ends on 2025-12-31 and holds 60,033 common site-hours
-over 37 calendar months. The main row set holds 76,727 site-hours from 2022-12-01 to 2026-08-31.
-Each pooled interval here therefore resamples 37 months, and treats neighbouring months as
-independent.
+dataset, version 202607, from 2017-01-01 to 2025-12-31: hourly global irradiation from the 10
+radiation stations downloaded for these studies, and air temperature from the 38 weather stations
+downloaded.** Some of the 38 weather stations report once a day, and so cannot meet the coverage
+rule below. MIDAS reports each irradiance row as an amount in kJ m⁻² over the hour ending at its
+label. This section converts each amount to a mean irradiance in W m⁻², keeping the hour-ending
+convention of the page's power aggregation. An air-temperature row is a spot reading at its label.
+
+**This section's row set ends on 2025-12-31 and holds 60,033 common site-hours over 37 calendar
+months, against the main row set's 76,727 site-hours from 2022-12-01 to 2026-08-31.** The last hour
+in the files is 2025-12-31 23:00 UTC. This page does not establish how often the Met Office releases
+a new version of the files. Each pooled interval here therefore resamples 37 months, and treats
+neighbouring months as independent.
+
+**Measured power tracks the irradiance of the same hour more strongly than the irradiance of the
+hour before or after, for both the station and CAMS, so the station's hours are labelled the same
+way as CAMS's.** Across the 47,369 site-hours whose neighbouring hours are also scored (exploratory,
+post hoc), the correlation of measured power with the station's irradiance is 0.880 for the same
+hour, against 0.768 for the hour before and 0.819 for the hour after. The same three correlations
+for CAMS's irradiance are 0.926, 0.804, and 0.824.
+
+**CAMS's irradiance at the farms correlates more strongly with the nearest station's irradiance than
+ERA5's irradiance does (exploratory).** Across the six farms, CAMS's irradiance follows the nearest
+station's irradiance with a correlation of 0.939 and a mean difference, product minus station, of
+−9.7 W m⁻². ERA5's irradiance follows the station's irradiance with a correlation of 0.890 and a
+mean difference of −10.3 W m⁻². The mean station irradiance is 273.6 W m⁻². Each product is read at
+the farms, 17 to 31 km from the station, so these figures are not a validation of either product
+against the station.
 
 **Six irradiance values in the whole files are corrected, and no quality-control flag is used to
-drop an hour.** The files' quality-control flags are kept as delivered, and the page does not decode
-the flag values. The nearest radiation station's flag differs from the value it carries at most
-hours, 6, at 107 of the 60,033 site-hours, and the three planned contrasts on the remaining
-site-hours are +2.009 [+1.702, +2.251], −2.068 [−2.337, −1.817], and −0.341 [−0.421, −0.277]
-(exploratory, post hoc). The reader makes two corrections, counted over the whole files before the
-row set is cut: it clips 3 slightly negative irradiance values to zero, and it sets 3 hours to
-missing where the station reports more than 5 W m⁻² in an hour that starts and ends with the sun
-below the horizon. No upper-limit check against clear-sky irradiance was run beyond that night-time
-test. The reader then drops the hours where a station an arm needs has no value.
+drop an hour.** The station-reading code makes two corrections, counted over the whole files before
+the row set is cut: the code clips three slightly negative irradiance values to zero, and sets 3
+hours to missing where the station reports more than 5 W m⁻² in an hour that starts and ends with
+the sun below the horizon. No upper-limit check against clear-sky irradiance was run beyond that
+night-time test. The files' quality-control flags are kept as delivered, and the page does not
+decode the flag values. At 107 of the 60,033 site-hours, the nearest radiation station's flag
+differs from 6, the value the flag carries at most hours. Without those 107 site-hours, the three
+planned contrasts are +2.009 [+1.702, +2.251], −2.068 [−2.337, −1.817], and −0.341 [−0.421, −0.277]
+(exploratory, post hoc). The station-reading code then drops the hours where a station an arm needs
+has no value. Of the 60,611 candidate site-hours, 578 (0.95%) were dropped because a station value
+was missing.
 
 #### How the stations were chosen
 
 **The station rule was written before any score existed: the nearest station with a usable value at
 no less than 99% of a farm's hours.** Stations are ranked by great-circle distance, with ties going
 to the lower station number. A threshold of 100% leaves at least one farm with no eligible station,
-because no station is complete. The rule skipped no station nearer than the nearest radiation
-station at any farm. The rule chooses among the 10 stations downloaded. The station-metadata file
-lists 76 more radiation stations whose record overlaps this section's years, and the nearest of them
-is 107 km or more from every farm, so no undownloaded station is nearer than the nearest chosen
-here. The nearest air-temperature stations are chosen by the same rule from their own 38 stations,
-so they can differ from the radiation station.
+because none of the downloaded stations has a usable value at every one of that farm's hours. At
+every farm, the rule chose the nearest downloaded radiation station, and no nearer radiation station
+was skipped for low coverage. The nearest air-temperature stations are chosen by the same rule from
+their own 38 stations, so a farm's nearest air-temperature station can differ from its nearest
+radiation station.
+
+**No radiation station left out of the download is nearer to any farm than the nearest radiation
+station chosen here.** For radiation, the rule is applied only to the 10 stations downloaded. The
+station-metadata file lists 76 more radiation stations whose record overlaps this section's years.
+The nearest of those 76 stations is 107 km or more from every farm, so no radiation station in that
+file is nearer to a farm than the nearest radiation station chosen here.
 
 | Kind | Rank | Distance range (km) | Distinct stations | Lowest coverage | Most nearer stations skipped |
 |---|---|---|---|---|---|
@@ -1183,14 +1221,16 @@ so they can differ from the radiation station.
 | air temperature | 3 | 18 to 31 | 4 | 0.9969 | 2 |
 
 **The table gives ranges pooled over the six farms, because a station-to-farm mapping would narrow
-where a metered generator is.** The nearest radiation station is the same at every farm. The
-second-nearest is also a single station, and the third-nearest is two stations. The third-nearest
-radiation station is therefore the only rank at which the radiation station varies across the six
-farms, and the air-temperature stations vary at every rank. The second-nearest arm, like the
-nearest, rests on one station, so the gap between the two ranks compares two stations. The 578 hours
-(0.95%) dropped because a station value was missing are a small share of the 60,611 candidate hours.
+where a metered generator is.**
 
-#### The models work
+**Only the third-nearest radiation rank varies across the six farms, so the nearest and
+second-nearest arms each rest on a single station.** The nearest radiation station is the same at
+every farm, and the second-nearest radiation station is also the same at every farm. The
+third-nearest radiation rank holds two stations. The air-temperature stations vary across the six
+farms at every rank. The gap between the nearest-station and second-nearest-station arms therefore
+compares two single stations.
+
+#### The XGBoost model given the nearest station tracks measured power
 
 **An XGBoost model given the nearest station follows measured power at every generator across a
 clear, a variable, and a dull week.** Figure 20 draws out-of-fold predictions, each held to the
@@ -1200,70 +1240,64 @@ earlier "models work" figure uses, so no input's values enter the choice.
 ![Figure 20: An XGBoost model given the nearest station follows measured power at every generator,
 across a clear, a variable, and a dull week](assets/station_past_solar_models_work.svg)
 
-**Output tracks the hour of irradiance it was measured over more strongly than the hour before or
-after, for both the station and CAMS, so the station's hours are labelled the same way as CAMS's.**
-Across the 47,369 site-hours whose neighbouring hours are also scored (exploratory, post hoc), the
-correlation of output with the station's irradiance is 0.880 for the same hour, against 0.768 for
-the hour before and 0.819 for the hour after. CAMS's are 0.926, 0.804, and 0.824. Across the six
-farms, CAMS's irradiance follows the nearest station's with a correlation of 0.939 and a mean
-difference, product minus station, of −9.7 W m⁻², and ERA5's with 0.890 and −10.3 W m⁻², against a
-mean station irradiance of 273.6 W m⁻² (exploratory). Each product is read at the farms, 17 to 31 km
-from the station, so these figures are not a validation of either product against the station.
-
-#### Absolute error, and the three planned contrasts
+#### Mean absolute error of each arm, and the three planned contrasts
 
 **CAMS and ERA5 both score worse on this section's shorter row set than on the main row set, so this
 section's absolute errors are not comparable with the page's main leaderboard.** CAMS scores 5.299%
-of capacity here against 5.085% on the main row set, and ERA5 9.389% against 9.080%. Scoring the
-main row set's own fits on the 59,873 site-hours the two row sets share gives 5.170% for CAMS and
-9.250% for ERA5. The remaining 0.129 and 0.139 points are attributed to the shorter training span,
-the folds re-cut on it, and the 160 site-hours only this section holds. No interval is computed for
-these two differences, so fitting-seed variation is not separated from them. The station arms carry
-the same shorter-history handicap as the refit products. This section's row set also holds 160
-site-hours that the main row set does not (the blend study's common rows include them). On the
-59,873 shared site-hours the three planned contrasts are +2.008 [+1.701, +2.250], −2.082 [−2.364,
-−1.817], and −0.341 [−0.420, −0.277], so the extra hours do not change what the contrasts show
-(exploratory, post hoc).
+of capacity here against 5.085% on the main row set, and ERA5 9.389% against 9.080%. The XGBoost
+models fitted on the main row set score 5.170% for CAMS and 9.250% for ERA5 on the 59,873 site-hours
+the two row sets share. The remaining 0.129 and 0.139 points are attributed to the shorter training
+span, the folds re-cut on the shorter row set, and the 160 site-hours that only this section's row
+set holds, which the common rows of the [blending study](blending-weather-products.md) include. No
+interval is computed for these two differences, so fitting-seed variation is not separated from
+them. The station arms carry the same shorter-history handicap as the CAMS and ERA5 arms refitted on
+this row set.
+
+**The 160 site-hours that only this section's row set holds do not change what the three planned
+contrasts show (exploratory, post hoc).** On the 59,873 site-hours the two row sets share, the three
+planned contrasts are +2.008 [+1.701, +2.250], −2.082 [−2.364, −1.817], and −0.341 [−0.420, −0.277].
 
 ![Figure 21: The nearest station beats ERA5 but not CAMS, and adds to
 CAMS](assets/station_past_solar_leaderboard.svg)
 
-**The station arm sits between CAMS and ERA5.** Each interval in this paragraph and in Figure 21
-carries the month-to-month swing that all arms share, so two arms whose intervals overlap can still
-differ significantly: the nearest station and the mean of the 3 nearest stations overlap in Figure
-21, but the paired contrast separates them by 0.359 points [0.245, 0.471]. Only the contrasts test
-one arm against another. The XGBoost model given CAMS and the nearest station scores 4.968% of
-capacity [4.620, 5.287], the model given CAMS alone 5.299% [4.990, 5.599], the model given the mean
-of the 3 nearest stations 6.948% [6.402, 7.391], the model given the nearest station 7.307% [6.740,
-7.768], the model given the second-nearest station 8.396% [7.775, 8.887], the model given ERA5
-9.389% [8.761, 9.919], and the model given the third-nearest station 9.397% [8.737, 9.931]. In every
-planned contrast, and in every exploratory contrast except the three against a plain product, the
-two arms carry the same number of feature columns, 8 or 9, with `colsample_bytree` at 1, and the
-report prints every arm's columns. The nearest-station arm reads the station's air temperature where
-the CAMS and ERA5 arms read ERA5's. The nearest-station arm scores 0.012 points below the same arm
-given ERA5's temperature [−0.036, +0.011], so the 95% interval puts the effect of the temperature
-swap within 0.036 points of zero, small beside the 2-point gaps to CAMS and ERA5, and the
-temperature swap is not what separates the arms (exploratory).
+**The station arm sits between CAMS and ERA5.** The XGBoost models score, in percent of capacity:
+given CAMS and the nearest station, 4.968% [4.620, 5.287]; given CAMS alone, 5.299% [4.990, 5.599];
+given the mean of the three nearest stations, 6.948% [6.402, 7.391]; given the nearest station,
+7.307% [6.740, 7.768]; given the second-nearest station, 8.396% [7.775, 8.887]; given ERA5, 9.389%
+[8.761, 9.919]; and given the third-nearest station, 9.397% [8.737, 9.931]. Each interval in this
+paragraph and in Figure 21 carries the month-to-month swing that all arms share, so two arms whose
+intervals overlap can still differ significantly. The intervals for the nearest station and for the
+mean of the three nearest stations overlap in Figure 21, but the contrast, which compares the two
+arms on the same site-hours and so cancels the shared swing, separates those two arms by 0.359
+points [0.245, 0.471]. Only the contrasts test one arm against another.
 
 ![Figure 22: The nearest station trails CAMS by 2.007 points, beats ERA5 by 2.082, and lowers CAMS's
 error by 0.340](assets/station_past_solar_planned_contrasts.svg)
 
-**Three contrasts are planned.** The nearest station's irradiance and temperature against CAMS, and
-against ERA5, and CAMS with the nearest station against CAMS with a shuffled copy of the station's
-irradiance, were written into the study's plan file, in a commit made before the first model was
-fitted. The shuffled copy is permuted within each farm, each calendar month of each year, and each
-hour of day, so it keeps the station's monthly average at each hour and removes its hour-to-hour
-weather. CAMS with the shuffled copy is called the padded control below, and CAMS with the real
-station column is called the blend below. The padded control carries the same 9 columns as the
-blend. ERA5's and CAMS's results on the main row set were published before this section was planned,
-so it was known in advance that CAMS beats ERA5, though not where the station would fall. Every
-other comparison in this section is exploratory.
+**Every planned contrast compares two arms with the same number of feature columns, and swapping the
+station's air temperature for ERA5's moves the nearest-station arm's error by no more than 0.036
+points (exploratory).** In every planned contrast, and in every exploratory contrast except the
+three that set an arm carrying an extra column against a plain product, the two arms carry the same
+number of feature columns, 8 or 9, with `colsample_bytree` at 1, so every tree sees every column.
+The three exceptions are CAMS padded with a shuffled station column against plain CAMS, ERA5 padded
+the same way against plain ERA5, and the blend against plain CAMS. The report prints every arm's
+feature columns. The nearest-station arm reads the station's air temperature where the CAMS and ERA5
+arms read ERA5's air temperature. The nearest-station arm scores 0.012 points below the same arm
+given ERA5's air temperature [−0.036, +0.011] (exploratory). The 95% interval puts the effect of the
+temperature swap within 0.036 points of zero, small beside the 2-point gaps to CAMS and ERA5, so the
+temperature swap is not what separates the arms.
+
+**The nearest station's own irradiance is what carries the nearest-station arm's skill.** The
+nearest-station arm scores 6.734 points below the same arm given a shuffled copy of the station's
+irradiance [6.082, 7.402] (exploratory). The station's hour-to-hour irradiance is therefore what the
+nearest-station arm adds over the shuffled arm, and the station's air temperature, the season and
+time-of-day features, and the sun position are not.
 
 **Each planned contrast has the same sign at all six generators, and an interval that excludes zero
 at each.** The nearest station trails CAMS by between 1.174 and 2.656 points at the six farms, and
 beats ERA5 by between 1.555 and 2.528. The blend gains between 0.221 and 0.469 points over its
-padded control. At generator E, which has the fewest site-hours, 4 of 5 folds agree for the CAMS
-contrast and for the blend contrast. The six farms share one nearest station and two ERA5 grid
+padded control. At generator E, which has the fewest site-hours, 4 of 5 folds agree in sign for the
+CAMS contrast and for the blend contrast. The six farms share one nearest station and two ERA5 grid
 cells, so the per-generator results are not independent replications.
 
 ![Figure 23: Each planned contrast has the same sign at all six
@@ -1271,64 +1305,62 @@ generators](assets/station_past_solar_per_generator.svg)
 
 **Splitting the planned contrasts by half of the year gives the same signs (exploratory, post
 hoc).** The nearest station trails CAMS by 2.457 points [2.280, 2.628] in April to September and by
-1.286 points [0.761, 1.794] in October to March. It beats ERA5 by 2.080 points [1.784, 2.431] and by
-2.087 points [1.643, 2.523] in the two halves. The blend's gain over the padded control is 0.193
-points [0.157, 0.235] in April to September and 0.576 points [0.494, 0.670] in October to March. The
-split was added after the first results. Each half-year interval resamples only 18 or 19 calendar
-months, so these intervals are likely too narrow.
+1.286 points [0.761, 1.794] in October to March. The nearest station beats ERA5 by 2.080 points
+[1.784, 2.431] in April to September and by 2.087 points [1.643, 2.523] in October to March. The
+blend's gain over the padded control is 0.193 points [0.157, 0.235] in April to September and 0.576
+points [0.494, 0.670] in October to March. The split was added after the first results. Each
+half-year interval resamples only 18 or 19 calendar months, so these intervals are likely too
+narrow.
 
 #### What a station adds to a gridded product
 
 **Adding the nearest station's irradiance to ERA5 lowers ERA5's error by 2.432 points [2.196, 2.673]
-against ERA5 with a shuffled copy of the station's irradiance, and adding it to CAMS lowers CAMS's
-by 0.340 points [0.277, 0.420] against the same padding (exploratory for ERA5, planned for CAMS).**
-The padded controls themselves (exploratory, post hoc) score within 0.012 points of the plain
-products (+0.009 [−0.004, +0.021] for CAMS and +0.012 [−0.018, +0.041] for ERA5), and the 95%
-intervals put any effect of the shuffled column within 0.041 points of zero, which is small beside
-the 0.340-point gain the real station column brings, so the padding does not explain that gain.
-Against the plain CAMS model, which carries one column fewer, the blend gains 0.331 points [0.267,
-0.411] (exploratory, post hoc).
+against ERA5 with a shuffled copy of the station's irradiance, and adding the station's irradiance
+to CAMS lowers CAMS's error by 0.340 points [0.277, 0.420] against the same padding (exploratory for
+ERA5, planned for CAMS).** The padded controls themselves (exploratory, post hoc) score within 0.012
+points of the plain products (+0.009 [−0.004, +0.021] for CAMS and +0.012 [−0.018, +0.041] for
+ERA5). The 95% intervals put any effect of the shuffled column within 0.041 points of zero, small
+beside the 0.340-point gain the real station column brings, so the padding does not explain that
+gain. Against the XGBoost model given CAMS alone, which carries one column fewer, the blend gains
+0.331 points [0.267, 0.411] (exploratory, post hoc).
 
-![Figure 24: The real station column lowers ERA5's error by 2.432 points and CAMS's by 0.331; a
-shuffled one, or the station's own temperature, moves no error by more than
-0.041](assets/station_past_solar_controls.svg)
+![Figure 24: The real station column lowers ERA5's error by 2.432 points against a shuffled column,
+and CAMS's error by 0.331 points against plain CAMS; a shuffled station column, or the station's own
+temperature, moves no error by more than 0.041](assets/station_past_solar_controls.svg)
 
-**A station's own irradiance is what carries the skill.** The nearest-station arm scores 6.734
-points below the same arm given a shuffled copy of the station's irradiance [6.082, 7.402], so the
-station's hour-to-hour irradiance, and not its air temperature, calendar features, or sun position,
-is what the nearest-station arm adds over the shuffled arm (exploratory).
+#### Averaging three stations, and stations further away
 
-#### More stations, and further stations
-
-**Averaging the 3 nearest stations beats the nearest station alone by 0.359 points [0.245, 0.471],
-and the second-nearest station scores 1.089 points worse than the nearest [0.921, 1.254]
-(exploratory).** The mean of the 3 nearest stations is still 1.648 points behind CAMS [1.330, 1.912]
-and 2.441 points ahead of ERA5 [2.217, 2.671]. The third-nearest station scores 2.091 points worse
-than the nearest [1.848, 2.345], and does not differ statistically significantly at the 5% level
-from ERA5 (+0.009 points [−0.222, +0.244], with 3 of 5 folds agreeing in sign, so the 95% interval
-runs from 0.222 points better than ERA5 to 0.244 points worse). The second-nearest station is 0.993
-points ahead of ERA5 [0.774, 1.230].
+**Averaging the three nearest stations beats the nearest station alone by 0.359 points [0.245,
+0.471], and the second-nearest station scores 1.089 points worse than the nearest [0.921, 1.254]
+(exploratory).** The mean of the three nearest stations is still 1.648 points behind CAMS [1.330,
+1.912] and 2.441 points ahead of ERA5 [2.217, 2.671]. The third-nearest station scores 2.091 points
+worse than the nearest station [1.848, 2.345]. The third-nearest station does not differ
+statistically significantly at the 5% level from ERA5 (+0.009 points [−0.222, +0.244], with 3 of 5
+folds agreeing in sign, so the 95% interval runs from 0.222 points better than ERA5 to 0.244 points
+worse). The second-nearest station is 0.993 points ahead of ERA5 [0.774, 1.230].
 
 ![Figure 25: Averaging three stations beats the nearest station alone, and the third-nearest station
 scores no better than ERA5](assets/station_past_solar_stations.svg)
 
 **The rise in error from the nearest to the second- and third-nearest stations cannot be attributed
 to distance alone.** The second-nearest station is 36 to 51 km from a farm and the third-nearest 52
-to 89 km, against 17 to 31 km for the nearest, but the three ranks are different instruments at
-different places, with different records, and the third rank skipped a nearer station on coverage at
-one or more farms.
+to 89 km, against 17 to 31 km for the nearest. But the stations at the three ranks are also
+different instruments at different places, with different records, and at one or more farms the
+third rank skipped a nearer station that failed the coverage rule.
 
 #### What this section does and does not show
 
 **The section shows that an XGBoost model given one station's pyranometer record, 17 to 31 km from
-the farms, predicts the farms' output with a lower mean absolute error than one given ERA5's value
-at the farm and a higher one than one given CAMS's satellite retrieval, at these six farms from
-December 2022 to December 2025.** The section does not show how the result changes with the station
-chosen, because every farm shares one. It does not show how the result changes with distance,
-because rank, place, and instrument change together, and it does not test the station's accuracy.
-Nor does it test any product with a beam and diffuse split, because the diffuse and direct columns
-are empty at all 10 stations in the files read here. The files read here end on 2025-12-31, and the
-section does not test any near-real-time station feed, so it says nothing about a live service.
+the farms, predicts the farms' output with a lower mean absolute error than an XGBoost model given
+ERA5's value at the farm, and a higher mean absolute error than an XGBoost model given CAMS's
+satellite retrieval, at these six farms from December 2022 to December 2025.** The section does not
+show how the result changes with the station chosen, because every farm shares one nearest radiation
+station. The section does not show how the result changes with distance, because rank, place, and
+instrument change together. The section does not test the station's accuracy either. Nor does the
+section test any product with a beam and diffuse split, because the diffuse and direct columns are
+empty at all 10 stations in the files read here. The files read here end on 2025-12-31, and the
+section does not test any near-real-time station feed, so the section says nothing about a live
+service.
 
 ## What to use
 
@@ -1389,20 +1421,21 @@ against availability and coverage.**
   [ENS section above](#ecmwf-ens-a-longer-lead-forecast-than-any-other-product-on-this-page) says
   what the evidence supports for each use.
 - **Weather-station observations: at these six farms, the nearest station is a worse input than CAMS
-  and a better one than ERA5, the only two products scored on its rows, and the evidence rests on
-  one station.** An XGBoost model given the nearest Met Office radiation station's irradiance and
-  air temperature, 17 to 31 km away, scores 7.307% of capacity on this section's rows, between
-  CAMS's 5.299% and ERA5's 9.389%. These percentages are not comparable with the main leaderboard's,
-  because this section's rows are shorter and score CAMS and ERA5 worse than the main rows do. For
-  capacity estimation, training history, and disaggregation, CAMS covers every hour the station
-  files do, so none of those three uses needs a station in place of CAMS, and adding the station to
-  CAMS lowers CAMS's error by a further 0.340 points [0.277, 0.420]. For historical features in the
-  live service, the page recommends ICON-EU or rebuilt UKV because CAMS arrives about a day late.
-  The station was not scored against ICON-EU or UKV, and no near-real-time station feed was tested,
-  so this page cannot say whether a station would serve that use. Where CAMS cannot be used, the
-  nearest station is a better input than ERA5, by 2.082 points [1.817, 2.363]. The third-nearest
-  station, 52 to 89 km away, does not differ statistically significantly at the 5% level from ERA5
-  (+0.009 points [−0.222, +0.244]). This page does not commit the project to reading station data.
+  and a better input than ERA5, the only two gridded products scored on the weather-station
+  section's rows, and the evidence rests on one station.** An XGBoost model given the nearest Met
+  Office radiation station's irradiance and air temperature, 17 to 31 km away, scores 7.307% of
+  capacity on the weather-station section's rows, between CAMS's 5.299% and ERA5's 9.389%. These
+  percentages are not comparable with the main leaderboard's percentages, because the
+  weather-station section's row set is shorter and scores CAMS and ERA5 worse than the main row set
+  does. For capacity estimation, training history, and disaggregation, CAMS covers every hour the
+  station files do, so none of those three uses needs a station in place of CAMS. Adding the
+  station's irradiance to CAMS lowers CAMS's error by a further 0.340 points [0.277, 0.420]. For
+  historical features in the live service, the page recommends ICON-EU or rebuilt UKV because CAMS
+  arrives about a day late. The station was not scored against ICON-EU or UKV, and no near-real-time
+  station feed was tested, so this page cannot say whether a station would serve that use. Where
+  CAMS cannot be used, the nearest station is a better input than ERA5, by 2.082 points [1.817,
+  2.363]. The third-nearest station, 52 to 89 km away, does not differ statistically significantly
+  at the 5% level from ERA5 (+0.009 points [−0.222, +0.244]).
 
 **Giving an XGBoost model CAMS, ERA5, UKV, ICON-D2, ICON-EU, and ICON global at once beats giving it
 CAMS alone, with CAMS's
@@ -1488,15 +1521,16 @@ single weather product?](blending-weather-products.md#solar-a-blend-beats-cams-g
 
 - **The weather-station section is scored on its own shorter row set, and its result rests on one
   station.** The Met Office's MIDAS Open files end on 2025-12-31, so the section's 60,033 site-hours
-  run from 2022-12-01 to 2025-12-31, against the main row set's 76,727 to 2026-08-31. All six farms
-  take the same nearest radiation station, 17 to 31 km away, so the section compares one pyranometer
-  with two gridded products, and its intervals cover month-to-month weather and the fitting seed,
-  not the choice of station. The second- and third-nearest stations differ from the nearest in
-  place, instrument, and record as well as in distance, so the gaps between the three ranks cannot
-  be read as an effect of distance alone. In the files read here, the diffuse and direct irradiance
-  columns are empty at all 10 stations, so no station arm has a beam split. The section scores only
-  CAMS and ERA5 on its rows, so it does not rank the station against the other products on this
-  page. The section is solar only.
+  run from 2022-12-01 to 2025-12-31, against the main row set's 76,727 site-hours, which run to
+  2026-08-31. All six farms take the same nearest radiation station, 17 to 31 km away, so the
+  section compares one pyranometer with two gridded products. The section's intervals cover
+  month-to-month weather and the fitting seed, not the choice of station. The second- and
+  third-nearest stations differ from the nearest in place, instrument, and record as well as in
+  distance, so the gaps between the three ranks cannot be read as an effect of distance alone. In
+  the files read here, the diffuse and direct irradiance columns are empty at all 10 stations, so no
+  station arm has a beam split. The only gridded products the weather-station section scores are
+  CAMS and ERA5, so the section does not rank the station against the other products on this page.
+  The section is solar only.
 
 ## Reproducing the figures
 
@@ -1534,13 +1568,14 @@ with `uv run
 --with cfgrib python studies/beam_diffuse_split/verify_icon_lineage.py --model icon-eu`, against the
 runs the German weather service still publishes, which cover about one day.
 
-The weather-station section has its own two scripts and a check, run in this order.
-`station_past_solar.py` builds the section's row set, fits every arm, and writes `report.md` and
-`losses.parquet` to `data/studies/beam_diffuse_split/past_weather_v2/station_past_solar/`.
+The weather-station section has three scripts of its own, run in this order: two that build and
+chart the section, and a check on the page's numbers. `station_past_solar.py` builds the section's
+row set, fits every arm, and writes `report.md` and `losses.parquet` to
+`data/studies/beam_diffuse_split/past_weather_v2/station_past_solar/`.
 `station_past_solar_charts.py` draws Figures 20 to 25 from those two files, and stops unless the
-saved report is the one the current code produces. `check_station_page_numbers.py` stops unless
-every number the section adds to the page appears in that report. The MIDAS Open files come from
-`studies/weather_downloads/fetch_midas_open.py`.
+saved report matches the report the current code produces. `check_station_page_numbers.py` stops
+unless every number the section adds to the page appears in `report.md`. The MIDAS Open files come
+from `studies/weather_downloads/fetch_midas_open.py`.
 
 ```bash
 uv run python studies/beam_diffuse_split/station_past_solar.py

@@ -656,9 +656,10 @@ def main() -> int:
             ],
             number=FIGURE_CONTROLS,
             title=(
-                f"The real station column lowers ERA5's error by {era5_gain:.3f} points and "
-                f"CAMS's by {cams_gain:.3f}; a shuffled one, or the station's own temperature, "
-                f"moves no error by more than {null_bound:.3f}"
+                f"The real station column lowers ERA5's error by {era5_gain:.3f} points against "
+                f"a shuffled column, and CAMS's error by {cams_gain:.3f} points against plain "
+                f"CAMS; a shuffled station column, or the station's own temperature, moves no "
+                f"error by more than {null_bound:.3f}"
             ),
             subtitle=[
                 (
