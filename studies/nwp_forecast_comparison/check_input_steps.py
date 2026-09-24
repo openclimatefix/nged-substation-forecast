@@ -3,14 +3,13 @@
 One-off throwaway script for the study in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/810>.
 
-**Method.** For each planned Previous Runs input other than the reference (UKV and IFS 0.25°), this
-takes the monthly mean of its day-1 global horizontal irradiance and 100 m wind speed, per
-anonymised site, and divides it by ICON-EU's day-1 monthly mean at the same site and month —
-ICON-EU is the reference because it has the longest continuous Previous Runs history among the
-planned inputs and covers the whole trial area. A step in one product but not in the reference
-shows up as a jump in the ratio that persists. GEFS and ENS are not compared here: GEFS's extract
-is not downloaded yet, and ENS is read through `ens_forecast_horizons.py`'s different schema, which
-`build_forecast_inputs.py` joins onto Previous Runs rather than this screen.
+**Method.** For each pair of planned Previous Runs inputs in `PAIRS`, this takes each product's
+monthly mean of its day-1 global horizontal irradiance and 100 m wind speed, per anonymised site,
+and divides one by the other at the same site and month. ICON-EU is the reference in two pairs and
+UKV in the third, so a step in ICON-EU shows in both of its pairs and is told apart from a step in
+UKV or IFS 0.25°. A step in one product but not in its partner shows up as a jump in the ratio that
+persists. GEFS and ENS are not screened: their columns are built by `build_forecast_inputs.py` from
+extracts with a different schema.
 
 **This is a screen, not a statistical test.** A jump flagged here is a candidate for a known upgrade
 date (recorded in the study's README) or a genuine defect; either way a flagged jump is a reason to
@@ -34,12 +33,14 @@ from contracts.settings import PROJECT_ROOT
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
-REFERENCE_PRODUCT: Final[str] = "ICON-EU"
-"""Every other planned input's ratio is read against this product's own day-1 monthly mean."""
-
-COMPARED_PRODUCTS: Final[tuple[str, ...]] = ("UKV", "ECMWF-IFS-025")
-"""The Previous Runs planned inputs compared against `REFERENCE_PRODUCT`. GEFS is not compared: its
-extract is not downloaded yet, and V2 checks its own steps separately."""
+PAIRS: Final[tuple[tuple[str, str], ...]] = (
+    ("UKV", "ICON-EU"),
+    ("ECMWF-IFS-025", "ICON-EU"),
+    ("ECMWF-IFS-025", "UKV"),
+)
+"""Each (compared product, reference product) pair whose day-1 monthly ratio is screened. A step in
+the reference shows in both pairs that use it, so ICON-EU's own step is told apart from UKV's or
+IFS 0.25°'s by the third pair, which uses neither ICON-EU. ENS and GEFS are not screened."""
 
 FIELDS: Final[dict[str, str]] = {
     "ghi": "shortwave_radiation_previous_day1",
@@ -126,7 +127,7 @@ def _step_lines(*, ratios: pl.DataFrame, product: str, field: str) -> list[str]:
 
 
 def main() -> int:
-    """Compute and flag monthly steps in each planned input's ratio to ICON-EU, per site."""
+    """Compute and flag monthly steps in each pair's ratio, per site."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, required=True)
@@ -134,17 +135,19 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     lines = [
-        "| Product | Field | Site | Month | Ratio to ICON-EU (prev → this) |",
+        "| Product / reference | Field | Site | Month | Ratio (prev → this) |",
         "|---|---|---|---|---|",
     ]
     for field_name, column in FIELDS.items():
-        reference = _monthly_mean(product_dir=REFERENCE_PRODUCT, field_column=column)
-        for product in COMPARED_PRODUCTS:
+        for product, reference_product in PAIRS:
+            reference = _monthly_mean(product_dir=reference_product, field_column=column)
             product_frame = _monthly_mean(product_dir=product, field_column=column)
             joined = product_frame.join(
                 reference.rename({"value": "reference_value"}), on=["site", "month"], how="inner"
             ).with_columns(ratio=pl.col("value") / pl.col("reference_value"))
-            lines += _step_lines(ratios=joined, product=product, field=field_name)
+            lines += _step_lines(
+                ratios=joined, product=f"{product} / {reference_product}", field=field_name
+            )
 
     if len(lines) == 2:
         lines.append(f"\nNo month-to-month change at or above {STEP_RATIO_THRESHOLD}x found.")

@@ -365,8 +365,12 @@ def compare_ens_rebuild(*, domain: DomainType) -> float:
     )
     if joined.is_empty():
         return 0.0
-    diffs = [(joined[column] - joined[f"{column}_new"]).abs().max() or 0.0 for column in wanted]
-    return float(max(diffs))
+    differences = joined.select(
+        pl.max_horizontal(
+            (pl.col(column) - pl.col(f"{column}_new")).abs().max() for column in wanted
+        ).alias("largest")
+    )
+    return float(differences.item() or 0.0)
 
 
 def _gefs_months_available() -> list[str]:
@@ -587,8 +591,7 @@ def _gefs_frame(*, keys: pl.DataFrame, domain: DomainType, window_dir: Path | No
                 "GEFS: data/studies/weather/GEFS/_month_cache/ is empty, no GEFS columns written."
             )
             return keys
-        last_row_date = keys["time"].max()
-        last_needed = f"{last_row_date.year:04d}-{last_row_date.month:02d}"
+        last_needed = keys.select(pl.col("time").max().dt.strftime("%Y-%m")).item()
         if not _gefs_span_complete(last_month=last_needed):
             _LOG.info(
                 "GEFS: month cache holds %d months but does not yet cover %s to %s (the rows' "
