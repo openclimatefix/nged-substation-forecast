@@ -130,6 +130,7 @@ def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         title="ICON-DREAM-EU ties ERA5 and beats only ICON global of the other five products",
         subtitle=[
             "Each product's own mean absolute error, sorted best first.",
+            "Only the comparisons with ERA5 and ICON-EU were planned.",
             DOTS,
             CAPACITY,
             SCOPE,

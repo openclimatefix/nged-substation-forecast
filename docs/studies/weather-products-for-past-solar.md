@@ -166,7 +166,7 @@ The map also draws AROME France, which this page does not test](../roadmap/asset
 | ICON-EU | DWD model for Europe, nested inside ICON global | 1 to 3 hours | yes | 6.5 km; served at about 7 km | November 2022 | about 3.5 hours |
 | ICON global | DWD global model | 1 to 6 hours | yes | 13 km; served at about 11 km | November 2022 | about 3.5 hours |
 | SARAH-3 | Satellite climate data record from Meteosat images, from EUMETSAT's Satellite Application Facility on Climate Monitoring (CM SAF); the years read here, from 2021, are from its Interim Climate Data Record | no forecast step | yes | 0.05° grid, about 3.3 km east to west by 5.6 km north to south here; read at the nearest cell | 1983; read here from January 2021 | 2 to 5 days |
-| ICON-DREAM-EU | DWD reanalysis over Europe, built from ICON | 1 to 3 hours | yes | about 6.5 km; read at the nearest cell | 2010; read here from September 2019 | not established |
+| ICON-DREAM-EU | DWD reanalysis over Europe, built from ICON | 1 to 3 hours | yes | about 6.5 km; read at the nearest cell | 2010; read here from September 2019 | monthly; DWD's readme states 2 to 3 months, but August 2026 was on DWD's server by 23 September 2026 |
 | ECMWF-IFS-HRES | ECMWF's global model | 1 to 12 hours before 1 October 2025, when Open-Meteo's archive held only the 00 and 12 UTC runs; 1 to 6 hours from it, when the archive switched to ECMWF's newly opened real-time catalogue and gained the 06 and 18 UTC runs | yes | 9 km; served on the native O1280 grid from 1 October 2025, served grid before then not established | 2017; read here from November 2024 | not established |
 | ARPEGE Europe | Météo-France's global model, a stretched grid finest over France, as distributed on its European 0.1° grid | 1 to 6 hours (4-times-daily cycle) | yes | 0.1°, about 11 km, as Open-Meteo documents | November 2022 in Open-Meteo's archive; read here from November 2024 | not established |
 | DMI HARMONIE-AROME | HARMONIE-AROME run by UWC-West, the collaboration of the Danish, Dutch, Icelandic and Irish weather services, over north-west Europe up to Iceland (the DINI domain), as distributed by the Danish Meteorological Institute (DMI) | 1 to 3 hours; run interval measured at 3 hours, matching the 3-hourly update Open-Meteo documents | yes | 2 km; Open-Meteo documents it at 2 km | July 2024; read here from November 2024 | not established |
@@ -183,8 +183,9 @@ the Exploitation of Meteorological Satellites (EUMETSAT) and available by manual
 SAF; its 2-to-5-day figure is this project's own tracking, cross-referenced in the
 [disaggregation
 roadmap](../roadmap/disaggregation.md#an-irradiance-nowcast-would-be-a-more-useful-product), not
-a figure CM SAF itself publishes. ICON-DREAM-EU's publication cadence is not established here.
-DMI's and KNMI's joint UWC-West run is documented on [KNMI's data
+a figure CM SAF itself publishes. DWD publishes ICON-DREAM-EU a month at a time, after the month
+ends: its readme states 2 to 3 months' delay, but August 2026 was on DWD's server by 23 September
+2026. DMI's and KNMI's joint UWC-West run is documented on [KNMI's data
 platform](https://english.knmidata.nl/open-data/harmonie), [Open-Meteo's DMI
 documentation](https://open-meteo.com/en/docs/dmi-api), and [Open-Meteo's KNMI
 documentation](https://open-meteo.com/en/docs/knmi-api). ARPEGE Europe's grid and Open-Meteo's own

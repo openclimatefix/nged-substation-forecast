@@ -78,11 +78,11 @@ from the freshest run of that weather model that Open-Meteo's archive holds for 
   from 0.46 points in 2025 to 0.75 points in 2026, a change of 0.30 points [0.04, 0.58] after
   rounding, while ICON-EU's and ICON-D2's leads did not change by a margin statistically
   significant at the 5% level.** See [ERA5's deficit, year by year](#era5s-deficit-year-by-year).
-- **ICON-DREAM-EU, DWD's newer reanalysis, does not beat ERA5, and trails ICON-EU, DWD's
-  operational ICON model over Europe, by 0.34 points [0.27, 0.41] at both hyperparameter
-  settings.** ICON-DREAM-EU's hourly wind is a 1 to 3 hour forecast, never an analysis; in an
-  exploratory comparison restricted to hours where its served lead matches ICON-EU's, the gap
-  narrows to 0.28 points. See [ICON-DREAM-EU does not beat ERA5, and trails
+- **[ICON-DREAM-EU](https://doi.org/10.5676/dwd/icon-dream_v1), DWD's newer reanalysis, does not
+  beat ERA5, and trails ICON-EU, DWD's operational ICON model over Europe, by 0.34 points [0.27,
+  0.41] at both hyperparameter settings.** ICON-DREAM-EU's hourly wind is a 1 to 3 hour forecast,
+  never an analysis; in an exploratory comparison restricted to hours where its served lead matches
+  ICON-EU's, the gap narrows to 0.28 points. See [ICON-DREAM-EU does not beat ERA5, and trails
   ICON-EU](#icon-dream-eu-does-not-beat-era5-and-trails-icon-eu).
 
 ## Introduction
@@ -115,7 +115,7 @@ reference.
 | ICON-D2 | DWD model for Germany and neighbouring countries | 2.2 km; served at about 2 km | 80 m and 120 m | 0 to 2 hours | no: its western edge runs from about 2°W on the south coast to about 2.5°W in the Midlands | November 2022 | about 1.5 hours |
 | ICON-EU | DWD model for Europe, nested inside ICON global | 6.5 km; served at about 7 km | 80 m and 120 m | 0 to 2 hours | yes | November 2022 | about 3.5 hours |
 | ICON global | DWD global model | 13 km; served at about 11 km | 80 m and 120 m | 0 to 5 hours | yes | November 2022 | about 3.5 hours |
-| ICON-DREAM-EU | DWD reanalysis run of the ICON model, over Europe, with its own data assimilation | 6.5 km; read here from DWD's native grid, not Open-Meteo | level 72 (about 96 m) and 10 m | 1 to 3 hours | yes | January 2010 | about 2 to 3 months |
+| ICON-DREAM-EU | DWD reanalysis run of the ICON model, over Europe, with its own data assimilation | 6.5 km; read here from DWD's native grid, not Open-Meteo | level 72 (about 96 m) and 10 m | 1 to 3 hours | yes | January 2010 | monthly; DWD's readme states 2 to 3 months, but August 2026 was on DWD's server by 23 September 2026 |
 
 ![Figure 3: ICON-D2 has no data west of a line running from 1.8°W at 49.9°N to 3.9°W at 57.3°N.
 The map also draws AROME France, which this page does not test](../roadmap/assets/weather_product_domains.svg)
@@ -430,7 +430,11 @@ hourly series from short forecasts run every 3 hours. At 00, 03, 06 UTC and ever
 ICON-EU is served here as a T+0 analysis, but ICON-DREAM-EU at the same hour is a 3 hour forecast
 from the previous run, the longest lead in its own cycle. The padding hours cfgrib leaves at each
 month boundary establish this: they fall at 22:00 and 23:00 before the month and 00:00 of the next
-one, which fits a run every 3 hours starting from 00 UTC, giving steps 1 to 3.
+one, which fits a run every 3 hours starting from 00 UTC, giving steps 1 to 3. A second, independent
+check agrees: the mean absolute hour-to-hour change in level 72's speed, over every cell in the
+download, is 0.604 m/s at the hour a new run's first step arrives, against 0.561 and 0.562 m/s
+within a run, because a fresh run replaces the previous run's 3-hour extrapolation rather than
+extending it.
 
 **Every arm, including the five products already scored above, is refitted on ICON-DREAM-EU's own
 row set: 50,041 generator-hours from August 2024 to August 2026.** ICON-DREAM-EU's record stops 10
@@ -440,13 +444,15 @@ sets. This section therefore rests on its own, shorter row set than the rest of 
 the row-build rules — the same power hour, the same zero-half-hour drop, the same fold boundary at
 the UKV upgrade — are otherwise identical.
 
-**The five original products still rank much as [UKV and ICON-D2 describe past wind
-best](#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested) found, on this shorter
-row set, with one exception.** ICON-EU still beats ERA5, by 0.340 points [0.193, 0.479], close to
-the 0.31 points found there. ICON-D2 still beats ICON-EU, by 0.240 points [0.164, 0.317], close to
-the 0.26 points found there. ICON-EU's small lead over UKV found there (0.13 points [0.01, 0.23],
-statistically significant at the 5% level) is not statistically significant at the 5% level here:
-ICON-EU is 0.086 points behind UKV [−0.028, +0.193].
+**In exploratory contrasts, the five original products still rank much as [UKV and ICON-D2 describe
+past wind best](#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested) found, on this
+shorter row set, with one exception.** ICON-EU still beats ERA5, by 0.340 points [0.193, 0.479],
+close to the 0.31 points found there. ICON-D2 still beats ICON-EU, by 0.240 points [0.164, 0.317],
+close to the 0.26 points found there. UKV's small lead over ICON-EU found there (0.13 points [0.01,
+0.23], statistically significant at the 5% level) shrinks here to 0.086 points [−0.028, +0.193], not
+statistically significant at the 5% level. `wind_products.py`'s own published fits, not refit,
+scored on these same 50,041 rows, give 0.119 points [0.000, 0.228], so the refit moves this
+borderline result across the threshold more than the 10 missing days do.
 
 **Every check below passed before any arm was fitted.** ICON-DREAM-EU's speed from its `U` and `V`
 wind components agrees with its own served scalar speed almost exactly: a median absolute
@@ -468,6 +474,13 @@ ICON-DREAM-EU is 0.001 points behind ERA5 [−0.119, +0.131], not statistically 
 level. At the second hyperparameter setting ICON-DREAM-EU is 0.047 points ahead of ERA5 [−0.080,
 +0.163], also not statistically significant; both estimates sit close to zero.
 
+**The two pages agree over the window they share.** The [past-solar
+page](weather-products-for-past-solar.md#icon-dream-eu-beats-era5-but-not-the-icon-weather-models)
+finds ICON-DREAM-EU ahead of ERA5 by 0.32 points [0.12, 0.52] over its longer window, back to
+September 2019, but by 0.16 points [−0.09, +0.38] since August 2024, the window this page shares
+with it, not statistically significant at the 5% level. On both pages ICON-DREAM-EU trails ICON-EU
+at equal leads: by 0.38 points for solar, and, as the next section below finds, by 0.28 points here.
+
 **ICON-DREAM-EU trails ICON-EU by 0.34 points at both hyperparameter settings.** At the primary
 setting the gap is 0.340 points [0.266, 0.405], and at the second setting 0.338 points [0.282,
 0.391]; both are statistically significant at the 5% level, with every fold agreeing.
@@ -478,8 +491,13 @@ points](assets/wind_icon_dream_planned_contrasts.svg)
 **The rest of this section is exploratory: chosen after the results were seen, not named in the
 plan.**
 
-**Part of ICON-DREAM-EU's gap to ICON-EU is a lead mismatch: ICON-EU is served here at 0 to 2
-hours, and ICON-DREAM-EU at 1 to 3.** On the two hours in three where the two products' served
+**Part of ICON-DREAM-EU's gap to ICON-EU comes from its 3-hour forecasts: dropping the hours where
+ICON-DREAM-EU is at step 3 and ICON-EU at T+0 narrows the gap to 0.28 points.** ICON-EU's own error
+against ERA5 is flat by lead: −0.341 points at T+0, −0.346 points at 1 hour, and −0.332 points at 2
+hours. ICON-DREAM-EU's error against ERA5 is not: it moves from −0.108 points at step 1 to +0.121
+points at step 3 (the next paragraph below sets out every step). So restricting to equal-lead hours
+narrows the gap between ICON-DREAM-EU and ICON-EU by dropping ICON-DREAM-EU's worst step, not by
+dropping one of ICON-EU's better leads. On the two hours in three where the two products' served
 leads match (33,344 rows), ICON-DREAM-EU trails ICON-EU by 0.279 points [0.197, 0.356] at the
 primary setting and 0.271 points [0.208, 0.333] at the second, against 0.340 and 0.338 points on
 every hour. So about 0.06 of the 0.34-point gap comes from the lead mismatch, and ICON-DREAM-EU
@@ -496,9 +514,9 @@ significant, and 0.121 points behind [+0.009, +0.230] at step 3, statistically s
 5% level. Step 3 is ICON-DREAM-EU's longest lead in its own cycle, so both comparisons get worse as
 ICON-DREAM-EU's own forecast ages.
 
-**The three-level arm does not settle whether a different ICON-DREAM-EU height would change either
-planned answer: it still trails ICON-EU, and does not beat ERA5, whichever it is compared
-against.** Giving the XGBoost model two more height levels — about 42 m and 167 m — alongside level
+**Giving the XGBoost model two more ICON-DREAM-EU heights does not change either planned answer: the
+three-level arm still trails ICON-EU, and still does not beat ERA5.** Giving the XGBoost model two
+more height levels — about 42 m and 167 m — alongside level
 72 improves on the primary (`icon_dream_eu_wind`) arm by 0.044 points [0.016, 0.074], statistically
 significant at the 5% level. Compared directly, the three-level arm still trails ICON-EU, by 0.296
 points [0.222, 0.365], statistically significant at the 5% level with every fold agreeing, and is
@@ -524,6 +542,13 @@ each statistically significant at the 5% level. Against ERA5, ICON-DREAM-EU trai
 Generator W2 (0.225 points ahead [−0.002, +0.449], not statistically significant) nor Generator W3
 (0.074 points behind [−0.083, +0.238], not statistically significant) shows a difference
 distinguishable from zero.
+
+**ICON-DREAM-EU's near-significant lead over ERA5 at Generator W2 reflects ERA5's own weakness
+there, not a property of ICON-DREAM-EU itself.** At Generator W2 every one of the three leading
+original products beats ERA5 by more than it does across all three generators: ICON-EU by 0.518
+points, UKV by 0.775 points, and ICON-D2 by 0.803 points, each statistically significant at the 5%
+level, against 0.31, 0.44, and 0.58 points across the window in [UKV and ICON-D2 describe past wind
+best](#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested).
 
 **Neither planned contrast's size changed by a margin statistically significant at the 5% level
 from 2025 to 2026, in a comparison restricted to January to August of each year so a partial 2026
@@ -558,8 +583,9 @@ significant.
   before August 2024 have not been screened for steps like the pair in ICON global's served wind.
   ICON-DREAM-EU reaches back to January 2010, the only product besides ERA5 that reaches before
   November 2022, but this study finds it ties ERA5 rather than beating it, so this study gives no
-  reason to prefer it for wind training history. DWD publishes ICON-DREAM-EU about 2 to 3 months
-  late, so, whatever its accuracy, it cannot supply the most recent months a live service needs.
+  reason to prefer it for wind training history. DWD publishes ICON-DREAM-EU a month at a time,
+  after the month ends, so whatever its accuracy it cannot supply the last few weeks a live service
+  needs.
 - **Capacity estimation and disaggregation: no recommendation.** Capacity estimation infers a farm's
   size from how its output tracks the wind, and disaggregation separates hidden generation from
   demand at a substation. Both have to read a product's wind without a fit to the farm's own metered

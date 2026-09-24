@@ -58,6 +58,10 @@ interpolation of it.
   the speed alone, with no direction, carries.
 - The two planned contrasts, by generator (W1-W3) and by calendar year (the same months in every
   year, the "too few months" rule, `bootstrap_year_change` between 2025 and 2026).
+- Added after the second science review: `icon_eu_wind − era5_wind` by ICON-EU's own served lead
+  (`_icon_eu_era5_by_lead_lines`), the three leading original products against ERA5 at Generator W2
+  alone (`_w2_other_products_lines`), and three of `wind_products.py`'s own published, unrefit
+  contrasts restricted to this study's shorter row set (`_published_fits_on_new_rows_lines`).
 
 **Before any fit runs**, `run_checks` and `_raise_on_failed_checks` establish, and raise if any
 fails: that ICON-DREAM-EU's `U`, `V` and `WS` agree (`check_component_speed`), that direction from
@@ -240,6 +244,40 @@ SPEED_ONLY_CONTRASTS: Final[tuple[tuple[str, str], ...]] = tuple(
 
 ERA5_YEAR_CHANGE_YEARS: Final[tuple[int, int]] = (2025, 2026)
 """The two years `_by_year_lines` tests for a change in each planned contrast, on matched months."""
+
+ICON_EU_ERA5_LEADS: Final[tuple[int, ...]] = (0, 1, 2)
+"""ICON-EU's own served lead in hours (`h % 3`): T+0, T+1, and T+2.
+
+Read by `_icon_eu_era5_by_lead_lines`, added after the second science review to check whether
+restricting the two deciding contrasts to equal-lead hours (`_equal_lead_lines`) narrows
+ICON-DREAM-EU's gap to ICON-EU by dropping ICON-DREAM-EU's worst step, or by dropping ICON-EU's own
+best lead.
+"""
+
+W2_OTHER_PRODUCT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("icon_eu_wind", "era5_wind"),
+    ("ukv_wind", "era5_wind"),
+    ("icon_d2_wind", "era5_wind"),
+)
+"""ICON-EU's, UKV's and ICON-D2's own contrasts against ERA5, at Generator W2 alone.
+
+Read by `_w2_other_products_lines`, added after the second science review to check whether every
+product's advantage over ERA5 is larger at Generator W2, which would mean ICON-DREAM-EU's
+near-significant lead over ERA5 there reflects ERA5's own weakness at that generator rather than
+anything specific to ICON-DREAM-EU.
+"""
+
+PUBLISHED_FITS_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("icon_eu_wind", "ukv_wind"),
+    ("icon_eu_wind", "era5_wind"),
+    ("icon_d2_wind", "icon_eu_wind"),
+)
+"""Three of the five original products' own contrasts, read by `_published_fits_on_new_rows_lines`
+from `wind_products.py`'s own saved, *unrefit* losses, restricted to this study's shorter row set.
+
+Isolates how much of a contrast's difference from the rest of the page comes from the shorter row
+set alone, as opposed to every arm being refit on it (see this module's docstring, "Row set").
+"""
 
 MAX_COMPONENT_SPEED_MEDIAN_DIFF_M_S: Final[float] = 0.01
 """`_raise_on_failed_checks` fails if `sqrt(u^2 + v^2)` disagrees with the served WS by more than
@@ -554,6 +592,36 @@ def check_component_speed_10m() -> dict[str, float]:
         median_abs_diff_m_s=diff.median(), p99_abs_diff_m_s=diff.quantile(0.99)
     ).row(0, named=True)
     return {key: float(value) for key, value in result.items()}
+
+
+def check_run_switch_jump() -> dict[int, float]:
+    """Compare ICON-DREAM-EU's hour-to-hour jump at a run switch against jumps within a run.
+
+    Second, independent evidence for the step assignment in this module's docstring's "Served lead"
+    section, alongside the padding-hour evidence. A run switch replaces the previous run's step-3
+    extrapolation with a fresh forecast, so the jump into an hour with `h % 3 == 1` (step 1 of the
+    new run) should be larger than a jump within one run.
+
+    Returns:
+        The mean absolute hour-to-hour change in `WS` at `HUB_LEVEL`, over every cell in the
+        download and the whole record, keyed by the arriving hour's `h % 3`.
+    """
+    ws = speed_at_level(
+        frame=_read_level_variable(filename=WS_FILE, value_column="ws_m_s"), level=HUB_LEVEL
+    )
+    frame = _as_time(ws).sort("cell_id", "time")
+    diffs = frame.with_columns(
+        change=(pl.col("ws_m_s") - pl.col("ws_m_s").shift(1).over("cell_id")).abs(),
+        gap=pl.col("time") - pl.col("time").shift(1).over("cell_id"),
+    ).filter(pl.col("gap") == pl.duration(hours=1))
+    result = (
+        diffs.group_by(residue=pl.col("time").dt.hour() % 3)
+        .agg(mean_abs_change_m_s=pl.col("change").mean())
+        .sort("residue")
+    )
+    residues = result["residue"].to_list()
+    values = result["mean_abs_change_m_s"].to_list()
+    return dict(zip(residues, values, strict=True))
 
 
 def check_direction_against_era5(*, sites: pl.DataFrame) -> dict[str, float]:
@@ -923,6 +991,109 @@ def _equal_lead_lines(*, losses: pl.DataFrame) -> list[str]:
     return lines
 
 
+def _icon_eu_era5_by_lead_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Report `icon_eu_wind − era5_wind` split by ICON-EU's own served lead (exploratory).
+
+    Added after the second science review: `_equal_lead_lines` narrows the gap between
+    ICON-DREAM-EU and ICON-EU by restricting to `h % 3 != 0`, and this checks whether that narrowing
+    comes from dropping ICON-DREAM-EU's worst step or from dropping ICON-EU's own best lead. ICON-EU
+    is served at 0 to 2 hours here, on the same `h % 3` residue ICON-DREAM-EU's own step is read
+    from (`_step_of_hour`).
+
+    Args:
+        losses: The pooled setting's losses, holding `icon_eu_wind` and `era5_wind`.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        "#### `icon_eu_wind − era5_wind`, by ICON-EU's own served lead (exploratory)",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    residue = pl.col("time").dt.hour() % 3
+    lines += [
+        _contrast_line(
+            losses=losses.filter(residue == lead),
+            treatment="icon_eu_wind",
+            reference="era5_wind",
+            label=f"T+{lead}",
+        )
+        for lead in ICON_EU_ERA5_LEADS
+    ]
+    return lines
+
+
+def _w2_other_products_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Report ICON-EU's, UKV's, and ICON-D2's own contrasts against ERA5 at Generator W2 alone.
+
+    Exploratory, added after the second science review to check whether ICON-DREAM-EU's
+    near-significant lead over ERA5 at Generator W2 (in the deciding-contrasts table above) reflects
+    ERA5's own weakness there rather than anything specific to ICON-DREAM-EU.
+
+    Args:
+        losses: The pooled setting's losses, holding every arm.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        "#### Three original products against ERA5, at Generator W2 alone (exploratory)",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    site_losses = losses.filter(pl.col("site") == "W2")
+    lines += [
+        _contrast_line(
+            losses=site_losses, treatment=treatment, reference=reference, label="site W2"
+        )
+        for treatment, reference in W2_OTHER_PRODUCT_CONTRASTS
+    ]
+    return lines
+
+
+def _published_fits_on_new_rows_lines(*, frame: pl.DataFrame) -> list[str]:
+    """Report three of `wind_products.py`'s own *published* (unrefit) fits, on this row set alone.
+
+    No refit: reads `wind_products.py`'s own saved `losses.parquet` -- fitted on its own row set, 10
+    days longer than this study's -- and restricts it to the rows this study's own row set also
+    holds, by an inner semi-join on `(site, time)`. Exploratory, added after the second science
+    review so a reviewer can read how much of a contrast's change from the rest of the page comes
+    from the shorter row set alone, before also allowing for the refit every other section of this
+    page runs.
+
+    Args:
+        frame: The common row set (`icon_dream_common_rows`'s result), for its `(site, time)` keys.
+
+    Returns:
+        Markdown lines.
+    """
+    published_path = STUDY_DATA_DIR / "beam_diffuse_wind_products" / "losses.parquet"
+    pooled_published = pl.read_parquet(published_path).filter(pl.col("setting") == "pooled")
+    restricted = pooled_published.join(
+        frame.select("site", "time"), on=["site", "time"], how="semi"
+    )
+    n_rows = restricted.filter(pl.col("arm") == "era5_wind", pl.col("seed") == 0).height
+    lines = [
+        (
+            "#### Three published (unrefit) contrasts, restricted to this study's row set "
+            "(exploratory)"
+        ),
+        "",
+        (
+            f"`wind_products.py`'s own saved fits, no refit, restricted by an inner join to the "
+            f"{n_rows:,} rows this study's row set also holds."
+        ),
+        "",
+        *CONTRAST_HEADER,
+    ]
+    lines += [
+        _contrast_line(losses=restricted, treatment=treatment, reference=reference, label="all")
+        for treatment, reference in PUBLISHED_FITS_CONTRASTS
+    ]
+    return lines
+
+
 class ChecksResult(TypedDict):
     """Every pre-fit check's raw result, computed once by `run_checks`.
 
@@ -935,6 +1106,7 @@ class ChecksResult(TypedDict):
     direction_vs_era5: dict[str, float]
     other_direction_vs_era5: dict[str, float]
     offset_correlations: dict[int, float]
+    run_switch_jump: dict[int, float]
     cell_distances: pl.DataFrame
 
 
@@ -969,6 +1141,7 @@ def run_checks(*, sites: pl.DataFrame, frame: pl.DataFrame) -> ChecksResult:
         "direction_vs_era5": check_direction_against_era5(sites=sites),
         "other_direction_vs_era5": other_products_direction_vs_era5(frame=frame),
         "offset_correlations": check_timestamp_offset(sites=sites),
+        "run_switch_jump": check_run_switch_jump(),
         "cell_distances": _nearest_cells(sites=sites),
     }
 
@@ -1057,6 +1230,16 @@ def _checks_lines(*, checks: ChecksResult) -> list[str]:
         "|---|---|",
     ]
     lines += [f"| {offset:+d} | {offsets[offset]:.3f} |" for offset in OFFSET_SCAN_HOURS]
+    jump = checks["run_switch_jump"]
+    lines += [
+        "",
+        (
+            "| Arriving hour's `h % 3` | Mean absolute hour-to-hour change in WS at level "
+            f"{HUB_LEVEL} (m/s) |"
+        ),
+        "|---|---|",
+    ]
+    lines += [f"| {residue} | {jump[residue]:.3f} |" for residue in sorted(jump)]
     return lines
 
 
@@ -1189,6 +1372,9 @@ def _report(
     ]
     lines += ["", *_by_step_lines(losses=pooled)]
     lines += ["", *_equal_lead_lines(losses=losses)]
+    lines += ["", *_icon_eu_era5_by_lead_lines(losses=pooled)]
+    lines += ["", *_w2_other_products_lines(losses=pooled)]
+    lines += ["", *_published_fits_on_new_rows_lines(frame=frame)]
     lines += ["", "#### Exploratory contrasts", "", *CONTRAST_HEADER]
     lines += [
         _contrast_line(losses=pooled, treatment=t, reference=r, label="all")
