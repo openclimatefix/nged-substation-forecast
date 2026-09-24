@@ -60,7 +60,7 @@ All three also run at `SENSITIVITY_HYPER_PARAMETERS`. Each is reported pooled an
 - `station_shuffled`: `shared_no_temp` + station temperature + a permuted station ghi, the negative control for `station_global`. 8 columns.
 - `cams_station_xgb − cams_global`: the blend against the plain, one-column-narrower CAMS arm (descriptive, because the columns are unequal).
 
-Every arm's absolute error is reported, not only the contrasts. The "km-band" wording in the brief is read as the second- and third-nearest station arms, reported with their own pooled distance ranges, because only 10 radiation stations exist and a fixed 3 km or 6 km band would leave most sites empty.
+Every arm's absolute error is reported, not only the contrasts. The "km-band" wording in the brief is read as the second- and third-nearest station arms, reported with their own pooled distance ranges, because only 10 radiation stations were downloaded (the 76 others listed are 107 km or more from every farm) and a fixed 3 km or 6 km band would leave most sites empty.
 
 ## Honest limits the page must state
 
