@@ -711,6 +711,7 @@ def leaderboard_panel(
     panel_title: str = "",
     keys: bool = True,
     solid: bool = False,
+    row_step_px: int | None = None,
 ) -> alt.LayerChart | alt.VConcatChart:
     """Draw one product per row, best first, as a dot at its own error with a 95% interval.
 
@@ -746,6 +747,10 @@ def leaderboard_panel(
         solid: Whether every condition's point is drawn filled, with no hollow second style — the
             colour-first default this project's charts favour when colour alone can carry
             `conditions`. False keeps the first condition filled and the rest hollow.
+        row_step_px: The height of every row in pixels. None sizes every row to the panel's
+            longest wrapped label, which leaves a row with a one-line label mostly empty when one
+            label wraps over several lines; a fixed step lets that label sit close to its
+            neighbours instead.
 
     Returns:
         The panel, under its keys where it has any.
@@ -849,7 +854,11 @@ def leaderboard_panel(
     panel = alt.LayerChart(
         layer=[interval, *points],
         width=width,
-        height=alt.Step(_ROW_STEP_PX * max(len(line) for line in lines.values())),
+        height=alt.Step(
+            row_step_px
+            if row_step_px is not None
+            else _ROW_STEP_PX * max(len(line) for line in lines.values())
+        ),
         title=alt.TitleParams(panel_title, anchor="start", frame="group", fontSize=_PANEL_TITLE_PX),
     )
     drawn_keys = []
