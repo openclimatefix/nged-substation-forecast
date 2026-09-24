@@ -42,6 +42,8 @@ way):
 - `fetch_midas_open.py` and `validate_midas_open.py` — Met Office MIDAS Open station observations.
 - `fetch_icon_dream.py` — DWD's ICON-DREAM-EU, whole-domain monthly GRIB cropped to the box then
   deleted, needs `uv run --with cfgrib --with eccodes --with requests`.
+- `fetch_nora3.py` and `validate_nora3.py` — NORA3 hourly wind at 50 m and 100 m over OPeNDAP, cut
+  server-side to the box, needs `uv run --with pydap`.
 
 Every script resolves `data/` the way `sources.REPO_DATA_DIR` does — the main checkout's `data/`,
 shared by every worktree, not a per-worktree copy — so run each script once, from whichever worktree
