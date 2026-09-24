@@ -2207,6 +2207,29 @@ def _t_check_lines(
     return lines
 
 
+def _relative_size_lines(*, pooled: pl.DataFrame) -> list[str]:
+    """Render each planned contrast's size as a share of its reference arm's own error.
+
+    Args:
+        pooled: Per-row losses at the primary setting.
+
+    Returns:
+        Markdown lines.
+    """
+    lines: list[str] = []
+    for name, treatment, reference in PLANNED_CONTRASTS:
+        difference = bootstrap_difference(
+            losses=pooled, treatment=treatment, reference=reference, metric=METRIC
+        )["difference"]
+        own = bootstrap_absolute(losses=pooled, arm=reference, metric=METRIC)["value"]
+        lines.append(
+            f"- {name}'s difference is {abs(difference) * PERCENTAGE_POINTS:.3f} points, "
+            f"{abs(difference) / own:.1%} of `{reference}`'s own error of "
+            f"{own * PERCENTAGE_POINTS:.3f}% of capacity (primary setting)."
+        )
+    return lines
+
+
 def _persona_lines(
     *, pooled: pl.DataFrame, sensitivity: pl.DataFrame, log: IntervalLog
 ) -> list[str]:
@@ -2238,6 +2261,10 @@ def _persona_lines(
         _pooled_caveat(losses=pooled, arm="station_wind"),
         "",
         *_between_group_lines(pooled=pooled, sensitivity=sensitivity, log=log),
+        "",
+        "#### Each planned contrast's size against its reference arm's own error",
+        "",
+        *_relative_size_lines(pooled=pooled),
         "",
         "#### Fold-level and month-level t-intervals beside the bootstrap interval",
         "",
