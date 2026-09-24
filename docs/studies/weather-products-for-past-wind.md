@@ -17,16 +17,17 @@ given the wind of ERA5, the reanalysis of the European Centre for Medium-Range W
 (ECMWF). Given ICON-D2's wind, the error is 0.58 points [0.40, 0.75] lower than given ERA5's, in a
 comparison chosen after the results were seen. The two gaps are 6% and 8% of ERA5's error.
 
-ECMWF's single high-resolution forecast (HRES) and the mean of its 51-member ensemble forecast (ENS)
-for the hours 00 to 23 UTC of the 00 UTC run's own day (ENS day 0) were scored separately, on a
-shorter row set from December 2024 that every product was refitted on. There UKV's error is 0.20
-points [0.06, 0.33] lower than the error given HRES's wind, about 3% of HRES's own error, and 0.41
-points [0.25, 0.58] lower than the error given ENS day 0's wind, about 6% of ENS day 0's own error,
-in two planned contrasts. In the third planned contrast HRES minus ERA5 is −0.27 points [−0.40,
-−0.12], but in exploratory refits that train across ECMWF's model upgrade of 12 November 2024
-without an era cut, HRES's lead over ERA5 is no longer statistically significant at the 5% level.
-Three wind farms are few independent sites, so these intervals describe these farms and this window
-only. ICON-DREAM-EU, DWD's reanalysis, was scored on its own, slightly shorter row set: it is
+Two ECMWF products were scored separately, on a shorter row set from December 2024 that every
+product was refitted on. HRES is ECMWF's single high-resolution forecast. ENS day 0 is the mean of
+the 51 members of ECMWF's ensemble forecast (ENS) for the hours 00 to 23 UTC of the 00 UTC run's own
+day. On that row set, UKV's error is 0.20 points [0.06, 0.33] lower than the error given HRES's wind
+in the first planned contrast, and 0.41 points [0.25, 0.58] lower than the error given ENS day 0's
+wind in the second. In the third planned contrast HRES minus ERA5 is −0.27 points [−0.40, −0.12],
+but in exploratory refits that train across ECMWF's upgrade to Integrated Forecasting System (IFS)
+Cycle 49r1 on 12 November 2024 without telling the XGBoost model which side of the upgrade each hour
+falls on, HRES's lead over ERA5 is no longer statistically significant at the 5% level. Three wind
+farms are few independent sites, so these intervals describe these farms and this window only.
+ICON-DREAM-EU, DWD's reanalysis, was scored on its own, slightly shorter row set: it is
 statistically indistinguishable from ERA5 and trails ICON-EU by 0.34 points [0.27, 0.41].
 
 **For historical features in the live service the page recommends UKV, and for training history
@@ -106,23 +107,24 @@ from the freshest run of that weather model that Open-Meteo's archive holds for 
   below is the first-named product's error minus the second's, so a positive difference means the
   first-named product's error is larger. HRES minus UKV is +0.20 points [+0.06, +0.33], ENS day 0
   minus UKV is +0.41 points [+0.25, +0.58], and HRES minus ERA5 is −0.27 points [−0.40, −0.12].
-  Three wind farms are few independent sites, so each interval describes these farms and this window
-  only. See [UKV describes past wind better than ECMWF's HRES and ENS day 0 on these
-  rows](#ukv-describes-past-wind-better-than-ecmwfs-hres-and-ens-day-0-on-these-rows).
+  Three wind farms are few independent sites, so these intervals describe these farms and this
+  window only. See [How ECMWF's HRES and ENS day 0 compare with UKV and
+  ERA5](#how-ecmwfs-hres-and-ens-day-0-compare-with-ukv-and-era5).
 - **In exploratory refits added after the first results, HRES's lead over ERA5 is no longer
-  statistically significant at the 5% level when the XGBoost model also trains on August to November
-  2024 and is not told which side of ECMWF's IFS Cycle 49r1 upgrade each hour falls on; ENS day 0
-  against ERA5 is unresolved.** IFS Cycle 49r1 went live on 12 November 2024, so August to November
-  2024 spans it. Under that training design HRES minus ERA5 is −0.06 points [−0.24, +0.15] on the
-  rows from December 2024, against −0.27 points [−0.40, −0.12] in the planned contrast. ENS day 0
-  minus ERA5 is −0.07 points [−0.19, +0.06] in the planned contrast's refit, an interval that bounds
-  the difference and does not show that the two products are equal. The ENS horizons page's figure
-  for the same contrast, +0.170 points [+0.021, +0.322], comes from different rows and folds. An era
-  cut, a separate era code and separate folds on each side of 1 December 2024, the first whole month
-  after the upgrade, changes ENS day 0 minus ERA5 by −0.16 points [−0.27, −0.06] on the rows from 12
-  August 2024. These intervals also rest on three farms, which are few independent sites. See [UKV
-  describes past wind better than ECMWF's HRES and ENS day 0 on these
-  rows](#ukv-describes-past-wind-better-than-ecmwfs-hres-and-ens-day-0-on-these-rows).
+  statistically significant at the 5% level when the XGBoost model trains across IFS Cycle 49r1
+  without being told which side of the upgrade each hour falls on, and ENS day 0 against ERA5 is
+  unresolved.** These refits also train on August to November 2024. IFS Cycle 49r1 went live on 12
+  November 2024, so those months span it. Under that training design HRES minus ERA5 is −0.06 points
+  [−0.24, +0.15] on the rows from December 2024, against −0.27 points [−0.40, −0.12] in the planned
+  contrast. ENS day 0 minus ERA5, an exploratory contrast, is −0.07 points [−0.19, +0.06] in the
+  study's own design. That interval bounds the difference and does not show that the two products
+  are equal. The figure for the same contrast on the [ENS forecast horizons
+  page](ens-forecast-horizons.md), +0.170 points [+0.021, +0.322], comes from different rows and
+  folds. An era cut gives the XGBoost model a separate era code and separate folds on each side of 1
+  December 2024, the first whole month after the upgrade. It changes ENS day 0 minus ERA5 by −0.16
+  points [−0.27, −0.06] on the rows from 12 August 2024. Three wind farms are few independent sites,
+  so these intervals describe these farms and this window only. See [How ECMWF's HRES and ENS day 0
+  compare with UKV and ERA5](#how-ecmwfs-hres-and-ens-day-0-compare-with-ukv-and-era5).
 
 ## Introduction
 
@@ -156,39 +158,45 @@ lead, and history of ICON-DREAM-EU, HRES, and ENS day 0 alongside the five, for 
 | ICON-EU | DWD model for Europe, nested inside ICON global | 6.5 km; served at about 7 km | 80 m and 120 m | 0 to 2 hours | yes | November 2022 | about 3.5 hours |
 | ICON global | DWD global model | 13 km; served at about 11 km | 80 m and 120 m | 0 to 5 hours | yes | November 2022 | about 3.5 hours |
 | ICON-DREAM-EU | DWD reanalysis run of the ICON model, over Europe, with its own data assimilation | 6.5 km; served by DWD on ICON's native triangular grid, not by Open-Meteo; read at the nearest cell | every model level (levels 65 to 74 downloaded here); read at level 72 (about 96 m) and 10 m, with levels 71 and 73 added in one exploratory arm | 1 to 3 hours | yes | January 2010 | after each month ends, a month at a time; DWD's readme states a delay of about 2 to 3 months, and August 2026 was on DWD's server by 23 September 2026 |
-| ECMWF-IFS-HRES | ECMWF's single high-resolution forecast, read as Open-Meteo's `ecmwf_ifs` | about 9 km native (O1280 grid); the served grid before 1 October 2025 is not established | 10 m and 100 m | 1 to 12 hours before 1 October 2025 and 0 to 5 hours from it, inferred from where hour-to-hour jumps fall; Open-Meteo does not document it | yes | January 2024 (Open-Meteo Previous Runs file as downloaded; the 9 km grid file read for a cross-check starts on 1 January 2017), scored here from 1 December 2024, the first whole month after IFS Cycle 49r1 | ECMWF's [dissemination schedule](https://confluence.ecmwf.int/display/DAC/Dissemination+schedule) lists the 00 UTC run's hourly steps 0 to 90 at 05:45 to 06:12 UTC; Open-Meteo's own delay was not measured |
-| ECMWF ENS day 0 | mean of the 51 members of ECMWF's ensemble forecast, hours 00 to 23 UTC of the 00 UTC run's own day | about 9 km native (O1280 grid) since IFS Cycle 48r1 on 27 June 2023; served on a 0.25° grid in 3-hourly steps rebuilt to hourly here, each value the area-weighted mean of the 0.25° cells overlapping the farm's H3 resolution-5 cell, with the eastward and northward wind averaged before the speed is taken | 10 m and 100 m | 0 to 23 hours | yes | April 2024 (Dynamical.org's archive of the 00 UTC run starts on 1 April 2024); this study reads it from 1 December 2024 | about 09:00 UTC for a 00 UTC run, this repository's assumption; ECMWF's [dissemination schedule](https://confluence.ecmwf.int/display/DAC/Dissemination+schedule) lists the 00 UTC ENS perturbation forecasts' hourly steps 0 to 90 at 06:40 to 06:55 UTC, and open-data publication and Dynamical.org's ingest come later and are not measured here |
+| ECMWF-IFS-HRES | ECMWF's single high-resolution forecast, read as Open-Meteo's `ecmwf_ifs` | about 9 km native (O1280 octahedral reduced Gaussian grid); the served grid before 1 October 2025 is not established | 10 m and 100 m | 1 to 12 hours before 1 October 2025 and 0 to 5 hours from it, inferred from where hour-to-hour jumps fall; Open-Meteo does not document it | yes | January 2024 (Open-Meteo Previous Runs file as downloaded; the 9 km grid file read for a cross-check starts on 1 January 2017), scored here from 1 December 2024, the first whole month after IFS Cycle 49r1 | ECMWF's [dissemination schedule](https://confluence.ecmwf.int/display/DAC/Dissemination+schedule) lists the 00 UTC run's hourly steps 0 to 90 at 05:45 to 06:12 UTC; Open-Meteo's own delay was not measured |
+| ECMWF ENS day 0 | mean of the 51 members of ECMWF's ensemble forecast, hours 00 to 23 UTC of the 00 UTC run's own day | about 9 km native (O1280 octahedral reduced Gaussian grid) since IFS Cycle 48r1 on 27 June 2023; served on a 0.25° grid in 3-hourly steps rebuilt to hourly here, each value the area-weighted mean of the 0.25° cells overlapping the farm's resolution-5 cell of the H3 hexagonal grid, with the eastward and northward wind averaged before the speed is taken | 10 m and 100 m | 0 to 23 hours | yes | April 2024 (Dynamical.org's archive of the 00 UTC run starts on 1 April 2024); this study reads it from 1 December 2024 | about 09:00 UTC for a 00 UTC run, this repository's assumption; ECMWF's [dissemination schedule](https://confluence.ecmwf.int/display/DAC/Dissemination+schedule) lists the 00 UTC ENS perturbation forecasts' hourly steps 0 to 90 at 06:40 to 06:55 UTC, and open-data publication and Dynamical.org's ingest come later and are not measured here |
 
-**The table's two ECMWF rows describe different products with different sources of limits, so the
-page attributes each limit to the source that sets it.** ENS runs four times a day, and ECMWF's
-[dissemination schedule](https://confluence.ecmwf.int/display/DAC/Dissemination+schedule) lists
-hourly steps to 90 hours. Dynamical.org's archive holds the 00 UTC run in 3-hourly steps on a 0.25°
-grid, and this study rebuilds the steps to hourly. Open-Meteo's [announcement of ECMWF's move to
-open data](https://openmeteo.substack.com/p/ecmwf-transitions-to-open-data) describes ECMWF's
-earlier open-data stream as limited to 0.25° grid spacing, with fewer variables, reduced time
-resolution, and an additional 2 hours of delay, and ECMWF's
+**ENS day 0's 3-hourly steps and 0.25° grid come from Dynamical.org's archive, and this study does
+not establish which of ECMWF's earlier open-data restrictions that archive inherits.** ENS runs four
+times a day. ECMWF's [dissemination
+schedule](https://confluence.ecmwf.int/display/DAC/Dissemination+schedule) lists hourly steps to 90
+hours. Dynamical.org's archive holds the 00 UTC run in 3-hourly steps on a 0.25° grid, and this
+study rebuilds the steps to hourly. Open-Meteo's [announcement of ECMWF's move to open
+data](https://openmeteo.substack.com/p/ecmwf-transitions-to-open-data) describes ECMWF's earlier
+open-data stream as limited to 0.25° grid spacing, with fewer variables, reduced time resolution,
+and an additional 2 hours of delay. ECMWF's
 [announcement](https://www.ecmwf.int/en/about/media-centre/news/2025/ecmwf-makes-its-entire-real-time-catalogue-open-all)
 says that its entire real-time catalogue became open on 1 October 2025, with a free subset published
-at 25 km resolution. This study does not establish which of those limits Dynamical.org's archive
-inherits. The 09:00 UTC read time is this repository's `NWP_PUBLICATION_DELAY_HOURS` assumption, and
-ECMWF's schedule lists the 00 UTC ENS perturbation forecasts' hourly steps 0 to 90 at 06:40 to 06:55
-UTC and the 00 UTC HRES steps 0 to 90 at 05:45 to 06:12 UTC. Open-data publication and the ingest of
-Dynamical.org and Open-Meteo come later, and this study did not measure them.
+at 25 km resolution.
 
-HRES is read through Open-Meteo's Previous Runs interface at each farm's point, at Open-Meteo's
-default land cell (the Previous Runs fetch sets no `cell_selection`), as every other product on this
-page is (`fetch_wind_point.py` sets `land`). Open-Meteo's documentation says only that each run's
-first few hours are stitched into a continuous hourly series, so HRES's served lead is inferred.
-Open-Meteo's announcement says that from 1 October 2025 it redistributes HRES at 9 km "without any
-additional delay". This study places a change of HRES's archive source on 1 October 2025, the date
-of both announcements, because the served series' hour-to-hour jumps change there. Before that date
-the served series hands over between runs twice a day, which describes how Open-Meteo's archive
-assembles the series and is not attributed to ECMWF. Open-Meteo's `ecmwf_ifs` series before 1
-October 2025 is a backfill from a source Open-Meteo does not document, and the lineage file beside
-the Previous Runs file records when this study downloaded it. IFS Cycle 49r1 went live with the 06
-UTC run of 12 November 2024, according to ECMWF's [implementation
+**The 09:00 UTC read time for ENS day 0 is an assumption of this repository, and this study did not
+measure when each product's data arrive.** The assumption is this repository's
+`NWP_PUBLICATION_DELAY_HOURS` setting. ECMWF's schedule lists the 00 UTC ENS perturbation forecasts'
+hourly steps 0 to 90 at 06:40 to 06:55 UTC and the 00 UTC HRES steps 0 to 90 at 05:45 to 06:12 UTC.
+Open-data publication and the ingest of Dynamical.org and Open-Meteo come later than those times.
+
+**HRES is read from Open-Meteo's Previous Runs interface, and this study infers its served lead.**
+HRES is read at each farm's point, at Open-Meteo's default land cell (the Previous Runs fetch sets
+no `cell_selection`), as every other Open-Meteo product on this page is (`fetch_wind_point.py` sets
+`land`). Open-Meteo's documentation says only that each run's first few hours are stitched into a
+continuous hourly series, so HRES's served lead is inferred. Open-Meteo's announcement says that
+from 1 October 2025 it redistributes HRES at 9 km "without any additional delay". This study places
+a change of HRES's archive source on 1 October 2025, the date given in both Open-Meteo's and ECMWF's
+announcements, because the served series' hour-to-hour jumps change there. Before that date the
+served series hands over between runs twice a day. That handover describes how Open-Meteo's archive
+assembles the series, and this study does not attribute it to ECMWF. Open-Meteo's `ecmwf_ifs` series
+before 1 October 2025 is a backfill from a source Open-Meteo does not document, and the lineage file
+beside the Previous Runs file records when this study downloaded it.
+
+**IFS Cycle 49r1 went live on 12 November 2024, and Cycle 50r1 on 12 May 2026.** Cycle 49r1 went
+live with the 06 UTC run of its day, according to ECMWF's [implementation
 page](https://confluence.ecmwf.int/display/FCST/Implementation+of+IFS+Cycle+49r1), and Cycle 50r1
-with the 06 UTC run of 12 May 2026.
+with the 06 UTC run of its day.
 
 ![Figure 3: ICON-D2 has no data west of a line running from 1.8°W at 49.9°N to 3.9°W at 57.3°N.
 The map also draws AROME France, which this page does not test](../roadmap/assets/weather_product_domains.svg)
@@ -261,8 +269,8 @@ nearest grid cell over land.**
   speed runs about 30% above that of the nearest land cell. At the other two generators ICON
   global's nearest cell is the land cell. In the ECMWF section, ENS day 0 is the area-weighted mean
   of the 0.25° cells that overlap each farm's H3 resolution-5 cell, with the eastward and northward
-  wind averaged before the speed is taken, so its speed is not a point value, and averaging vectors
-  can lower a mean speed.
+  wind averaged before the speed is taken. ENS day 0's speed is therefore not a point value, and
+  averaging vectors can lower a mean speed.
 - **Folds, normalisation, and intervals as in the solar study.** Each XGBoost model is trained on
   some blocks of whole months and scored on the others; each held-out block is called a fold. The
   folds are cut separately before and after the UKV upgrade, and the rest of January 2026 after the
@@ -279,70 +287,88 @@ nearest grid cell over land.**
   ICON-DREAM-EU against ERA5 and ICON-DREAM-EU against ICON-EU, written into that section's plan
   before ICON-DREAM-EU was fitted but after the five products above had been scored. The ECMWF
   section has three planned contrasts of its own, HRES against UKV, ENS day 0 against UKV, and HRES
-  against ERA5, written into a plan committed before that section's first fit. A contrast is
-  the difference between two products' errors on the same hours. A comparison is planned when it
-  was written into the study plan before any result existed; every other figure is exploratory,
-  chosen or added after results were seen. The distinction
-  matters because with many comparisons, about 1 in 20 exploratory rows reaches significance at the
-  5% level by chance, so an exploratory result is a lead to follow up rather than a finding. A chart
-  holding both kinds marks each planned row "(planned)". A chart whose rows are all one kind says so
-  once, in its subtitle. Every contrast is also rerun with a second hyperparameter setting for the
-  tree. The plan written before the run gave the XGBoost model each product's served 100 m wind.
-  After the first run, each ICON product was switched to its 80 m wind. The results with the served
-  100 m wind are reported alongside and change no ranking.
+  against ERA5, written into a plan committed before that section's first fit. A contrast is the
+  difference between two products' errors on the same hours. A comparison is planned when it was
+  written into the study plan before any result existed; every other figure is exploratory, chosen
+  or added after results were seen. The distinction matters because with many comparisons, about 1
+  in 20 exploratory rows reaches significance at the 5% level by chance, so an exploratory result is
+  a lead to follow up rather than a finding. A chart holding both kinds marks each planned row
+  "(planned)". A chart whose rows are all one kind says so once, in its subtitle. Every contrast is
+  also rerun with a second hyperparameter setting for the tree. The plan written before the run gave
+  the XGBoost model each product's served 100 m wind. After the first run, each ICON product was
+  switched to its 80 m wind. The results with the served 100 m wind are reported alongside and
+  change no ranking.
 
 ### How ECMWF's ENS and HRES were added
 
 **The ECMWF section rests on a plan committed before its first fit.** The plan,
-`plans/ens-hres-past-wind.md`, holds the three planned contrasts. It was committed as `9bb0a6f7`,
-and its last revision before any fit is `83dbbad3`. The script that fitted every XGBoost model,
-`ens_hres_past_wind.py`, was committed as `83dbbad3` before its first fit, and the report records
-that commit. HRES is read from Open-Meteo's Previous Runs file, because that file carries wind
-direction, where the 9 km grid file holds wind speed only, in kilometres per hour. The grid file
-serves one cross-check: at each farm, one of the five nearest grid points reproduced the Previous
-Runs speeds on every hour (71,712 farm-hours), which shows that two Open-Meteo downloads agree and
-does not show that the grid or the served lead is right. ENS day 0 is read from the saved inputs of
-the [ENS forecast horizons study](ens-forecast-horizons.md). `fetch_ens_forecast_horizons.py`
-extracts those inputs from the production NWP Delta table, which the Dagster `ecmwf_ens` asset fills
-from Dynamical.org's ECMWF ENS archive (00 UTC run, 0.25°), and `ens_forecast_horizons.py` writes
-them to `wind_inputs.parquet`.
+`plans/ens-hres-past-wind.md`, holds the three planned contrasts. The plan was committed as
+`9bb0a6f7`, and the plan's last revision before any fit is `83dbbad3`. The script that fitted every
+XGBoost model, `ens_hres_past_wind.py`, was committed as `83dbbad3` before its first fit, and the
+report records that commit.
 
-**In the planned ENS arm, wind direction is kept out of every average and interpolation, and two
-exploratory arms do not.** Each ENS member's speed and direction become eastward and northward
-components at each 3-hourly step, the components are interpolated linearly to hourly values, and the
-hourly speed and direction come from the interpolated vector. The mean of the 51 members' speeds is
-the ENS speed, and the direction of the mean wind vector is the ENS direction. The horizons study's
-own combination interpolates direction in degrees, which crosses north the wrong way on about 1% of
-day-0 hours, and runs here as an exploratory comparison, as does a combination that interpolates
-both speed and direction linearly. Each XGBoost model in this section is given the page's seven
-columns: the hour of the day, the day of the year, an era code, the hub-height speed, that height's
-direction as sine and cosine, and the 10 m speed. HRES, ENS day 0, ERA5, and UKV are read at 100 m.
+**HRES comes from Open-Meteo's Previous Runs file, and ENS day 0 from the saved inputs of the ENS
+forecast horizons page.** HRES is read from Open-Meteo's Previous Runs file, because that file
+carries wind direction, where the 9 km grid file holds wind speed only, in kilometres per hour. The
+grid file serves one cross-check: at each farm, one of the five nearest grid points reproduced the
+Previous Runs speeds on every hour (71,712 farm-hours), which shows that two Open-Meteo downloads
+agree and does not show that the grid or the served lead is right. ENS day 0 is read from the saved
+inputs of the [ENS forecast horizons page](ens-forecast-horizons.md).
+`fetch_ens_forecast_horizons.py` extracts those inputs from the production NWP Delta table, which
+the Dagster `ecmwf_ens` asset fills from Dynamical.org's ECMWF ENS archive (00 UTC run, 0.25°), and
+`ens_forecast_horizons.py` writes them to `wind_inputs.parquet`.
+
+**In the planned ENS arm, wind direction is kept out of every average and interpolation, and two of
+the three exploratory arms do not.** Each ENS member's speed and direction become eastward and
+northward components at each 3-hourly step, the components are interpolated linearly to hourly
+values, and the hourly speed and direction come from the interpolated vector. The mean of the 51
+members' speeds is the ENS speed, and the direction of the mean wind vector is the ENS direction.
+The three exploratory arms differ from the planned arm only in the interpolation. The horizons
+page's own combination interpolates the speed by components and the direction in degrees, which
+crosses north the wrong way in some hours. A second arm interpolates both speed and direction
+linearly, and a third interpolates the speed linearly and the direction by components. Each XGBoost
+model in this section is given the page's seven columns: the hour of the day, the day of the year,
+an era code, the hub-height speed, that height's direction as sine and cosine, and the 10 m speed.
+HRES, ENS day 0, ERA5, and UKV are read at 100 m.
 
 **The row set starts on 1 December 2024, and the folds are cut inside three eras.** December 2024 is
 the first whole month after IFS Cycle 49r1. Every product is refitted on the same 43,555 farm-hours
 (W1 14,489, W2 14,994, W3 14,072) in 22 calendar months. The three eras are before 1 October 2025,
 when the source of HRES's archive changed; 1 October 2025 to 20 January 2026; and from 1 February
-2026, after the UKV upgrade. The era code takes three values for every XGBoost model. Cutting folds
-inside each era ranks each era's months separately, so one calendar month can be held out of every
-era at once and leave no training data for that season ([issue #868][issue-868]). A check before any
-fit found six such cases across the three farms, for July and September, so the third era's fold
-numbers are rotated by 2, which leaves no failing case. October and November occur in one year only,
-2025, so whichever fold holds either month out has no training row for that calendar month under any
-fold design. In the study's design the covered cell with the fewest training rows is a September
-fold at one farm, with 229 training rows against 680 rows scored. The second hyperparameter setting
-is rerun for HRES, ENS day 0, UKV, and ERA5.
+2026, after the UKV upgrade. The era code takes three values for every XGBoost model. The second
+hyperparameter setting is rerun for HRES, ENS day 0, UKV, and ERA5.
 
-**Everything after the first results is exploratory.** After the first results, two scientific
-reviews, and a code review, these were added: the same products refitted on the longer row set from
-12 August 2024 under three fold designs; a table of fold designs, with the number of calendar months
-each leaves without training rows; a table of the hour-to-hour jumps that show HRES's served lead; a
-split of the scored hours by label hour, with control contrasts that involve no ENS lead; each
-product's 10 m wind speed over ERA5's, by month and by season; and corrections to the wording of
-product facts. After persona reviews, further tables were computed from the saved losses and inputs
-with no refit: the change each contrast shows between two fold designs, between the early and the
-late label hours, between two farms, and between the two periods of each split; each product's 100 m
-speed over ERA5's; and the hour-to-hour jump ratios of ERA5 and UKV as controls. The plan lists each
-of them, and the results below label them.
+**Cutting folds inside each era can leave a calendar month with no training data, so the third era's
+fold numbers are rotated.** Cutting folds inside each era ranks each era's months separately, so one
+calendar month can be held out of every era at once and leave no training data for that season
+([issue #868][issue-868]). A check before any fit found six such cases across the three farms, for
+July and September, so the third era's fold numbers are rotated by 2, which leaves no failing case.
+
+**October and November cannot be covered by any fold design, because each occurs in one year only.**
+October and November occur in one year only, 2025, so whichever fold holds either month out has no
+training row for that calendar month under any fold design. In the study's design the covered cell
+(one farm, one fold, and one calendar month) with the fewest training rows is a September fold at
+one farm, with 229 training rows against 680 rows scored.
+
+**Everything after the first results is exploratory.** The plan lists each addition, and the results
+below label each addition exploratory. After the first results, two scientific reviews, and a code
+review, these were added:
+
+- the same products refitted on the longer row set from 12 August 2024 under three fold designs
+- a table of fold designs, with the number of calendar months each leaves without training rows
+- a table of the hour-to-hour jumps that show HRES's served lead
+- control contrasts for the split of the scored hours by label hour, which involve no ENS lead
+- each product's 10 m wind speed over ERA5's, by month and by season
+- corrections to how the page words the ENS run schedule, the 09:00 UTC read-time assumption, the
+  date IFS Cycle 50r1 went live, the cell selection, and what the grid-file cross-check shows
+
+After persona reviews, further tables were computed from the saved losses and inputs with no refit:
+
+- the change each contrast shows between two fold designs, between the early and the late label
+  hours, between two farms, and between the two periods of each split
+- each product's 100 m speed over ERA5's
+- each product's 10 m and 100 m speed over ERA5's before and after IFS Cycle 49r1
+- the hour-to-hour jump ratios of ERA5 and UKV as controls
 
 ## Results
 
@@ -717,7 +743,9 @@ ICON-EU, the gap was 0.416 points [0.312, 0.498] in 2025 and 0.376 points [0.309
 statistically significant, a change of −0.041 points [−0.145, +0.080], not statistically
 significant.
 
-### UKV describes past wind better than ECMWF's HRES and ENS day 0 on these rows
+### How ECMWF's HRES and ENS day 0 compare with UKV and ERA5
+
+#### The three planned contrasts and each product's own error
 
 **UKV beats HRES by 0.20 points and ENS day 0 by 0.41 points, and HRES beats ERA5 by 0.27 points, on
 43,555 farm-hours from December 2024, in the section's three planned contrasts.** A difference below
@@ -725,18 +753,21 @@ is the first-named product's error minus the second's, in points of capacity, so
 difference means the first-named product's error is larger. HRES minus UKV is +0.20 points [+0.06,
 +0.33], with 4 of 5 folds agreeing. ENS day 0 minus UKV is +0.41 points [+0.25, +0.58], with all 5
 folds agreeing. HRES minus ERA5 is −0.27 points [−0.40, −0.12], with all 5 folds agreeing. The three
-contrasts share their 22 calendar months, and three wind farms are few independent sites, so each
-interval describes these farms and this window only. The third contrast depends on the training
-design, as the reconciliation below shows.
+contrasts share their 22 calendar months. Three wind farms are few independent sites, so these
+intervals describe these farms and this window only. The third contrast depends on the training
+design, as the paragraphs below on the era cut show.
 
 **Each product's own error, in order, is ICON-D2 6.67%, UKV 6.88%, ICON-EU 7.04%, HRES 7.08%, ENS
 day 0 7.29%, ERA5 7.35%, and ICON global 7.68% of capacity.** Every product is refitted on the same
-43,555 farm-hours, so these figures are not the page's earlier ones. Own intervals overlap widely,
-for example HRES's [6.28, 8.04] and ENS day 0's [6.52, 8.21], because every product's error rises
-and falls with the month. The paired differences are the test. No paired contrast between ICON-D2
-and either ECMWF product was computed, so this section ranks ICON-D2 against them by own error
-alone. In exploratory contrasts on these rows, UKV minus ERA5 is −0.47 points [−0.64, −0.29], and
-ENS day 0 minus HRES is +0.20 points [+0.07, +0.33]. These intervals, too, rest on three farms.
+43,555 farm-hours, so these errors differ from the errors reported earlier on this page. Own
+intervals overlap widely, for example HRES's [6.28, 8.04] and ENS day 0's [6.52, 8.21], because
+every product's error rises and falls with the month. The paired differences are the test. No paired
+contrast between ICON-D2 and either ECMWF product was computed, so this section ranks ICON-D2
+against them by own error alone.
+
+**In exploratory contrasts on these rows, UKV minus ERA5 is −0.47 points [−0.64, −0.29] and ENS day
+0 minus HRES is +0.20 points [+0.07, +0.33].** Three wind farms are few independent sites, so these
+intervals describe these farms and this window only.
 
 ![Figure 13: UKV beats ECMWF's HRES by 0.20 points and ENS day 0 by 0.41, and HRES beats ERA5 by
 0.27](assets/ens_hres_wind_leaderboard.svg)
@@ -744,18 +775,18 @@ ENS day 0 minus HRES is +0.20 points [+0.07, +0.33]. These intervals, too, rest 
 **ENS day 0 minus ERA5 is −0.07 points [−0.19, +0.06], so this section does not resolve whether ENS
 day 0 differs from ERA5.** The interval bounds the difference. An ENS error from 0.19 points below
 ERA5's to 0.06 points above it is not excluded, and the interval does not show that the two are
-equal. The contrast is exploratory, and the interval rests on three farms that are few independent
-sites.
+equal. The contrast is exploratory. Three wind farms are few independent sites, so this interval
+describes these farms and this window only.
 
 **At W1 and W2, and at W3 outside its windiest week, the XGBoost models given HRES's or ENS day 0's
 wind follow the shape of measured power.** Figure 14 plots out-of-fold predictions against measured
 power. The weeks are chosen by the rule the [first results section](#the-xgboost-models-work) uses,
 from measured power alone: the windiest week fell in December 2024, the most variable in February
 2025, and the calmest ran from July into August 2026. At Generator W3 in the windiest week both
-predictions run above measured power on most days, by up to about 45 points of capacity as read from
-the chart, and in the most variable week both run below measured power at its peaks. Both fit the
-turbine availability that no product records. Figure 14 shows days 1 to 7 with no calendar date, for
-the reason given there.
+predictions run above measured power on most days, and in the most variable week both run below
+measured power at its peaks. Both misses are consistent with the turbine availability that no
+product records. Figure 14 shows days 1 to 7 with no calendar date, for the reason the first results
+section gives.
 
 ![Figure 14: XGBoost models given HRES's or ENS day 0's wind follow the shape of measured
 power at W1 and W2, and at W3 outside its windiest week](assets/ens_hres_wind_models_work.svg)
@@ -764,26 +795,34 @@ power at W1 and W2, and at W3 outside its windiest week](assets/ens_hres_wind_mo
 ENS day 0's at each.** HRES's error is 5.94% against ENS day 0's 6.06% at Generator W1, 6.96%
 against 7.18% at Generator W2, and 8.38% against 8.66% at Generator W3, and ICON-D2's is 5.54%,
 6.58%, and 7.92%. No paired contrast was computed at each farm between these products, so the
-ranking rests on own errors alone. Figure 15 leaves ICON global out, as Figure 5 does, because its
-dots would show which generator carries the steps in ICON global's served wind.
+ranking rests on own errors alone. Figure 15 leaves ICON global out, as Figure 5 does, because ICON
+global's dots would show which generator carries the steps in ICON global's served wind.
 
 ![Figure 15: ICON-D2 has the lowest error at each of the three farms, and ECMWF HRES's error is
 lower than ENS day 0's at each](assets/ens_hres_wind_per_farm_error.svg)
 
+#### How far the results depend on the training design
+
 **The three planned contrasts keep their sign under five fold designs, one row subset, and the
 second hyperparameter setting, and their size depends on the training design.** Four alternative
 fold designs and one row subset were added after the first results, so they are exploratory, and the
-first row of Figure 16 is the study's own design, the planned contrast. The designs are the study's
-design, the same losses without the rows of May 2026 (the row subset), three eras with no fold
-rotation, two UKV eras as the rest of the page, the study's folds with an era code of two values,
-and an extra era cut at IFS Cycle 50r1 with May 2026 dropped. Across them, HRES minus UKV runs from
-+0.15 to +0.21 points, ENS day 0 minus UKV from +0.34 to +0.43, and HRES minus ERA5 from −0.24 to
-−0.29. The smallest lower bound is HRES minus UKV's under the two-valued era code, +0.15 points
-[+0.02, +0.28]. At the second hyperparameter setting the three differences are +0.21 points [+0.06,
-+0.36], +0.43 points [+0.28, +0.58], and −0.29 points [−0.42, −0.13]. At the primary setting,
-intervals adjusted for the three contrasts (98.33%, exploratory) are [+0.03, +0.36], [+0.21, +0.61],
-and [−0.42, −0.09], and none includes zero. The adjustment covers only these three contrasts, and
-each tail of such an interval rests on about 17 of the 2,000 resamples.
+first row of Figure 16 is the study's own design, the planned contrast. The six rows of Figure 16
+are the study's design; the same losses without the rows of May 2026 (the row subset); three eras
+with no fold rotation; two UKV eras, as in the rest of the page; the study's folds with an era code
+of two values; and an extra era cut at IFS Cycle 50r1 with May 2026 dropped. Across them, HRES minus
+UKV runs from +0.15 to +0.21 points, ENS day 0 minus UKV from +0.34 to +0.43, and HRES minus ERA5
+from −0.24 to −0.29. The smallest lower bound is HRES minus UKV's under the two-valued era code,
++0.15 points [+0.02, +0.28]. An extra era cut at IFS Cycle 50r1 moves none of the three planned
+contrasts, nor ENS day 0 minus HRES, by more than 0.04 points from the study's design (compared on
+the rows without May 2026).
+
+**The three planned contrasts also keep their sign at the second hyperparameter setting, and none of
+the three intervals adjusted for three contrasts includes zero.** At the second hyperparameter
+setting the three differences are +0.21 points [+0.06, +0.36], +0.43 points [+0.28, +0.58], and
+−0.29 points [−0.42, −0.13]. At the primary setting, intervals adjusted for the three contrasts
+(98.33%, exploratory) are [+0.03, +0.36], [+0.21, +0.61], and [−0.42, −0.09], and none includes
+zero. The adjustment covers only these three contrasts, and each tail of these adjusted intervals
+rests on about 17 of the 2,000 resamples.
 
 The three designs that train on the rows from 12 August 2024 and score only the rows from December
 2024 give larger differences. HRES minus UKV runs from +0.17 to +0.39 points there, and ENS day 0
@@ -803,9 +842,7 @@ with an extra cut at IFS Cycle 50r1. Three eras with no fold rotation leave 6 ce
 September), and two UKV eras, the rest of the page's design, leave 12 (February, April, May, and
 June). On the longer row set, the horizons page's own folds leave 6 (June and July), and the other
 two long-row designs leave 0. In the study's design the covered cell with the fewest training rows
-holds 229 training rows, for September at one farm, where 680 rows are scored. An extra era cut at
-IFS Cycle 50r1 moves none of the three planned contrasts, nor ENS day 0 minus HRES, by more than
-0.04 points from the study's design (compare the rows without the rows of May 2026).
+holds 229 training rows, for September at one farm, where 680 rows are scored.
 
 ![Figure 16: Each planned contrast keeps its sign and stays statistically significant at the 5%
 level under five fold designs and one row subset](assets/ens_hres_wind_robustness.svg)
@@ -813,100 +850,166 @@ level under five fold designs and one row subset](assets/ens_hres_wind_robustnes
 **The ENS horizons page's figure for ENS day 0 against ERA5 differs from this section's because the
 two differ in row set and in how the folds treat IFS Cycle 49r1, and the era cut moves the result
 more than the fold numbering does.** The horizons page reports ENS day 0 minus ERA5 as +0.170 points
-[+0.021, +0.322] on 50,268 rows from 12 August 2024. This section finds −0.07 points [−0.19, +0.06]
-on 43,555 rows from 1 December 2024. Three refits on the page's own rows from 12 August 2024 (50,734
-farm-hours in 26 calendar months) separate the causes. The 466 farm-hours that the horizons inputs
-hold no power for, 299 in November 2025 and 167 in June 2026, explain the difference in row count.
-The first refit uses the horizons page's folds, which do not cut at IFS Cycle 49r1, and gives +0.16
-points [+0.01, +0.31] for this study's ENS wind and +0.17 points [+0.03, +0.32] for the horizons
-page's own combination, which closely reproduces the published +0.170 (on 50,734 rather than 50,268
-farm-hours). Scoring only the rows from 1 December 2024 under those folds gives +0.10 points [−0.05,
-+0.25]. The second keeps the two eras and rotates the folds of the second era, and gives +0.147
-points [−0.005, +0.302] on all rows and +0.08 points [−0.07, +0.25] from December. For the horizons
-page's own combination the second refit gives +0.16 points [+0.01, +0.30] on all rows, which stays
-statistically significant at the 5% level. The third adds one era cut at 1 December 2024, and gives
-+0.00 points [−0.12, +0.13] on all rows and −0.01 points [−0.14, +0.14] from December. The horizons
-page's folds leave 6 cells without training rows (June and July), and the other two designs leave 0.
-These refits are exploratory, added after the first results, and rest on three farms that are few
-independent sites.
-[Issue #892](https://github.com/openclimatefix/nged-substation-forecast/issues/892) tracks the horizons
-page's treatment of the cycle change.
+[+0.021, +0.322] on 50,268 farm-hours from 12 August 2024. This section finds −0.07 points [−0.19,
++0.06] on 43,555 farm-hours from 1 December 2024. The 466 farm-hours that the horizons inputs hold
+no power for, 299 in November 2025 and 167 in June 2026, explain the difference in row count. Three
+refits on the page's own rows from 12 August 2024 (50,734 farm-hours in 26 calendar months) separate
+the causes:
 
-**Paired differences between the designs separate the era cut from the fold numbering, with one
-caution.** Each figure below is one design's contrast minus another design's contrast on the same
-rows and seeds, from the saved losses with nothing refitted, and is exploratory. For ENS day 0 minus
-ERA5 with this study's ENS wind, rotating the folds changes the contrast by −0.01 points [−0.05,
-+0.03] on all rows and −0.02 points [−0.06, +0.03] from December. Adding the era cut changes it by
-−0.15 points [−0.27, −0.04] on all rows and −0.08 points [−0.18, −0.00] from December. Rotating the
-folds alone therefore moves ENS day 0 minus ERA5 by no margin that is statistically significant at
-the 5% level, and the cut does on all rows. ENS day 0 minus ERA5 is statistically significant only
-without an era cut and only on all rows, and a difference between a significant and a
-non-significant interval, such as +0.147 points [−0.005, +0.302] against +0.16 points [+0.01,
-+0.31], is not a difference between the designs. The caution is that the cut also changes the fold
-layout, because the first era becomes its own set of folds, so the two effects are not fully
-separable. On the main row set, the fold layout and the era coding alone move HRES minus UKV across
-a range of +0.15 to +0.21 points and ENS day 0 minus UKV across +0.34 to +0.43, so the fold layout
-has an effect of its own.
+- **The horizons page's folds.** The first refit uses the horizons page's folds, which do not cut at
+  IFS Cycle 49r1, and gives +0.16 points [+0.01, +0.31] for this study's ENS wind and +0.17 points
+  [+0.03, +0.32] for the horizons page's own combination, which closely reproduces the published
+  +0.170 (on 50,734 rather than 50,268 farm-hours). Scoring only the rows from 1 December 2024 under
+  those folds gives +0.10 points [−0.05, +0.25].
+- **Two eras, rotated folds.** The second refit keeps the two eras and rotates the folds of the
+  second era, and gives +0.147 points [−0.005, +0.302] on all rows and +0.08 points [−0.07, +0.25]
+  from December. For the horizons page's own combination the second refit gives +0.16 points [+0.01,
+  +0.30] on all rows, which stays statistically significant at the 5% level.
+- **One era cut at 1 December 2024.** The third refit adds one era cut at 1 December 2024, and gives
+  +0.00 points [−0.12, +0.13] on all rows and −0.01 points [−0.14, +0.14] from December.
+
+The horizons page's folds leave 6 cells without training rows (June and July), and the other two
+designs leave 0. These refits are exploratory, added after the first results. Three wind farms are
+few independent sites, so these intervals describe these farms and this window only.
+[Issue #892](https://github.com/openclimatefix/nged-substation-forecast/issues/892) tracks the
+horizons page's treatment of the cycle change.
+
+**Paired differences between the designs separate the era cut from the fold numbering.** Each figure
+below is one design's contrast minus another design's contrast on the same rows and seeds, from the
+saved losses with nothing refitted, and is exploratory. For ENS day 0 minus ERA5 with this study's
+ENS wind, rotating the folds changes the contrast by −0.01 points [−0.05, +0.03] on all rows and
+−0.02 points [−0.06, +0.03] from December. Adding the era cut changes it by −0.15 points [−0.27,
+−0.04] on all rows and −0.08 points [−0.18, −0.00] from December. Rotating the folds alone therefore
+moves ENS day 0 minus ERA5 by no margin that is statistically significant at the 5% level, and the
+era cut moves it by a statistically significant margin on all rows. ENS day 0 minus ERA5 is
+statistically significant only without an era cut and only on all rows. A difference between a
+significant and a non-significant interval, such as +0.147 points [−0.005, +0.302] against +0.16
+points [+0.01, +0.31], is not a difference between the designs.
+
+**The era cut also changes the fold layout, so its effect and the effect of the fold numbering are
+not fully separable.** The cut changes the fold layout because the first era becomes its own set of
+folds. On the main row set, the fold layout and the era coding alone move HRES minus UKV across a
+range of +0.15 to +0.21 points and ENS day 0 minus UKV across +0.34 to +0.43, so the fold layout has
+an effect of its own.
 
 **In exploratory refits, HRES's lead over ERA5 is no longer statistically significant at the 5%
 level when the XGBoost model trains across IFS Cycle 49r1 without an era cut.** HRES minus ERA5 is
 +0.05 points [−0.14, +0.26] on all rows from 12 August 2024 with the horizons page's folds, and
-−0.06 points [−0.24, +0.15] on the rows from December. With those eras and rotated folds it is +0.03
-points [−0.18, +0.26] on all rows and −0.09 points [−0.27, +0.14] from December. With the extra era
-cut it is −0.19 points [−0.32, −0.04] on all rows and −0.23 points [−0.37, −0.06] from December.
-Paired, rotating the folds changes HRES minus ERA5 by −0.02 points [−0.07, +0.02] on all rows and
-−0.03 points [−0.08, +0.02] from December, and adding the cut changes it by −0.23 points [−0.39,
-−0.08] and −0.15 points [−0.28, −0.03]. HRES's advantage over ERA5 therefore depends on the era cut,
-not on the fold numbering. A training history that reads HRES across a cycle change without telling
-the XGBoost model which side each hour is on therefore risks losing HRES's advantage over ERA5 on
-these rows. These intervals describe three farms that are few independent sites.
+−0.06 points [−0.24, +0.15] on the rows from December. With the two eras and rotated folds, HRES
+minus ERA5 is +0.03 points [−0.18, +0.26] on all rows and −0.09 points [−0.27, +0.14] from December.
+With the extra era cut, HRES minus ERA5 is −0.19 points [−0.32, −0.04] on all rows and −0.23 points
+[−0.37, −0.06] from December. Paired, rotating the folds changes HRES minus ERA5 by −0.02 points
+[−0.07, +0.02] on all rows and −0.03 points [−0.08, +0.02] from December, and adding the cut changes
+it by −0.23 points [−0.39, −0.08] and −0.15 points [−0.28, −0.03]. HRES's advantage over ERA5
+therefore depends on the era cut, not on the fold numbering. On these rows, a training history risks
+losing HRES's advantage over ERA5 if it reads HRES across a cycle change without telling the XGBoost
+model which side each hour falls on. Three wind farms are few independent sites, so these intervals
+describe these farms and this window only.
 
 ![Figure 17: An extra era cut at 1 December 2024, the first whole month after IFS Cycle
 49r1, changes ENS day 0's and HRES's scores against ERA5 far more than rotating the folds
 does](assets/ens_hres_wind_reconciliation.svg)
+
+#### The step in ECMWF's wind at IFS Cycle 49r1
 
 **The mean 10 m wind speeds of ENS day 0 and HRES fall against ERA5's between October and November
 2024, and UKV's does not fall.** ENS day 0's ratio to ERA5 is 0.97 in August and September 2024 and
 0.94 in October, and it stays between 0.90 and 0.93 in every month from November 2024. HRES's is
 0.89 in August 2024, 0.86 in September, and 0.85 in October, and it stays between 0.78 and 0.83 from
 November 2024. UKV's ratio is 0.76 in August 2024, 0.75 in September, 0.71 in October, and 0.77 in
-November, so UKV's own ratio moves by 0.06 between October and November, and a month-to-month change
-alone is weak evidence. Holding the season fixed is stronger, with one year set against one year.
-Pooled over August to October, ENS day 0's ratio is 0.96 in 2024 and 0.91 in 2025, HRES's is 0.86
-and 0.80, and UKV's is 0.74 in both years, and UKV's stable ratio is what rules out a step in ERA5.
-ENS day 0 is served by Dynamical.org's archive, independently of Open-Meteo's, so its step points to
-the weather model, not to Open-Meteo's archive. ECMWF's [Newsletter
+November, so UKV's own ratio moves by 0.06 between October and November. A month-to-month change
+alone is weak evidence. A comparison that holds the season fixed is stronger evidence, although it
+sets one year against one year. Pooled over August to October, ENS day 0's ratio is 0.96 in 2024 and
+0.91 in 2025, HRES's is 0.86 and 0.80, and UKV's is 0.74 in both years, and UKV's stable ratio is
+what rules out a step in ERA5.
+
+**The step in ENS day 0's 10 m wind points to the weather model rather than to Open-Meteo's
+archive.** ENS day 0 is served by Dynamical.org's archive, independently of Open-Meteo's. ECMWF's
+[Newsletter
 181](https://www.ecmwf.int/en/newsletter/181/earth-system-science/ifs-upgrade-improves-near-surface-wind-and-temperature)
 describes IFS Cycle 49r1 as including "a revision of the diagnostic 10 m wind calculation, which
 removes a limiter and modifies the blending height, leading to reduced 10 m wind biases", and
 ECMWF's [implementation
 page](https://confluence.ecmwf.int/display/FCST/Implementation+of+IFS+Cycle+49r1) lists land-surface
 model upgrades among the changes. The step is consistent with the cycle change, and this study does
-not establish that the change is its cause. Neither page mentions 100 m wind.
+not establish that the change is its cause. Neither of those two pages, as read for this study,
+mentions 100 m wind.
 
 **At 100 m, the height the XGBoost models are given, the fall against ERA5 is smaller and gradual,
 and HRES's is larger than ENS day 0's.** HRES's ratio to ERA5 is 0.97 in August 2024, 0.96 in
 September, 0.95 in October, 0.93 in November, and 0.91 in December. ENS day 0's is 0.99 in August
-and September 2024 and 0.98 in October, and stays between 0.94 and 0.98 from November 2024. Split at
-the first hour of IFS Cycle 49r1 in each product's data (06 UTC on 12 November 2024 for HRES, 00 UTC
-on 13 November 2024 for ENS day 0), HRES's 100 m ratio is 0.96 before and 0.91 after (at 10 m, 0.86
-and 0.80), and ENS day 0's is 0.99 and 0.96 (at 10 m, 0.96 and 0.91). UKV, which the cycle does not
-touch, moves from 0.97 to 0.99 at 100 m (at 10 m, 0.74 to 0.77) across the same split. Over the 28
-days on each side of the split, HRES's 100 m ratio falls from 0.96 to 0.91 and ENS day 0's from 0.98
-to 0.97. This study does not establish why HRES's hub-height step is larger than ENS day 0's, and a
-change in Open-Meteo's archive is possible. These are exploratory ratios of means with no interval.
+and September 2024 and 0.98 in October, and stays between 0.94 and 0.98 from November 2024. The
+table below splits each product's data at the first hour of IFS Cycle 49r1 (06 UTC on 12 November
+2024 for HRES, 00 UTC on 13 November 2024 for ENS day 0), and splits UKV, which the cycle does not
+touch, at HRES's hour.
+
+| Product | 100 m ratio before | 100 m ratio after | 10 m ratio before | 10 m ratio after |
+|---|---|---|---|---|
+| HRES | 0.96 | 0.91 | 0.86 | 0.80 |
+| ENS day 0 | 0.99 | 0.96 | 0.96 | 0.91 |
+| UKV | 0.97 | 0.99 | 0.74 | 0.77 |
+
+Over the 28 days on each side of the split, HRES's 100 m ratio falls from 0.96 to 0.91 and ENS day
+0's from 0.98 to 0.97. This study does not establish why HRES's hub-height step is larger than ENS
+day 0's, and a change in Open-Meteo's archive is possible. These are exploratory ratios of means
+with no interval.
 
 ![Figure 18: ENS's and HRES's 10 m wind speeds fall against ERA5's between October and November
 2024, and UKV's does not](assets/ens_hres_wind_monthly_ratio.svg)
 
+#### How the ECMWF wind was read, and what the contrasts mix
+
+**None of the planned contrasts isolates which difference between an ECMWF product and its
+comparator causes the gap.** Each contrast mixes served lead, step width, native and served grid,
+IFS cycle, the source of HRES's archive, and how each value is read. ENS day 0's lead is 0 to 23
+hours from the 00 UTC run, its steps are 3-hourly and rebuilt to hourly, and each value is the
+area-weighted mean of the 0.25° cells that a farm's H3 resolution-5 cell overlaps. ENS day 0's speed
+is the magnitude of the cell-mean wind vector, which can lower the speed relative to a point read.
+HRES is a single land cell that Open-Meteo picks. UKV is read at T+0, and ERA5 is an analysis. The
+ENS-against-HRES contrast also mixes ensemble averaging with a single run, so the contrast's result
+cannot be attributed to ensemble averaging alone.
+
+**HRES's served lead is inferred from where hour-to-hour jumps fall: 1 to 12 hours before 1 October
+2025, and 0 to 5 hours from that date.** Before 1 October 2025 the 100 m wind speed's hour-to-hour
+change at 01 UTC is 1.32 times the mean of its two neighbouring hours' changes, and at 13 UTC 1.29
+times, the arrival hours of the 00 and 12 UTC runs.
+
+**The 07 UTC jump is consistent with the morning boundary-layer transition and is not read as a
+handover.** A jump of 1.19 at 07 UTC is not explained by a run schedule. It is concentrated in May
+to August: on the main row set HRES's 07 UTC ratio is 1.39 in May, 1.11 in June, 1.49 in July, and
+1.12 in August, and below 1.08 in every other calendar month. The same ratio for ERA5, an analysis
+with no handover between runs, is 1.28 in May and 1.30 in August, and UKV's does not exceed 1.18 in
+any month. No jump appears at 19 UTC.
+
+From 1 October 2025 the jumps fall at 00 UTC (1.20), 06 UTC (1.15), and 18 UTC (1.14), and the jump
+at 12 UTC (1.08) is below the report's threshold of 1.10 for wind. The plan wrote the threshold as
+1.15, and 1.10 was chosen after the results were seen. At the plan's threshold both expected hours
+before 1 October 2025 reach it at 100 m, and one of the four expected hours from that date does. An
+hour above the threshold is evidence of a handover, not proof of one.
+
+**The Previous Runs file's null pattern gives stronger evidence for the change of source than the
+hour-to-hour jumps do.** Of the 1,072,512 values in its 49 `_previous_day*` columns before 1 October
+2025, 1,320 are not null (the last on 2025-01-07), against 1,191,935 of 1,263,024 from that date,
+and from that date the one-day-earlier 100 m wind speed jumps at 00 UTC (1.30), 06 UTC (1.21), 12
+UTC (1.23), and 18 UTC (1.21), all four expected hours.
+
+**The choice of ENS interpolation does not move ENS day 0's error by a margin statistically
+significant at the 5% level.** Each of the ENS horizons page's three alternative interpolations
+moves ENS day 0's error by no more than 0.02 points from the planned combination: +0.02 points
+[−0.01, +0.04], −0.01 points [−0.05, +0.03], and +0.00 points [−0.03, +0.04]. These are exploratory
+contrasts. Three wind farms are few independent sites, so these intervals describe these farms and
+this window only.
+
+#### Where the gaps are largest: time of day, farm, and period
+
 **ENS day 0's gap to UKV and HRES is larger in the later hours of the day, as is ERA5's gap to UKV,
 and the split cannot apportion the widening between ENS lead and time of day.** Splitting the scored
 hours by label hour, an exploratory comparison, ENS day 0 minus UKV is +0.11 points [−0.06, +0.27]
-for labels 00 to 08 UTC (16,140 rows) and +0.60 points [+0.38, +0.84] for labels 10 to 23 UTC
-(25,604 rows). ENS day 0 minus HRES is +0.01 points [−0.10, +0.13] for labels 00 to 08 UTC and +0.34
-points [+0.16, +0.52] for labels 10 to 23 UTC. Label 09 is dropped. ERA5, an analysis with no lead,
-shows the same pattern against UKV: UKV minus ERA5 is −0.26 points [−0.44, −0.07] for labels 00 to
-08 UTC and −0.61 points [−0.79, −0.40] for labels 10 to 23 UTC. HRES minus UKV is +0.09 points
+for labels 00 to 08 UTC (16,140 farm-hours) and +0.60 points [+0.38, +0.84] for labels 10 to 23 UTC
+(25,604 farm-hours). ENS day 0 minus HRES is +0.01 points [−0.10, +0.13] for labels 00 to 08 UTC and
++0.34 points [+0.16, +0.52] for labels 10 to 23 UTC. Label 09 is dropped. ERA5, an analysis with no
+lead, shows the same pattern against UKV: UKV minus ERA5 is −0.26 points [−0.44, −0.07] for labels
+00 to 08 UTC and −0.61 points [−0.79, −0.40] for labels 10 to 23 UTC. HRES minus UKV is +0.09 points
 [−0.09, +0.27] and +0.26 points [+0.11, +0.40]. Against ERA5, ENS day 0 minus ERA5 is −0.15 points
 [−0.30, +0.00] and −0.01 points [−0.18, +0.18].
 
@@ -919,80 +1022,48 @@ ENS day 0 minus ERA5 is not statistically significant at the 5% level, and the c
 ERA5, which involves no ENS lead, is. Part of the widening of ENS day 0's gap to UKV therefore does
 not come from ENS lead. This study cannot attribute that part to time of day, because the controls
 are not clean: HRES's served lead varies with the UTC hour before 1 October 2025, and ERA5's
-assimilation windows change at 09 to 10 UTC and 21 to 22 UTC, beside the split. The split mixes ENS
-lead, 0 to 8 hours against 10 to 23 hours from the 00 UTC run, with time of day, with the growing
-smoothing of an ensemble mean as the members' spread widens with lead, and with the smoothing of
-interpolating 3-hourly steps to hourly, and HRES's lead before 1 October 2025 is mixed into it. The
-split is not a test of whether ENS could be read in time. Three wind farms are few independent
-sites, so these intervals describe these farms only.
+assimilation windows change at 09 to 10 UTC and 21 to 22 UTC, beside the split. The split mixes four
+effects: ENS lead (0 to 8 hours against 10 to 23 hours from the 00 UTC run), time of day, the
+growing smoothing of an ensemble mean as the members' spread widens with lead, and the smoothing
+from interpolating 3-hourly steps to hourly. In contrasts involving HRES, HRES's served lead before
+1 October 2025 is mixed in as well. The split is not a test of whether ENS could be read in time.
+Three wind farms are few independent sites, so these intervals describe these farms and this window
+only.
 
 ![Figure 19: ENS day 0's gap to UKV and HRES is larger in the later hours of the day, as is ERA5's
 gap to UKV](assets/ens_hres_wind_split.svg)
 
 **HRES minus ERA5 is statistically significant at the 5% level at one farm of three, Generator W2,
-and only one pair of farms differs from each other in it.** HRES minus ERA5 is −0.54 points [−0.72,
-−0.35] at Generator W2, −0.05 points [−0.21, +0.11] at Generator W1, and −0.22 points [−0.51, +0.10]
-at Generator W3. Between farms, W2 minus W1 is −0.49 points [−0.69, −0.26], W2 minus W3 is −0.32
-points [−0.63, +0.02], and W3 minus W1 is −0.17 points [−0.54, +0.22]. Of the nine between-farm
-differences in the three planned contrasts, two are statistically significant at the 5% level: that
-one, and ENS day 0 minus UKV between W2 and W3, at −0.37 points [−0.65, −0.10]. HRES minus UKV is
-+0.26 points [+0.15, +0.37] at Generator W1, +0.02 points [−0.23, +0.26] at Generator W2, and +0.33
-points [+0.05, +0.61] at Generator W3. ENS day 0 minus UKV is +0.38 points [+0.16, +0.60] at
-Generator W1, +0.24 points [−0.03, +0.50] at Generator W2, and +0.61 points [+0.43, +0.79] at
-Generator W3. Per-farm rows are exploratory, and the three farms share their weather, so they are
-not independent replications.
+and only one pair of farms differs in it.** HRES minus ERA5 is −0.54 points [−0.72, −0.35] at
+Generator W2, −0.05 points [−0.21, +0.11] at Generator W1, and −0.22 points [−0.51, +0.10] at
+Generator W3. Between farms, W2 minus W1 is −0.49 points [−0.69, −0.26], W2 minus W3 is −0.32 points
+[−0.63, +0.02], and W3 minus W1 is −0.17 points [−0.54, +0.22]. Of the nine between-farm differences
+in the three planned contrasts, two are statistically significant at the 5% level: that one, and ENS
+day 0 minus UKV between W2 and W3, at −0.37 points [−0.65, −0.10]. HRES minus UKV is +0.26 points
+[+0.15, +0.37] at Generator W1, +0.02 points [−0.23, +0.26] at Generator W2, and +0.33 points
+[+0.05, +0.61] at Generator W3. ENS day 0 minus UKV is +0.38 points [+0.16, +0.60] at Generator W1,
++0.24 points [−0.03, +0.50] at Generator W2, and +0.61 points [+0.43, +0.79] at Generator W3.
+Per-farm rows are exploratory, and the three farms share their weather, so they are not independent
+replications.
 
 ![Figure 20: The three planned contrasts pooled over the three farms and at each
 farm](assets/ens_hres_wind_by_farm.svg)
 
-**No planned contrast separates the differences between the two ECMWF products and the others.**
-Each contrast mixes served lead, step width, native and served grid, IFS cycle, the source of HRES's
-archive, and how each value is read. ENS day 0's lead is 0 to 23 hours from the 00 UTC run, its
-steps are 3-hourly and rebuilt to hourly, and each value is the area-weighted mean of the 0.25°
-cells that a farm's H3 resolution-5 cell overlaps, with its speed the magnitude of the cell-mean
-wind vector, which can lower the speed relative to a point read. HRES is a single land cell that
-Open-Meteo picks. UKV is read at T+0, and ERA5 is an analysis. The ENS-against-HRES contrast also
-mixes ensemble averaging with a single run, so it cannot be attributed to ensemble averaging.
-
-**HRES's served lead is inferred from where hour-to-hour jumps fall, and the jumps at 01 and 13 UTC
-are consistent with 1 to 12 hours before 1 October 2025, and those from 1 October 2025 with 0 to 5
-hours.** Before 1 October 2025 the 100 m wind speed's hour-to-hour change at 01 UTC is 1.32 times
-the mean of its two neighbouring hours' changes, and at 13 UTC 1.29 times, the arrival hours of the
-00 and 12 UTC runs. A jump of 1.19 at 07 UTC is not explained by a run schedule. It is concentrated
-in May to August: on the main row set HRES's 07 UTC ratio is 1.39 in May, 1.11 in June, 1.49 in
-July, and 1.12 in August, and below 1.08 in every other calendar month. The same ratio for ERA5, an
-analysis with no handover between runs, is 1.28 in May and 1.30 in August, and UKV's does not exceed
-1.18 in any month. No jump appears at 19 UTC. The 07 UTC jump is therefore consistent with the
-morning boundary-layer transition and is not read as a handover.
-
-From 1 October 2025 the jumps fall at 00 UTC (1.20), 06 UTC (1.15), and 18 UTC (1.14), and the jump
-at 12 UTC (1.08) is below the report's threshold of 1.10 for wind. The plan wrote the threshold as
-1.15, and 1.10 was chosen after the results were seen. At the plan's threshold both expected hours
-before 1 October 2025 reach it at 100 m, and one of the four expected hours from that date does. The
-Previous Runs file gives stronger evidence for the change of source: of the 1,072,512 cells in its
-49 `_previous_day*` columns before 1 October 2025, 1,320 are not null (the last on 2025-01-07),
-against 1,191,935 of 1,263,024 from that date, and from that date the one-day-earlier 100 m wind
-speed jumps at 00 UTC (1.30), 06 UTC (1.21), 12 UTC (1.23), and 18 UTC (1.21), all four expected
-hours. An hour above the threshold is evidence of a handover, not proof of one.
-
 **The period splits do not settle which difference drives the gap between HRES and UKV.** HRES minus
-UKV is +0.10 points [−0.13, +0.31] before 1 October 2025 (10 calendar months, 20,703 rows) and +0.29
-points [+0.14, +0.44] from that date (12 calendar months, 22,852 rows), although HRES's lead is
-shorter from that date. A shorter lead would be expected to narrow the gap, and the two periods also
-differ in season and archive source. The change between the periods, resampling each period's own
-months, is +0.18 points [−0.08, +0.44], not statistically significant at the 5% level. The later
-period also contains UKV's January 2026 upgrade, and UKV's own lead over ERA5 grows between the two
-periods, from −0.32 points [−0.57, −0.02] to −0.61 points [−0.80, −0.43], a change of −0.29 points
-[−0.64, +0.03], which is also not statistically significant, so this study does not compare the size
-of the two changes. The split at IFS Cycle 50r1 leaves 5 calendar-month labels from 12 May 2026, so
-the report marks its change intervals `too few months`, and its intervals under-cover. Three wind
-farms are few independent sites, so these intervals describe these farms only.
+UKV is +0.10 points [−0.13, +0.31] before 1 October 2025 (10 calendar months, 20,703 farm-hours) and
++0.29 points [+0.14, +0.44] from that date (12 calendar months, 22,852 farm-hours), although HRES's
+lead is shorter from that date. A shorter lead would be expected to narrow the gap, and the two
+periods also differ in season and archive source. The change between the periods, resampling each
+period's own months, is +0.18 points [−0.08, +0.44], not statistically significant at the 5% level.
+The later period also contains UKV's January 2026 upgrade. UKV's own lead over ERA5 grows between
+the two periods, from −0.32 points [−0.57, −0.02] to −0.61 points [−0.80, −0.43], a change of −0.29
+points [−0.64, +0.03] that is also not statistically significant. This study therefore does not
+compare the size of the two changes. Three wind farms are few independent sites, so these intervals
+describe these farms and this window only.
 
-**The choice of ENS interpolation does not move ENS day 0's error by a margin statistically
-significant at the 5% level.** Each of the ENS horizons page's three alternative interpolations
-moves ENS day 0's error by no more than 0.02 points from the planned combination: +0.02 points
-[−0.01, +0.04], −0.01 points [−0.05, +0.03], and +0.00 points [−0.03, +0.04]. These are exploratory
-contrasts on three farms.
+**The split at IFS Cycle 50r1 leaves too few months for a usable interval.** The split leaves 5
+calendar-month labels from 12 May 2026, so the report marks the split's change intervals `too few
+months`, and those intervals under-cover.
 
 ## What to use
 
@@ -1027,20 +1098,23 @@ contrasts on three farms.
 - **ECMWF's HRES and ENS day 0: not recommended for historical features or for training history on
   this evidence.** For historical features, UKV beat both in the planned contrasts of [the ECMWF
   results section][ecmwf-results], on 43,555 farm-hours over 22 calendar months at three farms that
-  are few independent sites. For training history, the planned contrast favours HRES over ERA5 on
-  rows from December 2024. Exploratory refits show the advantage is no longer statistically
-  significant at the 5% level when the XGBoost model trains across IFS Cycle 49r1 without an era
-  cut, so this study does not recommend HRES over ERA5 for training history. ENS day 0 is
-  statistically indistinguishable from ERA5 on these rows, an interval that bounds the difference,
-  and Dynamical.org's archive of it starts in April 2024. Open-Meteo's HRES archive may reach
-  further back, since the 9 km grid file read for the cross-check starts on 1 January 2017, and any
-  longer record spans many IFS cycles. At this repository's assumed 09:00 UTC read time only ENS day
-  0's hours 00 to 08 UTC have passed, so for live historical features ENS day 0 supplies at most the
-  early hours. ECMWF's products were compared only with products refitted on the same 43,555
-  farm-hours, so their errors cannot be set beside the figures elsewhere on this page. The verdict
-  concerns the ENS mean at day 0, from the 00 UTC run in Dynamical.org's 3-hourly steps at 0.25°.
-  The ENS control member, the members' spread, the other three daily runs, and hourly steps were not
-  tested.
+  are few independent sites. At this repository's assumed 09:00 UTC read time only ENS day 0's hours
+  00 to 08 UTC have passed, so for live historical features ENS day 0 supplies at most the early
+  hours.
+- **For training history, HRES over ERA5 is not established, and ENS day 0 is not distinguished from
+  ERA5.** The planned contrast favours HRES over ERA5 on rows from December 2024. Exploratory refits
+  show the advantage is no longer statistically significant at the 5% level when the XGBoost model
+  trains across IFS Cycle 49r1 without an era cut, so this study does not recommend HRES over ERA5
+  for training history. ENS day 0 is not statistically distinguishable from ERA5 on these rows, and
+  the interval bounds the difference without showing that the two are equal. Dynamical.org's archive
+  of ENS day 0 starts in April 2024. Open-Meteo's HRES archive may reach further back, since the 9
+  km grid file read for the cross-check starts on 1 January 2017, and any longer record spans many
+  IFS cycles.
+- **Scope of the ECMWF verdicts.** ECMWF's products were scored only on rows that every product was
+  refitted on (the same 43,555 farm-hours), so the errors in the ECMWF section cannot be set beside
+  the figures elsewhere on this page. The verdicts cover the ENS mean at day 0, from the 00 UTC run
+  in Dynamical.org's 3-hourly steps at 0.25°. The ENS control member, the members' spread, the other
+  three daily runs, and hourly steps were not tested.
 - **Capacity estimation and disaggregation: no recommendation.** Capacity estimation infers a farm's
   size from how its output tracks the wind, and disaggregation separates hidden generation from
   demand at a substation. Both have to read a product's wind without a fit to the farm's own metered
@@ -1080,34 +1154,36 @@ product?](blending-weather-products.md#wind-a-blend-beats-ukv-given-its-neighbou
   2024, 22 calendar months, against the page's 50,734 from 12 August 2024, so its errors are not
   comparable with the rest of the page's. October and November occur in one year, 2025, so a fold
   that holds either month out has no training row for that calendar month. The third era's fold
-  numbers are rotated to cover every other calendar month. Three fold designs on the ECMWF page keep
-  cells without training rows on purpose, and the report counts them: 6 for three eras with no fold
-  rotation, 12 for the page's two-UKV-era design, and 6 for the horizons page's own folds on the
-  longer row set.
+  numbers are rotated to cover every other calendar month. Three fold designs in the ECMWF section
+  keep cells without training rows on purpose, and the report counts them: 6 for three eras with no
+  fold rotation, 12 for the page's two-UKV-era design, and 6 for the horizons page's own folds on
+  the longer row set.
 - **ECMWF's products are compared over three farms, with different leads, grids, and archive
-  sources.** HRES's archive source changed on 1 October 2025 and IFS Cycle 49r1 and 50r1 fall in or
-  before the window, so an XGBoost model given HRES or ENS day 0 trains across cycle changes that
-  only the era cuts described above partly separate. IFS Cycle 49r1 went live before this row set
-  starts. Cycle 50r1 went live inside it, on 12 May 2026, and the study's three eras do not separate
-  it; an extra era cut there moves none of the planned contrasts, nor ENS day 0 minus HRES, by more
-  than 0.04 points (the fold-design table). At this repository's assumed 09:00 UTC read time, only
-  ENS day 0's hours 00 to 08 UTC have passed; hours 09 to 23 are still a forecast up to 14 hours
-  ahead. The ENS day-0 scores are therefore past weather delivered late for the early hours, and the
-  best a 00 UTC-only archive offers for the rest. HRES's 0 to 5 hour served lead is assembled after
-  the fact by Open-Meteo, and ECMWF's dissemination schedule lists the 00 UTC HRES steps 0 to 90 at
-  05:45 to 06:12 UTC, so at run time the freshest HRES hours would be older than the served lead
-  scored here, and HRES's scores are a best case in the same way ENS day 0's early hours are.
-  Open-Meteo's `ecmwf_ifs` series before 1 October 2025 is a backfill from a source Open-Meteo does
-  not document, and the lineage file beside the Previous Runs file records when this study
-  downloaded it.
-- **The ECMWF verdicts concern one narrow ENS product.** They concern the ENS mean at day 0, from
+  sources.** HRES's archive source changed on 1 October 2025. IFS Cycle 49r1 went live before the
+  main row set starts, and Cycle 50r1 went live inside it, on 12 May 2026. An XGBoost model given
+  HRES or ENS day 0 therefore trains across cycle changes that only the era cuts described in the
+  results partly separate. The study's three eras do not separate Cycle 50r1, and an extra era cut
+  there moves none of the planned contrasts, nor ENS day 0 minus HRES, by more than 0.04 points (the
+  fold-design table).
+- **ENS day 0's read time.** At this repository's assumed 09:00 UTC read time, only ENS day 0's
+  hours 00 to 08 UTC have passed; hours 09 to 23 are still a forecast up to 14 hours ahead. The ENS
+  day-0 scores are therefore past weather delivered late for the early hours, and the best a 00
+  UTC-only archive offers for the rest.
+- **HRES's served lead is assembled after the fact.** HRES's 0 to 5 hour served lead is assembled
+  after the fact by Open-Meteo, and ECMWF's dissemination schedule lists the 00 UTC HRES steps 0 to
+  90 at 05:45 to 06:12 UTC, so at run time the freshest HRES hours would be older than the served
+  lead scored here, and HRES's scores are a best case in the same way ENS day 0's early hours are.
+- **HRES's archive before 1 October 2025 is a backfill from an undocumented source.** Open-Meteo's
+  `ecmwf_ifs` series before 1 October 2025 is a backfill from a source Open-Meteo does not document,
+  and the lineage file beside the Previous Runs file records when this study downloaded it.
+- **The ECMWF verdicts cover one ENS product.** The verdicts cover only the ENS mean at day 0, from
   the 00 UTC run in Dynamical.org's 3-hourly steps at 0.25°. The control member, the members'
   spread, the other three daily runs, and hourly steps were not tested.
-- **The exploratory ECMWF rows.** The longer row set, the fold designs, the label-hour split, the
-  per-farm rows, the period splits, the paired design, label-hour, farm and period differences, and
-  the 100 m and jump-ratio tables were added after the first results, and about 1 in 20 exploratory
-  rows reaches significance at the 5% level by chance. The ENS horizons page's figure for ENS day 0
-  against ERA5 is not like for like with this section's, as the section explains.
+- **The exploratory ECMWF rows.** Every ECMWF figure other than the three planned contrasts is
+  exploratory, including the rows added after the first results that Data and methods lists, and
+  about 1 in 20 exploratory rows reaches significance at the 5% level by chance. The ENS horizons
+  page's figure for ENS day 0 against ERA5 is not like for like with this section's, as the section
+  explains.
 
 ## Reproducing the figures
 
@@ -1130,11 +1206,11 @@ uv run python studies/beam_diffuse_split/wind_icon_dream.py
 uv run python studies/beam_diffuse_split/wind_icon_dream_charts.py
 ```
 
-The ECMWF section has its own scripts. They need the ENS forecast horizons study's saved inputs and
-the Open-Meteo Previous Runs file for HRES already on disk. The ENS inputs come from a chain of
-scripts, and the production NWP Delta table that the Dagster `ecmwf_ens` asset fills from
-Dynamical.org's ECMWF ENS archive (00 UTC run, 0.25°) must hold the runs first. The HRES files come
-from two Open-Meteo downloads:
+The ECMWF section has its own scripts. They need the ENS forecast horizons page's saved inputs and
+the Open-Meteo Previous Runs file for HRES already on disk. The ENS inputs come from a chain of two
+scripts. Before they run, the production NWP Delta table must hold the ENS runs; the Dagster
+`ecmwf_ens` asset fills that table from Dynamical.org's ECMWF ENS archive (00 UTC run, 0.25°). The
+HRES files come from two Open-Meteo downloads:
 
 ```bash
 uv run python studies/beam_diffuse_split/fetch_ens_forecast_horizons.py
@@ -1155,38 +1231,41 @@ uv run python studies/beam_diffuse_split/ens_hres_past_wind_charts.py
 uv run python studies/beam_diffuse_split/check_page_numbers.py \
     docs/studies/weather-products-for-past-wind.md \
     data/studies/beam_diffuse_split/past_weather_v2/ens_hres_past_wind/report.md \
-    --section "### UKV describes past wind better than ECMWF's HRES and ENS day 0 on these rows" \
+    --section "### How ECMWF's HRES and ENS day 0 compare with UKV and ERA5" \
     --section "### How ECMWF's ENS and HRES were added" \
     --bullet "## Key findings" "- **On 43,555 farm-hours from December 2024" \
     --bullet "## Key findings" "- **In exploratory refits added after the first results" \
     --allow-empty
 ```
 
-The first run refuses to overwrite `losses.parquet`, `losses.fingerprint`, `intervals.parquet`,
-`report.md`, and `script_commit.txt`, so each of them has to move to a `superseded/` folder first,
-and `--extra-fits` refuses in the same way. `--allow-empty` applies to every checked section and
-list item, so a section that holds no decimal number passes.
+Running `ens_hres_past_wind.py` a second time with no flag refuses to overwrite `losses.parquet`,
+`losses.fingerprint`, `intervals.parquet`, `report.md`, and `script_commit.txt`, so each of those
+files has to move to a `superseded/` folder first, and `--extra-fits` refuses in the same way.
+`--allow-empty` applies to every checked section and list item, so a section that holds no decimal
+number passes.
 
 The check reads `intervals.parquet` beside the report, so it compares the page's two-decimal figures
 with full-precision values.
 
-That section's report lands in
+The ECMWF section's report lands in
 `data/studies/beam_diffuse_split/past_weather_v2/ens_hres_past_wind/report.md`. `--extra-fits` adds
 the post-review fits and leaves the first fit's losses alone, and `--report-only` rebuilds the
 report from the saved losses without fitting.
 
-The report lands in `data/studies/beam_diffuse_split/beam_diffuse_wind_products/report.md`.
-`wind_products.py --fit-missing` keeps the losses already saved and fits only the XGBoost models
-they lack. The report also prints the check with the solar study's power hour, the run that keeps
-the zero hours, the step ratios, and the distances between the farms and to ICON-D2's edge. `uv run
-python studies/beam_diffuse_split/check_served_wind.py` writes `served_wind_checks.md` beside it:
-the grid-cell check, the 100 m rescaling, and when the ICON 80 m wind starts. The hour-to-hour jump
-diagnostics behind the served leads were one-off checks during review, and are not in either report.
-`wind_products.py --era5-by-year` reads the saved losses, fits nothing, and writes Figure 10's table
-to `data/studies/beam_diffuse_split/past_weather_v2/wind/era5_by_year.md`.
-`wind_icon_dream.py`'s report lands separately, in
+The wind-products report lands in
+`data/studies/beam_diffuse_split/beam_diffuse_wind_products/report.md`. `wind_products.py
+--fit-missing` keeps the losses already saved and fits only the XGBoost models they lack. That
+report also prints the check with the solar study's power hour, the run that keeps the zero hours,
+the step ratios, and the distances between the farms and to ICON-D2's edge. `uv run python
+studies/beam_diffuse_split/check_served_wind.py` writes `served_wind_checks.md` beside it: the
+grid-cell check, the 100 m rescaling, and when the ICON 80 m wind starts. The hour-to-hour jump
+diagnostics behind the served leads were one-off checks during review, and are in neither
+`report.md` nor `served_wind_checks.md`. `wind_products.py --era5-by-year` reads the saved losses,
+fits nothing, and writes Figure 10's table to
+`data/studies/beam_diffuse_split/past_weather_v2/wind/era5_by_year.md`. `wind_icon_dream.py`'s
+report lands separately, in
 `data/studies/beam_diffuse_split/past_weather_v2/wind_icon_dream/report.md`; `--report-only`
 rebuilds it from a saved `losses.parquet` alone, fitting nothing.
 
-[ecmwf-results]: #ukv-describes-past-wind-better-than-ecmwfs-hres-and-ens-day-0-on-these-rows
+[ecmwf-results]: #how-ecmwfs-hres-and-ens-day-0-compare-with-ukv-and-era5
 [issue-868]: https://github.com/openclimatefix/nged-substation-forecast/issues/868
