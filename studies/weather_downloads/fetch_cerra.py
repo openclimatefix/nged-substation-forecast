@@ -456,7 +456,9 @@ def main() -> int:
         for height_level in HEIGHT_LEVELS
     )
     written = [summary for summary in summaries if summary is not None]
-    missing_chunk_labels = [summary["label"] for summary in written if summary["chunks_missing"]]
+    missing_chunk_labels = [
+        str(summary["label"]) for summary in written if summary["chunks_missing"]
+    ]
     if missing_chunk_labels:
         missing_value_convention = (
             "Polars null never appears — a whole chunk that failed to download is simply "

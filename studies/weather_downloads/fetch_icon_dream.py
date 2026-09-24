@@ -134,7 +134,7 @@ def fetch_one_month(
         series; this frame keeps every (time, step) value as reported rather than resolving any
         overlap, which is a study-time decision, not a download-time one.
     """
-    import cfgrib
+    import cfgrib  # ty: ignore[unresolved-import]
 
     grib_path = _SCRATCH_DIR / f"{variable}_{year_month}.grb"
     url = f"{BASE_URL}/hourly/{variable}/ICON-DREAM-EU_{year_month}_{variable}_hourly.grb"
