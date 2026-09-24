@@ -842,6 +842,23 @@ def base_frame(*, domain: DomainType) -> pl.DataFrame:
     return frame.filter(pl.col("time") > SPAN[0] + timedelta(days=1))
 
 
+def site_roster(*, domain: DomainType) -> pl.DataFrame:
+    """Return one technology's site roster, with its coordinates, for a nearest-cell match.
+
+    A caller matching a gridded product's cells to each site (`studies.grid_sampling`, say) needs
+    the roster's `latitude` and `longitude`; nothing about this function prints them, and neither
+    should a caller.
+
+    Args:
+        domain: `solar` or `wind`.
+
+    Returns:
+        One row per site with `site`, `latitude` and `longitude`.
+    """
+    roster = _pv_sites() if domain == "solar" else _wind_sites()
+    return roster.select("site", "latitude", "longitude")
+
+
 def _day_start(*, domain: DomainType) -> pl.Expr:
     """Return midnight UTC at the start of each row's day.
 
