@@ -775,7 +775,7 @@ def reduce_members(
     )
 
 
-def _prefixed(*, frame: pl.DataFrame, arm: str, domain: DomainType) -> pl.DataFrame:
+def prefixed(*, frame: pl.DataFrame, arm: str, domain: DomainType) -> pl.DataFrame:
     """Rename a reduced frame's fields to one arm's column names.
 
     Args:
@@ -897,7 +897,7 @@ def with_baselines(*, frame: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
     return frame.with_columns(columns)
 
 
-def _clear_sky_table(*, domain: DomainType) -> pl.DataFrame:
+def clear_sky_table(*, domain: DomainType) -> pl.DataFrame:
     """Return the hourly clear-sky table the solar resample reads, or an empty frame for wind.
 
     Args:
@@ -923,7 +923,7 @@ def build_inputs(*, domain: DomainType) -> Inputs:
     """
     frame = with_baselines(frame=base_frame(domain=domain), domain=domain)
     extract = members(sites=sorted(frame["site"].unique().to_list()))
-    clear_sky = _clear_sky_table(domain=domain)
+    clear_sky = clear_sky_table(domain=domain)
     native_rows: dict[int, pl.DataFrame] = {}
     chart_inputs = []
     for day in BAND_DAYS:
@@ -938,7 +938,7 @@ def build_inputs(*, domain: DomainType) -> Inputs:
                 way="mean",
             )
             frame = frame.join(
-                _prefixed(frame=mean, arm=upsampling_arm(method=method, day=day), domain=domain),
+                prefixed(frame=mean, arm=upsampling_arm(method=method, day=day), domain=domain),
                 on=["site", "time"],
                 how="left",
             )
@@ -1349,7 +1349,7 @@ def _native_losses(*, inputs: Inputs, domain: Domain) -> pl.DataFrame:
             width = _step_width(24 * day + 24)
             rows = inputs.frame.filter(pl.col("time").dt.hour() % width == 0)
         rows = (
-            rows.join(_prefixed(frame=mean, arm=arm, domain=domain.name), on=["site", "time"])
+            rows.join(prefixed(frame=mean, arm=arm, domain=domain.name), on=["site", "time"])
             .drop("fold", "era", strict=False)
             .sort("site", "time")
         )
@@ -1477,7 +1477,7 @@ def main_frame(*, inputs: Inputs, method: MethodType, domain: DomainType) -> Inp
     frame = inputs.frame
     keys = frame.select("site", "time")
     extract = members(sites=sorted(frame["site"].unique().to_list()))
-    clear_sky = _clear_sky_table(domain=domain)
+    clear_sky = clear_sky_table(domain=domain)
     member_rows: dict[int, pl.DataFrame] = {}
     for day in BAND_DAYS:
         steps = band_steps(members=extract, day=day, domain=domain)
@@ -1491,7 +1491,7 @@ def main_frame(*, inputs: Inputs, method: MethodType, domain: DomainType) -> Inp
         for way in ("control", "mean"):
             reduced = reduce_members(hourly=hourly, domain=domain, way=way)
             frame = frame.join(
-                _prefixed(frame=reduced, arm=ens_arm(way=way, day=day), domain=domain),
+                prefixed(frame=reduced, arm=ens_arm(way=way, day=day), domain=domain),
                 on=["site", "time"],
                 how="left",
             )
@@ -1511,7 +1511,7 @@ def main_frame(*, inputs: Inputs, method: MethodType, domain: DomainType) -> Inp
         way="mean",
     )
     frame = frame.join(
-        _prefixed(frame=emulated_mean, arm=ens_arm(way="mean6", day=EMULATED_DAY), domain=domain),
+        prefixed(frame=emulated_mean, arm=ens_arm(way="mean6", day=EMULATED_DAY), domain=domain),
         on=["site", "time"],
         how="left",
     )
