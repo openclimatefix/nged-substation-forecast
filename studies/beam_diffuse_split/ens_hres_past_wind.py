@@ -95,7 +95,8 @@ they were fitted, and run by `--extra-fits`, which writes `losses_long_rows.parq
 `losses_fold_designs.parquet`, each with its own fingerprint, and leaves `losses.parquet` alone:
 
 - The long-row-set reconciliation: ERA5, UKV, HRES and ENS refitted on the rows from 2024-08-12,
-  under two designs (the horizons study's, and one with an extra era cut at 2024-12-01).
+  under three designs (the horizons study's; the same eras with rotated folds; and one with an
+  extra era cut at 2024-12-01).
 - The fold-design robustness table for P1 to P3 and ENS-HRES.
 - The HRES served-lead table: the ratio of each UTC hour's mean absolute hour-to-hour change to
   the mean of its two neighbours' changes, from the saved Previous Runs file.
@@ -249,6 +250,13 @@ ERA_FOLD_OFFSETS_50R1: Final[Mapping[int, int]] = MappingProxyType({0: 0, 1: 0, 
 
 Era 3 (June to September 2026) is rotated by 4. Rotations of 0 and 4 both leave 0 uncovered cells;
 4 is kept so that the design's folds, and the figures printed for them, do not move.
+"""
+
+HORIZONS_ROTATED_FOLD_OFFSETS: Final[Mapping[int, int]] = MappingProxyType({0: 0, 1: 2})
+"""The fold rotation of the long row set's two-UKV-era design with no cut at IFS Cycle 49r1.
+
+Rotations of 2, 3 and 4 of era 1 (from 2026-02) leave 0 uncovered cells, where the horizons study's
+own fold layout leaves 6; 2 is the smallest.
 """
 
 LONG_ROW_FOLD_OFFSETS: Final[Mapping[int, int]] = MappingProxyType({0: 0, 1: 2, 2: 0})
@@ -1696,18 +1704,23 @@ def _cut_eras(
 
 
 def long_row_designs(*, frame: pl.DataFrame) -> dict[str, pl.DataFrame]:
-    """Return the long row set under its two era-and-fold designs.
+    """Return the long row set under its three era-and-fold designs.
 
     Args:
         frame: `long_row_frame`'s result.
 
     Returns:
-        The horizons study's design (two UKV eras, no cut at IFS Cycle 49r1, its own fold layout)
-        and the same rows with one extra era cut at `IFS_CYCLE_49R1_CUT_MONTH`, whose folds are
-        rotated by `LONG_ROW_FOLD_OFFSETS`.
+        The horizons study's design (two UKV eras, no cut at IFS Cycle 49r1, its own fold layout);
+        the same eras with era 1's folds rotated by `HORIZONS_ROTATED_FOLD_OFFSETS`; and the same
+        rows with one extra era cut at `IFS_CYCLE_49R1_CUT_MONTH`, whose folds are rotated by
+        `LONG_ROW_FOLD_OFFSETS`. The second design differs from the first only in the folds, and
+        from the third only in the cut.
     """
     return {
         "two UKV eras, no cut at 49r1 (horizons design)": with_eras(frame=frame),
+        "two UKV eras, no cut at 49r1, folds rotated": _rotate_folds(
+            frame=with_eras(frame=frame), fold_offsets=HORIZONS_ROTATED_FOLD_OFFSETS
+        ),
         "extra era cut at 2024-12-01": _cut_eras(
             frame=frame,
             first_months=(IFS_CYCLE_49R1_CUT_MONTH, UKV_UPGRADE_MONTH),
@@ -1819,50 +1832,53 @@ def _ratio_lines(*, frame: pl.DataFrame) -> list[str]:
         frame: The long row set, carrying `month`, `time` and every product's columns.
 
     Returns:
-        Markdown lines: the monthly table, then the table over August to October of each year.
+        Markdown lines: the monthly table, then the table over August to October of each complete
+        year. The long row set starts on 2024-08-12, so August 2024 is a part-month.
     """
-    aggregates = {product: _mean_10m_speed_ms(product=product) for product in RATIO_PRODUCTS}
     era5 = _mean_10m_speed_ms(product="era5")
-    ratios = [pl.len().alias("n"), *(aggregates[product] / era5 for product in RATIO_PRODUCTS)]
-    names = ["n", *RATIO_PRODUCTS]
+    ratios = [
+        pl.len().alias("n"),
+        *(
+            (_mean_10m_speed_ms(product=product) / era5).alias(product)
+            for product in RATIO_PRODUCTS
+        ),
+    ]
     monthly = frame.group_by("month").agg(ratios).sort("month")
     seasonal = (
         frame.filter(pl.col("time").dt.month().is_in(RATIO_SEASON_MONTHS))
         .group_by(year=pl.col("time").dt.year())
-        .agg(ratios)
+        .agg(*ratios, n_months=pl.col("month").n_unique())
+        .filter(pl.col("n_months") == len(RATIO_SEASON_MONTHS))
         .sort("year")
     )
+    header = ["| {} | Rows | ENS / ERA5 | HRES / ERA5 | UKV / ERA5 |", "|---|---|---|---|---|"]
     lines = [
         "Monthly ratio of each product's mean 10 m wind speed to ERA5's, on the long row set:",
         "",
-        "| Month | Rows | ENS / ERA5 | HRES / ERA5 | UKV / ERA5 |",
-        "|---|---|---|---|---|",
+        header[0].format("Month"),
+        header[1],
     ]
     lines += [
         f"| {row['month']} | {row['n']:,} | "
-        + " | ".join(f"{row[name]:.4f}" for name in names[1:])
+        + " | ".join(f"{row[product]:.4f}" for product in RATIO_PRODUCTS)
         + " |"
-        for row in monthly.rename(dict(zip(monthly.columns[1:], names, strict=True))).iter_rows(
-            named=True
-        )
+        for row in monthly.iter_rows(named=True)
     ]
     lines += [
         "",
         (
             "Season-controlled ratio of each product's mean 10 m wind speed to ERA5's, pooled over "
-            "August to October of each year, on the long row set:"
+            "August to October of each year that holds all three months, on the long row set:"
         ),
         "",
-        "| Months | Rows | ENS / ERA5 | HRES / ERA5 | UKV / ERA5 |",
-        "|---|---|---|---|---|",
+        header[0].format("Months"),
+        header[1],
     ]
     lines += [
         f"| August to October {row['year']} | {row['n']:,} | "
-        + " | ".join(f"{row[name]:.4f}" for name in names[1:])
+        + " | ".join(f"{row[product]:.4f}" for product in RATIO_PRODUCTS)
         + " |"
-        for row in seasonal.rename(dict(zip(seasonal.columns[1:], names, strict=True))).iter_rows(
-            named=True
-        )
+        for row in seasonal.iter_rows(named=True)
     ]
     return lines
 
@@ -1895,10 +1911,11 @@ def _long_row_lines(
             f"The rows are the page's own, from {frame['time'].min():%Y-%m-%d}: {frame.height:,} "
             f"farm-hours in {frame['month'].n_unique()} calendar months. Design one is the "
             "horizons study's: two UKV eras, its own fold layout, and no cut at IFS Cycle 49r1 "
-            "(12 November 2024). Design two adds one era cut at 2024-12-01, and rotates the "
-            f"folds of era 1 by {LONG_ROW_FOLD_OFFSETS[1]} and of era 2 by "
-            f"{LONG_ROW_FOLD_OFFSETS[2]} so that no calendar month is left without training "
-            "rows. `ens_mean_day0` is the `components` combination and "
+            "(12 November 2024). Design two keeps the two eras and rotates the folds of era 1 by "
+            f"{HORIZONS_ROTATED_FOLD_OFFSETS[1]}, so that no calendar month is left without "
+            "training rows. Design three adds one era cut at 2024-12-01, and rotates the folds "
+            f"of era 1 by {LONG_ROW_FOLD_OFFSETS[1]} and of era 2 by {LONG_ROW_FOLD_OFFSETS[2]} "
+            "for the same reason. `ens_mean_day0` is the `components` combination and "
             "`ens_mean_day0_speed_components` is the horizons study's own. Each design is scored "
             "on all rows and on the rows from 2024-12-01 only."
         ),
@@ -2323,7 +2340,7 @@ Outputs of `studies/beam_diffuse_split/ens_hres_past_wind.py`. Wind farms appear
 - `losses_long_rows.parquet` and `losses_fold_designs.parquet`: the post-review fits
   (`--extra-fits`, exploratory, added after the first results), in the same layout as
   `losses.parquet` plus a `design` column. The first refits ERA5, UKV, HRES and ENS on the rows from
-  2024-08-12 under two designs, and the second refits them on the main row set under four fold
+  2024-08-12 under three designs, and the second refits them on the main row set under four fold
   designs. Each has its own `.fingerprint` file, and `script_commit_extra_fits.txt` records the
   commit that fitted them. `losses.parquet` is not touched by them.
 - `report.md`: every table the docs page quotes, printed by the script and never transcribed.

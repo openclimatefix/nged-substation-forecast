@@ -329,8 +329,16 @@ nor overwritten. Two corrections to this file come first.
    layout to reproduce its +0.170 and the second has to be the page's design. Their uncovered counts
    are printed and the page states them. The extra era cut at IFS 50r1 keeps its offset map
    `{0: 0, 1: 0, 2: 2, 3: 4}`, which gives 0 uncovered cells (a search over era 3's offset finds 0
-   and 4 both do), so its folds and numbers do not move. Both refits (`losses_long_rows.*` and
-   `losses_fold_designs.*`) are moved to `superseded/` and refitted.
+   and 4 both do), so its folds and numbers do not move.
+
+   **A third long-row design isolates the coverage defect from the IFS 49r1 cut.** The horizons
+   design (two UKV eras, no cut at 49r1) leaves 6 cells uncovered, and the extra-cut design leaves
+   0, so a difference between them mixes the 49r1 cut with that defect. The third design uses the
+   horizons design's two eras with era 1's fold numbers rotated by 2, which leaves 0 uncovered
+   cells (rotations of 2, 3 and 4 all do; 2 is the smallest). Comparing it with the horizons
+   design isolates the coverage defect, and comparing it with the extra-cut design isolates the
+   49r1 cut. Both refits (`losses_long_rows.*` and `losses_fold_designs.*`) are moved to
+   `superseded/` and refitted.
 3. **More rows in the split and period tables.** The lead and time-of-day split adds `ukv_wind −
    era5_wind`, `hres_wind − era5_wind` and `hres_wind − ukv_wind`, because ERA5 is an analysis with
    no lead, so its gap to UKV between the halves shows how much of the change is time of day. The
