@@ -25,6 +25,7 @@ Run it with `uv run python studies/beam_diffuse_split/station_wind_arms_charts.p
 
 import argparse
 import logging
+import math
 import re
 import sys
 from collections.abc import Mapping
@@ -44,7 +45,6 @@ from studies.charts import (
     figure,
     interval_panel,
     leaderboard_panel,
-    ticks,
     wrapped,
 )
 from weather_product_charts import ASSETS_DIR, CAPACITY, LEADERBOARD_X_TITLE, X_TITLE
@@ -58,8 +58,8 @@ SETTINGS: Final[tuple[str, str]] = ("pooled", "sensitivity")
 """The two hyperparameter settings, as `intervals.parquet` names them."""
 
 SETTING_CONDITIONS: Final[tuple[str, str]] = (
-    "Main XGBoost settings",
-    "Shallower XGBoost settings (a check)",
+    "Main XGBoost setting",
+    "Second XGBoost setting (shallower trees; a check)",
 )
 """The key text of each setting, in the order of `SETTINGS`."""
 
@@ -79,14 +79,14 @@ FIGURE_BY_FARM: Final[int] = 23
 
 LEADERBOARD_ARMS: Final[Mapping[str, str]] = {
     "station_wind": "Nearest station",
-    "era5_10m_wind": "ERA5 10 m",
+    "era5_10m_wind": "ERA5 10\u00a0m",
     "era5_wind": "ERA5",
     "ukv_wind": "UKV",
     "icon_d2_wind": "ICON-D2",
     "icon_eu_wind": "ICON-EU",
     "icon_global_wind": "ICON global",
     "ukv_station_wind": "UKV + nearest station",
-    "ukv_padded_wind": "UKV + its own 80 m wind",
+    "ukv_padded_wind": "UKV + its own 80\u00a0m wind",
     "station_k3_wind": "Mean of 3 nearest stations",
     "ukv_icon_d2_wind": "UKV + ICON-D2",
 }
@@ -94,15 +94,15 @@ LEADERBOARD_ARMS: Final[Mapping[str, str]] = {
 
 CONTRAST_NAMES: Final[Mapping[str, str]] = {
     "station_wind": "Nearest station",
-    "era5_10m_wind": "ERA5 10 m",
+    "era5_10m_wind": "ERA5 10\u00a0m",
     "era5_wind": "ERA5",
     "ukv_wind": "UKV",
     "station_k3_wind": "Mean of 3 stations",
     "ukv_station_wind": "UKV + station",
-    "ukv_padded_wind": "UKV + its own 80 m wind",
+    "ukv_padded_wind": "UKV + its own 80\u00a0m wind",
     "ukv_icon_d2_wind": "UKV + ICON-D2",
     "station_speed_only": "Station speed alone",
-    "era5_10m_speed_only": "ERA5 10 m speed alone",
+    "era5_10m_speed_only": "ERA5 10\u00a0m speed alone",
 }
 """How a contrast row names each arm."""
 
@@ -276,6 +276,13 @@ def _round_half_up(*, value: float, places: int = 2) -> str:
     return str(Decimal(repr(abs(value))).quantize(step, rounding=ROUND_HALF_UP))
 
 
+def _signed_round_half_up(*, value: float, places: int = 2) -> str:
+    """Return `value` with its sign, rounded half up once from its full precision."""
+    step = Decimal(1).scaleb(-places)
+    rounded = Decimal(repr(abs(value))).quantize(step, rounding=ROUND_HALF_UP)
+    return f"{'-' if value < 0 else '+'}{rounded}"
+
+
 def _load() -> Source:
     """Read the saved results.
 
@@ -327,9 +334,21 @@ def _mark(*, label: str, row: dict[str, Any], condition: str, planned: bool) -> 
     }
 
 
+def _bracketed(*, name: str) -> str:
+    """Return an arm's name in brackets when the name holds a plus, so a difference reads clearly.
+
+    Args:
+        name: An arm's name as `CONTRAST_NAMES` gives it.
+
+    Returns:
+        The name, in brackets where it names two sources added together.
+    """
+    return f"({name})" if " + " in name else name
+
+
 def _contrast_label(*, first: str, second: str, prefix: str = "") -> str:
     """Return a contrast row's label, such as `S1: Nearest station − ERA5 10 m`."""
-    text = f"{CONTRAST_NAMES[first]} − {CONTRAST_NAMES[second]}"
+    text = f"{_bracketed(name=CONTRAST_NAMES[first])} − {_bracketed(name=CONTRAST_NAMES[second])}"
     return f"{prefix}: {text}" if prefix else text
 
 
@@ -473,8 +492,9 @@ def _headline(
         msg = f"the title says S1 is positive and S2 negative, but S1 is {s1} and S2 is {s2}"
         raise ValueError(msg)
     title = (
-        f"The nearest weather station trails ERA5's 10 m wind by {_round_half_up(value=s1)} "
-        f"points, and adding it to UKV lowers UKV's error by {_round_half_up(value=s2)}"
+        f"The nearest weather station trails ERA5's 10\u00a0m wind by {_round_half_up(value=s1)} "
+        f"points, and adding it to UKV lowers UKV's error by {_round_half_up(value=s2)} points "
+        "against a control with as many columns"
     )
     return (
         figure(
@@ -490,9 +510,11 @@ def _headline(
                     "error minus the second's."
                 ),
                 (
-                    "Each planned pair carries the same number of wind columns. S1 compares one "
-                    "10 m weather station with ERA5's 10 m wind. S2 compares UKV plus the station "
-                    "with UKV plus three of its own extra columns."
+                    "S1 and S2 were named in this section's plan before any station arm was "
+                    "fitted, after the five gridded products had been scored. Each planned pair "
+                    "carries the same number of wind columns. S1 compares one 10\u00a0m weather "
+                    "station with ERA5's 10\u00a0m wind. S2 compares UKV plus the station with "
+                    "UKV plus three of its own extra columns."
                 ),
                 f"{DOTS} {CAPACITY}",
                 scope,
@@ -530,7 +552,7 @@ def _season_rows(*, source: Source, first: str, second: str) -> pl.DataFrame:
                     label=(
                         label
                         if section == "calendar_balanced"
-                        else f"{label} ({row['n_months']} months, {row['n_rows']:,} rows)"
+                        else f"{label} ({row['n_months']} months, {row['n_rows']:,} farm-hours)"
                     ),
                     row=row,
                     condition=condition,
@@ -626,11 +648,18 @@ def _month_panel(*, months: pl.DataFrame, contrast: str, title: str) -> alt.Laye
         ),
         axis=alt.Axis(labelAngle=0, grid=False),
     )
+    whole_numbers = [
+        float(tick)
+        for tick in range(math.ceil(y_scale.domain[0]), math.floor(y_scale.domain[1]) + 1)
+    ]
     y = alt.Y(
         "difference:Q",
         scale=y_scale,
-        title="Mean difference (points of capacity)",
-        axis=alt.Axis(values=ticks(x_domain=(y_scale.domain[0], y_scale.domain[1])), format=".2~f"),
+        title=wrapped(
+            text="Mean difference (points of capacity; below zero: first-named arm better)",
+            width=60,
+        ),
+        axis=alt.Axis(values=whole_numbers, format=".0f"),
     )
     rule = (
         alt.Chart(pl.DataFrame({"zero": [0.0]}))
@@ -690,7 +719,8 @@ def _season(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
             conditions=SETTING_CONDITIONS,
             condition_title="XGBoost settings",
             panel_title=(
-                f"{name}, by season: {CONTRAST_NAMES[first]} minus {CONTRAST_NAMES[second]}"
+                f"{name}, by season: {_bracketed(name=CONTRAST_NAMES[first])} minus "
+                f"{_bracketed(name=CONTRAST_NAMES[second])}"
             ),
             figure_planning="mixed",
         )
@@ -702,12 +732,37 @@ def _season(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
                 title=f"{name}, by calendar month: mean difference over the month's rows",
             ),
         ]
-    if not (january > 0.0 and august > 0.0):
-        msg = f"the title says S1 is positive in both halves of the year: {january}, {august}"
+    second_january = source.row(
+        section="january_to_july",
+        scope="Jan-Jul",
+        treatment=PLANNED_CONTRASTS[0][1],
+        reference=PLANNED_CONTRASTS[0][2],
+        setting=SETTINGS[1],
+    )
+    main_january = source.row(
+        section="january_to_july",
+        scope="Jan-Jul",
+        treatment=PLANNED_CONTRASTS[0][1],
+        reference=PLANNED_CONTRASTS[0][2],
+    )
+    if not (
+        january > 0.0
+        and august > 0.0
+        and august > january
+        and main_january["lower"] > 0.0
+        and second_january["lower"] < 0.0
+    ):
+        msg = (
+            "the title says S1 is larger in August to December than in January to July, "
+            "significant in January to July at the main setting only: "
+            f"{january}, {august}, {main_january['lower']}, {second_january['lower']}"
+        )
         raise ValueError(msg)
     title = (
-        f"The nearest station trails ERA5's 10 m wind by {_round_half_up(value=january)} points "
-        f"in January to July but by {_round_half_up(value=august)} in August to December"
+        f"In exploratory splits, the nearest station trails ERA5's 10\u00a0m wind by "
+        f"{_round_half_up(value=august)} points in August to December, and by less in January to "
+        f"July ({_round_half_up(value=january)} points at the main XGBoost setting, and not "
+        "statistically significant at the 5% level at the second)"
     )
     return (
         figure(
@@ -717,6 +772,8 @@ def _season(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
             title=title,
             subtitle=[
                 (
+                    "Every row except the all-months row is exploratory, and the season split is "
+                    "confounded with which calendar months the models trained on. "
                     "First-named arm's mean absolute error minus the second's. The season rows "
                     "re-score the models fitted on every month."
                 ),
@@ -778,19 +835,31 @@ def _by_farm(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
             conditions=SETTING_CONDITIONS,
             condition_title="XGBoost settings",
             panel_title=(
-                f"{name}, at each farm: {CONTRAST_NAMES[first]} minus {CONTRAST_NAMES[second]}"
+                f"{name}, at each farm: {_bracketed(name=CONTRAST_NAMES[first])} minus "
+                f"{_bracketed(name=CONTRAST_NAMES[second])}"
             ),
             figure_planning="exploratory",
         )
         panels.append(panel if index == 0 else _without_key(panel=panel))
-    if any(len(values) != 1 for values in counts.values()):
-        msg = f"the count of significant farms differs between settings: {counts}"
+    if len(counts["S2"]) != 1 or next(iter(counts["S2"])) != len(SITES):
+        msg = f"the title says S2 is significant at every farm at both settings: {counts['S2']}"
         raise ValueError(msg)
-    words = {0: "none", 1: "one", 2: "two", 3: "all three"}
-    s1, s2 = (words[next(iter(counts[name]))] for name in ("S1", "S2"))
+    gaps = {
+        setting: source.row(
+            section="between_farm",
+            scope="W1 - W3",
+            treatment=PLANNED_CONTRASTS[0][1],
+            reference=PLANNED_CONTRASTS[0][2],
+            setting=setting,
+        )
+        for setting in SETTINGS
+    }
+    if any(row["lower"] <= 0.0 for row in gaps.values()):
+        msg = f"the title says S1 is larger at W1 than at W3 at both settings: {gaps}"
+        raise ValueError(msg)
     title = (
-        "The nearest station trails ERA5's 10 m wind by a statistically significant margin at "
-        f"{s1} of the three farms, and adding it to UKV lowers UKV's error at {s2}"
+        "The nearest station's deficit against ERA5's 10\u00a0m wind is larger at W1 than at W3, "
+        "and adding it to UKV lowers UKV's error at all three farms"
     )
     return (
         figure(
@@ -803,6 +872,14 @@ def _by_farm(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
                     "First-named arm's mean absolute error minus the second's, at each farm. "
                     "Statistically significant at the 5% level means the 95% interval lies "
                     "wholly on one side of zero."
+                ),
+                (
+                    "S1 at W1 minus S1 at W3, exploratory: "
+                    f"{_signed_round_half_up(value=gaps[SETTINGS[0]]['value'])} points "
+                    f"[{_signed_round_half_up(value=gaps[SETTINGS[0]]['lower'])}, "
+                    f"{_signed_round_half_up(value=gaps[SETTINGS[0]]['upper'])}] at the main "
+                    "setting. Where one farm's interval excludes zero and another's does not, the "
+                    "farms are not shown to differ; the direct comparison is this one."
                 ),
                 "Each farm's interval resamples whole calendar months and a fitting seed.",
                 f"{DOTS} {CAPACITY}",
