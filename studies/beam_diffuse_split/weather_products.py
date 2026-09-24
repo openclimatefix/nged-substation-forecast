@@ -48,7 +48,7 @@ record shortens the whole panel rather than giving that product easier or harder
   `published` panel runs. The panel spans Open-Meteo's change of UKV source on 12 August 2024 and
   treats it as the first round did, with the `ukv_live` scope.
 - `all`: all twelve products, adding the four fetched per site from Open-Meteo (ECMWF-IFS-HRES,
-  ARPEGE Europe, and the two HARMONIE-AROME models), from September 2024.
+  ARPEGE Europe, and the two HARMONIE-AROME models), from November 2024.
 - `record`: the four products with records from 2021, which is SARAH-3's start: ERA5, CAMS,
   SARAH-3 and ICON-DREAM-EU. It exists for the year-by-year table of ERA5's error against every
   other product, which every panel prints for its own years.
@@ -93,6 +93,7 @@ from run_experiment import (
     run_all,
 )
 from sources import (
+    IFS_OPEN_DATA_CUTOVER,
     OPEN_METEO_MODELS,
     STUDY_DATA_DIR,
     UNSCORED_EXTRACTED_SPLITS,
@@ -181,25 +182,36 @@ RUN_INTERVAL_HOURS: Final[dict[str, int]] = {
     "icon_eu": 3,
     "icon_global": 6,
     "icon_dream": 3,
+    "arpege": 6,
 }
-"""The run cadence of each ICON product, which fixes its served lead at each label hour.
+"""The run cadence of each product with one interval for its whole record.
 
-The evidence for the mapping is on the write-up page.
+The evidence for the ICON products is on the write-up page. `arpege` (Météo-France's ARPEGE Europe)
+is added from `check_new_products.py`'s night-jump table (`UPDATE_OUTPUT_DIR / "product_checks.md"`,
+"Mean absolute second difference of 2 m temperature into each UTC hour"), which reads a single-site
+hourly temperature fetch rather than the daytime-only radiation used for the ICON products: ARPEGE's
+values peak clearly at 00, 06, 12 and 18 UTC, against a flat baseline between them, matching its
+publicly documented four-times-daily cycle.
 
-**No entry is added for the four products the `all` panel adds.** `check_new_products.py`'s
-run-switch table (`UPDATE_OUTPUT_DIR / "product_checks.md"`, "Mean change in clearness index into
-each UTC hour") is the only evidence available -- none of the four has a documented run cadence in
-its own README or in `sources.OPEN_METEO_MODELS`. Read over the daytime hours the table covers
-(08-18 UTC), it does not pin a cadence for any of the four: `ecmwf-ifs-hres` shows one clean spike
-at 13:00 UTC (1.23, against a 0.93-1.03 baseline), which is consistent with a run every 6 hours
-(00, 06, 12, 18 UTC) but equally consistent with a run every 12 hours -- a daytime-only window
-cannot tell the two apart, because both predict a spike only at 13:00 within 08-18. The other three
-show no single hour standing out from noise: `arpege-europe` swings between 0.83 and 1.22 with no
-isolated peak, and `dmi-harmonie-arome` and `knmi-harmonie-arome` both show a broad rise across
-15-18 UTC rather than a one-hour spike, consistent with a short (1-3 hour) run interval too frequent
-for this table to resolve. Guessing an interval for `NEW_PLANNED_CONTRASTS["all"]`'s equal-lead
-rows is worse than leaving them unsplit, so `_matched_lead_lines` reports all three of that panel's
-contrasts as waiting on a measured run interval.
+**`ecmwf-ifs-hres` (IFS-HRES) is not in this dict because its cadence changes mid-record** --
+see `IFS_HRES_RUN_INTERVAL_HOURS` and `_served_lead`. **`dmi_harmonie` and `knmi_harmonie` stay
+unset.** The same night-jump table shows no single hour standing out from a flat baseline for
+either, consistent with a run interval too short (an hour or a few) for this table, which only
+resolves a switch at least a few hours apart, to read off cleanly. Guessing an interval for either
+is worse than leaving it unsplit, so `_matched_lead_lines` reports the `dmi_harmonie` and
+`knmi_harmonie` planned contrasts as waiting on a measured run interval.
+"""
+
+IFS_HRES_RUN_INTERVAL_HOURS: Final[tuple[int, int]] = (12, 6)
+"""IFS-HRES's run cadence before, and on or after, `sources.IFS_OPEN_DATA_CUTOVER`.
+
+Read from `check_new_products.py`'s night-jump table, which shows IFS-HRES's temperature peaking
+at 01:00 and 13:00 UTC before the cutover -- 12 hours apart, one hour after each of the two runs a
+day (00 and 12 UTC) the historical-forecast archive served with roughly a two-hour delay -- and at
+00:00, 06:00, 12:00 and 18:00 UTC from the cutover, matching the four-times-daily cycle of the
+native open-data feed it switched to. `_served_lead` reads this pair through
+`IFS_OPEN_DATA_CUTOVER` rather than through `RUN_INTERVAL_HOURS`, because that dict holds one
+interval per product for its whole record.
 """
 
 SARAH_SATELLITE_ERAS: Final[tuple[tuple[str, datetime, datetime], ...]] = (
@@ -389,7 +401,7 @@ PANELS: Final[dict[PanelType, Panel]] = {
         output_dir=UPDATE_OUTPUT_DIR / "solar_all",
         full_analysis=False,
         planned=NEW_PLANNED_CONTRASTS["all"],
-        first_time=datetime(2024, 9, 1, tzinfo=UTC),
+        first_time=datetime(2024, 11, 1, tzinfo=UTC),
     ),
     "record": Panel(
         products=("era5", "cams", "sarah3", "icon_dream"),
@@ -401,10 +413,14 @@ PANELS: Final[dict[PanelType, Panel]] = {
 """Every panel. The `published` panel's directory is the first round's; every other panel's sits
 under `sources.UPDATE_OUTPUT_DIR`.
 
-The `all` panel starts on 1 September 2024 rather than when HARMONIE-AROME's archive does, in July
-2024, because Open-Meteo's UKV before 12 August 2024 is a backfill from a source it does not name:
-a change of source is an era boundary, and a panel of 26 months has no room to cut folds on both
-sides of one. The first whole month after the change is the start.
+The `all` panel starts on 1 November 2024 rather than when HARMONIE-AROME's archive does, in July
+2024, because two changes of source sit in between, each an era boundary a panel this short has no
+room to cut folds on both sides of. Open-Meteo's UKV before 12 August 2024 is a backfill from a
+source it does not name. Météo-France's cycle 48t1, on 15 October 2024, replaced ARPEGE's
+radiation scheme with an ecRad-derived one; ARPEGE's irradiance steps at that date against
+ECMWF-IFS-HRES, [Météo-France's own report of the
+change](https://www.umr-cnrm.fr/old/IMG/pdf/r_r_2024-gb_web_2.pdf). The first whole month after
+the later of the two changes is the start.
 """
 
 DEFAULT_PANELS: Final[tuple[PanelType, ...]] = ("long", "all", "record")
@@ -1245,6 +1261,19 @@ def _contrast_line(*, losses: pl.DataFrame, treatment: str, reference: str, labe
     )
 
 
+def _measured_run_interval(*, product: str) -> bool:
+    """Return whether a product's run cadence is known well enough to split a lead table by it.
+
+    Args:
+        product: An arm prefix, as `_served_lead` takes.
+
+    Returns:
+        `True` for a key of `RUN_INTERVAL_HOURS`, or for `ifs_hres`, whose cadence is measured but
+        changes mid-record (`IFS_HRES_RUN_INTERVAL_HOURS`) rather than living in that flat dict.
+    """
+    return product in RUN_INTERVAL_HOURS or product == "ifs_hres"
+
+
 def _served_lead(*, product: str) -> pl.Expr:
     """Return the served lead in hours of a product's value at each row's label hour.
 
@@ -1253,20 +1282,29 @@ def _served_lead(*, product: str) -> pl.Expr:
     run: 1, 2 or 3 hours for a 3-hourly model, 1 to 6 for a 6-hourly one.
 
     Args:
-        product: A key of `RUN_INTERVAL_HOURS`.
+        product: A key of `RUN_INTERVAL_HOURS`, or `ifs_hres`.
 
     Returns:
         The lead, as an integer expression.
     """
     hour = pl.col("time").dt.hour().cast(pl.Int32)
-    return ((hour - 1) % RUN_INTERVAL_HOURS[product]) + 1
+    if product == "ifs_hres":
+        before, after = IFS_HRES_RUN_INTERVAL_HOURS
+        interval = (
+            pl.when(pl.col("time") < IFS_OPEN_DATA_CUTOVER)
+            .then(pl.lit(before))
+            .otherwise(pl.lit(after))
+        )
+    else:
+        interval = pl.lit(RUN_INTERVAL_HOURS[product])
+    return ((hour - 1) % interval) + 1
 
 
 def _matched_lead_lines(*, panel: Panel, losses: pl.DataFrame) -> list[str]:
     """Split each planned contrast by whether its two products sit at the same served lead.
 
-    Only a contrast whose two products both have an entry in `RUN_INTERVAL_HOURS` can be split;
-    the others are listed as waiting for a measured run interval.
+    Only a contrast whose two products both have a measured run interval can be split (see
+    `_measured_run_interval`); the others are listed as waiting for one.
 
     Args:
         panel: The panel reported.
@@ -1282,7 +1320,7 @@ def _matched_lead_lines(*, panel: Panel, losses: pl.DataFrame) -> list[str]:
     waiting: list[str] = []
     for treatment, reference in panel.planned:
         products = [arm.removesuffix("_global") for arm in (treatment, reference)]
-        if not all(product in RUN_INTERVAL_HOURS for product in products):
+        if not all(_measured_run_interval(product=product) for product in products):
             waiting.append(f"{treatment} − {reference}")
             continue
         treatment_lead, reference_lead = (_served_lead(product=product) for product in products)
@@ -1305,7 +1343,7 @@ def _matched_lead_lines(*, panel: Panel, losses: pl.DataFrame) -> list[str]:
         lines += [
             "",
             (
-                "Not split, because a product has no entry in RUN_INTERVAL_HOURS (a retrieval, a "
+                "Not split, because a product has no measured run interval (a retrieval, a "
                 "reanalysis, UKV's analysis, or a run interval not yet measured): "
                 f"{', '.join(waiting)}."
             ),

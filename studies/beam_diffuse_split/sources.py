@@ -11,6 +11,7 @@ scripts before its results are charted. The download and the dataset build need 
 """
 
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, Literal, NamedTuple
 
@@ -392,6 +393,36 @@ def point_output_path_for(*, source: SourceType) -> Path:
         The parquet path holding that source's per-site fluxes.
     """
     return WEATHER_DATA_DIR / source.upper() / f"beam_diffuse_{source}.parquet"
+
+
+def temperature_site_b_path_for(*, source: SourceType) -> Path:
+    """Return where one model's single-site 2 m temperature fetch is written.
+
+    A throwaway download, one site (B) only, for `check_new_products.py`'s night-jump table:
+    `time` and `temperature_2m`, hourly. Temperature rather than radiation, because it is served
+    around the clock, so a night-time reading isolates a run switch from the diurnal solar cycle
+    that swamps the same measure on radiation.
+
+    Args:
+        source: Which model's download to locate.
+
+    Returns:
+        The parquet path holding that model's single-site hourly temperature.
+    """
+    return WEATHER_DATA_DIR / source.upper() / "temperature_2m_site_b.parquet"
+
+
+IFS_OPEN_DATA_CUTOVER: Final[datetime] = datetime(2025, 10, 1, tzinfo=UTC)
+"""When Open-Meteo's historical-forecast archive switched ECMWF-IFS-HRES to ECMWF's own open-data
+catalogue.
+
+Before this date the archive served IFS-HRES with roughly a two-hour publication delay; from this
+date it serves the native 9 km O1280 HRES hourly to 90 hours with no such delay, following
+[ECMWF's real-time catalogue opening on 2025-10-01](https://openmeteo.substack.com/p/ecmwf-transitions-to-open-data).
+`check_new_products.py`'s night-jump table measures IFS-HRES's run cadence on both sides of this
+date separately, because the switch to a faster catalogue is expected to change how often a new
+run appears in the archive as well as how quickly.
+"""
 
 
 HISTORICAL_FORECAST_URL: Final[str] = "https://historical-forecast-api.open-meteo.com/v1/forecast"
