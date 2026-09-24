@@ -17,9 +17,17 @@ wind, the same power hour (centred on the label, since wind is instantaneous), t
 zero-half-hour and post-upgrade-tail drops — inner-joined to ICON-DREAM-EU's own columns, at each
 generator's nearest cell. **Every arm below, including the five original products, is refit on this
 row set**: it differs from `wind_products.py`'s own row set because it stops where ICON-DREAM-EU's
-record does (August 2026, a month short of the other five products'), so a saved loss from
-`wind_products.py`'s run cannot be reused without silently comparing two different row sets. The
-folds, eras, seeds, `SHARED_FEATURES` and hyperparameter settings are exactly `wind_products.py`'s.
+record does (31 August 2026, 10 days short of the other five products' 10 September 2026 end), so a
+saved loss from `wind_products.py`'s run cannot be reused without silently comparing two different
+row sets. The folds, eras, seeds, `SHARED_FEATURES` and hyperparameter settings are exactly
+`wind_products.py`'s.
+
+**Served lead.** ICON-DREAM-EU is not an hourly analysis: DWD assembles its hourly series from short
+forecast steps run every 3 hours, so a served hour is a 1, 2 or 3 hour forecast, never a T+0 value.
+`STEP_HOURS` and the pre-fit padding-hour evidence below establish which step each hour is. At every
+third hour (`h % 3 == 0`, the hour ICON-EU itself is served as a T+0 analysis), ICON-DREAM-EU's
+served value is the *longest*-lead step, 3 hours, because DWD's short forecasts start from the
+*previous* 3-hourly run.
 
 **Primary arm — `icon_dream_eu_wind`, the same four columns every product gets in the wind study**
 (`_wind_columns` from `wind_products.py`): ICON-DREAM-EU's level-72 speed (about 96 m — DWD's own
@@ -32,7 +40,10 @@ interpolation of it.
 **Planned contrasts, at both hyperparameter settings — the only ones a recommendation may rest on:**
 
 - `icon_dream_eu_wind − era5_wind`: the two reanalyses.
-- `icon_dream_eu_wind − icon_eu_wind`: the reanalysis against the operational model it is built on.
+- `icon_dream_eu_wind − icon_eu_wind`: the reanalysis against ICON-EU, DWD's operational ICON model
+  over Europe at the same 6.5 km grid spacing. ICON-DREAM-EU does not use ICON-EU's output; it is
+  DWD's own reanalysis run of ICON, with its own data assimilation, nested inside a 13 km global
+  run.
 
 **Exploratory arms and contrasts, each labelled so in the report:**
 
@@ -182,8 +193,9 @@ DECIDING_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
 )
 """The two contrasts the recommendations rest on, named before the run.
 
-Whether the reanalysis beats ERA5, the other reanalysis; and whether it beats the operational model
-it is built on. Every other contrast in the report is exploratory.
+Whether the reanalysis beats ERA5, the other reanalysis; and whether it beats ICON-EU, DWD's
+operational ICON model over Europe at the same 6.5 km grid spacing. Every other contrast in the
+report is exploratory.
 """
 
 EXPLORATORY_PRODUCT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
@@ -199,6 +211,18 @@ LEVELS_CONTRAST: Final[tuple[str, str]] = (f"{PRODUCT}_levels", f"{PRODUCT}_wind
 `{PRODUCT}_levels` carries two more feature columns than `{PRODUCT}_wind`; read this contrast with
 the column-count caveat in this module's docstring and the `study` skill.
 """
+
+LEVELS_VS_OTHERS_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    (f"{PRODUCT}_levels", "era5_wind"),
+    (f"{PRODUCT}_levels", "icon_eu_wind"),
+)
+"""Whether the three-level shear arm settles the height question, against ERA5 and ICON-EU,
+exploratory. Added after the first run, so a reviewer can check whether a different ICON-DREAM-EU
+height would change either planned answer."""
+
+STEP_HOURS: Final[tuple[int, ...]] = (1, 2, 3)
+"""ICON-DREAM-EU's served lead in hours: `h % 3 == 0` is step 3, `h % 3 == 1` is step 1, `h % 3 ==
+2` is step 2 -- see this module's docstring, "Served lead"."""
 
 SPEED_ONLY_CONTRASTS: Final[tuple[tuple[str, str], ...]] = tuple(
     (f"{product}_wind", f"{product}_speed_only") for product in PRODUCTS
@@ -571,6 +595,46 @@ def check_direction_against_era5(*, sites: pl.DataFrame) -> dict[str, float]:
     return results
 
 
+OTHER_DIRECTION_PRODUCTS: Final[dict[str, str]] = {
+    "ukv": "wind_direction_100m",
+    "icon_eu": "wind_direction_80m",
+    "icon_d2": "wind_direction_80m",
+}
+"""Each already-scored product's own served direction column, keyed for
+`other_products_direction_vs_era5`."""
+
+
+def other_products_direction_vs_era5(*, frame: pl.DataFrame) -> dict[str, float]:
+    """Return UKV's, ICON-EU's and ICON-D2's mean absolute direction disagreement with ERA5.
+
+    Same method as `check_direction_against_era5`, over exactly `frame`'s row set, so
+    ICON-DREAM-EU's own direction disagreement can be read against a same-method baseline from
+    three products already trusted, rather than judged on its own as "expected" with no comparison.
+
+    Args:
+        frame: The common row set (`icon_dream_common_rows`'s result), for `site` and `time`.
+
+    Returns:
+        One mean absolute angle difference in degrees, keyed by `OTHER_DIRECTION_PRODUCTS`.
+    """
+    rows = frame.select("site", "time")
+    era5 = pl.read_parquet(output_path_for(product="era5")).select(
+        "site", "time", era5_direction=pl.col("wind_direction_100m")
+    )
+    results: dict[str, float] = {}
+    for product, column in OTHER_DIRECTION_PRODUCTS.items():
+        other = pl.read_parquet(output_path_for(product=product)).select(
+            "site", "time", other_direction=pl.col(column)
+        )
+        joined_frame = rows.join(other, on=["site", "time"], how="inner").join(
+            era5, on=["site", "time"], how="inner"
+        )
+        results[product] = mean_absolute_angle_difference_deg(
+            a_deg=joined_frame["other_direction"], b_deg=joined_frame["era5_direction"]
+        )
+    return results
+
+
 OFFSET_SCAN_HOURS: Final[tuple[int, ...]] = (-2, -1, 0, 1, 2)
 """The offsets `check_timestamp_offset` scans, in hours."""
 
@@ -778,6 +842,78 @@ def _by_year_lines(*, losses: pl.DataFrame, treatment: str, reference: str) -> l
     return lines
 
 
+def _step_of_hour() -> pl.Expr:
+    """Return ICON-DREAM-EU's served lead in hours (a value in `STEP_HOURS`) for each row's `time`.
+
+    Returns:
+        `3` where `h % 3 == 0`, otherwise `h % 3`.
+    """
+    residue = pl.col("time").dt.hour() % 3
+    return pl.when(residue == 0).then(pl.lit(3)).otherwise(residue)
+
+
+def _by_step_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Report the two deciding contrasts split by ICON-DREAM-EU's served lead, exploratory.
+
+    Added after the first run, once the padding-hour evidence in this module's docstring's "Served
+    lead" section showed ICON-DREAM-EU's hourly value is a short forecast at every hour, never an
+    analysis.
+
+    Args:
+        losses: The pooled setting's losses, holding every arm.
+
+    Returns:
+        Markdown lines: one table per deciding contrast, one row per step.
+    """
+    lines = ["#### The two deciding contrasts, by ICON-DREAM-EU's served lead (exploratory)", ""]
+    for treatment, reference in DECIDING_CONTRASTS:
+        lines += [f"`{treatment} − {reference}`", "", *CONTRAST_HEADER]
+        lines += [
+            _contrast_line(
+                losses=losses.filter(_step_of_hour() == step),
+                treatment=treatment,
+                reference=reference,
+                label=f"step {step}",
+            )
+            for step in STEP_HOURS
+        ]
+        lines.append("")
+    return lines
+
+
+def _equal_lead_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Report the two deciding contrasts on equal-lead hours only, at both settings, exploratory.
+
+    ICON-EU is served at 0 to 2 hours; restricting to `h % 3 != 0` keeps the two hours in three
+    where ICON-DREAM-EU (1 to 3 hours) and ICON-EU sit at the same served lead, 1 or 2 hours.
+
+    Args:
+        losses: Every arm's losses, both settings.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        "#### The two deciding contrasts on equal-lead hours only (`h % 3 != 0`, exploratory)",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    equal_lead = losses.filter(pl.col("time").dt.hour() % 3 != 0)
+    settings: tuple[tuple[str, str], ...] = (
+        ("primary setting", "pooled"),
+        ("second setting", "sensitivity"),
+    )
+    for setting_label, setting in settings:
+        subset = equal_lead.filter(pl.col("setting") == setting)
+        lines += [
+            _contrast_line(
+                losses=subset, treatment=treatment, reference=reference, label=setting_label
+            )
+            for treatment, reference in DECIDING_CONTRASTS
+        ]
+    return lines
+
+
 class ChecksResult(TypedDict):
     """Every pre-fit check's raw result, computed once by `run_checks`.
 
@@ -788,6 +924,7 @@ class ChecksResult(TypedDict):
     hub_component_speed: dict[str, float]
     surface_component_speed: dict[str, float]
     direction_vs_era5: dict[str, float]
+    other_direction_vs_era5: dict[str, float]
     offset_correlations: dict[int, float]
     cell_distances: pl.DataFrame
 
@@ -806,11 +943,13 @@ def _nearest_cells(*, sites: pl.DataFrame) -> pl.DataFrame:
     return icon_dream_cells(sites=sites, cell_ids=cell_ids)
 
 
-def run_checks(*, sites: pl.DataFrame) -> ChecksResult:
+def run_checks(*, sites: pl.DataFrame, frame: pl.DataFrame) -> ChecksResult:
     """Run every pre-fit check once, before any arm is fitted.
 
     Args:
         sites: The wind roster.
+        frame: The common row set (`icon_dream_common_rows`'s result), for
+            `other_products_direction_vs_era5`'s same-method baseline.
 
     Returns:
         Every check's raw result.
@@ -819,6 +958,7 @@ def run_checks(*, sites: pl.DataFrame) -> ChecksResult:
         "hub_component_speed": check_component_speed(level=HUB_LEVEL),
         "surface_component_speed": check_component_speed_10m(),
         "direction_vs_era5": check_direction_against_era5(sites=sites),
+        "other_direction_vs_era5": other_products_direction_vs_era5(frame=frame),
         "offset_correlations": check_timestamp_offset(sites=sites),
         "cell_distances": _nearest_cells(sites=sites),
     }
@@ -871,6 +1011,7 @@ def _checks_lines(*, checks: ChecksResult) -> list[str]:
     hub = checks["hub_component_speed"]
     surface = checks["surface_component_speed"]
     direction = checks["direction_vs_era5"]
+    other_direction = checks["other_direction_vs_era5"]
     offsets = checks["offset_correlations"]
     lines = [
         "#### Checks run before any fit",
@@ -893,6 +1034,13 @@ def _checks_lines(*, checks: ChecksResult) -> list[str]:
             f"{direction[site]:.1f} degrees."
         )
         for site in sorted(direction)
+    ]
+    lines += [
+        (
+            f"- Direction vs ERA5 100 m, {product} (same-method baseline, not ICON-DREAM-EU): "
+            f"mean absolute angle difference {other_direction[product]:.1f} degrees."
+        )
+        for product in sorted(other_direction)
     ]
     lines += [
         "",
@@ -1030,10 +1178,17 @@ def _report(
         _contrast_line(losses=sensitivity, treatment=t, reference=r, label="all")
         for t, r in DECIDING_CONTRASTS
     ]
+    lines += ["", *_by_step_lines(losses=pooled)]
+    lines += ["", *_equal_lead_lines(losses=losses)]
     lines += ["", "#### Exploratory contrasts", "", *CONTRAST_HEADER]
     lines += [
         _contrast_line(losses=pooled, treatment=t, reference=r, label="all")
-        for t, r in (*EXPLORATORY_PRODUCT_CONTRASTS, LEVELS_CONTRAST, *SPEED_ONLY_CONTRASTS)
+        for t, r in (
+            *EXPLORATORY_PRODUCT_CONTRASTS,
+            LEVELS_CONTRAST,
+            *LEVELS_VS_OTHERS_CONTRASTS,
+            *SPEED_ONLY_CONTRASTS,
+        )
     ]
     lines.append("")
     for treatment, reference in DECIDING_CONTRASTS:
@@ -1068,7 +1223,7 @@ def main() -> int:
         frame["time"].max(),
     )
 
-    checks = run_checks(sites=sites)
+    checks = run_checks(sites=sites, frame=frame)
     _raise_on_failed_checks(checks=checks)
 
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
