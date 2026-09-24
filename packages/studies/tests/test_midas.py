@@ -153,21 +153,32 @@ def test_weather_refuses_a_duplicate_instant(tmp_path: Path):
 METADATA_CSV = """Conventions,G,BADC-CSV,1
 title,G,invented header text
 data
-src_id,station_name,station_file_name,station_latitude,station_longitude,station_elevation,extra
-00001,ALPHA,alpha,1.5,-2.5,10.0,x
-00002,BETA,beta,3.0,4.0,20.5,y
+src_id,station_name,station_file_name,station_latitude,station_longitude,station_elevation,first_year,last_year,extra
+00001,ALPHA,alpha,1.5,-2.5,10.0,1990,2025,x
+00002,BETA,beta,3.0,4.0,20.5,2001,2019,y
 end data
 """
 
 
-def test_the_metadata_reader_keeps_ids_and_coordinates_and_drops_the_name(tmp_path: Path):
+def test_the_metadata_reader_keeps_ids_coordinates_and_years_and_drops_the_name(tmp_path: Path):
     path = tmp_path / "metadata.csv"
     path.write_text(METADATA_CSV)
 
     stations = read_station_metadata(path=path)
 
-    assert stations.columns == ["src_id", "latitude", "longitude", "elevation_m"]
-    assert stations.rows() == [("00001", 1.5, -2.5, 10.0), ("00002", 3.0, 4.0, 20.5)]
+    assert stations.columns == [
+        "src_id",
+        "latitude",
+        "longitude",
+        "elevation_m",
+        "first_year",
+        "last_year",
+    ]
+    assert stations.rows() == [
+        ("00001", 1.5, -2.5, 10.0, 1990, 2025),
+        ("00002", 3.0, 4.0, 20.5, 2001, 2019),
+    ]
+    assert stations.schema["first_year"] == pl.Int64
 
 
 def test_the_metadata_reader_refuses_a_file_with_no_data_line(tmp_path: Path):

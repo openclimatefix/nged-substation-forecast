@@ -66,7 +66,7 @@ def main() -> int:
     report = (OUTPUT_DIR / "report.md").read_text()
     printed = {_normalise(text=token) for token in NUMBER.findall(report)}
     text = URL_OR_ANCHOR.sub(" ", "\n".join(added_lines(base=arguments.base)))
-    text = re.sub(r"Figures? \d+(?: to \d+)?", " ", text)
+    text = re.sub(r"Figures?\s+\d+(?:\s+to\s+\d+)?", " ", text)
     missing: dict[str, int] = {}
     checked = 0
     for token in NUMBER.findall(text):

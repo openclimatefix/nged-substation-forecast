@@ -292,7 +292,10 @@ def _leaderboard(
                 f"Every input scored on the same {_row_count(report=report):,} site-hours, "
                 "each through its own XGBoost model."
             ),
-            "The station rows also read the station's own air temperature.",
+            (
+                "The station rows also read the station's own air temperature. The top row is "
+                "CAMS with the station's irradiance added."
+            ),
             _one_station_line(report=report),
             DOTS,
             CAPACITY,
@@ -338,13 +341,16 @@ def _planned_contrasts(*, contrasts: pl.DataFrame, report: str) -> alt.VConcatCh
     return figure(
         panels=[panel],
         number=FIGURE_PLANNED,
-        figure_planning="planned",
+        figure_planning=None,
         title=(
             f"The nearest station trails CAMS by {against_cams:.3f} points, beats ERA5 by "
             f"{against_era5:.3f}, and lowers CAMS's error by {added:.3f}"
         ),
         subtitle=[
-            "Each contrast holds at the second hyperparameter setting.",
+            (
+                "All rows are planned: written into the study plan before any station model was "
+                "fitted. Each contrast holds at the second hyperparameter setting."
+            ),
             (
                 "The last row pairs CAMS and the station with CAMS and a shuffled copy of the "
                 "station's irradiance, which carries the same number of columns."
@@ -439,6 +445,14 @@ def _bound(*, contrasts: pl.DataFrame, keys: tuple[tuple[str, str], ...]) -> flo
         .row(0)
     ]
     return max(ends)
+
+
+def _difference(*, contrasts: pl.DataFrame, key: tuple[str, str]) -> float:
+    """Return one exploratory contrast's difference, in points of capacity."""
+    table = _contrast_rows(contrasts=contrasts, section=SECTION_EXPLORATORY)
+    treatment, reference = key
+    row = table.filter(pl.col("treatment") == treatment, pl.col("reference") == reference)
+    return float(row["difference"].item())
 
 
 def _exploratory(
@@ -593,6 +607,12 @@ def main() -> int:
     contrasts = report_contrasts(report_path=report_path)
     errors = report_errors(report_path=report_path, column="All sites")
     losses = all_losses.filter(pl.col("setting") == "pooled")
+    era5_gain = -_difference(contrasts=contrasts, key=("station_era5_xgb", "station_era5_control"))
+    cams_gain = -_difference(contrasts=contrasts, key=(BLEND_ARM, "cams_global"))
+    null_bound = max(
+        _bound(contrasts=contrasts, keys=PADDED_KEYS),
+        _bound(contrasts=contrasts, keys=TEMPERATURE_KEYS),
+    )
     charts = {
         "station_past_solar_leaderboard": _leaderboard(losses=losses, errors=errors, report=report),
         "station_past_solar_planned_contrasts": _planned_contrasts(
@@ -636,10 +656,9 @@ def main() -> int:
             ],
             number=FIGURE_CONTROLS,
             title=(
-                "A shuffled station column moves CAMS's and ERA5's errors by at most "
-                f"{_bound(contrasts=contrasts, keys=PADDED_KEYS):.3f} points, and swapping in the "
-                "station's own temperature by at most "
-                f"{_bound(contrasts=contrasts, keys=TEMPERATURE_KEYS):.3f}"
+                f"The real station column lowers ERA5's error by {era5_gain:.3f} points and "
+                f"CAMS's by {cams_gain:.3f}; a shuffled one, or the station's own temperature, "
+                f"moves no error by more than {null_bound:.3f}"
             ),
             subtitle=[
                 (

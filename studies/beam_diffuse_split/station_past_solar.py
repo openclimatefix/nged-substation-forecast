@@ -68,6 +68,7 @@ from studies.blending import climatology_permutation
 from studies.bootstrap import bootstrap_absolute
 from studies.charts import report_errors
 from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SEEDS, SENSITIVITY_HYPER_PARAMETERS
+from studies.grid_sampling import distance_matrix_km
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.midas import (
     null_night_spikes,
@@ -101,6 +102,9 @@ WEATHER_METADATA_PATH: Final[Path] = (
 )
 
 OUTPUT_DIR: Final[Path] = STUDY_DATA_DIR / "past_weather_v2" / "station_past_solar"
+
+ROW_SET_START_YEAR: Final[int] = 2022
+"""The calendar year of the row set's first hour, December 2022."""
 
 ROW_SET_END: Final[datetime] = datetime(2026, 1, 1, tzinfo=UTC)
 """The first instant after the station files' last hour (2025-12-31 23:00 UTC); rows end before."""
@@ -285,7 +289,12 @@ class Selection:
     """
 
     def __init__(
-        self, *, radiation: pl.DataFrame, temperature: pl.DataFrame, unusual_flags: pl.DataFrame
+        self,
+        *,
+        radiation: pl.DataFrame,
+        temperature: pl.DataFrame,
+        unusual_flags: pl.DataFrame,
+        undownloaded: tuple[int, float],
     ) -> None:
         """Hold the two choice frames and the hours with an unusual quality-control flag.
 
@@ -294,10 +303,13 @@ class Selection:
             temperature: The same for the air-temperature stations.
             unusual_flags: The `(site, time)` pairs where the nearest radiation station's flag
                 differs from `USUAL_FLAG`, a diagnostic and never a filter.
+            undownloaded: How many radiation stations the metadata file lists that were not
+                downloaded, and the smallest distance in km from any farm to any of them.
         """
         self.radiation = radiation
         self.temperature = temperature
         self.unusual_flags = unusual_flags
+        self.undownloaded = undownloaded
 
     def pooled_lines(self) -> list[str]:
         """Render the choices as pooled ranges and counts, never as a station-to-site mapping.
@@ -322,7 +334,14 @@ class Selection:
                     f"{ranked['distance_km'].max():{KM_FORMAT}} | {ranked['src_id'].n_unique()} | "
                     f"{ranked['coverage'].min():.4f} | {ranked['skipped_nearer'].max()} |"
                 )
+        count, nearest_km = self.undownloaded
         lines += [
+            "",
+            (
+                f"The radiation station-metadata file also lists {count} stations whose record "
+                "overlaps the row set's years and that were not downloaded. The nearest of them "
+                f"is {nearest_km:{KM_FORMAT}} km or more from every generator."
+            ),
             "",
             (
                 f"Stations across the {RANK_DEPTH} ranks: "
@@ -381,9 +400,17 @@ def _station_inputs(*, base: pl.DataFrame) -> tuple[pl.DataFrame, Selection, dic
 
     radiation_metadata = read_station_metadata(path=RADIATION_METADATA_PATH)
     raw = read_radiation(path=RADIATION_PATH)
+    listed = radiation_metadata
     radiation_metadata = radiation_metadata.filter(
         pl.col("src_id").is_in(raw["src_id"].unique().implode())
     )
+    others = listed.filter(
+        ~pl.col("src_id").is_in(raw["src_id"].unique().implode()),
+        pl.col("first_year") <= ROW_SET_END.year - 1,
+        pl.col("last_year") >= ROW_SET_START_YEAR,
+    )
+    other_distances = distance_matrix_km(sites=sites, cells=others)
+    undownloaded = (others.height, float(other_distances.min()))
     negative = int(
         (pl.read_parquet(RADIATION_PATH, columns=["glbl_irad_amt"])["glbl_irad_amt"] < 0.0).sum()
     )
@@ -442,7 +469,10 @@ def _station_inputs(*, base: pl.DataFrame) -> tuple[pl.DataFrame, Selection, dic
     )
     repairs = {"spike_hours": spikes, "clipped_negative_hours": negative}
     selection = Selection(
-        radiation=radiation_choice, temperature=temperature_choice, unusual_flags=unusual
+        radiation=radiation_choice,
+        temperature=temperature_choice,
+        unusual_flags=unusual,
+        undownloaded=undownloaded,
     )
     return both, selection, repairs
 
@@ -814,11 +844,17 @@ def _half_year_lines(*, pooled: pl.DataFrame) -> list[str]:
         "",
         *CONTRAST_HEADER,
     ]
-    for label, condition in (("April to September", summer), ("October to March", ~summer)):
+    halves = (("April to September", summer), ("October to March", ~summer))
+    for label, condition in halves:
         lines += [
             _contrast_line(losses=pooled.filter(condition), treatment=t, reference=r, label=label)
             for t, r in PLANNED_CONTRASTS
         ]
+    months = [pooled.filter(condition)["month"].n_unique() for _, condition in halves]
+    lines += [
+        "",
+        f"April to September holds {months[0]} calendar months and October to March {months[1]}.",
+    ]
     return lines
 
 
