@@ -69,8 +69,8 @@ NAMES: Final[dict[str, str]] = {
 """Every arm's public name, as the page writes it."""
 
 EXPLORATORY_NAMES: Final[dict[str, str]] = {
-    ERA5_3H_ARM: "ERA5 on ENS's 3-hourly steps",
-    CAMS_3H_ARM: "CAMS on ENS's 3-hourly steps",
+    ERA5_3H_ARM: "ERA5 averaged to 3-hour steps",
+    CAMS_3H_ARM: "CAMS averaged to 3-hour steps",
     ERA5_3X3_ARM: "ERA5 averaged over 3 by 3 cells",
 }
 """The public names of the exploratory arms, added to `NAMES` for the exploratory chart."""
@@ -152,7 +152,7 @@ def _ens_lead_range(*, report: str) -> str:
 
 
 def _leaderboard(
-    *, losses: pl.DataFrame, errors: dict[str, float], report: str
+    *, losses: pl.DataFrame, errors: dict[str, float], report: str, cams_gap: float
 ) -> alt.VConcatChart:
     """Draw the three headline arms' own mean absolute error, best first, with its 95% interval.
 
@@ -165,6 +165,7 @@ def _leaderboard(
         losses: Every arm's losses, at the `pooled` setting.
         errors: Each arm's pooled mean absolute error, read from the report's first table.
         report: The report's text, for the row count and ENS's leads.
+        cams_gap: ENS's planned contrast against CAMS, in points of capacity, for the title.
 
     Returns:
         The figure.
@@ -199,13 +200,13 @@ def _leaderboard(
         panels=[panel],
         number=FIGURE_LEADERBOARD,
         figure_planning=None,
-        title="ENS's own forecast trails CAMS by far, and beats ERA5",
+        title=f"ENS's own forecast trails CAMS by {cams_gap:.1f} points, and beats ERA5",
         subtitle=[
             f"All three products scored on the same {_row_count(report=report):,} site-hours.",
             (
                 f"ENS is a forecast {_ens_lead_range(report=report)} h ahead from a 00 UTC run; "
-                "ERA5's radiation is 1 to 12 h ahead; CAMS is a satellite retrieval with no "
-                "forecast step."
+                "ERA5's radiation is 1 to 12 h ahead; CAMS is a satellite retrieval whose "
+                "cloud information has no forecast step."
             ),
             DOTS,
             CAPACITY,
@@ -272,10 +273,13 @@ def _planned_contrasts(*, report_path: Path) -> alt.VConcatChart:
         figure_planning=None,
         title="ENS beats ERA5 but trails CAMS by more than three points",
         subtitle=[
-            "The two contrasts named in the plan before any result existed.",
             (
-                "ENS also differs from ERA5 and CAMS in lead, 3-hourly step width, spatial "
-                "support, and model version."
+                "Both contrasts were fixed before the first model was fitted, after ERA5 and CAMS "
+                "had been scored on the page's main rows."
+            ),
+            (
+                "ENS also differs from ERA5 and CAMS in lead, the 3-hourly steps of its open-data "
+                "subset, native and served resolution, and model version."
             ),
             f"{DOTS} {CAPACITY}",
             SCOPE,
@@ -338,10 +342,13 @@ def _exploratory_contrasts(*, report_path: Path) -> alt.VConcatChart:
         panels=[panel],
         number=FIGURE_EXPLORATORY,
         figure_planning="exploratory",
-        title="Averaging ERA5 and CAMS over ENS's 3-hourly steps narrows both of ENS's gaps",
+        title="Averaging ERA5 and CAMS over 3-hour steps narrows both of ENS's gaps",
         subtitle=[
-            "ERA5 and CAMS averaged over ENS's seven 3-hour steps and rebuilt to hourly values",
-            "by the code that rebuilds ENS's own hours; ERA5 also averaged over 3 by 3 cells.",
+            (
+                "ERA5 and CAMS averaged over the seven 3-hour steps of ENS's open-data subset, "
+                "then rebuilt to hourly values by the code that rebuilds ENS's own hours."
+            ),
+            "ERA5 also averaged over a 3 by 3 block of served 0.25° cells.",
             f"{DOTS} {CAPACITY}",
             SCOPE,
         ],
@@ -441,8 +448,20 @@ def main() -> int:
     errors = {arm: errors[arm] for arm in NAMES if arm in errors}
     losses = _losses(setting="pooled")
     _verify_numbers(report=report, losses=losses, sensitivity=_losses(setting="sensitivity"))
+    cams_gap = float(
+        report_contrasts(report_path=report_path)
+        .filter(
+            pl.col("section") == SECTION_DECIDING,
+            pl.col("scope") == "all",
+            pl.col("treatment") == MEAN_ARM,
+            pl.col("reference") == "cams_global",
+        )["difference"]
+        .item()
+    )
     charts = {
-        "ens_past_solar_leaderboard": _leaderboard(losses=losses, errors=errors, report=report),
+        "ens_past_solar_leaderboard": _leaderboard(
+            losses=losses, errors=errors, report=report, cams_gap=cams_gap
+        ),
         "ens_past_solar_planned_contrasts": _planned_contrasts(report_path=report_path),
         "ens_past_solar_exploratory_contrasts": _exploratory_contrasts(report_path=report_path),
     }
