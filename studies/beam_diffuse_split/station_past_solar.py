@@ -114,6 +114,13 @@ MIN_COVERAGE: Final[float] = 0.99
 RANK_DEPTH: Final[int] = 3
 """How many nearest stations of each kind are read: the nearest, the second and the third."""
 
+USUAL_FLAG: Final[int] = 6
+"""The quality-control flag value on 766,702 of the 772,093 radiation rows in the files.
+
+The flags are kept as delivered and never interpreted: no hour is dropped on its flag. The report
+counts the hours where the nearest station's flag differs from this value, as a diagnostic.
+"""
+
 STATION_PERMUTATION_SEED: Final[int] = 20260927
 """The seed of the permutation that builds the padded controls' station irradiance column."""
 
@@ -277,15 +284,20 @@ class Selection:
     logged or printed except through `pooled_lines`, which reports pooled ranges and counts.
     """
 
-    def __init__(self, *, radiation: pl.DataFrame, temperature: pl.DataFrame) -> None:
-        """Hold the two choice frames.
+    def __init__(
+        self, *, radiation: pl.DataFrame, temperature: pl.DataFrame, unusual_flags: pl.DataFrame
+    ) -> None:
+        """Hold the two choice frames and the hours with an unusual quality-control flag.
 
         Args:
             radiation: `select_nearest_stations`'s result for the radiation stations.
             temperature: The same for the air-temperature stations.
+            unusual_flags: The `(site, time)` pairs where the nearest radiation station's flag
+                differs from `USUAL_FLAG`, a diagnostic and never a filter.
         """
         self.radiation = radiation
         self.temperature = temperature
+        self.unusual_flags = unusual_flags
 
     def pooled_lines(self) -> list[str]:
         """Render the choices as pooled ranges and counts, never as a station-to-site mapping.
@@ -420,8 +432,19 @@ def _station_inputs(*, base: pl.DataFrame) -> tuple[pl.DataFrame, Selection, dic
             TEMPERATURE_MEAN
         ),
     )
+    flags = pl.read_parquet(RADIATION_PATH, columns=["src_id", "time", "glbl_irad_amt_q"])
+    nearest = radiation_choice.filter(pl.col("rank") == 1).select("site", "src_id")
+    unusual = (
+        required.join(nearest, on="site", how="inner")
+        .join(flags, on=["src_id", "time"], how="inner")
+        .filter(pl.col("glbl_irad_amt_q") != USUAL_FLAG)
+        .select("site", "time")
+    )
     repairs = {"spike_hours": spikes, "clipped_negative_hours": negative}
-    return both, Selection(radiation=radiation_choice, temperature=temperature_choice), repairs
+    selection = Selection(
+        radiation=radiation_choice, temperature=temperature_choice, unusual_flags=unusual
+    )
+    return both, selection, repairs
 
 
 def build_rows() -> tuple[pl.DataFrame, Selection, dict[str, int], int]:
@@ -453,26 +476,21 @@ def build_rows() -> tuple[pl.DataFrame, Selection, dict[str, int], int]:
         by=PERMUTATION_GROUPS,
         seed=STATION_PERMUTATION_SEED,
     )
-    station_columns = [
-        *(GHI.format(rank=r) for r in range(1, RANK_DEPTH + 1)),
-        *(TEMPERATURE.format(rank=r) for r in range(1, RANK_DEPTH + 1)),
-        GHI_MEAN,
-        TEMPERATURE_MEAN,
-        SHUFFLED,
-    ]
-    check_no_missing(frame=padded, columns=station_columns)
-    _LOG.info(
-        "%d rows in this section's own row set, from %d candidates", padded.height, base.height
+    rows = with_eras(frame=padded)
+    check_no_missing(
+        frame=rows, columns=[column for columns in _arm_features().values() for column in columns]
     )
-    return with_eras(frame=padded), selection, repairs, base.height
+    _LOG.info("%d rows in this section's own row set, from %d candidates", rows.height, base.height)
+    return rows, selection, repairs, base.height
 
 
 def _fingerprint(*, frame: pl.DataFrame, job_list: list[Job]) -> str:
     """Return a hash covering every row's values, every job's columns, and the seeds.
 
     `--report-only` refuses to reuse a saved `losses.parquet` when this does not match. Every float
-    column is cast to `Float32` before hashing, so floating-point noise in a rebuilt column cannot
-    flip the fingerprint; the saved `losses.parquet` keeps full precision.
+    column is cast to `Float32` before hashing, which makes a flip from floating-point noise in a
+    rebuilt column less likely, though not impossible; a flip only refuses `--report-only`. The
+    saved `losses.parquet` keeps full precision.
 
     Args:
         frame: The row set every job is fitted on.
@@ -749,6 +767,38 @@ def _shared_rows_lines(*, pooled: pl.DataFrame) -> list[str]:
     ]
 
 
+def _flag_lines(*, frame: pl.DataFrame, pooled: pl.DataFrame, selection: Selection) -> list[str]:
+    """Render the hours with an unusual quality-control flag, and the planned contrasts without.
+
+    Args:
+        frame: This section's row set.
+        pooled: Every arm's losses at the `pooled` setting.
+        selection: The in-memory station choice, whose `unusual_flags` names the hours.
+
+    Returns:
+        Markdown lines.
+    """
+    unusual = selection.unusual_flags.join(
+        frame.select("site", "time"), on=["site", "time"], how="inner"
+    )
+    kept = pooled.join(unusual, on=["site", "time"], how="anti")
+    return [
+        "#### The planned contrasts without the hours flagged unusually (exploratory, post hoc)",
+        "",
+        (
+            "The flags are kept as delivered and no hour is dropped on its flag. The nearest "
+            f"radiation station's flag differs from its usual value, {USUAL_FLAG}, at "
+            f"{unusual.height:,} of the {frame.height:,} site-hours."
+        ),
+        "",
+        *CONTRAST_HEADER,
+        *(
+            _contrast_line(losses=kept, treatment=t, reference=r, label="flag usual")
+            for t, r in PLANNED_CONTRASTS
+        ),
+    ]
+
+
 def _half_year_lines(*, pooled: pl.DataFrame) -> list[str]:
     """Render the planned contrasts for April to September and for October to March.
 
@@ -921,6 +971,8 @@ def _report(
         *_main_panel_lines(pooled=pooled, frame=frame),
         "",
         *_shared_rows_lines(pooled=pooled),
+        "",
+        *_flag_lines(frame=frame, pooled=pooled, selection=selection),
         "",
         *_half_year_lines(pooled=pooled),
         "",

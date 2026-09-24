@@ -28,17 +28,7 @@ NUMBER: Final[re.Pattern[str]] = re.compile(r"\d[\d,]*(?:\.\d+)?")
 URL_OR_ANCHOR: Final[re.Pattern[str]] = re.compile(r"\]\([^)]*\)|`[^`]*`|https?://\S+")
 
 ALLOWED: Final[dict[str, str]] = {
-    "95": "the 95% interval, defined once on the page",
-    "99": "the 99% coverage rule and the 99th-percentile capacity, both in the script's constants",
     "100": "the 100% coverage threshold the script's docstring says leaves a farm with no station",
-    "20": "Figure numbers 20 to 25 (chart script constants)",
-    "21": "Figure number",
-    "22": "Figure number",
-    "23": "Figure number",
-    "24": "Figure number",
-    "25": "Figure number",
-    "202607": "the MIDAS Open version, printed in the report inside a code span",
-    "2017": "the first hour of the MIDAS files, printed in the report's files table as a date",
 }
 
 
@@ -76,7 +66,7 @@ def main() -> int:
     report = (OUTPUT_DIR / "report.md").read_text()
     printed = {_normalise(text=token) for token in NUMBER.findall(report)}
     text = URL_OR_ANCHOR.sub(" ", "\n".join(added_lines(base=arguments.base)))
-    text = re.sub(r"Figure \d+", " ", text)
+    text = re.sub(r"Figures? \d+(?: to \d+)?", " ", text)
     missing: dict[str, int] = {}
     checked = 0
     for token in NUMBER.findall(text):

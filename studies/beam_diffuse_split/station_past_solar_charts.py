@@ -37,6 +37,7 @@ from station_past_solar import (
     PLANNED_CONTRASTS,
     STATION_ARM,
     Selection,
+    _fingerprint,
     _report,
     build_rows,
     jobs,
@@ -110,6 +111,15 @@ LEADERBOARD_ARMS: Final[tuple[str, ...]] = (
 )
 """The arms the leaderboard draws: every real input, and neither padded control."""
 
+TEMPERATURE_KEYS: Final[tuple[tuple[str, str], ...]] = ((STATION_ARM, "station_ghi_era5temp"),)
+"""The contrast that swaps the station's air temperature for ERA5's."""
+
+PADDED_KEYS: Final[tuple[tuple[str, str], ...]] = (
+    (BLEND_CONTROL_ARM, "cams_global"),
+    ("station_era5_control", "era5_global"),
+)
+"""The contrasts that pad a plain product with a shuffled copy of the station's irradiance."""
+
 SECTION_PLANNED: Final[str] = "Planned contrasts"
 SECTION_PER_GENERATOR: Final[str] = "The planned contrasts, per generator (exploratory)"
 SECTION_EXPLORATORY: Final[str] = "Exploratory contrasts"
@@ -171,9 +181,12 @@ def _check_report(
     )
     if regenerated != report:
         first = next(
-            (a, b)
-            for a, b in zip(regenerated.splitlines(), report.splitlines(), strict=False)
-            if a != b
+            (
+                (a, b)
+                for a, b in zip(regenerated.splitlines(), report.splitlines(), strict=False)
+                if a != b
+            ),
+            "the end: one report has extra lines",
         )
         msg = f"report.md differs from what the saved losses now produce, first at {first}"
         raise ValueError(msg)
@@ -407,6 +420,27 @@ def _per_generator(*, contrasts: pl.DataFrame, report: str) -> alt.VConcatChart:
     )
 
 
+def _bound(*, contrasts: pl.DataFrame, keys: tuple[tuple[str, str], ...]) -> float:
+    """Return the largest absolute interval end over the exploratory contrasts named.
+
+    Args:
+        contrasts: Every contrast table the report holds.
+        keys: The (treatment, reference) pairs.
+
+    Returns:
+        The bound, in points of capacity.
+    """
+    table = _contrast_rows(contrasts=contrasts, section=SECTION_EXPLORATORY)
+    ends = [
+        abs(end)
+        for treatment, reference in keys
+        for end in table.filter(pl.col("treatment") == treatment, pl.col("reference") == reference)
+        .select("lower_95", "upper_95")
+        .row(0)
+    ]
+    return max(ends)
+
+
 def _exploratory(
     *,
     contrasts: pl.DataFrame,
@@ -541,6 +575,13 @@ def main() -> int:
     report = report_path.read_text()
     frame, selection, repairs, candidates = build_rows()
     all_losses = pl.read_parquet(OUTPUT_DIR / "losses.parquet")
+    saved_fingerprint = (OUTPUT_DIR / "losses.fingerprint").read_text().strip()
+    if _fingerprint(frame=frame, job_list=jobs()) != saved_fingerprint:
+        msg = (
+            "losses.parquet was fitted on a different row set or job list than this code builds; "
+            "re-run station_past_solar.py"
+        )
+        raise ValueError(msg)
     _check_report(
         report=report,
         frame=frame,
@@ -588,22 +629,24 @@ def main() -> int:
         "station_past_solar_controls": _exploratory(
             contrasts=contrasts,
             keys=[
-                (STATION_ARM, "station_ghi_era5temp"),
-                (BLEND_CONTROL_ARM, "cams_global"),
-                ("station_era5_control", "era5_global"),
+                *TEMPERATURE_KEYS,
+                *PADDED_KEYS,
                 ("station_era5_xgb", "station_era5_control"),
                 (BLEND_ARM, "cams_global"),
             ],
             number=FIGURE_CONTROLS,
             title=(
-                "A shuffled station column changes neither CAMS's nor ERA5's error, and swapping "
-                "in the station's own temperature changes nothing"
+                "A shuffled station column moves CAMS's and ERA5's errors by at most "
+                f"{_bound(contrasts=contrasts, keys=PADDED_KEYS):.3f} points, and swapping in the "
+                "station's own temperature by at most "
+                f"{_bound(contrasts=contrasts, keys=TEMPERATURE_KEYS):.3f}"
             ),
             subtitle=[
                 (
                     "The first row swaps the station's air temperature for ERA5's; the next two "
                     "pad a product with a shuffled station column, one more column than the plain "
-                    "product; the last two add the real station column."
+                    "product; the last two add the real station column, and the last row's two "
+                    "arms differ by one column."
                 ),
             ],
             panel_title="Exploratory contrasts: controls, and what a station adds to a product",
