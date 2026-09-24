@@ -10,13 +10,25 @@ One-off throwaway script for the study in
   anonymised `site` label. UKV's radiation is rebuilt from its two label-adjacent snapshots
   (`studies.hourly_means.hourly_from_snapshots`), because V3 reads UKV as an instantaneous snapshot
   rather than an hour-ending mean; every other product's radiation is used as served.
-- **ECMWF ENS**: `ens_forecast_horizons.build_inputs` and `.main_frame`, at the upsampling
-  combination the ENS horizons page's rule chose before this study existed: `clear_sky` for solar
-  (radiation through the clear-sky index, temperature by straight line) and `speed_components` for
-  wind. This study reads that choice from `UPSAMPLING_METHODS` rather than re-running the rule.
-- **NOAA GEFS**: gated on `data/studies/weather/GEFS/_month_cache/` holding every month from
-  2024-11 to the month before today, or on `--gefs-window-dir` for a `GEFS_window_*` test extract
-  during development. Neither is complete yet, so this pass writes no GEFS columns.
+- **ECMWF ENS**: built directly on days 0-3, at the upsampling combination the ENS horizons page's
+  rule chose before this study existed (`clear_sky` for solar, radiation through the clear-sky
+  index and temperature by straight line; `speed_components` for wind), read from
+  `UPSAMPLING_METHODS` rather than re-running the rule. `_ens_frame` calls
+  `ens_forecast_horizons.band_steps`, `.upsampled_fields`, `.combine`, and `.reduce_members`
+  directly rather than going through `.build_inputs`/`.main_frame`, because those two also build
+  every band from 0 to 14 under every upsampling combination and then drop, through `._complete`,
+  every row missing any of them — including a day 0-3 row this study could otherwise score, whenever
+  the missing band is one of days 5 to 14 (commonly true for 10-14 days after a power outage, when
+  the run that would cover the later bands has not itself finished backfilling). Reading only the
+  four bands and one combination this study actually uses also cuts the upsampling cost by about
+  12x for solar and 8x for wind (`len(BAND_DAYS) * len(COMBINATIONS[domain])` down to
+  `len(ENS_DAYS) * 1`).
+- **NOAA GEFS**: `_gefs_frame` builds the mean of GEFS's 31 members the same way, reusing the same
+  `ens_forecast_horizons` functions with `ensemble_size=31` and GEFS's own extract as `source`,
+  gated on `data/studies/weather/GEFS/_month_cache/` holding every month from 2024-11 to the month
+  the study's rows actually end on, or on `--gefs-window-dir` for a `GEFS_window_*` test extract
+  during development, which always writes to the given `--output-dir` rather than the gated
+  production path.
 
 Every output row carries only the anonymised `site` label; no generator name, id or coordinate is
 read from the private roster in this script, except inside `studies.grid_sampling` (GEFS's
@@ -30,10 +42,11 @@ import argparse
 import logging
 import os
 import sys
-from datetime import UTC, datetime
+from collections.abc import Callable
 from pathlib import Path
 from typing import Final, Literal
 
+import numpy as np
 import polars as pl
 from contracts.settings import PROJECT_ROOT
 
@@ -42,7 +55,9 @@ from verify_previous_runs_leads import PRODUCT_DIRS
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
 import ens_forecast_horizons as efh
+from studies.grid_sampling import nearest_cells
 from studies.hourly_means import hourly_from_snapshots
+from studies.resample import gefs_step_means
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -151,6 +166,11 @@ def _solar_columns(*, frame: pl.DataFrame, day: int, snapshot: bool) -> pl.DataF
     return ghi.join(temp, on=["site", "time"], how="inner")
 
 
+KMH_TO_MS: Final[float] = 1.0 / 3.6
+"""Previous Runs serves wind speed in km/h; every other product (ENS, GEFS) is in m/s, and the plan
+converts every speed to m/s so a wind arm's columns are on one unit regardless of its product."""
+
+
 def _wind_columns(*, frame: pl.DataFrame, day: int) -> pl.DataFrame:
     """Return one product's day-N hub-height wind and 10 m wind, on the rows all three are present.
 
@@ -159,7 +179,7 @@ def _wind_columns(*, frame: pl.DataFrame, day: int) -> pl.DataFrame:
         day: The `previous_dayN` offset to read.
 
     Returns:
-        `site`, `time`, `speed_100m`, `sin_100m`, `cos_100m`, `speed_10m`.
+        `site`, `time`, `speed_100m`, `sin_100m`, `cos_100m`, `speed_10m`, speeds in m/s.
     """
     speed_100m_column = f"wind_speed_100m_previous_day{day}"
     direction_100m_column = f"wind_direction_100m_previous_day{day}"
@@ -168,9 +188,9 @@ def _wind_columns(*, frame: pl.DataFrame, day: int) -> pl.DataFrame:
         frame.select(
             "site",
             "time",
-            speed_100m=pl.col(speed_100m_column),
+            speed_100m=pl.col(speed_100m_column) * KMH_TO_MS,
             direction_100m=pl.col(direction_100m_column),
-            speed_10m=pl.col(speed_10m_column),
+            speed_10m=pl.col(speed_10m_column) * KMH_TO_MS,
         )
         .drop_nulls()
         .with_columns(
@@ -227,13 +247,61 @@ def _previous_runs_frame(*, keys: pl.DataFrame, domain: DomainType) -> pl.DataFr
     return frame
 
 
-def _ens_frame(*, keys: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
-    """Join ECMWF ENS's mean and control-member columns at `ENS_DAYS` onto the shared rows.
+def _ens_member_arms(
+    *,
+    extract: pl.DataFrame,
+    domain: DomainType,
+    days: tuple[int, ...],
+    method: str,
+    ensemble_size: int,
+    arm_name: Callable[[str, int], str],
+    ways: tuple[str, ...] = ("mean", "control"),
+) -> list[pl.DataFrame]:
+    """Upsample, combine and reduce one ensemble's members at several bands and ways.
 
-    Reuses `ens_forecast_horizons.build_inputs` and `.main_frame` rather than re-deriving the
-    upsampling: both are public functions of that script, unchanged in behaviour, and already do
-    the per-member upsampling, the clear-sky and component techniques, and the ensemble mean and
-    control-member reduction this study also needs.
+    Shared by `_ens_frame` (ENS, both ways) and `_gefs_frame` (GEFS, mean only), whose only
+    difference is the extract they read, its ensemble size, and the arm-name prefix.
+
+    Args:
+        extract: One row per (site, init_time, ensemble_member, lead_hours), as
+            `ens_forecast_horizons.members` or `_gefs_members_frame` returns.
+        domain: `solar` or `wind`.
+        days: The bands to build.
+        method: The upsampling combination (a key of `ens_forecast_horizons.COMBINATIONS[domain]`).
+        ensemble_size: How many members a run must hold to be kept.
+        arm_name: Given a way (`"mean"` or `"control"`) and a day, returns that arm's name.
+        ways: Which reductions to build; ENS wants both, GEFS only the mean (no control-member arm
+            is planned for GEFS).
+
+    Returns:
+        One frame per (day, way) with `site`, `time` and that arm's own weather columns.
+    """
+    clear_sky = efh.clear_sky_table(domain=domain)
+    frames: list[pl.DataFrame] = []
+    for day in days:
+        steps = efh.band_steps(members=extract, day=day, domain=domain, ensemble_size=ensemble_size)
+        upsampled = efh.upsampled_fields(steps=steps, day=day, domain=domain, clear_sky=clear_sky)
+        combined = efh.combine(
+            steps=steps, upsampled=upsampled, day=day, domain=domain, method=method
+        )
+        for way in ways:
+            reduced = efh.reduce_members(
+                hourly=combined, domain=domain, way=way, ensemble_size=ensemble_size
+            )
+            frames.append(efh.prefixed(frame=reduced, arm=arm_name(way, day), domain=domain))
+    return frames
+
+
+def _ens_frame(*, keys: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
+    """Build ECMWF ENS's mean and control-member columns at `ENS_DAYS` directly on the base rows.
+
+    Calls `ens_forecast_horizons.band_steps`, `.upsampled_fields`, `.combine` and `.reduce_members`
+    directly, rather than going through `.build_inputs`/`.main_frame`, which build every band from
+    0 to 14 under every upsampling combination and then drop, through `._complete`, every row
+    missing any of them. That would silently cost this study a row it could otherwise score at
+    days 0-3 whenever the band actually missing is one of days 5-14 (commonly true for 10-14 days
+    after a power outage, before the later-band run has finished backfilling); see the module
+    docstring's row-count comparison against the previous build.
 
     Args:
         keys: `site`, `time` for every row the study might score.
@@ -242,27 +310,60 @@ def _ens_frame(*, keys: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
     Returns:
         `keys` with `ens_mean_day<N>_<field>` and `ens_control_day<N>_<field>` for every `N` in
         `ENS_DAYS`, left-joined, plus `persistence_day<N>` and `diurnal_persistence_day<N>` (the
-        no-weather baselines' own inputs), which `build_inputs`'s `_with_baselines` step already
-        computes on the way to the ENS columns.
+        no-weather baselines' own inputs), which `with_baselines` computes on the way.
+    """
+    baselined = efh.with_baselines(frame=efh.base_frame(domain=domain), domain=domain)
+    sites = sorted(baselined["site"].unique().to_list())
+    extract = efh.members(sites=sites)
+    arms = _ens_member_arms(
+        extract=extract,
+        domain=domain,
+        days=ENS_DAYS,
+        method=UPSAMPLING_METHODS[domain],
+        ensemble_size=efh.ENSEMBLE_SIZE,
+        arm_name=lambda way, day: efh.ens_arm(way=way, day=day),
+    )
+    baseline_columns = [
+        efh.baseline_arm(name=name, day=day)
+        for day in ENS_DAYS
+        for name in ("persistence", "diurnal_persistence")
+    ]
+    frame = baselined.select("site", "time", *baseline_columns)
+    for arm_frame in arms:
+        frame = frame.join(arm_frame, on=["site", "time"], how="left")
+    return keys.join(frame, on=["site", "time"], how="left")
+
+
+def compare_ens_rebuild(*, domain: DomainType) -> float:
+    """Check the rebuilt ENS columns against the old `build_inputs`/`main_frame` path.
+
+    Run once by hand (not by `main`) to confirm `_ens_frame`'s direct build agrees with the
+    previous implementation on the rows both hold, before relying on the direct build.
+
+    Args:
+        domain: `solar` or `wind`.
+
+    Returns:
+        The largest absolute difference between the two builds' `ens_mean_day<N>_<field>` and
+        `ens_control_day<N>_<field>` columns, on the rows both builds hold (0.0 if identical).
     """
     inputs = efh.build_inputs(domain=domain)
-    main = efh.main_frame(inputs=inputs, method=UPSAMPLING_METHODS[domain], domain=domain)
+    old = efh.main_frame(inputs=inputs, method=UPSAMPLING_METHODS[domain], domain=domain).frame
     wanted = [
         column
         for day in ENS_DAYS
         for way in ("mean", "control")
         for column in efh.ens_columns(arm=efh.ens_arm(way=way, day=day), domain=domain)
     ]
-    baseline_columns = [
-        efh.baseline_arm(name=name, day=day)
-        for day in ENS_DAYS
-        for name in ("persistence", "diurnal_persistence")
-    ]
-    return keys.join(
-        main.frame.select("site", "time", *wanted, *baseline_columns),
-        on=["site", "time"],
-        how="left",
+    keys = old.select("site", "time")
+    new = _ens_frame(keys=keys, domain=domain)
+    joined = old.select("site", "time", *wanted).join(
+        new.select("site", "time", *wanted), on=["site", "time"], how="inner", suffix="_new"
     )
+    if joined.is_empty():
+        return 0.0
+    diffs = [(joined[column] - joined[f"{column}_new"]).abs().max() or 0.0 for column in wanted]
+    return float(max(diffs))
 
 
 def _gefs_months_available() -> list[str]:
@@ -298,14 +399,174 @@ def _gefs_span_complete(*, last_month: str) -> bool:
     return all(f"{d.year:04d}-{d.month:02d}" in available for d in expected)
 
 
-def _gefs_frame(*, keys: pl.DataFrame, domain: DomainType, window_dir: Path | None) -> pl.DataFrame:
-    """Read NOAA GEFS's mean columns, gated on a complete month cache or a test window extract.
+GEFS_ENSEMBLE_SIZE: Final[int] = 31
+"""How many members a GEFS run holds (ENS holds 51)."""
 
-    The full build (nearest-cell selection per site through `studies.grid_sampling`, the ensemble
-    mean, and `studies.resample.gefs_step_means` before any band slicing) is not implemented in
-    this pass: the month cache does not yet reach 2026-09 (see the module docstring), so there is
-    nothing to build against beyond a `GEFS_window_*` test extract, and the plan gates any fit that
-    reads GEFS on the study coordinator confirming the download.
+GEFS_STEP_MEAN_MAX_LEAD_HOURS: Final[int] = 240
+"""GEFS steps 3-hourly to this lead and 6-hourly beyond it; `gefs_step_means` only applies inside
+the 3-hourly part, which comfortably covers every band this study reads (day 3's steps end at lead
+24*3+30 = 102 h)."""
+
+GEFS_DAYS: Final[dict[DomainType, tuple[int, ...]]] = {
+    "solar": (1, 2, 3),
+    "wind": (1, 2, 3),
+}
+"""The bands GEFS is built at (the plan's product table: day offsets 1-3, from 2024-11-30)."""
+
+
+def _gefs_cell_selection(
+    *, grid_cells: pl.DataFrame, domain: DomainType, sites: list[str]
+) -> dict[str, int]:
+    """Return each site's nearest GEFS grid cell id.
+
+    Args:
+        grid_cells: `_grid_cells.parquet`'s rows, carrying `lat_index`, `lon_index`, `latitude` and
+            `longitude`.
+        domain: `solar` or `wind`.
+        sites: The sites to match.
+
+    Returns:
+        Each site to its nearest cell id (`lat_index * 10 + lon_index`, the same convention V1
+        uses). No coordinate is read outside `studies.grid_sampling`, and none is returned.
+    """
+    cells = grid_cells.with_columns(cell_id=pl.col("lat_index") * 10 + pl.col("lon_index"))
+    roster = efh.site_roster(domain=domain).filter(pl.col("site").is_in(sites))
+    nearest = nearest_cells(sites=roster, cells=cells)
+    return dict(zip(nearest["site"].to_list(), nearest["cell_id"].to_list(), strict=True))
+
+
+def _gefs_step_mean_radiation(*, radiation: pl.DataFrame) -> pl.DataFrame:
+    """Convert one cell's GEFS radiation from alternating windows to plain 3-hour step means.
+
+    Runs `studies.resample.gefs_step_means` on each (run, member) series in lead order, on the
+    whole run before any band slicing, as the plan requires.
+
+    Args:
+        radiation: `init_time`, `ensemble_member`, `lead_hours`, `ghi_raw`, restricted to leads
+            `<= GEFS_STEP_MEAN_MAX_LEAD_HOURS`, with the null value at lead 0 already excluded.
+
+    Returns:
+        `init_time`, `ensemble_member`, `lead_hours`, `ghi_w_m2`: the same (run, member, lead)
+        rows, radiation replaced by 3-hour step means. A (run, member) missing any lead in its
+        series is dropped whole, as `ens_forecast_horizons.band_steps` drops an incomplete run.
+    """
+    leads = np.sort(radiation["lead_hours"].unique().to_numpy())
+    lead_columns = [str(int(lead)) for lead in leads]
+    wide = radiation.pivot(
+        on="lead_hours", index=["init_time", "ensemble_member"], values="ghi_raw", sort_columns=True
+    ).drop_nulls(lead_columns)
+    if wide.is_empty():
+        return pl.DataFrame(
+            schema={
+                "init_time": pl.Datetime("us", "UTC"),
+                "ensemble_member": pl.Int8,
+                "lead_hours": pl.Int32,
+                "ghi_w_m2": pl.Float64,
+            }
+        )
+    values = wide.select(lead_columns).to_numpy()
+    step_means = gefs_step_means(values=values, leads=leads.astype(np.float64))
+    return (
+        wide.select("init_time", "ensemble_member")
+        .with_columns(
+            [pl.Series(lead_columns[index], step_means[:, index]) for index in range(len(leads))]
+        )
+        .unpivot(
+            index=["init_time", "ensemble_member"],
+            on=lead_columns,
+            variable_name="lead_hours",
+            value_name="ghi_w_m2",
+        )
+        .with_columns(lead_hours=pl.col("lead_hours").cast(pl.Int32))
+    )
+
+
+def _gefs_members_frame(*, path: Path, domain: DomainType, sites: list[str]) -> pl.DataFrame:
+    """Read one GEFS extract and reshape it to `ens_forecast_horizons.band_steps`'s input shape.
+
+    Each site reads its nearest 0.25 degree grid cell. Wind u/v components become speed and
+    direction (GEFS already gives both heights in m/s, unlike Previous Runs' km/h). Radiation is
+    converted through `_gefs_step_mean_radiation`.
+
+    Args:
+        path: The extract's directory, holding `GEFS.parquet` and `_grid_cells.parquet`.
+        domain: `solar` or `wind`.
+        sites: The sites to build.
+
+    Returns:
+        One row per (site, init_time, ensemble_member, lead_hours), with `ghi_w_m2`, `temp_c`,
+        `speed_100m`, `direction_100m`, `speed_10m`, `direction_10m`.
+    """
+    grid_cells = pl.read_parquet(path / "_grid_cells.parquet")
+    cell_by_site = _gefs_cell_selection(grid_cells=grid_cells, domain=domain, sites=sites)
+    raw = (
+        pl.read_parquet(path / "GEFS.parquet")
+        .with_columns(
+            lead_hours=(pl.col("lead_time").dt.total_minutes() / 60).cast(pl.Int32),
+            cell=pl.col("lat_index") * 10 + pl.col("lon_index"),
+            init_time=pl.col("init_time").dt.replace_time_zone("UTC"),
+        )
+        .filter(pl.col("lead_hours") <= GEFS_STEP_MEAN_MAX_LEAD_HOURS)
+    )
+    frames: list[pl.DataFrame] = []
+    for site, cell_id in cell_by_site.items():
+        cell_rows = raw.filter(pl.col("cell") == cell_id)
+        if cell_rows.is_empty():
+            continue
+        wind = cell_rows.select(
+            "init_time",
+            "ensemble_member",
+            "lead_hours",
+            speed_100m=(pl.col("wind_u_100m") ** 2 + pl.col("wind_v_100m") ** 2).sqrt(),
+            direction_100m=(
+                pl.arctan2(-pl.col("wind_u_100m"), -pl.col("wind_v_100m")).degrees() % 360.0
+            ),
+            speed_10m=(pl.col("wind_u_10m") ** 2 + pl.col("wind_v_10m") ** 2).sqrt(),
+            direction_10m=(
+                pl.arctan2(-pl.col("wind_u_10m"), -pl.col("wind_v_10m")).degrees() % 360.0
+            ),
+            temp_c="temperature_2m",
+        )
+        radiation_input = (
+            cell_rows.filter(pl.col("lead_hours") > 0)
+            .select(
+                "init_time",
+                "ensemble_member",
+                "lead_hours",
+                ghi_raw="downward_short_wave_radiation_flux_surface",
+            )
+            .drop_nulls()
+            .filter(pl.col("ghi_raw").is_not_nan())
+        )
+        radiation = _gefs_step_mean_radiation(radiation=radiation_input)
+        merged = wind.join(radiation, on=["init_time", "ensemble_member", "lead_hours"], how="left")
+        frames.append(merged.with_columns(site=pl.lit(site)))
+    if not frames:
+        return pl.DataFrame(
+            schema={
+                "site": pl.String,
+                "init_time": pl.Datetime("us", "UTC"),
+                "ensemble_member": pl.Int8,
+                "lead_hours": pl.Int32,
+                "ghi_w_m2": pl.Float64,
+                "temp_c": pl.Float32,
+                "speed_100m": pl.Float64,
+                "direction_100m": pl.Float64,
+                "speed_10m": pl.Float64,
+                "direction_10m": pl.Float64,
+            }
+        )
+    return pl.concat(frames, how="diagonal")
+
+
+def _gefs_frame(*, keys: pl.DataFrame, domain: DomainType, window_dir: Path | None) -> pl.DataFrame:
+    """Build NOAA GEFS's mean columns, gated on a complete month cache or a test window extract.
+
+    In production (`window_dir=None`) this only runs once `data/studies/weather/GEFS/_month_cache/`
+    covers every month from `GEFS_FIRST_MONTH` to the month `keys`'s own rows end on -- not "the
+    month before today", which in January gives an invalid `YYYY-00` month and, every other month,
+    checks a span the rows may not even reach. With `--gefs-window-dir`, a `GEFS_window_*` test
+    extract is read unconditionally, for development.
 
     Args:
         keys: `site`, `time` for every row the study might score.
@@ -313,39 +574,48 @@ def _gefs_frame(*, keys: pl.DataFrame, domain: DomainType, window_dir: Path | No
         window_dir: A `GEFS_window_*` test extract, for development only. `None` in production.
 
     Returns:
-        `keys` unchanged: no GEFS columns are added while the gate does not pass.
+        `keys` with `gefs_mean_day<N>_<field>` for every `N` in `GEFS_DAYS[domain]`, left-joined.
+        Unchanged (no GEFS columns) while the production gate does not pass.
     """
-    del domain  # not read until the full build is implemented
-    if window_dir is not None:
-        _LOG.warning(
-            "GEFS: --gefs-window-dir given (%s), but the member-mean build is not implemented in "
-            "this pass; no GEFS columns are written. See the module docstring.",
-            window_dir,
-        )
+    if window_dir is None:
+        months = _gefs_months_available()
+        if not months:
+            _LOG.info(
+                "GEFS: data/studies/weather/GEFS/_month_cache/ is empty, no GEFS columns written."
+            )
+            return keys
+        last_row_date = keys["time"].max()
+        last_needed = f"{last_row_date.year:04d}-{last_row_date.month:02d}"
+        if not _gefs_span_complete(last_month=last_needed):
+            _LOG.info(
+                "GEFS: month cache holds %d months but does not yet cover %s to %s (the rows' "
+                "last month), no GEFS columns written.",
+                len(months),
+                GEFS_FIRST_MONTH,
+                last_needed,
+            )
+            return keys
+        path = _weather_dir() / "GEFS"
+    else:
+        path = window_dir
+    sites = sorted(keys["site"].unique().to_list())
+    extract = _gefs_members_frame(path=path, domain=domain, sites=sites)
+    if extract.is_empty():
+        _LOG.warning("GEFS: no rows matched at %s, no GEFS columns written.", path)
         return keys
-    months = _gefs_months_available()
-    if not months:
-        _LOG.info(
-            "GEFS: data/studies/weather/GEFS/_month_cache/ is empty, no GEFS columns written."
-        )
-        return keys
-    last_needed = f"{datetime.now(tz=UTC).year:04d}-{datetime.now(tz=UTC).month - 1:02d}"
-    if not _gefs_span_complete(last_month=last_needed):
-        _LOG.info(
-            "GEFS: month cache holds %d months but does not yet cover %s to %s, no GEFS columns "
-            "written.",
-            len(months),
-            GEFS_FIRST_MONTH,
-            last_needed,
-        )
-        return keys
-    _LOG.warning(
-        "GEFS: month cache covers %s to %s, but the member-mean build is not implemented in this "
-        "pass. No GEFS columns written; see the module docstring.",
-        GEFS_FIRST_MONTH,
-        last_needed,
+    arms = _ens_member_arms(
+        extract=extract,
+        domain=domain,
+        days=GEFS_DAYS[domain],
+        method=UPSAMPLING_METHODS[domain],
+        ensemble_size=GEFS_ENSEMBLE_SIZE,
+        arm_name=lambda way, day: f"gefs_{way}_day{day}",
+        ways=("mean",),
     )
-    return keys
+    frame = keys
+    for arm_frame in arms:
+        frame = frame.join(arm_frame, on=["site", "time"], how="left")
+    return frame
 
 
 def build_domain(*, domain: DomainType, output_dir: Path, gefs_window_dir: Path | None) -> Path:
