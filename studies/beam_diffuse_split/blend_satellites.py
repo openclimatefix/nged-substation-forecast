@@ -72,6 +72,16 @@ column). Both post hoc contrasts, `cams_rich_sarah3_xgb` − `cams_rich` and `ca
 are fitted, never reused from an earlier run's `cams_split` fit, because `cams_rich` reads columns
 no earlier arm read.
 
+**Post hoc, added after the second science review of this section.** The review asked whether a
+second product other than SARAH-3 gives CAMS's split as much of a gain, since the section's
+narrative rests on SARAH-3 being unusually complementary to CAMS rather than any second product
+helping. Two more arms answer this, built the same way `cams_split_sarah3_xgb` and
+`cams_split_sarah3_control` are, but reading ERA5's or ICON-DREAM-EU's global irradiance in place of
+SARAH-3's: `cams_split_era5_xgb` and `cams_split_icon_dream_xgb`, each with its own
+climatology-permuted control (`cams_split_era5_control`, `cams_split_icon_dream_control`). Both are
+fitted at the primary setting only, against plain `cams_split`, via `--fit-missing`, reusing every
+other arm's fit bit for bit.
+
 Run it with `uv run python studies/beam_diffuse_split/blend_satellites.py`, after
 `weather_products.py` has written the `record` panel (`--panel record`). `--resume` reuses the
 per-arm fits a previous run left in `fits/`, refusing to reuse one whose rows, feature-column
@@ -106,6 +116,7 @@ from run_experiment import Job, _add_time_features, run_all
 from sources import STUDY_DATA_DIR
 from studies.blending import climatology_permutation, stacked_errors
 from studies.bootstrap import (
+    N_BOOTSTRAP_RESAMPLES,
     YearInterval,
     bootstrap_absolute,
     bootstrap_difference,
@@ -138,11 +149,17 @@ SHARED: Final[tuple[str, ...]] = (*RUN_SHARED_FEATURES, "era_code")
 """The features every arm gets: the past-solar study's shared features, plus the era."""
 
 PERMUTATION_GROUPS: Final[tuple[str, ...]] = ("site", "month", "hour_of_day")
-"""The rows the control's permuted SARAH-3 column may move between: one site, month, hour of day."""
+"""The rows a control's permuted column may move between: one site, month, hour of day."""
 
 PERMUTATION_SEED: Final[int] = 20260927
-"""Seeds `cams_sarah3_control`'s and `cams_split_sarah3_control`'s permutation of SARAH-3's global
-irradiance."""
+"""Seeds every control's permutation of its second product's global irradiance. Each column in
+`PERMUTED_COLUMNS` is permuted under its own seed (`climatology_permutation` adds the column's
+index in the list), so no two products share a permutation."""
+
+PERMUTED_COLUMNS: Final[tuple[str, str, str]] = ("ghi_sarah3", "ghi_era5", "ghi_icon_dream")
+"""Every column `build_rows` gives a climatology-permuted copy of: SARAH-3's global irradiance for
+the planned and post hoc blends, and ERA5's and ICON-DREAM-EU's for S7's post hoc second-product
+arms, each testing whether a second product other than SARAH-3 helps CAMS's split as much."""
 
 PERMUTED_UNCHANGED_FRACTION_LIMIT: Final[float] = 0.9
 """`_check_control_permutation` raises if the permuted column matches the real one on at least this
@@ -241,6 +258,29 @@ ENRICHED_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
 """Post hoc: does SARAH-3 still add once CAMS gets its own neighbouring hours, against an enriched
 reference rather than plain `cams_split`?"""
 
+SECOND_PRODUCT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("cams_split_era5_xgb", "cams_split"),
+    ("cams_split_era5_xgb", "cams_split_era5_control"),
+    ("cams_split_icon_dream_xgb", "cams_split"),
+    ("cams_split_icon_dream_xgb", "cams_split_icon_dream_control"),
+)
+"""Post hoc, added after the second science review (S7): does a second product other than SARAH-3
+help CAMS's split as much? Each blend and its climatology control, against plain `cams_split`."""
+
+BLEND_PRODUCTS_LOSSES: Final[Path] = STUDY_DATA_DIR / "blend_products" / "losses.parquet"
+"""The training-history blend study's saved losses, read only (never refitted) for M1's
+common-row reconciliation of this section's gain against that study's own gain."""
+
+RECONCILIATION_BLEND_STUDY_ARMS: Final[tuple[tuple[str, str], ...]] = (
+    ("everything_rich_xgb", "all six products"),
+    ("cams_icon_eu_rich_xgb", "CAMS + ICON-EU"),
+)
+"""M1: the training-history blend study's arms reconciled against this study's own gain, each
+against that study's own `cams_rich`, and the label the report and page use for each."""
+
+GENERATOR_RESAMPLE_SEED: Final[int] = 20260930
+"""Seeds S5's generator-resampled interval, drawing whole generators (sites) with replacement."""
+
 SENSITIVITY_ARMS: Final[tuple[str, ...]] = (
     "cams_split",
     "cams_split_sarah3_xgb",
@@ -337,6 +377,28 @@ def _arm_columns() -> dict[str, tuple[str, ...]]:
             "dhi_cams",
             "ghi_sarah3_shuffled",
         ),
+        "cams_split_era5_xgb": (*SHARED, "ghi_cams", "bhi_cams", "dhi_cams", "ghi_era5"),
+        "cams_split_era5_control": (
+            *SHARED,
+            "ghi_cams",
+            "bhi_cams",
+            "dhi_cams",
+            "ghi_era5_shuffled",
+        ),
+        "cams_split_icon_dream_xgb": (
+            *SHARED,
+            "ghi_cams",
+            "bhi_cams",
+            "dhi_cams",
+            "ghi_icon_dream",
+        ),
+        "cams_split_icon_dream_control": (
+            *SHARED,
+            "ghi_cams",
+            "bhi_cams",
+            "dhi_cams",
+            "ghi_icon_dream_shuffled",
+        ),
     }
 
 
@@ -397,58 +459,59 @@ def _cams_sarah3_rms_difference(*, frame: pl.DataFrame) -> float:
     )
 
 
-def _check_control_permutation(*, frame: pl.DataFrame) -> None:
-    """Raise unless SARAH-3's permuted column is a genuine within-group permutation of the real one.
+def _check_control_permutation(*, frame: pl.DataFrame, column: str) -> None:
+    """Raise unless a column's permuted copy is a genuine within-group permutation of the real one.
 
     Guards the control arms' whole purpose: if the permutation crossed a site, month or hour-of-day
-    boundary, or barely moved any row, a control would keep some of SARAH-3's real weather and
-    understate the size of gain a merely-redundant column can produce.
+    boundary, or barely moved any row, a control would keep some of the real weather and understate
+    the size of gain a merely-redundant column can produce.
 
     Args:
-        frame: The common rows, carrying `ghi_sarah3`, `ghi_sarah3_shuffled`, `site`, `month` and
+        frame: The common rows, carrying `column`, `{column}_shuffled`, `site`, `month` and
             `hour_of_day`.
+        column: The real column whose permuted copy is checked.
 
     Raises:
-        ValueError: If any (site, month, hour of day) group's permuted values are not a permutation
-            of its real ones, or if the permuted column matches the real one on
+        ValueError: Naming `column`, if any (site, month, hour of day) group's permuted values are
+            not a permutation of its real ones, or if the permuted column matches the real one on
             `PERMUTED_UNCHANGED_FRACTION_LIMIT` or more of the rows.
     """
+    shuffled = f"{column}_shuffled"
     groups = frame.group_by("site", "month", "hour_of_day").agg(
-        is_permutation=(pl.col("ghi_sarah3").sort() == pl.col("ghi_sarah3_shuffled").sort()).all()
+        is_permutation=(pl.col(column).sort() == pl.col(shuffled).sort()).all()
     )
     if not bool(groups["is_permutation"].all()):
-        msg = "ghi_sarah3_shuffled is not a within-(site, month, hour) permutation of ghi_sarah3"
+        msg = f"{shuffled} is not a within-(site, month, hour) permutation of {column}"
         raise ValueError(msg)
-    unchanged_fraction = float(
-        frame.select((pl.col("ghi_sarah3_shuffled") == pl.col("ghi_sarah3")).mean()).item()
-    )
+    unchanged_fraction = float(frame.select((pl.col(shuffled) == pl.col(column)).mean()).item())
     if unchanged_fraction >= PERMUTED_UNCHANGED_FRACTION_LIMIT:
         msg = (
-            f"ghi_sarah3_shuffled matches ghi_sarah3 on {unchanged_fraction:.0%} of rows; the "
-            "permutation barely moved any row"
+            f"{shuffled} matches {column} on {unchanged_fraction:.0%} of rows; the permutation "
+            "barely moved any row"
         )
         raise ValueError(msg)
 
 
 def _check_control_arms_read_the_right_column() -> None:
-    """Raise unless every `_control` arm reads the permuted SARAH-3 column and no other arm does.
+    """Raise unless every `_control` arm reads a permuted column and no other arm does.
 
-    A blend arm accidentally reading `ghi_sarah3_shuffled`, or a control arm accidentally reading
-    the real `ghi_sarah3`, would swap a planned contrast's treatment and control without either
-    arm's name changing.
+    A blend arm accidentally reading a permuted column, or a control arm accidentally reading the
+    real one, would swap a contrast's treatment and control without either arm's name changing.
 
     Raises:
-        ValueError: Naming the arm, if a `_control` arm's columns hold the real `ghi_sarah3`, or a
-            non-control arm's columns hold the permuted `ghi_sarah3_shuffled`.
+        ValueError: Naming the arm and the column, if a `_control` arm's columns hold one of
+            `PERMUTED_COLUMNS`' real values, or a non-control arm's columns hold one of its
+            permuted copies.
     """
     for arm, columns in _arm_columns().items():
         is_control = arm.endswith("_control")
-        if is_control and "ghi_sarah3" in columns:
-            msg = f"control arm {arm!r} reads the real ghi_sarah3 column"
-            raise ValueError(msg)
-        if not is_control and "ghi_sarah3_shuffled" in columns:
-            msg = f"non-control arm {arm!r} reads the permuted ghi_sarah3_shuffled column"
-            raise ValueError(msg)
+        for column in PERMUTED_COLUMNS:
+            if is_control and column in columns:
+                msg = f"control arm {arm!r} reads the real {column} column"
+                raise ValueError(msg)
+            if not is_control and f"{column}_shuffled" in columns:
+                msg = f"non-control arm {arm!r} reads the permuted {column}_shuffled column"
+                raise ValueError(msg)
 
 
 def _with_cams_neighbours(*, frame: pl.DataFrame) -> pl.DataFrame:
@@ -513,11 +576,12 @@ def build_rows() -> tuple[pl.DataFrame, float]:
     )
     frame = climatology_permutation(
         frame=frame,
-        column_groups=[("ghi_sarah3",)],
+        column_groups=[(column,) for column in PERMUTED_COLUMNS],
         by=PERMUTATION_GROUPS,
         seed=PERMUTATION_SEED,
     )
-    _check_control_permutation(frame=frame)
+    for column in PERMUTED_COLUMNS:
+        _check_control_permutation(frame=frame, column=column)
     _check_control_arms_read_the_right_column()
     rms_difference = _cams_sarah3_rms_difference(frame=frame)
     generator = np.random.default_rng(NEGATIVE_CONTROL_NOISE_SEED)
@@ -1024,6 +1088,27 @@ def _enriched_lines(*, losses: pl.DataFrame) -> list[str]:
     return lines
 
 
+def _second_product_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Render S7's post hoc contrasts: does a second product other than SARAH-3 help as much?
+
+    Args:
+        losses: Every arm's losses, primary setting.
+
+    Returns:
+        Markdown lines.
+    """
+    lines = [
+        "#### Post hoc: does a second product other than SARAH-3 help CAMS's split as much?",
+        "",
+        *CONTRAST_HEADER,
+    ]
+    lines += [
+        _contrast_line(losses=losses, treatment=treatment, reference=reference, label="all")
+        for treatment, reference in SECOND_PRODUCT_CONTRASTS
+    ]
+    return lines
+
+
 HEADLINE_FOLD_HEADER: Final[tuple[str, str]] = (
     (
         "| Scope | Contrast | ΔMAE (pp of capacity) | 95% interval | 95% t-interval across the 5 "
@@ -1094,6 +1179,30 @@ def _headline_fold_lines(*, losses: pl.DataFrame) -> list[str]:
     return lines
 
 
+def _noise_ratio_line(*, losses: pl.DataFrame) -> str:
+    """Return how many times larger the primary planned gain is than the primary negative control.
+
+    Args:
+        losses: Every arm's losses, primary setting.
+
+    Returns:
+        A markdown bullet (S3).
+    """
+    planned_treatment, planned_reference = PLANNED_CONTRASTS[0]
+    gain = bootstrap_difference(
+        losses=losses, treatment=planned_treatment, reference=planned_reference, metric=METRIC
+    )["difference"]
+    noise_treatment, noise_reference = NEGATIVE_CONTROLS[0]
+    noise = bootstrap_difference(
+        losses=losses, treatment=noise_treatment, reference=noise_reference, metric=METRIC
+    )["difference"]
+    ratio = abs(gain) / abs(noise)
+    return (
+        f"- The planned gain (`{planned_treatment}` − `{planned_reference}`) is {ratio:.0f} times "
+        f"the primary negative control's own difference from `cams`."
+    )
+
+
 def _negative_control_lines(*, losses: pl.DataFrame, rms_difference: float) -> list[str]:
     """Render both negative controls against `cams`.
 
@@ -1117,6 +1226,7 @@ def _negative_control_lines(*, losses: pl.DataFrame, rms_difference: float) -> l
             f"- Second control (`cams_cams_noise5_xgb`): noise standard deviation "
             f"{NEAR_DUPLICATE_NOISE_STD_W_M2:.1f} W/m2, close to a duplicate column."
         ),
+        _noise_ratio_line(losses=losses),
         "",
         *CONTRAST_HEADER,
     ]
@@ -1142,8 +1252,8 @@ def _method_lines(*, losses: pl.DataFrame) -> list[str]:
     """
     lines = [
         (
-            "#### Exploratory: the all-global blend, the mean, stack and equal blends, and the "
-            "same-reference comparisons the lead needs"
+            "#### Exploratory: the all-global blend, the mean, stack and equal blends, and "
+            "further comparisons among CAMS, CAMS's split, and SARAH-3"
         ),
         "",
         *CONTRAST_HEADER,
@@ -1335,6 +1445,372 @@ def _by_year_lines(*, losses: pl.DataFrame) -> list[str]:
     return lines
 
 
+def _generator_resampled_interval(
+    *, losses: pl.DataFrame, treatment: str, reference: str
+) -> tuple[float, float]:
+    """Bootstrap a paired difference by resampling whole generators, not months.
+
+    Complements `studies.bootstrap.bootstrap_difference`'s month-and-seed resampling: with six
+    solar farms sharing their weather, this interval instead asks how much the six generators' own
+    difference could vary if a different six (drawn with replacement) had been metered.
+
+    Args:
+        losses: Per-row losses holding both arms, restricted to the scope wanted.
+        treatment: The arm whose metric is being compared.
+        reference: The arm it is compared against.
+
+    Returns:
+        The 2.5th and 97.5th percentiles of the resampled mean difference (S5).
+    """
+    by_site = (
+        losses.filter(pl.col("arm") == reference)
+        .select("site", "time", "seed", reference=pl.col(METRIC))
+        .join(
+            losses.filter(pl.col("arm") == treatment).select(
+                "site", "time", "seed", treatment=pl.col(METRIC)
+            ),
+            on=["site", "time", "seed"],
+            how="inner",
+        )
+        .with_columns(difference=pl.col("treatment") - pl.col("reference"))
+        .group_by("site")
+        .agg(total=pl.col("difference").sum(), n=pl.len())
+    )
+    totals, counts = by_site["total"].to_numpy(), by_site["n"].to_numpy()
+    generator = np.random.default_rng(GENERATOR_RESAMPLE_SEED)
+    resampled = np.empty(N_BOOTSTRAP_RESAMPLES)
+    for resample in range(N_BOOTSTRAP_RESAMPLES):
+        draw = generator.integers(0, totals.shape[0], size=totals.shape[0])
+        resampled[resample] = totals[draw].sum() / counts[draw].sum()
+    return float(np.percentile(resampled, 2.5)), float(np.percentile(resampled, 97.5))
+
+
+def _all_months_gain_line(*, losses: pl.DataFrame, treatment: str, reference: str) -> str:
+    """Return whether every calendar month's mean gain favours `treatment` over `reference`.
+
+    Args:
+        losses: Per-row losses holding both arms, restricted to the scope wanted.
+        treatment: The arm whose metric is being compared.
+        reference: The arm it is compared against.
+
+    Returns:
+        A markdown bullet naming how many of the months gain (S5).
+    """
+    by_month = (
+        losses.filter(pl.col("arm") == reference)
+        .select("site", "time", "month", reference=pl.col(METRIC))
+        .join(
+            losses.filter(pl.col("arm") == treatment).select(
+                "site", "time", treatment=pl.col(METRIC)
+            ),
+            on=["site", "time"],
+        )
+        .group_by("month")
+        .agg(gain=(pl.col("reference") - pl.col("treatment")).mean())
+    )
+    gaining = int((by_month["gain"] > 0).sum())
+    return f"- `{treatment}` − `{reference}` gains in {gaining} of {by_month.height} scored months."
+
+
+def _generator_resampled_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Render S5's generator-resampled interval for the primary planned and enriched contrasts.
+
+    Args:
+        losses: Every arm's losses, primary setting.
+
+    Returns:
+        Markdown lines.
+    """
+    contrasts = (PLANNED_CONTRASTS[0], ENRICHED_CONTRASTS[0])
+    lines = [
+        "#### Exploratory: the primary contrasts, resampling whole generators instead of months",
+        "",
+        (
+            "Each interval below resamples the six generators with replacement, 2,000 times, "
+            "holding every row's month and seed fixed, complementing "
+            "`studies.bootstrap.bootstrap_difference`'s month-and-seed resampling above."
+        ),
+        "",
+        "| Contrast | ΔMAE (pp of capacity) | Generator-resampled 95% interval |",
+        "|---|---|---|",
+    ]
+    for treatment, reference in contrasts:
+        point = bootstrap_difference(
+            losses=losses, treatment=treatment, reference=reference, metric=METRIC
+        )["difference"]
+        lower, upper = _generator_resampled_interval(
+            losses=losses, treatment=treatment, reference=reference
+        )
+        lines.append(
+            f"| {treatment} − {reference} | {point * PERCENTAGE_POINTS:+.2f} "
+            f"| [{lower * PERCENTAGE_POINTS:+.2f}, {upper * PERCENTAGE_POINTS:+.2f}] |"
+        )
+    lines += [
+        "",
+        *[
+            _all_months_gain_line(losses=losses, treatment=treatment, reference=reference)
+            for treatment, reference in contrasts
+        ],
+    ]
+    return lines
+
+
+RAMP_QUANTILE_BANDS: Final[int] = 5
+"""How many equal-sized bands `_ramp_disagreement_lines` splits CAMS's ramp and its disagreement
+with SARAH-3 into (S6)."""
+
+DAYTIME_ZENITH_LIMIT_DEG: Final[float] = 80.0
+"""The solar zenith angle below which `_ramp_disagreement_lines`' least-squares fit keeps an hour,
+so a near-horizon hour with a near-zero irradiance does not dominate the fit."""
+
+
+def _ramp_disagreement_lines(*, losses: pl.DataFrame, frame: pl.DataFrame) -> list[str]:
+    """S6: does the enriched gain track CAMS's own ramp, or where CAMS and SARAH-3 disagree?
+
+    Answers whether a timing repair to CAMS's own hourly convention, rather than SARAH-3's
+    hour-by-hour weather, could explain the gain: if the gain grew with CAMS's hour-to-hour ramp,
+    that would point at CAMS's own timing rather than at information SARAH-3 alone carries.
+
+    Args:
+        losses: Every arm's losses, primary setting.
+        frame: The common rows, carrying `ghi_previous_cams`, `ghi_cams`, `ghi_next_cams`, and
+            `ghi_sarah3`.
+
+    Returns:
+        Markdown lines.
+    """
+    treatment, reference = ENRICHED_CONTRASTS[0]
+    per_row = (
+        losses.filter(pl.col("arm") == treatment)
+        .select("site", "time", treatment=pl.col(METRIC))
+        .join(
+            losses.filter(pl.col("arm") == reference).select(
+                "site", "time", reference=pl.col(METRIC)
+            ),
+            on=["site", "time"],
+        )
+        .join(
+            frame.select(
+                "site", "time", "ghi_previous_cams", "ghi_cams", "ghi_next_cams", "ghi_sarah3"
+            ),
+            on=["site", "time"],
+        )
+        .filter(pl.col("ghi_previous_cams").is_not_nan(), pl.col("ghi_next_cams").is_not_nan())
+        .with_columns(
+            gain=(pl.col("reference") - pl.col("treatment")) * PERCENTAGE_POINTS,
+            ramp=(pl.col("ghi_next_cams") - pl.col("ghi_previous_cams")).abs(),
+            disagreement=(pl.col("ghi_sarah3") - pl.col("ghi_cams")).abs(),
+        )
+    )
+    ramp_band = per_row.with_columns(
+        pl.col("ramp").qcut(
+            RAMP_QUANTILE_BANDS, labels=[str(i) for i in range(RAMP_QUANTILE_BANDS)]
+        )
+    )
+    ramp_gain = ramp_band.group_by("ramp").agg(pl.col("gain").mean()).sort("ramp")
+    calmest = float(ramp_gain.filter(pl.col("ramp") == "0")["gain"].item())
+    steepest = float(
+        ramp_gain.filter(pl.col("ramp") == str(RAMP_QUANTILE_BANDS - 1))["gain"].item()
+    )
+    disagreement_band = per_row.with_columns(
+        pl.col("disagreement").qcut(
+            RAMP_QUANTILE_BANDS, labels=[str(i) for i in range(RAMP_QUANTILE_BANDS)]
+        )
+    )
+    disagreement_gain = (
+        disagreement_band.group_by("disagreement").agg(pl.col("gain").mean()).sort("disagreement")
+    )
+    top_disagreement = float(
+        disagreement_gain.filter(pl.col("disagreement") == str(RAMP_QUANTILE_BANDS - 1))[
+            "gain"
+        ].item()
+    )
+    day = frame.filter(
+        pl.col("solar_zenith_deg") < DAYTIME_ZENITH_LIMIT_DEG,
+        pl.col("ghi_previous_cams").is_not_nan(),
+        pl.col("ghi_next_cams").is_not_nan(),
+    )
+    design = day.select("ghi_previous_cams", "ghi_cams", "ghi_next_cams").to_numpy()
+    design = np.concatenate([design, np.ones((design.shape[0], 1))], axis=1)
+    target = day["ghi_sarah3"].to_numpy()
+    coefficients, *_ = np.linalg.lstsq(design, target, rcond=None)
+    previous_coef, current_coef, next_coef, intercept = coefficients
+    return [
+        "#### Exploratory: does the gain track CAMS's ramp, or where CAMS and SARAH-3 disagree?",
+        "",
+        (
+            f"- The gain (`{treatment}` − `{reference}`) does not grow with CAMS's hour-to-hour "
+            f"ramp: {calmest:.2f} points in the calmest fifth of hours against {steepest:.2f} "
+            "points in the steepest fifth."
+        ),
+        (
+            "- The gain is concentrated where CAMS and SARAH-3 disagree most: "
+            f"{top_disagreement:.2f} points in the fifth of hours where the two differ most."
+        ),
+        (
+            "- A least-squares fit of SARAH-3's global irradiance on CAMS's own hour and its "
+            f"neighbours (daytime hours only, solar zenith below {DAYTIME_ZENITH_LIMIT_DEG:.0f}°) "
+            f"gives SARAH-3 ≈ {current_coef:.2f}·CAMS(t) + {previous_coef:.2f}·CAMS(t−1) + "
+            f"{next_coef:.2f}·CAMS(t+1), intercept {intercept:.1f} W/m2: SARAH-3 leans towards "
+            "CAMS's own hour, not towards a shifted one."
+        ),
+    ]
+
+
+def _reconciliation_common_rows(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Return the (site, time) keys this study shares with the training-history blend study.
+
+    Args:
+        frame: The common rows this study scores.
+
+    Returns:
+        One row per shared (site, time) key.
+    """
+    blend_keys = (
+        pl.read_parquet(BLEND_PRODUCTS_LOSSES)
+        .filter(
+            pl.col("setting") == "pooled", pl.col("domain") == "solar", pl.col("arm") == "cams_rich"
+        )
+        .select("site", "time")
+        .unique()
+    )
+    return frame.select("site", "time").unique().join(blend_keys, on=["site", "time"], how="inner")
+
+
+def _gain_frame(*, losses: pl.DataFrame, treatment: str, reference: str) -> pl.DataFrame:
+    """Return each row's per-seed gain (reference minus treatment), keyed for a later join.
+
+    Args:
+        losses: Per-row losses holding both arms.
+        treatment: The arm whose metric is being compared.
+        reference: The arm it is compared against.
+
+    Returns:
+        One row per (site, time, seed), carrying `month` and `gain` (positive means `treatment`
+        beats `reference`).
+    """
+    return (
+        losses.filter(pl.col("arm") == reference)
+        .select("site", "time", "seed", "month", reference=pl.col(METRIC))
+        .join(
+            losses.filter(pl.col("arm") == treatment).select(
+                "site", "time", "seed", treatment=pl.col(METRIC)
+            ),
+            on=["site", "time", "seed"],
+        )
+        .with_columns(gain=pl.col("reference") - pl.col("treatment"))
+        .select("site", "time", "seed", "month", "gain")
+    )
+
+
+def _reconciliation_lines(*, losses: pl.DataFrame, frame: pl.DataFrame) -> list[str]:
+    """M1: reconcile this section's gain against the training-history blend study's own gain.
+
+    Both studies score `cams_rich` on their own row set (this study's from January 2021, the
+    blend study's from December 2022), so the two `cams_rich` fits differ; only each study's own
+    gain over its own `cams_rich`, on the site-hours the two studies share, is compared here.
+
+    Args:
+        losses: Every arm's losses, primary setting.
+        frame: The common rows this study scores.
+
+    Returns:
+        Markdown lines.
+    """
+    common = _reconciliation_common_rows(frame=frame)
+    own_common = losses.join(common, on=["site", "time"])
+    blend_losses = (
+        pl.read_parquet(BLEND_PRODUCTS_LOSSES)
+        .filter(pl.col("setting") == "pooled", pl.col("domain") == "solar")
+        .join(common, on=["site", "time"])
+    )
+    own_gain = bootstrap_difference(
+        losses=own_common, treatment="cams_rich_sarah3_xgb", reference="cams_rich", metric=METRIC
+    )
+    blend_gains = {
+        label: bootstrap_difference(
+            losses=blend_losses, treatment=arm, reference="cams_rich", metric=METRIC
+        )
+        for arm, label in RECONCILIATION_BLEND_STUDY_ARMS
+    }
+    own_cams_rich = own_common.filter(pl.col("arm") == "cams_rich").select(
+        "site", "time", "seed", "month", **{METRIC: pl.col(METRIC)}, arm=pl.lit("own_cams_rich")
+    )
+    blend_cams_rich = blend_losses.filter(pl.col("arm") == "cams_rich").select(
+        "site", "time", "seed", "month", **{METRIC: pl.col(METRIC)}, arm=pl.lit("blend_cams_rich")
+    )
+    reference_gap = bootstrap_difference(
+        losses=pl.concat([own_cams_rich, blend_cams_rich]),
+        treatment="own_cams_rich",
+        reference="blend_cams_rich",
+        metric=METRIC,
+    )
+    own_sarah3_gain = _gain_frame(
+        losses=own_common, treatment="cams_rich_sarah3_xgb", reference="cams_rich"
+    )
+    everything_arm = RECONCILIATION_BLEND_STUDY_ARMS[0][0]
+    blend_everything_gain = _gain_frame(
+        losses=blend_losses, treatment=everything_arm, reference="cams_rich"
+    )
+    joined = own_sarah3_gain.join(
+        blend_everything_gain, on=["site", "time", "seed"], suffix="_blend"
+    ).with_columns(gain_difference=pl.col("gain") - pl.col("gain_blend"))
+    dd_losses = pl.concat(
+        [
+            joined.select(
+                "site", "time", "seed", "month", **{METRIC: pl.col("gain_difference")}
+            ).with_columns(arm=pl.lit("gain_difference")),
+            joined.select("site", "time", "seed", "month").with_columns(
+                **{METRIC: pl.lit(0.0)}, arm=pl.lit("zero")
+            ),
+        ]
+    )
+    gain_difference = bootstrap_difference(
+        losses=dd_losses, treatment="gain_difference", reference="zero", metric=METRIC
+    )
+    gap_value, gap_lower, gap_upper = (
+        reference_gap[key] * PERCENTAGE_POINTS for key in ("difference", "lower_95", "upper_95")
+    )
+    dd_value, dd_lower, dd_upper = (
+        gain_difference[key] * PERCENTAGE_POINTS for key in ("difference", "lower_95", "upper_95")
+    )
+    lines = [
+        "#### Exploratory: reconciling this gain against the training-history blend study's own",
+        "",
+        (
+            f"- {common.height:,} site-hours the two studies share. Each study's `cams_rich` "
+            "differs from the other's, fitted on a different row set, by "
+            f"{gap_value:+.2f} points [{gap_lower:+.2f}, {gap_upper:+.2f}] on these shared hours, "
+            "so only each blend's own gain over its own `cams_rich` is compared below."
+        ),
+        "",
+        "| Blend | Gain over its own `cams_rich` (pp of capacity) | 95% interval |",
+        "|---|---|---|",
+        (
+            f"| CAMS + SARAH-3 | {own_gain['difference'] * PERCENTAGE_POINTS:+.2f} "
+            f"| [{own_gain['lower_95'] * PERCENTAGE_POINTS:+.2f}, "
+            f"{own_gain['upper_95'] * PERCENTAGE_POINTS:+.2f}] |"
+        ),
+    ]
+    lines += [
+        (
+            f"| {label} | {interval['difference'] * PERCENTAGE_POINTS:+.2f} "
+            f"| [{interval['lower_95'] * PERCENTAGE_POINTS:+.2f}, "
+            f"{interval['upper_95'] * PERCENTAGE_POINTS:+.2f}] |"
+        )
+        for label, interval in blend_gains.items()
+    ]
+    lines += [
+        "",
+        (
+            "The CAMS + SARAH-3 gain minus the all-six-products gain, paired by (site, time, "
+            f"seed) on the same shared hours: {dd_value:+.2f} points [{dd_lower:+.2f}, "
+            f"{dd_upper:+.2f}]."
+        ),
+    ]
+    return lines
+
+
 def _feature_lines() -> list[str]:
     """Render every fitted arm's feature columns.
 
@@ -1409,6 +1885,8 @@ def build_report(
         "",
         *_planned_lines(losses=losses),
         "",
+        *_second_product_lines(losses=pooled),
+        "",
         *_headline_fold_lines(losses=pooled),
         "",
         *_negative_control_lines(losses=pooled, rms_difference=rms_difference),
@@ -1422,6 +1900,12 @@ def build_report(
         *_by_clearness_lines(losses=pooled, frame=frame),
         "",
         *_by_year_lines(losses=pooled),
+        "",
+        *_generator_resampled_lines(losses=pooled),
+        "",
+        *_ramp_disagreement_lines(losses=pooled, frame=frame),
+        "",
+        *_reconciliation_lines(losses=pooled, frame=frame),
         "",
         *_feature_lines(),
         "",

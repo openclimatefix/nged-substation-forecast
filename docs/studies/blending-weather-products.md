@@ -462,7 +462,10 @@ its own reference, most of the gain comes from SARAH-3's hour-by-hour values rat
 extra column alone. A single column averaging CAMS's and SARAH-3's global irradiance already gains
 0.12 points over CAMS (exploratory), as much as CAMS's own split gives CAMS (0.12 points,
 exploratory), so part of the gain is two retrievals of the same images averaging out each other's
-errors; no comparison here separates that from weather one retrieval sees and the other misses.
+errors, or two footprints of the same cloud field: CAMS is interpolated from satellite pixels about
+5 km across, and SARAH-3 is read from a 0.05° grid cell 0.8 to 2.8 km away from CAMS's own point, so
+the two rarely see exactly the same patch of cloud. No comparison here separates that spatial
+averaging from weather one retrieval sees and the other misses.
 
 ![Figure 12: Every single product and blend tested here, ranked by its own mean absolute error, with
 CAMS's split plus SARAH-3, enriched with its own neighbouring hours, ranked
@@ -484,29 +487,58 @@ error in each band the gain sits in a narrow band throughout — 5.0% overcast, 
 clear. Broken down by calendar year, restricted to January–August so a partial 2026 compares against
 the same months of every complete year, the gain ranges from 0.18 to 0.28 points and is statistically
 significant every year. These breakdowns share hours and XGBoost models with the whole-record result
-and with one another, so they are not independent tests.
+and with one another, so they are not independent tests. Resampling the six generators with
+replacement instead of the months gives a wider but still positive interval: 0.20 points [0.14, 0.30]
+for the planned comparison and 0.18 points [0.12, 0.30] against CAMS's split with its own
+neighbouring hours (both exploratory), and every one of the 68 scored months gains for both
+comparisons.
+
+**The gain does not track CAMS's own hour-to-hour ramp, so a timing repair to CAMS alone would not
+explain it.** Against CAMS's split with its own neighbouring hours, the gain is 0.21 points in the
+calmest fifth of hours (CAMS's own irradiance changing least from the hour before to the hour after)
+and 0.16 points in the steepest fifth (exploratory), the opposite of what a fix to CAMS's own timing
+convention would predict. The gain is instead concentrated where CAMS and SARAH-3 disagree most:
+0.53 points in the fifth of hours where the two differ most (exploratory). A least-squares fit of
+SARAH-3's global irradiance on CAMS's own hour and its immediate neighbours, restricted to daytime
+hours, gives SARAH-3 ≈ 0.82·CAMS(t) + 0.12·CAMS(t−1) + 0.07·CAMS(t+1): SARAH-3 leans towards CAMS's
+own hour, not towards a shifted one, so the gain looks like genuine disagreement between the two
+retrievals rather than CAMS's hour being mislabelled.
 
 **Blending the two products' global irradiance alone, without CAMS's split, also beats CAMS, but at a
 smaller gain than CAMS's split with SARAH-3 gets against the same reference, CAMS's split.** CAMS
 with SARAH-3, both global, beats CAMS alone by 0.24 points [0.21, 0.27] and its own climatology
 control by 0.26 points [0.23, 0.29] (exploratory). Against CAMS's split, rather than plain CAMS, the
 all-global blend's gain is smaller: 0.12 points [0.09, 0.15] (exploratory), and adding CAMS's own
-split on top of the all-global blend gains a further 0.08 points [0.06, 0.10] (exploratory) —
-together the same 0.20-point gain the planned comparison finds directly against CAMS's split. The
+split on top of the all-global blend gains a further 0.08 points [0.06, 0.10] (exploratory), which by
+construction sum to the 0.20-point gain the planned comparison finds directly against CAMS's split.
+The
 mean of the two products' global irradiance beats CAMS by 0.12 points [0.09, 0.16], the linear stack
 by 0.18 points [0.16, 0.21], and the equal-weight average by 0.13 points [0.10, 0.17], all
 exploratory and all smaller than the XGBoost blend's gain.
 
 **Both negative controls show the pipeline does not manufacture a gain from an uninformative second
 column.** CAMS paired with a copy of itself noised to match the measured CAMS/SARAH-3 gap is 0.01
-points worse than CAMS alone [0.00, 0.01] — statistically significant, but about 30 times smaller
+points worse than CAMS alone [0.00, 0.01] — statistically significant, but about 36 times smaller
 than the 0.20-point gain CAMS's split gets from SARAH-3, and in the wrong direction to explain it.
 CAMS paired with a copy of itself noised at a fixed 5 W/m2, close to a duplicate column, is not
 statistically significant at the 5% level (0.00 points [−0.00, +0.01]). Neither control comes close
 to the size or the sign of the gain SARAH-3 itself adds.
 
-![Figure 14: The all-global blend, a simple mean or a linear stack, both negative controls, and the
-same-reference comparisons the lead needs](assets/satellite_blend_exploratory.svg)
+![Figure 14: The all-global blend, a simple mean and a linear stack, both negative controls, and
+further comparisons among CAMS, CAMS's split, and
+SARAH-3](assets/satellite_blend_exploratory.svg)
+
+**No other second product beats CAMS's split by as much as SARAH-3 does.** ERA5 and ICON-DREAM-EU
+each cover the same rows as SARAH-3, so both can be blended with CAMS's split the same way, each
+with its own climatology control. CAMS's split with ERA5 gains 0.10 points [0.08, 0.12] over plain
+CAMS's split and 0.11 points [0.09, 0.13] over its own control; CAMS's split with ICON-DREAM-EU
+gains 0.10 points [0.08, 0.12] and 0.11 points [0.09, 0.13] (all post hoc). Both are real gains, each
+statistically significant at the 5% level, but each is about half of SARAH-3's 0.20-point gain over
+the same reference: SARAH-3 is not merely one second column among several that happens to help, and
+the size of its gain is unusual among the products tested here.
+
+![Figure 15: No other second product beats CAMS's split by as much as SARAH-3
+does](assets/satellite_blend_second_product.svg)
 
 ## What to use
 
@@ -526,7 +558,7 @@ gives each set's latency, which consumers can read it, and the first scored hour
 | Wind | UKV and ICON-EU | about 6 hours | yes | no | no | August 2024 | 12 August 2024 |
 | Wind | Four weather models | about 6 hours | no | no | yes | August 2024 | 12 August 2024 |
 | Wind | All five products | about 5.1 days | no | yes | yes | August 2024 | 12 August 2024 |
-| Solar | CAMS and SARAH-3 | about 2 to 5 days | no | yes | no | January 2021 | 1 January 2021 |
+| Solar | CAMS and SARAH-3 | about 2 to 5 days | no | yes | no | 2004 (SARAH-3's Interim Climate Data Record from January 2021) | 1 January 2021 |
 
 **These recommendations rest on 6 solar farms and 3 wind farms in one part of Lincolnshire,
 over less than 4 years for solar and 2 years for wind.**
@@ -548,10 +580,17 @@ over less than 4 years for solar and 2 years for wind.**
   gain of 0.07 points (exploratory), measured only from December 2022. CAMS with SARAH-3 also gains
   0.20 points over plain CAMS's own split (planned) and 0.18 points over CAMS's split with its own
   neighbouring hours (post hoc), on a different row set, longer but holding four products, from
-  January 2021, so the two results are not on the same rows and do not say which of the two blends
-  is better; the CAMS-with-SARAH-3 result shows only that two satellite retrievals, without any
-  weather model, already give a blend gain. SARAH-3's record before 2021 is a change of source, from
-  its Climate Data Record to its Interim Climate Data Record, and is untested.
+  January 2021, so the two blends were not fitted on the same rows. On the 76,727 site-hours the two
+  studies share, each blend's gain over its own study's CAMS's split with its own neighbouring hours
+  is 0.19 points [0.16, 0.23] for CAMS with SARAH-3, 0.13 points [0.10, 0.17] for all six products,
+  and 0.10 points [0.07, 0.13] for CAMS with ICON-EU (exploratory): CAMS with SARAH-3 gave the larger
+  gain, by 0.06 points [0.01, 0.10] over the six-product blend. The two studies' own reference models
+  differ by 0.16 points on these shared hours, so only each blend's own gain, not the reference
+  models themselves, compares across the studies. Where CAMS and SARAH-3 both cover the training
+  period, CAMS with SARAH-3 is therefore the stronger of the two recommendations; both products take
+  their clouds from satellite images rather than from a weather model, and no other second product
+  tested gains as much as SARAH-3 does (above). Before 2021 SARAH-3 comes from its Climate Data
+  Record rather than the Interim Climate Data Record scored here, and the blend is untested there.
 - **Capacity estimation and disaggregation: no recommendation.** Both have to read a product's
   weather without an XGBoost model fitted to the generator's own output, and every gain here exists
   only after an XGBoost model is fitted to that generator's output. The single-product

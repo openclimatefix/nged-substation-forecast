@@ -9,7 +9,7 @@ each arm's own absolute error, bootstrapped straight from `losses.parquet` with 
 month-and-seed resampling the report's contrasts use.
 
 Generators appear only as `A` to `F`, and every output is a fraction of the generator's own
-capacity. Follow the style of `blend_product_charts.py`. Figures are numbered 12 to 14, continuing
+capacity. Follow the style of `blend_product_charts.py`. Figures are numbered 12 to 15, continuing
 `docs/studies/blending-weather-products.md`'s own Figures 1 to 11.
 
 Run it with `uv run python studies/beam_diffuse_split/blend_satellites_charts.py`, after
@@ -33,6 +33,7 @@ from blend_satellites import (
     OUTPUT_DIR,
     PERCENTAGE_POINTS,
     PLANNED_CONTRASTS,
+    SECOND_PRODUCT_CONTRASTS,
 )
 from studies.bootstrap import bootstrap_absolute
 from studies.charts import (
@@ -66,6 +67,10 @@ NAMES: Final[dict[str, str]] = {
     "cams_rich": "CAMS (split + neighbouring hours)",
     "cams_rich_sarah3_xgb": "CAMS (split + neighbouring hours) + SARAH-3 (XGBoost)",
     "cams_rich_sarah3_control": "CAMS (split + neighbouring hours) + SARAH-3 (control)",
+    "cams_split_era5_xgb": "CAMS split + ERA5 (XGBoost)",
+    "cams_split_era5_control": "CAMS split + ERA5 (control)",
+    "cams_split_icon_dream_xgb": "CAMS split + ICON-DREAM-EU (XGBoost)",
+    "cams_split_icon_dream_control": "CAMS split + ICON-DREAM-EU (control)",
 }
 """Each arm's name as the page writes it. Every blend names both products it reads."""
 
@@ -81,8 +86,11 @@ SECTION_NEGATIVE_CONTROL: Final[str] = (
     "Negative controls: CAMS plus a noised copy of itself, against CAMS alone"
 )
 SECTION_METHODS: Final[str] = (
-    "Exploratory: the all-global blend, the mean, stack and equal blends, and the same-reference "
-    "comparisons the lead needs"
+    "Exploratory: the all-global blend, the mean, stack and equal blends, and further comparisons "
+    "among CAMS, CAMS's split, and SARAH-3"
+)
+SECTION_SECOND_PRODUCT: Final[str] = (
+    "Post hoc: does a second product other than SARAH-3 help CAMS's split as much?"
 )
 
 CAPACITY: Final[str] = "Capacity is each generator's 99th-percentile output."
@@ -247,15 +255,18 @@ def _headline(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     return figure(
         panels=[panel],
         number=13,
-        figure_planning=planning(rows=[rows]),
+        # The shared "mixed" planning note calls every non-planned row "exploratory", which would
+        # contradict the post hoc rows this subtitle already names correctly (S2), so the note is
+        # suppressed here and the subtitle states planned/post hoc itself.
+        figure_planning=None,
         title=(
             "Does CAMS's split plus SARAH-3 beat CAMS's split, with and without CAMS's own "
             "neighbouring hours, and does the gain survive a climatology control?"
         ),
         subtitle=[
             (
-                "Rows against plain CAMS (split) are the planned comparisons. Rows against CAMS "
-                "(split + neighbouring hours) are post hoc, added after the first science review."
+                "Rows against plain CAMS (split) are the two planned comparisons; the other two, "
+                "against CAMS (split + neighbouring hours), are post hoc."
             ),
             DOTS,
             CAPACITY,
@@ -304,8 +315,8 @@ def _exploratory(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         number=14,
         figure_planning="exploratory",
         title=(
-            "The all-global blend, a simple mean or a linear stack, both negative controls, and "
-            "the same-reference comparisons the lead needs"
+            "The all-global blend, a simple mean and a linear stack, both negative controls, and "
+            "further comparisons among CAMS, CAMS's split, and SARAH-3"
         ),
         subtitle=[
             "Every row's label names its own treatment and reference arm.",
@@ -320,8 +331,69 @@ def _exploratory(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     )
 
 
+def _second_product(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
+    """Draw S7's post hoc contrasts: does ERA5 or ICON-DREAM-EU help CAMS's split as much?
+
+    Args:
+        contrasts: Every contrast row in the report.
+
+    Returns:
+        Figure 15.
+    """
+    sarah3_contrast = PLANNED_CONTRASTS[0]
+    sarah3_row = select_contrasts(
+        contrasts=contrasts, wanted=[ContrastKey(SECTION_PLANNED, "all", *sarah3_contrast)]
+    )
+    other_rows = select_contrasts(
+        contrasts=contrasts,
+        wanted=[
+            ContrastKey(SECTION_SECOND_PRODUCT, "all", t, r) for t, r in SECOND_PRODUCT_CONTRASTS
+        ],
+    )
+    labels = [
+        f"{NAMES[sarah3_contrast[0]]} − {NAMES[sarah3_contrast[1]]}",
+        *(f"{NAMES[t]} − {NAMES[r]}" for t, r in SECOND_PRODUCT_CONTRASTS),
+    ]
+    rows = (
+        pl.concat([sarah3_row, other_rows])
+        .select("difference", "lower_95", "upper_95")
+        .with_columns(
+            label=pl.Series(labels),
+            family=pl.lit("satellite"),
+            planned=pl.Series([True, False, False, False, False]),
+        )
+    )
+    panel = interval_panel(
+        rows=rows,
+        x_domain=_contrast_domain(rows=rows),
+        x_title=CONTRAST_X_TITLE,
+        zero_label=ZERO_LABEL,
+        better_label=BETTER_LABEL,
+        figure_planning="mixed",
+    )
+    return figure(
+        panels=[panel],
+        number=15,
+        # The shared "mixed" note would call the SARAH-3 row "planned" and every other row
+        # "exploratory", but the other three rows are post hoc, so the note is suppressed and the
+        # subtitle states each row's kind itself.
+        figure_planning=None,
+        title="No other second product beats CAMS's split by as much as SARAH-3 does",
+        subtitle=[
+            (
+                "The top row, against plain CAMS (split), is the planned SARAH-3 comparison; the "
+                "other three are post hoc. Each control keeps the second product's climatology "
+                "but shuffles its hour-by-hour values."
+            ),
+            DOTS,
+            CAPACITY,
+            SCOPE,
+        ],
+    )
+
+
 def main() -> int:
-    """Read the report and the losses, and write the three SVGs."""
+    """Read the report and the losses, and write the four SVGs."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     argparse.ArgumentParser(description=__doc__).parse_args()
     report_path = OUTPUT_DIR / "report.md"
@@ -331,6 +403,7 @@ def main() -> int:
         "satellite_blend_leaderboard": _leaderboard(losses=losses),
         "satellite_blend_headline": _headline(contrasts=contrasts),
         "satellite_blend_exploratory": _exploratory(contrasts=contrasts),
+        "satellite_blend_second_product": _second_product(contrasts=contrasts),
     }
     for name, chart in charts.items():
         path = ASSETS_DIR / f"{name}.svg"
