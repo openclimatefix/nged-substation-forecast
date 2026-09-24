@@ -5,9 +5,8 @@ One-off throwaway script for the charts of the ECMWF addition to
 in `wind_icon_dream_charts.py`'s style. **Every number a chart shares with the page is read from
 `intervals.parquet` or `report.md`, both written by `ens_hres_past_wind.py`**, so a chart cannot
 disagree with the page. Before any chart is saved, `Source.verify` requires every interval a chart
-draws, printed the way the report prints it, to be in `report.md`, and `_check_title_numbers`
-requires every decimal number in a chart's title to be a report number rounded to the title's
-precision.
+draws, printed the way the report prints it, to be in `report.md`. Each title that states a sign or
+a significance checks it against the saved intervals before the chart is saved.
 
 Generators appear only as `W1` to `W3`. The only chart that plots a generator's output is the
 "models work" time series, which counts days 1 to 7 of a week and carries no calendar date. Every
@@ -26,17 +25,18 @@ import argparse
 import logging
 import re
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from datetime import UTC, datetime, timedelta
-from decimal import ROUND_HALF_UP, Decimal
+from types import MappingProxyType
 from typing import Any, Final
 
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
-from check_page_numbers import _report_numbers
 from ens_hres_past_wind import OUTPUT_DIR
 from studies.charts import (
+    CONTENT_WIDTH_PX,
     PLOT_WIDTH_PX,
     figure,
     interval_panel,
@@ -65,26 +65,30 @@ _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 SITES: Final[tuple[str, ...]] = ("W1", "W2", "W3")
 """The anonymous wind farm labels."""
 
-NAMES: Final[dict[str, str]] = {
-    "era5": "ERA5",
-    "ukv": "UKV",
-    "icon_d2": "ICON-D2",
-    "icon_eu": "ICON-EU",
-    "icon_global": "ICON global",
-    "hres": "ECMWF HRES",
-    "ens_mean_day0": "ECMWF ENS day-0 mean",
-}
+NAMES: Final[Mapping[str, str]] = MappingProxyType(
+    {
+        "era5": "ERA5",
+        "ukv": "UKV",
+        "icon_d2": "ICON-D2",
+        "icon_eu": "ICON-EU",
+        "icon_global": "ICON global",
+        "hres": "ECMWF HRES",
+        "ens_mean_day0": "ECMWF ENS day-0 mean",
+    }
+)
 """Every product's public name, as the page writes it."""
 
-FAMILIES: Final[dict[str, str]] = {
-    "era5": "reanalysis",
-    "ukv": "weather model",
-    "icon_d2": "weather model",
-    "icon_eu": "weather model",
-    "icon_global": "weather model",
-    "hres": "weather model",
-    "ens_mean_day0": "weather model",
-}
+FAMILIES: Final[Mapping[str, str]] = MappingProxyType(
+    {
+        "era5": "reanalysis",
+        "ukv": "weather model",
+        "icon_d2": "weather model",
+        "icon_eu": "weather model",
+        "icon_global": "weather model",
+        "hres": "weather model",
+        "ens_mean_day0": "weather model",
+    }
+)
 """Every product's family, which sets its colour in `studies.charts`."""
 
 HRES_COLOUR: Final[str] = ocf.DATA_BLUE
@@ -124,6 +128,12 @@ FIGURE_RECONCILIATION: Final[int] = 17
 FIGURE_MONTHLY_RATIO: Final[int] = 18
 FIGURE_SPLIT: Final[int] = 19
 FIGURE_BY_FARM: Final[int] = 20
+
+MODELS_WORK_AXIS_PX: Final[int] = 88
+"""The width of a week panel's y axis and gutter beyond its plot area, measured on the saved SVG."""
+
+MODELS_WORK_PANEL_WIDTH_PX: Final[int] = (CONTENT_WIDTH_PX - MODELS_WORK_AXIS_PX - 32) // 3
+"""The plot width of each of Figure 14's three week columns, so the figure fills the text column."""
 
 DOMAIN_MARGIN: Final[float] = 0.15
 """How far past the lowest and highest value a difference chart's x domain extends."""
@@ -228,35 +238,13 @@ def _printed_line(*, row: dict[str, Any], scope: str) -> str:
     value, lower, upper = row["value"], row["lower"], row["upper"]
     if row["reference"] is None:
         return (
-            f"| {row['treatment']} | {value:.3f} | [{lower:.3f}, {upper:.3f}] "
+            f"| {row['treatment']} | {value:.4f} | [{lower:.4f}, {upper:.4f}] "
             f"| {row['n_rows']:,} | {row['n_months']} |"
         )
     return (
-        f"| {scope} | {row['treatment']} − {row['reference']} | {value:+.3f} "
-        f"| [{lower:+.3f}, {upper:+.3f}] |"
+        f"| {scope} | {row['treatment']} − {row['reference']} | {value:+.4f} "
+        f"| [{lower:+.4f}, {upper:+.4f}] |"
     )
-
-
-def _check_title_numbers(*, title: str, report: str) -> None:
-    """Stop unless every decimal number in a title is a report number rounded to the title's places.
-
-    Args:
-        title: A chart's title.
-        report: `report.md`'s text.
-
-    Raises:
-        ValueError: If a decimal number in the title matches no report number.
-    """
-    reported = _report_numbers(report_text=report)
-    for printed in re.findall(r"\d+\.\d+", title):
-        places = len(printed.split(".")[1])
-        step = Decimal(1).scaleb(-places)
-        rounded = {
-            abs(Decimal(number)).quantize(step, rounding=ROUND_HALF_UP) for number in reported
-        }
-        if Decimal(printed) not in rounded:
-            msg = f"the title number {printed} is not a report number rounded to {places} places"
-            raise ValueError(msg)
 
 
 def _difference_domain(*, rows: pl.DataFrame) -> tuple[float, float]:
@@ -271,6 +259,37 @@ def _difference_domain(*, rows: pl.DataFrame) -> tuple[float, float]:
     low = min(0.0, *rows["lower_95"].to_list()) - DOMAIN_MARGIN
     high = max(0.0, *rows["upper_95"].to_list()) + DOMAIN_MARGIN
     return (round(low * 10) / 10, round(high * 10) / 10)
+
+
+def _difference_record(
+    *,
+    label: str,
+    family: str,
+    row: dict[str, Any],
+    planned: bool,
+    **extra: str,
+) -> dict[str, Any]:
+    """Return one difference row of an interval panel, from an `intervals.parquet` row.
+
+    Args:
+        label: The row's label on the panel.
+        family: The family that sets the row's colour.
+        row: The interval, from `Source.row`.
+        planned: Whether the row is one of the study's three planned contrasts.
+        **extra: Further columns, such as `condition`.
+
+    Returns:
+        The record, with `label`, `family`, `difference`, `lower_95`, `upper_95` and `planned`.
+    """
+    return {
+        "label": label,
+        "family": family,
+        "difference": row["value"],
+        "lower_95": row["lower"],
+        "upper_95": row["upper"],
+        "planned": planned,
+        **extra,
+    }
 
 
 def _contrast_rows(
@@ -296,31 +315,65 @@ def _contrast_rows(
         The rows in the order of `contrasts`, with `label`, `family`, `difference`, `lower_95`,
         `upper_95` and `planned`.
     """
-    records = []
-    for label, treatment, reference in contrasts:
-        row = source.row(
-            section=section,
-            scope=scope,
-            treatment=f"{treatment}_wind",
-            reference=f"{reference}_wind",
-            setting=setting,
-        )
-        records.append(
-            {
-                "label": label,
-                "family": FAMILIES[treatment],
-                "difference": row["value"],
-                "lower_95": row["lower"],
-                "upper_95": row["upper"],
-                "planned": planned,
-            }
-        )
-    return pl.DataFrame(records)
+    return pl.DataFrame(
+        [
+            _difference_record(
+                label=label,
+                family=FAMILIES[treatment],
+                row=source.row(
+                    section=section,
+                    scope=scope,
+                    treatment=f"{treatment}_wind",
+                    reference=f"{reference}_wind",
+                    setting=setting,
+                ),
+                planned=planned,
+            )
+            for label, treatment, reference in contrasts
+        ]
+    )
 
 
 def _name_pair(*, treatment: str, reference: str) -> str:
     """Return a contrast's row label, such as `ECMWF HRES − UKV`."""
     return f"{NAMES[treatment]} − {NAMES[reference]}"
+
+
+def _row_counts(*, source: Source) -> tuple[int, int, datetime, datetime]:
+    """Return the row and month counts every chart states, and the first and last day of the rows.
+
+    Args:
+        source: The saved results.
+
+    Returns:
+        The pooled leaderboard's row and month counts, and the first and last date, read from the
+        report's heading.
+
+    Raises:
+        ValueError: If the report has no heading with a row count and dates, or the heading's row
+            count disagrees with `intervals.parquet`.
+    """
+    match = re.search(
+        r"on ([\d,]+) common farm-hours \((\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2})\)",
+        source.report,
+    )
+    if match is None:
+        msg = "report.md has no 'on N common farm-hours (start to end)' heading"
+        raise ValueError(msg)
+    rows = int(match[1].replace(",", ""))
+    board = source.intervals.filter(
+        pl.col("section") == "leaderboard", pl.col("setting") == "pooled", pl.col("scope") == "all"
+    )
+    counts = board.select(rows=pl.col("n_rows").unique(), months=pl.col("n_months").unique())
+    if counts["rows"].to_list() != [rows] or counts["months"].n_unique() != 1:
+        msg = f"the report heading's {rows} rows disagree with intervals.parquet: {counts}"
+        raise ValueError(msg)
+    return (
+        rows,
+        counts["months"][0],
+        datetime.fromisoformat(match[2]),
+        datetime.fromisoformat(match[3]),
+    )
 
 
 def _scope_line(*, source: Source) -> str:
@@ -331,39 +384,12 @@ def _scope_line(*, source: Source) -> str:
 
     Returns:
         A sentence read from the report's heading and the pooled leaderboard.
-
-    Raises:
-        ValueError: If the report has no heading with a row count and dates.
     """
-    match = re.search(
-        r"on ([\d,]+) common farm-hours \((\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2})\)",
-        source.report,
-    )
-    if match is None:
-        msg = "report.md has no 'on N common farm-hours (start to end)' heading"
-        raise ValueError(msg)
-    rows = int(match[1].replace(",", ""))
-    first = datetime.fromisoformat(match[2])
-    last = datetime.fromisoformat(match[3])
-    board = source.intervals.filter(
-        pl.col("section") == "leaderboard", pl.col("setting") == "pooled", pl.col("scope") == "all"
-    )
-    counts = board.select(rows=pl.col("n_rows").unique(), months=pl.col("n_months").unique())
-    if counts["rows"].to_list() != [rows] or counts["months"].n_unique() != 1:
-        msg = f"the report heading's {rows} rows disagree with intervals.parquet: {counts}"
-        raise ValueError(msg)
+    rows, months, first, last = _row_counts(source=source)
     return (
         f"Three wind farms in Lincolnshire, {first:%B %Y} to {last:%B %Y}: {rows:,} farm-hours in "
-        f"{counts['months'][0]} calendar months. Three farms are few independent sites."
+        f"{months} calendar months. Three farms are few independent sites."
     )
-
-
-def _row_counts(*, source: Source) -> tuple[int, int]:
-    """Return the pooled leaderboard's row and month counts, as `_scope_line` checked them."""
-    board = source.intervals.filter(
-        pl.col("section") == "leaderboard", pl.col("scope") == "all", pl.col("setting") == "pooled"
-    )
-    return board["n_rows"][0], board["n_months"][0]
 
 
 def _leaderboard_rows(*, source: Source, scope: str, products: tuple[str, ...]) -> pl.DataFrame:
@@ -396,6 +422,27 @@ def _leaderboard_rows(*, source: Source, scope: str, products: tuple[str, ...]) 
             }
         )
     return pl.DataFrame(records).sort("value")
+
+
+def _require_headline_claims(*, planned: pl.DataFrame) -> None:
+    """Stop unless the three planned contrasts support Figure 13's title.
+
+    Args:
+        planned: The three planned contrasts' rows, P1 to P3 in order, with `difference`,
+            `lower_95` and `upper_95`.
+
+    Raises:
+        ValueError: If HRES minus UKV or ENS day 0 minus UKV is not positive, HRES minus ERA5 is
+            not negative, or any of the three intervals includes zero.
+    """
+    signs = [1 if difference > 0 else -1 for difference in planned["difference"].to_list()]
+    significant = ((planned["lower_95"] > 0) | (planned["upper_95"] < 0)).to_list()
+    if signs != [1, 1, -1] or not all(significant):
+        msg = (
+            "Figure 13's title says UKV beats HRES and ENS day 0 and HRES beats ERA5, each "
+            f"significantly; the signs are {signs} and significance is {significant}"
+        )
+        raise ValueError(msg)
 
 
 def _headline(*, source: Source) -> tuple[alt.VConcatChart, str]:
@@ -450,12 +497,13 @@ def _headline(*, source: Source) -> tuple[alt.VConcatChart, str]:
             (exploratory, "Paired differences: two exploratory contrasts", False, True),
         )
     ]
+    _require_headline_claims(planned=planned)
     p1, p2, p3 = (planned["difference"][i] for i in range(3))
     title = (
         f"UKV beats ECMWF's HRES by {p1:.2f} points and ENS day 0 by {p2:.2f}, and HRES beats "
         f"ERA5 by {-p3:.2f}"
     )
-    rows, months = _row_counts(source=source)
+    rows, months, _, _ = _row_counts(source=source)
     return (
         figure(
             panels=[leaderboard, *panels],
@@ -563,6 +611,7 @@ def _models_work(*, losses: pl.DataFrame) -> tuple[alt.VConcatChart, str]:
             colours=(ocf.TEXT, HRES_COLOUR, ENS_COLOUR),
             number=FIGURE_MODELS_WORK,
             title=title,
+            panel_width=MODELS_WORK_PANEL_WIDTH_PX,
             subtitle=[
                 "Out-of-fold power as a percentage of the generator's own capacity, days 1 to 7.",
                 (
@@ -588,8 +637,8 @@ def _per_farm_error(*, source: Source) -> tuple[alt.VConcatChart, str]:
         Figure 15, and its title.
 
     Raises:
-        ValueError: If the title's claim (ICON-D2 lowest and HRES ahead of ENS at every farm)
-            does not hold in the saved results.
+        ValueError: If the title's claim does not hold in the saved results: ICON-D2's error is the
+            lowest, and HRES's error is below ENS day 0's, at every farm.
     """
     per_farm = {
         site: _leaderboard_rows(source=source, scope=f"site {site}", products=PER_FARM_PRODUCTS)
@@ -617,8 +666,8 @@ def _per_farm_error(*, source: Source) -> tuple[alt.VConcatChart, str]:
         for site, rows in per_farm.items()
     ]
     title = (
-        "ICON-D2 has the lowest error at each of the three farms, and ECMWF HRES is ahead of ENS "
-        "day 0 at each"
+        "ICON-D2 has the lowest error at each of the three farms, and ECMWF HRES's error is lower "
+        "than ENS day 0's at each"
     )
     return (
         figure(
@@ -640,19 +689,27 @@ def _per_farm_error(*, source: Source) -> tuple[alt.VConcatChart, str]:
     )
 
 
-DESIGN_LABELS: Final[dict[str, str]] = {
-    "study design": "The study's design: three eras, third era's folds rotated",
-    "study design, May 2026 rows removed": "The study's design, May 2026 rows removed",
-    "three eras, no fold rotation": "Three eras, no fold rotation",
-    "two UKV eras (the page's design)": "Two UKV eras, as the rest of the page",
-    "study folds, two-valued era_code": "The study's folds, era code with two values",
-    "extra era cut at IFS 50r1, May 2026 dropped": "Extra era cut at IFS Cycle 50r1, May dropped",
-}
-"""Each fold design in `losses_fold_designs.parquet`, as the chart labels it, in the order drawn."""
+DESIGN_LABELS: Final[Mapping[str, str]] = MappingProxyType(
+    {
+        "study design": "The study's design: three eras, third era's folds rotated",
+        "study design, May 2026 rows removed": "The study's design, May 2026 rows removed",
+        "three eras, no fold rotation": "Three eras, no fold rotation",
+        "two UKV eras (the page's design)": "Two UKV eras, as the rest of the page",
+        "study folds, two-valued era_code": "The study's folds, era code with two values",
+        "extra era cut at IFS 50r1, May 2026 dropped": "Extra era cut at IFS 50r1, May dropped",
+    }
+)
+"""Each fold design in `losses_fold_designs.parquet`, as the chart labels it, in the order drawn.
+
+The first row is the study's own design, so its rows are the planned contrasts.
+"""
+
+STUDY_DESIGN: Final[str] = "study design"
+"""The key of `DESIGN_LABELS` whose rows are the planned contrasts themselves."""
 
 
 def _robustness(*, source: Source) -> tuple[alt.VConcatChart, str]:
-    """Draw P1 to P3 under each of six fold designs.
+    """Draw P1 to P3 under the study's design, one row subset of it, and four other fold designs.
 
     Args:
         source: The saved results.
@@ -673,7 +730,7 @@ def _robustness(*, source: Source) -> tuple[alt.VConcatChart, str]:
                 section="fold designs",
                 scope=design,
                 contrasts=[(design_label, treatment, reference)],
-                planned=False,
+                planned=design == STUDY_DESIGN,
             )
             for design, design_label in DESIGN_LABELS.items()
         )
@@ -692,27 +749,30 @@ def _robustness(*, source: Source) -> tuple[alt.VConcatChart, str]:
                 better_label="first-named product better",
                 panel_title=f"{label}: {_name_pair(treatment=treatment, reference=reference)}",
                 reference_labels=index == 0,
-                figure_planning="exploratory",
+                figure_planning="mixed",
             )
         )
     title = (
         "Each planned contrast keeps its sign and stays statistically significant at the 5% level "
-        "under all six fold designs"
+        "under five fold designs and one row subset"
     )
     return (
         figure(
             panels=panels,
             number=FIGURE_ROBUSTNESS,
-            figure_planning="exploratory",
+            figure_planning="mixed",
             title=title,
             subtitle=[
                 (
-                    "The three planned contrasts refitted under each fold design. The designs were "
-                    "added after the first results, so every row here is exploratory."
+                    "The three planned contrasts, refitted under each fold design. The first row "
+                    "of each panel is the planned contrast itself. The other designs were added "
+                    "after the first results, so those rows are exploratory."
                 ),
                 (
                     "A fold is a block of whole months held out for scoring. A design says where "
-                    "the blocks are cut and what the XGBoost model is told about each hour's era."
+                    "the blocks are cut and what the XGBoost model is told about each hour's era. "
+                    "The second row scores the study's own fits without the rows of May 2026, the "
+                    "rows the last design drops."
                 ),
                 f"{DOTS} {CAPACITY}",
                 _scope_line(source=source),
@@ -724,6 +784,7 @@ def _robustness(*, source: Source) -> tuple[alt.VConcatChart, str]:
 
 LONG_DESIGNS: Final[tuple[tuple[str, str], ...]] = (
     ("long rows: two UKV eras, no cut at 49r1 (horizons design)", "Folds as on the horizons page"),
+    ("long rows: two UKV eras, no cut at 49r1, folds rotated", "Same eras, folds rotated"),
     ("long rows: extra era cut at 2024-12-01", "Extra era cut at 1 December 2024"),
 )
 """The `intervals.parquet` section of each long-row-set design, and its condition name."""
@@ -733,6 +794,9 @@ LONG_SCOPES: Final[tuple[tuple[str, str], ...]] = (
     ("rows from 2024-12-01", "rows from 1 December 2024"),
 )
 """Each long-row-set scope's cell in the report, and its label."""
+
+LONG_TREATMENTS: Final[tuple[str, ...]] = ("ens_mean_day0_wind", "hres_wind")
+"""The two ECMWF arms Figure 17 draws against ERA5."""
 
 
 def _horizons_published(*, source: Source) -> pl.DataFrame:
@@ -767,10 +831,32 @@ def _horizons_published(*, source: Source) -> pl.DataFrame:
     )
 
 
+def _uncovered_cells(*, source: Source, design: str) -> int:
+    """Return how many cells a design leaves without training rows, from the report's table.
+
+    Args:
+        source: The saved results.
+        design: The design's name in the report's coverage table, without its `long rows: ` prefix.
+
+    Returns:
+        The count of (site, fold, calendar month) cells with no training row for a calendar month
+        that occurs in two years.
+
+    Raises:
+        ValueError: If the report's coverage tables hold no row for the design.
+    """
+    for line in source.report.splitlines():
+        cells = [cell.strip() for cell in line.strip().strip("|").split("|")]
+        if line.startswith("|") and cells[0] == design and len(cells) == 4:
+            return int(cells[2])
+    msg = f"report.md has no coverage row for {design!r}"
+    raise ValueError(msg)
+
+
 def _long_rows_panel(
     *, source: Source, treatment: str, panel_title: str, x_domain: tuple[float, float], last: bool
 ) -> alt.LayerChart | alt.VConcatChart:
-    """Draw one long-row-set contrast under both fold designs, on two row sets.
+    """Draw one long-row-set contrast under every fold design, on two row sets.
 
     Args:
         source: The saved results.
@@ -782,26 +868,19 @@ def _long_rows_panel(
     Returns:
         The panel.
     """
-    records = []
-    for scope, scope_label in LONG_SCOPES:
-        for section, condition in LONG_DESIGNS:
-            row = source.row(
-                section=section,
-                scope=scope,
-                treatment=treatment,
-                reference="era5_wind",
-            )
-            records.append(
-                {
-                    "label": scope_label[0].upper() + scope_label[1:],
-                    "condition": condition,
-                    "family": "weather model",
-                    "difference": row["value"],
-                    "lower_95": row["lower"],
-                    "upper_95": row["upper"],
-                    "planned": False,
-                }
-            )
+    records = [
+        _difference_record(
+            label=scope_label[0].upper() + scope_label[1:],
+            family="weather model",
+            row=source.row(
+                section=section, scope=scope, treatment=treatment, reference="era5_wind"
+            ),
+            planned=False,
+            condition=condition,
+        )
+        for scope, scope_label in LONG_SCOPES
+        for section, condition in LONG_DESIGNS
+    ]
     return interval_panel(
         rows=pl.DataFrame(records),
         x_domain=x_domain,
@@ -809,6 +888,7 @@ def _long_rows_panel(
         zero_label="no difference",
         better_label="first-named product better",
         conditions=[condition for _, condition in LONG_DESIGNS],
+        condition_colours=(HRES_COLOUR, ENS_COLOUR, ocf.BLACK_1),
         condition_title="Fold design",
         panel_title=panel_title,
         reference_labels=not last,
@@ -816,8 +896,39 @@ def _long_rows_panel(
     )
 
 
+def _require_reconciliation_claims(*, source: Source) -> None:
+    """Stop unless an era cut at IFS Cycle 49r1 moves the scores far more than rotating folds does.
+
+    Args:
+        source: The saved results.
+
+    Raises:
+        ValueError: If, for either ECMWF arm on either row set, rotating the folds moves the
+            difference from ERA5 by as much as the smallest move the extra era cut makes from
+            either design without it, or the cut moves it the wrong way.
+    """
+    horizons, rotated, cut = (section for section, _ in LONG_DESIGNS)
+    for treatment in LONG_TREATMENTS:
+        for scope, _ in LONG_SCOPES:
+            value = {
+                section: source.row(
+                    section=section, scope=scope, treatment=treatment, reference="era5_wind"
+                )["value"]
+                for section in (horizons, rotated, cut)
+            }
+            rotation_move = abs(value[rotated] - value[horizons])
+            cut_moves = [value[without] - value[cut] for without in (horizons, rotated)]
+            if min(cut_moves) <= 0 or rotation_move >= min(cut_moves):
+                msg = (
+                    f"{treatment} on {scope}: rotating folds moves the difference by "
+                    f"{rotation_move:.3f} and the era cut by {cut_moves}, so Figure 17's title "
+                    "is wrong"
+                )
+                raise ValueError(msg)
+
+
 def _reconciliation(*, source: Source) -> tuple[alt.VConcatChart, str]:
-    """Draw ENS and HRES against ERA5 under the horizons page's folds and under an extra era cut.
+    """Draw ENS and HRES against ERA5 under three fold designs.
 
     Args:
         source: The saved results.
@@ -825,39 +936,53 @@ def _reconciliation(*, source: Source) -> tuple[alt.VConcatChart, str]:
     Returns:
         Figure 17, and its title.
     """
+    _require_reconciliation_claims(source=source)
     published = _horizons_published(source=source)
-    every = []
-    counts: dict[str, tuple[int, int]] = {}
-    for treatment in ("ens_mean_day0_wind", "hres_wind"):
-        for section, _ in LONG_DESIGNS:
-            for scope, _ in LONG_SCOPES:
-                row = source.row(
-                    section=section, scope=scope, treatment=treatment, reference="era5_wind"
-                )
-                counts[scope] = (row["n_rows"], row["n_months"])
-                every.append({"lower_95": row["lower"], "upper_95": row["upper"]})
-    domain = _difference_domain(rows=pl.DataFrame(every))
+    every = pl.DataFrame(
+        [
+            {"lower_95": row["lower"], "upper_95": row["upper"]}
+            for treatment in LONG_TREATMENTS
+            for section, _ in LONG_DESIGNS
+            for scope, _ in LONG_SCOPES
+            for row in [
+                source.row(section=section, scope=scope, treatment=treatment, reference="era5_wind")
+            ]
+        ]
+    )
+    domain = _difference_domain(rows=every)
     panels = [
         _long_rows_panel(
             source=source,
-            treatment="ens_mean_day0_wind",
-            panel_title="ENS day 0 − ERA5, refitted here",
+            treatment=treatment,
+            panel_title=panel_title,
             x_domain=domain,
-            last=False,
-        ),
-        _long_rows_panel(
-            source=source,
-            treatment="hres_wind",
-            panel_title="ECMWF HRES − ERA5, refitted here",
-            x_domain=domain,
-            last=True,
-        ),
+            last=last,
+        )
+        for treatment, panel_title, last in (
+            ("ens_mean_day0_wind", "ENS day 0 − ERA5, refitted here", False),
+            ("hres_wind", "ECMWF HRES − ERA5, refitted here", True),
+        )
     ]
     title = (
-        "How the folds treat IFS Cycle 49r1 decides whether ENS day 0 trails ERA5 and whether "
-        "HRES beats ERA5"
+        "An extra era cut at IFS Cycle 49r1 changes ENS day 0's and HRES's scores against ERA5 far "
+        "more than rotating the folds does"
     )
-    (all_rows, all_months), (late_rows, late_months) = (counts[scope] for scope, _ in LONG_SCOPES)
+    late = source.row(
+        section=LONG_DESIGNS[0][0],
+        scope=LONG_SCOPES[1][0],
+        treatment=LONG_TREATMENTS[0],
+        reference="era5_wind",
+    )
+    all_rows = source.row(
+        section=LONG_DESIGNS[0][0],
+        scope=LONG_SCOPES[0][0],
+        treatment=LONG_TREATMENTS[0],
+        reference="era5_wind",
+    )
+    uncovered = [
+        _uncovered_cells(source=source, design=section.removeprefix("long rows: "))
+        for section, _ in LONG_DESIGNS
+    ]
     published_row = published.row(0, named=True)
     return (
         figure(
@@ -872,9 +997,15 @@ def _reconciliation(*, source: Source) -> tuple[alt.VConcatChart, str]:
                     "does."
                 ),
                 (
-                    f"All rows: {all_rows:,} farm-hours in {all_months} calendar months from 12 "
-                    f"August 2024. Rows from 1 December 2024: {late_rows:,} in {late_months} "
-                    "months, the rows the rest of this section scores."
+                    f"All rows: {all_rows['n_rows']:,} farm-hours in {all_rows['n_months']} "
+                    f"calendar months from 12 August 2024. Rows from 1 December 2024: "
+                    f"{late['n_rows']:,} in {late['n_months']} months, the rows the rest of this "
+                    "section scores."
+                ),
+                (
+                    "Fold cells with no training row for a calendar month that occurs in two "
+                    f"years: {uncovered[0]} under the horizons page's folds, {uncovered[1]} with "
+                    f"those folds rotated, and {uncovered[2]} with the extra cut."
                 ),
                 (
                     "The ENS horizons page published ENS day 0 − ERA5 as "
@@ -980,8 +1111,8 @@ def _monthly_ratio_chart(*, source: Source) -> tuple[alt.VConcatChart, str]:
     )
     panel = alt.LayerChart(layer=[rule, label, line], width=PLOT_WIDTH_PX, height=230)
     title = (
-        "ENS's and HRES's 10 m wind speeds fall against ERA5's between September and December "
-        "2024, and UKV's does not"
+        "ENS's and HRES's 10 m wind speeds fall against ERA5's between October and November 2024, "
+        "and UKV's does not"
     )
     return (
         figure(
@@ -1005,27 +1136,68 @@ def _monthly_ratio_chart(*, source: Source) -> tuple[alt.VConcatChart, str]:
     )
 
 
-def _require_split_and_farm_claims(
-    *, split: pl.DataFrame, farm_frames: list[tuple[str, str, str, pl.DataFrame]]
-) -> None:
-    """Stop unless the saved results support the title of the label-hour and by-farm figure.
+SPLIT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("ens_mean_day0", "ukv"),
+    ("ens_mean_day0", "hres"),
+    ("ens_mean_day0", "era5"),
+    ("hres", "ukv"),
+    ("ukv", "era5"),
+)
+"""The contrasts Figure 19 draws by label hour. The last two involve no ENS lead, and ERA5, an
+analysis, has no lead at all, so they show how much of a change between the halves is time of
+day."""
+
+SPLIT_GROUPS: Final[tuple[tuple[str, str], ...]] = (
+    ("labels 00-08 UTC", "Labels 00-08 UTC"),
+    ("labels 10-23 UTC", "Labels 10-23 UTC"),
+)
+"""Each label-hour half's scope cell in the report, and its condition name in the figure."""
+
+
+def _require_split_claims(*, source: Source) -> None:
+    """Stop unless the saved results support Figure 19's title.
 
     Args:
-        split: The label-hour panel's rows, with `condition` and the interval.
-        farm_frames: Each planned contrast's per-farm rows, pooled row first.
+        source: The saved results.
 
     Raises:
-        ValueError: If the early hours are significant, the later hours are not, or P3 is
-            significant at other than exactly one farm.
+        ValueError: If ENS day 0's error is not further above UKV's and HRES's in the later hours
+            than in the early hours, or UKV's error is not further below ERA5's.
     """
-    significant = (split["lower_95"] > 0) | (split["upper_95"] < 0)
-    early = split.filter(pl.col("condition").str.starts_with("Labels 00-08"))
-    if significant.filter(split["condition"].str.starts_with("Labels 00-08")).any():
-        msg = f"an early-hours contrast is significant: {early}"
+    value = {
+        (scope, treatment, reference): source.row(
+            section="lead and time of day",
+            scope=scope,
+            treatment=f"{treatment}_wind",
+            reference=f"{reference}_wind",
+        )["value"]
+        for scope, _ in SPLIT_GROUPS
+        for treatment, reference in SPLIT_CONTRASTS
+    }
+    (early, _), (late, _) = SPLIT_GROUPS
+    grows = [
+        (treatment, reference)
+        for treatment, reference in (("ens_mean_day0", "ukv"), ("ens_mean_day0", "hres"))
+        if value[late, treatment, reference] > value[early, treatment, reference]
+    ]
+    ukv_lead_grows = value[late, "ukv", "era5"] < value[early, "ukv", "era5"]
+    if len(grows) != 2 or not ukv_lead_grows:
+        msg = (
+            f"Figure 19's title is wrong: the ENS gaps that grow in the later hours are {grows}, "
+            f"and UKV's lead over ERA5 grows: {ukv_lead_grows}"
+        )
         raise ValueError(msg)
-    if not significant.filter(split["condition"].str.starts_with("Labels 10-23")).all():
-        msg = "a later-hours contrast is not significant"
-        raise ValueError(msg)
+
+
+def _require_farm_claims(*, farm_frames: list[tuple[str, str, str, pl.DataFrame]]) -> None:
+    """Stop unless the saved results support Figure 20's title.
+
+    Args:
+        farm_frames: Each planned contrast's rows, P1 to P3 in order, pooled row first.
+
+    Raises:
+        ValueError: If P3 is significant at other than exactly one farm.
+    """
     label, _, _, frame = farm_frames[-1]
     farms = frame.filter(pl.col("label") != "All three farms")
     at_farms = ((farms["lower_95"] > 0) | (farms["upper_95"] < 0)).sum()
@@ -1034,41 +1206,83 @@ def _require_split_and_farm_claims(
         raise ValueError(msg)
 
 
-def _split_and_farms(*, source: Source) -> dict[str, tuple[alt.VConcatChart, str]]:
-    """Draw ENS's gaps by label hour, and the three planned contrasts at each farm, as two figures.
+def _split_figure(*, source: Source) -> tuple[alt.VConcatChart, str]:
+    """Draw ENS's and the control contrasts' gaps by label hour.
 
     Args:
         source: The saved results.
 
     Returns:
-        Figures 19 and 20, each with its title, keyed by file name.
+        Figure 19, and its title.
     """
-    groups = (
-        ("labels 00-08 UTC", "Labels 00-08 UTC"),
-        ("labels 10-23 UTC", "Labels 10-23 UTC"),
-    )
-    split_records = []
-    for scope, condition in groups:
-        for reference in ("ukv", "hres"):
+    _require_split_claims(source=source)
+    records = []
+    for scope, condition in SPLIT_GROUPS:
+        for treatment, reference in SPLIT_CONTRASTS:
             row = source.row(
                 section="lead and time of day",
                 scope=scope,
-                treatment="ens_mean_day0_wind",
+                treatment=f"{treatment}_wind",
                 reference=f"{reference}_wind",
             )
-            split_records.append(
-                {
-                    "label": _name_pair(treatment="ens_mean_day0", reference=reference),
-                    "condition": f"{condition} ({row['n_rows']:,} rows)",
-                    "family": "weather model",
-                    "difference": row["value"],
-                    "lower_95": row["lower"],
-                    "upper_95": row["upper"],
-                    "planned": False,
-                }
+            records.append(
+                _difference_record(
+                    label=_name_pair(treatment=treatment, reference=reference),
+                    family="weather model",
+                    row=row,
+                    planned=False,
+                    condition=f"{condition} ({row['n_rows']:,} rows)",
+                )
             )
-    split = pl.DataFrame(split_records)
-    conditions = list(dict.fromkeys(split["condition"].to_list()))
+    split = pl.DataFrame(records)
+    panel = interval_panel(
+        rows=split,
+        x_domain=_difference_domain(rows=split),
+        x_title=X_TITLE,
+        zero_label="no difference",
+        better_label="first-named product better",
+        conditions=list(dict.fromkeys(split["condition"].to_list())),
+        condition_title="Hours scored",
+        panel_title="Each contrast by label hour",
+        figure_planning="exploratory",
+    )
+    title = (
+        "ENS day 0's gap to UKV and HRES is larger in the later hours of the day, as is ERA5's gap "
+        "to UKV"
+    )
+    return (
+        figure(
+            panels=[panel],
+            number=FIGURE_SPLIT,
+            figure_planning="exploratory",
+            title=title,
+            subtitle=[
+                (
+                    "Labels 00-08 UTC are ENS leads 0 to 8 h from the 00 UTC run, labels 10-23 UTC "
+                    "leads 10 to 23 h. The split mixes lead with time of day and does not show "
+                    "whether ENS could be read in time."
+                ),
+                (
+                    "HRES against UKV, and UKV against ERA5, involve no ENS lead, and ERA5 is an "
+                    "analysis with no lead, so their change between the halves is time of day."
+                ),
+                f"{DOTS} {CAPACITY}",
+                _scope_line(source=source),
+            ],
+        ),
+        title,
+    )
+
+
+def _farm_figure(*, source: Source) -> tuple[alt.VConcatChart, str]:
+    """Draw the three planned contrasts at each farm and pooled.
+
+    Args:
+        source: The saved results.
+
+    Returns:
+        Figure 20, and its title.
+    """
     farm_frames = []
     for label, treatment, reference in PLANNED:
         records = []
@@ -1080,50 +1294,17 @@ def _split_and_farms(*, source: Source) -> dict[str, tuple[alt.VConcatChart, str
                 reference=f"{reference}_wind",
             )
             records.append(
-                {
-                    "label": scope_label,
-                    "family": "weather model",
-                    "difference": row["value"],
-                    "lower_95": row["lower"],
-                    "upper_95": row["upper"],
-                    "planned": False,
-                }
+                _difference_record(
+                    label=scope_label,
+                    family="weather model",
+                    row=row,
+                    planned=scope == "all",
+                )
             )
         farm_frames.append((label, treatment, reference, pl.DataFrame(records)))
-    _require_split_and_farm_claims(split=split, farm_frames=farm_frames)
-    split_domain = _difference_domain(rows=split)
-    split_panel = interval_panel(
-        rows=split,
-        x_domain=split_domain,
-        x_title=X_TITLE,
-        zero_label="no difference",
-        better_label="first-named product better",
-        conditions=conditions,
-        condition_title="Hours scored",
-        panel_title="ENS by label hour",
-        figure_planning="exploratory",
-    )
-    split_title = (
-        "ENS day 0 trails UKV and HRES by a statistically significant margin only in the later "
-        "hours of the day"
-    )
-    split_figure = figure(
-        panels=[split_panel],
-        number=FIGURE_SPLIT,
-        figure_planning="exploratory",
-        title=split_title,
-        subtitle=[
-            (
-                "Labels 00-08 UTC are ENS leads 0 to 8 h from the 00 UTC run, labels 10-23 UTC "
-                "leads 10 to 23 h. The split mixes lead with time of day and does not show "
-                "whether ENS could be read in time."
-            ),
-            f"{DOTS} {CAPACITY}",
-            _scope_line(source=source),
-        ],
-    )
+    _require_farm_claims(farm_frames=farm_frames)
     farm_domain = _difference_domain(rows=pl.concat(frame for *_, frame in farm_frames))
-    farm_panels = [
+    panels = [
         interval_panel(
             rows=frame,
             x_domain=farm_domain,
@@ -1134,29 +1315,29 @@ def _split_and_farms(*, source: Source) -> dict[str, tuple[alt.VConcatChart, str
                 f"{label} at each farm: {_name_pair(treatment=treatment, reference=reference)}"
             ),
             reference_labels=index == 0,
-            figure_planning="exploratory",
+            figure_planning="mixed",
         )
         for index, (label, treatment, reference, frame) in enumerate(farm_frames)
     ]
-    farm_title = "HRES beats ERA5 by a statistically significant margin at one farm of three"
-    farm_figure = figure(
-        panels=farm_panels,
-        number=FIGURE_BY_FARM,
-        figure_planning="exploratory",
-        title=farm_title,
-        subtitle=[
-            (
-                "Each planned contrast at each farm, and pooled over the three farms. The "
-                "per-farm rows were not planned, so every row is exploratory."
-            ),
-            f"{DOTS} {CAPACITY}",
-            _scope_line(source=source),
-        ],
+    title = "HRES beats ERA5 by a statistically significant margin at one farm of three"
+    return (
+        figure(
+            panels=panels,
+            number=FIGURE_BY_FARM,
+            figure_planning="mixed",
+            title=title,
+            subtitle=[
+                (
+                    "Each planned contrast pooled over the three farms, which is the planned "
+                    "row, and at each farm. The per-farm rows were not planned, so they are "
+                    "exploratory."
+                ),
+                f"{DOTS} {CAPACITY}",
+                _scope_line(source=source),
+            ],
+        ),
+        title,
     )
-    return {
-        "ens_hres_wind_split": (split_figure, split_title),
-        "ens_hres_wind_by_farm": (farm_figure, farm_title),
-    }
 
 
 def main() -> int:
@@ -1175,12 +1356,12 @@ def main() -> int:
         "ens_hres_wind_robustness": _robustness(source=source),
         "ens_hres_wind_reconciliation": _reconciliation(source=source),
         "ens_hres_wind_monthly_ratio": _monthly_ratio_chart(source=source),
+        "ens_hres_wind_split": _split_figure(source=source),
+        "ens_hres_wind_by_farm": _farm_figure(source=source),
     }
-    charts.update(_split_and_farms(source=source))
     source.verify()
     _LOG.info("%d report lines checked", len(source.printed))
     for name, (chart, title) in charts.items():
-        _check_title_numbers(title=title, report=source.report)
         path = ASSETS_DIR / f"{name}.svg"
         chart.save(path)
         _LOG.info("wrote %s: %s", path, " ".join(wrapped(text=title)))
