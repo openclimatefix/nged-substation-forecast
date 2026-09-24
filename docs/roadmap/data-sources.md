@@ -589,7 +589,7 @@ supply risk.
   each fetch into Delta and treat the snapshot as the source of truth, or experiments stop being
   reproducible.
 
-### What comparing four irradiance products on the trial area's solar farms found
+### What comparing weather products on the trial area's solar farms found
 
 **The satellite retrieval beat the reanalysis by 4.29 points of mean absolute error on the six
 metered solar farms, which is the largest effect anything in that experiment varied.** On the
