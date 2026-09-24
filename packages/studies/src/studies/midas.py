@@ -43,11 +43,21 @@ METADATA_COLUMNS: Final[dict[str, str]] = {
     "station_latitude": "latitude",
     "station_longitude": "longitude",
     "station_elevation": "elevation_m",
+    "first_year": "first_year",
+    "last_year": "last_year",
 }
 """The station-metadata CSV's columns this module keeps, mapped to their tidy names.
 
 The station name is deliberately absent: choosing a station does not need it, and it identifies one.
 """
+
+
+_METADATA_TYPES: Final[dict[str, pl.DataType | type[pl.DataType]]] = {
+    "src_id": pl.String,
+    "first_year": pl.Int64,
+    "last_year": pl.Int64,
+}
+"""The tidy type of each metadata column that is not a `Float64`."""
 
 
 def _raise_on_duplicate_keys(*, frame: pl.DataFrame) -> None:
@@ -112,7 +122,7 @@ def read_hourly_weather(*, path: Path, columns: Sequence[str]) -> pl.DataFrame:
 
 
 def read_station_metadata(*, path: Path) -> pl.DataFrame:
-    """Read a station-metadata CSV, keeping the id, the coordinates and the elevation.
+    """Read a station-metadata CSV, keeping the id, coordinates, elevation and record years.
 
     The file is BADC-CSV: a header block, a line reading `data`, a column-name row, one row per
     station, and a line reading `end data`.
@@ -121,7 +131,8 @@ def read_station_metadata(*, path: Path) -> pl.DataFrame:
         path: A `..._station-metadata.csv` under `MIDAS-OPEN/_station_metadata/`.
 
     Returns:
-        One row per station with `src_id`, `latitude`, `longitude` (degrees) and `elevation_m`.
+        One row per station with `src_id`, `latitude`, `longitude` (degrees), `elevation_m`, and
+        `first_year` and `last_year`, the calendar years the station's record spans.
 
     Raises:
         ValueError: If the file has no `data` line, or lacks one of `METADATA_COLUMNS`.
@@ -139,7 +150,7 @@ def read_station_metadata(*, path: Path) -> pl.DataFrame:
         msg = f"{path} lacks the columns {missing}"
         raise ValueError(msg)
     return raw.select(
-        pl.col(source).cast(pl.String if target == "src_id" else pl.Float64).alias(target)
+        pl.col(source).cast(_METADATA_TYPES.get(target, pl.Float64), strict=False).alias(target)
         for source, target in METADATA_COLUMNS.items()
     )
 

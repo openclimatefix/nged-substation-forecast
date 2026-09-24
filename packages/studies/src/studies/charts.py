@@ -24,13 +24,15 @@ import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 
-ProductFamily = Literal["satellite", "reanalysis", "weather model"]
-"""The three kinds of weather product the study pages compare."""
+ProductFamily = Literal["satellite", "reanalysis", "weather model", "station observations"]
+"""The kinds of weather input the study pages compare: three kinds of gridded product, and the
+weather-station observations, alone or blended with a gridded product."""
 
 FAMILY_COLOURS: Final[dict[ProductFamily, str]] = {
     "satellite": ocf.BRAND_ORANGE,
     "reanalysis": ocf.DATA_SKY,
     "weather model": ocf.DATA_BLUE,
+    "station observations": ocf.DATA_PURPLE,
 }
 """Each family's colour, from the main data colours OCF's brand guidelines allow in published work.
 
@@ -42,6 +44,7 @@ FAMILY_COLOURS_LIGHT: Final[dict[ProductFamily, str]] = {
     "satellite": ocf.BRAND_ORANGE_LIGHT,
     "reanalysis": ocf.DATA_SKY_LIGHT,
     "weather model": ocf.DATA_BLUE_LIGHT,
+    "station observations": ocf.DATA_PURPLE_LIGHT,
 }
 """The light shade of each family's colour, for a second condition of the same row.
 
