@@ -368,3 +368,12 @@ studies import them rather than copy them. The script's `with_three_eras` is `cu
 `ERA_START_MONTHS`. No fold assignment or printed number changed: `--report-only` reproduces
 `report.md`, `intervals.parquet` and `README.md` byte for byte, and every design's saved fold column
 matches the package's output.
+
+**Package hardening after the package reviews.** `studies.cross_validation` now validates its
+inputs (`cut_eras` and `rotate_folds` raise on a missing or extra era offset, and `cut_eras` on a
+malformed month label), holds the study's era constants (`UKV_UPGRADE_MONTH`, `ERA_START_MONTHS`,
+`ERA_FOLD_OFFSETS`), and offers `search_fold_offsets` to confirm a fold rotation on a new row set.
+`studies.bootstrap` rejects an interval level that is not a percentage. The scripts import the
+constants. `--report-only` again reproduces `report.md`, `README.md`, the fingerprints and every
+saved loss file byte for byte and `intervals.parquet` value for value, and every design's saved fold
+column matches the package's.

@@ -145,9 +145,12 @@ from studies.bootstrap import (
 )
 from studies.charts import CONTRAST_COLUMNS
 from studies.cross_validation import (
+    ERA_FOLD_OFFSETS,
+    ERA_START_MONTHS,
     PRIMARY_HYPER_PARAMETERS,
     SEEDS,
     SENSITIVITY_HYPER_PARAMETERS,
+    UKV_UPGRADE_MONTH,
     HyperParameters,
     calendar_month_coverage,
     cut_eras,
@@ -229,22 +232,6 @@ FIRST_MONTH_AFTER_50R1: Final[str] = (
 )
 """The first whole month after IFS Cycle 50r1, where the 50r1 fold design's extra era begins."""
 
-UKV_UPGRADE_MONTH: Final[str] = "2026-02"
-"""The first month of the second UKV era, the page's own cut, after the Met Office's upgrade of UKV
-on 21 January 2026."""
-
-ERA_START_MONTHS: Final[tuple[str, str]] = (f"{HRES_ARCHIVE_CHANGE_DATE:%Y-%m}", UKV_UPGRADE_MONTH)
-"""The first month of the second and third eras, in the page's `%Y-%m` month label."""
-
-ERA_FOLD_OFFSETS: Final[Mapping[int, int]] = MappingProxyType({0: 0, 1: 0, 2: 2})
-"""How far each era's fold numbers are rotated, modulo `N_FOLDS`, before any fit.
-
-The calendar-month coverage check (`calendar_month_coverage`) fails with every offset at 0: July
-is in fold 3 and September in fold 4 in both 2025 and 2026, so holding either fold out leaves no
-training row for that season. A rotation of 2 for the third era puts every calendar month that
-occurs in both years into two different folds.
-"""
-
 NO_FOLD_OFFSETS: Final[Mapping[int, int]] = MappingProxyType({0: 0, 1: 0, 2: 0})
 """No rotation of any of the three eras' fold numbers: the design the coverage check rejected."""
 
@@ -252,14 +239,16 @@ ERA_FOLD_OFFSETS_50R1: Final[Mapping[int, int]] = MappingProxyType({0: 0, 1: 0, 
 """The fold rotation of the design with an extra era cut at IFS Cycle 50r1.
 
 Era 3 (June to September 2026) is rotated by 4. Rotations of 0 and 4 both leave 0 uncovered cells;
-4 is kept so that the design's folds, and the figures printed for them, do not move.
+4 is kept so that the design's folds, and the figures printed for them, do not move. These offsets
+belong to this row set; `studies.cross_validation.search_fold_offsets` confirms coverage on another.
 """
 
 HORIZONS_ROTATED_FOLD_OFFSETS: Final[Mapping[int, int]] = MappingProxyType({0: 0, 1: 2})
 """The fold rotation of the long row set's two-UKV-era design with no cut at IFS Cycle 49r1.
 
 Rotations of 2, 3 and 4 of era 1 (from 2026-02) leave 0 uncovered cells, where the horizons study's
-own fold layout leaves 6; 2 is the smallest.
+own fold layout leaves 6; 2 is the smallest. `studies.cross_validation.search_fold_offsets` finds
+such rotations for a given row set.
 """
 
 LONG_ROW_FOLD_OFFSETS: Final[Mapping[int, int]] = MappingProxyType({0: 0, 1: 2, 2: 0})
@@ -267,7 +256,7 @@ LONG_ROW_FOLD_OFFSETS: Final[Mapping[int, int]] = MappingProxyType({0: 0, 1: 2, 
 
 Found by searching every pair of rotations of eras 1 and 2 (era 0 fixed): six of the 25 pairs leave
 0 uncovered cells, and this is the one with a single non-zero rotation, the smaller of the two such
-pairs.
+pairs. `studies.cross_validation.search_fold_offsets` runs that search.
 """
 
 SPLIT_LABEL_HOURS: Final[tuple[range, range]] = (range(9), range(10, 24))
