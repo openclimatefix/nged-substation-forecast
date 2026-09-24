@@ -83,6 +83,7 @@ from studies.bootstrap import (
 from studies.cross_validation import (
     PRIMARY_HYPER_PARAMETERS,
     SENSITIVITY_HYPER_PARAMETERS,
+    UKV_UPGRADE_MONTH,
     HyperParameters,
 )
 
@@ -1539,7 +1540,7 @@ def _split_scopes(*, losses: pl.DataFrame) -> list[tuple[str, pl.DataFrame]]:
         season=pl.col("time")
         .dt.month()
         .replace_strict(weather_products.SEASONS, return_dtype=pl.Utf8),
-        era=pl.when(pl.col("month") >= weather_products.UPGRADE_MONTH)
+        era=pl.when(pl.col("month") >= UKV_UPGRADE_MONTH)
         .then(pl.lit("post"))
         .otherwise(pl.lit("pre")),
     )
