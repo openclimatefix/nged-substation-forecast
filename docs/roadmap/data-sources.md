@@ -207,6 +207,22 @@ as a possible source. The Status column says which, and several rows are marked 
 deprioritised, or unlikely. Products researched only for the studies are on the [weather products
 survey](../background/weather-products-survey.md) page.
 
+**Only ECMWF's own models and Google DeepMind's WeatherNext 3 reach NGED's 14-day forecast
+horizon; every regional model on this page stops at 7.5 days or less.**
+
+![Horizontal bar chart of eleven NWPs' longest routine forecast horizon in days, sorted longest to
+shortest. ECMWF ENS, AIFS-ENS, AIFS Single, ECMWF IFS HRES, and WeatherNext 3 all reach 15 days;
+ICON global reaches 7.5 days; the Met Office's global model reaches 7 days; MOGREPS-UK reaches 5.25
+days; UKV and ICON-EU reach 5 days; and ICON-D2 reaches 2 days. A dashed line marks NGED's 14-day
+forecast horizon.](assets/nwp_horizons.svg)
+
+Each bar is the model's longest routine run, taken from this page, from the [weather products
+survey](../background/weather-products-survey.md), or from the producer's own documentation — the
+source for every bar is recorded next to its horizon in `studies/beam_diffuse_split/nwp_horizons.py`.
+Reanalyses and satellite products carry no forecast horizon and are left off, and so are NOAA's GFS
+and GEFS, Météo-France's ARPEGE and AROME, and the HARMONIE-AROME feeds, which this page names only
+once, as products the project neither reads nor evaluates.
+
 | Source | Status | Description |
 |---|---|---|
 | **ECMWF ENS** (Dynamical.org) | ✅ | Main NWP source: 51-member ensemble, distributed as live-updating Zarrs. OCF converts gridded NWP to tabular via the H3 spatial index and stores as Delta Lake, stored as `Float32` rounded to a 13-bit significand, with zstd compression (~40 GB/year for all of GB; ~1 minute to download+convert one day). **The archive currently only extends back to 2024-04-01**; Dynamical.org are back-filling the operational archive from MARS to 2016-03-08 (51 members, 0.25°, 00Z inits only), but at ~0.8 TB/day against ~446 TB remaining the estimate is **~November 2027** — after v1.0, which is why we [extend the training history with ERA5](training-history.md) instead. Radiation: no direct component, which is what forces [DP forecasting of PV](disaggregation.md) (v2) to find the beam/diffuse split elsewhere — see [which sources carry which irradiance components](#which-sources-carry-which-irradiance-components). |
