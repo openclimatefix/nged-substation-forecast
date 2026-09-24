@@ -8,8 +8,8 @@ day 0 and day 1, but not with UKV, ICON, or HRES.
 
 **Solution.** One new study script that reads the page's own row set, adds an HRES arm and an ENS
 ensemble-mean arm, and refits every product on the rows all of them cover. It scores three
-planned contrasts fixed in this file before any fit. It reuses the horizons study's ENS wind inputs and the
-`wind_icon_dream.py` structure, so no new ENS code is written. One results section, one "What to
+planned contrasts fixed in this file before any fit. It reuses the horizons study's ENS wind
+inputs and the `wind_icon_dream.py` structure, so no new ENS code is written. One results section, one "What to
 use" bullet and one chart script follow.
 
 ## Verdict, size and the five trigger answers
@@ -119,8 +119,8 @@ model absorbs the mismatch. Phase 1 adds no shear extrapolation.
   UKV, ERA5). Speeds are converted to m/s explicitly (HRES's Open-Meteo columns are km/h, ENS is
   m/s).
 - **Fairness.** Every arm has exactly the same rows and seven columns; `colsample_bytree=1`;
-  per-arm column lists in the report; folds cut inside each of three eras, before 1 October 2025 (HRES's archive source changes),
-  1 October 2025 to 20 January 2026, and from 1 February 2026 (the UKV upgrade; the rest of January
+  per-arm column lists in the report; folds cut inside each of three eras: before 1 October 2025
+  (HRES's archive source changes), 1 October 2025 to 20 January 2026, and from 1 February 2026 (the UKV upgrade; the rest of January
   2026 dropped as on the page), with `era_code` taking three values for every arm, so IFS Cycle
   50r1 on 12 May 2026 is left to the period split below; month-resampled
   paired bootstrap of whole months and seeds.
