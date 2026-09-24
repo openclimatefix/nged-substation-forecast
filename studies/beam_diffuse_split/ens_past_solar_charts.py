@@ -24,6 +24,7 @@ from typing import Final
 
 import altair as alt
 import polars as pl
+from build_dataset import _pv_sites
 from ens_past_solar import (
     CAMS_3H_ARM,
     CONFOUND_CONTRASTS,
@@ -41,6 +42,7 @@ from ens_past_solar import (
     _lead_lines,
     _main_panel_lines,
     _servable_lines,
+    _support_lines,
     _t3_members,
     build_rows,
 )
@@ -419,6 +421,7 @@ def _verify_numbers(*, report: str, losses: pl.DataFrame, sensitivity: pl.DataFr
             _absolute_table_lines(pooled=losses, arms=EXPLORATORY_ARMS),
             _servable_lines(pooled=losses),
             _lead_lines(frame=frame),
+            _support_lines(sites=_pv_sites()),
             _generator_lines(frame=frame, members=_t3_members()),
             _main_panel_lines(pooled=losses),
         )

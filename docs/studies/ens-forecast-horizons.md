@@ -416,7 +416,12 @@ predict — but loses to ERA5 for wind by 0.43 points [0.24, 0.62] even at day 0
 model-version story alone would not predict either. Forecast lead may explain the wind result: ERA5's
 wind is an hourly analysis, which assimilates observations of the hour it describes, while day 0
 spans leads of 0 to 23 hours. ERA5's radiation, by contrast, comes from forecasts 1 to 12 hours old,
-so lead does not favour ERA5 for solar. **UKV with ICON-EU, the best of the inputs the blending page
+so lead does not favour ERA5 for solar by enough to explain the gaps above. The past-solar page's
+[ENS section](weather-products-for-past-solar.md#ecmwf-ens-a-longer-lead-forecast-than-any-other-product-on-this-page)
+estimates, on its own rows at leads 5 to 20 hours, that ENS's extra 6.11 hours of mean lead over
+ERA5 raises ENS's error by about 0.16 points, so lead does favour ERA5 slightly.
+
+**UKV with ICON-EU, the best of the inputs the blending page
 compared, beats the day-1 ensemble mean by 1.29 points [1.06, 1.55] for solar and 2.20 points [1.93,
 2.49] for wind.** UKV with ICON-EU is weather a few hours old rather than a day-ahead forecast, so
 the gap bounds from above what a higher-resolution day-1 forecast could gain; it does not measure

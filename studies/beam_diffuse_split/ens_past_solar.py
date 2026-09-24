@@ -83,6 +83,7 @@ from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final, cast
 
+import h3
 import numpy as np
 import polars as pl
 from blend_products import SOLAR, _solar_frame
@@ -203,6 +204,15 @@ ERA5_RUN_INTERVAL_HOURS: Final[int] = 12
 """ERA5's radiation is a forecast at steps of 1 to 12 hours from the 06 and 18 UTC runs, so
 its lead at an hour labelled `h` (the hour ending at `h` UTC) is `((h - 7) % 12) + 1`: lead 1
 at 07 and 19 UTC, lead 12 at 18 and 06 UTC."""
+
+H3_RESOLUTION: Final[int] = 5
+"""The H3 resolution ENS's values are averaged over at each generator."""
+
+ERA5_CELL_DEGREES: Final[float] = 0.25
+"""ERA5's grid spacing, in degrees."""
+
+KM_PER_DEGREE_LATITUDE: Final[float] = 111.19
+"""One degree of latitude, in kilometres, on a sphere of mean Earth radius."""
 
 SERVABLE_HEADING: Final[str] = (
     "The planned contrasts, split by when the 00 UTC run becomes readable (exploratory, post hoc)"
@@ -713,6 +723,39 @@ def _lead_lines(*, frame: pl.DataFrame) -> list[str]:
     ]
 
 
+def _support_lines(*, sites: pl.DataFrame) -> list[str]:
+    """Render the area an ENS value covers and the area of the 3 by 3 ERA5 block.
+
+    ENS's value at a generator is averaged over the generator's H3 resolution-5 cell (mean cell
+    area). The block is nine 0.25-degree ERA5 cells at the generators' mean latitude, so one cell
+    is 0.25 degrees of latitude tall and 0.25 degrees of longitude times the cosine of the latitude
+    wide.
+
+    Args:
+        sites: The solar roster, with `latitude`.
+
+    Returns:
+        Markdown lines.
+    """
+    latitude = cast("float", sites["latitude"].mean())
+    cell_km2 = h3.average_hexagon_area(H3_RESOLUTION, unit="km^2")
+    era5_cell_km2 = (
+        ERA5_CELL_DEGREES
+        * KM_PER_DEGREE_LATITUDE
+        * ERA5_CELL_DEGREES
+        * KM_PER_DEGREE_LATITUDE
+        * float(np.cos(np.radians(latitude)))
+    )
+    block_km2 = 9 * era5_cell_km2
+    return [
+        "#### Spatial support",
+        "",
+        f"- ENS's H3 resolution-{H3_RESOLUTION} cell has a mean area of {cell_km2:,.0f} km².",
+        f"- The 3 by 3 ERA5 block covers {block_km2:,.0f} km² at latitude {latitude:.1f}°.",
+        f"- The block is {block_km2 / cell_km2:.1f} times the area of an H3 cell.",
+    ]
+
+
 def _generator_lines(*, frame: pl.DataFrame, members: pl.DataFrame) -> list[str]:
     """Render each generator's rows and months, and which generators share one ENS input.
 
@@ -893,6 +936,8 @@ def _report(
         *_servable_lines(pooled=pooled),
         "",
         *_lead_lines(frame=frame),
+        "",
+        *_support_lines(sites=sites),
         "",
         *_generator_lines(frame=frame, members=_t3_members()),
         "",
