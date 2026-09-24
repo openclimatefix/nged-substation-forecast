@@ -127,7 +127,7 @@ def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         panels=[panel],
         number=11,
         figure_planning=None,
-        title="ICON-DREAM-EU ties ERA5 and beats only ICON global of the six products tested",
+        title="ICON-DREAM-EU ties ERA5 and beats only ICON global of the other five products",
         subtitle=[
             "Each product's own mean absolute error, sorted best first.",
             DOTS,
@@ -182,10 +182,13 @@ def _planned_contrasts(*, report_path: Path) -> alt.VConcatChart:
         panel_title="The two planned contrasts",
         figure_planning="planned",
     )
+    # figure_planning=None here, not "planned": the panel's own title ("The two planned
+    # contrasts") and this subtitle's first line already say the rows are planned, so the
+    # PLANNING_NOTES line `figure_planning="planned"` would add repeats that a third time.
     return figure(
         panels=[panel],
         number=12,
-        figure_planning="planned",
+        figure_planning=None,
         title="ICON-DREAM-EU does not beat ERA5, and trails ICON-EU by 0.34 points",
         subtitle=[
             "The two contrasts named in the plan before any result existed.",
