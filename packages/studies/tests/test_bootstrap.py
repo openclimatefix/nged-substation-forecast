@@ -11,6 +11,7 @@ from studies.bootstrap import (
     bootstrap_row_difference,
     bootstrap_year_change,
     bracket_verdict,
+    combine_setting_verdicts,
     fold_t_interval,
     per_fold_differences,
 )
@@ -494,6 +495,7 @@ def test_bootstrap_row_difference_interval_collapses_with_no_month_spread():
 
 
 def _interval(*, difference: float, lower_95: float, upper_95: float) -> BootstrapInterval:
+    """Build a `BootstrapInterval` for a verdict test, with fixed row and month counts."""
     return {
         "difference": difference,
         "lower_95": lower_95,
@@ -532,3 +534,34 @@ def test_bracket_verdict_unresolved_when_an_interval_touches_zero():
     upper_side = _interval(difference=0.4, lower_95=0.0, upper_95=0.8)
 
     assert bracket_verdict(lower_side=lower_side, upper_side=upper_side) == "unresolved"
+
+
+def test_bracket_verdict_unresolved_when_both_sides_are_significant():
+    # A contradictory pair: the lower side says "beats" and the upper side says "loses" at once,
+    # which can only happen if ENS's day N scored better than its day N − 1, breaking the bracket's
+    # own monotonicity assumption. Checking "loses" before "beats" (or vice versa) without this
+    # combined case would wrongly report one side's verdict instead of "unresolved".
+    lower_side = _interval(difference=-0.5, lower_95=-0.8, upper_95=-0.2)
+    upper_side = _interval(difference=0.5, lower_95=0.2, upper_95=0.8)
+
+    assert bracket_verdict(lower_side=lower_side, upper_side=upper_side) == "unresolved"
+
+
+def test_combine_setting_verdicts_stands_when_both_settings_agree():
+    assert combine_setting_verdicts(primary="beats", sensitivity="beats") == "beats"
+
+
+def test_combine_setting_verdicts_unresolved_when_settings_disagree():
+    assert combine_setting_verdicts(primary="beats", sensitivity="unresolved") == "unresolved"
+    assert combine_setting_verdicts(primary="beats", sensitivity="loses") == "unresolved"
+
+
+def test_combine_setting_verdicts_uses_the_given_neutral_value():
+    assert (
+        combine_setting_verdicts(
+            primary="lowers the day-ahead error",
+            sensitivity="no detectable difference",
+            unresolved="no detectable difference",
+        )
+        == "no detectable difference"
+    )

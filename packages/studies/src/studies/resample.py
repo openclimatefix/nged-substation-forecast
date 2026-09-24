@@ -338,11 +338,16 @@ def gefs_step_means(
 
     Raises:
         ValueError: If `leads` does not start on a 3-hour window's own end, leaving no preceding
-            step to invert the first 6-hour window against.
+            step to invert the first 6-hour window against, or if `leads` is not a contiguous run
+            of 3-hour steps (a missing step would invert a window against the wrong earlier step).
     """
     leads = np.asarray(leads)
     if leads.shape[0] == 0 or leads[0] % 6 != 3:
-        msg = f"leads must start on a 3-hour window end (lead % 6 == 3), got {leads[0]!r}"
+        got = leads[0] if leads.shape[0] else "an empty array"
+        msg = f"leads must start on a 3-hour window end (lead % 6 == 3), got {got!r}"
+        raise ValueError(msg)
+    if not np.all(np.diff(leads) == 3):
+        msg = f"leads must be contiguous 3-hour steps, got {leads!r}"
         raise ValueError(msg)
     step_means_array = values.copy()
     for index in range(1, len(leads)):

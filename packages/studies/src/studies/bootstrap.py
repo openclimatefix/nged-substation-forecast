@@ -513,13 +513,40 @@ def bracket_verdict(
 
     Returns:
         `"beats"` if the lower side is negative and significant (the product beats ENS even at
-        ENS's shorter lead); `"loses"` if the upper side is positive and significant (ENS beats the
-        product even at ENS's longer lead); `"unresolved"` otherwise.
+        ENS's shorter lead) and the upper side is not also significantly positive; `"loses"` if the
+        upper side is positive and significant (ENS beats the product even at ENS's longer lead)
+        and the lower side is not also significantly negative; `"unresolved"` otherwise, including
+        the contradictory case where both sides are significant, which means ENS's day `N` scored
+        better than ENS's day `N − 1` and so breaks the bracket's own monotonicity assumption — a
+        failed bracket assumption, not a resolved contrast.
     """
     beats = lower_side["upper_95"] < 0.0
     loses = upper_side["lower_95"] > 0.0
+    if beats and loses:
+        return "unresolved"
     if beats:
         return "beats"
     if loses:
         return "loses"
     return "unresolved"
+
+
+def combine_setting_verdicts(
+    *, primary: str, sensitivity: str, unresolved: str = "unresolved"
+) -> str:
+    """Combine one contrast's verdicts at the primary and sensitivity settings into one verdict.
+
+    The plan's rule: a verdict stands only if both hyperparameter settings give it; where the two
+    settings disagree, the published verdict is `unresolved` (or, for a family whose neutral
+    outcome is named differently, whatever `unresolved` is given as).
+
+    Args:
+        primary: The verdict read at `PRIMARY_HYPER_PARAMETERS`.
+        sensitivity: The verdict read at `SENSITIVITY_HYPER_PARAMETERS`.
+        unresolved: The verdict to return when the two settings disagree, so this works for both
+            a bracket verdict's `"unresolved"` and a blend verdict's `"no detectable difference"`.
+
+    Returns:
+        `primary` if the two settings agree, else `unresolved`.
+    """
+    return primary if primary == sensitivity else unresolved

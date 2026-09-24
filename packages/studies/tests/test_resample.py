@@ -361,6 +361,28 @@ def test_gefs_step_means_refuses_a_series_that_starts_on_a_6_hour_window_end():
         gefs_step_means(values=np.ones((1, 2)), leads=np.array([6.0, 9.0]))
 
 
+def test_gefs_step_means_refuses_an_empty_series():
+    with pytest.raises(ValueError, match="3-hour window end"):
+        gefs_step_means(values=np.ones((1, 0)), leads=np.array([]))
+
+
+def test_gefs_step_means_refuses_a_gap_in_the_leads():
+    # A missing 9-hour step would invert the 12-hour window's 6-hour mean against the 6-hour
+    # window's mean instead of the immediately preceding 3-hour step's mean.
+    with pytest.raises(ValueError, match="contiguous"):
+        gefs_step_means(values=np.ones((1, 3)), leads=np.array([3.0, 6.0, 12.0]))
+
+
+def test_gefs_step_means_does_not_mutate_its_input():
+    values = np.array([[10.0, 1.0]])
+    original = values.copy()
+    leads = np.array([3.0, 6.0])
+
+    gefs_step_means(values=values, leads=leads)
+
+    np.testing.assert_array_equal(values, original)
+
+
 def test_gefs_step_means_clips_a_negative_producing_inversion_to_the_floor():
     # A 3-hour step of 10.0 followed by a 6-hour window mean of only 1.0 inverts to 2*1.0 - 10.0 =
     # -8.0, which is not a physically possible radiation value.
