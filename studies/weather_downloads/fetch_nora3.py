@@ -24,13 +24,15 @@ skill). It writes each month to `_month_cache/YYYY-MM.parquet` as soon as the mo
 cached months on the next run. Before a month is written, the script reads the served `time` values
 for that month and asserts that they equal the requested hours exactly, so a time-axis offset or gap
 cannot mislabel rows. A month that extends past the last hour the aggregated dataset serves is
-skipped as not published yet. Every other failure aborts the run. The lineage note lists the months
-combined and the months skipped as not published. The aggregated dataset ends at the hour recorded
-in `lineage.json` as `last_served_hour_utc`; later months need the individual monthly files under
-`nora3_subset_atmos/wind_hourly_v2/`.
+skipped, because the aggregate ends there; MET Norway publishes later months as individual monthly
+files under `nora3_subset_atmos/wind_hourly_v2/`, which this script does not fetch. A run whose
+range passes the aggregate's end prints a warning and exits 1 after writing everything it could.
+Every other failure aborts the run. The lineage note lists the months combined and the months
+beyond the aggregate. The aggregate's last hour is recorded in `lineage.json` as
+`last_served_hour_utc`.
 
-The combined output is one canonical file, `NORA3_wind.parquet`, rebuilt from the month cache on
-every run. Validate it with `validate_nora3.py`.
+The combined output is one canonical file, `NORA3_wind.parquet`, rebuilt from every month in the
+month cache on every run, whatever range the run requested. Validate it with `validate_nora3.py`.
 """
 
 import argparse
@@ -80,6 +82,9 @@ SPEED_SCALE_FACTOR: Final[float] = 0.01
 DIRECTION_SCALE_FACTOR: Final[float] = 0.1
 """The `.das` scale factors (`add_offset=0.0` for both). The two variables do not share one."""
 
+ADD_OFFSET: Final[float] = 0.0
+"""The `.das` `add_offset` for both variables."""
+
 OUTPUT_NAME: Final[str] = "NORA3_wind.parquet"
 """The one canonical combined file, so runs over different date ranges never leave overlapping
 files behind."""
@@ -92,7 +97,8 @@ def _open_dataset() -> object:
         The opened `pydap` dataset.
 
     Raises:
-        RuntimeError: If the dataset's `x`, `y`, or `height` axis differs from the constants above.
+        RuntimeError: If the dataset's `x`, `y`, or `height` axis, or a variable's `scale_factor`,
+            `add_offset`, or `_FillValue`, differs from the constants above.
     """
     dataset = open_url(CATALOG_URL)
     x_first = np.asarray(dataset["x"][0:2].data)
@@ -102,6 +108,20 @@ def _open_dataset() -> object:
         and np.allclose(y_first, [GRID_Y0_M, GRID_Y0_M + GRID_SPACING_M], atol=0.5)
     ):
         raise RuntimeError("The served x/y axes no longer match GRID_X0_M/GRID_Y0_M/GRID_SPACING_M")
+    for name, scale_factor in (
+        ("wind_speed", SPEED_SCALE_FACTOR),
+        ("wind_direction", DIRECTION_SCALE_FACTOR),
+    ):
+        attributes = dataset[name].attributes
+        if (
+            attributes.get("scale_factor") != scale_factor
+            or attributes.get("add_offset") != ADD_OFFSET
+            or attributes.get("_FillValue") != FILL_VALUE
+        ):
+            raise RuntimeError(
+                f"{name}'s served scale_factor, add_offset, or _FillValue differs from the "
+                "constants in this script"
+            )
     heights = np.asarray(dataset["height"][:].data)[list(HEIGHT_INDICES)]
     if not np.array_equal(heights, HEIGHTS_M):
         raise RuntimeError(f"HEIGHT_INDICES select {heights.tolist()} m, expected {HEIGHTS_M}")
@@ -286,7 +306,7 @@ def main() -> int:
         n_y=dataset["y"].shape[0],  # ty: ignore[not-subscriptable]
     )
 
-    not_published: list[str] = []
+    beyond_aggregate: list[str] = []
     for year, month in months:
         label = f"{year}-{month:02d}"
         month_path = month_cache_dir / f"{label}.parquet"
@@ -294,22 +314,18 @@ def main() -> int:
             print(f"NORA3 {label}: already cached, skipping")
             continue
         if _month_hours(year=year, month=month)[-1] > last_served_hour:
-            print(f"NORA3 {label}: not published yet in the aggregated dataset, skipping")
-            not_published.append(label)
+            print(f"NORA3 {label}: beyond the end of the aggregated dataset, skipping")
+            beyond_aggregate.append(label)
             continue
         frame = fetch_month(dataset=dataset, year=year, month=month, index_range=index_range)
         partial = month_path.with_suffix(".parquet.partial")
         frame.write_parquet(partial)
         partial.rename(month_path)
-        print(f"NORA3 {label}: {frame.height} rows")
+        print(f"NORA3 {label}: fetched and cached")
 
-    labels = [
-        f"{year}-{month:02d}"
-        for year, month in months
-        if f"{year}-{month:02d}" not in not_published
-    ]
+    labels = sorted(path.stem for path in month_cache_dir.glob("*.parquet"))
     if not labels:
-        print("NORA3: no requested month is published, nothing written")
+        print("NORA3: no month is cached, nothing written")
         return 1
     combined = pl.concat(
         [pl.read_parquet(month_cache_dir / f"{label}.parquet") for label in labels]
@@ -317,10 +333,7 @@ def main() -> int:
     output_path = output_dir / OUTPUT_NAME
     combined.write_parquet(output_path)
     size_mb = output_path.stat().st_size / 1e6
-    print(
-        f"NORA3: wrote {combined.height} rows ({len(labels)} months) to {output_path}, "
-        f"{size_mb:.3f} MB"
-    )
+    print(f"NORA3: wrote the combined file from {len(labels)} cached months to {output_path}")
 
     write_lineage_note(
         product_dir=output_dir,
@@ -334,7 +347,7 @@ def main() -> int:
         extra={
             "months_requested": [arguments.start_month, arguments.end_month],
             "months_combined": labels,
-            "months_not_published": not_published,
+            "months_beyond_aggregate": beyond_aggregate,
             "last_served_hour_utc": datetime.fromtimestamp(last_served_hour, tz=UTC),
             "heights_m": list(HEIGHTS_M),
             "rows": combined.height,
@@ -363,14 +376,21 @@ def main() -> int:
             "The grid is projected: `x_index` and `y_index` are not longitude and latitude.",
             "Wind direction is circular: average vectors, not degrees.",
             (
-                "The aggregated dataset ends at `last_served_hour_utc` in `lineage.json`; months "
-                "after it are listed under `months_not_published`."
+                "The aggregated dataset ends at `last_served_hour_utc` in `lineage.json`. Months "
+                "after it are not fetched and are listed under `months_beyond_aggregate`."
             ),
         ],
         external_docs={
             "NORA3 wind dataset paper": "https://doi.org/10.1175/JAMC-D-21-0029.1",
         },
     )
+    if beyond_aggregate:
+        print(
+            f"NORA3: WARNING: {len(beyond_aggregate)} requested month(s) lie beyond the end of "
+            f"the aggregated dataset ({beyond_aggregate[0]} onwards) and were NOT fetched. "
+            "Exiting non-zero."
+        )
+        return 1
     return 0
 
 
