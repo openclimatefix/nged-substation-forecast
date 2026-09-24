@@ -197,7 +197,8 @@ documentation](https://open-meteo.com/en/docs/historical-forecast-api).
 global model, Météo-France's global model on its European grid, and the UWC-West HARMONIE-AROME run
 as the Danish and the Dutch weather services each distribute it are all available from Open-Meteo's
 archive at each generator's coordinates. Two of the four start only in July 2024, and ARPEGE changed
-its radiation scheme in October 2024, so a comparison that includes all four needs its own row set,
+its radiation scheme in October 2024 (Météo-France's
+[cycle 48t1](https://www.umr-cnrm.fr/old/IMG/pdf/r_r_2024-gb_web_2.pdf)), so a comparison that includes all four needs its own row set,
 from November 2024, separate from the row set above: see [The four extra Open-Meteo
 models](#the-four-extra-open-meteo-models).
 
@@ -723,12 +724,14 @@ later start already accommodates.
 
 **The row set starts in November 2024 for two reasons, and ARPEGE's own longer record confirms
 that start date is not hiding a step in irradiance.** Open-Meteo's UKV archive is a backfill before
-12 August 2024, and Météo-France's cycle 48t1, on 15 October 2024, replaced ARPEGE's radiation
-scheme; the first whole month after the later of the two changes is the start. ARPEGE's own
+12 August 2024, and Météo-France's
+[cycle 48t1](https://www.umr-cnrm.fr/old/IMG/pdf/r_r_2024-gb_web_2.pdf), on 15 October 2024,
+replaced ARPEGE's radiation scheme; the first whole month after the later of the two changes is the start. ARPEGE's own
 per-site build reads back to January 2024, further than this row set's own November 2024 start, so
 it can check whether cycle 48t1 left a step: ARPEGE's ratio to ECMWF-IFS-HRES shows no step at
-cycle 48t1's date, but that ratio cannot isolate ARPEGE's own change, because ECMWF's own Cycle
-49r1 went operational on 12 November 2024, inside the same window. ARPEGE's ratio to CAMS does
+cycle 48t1's date, but that ratio cannot isolate ARPEGE's own change, because ECMWF's own
+[Cycle 49r1](https://www.ecmwf.int/en/about/media-centre/news/2024/forecast-upgrade-improves-wind-and-temperature-predictions)
+went operational on 12 November 2024, inside the same window. ARPEGE's ratio to CAMS does
 rise: from 0.94 to 1.07 across the 10 calendar months from January to October 2024, to 1.01 to 1.32
 from November 2024, and it is higher in 8 of the 10 calendar months the report holds on both sides
 of the change (`report.md`), roughly equal in June and 0.01 lower in April. The row set's November
