@@ -203,3 +203,32 @@ sweep and a pre-merge check of the rendered HTML.
 
 - Reading ERA5, UKV and the ICON arms from the page's published losses: rejected because the row
   set starts later, so their losses are refit.
+
+## Decisions made during implementation
+
+Written before the first fit. Each was made where this plan is silent or could not be followed as
+written.
+
+- **The coverage check cannot pass for October and November.** The row set runs from 1 December 2024
+  to 10 September 2026, so October and November occur in one year only (2025). Whichever fold holds
+  October or November 2025 out leaves no training row for that calendar month, under any fold
+  design. The script prints every (site, fold, calendar month) cell, lists the single-year months,
+  and raises only for a calendar month that occurs in two years. The page states the October and
+  November limitation.
+- **The coverage check failed with the era folds unrotated, and the fold numbers are now offset.**
+  With no offset, six (site, fold, calendar month) cells failed, across the three farms: July (fold
+  3 in both 2025 and 2026) and September (fold 4 in both). The third era's fold numbers are rotated by 2 (`ERA_FOLD_OFFSETS`), which leaves the folds
+  contiguous within an era and the check with 0 failing cells.
+- **The HRES served-lead evidence is read from the data, not assumed.** The script prints the
+  hour-to-hour change by UTC hour and lists the hours that reach a ratio of 1.15, and states how
+  many of the plan's expected handover hours (01 and 13 before 1 October 2025; 00, 06, 12 and 18
+  from it) reach it. The lead statement on the page is limited to what those hours support.
+- **The Bonferroni intervals use the script's own resampler**, because `studies.bootstrap` fixes its
+  percentiles at 2.5 and 97.5. The script asserts that its resampler reproduces
+  `bootstrap_difference`'s 95% interval on the first planned contrast before it prints an adjusted
+  one, so only the level differs.
+- **Speeds.** HRES speeds are converted to m/s where the frame is built. ERA5, UKV and the ICON
+  products stay in the km/h the page fitted them in, since XGBoost's splits are invariant to a
+  rescaling of one column. Mean speeds are printed in m/s for every product.
+- **The report adds a Months column to every contrast table**, so the period splits state how many
+  calendar months each interval rests on.
