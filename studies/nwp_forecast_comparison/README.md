@@ -53,9 +53,12 @@ Full tables: `v1_wind.md`, `v1_radiation.md` in the output directory.
 ### V1b — each product's run-switch pattern
 
 `_previous_day1`'s mean absolute second difference, by UTC hour of day, for 100 m wind speed and
-2 m temperature. See `v1b_run_switches.md` for the elevated hours and the inferred cycle per
-product; this is a screen, and a product whose elevated hours are noisy or spread across many hours
-is reported as "unclear" rather than forced into a 3- or 6-hourly reading.
+2 m temperature. **The threshold this script uses (mean plus one standard deviation) is too loose:
+it reads a 1-hourly cycle for nearly every product**, including GFS, ICON-EU and ICON global, which
+the plan's own review measured as switching 6-hourly. Only IFS 0.25° (3-hourly here) and the
+overall shape of the flagged hours are informative; the inferred-cycle column in
+`v1b_run_switches.md` should not be read as confirming or contradicting the plan's cycle claims,
+and a tighter or differently-shaped detector is needed before V1b's result can be relied on.
 
 ### V1c — steps in the planned inputs
 
