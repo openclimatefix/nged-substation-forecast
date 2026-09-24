@@ -608,6 +608,30 @@ def _agreement_lines(*, frame: pl.DataFrame) -> list[str]:
     return lines
 
 
+def _files_lines() -> list[str]:
+    """Render what the two MIDAS files hold: stations, and the first and last hour.
+
+    Returns:
+        Markdown lines.
+    """
+    radiation = read_radiation(path=RADIATION_PATH)
+    weather = read_hourly_weather(path=WEATHER_PATH, columns=["air_temperature"])
+    return [
+        "#### What the MIDAS files hold",
+        "",
+        "| File | Stations | First hour (UTC) | Last hour (UTC) |",
+        "|---|---|---|---|",
+        *(
+            f"| {name} | {frame['src_id'].n_unique()} | {frame['time'].min():%Y-%m-%d %H:%M} "
+            f"| {frame['time'].max():%Y-%m-%d %H:%M} |"
+            for name, frame in (
+                ("hourly global irradiance", radiation),
+                ("air temperature", weather),
+            )
+        ),
+    ]
+
+
 def _row_lines(*, frame: pl.DataFrame, candidates: int, repairs: dict[str, int]) -> list[str]:
     """Render the row counts and the reader's repairs.
 
@@ -876,6 +900,8 @@ def _report(
         ),
         "",
         *selection.pooled_lines(),
+        "",
+        *_files_lines(),
         "",
         *_row_lines(frame=frame, candidates=candidates, repairs=repairs),
         "",
