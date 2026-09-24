@@ -23,7 +23,12 @@ never be averaged, interpolated, or differenced as plain numbers. They are writt
 unchanged here for a downstream study to turn into sine/cosine features, as
 `wind_products.py` already does for its other wind sources.
 
-Run it with `uv run python studies/beam_diffuse_split/fetch_ens_point_wind.py`.
+The `ecmwf_ens` Dagster asset must already have populated `data/NWP/`, because this script reads
+that ENS Delta table. Then run this script with
+`uv run python studies/beam_diffuse_split/fetch_ens_point_wind.py`.
+
+The script writes one parquet file, `data/studies/weather/ENS/beam_diffuse_ens_wind.parquet`, at the
+path held in `OUTPUT_PATH`.
 """
 
 import logging
