@@ -360,3 +360,11 @@ nor overwritten. Two corrections to this file come first.
 6. **Wording.** The threshold, provenance, coverage and cell-selection corrections above; "before 1
    October 2025" for HRES's served grid; ENS's cadence and dissemination sentences as in the science
    review; and no work commitment on the page.
+
+**Fold helpers moved into the shared package.** `cut_eras`, `rotate_folds`, `calendar_month_coverage`,
+`uncovered_months` and `raise_on_uncovered_months` now live in `studies.cross_validation`, beside
+`assign_folds`, with tests in `packages/studies/tests/test_cross_validation.py`, so that other
+studies import them rather than copy them. The script's `with_three_eras` is `cut_eras` called with
+`ERA_START_MONTHS`. No fold assignment or printed number changed: `--report-only` reproduces
+`report.md`, `intervals.parquet` and `README.md` byte for byte, and every design's saved fold column
+matches the package's output.

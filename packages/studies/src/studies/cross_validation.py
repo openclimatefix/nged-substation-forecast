@@ -10,7 +10,7 @@ of mean errors and a table of differences between those means then subtract exac
 not if one divides per row and the other divides a pooled megawatt difference by a pooled capacity.
 """
 
-from collections.abc import Sequence
+from collections.abc import Mapping, Sequence
 from typing import Final, TypedDict
 
 import numpy as np
@@ -125,6 +125,115 @@ def assign_folds(*, dataset: pl.DataFrame, by: Sequence[str] = ("site",)) -> pl.
     month_count = pl.col("month").n_unique().over(group)
     fold = (month_rank - 1) * N_FOLDS // month_count
     return dataset.with_columns(fold=fold.cast(pl.Int32))
+
+
+def rotate_folds(*, frame: pl.DataFrame, fold_offsets: Mapping[int, int]) -> pl.DataFrame:
+    """Rotate each era's fold numbers by an offset, modulo `N_FOLDS`.
+
+    Rotating leaves the folds contiguous within an era. It changes which fold each era's months fall
+    in, so that a calendar month held out in one era is training data in another.
+
+    Args:
+        frame: Rows carrying `era_code` and `fold`.
+        fold_offsets: Each `era_code` to how far its fold numbers are rotated.
+
+    Returns:
+        The frame with the rotated `fold`.
+    """
+    rotation = pl.col("era_code").replace_strict(dict(fold_offsets), return_dtype=pl.Int32)
+    return frame.with_columns(fold=(pl.col("fold") + rotation) % N_FOLDS)
+
+
+def cut_eras(
+    *, frame: pl.DataFrame, first_months: Sequence[str], fold_offsets: Mapping[int, int]
+) -> pl.DataFrame:
+    """Label eras that begin at the given months, cut folds inside each, and rotate them.
+
+    An era is a stretch of months over which an input kept one version. Each era is cut into
+    `N_FOLDS` blocks per site by `assign_folds`, and then each era's fold numbers are rotated by
+    `fold_offsets`.
+
+    Args:
+        frame: Rows carrying `site` and `month`, where `month` is a `%Y-%m` string.
+        first_months: The first month of every era after the first, in ascending order.
+        fold_offsets: Each `era_code` (0 for the first era, counting up) to how far its fold numbers
+            are rotated.
+
+    Returns:
+        The frame with `era_code`, `era` (`era_code` as a string, for `assign_folds`) and `fold`.
+    """
+    era_code = sum((pl.col("month") >= month).cast(pl.Int8) for month in first_months)
+    labelled = frame.with_columns(era_code=era_code).with_columns(
+        era=pl.col("era_code").cast(pl.String)
+    )
+    return rotate_folds(
+        frame=assign_folds(dataset=labelled, by=("site", "era")), fold_offsets=fold_offsets
+    )
+
+
+def calendar_month_coverage(*, frame: pl.DataFrame) -> pl.DataFrame:
+    """Count, for each held-out calendar month, the training rows that carry it.
+
+    For every (site, fold, calendar month) with rows in the fold, counts the rows of the same site
+    and calendar month that lie in the other folds, from any era or year. A count of 0 means the
+    fitted model has seen no row of that season.
+
+    Args:
+        frame: The row set carrying `site`, `fold` and `time`.
+
+    Returns:
+        One row per (site, fold, calendar_month) with `n_scored`, `n_train`, `n_years` (how many
+        distinct years of the site's rows carry that calendar month) and `covered`.
+    """
+    rows = frame.select(
+        "site",
+        "fold",
+        calendar_month=pl.col("time").dt.month(),
+        year=pl.col("time").dt.year(),
+    )
+    totals = rows.group_by("site", "calendar_month").agg(
+        n_total=pl.len(), n_years=pl.col("year").n_unique()
+    )
+    return (
+        rows.group_by("site", "fold", "calendar_month")
+        .agg(n_scored=pl.len())
+        .join(totals, on=["site", "calendar_month"])
+        .with_columns(n_train=pl.col("n_total") - pl.col("n_scored"))
+        .with_columns(covered=pl.col("n_train") > 0)
+        .drop("n_total")
+        .sort("site", "fold", "calendar_month")
+    )
+
+
+def uncovered_months(*, coverage: pl.DataFrame) -> pl.DataFrame:
+    """Return the coverage rows with no training row for a calendar month that a design could cover.
+
+    Args:
+        coverage: `calendar_month_coverage`'s result.
+
+    Returns:
+        The rows with no training row for a calendar month that occurs in more than one year: the
+        failures the fold design could have avoided.
+    """
+    return coverage.filter(~pl.col("covered"), pl.col("n_years") > 1)
+
+
+def raise_on_uncovered_months(*, coverage: pl.DataFrame) -> None:
+    """Raise if a held-out calendar month that occurs in two years has no training row.
+
+    Args:
+        coverage: `calendar_month_coverage`'s result.
+
+    Raises:
+        ValueError: Naming the first failing (site, fold, calendar month) rows.
+    """
+    failures = uncovered_months(coverage=coverage)
+    if failures.height:
+        msg = (
+            f"{failures.height} (site, fold, calendar month) cells hold out a calendar month that "
+            f"occurs in two years and leave no training row for it: {failures.head(5).to_dicts()}"
+        )
+        raise ValueError(msg)
 
 
 def crps(*, actual: np.ndarray, quantiles: np.ndarray) -> np.ndarray:

@@ -145,12 +145,15 @@ from studies.bootstrap import (
 )
 from studies.charts import CONTRAST_COLUMNS
 from studies.cross_validation import (
-    N_FOLDS,
     PRIMARY_HYPER_PARAMETERS,
     SEEDS,
     SENSITIVITY_HYPER_PARAMETERS,
     HyperParameters,
-    assign_folds,
+    calendar_month_coverage,
+    cut_eras,
+    raise_on_uncovered_months,
+    rotate_folds,
+    uncovered_months,
 )
 from studies.grid_sampling import distance_matrix_km
 from studies.guards import refuse_to_overwrite
@@ -682,95 +685,6 @@ def joined_row_set(*, sites: pl.DataFrame) -> tuple[pl.DataFrame, list[tuple[str
     return frame.sort("site", "time"), counts
 
 
-def with_three_eras(*, frame: pl.DataFrame, fold_offsets: Mapping[int, int]) -> pl.DataFrame:
-    """Label each row's era, add the era feature, and cut folds inside each era.
-
-    The date filter has already run, so the folds are cut on the row set the arms are fitted on.
-    Each era's fold numbers are rotated by `fold_offsets` afterward, which leaves the folds
-    contiguous within an era.
-
-    Args:
-        frame: The common rows, carrying `month`.
-        fold_offsets: Each `era_code` to how far its fold numbers are rotated.
-
-    Returns:
-        The frame with `era`, `era_code` and `fold`.
-    """
-    second, third = ERA_START_MONTHS
-    era_code = (pl.col("month") >= second).cast(pl.Int8) + (pl.col("month") >= third).cast(pl.Int8)
-    labelled = frame.with_columns(era_code=era_code).with_columns(
-        era=pl.col("era_code").cast(pl.String)
-    )
-    return _rotate_folds(
-        frame=assign_folds(dataset=labelled, by=("site", "era")), fold_offsets=fold_offsets
-    )
-
-
-def calendar_month_coverage(*, frame: pl.DataFrame) -> pl.DataFrame:
-    """Count, for each held-out calendar month, the training rows that carry it.
-
-    For every (site, fold, calendar month) with rows in the fold, counts the rows of the same site
-    and calendar month that lie in the other folds, from any era or year. A count of 0 means the
-    fitted model has seen no row of that season.
-
-    Args:
-        frame: The row set carrying `site`, `fold` and `time`.
-
-    Returns:
-        One row per (site, fold, calendar_month) with `n_scored`, `n_train`, `n_years` (how many
-        distinct years of the site's rows carry that calendar month) and `covered`.
-    """
-    rows = frame.select(
-        "site",
-        "fold",
-        calendar_month=pl.col("time").dt.month(),
-        year=pl.col("time").dt.year(),
-    )
-    totals = rows.group_by("site", "calendar_month").agg(
-        n_total=pl.len(), n_years=pl.col("year").n_unique()
-    )
-    return (
-        rows.group_by("site", "fold", "calendar_month")
-        .agg(n_scored=pl.len())
-        .join(totals, on=["site", "calendar_month"])
-        .with_columns(n_train=pl.col("n_total") - pl.col("n_scored"))
-        .with_columns(covered=pl.col("n_train") > 0)
-        .drop("n_total")
-        .sort("site", "fold", "calendar_month")
-    )
-
-
-def uncovered_months(*, coverage: pl.DataFrame) -> pl.DataFrame:
-    """Return the rows of the coverage table that no fold design could fix, and the ones that fail.
-
-    Args:
-        coverage: `calendar_month_coverage`'s result.
-
-    Returns:
-        The rows with no training row for a calendar month that occurs in more than one year: the
-        failures the fold design could have avoided.
-    """
-    return coverage.filter(~pl.col("covered"), pl.col("n_years") > 1)
-
-
-def _raise_on_uncovered_months(*, coverage: pl.DataFrame) -> None:
-    """Raise if a held-out calendar month that occurs in two years has no training row.
-
-    Args:
-        coverage: `calendar_month_coverage`'s result.
-
-    Raises:
-        ValueError: Naming the first failing (site, fold, calendar month) rows.
-    """
-    failures = uncovered_months(coverage=coverage)
-    if failures.height:
-        msg = (
-            f"{failures.height} (site, fold, calendar month) cells hold out a calendar month that "
-            f"occurs in two years and leave no training row for it: {failures.head(5).to_dicts()}"
-        )
-        raise ValueError(msg)
-
-
 def _coverage_lines(*, coverage: pl.DataFrame) -> list[str]:
     """Render the calendar-month coverage table as markdown.
 
@@ -1171,7 +1085,7 @@ def _raise_on_failed_checks(*, checks: ChecksResult) -> None:
     Raises:
         ValueError: Naming every failed check.
     """
-    _raise_on_uncovered_months(coverage=checks["coverage"])
+    raise_on_uncovered_months(coverage=checks["coverage"])
     ens_power = checks["ens_power"]
     if not ens_power["n_shared_rows"] or ens_power["max_abs_diff_mw"] > MAX_ENS_POWER_DIFF_MW:
         msg = (
@@ -1667,42 +1581,6 @@ def long_row_frame(*, sites: pl.DataFrame) -> pl.DataFrame:
     return _add_time_features(dataset=frame).sort("site", "time")
 
 
-def _rotate_folds(*, frame: pl.DataFrame, fold_offsets: Mapping[int, int]) -> pl.DataFrame:
-    """Rotate each era's fold numbers by an offset, modulo `N_FOLDS`.
-
-    Args:
-        frame: Rows carrying `era_code` and `fold`.
-        fold_offsets: Each `era_code` to how far its fold numbers are rotated.
-
-    Returns:
-        The frame with the rotated `fold`.
-    """
-    rotation = pl.col("era_code").replace_strict(dict(fold_offsets), return_dtype=pl.Int32)
-    return frame.with_columns(fold=(pl.col("fold") + rotation) % N_FOLDS)
-
-
-def _cut_eras(
-    *, frame: pl.DataFrame, first_months: tuple[str, ...], fold_offsets: Mapping[int, int]
-) -> pl.DataFrame:
-    """Label eras that begin at the given months, cut folds inside each, and rotate them.
-
-    Args:
-        frame: Rows carrying `site` and `month`.
-        first_months: The first month of every era after the first.
-        fold_offsets: Each `era_code` to how far its fold numbers are rotated.
-
-    Returns:
-        The frame with `era_code`, `era` and `fold`.
-    """
-    era_code = sum((pl.col("month") >= month).cast(pl.Int8) for month in first_months)
-    labelled = frame.with_columns(era_code=era_code).with_columns(
-        era=pl.col("era_code").cast(pl.String)
-    )
-    return _rotate_folds(
-        frame=assign_folds(dataset=labelled, by=("site", "era")), fold_offsets=fold_offsets
-    )
-
-
 def long_row_designs(*, frame: pl.DataFrame) -> dict[str, pl.DataFrame]:
     """Return the long row set under its three era-and-fold designs.
 
@@ -1718,10 +1596,10 @@ def long_row_designs(*, frame: pl.DataFrame) -> dict[str, pl.DataFrame]:
     """
     return {
         "two UKV eras, no cut at 49r1 (horizons design)": with_eras(frame=frame),
-        "two UKV eras, no cut at 49r1, folds rotated": _rotate_folds(
+        "two UKV eras, no cut at 49r1, folds rotated": rotate_folds(
             frame=with_eras(frame=frame), fold_offsets=HORIZONS_ROTATED_FOLD_OFFSETS
         ),
-        "extra era cut at 2024-12-01": _cut_eras(
+        "extra era cut at 2024-12-01": cut_eras(
             frame=frame,
             first_months=(IFS_CYCLE_49R1_CUT_MONTH, UKV_UPGRADE_MONTH),
             fold_offsets=LONG_ROW_FOLD_OFFSETS,
@@ -1740,14 +1618,18 @@ def fold_designs(*, frame: pl.DataFrame) -> dict[str, pl.DataFrame]:
         the study's folds with a two-valued `era_code`; and an extra era cut at IFS Cycle 50r1 with
         the part-month of May 2026 dropped.
     """
-    study_folds = with_three_eras(frame=frame, fold_offsets=ERA_FOLD_OFFSETS)
+    study_folds = cut_eras(
+        frame=frame, first_months=ERA_START_MONTHS, fold_offsets=ERA_FOLD_OFFSETS
+    )
     return {
-        "three eras, no fold rotation": with_three_eras(frame=frame, fold_offsets=NO_FOLD_OFFSETS),
+        "three eras, no fold rotation": cut_eras(
+            frame=frame, first_months=ERA_START_MONTHS, fold_offsets=NO_FOLD_OFFSETS
+        ),
         "two UKV eras (the page's design)": with_eras(frame=frame),
         "study folds, two-valued era_code": study_folds.with_columns(
             era_code=(pl.col("month") >= UKV_UPGRADE_MONTH).cast(pl.Int8)
         ),
-        "extra era cut at IFS 50r1, May 2026 dropped": _cut_eras(
+        "extra era cut at IFS 50r1, May 2026 dropped": cut_eras(
             frame=frame.filter(pl.col("month") != IFS_CYCLE_50R1_MONTH),
             first_months=(*ERA_START_MONTHS, FIRST_MONTH_AFTER_50R1),
             fold_offsets=ERA_FOLD_OFFSETS_50R1,
@@ -2485,7 +2367,7 @@ def main() -> int:
     sites = _wind_sites()
     rows, counts = joined_row_set(sites=sites)
     timed_rows = _add_time_features(dataset=rows)
-    frame = with_three_eras(frame=timed_rows, fold_offsets=ERA_FOLD_OFFSETS)
+    frame = cut_eras(frame=timed_rows, first_months=ERA_START_MONTHS, fold_offsets=ERA_FOLD_OFFSETS)
     _LOG.info("common rows: %d, %s to %s", frame.height, frame["time"].min(), frame["time"].max())
 
     checks = run_checks(sites=sites, frame=frame, counts=counts)
