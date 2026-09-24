@@ -20,9 +20,7 @@ import polars as pl
 REPO_ROOT: Final[Path] = Path(__file__).parent.parent
 """The repo root, one level above this `tests/` directory."""
 
-SCRIPT_PATH: Final[Path] = (
-    REPO_ROOT / "studies" / "beam_diffuse_split" / "weather_products.py"
-)
+SCRIPT_PATH: Final[Path] = REPO_ROOT / "studies" / "beam_diffuse_split" / "weather_products.py"
 """The study script under test, imported by path because `studies/` is not an importable package."""
 
 
@@ -63,9 +61,9 @@ def test_ifs_hres_lead_follows_the_cutover_date() -> None:
         }
     )
 
-    leads = frame.select(
-        weather_products._served_lead(product="ifs_hres").alias("lead")
-    )["lead"].to_list()
+    leads = frame.select(weather_products._served_lead(product="ifs_hres").alias("lead"))[
+        "lead"
+    ].to_list()
 
     assert leads == [7, 1], leads
 
@@ -81,8 +79,8 @@ def test_other_products_are_unaffected_by_the_cutover() -> None:
         }
     )
 
-    leads = frame.select(
-        weather_products._served_lead(product="icon_eu").alias("lead")
-    )["lead"].to_list()
+    leads = frame.select(weather_products._served_lead(product="icon_eu").alias("lead"))[
+        "lead"
+    ].to_list()
 
     assert leads == [1, 1], leads
