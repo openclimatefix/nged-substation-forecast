@@ -21,6 +21,12 @@ names on disk.
 placed in an exception message. No HTTP redirect is followed, because CEDA answers a bad or expired
 token by redirecting to its login page.
 
+**The station lists are hand-typed.** The rule that reproduces them is: `last_year` 2025 or later
+in the station-metadata CSV, and within 100 km of at least one of the nine anonymised study sites.
+That gives all 10 radiation stations and 37 of the 38 hourly-weather stations; station 24219
+(record ends 2024) is the exception. No other station with `last_year` 2025 is within 100 km of
+any site.
+
 **CEDA's own directory listing decides which files exist.** The station-metadata CSV's
 `first_year` and `last_year` bound a station's record but do not promise a file for every year in
 between: station 00390 has no `uk-hourly-weather-obs` file for 2017 to 2024, for example. So the
@@ -1250,6 +1256,15 @@ def _extra_readme_sections(
     )
     return f"""
 ## Station coverage
+
+**Which stations were fetched.** The station lists were typed by hand and the script did not
+record the rule behind them. The rule below reproduces them from the station-metadata CSVs: a
+station is fetched if its `last_year` is 2025 or later and it lies within 100 km of at least one of
+the nine anonymised study sites. That rule gives exactly the 10 of 241 `uk-radiation-obs` stations
+and 37 of the 38 `uk-hourly-weather-obs` stations. The exception is station 24219, whose record
+ends in 2024 but which was fetched as well. Every other station with `last_year` 2025 lies further
+than 100 km from every site. This README gives no per-station distances, because a distance to a
+study site would help locate that site.
 
 Computed from the tidy parquets and the raw files on disk when this README was written. The
 station-metadata CSVs do not say which variables a station reports or how often, so the last
