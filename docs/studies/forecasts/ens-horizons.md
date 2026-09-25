@@ -422,7 +422,7 @@ model-version story alone would not predict either. Forecast lead may explain th
 wind is an hourly analysis, which assimilates observations of the hour it describes, while day 0
 spans leads of 0 to 23 hours. ERA5's radiation, by contrast, comes from forecasts 1 to 12 hours old,
 so lead does not favour ERA5 for solar by enough to explain the gaps above. The past-solar page's
-[ENS section](../past-weather/solar.md#ecmwf-ens-a-longer-lead-forecast-than-any-other-product-on-this-page)
+[ENS section](../past-weather/solar.md#ecmwf-ens-beats-era5-and-trails-cams)
 estimates, on its own rows at leads 5 to 20 hours, that ENS's extra 6.11 hours of mean lead over
 ERA5 raises ENS's error by about 0.16 points, so lead does favour ERA5 slightly.
 

@@ -70,16 +70,17 @@ The ranking rests on four planned contrasts: CAMS against ICON-D2, ICON-EU again
 against UKV, and ICON global against ICON-EU. Two more were written before SARAH-3 and ICON-DREAM-EU
 were scored: SARAH-3 against CAMS, and ICON-DREAM-EU against ERA5. Three more planned contrasts,
 including ECMWF's 9 km global model against ICON-EU, are scored on the four extra Open-Meteo models'
-own, shorter row set: see [The four extra Open-Meteo
-models](solar.md#the-four-extra-open-meteo-models). Two further planned contrasts, ECMWF ENS against
-ERA5 and against CAMS, are scored on ENS's own row set: see [ECMWF ENS: a longer-lead forecast than
-any other product on this
-page](solar.md#ecmwf-ens-a-longer-lead-forecast-than-any-other-product-on-this-page). Three further
+own, shorter row set: see [HARMONIE-AROME as Open-Meteo serves it trails the ICON model of similar
+grid
+spacing](solar.md#harmonie-arome-as-open-meteo-serves-it-trails-the-icon-model-of-similar-grid-spacing)
+and [ECMWF-IFS-HRES against ICON-EU is not resolved, and IFS-HRES beats
+ERA5](solar.md#ecmwf-ifs-hres-against-icon-eu-is-not-resolved-and-ifs-hres-beats-era5). Two further
+planned contrasts, ECMWF ENS against ERA5 and against CAMS, are scored on ENS's own row set: see
+[ECMWF ENS beats ERA5 and trails CAMS](solar.md#ecmwf-ens-beats-era5-and-trails-cams). Three further
 planned contrasts are scored on the weather-station section's own row set: the nearest weather
 station against CAMS and against ERA5, and CAMS with the station against CAMS with a shuffled copy
-of the station's irradiance. See [Met Office weather-station observations as a stand-in for a
-gridded
-product](solar.md#met-office-weather-station-observations-as-a-stand-in-for-a-gridded-product).
+of the station's irradiance. See [The nearest station is a worse input than CAMS and a better input
+than ERA5](solar.md#the-nearest-station-is-a-worse-input-than-cams-and-a-better-input-than-era5).
 
 ### The 14 planned contrasts
 

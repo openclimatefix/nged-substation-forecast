@@ -449,7 +449,7 @@ rather than from a shared column; all three are built on the two products' globa
 since this study reads no split for SARAH-3. CM SAF does publish a direct/diffuse split for
 SARAH-3, modelled from its own global irradiance rather than retrieved independently, as [the
 past-solar page
-explains](solar.md#a-products-own-direct-beam-adds-little), so it is not
+explains](solar.md#a-products-own-direct-beam-adds-little-on-the-main-row-set), so it is not
 scored here. Two negative controls pair CAMS with a noised copy of itself: one noised at 48.2 W/m2,
 the measured root-mean-square difference between CAMS's and SARAH-3's global irradiance on these
 rows, so its two columns differ from each other about as much as the two products genuinely do; the
