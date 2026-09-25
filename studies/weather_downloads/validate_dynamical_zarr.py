@@ -24,7 +24,7 @@ grid-cell hash, and the combined file's row count equals the sum of the files. W
 Run it with `uv run python studies/weather_downloads/validate_dynamical_zarr.py --directory
 <directory under data/studies/weather>`, for example `--directory GEFS` or `--directory
 ECMWF-AIFS-ENS`. A level shift at a model-version change is not tested. For AIFS Single, the
-shortwave radiation and 100 m winds are expected `NaN` before the 2025-02-24 06 UTC run
+shortwave and longwave radiation and 100 m winds are expected `NaN` before the 2025-02-24 06 UTC run
 (`EXPECTED_NAN`), and the validator checks they are `NaN` there and finite after.
 """
 
@@ -103,6 +103,9 @@ EXPECTED_NAN: Final[dict[str, tuple[frozenset[str], datetime]]] = {
 """Per model: the variables the store lacks, and the first `init_time` that has them. Before that
 run the variable is `NaN` at every lead time and every cell, so these `NaN`s are expected and are
 not failures. Every other `NaN` is a finding."""
+
+ENSEMBLE_SIZE: Final[int] = 51
+"""AIFS ENS has the control member 0 and 50 perturbed members, so `ensemble_member` is 0 to 50."""
 
 NIGHT_MEDIAN_LIMIT_W_M2: Final[float] = 5.0
 MIDDAY_MEAN_MINIMUM_W_M2: Final[float] = 100.0
@@ -237,6 +240,10 @@ def _validate_month(*, path: Path, month: str, label: str, edge: bool, results: 
         expected_rows *= frame[column].n_unique()
     if expected_rows != frame.height:
         _fail(results=results, check="dense", month=month)
+    if label == "ECMWF-AIFS-ENS" and set(frame["ensemble_member"].unique().to_list()) != set(
+        range(ENSEMBLE_SIZE)
+    ):
+        _fail(results=results, check="ensemble_members", month=month)
     _check_runs(frame=frame, month=month, label=label, edge=edge, results=results)
     _check_values(
         frame=frame,

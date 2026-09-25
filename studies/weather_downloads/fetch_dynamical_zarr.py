@@ -109,14 +109,17 @@ def _cropped_dataset(*, dataset_id: str) -> xr.Dataset:
     )
 
 
-def _load_with_retries(*, dataset: xr.Dataset) -> xr.Dataset:
+def _load_with_retries(*, dataset: xr.Dataset, month: str) -> xr.Dataset:
     """Load a lazy dataset, retrying with exponential backoff on any failure.
 
-    A transient network error partway through a month would otherwise abandon the whole run.
-
+    A transient network error partway through a month would otherwise abandon the whole run. The
+    first sleep is 10 s and each later one doubles. Each retry prints the month, the attempt
+    number, and the exception's type name only, because an exception message can carry a request
+    URL.
 
     Args:
         dataset: The lazy, cropped slice to load.
+        month: The `YYYY-MM` label, for the retry log line.
 
     Returns:
         The same slice, in memory.
@@ -127,9 +130,13 @@ def _load_with_retries(*, dataset: xr.Dataset) -> xr.Dataset:
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
             return dataset.load()
-        except Exception:
+        except Exception as error:
             if attempt == MAX_ATTEMPTS:
                 raise
+            print(
+                f"{month}: load attempt {attempt} failed ({type(error).__name__}); retrying",
+                flush=True,
+            )
             time.sleep(BACKOFF_SECONDS * 2**attempt)
     raise AssertionError  # unreachable: the loop returns or raises
 
@@ -288,7 +295,9 @@ VERSION_NOTES: Final[dict[str, list[str]]] = {
             "The store starts on 2024-04-01, but `downward_short_wave_radiation_flux_surface`, "
             "`downward_long_wave_radiation_flux_surface`, `wind_u_100m` and `wind_v_100m` are "
             "`NaN` in every run before the 2025-02-24 06 UTC run: the store holds no values "
-            "for those fields before then. Those rows are kept as `NaN`; "
+            "for those fields before then. That is one day before the operational v1 date "
+            "(2025-02-25 06 UTC) read from ECMWF's pages, so the store's start of these four "
+            "fields does not coincide with that date. Those rows are kept as `NaN`; "
             "`validate_dynamical_zarr.py` treats exactly those `NaN`s as expected."
         ),
     ],
@@ -476,7 +485,9 @@ def main() -> int:
             return complete_path
         # A string bound is expanded by xarray to the whole month; a `np.datetime64` bound would
         # be an exact instant and drop later init_times on the last day.
-        month_slice = _load_with_retries(dataset=cropped.sel(init_time=slice(month, month)))
+        month_slice = _load_with_retries(
+            dataset=cropped.sel(init_time=slice(month, month)), month=month
+        )
         frame = _to_long_frame(dataset=month_slice)
         target = complete_path if complete else partial_path
         temporary = target.with_suffix(".parquet.tmp")
