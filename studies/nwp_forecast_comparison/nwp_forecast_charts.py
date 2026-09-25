@@ -90,6 +90,10 @@ CAPACITY_NOTE: Final[str] = (
     "metered output."
 )
 SHARED_ROWS_NOTE: Final[str] = "Every product is scored on exactly the same hours."
+SHARED_ROWS_EXCEPT_IFS_NOTE: Final[str] = (
+    "Every product except IFS HRES 9 km is scored on exactly the same hours; IFS HRES 9 km is "
+    "scored without the target days its archive lacks."
+)
 DOTS_NOTE: Final[str] = (
     "Dot: estimate. Line: 95% interval from resampling whole months and a fitting seed."
 )
@@ -634,17 +638,6 @@ LEAD_LABEL_ROOM: Final[float] = 1.5
 """How far right of the baselines the leaderboard's x axis runs, in percentage points of capacity,
 leaving room for the name written beside the smart-persistence line."""
 
-DEVICE_NOTES: Final[dict[DomainType, str]] = {
-    "solar": "a GPU fit of an arm differs from its CPU fit by at most 0.02 points",
-    "wind": (
-        "a GPU fit of an arm has an error 0.04 to 0.09 points lower than its CPU fit, in every "
-        "estimate"
-    ),
-}
-"""How far a GPU refit of an arm lies from its published CPU fit (the extra-lead report's device
-noise floor), for the leaderboard's subtitle. For wind every estimate is lower, though no single
-interval excludes zero."""
-
 DIAMOND_DAYS: Final[frozenset[int]] = frozenset({0, 7})
 """The lead days drawn as diamonds, a second encoding beside the colour: day 0 (black) and day 7
 (grey), the two days that are not one of the chromatic circles."""
@@ -863,47 +856,21 @@ def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt
             (
                 "Each row is one forecast product. Each mark is an XGBoost model's mean absolute "
                 "error, as a percentage of capacity, given that product's forecast at one lead "
-                "day, on the hours every forecast is scored on. The XGBoost model uses the "
-                "primary setting. Smaller is better. A lead day with no mark was not fitted for "
-                "that product; nothing is filled in. Dashed lines mark the no-weather baselines."
+                "day. Smaller is better. Marks run from day 0 at the top to day 14 at the bottom; "
+                "day 7 is a grey diamond and day 0 is a black diamond. A lead day with no mark "
+                "was not fitted; nothing is filled in. Dashed lines mark the no-weather "
+                f"baselines. {DOTS_NOTE} Overlapping intervals can still hide a significant "
+                f"paired difference (Figure {FIGURE_NUMBERS[(domain, 'headline')]})."
             ),
             (
-                "Within each row, marks run from day 0 at the top to day 14 at the bottom; day 7 "
-                "is a grey diamond and day 0 is a black diamond. Day 0 is not a day-ahead "
-                "forecast a service could read: ENS's and GEFS's day 0 comes from the 00 UTC run, "
-                "0 to 23 hours before the hour it describes; GFS (native)'s from the freshest of "
-                "its four runs a day, 0 to 5 hours before; and every other product's from "
-                "Open-Meteo's freshest run, 0 to 3 hours before for ICON-EU and ICON-D2 and at a "
-                "lead set by each product's own run cycle for the rest. GFS (native) at days 1 "
-                "and above reads the 00 UTC run that many days before, from Dynamical.org's "
-                "native store, and its radiation is a mean since the last 6-hourly reset, "
-                "converted to the mean over each hour or 3 hours before its label; GFS "
-                "(Open-Meteo) is NOAA GFS as Open-Meteo's archive serves it. IFS HRES (9 km, "
-                "Open-Meteo) is ECMWF's IFS HRES as Open-Meteo's Single Runs archive serves it on "
-                "its 9 km grid, a finer product than IFS 0.25° and not another version of it. "
-                "It holds 00 UTC runs only, so its day 0 is the 00 UTC run of the hour's own "
-                "day, and it is fitted at days 0 to 7 (its runs end at lead 240 hours, so it has "
-                "no day 10). IFS HRES publishes 3-hourly steps after lead 90 hours and 6-hourly "
-                "steps after lead 144 hours, and Open-Meteo interpolates them to hourly, so "
-                "hourly values at day 5 and above, and at the last hours of day 3, are "
-                "interpolated. Open-Meteo's processing of HRES has not been checked against a "
-                "native archive. Every mark is an XGBoost model fitted "
-                "on a graphics processing unit (GPU) at the primary setting, so no mark mixes "
-                f"devices; {DEVICE_NOTES[domain]}. "
-                f"Overlapping intervals here can still hide a significant paired difference "
-                f"(Figure {FIGURE_NUMBERS[(domain, 'headline')]}). {DOTS_NOTE}"
-            ),
-            (
-                "Leads are not equal: a forecast from Open-Meteo's Previous Runs archive comes "
-                "from the freshest run made at least a day before the hour it describes, so its "
-                "day-1 lead is shorter than ENS's on most hours, which favours that product. "
-                "At days 1 and above, only GEFS, GFS (native), IFS HRES (9 km, Open-Meteo), and "
-                "the ENS control member share ENS's lead; at day 0, GFS (native) reads the "
-                "freshest of its four runs a day. IFS HRES (9 km, Open-Meteo) is scored on the "
-                "shared hours minus the target days whose 00 UTC run the archive lacks (seven run "
-                "days), which the other rows include. That difference alone moves the ENS mean's "
-                f"day-1 error by {ROW_SET_SHIFT_TEXT[domain]}. Contrasts with IFS HRES are "
-                "computed on the hours both score."
+                "Day 0 is not a day-ahead forecast a service could read, because each product "
+                "reads a run that started before the hour it describes. Every mark is a graphics "
+                "processing unit (GPU) fit, so no mark mixes devices. Leads are not equal: a "
+                "Previous Runs product reads the freshest run at least a day old, a shorter lead "
+                "than ENS's on most hours, which favours that product. IFS HRES (9 km, "
+                "Open-Meteo) is scored on the shared hours minus the target days its archive "
+                "lacks, which the other rows include. That difference alone moves the ENS mean's "
+                f"day-1 error by {ROW_SET_SHIFT_TEXT[domain]}."
             ),
             f"{scope_text(losses=losses, domain=domain)} {CAPACITY_NOTE}",
         ],
@@ -1331,6 +1298,19 @@ def lead_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
     )
 
 
+def dashed_lines_note(*, domain: DomainType) -> str:
+    """Name the dashed lines of the lead-day chart, which the technology decides."""
+    listed = (
+        "GFS (native), IFS HRES 9 km, and ARPEGE"
+        if domain == "solar"
+        else "GFS (native) and IFS HRES 9 km"
+    )
+    return (
+        f"The dashed lines are {listed}. GFS (native) and IFS HRES 9 km each share a colour with "
+        "a solid line, GFS (Open-Meteo) and IFS 0.25°."
+    )
+
+
 def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.VConcatChart | None:
     """Draw error against lead day, with ENS's day-0 and day-1 intervals shaded.
 
@@ -1372,11 +1352,7 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
         values=[0, 1, 2, 3],
         labelExpr="'Day ' + datum.value",
         grid=False,
-        title=(
-            "Lead day (ENS, native GFS, and IFS HRES (9 km, Open-Meteo): a 24-hour band of leads "
-            "of the 00 UTC run that many days earlier; other products: the freshest run at "
-            "least as many days old as the lead day)"
-        ),
+        title="Lead day",
     )
     y = alt.Y(
         "value:Q",
@@ -1485,30 +1461,23 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
                 "Mean absolute error of an XGBoost model given each forecast product at each "
                 "lead day, as a percentage of capacity. The XGBoost model uses the primary "
                 "setting. Smaller is better. Shaded bands: the 95% intervals of the ENS mean's "
-                "day-0 and day-1 errors; the two ENS leads between which a Previous Runs "
+                "day-0 and day-1 errors, the two ENS leads between which a Previous Runs "
                 "product's day-1 lead falls."
             ),
             (
                 f"{DOTS_NOTE} Products at one day are drawn side by side, and each product's "
-                "name is written beside its last point. Two of the dashed lines each sit beside a "
-                "solid line of the same colour; on the solar chart, the dashed black line is "
-                "ARPEGE Europe, shown as ARPEGE. The dashed burnt-orange line, shown as IFS HRES "
-                "9 km, is "
-                "IFS HRES (9 km, Open-Meteo): 00 UTC runs only, scored without the target days "
-                "whose run the archive lacks, not checked against a native archive, and its "
-                "day-3 values after lead 90 hours are interpolated from 3-hourly steps. The "
-                "solid burnt-orange line is IFS 0.25°, a coarser product. The two GFS lines are "
-                "one weather model from two sources: the solid line is Open-Meteo's "
-                "GFS-SEAMLESS archive, and the dashed line is Dynamical.org's native GFS "
-                "store, whose radiation is a mean since "
-                "the last 6-hourly reset and is converted to the mean over each hour before its "
-                "label. ICON-EU's day 0 is not drawn here: it is "
-                "Open-Meteo's freshest ICON-EU run, a lead of at most 3 hours, fitted later on a "
-                "GPU. IFS HRES 9 km is drawn at days 1 to 3 only: its day 0 and its day 7 are "
-                "left out, as day 7 is for every product. Products fitted at fewer than three of "
-                "days 0 to 3, and days 5, 10, and 14, "
-                f"are left out; Figure {FIGURE_NUMBERS[(domain, 'leaderboard')]} shows them. "
-                f"{SHARED_ROWS_NOTE}"
+                f"name is written beside its last point. {dashed_lines_note(domain=domain)} "
+                "IFS HRES 9 km is IFS HRES (9 km, Open-Meteo): 00 UTC runs only, not checked "
+                "against a native archive, and its day-3 values after lead 90 hours are "
+                "interpolated from 3-hourly steps. ICON-EU's day 0 is not drawn, because it "
+                "reads a run at most 3 hours old. Products fitted at fewer than three of days 0 "
+                "to 3 are left out, and days 5 to 14 and IFS HRES 9 km's day 0 appear only in "
+                f"Figure {FIGURE_NUMBERS[(domain, 'leaderboard')]}."
+            ),
+            (
+                "Lead day: ENS, GFS (native), and IFS HRES 9 km read a 24-hour band of leads of "
+                "the 00 UTC run that many days earlier; other products read the freshest run at "
+                f"least that many days old. {SHARED_ROWS_EXCEPT_IFS_NOTE}"
             ),
             f"{scope_text(losses=losses, domain=domain)} {CAPACITY_NOTE}",
         ],
