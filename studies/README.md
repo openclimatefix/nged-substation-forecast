@@ -62,3 +62,4 @@ branch. The directory is not an attic.
 | Directory | Question it answered | Where the answer lives |
 |---|---|---|
 | `beam_diffuse_split/` | Does a weather product's own beam/diffuse split carry information a PV forecast can use, beyond the global horizontal irradiance alone? | [Does a weather product's beam/diffuse split help a PV forecast?](https://openclimatefix.github.io/nged-substation-forecast/studies/beam-diffuse-split/) |
+| `nwp_forecast_comparison/` | At the day-ahead lead the live service delivers, and the two days after it, which forecast product, or which blend of products, gives the most accurate power forecast? | In progress — no fit has run yet; see `studies/nwp_forecast_comparison/README.md` |

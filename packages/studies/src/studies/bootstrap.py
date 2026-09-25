@@ -6,11 +6,17 @@ than the number of site-hours. Resampling whole calendar months keeps each episo
 and resampling the *same* months for both arms keeps the comparison paired.
 """
 
-from typing import Final, TypedDict
+from typing import Final, Literal, TypedDict
 
 import numpy as np
 import polars as pl
 from scipy import stats
+
+BracketVerdictType = Literal["beats", "loses", "unresolved"]
+"""Whether a product beats ENS, loses to ENS, or is unresolved at matched lead.
+
+Returned by `bracket_verdict`.
+"""
 
 N_BOOTSTRAP_RESAMPLES: Final[int] = 2000
 """How many resamples each interval is read from."""
@@ -527,3 +533,110 @@ def bootstrap_year_change(
         "n_months_year0": len(np.unique(by_year[year0][1])),
         "n_months_year1": len(np.unique(by_year[year1][1])),
     }
+
+
+def bracket_verdict(
+    *, lower_side: BootstrapInterval, upper_side: BootstrapInterval
+) -> BracketVerdictType:
+    """Turn a bracket's two intervals into a published verdict.
+
+    The bracket sandwiches a Previous Runs product's lead between two ENS leads: the lower side is
+    `product − ENS day N−1` (ENS's shorter lead), and the upper side is `product − ENS day N` (ENS's
+    equal-or-longer lead). "Beats" and "loses" both need the *whole* 95% interval on one side of
+    zero, not just the point estimate, so an interval that merely touches zero is unresolved.
+
+    Args:
+        lower_side: The product-minus-ENS interval at ENS's shorter lead (`product − ENS day N−1`).
+        upper_side: The product-minus-ENS interval at ENS's longer-or-equal lead
+            (`product − ENS day N`).
+
+    Returns:
+        `"beats"` if the lower side is negative and significant (the product beats ENS even at
+        ENS's shorter lead) and the upper side is not also significantly positive; `"loses"` if the
+        upper side is positive and significant (ENS beats the product even at ENS's longer lead)
+        and the lower side is not also significantly negative; `"unresolved"` otherwise, including
+        the contradictory case where both sides are significant, which means ENS's day `N` scored
+        better than ENS's day `N − 1` and so breaks the bracket's own monotonicity assumption — a
+        failed bracket assumption, not a resolved contrast.
+    """
+    beats = lower_side["upper_95"] < 0.0
+    loses = upper_side["lower_95"] > 0.0
+    if beats and loses:
+        return "unresolved"
+    if beats:
+        return "beats"
+    if loses:
+        return "loses"
+    return "unresolved"
+
+
+class BlendVerdict(TypedDict):
+    """A blend's published verdict, and how large a gain its conservative interval leaves open."""
+
+    verdict: str
+    largest_gain_not_excluded: float | None
+
+
+LOWERS_ERROR: Final[str] = "lowers the day-ahead error"
+MAY_LOWER_ERROR: Final[str] = "may lower the error"
+NO_DETECTABLE_DIFFERENCE: Final[str] = "no detectable difference"
+
+
+def blend_verdict(
+    *,
+    p4a: BootstrapInterval,
+    p4a_guard: BootstrapInterval,
+    p4b: BootstrapInterval,
+    p4b_guard: BootstrapInterval,
+) -> BlendVerdict:
+    """Turn a blend's two lead bounds and their two guards into the plan's published verdict.
+
+    Each blend contrast is the blend's error minus ENS alone's, so a negative interval is a gain. A
+    gain counts only if the guard (the blend minus the same blend with the other products' weather
+    permuted) is also negative and significant, which attributes the gain to the other products'
+    weather rather than to the extra columns.
+
+    - **Lowers the day-ahead error**: the conservative bound (P4b) and its guard are both negative
+      and significant, so the gain survives the longest lead a 09:00 UTC service could have.
+    - **May lower the error**: only the optimistic bound (P4a) and its guard are.
+    - **No detectable difference**: neither, with the largest gain P4b's interval leaves open.
+
+    Args:
+        p4a: The optimistic-lead blend minus ENS alone.
+        p4a_guard: The optimistic-lead blend minus its permutation control.
+        p4b: The conservative-lead blend minus ENS alone.
+        p4b_guard: The conservative-lead blend minus its permutation control.
+
+    Returns:
+        The verdict, and, for "no detectable difference" only, the largest gain (a positive number
+        in the metric's unit) that P4b's lower bound does not exclude.
+    """
+    if p4b["upper_95"] < 0.0 and p4b_guard["upper_95"] < 0.0:
+        return {"verdict": LOWERS_ERROR, "largest_gain_not_excluded": None}
+    if p4a["upper_95"] < 0.0 and p4a_guard["upper_95"] < 0.0:
+        return {"verdict": MAY_LOWER_ERROR, "largest_gain_not_excluded": None}
+    return {
+        "verdict": NO_DETECTABLE_DIFFERENCE,
+        "largest_gain_not_excluded": max(0.0, -p4b["lower_95"]),
+    }
+
+
+def combine_setting_verdicts(
+    *, primary: str, sensitivity: str, unresolved: str = "unresolved"
+) -> str:
+    """Combine one contrast's verdicts at the primary and sensitivity settings into one verdict.
+
+    The plan's rule: a verdict stands only if both hyperparameter settings give it; where the two
+    settings disagree, the published verdict is `unresolved` (or, for a family whose neutral
+    outcome is named differently, whatever `unresolved` is given as).
+
+    Args:
+        primary: The verdict read at `PRIMARY_HYPER_PARAMETERS`.
+        sensitivity: The verdict read at `SENSITIVITY_HYPER_PARAMETERS`.
+        unresolved: The verdict to return when the two settings disagree, so this works for both
+            a bracket verdict's `"unresolved"` and a blend verdict's `"no detectable difference"`.
+
+    Returns:
+        `primary` if the two settings agree, else `unresolved`.
+    """
+    return primary if primary == sensitivity else unresolved

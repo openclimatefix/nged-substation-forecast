@@ -4,12 +4,16 @@ import numpy as np
 import polars as pl
 import pytest
 from studies.bootstrap import (
+    BootstrapInterval,
+    blend_verdict,
     bootstrap_absolute,
     bootstrap_difference,
     bootstrap_difference_at_level,
     bootstrap_difference_by_year,
     bootstrap_row_difference,
     bootstrap_year_change,
+    bracket_verdict,
+    combine_setting_verdicts,
     fold_t_interval,
     per_fold_differences,
 )
@@ -490,6 +494,141 @@ def test_bootstrap_row_difference_interval_collapses_with_no_month_spread():
 
     assert result["lower_95"] == pytest.approx(5.0)
     assert result["upper_95"] == pytest.approx(5.0)
+
+
+def _interval(*, difference: float, lower_95: float, upper_95: float) -> BootstrapInterval:
+    """Build a `BootstrapInterval` for a verdict test, with fixed row and month counts."""
+    return {
+        "difference": difference,
+        "lower_95": lower_95,
+        "upper_95": upper_95,
+        "seed_spread": 0.0,
+        "n_rows": 100,
+        "n_months": 10,
+    }
+
+
+def test_bracket_verdict_beats_when_the_lower_side_is_negative_and_significant():
+    lower_side = _interval(difference=-0.5, lower_95=-0.8, upper_95=-0.2)
+    upper_side = _interval(difference=0.1, lower_95=-0.1, upper_95=0.3)
+
+    assert bracket_verdict(lower_side=lower_side, upper_side=upper_side) == "beats"
+
+
+def test_bracket_verdict_loses_when_the_upper_side_is_positive_and_significant():
+    lower_side = _interval(difference=0.3, lower_95=-0.1, upper_95=0.7)
+    upper_side = _interval(difference=0.5, lower_95=0.2, upper_95=0.8)
+
+    assert bracket_verdict(lower_side=lower_side, upper_side=upper_side) == "loses"
+
+
+def test_bracket_verdict_unresolved_when_neither_side_is_significant():
+    lower_side = _interval(difference=-0.1, lower_95=-0.4, upper_95=0.2)
+    upper_side = _interval(difference=0.1, lower_95=-0.2, upper_95=0.4)
+
+    assert bracket_verdict(lower_side=lower_side, upper_side=upper_side) == "unresolved"
+
+
+def test_bracket_verdict_unresolved_when_an_interval_touches_zero():
+    # The lower side's upper bound sits exactly at zero, so it does not clear zero and is not
+    # significant: a `<=` in place of `<` in the function's key line would wrongly say "beats".
+    lower_side = _interval(difference=-0.4, lower_95=-0.8, upper_95=0.0)
+    upper_side = _interval(difference=0.4, lower_95=0.0, upper_95=0.8)
+
+    assert bracket_verdict(lower_side=lower_side, upper_side=upper_side) == "unresolved"
+
+
+def test_bracket_verdict_unresolved_when_both_sides_are_significant():
+    # A contradictory pair: the lower side says "beats" and the upper side says "loses" at once,
+    # which can only happen if ENS's day N scored better than its day N − 1, breaking the bracket's
+    # own monotonicity assumption. Checking "loses" before "beats" (or vice versa) without this
+    # combined case would wrongly report one side's verdict instead of "unresolved".
+    lower_side = _interval(difference=-0.5, lower_95=-0.8, upper_95=-0.2)
+    upper_side = _interval(difference=0.5, lower_95=0.2, upper_95=0.8)
+
+    assert bracket_verdict(lower_side=lower_side, upper_side=upper_side) == "unresolved"
+
+
+def test_combine_setting_verdicts_stands_when_both_settings_agree():
+    assert combine_setting_verdicts(primary="beats", sensitivity="beats") == "beats"
+
+
+def test_combine_setting_verdicts_unresolved_when_settings_disagree():
+    assert combine_setting_verdicts(primary="beats", sensitivity="unresolved") == "unresolved"
+    assert combine_setting_verdicts(primary="beats", sensitivity="loses") == "unresolved"
+
+
+def test_combine_setting_verdicts_uses_the_given_neutral_value():
+    assert (
+        combine_setting_verdicts(
+            primary="lowers the day-ahead error",
+            sensitivity="no detectable difference",
+            unresolved="no detectable difference",
+        )
+        == "no detectable difference"
+    )
+
+
+def _gain(*, upper_95: float, lower_95: float = -0.9) -> BootstrapInterval:
+    return _interval(difference=(lower_95 + upper_95) / 2.0, lower_95=lower_95, upper_95=upper_95)
+
+
+def test_blend_verdict_lowers_the_error_when_the_conservative_bound_and_its_guard_gain():
+    result = blend_verdict(
+        p4a=_gain(upper_95=-0.1),
+        p4a_guard=_gain(upper_95=-0.1),
+        p4b=_gain(upper_95=-0.1),
+        p4b_guard=_gain(upper_95=-0.1),
+    )
+
+    assert result == {"verdict": "lowers the day-ahead error", "largest_gain_not_excluded": None}
+
+
+def test_blend_verdict_may_lower_the_error_when_only_the_optimistic_bound_gains():
+    result = blend_verdict(
+        p4a=_gain(upper_95=-0.1),
+        p4a_guard=_gain(upper_95=-0.1),
+        p4b=_gain(upper_95=0.2),
+        p4b_guard=_gain(upper_95=-0.1),
+    )
+
+    assert result == {"verdict": "may lower the error", "largest_gain_not_excluded": None}
+
+
+def test_blend_verdict_needs_the_guard_as_well_as_the_gain():
+    # P4b gains but its guard does not: the gain may come from the extra columns, not the weather.
+    result = blend_verdict(
+        p4a=_gain(upper_95=0.3),
+        p4a_guard=_gain(upper_95=0.3),
+        p4b=_gain(upper_95=-0.1),
+        p4b_guard=_gain(upper_95=0.1),
+    )
+
+    assert result["verdict"] == "no detectable difference"
+
+
+def test_blend_verdict_states_the_gain_the_conservative_interval_leaves_open():
+    result = blend_verdict(
+        p4a=_gain(upper_95=0.3),
+        p4a_guard=_gain(upper_95=0.3),
+        p4b=_gain(upper_95=0.2, lower_95=-0.45),
+        p4b_guard=_gain(upper_95=0.2),
+    )
+
+    assert result["verdict"] == "no detectable difference"
+    assert result["largest_gain_not_excluded"] == pytest.approx(0.45)
+
+
+def test_blend_verdict_reports_no_open_gain_when_the_lower_bound_is_positive():
+    # P4b's whole interval sits above zero (the blend is worse): no gain is left open.
+    result = blend_verdict(
+        p4a=_gain(upper_95=0.6, lower_95=0.1),
+        p4a_guard=_gain(upper_95=0.6, lower_95=0.1),
+        p4b=_gain(upper_95=0.6, lower_95=0.1),
+        p4b_guard=_gain(upper_95=0.6, lower_95=0.1),
+    )
+
+    assert result == {"verdict": "no detectable difference", "largest_gain_not_excluded": 0.0}
 
 
 def test_the_interval_at_95_percent_equals_the_published_interval():

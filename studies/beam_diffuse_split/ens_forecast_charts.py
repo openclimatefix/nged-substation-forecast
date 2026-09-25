@@ -70,10 +70,29 @@ SITES: Final[dict[DomainType, tuple[str, ...]]] = {
     "wind": ("W1", "W2", "W3"),
 }
 
-SCOPES: Final[dict[DomainType, str]] = {
-    "solar": "Six solar farms in Lincolnshire, every daylight hour, April 2024 to September 2026.",
-    "wind": "Three wind farms in Lincolnshire, every hour, August 2024 to September 2026.",
+SCOPE_PREFIX: Final[dict[DomainType, str]] = {
+    "solar": "Six solar farms in Lincolnshire, every daylight hour",
+    "wind": "Three wind farms in Lincolnshire, every hour",
 }
+
+
+def scope(*, domain: DomainType) -> str:
+    """Describe a technology's generators and the span of the rows in `_results_dir`.
+
+    Args:
+        domain: `solar` or `wind`.
+
+    Returns:
+        The scope line of a chart's subtitle, with the span read from the saved rows.
+    """
+    times = pl.read_parquet(_results_dir / f"{domain}_rows.parquet", columns=["time"])["time"]
+    return f"{SCOPE_PREFIX[domain]}, {times.min():%B %Y} to {times.max():%B %Y}."
+
+
+def both_scopes() -> str:
+    """Return the scope lines of both technologies, joined for a chart that draws both."""
+    return " ".join(scope(domain=domain) for domain in DOMAINS)
+
 
 CAPACITY: Final[str] = "Capacity is each generator's 99th-percentile output."
 DOTS: Final[str] = (
@@ -537,7 +556,7 @@ def leaderboard(
                 "inputs the blending page compared, scored on the same hours."
             ),
             f"{DOTS} {CAPACITY}",
-            f"{SCOPES['solar']} {SCOPES['wind']}",
+            both_scopes(),
             (
                 "The intervals are wide mainly because every row's error rises and falls together "
                 "from month to month; Figures 2, 9, and 10 compare rows on the same months."
@@ -679,7 +698,7 @@ def against_day0(*, contrasts: pl.DataFrame, title: str) -> alt.VConcatChart:
                 "is exploratory."
             ),
             f"{DOTS} {CAPACITY}",
-            f"{SCOPES['solar']} {SCOPES['wind']}",
+            both_scopes(),
         ],
         figure_planning=None,
     )
@@ -733,7 +752,7 @@ def ways(*, contrasts: pl.DataFrame, title: str) -> alt.VConcatChart:
                 "mark is exploratory."
             ),
             f"{DOTS} {CAPACITY}",
-            f"{SCOPES['solar']} {SCOPES['wind']}",
+            both_scopes(),
         ],
         figure_planning=None,
     )
@@ -809,7 +828,7 @@ def against_baselines(
                 f"{named}. {plan_note}"
             ),
             f"{DOTS} {CAPACITY}",
-            f"{SCOPES['solar']} {SCOPES['wind']}",
+            both_scopes(),
         ],
         figure_planning=None,
     )
@@ -867,7 +886,7 @@ def calendar_contrast(*, contrasts: pl.DataFrame, title: str) -> alt.VConcatChar
                 "are post hoc: added after the first and second science reviews."
             ),
             f"{DOTS} {CAPACITY}",
-            f"{SCOPES['solar']} {SCOPES['wind']}",
+            both_scopes(),
         ],
         figure_planning=None,
     )
@@ -963,7 +982,7 @@ def upsampling_contrasts(
                 "6-hour steps. All marks are exploratory."
             ),
             f"{DOTS} {CAPACITY}",
-            SCOPES[domain],
+            scope(domain=domain),
         ],
         figure_planning=None,
     )
@@ -1216,7 +1235,7 @@ def _example_days_figure(
                     "The panels pair the same calendar day at day 1 and at day 7, chosen by rule "
                     f"from measured output alone: {EXAMPLE_DAY_RULE[domain]}. Generator not named."
                 ),
-                SCOPES[domain],
+                scope(domain=domain),
                 CAPACITY,
             ],
             figure_planning=None,
@@ -1514,7 +1533,7 @@ def per_generator(*, title: str, number: int) -> alt.VConcatChart:
                 "day 7. Exploratory."
             ),
             f"{DOTS} {CAPACITY}",
-            f"{SCOPES['solar']} {SCOPES['wind']}",
+            both_scopes(),
         ],
         figure_planning=None,
     )
