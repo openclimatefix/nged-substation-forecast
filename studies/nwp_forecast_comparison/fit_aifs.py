@@ -1,4 +1,4 @@
-"""Fit the AIFS arms and their references on the GPU, and write their losses and report once.
+"""Fit the AIFS arms and their references on the GPU, and write their losses and report.
 
 One-off throwaway script for the AIFS arms of
 <https://github.com/openclimatefix/nged-substation-forecast/issues/923>. It reads the published
@@ -7,7 +7,8 @@ shared rows (`nwp_forecast_comparison.rows` on the published inputs), joins the 
 AIFS version era, recuts the folds inside those eras, and fits every arm out of fold on the GPU.
 It writes `<domain>_<row_set>_losses.parquet`, `<domain>_<row_set>_predictions.parquet` and
 `report.md` to the `--output-dir` the AIFS inputs are in, and never writes to the published folder.
-`report.md` refuses to be overwritten.
+`report.md` refuses to be overwritten. A set whose losses file exists is not refitted, so a rerun
+after a crash resumes at the first set without losses.
 
 Two nested row sets are fitted, each on its own rows: `single` (AIFS Single and every reference) and
 `ens` (those and AIFS ENS, whose store starts later). One contrast is named deciding before any fit,
@@ -300,8 +301,13 @@ def check_runs(*, frame: pl.DataFrame, domain: DomainType, row_set: str) -> None
     time_of_day = pl.col("time") - pl.duration(minutes=30) if domain == "solar" else pl.col("time")
     problems: dict[str, dict[str, int]] = {}
     for prefix in AIFS_ARM_PREFIXES:
-        if f"{prefix}_init_time" not in frame.columns or prefix not in spec.arms:
+        if prefix not in spec.arms:
             continue
+        if f"{prefix}_init_time" not in frame.columns:
+            msg = (
+                f"{domain}/{row_set}: {prefix}_init_time is missing, so its runs cannot be checked"
+            )
+            raise ValueError(msg)
         init = pl.col(f"{prefix}_init_time")
         day = int(prefix[-1])
         expected_date = (time_of_day.dt.truncate("1d") - pl.duration(days=day)).dt.date()
@@ -355,12 +361,12 @@ def aifs_rows(
         if arm not in PERMUTED_SEEDS
         for column in arm_features(arm=arm, domain=domain)
     ]
-    check_no_missing(frame=kept, columns=columns)
     found = search_fold_offsets(frame=kept, first_months=spec.era_start_months)
     if spec.fold_offsets not in [dict(offsets) for offsets in found]:
         msg = f"{domain}/{row_set}: {spec.fold_offsets} no longer covers every calendar month"
         raise ValueError(msg)
     cut = cut_eras(frame=kept, first_months=spec.era_start_months, fold_offsets=spec.fold_offsets)
+    check_no_missing(frame=cut, columns=columns)
     coverage_table(frame=cut)
     check_runs(frame=cut, domain=domain, row_set=row_set)
     return add_permuted_columns(frame=cut, domain=domain)
@@ -738,9 +744,19 @@ def report_set(
         *CONTRAST_HEADER,
     ]
     for contrast in contrasts(row_set=row_set):
-        if {contrast.treatment, contrast.reference} <= second_arms:
-            why = "deciding" if contrast.label == "deciding" else "near the 5% line"
-            lines.append(contrast_row(losses=second, contrast=contrast, label=why))
+        if not {contrast.treatment, contrast.reference} <= second_arms:
+            continue
+        if contrast.label == "deciding":
+            why = "deciding"
+        elif near_line(
+            interval=difference(
+                losses=primary, treatment=contrast.treatment, reference=contrast.reference
+            )
+        ):
+            why = "near the 5% line"
+        else:
+            why = "both arms fitted at the second setting for other pairs"
+        lines.append(contrast_row(losses=second, contrast=contrast, label=why))
     era_pair = "aifs_single_day1" if row_set == "single" else "aifs_ens_mean_day1"
     lines += [
         "",
@@ -811,9 +827,6 @@ def main() -> int:
     parser.add_argument("--published-dir", type=Path, required=True)
     parser.add_argument("--workers", type=int, default=1, help="(arm, site) fits run at once.")
     parser.add_argument("--check", action="store_true", help="Compare two GPU runs of one arm.")
-    parser.add_argument(
-        "--report-only", action="store_true", help="Write the report from the saved losses."
-    )
     args = parser.parse_args()
     if args.output_dir.resolve() == args.published_dir.resolve():
         msg = "the output folder must not be the published folder"
@@ -823,19 +836,7 @@ def main() -> int:
         sys.stdout.write(f"two GPU runs agree: {agree}\n")
         return 0 if agree else 1
     report_path = args.output_dir / "report.md"
-    targets = [
-        (
-            domain,
-            row_set,
-            path_for(output_dir=args.output_dir, domain=domain, row_set=row_set, kind=kind),
-        )
-        for domain in DOMAINS
-        for row_set in ROW_SETS
-        for kind in ("losses", "predictions")
-    ]
-    refuse_to_overwrite(
-        paths=[report_path, *([] if args.report_only else [p for *_, p in targets])]
-    )
+    refuse_to_overwrite(paths=[report_path])
     report = [
         "# AIFS Single and AIFS ENS at matched leads, GPU fits: report",
         "",
@@ -861,21 +862,18 @@ def main() -> int:
             losses_file = path_for(
                 output_dir=args.output_dir, domain=domain, row_set=row_set, kind="losses"
             )
-            if args.report_only:
+            predictions_file = path_for(
+                output_dir=args.output_dir, domain=domain, row_set=row_set, kind="predictions"
+            )
+            if losses_file.exists():
                 losses = pl.read_parquet(losses_file)
             else:
                 losses = fit_row_set(
                     frame=frame, domain=domain, row_set=row_set, workers=args.workers
                 )
                 losses.write_parquet(losses_file)
-                predictions_from_losses(losses=losses, frame=frame).write_parquet(
-                    path_for(
-                        output_dir=args.output_dir,
-                        domain=domain,
-                        row_set=row_set,
-                        kind="predictions",
-                    )
-                )
+            if not predictions_file.exists():
+                predictions_from_losses(losses=losses, frame=frame).write_parquet(predictions_file)
             report += report_set(losses=losses, frame=frame, row_set=row_set, domain=domain)
     report_path.write_text("\n".join(report))
     return 0

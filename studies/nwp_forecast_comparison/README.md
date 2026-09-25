@@ -79,7 +79,8 @@ lead?](../../docs/studies/nwp-forecasts-at-matched-leads.md).
   `ens` where AIFS ENS also exists), with folds cut inside the AIFS version eras. One contrast is
   deciding (AIFS Single against ENS's control member at day 1); AIFS ENS contrasts are
   descriptive; all others are exploratory. `--check` fits one arm twice and prints a time
-  estimate; `--report-only` writes the report from the saved losses.
+  estimate. A row set whose losses file exists is not refitted, so a rerun after a crash resumes
+  where it stopped; `report.md` is always written once.
 - `nwp_forecast_charts.py` reads the saved losses and predictions from `--input-dir`, and the extra
   lead days' losses from `--extra-dir`, and, with `--aifs-dir`, the AIFS losses, and writes six SVG
   charts per technology (seven with the AIFS chart) to `--output-dir`, each optimised with `svgo`
