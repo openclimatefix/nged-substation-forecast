@@ -1588,6 +1588,10 @@ uv run python studies/weather_downloads/fetch_midas_open.py
 uv run python studies/beam_diffuse_split/station_wind_arms.py
 uv run python studies/beam_diffuse_split/station_wind_arms.py --report-only
 uv run python studies/beam_diffuse_split/station_wind_arms_charts.py
+uv run python studies/beam_diffuse_split/check_page_numbers.py \
+    docs/studies/weather-products-for-past-wind.md \
+    data/studies/beam_diffuse_split/past_weather_v2/station_wind_arms/report.md \
+    --section "### One nearby 10 m weather station trails ERA5's 10 m wind on its own, and lowers UKV's error when added to it"
 ```
 
 The `station_wind_arms.py` command without a flag fits every arm, including the three added after
