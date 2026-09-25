@@ -70,7 +70,9 @@ error by 0.18 points even at a conservative lead.
 - **Adding ICON-EU and IFS 0.25° to ENS lowers the wind error by 0.184 points [-0.282, -0.087] at a
   lead a live service could use, and lowers the solar error only at a lead it may not**
   ([blending](#does-blending-products-help)).
-- **The study cannot say which added product carries the wind gain** ([blending](#does-blending-products-help)).
+- **For wind, ICON-EU at day 2 carries most of the blend's gain** (exploratory): ENS plus ICON-EU
+  alone lowers the error by 0.169 points [-0.250, -0.090], and P4b, which adds IFS 0.25° as well,
+  is not statistically distinguishable from it ([blending](#does-blending-products-help)).
 - **At the wind farms, part of ENS's lead over the single-run products may be timing noise that
   averaging removes, but at the solar farms averaging does not shrink the gaps relative to ENS's own
   error** ([gaps](#are-the-gaps-about-model-quality)).
@@ -509,14 +511,29 @@ published before 09:00 UTC, so the latest run it needs is ENS's 00 UTC run, whic
 can read from about 09:00 UTC. P4a's day-1 values can come from runs published after that time, and
 the study did not measure when those runs are published, so P4a's delivery time is not established.
 
-**The study cannot tell whether ICON-EU or IFS 0.25° carries the wind gain.** The study fitted no
-blend of ENS with one added product alone. Three differences between the added products and ENS
-could account for part of the wind gain. IFS 0.25° is ECMWF's own model, so its older run may act
-like an extra ensemble member of ENS. Both added products are read at one grid point, whereas ENS
-is an average over an H3 cell. ICON-EU's served "100 m" wind is its 120 m wind multiplied by about
-0.98, so ICON-EU may add information about wind at a second height.
-<!-- report: Wind / Arm columns; UKV radiation timestamp convention (V3), height
-convention -->
+**For wind, ICON-EU at day 2 carries most of the gain, and IFS 0.25° at day 2 carries a smaller
+share (exploratory).** Two further XGBoost models were fitted on wind only: ENS's day-1 columns plus
+ICON-EU's day-2 columns, and ENS's day-1 columns plus IFS 0.25°'s day-2 columns. Each has 11 columns,
+whereas P4b has 15, so equal column counts with P4b are impossible. The fair reference for each is
+ENS alone at day 1, with 7 columns. ENS plus ICON-EU differs from ENS alone by -0.169 points [-0.250,
+-0.090] at the primary setting and -0.180 [-0.284, -0.085] at the sensitivity setting. ENS plus IFS
+0.25° differs from ENS alone by -0.073 points [-0.132, -0.011] and -0.067 [-0.128, -0.006]. Against
+P4b, ENS plus ICON-EU is +0.015 points [-0.033, +0.065] and +0.018 [-0.022, +0.058], so the study
+cannot distinguish the two. ENS plus IFS 0.25° is +0.111 points [+0.035, +0.189] and +0.130 [+0.064,
++0.200] worse than P4b, so ENS plus IFS 0.25° reaches only part of P4b's gain. The ICON-EU
+permutation guard is -0.142 points [-0.217, -0.066] and -0.181 [-0.273, -0.105], and its control is
+not worse than ENS alone (-0.027 [-0.081, +0.023] and +0.002 [-0.038, +0.036]), so the gain comes
+from ICON-EU's weather. The IFS 0.25° permutation guard is -0.040 points [-0.138, +0.074] and -0.058
+[-0.151, +0.033], which is not statistically significant at the 5% level, so the small IFS 0.25°
+gain is not clearly separated from what a shuffled column gives. Three differences between the added
+products and ENS could account for part of the ICON-EU gain. Both added products are read at one
+grid point, whereas ENS is an average over an H3 cell. ICON-EU's served "100 m" wind is its 120 m
+wind multiplied by about 0.98, so ICON-EU may add information about wind at a second height. ICON-EU
+is also a different weather model from ENS, whereas IFS 0.25° is ECMWF's own model, so an older IFS
+0.25° run may act like an extra ensemble member of ENS. The study has no contrast that separates
+these three explanations.
+<!-- report: Wind / Exploratory: which product carries P4b's wind gain; Wind / Arm columns; UKV
+radiation timestamp convention (V3), height convention -->
 
 **Averaging over 3 hours or a day leaves the wind gain in place, and makes the solar gain at the
 conservative lead statistically significant over a day.** For wind, P4b minus ENS is -0.194 points
@@ -745,8 +762,8 @@ of 0.068 points is not excluded either. The optimistic contrast, P4a (planned), 
 alone by +0.152 points [+0.097, +0.215], and P4a's IFS 0.25° value can come from a run newer than
 ENS's. P4b already gives the added products runs that a 09:00 UTC service can read, so fresher runs
 would probably enlarge the gain rather than reverse it. What would change the recommendation: a
-test that separates a second weather model from a newer ECMWF run, such as a blend given ICON-EU
-alone.
+test that separates a second weather model from a newer ECMWF run, such as a solar blend given ICON-EU
+alone, which the study fitted for wind only.
 <!-- report: Solar, P4, the blend -->
 
 **For solar, the free GEFS ensemble is not a substitute for ENS.** At the same lead, an XGBoost
@@ -791,8 +808,9 @@ interval reaches zero (-0.073 [-0.164, +0.005]), at W2 it is -0.179 [-0.309, -0.
 is -0.304 [-0.536, -0.093] (exploratory; each interval covers month-to-month weather and the
 fitting seed, not differences between generators). P4b already gives the added products runs that
 a 09:00 UTC service can read, so fresher runs would probably enlarge the gain rather than reverse
-it. What would change the recommendation: more than 3 wind generators, and a test that shows
-whether ICON-EU or IFS 0.25° carries the gain.
+it. ICON-EU at day 2 alone, added to ENS, gives -0.169 points [-0.250, -0.090] (exploratory), which
+is not statistically distinguishable from P4b, so a service that ingests one added product gets
+most of the gain from ICON-EU. What would change the recommendation: more than 3 wind generators.
 <!-- report: Wind, P4, the blend; Exploratory: one generator at a time -->
 
 ## What this study cannot separate
