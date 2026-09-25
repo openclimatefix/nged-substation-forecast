@@ -1679,12 +1679,13 @@ in `packages/studies/`.
 - **Planned contrasts:** each row set's planned contrasts were recorded in the study plans in the
   repository's git history. The commits of the ECMWF and weather-station plans are named in [The
   ECMWF arms](#the-ecmwf-arms) and [The weather-station arms](#the-weather-station-arms).
-- **XGBoost:** version 3.4.1, with `tree_method` set to `hist`, the objective `reg:absoluteerror`,
-  and 4 threads per fit. The primary setting is `max_depth` 6, `learning_rate` 0.05, `subsample`
-  0.8, `min_child_weight` 20, `reg_lambda` 1, and 500 boosting rounds. The second setting is
-  `max_depth` 4, `learning_rate` 0.03, `subsample` 0.8, `min_child_weight` 50, `reg_lambda` 5, and
-  1,200 rounds. Neither setting subsamples columns, and neither uses early stopping. Each fit is
-  repeated with the seeds 0, 1, and 2. The settings are
+- **XGBoost:** version 3.4.1, the version in this repository's lock file (the saved losses do not
+  record the version that fitted them), with `tree_method` set to `hist`, the objective
+  `reg:absoluteerror`, and 4 threads per fit. The primary setting is `max_depth` 6, `learning_rate`
+  0.05, `subsample` 0.8, `min_child_weight` 20, `reg_lambda` 1, and 500 boosting rounds. The second
+  setting is `max_depth` 4, `learning_rate` 0.03, `subsample` 0.8, `min_child_weight` 50,
+  `reg_lambda` 5, and 1,200 rounds. Neither setting subsamples columns, and neither uses early
+  stopping. Each fit is repeated with the seeds 0, 1, and 2. The settings are
   `studies.cross_validation.PRIMARY_HYPER_PARAMETERS` and `SENSITIVITY_HYPER_PARAMETERS`.
 - **How the two settings were chosen:** neither setting was tuned on this study's data, because
   tuning each arm would let the tuner's own noise decide which arm wins. The second setting is a
