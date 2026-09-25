@@ -74,104 +74,66 @@ recommendation.
 
 ## Key findings
 
-**A planned comparison was written down before any result existed, and every other comparison is
-exploratory.** A post hoc comparison is either a planned one whose inputs changed after the first
-run, as on the main row set's ICON contrasts, or an exploratory one added after results were seen.
-The [Methods page](methods.md#planned-and-exploratory-comparisons) gives the rule, and [How the
-comparison was made](#how-the-comparison-was-made) says which planned contrasts of this page are
-post hoc. Where a product "beats" another, the difference is statistically significant at the 5%
-level. A farm-hour is one wind farm's power in one hour. A weather model's value for an hour, as
-served, comes from the freshest run of that weather model that Open-Meteo's archive holds for the
-hour.
+**Each finding below is labelled planned, exploratory, or post hoc.** A planned comparison was
+written down before any result existed, every other comparison is exploratory, and a post hoc
+comparison is a planned one whose inputs changed after the first run or an exploratory one added
+after results were seen. [How the comparison was made](#how-the-comparison-was-made) says which
+planned contrasts of this page are post hoc, and the [Methods
+page](methods.md#planned-and-exploratory-comparisons) gives the rule.
 
-**Figure 1's intervals are wide mainly because every product's error rises and falls together from
-month to month.** Some months are harder to describe than others for every product, and resampling
-whole months carries that shared swing into each product's own interval. The three generators also
-share their weather, so each interval on the main row set rests on 26 months rather than on
-thousands of independent hours. Figure 2 pairs two products on the same hours, which cancels the
-shared swing. Two products whose intervals overlap in Figure 1, or in the upper panel of a block of
-Figure 2, can therefore still differ by a margin that is statistically significant at the 5% level.
-Only a contrast pairing those two products tests them directly, and the lower panel of each block of
-Figure 2 holds that row set's planned contrasts.
+**Figure 1's intervals are wide because every product's error rises and falls together from month to
+month, so two products whose intervals overlap in Figure 1 can still differ by a margin that is
+statistically significant at the 5% level.** The lower panel of each block of Figure 2 pairs two
+products on the same hours, which cancels the shared swing. The [Methods
+page](methods.md#bootstrap-intervals) explains the intervals.
 
 - **UKV's and ICON-D2's advantages over ERA5 are estimated larger from April to September than from
   October to March, and from October to March only ICON-D2's advantage over ERA5 is statistically
-  significant at the 5% level.** Each half of the year has its own interval, and no interval is
-  computed for the difference between the halves. See [UKV and ICON-D2 describe past wind
-  best](#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested).
+  significant at the 5% level.** See [UKV and ICON-D2 describe past wind best of the five products
+  tested](#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested).
 - **In an exploratory comparison, ICON-D2 leads UKV across the window, and the lead is not
-  statistically significant since the Met Office upgraded UKV in January 2026.** Across the window
-  ICON-D2 leads by 0.14 points [0.03, 0.25]. Since the upgrade UKV is 0.06 points ahead [−0.03,
-  +0.19], and no interval is computed for the change between the periods. See [ICON-D2 leads UKV
-  across the window, and its lead is not statistically significant since UKV's
+  statistically significant since the Met Office upgraded UKV in January 2026.** See [ICON-D2 leads
+  UKV across the window, and its lead is not statistically significant since UKV's
   upgrade](#icon-d2-leads-ukv-across-the-window-and-its-lead-is-not-statistically-significant-since-ukvs-upgrade).
 - **An XGBoost model given the 80 m wind of ICON-EU, the European ICON model, beats an XGBoost model
-  given ERA5's 100 m wind.** An XGBoost model given the 100 m wind Open-Meteo serves for ICON-EU
-  also beats ERA5. From October to March, the difference between ICON-EU at 80 m and ERA5 is not
-  statistically significant at the 5% level. See [ICON-EU beats ERA5 at 80 m and at 100 m, and UKV's
-  lead over ICON-EU depends on the XGBoost model's
+  given ERA5's 100 m wind.** See [ICON-EU beats ERA5 at 80 m and at 100 m, and UKV's lead over
+  ICON-EU depends on the XGBoost model's
   settings](#icon-eu-beats-era5-at-80-m-and-at-100-m-and-ukvs-lead-over-icon-eu-depends-on-the-xgboost-models-settings).
-- **UKV's lead over ICON-EU is small, 0.13 points [0.01, 0.23], and depends on the XGBoost model's
-  settings.** This contrast was planned, and it is marked post hoc because ICON-EU's wind height was
-  switched after the first run. At the second hyperparameter setting, ICON-EU minus UKV is +0.082
-  points [−0.022, +0.178], not statistically significant at the 5% level. See [ICON-EU beats ERA5 at
-  80 m and at 100 m, and UKV's lead over ICON-EU depends on the XGBoost model's
+- **UKV's lead over ICON-EU is small, 0.13 points [0.01, 0.23] (post hoc), and depends on the
+  XGBoost model's settings.** See [ICON-EU beats ERA5 at 80 m and at 100 m, and UKV's lead over
+  ICON-EU depends on the XGBoost model's
   settings](#icon-eu-beats-era5-at-80-m-and-at-100-m-and-ukvs-lead-over-icon-eu-depends-on-the-xgboost-models-settings).
 - **ICON global, DWD's global model, had the largest error of the five as served here, and about
   half of its gap to ICON-EU is a pair of steps in the wind Open-Meteo's archive serves for ICON
-  global at one generator.** With the XGBoost models for ICON global and ERA5 both told when the
-  steps fall, the difference between ICON global and ERA5 is not statistically significant at the 5%
-  level. See [About half of ICON global's gap to ICON-EU is a pair of steps in its served
+  global at one generator.** See [About half of ICON global's gap to ICON-EU is a pair of steps in
+  its served
   wind](#about-half-of-icon-globals-gap-to-icon-eu-is-a-pair-of-steps-in-its-served-wind).
 - **In an exploratory comparison on January to September of each year, UKV's lead over ERA5 is 0.46
   points in 2025 and 0.75 points in 2026, a change of 0.30 points [0.04, 0.58] after rounding that
   is statistically significant at the 5% level, while ICON-EU's and ICON-D2's leads did not change
-  by a margin statistically significant at the 5% level.** Each year's interval, and the interval
-  for the change, resamples that year's own months. See [ERA5's deficit, year by
-  year](#ukvs-lead-over-era5-grew-from-2025-to-2026-while-icon-eus-and-icon-d2s-did-not-change-by-a-statistically-significant-margin).
+  by a margin statistically significant at the 5% level.** See [UKV's lead over ERA5 grew from 2025
+  to 2026, while ICON-EU's and ICON-D2's did not change by a statistically significant
+  margin](#ukvs-lead-over-era5-grew-from-2025-to-2026-while-icon-eus-and-icon-d2s-did-not-change-by-a-statistically-significant-margin).
 - **[ICON-DREAM-EU](https://doi.org/10.5676/dwd/icon-dream_v1), DWD's ICON-based reanalysis, does
   not beat ERA5, and trails ICON-EU, DWD's operational ICON model over Europe, by 0.34 points [0.27,
-  0.41] at the primary hyperparameter setting and 0.34 points [0.28, 0.39] at the second.**
-  ICON-DREAM-EU's hourly wind, read from DWD rather than Open-Meteo, is a 1 to 3 hour forecast,
-  never an analysis. In an exploratory comparison restricted to hours where its served lead matches
-  ICON-EU's, the gap narrows to 0.28 points [0.20, 0.36]. See [ICON-DREAM-EU does not beat ERA5, and
-  trails ICON-EU](#icon-dream-eu-does-not-beat-era5-and-trails-icon-eu).
+  0.41] at the primary hyperparameter setting and 0.34 points [0.28, 0.39] at the second.** See
+  [ICON-DREAM-EU does not beat ERA5, and trails
+  ICON-EU](#icon-dream-eu-does-not-beat-era5-and-trails-icon-eu).
 - **On 43,555 farm-hours from December 2024 to September 2026 at three wind farms, UKV beats ECMWF's
   HRES and ENS day 0, and HRES beats ERA5, in the three planned contrasts, but the third result
-  depends on how the XGBoost model is trained.** HRES is the high-resolution forecast of ECMWF's
-  Integrated Forecasting System (IFS), and ENS day 0 is the mean of the 51 members of ECMWF's
-  ensemble forecast (ENS) for the hours 00 to 23 UTC of the 00 UTC run's own day. Each difference
-  below is the first-named product's error minus the second's, so a positive difference means the
-  first-named product's error is larger. HRES minus UKV is +0.20 points [+0.06, +0.33], ENS day 0
-  minus UKV is +0.41 points [+0.25, +0.58], and HRES minus ERA5 is −0.27 points [−0.40, −0.12].
-  Three wind farms are few independent sites, so these intervals describe these farms and this
-  window only. See [How ECMWF's HRES and ENS day 0 compare with UKV and
-  ERA5](#ukv-beats-hres-and-ens-day-0-and-hress-lead-over-era5-depends-on-the-training-design).
+  depends on how the XGBoost model is trained.** See [UKV beats HRES and ENS day 0, and HRES's lead
+  over ERA5 depends on the training
+  design](#ukv-beats-hres-and-ens-day-0-and-hress-lead-over-era5-depends-on-the-training-design).
 - **In exploratory refits added after the first results, HRES's lead over ERA5 is no longer
   statistically significant at the 5% level when the XGBoost model trains across IFS Cycle 49r1
   without being told which side of the upgrade each hour falls on, and ENS day 0 against ERA5 is
-  unresolved.** These refits also train on August to November 2024. IFS Cycle 49r1 went live on 12
-  November 2024, so those months span it. Under that training design HRES minus ERA5 is −0.06 points
-  [−0.24, +0.15] on the rows from December 2024, against −0.27 points [−0.40, −0.12] in the planned
-  contrast. ENS day 0 minus ERA5, an exploratory contrast, is −0.07 points [−0.19, +0.06] in the
-  study's own design. That interval bounds the difference and does not show that the two products
-  are equal. The figure for the same contrast on the [ENS forecast horizons
-  page](../forecasts/ens-horizons.md), +0.170 points [+0.021, +0.322], comes from different rows and
-  folds. An era cut gives the XGBoost model a separate era code and separate folds on each side of 1
-  December 2024, the first whole month after the upgrade. It changes ENS day 0 minus ERA5 by −0.16
-  points [−0.27, −0.06] on the rows from 12 August 2024. Three wind farms are few independent sites,
-  so these intervals describe these farms and this window only. See [How ECMWF's HRES and ENS day 0
-  compare with UKV and ERA5](#ukv-beats-hres-and-ens-day-0-and-hress-lead-over-era5-depends-on-the-training-design).
+  unresolved.** See [UKV beats HRES and ENS day 0, and HRES's lead over ERA5 depends on the training
+  design](#ukv-beats-hres-and-ens-day-0-and-hress-lead-over-era5-depends-on-the-training-design).
 - **At three farms over 17 months (34,156 farm-hours), one nearby 10 m weather station gives a
   larger error than ERA5's 10 m wind by 0.99 points [0.59, 1.45], and adding the station to UKV
   changes UKV's error by −0.64 points [−0.81, −0.46] against a control with the same number of
-  columns.** The 0.99 points is about 12% of ERA5's 10 m error, and the 0.64 points is about 8% of
-  the control's error. In exploratory comparisons, the mean of the three nearest stations could not
-  be told apart from ERA5's 10 m wind, −0.09 points [−0.40, +0.27]. Adding ICON-D2's wind to UKV
-  lowered the error more than adding the station did. In exploratory splits, the station's gap to
-  ERA5 was larger in August to December than in January to July, a split confounded with which
-  calendar months the XGBoost models trained on. See [One nearby 10 m weather station trails ERA5's
-  10 m wind on its own, and lowers UKV's error when added to
+  columns.** See [One nearby 10 m weather station trails ERA5's 10 m wind on its own, and lowers
+  UKV's error when added to
   it](#one-nearby-10-m-weather-station-trails-era5s-10-m-wind-on-its-own-and-lowers-ukvs-error-when-added-to-it).
 
 ## Introduction
@@ -325,11 +287,13 @@ set resamples.
   against UKV, and ICON-D2 against ICON-EU. The plan gave the XGBoost model each product's served
   100 m wind. After the first run, each ICON product was switched to its 80 m wind, so the three
   planned contrasts that involve an ICON product (ICON-EU against ERA5, ICON-EU against UKV, and
-  ICON-D2 against ICON-EU) use arms chosen after the first run, and this page calls them post hoc.
-  UKV against ERA5 stays planned, because UKV's wind height did not change. The results with the
-  served 100 m wind are reported alongside and change no ranking. ICON-D2 against UKV is
-  exploratory. The ICON-DREAM-EU, ECMWF, and weather-station row sets have planned contrasts of
-  their own, described with each row set below. Every other figure on this page is exploratory.
+  ICON-D2 against ICON-EU) use arms chosen after the first run, and this page calls them post hoc. A
+  post hoc comparison is either a planned one whose inputs changed after the first run, as on the
+  main row set's ICON contrasts, or an exploratory one added after results were seen. UKV against
+  ERA5 stays planned, because UKV's wind height did not change. The results with the served 100 m
+  wind are reported alongside and change no ranking. ICON-D2 against UKV is exploratory. The
+  ICON-DREAM-EU, ECMWF, and weather-station row sets have planned contrasts of their own, described
+  with each row set below. Every other figure on this page is exploratory.
 - **The second hyperparameter setting.** Every planned contrast is rerun at the second setting. A
   contrast near the 5% line, an interval bound within 20% of the interval's width from zero, is
   rerun where both arms have saved second-setting losses. Not every contrast is rerun, because the
@@ -836,13 +800,12 @@ which may handicap ICON global there.
 
 ### UKV's lead over ERA5 grew from 2025 to 2026, while ICON-EU's and ICON-D2's did not change by a statistically significant margin
 
-**In an exploratory comparison on January to September of each year, UKV's lead over ERA5 is 0.46
-points in 2025 and 0.75 points in 2026, a change of 0.30 points [0.04, 0.58] after rounding that is
-statistically significant at the 5% level, while ICON-EU's and ICON-D2's leads did not change by a
-margin statistically significant at the 5% level.** Each comparison below is exploratory, and each
-year's interval comes from resampling that year's months alone, restricted to January to September
-so a partial 2026 compares against the same months of the earlier years rather than against their
-full 12 months. Each year's interval rests on 9 months, so the intervals are likely too narrow.
+**UKV's lead over ERA5 is 0.46 points in 2025 and 0.75 points in 2026, a change of 0.30 points after
+rounding, and the change is statistically significant at the 5% level.** Each comparison below is
+exploratory, and each year's interval comes from resampling that year's months alone, restricted to
+January to September so a partial 2026 compares against the same months of the earlier years rather
+than against their full 12 months. Each year's interval rests on 9 months, so the intervals are
+likely too narrow.
 
 **UKV, ICON-EU, and ICON-D2 each beat ERA5 in both years.** UKV beat ERA5 by 0.46 points [0.22,
 0.64] in 2025 and by 0.75 points [0.59, 0.93] in 2026. The larger 2026 figure is in step with
@@ -893,15 +856,16 @@ no contrast by more than 0.031 points, in a check added after the first run.
 
 ### ICON-DREAM-EU does not beat ERA5, and trails ICON-EU
 
-**ICON-DREAM-EU, DWD's ICON-based reanalysis, does not beat ERA5, and trails ICON-EU, DWD's
-operational ICON model over Europe at the same 6.5 km grid spacing, by 0.34 points [0.27, 0.41] at
-the primary hyperparameter setting and 0.34 points [0.28, 0.39] at the second.** ICON-DREAM-EU does
-not consume ICON-EU's output: it is DWD's own reanalysis run of the ICON model family, with its own
-data assimilation, nested inside a 13 km global run. Like ERA5, ICON-DREAM-EU runs one fixed version
-of its weather model over its whole record so that the record is consistent over time, while
-ICON-EU is DWD's operational run. This section's two planned contrasts ask whether a reanalysis
-built on a newer model beats ERA5, and whether it improves on ICON-EU, the operational run sharing
-its grid spacing.
+**Of the two planned contrasts, ICON-DREAM-EU against ICON-EU is statistically significant at the 5%
+level and ICON-DREAM-EU against ERA5 is not.** ICON-DREAM-EU trails ICON-EU, DWD's operational ICON
+model over Europe at the same 6.5 km grid spacing, by 0.34 points [0.27, 0.41] at the primary
+hyperparameter setting and 0.34 points [0.28, 0.39] at the second. ICON-DREAM-EU does not consume
+ICON-EU's output: it is DWD's own reanalysis run of the ICON model family, with its own data
+assimilation, nested inside a 13 km global run. Like ERA5, ICON-DREAM-EU runs one fixed version of
+its weather model over its whole record so that the record is consistent over time, while ICON-EU is
+DWD's operational run. This section's two planned contrasts ask whether a reanalysis built on a
+newer model beats ERA5, and whether it improves on ICON-EU, the operational run sharing its grid
+spacing.
 
 **In exploratory contrasts, the five original products still rank much as [UKV and ICON-D2 describe
 past wind best](#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested) found, on this
@@ -1132,12 +1096,14 @@ below is one design's contrast minus another design's contrast on the same rows 
 saved losses with nothing refitted, and is exploratory. For ENS day 0 minus ERA5 with this study's
 ENS wind, rotating the folds changes the contrast by −0.01 points [−0.05, +0.03] on all rows and
 −0.02 points [−0.06, +0.03] from December. Adding the era cut changes it by −0.15 points [−0.27,
-−0.04] on all rows and −0.08 points [−0.18, −0.00] from December. Rotating the folds alone therefore
-moves ENS day 0 minus ERA5 by no margin that is statistically significant at the 5% level, and the
-era cut moves it by a statistically significant margin on all rows. ENS day 0 minus ERA5 is
-statistically significant only without an era cut and only on all rows. A difference between a
-significant and a non-significant interval, such as +0.147 points [−0.005, +0.302] against +0.16
-points [+0.01, +0.31], is not a difference between the designs.
+−0.04] on all rows and −0.08 points [−0.18, −0.00] from December. Both changes together, the era cut
+with rotated folds against the horizons page's folds, change it by −0.16 points [−0.27, −0.06] on
+all rows. Rotating the folds alone therefore moves ENS day 0 minus ERA5 by no margin that is
+statistically significant at the 5% level, and the era cut moves it by a statistically significant
+margin on all rows. ENS day 0 minus ERA5 is statistically significant only without an era cut and
+only on all rows. A difference between a significant and a non-significant interval, such as +0.147
+points [−0.005, +0.302] against +0.16 points [+0.01, +0.31], is not a difference between the
+designs.
 
 **The era cut also changes the fold layout, so its effect and the effect of the fold numbering are
 not fully separable.** The cut changes the fold layout because the first era becomes its own set of
