@@ -502,7 +502,7 @@ def band_steps(
         step_leads, values = coarsen_to_six_hourly(
             leads=step_leads,
             values=values,
-            period_means=frozenset({"ghi_w_m2"}),
+            period_means=frozenset({"ghi_w_m2"}) if domain == "solar" else frozenset(),
             last_three_hourly_lead=fine_step_last_lead,
         )
         widths = np.full(len(step_leads), 6)
