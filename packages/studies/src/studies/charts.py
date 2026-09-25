@@ -145,6 +145,11 @@ _AXIS_TITLE_CHARACTERS: Final[int] = 78
 """The characters an interval panel's axis-title line holds before wrapping, at `PLOT_WIDTH_PX`."""
 
 _ZERO_LABEL_ROOM: Final[float] = 0.25
+_BETTER_LABEL_CHARACTER_PX: Final[int] = 8
+"""The width of one character of the bold better-direction label, generously rounded up."""
+
+_VALUE_LABEL_PX: Final[int] = 125
+"""The width of a printed estimate and interval such as `+0.10 [+0.05, +0.15]`."""
 """The share of the axis the zero label needs on its side of the rule to stay inside the plot."""
 
 _INTERVAL: Final[re.Pattern[str]] = re.compile(r"^\[(\S+), (\S+)\]$")
@@ -396,6 +401,7 @@ def _reference_layers(
     better_label: str,
     better_direction: BetterDirectionType,
     labelled: bool,
+    width: int,
 ) -> list[alt.Chart]:
     """Return the zero rule, its label, and the label saying which direction is better.
 
@@ -405,6 +411,8 @@ def _reference_layers(
         better_label: What the better direction means, such as `better than ERA5`.
         better_direction: Which sign of difference is the better one.
         labelled: Whether to draw the two labels, or the rule alone.
+        width: The plot's width in pixels, which decides whether the better-direction label's
+            text fits between the axis edge and the rule.
 
     Returns:
         The rule, then the two labels if `labelled`.
@@ -444,7 +452,7 @@ def _reference_layers(
     # below zero and the edge sits right next to the rule. Stack the better-direction label above
     # the zero label instead of relying on the horizontal room that keeps them apart elsewhere.
     room = abs(edge) / (high - low)
-    crowded = room < _ZERO_LABEL_ROOM
+    crowded = room < _ZERO_LABEL_ROOM or room * width < _BETTER_LABEL_CHARACTER_PX * len(text)
     better = (
         alt.Chart(pl.DataFrame({"x": [edge]}))
         .mark_text(
@@ -517,6 +525,7 @@ def interval_panel(
     condition_key: bool = True,
     width: int = PLOT_WIDTH_PX,
     figure_planning: PlanningType = "mixed",
+    value_labels: bool = False,
 ) -> alt.LayerChart | alt.VConcatChart:
     """Draw one panel of dots and 95% interval lines beside a labelled zero rule.
 
@@ -570,6 +579,9 @@ def interval_panel(
         width: The plot's width in pixels, `PLOT_WIDTH_PX` unless the panel shares a row.
         figure_planning: What `planning` returns for every panel in the figure, which decides
             whether a planned row's label carries `NAMED_SUFFIX`.
+        value_labels: Whether to print each row's estimate and interval, signed and to two
+            decimal places, beside the row, so an interval narrower than its own marker is still
+            readable.
 
     Returns:
         The panel, under its keys where it has any.
@@ -706,7 +718,12 @@ def interval_panel(
         better_label=better_label,
         better_direction=better_direction,
         labelled=reference_labels,
+        width=width,
     )
+    if value_labels:
+        points.extend(
+            _value_label_layers(data=data, x_domain=x_domain, x_scale=x_scale, width=width)
+        )
     offset_positions = len(conditions) if "yOffset" in encodings else 1
     panel = alt.LayerChart(
         layer=[*reference, interval, *points],
@@ -751,6 +768,67 @@ def interval_panel(
             )
         )
     return alt.vconcat(*keys, panel, spacing=8) if keys else panel
+
+
+def _value_label_layers(
+    *,
+    data: pl.DataFrame,
+    x_domain: tuple[float, float],
+    x_scale: alt.Scale,
+    width: int,
+) -> list[alt.Chart]:
+    """Return the text layers printing each row's estimate and interval beside the row.
+
+    A row's text sits to the right of its interval's upper bound, or to the left of its lower
+    bound where the right side has less than `_VALUE_LABEL_PX` of room and the left side has more.
+
+    Args:
+        data: The panel's rows, with `difference`, `lower_95` and `upper_95`.
+        x_domain: The panel's x range.
+        x_scale: The scale the panel's marks share.
+        width: The plot's width in pixels.
+
+    Returns:
+        One text layer per side that holds a row.
+    """
+    low, high = x_domain
+    pixels_per_point = width / (high - low)
+    text = data.with_columns(
+        text=pl.format(
+            "{} [{}, {}]",
+            *(
+                pl.col(name).map_elements(lambda value: f"{value:+.2f}", return_dtype=pl.String)
+                for name in ("difference", "lower_95", "upper_95")
+            ),
+        ),
+        right_room=(high - pl.col("upper_95")) * pixels_per_point,
+        left_room=(pl.col("lower_95") - low) * pixels_per_point,
+    )
+    on_left = (pl.col("right_room") < _VALUE_LABEL_PX) & (
+        pl.col("left_room") > pl.col("right_room")
+    )
+    layers = []
+    for side_is_left in (False, True):
+        side = text.filter(on_left if side_is_left else ~on_left)
+        if side.height == 0:
+            continue
+        layers.append(
+            alt.Chart(side)
+            .mark_text(
+                align="right" if side_is_left else "left",
+                dx=-7 if side_is_left else 7,
+                baseline="middle",
+                fontSize=11,
+                aria=False,
+            )
+            .encode(  # ty: ignore[unresolved-attribute]
+                x=alt.X("lower_95:Q" if side_is_left else "upper_95:Q", scale=x_scale, title=None),
+                y=alt.Y("label:N", sort=list(dict.fromkeys(data["label"].to_list())), title=None),
+                text="text:N",
+                color=alt.value(ocf.BLACK_1),
+            )
+        )
+    return layers
 
 
 def leaderboard_panel(
@@ -1453,8 +1531,10 @@ def shared_domain(
         step: The multiple of percentage points the range is rounded outwards to.
 
     Returns:
-        The lowest lower bound and highest upper bound over every block, each rounded outwards to
-        a multiple of `step`.
+        The lowest and highest of every lower bound, upper bound, estimate, and second-setting
+        estimate over every block, each rounded outwards to a multiple of `step`. Estimates count
+        because a mark is clipped at the plot's edge, so an estimate outside its own interval would
+        otherwise vanish.
     """
     frames = [
         frame for block in blocks for frame in (block.rows, block.planned_rows) if frame is not None
@@ -1467,8 +1547,14 @@ def shared_domain(
         if "second_difference" in frame.columns
         for value in frame["second_difference"].drop_nulls().to_list()
     ]
-    lows += seconds
-    highs += seconds
+    estimates = [
+        value
+        for frame in frames
+        if "difference" in frame.columns
+        for value in frame["difference"].drop_nulls().to_list()
+    ]
+    lows += seconds + estimates
+    highs += seconds + estimates
     if include_zero:
         lows.append(0.0)
         highs.append(0.0)
@@ -1479,8 +1565,10 @@ def planned_domain(*, block: RowSetBlock) -> tuple[float, float]:
     """Return the x range of a block's own planned-contrast panel, from its planned rows alone.
 
     The planned contrasts of one row set can be far narrower than the range every block shares,
-    which would draw a 0.1-point interval under its own marker. The range holds zero and each
-    second-setting marker, and rounds outwards to `_PLANNED_DOMAIN_STEP`.
+    which would draw a 0.1-point interval under its own marker. The range holds zero, each
+    estimate, and each second-setting marker, and rounds outwards to `_PLANNED_DOMAIN_STEP`. A
+    range this narrow still cannot show a 0.1-point interval beside a 2.7-point one, so
+    `interval_panel(value_labels=True)` prints each row's estimate and interval as text.
 
     Args:
         block: A block with `planned_rows`.
@@ -1640,6 +1728,7 @@ def stacked_contrasts(
                     x_title=PLANNED_CONTRAST_X_TITLE,
                     zero_label="same as the second product",
                     better_label="first product better",
+                    value_labels=True,
                     panel_title=f"{block.label}: planned contrasts",
                     family_key=False,
                     condition_key=False,

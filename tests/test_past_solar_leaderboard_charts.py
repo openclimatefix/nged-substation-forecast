@@ -85,13 +85,13 @@ def test_the_contrast_figure_warns_that_a_difference_from_era5_moves_between_blo
     ).to_dict()
 
     assert "not comparable across blocks either" in _caption(spec=spec)
-    assert "moves by 0.5 points between blocks" in _caption(spec=spec)
+    assert "moves by as much as 0.5 points between blocks" in _caption(spec=spec)
 
 
 def test_the_spread_is_taken_from_the_data_not_a_literal() -> None:
     module = _load()
 
-    assert "moves by 1.2 points" in module.contrasts_not_comparable(
+    assert "moves by as much as 1.2 points" in module.contrasts_not_comparable(
         cams_differences=[-3.0, -4.2, -3.5]
     )
 
@@ -124,13 +124,28 @@ def test_both_figures_carry_the_lead_and_pyranometer_caveats(caveat: str) -> Non
     assert caveat in _caption(spec=contrasts)
 
 
+def test_the_leaderboard_names_both_post_hoc_ukv_rebuilds_in_its_note() -> None:
+    module = _load()
+    rows = _contrast_block(cams=-3.7).rows.rename({"difference": "value"})
+
+    caption = _caption(
+        spec=module.leaderboard_figure(
+            blocks=[RowSetBlock("Main", "January 2025", 8, rows)]
+        ).to_dict()
+    )
+
+    assert "Rows marked (post hoc) were added after the first run" in caption
+    assert "two ways of rebuilding UKV's hourly value from its snapshots" in caption
+
+
 def test_the_contrast_figure_says_two_leads_are_unmeasured_or_unequal() -> None:
     module = _load()
 
     caption = _caption(spec=module.contrasts_figure(blocks=[_contrast_block(cams=-3.7)]).to_dict())
 
     assert "KNMI HARMONIE-AROME's lead is not measured" in caption
-    assert "ECMWF-IFS-HRES's lead is longer than ICON-EU's" in caption
+    assert "ECMWF-IFS-HRES's lead is never shorter than ICON-EU's and often longer" in caption
+    assert "their planned contrasts against ICON-EU mix weather-model skill with lead" in caption
 
 
 def _intervals(*, arms: dict[str, float]) -> pl.DataFrame:
@@ -168,6 +183,6 @@ def test_a_post_hoc_rebuild_is_labelled_post_hoc_on_the_leaderboard_and_others_a
 
     labels = dict(zip(rows["arm"], rows["label"], strict=True))
     assert labels == {
-        "ukv_trap_global": "UKV rebuilt from its snapshots (post hoc)",
+        "ukv_trap_global": "UKV, snapshot mean (post hoc)",
         "icon_eu_global": "ICON-EU",
     }

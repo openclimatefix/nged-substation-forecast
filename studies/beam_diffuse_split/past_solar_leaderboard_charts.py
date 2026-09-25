@@ -62,6 +62,8 @@ BLOCK_LABELS: Final[dict[str, str]] = {
 
 DISPLAY_LABELS: Final[dict[str, str]] = {
     "ECMWF ENS (control member, T+3 band)": "ECMWF ENS control (T+3 band)",
+    "UKV rebuilt from its snapshots": "UKV, snapshot mean",
+    "UKV, both snapshots as separate inputs": "UKV, both snapshots",
 }
 """Labels the report prints that are too long for one line of a block's row-label column."""
 
@@ -82,14 +84,17 @@ STATION_SCOPE: Final[str] = (
     "station, 17 to 31 km away."
 )
 UNEQUAL_LEADS: Final[str] = (
-    "KNMI HARMONIE-AROME's lead is not measured, and ECMWF-IFS-HRES's lead is longer than "
-    "ICON-EU's, so a contrast of either product mixes weather-model skill with lead."
+    "KNMI HARMONIE-AROME's lead is not measured, and ECMWF-IFS-HRES's lead is never shorter than "
+    "ICON-EU's and often longer, so their planned contrasts against ICON-EU mix weather-model "
+    "skill with lead."
 )
 POST_HOC_NOTE: Final[str] = (
-    "Rows marked (post hoc) were added after the first run: UKV rebuilt from its snapshots."
+    "Rows marked (post hoc) were added after the first run: two ways of rebuilding UKV's hourly "
+    "value from its snapshots."
 )
 CAMS_EXPLORATORY: Final[str] = (
-    "The CAMS row is exploratory: no row set names CAMS against ERA5 as a planned contrast."
+    "The CAMS row is exploratory: the study plan names CAMS against ERA5 as a planned contrast on "
+    "no row set."
 )
 
 _BLOCK_HEADING: Final[re.Pattern[str]] = re.compile(
@@ -160,9 +165,10 @@ def read_report(*, report_text: str) -> dict[str, PrintedBlock]:
             if cells[0] in ("Contrast", "---") or set(cells[0]) == {"-"}:
                 continue
             second_cell = cells[-1] if section != ABSOLUTE_SECTION else None
-            blocks[label].tables[section][cells[0]] = _printed_row(
-                cells=cells, second_cell=second_cell
+            name = (
+                cells[0].removesuffix(POST_HOC_SUFFIX) if section == ABSOLUTE_SECTION else cells[0]
             )
+            blocks[label].tables[section][name] = _printed_row(cells=cells, second_cell=second_cell)
     return blocks
 
 
@@ -458,7 +464,7 @@ def contrasts_not_comparable(*, cams_differences: list[float]) -> str:
     spread = max(cams_differences) - min(cams_differences)
     return (
         "A difference from ERA5 is not comparable across blocks either: the same CAMS minus "
-        f"ERA5 contrast moves by {spread:.1f} points between blocks."
+        f"ERA5 contrast moves by as much as {spread:.1f} points between blocks."
     )
 
 

@@ -1206,7 +1206,10 @@ def test_planned_domain_holds_zero_and_the_second_setting_marker() -> None:
     block = _blocks_with_planned(second=True)[0]
     assert block.planned_rows is not None
     planned = block.planned_rows.with_columns(
-        lower_95=pl.lit(0.05), upper_95=pl.lit(0.15), second_difference=pl.Series([0.9, None])
+        difference=pl.lit(0.1),
+        lower_95=pl.lit(0.05),
+        upper_95=pl.lit(0.15),
+        second_difference=pl.Series([0.9, None]),
     )
 
     assert planned_domain(block=block._replace(planned_rows=planned)) == (0.0, 1.0)
@@ -1357,3 +1360,55 @@ def test_the_stacked_contrasts_key_lists_a_family_only_a_later_block_holds() -> 
     blocks = [block(label="First", arms=BLOCK_ARMS[:1]), block(label="Second", arms=BLOCK_ARMS[2:])]
 
     assert _key_labels(blocks=blocks, contrasts=True) == ["satellite", "weather model"]
+
+
+def test_the_shared_domain_covers_an_estimate_outside_its_own_interval() -> None:
+    rows = pl.DataFrame({"difference": [3.2], "lower_95": [0.1], "upper_95": [0.4]})
+
+    low, high = shared_domain(
+        blocks=[RowSetBlock("Rows", "Jan 2025", SITE_HOURS, rows)], include_zero=True
+    )
+
+    assert high >= 3.2
+    assert low <= 0.0
+
+
+def test_planned_panels_print_each_estimate_and_interval_signed_to_two_decimals() -> None:
+    blocks = _blocks_with_planned(second=False)
+    narrow = _planned(contrasts=[UKV_AGAINST_CAMS]).with_columns(
+        difference=pl.lit(0.097), lower_95=pl.lit(0.046), upper_95=pl.lit(0.147)
+    )
+    blocks = [block._replace(planned_rows=narrow) for block in blocks]
+
+    text = str(stacked_contrasts(blocks=blocks, number=2, title="A", subtitle=["A."]).to_dict())
+
+    assert "+0.10 [+0.05, +0.15]" in text
+
+
+def test_a_value_label_moves_left_of_an_interval_that_ends_near_the_right_edge() -> None:
+    blocks = _blocks_with_planned(second=False)
+    near_edge = _planned(contrasts=[UKV_AGAINST_CAMS]).with_columns(
+        difference=pl.lit(0.9), lower_95=pl.lit(0.5), upper_95=pl.lit(1.0)
+    )
+    block = blocks[0]._replace(planned_rows=near_edge)
+    spec = stacked_contrasts(blocks=[block], number=2, title="A", subtitle=["A."]).to_dict()
+
+    aligns = {
+        node["mark"]["align"]
+        for node in _walk(spec)
+        if isinstance(node.get("mark"), dict)
+        and node["mark"].get("type") == "text"
+        and node["mark"].get("fontSize") == 11
+    }
+
+    assert aligns == {"right"}
+
+
+def _walk(node: object) -> Iterator[dict]:
+    if isinstance(node, dict):
+        yield node
+        for value in node.values():
+            yield from _walk(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _walk(value)

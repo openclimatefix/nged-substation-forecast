@@ -45,6 +45,7 @@ import weather_product_charts as main_charts
 from ens_past_solar_charts import NAMES as ENS_NAMES
 from sources import SOLAR_LEADERBOARD_DIR, UPDATE_OUTPUT_DIR
 from studies.charts import (
+    POST_HOC_SUFFIX,
     REPORT_PRINT_DECIMALS,
     BlockArm,
     PlannedContrast,
@@ -101,12 +102,12 @@ REPORT_INTRODUCTION: Final[str] = (
     "whole months and a fitting seed. Each row set is scored on its own common rows, so a value "
     "is comparable within a row set and not across row sets. Mean absolute error is a percentage "
     "of each generator's 99th-percentile output. Every contrast not named before the run is "
-    "exploratory, except the two UKV rebuilds, which were added after the first run and are post "
-    "hoc. `Second setting` is the same contrast at the second hyperparameter setting, "
-    "shown only for planned contrasts and contrasts near the 5% line (an interval bound within "
-    "20% of the interval's width from zero), and only where both arms have saved second-setting "
-    "losses. `Exploratory contrasts` are contrasts between two products that no earlier report "
-    "prints, shown at the first setting only."
+    "exploratory, except the two UKV rebuilds, which were added after the first run: their own "
+    "errors and their contrasts are post hoc. `Second setting` is the same contrast at the second "
+    "hyperparameter setting, shown only for planned contrasts and contrasts near the 5% line "
+    "(an interval bound within 20% of the interval's width from zero), and only where both arms "
+    "have saved second-setting losses. `Exploratory contrasts` are contrasts between two "
+    "products that no earlier report prints, shown at the first setting only."
 )
 CONTRAST_HEADER: Final[str] = (
     "| Arm | Difference (pp of capacity) | 95% interval | Planned or exploratory "
@@ -294,7 +295,8 @@ EXTRA_EXPLORATORY: Final[tuple[PlannedContrast, ...]] = _planned(
 """SARAH-3 minus CAMS on the extra rows, which no report prints for that row set.
 
 The main rows' report names the same contrast as planned, so Figure 1's title (CAMS has the lowest
-error of the gridded products) rests on a number for the extra rows only if this script prints it.
+error of the gridded products tested) rests on a number for the extra rows only if this script
+prints it.
 """
 
 
@@ -907,8 +909,9 @@ def render_report(*, results: list[RowSetResult]) -> str:
             "|---|---|---|---|",
         ]
         for row in result.absolute.iter_rows(named=True):
+            post_hoc = POST_HOC_SUFFIX if row["arm"] in POST_HOC_ARMS else ""
             lines.append(
-                f"| {row['label']} | {row['value']:.{PRINT_DECIMALS}f} | "
+                f"| {row['label']}{post_hoc} | {row['value']:.{PRINT_DECIMALS}f} | "
                 f"[{row['lower_95']:.{PRINT_DECIMALS}f}, {row['upper_95']:.{PRINT_DECIMALS}f}] | "
                 f"{'yes' if row['reference'] else 'no'} |"
             )
