@@ -9,7 +9,7 @@ Before `build_forecast_inputs.py --aifs` has run, `aifs_steps.md` holds:
 1. **Radiation window.** AIFS Single's radiation is read as a 6-hour mean ending at the lead. For
    each candidate end offset from -6 to +6 h, the mean absolute difference between AIFS Single's
    radiation at each valid time and ERA5's mean over the six hours ending at that time plus the
-   offset, pooled over the solar sites at leads 18 to 78 h. The check fails unless the minimum is at
+   offset, pooled over the solar sites at leads 6 to 78 h. The check fails unless the minimum is at
    offset 0, both over every valid time and over the 06 UTC valid times alone. ERA5 is read for all
    24 hours, and every offset is scored on the same rows: the valid times at which every hour any
    offset's window needs is present.
@@ -20,7 +20,7 @@ Before `build_forecast_inputs.py --aifs` has run, `aifs_steps.md` holds:
 3. **Units.** AIFS temperature in degrees Celsius, wind in m/s, radiation between 0 and 1,100 W/m2.
 4. **Grid orientation.** `_grid_cells.parquet`'s latitude rises with `lat_index` and its longitude
    with `lon_index`. For each non-central cell of the crop, the correlation of its 2 m temperature
-   anomaly (the cell's value minus the 9-cell mean at the same run and lead) with GEFS's
+   anomaly (the cell's value minus the mean of the 9 cells shared with GEFS's crop at the same run and lead) with GEFS's
    control-member anomaly at the cell's latitude and longitude must exceed the correlation of each
    mirrored or transposed cell's anomaly with the same GEFS anomaly.
 
@@ -86,7 +86,10 @@ ORIENTATION_LEADS: Final[tuple[int, ...]] = (24, 48)
 """The leads, in hours, that the orientation check pairs with GEFS (both products carry them)."""
 
 CROP_SIZE: Final[int] = 3
-"""AIFS's crop is 3 by 3 cells."""
+"""The side of the block of cells AIFS shares with the GEFS crop."""
+
+KM_PER_HOUR_PER_M_PER_S: Final[float] = 3.6
+"""ERA5's `wind_speed_100m` is in km/h; dividing by this gives m/s, AIFS's unit."""
 
 MIN_WIRING_ROWS: Final[int] = 1000
 """The fewest rows a wiring comparison may rest on."""
@@ -120,7 +123,7 @@ def era5_column(*, domain: DomainType, sites: list[str]) -> pl.DataFrame:
         return (
             pl.read_parquet(WEATHER_DATA_DIR / "ERA5" / "wind_era5.parquet")
             .filter(pl.col("site").is_in(sites))
-            .select("site", "time", era5="wind_speed_100m")
+            .select("site", "time", era5=pl.col("wind_speed_100m") / KM_PER_HOUR_PER_M_PER_S)
             .drop_nulls()
         )
     gridded = read_era5(source="open-meteo")
@@ -234,9 +237,12 @@ def radiation_verdict(*, table: pl.DataFrame) -> list[str]:
 def wind_table(*, aifs: pl.DataFrame, era5: pl.DataFrame) -> pl.DataFrame:
     """Return AIFS 100 m speed's correlation with ERA5's at each offset and with its 6-hour mean.
 
+    Each offset is an inner join, so `n` differs by a few rows near the end of ERA5's series. That
+    difference does not change a correlation materially.
+
     Args:
         aifs: `aifs_valid_rows`'s result for wind.
-        era5: `era5_column`'s result for wind, holding all 24 hours.
+        era5: `era5_column`'s result for wind in m/s, holding all 24 hours.
 
     Returns:
         `reading` (an offset, or `6-hour mean`), `correlation` and `n`.
@@ -359,11 +365,17 @@ def orientation_table(*, weather_dir: Path) -> tuple[pl.DataFrame, list[str]]:
             - pl.col("temperature_2m").mean().over("init_time", "lead_time")
         ).collect()
 
-    aifs_cells = grid.select("lat_index", "lon_index", *key)
     gefs_dir = weather_dir / GEFS_WINDOW_DIR_NAME
     gefs_cells = pl.read_parquet(gefs_dir / "_grid_cells.parquet").select(
         "lat_index", "lon_index", *key
     )
+    aifs_cells = grid.select("lat_index", "lon_index", *key).join(
+        gefs_cells.select("lat", "lon"), on=["lat", "lon"], how="semi"
+    )
+    shared = set(aifs_cells.select("lat_index", "lon_index").iter_rows())
+    if shared != {(i, j) for i in range(CROP_SIZE) for j in range(CROP_SIZE)}:
+        failures.append("the AIFS cells shared with GEFS are not the 3 by 3 block indexed 0 to 2")
+        return pl.DataFrame(), failures
     aifs = anomalies(
         store=aifs_dir / f"{AIFS_SINGLE_DIR_NAME}.parquet", cells=aifs_cells, control=False
     )
@@ -442,7 +454,7 @@ def steps_report(*, published_dir: Path, weather_dir: Path) -> tuple[list[str], 
             for r in radiation.iter_rows(named=True)
         ),
         "",
-        "## Wind: correlation of AIFS Single's 100 m speed with ERA5's hub-height speed",
+        "## Wind: correlation of AIFS Single's 100 m speed with ERA5's 100 m speed",
         "",
         "| ERA5 reading | Correlation | Rows |",
         "|---|---|---|",

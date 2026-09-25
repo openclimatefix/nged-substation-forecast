@@ -274,3 +274,97 @@ def test_orientation_lead_filter_builds() -> None:
         frame.filter(
             pl.col("lead_time").is_in([pl.duration(hours=lead) for lead in v.ORIENTATION_LEADS])
         )
+
+
+def _orientation_weather_dir(root: Path, *, aifs_lon_cells: int, swap_gefs: bool = False) -> Path:
+    """Write synthetic AIFS Single and GEFS downloads whose shared 3x3 block has equal anomalies.
+
+    The AIFS crop has `aifs_lon_cells` columns; its first 3 columns lie at the GEFS cells'
+    coordinates. With `swap_gefs`, the GEFS data is mirrored in latitude, as a wrongly oriented
+    download would be.
+    """
+    rng = np.random.default_rng(0)
+    inits = [datetime(2026, 3, 1) + timedelta(days=d) for d in range(20)]
+    leads = [timedelta(hours=lead) for lead in v.ORIENTATION_LEADS]
+    values = {
+        (i, j, t, lead): float(rng.normal())
+        for i in range(3)
+        for j in range(aifs_lon_cells)
+        for t in inits
+        for lead in leads
+    }
+
+    def grid(*, columns: int) -> pl.DataFrame:
+        return pl.DataFrame(
+            [
+                {
+                    "lat_index": i,
+                    "lon_index": j,
+                    "latitude": 52.0 + 0.25 * i,
+                    "longitude": 0.25 * j,
+                }
+                for i in range(3)
+                for j in range(columns)
+            ]
+        )
+
+    def store(*, columns: int, mirror: bool) -> pl.DataFrame:
+        return pl.DataFrame(
+            [
+                {
+                    "init_time": t,
+                    "lead_time": lead,
+                    "lat_index": i,
+                    "lon_index": j,
+                    "ensemble_member": 0,
+                    "temperature_2m": values[(2 - i if mirror else i, j, t, lead)],
+                }
+                for i in range(3)
+                for j in range(columns)
+                for t in inits
+                for lead in leads
+            ]
+        )
+
+    aifs_dir = root / v.AIFS_SINGLE_DIR_NAME
+    gefs_dir = root / v.GEFS_WINDOW_DIR_NAME
+    (gefs_dir / "_month_cache").mkdir(parents=True)
+    aifs_dir.mkdir()
+    grid(columns=aifs_lon_cells).write_parquet(aifs_dir / "_grid_cells.parquet")
+    store(columns=aifs_lon_cells, mirror=False).write_parquet(
+        aifs_dir / f"{v.AIFS_SINGLE_DIR_NAME}.parquet"
+    )
+    grid(columns=3).write_parquet(gefs_dir / "_grid_cells.parquet")
+    store(columns=3, mirror=swap_gefs).write_parquet(
+        gefs_dir / "_month_cache" / f"{v.ORIENTATION_MONTH}.parquet"
+    )
+    return root
+
+
+def test_orientation_check_passes_on_a_wider_crop(tmp_path: Path) -> None:
+    root = _orientation_weather_dir(tmp_path, aifs_lon_cells=4)
+    table, failures = v.orientation_table(weather_dir=root)
+    assert failures == []
+    assert table.height == 8  # the 8 non-central cells of the shared 3 by 3 block
+
+
+def test_orientation_check_fails_on_a_mirrored_download(tmp_path: Path) -> None:
+    root = _orientation_weather_dir(tmp_path, aifs_lon_cells=4, swap_gefs=True)
+    _, failures = v.orientation_table(weather_dir=root)
+    assert any("mirrored" in failure for failure in failures)
+
+
+def test_aifs_members_frame_raises_when_a_weighted_cell_is_missing(tmp_path: Path) -> None:
+    store = _store(tmp_path / "s.parquet", cells=[(1, 1, 2.0), (1, 2, 6.0)])
+    frame = pl.read_parquet(store)
+    dropped = frame.filter(
+        ~((pl.col("lon_index") == 2) & (pl.col("init_time") == datetime(2025, 3, 1)))
+    )
+    dropped.write_parquet(store)
+    with pytest.raises(ValueError, match="miss a weighted cell"):
+        b.aifs_members_frame(
+            store=store,
+            weights=_weights([(1, 1, 0.75), (1, 2, 0.25)]),
+            ensemble=False,
+            first_init=datetime(2025, 3, 1, tzinfo=UTC),
+        )

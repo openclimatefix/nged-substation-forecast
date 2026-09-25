@@ -1150,7 +1150,8 @@ def aifs_members_frame(
         0), `temp_c`, `speed_100m`, `direction_100m`, `speed_10m` and `direction_10m`.
 
     Raises:
-        ValueError: If any value the study reads is `NaN` after the run filter.
+        ValueError: If any (site, run, member, lead) group lacks a row for one of the site's
+            weighted cells, or any value the study reads is `NaN` after the run filter.
     """
     scan = pl.scan_parquet(store).filter(
         pl.col("init_time").dt.hour() == 0,
@@ -1164,11 +1165,20 @@ def aifs_members_frame(
         scan.join(weights.lazy(), on=["lat_index", "lon_index"])
         .group_by(keys)
         .agg(
-            ((pl.col(column) * pl.col("weight")).sum() / pl.col("weight").sum()).alias(column)
-            for column in AIFS_VALUE_COLUMNS
+            *(
+                ((pl.col(column) * pl.col("weight")).sum() / pl.col("weight").sum()).alias(column)
+                for column in AIFS_VALUE_COLUMNS
+            ),
+            n_cells=pl.len(),
         )
         .collect()
     )
+    expected = weights.group_by("site").agg(expected_cells=pl.len())
+    short = weighted.join(expected, on="site").filter(pl.col("n_cells") != pl.col("expected_cells"))
+    if short.height:
+        msg = f"{store.name}: {short.height} (site, run, member, lead) groups miss a weighted cell"
+        raise ValueError(msg)
+    weighted = weighted.drop("n_cells")
     lead_hours = pl.col("lead_time").dt.total_hours().cast(pl.Int32)
     frame = weighted.select(
         "site",
