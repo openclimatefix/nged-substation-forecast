@@ -683,11 +683,9 @@ the section is written before one does.
 
 **The wording rule stands.** The survey page's stance is that [AIFS has not been shown to improve
 faster than the physics-based
-IFS](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-
-survey/#aifs-has-not-been-shown-to-improve-faster-than-the-physics-based-ifs)
+IFS](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-survey/#aifs-has-not-been-shown-to-improve-faster-than-the-physics-based-ifs)
 and that [each AIFS version is scored
-separately](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-
-survey/#score-each-aifs-version-separately).
+separately](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-survey/#score-each-aifs-version-separately).
 The hypotheses below are worded as "has a lower error than" and never as "improves". Every result
 sentence carries its scope: 6 solar farms, 3 wind farms, the months of the row set, and the AIFS
 versions in those months. The same anonymised labels (A to F, W1 to W3) are used everywhere, and no
