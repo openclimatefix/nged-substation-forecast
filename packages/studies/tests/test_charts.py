@@ -944,7 +944,22 @@ def test_stacked_leaderboard_draws_reference_rows_in_the_light_shade_and_hollow(
 
     assert "'shade': 'reanalysis, light'" in str(spec)
     assert "'shade': 'weather model'" in str(spec)
-    assert "'filled': False" in str(spec)
+    _assert_light_rows_hollow_and_others_filled(spec)
+
+
+def _assert_light_rows_hollow_and_others_filled(spec: dict) -> None:
+    """Check that the point layers holding light-shade rows are hollow and the rest filled."""
+    seen = {True: 0, False: 0}
+    for panel in _leaf_panels(spec):
+        for layer in _layer(panel, "point"):
+            shades = {row["shade"] for row in _values(spec, layer) if "shade" in row}
+            if not shades:
+                continue
+            light = all(shade.endswith(", light") for shade in shades)
+            assert layer["mark"]["filled"] is (not light), shades
+            seen[light] += 1
+    assert seen[True] > 0
+    assert seen[False] > 0
 
 
 def test_stacked_contrasts_draws_reference_rows_hollow() -> None:
@@ -955,7 +970,7 @@ def test_stacked_contrasts_draws_reference_rows_hollow() -> None:
     ).to_dict()
 
     assert "'shade': 'satellite, light'" in str(spec)
-    assert "'filled': False" in str(spec)
+    _assert_light_rows_hollow_and_others_filled(spec)
 
 
 def _leaf_panels(spec: dict) -> list[dict]:
@@ -1149,3 +1164,80 @@ def test_the_shared_domain_covers_the_planned_rows_and_the_second_setting_marker
 
     assert high >= 7.2
     assert low <= -1.0
+
+
+def test_block_leaderboard_rows_come_back_best_first_whatever_the_arm_order() -> None:
+    rows = block_leaderboard_rows(
+        losses=_losses(),
+        arms=BLOCK_ARMS[::-1],
+        setting="pooled",
+        site_hours=SITE_HOURS,
+        metric=METRIC,
+    )
+
+    assert rows["label"].to_list() == ["CAMS", "ERA5", "UKV"]
+
+
+def test_block_leaderboard_rows_raise_when_the_printed_errors_lack_an_arm() -> None:
+    with pytest.raises(KeyError, match="ukv_global"):
+        block_leaderboard_rows(
+            losses=_losses(),
+            arms=BLOCK_ARMS,
+            setting="pooled",
+            site_hours=SITE_HOURS,
+            metric=METRIC,
+            printed={"cams_global": 1.15, "era5_global": 2.15},
+        )
+
+
+def _interval_block(*, lower: float, upper: float) -> RowSetBlock:
+    rows = pl.DataFrame({"lower_95": [lower], "upper_95": [upper]})
+    return RowSetBlock("Rows", "Jan 2025", SITE_HOURS, rows)
+
+
+def test_the_shared_domain_rounds_outwards_to_half_a_point() -> None:
+    blocks = [_interval_block(lower=0.3, upper=1.2), _interval_block(lower=0.6, upper=0.9)]
+
+    assert shared_domain(blocks=blocks, include_zero=False) == (0.0, 1.5)
+    assert shared_domain(blocks=[_interval_block(lower=-0.3, upper=-0.1)], include_zero=False) == (
+        -0.5,
+        -0.0,
+    )
+
+
+def test_the_shared_domain_holds_zero_only_when_asked() -> None:
+    blocks = [_interval_block(lower=0.6, upper=1.2)]
+
+    assert shared_domain(blocks=blocks, include_zero=False) == (0.5, 1.5)
+    assert shared_domain(blocks=blocks, include_zero=True) == (0.0, 1.5)
+
+
+def test_each_panel_of_a_stacked_leaderboard_holds_only_its_own_blocks_rows() -> None:
+    losses = _losses()
+
+    def block(*, label: str, arms: list[BlockArm]) -> RowSetBlock:
+        rows = block_leaderboard_rows(
+            losses=losses, arms=arms, setting="pooled", site_hours=SITE_HOURS, metric=METRIC
+        )
+        return RowSetBlock(label, "Jan 2025", SITE_HOURS, rows)
+
+    blocks = [
+        block(label="First rows", arms=BLOCK_ARMS[:2]),
+        block(label="Second rows", arms=BLOCK_ARMS[1:]),
+    ]
+
+    spec = stacked_leaderboard(
+        blocks=blocks, number=1, title="A title", subtitle=["A subtitle."]
+    ).to_dict()
+
+    labels = []
+    for panel in _leaf_panels(spec):
+        shown = {
+            row["label"]
+            for layer in _layer(panel, "point")
+            for row in _values(spec, layer)
+            if "value" in row
+        }
+        if shown:
+            labels.append(shown)
+    assert labels == [{"CAMS", "ERA5"}, {"ERA5", "UKV"}]

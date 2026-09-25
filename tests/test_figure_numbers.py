@@ -69,3 +69,28 @@ def test_the_dropped_station_models_work_figure_has_no_number() -> None:
     module = _load()
 
     assert module.SVG_FIGURES["station_past_solar_models_work"] is None
+
+
+def test_the_svgs_map_to_the_figures_the_outline_names() -> None:
+    module = _load()
+    figures = module.SVG_FIGURES
+
+    def stems(key: str) -> set[str]:
+        return {stem for stem, figure in figures.items() if figure == key}
+
+    assert stems("leaderboard") == {
+        "sunshine_leaderboard",
+        "sunshine_all_leaderboard",
+        "ens_past_solar_leaderboard",
+        "station_past_solar_leaderboard",
+    }
+    assert stems("contrasts") == {
+        "sunshine_headline",
+        "sunshine_all_contrasts",
+        "ens_past_solar_planned_contrasts",
+        "station_past_solar_planned_contrasts",
+    }
+    assert stems("weather_model_rivals") == {"sunshine_icon_eu_rivals", "sunshine_ukv_against_era5"}
+    assert stems("per_generator") == {"station_past_solar_per_generator"}
+    assert figures["sunshine_own_beam"] == "own_beam"
+    assert figures["station_past_solar_controls"] == "station_controls"
