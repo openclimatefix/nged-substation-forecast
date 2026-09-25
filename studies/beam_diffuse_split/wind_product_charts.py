@@ -584,7 +584,10 @@ def _steps(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatChart:
                 "the generator with the steps and grey at the other two; 1 means the two agree."
             ),
             ("Pale bars: the mean of each period at the generator with the steps."),
-            "Bottom: error difference, added after the first run.",
+            (
+                "Bottom: error difference, added after the first run. Here a positive difference, "
+                "to the right, means ICON-EU has the lower error."
+            ),
             f"{DOTS} {CAPACITY}",
             SCOPE,
         ],
@@ -777,8 +780,8 @@ def _wind_models_work(
         title=wind_figure_title(
             row_set="main",
             title=(
-                "An XGBoost model given ICON-D2 follows measured power at every generator, across "
-                "a windy, a variable, and a calm week"
+                "An XGBoost model given ICON-D2 follows the shape of measured power at each "
+                "generator, except in W3's windiest week, when it predicts too high"
             ),
         ),
         subtitle=[

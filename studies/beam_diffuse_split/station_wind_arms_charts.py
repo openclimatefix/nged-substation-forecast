@@ -55,6 +55,12 @@ _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 SITES: Final[tuple[str, ...]] = ("W1", "W2", "W3")
 """The anonymous wind farm labels."""
 
+_MONTH_PANEL_TITLE_CHARACTERS: Final[int] = 44
+"""The characters a by-calendar-month panel's title line holds, which is set in a larger font."""
+
+_PANEL_TITLE_CHARACTERS: Final[int] = 56
+"""The characters a contrast panel's title line holds before wrapping, inside the plot's width."""
+
 SETTINGS: Final[tuple[str, str]] = ("pooled", "sensitivity")
 """The two hyperparameter settings, as `intervals.parquet` names them."""
 
@@ -674,7 +680,11 @@ def _month_panel(*, months: pl.DataFrame, contrast: str, title: str) -> alt.Laye
         layer=[rule, filled, hollow],
         width=PLOT_WIDTH_PX,
         height=MONTH_PANEL_HEIGHT_PX,
-        title=alt.TitleParams(text=title, anchor="start", frame="group"),
+        title=alt.TitleParams(
+            text=wrapped(text=title, width=_MONTH_PANEL_TITLE_CHARACTERS),
+            anchor="start",
+            frame="group",
+        ),
     )
 
 
@@ -710,9 +720,12 @@ def _season(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
             better_label="first-named arm better",
             conditions=SETTING_CONDITIONS,
             condition_title="XGBoost settings",
-            panel_title=(
-                f"{name}, by season: {_bracketed(name=CONTRAST_NAMES[first])} minus "
-                f"{_bracketed(name=CONTRAST_NAMES[second])}"
+            panel_title=wrapped(
+                text=(
+                    f"{name}, by season: {_bracketed(name=CONTRAST_NAMES[first])} minus "
+                    f"{_bracketed(name=CONTRAST_NAMES[second])}"
+                ),
+                width=_PANEL_TITLE_CHARACTERS,
             ),
             figure_planning="mixed",
         )
@@ -826,9 +839,12 @@ def _by_farm(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
             better_label="first-named arm better",
             conditions=SETTING_CONDITIONS,
             condition_title="XGBoost settings",
-            panel_title=(
-                f"{name}, at each farm: {_bracketed(name=CONTRAST_NAMES[first])} minus "
-                f"{_bracketed(name=CONTRAST_NAMES[second])}"
+            panel_title=wrapped(
+                text=(
+                    f"{name}, at each farm: {_bracketed(name=CONTRAST_NAMES[first])} minus "
+                    f"{_bracketed(name=CONTRAST_NAMES[second])}"
+                ),
+                width=_PANEL_TITLE_CHARACTERS,
             ),
             figure_planning="exploratory",
         )

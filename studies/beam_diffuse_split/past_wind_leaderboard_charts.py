@@ -116,7 +116,12 @@ UNDRAWN_PLANNED_ICON_NOTE: Final[str] = (
 )
 """The caption line that says where the plan's own ICON contrasts, which the figure lacks, are."""
 
-CAPACITY: Final[str] = "Capacity is each generator's 99th-percentile output."
+CAPACITY: Final[str] = (
+    "Capacity is each generator's 99th-percentile output, not its nameplate capacity."
+)
+FARM_HOURS: Final[str] = (
+    "A farm-hour is one hour at one farm, so a block's count sums the hours of the three farms."
+)
 DOTS: Final[str] = (
     "Dot: estimate. Line: 95% interval from resampling whole calendar months, each with all three "
     "farms' rows, and a fitting seed. The interval does not cover variation between the three "
@@ -427,6 +432,7 @@ def leaderboard_figure(
                 *block_notes(),
                 DOTS,
                 CAPACITY,
+                FARM_HOURS,
                 SCOPE,
             ]
         ),
@@ -464,6 +470,7 @@ def contrasts_figure(
                 *significance_change_notes(intervals=intervals),
                 DOTS,
                 CAPACITY,
+                FARM_HOURS,
                 SCOPE,
             ]
         ),

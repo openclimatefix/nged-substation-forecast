@@ -493,3 +493,14 @@ def test_no_wind_caption_line_runs_past_the_caption_width() -> None:
     # The figure helper appends the reference-row note after the lines this script narrows.
     narrowed = [line for line in lines if not line.startswith("Lighter, hollow rows")]
     assert max(len(line) for line in narrowed) <= module.CAPTION_CHARACTERS
+
+
+def test_figure_1_explains_farm_hours_and_capacity() -> None:
+    # Catches a caption that leaves a planner to guess what a farm-hour and a capacity are.
+    module = _load()
+    leaderboard = module.leaderboard_figure(blocks=[_leaderboard_block()], shares=_all_shares())
+
+    text = " ".join(leaderboard.to_dict()["title"]["subtitle"])
+
+    assert "not its nameplate capacity" in text
+    assert "A farm-hour is one hour at one farm" in text

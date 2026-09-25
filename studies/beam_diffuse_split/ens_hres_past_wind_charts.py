@@ -38,7 +38,6 @@ from ens_hres_past_wind import OUTPUT_DIR
 from figure_numbers import WIND_FIGURE_NUMBERS, wind_figure_number, wind_figure_title
 from studies.charts import (
     CONTENT_WIDTH_PX,
-    PLOT_WIDTH_PX,
     figure,
     interval_panel,
     leaderboard_panel,
@@ -62,6 +61,13 @@ from wind_product_charts import (
 )
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
+
+RATIO_PLOT_WIDTH_PX: Final[int] = CONTENT_WIDTH_PX - 74
+"""The plot width of a monthly-ratio panel, whose y axis title and tick labels take 74 px, so
+that the panel and its axes fill the text column as an interval figure does."""
+
+_CAPTION_CHARACTERS: Final[int] = 100
+"""The characters a caption line holds before wrapping, which keeps it inside a 680 px figure."""
 
 SITES: Final[tuple[str, ...]] = ("W1", "W2", "W3")
 """The anonymous wind farm labels."""
@@ -1133,7 +1139,7 @@ def _ratio_panel(
         .mark_text(align="left", baseline="top", dx=4, dy=2, color=ocf.BLACK_1, aria=False)
         .encode(x="date:T", y=alt.value(0), text="text:N")  # ty: ignore[unresolved-attribute]
     )
-    return alt.LayerChart(layer=[rule, label, line], width=PLOT_WIDTH_PX, height=200)
+    return alt.LayerChart(layer=[rule, label, line], width=RATIO_PLOT_WIDTH_PX, height=200)
 
 
 def _monthly_ratio_chart(*, source: Source) -> tuple[alt.VConcatChart, str]:
@@ -1162,7 +1168,7 @@ def _monthly_ratio_chart(*, source: Source) -> tuple[alt.VConcatChart, str]:
         ),
     ]
     title = (
-        "ENS's and HRES's 10 m wind speeds fall against ERA5's between October and November 2024, "
+        "ENS's and HRES's 10 m wind speeds fall against ERA5's from October to November 2024, "
         "and UKV's does not"
     )
     return (
@@ -1172,17 +1178,21 @@ def _monthly_ratio_chart(*, source: Source) -> tuple[alt.VConcatChart, str]:
             figure_planning=None,
             title=title,
             subtitle=[
-                (
-                    "Each month's mean wind speed of one product, over ERA5's mean for the same "
-                    "hours, pooled over the three farms. The upper panel is 10 m. The lower panel "
-                    "is 100 m, the height the XGBoost models are given, where the fall is "
-                    "smaller and gradual."
-                ),
-                (
-                    "Rows are the page's own from 12 August 2024, before any hour is dropped for "
-                    "the fold design. Each month's row count is in the report."
-                ),
-                "Three wind farms in Lincolnshire. Three farms are few independent sites.",
+                line
+                for text in (
+                    (
+                        "Each month's mean wind speed of one product, over ERA5's mean for the "
+                        "same hours, pooled over the three farms. The upper panel is 10 m. The "
+                        "lower panel is 100 m, the height the XGBoost models are given, where the "
+                        "fall is smaller and gradual."
+                    ),
+                    (
+                        "Rows are the page's own from 12 August 2024, before any hour is dropped "
+                        "for the fold design. Each month's row count is in the report."
+                    ),
+                    "Three wind farms in Lincolnshire. Three farms are few independent sites.",
+                )
+                for line in wrapped(text=text, width=_CAPTION_CHARACTERS)
             ],
         ),
         title,
