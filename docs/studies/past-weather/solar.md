@@ -1583,28 +1583,3 @@ the saved report matches the report the current code produces. The MIDAS Open fi
 `studies/weather_downloads/fetch_midas_open.py`. `past_solar_leaderboard.py` reads every row set's
 saved losses and writes the leaderboard report that Figures 1 and 2 come from;
 `past_solar_leaderboard_charts.py` draws them.
-
-Check the page's numbers against each report after the reports exist, one section at a time. Each
-command stops unless every decimal number and bracketed interval in its sections appears in the
-report.
-
-```bash
-uv run python studies/beam_diffuse_split/check_page_numbers.py \
-    docs/studies/past-weather/solar.md \
-    data/studies/beam_diffuse_split/past_weather_v2/solar_long/report.md \
-    --section "### CAMS describes past sunshine best of the eight main-row-set products, by a wide margin" \
-    --section "### Once UKV's hour is rebuilt from its snapshots, UKV beats ICON-EU and ERA5" \
-    --allow-empty
-uv run python studies/beam_diffuse_split/check_page_numbers.py \
-    docs/studies/past-weather/solar.md \
-    data/studies/beam_diffuse_split/past_weather_v2/ens_past_solar/report.md \
-    --section "### ECMWF ENS beats ERA5 and trails CAMS" \
-    --section "### ENS beats ERA5 both before and after the 00 UTC run became readable (exploratory, post hoc)" \
-    --allow-empty
-uv run python studies/beam_diffuse_split/check_page_numbers.py \
-    docs/studies/past-weather/solar.md \
-    data/studies/beam_diffuse_split/past_weather_v2/station_past_solar/report.md \
-    --section "### The nearest station is a worse input than CAMS and a better input than ERA5" \
-    --section "### Adding the nearest station's irradiance lowers the error of both CAMS and ERA5" \
-    --allow-empty
-```
