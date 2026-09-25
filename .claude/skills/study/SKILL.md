@@ -259,6 +259,13 @@ sets out the rule and the products the rule covers.
 - **Never overwrite an output a merged page quotes; move it to `superseded/` first.** Every worktree
   writes to the main checkout's `data/studies/` (`sources.REPO_DATA_DIR`), so a re-run in a review
   worktree or a parallel session overwrites the same files.
+- **Fit on the GPU when the workstation has one.** Set XGBoost's `device="cuda"` on a fit script if
+  `nvidia-smi` shows a GPU. On the RTX A6000, 60,000 rows with 30 to 100 features and 300 rounds fitted
+  2.5 to 4.5 times faster than on 16 CPU threads, at near-identical error; a GPU fit also needs only
+  about one CPU core, so it can overlap a CPU fit. GPU and CPU results are not bit-identical, so keep
+  one device inside each planned contrast, state the device on the page, and refit one published arm on
+  both devices to report the difference as a noise floor. Mixing CPU-fitted and GPU-fitted results
+  across pages is acceptable. The fingerprint and bit-for-bit rules apply within one device.
 - **Every page ends with the commands that reproduce it.**
 - **Run a moved script end to end.** No linter evaluates a `sys.path` string: when
   `site_e_commissioning.py` moved up one directory, its `parents[3]` path hack pointed above the
