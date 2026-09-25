@@ -39,6 +39,7 @@ from studies.charts import (
     PLOT_WIDTH_PX,
     ContrastKey,
     ProductFamily,
+    assert_matches_printed,
     figure,
     flip_contrast,
     interval_panel,
@@ -649,9 +650,7 @@ def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         arm = f"{product}_global"
         interval = bootstrap_absolute(losses=losses, arm=arm, metric=METRIC)
         value = interval["value"] * PERCENTAGE_POINTS
-        if round(value, 3) != errors[product]:
-            msg = f"{product}: bootstrapped {value:.3f} but the report says {errors[product]}"
-            raise ValueError(msg)
+        assert_matches_printed(name=product, recomputed=value, printed=errors[product])
         records.append(
             {
                 "label": _served_name(product),
@@ -1480,9 +1479,7 @@ def _all_panel_leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) ->
         arm = f"{product}_global"
         interval = bootstrap_absolute(losses=losses, arm=arm, metric=METRIC)
         value = interval["value"] * PERCENTAGE_POINTS
-        if round(value, 3) != errors[product]:
-            msg = f"{product}: bootstrapped {value:.3f} but the report says {errors[product]}"
-            raise ValueError(msg)
+        assert_matches_printed(name=product, recomputed=value, printed=errors[product])
         records.append(
             {
                 "label": _all_served_name(product),

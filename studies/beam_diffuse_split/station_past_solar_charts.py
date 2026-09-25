@@ -46,6 +46,7 @@ from studies.bootstrap import bootstrap_absolute
 from studies.charts import (
     FAMILY_COLOURS,
     ProductFamily,
+    assert_matches_printed,
     figure,
     interval_panel,
     leaderboard_panel,
@@ -264,9 +265,7 @@ def _leaderboard(
     for arm in order:
         interval = bootstrap_absolute(losses=losses, arm=arm, metric=METRIC)
         value = interval["value"] * PERCENTAGE_POINTS
-        if round(value, 3) != errors[arm]:
-            msg = f"{arm}: bootstrapped {value:.3f} but the report says {errors[arm]}"
-            raise ValueError(msg)
+        assert_matches_printed(name=arm, recomputed=value, printed=errors[arm])
         records.append(
             {
                 "label": NAMES[arm],
