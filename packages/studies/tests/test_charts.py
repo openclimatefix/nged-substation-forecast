@@ -1,4 +1,6 @@
 import re
+from collections.abc import Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import plotting.ocf_theme as ocf
@@ -13,17 +15,31 @@ from studies.charts import (
     NAMED_SUFFIX,
     PLANNING_NOTES,
     PLOT_WIDTH_PX,
+    POST_HOC_PLANNING_NOTE,
+    POST_HOC_SUFFIX,
+    SECOND_SETTING_SHAPE,
+    BlockArm,
     ContrastKey,
     Panel,
+    PlannedContrast,
     PlanningType,
+    RowSetBlock,
+    assert_matches_printed,
+    block_contrast_rows,
+    block_leaderboard_rows,
     figure,
     flip_contrast,
     interval_panel,
     leaderboard_panel,
+    planned_contrast_rows,
+    planned_domain,
     planning,
     report_contrasts,
     report_errors,
     select_contrasts,
+    shared_domain,
+    stacked_contrasts,
+    stacked_leaderboard,
     ticks,
 )
 
@@ -750,3 +766,649 @@ def test_the_station_family_is_purple_and_named_in_the_key():
         FAMILY_COLOURS["station observations"],
     ]
     assert FAMILY_COLOURS["station observations"] == ocf.DATA_PURPLE
+
+
+METRIC = "loss"
+BLOCK_ARMS = [
+    BlockArm(arm="cams_global", label="CAMS", family="satellite", reference=True),
+    BlockArm(arm="era5_global", label="ERA5", family="reanalysis", reference=True),
+    BlockArm(arm="ukv_global", label="UKV", family="weather model"),
+]
+SITE_HOURS = 8
+
+
+def _losses(*, sensitivity_offset: float = 0.05) -> pl.DataFrame:
+    """Return losses for three arms at two settings sharing arm names, 2 sites x 4 hours x 2 seeds.
+
+    Each arm's `pooled` loss is its base plus a small hourly ramp; its `sensitivity` loss adds
+    `sensitivity_offset`, so a bootstrap that mixed the settings would return a different number.
+    """
+    start = datetime(2025, 1, 1, tzinfo=UTC)
+    base = {"cams_global": 0.01, "era5_global": 0.02, "ukv_global": 0.03}
+    rows = [
+        {
+            "arm": arm,
+            "setting": setting,
+            "site": site,
+            "time": start + timedelta(hours=hour),
+            "seed": seed,
+            "month": "2025-01" if hour < 2 else "2025-02",
+            METRIC: value
+            + 0.001 * hour
+            + (sensitivity_offset if setting == "sensitivity" else 0.0),
+        }
+        for arm, value in base.items()
+        for setting in ("pooled", "sensitivity")
+        for site in ("a", "b")
+        for hour in range(4)
+        for seed in (0, 1)
+    ]
+    return pl.DataFrame(rows)
+
+
+def test_block_leaderboard_rows_ignores_the_other_setting_that_shares_arm_names() -> None:
+    # Catches the silent cross-join of the `pooled` and `sensitivity` settings.
+    rows = block_leaderboard_rows(
+        losses=_losses(), arms=BLOCK_ARMS, setting="pooled", site_hours=SITE_HOURS, metric=METRIC
+    )
+
+    assert rows["value"].to_list() == pytest.approx([1.15, 2.15, 3.15])
+
+
+def test_block_leaderboard_rows_raises_when_the_setting_is_absent() -> None:
+    with pytest.raises(ValueError, match="no row has setting 'missing'"):
+        block_leaderboard_rows(
+            losses=_losses(),
+            arms=BLOCK_ARMS,
+            setting="missing",
+            site_hours=SITE_HOURS,
+            metric=METRIC,
+        )
+
+
+def test_block_leaderboard_rows_raises_when_two_settings_leave_duplicate_rows() -> None:
+    # A frame whose setting label is the same for both blocks of rows doubles every (site, time).
+    doubled = _losses().with_columns(setting=pl.lit("pooled"))
+
+    with pytest.raises(ValueError, match="rows per seed"):
+        block_leaderboard_rows(
+            losses=doubled,
+            arms=BLOCK_ARMS,
+            setting="pooled",
+            site_hours=SITE_HOURS,
+            metric=METRIC,
+        )
+
+
+def test_block_leaderboard_rows_holds_one_row_per_arm_with_reference_rows_flagged() -> None:
+    rows = block_leaderboard_rows(
+        losses=_losses(), arms=BLOCK_ARMS, setting="pooled", site_hours=SITE_HOURS, metric=METRIC
+    )
+
+    assert rows["label"].to_list() == ["CAMS", "ERA5", "UKV"]
+    assert rows["reference"].to_list() == [True, True, False]
+
+
+def test_block_leaderboard_rows_checks_recomputed_values_against_the_printed_ones() -> None:
+    losses = _losses()
+    printed = {"cams_global": 1.15, "era5_global": 2.15, "ukv_global": 3.15}
+    block_leaderboard_rows(
+        losses=losses,
+        arms=BLOCK_ARMS,
+        setting="pooled",
+        site_hours=SITE_HOURS,
+        metric=METRIC,
+        printed=printed,
+    )
+
+    with pytest.raises(ValueError, match=r"era5_global: bootstrapped 2\.150 but the report says"):
+        block_leaderboard_rows(
+            losses=losses,
+            arms=BLOCK_ARMS,
+            setting="pooled",
+            site_hours=SITE_HOURS,
+            metric=METRIC,
+            printed={**printed, "era5_global": 2.151},
+        )
+
+
+def test_block_contrast_rows_differences_each_arm_against_the_reference_arm() -> None:
+    rows = block_contrast_rows(
+        losses=_losses(),
+        arms=[BLOCK_ARMS[0], BLOCK_ARMS[2]],
+        reference_arm="era5_global",
+        setting="pooled",
+        site_hours=SITE_HOURS,
+        metric=METRIC,
+    )
+
+    assert rows["difference"].to_list() == pytest.approx([-1.0, 1.0])
+
+
+def test_block_contrast_rows_raises_when_the_site_hours_differ() -> None:
+    with pytest.raises(ValueError, match="rows per seed"):
+        block_contrast_rows(
+            losses=_losses(),
+            arms=[BLOCK_ARMS[0]],
+            reference_arm="era5_global",
+            setting="pooled",
+            site_hours=SITE_HOURS + 1,
+            metric=METRIC,
+        )
+
+
+def test_assert_matches_printed_stops_when_one_printed_number_is_perturbed() -> None:
+    assert_matches_printed(name="cams", recomputed=5.0854, printed=5.085)
+
+    with pytest.raises(ValueError, match=r"cams: bootstrapped 5\.085 but the report says 5\.086"):
+        assert_matches_printed(name="cams", recomputed=5.0854, printed=5.086)
+
+
+def _blocks() -> tuple[list[RowSetBlock], list[RowSetBlock]]:
+    losses = _losses()
+    leaderboard = block_leaderboard_rows(
+        losses=losses, arms=BLOCK_ARMS, setting="pooled", site_hours=SITE_HOURS, metric=METRIC
+    )
+    contrasts = block_contrast_rows(
+        losses=losses,
+        arms=[BLOCK_ARMS[0], BLOCK_ARMS[2]],
+        reference_arm="era5_global",
+        setting="pooled",
+        site_hours=SITE_HOURS,
+        metric=METRIC,
+    )
+    labels = ("Main rows", "Extra rows")
+    return (
+        [RowSetBlock(label, "Jan 2025", SITE_HOURS, leaderboard) for label in labels],
+        [RowSetBlock(label, "Jan 2025", SITE_HOURS, contrasts) for label in labels],
+    )
+
+
+def test_stacked_leaderboard_draws_one_panel_per_block_with_titles_naming_site_hours() -> None:
+    blocks, _ = _blocks()
+
+    spec = stacked_leaderboard(
+        blocks=blocks, number=1, title="A title", subtitle=["A subtitle."]
+    ).to_dict()
+
+    panel_titles = [
+        vconcat["title"]["text"] if "title" in vconcat else None for vconcat in _leaf_panels(spec)
+    ]
+    assert "Main rows: Jan 2025, 8 site-hours" in panel_titles
+    assert "Extra rows: Jan 2025, 8 site-hours" in panel_titles
+
+
+def test_stacked_leaderboard_draws_reference_rows_in_the_light_shade_and_hollow() -> None:
+    blocks, _ = _blocks()
+
+    spec = stacked_leaderboard(
+        blocks=blocks, number=1, title="A title", subtitle=["A subtitle."]
+    ).to_dict()
+
+    assert "'shade': 'reanalysis, light'" in str(spec)
+    assert "'shade': 'weather model'" in str(spec)
+    _assert_light_rows_hollow_and_others_filled(spec)
+
+
+def _assert_light_rows_hollow_and_others_filled(spec: dict) -> None:
+    """Check that the point layers holding light-shade rows are hollow and the rest filled."""
+    seen = {True: 0, False: 0}
+    for panel in _leaf_panels(spec):
+        for layer in _layer(panel, "point"):
+            shades = {row["shade"] for row in _values(spec, layer) if "shade" in row}
+            if not shades:
+                continue
+            light = all(shade.endswith(", light") for shade in shades)
+            assert layer["mark"]["filled"] is (not light), shades
+            seen[light] += 1
+    assert seen[True] > 0
+    assert seen[False] > 0
+
+
+def test_stacked_contrasts_draws_reference_rows_hollow() -> None:
+    _, blocks = _blocks()
+
+    spec = stacked_contrasts(
+        blocks=blocks, number=2, title="A title", subtitle=["A subtitle."]
+    ).to_dict()
+
+    assert "'shade': 'satellite, light'" in str(spec)
+    _assert_light_rows_hollow_and_others_filled(spec)
+
+
+def _leaf_panels(spec: dict) -> list[dict]:
+    """Return every layered panel in a figure's spec, however deeply the concats nest."""
+    found = []
+    for child in spec.get("vconcat", []):
+        found.extend(_leaf_panels(child) if "vconcat" in child else [child])
+    return found
+
+
+def _x_titles_in(node: object) -> Iterator[list[str]]:
+    """Yield the title of every x encoding under `node`, each as its list of lines."""
+    if isinstance(node, dict):
+        x = node.get("x")
+        if isinstance(x, dict) and "field" in x and x.get("title") is not None:
+            yield x["title"]
+        for value in node.values():
+            yield from _x_titles_in(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _x_titles_in(value)
+
+
+def _x_axis_titles(spec: dict) -> list[str]:
+    """Return each data panel's x axis title from top to bottom, `""` where a panel has none.
+
+    A panel with no x encoding at all (the colour key) is skipped.
+    """
+    titles = []
+    for panel in _leaf_panels(spec):
+        lines = next(_x_titles_in(panel), None)
+        if lines is not None:
+            titles.append(" ".join(lines))
+    return titles
+
+
+def test_stacked_contrasts_puts_the_x_axis_title_under_the_last_block_only() -> None:
+    _, blocks = _blocks()
+
+    spec = stacked_contrasts(
+        blocks=blocks, number=2, title="A title", subtitle=["A subtitle."]
+    ).to_dict()
+
+    titles = _x_axis_titles(spec)
+    assert len(titles) == len(blocks)
+    assert titles[-1].startswith("Mean absolute error minus ERA5's (points of capacity")
+    assert titles[:-1] == [""]
+
+
+UKV_AGAINST_CAMS = PlannedContrast(treatment=BLOCK_ARMS[2], reference=BLOCK_ARMS[0])
+CAMS_AGAINST_ERA5 = PlannedContrast(treatment=BLOCK_ARMS[0], reference=BLOCK_ARMS[1])
+
+
+def _planned(*, contrasts: list[PlannedContrast], setting: str = "pooled") -> pl.DataFrame:
+    return planned_contrast_rows(
+        losses=_losses(),
+        contrasts=contrasts,
+        setting=setting,
+        site_hours=SITE_HOURS,
+        metric=METRIC,
+    )
+
+
+def test_planned_contrast_rows_are_treatment_minus_reference_not_the_other_way_round() -> None:
+    # UKV loses 0.03 and CAMS 0.01, so UKV minus CAMS is +2 points and CAMS minus UKV would be -2.
+    rows = _planned(contrasts=[UKV_AGAINST_CAMS, CAMS_AGAINST_ERA5])
+
+    assert rows["difference"].to_list() == pytest.approx([2.0, -1.0])
+    assert rows["arm"].to_list() == ["ukv_global", "cams_global"]
+    assert rows["reference_arm"].to_list() == ["cams_global", "era5_global"]
+    assert rows["label"].to_list() == ["UKV against CAMS", "CAMS against ERA5"]
+    assert rows["planned"].to_list() == [True, True]
+
+
+def test_planned_contrast_rows_use_the_asked_setting_only() -> None:
+    losses = _losses(sensitivity_offset=0.05)
+    shifted = losses.with_columns(
+        pl.when((pl.col("setting") == "sensitivity") & (pl.col("arm") == "ukv_global"))
+        .then(pl.col(METRIC) + 0.01)
+        .otherwise(pl.col(METRIC))
+        .alias(METRIC)
+    )
+
+    rows = planned_contrast_rows(
+        losses=shifted,
+        contrasts=[UKV_AGAINST_CAMS],
+        setting="sensitivity",
+        site_hours=SITE_HOURS,
+        metric=METRIC,
+    )
+
+    assert rows["difference"].to_list() == pytest.approx([3.0])
+
+
+def test_planned_contrast_rows_raise_when_the_site_hours_differ() -> None:
+    with pytest.raises(ValueError, match="rows per seed"):
+        planned_contrast_rows(
+            losses=_losses(),
+            contrasts=[UKV_AGAINST_CAMS],
+            setting="pooled",
+            site_hours=SITE_HOURS + 1,
+            metric=METRIC,
+        )
+
+
+def _blocks_with_planned(*, second: bool) -> list[RowSetBlock]:
+    _, blocks = _blocks()
+    planned = _planned(contrasts=[UKV_AGAINST_CAMS, CAMS_AGAINST_ERA5])
+    if second:
+        planned = planned.with_columns(second_difference=pl.Series([1.5, None]))
+    return [block._replace(planned_rows=planned) for block in blocks]
+
+
+def test_stacked_contrasts_draws_each_blocks_planned_contrasts_in_a_lower_panel() -> None:
+    blocks = _blocks_with_planned(second=False)
+
+    spec = stacked_contrasts(
+        blocks=blocks, number=2, title="A title", subtitle=["A subtitle."]
+    ).to_dict()
+
+    titles = [
+        panel["title"]["text"]
+        for panel in _leaf_panels(spec)
+        if "title" in panel and panel["title"]["text"] != "Product type"
+    ]
+    assert titles == [
+        "Main rows: Jan 2025, 8 site-hours",
+        "Main rows: planned contrasts",
+        "Extra rows: Jan 2025, 8 site-hours",
+        "Extra rows: planned contrasts",
+    ]
+    text = str(spec)
+    for label in ("UKV against CAMS", "CAMS against ERA5"):
+        assert f"{label}{NAMED_SUFFIX}" in text
+    # The plotted estimates are treatment minus reference; the opposite sign would show -2.0.
+    assert "'difference': 2.0" in text
+    assert "'difference': -2.0" not in text
+
+
+def test_a_planned_row_dropped_from_the_data_is_dropped_from_the_chart() -> None:
+    blocks = _blocks_with_planned(second=False)
+    fewer = [
+        block._replace(planned_rows=_planned(contrasts=[UKV_AGAINST_CAMS])) for block in blocks
+    ]
+
+    text = str(
+        stacked_contrasts(blocks=fewer, number=2, title="A title", subtitle=["A."]).to_dict()
+    )
+
+    assert "CAMS against ERA5" not in text
+    assert f"UKV against CAMS{NAMED_SUFFIX}" in text
+
+
+def test_every_panel_of_a_block_with_planned_contrasts_titles_its_own_x_axis() -> None:
+    spec = stacked_contrasts(
+        blocks=_blocks_with_planned(second=False), number=2, title="A", subtitle=["A."]
+    ).to_dict()
+
+    titles = _x_axis_titles(spec)
+    assert len(titles) == 4
+    assert titles[0].startswith("Mean absolute error minus ERA5's")
+    assert titles[1].startswith("Mean absolute error of the first product minus the second's")
+
+
+def test_a_second_setting_is_a_hollow_marker_not_a_second_chart() -> None:
+    with_second = str(
+        stacked_contrasts(
+            blocks=_blocks_with_planned(second=True), number=2, title="A", subtitle=["A."]
+        ).to_dict()
+    )
+    without = str(
+        stacked_contrasts(
+            blocks=_blocks_with_planned(second=False), number=2, title="A", subtitle=["A."]
+        ).to_dict()
+    )
+
+    assert SECOND_SETTING_SHAPE in with_second
+    assert "second hyperparameter setting" in with_second
+    assert SECOND_SETTING_SHAPE not in without
+    assert "second hyperparameter setting" not in without
+    assert "'second_difference': 1.5" in with_second
+
+
+def test_the_shared_domain_covers_the_planned_rows_and_the_second_setting_markers() -> None:
+    blocks = _blocks_with_planned(second=True)
+    wide = _planned(contrasts=[UKV_AGAINST_CAMS, CAMS_AGAINST_ERA5]).with_columns(
+        second_difference=pl.Series([7.2, None])
+    )
+
+    low, high = shared_domain(blocks=[blocks[0]._replace(planned_rows=wide)], include_zero=True)
+
+    assert high >= 7.2
+    assert low <= -1.0
+
+
+def _x_domains(spec: dict) -> list[list[float]]:
+    """Return each data panel's x scale domain from top to bottom."""
+
+    def find(node: object) -> Iterator[list[float]]:
+        if isinstance(node, dict):
+            x = node.get("x")
+            if isinstance(x, dict) and "field" in x and (x.get("scale") or {}).get("domain"):
+                yield x["scale"]["domain"]
+            for value in node.values():
+                yield from find(value)
+        elif isinstance(node, list):
+            for value in node:
+                yield from find(value)
+
+    return [next(find(panel)) for panel in _leaf_panels(spec) if next(find(panel), None)]
+
+
+def test_a_planned_panel_has_its_own_x_range_and_the_contrast_panels_keep_the_shared_one() -> None:
+    blocks = _blocks_with_planned(second=False)
+    narrow = _planned(contrasts=[UKV_AGAINST_CAMS]).with_columns(
+        difference=pl.lit(0.1), lower_95=pl.lit(0.05), upper_95=pl.lit(0.15)
+    )
+    wide = _planned(contrasts=[UKV_AGAINST_CAMS]).with_columns(
+        difference=pl.lit(-3.0), lower_95=pl.lit(-4.0), upper_95=pl.lit(-2.0)
+    )
+    blocks = [blocks[0]._replace(planned_rows=narrow), blocks[1]._replace(planned_rows=wide)]
+
+    spec = stacked_contrasts(blocks=blocks, number=2, title="A", subtitle=["A."]).to_dict()
+
+    shared = list(shared_domain(blocks=blocks, include_zero=True))
+    assert _x_domains(spec) == [shared, [0.0, 0.25], shared, [-4.0, 0.0]]
+
+
+def test_planned_domain_holds_zero_and_the_second_setting_marker() -> None:
+    block = _blocks_with_planned(second=True)[0]
+    assert block.planned_rows is not None
+    planned = block.planned_rows.with_columns(
+        difference=pl.lit(0.1),
+        lower_95=pl.lit(0.05),
+        upper_95=pl.lit(0.15),
+        second_difference=pl.Series([0.9, None]),
+    )
+
+    assert planned_domain(block=block._replace(planned_rows=planned)) == (0.0, 1.0)
+
+
+def test_a_mixed_contrast_figure_with_a_post_hoc_row_says_so_in_its_planning_line() -> None:
+    blocks = _blocks_with_planned(second=False)
+    marked = blocks[0].rows.with_columns(label=pl.col("label") + POST_HOC_SUFFIX)
+    plain = str(stacked_contrasts(blocks=blocks, number=2, title="A", subtitle=["A."]).to_dict())
+    post_hoc = str(
+        stacked_contrasts(
+            blocks=[blocks[0]._replace(rows=marked), blocks[1]],
+            number=2,
+            title="A",
+            subtitle=["A."],
+        ).to_dict()
+    )
+
+    assert "or, where marked, post hoc" in post_hoc
+    assert "or, where marked, post hoc" not in plain
+    assert POST_HOC_PLANNING_NOTE.startswith("Planned:")
+
+
+def test_planned_domain_needs_planned_rows() -> None:
+    with pytest.raises(ValueError, match="no planned rows"):
+        planned_domain(block=_blocks()[1][0])
+
+
+def test_block_leaderboard_rows_come_back_best_first_whatever_the_arm_order() -> None:
+    rows = block_leaderboard_rows(
+        losses=_losses(),
+        arms=BLOCK_ARMS[::-1],
+        setting="pooled",
+        site_hours=SITE_HOURS,
+        metric=METRIC,
+    )
+
+    assert rows["label"].to_list() == ["CAMS", "ERA5", "UKV"]
+
+
+def test_block_leaderboard_rows_raise_when_the_printed_errors_lack_an_arm() -> None:
+    with pytest.raises(KeyError, match="ukv_global"):
+        block_leaderboard_rows(
+            losses=_losses(),
+            arms=BLOCK_ARMS,
+            setting="pooled",
+            site_hours=SITE_HOURS,
+            metric=METRIC,
+            printed={"cams_global": 1.15, "era5_global": 2.15},
+        )
+
+
+def _interval_block(*, lower: float, upper: float) -> RowSetBlock:
+    rows = pl.DataFrame({"lower_95": [lower], "upper_95": [upper]})
+    return RowSetBlock("Rows", "Jan 2025", SITE_HOURS, rows)
+
+
+def test_the_shared_domain_rounds_outwards_to_half_a_point() -> None:
+    blocks = [_interval_block(lower=0.3, upper=1.2), _interval_block(lower=0.6, upper=0.9)]
+
+    assert shared_domain(blocks=blocks, include_zero=False) == (0.0, 1.5)
+    assert shared_domain(blocks=[_interval_block(lower=-0.3, upper=-0.1)], include_zero=False) == (
+        -0.5,
+        -0.0,
+    )
+
+
+def test_the_shared_domain_holds_zero_only_when_asked() -> None:
+    blocks = [_interval_block(lower=0.6, upper=1.2)]
+
+    assert shared_domain(blocks=blocks, include_zero=False) == (0.5, 1.5)
+    assert shared_domain(blocks=blocks, include_zero=True) == (0.0, 1.5)
+
+
+def test_each_panel_of_a_stacked_leaderboard_holds_only_its_own_blocks_rows() -> None:
+    losses = _losses()
+
+    def block(*, label: str, arms: list[BlockArm]) -> RowSetBlock:
+        rows = block_leaderboard_rows(
+            losses=losses, arms=arms, setting="pooled", site_hours=SITE_HOURS, metric=METRIC
+        )
+        return RowSetBlock(label, "Jan 2025", SITE_HOURS, rows)
+
+    blocks = [
+        block(label="First rows", arms=BLOCK_ARMS[:2]),
+        block(label="Second rows", arms=BLOCK_ARMS[1:]),
+    ]
+
+    spec = stacked_leaderboard(
+        blocks=blocks, number=1, title="A title", subtitle=["A subtitle."]
+    ).to_dict()
+
+    labels = []
+    for panel in _leaf_panels(spec):
+        shown = {
+            row["label"]
+            for layer in _layer(panel, "point")
+            for row in _values(spec, layer)
+            if "value" in row
+        }
+        if shown:
+            labels.append(shown)
+    assert labels == [{"CAMS", "ERA5"}, {"ERA5", "UKV"}]
+
+
+def _key_labels(*, blocks: list[RowSetBlock], contrasts: bool) -> list[str]:
+    """Return the labels of the one family key a stacked figure draws above its first block."""
+    draw = stacked_contrasts if contrasts else stacked_leaderboard
+    spec = draw(blocks=blocks, number=1, title="A title", subtitle=["A subtitle."]).to_dict()
+    key, _ = spec["vconcat"][0]["vconcat"]
+    (text,) = _layer(key, "text")
+    return [row["label"] for row in _values(spec, text)]
+
+
+def test_the_stacked_leaderboard_key_lists_a_family_only_a_later_block_holds() -> None:
+    # Catches a key drawn from the first block alone, which left a station block's colour unnamed.
+    losses = _losses()
+
+    def block(*, label: str, arms: list[BlockArm]) -> RowSetBlock:
+        rows = block_leaderboard_rows(
+            losses=losses, arms=arms, setting="pooled", site_hours=SITE_HOURS, metric=METRIC
+        )
+        return RowSetBlock(label, "Jan 2025", SITE_HOURS, rows)
+
+    blocks = [block(label="First", arms=BLOCK_ARMS[:2]), block(label="Second", arms=BLOCK_ARMS[2:])]
+
+    assert _key_labels(blocks=blocks, contrasts=False) == [
+        "satellite",
+        "reanalysis",
+        "weather model",
+    ]
+
+
+def test_the_stacked_contrasts_key_lists_a_family_only_a_later_block_holds() -> None:
+    losses = _losses()
+
+    def block(*, label: str, arms: list[BlockArm]) -> RowSetBlock:
+        rows = block_contrast_rows(
+            losses=losses,
+            arms=arms,
+            reference_arm="era5_global",
+            setting="pooled",
+            site_hours=SITE_HOURS,
+            metric=METRIC,
+        )
+        return RowSetBlock(label, "Jan 2025", SITE_HOURS, rows)
+
+    blocks = [block(label="First", arms=BLOCK_ARMS[:1]), block(label="Second", arms=BLOCK_ARMS[2:])]
+
+    assert _key_labels(blocks=blocks, contrasts=True) == ["satellite", "weather model"]
+
+
+def test_the_shared_domain_covers_an_estimate_outside_its_own_interval() -> None:
+    rows = pl.DataFrame({"difference": [3.2], "lower_95": [0.1], "upper_95": [0.4]})
+
+    low, high = shared_domain(
+        blocks=[RowSetBlock("Rows", "Jan 2025", SITE_HOURS, rows)], include_zero=True
+    )
+
+    assert high >= 3.2
+    assert low <= 0.0
+
+
+def test_planned_panels_print_each_estimate_and_interval_signed_to_two_decimals() -> None:
+    blocks = _blocks_with_planned(second=False)
+    narrow = _planned(contrasts=[UKV_AGAINST_CAMS]).with_columns(
+        difference=pl.lit(0.097), lower_95=pl.lit(0.046), upper_95=pl.lit(0.147)
+    )
+    blocks = [block._replace(planned_rows=narrow) for block in blocks]
+
+    text = str(stacked_contrasts(blocks=blocks, number=2, title="A", subtitle=["A."]).to_dict())
+
+    assert "+0.10 [+0.05, +0.15]" in text
+
+
+def test_a_value_label_moves_left_of_an_interval_that_ends_near_the_right_edge() -> None:
+    blocks = _blocks_with_planned(second=False)
+    near_edge = _planned(contrasts=[UKV_AGAINST_CAMS]).with_columns(
+        difference=pl.lit(0.9), lower_95=pl.lit(0.5), upper_95=pl.lit(1.0)
+    )
+    block = blocks[0]._replace(planned_rows=near_edge)
+    spec = stacked_contrasts(blocks=[block], number=2, title="A", subtitle=["A."]).to_dict()
+
+    aligns = {
+        node["mark"]["align"]
+        for node in _walk(spec)
+        if isinstance(node.get("mark"), dict)
+        and node["mark"].get("type") == "text"
+        and node["mark"].get("fontSize") == 11
+    }
+
+    assert aligns == {"right"}
+
+
+def _walk(node: object) -> Iterator[dict]:
+    if isinstance(node, dict):
+        yield node
+        for value in node.values():
+            yield from _walk(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _walk(value)

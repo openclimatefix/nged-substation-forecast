@@ -1,4 +1,4 @@
-"""Draw the leaderboard and planned-contrasts charts for the ENS past-solar section.
+"""Draw the exploratory-contrasts chart for the ENS past-solar section.
 
 One-off throwaway script for the charts of the ECMWF ENS addition to
 <https://github.com/openclimatefix/nged-substation-forecast/issues/810>, in
@@ -17,7 +17,6 @@ before committing it.
 
 import argparse
 import logging
-import re
 import sys
 from pathlib import Path
 from typing import Final
@@ -35,7 +34,6 @@ from ens_past_solar import (
     ERA5_3X3_ARM,
     EXPLORATORY_ARMS,
     EXPLORATORY_CONTRASTS,
-    MEAN_ARM,
     OUTPUT_DIR,
     _absolute_table_lines,
     _generator_lines,
@@ -46,13 +44,12 @@ from ens_past_solar import (
     _t3_members,
     build_rows,
 )
+from figure_numbers import FIGURE_NUMBERS
 from studies.bootstrap import bootstrap_absolute
 from studies.charts import (
     figure,
     interval_panel,
-    leaderboard_panel,
     report_contrasts,
-    report_errors,
 )
 from weather_products import METRIC, PERCENTAGE_POINTS, _contrast_line, _mae
 
@@ -85,20 +82,15 @@ FAMILIES: Final[dict[str, str]] = {
 }
 """Every arm's family, which sets its colour in `studies.charts`."""
 
-SECTION_DECIDING: Final[str] = "Planned contrasts"
-"""The report heading `ens_past_solar.py` writes above the two planned contrasts."""
-
 CAPACITY: Final[str] = "Capacity is each generator's 99th-percentile output."
 DOTS: Final[str] = "Dot: estimate. Line: 95% interval from resampling whole months."
 SCOPE: Final[str] = "Six solar farms in Lincolnshire, April 2024 to September 2026."
-LEADERBOARD_X_TITLE: Final[str] = "Mean absolute error (% of capacity; smaller is better)"
 X_TITLE: Final[str] = "Difference in mean absolute error (points of capacity)"
 DOMAIN_MARGIN: Final[float] = 0.3
 """How far past the lowest and highest value a figure's x domain extends, on either chart."""
 
-FIGURE_LEADERBOARD: Final[int] = 17
-FIGURE_CONTRASTS: Final[int] = 18
-FIGURE_EXPLORATORY: Final[int] = 19
+GENERATOR_LABELS: Final[tuple[str, ...]] = tuple("ABCDEF")
+"""The anonymised generator labels, one row per label in a per-generator contrast."""
 
 
 def _losses(*, setting: str) -> pl.DataFrame:
@@ -113,178 +105,48 @@ def _losses(*, setting: str) -> pl.DataFrame:
     return pl.read_parquet(OUTPUT_DIR / "losses.parquet").filter(pl.col("setting") == setting)
 
 
-def _row_count(*, report: str) -> int:
-    """Read the number of common site-hours from the report's heading.
-
-    Args:
-        report: The report's text.
-
-    Returns:
-        The row count.
-
-    Raises:
-        ValueError: If the heading does not hold a count.
-    """
-    match = re.search(r"on ([\d,]+) common site-hours", report)
-    if match is None:
-        msg = "report.md has no 'on N common site-hours' heading"
-        raise ValueError(msg)
-    return int(match[1].replace(",", ""))
+SECTION_PER_GENERATOR: Final[str] = "The same two contrasts, per generator (exploratory)"
+"""The report heading `ens_past_solar.py` writes above each planned contrast at each generator."""
 
 
-def _ens_lead_range(*, report: str) -> str:
-    """Read ENS's lead range, such as `5 to 20`, from the report's lead section.
-
-    Args:
-        report: The report's text.
-
-    Returns:
-        The range, as the report prints it.
-
-    Raises:
-        ValueError: If the report has no ENS lead line.
-    """
-    match = re.search(r"ENS's lead is (\d+ to \d+) hours", report)
-    if match is None:
-        msg = 'report.md has no "ENS\'s lead is N to M hours" line'
-        raise ValueError(msg)
-    return match[1]
-
-
-def _leaderboard(
-    *, losses: pl.DataFrame, errors: dict[str, float], report: str, cams_gap: float
-) -> alt.VConcatChart:
-    """Draw the three headline arms' own mean absolute error, best first, with their 95% intervals.
-
-    Bootstraps each arm's absolute error from `losses.parquet` directly, the same month-and-seed
-    resampling `ens_past_solar.py`'s own report interval uses, because `leaderboard_panel` needs a
-    `lower_95` and `upper_95` per row and the report's point estimate alone supplies neither. No
-    model is refitted.
-
-    Args:
-        losses: Every arm's losses, at the `pooled` setting.
-        errors: Each arm's pooled mean absolute error, read from the report's first table.
-        report: The report's text, for the row count and ENS's leads.
-        cams_gap: ENS's planned contrast against CAMS, in points of capacity, for the title.
-
-    Returns:
-        The figure.
-
-    Raises:
-        ValueError: If a bootstrapped point estimate disagrees with the report's own number.
-    """
-    order = sorted(NAMES, key=errors.__getitem__)
-    records = []
-    for arm in order:
-        interval = bootstrap_absolute(losses=losses, arm=arm, metric=METRIC)
-        value = interval["value"] * PERCENTAGE_POINTS
-        if round(value, 3) != errors[arm]:
-            msg = f"{arm}: bootstrapped {value:.3f} but the report says {errors[arm]}"
-            raise ValueError(msg)
-        records.append(
-            {
-                "label": NAMES[arm],
-                "family": FAMILIES[arm],
-                "value": value,
-                "lower_95": interval["lower_95"] * PERCENTAGE_POINTS,
-                "upper_95": interval["upper_95"] * PERCENTAGE_POINTS,
-            }
-        )
-    rows = pl.DataFrame(records)
-    domain = (
-        min(rows["lower_95"].to_list()) - DOMAIN_MARGIN,
-        max(rows["upper_95"].to_list()) + DOMAIN_MARGIN,
-    )
-    panel = leaderboard_panel(rows=rows, x_domain=domain, x_title=LEADERBOARD_X_TITLE)
-    return figure(
-        panels=[panel],
-        number=FIGURE_LEADERBOARD,
-        figure_planning=None,
-        title=f"ENS's own forecast trails CAMS by {cams_gap:.1f} points, and beats ERA5",
-        subtitle=[
-            f"All three products scored on the same {_row_count(report=report):,} site-hours.",
-            (
-                f"ENS is a forecast {_ens_lead_range(report=report)} h ahead from a 00 UTC run; "
-                "ERA5's radiation is 1 to 12 h ahead; CAMS is a satellite retrieval whose "
-                "cloud information has no forecast step."
-            ),
-            DOTS,
-            CAPACITY,
-            SCOPE,
-        ],
-    )
-
-
-def _planned_contrasts(*, report_path: Path) -> alt.VConcatChart:
-    """Draw the two planned contrasts, ENS against ERA5 and against CAMS.
+def per_generator_rows(*, report_path: Path) -> list[pl.DataFrame]:
+    """Read each planned contrast at each generator from the report, one frame per contrast.
 
     Args:
         report_path: The `report.md` `ens_past_solar.py` wrote.
 
     Returns:
-        The figure.
+        One frame per planned contrast, in `DECIDING_CONTRASTS` order, with one row per generator
+        (`Generator A` to `Generator F`) holding `treatment`, `reference`, `label`, `family`,
+        `planned` (false), `difference`, `lower_95` and `upper_95`.
 
     Raises:
-        ValueError: If the report does not hold exactly the two planned contrasts, for example
-            because `SECTION_DECIDING` no longer matches a renamed report heading.
+        ValueError: If a contrast lacks exactly one row per generator.
     """
-    contrasts = report_contrasts(report_path=report_path)
-    reference_order = {reference: index for index, (_, reference) in enumerate(DECIDING_CONTRASTS)}
-    selected = (
-        contrasts.filter(
-            pl.col("section") == SECTION_DECIDING,
-            pl.col("scope") == "all",
-            pl.col("treatment") == MEAN_ARM,
-            pl.col("reference").is_in(list(reference_order)),
+    per_site = report_contrasts(report_path=report_path).filter(
+        pl.col("section") == SECTION_PER_GENERATOR
+    )
+    frames = []
+    for treatment, reference in DECIDING_CONTRASTS:
+        selected = per_site.filter(
+            pl.col("treatment") == treatment, pl.col("reference") == reference
+        ).sort("scope")
+        if selected.height != len(GENERATOR_LABELS):
+            msg = f"{treatment} - {reference}: expected one row per generator"
+            raise ValueError(msg)
+        frames.append(
+            selected.select(
+                "treatment",
+                "reference",
+                "difference",
+                "lower_95",
+                "upper_95",
+                label=pl.col("scope").str.replace("site ", "Generator "),
+                family=pl.lit(FAMILIES[treatment]),
+                planned=pl.lit(value=False),
+            )
         )
-        .with_columns(_order=pl.col("reference").replace_strict(reference_order))
-        .sort("_order")
-    )
-    if selected.height != len(DECIDING_CONTRASTS):
-        msg = (
-            f"expected {len(DECIDING_CONTRASTS)} planned contrasts under {SECTION_DECIDING!r}, "
-            f"found {selected.height}"
-        )
-        raise ValueError(msg)
-    labels = [
-        f"{NAMES[MEAN_ARM]} − {NAMES[reference]}" for reference in selected["reference"].to_list()
-    ]
-    rows = selected.select(
-        "treatment", "reference", "difference", "lower_95", "upper_95"
-    ).with_columns(
-        label=pl.Series(labels), family=pl.lit("weather model"), planned=pl.lit(value=True)
-    )
-    domain = (
-        min(0.0, *rows["lower_95"].to_list()) - DOMAIN_MARGIN,
-        max(0.0, *rows["upper_95"].to_list()) + DOMAIN_MARGIN,
-    )
-    panel = interval_panel(
-        rows=rows,
-        x_domain=domain,
-        x_title=X_TITLE,
-        zero_label="no difference",
-        better_label="ENS better",
-        panel_title="The two planned contrasts",
-        figure_planning="planned",
-    )
-    return figure(
-        panels=[panel],
-        number=FIGURE_CONTRASTS,
-        figure_planning=None,
-        title="ENS beats ERA5 but trails CAMS by more than three points",
-        subtitle=[
-            (
-                "Both contrasts were fixed before the first model was fitted, after ERA5 and CAMS "
-                "had been scored on the page's main rows."
-            ),
-            (
-                "ENS also differs from ERA5 and CAMS in lead, the 3-hourly steps of its open-data "
-                "subset, native resolution, spatial support, and model version."
-            ),
-            f"{DOTS} {CAPACITY}",
-            SCOPE,
-        ],
-    )
+    return frames
 
 
 def _exploratory_contrasts(*, report_path: Path) -> alt.VConcatChart:
@@ -340,7 +202,7 @@ def _exploratory_contrasts(*, report_path: Path) -> alt.VConcatChart:
     )
     return figure(
         panels=[panel],
-        number=FIGURE_EXPLORATORY,
+        number=FIGURE_NUMBERS["ens_exploratory"],
         figure_planning="exploratory",
         title="Averaging ERA5 and CAMS over 3-hour steps narrows both of ENS's gaps",
         subtitle=[
@@ -439,30 +301,14 @@ def _verify_numbers(*, report: str, losses: pl.DataFrame, sensitivity: pl.DataFr
 
 
 def main() -> int:
-    """Read the report and write the three SVGs."""
+    """Check the report against the saved losses, then write the exploratory-contrasts SVG."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     argparse.ArgumentParser(description=__doc__).parse_args()
     report_path = OUTPUT_DIR / "report.md"
     report = report_path.read_text()
-    errors = report_errors(report_path=report_path, column="All sites")
-    errors = {arm: errors[arm] for arm in NAMES if arm in errors}
     losses = _losses(setting="pooled")
     _verify_numbers(report=report, losses=losses, sensitivity=_losses(setting="sensitivity"))
-    cams_gap = float(
-        report_contrasts(report_path=report_path)
-        .filter(
-            pl.col("section") == SECTION_DECIDING,
-            pl.col("scope") == "all",
-            pl.col("treatment") == MEAN_ARM,
-            pl.col("reference") == "cams_global",
-        )["difference"]
-        .item()
-    )
     charts = {
-        "ens_past_solar_leaderboard": _leaderboard(
-            losses=losses, errors=errors, report=report, cams_gap=cams_gap
-        ),
-        "ens_past_solar_planned_contrasts": _planned_contrasts(report_path=report_path),
         "ens_past_solar_exploratory_contrasts": _exploratory_contrasts(report_path=report_path),
     }
     for name, chart in charts.items():
