@@ -307,7 +307,11 @@ BLOCK_SETTINGS: Final[dict[str, BlockSetting]] = {
     ),
     "ecmwf": BlockSetting(hub_height="100 m; ICON 80 m", reference_name="ERA5"),
     "station": BlockSetting(
-        hub_height="10 m station and ERA5 arm; 100 m others", reference_name="ERA5's 10\u00a0m wind"
+        hub_height=(
+            "ERA5 at 10 m and at 100 m; the nearest station at 10 m; UKV at 100 m; UKV + its own "
+            "80 m wind at 100 m and 80 m; UKV + nearest station at 100 m and the station's 10 m"
+        ),
+        reference_name="ERA5's 10\u00a0m wind",
     ),
 }
 """What each block's label and axis state beyond its dates and row count, by row set `key`."""

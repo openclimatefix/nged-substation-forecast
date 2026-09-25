@@ -206,7 +206,8 @@ def test_each_figure_carries_its_own_number_from_the_wind_map(
         blocks=[_block(reference_name="ERA5")], shares=_all_shares(), intervals=_intervals(rows=[])
     )
 
-    leaderboard_title, leaderboard_spec = _title_and_cross_reference(figure=leaderboard)
+    leaderboard_title, _ = _title_and_cross_reference(figure=leaderboard)
+    leaderboard_spec = _subtitle(figure=leaderboard)
     contrasts_title, _ = _title_and_cross_reference(figure=contrasts)
 
     assert leaderboard_title == "Figure 1"
@@ -220,7 +221,8 @@ def test_each_figure_carries_its_own_number_from_the_wind_map(
     moved_contrasts = module.contrasts_figure(
         blocks=[_block(reference_name="ERA5")], shares=_all_shares(), intervals=_intervals(rows=[])
     )
-    moved_title, moved_spec = _title_and_cross_reference(figure=moved_leaderboard)
+    moved_title, _ = _title_and_cross_reference(figure=moved_leaderboard)
+    moved_spec = _subtitle(figure=moved_leaderboard)
     assert moved_title == "Figure 7"
     assert "Figure 9's paired contrasts" in moved_spec
     assert _title_and_cross_reference(figure=moved_contrasts)[0] == "Figure 9"
@@ -252,7 +254,10 @@ def test_the_captions_state_each_blocks_wind_heights_and_the_dream_caveat() -> N
 
     assert notes[0] == "Wind heights of each block's arms:"
     assert "Main: 100 m; ICON 80 m." in notes
-    assert notes[-1] == "Station: 10 m station and ERA5 arm; 100 m others."
+    assert notes[-1] == (
+        "Station: ERA5 at 10 m and at 100 m; the nearest station at 10 m; UKV at 100 m; UKV + its "
+        "own 80 m wind at 100 m and 80 m; UKV + nearest station at 100 m and the station's 10 m."
+    )
     assert not any("planned contrasts were written" in note for note in notes)
     (caveat,) = module.block_caveats()
     assert caveat.startswith("Caveat on the ICON-DREAM-EU block: planned contrasts were written")
@@ -295,9 +300,9 @@ def test_figure_1_says_overlap_does_not_show_equality_and_figure_2_says_where_er
     )
 
     first = _subtitle(figure=leaderboard)
-    assert (
-        "Overlapping intervals do not show that two arms are equal; Figure 2 tests each difference."
-    ) in first
+    assert "Overlapping intervals do not show that two arms are equal." in first
+    assert "Figure 2 tests each difference against ERA5 and each planned contrast" in first
+    assert "ICON-D2 against UKV is exploratory and is in Figure 8." in first
     assert "do not make two arms equal" not in first
     assert "Each arm's own error is in Figure 1." in _subtitle(figure=contrasts)
 
@@ -444,3 +449,47 @@ def test_the_contrast_figure_says_the_plans_100_m_icon_contrasts_are_not_drawn()
         "The ICON contrasts that the study plan specified at 100 m are reported on the page, not "
         "drawn here." in json.dumps(figure.to_dict())
     )
+
+
+def test_both_figures_carry_the_three_product_caveats_with_their_figure_pointers() -> None:
+    # Catches a caveat dropped from either figure, or a pointer that stops following the map.
+    module = _load()
+    leaderboard = module.leaderboard_figure(blocks=[_leaderboard_block()], shares=_all_shares())
+    contrasts = module.contrasts_figure(
+        blocks=[_block(reference_name="ERA5")], shares=_all_shares(), intervals=_intervals(rows=[])
+    )
+
+    for figure in (leaderboard, contrasts):
+        text = _subtitle(figure=figure)
+        assert "ICON-D2 does not cover western Great Britain" in text
+        assert "(Figure 3)" in text
+        assert "not statistically significant (Figure 9)" in text
+        assert "-0.06 points [-0.24, +0.15]" in text
+        assert "(Figure 12)" in text
+
+
+def test_figure_2_states_the_chance_rate_and_defines_planned_and_post_hoc_rows() -> None:
+    module = _load()
+    contrasts = module.contrasts_figure(
+        blocks=[_block(reference_name="ERA5")], shares=_all_shares(), intervals=_intervals(rows=[])
+    )
+
+    text = _subtitle(figure=contrasts)
+
+    assert "About 1 in 20 exploratory contrasts reaches significance" in text
+    assert "17 to 26 resampled calendar months" in text
+    assert "written down before that block's own arms were fitted" in text
+    assert "switched from 100 m to 80 m after the first run" in text
+    assert "written into the study plan before any result existed" not in text
+
+
+def test_no_wind_caption_line_runs_past_the_caption_width() -> None:
+    # Catches a long line that reaches the figure's right edge and clips.
+    module = _load()
+    leaderboard = module.leaderboard_figure(blocks=[_leaderboard_block()], shares=_all_shares())
+
+    lines = leaderboard.to_dict()["title"]["subtitle"]
+
+    # The figure helper appends the reference-row note after the lines this script narrows.
+    narrowed = [line for line in lines if not line.startswith("Lighter, hollow rows")]
+    assert max(len(line) for line in narrowed) <= module.CAPTION_CHARACTERS

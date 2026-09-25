@@ -51,6 +51,7 @@ from studies.charts import (
     RowSetBlock,
     stacked_contrasts,
     stacked_leaderboard,
+    wrapped,
 )
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
@@ -143,6 +144,20 @@ WIND_SECOND_SETTING_NOTE: Final[str] = (
     "and post hoc contrasts, and for contrasts near the 5% line where both arms have "
     "second-setting losses."
 )
+PLANNING_NOTE: Final[str] = (
+    "Planned: a comparison written down before that block's own arms were fitted, in the study "
+    "plan for the main, ECMWF, and station blocks, and after the main block's five products were "
+    "scored for the ICON-DREAM-EU block. Post hoc: a planned comparison whose ICON arm was "
+    "switched from 100 m to 80 m after the first run. Every other row is exploratory."
+)
+"""The caption line defining planned and post hoc rows, with the ICON-DREAM-EU block's plan."""
+CHANCE_NOTE: Final[str] = (
+    "About 1 in 20 exploratory contrasts reaches significance at the 5% level by chance. Each "
+    "interval rests on 17 to 26 resampled calendar months, depending on the block, so the "
+    "intervals are likely somewhat narrow."
+)
+CAPTION_CHARACTERS: Final[int] = 100
+"""The characters a wind caption line holds, fewer than the default so no line reaches the edge."""
 EACH_ARM_ERROR_NOTE: Final[str] = "Each arm's own error is in Figure {number}."
 
 
@@ -191,6 +206,30 @@ def block_notes() -> list[str]:
     return ["Wind heights of each block's arms:", *heights]
 
 
+def wind_product_caveats() -> list[str]:
+    """State three caveats on the ranking of the weather products, each with a pointer.
+
+    Returns:
+        One caption line for each of ICON-D2's coverage, ICON global's steps, and HRES's lead.
+    """
+    return [
+        (
+            "ICON-D2 does not cover western Great Britain: its western edge runs from about "
+            f"2\u00b0W to about 2.5\u00b0W (Figure {WIND_FIGURE_NUMBERS['domains']})."
+        ),
+        (
+            "ICON global's worse-than-ERA5 result is mostly a pair of steps in its served wind at "
+            "one generator. Once the XGBoost models are told where the steps fall, the difference "
+            f"is not statistically significant (Figure {WIND_FIGURE_NUMBERS['icon_global_steps']})."
+        ),
+        (
+            "HRES's planned lead over ERA5 is fragile: HRES minus ERA5 is -0.06 points "
+            "[-0.24, +0.15] when the XGBoost model trains across IFS Cycle 49r1 without an era "
+            f"cut (Figure {WIND_FIGURE_NUMBERS['reconciliation']})."
+        ),
+    ]
+
+
 def block_caveats() -> list[str]:
     """State each block's caveat on a caption line of its own, naming the block it is about.
 
@@ -202,6 +241,11 @@ def block_caveats() -> list[str]:
         for row_set in ROW_SETS
         if BLOCK_SETTINGS[row_set.key].note
     ]
+
+
+def _narrow(*, lines: list[str]) -> list[str]:
+    """Wrap each caption line at `CAPTION_CHARACTERS`, which keeps it inside the figure's edge."""
+    return [piece for line in lines for piece in wrapped(text=line, width=CAPTION_CHARACTERS)]
 
 
 def _excludes_zero(*, lower: float, upper: float) -> bool:
@@ -363,23 +407,29 @@ def leaderboard_figure(
         blocks=blocks,
         number=WIND_FIGURE_NUMBERS["leaderboard"],
         title="Mean absolute error of each weather product's wind, on four row sets",
-        subtitle=[
-            "Each arm's own mean absolute error, sorted best first within its block.",
-            BLOCKS_NOT_COMPARABLE,
-            (
-                "Overlapping intervals do not show that two arms are equal; Figure "
-                f"{WIND_FIGURE_NUMBERS['contrasts']} tests each difference. The intervals are wide "
-                "mainly because every arm's error swings together from month to month, a swing "
-                f"that Figure {WIND_FIGURE_NUMBERS['contrasts']}'s paired contrasts cancel."
-            ),
-            STATION_SCOPE,
-            *uncovered_month_note(shares=shares),
-            *block_caveats(),
-            *block_notes(),
-            DOTS,
-            CAPACITY,
-            SCOPE,
-        ],
+        subtitle=_narrow(
+            lines=[
+                "Each arm's own mean absolute error, sorted best first within its block.",
+                BLOCKS_NOT_COMPARABLE,
+                (
+                    "Overlapping intervals do not show that two arms are equal. Figure "
+                    f"{WIND_FIGURE_NUMBERS['contrasts']} tests each difference against ERA5 and "
+                    "each "
+                    "planned contrast; ICON-D2 against UKV is exploratory and is in Figure "
+                    f"{WIND_FIGURE_NUMBERS['icon_d2_leads']}. The intervals are wide "
+                    "mainly because every arm's error swings together from month to month, a swing "
+                    f"that Figure {WIND_FIGURE_NUMBERS['contrasts']}'s paired contrasts cancel."
+                ),
+                STATION_SCOPE,
+                *wind_product_caveats(),
+                *uncovered_month_note(shares=shares),
+                *block_caveats(),
+                *block_notes(),
+                DOTS,
+                CAPACITY,
+                SCOPE,
+            ]
+        ),
         reference_note=REFERENCE_ROW_NOTE,
     )
 
@@ -395,27 +445,32 @@ def contrasts_figure(
         blocks=blocks,
         number=WIND_FIGURE_NUMBERS["contrasts"],
         title="Each arm's mean absolute error minus ERA5's, and each row set's planned contrasts",
-        subtitle=[
-            (
-                "Top panel of each block: each arm's mean absolute error minus the reference "
-                "arm's. Lower panel: that row set's planned contrasts, the first arm's error minus "
-                "the second's; each row names both arms."
-            ),
-            EACH_ARM_ERROR_NOTE.format(number=WIND_FIGURE_NUMBERS["leaderboard"]),
-            UNDRAWN_PLANNED_ICON_NOTE,
-            BLOCKS_NOT_COMPARABLE,
-            STATION_SCOPE,
-            *uncovered_month_note(shares=shares),
-            *block_caveats(),
-            *block_notes(),
-            *significance_change_notes(intervals=intervals),
-            DOTS,
-            CAPACITY,
-            SCOPE,
-        ],
+        subtitle=_narrow(
+            lines=[
+                (
+                    "Top panel of each block: each arm's mean absolute error minus the reference "
+                    "arm's. Lower panel: that row set's planned contrasts, the first arm's error "
+                    "minus the second's; each row names both arms."
+                ),
+                EACH_ARM_ERROR_NOTE.format(number=WIND_FIGURE_NUMBERS["leaderboard"]),
+                UNDRAWN_PLANNED_ICON_NOTE,
+                BLOCKS_NOT_COMPARABLE,
+                STATION_SCOPE,
+                *wind_product_caveats(),
+                CHANCE_NOTE,
+                *uncovered_month_note(shares=shares),
+                *block_caveats(),
+                *block_notes(),
+                *significance_change_notes(intervals=intervals),
+                DOTS,
+                CAPACITY,
+                SCOPE,
+            ]
+        ),
         reference_note=CONTRAST_REFERENCE_ROW_NOTE,
         colour_by_family=True,
         second_setting_note=WIND_SECOND_SETTING_NOTE,
+        planning_note=PLANNING_NOTE,
     )
 
 

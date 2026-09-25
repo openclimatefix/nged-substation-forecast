@@ -1185,6 +1185,7 @@ def figure(
     subtitle: Sequence[str],
     figure_planning: PlanningType | None,
     post_hoc: bool = False,
+    planning_note: str | None = None,
 ) -> alt.VConcatChart:
     """Stack panels, one above the other, under a "Figure N:" caption.
 
@@ -1202,12 +1203,17 @@ def figure(
             exploratory rows to describe.
         post_hoc: Whether any row ends in `POST_HOC_SUFFIX`, which swaps a `mixed` figure's line
             for `POST_HOC_PLANNING_NOTE`.
+        planning_note: A line that replaces the `PLANNING_NOTES` or `POST_HOC_PLANNING_NOTE` line
+            whenever the figure has one, for a figure whose planned rows need a definition of their
+            own.
 
     Returns:
         The figure.
     """
     note = (
-        POST_HOC_PLANNING_NOTE
+        planning_note
+        if planning_note is not None and figure_planning is not None
+        else POST_HOC_PLANNING_NOTE
         if post_hoc and figure_planning == "mixed"
         else None
         if figure_planning is None
@@ -1722,6 +1728,7 @@ def stacked_contrasts(
     reference_note: str = CONTRAST_REFERENCE_ROW_NOTE,
     colour_by_family: bool = False,
     second_setting_note: str = SECOND_SETTING_NOTE,
+    planning_note: str | None = None,
 ) -> alt.VConcatChart:
     """Stack, per row set, a panel of contrasts against ERA5 and a panel of planned contrasts.
 
@@ -1749,6 +1756,8 @@ def stacked_contrasts(
             scale.
         second_setting_note: The caption line explaining the hollow second-setting marker, for a
             figure whose rule for showing one differs from `SECOND_SETTING_NOTE`'s.
+        planning_note: The caption line defining planned and post hoc rows, where the default of
+            `figure` does not fit the figure.
 
     Returns:
         The figure.
@@ -1813,4 +1822,5 @@ def stacked_contrasts(
         subtitle=[*subtitle, *notes],
         figure_planning=figure_planning,
         post_hoc=post_hoc,
+        planning_note=planning_note,
     )
