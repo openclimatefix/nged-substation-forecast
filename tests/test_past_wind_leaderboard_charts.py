@@ -307,6 +307,7 @@ def test_the_second_setting_line_names_post_hoc_contrasts_and_the_both_arms_cond
     # losses a contrast near the 5% line needs.
     module = _load()
     block = _block(reference_name="ERA5")
+    assert block.planned_rows is not None
     block = block._replace(
         planned_rows=block.planned_rows.with_columns(second_difference=pl.lit(-0.05))
     )
@@ -409,6 +410,7 @@ def test_a_block_with_post_hoc_rows_titles_its_planned_panel_planned_and_post_ho
     # planned rows that gains the post hoc wording.
     module = _load()
     plain = _block(reference_name="ERA5")
+    assert plain.planned_rows is not None
     marked = plain._replace(
         planned_rows=plain.planned_rows.with_columns(
             label=pl.col("label") + " (post hoc)", planned=pl.lit(value=False)

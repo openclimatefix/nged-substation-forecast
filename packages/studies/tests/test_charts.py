@@ -1584,12 +1584,20 @@ def test_stacked_contrasts_takes_its_own_second_setting_note_and_defaults_to_the
     # shared note.
     blocks = _blocks_with_planned(second=True)
 
-    def caption(**extra: object) -> str:
-        spec = stacked_contrasts(
-            blocks=blocks, number=2, title="A title", subtitle=["A subtitle."], **extra
-        ).to_dict()  # ty: ignore[invalid-argument-type]
+    def joined(spec: dict) -> str:
         return " ".join(spec["title"]["subtitle"])
 
-    assert SECOND_SETTING_NOTE in caption()
-    assert "A custom note." in caption(second_setting_note="A custom note.")
-    assert SECOND_SETTING_NOTE not in caption(second_setting_note="A custom note.")
+    default = stacked_contrasts(
+        blocks=blocks, number=2, title="A title", subtitle=["A subtitle."]
+    ).to_dict()
+    custom = stacked_contrasts(
+        blocks=blocks,
+        number=2,
+        title="A title",
+        subtitle=["A subtitle."],
+        second_setting_note="A custom note.",
+    ).to_dict()
+
+    assert SECOND_SETTING_NOTE in joined(default)
+    assert "A custom note." in joined(custom)
+    assert SECOND_SETTING_NOTE not in joined(custom)
