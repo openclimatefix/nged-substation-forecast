@@ -1565,7 +1565,8 @@ def aifs_contrast_rows(*, losses: pl.DataFrame, row_set: str) -> pl.DataFrame:
         row_set: `single` or `ens`.
 
     Returns:
-        `contrast_rows`'s frame, with the deciding contrast planned and every other exploratory.
+        `contrast_rows`'s frame, every row exploratory, the deciding contrast's label starting
+        `Deciding: `. No AIFS contrast was written into the published plan, so none is planned.
     """
     by_name = by_setting(losses=losses)
     frames = []
@@ -1573,9 +1574,10 @@ def aifs_contrast_rows(*, losses: pl.DataFrame, row_set: str) -> pl.DataFrame:
         frame = contrast_rows(
             losses_by_setting=by_name,
             specs=[ContrastSpec(contrast.label, contrast.treatment, contrast.reference)],
-            planned=contrast.label == "deciding",
+            planned=False,
         ).with_columns(
             label=pl.lit(
+                f"{'Deciding: ' if contrast.label == 'deciding' else ''}"
                 f"{AIFS_ARM_LABELS[contrast.treatment]} minus {AIFS_ARM_LABELS[contrast.reference]}"
             )
         )
