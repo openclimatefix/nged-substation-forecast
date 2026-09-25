@@ -36,7 +36,8 @@ of reads, so a month per file would put 1.5 TB at risk. Each (variable, lead tim
 one task in a pool of `--workers` threads (default 16), retried with exponential backoff on any
 error. A missing chunk does not raise in Zarr version 3 (it reads as the fill value, NaN), so a
 slice that is entirely NaN is treated as a failed read. A run whose `success` marker object is
-absent is skipped and recorded in the lineage note rather than raised. The final file is built from
+absent, and a wanted run the bucket does not list, are skipped and recorded in the lineage note
+rather than raised. The final file is built from
 this invocation's runs with `scan_parquet` and `sink_parquet`, after checking that every run file
 records the same grid hash.
 
@@ -77,7 +78,7 @@ import xarray as xr
 from delta_store.precision import round_to_significand_bits
 from fetch_dynamical_zarr import _axis_column
 from lineage import write_lineage_note, write_readme
-from paths import WEATHER_DOWNLOADS_DIR, load_trial_area_box
+from paths import WEATHER_DOWNLOADS_DIR, TrialAreaBox, load_trial_area_box
 
 BUCKET_PREFIX: Final[str] = (
     "weathernext3_statistics_spatial/weathernext_3_0_0_statistics/zarr/2026_to_present"
@@ -114,6 +115,18 @@ BACKOFF_SECONDS: Final[float] = 5.0
 """Base of the exponential backoff: the first retry sleeps twice this (10 s), the next four
 times."""
 
+NON_RETRYABLE_ERRORS: Final[tuple[type[Exception], ...]] = (
+    AssertionError,
+    KeyError,
+    FileNotFoundError,
+    ValueError,
+)
+"""Errors that repeating the call cannot fix: a failed store assertion, a missing key or file, and
+this module's own `ValueError`s (an all-NaN slice, a mismatched grid)."""
+
+INTERRUPTED_EXIT_CODE: Final[int] = 130
+"""The shell's conventional exit code for a process ended by Ctrl-C."""
+
 LONG_RUN_LEADS: Final[int] = 360
 SHORT_RUN_LEADS: Final[int] = 48
 LONG_RUN_HOURS: Final[frozenset[int]] = frozenset({0, 6, 12, 18})
@@ -132,6 +145,18 @@ EGRESS_USD_PER_GB: Final[float] = 0.12
 _METADATA_ZONE_URL: Final[str] = "http://metadata.google.internal/computeMetadata/v1/instance/zone"
 _METADATA_TIMEOUT_SECONDS: Final[float] = 2.0
 _BYTES_PER_MB: Final[float] = 1e6
+
+
+def _describe(*, error: Exception) -> str:
+    """Return what may be printed about `error`: its type name, plus the message of an assertion.
+
+    The message of an `AssertionError` is a fixed string written in this module, with no data
+    value, coordinate, or count. The message of any other exception can carry an account name, the
+    billing project, or the crop's shape.
+    """
+    if isinstance(error, AssertionError):
+        return f"AssertionError: {error}"
+    return type(error).__name__
 
 
 def _estimated_gb(*, init_hour: int) -> float:
@@ -190,10 +215,11 @@ def _filesystem() -> gcsfs.GCSFileSystem:
 def _with_retries[T](*, action: Callable[[], T], label: str, what: str) -> T:
     """Call `action`, retrying with exponential backoff on any failure.
 
-    A transient network error partway through a run would otherwise abandon 50 GB of reads. The
-    first sleep is 10 s and each later one doubles. Each retry prints the run label, what was being
-    done, the attempt number, and the exception's type name only, because an exception message can
-    carry a request URL, an account name, or the billing project.
+    A transient network error partway through a run would otherwise abandon 50 GB of reads. An error
+    in `NON_RETRYABLE_ERRORS` is deterministic, so it is raised at once. The first sleep is 10 s and
+    each later one doubles. Each retry prints the run label, what was being done, the attempt
+    number, and the exception's type name only, because an exception message can carry a request
+    URL, an account name, or the billing project.
 
     Args:
         action: The call to make.
@@ -204,23 +230,27 @@ def _with_retries[T](*, action: Callable[[], T], label: str, what: str) -> T:
         Whatever `action` returns.
 
     Raises:
-        Exception: The last error, after `MAX_ATTEMPTS` failed attempts.
+        Exception: The last error, after `MAX_ATTEMPTS` failed attempts, or at once for an error in
+            `NON_RETRYABLE_ERRORS`.
     """
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
             return action()
+        except NON_RETRYABLE_ERRORS:
+            raise
         except Exception as error:
             if attempt == MAX_ATTEMPTS:
                 raise
-            print(
-                f"{label}: {what} attempt {attempt} failed ({type(error).__name__}); retrying",
-                flush=True,
-            )
-            time.sleep(BACKOFF_SECONDS * 2**attempt)
-    raise AssertionError  # unreachable: the loop returns or raises
+            error_name = type(error).__name__
+        # The backoff sleeps outside the `except` block, so a Ctrl-C during the sleep does not
+        # chain the original error, whose message can carry the billing project or an account.
+        print(f"{label}: {what} attempt {attempt} failed ({error_name}); retrying", flush=True)
+        time.sleep(BACKOFF_SECONDS * 2**attempt)
+    message = "unreachable: the loop returns or raises"
+    raise AssertionError(message)
 
 
-def _crop_indices(*, dataset: xr.Dataset) -> tuple[np.ndarray, np.ndarray]:
+def _crop_indices(*, dataset: xr.Dataset, box: TrialAreaBox) -> tuple[np.ndarray, np.ndarray]:
     """Return the latitude and longitude positions inside the trial-area box.
 
     The store's longitude axis is 0 to 360, so it is converted to signed degrees before the
@@ -229,11 +259,11 @@ def _crop_indices(*, dataset: xr.Dataset) -> tuple[np.ndarray, np.ndarray]:
 
     Args:
         dataset: A run store, still lazy.
+        box: The trial-area box.
 
     Returns:
         The latitude positions and the longitude positions to pass to one `.isel()`.
     """
-    box = load_trial_area_box()
     latitudes = dataset[LATITUDE_DIM].to_numpy()
     signed_longitudes = (dataset[LONGITUDE_DIM].to_numpy() + 180.0) % 360.0 - 180.0
     lat_positions = np.flatnonzero((latitudes >= box.lat_min) & (latitudes <= box.lat_max))
@@ -244,16 +274,16 @@ def _crop_indices(*, dataset: xr.Dataset) -> tuple[np.ndarray, np.ndarray]:
     return lat_positions, lon_positions
 
 
-def _open_cropped(*, fs: gcsfs.GCSFileSystem, run_name: str) -> xr.Dataset:
+def _open_cropped(*, fs: gcsfs.GCSFileSystem, run_name: str, box: TrialAreaBox) -> xr.Dataset:
     """Open one run's store lazily and crop it to the box, keeping the seven `VARIABLES`.
 
     Asserts, before any chunk is read, that every variable's fill value is NaN, that `lead_time`
     decodes to a timedelta, that latitude ascends, and that the store's `datetime` coordinate
-    equals `init_time + lead_time` at every lead.
+    equals `init_time + lead_time` at every lead. The store has no consolidated metadata.
     """
     path = f"{BUCKET_PREFIX}/{run_name}/predictions.zarr"
     dataset = xr.open_zarr(
-        fs.get_mapper(path), chunks=None, consolidated=None, decode_timedelta=True
+        fs.get_mapper(path), chunks=None, consolidated=False, decode_timedelta=True
     )
     for variable in VARIABLES:
         fill_value = dataset[variable].encoding.get("_FillValue")
@@ -264,7 +294,7 @@ def _open_cropped(*, fs: gcsfs.GCSFileSystem, run_name: str) -> xr.Dataset:
         dataset["datetime"].to_numpy()
         == dataset["init_time"].to_numpy() + dataset["lead_time"].to_numpy()
     ), "datetime is not init_time + lead_time"
-    lat_positions, lon_positions = _crop_indices(dataset=dataset)
+    lat_positions, lon_positions = _crop_indices(dataset=dataset, box=box)
     cropped = dataset[list(VARIABLES)].isel(
         {LATITUDE_DIM: lat_positions, LONGITUDE_DIM: lon_positions}
     )
@@ -432,6 +462,23 @@ def _candidate_runs(
     )
 
 
+def _unlisted_runs(
+    *, start: date, end: date | None, init_hours: list[int], listed: set[str]
+) -> list[str]:
+    """Return the `YYYYMMDD_HH` label of every wanted run in the window that the bucket lacks.
+
+    The window ends at `end`, or at the newest listed run's date.
+    """
+    parsed = {run for name in listed if (run := _parse_run_name(name=name)) is not None}
+    last = end or max(day for day, _ in parsed)
+    return [
+        f"{day:%Y%m%d}_{hour:02d}"
+        for day in (start + timedelta(days=offset) for offset in range((last - start).days + 1))
+        for hour in sorted(init_hours)
+        if (day, hour) not in parsed
+    ]
+
+
 def _write_documentation(
     *,
     output_dir: Path,
@@ -439,6 +486,7 @@ def _write_documentation(
     last_init: str,
     used_paths: list[Path],
     skipped: list[str],
+    not_published: list[str],
     fingerprint: dict[str, str],
     rows: int,
     size_mb: float,
@@ -451,6 +499,7 @@ def _write_documentation(
         last_init: The latest `init_time` fetched, ISO format.
         used_paths: The run files combined.
         skipped: Labels of runs skipped because their `success` marker is missing.
+        not_published: Labels of wanted runs in the window that the bucket does not list.
         fingerprint: The crop's cell count and hash (private, lineage only).
         rows: Row count of the combined file (private, lineage only).
         size_mb: Size of the combined file, MB.
@@ -469,6 +518,7 @@ def _write_documentation(
             "last_init_time": last_init,
             "runs_cached": [path.stem for path in used_paths],
             "runs_skipped_missing_success_marker": skipped,
+            "runs_skipped_not_published": not_published,
             "rows": rows,
             "output_size_mb": round(size_mb, 2),
             "cell_count": fingerprint["cell_count"],
@@ -548,11 +598,17 @@ def _write_documentation(
 
 
 def _fetch_run(
-    *, fs: gcsfs.GCSFileSystem, run_name: str, label: str, output_dir: Path, workers: int
+    *,
+    fs: gcsfs.GCSFileSystem,
+    run_name: str,
+    label: str,
+    output_dir: Path,
+    workers: int,
+    box: TrialAreaBox,
 ) -> None:
     """Read one run, then checkpoint it to `_run_cache/<label>.parquet` through a `.tmp` rename."""
     dataset = _with_retries(
-        action=lambda: _open_cropped(fs=fs, run_name=run_name), label=label, what="open"
+        action=lambda: _open_cropped(fs=fs, run_name=run_name, box=box), label=label, what="open"
     )
     fingerprint = _cell_fingerprint(dataset=dataset)
     values = _load_run(dataset=dataset, label=label, workers=workers)
@@ -621,6 +677,12 @@ def _run(*, arguments: argparse.Namespace) -> int:
         init_hours=arguments.init_hours,
         listed={Path(entry).name for entry in entries},
     )
+    not_published = _unlisted_runs(
+        start=arguments.start_date,
+        end=arguments.end_date,
+        init_hours=arguments.init_hours,
+        listed={Path(entry).name for entry in entries},
+    )
     directory_name = (
         f"WeatherNext3_window_{arguments.start_date}_{arguments.end_date or 'latest'}"
         if is_window
@@ -657,6 +719,7 @@ def _run(*, arguments: argparse.Namespace) -> int:
         return 1
 
     failed: list[str] = []
+    box = load_trial_area_box()
     for label, run_name, _ in to_fetch:
         try:
             _fetch_run(
@@ -665,10 +728,11 @@ def _run(*, arguments: argparse.Namespace) -> int:
                 label=label,
                 output_dir=output_dir,
                 workers=arguments.workers,
+                box=box,
             )
         except Exception as error:  # noqa: BLE001  # one failed run must not stop the job
             failed.append(label)
-            print(f"{label}: FAILED ({type(error).__name__})", file=sys.stderr, flush=True)
+            print(f"{label}: FAILED ({_describe(error=error)})", file=sys.stderr, flush=True)
     if failed:
         print(f"Failed runs, combine skipped: {', '.join(failed)}", file=sys.stderr)
         return 1
@@ -686,6 +750,7 @@ def _run(*, arguments: argparse.Namespace) -> int:
         last_init=max(inits).isoformat(),
         used_paths=used_paths,
         skipped=skipped,
+        not_published=not_published,
         fingerprint=fingerprint,
         rows=rows,
         size_mb=size_mb,
@@ -697,7 +762,8 @@ def main() -> int:
     """Fetch WeatherNext 3 ensemble-mean runs, cropped to the trial-area box, one run per file.
 
     Any uncaught exception prints only its type name, because a message can carry an account name,
-    the billing project, or the crop's shape.
+    the billing project, or the crop's shape. The message of an `AssertionError` is printed too,
+    because every assertion in this module has a fixed message. Ctrl-C prints only `interrupted`.
     """
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
@@ -720,8 +786,11 @@ def main() -> int:
     arguments = parser.parse_args()
     try:
         return _run(arguments=arguments)
+    except KeyboardInterrupt:
+        print("interrupted", file=sys.stderr)
+        return INTERRUPTED_EXIT_CODE
     except Exception as error:  # noqa: BLE001  # the message can carry the project or an account
-        print(f"FAILED ({type(error).__name__})", file=sys.stderr)
+        print(f"FAILED ({_describe(error=error)})", file=sys.stderr)
         return 1
 
 

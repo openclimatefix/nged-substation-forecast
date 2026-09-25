@@ -10,12 +10,14 @@ or a coordinate,** because those reveal the size of the private trial-area box.
 
 Checks per run file: `init_time` matches the file name; the lead-time axis is 1 to 360 hours in
 steps of 1 hour (48 for a run whose init hour is not 00, 06, 12, or 18 UTC); no duplicate key; no
-null and no `NaN` in any column, because the store documents no missing value; each value inside a
+null, `NaN`, or infinite value in any column, because the store documents no missing value;
+each value inside a
 physical range (`RANGES`); the row count equals the number of leads times the cell count recorded
 in the file's parquet metadata; radiation is near zero for night-time valid hours and positive at
 midday in April to September; and direct radiation does not exceed total radiation by more than a
-small tolerance; and no (variable, lead time) slice is constant across the crop, except dark
-radiation slices. Radiation may dip to -1000 J/m2, because an ensemble mean from a machine-learning
+small tolerance (`ranges` and `direct_le_total` fail above 0.01% of a run's rows, and print that
+percentage); and no (variable, lead time) slice is constant across the crop, except dark
+radiation slices. Radiation may dip to -3600 J/m2, because an ensemble mean from a machine-learning
 weather model can be slightly negative at night. Across runs: every file carries the same grid
 hash; the run labels cover every init hour in the first-to-last date range, except runs that
 `lineage.json` lists as skipped for a missing `success` marker; the combined `WeatherNext3.parquet`
@@ -31,6 +33,7 @@ import argparse
 import hashlib
 import json
 import sys
+from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
@@ -47,9 +50,13 @@ RADIATION_FIELDS: Final[tuple[str, str]] = (TOTAL_RADIATION, DIRECT_RADIATION)
 
 WIND_LIMIT_M_S: Final[float] = 80.0
 MAX_HOURLY_RADIATION_J_M2: Final[float] = 4.0e6
-MIN_HOURLY_RADIATION_J_M2: Final[float] = -1000.0
+MIN_HOURLY_RADIATION_J_M2: Final[float] = -3600.0
 """An ensemble mean from a machine-learning weather model may dip slightly below zero at night, so
-the lower bound allows -1000 J/m2 (a mean of about -0.3 W/m2 over the hour)."""
+the lower bound allows -3600 J/m2 (a mean of -1 W/m2 over the hour)."""
+OFFENDING_ROW_FRACTION_LIMIT: Final[float] = 1e-4
+"""`ranges` and `direct_le_total` fail only when more than 0.01% of a run's rows offend, so that a
+few cells of a machine-learning weather model's noise do not fail a run, while a shifted or
+corrupted field, which offends in far more rows, does."""
 
 RANGES: Final[dict[str, tuple[float, float]]] = {
     "temperature_2m_mean": (230.0, 320.0),
@@ -74,13 +81,14 @@ MIDDAY_MEAN_MINIMUM_J_M2: Final[float] = 100.0 * SECONDS_PER_HOUR
 SUMMER_MONTHS: Final[tuple[int, ...]] = (4, 5, 6, 7, 8, 9)
 DIRECT_EXCESS_FRACTION: Final[float] = 0.01
 DIRECT_EXCESS_FLOOR_J_M2: Final[float] = 1.0 * SECONDS_PER_HOUR
-"""Direct radiation may exceed total radiation by this fraction of total plus this floor (a mean of
-1 W/m2 over the hour), which covers rounding."""
+"""Direct radiation may exceed `max(total, 0)` by this fraction of it plus this floor (a mean of
+1 W/m2 over the hour), which covers rounding and a slightly negative total."""
 
 Results = dict[str, list[str]]
 """Check name mapped to the runs it failed in (empty if the check passed)."""
 
 CHECKS: Final[tuple[str, ...]] = (
+    "readable",
     "init_matches_name",
     "lead_axis",
     "keys",
@@ -103,6 +111,18 @@ def _fail(*, results: Results, check: str, label: str) -> None:
     results.setdefault(check, []).append(label)
 
 
+def _fail_if_many_rows(
+    *, results: Results, check: str, label: str, offending: int, total: int
+) -> None:
+    """Record a failure of `check` if more than `OFFENDING_ROW_FRACTION_LIMIT` of rows offend.
+
+    The failure names the run and the percentage of offending rows, never a count.
+    """
+    fraction = offending / total if total else 0.0
+    if fraction > OFFENDING_ROW_FRACTION_LIMIT:
+        _fail(results=results, check=check, label=f"{label} ({fraction:.3%} of rows)")
+
+
 def _check_axes(*, frame: pl.DataFrame, label: str, results: Results) -> None:
     """Check `init_time` matches the file name, the lead-time axis, and key uniqueness."""
     init_times = frame["init_time"].unique().to_list()
@@ -110,7 +130,10 @@ def _check_axes(*, frame: pl.DataFrame, label: str, results: Results) -> None:
         _fail(results=results, check="init_matches_name", label=label)
     hour = int(label.split("_")[1])
     n_leads = LONG_RUN_LEADS if hour in LONG_RUN_HOURS else SHORT_RUN_LEADS
-    leads = frame["lead_time"].unique().sort().dt.total_hours().to_list()
+    try:
+        leads = frame["lead_time"].unique().sort().dt.total_hours().to_list()
+    except pl.exceptions.PolarsError:  # for example an integer `lead_time`, not a duration
+        leads = []
     if leads != list(range(1, n_leads + 1)):
         _fail(results=results, check="lead_axis", label=label)
     key = ["init_time", "lead_time", "lat_index", "lon_index"]
@@ -119,17 +142,16 @@ def _check_axes(*, frame: pl.DataFrame, label: str, results: Results) -> None:
 
 
 def _check_values(*, frame: pl.DataFrame, label: str, results: Results) -> None:
-    """Check nulls, `NaN`s, and physical ranges of every value column."""
+    """Check nulls, `NaN`s, infinite values, and physical ranges of every value column."""
     for variable in VARIABLES:
-        if frame[variable].null_count() or frame[variable].is_nan().any():
+        column = pl.col(variable)
+        if frame[variable].null_count() or frame.select((~column.is_finite()).any()).item():
             _fail(results=results, check="nulls_and_nan", label=label)
         low, high = RANGES[variable]
-        observed = frame.filter(pl.col(variable).is_finite()).select(
-            low=pl.col(variable).min(), high=pl.col(variable).max()
+        offending = frame.select(((column < low) | (column > high)).sum()).item()
+        _fail_if_many_rows(
+            results=results, check="ranges", label=label, offending=offending, total=frame.height
         )
-        observed_low, observed_high = observed.row(0)
-        if observed_low is not None and (observed_low < low or observed_high > high):
-            _fail(results=results, check="ranges", label=label)
 
 
 def _check_radiation(*, frame: pl.DataFrame, label: str, results: Results) -> None:
@@ -156,12 +178,15 @@ def _check_radiation(*, frame: pl.DataFrame, label: str, results: Results) -> No
         results.setdefault("midday_total", []).append(_SKIPPED)
     elif midday <= MIDDAY_MEAN_MINIMUM_J_M2:
         _fail(results=results, check="midday_total", label=label)
-    excess = valid.filter(
-        pl.col("direct")
-        > pl.col("total") * (1.0 + DIRECT_EXCESS_FRACTION) + DIRECT_EXCESS_FLOOR_J_M2
+    allowed = pl.max_horizontal(pl.col("total"), 0.0) * (1.0 + DIRECT_EXCESS_FRACTION)
+    excess = valid.select((pl.col("direct") > allowed + DIRECT_EXCESS_FLOOR_J_M2).sum()).item()
+    _fail_if_many_rows(
+        results=results,
+        check="direct_le_total",
+        label=label,
+        offending=excess,
+        total=valid.height,
     )
-    if excess.height:
-        _fail(results=results, check="direct_le_total", label=label)
 
 
 def _check_constant_slices(*, frame: pl.DataFrame, label: str, results: Results) -> None:
@@ -182,26 +207,69 @@ def _check_constant_slices(*, frame: pl.DataFrame, label: str, results: Results)
             _fail(results=results, check="constant_slice", label=label)
 
 
+def _guarded(*, results: Results, check: str, label: str, action: Callable[[], None]) -> None:
+    """Call `action`; if it raises, record a failure of `check` and carry on with other checks.
+
+    A malformed run file (a wrong column type, a truncated file) is a finding, not a reason to
+    stop validating. The report names the exception's type only.
+    """
+    try:
+        action()
+    except Exception as error:  # noqa: BLE001  # any failure to run a check is itself a finding
+        _fail(results=results, check=check, label=f"{label} (check raised {type(error).__name__})")
+
+
 def _validate_run(*, path: Path, results: Results) -> str | None:
     """Run every per-run check on one run file; return its grid hash from the parquet metadata."""
     label = path.stem
-    frame = pl.read_parquet(path)
-    metadata = pl.read_parquet_metadata(path)
-    _check_axes(frame=frame, label=label, results=results)
-    _check_values(frame=frame, label=label, results=results)
-    _check_radiation(frame=frame, label=label, results=results)
-    _check_constant_slices(frame=frame, label=label, results=results)
+    try:
+        frame = pl.read_parquet(path)
+        metadata = pl.read_parquet_metadata(path)
+    except Exception as error:  # noqa: BLE001  # an unreadable file is a finding
+        _fail(
+            results=results,
+            check="readable",
+            label=f"{label} ({type(error).__name__})",
+        )
+        return None
+    for check, function in (
+        ("lead_axis", _check_axes),
+        ("nulls_and_nan", _check_values),
+        ("night_total", _check_radiation),
+        ("constant_slice", _check_constant_slices),
+    ):
+        _guarded(
+            results=results,
+            check=check,
+            label=label,
+            action=lambda function=function: function(frame=frame, label=label, results=results),
+        )
+    _guarded(
+        results=results,
+        check="row_count",
+        label=label,
+        action=lambda: _check_row_count(
+            frame=frame, metadata=metadata, label=label, results=results
+        ),
+    )
+    return metadata.get("cell_hash")
+
+
+def _check_row_count(
+    *, frame: pl.DataFrame, metadata: dict[str, str], label: str, results: Results
+) -> None:
+    """Check the rows equal the number of lead times times the recorded cell count."""
     n_cells = int(metadata.get("cell_count", "0"))
     if frame.height != frame["lead_time"].n_unique() * n_cells:
         _fail(results=results, check="row_count", label=label)
-    return metadata.get("cell_hash")
 
 
 def _check_completeness(*, paths: list[Path], product_dir: Path, results: Results) -> None:
     """Check every init hour selected by the files' first-to-last date range has a run file.
 
     The selected hours are the init hours that occur in the file names. A run whose `success`
-    marker was missing is listed in `lineage.json` and is allowed to be absent.
+    marker was missing, and a wanted run the bucket did not list, are listed in `lineage.json` and
+    are allowed to be absent.
     """
     labels = {path.stem for path in paths}
     days = sorted({label.split("_")[0] for label in labels})
@@ -217,7 +285,9 @@ def _check_completeness(*, paths: list[Path], product_dir: Path, results: Result
     skipped: set[str] = set()
     if lineage_path.exists():
         note = json.loads(lineage_path.read_text())
-        skipped = set(note.get("runs_skipped_missing_success_marker", []))
+        skipped = set(note.get("runs_skipped_missing_success_marker", [])) | set(
+            note.get("runs_skipped_not_published", [])
+        )
     missing = sorted(expected - labels - skipped)
     results["complete"] = missing
 
@@ -230,18 +300,27 @@ def _check_combined_and_grid(*, paths: list[Path], product_dir: Path, results: R
     results["combined_rows"] = [] if combined == run_rows else ["all"]
     metadata = pl.read_parquet_metadata(paths[0])
     grid_path = product_dir / "_grid_cells.parquet"
-    grid_ok = False
-    if grid_path.exists():
-        grid = pl.read_parquet(grid_path)
-        latitudes = grid.filter(pl.col("lon_index") == 0).sort("lat_index")["latitude"]
-        longitudes = grid.filter(pl.col("lat_index") == 0).sort("lon_index")["longitude"]
-        digest = hashlib.sha256()
-        digest.update(latitudes.to_numpy().tobytes())
-        digest.update(longitudes.to_numpy().tobytes())
-        grid_ok = str(grid.height) == metadata.get("cell_count") and digest.hexdigest() == (
-            metadata.get("cell_hash")
-        )
+    try:
+        grid_ok = _grid_matches(grid_path=grid_path, metadata=metadata)
+    except Exception as error:  # noqa: BLE001  # a truncated or unreadable file is a finding
+        results["grid_cells_match"] = [f"({type(error).__name__})"]
+        return
     results["grid_cells_match"] = [] if grid_ok else ["all"]
+
+
+def _grid_matches(*, grid_path: Path, metadata: dict[str, str]) -> bool:
+    """Return whether `_grid_cells.parquet` has the recorded cell count and coordinate hash."""
+    if not grid_path.exists():
+        return False
+    grid = pl.read_parquet(grid_path)
+    latitudes = grid.filter(pl.col("lon_index") == 0).sort("lat_index")["latitude"]
+    longitudes = grid.filter(pl.col("lat_index") == 0).sort("lon_index")["longitude"]
+    digest = hashlib.sha256()
+    digest.update(latitudes.to_numpy().tobytes())
+    digest.update(longitudes.to_numpy().tobytes())
+    return str(grid.height) == metadata.get("cell_count") and digest.hexdigest() == (
+        metadata.get("cell_hash")
+    )
 
 
 def main() -> int:

@@ -43,4 +43,4 @@ None beyond running the script. It is a throwaway under `studies/`, like the oth
 
 - The lead axis of the 00 UTC run and the `success` marker's meaning are assumed from two inspected runs; the dry run and validation will confirm them for every run.
 - The VM needs the repository, `uv sync`, and a copy of the private `_trial_area_box.json`. That file is the box's bounds. Copying it to a VM in the maintainer's own project keeps it private; recommendation: do that, and delete the VM afterwards.
-- 4 runs per day is affordable on the VM (about 200 GB per day of reads, no egress) if the study wants it. The default is 00 UTC only.
+- 4 runs per day is affordable on the VM (about 200 GB per day of reads, no egress) if the study wants it. The default is 4 runs a day (00, 06, 12, and 18 UTC).
