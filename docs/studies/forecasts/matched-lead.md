@@ -394,7 +394,7 @@ may therefore sit slightly below where a CPU fit would put it.
 **The ENS numbers at the extra leads are not comparable with the ENS horizons study.** Days 5 and 14
 of ENS, and ICON's day 0, use this study's rows, which start after the IFS Cycle 49r1 change. The
 ENS numbers here are therefore not comparable with the [ENS horizons
-study](ens-horizons.md), whose ENS rows span that change.
+study](ens-horizons.md), whose solar ENS rows span that change.
 <!-- report (extra leads): Device noise floor; Absolute error of every arm fitted here -->
 
 ## Results
