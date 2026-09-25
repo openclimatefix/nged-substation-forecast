@@ -1566,9 +1566,8 @@ icon-eu`, against the runs the German weather service still publishes, which cov
 `check_new_products.py` also reads a single-site hourly 2 m temperature fetch for each of the four
 extra models, a throwaway download not scripted with its own command
 (`sources.temperature_site_b_path_for`); without it, the night-jump table prints only "no positive
-control" and skips each model's row. `check_new_products.py` writes its timing and direct-beam
-checks on all six products the second round adds to `past_weather_v2/product_checks.md`. The extra
-row set's report lands in `past_weather_v2/solar_all/report.md`.
+control" and skips each model's row. The extra row set's report lands in
+`past_weather_v2/solar_all/report.md`.
 
 The ENS row set's `ens_past_solar.py` reads `data/studies/weather/ENS/beam_diffuse_ens.parquet` (no
 fetch needed) and the saved solar dataset that `weather_products.py` writes, and writes its report
