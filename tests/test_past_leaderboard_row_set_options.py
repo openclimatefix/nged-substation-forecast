@@ -168,8 +168,8 @@ def test_a_wind_shaped_report_is_scored_against_its_own_reference_arm(tmp_path: 
 
 def _charts_module() -> Any:
     """Load `past_solar_leaderboard_charts.py`, which reads the report and the intervals."""
-    module = _load()
-    script_dir = Path(module.__file__).parent
+    _load()
+    script_dir = Path(__file__).parent.parent / "studies" / "beam_diffuse_split"
     spec = importlib.util.spec_from_file_location(
         "past_solar_leaderboard_charts", script_dir / "past_solar_leaderboard_charts.py"
     )

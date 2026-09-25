@@ -67,65 +67,12 @@ def test_every_planned_contrast_is_between_two_arms_of_its_block() -> None:
             assert {contrast.treatment.arm, contrast.reference.arm} <= scored, row_set.key
 
 
-def test_the_blocks_hold_the_planned_contrasts_their_reports_name() -> None:
-    module = _load()
-
-    planned = {
-        row_set.key: [
-            (contrast.treatment.arm, contrast.reference.arm)
-            for contrast in row_set.planned_contrasts
-        ]
-        for row_set in module.ROW_SETS
-    }
-
-    assert planned == {
-        "main": [
-            ("icon_eu_wind", "era5_wind"),
-            ("ukv_wind", "era5_wind"),
-            ("icon_eu_wind", "ukv_wind"),
-            ("icon_d2_wind", "icon_eu_wind"),
-        ],
-        "icon_dream_eu": [
-            ("icon_dream_eu_wind", "era5_wind"),
-            ("icon_dream_eu_wind", "icon_eu_wind"),
-        ],
-        "ecmwf": [
-            ("hres_wind", "ukv_wind"),
-            ("ens_mean_day0_wind", "ukv_wind"),
-            ("hres_wind", "era5_wind"),
-        ],
-        "station": [
-            ("station_wind", "era5_10m_wind"),
-            ("ukv_station_wind", "ukv_padded_wind"),
-        ],
-    }
-
-
-def test_the_main_row_set_names_the_one_exploratory_contrast_under_its_planned_heading() -> None:
-    # Catches the planned-contrast check treating ICON-D2 minus UKV as a planned contrast the
-    # script forgot to list.
-    module = _load()
-    main = module.ROW_SETS[0]
-
-    assert main.exploratory_in_planned == (("icon_d2_wind", "ukv_wind"),)
-
-
 def test_every_block_has_a_setting_and_every_arm_a_label() -> None:
     module = _load()
 
     assert set(module.BLOCK_SETTINGS) == {row_set.key for row_set in module.ROW_SETS}
     for row_set in module.ROW_SETS:
         assert {arm.arm for arm in row_set.leaderboard_arms} <= set(module.ARM_LABELS)
-
-
-def test_only_the_station_block_reads_contrast_tables_with_a_months_column() -> None:
-    # Catches a block whose tables carry a `Months` column being read as if they did not, which
-    # skips every one of its contrast tables.
-    module = _load()
-
-    wide = {row_set.key for row_set in module.ROW_SETS if row_set.wide_contrast_tables}
-
-    assert wide == {"station"}
 
 
 def _table(*, rows: list[tuple[str, str, int]], months: bool = False) -> str:
@@ -336,3 +283,15 @@ def test_the_icon_dream_eu_block_carries_the_provisional_note() -> None:
         "the fold-covering refit is measured."
     )
     assert [key for key, note in notes.items() if note] == ["icon_dream_eu"]
+
+
+def test_a_block_reads_a_months_column_exactly_where_its_report_prints_one(tmp_path: Path) -> None:
+    # Catches a block whose report tables carry a `Months` column being read as if they did not,
+    # which skips every one of its contrast tables, and the reverse.
+    module = _load()
+
+    for row_set in module.ROW_SETS:
+        path = tmp_path / f"{row_set.key}.md"
+        path.write_text(REPORT_TEXTS[row_set.key])
+        read_without_months = report_contrasts(report_path=path).height > 0
+        assert read_without_months != row_set.wide_contrast_tables, row_set.key

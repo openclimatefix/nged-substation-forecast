@@ -109,14 +109,55 @@ def test_the_contrast_figure_names_the_arm_the_station_block_is_against() -> Non
     assert "ICON-D2 against UKV" in spec
 
 
-def test_the_figures_carry_their_numbers_from_the_wind_map() -> None:
-    # Catches a title number typed by hand: leaderboard is Figure 1 and contrasts Figure 2.
+def _leaderboard_block() -> RowSetBlock:
+    rows = pl.DataFrame(
+        {
+            "arm": ["icon_d2_wind", "ukv_wind"],
+            "label": ["ICON-D2", "UKV"],
+            "family": ["weather model", "weather model"],
+            "reference": [False, False],
+            "planned": [False, False],
+            "value": [8.0, 8.4],
+            "lower_95": [7.0, 7.4],
+            "upper_95": [9.0, 9.4],
+        }
+    )
+    return RowSetBlock("Main", "August 2024", 8, rows, hours_unit="farm-hours")
+
+
+def _title_and_cross_reference(*, figure: object) -> tuple[str, str]:
+    """Return a figure's title text and the whole spec, as JSON."""
+    spec = json.dumps(figure.to_dict(), ensure_ascii=False)  # ty: ignore[unresolved-attribute]
+    title = spec[spec.index("Figure ") :].split(":")[0]
+    return title, spec
+
+
+def test_each_figure_carries_its_own_number_from_the_wind_map(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # Catches a title number typed by hand, and a leaderboard figure that takes the contrasts
+    # figure's number: the two figures' numbers are asserted apart, under the real map and under
+    # a map with both numbers changed.
     module = _load()
-    blocks = [_block(reference_name="ERA5")]
+    leaderboard = module.leaderboard_figure(blocks=[_leaderboard_block()], shares=ALL_SHARES)
+    contrasts = module.contrasts_figure(blocks=[_block(reference_name="ERA5")], shares=ALL_SHARES)
 
-    leaderboard = str(module.contrasts_figure(blocks=blocks, shares=ALL_SHARES).to_dict())
+    leaderboard_title, leaderboard_spec = _title_and_cross_reference(figure=leaderboard)
+    contrasts_title, _ = _title_and_cross_reference(figure=contrasts)
 
-    assert "Figure 2:" in leaderboard
+    assert leaderboard_title == "Figure 1"
+    assert contrasts_title == "Figure 2"
+    assert "Figure 2's paired contrasts" in leaderboard_spec
+    monkeypatch.setitem(module.WIND_FIGURE_NUMBERS, "leaderboard", 7)
+    monkeypatch.setitem(module.WIND_FIGURE_NUMBERS, "contrasts", 9)
+    moved_leaderboard = module.leaderboard_figure(blocks=[_leaderboard_block()], shares=ALL_SHARES)
+    moved_contrasts = module.contrasts_figure(
+        blocks=[_block(reference_name="ERA5")], shares=ALL_SHARES
+    )
+    moved_title, moved_spec = _title_and_cross_reference(figure=moved_leaderboard)
+    assert moved_title == "Figure 7"
+    assert "Figure 9's paired contrasts" in moved_spec
+    assert _title_and_cross_reference(figure=moved_contrasts)[0] == "Figure 9"
 
 
 def test_no_block_title_carries_a_wind_height_or_runs_past_70_characters() -> None:
