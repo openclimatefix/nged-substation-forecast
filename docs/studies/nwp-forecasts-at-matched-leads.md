@@ -7,14 +7,15 @@ model, one product's weather forecast and scores the power forecast it makes as 
 error, in percentage points of the generator's capacity. A difference is the first product's error
 minus the second's, so a positive difference means the first product forecasts worse. Each bracketed
 pair is a 95% interval. The four single products are the Met Office's UK variable-resolution model
-(UKV), the German weather service's (DWD's) ICON-EU, the National Oceanic and Atmospheric
-Administration's (NOAA's) Global Ensemble Forecast System (GEFS), and ECMWF's own single-run 0.25°
-Integrated Forecasting System (IFS 0.25°). The study also tests blends of ENS with ICON-EU and IFS
-0.25°. The study reads the products in three ways: UKV, ICON-EU, and IFS 0.25° are single
-deterministic runs read at one grid point, ENS is a 51-member mean averaged over an H3 cell (one
-hexagon of the H3 global hexagonal grid), and GEFS is a 31-member mean read at the nearest 0.25°
-cell. The live lead of UKV and ICON-EU is unmeasured, and would probably strengthen the verdicts
-against UKV and ICON-EU. The effect of the live lead on the blends was not tested.
+(UKV), ICON-EU from the German weather service's (DWD's) Icosahedral Nonhydrostatic (ICON) model
+family, the National Oceanic and Atmospheric Administration's (NOAA's) Global Ensemble Forecast
+System (GEFS), and ECMWF's own single-run 0.25° Integrated Forecasting System (IFS 0.25°). The study
+also tests blends of ENS with ICON-EU and IFS 0.25°. The study reads the products in three ways:
+UKV, ICON-EU, and IFS 0.25° are single deterministic runs read at one grid point, ENS is a 51-member
+mean averaged over an H3 cell (one hexagon of the H3 global hexagonal grid), and GEFS is a 31-member
+mean read at the nearest 0.25° cell. The live lead of UKV and ICON-EU is unmeasured, and would
+probably strengthen the verdicts against UKV and ICON-EU. The effect of the live lead on the blends
+was not tested.
 
 **For solar power, ENS beat UKV, ICON-EU, and GEFS, and a blend gained only at an optimistic
 lead.** The XGBoost model's error given UKV's day-1 forecast, minus its error given ENS's day-1
@@ -535,9 +536,9 @@ solar error only at the optimistic lead.**
 the verdict because a live service could have read every value it adds.** Each blend gives one
 XGBoost model the ENS day-1 columns plus the ICON-EU and IFS 0.25° columns. Both blends are
 planned. Every value P4b adds comes from a run published before the 09:00 UTC issue time. P4a's
-IFS 0.25° day-1 value can come from a 06, 12, or 18 UTC run, and only the later two of those runs
-are published after that issue time, so P4a may use weather that a live service could not have
-read. Each blend is compared with ENS alone at day 1, and with a permutation control
+IFS 0.25° day-1 value can come from a 06, 12, or 18 UTC run. The 12 and 18 UTC runs are published
+after that issue time, so P4a may use weather that a live service could not have read. Each blend
+is compared with ENS alone at day 1, and with a permutation control
 that has the same columns with the two added products' weather shuffled among hours of the same
 generator, year-month, and UTC hour of day.
 <!-- report: Solar / P4, the blend; Wind / P4, the blend -->
@@ -556,11 +557,11 @@ generator, year-month, and UTC hour of day.
 
 **For wind, the blend lowers the day-ahead error even at the conservative lead, and the guard
 confirms that the gain comes from the added weather.** P4b is -0.184 points [-0.282, -0.087] at the
-primary setting and -0.197 points [-0.311, -0.088] at the sensitivity setting. Its guard is negative
-and significant at both settings. Neither wind control is significantly worse than ENS alone, so a
-blend that beats its control is a blend that adds real information. The wind blend verdict is
-"lowers the day-ahead error". At the primary setting the P4a blend has an error of 7.771% [6.839,
-8.834] and the P4b blend 8.243% [7.299, 9.277], against 8.427% for ENS alone.
+primary setting and -0.197 points [-0.311, -0.088] at the sensitivity setting. P4b's guard is
+negative and significant at both settings. Neither wind control is significantly worse than ENS
+alone, so a blend that beats its control is a blend that adds real information. The wind blend
+verdict is "lowers the day-ahead error". At the primary setting the P4a blend has an error of 7.771%
+[6.839, 8.834] and the P4b blend 8.243% [7.299, 9.277], against 8.427% for ENS alone.
 <!-- report: Wind / P4, the blend; Wind / Leaderboard, primary setting -->
 
 **For solar, the blend lowers the error at the optimistic lead only, so the verdict is "may lower
@@ -574,11 +575,11 @@ The P4a blend has an error of 8.419% of capacity [7.727, 9.044] at the primary s
 
 **The solar guard is uninformative, because each solar control is itself worse than ENS alone.** A
 blend beats a control that is significantly worse than ENS alone whether or not the blend adds
-anything to ENS. The P4a control is +0.152 points [+0.097, +0.215] worse than ENS at the primary
+information to ENS. The P4a control is +0.152 points [+0.097, +0.215] worse than ENS at the primary
 setting, and the P4b control is +0.136 points [+0.066, +0.211] worse. Both controls are
 significantly worse at the sensitivity setting too. The P4a gain may therefore reflect newer ECMWF
 runs rather than a second weather model ([What this study cannot
-separate](#what-this-study-cannot-separate)), and P4b is the deciding contrast because its added
+separate](#what-this-study-cannot-separate)). P4b is the deciding contrast because P4b's added
 runs precede 09:00 UTC. IFS 0.25° alone at day 1 does not differ detectably from ENS at day 1:
 +0.036 points [-0.225, +0.296] at the primary setting and +0.088 points [-0.171, +0.336] at the
 sensitivity setting (exploratory). The same contrast for wind is +0.003 points [-0.163, +0.186] and
@@ -588,40 +589,40 @@ sensitivity setting (exploratory). The same contrast for wind is +0.003 points [
 **Each blend covers Great Britain, and its delivery time is set by the latest run it reads.**
 ENS, ICON-EU, and IFS 0.25° all cover Great Britain, so each blend does. P4b reads only runs
 published before 09:00 UTC, so the latest run it needs is ENS's 00 UTC run, which a live service
-can read from about 09:00 UTC. P4a's day-1 values can come from runs published after that time, and
-the study did not measure when those runs are published, so P4a's delivery time is not established.
+can read from about 09:00 UTC. P4a's day-1 values can come from runs published after 09:00 UTC.
+The study did not measure when those runs are published, so P4a's delivery time is not established.
 
 **For wind, ICON-EU at day 2 carries most of the gain, and IFS 0.25° at day 2 carries a smaller
 share (exploratory and post hoc).** The study fitted two further XGBoost models on wind only after
 P4b's result was seen: ENS's day-1 columns plus ICON-EU's day-2 columns, and ENS's day-1 columns
-plus IFS 0.25°'s day-2 columns. Each has 11 columns, whereas P4b has 15, so equal column counts with
-P4b are impossible. The fair reference for each is ENS alone at day 1, with 7 columns. ENS plus
-ICON-EU differs from ENS alone by -0.169 points [-0.250, -0.090] at the primary setting and -0.180
-[-0.284, -0.085] at the sensitivity setting. ENS plus IFS 0.25° differs from ENS alone by -0.073
-points [-0.132, -0.011] and -0.067 [-0.128, -0.006]. Against P4b, ENS plus ICON-EU is +0.015 points
-[-0.033, +0.065] and +0.018 [-0.022, +0.058], so the study cannot distinguish the two. ENS plus IFS
-0.25° is +0.111 points [+0.035, +0.189] and +0.130 [+0.064, +0.200] worse than P4b, so ENS plus IFS
-0.25° reaches only part of P4b's gain. The ICON-EU permutation guard is -0.142 points [-0.217,
--0.066] and -0.181 [-0.273, -0.105], and its control is not worse than ENS alone (-0.027 [-0.081,
-+0.023] and +0.002 [-0.038, +0.036]), so the gain comes from ICON-EU's weather.
+plus IFS 0.25°'s day-2 columns. Each of the two post hoc XGBoost models has 11 columns, whereas P4b
+has 15, so equal column counts with P4b are impossible. The fair reference for each post hoc XGBoost
+model is ENS alone at day 1, with 7 columns. ENS plus ICON-EU differs from ENS alone by -0.169
+points [-0.250, -0.090] at the primary setting and -0.180 [-0.284, -0.085] at the sensitivity
+setting. ENS plus IFS 0.25° differs from ENS alone by -0.073 points [-0.132, -0.011] and -0.067
+[-0.128, -0.006]. Against P4b, ENS plus ICON-EU is +0.015 points [-0.033, +0.065] and +0.018
+[-0.022, +0.058], so the study cannot distinguish ENS plus ICON-EU from P4b. ENS plus IFS 0.25° is
++0.111 points [+0.035, +0.189] and +0.130 [+0.064, +0.200] worse than P4b, so ENS plus IFS 0.25°
+reaches only part of P4b's gain. The ICON-EU permutation guard is -0.142 points [-0.217, -0.066] and
+-0.181 [-0.273, -0.105]. The ICON-EU control is not worse than ENS alone (-0.027 [-0.081, +0.023]
+and +0.002 [-0.038, +0.036]), so the gain comes from ICON-EU's weather.
 
 **IFS 0.25°'s small wind gain cannot be told apart from what a shuffled column gives.** The IFS
-0.25° permutation guard is -0.040 points [-0.138, +0.074] and -0.058 [-0.151, +0.033], which is not
-statistically significant at the 5% level, so the small IFS 0.25° gain is not clearly separated from
-what a shuffled column gives.
+0.25° permutation guard is -0.040 points [-0.138, +0.074] and -0.058 [-0.151, +0.033], and neither
+interval is statistically significant at the 5% level.
 
 **The study cannot say whether ICON-EU's wind gain comes from a second weather model or from
 reading one grid point.** Two differences between the added products and ENS could account for
-part of the ICON-EU gain, and the study did not test either one. Both added products are read at one
-grid point, whereas ENS is an average over an H3 cell. ICON-EU is also a different weather model
-from ENS, whereas IFS 0.25° is ECMWF's own model, so an older IFS 0.25° run may act like an extra
-ensemble member of ENS. The study has no contrast that separates these two explanations.
+part of the ICON-EU gain, and the study did not test either difference. Both added products are read
+at one grid point, whereas ENS is an average over an H3 cell. ICON-EU is also a different weather
+model from ENS. IFS 0.25° is ECMWF's own weather model, so an older IFS 0.25° run may act like an
+extra ensemble member of ENS. The study has no contrast that separates these two explanations.
 <!-- report: Wind / Exploratory: which product carries P4b's wind gain; Wind / Arm columns -->
 
 **Averaging over 3 hours or a day leaves the wind gain in place, and makes the solar gain at the
 conservative lead statistically significant over a day (exploratory).** For wind, P4b minus ENS is
 -0.194 points [-0.285, -0.095] averaged over 3 hours and -0.188 points [-0.311, -0.066] averaged
-over a day, against -0.184 points [-0.282, -0.087] hourly. Its guard is -0.130 points [-0.253,
+over a day, against -0.184 points [-0.282, -0.087] hourly. P4b's guard is -0.130 points [-0.253,
 -0.000] over 3 hours and -0.164 points [-0.332, -0.000] over a day, so the guard's upper bound
 rounds to zero at both block lengths. For solar, P4b is -0.055 points [-0.124, +0.014] over 3 hours
 and -0.097 points [-0.190, -0.016] over a day, with a guard of -0.139 points [-0.200, -0.073] and
@@ -633,9 +634,10 @@ over blocks -->
 **The per-generator P4b contrasts agree with the pooled result for wind and differ across solar
 generators.** For solar, the P4b blend minus ENS at day 1 is -0.096 points [-0.215, -0.006] at
 generator A and -0.111 points [-0.204, -0.003] at generator B, but it is +0.026 points [-0.132,
-+0.169] at generator E and +0.068 points [-0.015, +0.160] at generator F. For wind, it is -0.073
-points [-0.164, +0.005] at W1, -0.179 points [-0.309, -0.073] at W2, and -0.304 points [-0.536,
--0.093] at W3. These contrasts are exploratory, and Figures 7 and 8 draw them.
++0.169] at generator E and +0.068 points [-0.015, +0.160] at generator F. For wind, the P4b contrast
+is -0.073 points [-0.164, +0.005] at W1, -0.179 points [-0.309, -0.073] at W2, and -0.304 points
+[-0.536, -0.093] at W3. These contrasts are exploratory, and Figures 7 and 8 draw these
+per-generator contrasts.
 <!-- report: Solar / X: P1a, P2a and P4b one generator at a time; Wind / same -->
 
 ![Two panels for solar: each forecast's own error, and paired differences of the blends minus ENS
