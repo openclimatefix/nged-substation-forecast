@@ -296,6 +296,32 @@ def test_a_post_hoc_contrast_is_marked_post_hoc_in_the_report_table_and_the_inte
     assert set(plain_rows["planning"]) == {"planned"}
 
 
+def test_a_post_hoc_contrast_is_drawn_unplanned_even_if_its_interval_row_says_planned(
+    tmp_path: Path,
+) -> None:
+    # Catches the figure deciding `planned` from the interval row's `planning` alone, so a
+    # post-hoc contrast whose row says "planned" is drawn as a planned one.
+    module = _load()
+    charts = _charts_module()
+    marked = _score(tmp_path=tmp_path, post_hoc_contrasts=((ENS.arm, REFERENCE.arm),))
+    report = charts.read_report(report_text=module.render_report(results=[marked]))
+    intervals = module.intervals_frame(results=[marked]).with_columns(
+        planning=pl.when(pl.col("planning") == "post hoc")
+        .then(pl.lit("planned"))
+        .otherwise(pl.col("planning"))
+    )
+
+    drawn = charts.contrast_rows(
+        frame=intervals,
+        row_set=marked.row_set,
+        order=[],
+        printed=report["Test farms"].tables[module.CONTRAST_SECTION],
+    )
+
+    flags = dict(zip(drawn["arm"], drawn["planned"], strict=True))
+    assert flags[ENS.arm] is False
+
+
 def test_a_farm_hours_heading_is_read() -> None:
     # Catches a heading regex that knows only "common site-hours".
     module = _load()
