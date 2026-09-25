@@ -225,6 +225,73 @@ serves DMI's "downward short-wave radiation flux" as direct and leaves DMI's "di
 field unused, with a comment that the "direct solar exposure" field "seems to be DNI". The mapping
 has not been checked against DMI's own files.
 
+### AIFS has not been shown to improve faster than the physics-based IFS
+
+**In the sources we read, we found no like-for-like evidence that AIFS improves faster than the
+physics-based IFS.** The claim would need AIFS version-to-version scores set beside IFS
+cycle-to-cycle scores, computed the same way against the same truth. We found neither the AIFS
+version-to-version scores for 2 m temperature, wind, or radiation, nor any IFS cycle-to-cycle scores
+of the same kind. The search covered ECMWF's implementation pages, newsletters, and blog, one
+independent industry analysis, and one journal paper. It did not cover the wider peer-reviewed
+literature.
+
+**ECMWF's own reports show AIFS ahead of the IFS at one point in time, not improving faster.** In
+[Forecast performance 2025](https://www.ecmwf.int/en/newsletter/187/news/forecast-performance-2025),
+ECMWF reports AIFS error reductions against the IFS that are "typically of the order of 5–15%" in the
+medium range, with AIFS leading for 2 m temperature and 10 m wind speed, especially over Europe. The
+same page notes a small decrease in skill during the last 12 months. ECMWF wrote all of these
+sources, so none is independent. For
+[AIFS ENS v1](https://www.ecmwf.int/en/newsletter/185/earth-system-science/aifs-ens-becomes-operational),
+ECMWF reports gains of up to 25% for upper-air variables and better 2 m temperature at all leads,
+but reports 10 m wind and 100 hPa temperature as worse than the physics-based ensemble.
+[Solcast](https://solcast.com/blog/accuracy-analysis-ecmwfs-ai-model-for-solar-forecasting-performs-well),
+scoring against satellite-derived irradiance in the weeks after AIFS Single v1 went operational,
+called its own dataset limited. Solcast found a bias of about -8% for AIFS against about +2% for the
+IFS, and about equal accuracy at day 1, 3, and 5.
+
+**The largest documented change from AIFS Single v1.1 to v2 is new variables plus recovery from an IFS
+upgrade.** [ECMWF's v2 announcement](https://www.ecmwf.int/en/newsletter/187/news/implementation-aifs-v2)
+adds wave variables, snow cover, and a 10 hPa level. It reports significant wave height errors down
+by around 10% and a 3-day gain in skill at 50 and 100 hPa, with a small negative impact remaining for
+2 m temperature in the Arctic. We found no headline v2-versus-v1.1 numbers for 2 m temperature, wind,
+or radiation. ECMWF's
+[blog on adapting AIFS to IFS cycle 50r1](https://www.ecmwf.int/en/about/media-centre/aifs-blog/2026/adapting-aifs-50r1)
+reports that feeding the 50r1 analyses to AIFS Single v1.1 and AIFS ENS v1 adversely affected them,
+with degradations of 30% reported for Arctic 2 m temperature, and that fine-tuning on 50r1 data
+improved the situation. AIFS skill therefore depends on the IFS analysis that AIFS is fed, and part
+of the v2 gain is recovery from an IFS upgrade.
+
+**Each AIFS version should be scored separately, by initialisation time.** Each version is a
+different trained model, so a score pooled across versions describes no single model. The version
+that produced a forecast is set by the forecast's initialisation time, so a version era is
+defined by initialisation time, never by valid time. The eras and their dates are:
+
+| Era | Initialisation times (06 UTC runs) | Notes |
+|---|---|---|
+| AIFS Single v1.0 | 2025-02-25 to 2025-07-30 | First operational AIFS Single |
+| AIFS Single v1.1 | 2025-08-27 onwards, until v2 | Runs initialised 2025-07-31 to 2025-08-01 are excluded (see below) |
+| AIFS Single v2 | 2026-05-12 onwards | Introduced together with IFS 50r1 |
+| AIFS ENS v1 | 2025-07-01 to 2026-05-11 | First operational AIFS ENS |
+| AIFS ENS v2 | 2026-05-12 onwards | Introduced together with IFS 50r1 |
+
+**The v2 boundary coincides with IFS 50r1, so an AIFS change cannot be separated from an IFS change
+after 2026-05-12.** ECMWF introduced AIFS v2 and IFS cycle 50r1 on the same day, and AIFS ingests
+IFS analyses. A change in the AIFS-versus-IFS score across that date has at least two causes that a
+score cannot tell apart.
+
+**The one-day AIFS Single v1.1 window is excluded.** ECMWF implemented v1.1 on 2025-07-31 and
+reverted it on 2025-08-01 after a `stepRange` error on six accumulated variables. Forecasts
+initialised in that window belong to neither era, so we drop them. ECMWF re-implemented v1.1 on
+2025-08-27 and reports skill and bias "equivalent (but not identical)" to v1.0 after cutting the
+soil-moisture loss weight by a factor of 100 to remove spurious point-rainfall artefacts. Even so,
+the two eras are separate trained models and are scored separately. The dated list of every version
+is in the [NWP model upgrades table](../roadmap/data-sources.md#nwp-model-upgrades-since-2019).
+
+**The journal paper "AIFS Single 1.1.0" labels its model version in ECMWF's numbering.** The
+[paper](https://gmd.copernicus.org/articles/19/4703/2026/) states that the first operational version,
+1.0.0, went operational on 2025-02-25 and that 1.1.0 was released on 2025-08-27. Those dates match
+ECMWF's implementation page.
+
 ### Reanalyses, hindcasts, and satellite retrievals
 
 | Product | Roadmap status | Scored in | Producer and method | Grid | Covers GB | Period | Solar variables | Wind heights | Time step | Latency | Access | Licence | Source |
