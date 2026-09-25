@@ -20,12 +20,14 @@ Run it with `uv run python studies/beam_diffuse_split/ens_forecast_charts.py`, a
 --final-newline` before committing it.
 """
 
+import argparse
 import logging
 import math
 import re
 import sys
 from collections.abc import Sequence
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Final, Literal
 
 import altair as alt
@@ -55,6 +57,10 @@ from studies.charts import (
 from weather_product_charts import ASSETS_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger("ens_forecast_charts")
+
+_results_dir: Path = OUTPUT_DIR
+"""The folder every chart reads its results from: `OUTPUT_DIR` unless `--results-dir` says
+otherwise. `main` sets it once, before any chart is drawn."""
 
 DomainType = Literal["solar", "wind"]
 DOMAINS: Final[tuple[DomainType, DomainType]] = ("solar", "wind")
@@ -212,7 +218,7 @@ def _board(*, domain: DomainType, report: str) -> dict[str, dict[str, float]]:
     Returns:
         Arm to its `value`, `lower_95`, and `upper_95`, in percentage points.
     """
-    rows = pl.read_parquet(OUTPUT_DIR / "leaderboard.parquet").filter(
+    rows = pl.read_parquet(_results_dir / "leaderboard.parquet").filter(
         (pl.col("domain") == domain) & (pl.col("setting") == "pooled")
     )
     _check_printed(
@@ -242,7 +248,7 @@ def _contrasts(*, report: str) -> pl.DataFrame:
     Returns:
         One row per interval.
     """
-    rows = pl.read_parquet(OUTPUT_DIR / "intervals.parquet")
+    rows = pl.read_parquet(_results_dir / "intervals.parquet")
     _check_printed(
         report=report,
         texts=[
@@ -1293,11 +1299,11 @@ def _seed_mean(*, domain: DomainType, arms: list[str]) -> pl.DataFrame:
     Returns:
         One row per (site, time, arm), with `measured` and `predicted`.
     """
-    capacity = pl.read_parquet(OUTPUT_DIR / f"{domain}_rows.parquet").select(
+    capacity = pl.read_parquet(_results_dir / f"{domain}_rows.parquet").select(
         "site", "time", "effective_capacity_mw"
     )
     return (
-        pl.scan_parquet(OUTPUT_DIR / f"{domain}_predictions.parquet")
+        pl.scan_parquet(_results_dir / f"{domain}_predictions.parquet")
         .filter(pl.col("setting") == "pooled", pl.col("arm").is_in(arms))
         .group_by("site", "time", "arm")
         .agg(pl.col("power_mw").first(), pl.col("prediction_mw").mean())
@@ -1459,7 +1465,7 @@ def per_generator(*, title: str, number: int) -> alt.VConcatChart:
     panels = []
     conditions = ("Day 1", "Day 7")
     for domain in DOMAINS:
-        losses = pl.read_parquet(OUTPUT_DIR / f"{domain}_losses.parquet").filter(
+        losses = pl.read_parquet(_results_dir / f"{domain}_losses.parquet").filter(
             pl.col("setting") == "pooled"
         )
         rows = []
@@ -1538,8 +1544,21 @@ def _chosen(*, report: str) -> dict[DomainType, str]:
 
 def main() -> int:
     """Draw every chart and print the example periods' months for the page."""
+    global _results_dir  # noqa: PLW0603
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    report = (OUTPUT_DIR / "report.md").read_text()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--results-dir",
+        type=Path,
+        default=OUTPUT_DIR,
+        help=(
+            "The folder holding the horizons script's results. Defaults to the folder the "
+            "published page's results are in; pass `ens_forecast_horizons.RESULTS_DIR` for the "
+            "re-run on rows from 2024-12-01."
+        ),
+    )
+    _results_dir = parser.parse_args().results_dir
+    report = (_results_dir / "report.md").read_text()
     boards = {domain: _board(domain=domain, report=report) for domain in DOMAINS}
     contrasts = _contrasts(report=report)
     best = {
@@ -1559,7 +1578,7 @@ def main() -> int:
         for domain in DOMAINS
     }
     inputs = {
-        domain: pl.read_parquet(OUTPUT_DIR / f"{domain}_inputs.parquet") for domain in DOMAINS
+        domain: pl.read_parquet(_results_dir / f"{domain}_inputs.parquet") for domain in DOMAINS
     }
     solar_days_chart, solar_day_month = example_days_solar(
         inputs=inputs["solar"], title=TITLES["example_days_solar"]
