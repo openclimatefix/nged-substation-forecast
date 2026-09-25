@@ -172,6 +172,13 @@ def _check_row(*, name: str, row: dict[str, float | None], printed: PrintedRow) 
 def _one(*, frame: pl.DataFrame, **matches: str) -> dict[str, float | None]:
     """Return the single row of `intervals.parquet` that matches every column given.
 
+    Args:
+        frame: The rows of `intervals.parquet`.
+        **matches: Column name and the value it must equal.
+
+    Returns:
+        The one matching row, by column name.
+
     Raises:
         ValueError: If no row or more than one row matches.
     """
