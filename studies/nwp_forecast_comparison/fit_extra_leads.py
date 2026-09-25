@@ -4,8 +4,10 @@ One-off throwaway script for the extra lead days of
 <https://github.com/openclimatefix/nged-substation-forecast/issues/912>. It reads the published
 shared rows and folds (`nwp_forecast_comparison.rows` on the published inputs), joins the columns
 `build_forecast_inputs.py --extra-leads` wrote onto them, fits each arm at the primary setting only
-(every arm here is exploratory), and writes `<domain>_losses.parquet` and `report.md` to a new
-`--output-dir`. It never writes to the published folder, and refuses to overwrite its own outputs.
+(every arm here is exploratory), and writes `<domain>_losses.parquet`,
+`<domain>_predictions.parquet`, and `report.md` to a new `--output-dir`. It never writes to the
+published folder. It reuses a domain's saved losses rather
+than refitting, and refuses to overwrite `report.md`.
 
 The arms:
 
@@ -20,8 +22,9 @@ same fingerprint. Run it before the full fit.
 
 Every output carries only the anonymised `site` label.
 
-Run it with `uv run python studies/nwp_forecast_comparison/fit_extra_leads.py --output-dir DIR`,
-after `build_forecast_inputs.py --extra-leads --output-dir DIR` has written the extra inputs there.
+Run it with `uv run python studies/nwp_forecast_comparison/fit_extra_leads.py --published-dir
+PUBLISHED --output-dir DIR`, after `build_forecast_inputs.py --extra-leads --output-dir DIR` has
+written the extra inputs there.
 """
 
 import argparse
@@ -120,6 +123,23 @@ NEAR_ANALYSIS_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("icon_d2_day1", "icon_eu_day1"),
 )
 """ICON-D2 against ICON-EU at day 0 and day 1, also split by the hour of day modulo 3."""
+
+ELSEWHERE_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("ens_mean_day14", "ens_mean_day5"),
+    ("gefs_mean_day14", "gefs_mean_day10"),
+    ("icon_d2_day0", "ens_mean_day0"),
+    ("ens_mean_day0", "icon_eu_day0"),
+)
+"""Contrasts between two arms fitted here, as (treatment, reference): the error's rise from day 5 to
+day 14, GEFS's fall from day 10 to day 14, and ICON-D2 and ICON-EU at day 0 against ENS at day 0."""
+
+CLIMATOLOGY_CONTRASTS: Final[tuple[str, ...]] = (
+    "ens_mean_day14",
+    "gefs_mean_day10",
+    "gefs_mean_day14",
+)
+"""The arms compared with the no-weather climatology baseline, which is the published fit because
+climatology involves no XGBoost model, so no device."""
 
 HOUR_MODULO: Final[int] = 3
 """ICON-D2's and ICON-EU's runs start every 3 hours, so the freshest run's lead depends on the hour
@@ -403,6 +423,21 @@ def report_domain(
                 )
             )
     lines += ["", "### ICON-D2 against ICON-EU, whole and by hour of day modulo 3", *near]
+    climatology = published.filter(pl.col("arm") == "climatology")
+    with_climatology = pl.concat([losses, climatology], how="vertical_relaxed")
+    elsewhere = [
+        contrast_line(losses=losses, treatment=t, reference=r) for t, r in ELSEWHERE_CONTRASTS
+    ]
+    elsewhere += [
+        contrast_line(losses=with_climatology, treatment=arm, reference="climatology")
+        for arm in CLIMATOLOGY_CONTRASTS
+    ]
+    lines += [
+        "",
+        "### Long leads against climatology, and day 0 against ENS at day 0 (GPU fits)",
+        *header,
+        *(line for line in elsewhere if line),
+    ]
     lines += [
         "",
         "### Absolute error by hour of day modulo 3, ICON-D2 and ICON-EU at day 0",

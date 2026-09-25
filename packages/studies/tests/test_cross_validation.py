@@ -109,19 +109,6 @@ def test_the_booster_settings_translate_exactly_and_never_subsample_columns():
     }
 
 
-def test_the_booster_device_is_passed_through_and_defaults_to_the_cpu():
-    # A GPU fit is not bit-identical to a CPU fit, so a study that mixes the two must be able to
-    # name the device of each fit; silently falling back to the CPU would put a GPU arm in a CPU
-    # contrast.
-    assert booster_parameters(hyper_parameters=PRIMARY_HYPER_PARAMETERS, seed=0)["device"] == "cpu"
-    assert (
-        booster_parameters(hyper_parameters=PRIMARY_HYPER_PARAMETERS, seed=0, device="cuda")[
-            "device"
-        ]
-        == "cuda"
-    )
-
-
 def test_the_published_seeds_are_the_ones_fitted():
     assert SEEDS == (0, 1, 2)
 

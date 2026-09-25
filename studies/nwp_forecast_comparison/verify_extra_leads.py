@@ -11,7 +11,8 @@ It writes two Markdown files under `<output-dir>/verification/`:
    240 h with the mean at the same valid hour at leads to 240 h (a 6-hour window), and with the mean
    3-hour window ending at that hour, which the 3-hourly leads give exactly. It stops with an error
    unless the 6-hour reading is closer at every valid hour where the two windows differ by at least
-   15%.
+   15%. It also compares the mean at each of the first 6-hourly leads (246 to 270 h) with the mean
+   24 hours earlier at the same valid hour, and fails if any daylight lead differs by more than 10%.
 2. `day0_matches_past_series.md`: whether Open-Meteo's unsuffixed Previous Runs series, which the
    extra-lead build reads as day 0 for ICON-D2 and ICON-EU, equals the series the past-weather
    studies read (`beam_diffuse_<product>.parquet`, `wind_<product>.parquet`) on the hours both hold.
