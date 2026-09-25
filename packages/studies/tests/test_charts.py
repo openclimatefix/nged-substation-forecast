@@ -1,4 +1,5 @@
 import re
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import plotting.ocf_theme as ocf
@@ -13,9 +14,14 @@ from studies.charts import (
     NAMED_SUFFIX,
     PLANNING_NOTES,
     PLOT_WIDTH_PX,
+    BlockArm,
     ContrastKey,
     Panel,
     PlanningType,
+    RowSetBlock,
+    assert_matches_printed,
+    block_contrast_rows,
+    block_leaderboard_rows,
     figure,
     flip_contrast,
     interval_panel,
@@ -24,6 +30,8 @@ from studies.charts import (
     report_contrasts,
     report_errors,
     select_contrasts,
+    stacked_contrasts,
+    stacked_leaderboard,
     ticks,
 )
 
@@ -750,3 +758,204 @@ def test_the_station_family_is_purple_and_named_in_the_key():
         FAMILY_COLOURS["station observations"],
     ]
     assert FAMILY_COLOURS["station observations"] == ocf.DATA_PURPLE
+
+
+METRIC = "loss"
+BLOCK_ARMS = [
+    BlockArm(arm="cams_global", label="CAMS", family="satellite", reference=True),
+    BlockArm(arm="era5_global", label="ERA5", family="reanalysis", reference=True),
+    BlockArm(arm="ukv_global", label="UKV", family="weather model"),
+]
+SITE_HOURS = 8
+
+
+def _losses(*, sensitivity_offset: float = 0.05) -> pl.DataFrame:
+    """Return losses for three arms at two settings sharing arm names, 2 sites x 4 hours x 2 seeds.
+
+    Each arm's `pooled` loss is its base plus a small hourly ramp; its `sensitivity` loss adds
+    `sensitivity_offset`, so a bootstrap that mixed the settings would return a different number.
+    """
+    start = datetime(2025, 1, 1, tzinfo=UTC)
+    base = {"cams_global": 0.01, "era5_global": 0.02, "ukv_global": 0.03}
+    rows = [
+        {
+            "arm": arm,
+            "setting": setting,
+            "site": site,
+            "time": start + timedelta(hours=hour),
+            "seed": seed,
+            "month": "2025-01" if hour < 2 else "2025-02",
+            METRIC: value
+            + 0.001 * hour
+            + (sensitivity_offset if setting == "sensitivity" else 0.0),
+        }
+        for arm, value in base.items()
+        for setting in ("pooled", "sensitivity")
+        for site in ("a", "b")
+        for hour in range(4)
+        for seed in (0, 1)
+    ]
+    return pl.DataFrame(rows)
+
+
+def test_block_leaderboard_rows_ignores_the_other_setting_that_shares_arm_names() -> None:
+    # Catches the silent cross-join of the `pooled` and `sensitivity` settings.
+    rows = block_leaderboard_rows(
+        losses=_losses(), arms=BLOCK_ARMS, setting="pooled", site_hours=SITE_HOURS, metric=METRIC
+    )
+
+    assert rows["value"].to_list() == pytest.approx([1.15, 2.15, 3.15])
+
+
+def test_block_leaderboard_rows_raises_when_the_setting_is_absent() -> None:
+    with pytest.raises(ValueError, match="no row has setting 'missing'"):
+        block_leaderboard_rows(
+            losses=_losses(),
+            arms=BLOCK_ARMS,
+            setting="missing",
+            site_hours=SITE_HOURS,
+            metric=METRIC,
+        )
+
+
+def test_block_leaderboard_rows_raises_when_two_settings_leave_duplicate_rows() -> None:
+    # A frame whose setting label is the same for both blocks of rows doubles every (site, time).
+    doubled = _losses().with_columns(setting=pl.lit("pooled"))
+
+    with pytest.raises(ValueError, match="rows per seed"):
+        block_leaderboard_rows(
+            losses=doubled,
+            arms=BLOCK_ARMS,
+            setting="pooled",
+            site_hours=SITE_HOURS,
+            metric=METRIC,
+        )
+
+
+def test_block_leaderboard_rows_holds_one_row_per_arm_with_reference_rows_flagged() -> None:
+    rows = block_leaderboard_rows(
+        losses=_losses(), arms=BLOCK_ARMS, setting="pooled", site_hours=SITE_HOURS, metric=METRIC
+    )
+
+    assert rows["label"].to_list() == ["CAMS", "ERA5", "UKV"]
+    assert rows["reference"].to_list() == [True, True, False]
+
+
+def test_block_leaderboard_rows_checks_recomputed_values_against_the_printed_ones() -> None:
+    losses = _losses()
+    printed = {"cams_global": 1.15, "era5_global": 2.15, "ukv_global": 3.15}
+    block_leaderboard_rows(
+        losses=losses,
+        arms=BLOCK_ARMS,
+        setting="pooled",
+        site_hours=SITE_HOURS,
+        metric=METRIC,
+        printed=printed,
+    )
+
+    with pytest.raises(ValueError, match=r"era5_global: bootstrapped 2\.150 but the report says"):
+        block_leaderboard_rows(
+            losses=losses,
+            arms=BLOCK_ARMS,
+            setting="pooled",
+            site_hours=SITE_HOURS,
+            metric=METRIC,
+            printed={**printed, "era5_global": 2.151},
+        )
+
+
+def test_block_contrast_rows_differences_each_arm_against_the_reference_arm() -> None:
+    rows = block_contrast_rows(
+        losses=_losses(),
+        arms=[BLOCK_ARMS[0], BLOCK_ARMS[2]],
+        reference_arm="era5_global",
+        setting="pooled",
+        site_hours=SITE_HOURS,
+        metric=METRIC,
+    )
+
+    assert rows["difference"].to_list() == pytest.approx([-1.0, 1.0])
+
+
+def test_block_contrast_rows_raises_when_the_site_hours_differ() -> None:
+    with pytest.raises(ValueError, match="rows per seed"):
+        block_contrast_rows(
+            losses=_losses(),
+            arms=[BLOCK_ARMS[0]],
+            reference_arm="era5_global",
+            setting="pooled",
+            site_hours=SITE_HOURS + 1,
+            metric=METRIC,
+        )
+
+
+def test_assert_matches_printed_stops_when_one_printed_number_is_perturbed() -> None:
+    assert_matches_printed(name="cams", recomputed=5.0854, printed=5.085)
+
+    with pytest.raises(ValueError, match=r"cams: bootstrapped 5\.085 but the report says 5\.086"):
+        assert_matches_printed(name="cams", recomputed=5.0854, printed=5.086)
+
+
+def _blocks() -> tuple[list[RowSetBlock], list[RowSetBlock]]:
+    losses = _losses()
+    leaderboard = block_leaderboard_rows(
+        losses=losses, arms=BLOCK_ARMS, setting="pooled", site_hours=SITE_HOURS, metric=METRIC
+    )
+    contrasts = block_contrast_rows(
+        losses=losses,
+        arms=[BLOCK_ARMS[0], BLOCK_ARMS[2]],
+        reference_arm="era5_global",
+        setting="pooled",
+        site_hours=SITE_HOURS,
+        metric=METRIC,
+    )
+    labels = ("Main rows", "Extra rows")
+    return (
+        [RowSetBlock(label, "Jan 2025", SITE_HOURS, leaderboard) for label in labels],
+        [RowSetBlock(label, "Jan 2025", SITE_HOURS, contrasts) for label in labels],
+    )
+
+
+def test_stacked_leaderboard_draws_one_panel_per_block_with_titles_naming_site_hours() -> None:
+    blocks, _ = _blocks()
+
+    spec = stacked_leaderboard(
+        blocks=blocks, number=1, title="A title", subtitle=["A subtitle."]
+    ).to_dict()
+
+    panel_titles = [
+        vconcat["title"]["text"] if "title" in vconcat else None for vconcat in _leaf_panels(spec)
+    ]
+    assert "Main rows: Jan 2025, 8 site-hours" in panel_titles
+    assert "Extra rows: Jan 2025, 8 site-hours" in panel_titles
+
+
+def test_stacked_leaderboard_draws_reference_rows_in_the_light_shade_and_hollow() -> None:
+    blocks, _ = _blocks()
+
+    spec = stacked_leaderboard(
+        blocks=blocks, number=1, title="A title", subtitle=["A subtitle."]
+    ).to_dict()
+
+    assert "'shade': 'reanalysis, light'" in str(spec)
+    assert "'shade': 'weather model'" in str(spec)
+    assert "'filled': False" in str(spec)
+
+
+def test_stacked_contrasts_draws_reference_rows_hollow() -> None:
+    _, blocks = _blocks()
+
+    spec = stacked_contrasts(
+        blocks=blocks, number=2, title="A title", subtitle=["A subtitle."]
+    ).to_dict()
+
+    assert "'shade': 'satellite, light'" in str(spec)
+    assert "'filled': False" in str(spec)
+
+
+def _leaf_panels(spec: dict) -> list[dict]:
+    """Return every layered panel in a figure's spec, however deeply the concats nest."""
+    found = []
+    for child in spec.get("vconcat", []):
+        found.extend(_leaf_panels(child) if "vconcat" in child else [child])
+    return found

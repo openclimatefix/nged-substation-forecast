@@ -24,6 +24,8 @@ import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 
+from studies.bootstrap import bootstrap_absolute, bootstrap_difference
+
 ProductFamily = Literal["satellite", "reanalysis", "weather model", "station observations"]
 """The kinds of weather input the study pages compare: three kinds of gridded product, and the
 weather-station observations, alone or blended with a gridded product."""
@@ -496,6 +498,7 @@ def interval_panel(
     panel_title: str | Sequence[str] = "",
     reference_labels: bool = True,
     family_key: bool = True,
+    condition_key: bool = True,
     width: int = PLOT_WIDTH_PX,
     figure_planning: PlanningType = "mixed",
 ) -> alt.LayerChart | alt.VConcatChart:
@@ -542,6 +545,8 @@ def interval_panel(
             stacked under another that already carries them can leave out.
         family_key: Whether to draw the family key, which a panel stacked under another that
             already carries it can leave out.
+        condition_key: Whether to draw the condition key, which a panel stacked under another
+            that already carries it can leave out.
         width: The plot's width in pixels, `PLOT_WIDTH_PX` unless the panel shares a row.
         figure_planning: What `planning` returns for every panel in the figure, which decides
             whether a planned row's label carries `NAMED_SUFFIX`.
@@ -674,7 +679,7 @@ def interval_panel(
                 colours=[FAMILY_COLOURS[family] for family in families],
             )
         )
-    if conditions:
+    if conditions and condition_key:
         keys.append(
             _key(
                 title=condition_title,
@@ -725,15 +730,19 @@ def leaderboard_panel(
     Each row is coloured by its family, unless `conditions` is given: then each row is coloured by
     its `condition` from `CONDITION_COLOURS`, with the first condition's point filled and every
     other condition's hollow, so the distinction survives without colour, unless `solid` is set.
-    Where `kinds` is given, each row's point takes its `kind`'s shape from `CONDITION_SHAPES`. The
-    keys sit in a row above the plot: the family key only where the panel holds more than one
+    Where `kinds` is given, each row's point takes its `kind`'s shape from `CONDITION_SHAPES`. Where
+    the rows carry a Boolean `reference` column and `conditions` is not given, each reference row
+    is drawn hollow, in the light shade of its family's colour, so a product repeated on every
+    panel of a stacked figure reads as a yardstick and not as a competitor. The keys sit in a row
+    above the plot: the family key only where the panel holds more than one
     family and no `conditions`, the condition key where `conditions` is given, and the kind key
     where `kinds` is given.
 
     Args:
         rows: One row per product, with `label`, `family` (a `ProductFamily`), `value`,
-            `lower_95` and `upper_95`, `condition` if `conditions` is given, and `kind` if `kinds`
-            is given, in the order to draw them top to bottom (best first).
+            `lower_95` and `upper_95`, `condition` if `conditions` is given, `kind` if `kinds` is
+            given, and `reference` if some rows are reference rows, in the order to draw them top
+            to bottom (best first).
         x_domain: The x axis's range, set explicitly so the panel and any panel sharing its scale
             agree.
         x_title: The x axis's title, naming the quantity, its unit, and which direction is
@@ -766,7 +775,14 @@ def leaderboard_panel(
         msg = f"too many conditions ({len(conditions)}) or kinds ({len(kinds)}) to draw apart"
         raise ValueError(msg)
     families = [family for family in FAMILY_COLOURS if family in set(rows["family"].to_list())]
+    hollow_references = "reference" in rows.columns and not conditions
     data = rows.with_columns(pl.col("value", "lower_95", "upper_95").round(3))
+    if hollow_references:
+        data = data.with_columns(
+            shade=pl.when(pl.col("reference"))
+            .then(pl.col("family") + ", light")
+            .otherwise(pl.col("family"))
+        )
     labels = data["label"].to_list()
     lines = {label: wrapped(text=label, width=_LABEL_CHARACTERS) for label in labels}
     y = alt.Y(
@@ -792,6 +808,8 @@ def leaderboard_panel(
             legend=None,
         )
         if conditions
+        else alt.Color("shade:N", scale=_shade_scale(), legend=None)
+        if hollow_references
         else alt.Color(
             "family:N",
             scale=alt.Scale(domain=list(FAMILY_COLOURS), range=list(FAMILY_COLOURS.values())),
@@ -835,6 +853,9 @@ def leaderboard_panel(
     if conditions and not solid:
         first = pl.col("condition") == conditions[0]
         groups = [(data.filter(first), True), (data.filter(~first), False)]
+    elif hollow_references:
+        reference = pl.col("reference")
+        groups = [(data.filter(~reference), True), (data.filter(reference), False)]
     points = [
         alt.Chart(frame)
         .mark_point(
@@ -1040,4 +1061,342 @@ def figure(
         .resolve_scale(color="shared", shape="shared")
         .configure_view(stroke=None)
         .configure_legend(orient="bottom", direction="horizontal")
+    )
+
+
+PERCENTAGE_POINTS: Final[float] = 100.0
+"""Converts a loss expressed as a fraction of capacity into percentage points of capacity."""
+
+ABSOLUTE_ERROR_X_TITLE: Final[str] = "Mean absolute error (% of capacity; smaller is better)"
+"""The x axis title of a stacked leaderboard, which says which direction is better."""
+
+REFERENCE_ROW_NOTE: Final[str] = (
+    "Lighter, hollow rows are CAMS and ERA5, repeated in every block as a yardstick and scored "
+    "on that block's own rows."
+)
+"""The subtitle line a stacked leaderboard adds to say what its hollow reference rows are."""
+
+CONTRAST_REFERENCE_ROW_NOTE: Final[str] = (
+    "The lighter, hollow row is CAMS, repeated in every block as a yardstick and contrasted with "
+    "that block's own ERA5."
+)
+"""The subtitle line a stacked contrast chart adds to say what its hollow reference row is."""
+
+_BLOCK_DOMAIN_STEP: Final[float] = 0.5
+"""The multiple of percentage points a stacked figure's shared x range is rounded out to."""
+
+_BLOCK_ROW_STEP_PX: Final[int] = 26
+"""The height of each row of a stacked figure's blocks, which hold one-line labels."""
+
+
+class BlockArm(NamedTuple):
+    """One arm of a row-set block, and how the block draws it."""
+
+    arm: str
+    label: str
+    family: ProductFamily
+    reference: bool = False
+    planned: bool = False
+
+
+class RowSetBlock(NamedTuple):
+    """One block of a stacked figure: the arms scored on one row set.
+
+    `rows` holds one row per arm, with `label`, `family`, `reference`, `planned`, and either
+    `value` (a leaderboard block) or `difference` (a contrast block), each with `lower_95` and
+    `upper_95`, all in percentage points of capacity.
+    """
+
+    label: str
+    dates: str
+    site_hours: int
+    rows: pl.DataFrame
+
+    @property
+    def title(self) -> str:
+        """The block's panel title, naming its row set, its dates, and its site-hours."""
+        return f"{self.label}: {self.dates}, {self.site_hours:,} site-hours"
+
+
+def assert_matches_printed(
+    *, name: str, recomputed: float, printed: float, decimals: int = 3
+) -> None:
+    """Stop unless a recomputed value rounds to the number a report printed.
+
+    A chart draws numbers it recomputes from `losses.parquet`, the report prints the page's
+    numbers, and the two must be the same number: a difference means the chart was drawn from
+    other losses than the report, and the page and the chart would disagree.
+
+    Args:
+        name: The product or arm the value belongs to, for the error message.
+        recomputed: The value recomputed from the saved losses.
+        printed: The value the report prints.
+        decimals: The report's print precision.
+
+    Raises:
+        ValueError: If the recomputed value, rounded to `decimals` places, differs from `printed`.
+    """
+    if round(recomputed, decimals) != printed:
+        msg = f"{name}: bootstrapped {recomputed:.{decimals}f} but the report says {printed}"
+        raise ValueError(msg)
+
+
+def _rows_at_setting(*, losses: pl.DataFrame, setting: str) -> pl.DataFrame:
+    """Restrict saved losses to one hyperparameter setting.
+
+    The saved `losses.parquet` files reuse an arm's name across their `pooled` and `sensitivity`
+    settings, and the bootstraps join on `(site, time, seed)` alone, so an unfiltered frame is
+    silently cross-joined between the two settings.
+
+    Args:
+        losses: A `losses.parquet`, with a `setting` column.
+        setting: The setting to keep, such as `pooled`.
+
+    Returns:
+        The rows of that setting.
+
+    Raises:
+        ValueError: If no row has that setting.
+    """
+    kept = losses.filter(pl.col("setting") == setting)
+    if kept.is_empty():
+        held = losses["setting"].unique().to_list()
+        msg = f"no row has setting {setting!r}; the losses hold {held}"
+        raise ValueError(msg)
+    return kept
+
+
+def _check_rows(*, arm: str, n_rows: int, site_hours: int) -> None:
+    """Raise unless one arm's bootstrap rests on exactly its block's site-hours."""
+    if n_rows != site_hours:
+        msg = f"arm {arm!r} has {n_rows:,} rows per seed but the block holds {site_hours:,}"
+        raise ValueError(msg)
+
+
+def block_leaderboard_rows(
+    *,
+    losses: pl.DataFrame,
+    arms: Sequence[BlockArm],
+    setting: str,
+    site_hours: int,
+    metric: str,
+    printed: dict[str, float] | None = None,
+) -> pl.DataFrame:
+    """Compute each arm's own mean absolute error and 95% interval on one row set.
+
+    Filters to `setting` before any bootstrap, and checks that each arm's bootstrap rests on
+    exactly `site_hours` rows. The rows come back best first.
+
+    Args:
+        losses: A `losses.parquet`.
+        arms: The arms to score.
+        setting: The hyperparameter setting to score, such as `pooled`.
+        site_hours: The row set's number of site-hours.
+        metric: The loss column to average.
+        printed: Each arm's mean absolute error as the row set's report prints it, to check the
+            recomputed values against; `None` skips the check.
+
+    Returns:
+        One row per arm with `label`, `family`, `reference`, `planned`, `value`, `lower_95` and
+        `upper_95`, in percentage points of capacity.
+
+    Raises:
+        ValueError: If the setting is absent, an arm's bootstrap does not rest on `site_hours`
+            rows, or a recomputed value differs from its printed value.
+    """
+    at_setting = _rows_at_setting(losses=losses, setting=setting)
+    records = []
+    for block_arm in arms:
+        interval = bootstrap_absolute(losses=at_setting, arm=block_arm.arm, metric=metric)
+        _check_rows(arm=block_arm.arm, n_rows=interval["n_rows"], site_hours=site_hours)
+        value = interval["value"] * PERCENTAGE_POINTS
+        if printed is not None:
+            assert_matches_printed(
+                name=block_arm.arm, recomputed=value, printed=printed[block_arm.arm]
+            )
+        records.append(
+            {
+                "label": block_arm.label,
+                "family": block_arm.family,
+                "reference": block_arm.reference,
+                "planned": block_arm.planned,
+                "value": value,
+                "lower_95": interval["lower_95"] * PERCENTAGE_POINTS,
+                "upper_95": interval["upper_95"] * PERCENTAGE_POINTS,
+            }
+        )
+    return pl.DataFrame(records).sort("value")
+
+
+def block_contrast_rows(
+    *,
+    losses: pl.DataFrame,
+    arms: Sequence[BlockArm],
+    reference_arm: str,
+    setting: str,
+    site_hours: int,
+    metric: str,
+) -> pl.DataFrame:
+    """Compute each arm's mean absolute error minus a reference arm's, with its 95% interval.
+
+    Filters to `setting` before any bootstrap, and checks that each contrast rests on exactly
+    `site_hours` rows. The rows keep the order of `arms`.
+
+    Args:
+        losses: A `losses.parquet`.
+        arms: The arms to contrast with the reference arm. The reference arm itself is not
+            listed: the zero rule stands for it.
+        reference_arm: The arm every contrast is taken against, such as `era5_global`.
+        setting: The hyperparameter setting to score, such as `pooled`.
+        site_hours: The row set's number of site-hours.
+        metric: The loss column to difference.
+
+    Returns:
+        One row per arm with `label`, `family`, `reference`, `planned`, `difference`, `lower_95`
+        and `upper_95`, in percentage points of capacity.
+
+    Raises:
+        ValueError: If the setting is absent or a contrast does not rest on `site_hours` rows.
+    """
+    at_setting = _rows_at_setting(losses=losses, setting=setting)
+    records = []
+    for block_arm in arms:
+        interval = bootstrap_difference(
+            losses=at_setting, treatment=block_arm.arm, reference=reference_arm, metric=metric
+        )
+        _check_rows(arm=block_arm.arm, n_rows=interval["n_rows"], site_hours=site_hours)
+        records.append(
+            {
+                "label": block_arm.label,
+                "family": block_arm.family,
+                "reference": block_arm.reference,
+                "planned": block_arm.planned,
+                "difference": interval["difference"] * PERCENTAGE_POINTS,
+                "lower_95": interval["lower_95"] * PERCENTAGE_POINTS,
+                "upper_95": interval["upper_95"] * PERCENTAGE_POINTS,
+            }
+        )
+    return pl.DataFrame(records)
+
+
+def shared_domain(*, blocks: Sequence[RowSetBlock], include_zero: bool) -> tuple[float, float]:
+    """Return one x range covering every block's intervals, rounded out to half a point.
+
+    Args:
+        blocks: The blocks of a stacked figure.
+        include_zero: Whether the range must contain zero, as a contrast chart's does.
+
+    Returns:
+        The lowest lower bound and highest upper bound over every block, each rounded outwards to
+        a multiple of half a percentage point.
+    """
+    lows = [low for block in blocks for low in block.rows["lower_95"].to_list()]
+    highs = [high for block in blocks for high in block.rows["upper_95"].to_list()]
+    if include_zero:
+        lows.append(0.0)
+        highs.append(0.0)
+    step = _BLOCK_DOMAIN_STEP
+    return (math.floor(min(lows) / step) * step, math.ceil(max(highs) / step) * step)
+
+
+def stacked_leaderboard(
+    *,
+    blocks: Sequence[RowSetBlock],
+    number: int | str,
+    title: str,
+    subtitle: Sequence[str],
+    x_domain: tuple[float, float] | None = None,
+) -> alt.VConcatChart:
+    """Stack one leaderboard panel per row set, on one x range, under one caption.
+
+    Each block is a `leaderboard_panel` titled with its row set, dates and site-hours. A block's
+    reference rows are drawn hollow. Blocks are scored on different rows, so the panels are for
+    reading each block's own ranking; the subtitle should say so.
+
+    Args:
+        blocks: The row-set blocks from top to bottom, each holding `block_leaderboard_rows`'s
+            output.
+        number: The figure's number on its page.
+        title: The finding the figure shows.
+        subtitle: Short lines for the caption; `REFERENCE_ROW_NOTE` is added.
+        x_domain: The shared x range; `None` takes `shared_domain`.
+
+    Returns:
+        The figure.
+    """
+    domain = x_domain or shared_domain(blocks=blocks, include_zero=False)
+    panels = [
+        leaderboard_panel(
+            rows=block.rows,
+            x_domain=domain,
+            x_title=ABSOLUTE_ERROR_X_TITLE if index == len(blocks) - 1 else "",
+            panel_title=block.title,
+            keys=index == 0,
+            row_step_px=_BLOCK_ROW_STEP_PX,
+        )
+        for index, block in enumerate(blocks)
+    ]
+    return figure(
+        panels=panels,
+        number=number,
+        title=title,
+        subtitle=[*subtitle, REFERENCE_ROW_NOTE],
+        figure_planning=None,
+    )
+
+
+def stacked_contrasts(
+    *,
+    blocks: Sequence[RowSetBlock],
+    number: int | str,
+    title: str,
+    subtitle: Sequence[str],
+    x_title: str = "Mean absolute error minus ERA5's (points of capacity)",
+    x_domain: tuple[float, float] | None = None,
+) -> alt.VConcatChart:
+    """Stack one panel of contrasts against ERA5 per row set, on one x range.
+
+    Each block is an `interval_panel` titled with its row set, dates and site-hours. A block's
+    reference rows (CAMS) are drawn hollow, in the light shade of their family's colour.
+
+    Args:
+        blocks: The row-set blocks from top to bottom, each holding `block_contrast_rows`'s
+            output.
+        number: The figure's number on its page.
+        title: The finding the figure shows.
+        subtitle: Short lines for the caption; `CONTRAST_REFERENCE_ROW_NOTE` is added.
+        x_title: The x axis title, naming the quantity and its unit.
+        x_domain: The shared x range; `None` takes `shared_domain`.
+
+    Returns:
+        The figure.
+    """
+    domain = x_domain or shared_domain(blocks=blocks, include_zero=True)
+    figure_planning = planning(rows=[block.rows for block in blocks])
+    conditions = ("Product", "Reference row")
+    panels = [
+        interval_panel(
+            rows=block.rows.with_columns(
+                condition=pl.when(pl.col("reference"))
+                .then(pl.lit(conditions[1]))
+                .otherwise(pl.lit(conditions[0]))
+            ),
+            x_domain=domain,
+            x_title=x_title if index == 0 else "",
+            zero_label="same as ERA5",
+            better_label="better than ERA5",
+            conditions=conditions,
+            panel_title=block.title,
+            family_key=index == 0,
+            condition_key=False,
+            figure_planning=figure_planning,
+        )
+        for index, block in enumerate(blocks)
+    ]
+    return figure(
+        panels=panels,
+        number=number,
+        title=title,
+        subtitle=[*subtitle, CONTRAST_REFERENCE_ROW_NOTE],
+        figure_planning=figure_planning,
     )
