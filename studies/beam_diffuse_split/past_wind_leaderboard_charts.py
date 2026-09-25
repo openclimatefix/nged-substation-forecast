@@ -157,9 +157,15 @@ PLANNING_NOTE: Final[str] = (
 )
 """The caption line defining planned and post hoc rows, with the ICON-DREAM-EU block's plan."""
 CHANCE_NOTE: Final[str] = (
-    "About 1 in 20 exploratory contrasts reaches significance at the 5% level by chance. Each "
-    "interval rests on 17 to 26 resampled calendar months, depending on the block, so the "
-    "intervals are likely somewhat narrow."
+    "No correction is made for the number of exploratory contrasts. About 1 in 20 contrasts with "
+    "no true difference would reach statistical significance at the 5% level by chance, and the "
+    "contrasts are correlated. Each interval rests on 17 to 26 resampled calendar months, "
+    "depending on the block, so the intervals are likely somewhat narrow."
+)
+LEAD_NOTE: Final[str] = (
+    "The products are scored at different lead times: ERA5 is an analysis, UKV is scored at T+0, "
+    "its analysis, and the ICON products at 0 to 2 hours into the run (ICON global, 0 to 5), so a "
+    "ranking here is partly a lead-time effect. Figure {number} shows it for ICON-D2 against UKV."
 )
 CAPTION_CHARACTERS: Final[int] = 100
 """The characters a wind caption line holds, fewer than the default so no line reaches the edge."""
@@ -426,6 +432,7 @@ def leaderboard_figure(
                     f"that Figure {WIND_FIGURE_NUMBERS['contrasts']}'s paired contrasts cancel."
                 ),
                 STATION_SCOPE,
+                LEAD_NOTE.format(number=WIND_FIGURE_NUMBERS["icon_d2_leads"]),
                 *wind_product_caveats(),
                 *uncovered_month_note(shares=shares),
                 *block_caveats(),
@@ -462,6 +469,7 @@ def contrasts_figure(
                 UNDRAWN_PLANNED_ICON_NOTE,
                 BLOCKS_NOT_COMPARABLE,
                 STATION_SCOPE,
+                LEAD_NOTE.format(number=WIND_FIGURE_NUMBERS["icon_d2_leads"]),
                 *wind_product_caveats(),
                 CHANCE_NOTE,
                 *uncovered_month_note(shares=shares),
