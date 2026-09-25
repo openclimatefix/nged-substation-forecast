@@ -679,6 +679,30 @@ def test_the_zero_label_stays_inside_the_plot(
     assert zero_text["mark"]["align"] == align
 
 
+@pytest.mark.parametrize(
+    ("zero_label", "align"),
+    [("same as ERA5", "left"), ("same as the second product", "right")],
+)
+def test_a_long_zero_label_moves_to_the_side_with_room_for_its_text(
+    zero_label: str, align: str
+) -> None:
+    # Catches the zero label of a planned-contrast panel running off the plot's right edge when the
+    # rule sits at three quarters of the axis and the label is 26 characters long.
+    spec = _panel(
+        _rows(["weather model"]),
+        x_domain=(-0.75, 0.25),
+        better_direction="negative",
+        zero_label=zero_label,
+    )
+    (zero_text,) = [
+        layer
+        for layer in _layer(spec, "text")
+        if layer["encoding"]["text"].get("value") == zero_label
+    ]
+
+    assert zero_text["mark"]["align"] == align
+
+
 def _planned_rows(planned: list[bool]) -> pl.DataFrame:
     return _rows(["satellite", "reanalysis"][: len(planned)]).with_columns(
         planned=pl.Series(planned)

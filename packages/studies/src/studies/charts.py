@@ -155,6 +155,9 @@ _AXIS_TITLE_CHARACTERS: Final[int] = 78
 """The characters an interval panel's axis-title line holds before wrapping, at `PLOT_WIDTH_PX`."""
 
 _ZERO_LABEL_ROOM: Final[float] = 0.25
+_ZERO_LABEL_CHARACTER_PX: Final[int] = 6
+"""The width of one character of the regular-weight zero label, generously rounded up."""
+
 _BETTER_LABEL_CHARACTER_PX: Final[int] = 8
 """The width of one character of the bold better-direction label, generously rounded up."""
 
@@ -444,12 +447,14 @@ def _reference_layers(
     )
     # The zero label sits on the side of the rule away from the better-direction label, so the
     # two collide only if the better-direction label crosses zero, unless that side holds less
-    # than a quarter of the axis, where the label would run off the plot.
+    # than a quarter of the axis or than the label's own text needs, where the label would run off
+    # the plot.
     low, high = x_domain
+    zero_room = max(_ZERO_LABEL_ROOM, _ZERO_LABEL_CHARACTER_PX * len(zero_label) / width)
     to_the_right = better_direction == "negative"
-    if to_the_right and high / (high - low) < _ZERO_LABEL_ROOM:
+    if to_the_right and high / (high - low) < zero_room:
         to_the_right = False
-    if not to_the_right and -low / (high - low) < _ZERO_LABEL_ROOM:
+    if not to_the_right and -low / (high - low) < zero_room:
         to_the_right = True
     zero_text = (
         alt.Chart(anchor)

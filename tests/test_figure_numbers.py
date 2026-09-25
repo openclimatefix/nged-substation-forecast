@@ -13,19 +13,7 @@ ASSETS_DIR: Final[Path] = REPO_ROOT / "docs" / "studies" / "assets"
 SOLAR_SVG_PREFIXES: Final[tuple[str, ...]] = ("sunshine_", "ens_past_solar_", "station_past_solar_")
 WIND_SVG_PREFIXES: Final[tuple[str, ...]] = ("wind_", "ens_hres_wind_", "station_wind_")
 TITLE_NUMBER: Final[re.Pattern[str]] = re.compile(r"aria-label=\"Title text 'Figure (\d+):")
-STALE_TITLE_SVGS: Final[frozenset[str]] = frozenset(
-    {
-        "ens_hres_wind_models_work",
-        "ens_hres_wind_per_farm_error",
-        "ens_hres_wind_robustness",
-        "ens_hres_wind_reconciliation",
-        "ens_hres_wind_monthly_ratio",
-        "ens_hres_wind_split",
-        "ens_hres_wind_by_farm",
-        "station_wind_by_farm",
-        "station_wind_season",
-    }
-)
+STALE_TITLE_SVGS: Final[frozenset[str]] = frozenset()
 """Wind SVGs still on disk with their old title number, until the redraw of the wind page. Delete a
 stem from here when its SVG is redrawn; a test fails if the stem stays after the title is right."""
 
