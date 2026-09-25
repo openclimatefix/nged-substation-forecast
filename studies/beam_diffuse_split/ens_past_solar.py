@@ -101,8 +101,8 @@ from ens_forecast_horizons import (
     Steps,
     _clear_sky_arrays,
     _long,
-    _prefixed,
     ens_columns,
+    prefixed,
     reduce_members,
     shared_features,
 )
@@ -501,12 +501,12 @@ def build_rows() -> pl.DataFrame:
     )
     upsampled = _t3_upsampled(steps=steps, clear_sky=clear_sky)
     hourly = _long(steps=steps, targets=TARGET_LEADS, values=upsampled)
-    mean_frame = _prefixed(
+    mean_frame = prefixed(
         frame=reduce_members(hourly=hourly, domain="solar", way="mean"),
         arm=MEAN_ARM,
         domain="solar",
     )
-    control_frame = _prefixed(
+    control_frame = prefixed(
         frame=reduce_members(hourly=hourly, domain="solar", way="control"),
         arm=CONTROL_ARM,
         domain="solar",
