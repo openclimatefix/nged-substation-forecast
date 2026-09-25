@@ -329,8 +329,12 @@ interval resamples whole year-months.** Capacity is the generator's `effective_c
 page](blending-weather-products.md#data-and-methods). Each of 2,000 resamples draws whole
 year-months, and one of the three fitting seeds, paired across the two arms of a contrast. Each
 contrast asserts that both arms hold the same rows. The XGBoost model is fitted at two
-hyperparameter settings, called primary and sensitivity, and the sensitivity setting is run on
-every planned contrast.
+hyperparameter settings, called primary and sensitivity. The page shows the sensitivity setting for
+every planned contrast, for the exploratory results that decide whether a planned contrast is
+informative (the permutation controls against ENS alone, and the check that ENS's error rises with
+lead), and for any exploratory result near the 5% line, which is one with a 95% interval bound within
+20% of the interval's width from zero. Every other exploratory result is shown at the primary
+setting only.
 <!-- report: Design constants (Intervals, Capacity) -->
 
 ## Results
@@ -559,7 +563,7 @@ generator, year-month, and UTC hour of day.
 | P4b guard: blend − control | -0.168 [-0.241, -0.095] | -0.136 [-0.194, -0.079] | -0.148 [-0.266, -0.026] | -0.198 [-0.317, -0.087] |
 | Control P4a − ENS day 1 (exploratory) | +0.152 [+0.097, +0.215] | +0.152 [+0.097, +0.211] | -0.052 [-0.151, +0.032] | -0.001 [-0.090, +0.064] |
 | Control P4b − ENS day 1 (exploratory) | +0.136 [+0.066, +0.211] | +0.150 [+0.092, +0.209] | -0.036 [-0.139, +0.048] | +0.001 [-0.094, +0.070] |
-| IFS 0.25° day 1 − ENS day 1 (exploratory) | +0.036 [-0.225, +0.296] | +0.088 [-0.171, +0.336] | +0.003 [-0.163, +0.186] | -0.055 [-0.238, +0.133] |
+| IFS 0.25° day 1 − ENS day 1 (exploratory) | +0.036 [-0.225, +0.296] | not shown | +0.003 [-0.163, +0.186] | not shown |
 
 <!-- report: Solar / P4, the blend; Wind / P4, the blend -->
 
@@ -589,9 +593,8 @@ significantly worse at the sensitivity setting too. The P4a gain may therefore r
 runs rather than a second weather model ([What this study cannot
 separate](#what-this-study-cannot-separate)). P4b is the deciding contrast because P4b's added
 runs precede 09:00 UTC. IFS 0.25° alone at day 1 does not differ detectably from ENS at day 1:
-+0.036 points [-0.225, +0.296] at the primary setting and +0.088 points [-0.171, +0.336] at the
-sensitivity setting (exploratory). The same contrast for wind is +0.003 points [-0.163, +0.186] and
--0.055 points [-0.238, +0.133].
++0.036 points [-0.225, +0.296] at the primary setting (exploratory). The same contrast for wind is
++0.003 points [-0.163, +0.186].
 <!-- report: Solar / P4, the blend; Wind / P4, the blend -->
 
 **Each blend covers Great Britain, and its delivery time is set by the latest run it reads.**
@@ -606,13 +609,13 @@ P4b's result was seen: ENS's day-1 columns plus ICON-EU's day-2 columns, and ENS
 plus IFS 0.25°'s day-2 columns. Each of the two post hoc XGBoost models has 11 columns, whereas P4b
 has 15, so equal column counts with P4b are impossible. The fair reference for each post hoc XGBoost
 model is ENS alone at day 1, with 7 columns. ENS plus ICON-EU differs from ENS alone by -0.169
-points [-0.250, -0.090] at the primary setting and -0.180 [-0.284, -0.085] at the sensitivity
-setting. ENS plus IFS 0.25° differs from ENS alone by -0.073 points [-0.132, -0.011] and -0.067
-[-0.128, -0.006]. Against P4b, ENS plus ICON-EU is +0.015 points [-0.033, +0.065] and +0.018
-[-0.022, +0.058], so the study cannot distinguish ENS plus ICON-EU from P4b. ENS plus IFS 0.25° is
-+0.111 points [+0.035, +0.189] and +0.130 [+0.064, +0.200] worse than P4b, so ENS plus IFS 0.25°
-reaches only part of P4b's gain. The ICON-EU permutation guard is -0.142 points [-0.217, -0.066] and
--0.181 [-0.273, -0.105]. The ICON-EU control is not worse than ENS alone (-0.027 [-0.081, +0.023]
+points [-0.250, -0.090] at the primary setting. ENS plus IFS 0.25° differs from ENS alone by -0.073
+points [-0.132, -0.011] at the primary setting and -0.067 [-0.128, -0.006] at the sensitivity
+setting; both settings are shown because the upper bound is close to zero. Against P4b, ENS plus
+ICON-EU is +0.015 points [-0.033, +0.065], so the study cannot distinguish ENS plus ICON-EU from
+P4b. ENS plus IFS 0.25° is +0.111 points [+0.035, +0.189] worse than P4b, so ENS plus IFS 0.25°
+reaches only part of P4b's gain. The ICON-EU permutation guard is -0.142 points [-0.217, -0.066].
+The ICON-EU control is not worse than ENS alone (-0.027 [-0.081, +0.023]
 and +0.002 [-0.038, +0.036]), so the gain comes from ICON-EU's weather.
 
 **IFS 0.25°'s small wind gain cannot be told apart from what a shuffled column gives.** The IFS
