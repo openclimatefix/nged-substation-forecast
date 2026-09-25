@@ -347,6 +347,20 @@ decision to score the product. Ordered by how far back whole runs reach:
 6. **Open-Meteo Previous Runs**, from 2024-01-19 at the earliest — capped at the offsets in the
    table above.
 
+**The matched-lead study scored most of these candidates and found ENS ahead of UKV, ICON-EU, and
+GEFS for solar.** The
+[study](https://openclimatefix.github.io/nged-substation-forecast/studies/nwp-forecasts-at-matched-leads/)
+reads Open-Meteo Previous Runs (UKV, ICON-D2, ICON-EU, ICON global, IFS 0.25°, GFS, ARPEGE, AROME,
+and two HARMONIE-AROME products) at whole-day offsets, and Dynamical.org's ECMWF ENS and GEFS as
+whole 00 UTC runs. Previous Runs is not a fixed-lead archive, because a value's lead depends on each
+product's run cycle, so the study brackets each product between ENS's day-0 and day-1 errors. For
+solar, UKV (+1.242 points [+0.824, +1.689]) and ICON-EU (+0.817 [+0.584, +1.069]) lose to ENS, and
+GEFS at an identical lead is +1.272 points [+0.937, +1.601] worse. For wind, UKV loses (+0.770
+[+0.460, +1.057]), ICON-EU is unresolved (+0.169 [-0.064, +0.384]), and GEFS is +0.858 points
+[+0.598, +1.099] worse. Dynamical.org's GEFS is read from 2024-11-30 in the study, although the
+archive reaches back to 2020-10-01. Products the study does not fit are the ERA5 and CAMS reference
+rows, IFS HRES 9 km, Dynamical.org's own GFS, and Open-Meteo Single Runs.
+
 Dynamical.org's ICON-EU whole runs carry native direct and diffuse irradiance, but start only on
 2026-02-10, too short a history to list.
 

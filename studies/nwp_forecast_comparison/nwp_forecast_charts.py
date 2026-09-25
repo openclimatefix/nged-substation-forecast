@@ -1265,14 +1265,14 @@ FIGURE_NUMBERS: Final[dict[tuple[DomainType, str], int]] = {
     ("wind", "headline"): 2,
     ("solar", "models_work"): 3,
     ("wind", "models_work"): 4,
-    ("solar", "per_generator"): 5,
-    ("wind", "per_generator"): 6,
-    ("solar", "leaderboard"): 7,
-    ("wind", "leaderboard"): 8,
-    ("solar", "by_lead_day"): 9,
-    ("wind", "by_lead_day"): 10,
-    ("solar", "blends"): 11,
-    ("wind", "blends"): 12,
+    ("solar", "per_generator"): 7,
+    ("wind", "per_generator"): 8,
+    ("solar", "leaderboard"): 5,
+    ("wind", "leaderboard"): 6,
+    ("solar", "by_lead_day"): 11,
+    ("wind", "by_lead_day"): 12,
+    ("solar", "blends"): 9,
+    ("wind", "blends"): 10,
 }
 """Each chart's figure number on the page, in the page's order: the headline pair opens the page."""
 

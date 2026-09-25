@@ -1374,6 +1374,22 @@ arrived; [masking whole
 sources](../techniques/encoders.md#handling-missing-inputs-remove-the-token-dont-zero-fill) sets out
 what that precedent does and does not cover.
 
+**Two measurements of adding weather products to ECMWF ENS point the same way, and the day-ahead
+study puts a size on the wind gain.** An earlier multi-source measurement found -0.30 points of
+capacity [-0.37, -0.24]. The [matched-lead
+study](https://openclimatefix.github.io/nged-substation-forecast/studies/nwp-forecasts-at-matched-leads/)
+scores an XGBoost model given ENS's day-1 mean plus ICON-EU and IFS 0.25° forecasts against an
+XGBoost model given ENS alone, at 3 wind and 6 solar generators over 21 months. The contrast P4b
+(planned) gives the other products day-2 values, which are never fresher than a 09:00 UTC service
+could read. For wind, P4b is -0.184 points [-0.282, -0.087] at the primary hyperparameter setting
+and -0.197 [-0.311, -0.088] at the sensitivity setting, and its permutation guard is negative at
+both. The optimistic contrast, P4a, uses day-1 values and is -0.656 points [-0.851, -0.472]; its
+gain may include newer ECMWF runs. For solar, P4b is -0.033 points [-0.106, +0.033] and +0.014
+[-0.049, +0.068], so the study finds no detectable solar gain at the conservative lead. P4a for
+solar is -0.347 points [-0.482, -0.219], but its guard is uninformative because the permuted control
+is itself worse than ENS alone. The study scores point forecasts, so it does not test whether a
+second source improves the probabilistic forecast or the CRPS the experiment steps above use.
+
 **Each step of the experiment has to beat the step before on out-of-sample CRPS per horizon slice,
 with a block-bootstrap confidence interval that excludes zero:**
 

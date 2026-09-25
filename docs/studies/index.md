@@ -58,3 +58,8 @@ climates, so a result may not hold elsewhere.
   post hoc check, over the same model given no weather at all. The ensemble mean beats the control
   member and beats training on every member, and rebuilding solar radiation through the clear-sky
   index beats the straight-line resample the live service uses today.
+- [Which weather forecast is best at day-ahead lead?](nwp-forecasts-at-matched-leads.md) — at the 6
+  solar farms and 3 wind farms, ECMWF's ensemble mean beats UKV, ICON-EU, and GEFS at matched lead
+  for solar; for wind it beats UKV, and ICON-EU is unresolved. A blend of ENS, ICON-EU, and IFS
+  0.25° lowers the wind error but shows no detectable solar gain at a lead a 09:00 UTC service could
+  use.
