@@ -65,7 +65,8 @@ run at the second hyperparameter setting):
 
 **Exploratory, labelled so in the report:** `EXPLORATORY_CONTRASTS` (CERRA against `cams_3h`, and
 the effect of the step width on ERA5 and CAMS), the four planned contrasts per generator, the
-checks on the rebuild, and every arm at the second hyperparameter setting.
+checks on the rebuild, and the second hyperparameter setting of the arms the planned contrasts
+use.
 
 Run it with `uv run python studies/beam_diffuse_split/cerra_past_solar.py`, after
 `weather_products.py` has built its datasets and `fetch_cerra.py` has written the CERRA files.
@@ -127,9 +128,10 @@ GENERATOR_CELLS_PATH: Final[Path] = CERRA_DIR / "generator_cells.parquet"
 """One row per generator with `site`, `y_index`, `x_index` and `distance_km`, which the values are
 read through once `check_cells_match` has confirmed them against the grid."""
 
-GRID_PATH: Final[Path] = CERRA_DIR / "grid_latlon.parquet"
-"""The grid's `y_index`, `x_index`, `latitude` and `longitude`, one row per cell. The path is a
-placeholder until `fetch_cerra.py` writes the grid."""
+GRID_PATH: Final[Path] = CERRA_DIR / "cerra_grid.parquet"
+"""The grid's `y_index`, `x_index`, `latitude` and `longitude`, one row per cell of the whole
+CERRA domain. The file is private: nothing reads a coordinate out of it into a log, a report or a
+chart."""
 
 OUTPUT_DIR: Final[Path] = STUDY_DATA_DIR / "past_weather_v2" / "cerra_past_solar"
 """Where the script writes `losses.parquet`, `losses.fingerprint`, `report.md`, and a `superseded/`
@@ -186,6 +188,11 @@ PLANNED_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     (SPLIT_ARM, ERBS_ARM),
 )
 """The four contrasts written into the plan before the first fit: (treatment, reference)."""
+
+PLANNED_ARMS: Final[tuple[str, ...]] = tuple(
+    arm for arm in ARM_ORDER if any(arm in contrast for contrast in PLANNED_CONTRASTS)
+)
+"""The arms the planned contrasts use, in `ARM_ORDER`: the arms refit at the second setting."""
 
 EXPLORATORY_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     (CERRA_ARM, CAMS_3H_ARM),
@@ -732,23 +739,24 @@ def check_column_counts(
 
 
 def jobs() -> list[Job]:
-    """Return every arm at `pooled` and at `sensitivity`.
+    """Return every arm at `pooled`, and each arm of a planned contrast at `sensitivity` too.
 
-    Every arm is refit at the second hyperparameter setting, so that the four planned contrasts,
-    and every exploratory contrast that lands near the 5% line, have a second setting.
+    The second hyperparameter setting is fitted only for the arms the four planned contrasts use,
+    so that each planned contrast has a second setting. An exploratory contrast shows a second
+    setting only where both its arms have one.
 
     Returns:
-        One job per arm at each setting.
+        One job per arm at the first setting, and one per planned-contrast arm at the second.
     """
     features = _arm_features()
     check_column_counts(features=features, contrasts=(*PLANNED_CONTRASTS, *EXPLORATORY_CONTRASTS))
     return [
         (arm, setting, "power_mw", features[arm], hyper_parameters, False)
-        for setting, hyper_parameters in (
-            ("pooled", PRIMARY_HYPER_PARAMETERS),
-            ("sensitivity", SENSITIVITY_HYPER_PARAMETERS),
+        for setting, hyper_parameters, arms in (
+            ("pooled", PRIMARY_HYPER_PARAMETERS, ARM_ORDER),
+            ("sensitivity", SENSITIVITY_HYPER_PARAMETERS, PLANNED_ARMS),
         )
-        for arm in ARM_ORDER
+        for arm in arms
     ]
 
 

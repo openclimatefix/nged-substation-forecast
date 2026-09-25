@@ -384,14 +384,17 @@ def test_every_arm_carries_the_same_number_of_distinct_columns_where_a_contrast_
     assert set(features) == set(module.ARM_ORDER)
 
 
-def test_every_arm_is_fitted_at_both_settings() -> None:
+def test_only_the_planned_contrasts_arms_are_fitted_at_the_second_setting() -> None:
     module = _load()
 
     settings = {(job[0], job[1]) for job in module.jobs()}
 
     assert settings == {
-        (arm, setting) for arm in module.ARM_ORDER for setting in ("pooled", "sensitivity")
+        *((arm, "pooled") for arm in module.ARM_ORDER),
+        *((arm, "sensitivity") for arm in module.PLANNED_ARMS),
     }
+    assert ("cams_3h", "sensitivity") not in settings
+    assert set(module.PLANNED_ARMS) == set(module.ARM_ORDER) - {"cams_3h"}
 
 
 def test_a_contrast_between_arms_of_different_widths_raises() -> None:

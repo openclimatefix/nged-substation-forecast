@@ -259,6 +259,14 @@ traded away.
 - Mechanical checks in the script on the built row set (they run in every fit, not only in
   tests): the hour of the peak of the rebuilt CERRA clear-day composite equals ERA5's, since a
   wrong window convention shifts the series by 3 hours without any value looking wrong.
+  **The tolerance is stated here before any run: none.** A difference of one hour or more between
+  the CERRA and ERA5 clear-day peaks is a hard failure, and the script raises. The run then stops,
+  and the maintainer's coordinator is told. A legitimate one-hour difference has to be explained
+  in the report and the check changed in a reviewed commit, never loosened silently.
+- **Second hyperparameter setting:** only the arms of the four planned contrasts are fitted at it
+  (`PLANNED_ARMS`: every arm except `cams_3h`), and an exploratory contrast shows a second setting
+  only where both its arms have one, the maintainer's rule for planned and deciding contrasts and
+  results near the 5% line.
 
 ## Docs to update
 
