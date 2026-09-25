@@ -10,9 +10,11 @@ Before `build_forecast_inputs.py --aifs` has run, `aifs_steps.md` holds:
    each candidate end offset from -6 to +6 h, the mean absolute difference between AIFS Single's
    radiation at each valid time and ERA5's mean over the six hours ending at that time plus the
    offset, pooled over the solar sites at leads 18 to 78 h. The check fails unless the minimum is at
-   offset 0, both over every valid time and over the 06 UTC valid times alone.
+   offset 0, both over every valid time and over the 06 UTC valid times alone. ERA5 is read for all
+   24 hours, and every offset is scored on the same rows: the valid times at which every hour any
+   offset's window needs is present.
 2. **Wind is instantaneous.** For offsets from -3 to +3 h, the correlation of AIFS Single's 100 m
-   speed with ERA5's hub-height speed at the valid time plus the offset, and with ERA5's 6-hour
+   speed with ERA5's 100 m speed at the valid time plus the offset, and with ERA5's 6-hour
    mean ending at the valid time. The check fails unless offset 0 correlates best and beats the
    6-hour mean.
 3. **Units.** AIFS temperature in degrees Celsius, wind in m/s, radiation between 0 and 1,100 W/m2.
@@ -63,7 +65,9 @@ from build_forecast_inputs import (
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
 import ens_forecast_horizons as efh
+from build_dataset import _pv_sites, nearest_era5_cell, read_era5
 from sources import WEATHER_DATA_DIR
+from studies.guards import refuse_to_overwrite
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -96,20 +100,38 @@ SPEED_TOLERANCE: Final[float] = 1e-5
 Float32 store allows."""
 
 
-def era5_column(*, published_dir: Path, domain: DomainType) -> pl.DataFrame:
-    """Return ERA5's own value at each generator and hour, from the published inputs.
+def era5_column(*, domain: DomainType, sites: list[str]) -> pl.DataFrame:
+    """Return ERA5's own value at each generator for every hour of the day.
+
+    The published inputs hold only the daylight hours of solar, so the radiation window check
+    needs these full series: a 6-hour window at every end offset from -6 to +6 h has to be complete
+    for one common set of valid times.
 
     Args:
-        published_dir: The folder holding the published inputs.
-        domain: `solar` (hour-ending global irradiance) or `wind` (hub-height speed at the instant).
+        domain: `solar` (hour-ending global irradiance at the site's nearest ERA5 cell, from
+            `beam_diffuse_open_meteo.parquet`) or `wind` (100 m speed at the instant, from
+            `wind_era5.parquet`).
+        sites: The anonymised site labels to keep.
 
     Returns:
-        `site`, `time` and `era5`.
+        `site`, `time` and `era5`, with one row per hour.
     """
-    column = "ghi_era5" if domain == "solar" else "speed_hub_era5"
+    if domain == "wind":
+        return (
+            pl.read_parquet(WEATHER_DATA_DIR / "ERA5" / "wind_era5.parquet")
+            .filter(pl.col("site").is_in(sites))
+            .select("site", "time", era5="wind_speed_100m")
+            .drop_nulls()
+        )
+    gridded = read_era5(source="open-meteo")
+    cells = nearest_era5_cell(sites=_pv_sites().filter(pl.col("site").is_in(sites)), era5=gridded)
     return (
-        pl.read_parquet(published_dir / f"{domain}_forecast_inputs.parquet")
-        .select("site", "time", era5=column)
+        cells.join(
+            gridded,
+            left_on=["cell_latitude", "cell_longitude"],
+            right_on=["latitude", "longitude"],
+        )
+        .select("site", "time", era5="ghi_w_m2")
         .drop_nulls()
     )
 
@@ -148,36 +170,34 @@ def aifs_valid_rows(*, weather_dir: Path, published_dir: Path, domain: DomainTyp
 def radiation_window_table(*, aifs: pl.DataFrame, era5: pl.DataFrame) -> pl.DataFrame:
     """Return the mean absolute radiation difference for each candidate window end offset.
 
+    Every offset is scored on one common set of rows: the valid times at which ERA5 has every hour
+    that any offset's window needs. Offsets therefore differ only in where the window ends.
+
     Args:
         aifs: `aifs_valid_rows`'s result for solar.
-        era5: `era5_column`'s result for solar.
+        era5: `era5_column`'s result for solar, holding all 24 hours.
 
     Returns:
-        `offset`, `valid_hours` (`all` or `06`), `mae` and `n`.
+        `offset`, `valid_hours` (`all` or `06`), `mae` and `n`, with the same `n` at every offset.
     """
-    base = aifs.filter(pl.col("lead_hours") > 0).select(
+    shifts = range(min(RADIATION_OFFSETS) - WINDOW_HOURS + 1, max(RADIATION_OFFSETS) + 1)
+    window = aifs.filter(pl.col("lead_hours") > 0).select(
         "site", "valid_time", ghi=pl.col("ghi_w_m2").cast(pl.Float64)
     )
+    for shift in shifts:
+        window = window.join(
+            era5.select(
+                "site", end=pl.col("time") - pl.duration(hours=shift), **{f"era5_{shift}": "era5"}
+            ),
+            left_on=["site", "valid_time"],
+            right_on=["site", "end"],
+            how="left",
+        )
+    common = window.drop_nulls([f"era5_{shift}" for shift in shifts])
     records = []
     for offset in RADIATION_OFFSETS:
-        window = base
-        hours = []
-        for k in range(WINDOW_HOURS):
-            name = f"era5_{k}"
-            hours.append(name)
-            window = window.join(
-                era5.select(
-                    "site",
-                    end=pl.col("time") - pl.duration(hours=offset - k),
-                    **{name: "era5"},
-                ),
-                left_on=["site", "valid_time"],
-                right_on=["site", "end"],
-                how="left",
-            )
-        scored = window.drop_nulls(hours).with_columns(
-            error=(pl.col("ghi") - pl.mean_horizontal(hours)).abs()
-        )
+        window_hours = [f"era5_{offset - k}" for k in range(WINDOW_HOURS)]
+        scored = common.with_columns(error=(pl.col("ghi") - pl.mean_horizontal(window_hours)).abs())
         for label, subset in (
             ("all", scored),
             ("06", scored.filter(pl.col("valid_time").dt.hour() == WINDOW_HOURS)),
@@ -186,7 +206,7 @@ def radiation_window_table(*, aifs: pl.DataFrame, era5: pl.DataFrame) -> pl.Data
                 {
                     "offset": offset,
                     "valid_hours": label,
-                    "mae": cast("float", subset["error"].mean()),
+                    "mae": cast("float | None", subset["error"].mean()),
                     "n": subset.height,
                 }
             )
@@ -197,11 +217,14 @@ def radiation_verdict(*, table: pl.DataFrame) -> list[str]:
     """Return the failures of the radiation window check, empty when it passes.
 
     Offset 0 must have a strictly smaller error than every other offset, so a tie (as at night)
-    is a failure rather than evidence.
+    is a failure rather than evidence. A subset with no rows is a failure too.
     """
     failures = []
     for label in ("all", "06"):
         subset = table.filter(pl.col("valid_hours") == label)
+        if subset["n"].min() == 0:
+            failures.append(f"radiation check has no rows ({label})")
+            continue
         at_zero = subset.filter(pl.col("offset") == 0)["mae"].item()
         if at_zero >= subset.filter(pl.col("offset") != 0)["mae"].min():
             failures.append(f"radiation error is not smallest at offset 0 ({label})")
@@ -213,7 +236,7 @@ def wind_table(*, aifs: pl.DataFrame, era5: pl.DataFrame) -> pl.DataFrame:
 
     Args:
         aifs: `aifs_valid_rows`'s result for wind.
-        era5: `era5_column`'s result for wind.
+        era5: `era5_column`'s result for wind, holding all 24 hours.
 
     Returns:
         `reading` (an offset, or `6-hour mean`), `correlation` and `n`.
@@ -318,7 +341,7 @@ def orientation_table(*, weather_dir: Path) -> tuple[pl.DataFrame, list[str]]:
     key = [pl.col("latitude").round(4).alias("lat"), pl.col("longitude").round(4).alias("lon")]
     first = datetime.strptime(ORIENTATION_MONTH, "%Y-%m")  # noqa: DTZ007
     last = first + timedelta(days=31)
-    hours = [pl.duration(hours=lead) for lead in ORIENTATION_LEADS]
+    hours = [timedelta(hours=lead) for lead in ORIENTATION_LEADS]
 
     def anomalies(*, store: Path, cells: pl.DataFrame, control: bool) -> pl.DataFrame:
         scan = pl.scan_parquet(store).filter(
@@ -394,9 +417,11 @@ def steps_report(*, published_dir: Path, weather_dir: Path) -> tuple[list[str], 
     solar = aifs_valid_rows(weather_dir=weather_dir, published_dir=published_dir, domain="solar")
     wind = aifs_valid_rows(weather_dir=weather_dir, published_dir=published_dir, domain="wind")
     radiation = radiation_window_table(
-        aifs=solar, era5=era5_column(published_dir=published_dir, domain="solar")
+        aifs=solar, era5=era5_column(domain="solar", sites=solar["site"].unique().to_list())
     )
-    wind_corr = wind_table(aifs=wind, era5=era5_column(published_dir=published_dir, domain="wind"))
+    wind_corr = wind_table(
+        aifs=wind, era5=era5_column(domain="wind", sites=wind["site"].unique().to_list())
+    )
     units, unit_failures = units_lines(solar=solar, wind=wind)
     orientation, orientation_failures = orientation_table(weather_dir=weather_dir)
     failures = [
@@ -639,18 +664,21 @@ def main() -> int:
         "--wiring", action="store_true", help="Run the checks that follow the build."
     )
     args = parser.parse_args()
+    if args.output_dir.resolve() == args.published_dir.resolve():
+        msg = "the verification output must not be the published folder"
+        raise ValueError(msg)
     verification = args.output_dir / "verification"
+    name = "aifs_wiring.md" if args.wiring else "aifs_steps.md"
+    refuse_to_overwrite(paths=[verification / name])
     verification.mkdir(parents=True, exist_ok=True)
     if args.wiring:
         lines, failures = wiring_report(
             published_dir=args.published_dir, aifs_dir=args.output_dir, weather_dir=args.weather_dir
         )
-        name = "aifs_wiring.md"
     else:
         lines, failures = steps_report(
             published_dir=args.published_dir, weather_dir=args.weather_dir
         )
-        name = "aifs_steps.md"
     (verification / name).write_text("\n".join(lines))
     _LOG.info("wrote %s", verification / name)
     if failures:
