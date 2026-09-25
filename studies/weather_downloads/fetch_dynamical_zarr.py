@@ -297,10 +297,14 @@ _NO_VERSION_MARKER: Final[str] = (
 VERSION_NOTES: Final[dict[str, list[str]]] = {
     "ECMWF-AIFS": [
         "Operational versions of AIFS Single, by first `init_time` (UTC) and identifier: "
-        "2025-02-25 06:00, AIFS Single v1.0; 2025-08-27 (hour not recorded), AIFS Single v1.1.0 "
-        "(paper: 'AIFS Single 1.1.0'); 2026-05-12 06:00, AIFS Single v2 (released jointly with "
-        "IFS Cycle 50r1). Runs before 2025-02-25 06:00 pre-date the operational v1.0; which "
-        "model version produced them was not checked. " + _VERSION_READ_NOT_VERIFIED,
+        "2025-02-25 06:00, AIFS Single v1.0; 2025-07-31 06:00, a first attempt at AIFS Single "
+        "v1.1, reverted on 2025-08-01 (v1.0 ran again until 2025-08-27), so runs from "
+        "2025-07-31 06:00 to 2025-08-01 18:00 inclusive are an excluded window of uncertain "
+        "version; 2025-08-27 06:00, AIFS Single v1.1.0 re-implemented (paper: 'AIFS Single "
+        "1.1.0'); 2026-05-12 06:00, AIFS Single v2 (released jointly with IFS Cycle 50r1, so "
+        "AIFS and IFS changes cannot be separated after that run). Runs before 2025-02-25 06:00 "
+        "pre-date the operational v1.0; which model version produced them was not checked. "
+        + _VERSION_READ_NOT_VERIFIED,
         _NO_VERSION_MARKER,
         (
             "The store starts on 2024-04-01, but `downward_short_wave_radiation_flux_surface`, "
@@ -315,7 +319,8 @@ VERSION_NOTES: Final[dict[str, list[str]]] = {
     "ECMWF-AIFS-ENS": [
         "Operational versions of AIFS ENS, by first `init_time` (UTC) and identifier: "
         "2025-07-01 06:00, AIFS ENS v1 (the store starts on 2025-07-02 00:00, so it holds no "
-        "run before v1); 2026-05-12 06:00, AIFS ENS v2 (released jointly with IFS Cycle 50r1). "
+        "run before v1); 2026-05-12 06:00, AIFS ENS v2 (released jointly with IFS Cycle 50r1, "
+        "so AIFS and IFS changes cannot be separated after that run). "
         + _VERSION_READ_NOT_VERIFIED,
         _NO_VERSION_MARKER,
     ],
