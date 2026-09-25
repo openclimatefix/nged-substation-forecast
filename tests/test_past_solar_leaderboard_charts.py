@@ -73,7 +73,7 @@ def test_the_contrast_figures_title_and_subtitle_say_the_cams_row_is_exploratory
     ).to_dict()
 
     caption = _caption(spec=spec)
-    assert "CAMS beats ERA5 by 3.7 to 4.1 points on every row set (exploratory)" in caption
+    assert "CAMS beats ERA5 by 3.7 to 4.1 points in each block (exploratory)" in caption
     assert "The CAMS row is exploratory" in caption
 
 
@@ -143,9 +143,9 @@ def test_the_contrast_figure_says_two_leads_are_unmeasured_or_unequal() -> None:
 
     caption = _caption(spec=module.contrasts_figure(blocks=[_contrast_block(cams=-3.7)]).to_dict())
 
-    assert "KNMI HARMONIE-AROME's lead is not measured" in caption
-    assert "ECMWF-IFS-HRES's lead is never shorter than ICON-EU's and often longer" in caption
-    assert "their planned contrasts against ICON-EU mix weather-model skill with lead" in caption
+    assert "KNMI HARMONIE-AROME's lead not measured" in caption
+    assert "ECMWF-IFS-HRES never shorter than ICON-EU's" in caption
+    assert "ICON-DREAM-EU's 1 to 3 hours against ERA5's 1 to 12" in caption
 
 
 def _intervals(*, arms: dict[str, float]) -> pl.DataFrame:
@@ -186,3 +186,18 @@ def test_a_post_hoc_rebuild_is_labelled_post_hoc_on_the_leaderboard_and_others_a
         "ukv_trap_global": "UKV, snapshot mean (post hoc)",
         "icon_eu_global": "ICON-EU",
     }
+
+
+def test_the_figures_carry_the_scope_caveats_added_after_review() -> None:
+    module = _load()
+    block = _contrast_block(cams=-3.7)
+    leaderboard = module.leaderboard_figure(
+        blocks=[RowSetBlock("Main", "January 2025", 8, block.rows.rename({"difference": "value"}))]
+    ).to_dict()
+    contrasts = module.contrasts_figure(blocks=[block]).to_dict()
+
+    assert "not a gridded product" in _caption(spec=leaderboard)
+    assert "36.9% of its hours" in _caption(spec=leaderboard)
+    assert "almost entirely subsets of the main rows" in _caption(spec=contrasts)
+    assert "ICON global is served up to 6 hours ahead" in _caption(spec=contrasts)
+    assert "and a fitting seed" in _caption(spec=contrasts)
