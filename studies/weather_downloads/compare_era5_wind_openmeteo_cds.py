@@ -27,6 +27,7 @@ the output away from the final folder, for a trial.
 """
 
 import argparse
+import itertools
 import logging
 import sys
 from datetime import timedelta
@@ -56,6 +57,9 @@ FACTOR_VISIBLE_THRESHOLD: Final[float] = 0.005
 as a visible constant factor."""
 HEIGHTS: Final[tuple[str, ...]] = ("100m", "10m")
 CELL_KEYS: Final[list[str]] = ["site", "dy", "dx"]
+MATCHED_RMS_KM_PER_HOUR: Final[float] = 0.2
+"""A best cell whose 100 m or 10 m speed RMS is under this matches Open-Meteo to within its
+quantisation, so a ratio of means there can be read as a scaling test. Above it, no cell matches."""
 
 
 def _load_native(*, site: str | None) -> pl.DataFrame:
@@ -108,24 +112,30 @@ def _speed_metrics(*, pairs: pl.DataFrame, height: str, by: list[str]) -> pl.Dat
     """Return agreement statistics of Open-Meteo speed against native speed, in km/h."""
     open_meteo, native = f"open_meteo_speed_{height}", f"native_speed_{height}"
     difference = pl.col(open_meteo) - pl.col(native)
-    return pairs.group_by(by).agg(
-        pl.len().alias("n"),
-        difference.abs().mean().alias("mean_abs_diff"),
-        difference.pow(2).mean().sqrt().alias("rms"),
-        difference.mean().alias("bias"),
-        difference.abs().max().alias("max_abs_diff"),
-        pl.corr(open_meteo, native).alias("correlation"),
-        (pl.col(open_meteo).mean() / pl.col(native).mean()).alias("ratio_of_means"),
-        ((pl.col(open_meteo) * pl.col(native)).sum() / (pl.col(native) ** 2).sum()).alias(
-            "slope_through_origin"
-        ),
-        pl.col(native).mean().alias("native_mean"),
+    return (
+        pairs.drop_nulls([open_meteo, native])
+        .group_by(by)
+        .agg(
+            pl.len().alias("n"),
+            difference.abs().mean().alias("mean_abs_diff"),
+            difference.pow(2).mean().sqrt().alias("rms"),
+            difference.mean().alias("bias"),
+            difference.abs().max().alias("max_abs_diff"),
+            pl.corr(open_meteo, native).alias("correlation"),
+            (pl.col(open_meteo).mean() / pl.col(native).mean()).alias("ratio_of_means"),
+            ((pl.col(open_meteo) * pl.col(native)).sum() / (pl.col(native) ** 2).sum()).alias(
+                "slope_through_origin"
+            ),
+            pl.col(native).mean().alias("native_mean"),
+        )
     )
 
 
 def _direction_metrics(*, pairs: pl.DataFrame, by: list[str]) -> pl.DataFrame:
     """Return circular agreement statistics of the 100 m direction, in degrees."""
-    windy = pairs.filter(pl.col("native_speed_100m") > CALM_SPEED_KM_PER_HOUR)
+    windy = pairs.drop_nulls(
+        ["open_meteo_direction_100m", "native_direction_100m", "native_speed_100m"]
+    ).filter(pl.col("native_speed_100m") > CALM_SPEED_KM_PER_HOUR)
     difference = (
         (pl.col("open_meteo_direction_100m") - pl.col("native_direction_100m") + 180.0) % 360.0
     ) - 180.0
@@ -301,15 +311,60 @@ def _factor_verdicts(*, summary: pl.DataFrame, best: pl.DataFrame) -> list[str]:
             & (pl.col("dy") == row["best_dy"])
             & (pl.col("dx") == row["best_dx"])
         ).row(0, named=True)
-        floor = 0.5 * OPEN_METEO_ROUNDING_KM_PER_HOUR / cell["native_mean"]
+        if cell["rms"] >= MATCHED_RMS_KM_PER_HOUR:
+            sentences.append(
+                f"{row['site']} {row['height']}: no cell matches "
+                f"(best RMS {cell['rms']:.3g} km/h), factor undetermined."
+            )
+            continue
+        floor = cell["max_abs_diff"] / cell["native_mean"]
         deviation = abs(cell["ratio_of_means"] - 1.0)
         visible = deviation > max(FACTOR_VISIBLE_THRESHOLD, 3.0 * floor)
         sentences.append(
             f"{row['site']} {row['height']}: ratio of means {cell['ratio_of_means']:.4f}, "
-            f"rounding noise floor {floor:.5f}, "
+            f"observed floor (maximum absolute difference over mean native speed) {floor:.5f}, "
             f"{'a constant factor IS visible' if visible else 'no constant factor visible'}."
         )
     return sentences
+
+
+def _shared_cell_sites(*, native: pl.DataFrame) -> list[tuple[str, str]]:
+    """Return the site pairs whose nearest-cell native 100 m series are identical."""
+    nearest = native.filter((pl.col("dy") == 0) & (pl.col("dx") == 0))
+    series = {
+        key[0]: group.sort("time").select("time", "native_speed_100m")
+        for key, group in nearest.group_by("site")
+    }
+    return [
+        (first, second)
+        for first, second in itertools.combinations(sorted(series), 2)
+        if series[first].equals(series[second])
+    ]
+
+
+def _observed_floor(*, summary: pl.DataFrame, best: pl.DataFrame) -> str:
+    """Return a sentence giving the observed RMS and maximum difference at the matched cells."""
+    cells = []
+    for row in best.iter_rows(named=True):
+        cell = summary.filter(
+            (pl.col("site") == row["site"])
+            & (pl.col("quantity") == f"speed_{row['height']}")
+            & (pl.col("dy") == row["best_dy"])
+            & (pl.col("dx") == row["best_dx"])
+        ).row(0, named=True)
+        if cell["rms"] < MATCHED_RMS_KM_PER_HOUR:
+            cells.append(cell)
+    if not cells:
+        return "No cell matched Open-Meteo closely enough to measure a floor."
+    return (
+        f"At the {len(cells)} matched site-height cells the observed RMS is "
+        f"{min(c['rms'] for c in cells):.3f} to {max(c['rms'] for c in cells):.3f} km/h and the "
+        f"maximum absolute difference is {max(c['max_abs_diff'] for c in cells):.3f} km/h. "
+        f"Rounding to {OPEN_METEO_ROUNDING_KM_PER_HOUR:g} km/h alone would give an RMS of "
+        f"{OPEN_METEO_ROUNDING_KM_PER_HOUR / 12**0.5:.3f} km/h and a maximum of "
+        f"{OPEN_METEO_ROUNDING_KM_PER_HOUR / 2:.2f} km/h, so any excess is quantisation upstream "
+        "of the displayed rounding."
+    )
 
 
 def _markdown_table(*, frame: pl.DataFrame) -> str:
@@ -340,6 +395,7 @@ def _write_readme(
     height_ratio: pl.DataFrame,
     verdicts: list[str],
     summary: pl.DataFrame,
+    shared_cells: list[tuple[str, str]],
 ) -> None:
     """Write the README that explains every file and states the findings."""
     nearest = summary.filter(pl.col("quantity") != "direction_100m").filter(
@@ -348,6 +404,13 @@ def _write_readme(
     direction = summary.filter(pl.col("quantity") == "direction_100m").filter(
         (pl.col("dy") == 0) & (pl.col("dx") == 0)
     )
+    shared_note = "".join(
+        f"**{first} and {second} share one ERA5 cell**, so their native series are identical, "
+        "and their Open-Meteo series are expected to be too; the evidence is fewer independent "
+        "series than sites.\n\n"
+        for first, second in shared_cells
+    )
+    floor_text = _observed_floor(summary=summary, best=best)
     text = f"""# Open-Meteo's ERA5 wind against native ERA5 wind
 
 One-off throwaway comparison written by
@@ -361,6 +424,7 @@ Nothing in this folder carries a coordinate.
 Overlap compared: {span[0]} to {span[1]} (UTC hours). Speeds are km/h. Open-Meteo minus native is
 the sign convention for every difference and bias.
 
+{shared_note}
 ## Files
 
 - `pairs.parquet`: matched hourly pairs at zero shift, one row per site, cell, and hour, with
@@ -369,15 +433,19 @@ the sign convention for every difference and bias.
   mean absolute difference, RMS, bias, maximum absolute difference, correlation, ratio of means, and
   the slope of a fit through the origin. Direction rows count only hours with native 100 m speed
   above {CALM_SPEED_KM_PER_HOUR:g} km/h, use circular differences wrapped to plus or minus 180
-  degrees, and leave the ratio and correlation columns empty.
+  degrees, and leave the `rms`, `correlation`, `ratio_of_means`, `slope_through_origin`, and
+  `native_mean` columns empty.
 - `best_cells.csv`, `blend.csv`, `timing.csv`, `height_ratio.csv`: the tables below.
 - `lineage.json`: the inputs and the run time.
 
 ## Is a constant factor visible?
 
-Open-Meteo rounds speeds to {OPEN_METEO_ROUNDING_KM_PER_HOUR:g} km/h, so a ratio of means carries a
-rounding noise floor of at most 0.05 km/h divided by the mean native speed. A ratio further than
-{FACTOR_VISIBLE_THRESHOLD:g} from 1 and beyond 3 times that floor is called a visible factor. Ratios
+Open-Meteo rounds speeds to {OPEN_METEO_ROUNDING_KM_PER_HOUR:g} km/h. {floor_text}
+
+The floor used below is the maximum absolute difference at the matched cell divided by the mean
+native speed. A ratio further than {FACTOR_VISIBLE_THRESHOLD:g} from 1 and beyond 3 times that
+floor is called a visible factor. The test runs only where the best cell's RMS is under
+{MATCHED_RMS_KM_PER_HOUR:g} km/h; elsewhere no cell matches and the factor is undetermined. Ratios
 are at the best-matching cell.
 
 {chr(10).join(f"- {sentence}" for sentence in verdicts)}
@@ -390,7 +458,8 @@ are at the best-matching cell.
 
 ## Non-negative least-squares blend of the 9 cells
 
-A diagnostic of Open-Meteo's processing, not a forecast model. Weights are non-negative with no
+A diagnostic of Open-Meteo's processing in speed space (it fits speeds, not the u and v
+components), not a forecast model. Weights are non-negative with no
 intercept; `weight_sum` far from 1 would show a scaling factor, and weight spread over several
 cells would show interpolation. A bilinear blend of the 4 nearest cells is a special case.
 
@@ -476,6 +545,7 @@ def main() -> int:
         height_ratio=height_ratio,
         verdicts=verdicts,
         summary=summary,
+        shared_cells=_shared_cell_sites(native=native),
     )
     write_lineage_note(
         product_dir=output_dir,
@@ -484,7 +554,15 @@ def main() -> int:
             "Open-Meteo's ERA5 wind (archive API, model era5, cell_selection=land) compared with "
             "native Copernicus ERA5 wind at a 3 x 3 block of cells per site, on the overlap."
         ),
-        variables=["wind_speed_100m", "wind_speed_10m", "wind_direction_100m", "u100", "v100"],
+        variables=[
+            "wind_speed_100m",
+            "wind_speed_10m",
+            "wind_direction_100m",
+            "u100",
+            "v100",
+            "u10",
+            "v10",
+        ],
         extra={"span": span, "pairs": pairs.height, "sites": pairs["site"].unique().to_list()},
     )
     _LOG.info("wrote outputs to %s", output_dir)

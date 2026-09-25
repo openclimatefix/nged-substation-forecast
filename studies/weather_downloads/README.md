@@ -41,9 +41,10 @@ way):
   `uv run --with cdsapi --with netCDF4`.
 - `fetch_era5_wind.py` — native ERA5 10 m and 100 m wind from the Climate Data Store at a 3 x 3 block
   of cells around each of the three wind sites, needs `uv run --with cdsapi --with netCDF4`. The
-  data on disk covers only 2024-01-01 to 2026-09-20 (the newest 6 six-month chunks, fetched with
-  `--chunks 6`), because the comparison with Open-Meteo's ERA5 wind needs only a couple of years.
-  Running without `--chunks` fetches the older chunks back to 2019-09; cached chunks are skipped.
+  data on disk covers only 2024-01-01 to 2026-09-20 (the newest 6 chunks, about 2.7 years, fetched
+  with `--chunks 6`), because the comparison with Open-Meteo's ERA5 wind needs only a couple of years.
+  Running without `--chunks` fetches the older chunks back to 2019-09; cached chunks are skipped,
+  so extending past 2026-09-20 means deleting `era5_wind_2026_07_09.zip` first.
   `compare_era5_wind_openmeteo_cds.py` is that comparison.
 - `fetch_midas_open.py` and `validate_midas_open.py` — Met Office MIDAS Open station observations.
 - `fetch_icon_dream.py` — DWD's ICON-DREAM-EU, whole-domain monthly GRIB cropped to the box then

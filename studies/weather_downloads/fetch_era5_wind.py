@@ -16,10 +16,11 @@ logged.
 rejects requests over its cost limit (a two-year request was refused). Each chunk is skipped when
 its output exists.
 
-**The data on disk covers only 2024-01-01 to 2026-09-20.** That is 3 years, the newest 6 six-month
-chunks, fetched with `--chunks 6`, because the Open-Meteo comparison needs only a couple of years.
+**The data on disk covers only 2024-01-01 to 2026-09-20.** That is the newest 6 chunks (about 2.7
+years), fetched with `--chunks 6`, because the Open-Meteo comparison needs only a couple of years.
 Running without `--chunks` fetches the older chunks back to 2019-09 as well; cached chunks are
-skipped.
+skipped. The 2026-07 to 09 chunk is cached and skipped too, so extending past 2026-09-20 means
+deleting `era5_wind_2026_07_09.zip` first.
 
 Run with `uv run --with cdsapi --with netCDF4 python studies/weather_downloads/fetch_era5_wind.py`,
 adding `--chunks 6` for the newest three years only.
@@ -224,9 +225,10 @@ def main() -> int:
                 "cells could locate the generators."
             ),
             (
-                "The file on disk covers only 2024-01-01 to 2026-09-20, the newest 6 six-month "
-                "chunks (`--chunks 6`). Running the script without `--chunks` adds older chunks "
-                "back to 2019-09."
+                "The file on disk covers only 2024-01-01 to 2026-09-20, the newest 6 chunks "
+                "(`--chunks 6`, about 2.7 years); the 2026-07 to 09 chunk is cached, so delete "
+                "`era5_wind_2026_07_09.zip` before extending past 2026-09-20. Running the script "
+                "without `--chunks` adds older chunks back to 2019-09."
             ),
             (
                 "The newest chunk asks for whole months up to 2026-09, so it ends a few days short "
