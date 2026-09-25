@@ -232,7 +232,7 @@ EXTRA_LEAD_BUILDS: Final[dict[ExtraBatchType, ExtraLeadBuild]] = {
 ENS control member at days 5, 7, 10 and 14, and GEFS mean at day 7, with no Previous Runs column
 because the arms it refits take their columns from the published inputs), and the third batch's
 (the native GFS store at `GFS_NATIVE_DAYS`, and nothing else), and the fourth batch's (Open-Meteo's
-Open-Meteo's IFS HRES archive at `IFS_SINGLE_DAYS`, and nothing else)."""
+IFS HRES archive at `IFS_SINGLE_DAYS`, and nothing else)."""
 
 SOLAR_ONLY_PRODUCTS: Final[frozenset[str]] = frozenset({"ARPEGE Europe", "AROME France"})
 """Products the plan scores for solar only: their 100 m wind offsets are missing on most rows."""
@@ -1258,9 +1258,10 @@ IFS_SINGLE_ARM_PREFIX: Final[str] = "ifs_single"
 
 IFS_SINGLE_MAX_MISSING_SHARE: Final[float] = 0.015
 """The largest share of rows with a null in one IFS HRES (9 km, Open-Meteo) arm's columns the build
-accepts, the limit `fit_extra_leads.MAX_MISSING_SHARE` applies to every new arm. The nulls are the
-days whose run the archive lacks (seven run days; each arm loses the target days those runs would
-serve)."""
+accepts. The build measures it over every published row (about 1% at most), whereas
+`fit_extra_leads.MAX_MISSING_SHARE`, the same limit, is measured over the shared rows only, where
+the seven gap run days fall on long summer days and reach 1.45% for solar day 0. The nulls are the
+days whose run the archive lacks (each arm loses the target days those runs would serve)."""
 
 
 def ifs_single_arm(*, day: int) -> str:
@@ -1353,7 +1354,9 @@ def _ifs_single_frame(
     hour's own day (a solar hour's own day is the day of the instant an hour before its label), at a
     lead of `24 * N + 1` to `24 * N + 24` for solar and `24 * N` to `24 * N + 23` for wind, the ENS
     and GEFS arms' rule (`studies.ifs_single_runs.served_init_time`). Day 0 is the run of the
-    hour's own day, so it is the 00 UTC run and not the freshest run, and it is not a nowcast.
+    hour's own day, so it is the 00 UTC run and not the freshest run. Like ENS's day 0, it covers
+    hours before the 00 UTC run is published, so it is not a forecast that could have been used in
+    advance for those hours.
 
     **The values.** Every value is used as the archive serves it, with no upsampling, because the
     archive is already hourly. Radiation is the mean over the hour ending at the label, clipped at

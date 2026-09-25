@@ -446,7 +446,9 @@ FOURTH_BATCH_NOTE: Final[str] = (
     "and each wind generator its nearest land cell (sites B and D share a source cell and carry "
     "identical series). Day N reads the 00 UTC run issued N days before the hour's own day, at "
     "leads 24 N + 1 to 24 N + 24 hours for solar and 24 N to 24 N + 23 hours for wind, the rule "
-    "the ENS arms follow, so day 0 is the run of the hour's own day and not a nowcast. Day 10 is "
+    "the ENS arms follow, so day 0 is the run of the hour's own day. Like ENS's day 0, it covers "
+    "hours before the 00 UTC run is published, so it is not a forecast that could have been used "
+    "in advance for those hours. Day 10 is "
     "absent because the runs end at lead 240 hours. Radiation is clipped at zero; wind is the "
     "served speed and the sine and cosine of the served direction, as the Open-Meteo Previous "
     "Runs arms are. IFS HRES publishes every 3 hours after lead 90 and every 6 hours after lead "
@@ -855,6 +857,60 @@ def intersection_contrast_line(
     )
 
 
+ROW_SET_REFERENCE_ARM: Final[str] = "ens_mean_day1"
+"""The arm the row-set diagnostic scores on all shared rows and on the rows without a gap."""
+
+
+def row_set_diagnostic(*, losses: pl.DataFrame, gap_arm: str) -> str | None:
+    """Format how far dropping an arm's gap rows moves a reference arm's absolute error.
+
+    The leaderboard mark of an arm scored without its gap rows averages over different hours from
+    every other mark. This line measures that alone, on an arm that has no gap: the reference arm
+    scored on every shared row and on the rows `gap_arm` also holds.
+
+    Args:
+        losses: Per-row losses at one setting, carrying `ROW_SET_REFERENCE_ARM` and `gap_arm`.
+        gap_arm: An arm scored without its gap rows.
+
+    Returns:
+        `| reference | error on all rows | error without the gap rows | difference | rows | rows |`,
+        in percent of capacity and percentage points, or None if either arm is absent.
+    """
+    present = set(losses["arm"].unique().to_list())
+    if ROW_SET_REFERENCE_ARM not in present or gap_arm not in present:
+        return None
+    every_row = bootstrap_absolute(losses=losses, arm=ROW_SET_REFERENCE_ARM, metric=METRIC)
+    kept = shared_rows(losses=losses, treatment=ROW_SET_REFERENCE_ARM, reference=gap_arm)
+    without_gap = bootstrap_absolute(losses=kept, arm=ROW_SET_REFERENCE_ARM, metric=METRIC)
+    moved = (without_gap["value"] - every_row["value"]) * PERCENTAGE_POINTS
+    return (
+        f"| {ROW_SET_REFERENCE_ARM} | {every_row['value'] * PERCENTAGE_POINTS:.3f} "
+        f"| {without_gap['value'] * PERCENTAGE_POINTS:.3f} | {moved:+.3f} "
+        f"| {every_row['n_rows']} | {without_gap['n_rows']} |"
+    )
+
+
+def row_set_diagnostic_lines(*, losses: pl.DataFrame, gap_arm: str) -> list[str]:
+    """Write the row-set diagnostic's report section, or nothing if an arm is absent."""
+    diagnostic = row_set_diagnostic(losses=losses, gap_arm=gap_arm)
+    if diagnostic is None:
+        return []
+    return [
+        "",
+        (
+            f"### Row-set diagnostic: {ROW_SET_REFERENCE_ARM} on all shared rows and without the "
+            f"gap days of {gap_arm}"
+        ),
+        "",
+        (
+            "| Arm | Error on all rows (%) | Error without the gap rows (%) "
+            "| Change (points) | Rows, all | Rows, without the gap rows |"
+        ),
+        "|---|---|---|---|---|---|",
+        diagnostic,
+    ]
+
+
 def served_lead(*, domain: DomainType, remainder: int) -> int:
     """Return a 3-hourly model's served lead in hours where `hour % 3 == remainder`.
 
@@ -1038,6 +1094,8 @@ def report_domain(
         contrast_line(losses=with_climatology, treatment=arm, reference="climatology")
         for arm in batch.climatology_contrasts
     ]
+    if batch.drop_gap_rows:
+        lines += row_set_diagnostic_lines(losses=pooled, gap_arm=batch.new_prefixes[1])
     if any(elsewhere):
         lines += [
             "",

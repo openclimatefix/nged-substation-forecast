@@ -901,7 +901,8 @@ def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt
                 "the ENS control member share ENS's lead; at day 0, GFS (native) reads the "
                 "freshest of its four runs a day. IFS HRES (9 km, Open-Meteo) is scored on the "
                 "shared hours minus the target days whose 00 UTC run the archive lacks (seven run "
-                "days), which the other rows include; contrasts with it are computed on the "
+                "days), which the other rows include; the report's row-set diagnostic gives how "
+                "far that difference alone moves a mark, and contrasts with it are computed on the "
                 "hours both score."
             ),
             f"{scope_text(losses=losses, domain=domain)} {CAPACITY_NOTE}",
@@ -1012,31 +1013,41 @@ def choose_week(*, series: pl.DataFrame, domain: DomainType) -> datetime:
     return chosen
 
 
+KEY_ROW_PX: Final[int] = 18
+"""The height of each extra row of a wrapped `line_key`."""
+
+
 def line_key(
     *,
     labels: Sequence[str],
     colours: Sequence[str],
     width: int = CONTENT_WIDTH_PX - 60,
     dashed: Sequence[bool] | None = None,
+    columns: int | None = None,
 ) -> alt.LayerChart:
-    """Draw a one-row key of short line segments above a chart.
+    """Draw a key of short line segments above a chart, in one row unless `columns` wraps it.
 
     Args:
         labels: Each entry's label.
         colours: Each entry's colour.
         width: The key's width in pixels.
         dashed: Whether each entry's segment is dashed; None draws every segment solid.
+        columns: How many entries a row holds before the key wraps to a new row; None puts every
+            entry in one row. A wider slot leaves room for a longer label.
 
     Returns:
-        A one-row chart.
+        A chart one row tall, or `KEY_ROW_PX` taller for each extra row.
     """
-    slot = width // len(labels)
+    per_row = columns or len(labels)
+    slot = width // per_row
+    rows = -(-len(labels) // per_row)
     data = pl.DataFrame(
         {
             "label": list(labels),
             "colour": list(colours),
-            "x": [index * slot for index in range(len(labels))],
-            "x2": [index * slot + 18 for index in range(len(labels))],
+            "x": [index % per_row * slot for index in range(len(labels))],
+            "x2": [index % per_row * slot + 18 for index in range(len(labels))],
+            "y": [8 + KEY_ROW_PX * (index // per_row) for index in range(len(labels))],
             "dashed": [str(flag).lower() for flag in (dashed or [False] * len(labels))],
         }
     )
@@ -1046,7 +1057,7 @@ def line_key(
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("x:Q", scale=None),
             x2="x2:Q",
-            y=alt.value(8),
+            y=alt.Y("y:Q", scale=None),
             color=alt.Color("colour:N", scale=None),
             strokeDash=alt.StrokeDash(
                 "dashed:N",
@@ -1058,9 +1069,9 @@ def line_key(
     text = (
         alt.Chart(data)
         .mark_text(align="left", dx=22, color=ocf.BLACK_1, limit=slot - 24)
-        .encode(x=alt.X("x:Q", scale=None), y=alt.value(8), text="label:N")  # ty: ignore[unresolved-attribute]
+        .encode(x=alt.X("x:Q", scale=None), y=alt.Y("y:Q", scale=None), text="label:N")  # ty: ignore[unresolved-attribute]
     )
-    return alt.LayerChart(layer=[segments, text], width=width, height=16)
+    return alt.LayerChart(layer=[segments, text], width=width, height=16 + KEY_ROW_PX * (rows - 1))
 
 
 def models_work(
@@ -1191,8 +1202,17 @@ each line's last point carry the difference.
 `IFS HRES (9 km, Open-Meteo)` reuses IFS 0.25°'s Data Burnt Orange and is dashed, for the same
 reason. No colour was added, so the palette check above is unchanged."""
 
-KEY_LABELS: Final[dict[str, str]] = {"ARPEGE Europe": "ARPEGE"}
-"""Shorter names for the key above the lead-day chart, whose slots are narrow."""
+KEY_LABELS: Final[dict[str, str]] = {
+    "ARPEGE Europe": "ARPEGE",
+    "IFS HRES (9 km, Open-Meteo)": "IFS HRES 9 km",
+}
+"""Shorter names for the key above the lead-day chart and for the names beside each line's last
+point, whose room is limited: the key wraps to `KEY_COLUMNS` entries a row, and the label beside a
+line has about 115 pixels."""
+
+KEY_COLUMNS: Final[int] = 5
+"""How many entries a row of the lead-day chart's key holds. The chart can hold nine products, and
+nine slots would leave 44 pixels for a label."""
 
 DASHED_PRODUCTS: Final[frozenset[str]] = frozenset(
     {"ARPEGE Europe", "GFS (native)", "IFS HRES (9 km, Open-Meteo)"}
@@ -1411,6 +1431,7 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
     )
     ends = drawn.sort("day").group_by("product", maintain_order=True).last()
     ends = ends.with_columns(
+        end_label=pl.col("product").replace(KEY_LABELS),
         label_x=pl.lit(MAX_LINE_DAY + max(offsets.values()), dtype=pl.Float64),
         label_y=pl.Series(
             spread_labels(values=ends["value"].to_list(), min_gap=(y_domain[1] - y_domain[0]) / 16)
@@ -1422,7 +1443,7 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("label_x:Q", scale=x_scale, axis=x_axis),
             y=alt.Y("label_y:Q", scale=alt.Scale(domain=list(y_domain), nice=False)),
-            text="product:N",
+            text="end_label:N",
             color=colour,
         )
     )
@@ -1437,6 +1458,7 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
                 labels=[KEY_LABELS.get(name, name) for name in names],
                 colours=[PRODUCT_COLOURS[name] for name in names],
                 dashed=[name in DASHED_PRODUCTS for name in names],
+                columns=KEY_COLUMNS,
             ),
             panel,
         ],
@@ -1452,10 +1474,13 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
             ),
             (
                 f"{DOTS_NOTE} Products at one day are drawn side by side, and each product's "
-                "name is written beside its last point. The dashed orange line is IFS HRES (9 km, "
-                "Open-Meteo), 00 UTC runs only, scored without the target days whose run the "
-                "archive lacks, and not checked against a native archive; the solid orange line "
-                "is IFS 0.25°, a coarser product. The two GFS lines are one weather model "
+                "name is written beside its last point. Two dashed lines each sit beside a solid "
+                "line of the same colour. The dashed burnt-orange line, shown as IFS HRES 9 km, is "
+                "IFS HRES (9 km, Open-Meteo): 00 UTC runs only, scored without the target days "
+                "whose run the archive lacks, not checked against a native archive, and its "
+                "day-3 values after lead 90 hours are interpolated from 3-hourly steps. The "
+                "solid burnt-orange line is IFS 0.25°, a coarser product. The dashed amber line "
+                "is GFS (native). The two GFS lines are one weather model "
                 "from two sources: the solid line is Open-Meteo's GFS-SEAMLESS archive, and the "
                 "dashed line is Dynamical.org's native GFS store, whose radiation is a mean since "
                 "the last 6-hourly reset and is converted to the mean over each hour before its "

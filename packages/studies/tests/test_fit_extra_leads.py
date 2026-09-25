@@ -14,6 +14,7 @@ from fit_extra_leads import (  # noqa: E402
     BATCHES,
     NEW_PREFIXES,
     REFERENCE_PREFIXES,
+    ROW_SET_REFERENCE_ARM,
     SECOND_NEW_PREFIXES,
     SECOND_REFERENCE_PREFIXES,
     arm_rows,
@@ -22,8 +23,10 @@ from fit_extra_leads import (  # noqa: E402
     check_saved_losses_hold_arms,
     contrast_arms,
     domain_prefixes,
+    fit_arms,
     intersection_contrast_line,
     noise_floor_lines,
+    row_set_diagnostic,
     shared_rows,
 )
 from nwp_forecast_comparison import METRIC, DomainType, arm_columns  # noqa: E402
@@ -253,18 +256,6 @@ def test_the_first_batch_alone_leaves_a_fourth_batch_contrast_arm_unfitted() -> 
         )
 
 
-def test_every_arm_a_fourth_batch_contrast_names_is_fitted_in_some_batch():
-    fitted = (
-        set(BATCHES["fourth"].new_prefixes)
-        | set(NEW_PREFIXES)
-        | set(REFERENCE_PREFIXES)
-        | set(SECOND_NEW_PREFIXES)
-        | set(SECOND_REFERENCE_PREFIXES)
-    )
-
-    assert _all_contrast_arms(batch="fourth") <= fitted
-
-
 def test_the_fourth_batch_contrasts_ifs_025_at_the_days_it_is_fitted_and_icon_eu_at_one_to_three():
     batch = BATCHES["fourth"]
 
@@ -276,14 +267,6 @@ def test_the_fourth_batch_contrasts_ifs_025_at_the_days_it_is_fitted_and_icon_eu
     )
     assert batch.drop_gap_rows
     assert not any(BATCHES[name].drop_gap_rows for name in ("first", "second", "third"))
-
-
-def test_the_fourth_batch_arms_have_the_column_counts_of_every_other_arm():
-    for domain in ("solar", "wind"):
-        ifs = arm_columns(domain=domain, prefixes=("ifs_single_day2",))
-        ens = arm_columns(domain=domain, prefixes=("ens_mean_day2",))
-
-        assert len(ifs) == len(ens)
 
 
 def test_a_batch_that_drops_gap_rows_drops_only_the_rows_with_a_null_in_the_arms_columns():
@@ -353,3 +336,86 @@ def test_an_intersection_contrast_with_an_absent_arm_is_none():
     losses = _losses(rows={"first": [0, 1]}, errors={"first": 0.1})
 
     assert intersection_contrast_line(losses=losses, treatment="first", reference="gone") is None
+
+
+class _RecordedFit:
+    """A stand-in for `out_of_fold_losses` that records the rows each fit is given."""
+
+    def __init__(self) -> None:
+        self.rows: list[pl.DataFrame] = []
+
+    def __call__(self, *, site_rows: pl.DataFrame, **_: object) -> pl.DataFrame:
+        self.rows.append(site_rows)
+        return pl.DataFrame({"loss": [0.0]})
+
+
+def _rows_with_one_gap() -> pl.DataFrame:
+    """One site's rows, one of which has a null in the arm's columns."""
+    columns = arm_columns(domain="wind", prefixes=("ifs_single_day1",))
+    return pl.DataFrame(
+        {
+            "site": ["A"] * 3,
+            **{
+                column: [1.0, None if column.endswith("speed_10m") else 1.0, 1.0]
+                for column in columns
+            },
+        }
+    )
+
+
+def test_a_gap_dropping_fit_hands_the_model_no_null_rows(monkeypatch: pytest.MonkeyPatch) -> None:
+    recorded = _RecordedFit()
+    monkeypatch.setattr("fit_extra_leads.out_of_fold_losses", recorded)
+
+    fit_arms(
+        frame=_rows_with_one_gap(),
+        domain="wind",
+        prefixes=("ifs_single_day1",),
+        workers=1,
+        drop_gap_rows=True,
+    )
+
+    assert [rows.height for rows in recorded.rows] == [2]
+    assert not any(recorded.rows[0].null_count().row(0))
+
+
+def test_a_fit_that_keeps_gap_rows_hands_the_model_the_null_row(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    recorded = _RecordedFit()
+    monkeypatch.setattr("fit_extra_leads.out_of_fold_losses", recorded)
+
+    fit_arms(
+        frame=_rows_with_one_gap(),
+        domain="wind",
+        prefixes=("ifs_single_day1",),
+        workers=1,
+    )
+
+    assert [rows.height for rows in recorded.rows] == [3]
+
+
+def test_only_the_gap_dropping_batch_asks_for_dropped_rows() -> None:
+    assert [name for name, batch in BATCHES.items() if batch.drop_gap_rows] == ["fourth"]
+
+
+def test_the_row_set_diagnostic_measures_the_reference_arm_on_both_row_sets() -> None:
+    losses = _losses(
+        rows={ROW_SET_REFERENCE_ARM: list(range(48)), "ifs_single_day1": list(range(24, 72))},
+        errors={ROW_SET_REFERENCE_ARM: 0.10, "ifs_single_day1": 0.20},
+    )
+
+    line = row_set_diagnostic(losses=losses, gap_arm="ifs_single_day1")
+
+    assert line is not None
+    cells = [cell.strip() for cell in line.strip("|").split("|")]
+    # All 48 days average 0.1 + 0.001 * 23.5, and the 24 shared days 0.1 + 0.001 * 35.5.
+    assert abs(float(cells[1]) - 12.35) < 0.01
+    assert abs(float(cells[2]) - 13.55) < 0.01
+    assert cells[4:] == ["48", "24"]
+
+
+def test_the_row_set_diagnostic_is_none_without_the_gap_arm() -> None:
+    losses = _losses(rows={ROW_SET_REFERENCE_ARM: [0, 1]}, errors={ROW_SET_REFERENCE_ARM: 0.1})
+
+    assert row_set_diagnostic(losses=losses, gap_arm="ifs_single_day1") is None

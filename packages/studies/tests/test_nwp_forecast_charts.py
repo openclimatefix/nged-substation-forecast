@@ -10,11 +10,17 @@ sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
 
 from nwp_forecast_charts import (  # noqa: E402
     DIAMOND_DAYS,
+    KEY_COLUMNS,
+    KEY_LABELS,
+    KEY_ROW_PX,
     LEAD_COLOURS,
     MAX_LINE_DAY,
+    PRODUCT_COLOURS,
+    PRODUCT_NAMES,
     check_single_device,
     combine_losses,
     extra_arm_devices,
+    line_key,
 )
 
 
@@ -97,3 +103,20 @@ def test_day_seven_has_a_grey_colour_and_a_diamond_and_the_lines_stop_at_day_thr
     assert 7 in DIAMOND_DAYS
     assert len(set(LEAD_COLOURS.values())) == len(LEAD_COLOURS)
     assert MAX_LINE_DAY == 3
+
+
+def test_the_ifs_hres_row_reuses_the_ifs_025_colour_and_has_a_short_key_label() -> None:
+    name = PRODUCT_NAMES["ifs_single"]
+
+    assert name == "IFS HRES (9 km, Open-Meteo)"
+    assert PRODUCT_COLOURS[name] == PRODUCT_COLOURS["IFS 0.25°"]
+    assert len(KEY_LABELS[name]) < len(name)
+
+
+def test_a_key_of_more_entries_than_a_row_holds_wraps_and_grows_taller() -> None:
+    labels = [f"product {index}" for index in range(KEY_COLUMNS + 4)]
+
+    wrapped = line_key(labels=labels, colours=["#000000"] * len(labels), columns=KEY_COLUMNS)
+    single = line_key(labels=labels[:KEY_COLUMNS], colours=["#000000"] * KEY_COLUMNS)
+
+    assert wrapped.height == single.height + KEY_ROW_PX

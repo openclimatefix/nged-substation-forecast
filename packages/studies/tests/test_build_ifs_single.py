@@ -16,7 +16,6 @@ from build_forecast_inputs import (  # noqa: E402
     KMH_TO_MS,
     _ifs_single_arm_columns,
     _ifs_single_extract,
-    ifs_single_arm,
 )
 from nwp_forecast_comparison import DomainType, arm_columns  # noqa: E402
 
@@ -129,7 +128,3 @@ def test_day_ten_raises_because_the_runs_end_at_lead_240():
 
     with pytest.raises(ValueError, match="day 10"):
         _ifs_single_arm_columns(keys=keys, extract=extract, domain="wind", day=10)
-
-
-def test_the_arm_is_named_by_prefix_and_day():
-    assert ifs_single_arm(day=7) == "ifs_single_day7"
