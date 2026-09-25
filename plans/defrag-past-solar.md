@@ -12,7 +12,7 @@ PR A (code, charts, drift fixes) puts every headline result into one leaderboard
 
 **Verdict:** worth doing, as approved by the maintainer. **Size: complex.** The five triggers:
 
-1. What gets stored: yes. A new write-once folder `data/studies/past_weather_v2/solar_leaderboard/` (report, `intervals.parquet`), and about 17 SVGs redrawn. No Delta table, Patito model or asset.
+1. What gets stored: yes. A new write-once folder `data/studies/past_weather_v2/solar_leaderboard/` (report, `intervals.parquet`; no past-solar row set has one today, the intervals in the page come from `report.md` files), and about 17 SVGs redrawn. No Delta table, Patito model or asset.
 2. Production serving path: no. Nothing under `defs/`, `ml_core` or `xgboost_forecaster`.
 3. Degradation rule: no.
 4. More than one defensible design: yes. Whether a shared leaderboard helper is a list of row-set blocks or one frame, whether pages move with or without redirects, and where the Methods page sits.
@@ -47,7 +47,7 @@ Studies
 
 Assets stay in `docs/studies/assets/`; moved pages link them as `../assets/...`. The Methods page holds, moved verbatim from the solar page: the four row sets, the 14 planned contrasts and the planned/exploratory rule, capacity normalisation, bootstrap intervals, the second hyperparameter setting, and the gotchas that are not solar-specific. The Overview holds the take-home for all three past-weather studies in one paragraph each, linking the pages. The wind and blending pages keep their duplicated methods until their own restructures, which then only delete duplicates and add links.
 
-Moving a page changes its slug, so the work list in PR B is: `git mv` the five pages; update `mkdocs.yml`; fix every inbound link and `#anchor` (inventory below); fix `studies/**` script docstrings and reproduce text that name pages or figure numbers; fix `.claude/skills` and `CLAUDE.md` mentions; and if no redirect plugin is installed, decide with the maintainer whether to add `mkdocs-redirects` (open question 3). The docs-link check and `mkdocs build --strict` prove no link is left dangling.
+Moving a page changes its slug, so the work list in PR B is: `git mv` the five pages; update `mkdocs.yml`; fix every inbound link and `#anchor` (inventory below); fix `studies/**` script docstrings and reproduce text that name pages or figure numbers; fix `.claude/skills` and `CLAUDE.md` mentions; and add a `redirect_maps` entry per moved page. The docs-link check and `mkdocs build --strict` prove no link is left dangling.
 
 ## What changes, file by file
 
@@ -99,8 +99,12 @@ Labels A-F only for generators; no MIDAS station names, coordinates, farm mappin
 
 ## Risks and open questions
 
-1. Redirects: decided (via the coordinator): add `mkdocs-redirects`, pinned, in its own small commit, and check `uv run mkdocs build --strict` handles the redirect map. Redirects keep old page URLs working for GitHub issues and PR bodies. Anchors inside pages cannot be redirected, so every inbound anchor link is still updated.
+1. Redirects: decided (via the coordinator) to keep old page URLs working. `mkdocs-redirects` is already installed and pinned (`pyproject.toml`, `<1.2.3`) and configured with two `redirect_maps` entries in `mkdocs.yml`, so PR B adds one entry per moved page and re-points the existing `studies/weather-products-for-the-past.md` entry to the new Solar page; no dependency commit is needed. `uv run mkdocs build --strict` must accept the map. Redirects cannot cover anchors inside pages, so every inbound anchor link is still updated: the inventory found 12 distinct anchors into the solar page (7 links from the survey page), 5 into the wind and blending pages from siblings, and the rest into beam-diffuse-split and ens-forecast-horizons, which do not move or change headings.
 2. Beam/diffuse split page stays at the top of Studies rather than under Past weather. Recommendation: leave it, since it is a forecast-skill study rather than a product comparison.
 3. Wrong row set on a number (5.20 is the extra rows' CAMS, not main's 5.09); Figure 1 inviting cross-block comparison (ENS 8.267 vs ICON-EU 8.386); a qualifier deleted with a duplicate; planned status lost when charts merge; the take-home overclaiming; recomputed intervals drifting from printed ones. Each has a gate above.
 4. If the fold fix moves past-solar numbers, the refit lands first and the leaderboard is computed on the new losses; the conservation gate then compares against the post-refit old page, and the planned-contrast diff table goes in the PR body.
 5. The maintainer is considering running the second XGBoost setting only on planned or deciding contrasts and near-threshold results. The Methods page's second-setting paragraph is moved verbatim and stays unchanged until the coordinator confirms the rule; charts are not changed for it.
+
+## Inventory facts the plan relies on
+
+Full inventory: scratch file `inventory.md` (not committed). Figure numbers 1-16 come from `weather_product_charts.py`, 17-19 from `ens_past_solar_charts.py`, 20-25 from `station_past_solar_charts.py`; Figure 3 lives in `docs/roadmap/assets/weather_product_domains.svg`. The chart scripts also hard-code cross-references inside SVG text (`weather_product_charts.py` subtitles naming Figures 2 and 16), so `FIGURE_NUMBERS` must cover those. `check_station_page_numbers.py:25` reads the solar page by path, so PR B updates it. Scripts and READMEs that name pages by absolute URL are about 20 (all under `studies/`), and are covered by the redirects but are still updated to the new URLs. `studies.charts` already has `report_errors`, `bootstrap_absolute`, `leaderboard_panel` and `figure`, so `studies.leaderboard` builds on them rather than duplicating.
