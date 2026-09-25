@@ -52,12 +52,12 @@ way):
 - `fetch_nora3.py` and `validate_nora3.py` — NORA3 hourly wind at 50 m and 100 m over OPeNDAP, cut
   server-side to the box, from the aggregated dataset and then MET Norway's monthly files, needs
   `uv run --with pydap`.
+- `fetch_weathernext3.py` and `validate_weathernext3.py` — WeatherNext 3 ensemble-mean runs from a
+  Requester Pays Google Cloud Storage bucket, cropped to the box. The Zarr chunks are whole-globe,
+  so a run reads about 50 GB and keeps about 15 MB. Run it only on a Compute Engine machine in
+  us-east1, with `GOOGLE_CLOUD_PROJECT` set, because reads from elsewhere are billed as egress
+  (`--dry-run` prints the estimate first).
 
 Every script resolves `data/` the way `sources.REPO_DATA_DIR` does — the main checkout's `data/`,
 shared by every worktree, not a per-worktree copy — so run each script once, from whichever worktree
 is doing the download, and every other worktree sees the result.
-
-## Not covered here
-
-**WeatherNext 3** has no fetch script: whether a colleague's existing archive can be reused instead
-of a fresh access request is a decision for the maintainer.

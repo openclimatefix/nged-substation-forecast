@@ -63,6 +63,8 @@ dev = [
     # studies is a dev dependency for the same reason as dashboard, and for a second one: the
     # Dockerfile runs `uv sync --frozen --no-dev`, so this line keeps pvlib out of the image.
     "studies",
+    # gcsfs reads the WeatherNext 3 Zarr stores in `studies/weather_downloads/fetch_weathernext3.py`.
+    "gcsfs",
     "pytest-xdist>=3.6.1",
     # Pinned below 1.2.3: that release and later pull in `properdocs` as a transitive dependency,
     # which prints an unsolicited warning urging a switch away from MkDocs on every build.
