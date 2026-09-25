@@ -155,9 +155,6 @@ _AXIS_TITLE_CHARACTERS: Final[int] = 78
 """The characters an interval panel's axis-title line holds before wrapping, at `PLOT_WIDTH_PX`."""
 
 _ZERO_LABEL_ROOM: Final[float] = 0.25
-_ZERO_LABEL_CHARACTER_PX: Final[int] = 6
-"""The width of one character of the regular-weight zero label, generously rounded up."""
-
 _BETTER_LABEL_CHARACTER_PX: Final[int] = 8
 """The width of one character of the bold better-direction label, generously rounded up."""
 
@@ -450,7 +447,7 @@ def _reference_layers(
     # than a quarter of the axis or than the label's own text needs, where the label would run off
     # the plot.
     low, high = x_domain
-    zero_room = max(_ZERO_LABEL_ROOM, _ZERO_LABEL_CHARACTER_PX * len(zero_label) / width)
+    zero_room = max(_ZERO_LABEL_ROOM, _BETTER_LABEL_CHARACTER_PX * len(zero_label) / width)
     to_the_right = better_direction == "negative"
     if to_the_right and high / (high - low) < zero_room:
         to_the_right = False

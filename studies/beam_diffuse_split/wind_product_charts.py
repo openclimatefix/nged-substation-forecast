@@ -2,7 +2,7 @@
 
 One-off throwaway script for the charts in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/830>. The write-up is
-<https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-wind/>.
+<https://openclimatefix.github.io/nged-substation-forecast/studies/past-weather/wind/>.
 
 **Every number a chart shares with the page is read from the report `wind_products.py` wrote**,
 so a chart cannot disagree with the page. The step chart's fortnightly wind-speed ratios are read

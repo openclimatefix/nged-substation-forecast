@@ -22,7 +22,7 @@ from typing import Final
 from station_past_solar import OUTPUT_DIR
 
 PAGE: Final[Path] = (
-    Path(__file__).resolve().parents[2] / "docs" / "studies" / "weather-products-for-past-solar.md"
+    Path(__file__).resolve().parents[2] / "docs" / "studies" / "past-weather" / "solar.md"
 )
 NUMBER: Final[re.Pattern[str]] = re.compile(r"\d[\d,]*(?:\.\d+)?")
 URL_OR_ANCHOR: Final[re.Pattern[str]] = re.compile(r"\]\([^)]*\)|`[^`]*`|https?://\S+")

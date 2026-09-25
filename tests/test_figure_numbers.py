@@ -35,21 +35,14 @@ def test_figure_numbers_run_from_1_to_17_with_no_gap_or_duplicate() -> None:
     assert numbers == list(range(1, 18))
 
 
-def test_every_solar_svg_feeds_a_figure_or_is_listed_as_superseded() -> None:
+def test_every_solar_svg_feeds_a_figure() -> None:
     # Catches a solar-page SVG the map forgot, whose number would then be typed by hand.
     module = _load()
     stems = {
         path.stem for path in ASSETS_DIR.glob("*.svg") if path.stem.startswith(SOLAR_SVG_PREFIXES)
     }
 
-    assert stems <= set(module.SVG_FIGURES) | module.SUPERSEDED_SVGS
-
-
-def test_a_superseded_svg_feeds_no_figure() -> None:
-    # Catches a stem that is both drawn for a figure and listed for deletion.
-    module = _load()
-
-    assert not set(module.SVG_FIGURES) & module.SUPERSEDED_SVGS
+    assert stems <= set(module.SVG_FIGURES)
 
 
 def test_every_figure_key_named_by_an_svg_has_a_number() -> None:

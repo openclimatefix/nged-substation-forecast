@@ -2,7 +2,7 @@
 
 One-off throwaway script for the charts in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/830>. The write-up is
-<https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-solar/>.
+<https://openclimatefix.github.io/nged-substation-forecast/studies/past-weather/solar/>.
 `figure_numbers.FIGURE_NUMBERS` gives each chart's number, and `past_solar_leaderboard_charts.py`
 draws the page's leaderboard and contrasts.
 

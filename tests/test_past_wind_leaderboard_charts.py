@@ -476,7 +476,7 @@ def test_figure_2_states_the_chance_rate_and_defines_planned_and_post_hoc_rows()
 
     text = _subtitle(figure=contrasts)
 
-    assert "About 1 in 20 exploratory contrasts reaches significance" in text
+    assert "About 1 in 20 contrasts with no true difference" in text
     assert "17 to 26 resampled calendar months" in text
     assert "written down before that block's own arms were fitted" in text
     assert "switched from 100 m to 80 m after the first run" in text

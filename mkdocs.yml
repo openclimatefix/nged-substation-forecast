@@ -44,7 +44,12 @@ plugins:
   - redirects:
       redirect_maps:
         background/nged-incumbent-forecast.md: background/manual-heuristic-forecast.md
-        studies/weather-products-for-the-past.md: studies/weather-products-for-past-solar.md
+        studies/weather-products-for-the-past.md: studies/past-weather/solar.md
+        studies/weather-products-for-past-solar.md: studies/past-weather/solar.md
+        studies/weather-products-for-past-wind.md: studies/past-weather/wind.md
+        studies/blending-weather-products.md: studies/past-weather/blending.md
+        studies/ens-forecast-horizons.md: studies/forecasts/ens-horizons.md
+        studies/nwp-forecasts-at-matched-leads.md: studies/forecasts/matched-lead.md
 
 nav:
   - Home: index.md
@@ -87,11 +92,15 @@ nav:
   - Studies:
       - Overview: studies/index.md
       - "Does a weather product's beam/diffuse split help a PV forecast?": studies/beam-diffuse-split.md
-      - "Which weather product best describes past sunshine?": studies/weather-products-for-past-solar.md
-      - "Which weather product best describes past wind?": studies/weather-products-for-past-wind.md
-      - "Does blending weather products beat the best single weather product?": studies/blending-weather-products.md
-      - "How accurate is a power forecast driven by ECMWF ENS at each horizon?": studies/ens-forecast-horizons.md
-      - "Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?": studies/nwp-forecasts-at-matched-leads.md
+      - Past weather:
+          - Overview: studies/past-weather/index.md
+          - Methods shared by the past-weather studies: studies/past-weather/methods.md
+          - "Which weather product best describes past sunshine?": studies/past-weather/solar.md
+          - "Which weather product best describes past wind?": studies/past-weather/wind.md
+          - "Does blending weather products beat the best single weather product?": studies/past-weather/blending.md
+      - Forecasts:
+          - "How accurate is a power forecast driven by ECMWF ENS at each horizon?": studies/forecasts/ens-horizons.md
+          - "Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?": studies/forecasts/matched-lead.md
   - ML experimentation:
       - Overview: ml_experimentation/index.md
       - Model configuration: ml_experimentation/model-configuration.md
