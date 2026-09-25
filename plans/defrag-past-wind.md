@@ -93,7 +93,7 @@ Generators are W1 to W3 only. No MIDAS station names, coordinates, farm mapping 
 3. Figure 1 invites cross-block comparison of absolute errors from different row sets. Recommendation: block labels carry dates and row counts, and every block repeats ERA5.
 4. Base branch: stacking on `defrag-past-solar` means a rebase when it merges. Recommendation: accept.
 5. Planned or exploratory: the main row set's ICON arms are the 80 m arms chosen after the first run (the plan specified 100 m), ICON-DREAM-EU's planned contrasts were written after the five products were scored, the main report's "Deciding" table holds one exploratory contrast (`icon_d2` minus `ukv`), and per-farm rows sit under planned headings. Each contrast's status is fixed from the report text and listed in a table in the PR body before the merged charts are drawn.
-6. Hard rule and a verbatim move: the page states each generator's distance to its ICON-DREAM-EU grid cell (1.9, 3.4 and 1.3 km) in Data and methods. The rule covers MIDAS stations and per-generator distances; whether it reaches generator-to-grid-cell distances is a question for the coordinator, and until answered PR B states the range only.
+6. Hard rule and a verbatim move: the page states each generator's distance to its ICON-DREAM-EU grid cell (1.9, 3.4 and 1.3 km) in Data and methods. The coordinator's answer: the per-generator-distance rule covers any per-generator distance, so PR B states the pooled range (for example "1 to 4 km") and no per-farm value.
 7. If the D1 refit moves wind numbers, the leaderboard is computed on the new losses and the conservation gate compares against the post-refit old page.
 
 ## Plan review 1 (simplicity): triage
