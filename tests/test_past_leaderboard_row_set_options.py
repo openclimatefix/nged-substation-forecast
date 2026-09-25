@@ -588,3 +588,32 @@ def test_the_arm_suffix_is_added_to_the_names_of_the_printed_intervals(tmp_path:
     assert result.site_hours == SITE_HOURS
     with pytest.raises(ValueError, match="interval"):
         _score(tmp_path=tmp_path, suffix="_global", tweak="wrong_interval", **row_set)
+
+
+def test_the_cerra_row_set_keeps_the_solar_report_shape_the_default_options_read() -> None:
+    module = _load()
+    cerra = module.ROW_SETS[-1]
+    ens = next(row_set for row_set in module.ROW_SETS if row_set.key == "ens")
+
+    for name in (
+        "printed_column",
+        "arm_suffix",
+        "reference_arm",
+        "reference_label",
+        "printed_decimals",
+        "leaderboard_section",
+        "intervals",
+        "planned_heading",
+        "planned_section",
+        "second_planned_section",
+        "second_scope",
+        "second_section",
+        "other_fit_sections",
+        "exploratory_in_planned",
+        "post_hoc_contrasts",
+        "wide_contrast_tables",
+        "hours_unit",
+    ):
+        assert getattr(cerra, name) == getattr(ens, name), name
+    assert cerra.key == "cerra"
+    assert cerra.printed_decimals == 3
