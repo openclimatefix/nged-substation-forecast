@@ -1217,11 +1217,14 @@ ROW_SET_SHIFT_TEXT: Final[dict[DomainType, str]] = {
         "+0.022 points (8.771% on all 35,263 shared rows, 8.792% on the 34,771 rows without "
         "the gap days)"
     ),
-    "wind": "[wind: fill from the fitted report's row-set diagnostic]",
+    "wind": (
+        "+0.029 points (8.350% on all 37,407 shared rows, 8.379% on the 37,001 rows without "
+        "the gap days)"
+    ),
 }
 """The row-set diagnostic's result for the leaderboard caption, by technology: the ENS mean's day-1
-error on all shared rows and without IFS HRES (9 km, Open-Meteo)'s day-1 gap days. The wind slot is
-marked for filling from the fitted report, and must be replaced before the chart is published."""
+error on all shared rows and without IFS HRES (9 km, Open-Meteo)'s day-1 gap days, as the fourth
+batch's fit report states them."""
 
 KEY_COLUMNS: Final[int] = 5
 """How many entries a row of the lead-day chart's key holds. The chart can hold nine products, and
