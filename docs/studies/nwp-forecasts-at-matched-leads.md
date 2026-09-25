@@ -110,6 +110,15 @@ models that produce these forecasts.
   climatology baseline.** The XGBoost model's error given ENS is 8.766% of capacity for solar and
   8.427% for wind, against climatology's 14.458% and 18.460% ([the XGBoost
   forecasts work](#the-xgboost-models-track-measured-output-and-every-day-1-weather-forecast-beats-climatology)).
+- **Every product's error rises with lead, and at day 14 the ENS mean's error is not lower than
+  climatology's** (exploratory). For solar the ENS mean's error is 14.876% of capacity [13.797,
+  15.870] at day 14 against climatology's 14.458%, and for wind 18.867% [16.664, 21.091] against
+  18.460%
+  ([error and lead](#error-rises-with-lead-and-at-day-14-the-ens-mean-is-no-better-than-climatology-exploratory)).
+- **ICON-D2 read at Open-Meteo's freshest run, a served lead of 1 to 3 hours, has the lowest error of
+  any forecast fitted, and at day 1 it is mid-ranking** (exploratory). ICON-D2 minus ICON-EU is
+  -0.711 points [-0.871, -0.557] at day 0 and +0.302 points [+0.061, +0.665] at day 1 for solar
+  ([error and lead](#error-rises-with-lead-and-at-day-14-the-ens-mean-is-no-better-than-climatology-exploratory)).
 - **Open-Meteo's Previous Runs day 1 gives UKV, ICON-EU, and IFS 0.25° a shorter lead than ENS's on
   most hours, which flatters those three products** ([matched leads](#how-the-leads-are-matched)).
 
