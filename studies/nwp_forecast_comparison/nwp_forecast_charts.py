@@ -568,6 +568,11 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
                 "among matched hours. Overlapping intervals here can still hide a significant "
                 f"paired difference (Figure {FIGURE_NUMBERS[(domain, 'headline')]}). {DOTS_NOTE}"
             ),
+            (
+                "Leads are not equal: a forecast from Open-Meteo's Previous Runs archive has a "
+                "day-1 lead of 24 + (h mod n) hours, shorter than ENS's 24 + h on most hours, "
+                "so the comparison favours those forecasts. Only GEFS shares ENS's lead."
+            ),
             f"{scope_text(losses=losses, domain=domain)} {CAPACITY_NOTE}",
         ],
         figure_planning=None,
