@@ -1564,9 +1564,9 @@ def aifs_contrast_rows(*, losses: pl.DataFrame, row_set: str) -> pl.DataFrame:
         losses: One row set's per-row losses.
         row_set: `single` or `ens`.
 
-    Returns:
-        `contrast_rows`'s frame, every row exploratory, the deciding contrast's label starting
-        `Deciding: `. No AIFS contrast was written into the published plan, so none is planned.
+        `contrast_rows`'s frame, every row exploratory, and the deciding contrast's label starting
+        with "Deciding:". No AIFS contrast was written into the published plan, so none is planned.
+        with "Deciding:". No AIFS contrast was written into the published plan, so none is planned.
     """
     by_name = by_setting(losses=losses)
     frames = []
