@@ -985,7 +985,9 @@ def _row_lines(*, built: Built) -> list[str]:
     months = sorted(frame["month"].unique().to_list())
     per_site = frame.group_by("site").agg(n=pl.len()).sort("site")
     coverage = calendar_month_coverage(frame=frame)
-    smallest_training = cast("int", coverage["n_train"].min())
+    several_years = coverage.filter(pl.col("n_years") > 1)
+    smallest_training = cast("int", several_years["n_train"].min())
+    one_year_hours = cast("int", coverage.filter(pl.col("n_years") == 1)["n_scored"].sum())
     dropped = ", ".join(built.months_dropped) or "none"
     return [
         "#### The row set and its folds",
@@ -1020,7 +1022,9 @@ def _row_lines(*, built: Built) -> list[str]:
         "",
         (
             f"The smallest number of training rows for any held-out (generator, fold, calendar "
-            f"month) is {smallest_training:,}."
+            f"month) whose calendar month occurs in more than one year is {smallest_training:,}. "
+            f"A further {one_year_hours:,} scored hours sit in a calendar month that occurs in one "
+            f"year only for their generator, which no fold design can cover."
         ),
     ]
 
