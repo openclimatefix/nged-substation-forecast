@@ -15,13 +15,12 @@ This folder holds the measurement behind `plans/era-fold-design.md` (PR #906): h
 | Solar, `long` panel | 76,727 | 2,129 (2.8%), one farm, May to July | 0 |
 | Solar, `all` panel (extra Open-Meteo block) | 40,243 | 14,853 (36.9%), April to June | 0 |
 | Solar, ENS block (`ens_past_solar`) | 54,447 | 1,194 (2.2%) | 0 |
-| Solar, station block | 0 | 0 | 0 |
 | Wind, main block | 50,734 | 8,326 (16.4%), June and July, all three farms | 0 |
 | Wind, ICON-DREAM-EU block (`wind_icon_dream`) | 50,041 | 12,570 (25.12%), May to July | 0 |
 | Wind, ECMWF block (`ens_hres_past_wind`) | 43,555 | 0 (0.00%) | 4,082 (9.37%), months 10 and 11 |
 | Wind, station block (`station_wind_arms`) | 34,156 | 0 (0.00%) | 14,411 (42.19%), months 1 to 7 |
 
-The wind main block's 8,326 hours come from recomputing today's folds on the past-wind study's frame (`report.md`, Part A); the saved `beam_diffuse_wind_products` file is an older frame with 52,996 hours and 8,603 (16.23%) uncovered. The solar station block's row is the past-wind station arms, which the past-solar page does not fit.
+The wind main block's 8,326 hours come from recomputing today's folds on the past-wind study's frame (`report.md`, Part A); the saved `beam_diffuse_wind_products` file is an older frame with 52,996 hours and 8,603 (16.23%) uncovered. The only saved station losses under `data/studies/` are the wind station arms' (`station_*`), so this folder has no solar station row.
 
 ## Past-solar `all` panel: D1 minus D0, three planned contrasts
 
