@@ -6,8 +6,8 @@ The data is now on disk under `data/studies/weather/ECMWF-AIFS/` (AIFS Single) a
 `data/studies/weather/ECMWF-AIFS-ENS/` (AIFS ENS): four runs a day, leads 0 to 360 h in 6-hour
 steps, a 3 by 4 crop of 0.25° cells (12 cells: latitude
 indices 0 to 2, longitude indices 0 to 3). The extra longitude column comes from a wider re-fetch,
-because the original 3 by 3 crop held only 65% of the area of some sites' H3 hexagons. The two products are harder to compare fairly than the products
-already on the page. Each serves 6-hourly steps where ENS serves 3-hourly steps to 144 h, so a
+because the original 3 by 3 crop held only 65% of the area of some sites' H3 hexagons. The two
+products are harder to compare fairly than the products already on the page. Each serves 6-hourly steps where ENS serves 3-hourly steps to 144 h, so a
 product with finer time steps is favoured by resolution alone. AIFS Single carries radiation and
 100 m wind only from the 2025-02-24 06 UTC run, and AIFS ENS starts on 2025-07-02, so neither
 product covers the page's 35,263 solar and 37,407 wind shared rows. Both products change version
