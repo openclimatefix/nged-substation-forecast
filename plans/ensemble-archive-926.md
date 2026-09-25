@@ -2,7 +2,7 @@
 
 **The problem.** DWD keeps only the last 4 runs of ICON-EU-EPS and the last 8 runs of ICON-D2-EPS (about 24 hours), and the Met Office keeps MOGREPS-UK for about 33 days. Nobody archives these products, so a later study cannot compare ensemble means against deterministic products (UKV, ICON-EU, ICON-D2, ECMWF ENS) for Great Britain solar and wind forecasting, onshore and offshore. Every day the recorder is down is lost permanently for the DWD products.
 
-**The plan.** A new workspace package, `packages/ensemble_archive`, holds a small recorder that runs on an AWS t4g.small in London under a systemd timer. The recorder computes which product runs should exist, fetches each expected file (a 404 means "not yet"), crops it to a "fat Great Britain" box on the native grid, builds one Zarr v3 store per product run on the instance's disk, and uploads the store to Source Cooperative with the root `zarr.json` last, so that object is the commit. Missed or partial runs are reported to Sentry. The work ships in two pull requests: the DWD products first, because DWD deletes each run after 24 hours, then MOGREPS-UK, which has about four weeks of slack. Nothing is published until the accounts in "Blocked on the maintainer" exist.
+**The plan.** A new public repository, `openclimatefix/nwp-archivist` (pull requests limited to collaborators), holds a small recorder that runs on an AWS t4g.small in London under a systemd timer. The recorder computes which product runs should exist, fetches each expected file (a 404 means "not yet"), crops it to a "fat Great Britain" box on the native grid, builds one Zarr v3 store per product run on the instance's disk, and uploads the store to Source Cooperative with the root `zarr.json` last, so that object is the commit. Missed or partial runs are reported to Sentry. The work ships in two pull requests: the DWD products first, because DWD deletes each run after 24 hours, then MOGREPS-UK, which has about four weeks of slack. Nothing is published until the accounts in "Blocked on the maintainer" exist.
 
 ## Verdict, size and departures
 
@@ -39,6 +39,10 @@ The size buys the plan, both plan reviews, and both diff reviews.
 - **`content.log.bz2`** is at `https://opendata.dwd.de/weather/nwp/content.log.bz2` and is not used by the recorder.
 - **Still to verify in implementation:** hourly-mean versus instantaneous shortwave for DWD (GRIB `stepType`), and whether `numcodecs.BitRound(keepbits=13)` counts the same bits as `delta_store.precision` (`NWP_SIGNIFICAND_BITS`).
 
+## Where the code lives
+
+The maintainer chose a separate repository, `openclimatefix/nwp-archivist`, created public with pull requests restricted to collaborators (the repository setting `pull_request_creation_policy=collaborators_only`). The reasons: the recorder shares no code with the forecasting packages, it should deploy from a pinned tag rather than track `main`, and a public archive with its own licences is easier to cite and reuse as its own repository. Issue #926 and the consumer-facing docs page stay in this repository. This plan file and draft PR #927 stay here until the plan is approved; the implementation PRs then open in `nwp-archivist`.
+
 ## Sequencing: two pull requests under #926
 
 1. **PR 1 (this branch): the DWD products** ICON-EU-EPS, ICON-D2-EPS, ICON-D2 and ICON-ART-EU deterministic, the recorder, the package README, the docs page, and the deployment files. This is the urgent PR.
@@ -46,14 +50,14 @@ The size buys the plan, both plan reviews, and both diff reviews.
 
 ## What changes, file by file (PR 1)
 
-New package `packages/ensemble_archive/` (workspace member, `uv_build`, Python 3.14; dependencies `eccodes`, `zarr>=3`, `numcodecs`, `numpy`, `httpx`, `sentry-sdk`, and `obstore` or `s3fs` for the upload):
+New Python package in the `nwp-archivist` repository (its own `pyproject.toml`, `uv_build`, Python 3.14, the house ruff, `ty` and pre-commit settings copied from this repository; dependencies `eccodes`, `zarr>=3`, `numcodecs`, `numpy`, `httpx`, `sentry-sdk`, and `obstore` or `s3fs` for the upload):
 
 - `products.py` — a frozen table of `Product` records (name, provider, licence, cycle hours, members, steps, fields and levels, path template) and a function that returns the exact list of expected file URLs for a run. The recorder, the tests and the docs read this one table.
 - `dwd.py` — fetch one file with keep-alive, retry with exponential backoff and jitter, and an optional rate limit; treat 404 as "not yet"; decode one GRIB2 message with eccodes.
 - `store.py` — crop to the box, write each decoded step into a local Zarr v3 store as a region write (arrays `(member, step, cell)`, chunked per member or sharded so a run is tens of objects, `BitRound` plus zstd plus the `crc32c` codec), write the cropped `clat`, `clon`, `hsurf`, `fr_land` and `hhl` coordinates into every store, then upload the store with the root `zarr.json` last. The root attributes carry status (`complete` or `partial`), expected and received file counts, source bytes, code version, ICON model version where the GRIB header has one, and archive time. The local store doubles as the checkpoint: a re-run skips files already written.
 - `recorder.py` and a small CLI (`archive-record`) — every 15 minutes: compute expected runs, start each run at a fixed delay after init, fetch every expected file not yet in the local store, commit when the count reaches the expected count or the deadline passes (20 hours after init), then upload. A `missing` run (nothing arrived by the deadline) is recorded as a Sentry event only. Each cycle sends a Sentry cron check-in, and each `partial` or `missing` run sends a warning event tagged with the product and init time. Nothing in the recorder raises on an absent or late file.
 - `README.md`, `deploy/` (systemd service and timer, instance bootstrap, IAM policy JSON), and `docs/architecture/ensemble-archive.md` (what is stored, where, licence, how to read it, the reliability design), linked from `docs/roadmap/data-sources.md` and `docs/background/weather-products-survey.md` and added to `mkdocs.yml`.
-- Root `pyproject.toml` workspace source, and the `CLAUDE.md` packages table.
+- In this repository, only `docs/architecture/ensemble-archive.md`, its two inbound links and `mkdocs.yml`; the code, its README and the deployment files live in `nwp-archivist`. The instance deploys a tagged release of that repository.
 
 **The crop box** is the "fat Great Britain" box 49.0-61.5 N, 10.0 W-3.5 E, chosen by the maintainer to reach offshore wind farms. It covers Northern Ireland, the Irish Sea, the Celtic Sea off Cornwall, the seas west of the Hebrides, Shetland, and the North Sea out to the Dutch and Belgian coasts. ICON-D2-EPS covers only the part east of about 3.94 W, so its offshore coverage is the North Sea. DWD: keep native cells whose `clat`/`clon` fall in the box. MOGREPS-UK (PR 2): an index box on its own projection.
 
@@ -83,7 +87,7 @@ Each new test states the assertion that fails on `main` today (the package does 
 
 ## Docs to update
 
-`docs/architecture/ensemble-archive.md` (new), the two link pages, `mkdocs.yml`, and the `CLAUDE.md` packages table. Issue #801 gets a comment linking #926 and stating what remains open there.
+`docs/architecture/ensemble-archive.md` (new, here), the two link pages, and `mkdocs.yml`. The `nwp-archivist` README carries the licences, attribution and lineage. Issue #801 gets a comment linking #926 and stating what remains open there.
 
 ## Verification commands
 
