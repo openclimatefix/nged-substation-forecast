@@ -19,15 +19,14 @@ history, historical features, and disaggregation, and each reads one weather pro
   five, about half of its gap to ICON-EU a pair of steps in the wind Open-Meteo's archive serves for
   it at one generator.
 - [Does blending weather products beat the best single weather product?](blending.md) — at the six
-  solar farms and three wind farms, an XGBoost
-  model given several weather products at once beats one given the best single product with its
-  neighbouring hours: by 0.13 points of capacity for solar and 0.48 for wind. The gain comes from
-the
-  other products' weather rather than from the extra columns, a blend of UKV and ICON-EU that a live
-  service could read beats UKV alone, and an XGBoost blend beats a linear stack of single-product
-  predictions. An XGBoost model given CAMS's split plus SARAH-3's global irradiance, the two
-  satellite retrievals the past-solar study compared, beats CAMS's split with its neighbouring hours
-  by 0.18 points and plain CAMS's split by 0.20 points, on a longer row set from January 2021.
+  solar farms and three wind farms, an XGBoost model given several weather products at once beats an
+  XGBoost model given the best single product with its neighbouring hours, by 0.13 points of
+  capacity for solar and 0.48 for wind. The gain comes from the other products' weather rather than
+  from the extra columns. A blend of UKV and ICON-EU that a live service could read beats UKV alone,
+  and an XGBoost blend beats a linear stack of single-product predictions. An XGBoost model given
+  CAMS's split plus SARAH-3's global irradiance, the two satellite retrievals the past-solar study
+  compared, beats CAMS's split with its neighbouring hours by 0.18 points and plain CAMS's split by
+  0.20 points, on a longer row set from January 2021.
 
 **The [Methods page](methods.md) states what the three studies share.** The Methods page holds the
 row sets and their site-hours, the capacity normalisation, the month-block folds, the bootstrap

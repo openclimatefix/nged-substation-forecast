@@ -22,7 +22,7 @@ satellite climate data record from EUMETSAT's Satellite Application Facility on 
 (CM SAF). The error is 7.76% given ICON-D2, the best of the four weather models on the main row set.
 It is 8.77% given ICON-DREAM-EU, the German weather service's reanalysis, and 9.08% given ERA5, the
 reanalysis from the European Centre for Medium-Range Weather Forecasts (ECMWF). ICON-D2 is the
-German weather service's model for Germany and neighbouring countries, and it has the lowest error
+German weather service's model for Germany and neighbouring countries. ICON-D2 has the lowest error
 of all eight weather models on the extra row set, which adds four weather models to the main row
 set's four (exploratory; not paired against ECMWF-IFS-HRES). A satellite observes the clouds of the
 hour itself, where every weather model and reanalysis simulates them from a run started before the
@@ -107,7 +107,7 @@ thousands of independent hours. Figure 2 pairs two products on the same hours, w
 shared swing. Two products whose intervals overlap in Figure 1, or in the upper panel of a block of
 Figure 2, can therefore still differ by a margin that is statistically significant at the 5% level.
 Only a contrast pairing those two products tests them directly, and the lower panel of each block of
-Figure 2 holds that row set's planned ones.
+Figure 2 holds that row set's planned contrasts.
 
 <!-- SLOT: CERRA solar and WeatherNext 3 each add one Key findings bullet here -->
 
@@ -409,13 +409,13 @@ holds 40,243 common site-hours from November 2024 to August 2026, all 12 product
 hour, and each pooled interval resamples 22 months.
 
 **The row set starts in November 2024 for two reasons, and ARPEGE's own longer record does not rule
-out a step in irradiance at cycle 48t1: ARPEGE's ratio to CAMS rises there, and its ratio to
-ECMWF-IFS-HRES cannot isolate ARPEGE.** Open-Meteo's UKV archive is a backfill before 12 August
+out a step in irradiance at cycle 48t1.** ARPEGE's ratio to CAMS rises at cycle 48t1, and its ratio
+to ECMWF-IFS-HRES cannot isolate ARPEGE. Open-Meteo's UKV archive is a backfill before 12 August
 2024, and Météo-France's [cycle 48t1](https://www.umr-cnrm.fr/old/IMG/pdf/r_r_2024-gb_web_2.pdf), on
 15 October 2024, replaced ARPEGE's radiation scheme; the first whole month after the later of the
-two changes is the start. ARPEGE's own per-site build reads back to January 2024, further than this
-row set's own November 2024 start, so it can check whether cycle 48t1 left a step: ARPEGE's ratio to
-ECMWF-IFS-HRES shows no step at cycle 48t1's date, but that ratio cannot isolate ARPEGE's own
+two changes is the start. ARPEGE's own per-site build reads back to January 2024, further back than
+this row set's own November 2024 start, so it can check whether cycle 48t1 left a step: ARPEGE's
+ratio to ECMWF-IFS-HRES shows no step at cycle 48t1's date. That ratio cannot isolate ARPEGE's own
 change, because ECMWF's own [Cycle
 49r1](https://www.ecmwf.int/en/about/media-centre/news/2024/forecast-upgrade-improves-wind-and-temperature-predictions)
 went operational on 12 November 2024, inside the same window. ARPEGE's ratio to CAMS does rise: from
@@ -756,12 +756,12 @@ as on the main row set, where it is 0.402 points [0.294, 0.498].
 
 **On the [main row set](methods.md#row-sets), ICON-DREAM-EU beats ERA5 by 0.32 points [0.12, 0.52],
 one of the main row set's six planned contrasts, but its error of 8.77% is higher than that of each
-of the three ICON weather models.** The two reanalyses, like SARAH-3, a satellite climate data
-record, are built to be consistent over time, each with one fixed version of its weather model or
-retrieval, though the observations and satellites each uses change over time. With the second set of
-XGBoost settings, ICON-DREAM-EU is 0.33 points ahead of ERA5 [0.14, 0.52], and for a generator
-predicted from its neighbours 0.37 points ahead [0.17, 0.58]. At the first setting only 4 of the 5
-folds agree in sign, and at the second setting all 5 agree. On the record row set from January 2021,
+of the three ICON weather models.** The two reanalyses and SARAH-3, a satellite climate data record,
+are built to be consistent over time, each with one fixed version of its weather model or retrieval,
+though the observations and satellites each uses change over time. With the second set of XGBoost
+settings, ICON-DREAM-EU is 0.33 points ahead of ERA5 [0.14, 0.52], and for a generator predicted
+from its neighbours 0.37 points ahead [0.17, 0.58]. At the first setting only 4 of the 5 folds agree
+in sign, and at the second setting all 5 agree. On the record row set from January 2021,
 ICON-DREAM-EU is 0.39 points ahead [0.23, 0.54].
 
 **Since August 2024, ICON-DREAM-EU's advantage over ERA5 is not statistically significant at the 5%
@@ -1085,7 +1085,7 @@ diffuse-fraction model rather than the satellite.
 points worse than a synthetic Erbs split derived from its own global irradiance alone [0.02, 0.14],
 an exploratory result in the opposite direction to the finding on the main row set; ICON-EU's own
 beam (+0.01 [−0.05, +0.07]) and ICON global's (+0.04 [−0.00, +0.08]) show no gain either, and only 2
-of the 5 folds agree in sign on ECMWF-IFS-HRES's own result, so not settled.
+of the 5 folds agree in sign on ECMWF-IFS-HRES's own result, so the result is not settled.
 
 **On the extra rows, UKV and ICON-D2 gain from their own direct beam, exploratory.** UKV's own split
 is 0.144 points better than a synthetic Erbs split derived from its own global irradiance alone
@@ -1403,7 +1403,7 @@ hours come from an older run at a longer lead than scored here.
 supports the ranking but not the size of the error.** An XGBoost model trained on five generators
 ranks the products the same way at the sixth, with errors 0.10 to 0.20 points larger ([neighbour
 test](#the-main-ranking-survives-a-raw-irradiance-comparison-and-a-neighbour-test)). The test
-assumes the held-out generator's capacity is known, and its training generators lie within 34 km.
+assumes the held-out generator's capacity is known. The test's training generators lie within 34 km.
 The error at a site further from any metered generator is therefore not measured here. CAMS serves
 where its one-day delay allows; elsewhere, ICON-EU or rebuilt UKV, for the reasons under historical
 features.
@@ -1417,9 +1417,10 @@ support a narrow reading for each of the four uses:
 - **Capacity estimation:** the ENS results compute no implied capacity for ENS, so they give no
   evidence for or against ENS.
 - **Training history:** ENS describes past sunshine better than ERA5 and worse than CAMS, with the
-  five differences not separated. The ENS results do not train a forecasting model on ENS and run
-  the model on ENS forecasts, so they do not show whether ENS's match to its own forecasts offsets
-  its lower accuracy than CAMS in describing past sunshine.
+  five differences between the ENS and CAMS arms (lead, step width, native resolution, spatial
+  support, and weather-model version) not separated. The ENS results do not train a forecasting
+  model on ENS and run the model on ENS forecasts, so they do not show whether ENS's match to its
+  own forecasts offsets its lower accuracy than CAMS in describing past sunshine.
 - **Historical features in the live service:** the ENS value for an hour can reach the service after
   the hour has ended (23% of the scored site-hours at Dynamical.org's archive latency). The ENS
   results give no comparison with ICON-EU or rebuilt UKV, so they give no reason to replace either.
@@ -1474,16 +1475,16 @@ product?](blending.md#solar-a-blend-beats-cams-given-its-neighbouring-hours)**
   is untested elsewhere in Great Britain, and nothing here measures a site near ICON-D2's edge or
   outside its domain. The extra row set's intervals rest on 22 months against 45 on the main row
   set, so they are less reliable.
-- **Every product except CAMS is read at a grid cell, not at the generator.** ERA5 at its nearest
-  0.25° cell, the Open-Meteo weather models at the cell Open-Meteo serves, SARAH-3 at a cell 0.8 km
-  to 2.8 km away, and ICON-DREAM-EU at a cell 1.6 km to 5.0 km away. A cell that misses a
+- **Every product except CAMS is read at a grid cell, not at the generator.** ERA5 is read at its
+  nearest 0.25° cell, the Open-Meteo weather models at the cell Open-Meteo serves, SARAH-3 at a cell
+  0.8 km to 2.8 km away, and ICON-DREAM-EU at a cell 1.6 km to 5.0 km away. A cell that misses a
   generator's own clouds handicaps the product read from it.
 - **ENS is a forecast, not past weather, and the ENS row set says nothing about the ranking on the
   main row set.** ENS's own archive here starts on 1 April 2024, so the ENS row set says nothing
   about the ranking above, from December 2022. ICON-EU and rebuilt UKV also beat ERA5, on the main
   row set, so ENS's gain over ERA5 does not show that ENS competes with the products the
   [Discussion: what to use](#discussion-what-to-use) section recommends. This page scores ENS
-  because it is the live service's own forecast product, and this page is where this project
+  because ENS is the live service's own forecast product, and this page is where this project
   compares weather products. The ENS results do not separate ENS's lead, step width, native
   resolution, spatial support, and model version, so ENS's gaps to ERA5 and CAMS are not a measure
   of forecasting skill alone.
@@ -1530,7 +1531,7 @@ product?](blending.md#solar-a-blend-beats-cams-given-its-neighbouring-hours)**
 Lincolnshire, or a comparison of ENS or the weather stations with every other product.**
 
 - **Wind is not covered here.** [Which weather product best describes past wind?](wind.md) measures
-  it.
+  wind.
 - **Forecast leads are not covered.** The comparison at longer leads belongs to
   [#810](https://github.com/openclimatefix/nged-substation-forecast/issues/810), the study comparing
   weather models for UK power forecasting.
@@ -1575,9 +1576,9 @@ in `packages/studies/`.
 **Run the commands below in order.** Cut SARAH-3 and ICON-DREAM-EU at each generator, fetch and
 build the four extra Open-Meteo models, check every product's timestamps against the sun, build
 every product's dataset, then fit and chart each row set. `check_new_products.py` relies on its
-default `--sources`, all six products the second round adds, so the extra models' own fetches have
-to run first, or the check fails on a missing file rather than silently dropping those four models'
-checks.
+default `--sources`, all six products the second round adds. The extra models' own fetches therefore
+have to run first, or the check fails on a missing file rather than silently dropping those four
+models' checks.
 
 ```bash uv run --with netcdf4 python studies/beam_diffuse_split/extract_site_series.py --product
 sarah-3 uv run python studies/beam_diffuse_split/extract_site_series.py --product icon-dream-eu uv

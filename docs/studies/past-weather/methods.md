@@ -5,8 +5,8 @@ same error measure, and the same intervals, and this page states those methods o
 are [Which weather product best describes past sunshine?](solar.md), [Which weather product best
 describes past wind?](wind.md), and [Does blending weather products beat the best single weather
 product?](blending.md). Each study page states only what is specific to that study. Several
-sentences below were written on the solar page, so "this page" in a sentence below means the study
-page that quotes it.
+sentences below were written for the solar page, so "this page" in a sentence below means the study
+page that repeats the sentence.
 
 ## Row sets
 
