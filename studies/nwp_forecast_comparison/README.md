@@ -224,6 +224,14 @@ uv run python studies/nwp_forecast_comparison/nwp_forecast_charts.py \
   --aifs-blends-dir $D/nwp_forecast_comparison_aifs_blends --output-dir docs/studies/assets
 ```
 
+After the blends fit and again after the P4 refit, check both baselines:
+
+```bash
+B=/home/jack/dev/nged-substation-forecast/.claude/worktrees/scratch/matched-lead
+sha256sum -c $B/sha-before-aifs-blends.txt
+sha256sum -c /tmp/claude-1000/pub-sha-before.txt
+```
+
 Before the first command, record a SHA-256 baseline of every file in the published folder, the
 day-1 and day-2 AIFS folder, and the three extra-lead folders (`nwp_forecast_comparison_leads_day10`,
 `_day10b`, and `_day10d`), and check it after the last fit. Check CPU load with `uptime` before each

@@ -52,14 +52,20 @@ from build_forecast_inputs import PRODUCT_SLUGS
 from fit_aifs import (
     BLEND_DAYS,
     LONG_DAYS,
+    NO_DETECTABLE_DIFFERENCE,
+    NO_DOY_SUFFIX,
+    NO_SKILL,
     ROW_SETS,
     Contrast,
     blend_arm_name,
     blend_contrasts,
     day14_reading,
+    deciding_verdict,
     ens_control_prefix,
     lead_verdict,
+    leave_one_month_out,
     shuffled_prefix,
+    smoothing_reading,
 )
 from fit_aifs import contrasts as aifs_contrasts
 from nwp_forecast_comparison import (
@@ -2166,8 +2172,20 @@ def lead_reading(*, interval: BootstrapInterval | None) -> str:
     return "has a lower error than" if interval["upper_95"] < 0.0 else "has a higher error than"
 
 
+def blend_phrase(*, verdict: str, day: int) -> str:
+    """Say a blend's verdict at one day as a clause, such as `the blend lowers the error`."""
+    if verdict == NO_DETECTABLE_DIFFERENCE:
+        return "the blend shows no detectable difference"
+    if verdict == "unresolved":
+        return "the blend is unresolved"
+    return f"the blend {verdict.removesuffix(f' at day {day}')}"
+
+
 def aifs_leads_title(*, losses: pl.DataFrame, domain: DomainType) -> str:
     """State the finding of the AIFS lead chart's deciding contrasts, from the losses themselves.
+
+    The AIFS Single reading applies the report's claim rule (both settings, leave-one-month-out,
+    and the refit without `day_of_year`), the smoothing reading, and the day-14 reading rule.
 
     Args:
         losses: The `single` row set's stacked per-row losses.
@@ -2175,46 +2193,11 @@ def aifs_leads_title(*, losses: pl.DataFrame, domain: DomainType) -> str:
 
     Returns:
         A sentence for the figure's title and its caption on the page: AIFS Single against ENS's
-        control member at days 7 and 14 (the reading at the two settings, a reading that differs
-        between them called unresolved), the blend's verdict at each, and the day-14 reading rule's
-        outcome.
+        control member at days 7 and 14, the blend's verdict at each, and the day-14 reading
+        rule's outcome. Where the rule finds no skill, the day-14 reading is replaced by that
+        finding.
     """
     settings = by_setting(losses=losses)
-
-    def both_settings(*, treatment: str, reference: str) -> str:
-        readings = {
-            lead_reading(
-                interval=difference(losses=frame, treatment=treatment, reference=reference)
-            )
-            for frame in settings.values()
-            if arms_present(losses=frame, arms=(treatment, reference))
-        }
-        return readings.pop() if len(readings) == 1 else "is unresolved against"
-
-    parts = []
-    verdicts = []
-    for day in LONG_DAYS:
-        reading = both_settings(
-            treatment=f"aifs_single_day{day}", reference=ens_control_prefix(day=day)
-        )
-        parts.append(f"at day {day} AIFS Single {reading} ENS's control member")
-        blend = blend_arm_name(product="aifs_single", day=day)
-        per_setting = [
-            lead_verdict(
-                day=day,
-                versus_ens=difference(
-                    losses=frame, treatment=blend, reference=f"ens_mean_day{day}"
-                ),
-                versus_control=difference(
-                    losses=frame, treatment=blend, reference=f"{blend}_control"
-                ),
-            )["verdict"]
-            for frame in settings.values()
-            if arms_present(losses=frame, arms=(blend, f"{blend}_control"))
-        ]
-        verdicts.append(
-            f"at day {day}, {per_setting[0] if len(set(per_setting)) == 1 else 'unresolved'}"
-        )
     primary = settings["primary"]
     shuffled = [
         shuffled_prefix(source="aifs_single_day14"),
@@ -2230,9 +2213,69 @@ def aifs_leads_title(*, losses: pl.DataFrame, domain: DomainType) -> str:
             for name in shuffled
         ],
     )
+    parts = []
+    verdicts = []
+    for day in LONG_DAYS:
+        single = f"aifs_single_day{day}"
+        control = ens_control_prefix(day=day)
+        if day == 14 and rule == NO_SKILL:
+            parts.append("at day 14 there is no skill to compare")
+        else:
+            intervals = {
+                name: difference(losses=frame, treatment=single, reference=control)
+                for name, frame in settings.items()
+            }
+            readings = {lead_reading(interval=interval) for interval in intervals.values()}
+            reading = readings.pop() if len(readings) == 1 else "is unresolved against"
+            _, _, _, same_sign = leave_one_month_out(
+                losses=primary, treatment=single, reference=control
+            )
+            no_doy = difference(
+                losses=primary,
+                treatment=f"{single}{NO_DOY_SUFFIX}",
+                reference=f"{control}{NO_DOY_SUFFIX}",
+            )
+            claim = deciding_verdict(
+                primary=intervals["primary"],
+                sensitivity=intervals["sensitivity"],
+                every_drop_same_sign=same_sign,
+                no_doy_point=no_doy["difference"],
+            )
+            text = f"at day {day} AIFS Single {reading} ENS's control member"
+            if reading.startswith(("has a lower", "has a higher")) and claim.startswith("not"):
+                text += " (not claimable)"
+            versus_mean = difference(
+                losses=primary, treatment=single, reference=f"ens_mean_day{day}"
+            )
+            if "consistent with smoothing" in smoothing_reading(
+                versus_control=intervals["primary"], versus_mean=versus_mean
+            ):
+                text += ", which is consistent with smoothing: it is not lower than the ENS mean's"
+            parts.append(text)
+        blend = blend_arm_name(product="aifs_single", day=day)
+        per_setting = [
+            lead_verdict(
+                day=day,
+                versus_ens=difference(
+                    losses=frame, treatment=blend, reference=f"ens_mean_day{day}"
+                ),
+                versus_control=difference(
+                    losses=frame, treatment=blend, reference=f"{blend}_control"
+                ),
+            )["verdict"]
+            for frame in settings.values()
+            if arms_present(losses=frame, arms=(blend, f"{blend}_control"))
+        ]
+        verdicts.append(
+            f"at day {day} "
+            + blend_phrase(
+                verdict=per_setting[0] if len(set(per_setting)) == 1 else "unresolved", day=day
+            )
+        )
     return (
-        f"For {TECHNOLOGY_NAMES[domain]}, {' and '.join(parts)}. A blend of ENS's mean and AIFS "
-        f"Single: {'; '.join(verdicts)}. The day-14 reading rule says {rule}"
+        f"For {TECHNOLOGY_NAMES[domain]}, {' and '.join(parts)}. For a blend of ENS's mean and "
+        f"AIFS Single, {' and '.join(verdicts)}. The day-14 reading rule finds "
+        f"{'no ' if rule == NO_SKILL else ''}skill to compare at day 14."
     )
 
 
@@ -2281,7 +2324,10 @@ def aifs_leads(
                     "of two. The hours differ by day: an hour whose 00 UTC run lies in an earlier "
                     "AIFS version is dropped, so a mark is compared only with marks of the same "
                     "day. Points of capacity; negative means the first forecast in a row is "
-                    "better."
+                    "better. AIFS steps every 6 hours throughout. At days 1 and 2 the ENS control "
+                    "member series is 6-hourly, but the ENS mean and the blends read the "
+                    "full-resolution 3-hourly ENS mean; at days 7 and 14 all ENS series are "
+                    "natively 6-hourly."
                 ),
                 (
                     "Deciding rows were named before any fit of this figure, but they are not "

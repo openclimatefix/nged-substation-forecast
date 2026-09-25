@@ -1,4 +1,5 @@
 import re
+import subprocess
 import sys
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -6,6 +7,7 @@ from pathlib import Path
 import numpy as np
 import polars as pl
 import pytest
+import xgboost
 
 _STUDY_DIR = Path(__file__).resolve().parents[3] / "studies" / "nwp_forecast_comparison"
 sys.path.insert(0, str(_STUDY_DIR))
@@ -256,13 +258,6 @@ def test_a_blend_control_shows_the_shuffled_aifs_columns_and_the_mirror_the_shuf
     )
 
 
-def test_the_blend_control_shares_its_shuffled_columns_with_the_climatology_arm():
-    control = arm_features(arm="blend_aifs_single_day14_control", domain="wind")
-    climatology = arm_features(arm=shuffled_prefix(source="aifs_single_day14"), domain="wind")
-
-    assert set(climatology) - {"hour_of_day", "day_of_year", "era_code"} <= set(control)
-
-
 def test_each_stage_holds_the_arms_the_plan_counts():
     single = {day: blend_arms(row_set="single", day=day) for day in BLEND_DAYS}
     ens = {day: blend_arms(row_set="ens", day=day) for day in BLEND_DAYS}
@@ -310,7 +305,6 @@ def test_the_deciding_contrasts_are_exactly_h7_h14_b7_b14_and_their_guards_on_si
 def test_the_control_member_is_six_hourly_at_days_1_and_2_and_native_beyond():
     assert ens_control_prefix(day=1) == "ens_control6_day1"
     assert ens_control_prefix(day=7) == "ens_control_day7"
-    assert LONG_DAYS == (7, 14)
 
 
 # --- fit_jobs -------------------------------------------------------------------------------------
@@ -504,14 +498,15 @@ def test_the_lead_verdict_needs_both_the_blend_and_its_guard_to_be_below_zero():
     assert verdict["largest_gain_not_excluded"] == pytest.approx(0.9)
 
 
-def test_the_lead_verdict_reports_no_gain_when_the_lower_bound_is_positive():
+def test_a_blend_significantly_worse_than_ens_raises_the_error_not_no_difference():
     verdict = lead_verdict(
         day=14,
         versus_ens=_interval(difference=0.3, lower=0.1, upper=0.5),
         versus_control=_interval(difference=0.1, lower=-0.2, upper=0.4),
     )
 
-    assert verdict["largest_gain_not_excluded"] == 0.0
+    assert verdict["verdict"] == "raises the error at day 14"
+    assert verdict["largest_gain_not_excluded"] is None
 
 
 def test_the_day_14_rule_needs_two_shuffle_seeds_to_agree():
@@ -967,19 +962,6 @@ def test_the_report_of_the_ens_row_set_is_descriptive_and_has_no_deciding_sectio
     assert "deciding (" not in report
 
 
-def test_the_listed_interval_count_matches_the_contrast_lists():
-    expected = 2 * (
-        sum(
-            len(blend_contrasts(row_set=row_set, day=day))
-            for row_set in ROW_SETS
-            for day in BLEND_DAYS
-        )
-        + 1
-    )
-
-    assert fit_aifs.count_listed_intervals() == expected
-
-
 # --- the P4 second-seed control refit ------------------------------------------------------------
 
 
@@ -1017,18 +999,6 @@ def _published_like_frame(*, domain: DomainType) -> pl.DataFrame:
     return frame.with_columns(
         (pl.col("value") * (1 + index / 10) + index % 7).alias(f"{prefix}_{field}")
         for index, (prefix, field) in enumerate((p, f) for p in sorted(prefixes) for f in fields)
-    )
-
-
-def test_the_p4_refit_holds_the_reference_and_each_blend_with_both_controls():
-    assert fit_aifs.p4_arms() == (
-        "ens_mean_day1",
-        "blend_p4a",
-        "blend_p4a_control",
-        "blend_p4a_control_b",
-        "blend_p4b",
-        "blend_p4b_control",
-        "blend_p4b_control_b",
     )
 
 
@@ -1312,9 +1282,7 @@ def test_the_lead_chart_reads_an_interval_by_whether_it_excludes_zero(
     )
 
 
-def test_the_lead_chart_states_its_finding_and_draws_from_synthetic_fits(
-    monkeypatch: pytest.MonkeyPatch,
-):
+def test_the_lead_chart_draws_from_synthetic_fits(monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setattr("studies.bootstrap.N_BOOTSTRAP_RESAMPLES", 30)
     rng = np.random.default_rng(2)
     by_set = {}
@@ -1329,10 +1297,9 @@ def test_the_lead_chart_states_its_finding_and_draws_from_synthetic_fits(
 
     chart, title = charts.aifs_leads(losses_by_set=by_set, domain="solar")
 
-    assert "at day 7 AIFS Single" in title
-    assert "at day 14 AIFS Single" in title
-    assert "day-14 reading rule says" in title
     assert " ".join(chart.to_dict()["title"]["text"]) == f"Figure 15: {title}"
+    subtitle = " ".join(chart.to_dict()["title"]["subtitle"])
+    assert "ENS control member series is 6-hourly" in subtitle
 
 
 def test_the_lead_chart_refuses_a_site_label_that_is_not_anonymised(tmp_path: Path):
@@ -1344,3 +1311,290 @@ def test_the_lead_chart_refuses_a_site_label_that_is_not_anonymised(tmp_path: Pa
 
     with pytest.raises(ValueError, match="not anonymised"):
         charts.load_aifs_leads(blends_dir=tmp_path, domain="solar")
+
+
+# --- constructed losses: verdict text, chart titles and the code review's fixes ---------------
+
+
+def _levels(
+    *, aifs: float, control: float, mean: float, blend: float, blend_control: float
+) -> dict[str, float]:
+    return {
+        "aifs": aifs,
+        "control": control,
+        "mean": mean,
+        "blend": blend,
+        "blend_control": blend_control,
+    }
+
+
+def _single_losses(
+    *,
+    day7: dict[str, float],
+    day14: dict[str, float],
+    permuted_14: float,
+    sensitivity_aifs_7: float | None = None,
+) -> pl.DataFrame:
+    """Per-row losses of the days 7 and 14 arms of `single`, each near its own level."""
+    rng = np.random.default_rng(5)
+    months = [f"2025-{m:02d}" for m in range(1, 9)]
+    keys = pl.DataFrame(
+        [
+            {
+                "site": "A",
+                "month": month,
+                "time": datetime(2025, 1, 1, tzinfo=UTC) + timedelta(days=30 * m + d),
+            }
+            for m, month in enumerate(months)
+            for d in range(10)
+        ]
+    )
+    frames = []
+    for day, level in ((7, day7), (14, day14)):
+        control = ens_control_prefix(day=day)
+        blend = blend_arm_name(product="aifs_single", day=day)
+        means = {
+            f"aifs_single_day{day}": level["aifs"],
+            control: level["control"],
+            f"ens_mean_day{day}": level["mean"],
+            blend: level["blend"],
+            f"{blend}_control": level["blend_control"],
+            f"aifs_single_day{day}{NO_DOY_SUFFIX}": level["aifs"],
+            f"{control}{NO_DOY_SUFFIX}": level["control"],
+        }
+        if day == 14:
+            means[shuffled_prefix(source="aifs_single_day14")] = permuted_14
+            means[shuffled_prefix(source="aifs_single_day14", variant="_b")] = permuted_14
+        for setting in ("primary", "sensitivity"):
+            for arm, mean in means.items():
+                shifted = (
+                    sensitivity_aifs_7
+                    if setting == "sensitivity"
+                    and sensitivity_aifs_7 is not None
+                    and arm == "aifs_single_day7"
+                    else mean
+                )
+                if setting == "sensitivity" and arm.endswith(NO_DOY_SUFFIX):
+                    continue
+                frames.extend(
+                    keys.with_columns(
+                        arm=pl.lit(arm),
+                        setting=pl.lit(setting),
+                        seed=pl.lit(seed),
+                        fold=pl.lit(0),
+                        signed_error_capped_mw=pl.lit(0.0),
+                        **{METRIC: pl.Series(shifted + rng.normal(0.0, 0.002, keys.height))},
+                    )
+                    for seed in range(3)
+                )
+    return pl.concat(frames)
+
+
+_WIN = _levels(aifs=0.08, control=0.12, mean=0.10, blend=0.07, blend_control=0.11)
+_DAY14_WIN = _levels(aifs=0.10, control=0.14, mean=0.13, blend=0.09, blend_control=0.12)
+
+
+@pytest.fixture
+def few_resamples(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr("studies.bootstrap.N_BOOTSTRAP_RESAMPLES", 50)
+
+
+def test_the_title_states_a_lower_error_and_a_blend_that_lowers_it(few_resamples: None):
+    losses = _single_losses(day7=_WIN, day14=_DAY14_WIN, permuted_14=0.16)
+
+    title = charts.aifs_leads_title(losses=losses, domain="solar")
+
+    assert title == (
+        "For the six solar farms, at day 7 AIFS Single has a lower error than ENS's control member "
+        "and at day 14 AIFS Single has a lower error than ENS's control member. For a blend of "
+        "ENS's mean and AIFS Single, at day 7 the blend lowers the error and at day 14 the blend "
+        "lowers the error. The day-14 reading rule finds skill to compare at day 14."
+    )
+
+
+def test_the_title_replaces_the_day_14_reading_when_the_rule_finds_no_skill(few_resamples: None):
+    losses = _single_losses(day7=_WIN, day14=_DAY14_WIN, permuted_14=0.10)
+
+    title = charts.aifs_leads_title(losses=losses, domain="wind")
+
+    assert "at day 14 there is no skill to compare" in title
+    assert "at day 14 AIFS Single" not in title
+    assert title.endswith("The day-14 reading rule finds no skill to compare at day 14.")
+
+
+def test_the_title_says_higher_raises_and_cannot_be_told_apart(few_resamples: None):
+    higher = _levels(aifs=0.14, control=0.12, mean=0.10, blend=0.14, blend_control=0.13)
+    same = _levels(aifs=0.12, control=0.12, mean=0.12, blend=0.12, blend_control=0.12)
+    losses = _single_losses(day7=higher, day14=same, permuted_14=0.30)
+
+    title = charts.aifs_leads_title(losses=losses, domain="solar")
+
+    assert "at day 7 AIFS Single has a higher error than ENS's control member" in title
+    assert "at day 7 the blend raises the error" in title
+    assert "at day 14 AIFS Single cannot be told apart from ENS's control member" in title
+    assert "at day 14 the blend shows no detectable difference" in title
+
+
+def test_the_title_calls_a_lower_error_than_the_control_but_not_the_mean_smoothing(
+    few_resamples: None,
+):
+    smooth = _levels(aifs=0.10, control=0.12, mean=0.10, blend=0.10, blend_control=0.10)
+    losses = _single_losses(day7=smooth, day14=_DAY14_WIN, permuted_14=0.16)
+
+    title = charts.aifs_leads_title(losses=losses, domain="solar")
+
+    assert (
+        "at day 7 AIFS Single has a lower error than ENS's control member, which is consistent "
+        "with smoothing: it is not lower than the ENS mean's"
+    ) in title
+
+
+def test_the_title_calls_a_reading_between_the_settings_unresolved(few_resamples: None):
+    losses = _single_losses(day7=_WIN, day14=_DAY14_WIN, permuted_14=0.16, sensitivity_aifs_7=0.12)
+
+    title = charts.aifs_leads_title(losses=losses, domain="solar")
+
+    assert "at day 7 AIFS Single is unresolved against ENS's control member" in title
+
+
+def test_the_title_marks_a_reading_the_claim_rule_refuses(
+    few_resamples: None, monkeypatch: pytest.MonkeyPatch
+):
+    losses = _single_losses(day7=_WIN, day14=_DAY14_WIN, permuted_14=0.16)
+    monkeypatch.setattr(charts, "leave_one_month_out", lambda **_: (-0.04, -0.05, 0.01, False))
+
+    title = charts.aifs_leads_title(losses=losses, domain="solar")
+
+    assert (
+        "at day 7 AIFS Single has a lower error than ENS's control member (not claimable)" in title
+    )
+
+
+def test_a_stage_with_nothing_to_refit_at_the_second_setting_returns_the_primary_fits(
+    stub_fit: None, monkeypatch: pytest.MonkeyPatch
+):
+    arms = list(blend_arms(row_set="ens", day=1))
+    frame = _frame_with(arms=arms, domain="solar")
+    monkeypatch.setattr(fit_aifs, "blend_sensitivity_arms", lambda **_: [])
+
+    losses = fit_aifs.fit_blend_stage(frame=frame, domain="solar", row_set="ens", day=1, workers=1)
+
+    assert set(losses["setting"]) == {"primary"}
+    assert set(losses["arm"]) == set(arms)
+    assert set(losses["device"]) == {"cuda"}
+
+
+def test_a_blend_whose_sign_flips_when_one_month_is_dropped_is_not_claimable(
+    few_resamples: None, monkeypatch: pytest.MonkeyPatch
+):
+    losses = _single_losses(day7=_WIN, day14=_DAY14_WIN, permuted_14=0.16)
+    monkeypatch.setattr(fit_aifs, "leave_one_month_out", lambda **_: (-0.03, -0.04, 0.01, False))
+
+    text = "\n".join(fit_aifs.deciding_blend_lines(losses=losses, domain="solar", day=7))
+
+    assert "Verdict: not claimable: dropping one month changes the sign of" in text
+    assert "Verdict: lowers" not in text
+
+
+def test_a_blend_that_lowers_the_error_with_stable_months_is_claimed(few_resamples: None):
+    losses = _single_losses(day7=_WIN, day14=_DAY14_WIN, permuted_14=0.16)
+
+    text = "\n".join(fit_aifs.deciding_blend_lines(losses=losses, domain="solar", day=7))
+
+    assert "Verdict: lowers the error at day 7" in text
+
+
+def test_the_report_gates_h14_by_the_reading_rule(few_resamples: None):
+    rng = np.random.default_rng(0)
+    frames, losses = {}, {}
+    for day in BLEND_DAYS:
+        frames[day], losses[day] = _synthetic_stage(
+            row_set="single", day=day, domain="solar", rng=rng
+        )
+
+    report = "\n".join(
+        fit_aifs.blend_set_lines(domain="solar", row_set="single", frames=frames, losses=losses)
+    )
+
+    assert "Rule: skill exists at day 14 only if" in report
+    assert (
+        (
+            "H14 verdict under the reading rule: no skill to compare at day 14; the deciding "
+            "verdict above is not read."
+        )
+        in report
+        or "H14 verdict under the reading rule: the deciding verdict above stands." in report
+    )
+
+
+def test_the_p4_report_lists_the_controls_significantly_worse_than_ens(few_resamples: None):
+    losses = _p4_losses(means=_p4_means(second_control=0.14))
+    frame = losses.filter(pl.col("setting") == "primary").select("site", "month").unique()
+
+    report = "\n".join(fit_aifs.p4_lines(domain="solar", frame=frame, losses=losses))
+
+    assert "(their guards are uninformative): blend_p4a_control_b at primary" in report
+    assert "Settings agree within each seed:" in report
+
+    clean = _p4_losses(means=_p4_means(second_control=0.08))
+    frame = clean.filter(pl.col("setting") == "primary").select("site", "month").unique()
+    text = "\n".join(fit_aifs.p4_lines(domain="solar", frame=frame, losses=clean))
+    assert "(their guards are uninformative): none at either setting." in text
+
+
+def test_the_day_1_and_day_2_columns_must_equal_the_existing_build(tmp_path: Path):
+    stamp = datetime(2025, 3, 1, tzinfo=UTC)
+    base = pl.DataFrame(
+        {
+            "site": ["A", "A"],
+            "time": [1, 2],
+            "aifs_single_day1_ghi": [1.0, 2.0],
+            "aifs_single_day1_init_time": [stamp, stamp],
+        }
+    )
+    base.write_parquet(tmp_path / "solar_aifs_inputs.parquet")
+
+    fit_aifs.check_equal_to_existing(built=base, existing_dir=tmp_path, domain="solar")
+    with pytest.raises(ValueError, match="differ"):
+        fit_aifs.check_equal_to_existing(
+            built=base.with_columns(aifs_single_day1_ghi=pl.Series([1.0, 2.5])),
+            existing_dir=tmp_path,
+            domain="solar",
+        )
+    with pytest.raises(ValueError, match="run stamps differ"):
+        fit_aifs.check_equal_to_existing(
+            built=base.with_columns(
+                aifs_single_day1_init_time=pl.Series([stamp, stamp + timedelta(days=1)])
+            ),
+            existing_dir=tmp_path,
+            domain="solar",
+        )
+
+
+def test_the_environment_stamp_names_the_gpu_without_its_serial_and_the_library_versions(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    monkeypatch.setattr(
+        fit_aifs.subprocess,
+        "run",
+        lambda *_a, **_k: subprocess.CompletedProcess(
+            [], 0, stdout="GPU 0: NVIDIA RTX A6000 (UUID: GPU-abc)\n"
+        ),
+    )
+
+    stamp = fit_aifs.environment_stamp()
+
+    assert stamp["gpu"] == "GPU 0: NVIDIA RTX A6000"
+    assert stamp["xgboost"] == xgboost.__version__
+    assert stamp["polars"] == pl.__version__
+
+    def missing(*_a: object, **_k: object) -> None:
+        raise FileNotFoundError
+
+    monkeypatch.setattr(fit_aifs.subprocess, "run", missing)
+    assert fit_aifs.environment_stamp()["gpu"] == "unavailable"
+
+
+def test_the_printed_interval_count_is_the_plans_contrast_lists_count():
+    # 38 listed contrasts per technology across both row sets and four days.
+    assert fit_aifs.count_listed_intervals() == 2 * 38

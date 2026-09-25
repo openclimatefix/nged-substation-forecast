@@ -60,6 +60,7 @@ from typing import Final, Literal, NamedTuple
 
 import numpy as np
 import polars as pl
+import xgboost
 from fit_extra_leads import error_text, interval_text
 from nwp_forecast_comparison import (
     BLEND_ARMS,
@@ -1095,6 +1096,23 @@ def check_determinism(*, published_dir: Path, aifs_dir: Path) -> bool:
     return agree
 
 
+def environment_stamp() -> dict[str, str]:
+    """Return the GPU model (no serial number) and the XGBoost and Polars versions in use.
+
+    Returns:
+        `gpu` (the first line of `nvidia-smi -L` without its UUID, or `unavailable`), `xgboost` and
+        `polars`.
+    """
+    try:
+        listing = subprocess.run(
+            ["nvidia-smi", "-L"], capture_output=True, text=True, check=False
+        ).stdout.splitlines()
+    except OSError:
+        listing = []
+    gpu = listing[0].split(" (UUID")[0] if listing else "unavailable"
+    return {"gpu": gpu, "xgboost": xgboost.__version__, "polars": pl.__version__}
+
+
 def sha256_of(*, path: Path) -> str:
     """Return a file's SHA-256 as a hex string."""
     return hashlib.sha256(path.read_bytes()).hexdigest()
@@ -1125,6 +1143,7 @@ def build_stamp(
         "inputs_sha256": sha256_of(path=aifs_dir / f"{domain}_aifs_inputs.parquet"),
         "published_sha256": sha256_of(path=published_dir / f"{domain}_forecast_inputs.parquet"),
         "device": DEVICE,
+        **environment_stamp(),
         "settings": json.dumps(SETTINGS, sort_keys=True),
         "columns": json.dumps({arm: arm_features(arm=arm, domain=domain) for arm in sorted(arms)}),
     }
@@ -1506,6 +1525,8 @@ def fit_blend_stage(
     second_arms = blend_sensitivity_arms(
         losses=primary, frame=frame, domain=domain, row_set=row_set, day=day
     )
+    if not second_arms:
+        return primary.with_columns(device=pl.lit(DEVICE))
     second = fit_jobs(
         frame=frame,
         domain=domain,
@@ -1558,8 +1579,46 @@ def check_columns_equal(
         raise ValueError(msg)
 
 
+def check_equal_to_existing(*, built: pl.DataFrame, existing_dir: Path, domain: DomainType) -> None:
+    """Raise unless the build's day-1 and day-2 columns equal the existing AIFS folder's.
+
+    The lead-band filter is new code, so the columns it must leave unchanged are compared with the
+    day-1 and day-2 build already on disk: the numeric columns to Float32 precision and the run
+    stamps exactly.
+
+    Args:
+        built: The new build's columns.
+        existing_dir: The folder holding the day-1 and day-2 `<domain>_aifs_inputs.parquet`.
+        domain: `solar` or `wind`.
+
+    Raises:
+        ValueError: If a column both builds hold differs on any row.
+    """
+    existing = pl.read_parquet(existing_dir / f"{domain}_aifs_inputs.parquet")
+    shared = [c for c in existing.columns if c in built.columns and c not in ("site", "time")]
+    stamps = [c for c in shared if c.endswith("_init_time")]
+    check_columns_equal(
+        built=built,
+        reference=existing,
+        columns=[c for c in shared if c not in stamps],
+        label=f"{domain}/existing AIFS folder",
+    )
+    keys = ["site", "time"]
+    joined = built.select(*keys, *stamps).join(
+        existing.select(*keys, *stamps), on=keys, how="left", suffix="_existing"
+    )
+    unequal = [c for c in stamps if not joined[c].equals(joined[f"{c}_existing"])]
+    if unequal:
+        msg = f"{domain}/existing AIFS folder: run stamps differ from the build's: {unequal}"
+        raise ValueError(msg)
+
+
 def blend_inputs(
-    *, aifs_dir: Path, extra_dirs: Mapping[str, Path], domain: DomainType
+    *,
+    aifs_dir: Path,
+    extra_dirs: Mapping[str, Path],
+    domain: DomainType,
+    existing_dir: Path | None = None,
 ) -> pl.DataFrame:
     """Return the AIFS build's columns with the extra-lead columns the blends fit needs.
 
@@ -1572,15 +1631,20 @@ def blend_inputs(
         aifs_dir: The folder holding `<domain>_aifs_inputs.parquet`.
         extra_dirs: The extra-lead folders by `EXTRA_FOLDERS` short name.
         domain: `solar` or `wind`.
+        existing_dir: The day-1 and day-2 AIFS folder, whose columns the build's day-1 and day-2
+            columns must equal, or `None` to skip that check.
 
     Returns:
         The columns, keyed by `site` and `time`.
 
     Raises:
-        ValueError: If an extra-lead folder lacks a row of the build or disagrees with it, or an
-            ENS prefix that must carry a run stamp has none.
+        ValueError: If an extra-lead folder lacks a row of the build or disagrees with it, the
+            existing AIFS folder disagrees with it, or an ENS prefix that must carry a run stamp
+            has none.
     """
     aifs = pl.read_parquet(aifs_dir / f"{domain}_aifs_inputs.parquet")
+    if existing_dir is not None:
+        check_equal_to_existing(built=aifs, existing_dir=existing_dir, domain=domain)
     renames = {
         column: column.replace(f"ens_{way}6_day{day}_", f"ens_{way}_day{day}_", 1)
         for column in aifs.columns
@@ -1665,11 +1729,14 @@ def lead_verdict(
         versus_control: The blend's error minus its control's.
 
     Returns:
-        `lowers the error at day N`, or `no detectable difference` with the largest gain the
+        `lowers the error at day N`; `raises the error at day N` where the blend-minus-ENS lower
+        bound is above zero; otherwise `no detectable difference` with the largest gain the
         blend-minus-ENS lower bound leaves open (a positive number in the metric's unit).
     """
     if versus_ens["upper_95"] < 0.0 and versus_control["upper_95"] < 0.0:
         return {"verdict": f"lowers the error at day {day}", "largest_gain_not_excluded": None}
+    if versus_ens["lower_95"] > 0.0:
+        return {"verdict": f"raises the error at day {day}", "largest_gain_not_excluded": None}
     return {
         "verdict": NO_DETECTABLE_DIFFERENCE,
         "largest_gain_not_excluded": max(0.0, -versus_ens["lower_95"]),
@@ -1780,8 +1847,8 @@ def gap_lines(
         f"### Gap at day 14 minus gap at day 7, {domain}, `single`, on the day-14 rows",
         "",
         (
-            "The gap is aifs_single − ens_control at each day, so a negative change means AIFS "
-            "Single's advantage over the control member widens with lead. Exploratory, post hoc."
+            "The gap is aifs_single − ens_control at each day, so a negative change means the gap "
+            "moves in AIFS Single's favour with lead. Exploratory, post hoc."
         ),
         "",
         *CONTRAST_HEADER,
@@ -1870,6 +1937,8 @@ def deciding_blend_lines(*, losses: pl.DataFrame, domain: DomainType, day: int) 
     full, lowest, highest, same_sign = leave_one_month_out(
         losses=by_setting[PRIMARY], treatment=blend, reference=mean
     )
+    if combined.startswith("lowers") and not same_sign:
+        combined = f"not claimable: dropping one month changes the sign of {blend} − {mean}"
     rows_ = []
     for setting, (versus_ens, versus_control, control_vs_ens) in intervals.items():
         for name, result in (
@@ -2124,9 +2193,18 @@ def blend_set_lines(
         f"### Day-14 reading rule, {domain}, `single`",
         "",
         (
-            "Neither AIFS Single nor the ENS control member has an error significantly below both "
-            "shuffled-AIFS arms (two seeds, primary setting, 95%) unless the rule says otherwise. "
-            f"Reading: **{reading}**. H14's interval is printed above either way."
+            "Rule: skill exists at day 14 only if AIFS Single or the ENS control member has an "
+            "error significantly below both shuffled-AIFS arms (two seeds, primary setting, "
+            f"95%). Reading: **{reading}**. H14's interval is printed above either way."
+        ),
+        "",
+        (
+            "H14 verdict under the reading rule: "
+            + (
+                "no skill to compare at day 14; the deciding verdict above is not read."
+                if reading == NO_SKILL
+                else "the deciding verdict above stands."
+            )
         ),
         "",
         "### Smoothing reading beside H7 and H14",
@@ -2187,18 +2265,67 @@ def blend_set_lines(
     return lines
 
 
-def check_blends(*, published_dir: Path, aifs_dir: Path, extra_dirs: Mapping[str, Path]) -> bool:
+def day1_determinism_lines(
+    *, domain: DomainType, losses: pl.DataFrame, existing_dir: Path
+) -> list[str]:
+    """Compare the refitted day-1 AIFS Single losses with the saved day-1 fit's, row by row.
+
+    The day-1 frame drops no row and the folds and settings are the same, so on the same GPU the
+    per-row losses should be identical. The line is informational and never raises.
+
+    Args:
+        domain: `solar` or `wind`.
+        losses: The `single` day-1 stage's losses.
+        existing_dir: The day-1 and day-2 AIFS folder.
+
+    Returns:
+        Markdown lines.
+    """
+    path = existing_dir / f"{domain}_single_losses.parquet"
+    header = f"### Day-1 refit against the saved day-1 fit, {domain}"
+    if not path.exists():
+        return [header, "", "The saved day-1 losses are absent, so nothing is compared.", ""]
+    keys = ["site", "time", "seed"]
+    arm = "aifs_single_day1"
+
+    def take(frame: pl.DataFrame, name: str) -> pl.DataFrame:
+        return frame.filter((pl.col("arm") == arm) & (pl.col("setting") == PRIMARY)).select(
+            *keys, **{name: pl.col(METRIC)}
+        )
+
+    joined = take(losses, "new").join(take(pl.read_parquet(path), "old"), on=keys, how="full")
+    unmatched = int(joined.select((pl.col("new").is_null() | pl.col("old").is_null()).sum()).item())
+    largest = joined.select((pl.col("new") - pl.col("old")).abs().max()).item()
+    return [
+        header,
+        "",
+        (
+            f"{arm} at the primary setting: {joined.height} rows, {unmatched} in only one fit, "
+            f"largest per-row difference {largest}. Identical: "
+            f"{'yes' if unmatched == 0 and largest == 0 else 'no'}."
+        ),
+        "",
+    ]
+
+
+def check_blends(
+    *, published_dir: Path, aifs_dir: Path, extra_dirs: Mapping[str, Path], existing_dir: Path
+) -> bool:
     """Fit `aifs_single_day7` at one wind site twice on the GPU, and print a time estimate.
 
     Args:
         published_dir: The folder holding the published inputs.
         aifs_dir: The blends folder holding the AIFS inputs.
         extra_dirs: The extra-lead folders.
+        existing_dir: The day-1 and day-2 AIFS folder, which the build's day-1 and day-2 columns
+            must equal.
 
     Returns:
         Whether the two fingerprints agree.
     """
-    inputs = blend_inputs(aifs_dir=aifs_dir, extra_dirs=extra_dirs, domain="wind")
+    inputs = blend_inputs(
+        aifs_dir=aifs_dir, extra_dirs=extra_dirs, domain="wind", existing_dir=existing_dir
+    )
     frame = blend_rows(
         published_dir=published_dir, inputs=inputs, domain="wind", row_set="single", day=7
     )
@@ -2234,7 +2361,12 @@ def refuse_read_only_folders(*, output_dir: Path, read_only: Collection[Path]) -
 
 
 def run_blends(
-    *, published_dir: Path, output_dir: Path, extra_dirs: Mapping[str, Path], workers: int
+    *,
+    published_dir: Path,
+    output_dir: Path,
+    extra_dirs: Mapping[str, Path],
+    existing_dir: Path,
+    workers: int,
 ) -> int:
     """Fit every stage of the blends fit and write its outputs once.
 
@@ -2243,6 +2375,7 @@ def run_blends(
         output_dir: The new folder holding `<domain>_aifs_inputs.parquet`, built with
             `--aifs-days 1 2 7 14`, which receives every output.
         extra_dirs: The extra-lead folders by `EXTRA_FOLDERS` short name.
+        existing_dir: The day-1 and day-2 AIFS folder, which is only read.
         workers: How many (arm, site) fits run at once.
 
     Returns:
@@ -2252,7 +2385,9 @@ def run_blends(
     refuse_to_overwrite(paths=[report_path])
     sections: list[str] = []
     for domain in DOMAINS:
-        inputs = blend_inputs(aifs_dir=output_dir, extra_dirs=extra_dirs, domain=domain)
+        inputs = blend_inputs(
+            aifs_dir=output_dir, extra_dirs=extra_dirs, domain=domain, existing_dir=existing_dir
+        )
         for row_set in ROW_SETS:
             frames: dict[int, pl.DataFrame] = {}
             stage_losses: dict[int, pl.DataFrame] = {}
@@ -2306,6 +2441,10 @@ def run_blends(
             sections += blend_set_lines(
                 domain=domain, row_set=row_set, frames=frames, losses=stage_losses
             )
+            if row_set == "single":
+                sections += day1_determinism_lines(
+                    domain=domain, losses=stage_losses[1], existing_dir=existing_dir
+                )
     n_listed = count_listed_intervals()
     header = [
         "# AIFS Single and AIFS ENS at days 1, 2, 7 and 14, and blends with ENS's mean: report",
@@ -2319,7 +2458,8 @@ def run_blends(
             "`single`). They are not planned contrasts in the published page's sense: the day-1 "
             "and day-2 AIFS results and the ENS results at days 7 and 14 were known when they "
             "were named. Every other contrast is exploratory or, on `ens`, descriptive. The report "
-            f"prints {n_listed} listed intervals at the primary setting across both technologies, "
+            f"prints {n_listed} listed intervals at the primary setting across both technologies "
+            "(the by-era, month-drop, Bonferroni, and control-minus-ENS lines are not counted), "
             f"so about {n_listed / 20:.1f} would reach statistical significance at the 5% level by "
             "chance."
         ),
@@ -2629,12 +2769,58 @@ def p4_lines(*, domain: DomainType, frame: pl.DataFrame, losses: pl.DataFrame) -
         for key in ("first", "second")
     }
     final = seed_agreement_verdict(first=combined["first"], second=combined["second"])
+    settings_agree = {
+        key: verdicts[PRIMARY][key] == verdicts[SENSITIVITY][key] for key in ("first", "second")
+    }
+    worse = [
+        f"{arm} at {setting} ("
+        + interval_text(point=r["difference"], lower=r["lower_95"], upper=r["upper_95"])
+        + ")"
+        for setting, setting_losses in by_setting_.items()
+        for blend in P4_BLENDS
+        for arm in (f"{blend}_control", f"{blend}_control_b")
+        for r in [difference(losses=setting_losses, treatment=arm, reference=P4_REFERENCE)]
+        if r["lower_95"] > 0.0
+    ]
     lines += [
         "",
         (
             f"Combined across the two settings: first control {combined['first']}; second "
             f"control {combined['second']}. **Verdict: {final}.**"
         ),
+        "",
+        (
+            f"Settings agree within each seed: first control "
+            f"{'yes' if settings_agree['first'] else 'no'}; second control "
+            f"{'yes' if settings_agree['second'] else 'no'}."
+        ),
+    ]
+    if final == UNRESOLVED_ACROSS_SEEDS and not all(settings_agree.values()):
+        lines += [
+            "",
+            (
+                "A seed's combined verdict is `no detectable difference` here because its two "
+                "settings disagree, so the seeds' disagreement may come from the settings and "
+                "not from the shuffle."
+            ),
+        ]
+    lines += [
+        "",
+        (
+            "Controls significantly worse than ENS alone (their guards are uninformative): "
+            + ("; ".join(worse) if worse else "none at either setting")
+            + "."
+        ),
+    ]
+    if worse and final.startswith(("lowers", "may lower")):
+        lines += [
+            "",
+            (
+                "The verdict above rests on a guard that is uninformative for at least one "
+                "control, so the blend claim is not read as settled."
+            ),
+        ]
+    lines += [
         "",
         (
             "If the two seeds disagree on the guard's verdict, the page must call the blend claim "
@@ -2673,6 +2859,7 @@ def p4_stamp(*, published_dir: Path, domain: DomainType) -> dict[str, str]:
     return {
         "published_sha256": sha256_of(path=published_dir / f"{domain}_forecast_inputs.parquet"),
         "device": DEVICE,
+        **environment_stamp(),
         "settings": json.dumps(SETTINGS, sort_keys=True),
         "seeds": json.dumps({"first": "add_blend_guard_columns", "second": P4_SECOND_SEED}),
         "columns": json.dumps({arm: arm_features(arm=arm, domain=domain) for arm in p4_arms()}),
@@ -2795,7 +2982,10 @@ def main() -> int:
         )
         if args.check:
             agree = check_blends(
-                published_dir=args.published_dir, aifs_dir=args.output_dir, extra_dirs=extra_dirs
+                published_dir=args.published_dir,
+                aifs_dir=args.output_dir,
+                extra_dirs=extra_dirs,
+                existing_dir=studies_dir / EXISTING_AIFS_DIR_NAME,
             )
             sys.stdout.write(f"two GPU runs agree: {agree}\n")
             return 0 if agree else 1
@@ -2803,6 +2993,7 @@ def main() -> int:
             published_dir=args.published_dir,
             output_dir=args.output_dir,
             extra_dirs=extra_dirs,
+            existing_dir=studies_dir / EXISTING_AIFS_DIR_NAME,
             workers=args.workers,
         )
     if args.check:

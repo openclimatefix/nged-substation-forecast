@@ -1239,11 +1239,14 @@ uv run python studies/nwp_forecast_comparison/build_forecast_inputs.py --aifs \
   --output-dir $D/nwp_forecast_comparison_aifs_blends
 uv run python studies/nwp_forecast_comparison/verify_aifs_steps.py \
   --published-dir $D/nwp_forecast_comparison --output-dir $D/nwp_forecast_comparison_aifs_blends
+uv run python studies/nwp_forecast_comparison/verify_aifs_steps.py --wiring \
+  --published-dir $D/nwp_forecast_comparison --output-dir $D/nwp_forecast_comparison_aifs_blends
 uv run python studies/nwp_forecast_comparison/fit_aifs.py --blends --check \
   --published-dir $D/nwp_forecast_comparison --output-dir $D/nwp_forecast_comparison_aifs_blends
 uv run python studies/nwp_forecast_comparison/fit_aifs.py --blends --workers 1 \
   --published-dir $D/nwp_forecast_comparison --output-dir $D/nwp_forecast_comparison_aifs_blends
 sha256sum -c $B/sha-before-aifs-blends.txt
+sha256sum -c /tmp/claude-1000/pub-sha-before.txt
 uv run python studies/nwp_forecast_comparison/nwp_forecast_charts.py \
   --input-dir $D/nwp_forecast_comparison --aifs-dir $D/nwp_forecast_comparison_aifs_blends \
   --output-dir docs/studies/assets
@@ -1411,7 +1414,13 @@ uv run python studies/nwp_forecast_comparison/fit_aifs.py --p4-controls --check 
   --published-dir $D/nwp_forecast_comparison --output-dir $D/nwp_forecast_comparison_p4_seeds
 uv run python studies/nwp_forecast_comparison/fit_aifs.py --p4-controls --workers 1 \
   --published-dir $D/nwp_forecast_comparison --output-dir $D/nwp_forecast_comparison_p4_seeds
+B=/home/jack/dev/nged-substation-forecast/.claude/worktrees/scratch/matched-lead
+sha256sum -c $B/sha-before-aifs-blends.txt
+sha256sum -c /tmp/claude-1000/pub-sha-before.txt
 ```
+
+The two checksum commands after the refit show that the published folder, the day-1 and day-2 AIFS
+folder, and the extra-lead folders are unchanged.
 
 **The refit is 63 fits at each of the two settings** (7 arms at 6 solar and 3 wind sites).
 `--check` fits `blend_p4b` at one wind site twice, stops unless the two fingerprints agree, and
