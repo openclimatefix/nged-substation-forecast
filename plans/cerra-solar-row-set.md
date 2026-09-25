@@ -73,7 +73,8 @@ Read from `data/studies/weather/CERRA/` (the lineage notes, the parquet schemas,
 - **Coverage:** 2019-09-01 03:00 to 2026-07-01 00:00 UTC, 190 grid cells (a cropped box around
   the roster), 5.5 km grid, no nulls, no NaNs, no duplicate keys. Every month has all 240 to 248
   time steps (February has 224 or 232, September 2019 has 239, and the last label, 2026-07-01
-  00:00, is the window 21 to 24 UTC on 30 June), so no month is short. The domain is the whole of Europe, so every generator is
+  00:00, is the window 21 to 24 UTC on 30 June), so no month is short. The domain is the whole of
+  Europe, so every generator is
   inside it. Each generator's nearest cell is 1.0 km to 3.5 km away (pooled range only; the
   per-generator table in `generator_cells.parquet` is never printed or charted).
 - **Not provided:** hourly means (needs leads 1 and 2, not downloaded), diffuse, direct normal
@@ -107,7 +108,8 @@ means over CERRA's own windows (the three hours ending at 00, 03, ..., 21 UTC, a
 all three hours are present, and dropped where not) and rebuild them with the same
 `rebuild_hourly_from_windows`, so their windows have CERRA's phase, not the ENS runs' 00 and 12
 UTC phase. The 0.287-point step-width figure on the page belongs to ENS's phase and does not carry
-over to CERRA's windows: the report measures it again as `era5_global − era5_3h`. The gap between `era5_global` and
+over to CERRA's windows: the report measures it again as `era5_global − era5_3h`. The gap between
+`era5_global` and
 `era5_3h` is then the price of the step width alone, and `cerra_global − era5_3h` is CERRA against
 ERA5 with the step width matched. Any conclusion about CERRA's physics rests on the matched
 contrast, not the unmatched one.
@@ -116,7 +118,8 @@ contrast, not the unmatched one.
 window end 2026-07-01 00:00 UTC (the last CERRA label, which belongs to 30 June) and to hours where
 CERRA, ERA5 and CAMS all have a value, so every arm scores the same rows (the `study` skill's
 shared-rows rule). CERRA is on disk from 2019, and the row set starts in December 2022 because the
-power data, ERA5 and CAMS limit it, about 43 months to June 2026. CERRA ends about 10 weeks before the main row
+power data, ERA5 and CAMS limit it, about 43 months to June 2026. CERRA ends about 10 weeks before
+the main row
 set (2026-09-10), so this row set is a near-subset of main's rows and a shorter window; the report
 prints its row count, its first and last day, and the months dropped. The page says so in the
 block's caption, as it does for the ENS and station blocks.
@@ -126,7 +129,8 @@ on `first_months=(UKV_UPGRADE_MONTH,)` (the one era boundary in this window; the
 five months, February to June 2026), with the offsets `search_fold_offsets` returns for this
 row set's own frame (at most five candidates, `N_FOLDS=5`, one era after the first), and
 `raise_on_uncovered_months` runs before any fit. `ens_past_solar.build_rows` ends in `with_eras`,
-which cuts main-style folds, so the new script builds its own rows and does not end there. The report prints the uncovered share this row
+which cuts main-style folds, so the new script builds its own rows and does not end there. The
+report prints the uncovered share this row
 set would have under the published main-row folds and under the chosen offsets (0 by
 construction), so a reader sees what the covering design changed. If `search_fold_offsets` finds
 no covering design, the script raises. The fallback is then to report the uncovered share, and the
@@ -234,7 +238,8 @@ traded away.
     - the J m⁻² to W m⁻² conversion (10,800,000 J m⁻² over 3 hours is 1,000 W m⁻²) fails on a wrong
       divisor;
     - an asymmetric synthetic day whose window energy is known: the rebuilt hour-ending means peak
-      in the exact hour (not within ± 1 hour), a start-labelled reading of the windows moves the peak
+      in the exact hour (not within ± 1 hour), a start-labelled reading of the windows moves the
+      peak
       by 3 hours and fails, and the rebuilt hours of a window average within a stated tolerance of
       the window mean (no rescaling is applied, so the tolerance is stated, not zero);
     - `join_rows` drops every hour after the window end 2026-07-01 00:00 and every hour where any of
