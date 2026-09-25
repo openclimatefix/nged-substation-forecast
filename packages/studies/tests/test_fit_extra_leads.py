@@ -8,7 +8,7 @@ _STUDY_DIR = Path(__file__).resolve().parents[3] / "studies" / "nwp_forecast_com
 sys.path.insert(0, str(_STUDY_DIR))
 sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
 
-from build_forecast_inputs import EXTRA_LEAD_BUILDS, extra_ens_ways  # noqa: E402
+from build_forecast_inputs import EXTRA_LEAD_BUILDS, ExtraBatchType, extra_ens_ways  # noqa: E402
 from fit_extra_leads import (  # noqa: E402
     BATCHES,
     NEW_PREFIXES,
@@ -16,9 +16,11 @@ from fit_extra_leads import (  # noqa: E402
     SECOND_NEW_PREFIXES,
     SECOND_REFERENCE_PREFIXES,
     batch_prefixes,
-    check_first_batch_arms,
+    contrast_arms,
+    check_context_arms,
     check_saved_losses_hold_arms,
     domain_prefixes,
+    noise_floor_lines,
 )
 from nwp_forecast_comparison import DomainType  # noqa: E402
 
@@ -116,37 +118,103 @@ def test_ens_ways_follow_the_days_each_reduction_is_wanted_at():
     assert extra_ens_ways(day=10, **kwargs) == ()
 
 
-def _all_contrast_arms(domain: DomainType) -> set[str]:
-    batch = BATCHES["second"]
-    named = {
-        arm
-        for pairs in (batch.same_product_contrasts, batch.ensemble_contrasts)
-        for pair in pairs
-        for arm in pair
-    } | set(batch.climatology_contrasts)
-    own = set(batch_prefixes(batch=batch, domain=domain))
-    return set(domain_prefixes(domain=domain, prefixes=tuple(sorted(named)))) - own
+def _all_contrast_arms(*, batch: ExtraBatchType) -> set[str]:
+    selected = BATCHES[batch]
+    pairs = (
+        *selected.same_product_contrasts,
+        *selected.ensemble_contrasts,
+        *selected.open_meteo_gfs_contrasts,
+        *selected.elsewhere_contrasts,
+    )
+    return {arm for pair in pairs for arm in pair}
 
 
-@pytest.mark.parametrize("domain", ["solar", "wind"])
-def test_first_batch_arms_that_complete_the_contrasts_pass(domain: DomainType) -> None:
-    check_first_batch_arms(
-        domain=domain, first_batch_arms=_all_contrast_arms(domain), batch=BATCHES["second"]
+def test_the_third_batch_fits_eight_native_gfs_arms_per_technology():
+    for domain in ("solar", "wind"):
+        arms = batch_prefixes(batch=BATCHES["third"], domain=domain)
+
+        assert arms == tuple(f"gfs_native_day{day}" for day in (0, 1, 2, 3, 5, 7, 10, 14))
+
+
+def test_the_third_batch_refits_nothing_the_earlier_batches_fitted():
+    third = set(BATCHES["third"].new_prefixes)
+    earlier = (
+        set(NEW_PREFIXES)
+        | set(REFERENCE_PREFIXES)
+        | set(SECOND_NEW_PREFIXES)
+        | set(SECOND_REFERENCE_PREFIXES)
+    )
+
+    assert not third & earlier
+    assert not BATCHES["third"].reference_prefixes
+
+
+def test_every_arm_a_third_batch_contrast_names_is_fitted_in_some_batch():
+    fitted = (
+        set(BATCHES["third"].new_prefixes)
+        | set(NEW_PREFIXES)
+        | set(REFERENCE_PREFIXES)
+        | set(SECOND_NEW_PREFIXES)
+        | set(SECOND_REFERENCE_PREFIXES)
+    )
+
+    assert _all_contrast_arms(batch="third") <= fitted
+
+
+def test_the_third_batch_contrasts_open_meteo_gfs_at_days_one_to_three_five_and_seven():
+    pairs = BATCHES["third"].open_meteo_gfs_contrasts
+
+    assert pairs == tuple((f"gfs_native_day{day}", f"gfs_day{day}") for day in (1, 2, 3, 5, 7))
+
+
+def test_the_third_batch_contrasts_each_day_with_the_ens_mean_of_the_same_day():
+    assert all(
+        treatment.removeprefix("gfs_native_") == reference.removeprefix("ens_mean_")
+        for treatment, reference in BATCHES["third"].ensemble_contrasts
     )
 
 
-def test_a_contrast_arm_fitted_by_neither_batch_raises() -> None:
-    arms = _all_contrast_arms("solar")
-    with pytest.raises(ValueError, match="fitted by neither batch"):
-        check_first_batch_arms(
-            domain="solar", first_batch_arms=arms - {min(arms)}, batch=BATCHES["second"]
+def test_a_batch_with_no_reference_arms_writes_no_noise_floor_section():
+    empty = pl.DataFrame({"arm": []}, schema={"arm": pl.String})
+
+    lines = noise_floor_lines(
+        domain="solar", losses=empty, published=empty, batch=BATCHES["third"], header=[]
+    )
+
+    assert lines == []
+
+
+def _earlier_arms(*, batch: ExtraBatchType, domain: DomainType) -> set[str]:
+    selected = BATCHES[batch]
+    return contrast_arms(batch=selected, domain=domain) - set(
+        batch_prefixes(batch=selected, domain=domain)
+    )
+
+
+@pytest.mark.parametrize("domain", ["solar", "wind"])
+def test_the_first_two_batches_complete_the_third_batch_contrasts(domain: DomainType) -> None:
+    check_context_arms(
+        domain=domain,
+        context_arms=[
+            set(batch_prefixes(batch=BATCHES["first"], domain=domain)),
+            set(batch_prefixes(batch=BATCHES["second"], domain=domain)),
+        ],
+        batch=BATCHES["third"],
+    )
+
+
+@pytest.mark.parametrize("batch", ["second", "third"])
+def test_a_contrast_arm_fitted_by_no_batch_raises(batch: ExtraBatchType) -> None:
+    arms = _earlier_arms(batch=batch, domain="solar")
+    with pytest.raises(ValueError, match="fitted by no batch"):
+        check_context_arms(
+            domain="solar", context_arms=[arms - {min(arms)}], batch=BATCHES[batch]
         )
 
 
-def test_an_arm_in_both_batches_raises() -> None:
-    batch = BATCHES["second"]
-    own = batch_prefixes(batch=batch, domain="solar")[0]
-    with pytest.raises(ValueError, match="both batches"):
-        check_first_batch_arms(
-            domain="solar", first_batch_arms=_all_contrast_arms("solar") | {own}, batch=batch
+def test_an_arm_in_two_batches_raises() -> None:
+    arms = _earlier_arms(batch="third", domain="solar")
+    with pytest.raises(ValueError, match="fitted twice"):
+        check_context_arms(
+            domain="solar", context_arms=[arms, {"ens_mean_day7"}], batch=BATCHES["third"]
         )

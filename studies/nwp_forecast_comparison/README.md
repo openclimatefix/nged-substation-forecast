@@ -62,6 +62,23 @@ lead?](../../docs/studies/nwp-forecasts-at-matched-leads.md).
   published arms they are compared with, refitted on the same device. `--check` fits one arm at one
   generator twice and stops unless the two runs agree. `--report-only` writes the report from the
   saved losses. It never writes to the published folder.
+- `build_forecast_inputs.py --extra-leads --batch third` writes the native GFS arms
+  `gfs_native_day<N>_*` at days 0, 1, 2, 3, 5, 7, 10, and 14, read from Dynamical.org's GFS store
+  (`data/studies/weather/GFS/`) at each generator's nearest 0.25 degree cell. Day 1 and above read
+  the 00 UTC run issued that many days before, at leads from 24 hours per day. Day 0 reads the
+  freshest of the four runs a day, at a lead of 1 to 6 hours for solar and 0 to 5 hours for wind.
+  The store's radiation is a mean since the last 6-hourly reset, with the lead labelling the end of
+  the window, so `studies.gfs_native.step_means` recovers the mean over each hour (or, beyond lead
+  120, each 3 hours) before use. Days 0 to 4 read hourly leads directly, and days 5 and above are
+  upsampled from 3-hourly leads as the ENS and GEFS arms are.
+- `verify_gfs_native.py` reads only, and writes `gfs_radiation_window.md` (whether the store's
+  radiation follows the reset rule, at every window length including the windows shorter than 6
+  hours and lead 0), `gfs_served_runs.md` (the run and lead each target hour reads), and, with
+  `--built-dir`, `gfs_built_columns.md` (a sample of built values recomputed from the store in
+  plain Python) under `<output-dir>/verification/`. It exits non-zero if any check fails.
+- `fit_extra_leads.py --batch third` fits the eight native GFS arms per technology on a GPU and
+  refits nothing: its contrasts against the ENS mean and against Open-Meteo's GFS read the earlier
+  batches' GPU fits, through one `--context-dir` for each earlier batch's folder.
 - `nwp_forecast_charts.py` reads the saved losses and predictions from `--input-dir`, and the extra
   lead days' losses from `--extra-dir`, and writes six SVG charts per technology to `--output-dir`,
   each optimised with `svgo` (skip with `--no-svgo`): the leaderboard of every product's absolute

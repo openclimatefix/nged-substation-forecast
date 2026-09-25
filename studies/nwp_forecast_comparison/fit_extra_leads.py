@@ -11,12 +11,15 @@ than refitting, and refuses to overwrite `report.md`.
 
 The arms:
 
-Two batches run into two folders (`--batch first` and `--batch second`, the latter with
-`--first-batch-dir` so its contrast tables can name the first batch's arms). The second batch's
-arms are `SECOND_NEW_PREFIXES` (ENS mean at day 7, ENS control member at days 2, 3, 5, 7, 10 and
-14, GEFS mean at day 7) and `SECOND_REFERENCE_PREFIXES` (GPU refits of the published arms the
-first batch left on the CPU), so that every mark on the leaderboard is a GPU fit. The first batch's
-arms:
+Three batches run into three folders (`--batch first`, `--batch second`, and `--batch third`). The
+second and third batches take one `--context-dir` for each earlier batch's folder whose arms their
+contrast tables name. The third batch fits eight native GFS arms (`THIRD_NEW_PREFIXES`) and refits
+no reference, because every arm it is compared with is already a GPU fit in an earlier batch; its
+contrasts are against the ENS mean at the same day and against Open-Meteo's GFS at days 1, 2, 3, 5,
+and 7. The second batch's arms are `SECOND_NEW_PREFIXES` (ENS mean at day 7, ENS control member at
+days 2, 3, 5, 7, 10 and 14, GEFS mean at day 7) and `SECOND_REFERENCE_PREFIXES` (GPU refits of
+the published arms the first batch left on the CPU), so that every mark on the leaderboard is a
+GPU fit. The first batch's arms:
 
 - **New arms:** ENS mean at days 5, 10 and 14; GEFS mean at days 0, 5, 10 and 14; IFS 0.25° and GFS
   at days 0, 5 and 7; ICON global at days 0 and 5; every other Previous Runs product at day 0
@@ -26,8 +29,8 @@ arms:
   device, because a GPU fit is not bit-identical to a CPU fit and a contrast must not mix them.
   Each reference's difference from its published CPU fit is the device noise floor.
 
-`--check` fits one arm at one site twice, on the GPU, and stops unless the two runs produce the
-same fingerprint. Run it before the full fit.
+`--check` fits the batch's first new arm at one site twice, on the GPU, and stops unless the two
+runs produce the same fingerprint. Run it before the full fit.
 
 Every output carries only the anonymised `site` label.
 
@@ -40,11 +43,19 @@ import argparse
 import concurrent.futures
 import logging
 import sys
+from collections.abc import Sequence
+from itertools import pairwise
 from pathlib import Path
 from typing import Final, NamedTuple
 
 import polars as pl
-from build_forecast_inputs import PRODUCT_SLUGS, SOLAR_ONLY_PRODUCTS, ExtraBatchType
+from build_forecast_inputs import (
+    GFS_NATIVE_DAYS,
+    PRODUCT_SLUGS,
+    SOLAR_ONLY_PRODUCTS,
+    ExtraBatchType,
+    gfs_native_arm,
+)
 from nwp_forecast_comparison import (
     METRIC,
     PERCENTAGE_POINTS,
@@ -274,6 +285,88 @@ SECOND_CLIMATOLOGY_CONTRASTS: Final[tuple[str, ...]] = (
 """The second batch's arms compared with the published no-weather climatology baseline."""
 
 
+THIRD_NEW_PREFIXES: Final[tuple[str, ...]] = tuple(
+    gfs_native_arm(day=day) for day in GFS_NATIVE_DAYS
+)
+"""The third batch's arms: NOAA GFS read from Dynamical.org's native store at days 0, 1, 2, 3, 5, 7,
+10 and 14, whose columns `build_forecast_inputs.py --batch third` builds."""
+
+THIRD_REFERENCE_PREFIXES: Final[tuple[str, ...]] = ()
+"""The third batch refits no reference: the arms it is compared with are GPU fits of the first two
+batches, read through `--context-dir`."""
+
+THIRD_SAME_PRODUCT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = tuple(
+    (gfs_native_arm(day=day), gfs_native_arm(day=earlier))
+    for earlier, day in pairwise(GFS_NATIVE_DAYS)
+)
+"""Each native GFS arm against the native GFS arm at the next shorter lead fitted, as (treatment,
+reference)."""
+
+THIRD_ENSEMBLE_CONTRASTS: Final[tuple[tuple[str, str], ...]] = tuple(
+    (gfs_native_arm(day=day), f"ens_mean_day{day}") for day in GFS_NATIVE_DAYS
+)
+"""Each native GFS arm against the ENS mean at the same day, from the first two batches."""
+
+OPEN_METEO_GFS_DAYS: Final[tuple[int, ...]] = (1, 2, 3, 5, 7)
+"""The days at which Open-Meteo's GFS-SEAMLESS arm (`gfs_day<N>`) is already fitted on the GPU (day
+0 is a freshest-run nowcast whose lead differs, so it is left out)."""
+
+THIRD_OPEN_METEO_GFS_CONTRASTS: Final[tuple[tuple[str, str], ...]] = tuple(
+    (gfs_native_arm(day=day), f"gfs_day{day}") for day in OPEN_METEO_GFS_DAYS
+)
+"""Each native GFS arm against Open-Meteo's GFS-SEAMLESS arm at the same day. The two differ in
+source (Dynamical.org's store against Open-Meteo's archive) and, at each day of at least 1, in
+served lead: Open-Meteo serves the freshest run at least that many days old, which on most hours
+is a shorter lead than the 00 UTC run N days before that the native GFS reads."""
+
+THIRD_CLIMATOLOGY_CONTRASTS: Final[tuple[str, ...]] = (
+    gfs_native_arm(day=10),
+    gfs_native_arm(day=14),
+)
+"""The long-lead native GFS arms compared with the published no-weather climatology baseline."""
+
+ENSEMBLE_TITLE: Final[str] = (
+    "Other products against ENS at the same day (Previous Runs day-0 rows mix "
+    "weather models and leads; GEFS and the ENS control member share ENS's lead)"
+)
+"""The heading of the contrasts against ENS in the first and second batches' reports."""
+
+THIRD_ENSEMBLE_TITLE: Final[str] = (
+    "Native GFS against the ENS mean at the same day (the native GFS arm at day N reads a 00 UTC "
+    "run's leads from 24 N hours, ENS's own lead; day 0 reads the freshest of four GFS runs a day)"
+)
+"""The heading of the third batch's contrasts against ENS."""
+
+OPEN_METEO_GFS_TITLE: Final[str] = (
+    "Native GFS against Open-Meteo's GFS at the same day (different source; Open-Meteo serves the "
+    "freshest run at least N days old, a shorter lead)"
+)
+"""The heading of the third batch's contrasts against Open-Meteo's GFS."""
+
+FIRST_BATCH_NOTE: Final[str] = (
+    "Every day-0 arm is a nowcast, not a day-ahead forecast: a Previous Runs "
+    "product's day 0 is the freshest run covering each hour, at a lead set by that "
+    "product's own run cycle, and ENS's and GEFS's day 0 covers hours before the 00 "
+    "UTC run is published. The day-0 served lead is measured only for ICON-D2 and "
+    "ICON-EU; for every other product it is inferred from the run cycle."
+)
+"""The paragraph the first batch's report opens with, on what its day-0 arms are."""
+
+THIRD_BATCH_NOTE: Final[str] = (
+    "Every arm here reads NOAA GFS from Dynamical.org's native store, not Open-Meteo's "
+    "GFS-SEAMLESS archive, at each generator's nearest 0.25 degree grid cell. Day N of 1 or more "
+    "reads the 00 UTC run issued N days before the hour's own day, at leads 24 N + 1 to 24 N + 24 "
+    "hours for solar (a solar hour is labelled by its end) and 24 N to 24 N + 23 hours for wind. "
+    "Day 0 is a nowcast: it reads the freshest of the four runs a day (00, 06, 12, and 18 UTC) at "
+    "a lead of 1 to 6 hours for solar and 0 to 5 hours for wind, which ignores the hours GFS takes "
+    "to publish a run. GFS's radiation is a mean since the last 6-hourly reset, and its lead "
+    "labels the window's end; each step's mean is recovered before use "
+    "(`studies.gfs_native.step_means`). Days 0 to 4 read hourly leads directly. Days 5, 7, 10, and "
+    "14 lie on 3-hourly leads and are upsampled to hourly as the ENS and GEFS arms are."
+)
+"""The paragraph the third batch's report opens with, on which run and lead each arm reads."""
+
+
 class ArmBatch(NamedTuple):
     """One fit batch's arms and the contrasts its report tabulates."""
 
@@ -284,6 +377,9 @@ class ArmBatch(NamedTuple):
     near_analysis_contrasts: tuple[tuple[str, str], ...]
     elsewhere_contrasts: tuple[tuple[str, str], ...]
     climatology_contrasts: tuple[str, ...]
+    note: str = ""
+    ensemble_title: str = ENSEMBLE_TITLE
+    open_meteo_gfs_contrasts: tuple[tuple[str, str], ...] = ()
 
 
 BATCHES: Final[dict[ExtraBatchType, ArmBatch]] = {
@@ -295,6 +391,7 @@ BATCHES: Final[dict[ExtraBatchType, ArmBatch]] = {
         near_analysis_contrasts=NEAR_ANALYSIS_CONTRASTS,
         elsewhere_contrasts=ELSEWHERE_CONTRASTS,
         climatology_contrasts=CLIMATOLOGY_CONTRASTS,
+        note=FIRST_BATCH_NOTE,
     ),
     "second": ArmBatch(
         new_prefixes=SECOND_NEW_PREFIXES,
@@ -305,8 +402,20 @@ BATCHES: Final[dict[ExtraBatchType, ArmBatch]] = {
         elsewhere_contrasts=(),
         climatology_contrasts=SECOND_CLIMATOLOGY_CONTRASTS,
     ),
+    "third": ArmBatch(
+        new_prefixes=THIRD_NEW_PREFIXES,
+        reference_prefixes=THIRD_REFERENCE_PREFIXES,
+        same_product_contrasts=THIRD_SAME_PRODUCT_CONTRASTS,
+        ensemble_contrasts=THIRD_ENSEMBLE_CONTRASTS,
+        near_analysis_contrasts=(),
+        elsewhere_contrasts=(),
+        climatology_contrasts=THIRD_CLIMATOLOGY_CONTRASTS,
+        note=THIRD_BATCH_NOTE,
+        ensemble_title=THIRD_ENSEMBLE_TITLE,
+        open_meteo_gfs_contrasts=THIRD_OPEN_METEO_GFS_CONTRASTS,
+    ),
 }
-"""The two fit batches, by the name `--batch` takes."""
+"""The three fit batches, by the name `--batch` takes."""
 
 
 def batch_prefixes(*, batch: ArmBatch, domain: DomainType) -> tuple[str, ...]:
@@ -473,12 +582,13 @@ def fit_arms(
     return pl.concat(outputs)
 
 
-def check_determinism(*, published_dir: Path, output_dir: Path) -> bool:
+def check_determinism(*, published_dir: Path, output_dir: Path, prefix: str) -> bool:
     """Fit one arm at one site twice on the GPU and compare the two runs' fingerprints.
 
     Args:
         published_dir: The folder holding the published inputs.
         output_dir: The folder holding the extra-lead inputs.
+        prefix: The arm to fit, which must have wind columns in the joined rows.
 
     Returns:
         Whether the two fingerprints agree.
@@ -490,7 +600,7 @@ def check_determinism(*, published_dir: Path, output_dir: Path) -> bool:
         losses = fit_arms(
             frame=frame.filter(pl.col("site") == site),
             domain="wind",
-            prefixes=("ens_mean_day1",),
+            prefixes=(prefix,),
             workers=1,
         )
         fingerprints.append(fingerprint(frame=losses))
@@ -572,6 +682,49 @@ def by_hour_modulo(
     return lines
 
 
+def noise_floor_lines(
+    *,
+    domain: DomainType,
+    losses: pl.DataFrame,
+    published: pl.DataFrame,
+    batch: ArmBatch,
+    header: list[str],
+) -> list[str]:
+    """Write the device noise floor: each refitted arm's GPU fit minus its published CPU fit.
+
+    Args:
+        domain: `solar` or `wind`.
+        losses: The new fits' per-row losses at the primary setting.
+        published: The published CPU fits' per-row losses at the primary setting.
+        batch: The batch whose reference arms are compared.
+        header: The contrast table's header lines.
+
+    Returns:
+        The section's Markdown lines, or none for a batch that refits no reference.
+    """
+    if not batch.reference_prefixes:
+        return []
+    noise = ["", "### Device noise floor: GPU fit minus published CPU fit, same arm", *header]
+    for prefix in domain_prefixes(domain=domain, prefixes=batch.reference_prefixes):
+        both = pl.concat(
+            [
+                losses.filter(pl.col("arm") == prefix).with_columns(arm=pl.lit("gpu")),
+                published.filter(pl.col("arm") == prefix).with_columns(arm=pl.lit("cpu")),
+            ],
+            how="diagonal",
+        )
+        if (
+            both.filter(pl.col("arm") == "cpu").is_empty()
+            or both.filter(pl.col("arm") == "gpu").is_empty()
+        ):
+            continue
+        assert_equal_rows(losses=both, treatment="gpu", reference="cpu")
+        line = contrast_line(losses=both, treatment="gpu", reference="cpu")
+        if line:
+            noise.append(line.replace("| gpu − cpu", f"| {prefix} (GPU − CPU)", 1))
+    return noise
+
+
 def report_domain(
     *,
     domain: DomainType,
@@ -579,7 +732,7 @@ def report_domain(
     published: pl.DataFrame,
     shares: pl.DataFrame,
     batch: ArmBatch,
-    context: pl.DataFrame | None = None,
+    context: Sequence[pl.DataFrame] = (),
 ) -> list[str]:
     """Write one technology's report section.
 
@@ -589,19 +742,18 @@ def report_domain(
         published: The published CPU fits' per-row losses at the primary setting.
         shares: `missing_shares`'s result.
         batch: The batch whose contrasts the report tabulates.
-        context: Another batch's GPU losses at the primary setting, or None. The contrast tables
-            read the arms of `losses` and `context` together, so a contrast can name an arm the
-            other batch fitted.
+        context: Earlier batches' GPU losses at the primary setting, one frame per batch. The
+            contrast tables read the arms of `losses` and `context` together, so a contrast can
+            name an arm an earlier batch fitted.
 
     Returns:
         The section's Markdown lines.
     """
     arms = list(batch_prefixes(batch=batch, domain=domain))
     board = leaderboard(losses=losses, arms=arms)
-    pooled = (
-        losses
-        if context is None
-        else pl.concat([losses, context.drop("device", strict=False)], how="diagonal_relaxed")
+    pooled = pl.concat(
+        [losses, *(frame.drop("device", strict=False) for frame in context)],
+        how="diagonal_relaxed",
     )
     lines = [
         f"## {domain.capitalize()}",
@@ -635,12 +787,11 @@ def report_domain(
             "Change with lead: each arm minus the same product at the lead named",
             batch.same_product_contrasts,
         ),
-        (
-            (
-                "Other products against ENS at the same day (Previous Runs day-0 rows mix "
-                "weather models and leads; GEFS and the ENS control member share ENS's lead)"
-            ),
-            batch.ensemble_contrasts,
+        (batch.ensemble_title, batch.ensemble_contrasts),
+        *(
+            ((OPEN_METEO_GFS_TITLE, batch.open_meteo_gfs_contrasts),)
+            if batch.open_meteo_gfs_contrasts
+            else ()
         ),
     ):
         table = [contrast_line(losses=pooled, treatment=t, reference=r) for t, r in pairs]
@@ -700,24 +851,9 @@ def report_domain(
                 f"| {arm} | {remainder} ({lead} h) | {text.split(' [')[0]} "
                 f"| [{text.split(' [')[1]} | {result['n_rows']} |"
             )
-    noise = ["", "### Device noise floor: GPU fit minus published CPU fit, same arm", *header]
-    for prefix in domain_prefixes(domain=domain, prefixes=batch.reference_prefixes):
-        both = pl.concat(
-            [
-                losses.filter(pl.col("arm") == prefix).with_columns(arm=pl.lit("gpu")),
-                published.filter(pl.col("arm") == prefix).with_columns(arm=pl.lit("cpu")),
-            ],
-            how="diagonal",
-        )
-        if (
-            both.filter(pl.col("arm") == "cpu").is_empty()
-            or both.filter(pl.col("arm") == "gpu").is_empty()
-        ):
-            continue
-        assert_equal_rows(losses=both, treatment="gpu", reference="cpu")
-        line = contrast_line(losses=both, treatment="gpu", reference="cpu")
-        if line:
-            noise.append(line.replace("| gpu − cpu", f"| {prefix} (GPU − CPU)", 1))
+    noise = noise_floor_lines(
+        domain=domain, losses=losses, published=published, batch=batch, header=header
+    )
     return [*lines, *noise, ""]
 
 
@@ -743,66 +879,93 @@ def require_arms(*, frame: pl.DataFrame, domain: DomainType, batch: ArmBatch) ->
         raise ValueError(msg)
 
 
-def check_first_batch_arms(
-    *, domain: DomainType, first_batch_arms: set[str], batch: ArmBatch
+def contrast_arms(*, batch: ArmBatch, domain: DomainType) -> set[str]:
+    """Return every arm a batch's contrast tables name for one technology.
+
+    Args:
+        batch: One of `BATCHES`.
+        domain: `solar` or `wind`.
+
+    Returns:
+        The arms of every contrast pair and every climatology contrast, without solar-only
+        products for wind.
+    """
+    pairs = (
+        *batch.same_product_contrasts,
+        *batch.ensemble_contrasts,
+        *batch.open_meteo_gfs_contrasts,
+        *batch.near_analysis_contrasts,
+        *batch.elsewhere_contrasts,
+    )
+    named = {arm for pair in pairs for arm in pair} | set(batch.climatology_contrasts)
+    return set(domain_prefixes(domain=domain, prefixes=tuple(sorted(named))))
+
+
+def check_context_arms(
+    *, domain: DomainType, context_arms: Sequence[set[str]], batch: ArmBatch
 ) -> None:
-    """Raise unless the first batch's arms and the batch's own arms cover every contrast arm once.
+    """Raise unless the batch's own arms and the earlier batches' cover every contrast arm once.
 
     Args:
         domain: `solar` or `wind`.
-        first_batch_arms: The arms held by the first batch's saved losses.
-        batch: The second batch, whose contrast tables read the first batch's losses.
+        context_arms: The arms each `--context-dir` folder's saved losses hold, one set per folder.
+        batch: The batch being fitted.
 
     Raises:
-        ValueError: If an arm is in both batches, or a contrast names an arm that neither batch
-            fits, which would otherwise drop that contrast row from the report or make
-            `assert_equal_rows` raise only at report time.
+        ValueError: If an arm is fitted by two batches, which would double its rows in the pooled
+            losses, or a contrast names an arm no batch fits, which would drop its row silently.
     """
-    own = set(batch_prefixes(batch=batch, domain=domain))
-    both = sorted(first_batch_arms & own)
-    if both:
-        msg = f"{domain}: arms in both batches: {both}"
-        raise ValueError(msg)
-    named = {
-        arm
-        for pairs in (batch.same_product_contrasts, batch.ensemble_contrasts)
-        for pair in pairs
-        for arm in pair
-    } | set(batch.climatology_contrasts)
-    wanted = set(domain_prefixes(domain=domain, prefixes=tuple(sorted(named))))
-    lacking = sorted(wanted - own - first_batch_arms)
+    seen = set(batch_prefixes(batch=batch, domain=domain))
+    for arms in context_arms:
+        twice = sorted(arms & seen)
+        if twice:
+            msg = f"{domain}: arms fitted twice across the batches: {twice}"
+            raise ValueError(msg)
+        seen |= arms
+    lacking = sorted(contrast_arms(batch=batch, domain=domain) - seen)
     if lacking:
-        msg = f"{domain}: contrast arms fitted by neither batch: {lacking}"
+        msg = f"{domain}: contrast arms fitted by no batch: {lacking}"
         raise ValueError(msg)
 
 
-def check_first_batch_dir(*, args: argparse.Namespace, batch: ArmBatch) -> None:
-    """Raise unless `--first-batch-dir` holds a finished first batch that complements `batch`.
+def check_context_dirs(*, args: argparse.Namespace, batch: ArmBatch) -> None:
+    """Raise unless `--context-dir` names finished earlier batches that complete the contrasts.
 
     Args:
         args: The parsed command line.
-        batch: The chosen batch; the check applies only to the second.
+        batch: The chosen batch; the first batch reads no context.
 
     Raises:
-        ValueError: If the flag is missing, names the output or published folder, or the arms
-            do not fit together (see `check_first_batch_arms`).
-        FileNotFoundError: If the first batch has not written its losses.
+        ValueError: If a later batch has no `--context-dir`, one names the output or published
+            folder, or the arms do not fit together (see `check_context_arms`).
+        FileNotFoundError: If an earlier batch has not written its losses.
     """
-    if args.batch != "second":
+    if args.batch == "first":
         return
-    if args.first_batch_dir is None:
-        msg = "--batch second needs --first-batch-dir, or its contrast tables lose rows"
+    if not args.context_dir:
+        msg = f"--batch {args.batch} needs one --context-dir per earlier batch"
         raise ValueError(msg)
-    if args.first_batch_dir.resolve() in {args.output_dir.resolve(), args.published_dir.resolve()}:
-        msg = "--first-batch-dir must be the first batch's own folder"
+    forbidden = {args.output_dir.resolve(), args.published_dir.resolve()}
+    if any(directory.resolve() in forbidden for directory in args.context_dir):
+        msg = "--context-dir must name an earlier batch's own folder"
         raise ValueError(msg)
     for domain in DOMAINS:
-        path = losses_path(output_dir=args.first_batch_dir, domain=domain)
-        if not path.exists():
-            msg = f"{path} does not exist; let the first batch finish first"
-            raise FileNotFoundError(msg)
-        arms = set(pl.scan_parquet(path).select("arm").unique().collect()["arm"].to_list())
-        check_first_batch_arms(domain=domain, first_batch_arms=arms, batch=batch)
+        context_arms = []
+        for directory in args.context_dir:
+            path = losses_path(output_dir=directory, domain=domain)
+            if not path.exists():
+                msg = f"{path} does not exist; let that batch finish first"
+                raise FileNotFoundError(msg)
+            arms = (
+                pl.scan_parquet(path)
+                .filter(pl.col("setting") == SETTING)
+                .select("arm")
+                .unique()
+                .collect()["arm"]
+                .to_list()
+            )
+            context_arms.append(set(arms))
+        check_context_arms(domain=domain, context_arms=context_arms, batch=batch)
 
 
 def main() -> int:
@@ -816,16 +979,18 @@ def main() -> int:
         "--batch",
         choices=tuple(BATCHES),
         default="first",
-        help="Which fit batch: the first (the day-0 to day-14 arms) or the second (ENS mean at "
+        help="Which fit batch: the first (the day-0 to day-14 arms), the second (ENS mean at "
         "day 7, the ENS control member, GEFS mean at day 7, and GPU refits of the arms the first "
-        "batch left on the CPU).",
+        "batch left on the CPU), or the third (native GFS at days 0, 1, 2, 3, 5, 7, 10 and 14).",
     )
     parser.add_argument(
-        "--first-batch-dir",
+        "--context-dir",
         type=Path,
-        default=None,
-        help="With --batch second: the first batch's folder, whose losses the contrast tables "
-        "read for arms only that batch fitted.",
+        action="append",
+        default=[],
+        help="With --batch second or third: an earlier batch's folder, whose losses the contrast "
+        "tables read for arms only that batch fitted. Repeat it for each earlier batch the "
+        "contrasts name (the third batch needs the first and the second).",
     )
     parser.add_argument("--check", action="store_true", help="Compare two GPU runs of one arm.")
     parser.add_argument(
@@ -836,7 +1001,7 @@ def main() -> int:
     if args.output_dir.resolve() == args.published_dir.resolve():
         msg = "the output folder must not be the published folder"
         raise ValueError(msg)
-    check_first_batch_dir(args=args, batch=batch)
+    check_context_dirs(args=args, batch=batch)
     if args.check:
         for domain in DOMAINS:
             checked = joined_rows(
@@ -844,7 +1009,11 @@ def main() -> int:
             )
             require_arms(frame=checked, domain=domain, batch=batch)
             missing_shares(frame=checked, domain=domain, batch=batch)
-        agree = check_determinism(published_dir=args.published_dir, output_dir=args.output_dir)
+        agree = check_determinism(
+            published_dir=args.published_dir,
+            output_dir=args.output_dir,
+            prefix=domain_prefixes(domain="wind", prefixes=batch.new_prefixes)[0],
+        )
         sys.stdout.write(f"two GPU runs agree: {agree}\n")
         return 0 if agree else 1
     report_path = args.output_dir / "report.md"
@@ -874,17 +1043,8 @@ def main() -> int:
         ),
         "",
     ]
-    if any(prefix.endswith("_day0") for prefix in batch.new_prefixes):
-        report += [
-            (
-                "Every day-0 arm is a nowcast, not a day-ahead forecast: a Previous Runs "
-                "product's day 0 is the freshest run covering each hour, at a lead set by that "
-                "product's own run cycle, and ENS's and GEFS's day 0 covers hours before the 00 "
-                "UTC run is published. The day-0 served lead is measured only for ICON-D2 and "
-                "ICON-EU; for every other product it is inferred from the run cycle."
-            ),
-            "",
-        ]
+    if batch.note:
+        report += [batch.note, ""]
     for domain in DOMAINS:
         path = losses_path(output_dir=args.output_dir, domain=domain)
         if path.exists():
@@ -908,13 +1068,12 @@ def main() -> int:
         published = pl.read_parquet(
             losses_path(output_dir=args.published_dir, domain=domain)
         ).filter(pl.col("setting") == SETTING)
-        context = (
-            None
-            if args.first_batch_dir is None
-            else pl.read_parquet(
-                losses_path(output_dir=args.first_batch_dir, domain=domain)
-            ).filter(pl.col("setting") == SETTING)
-        )
+        context = [
+            pl.read_parquet(losses_path(output_dir=directory, domain=domain)).filter(
+                pl.col("setting") == SETTING
+            )
+            for directory in args.context_dir
+        ]
         report += report_domain(
             domain=domain,
             losses=losses,

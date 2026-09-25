@@ -46,6 +46,9 @@ keys, into a new write-once `--output-dir`, and never writes to the published fo
 are separate constants (`EXTRA_ENS_DAYS`, `EXTRA_GEFS_DAYS`), never added to `ENS_DAYS`, so the
 shared rows cannot move. `--batch second` builds the second batch instead: ENS mean at day 7, the
 ENS control member at days 5, 7, 10 and 14, and GEFS mean at day 7 (`EXTRA_LEAD_BUILDS`).
+`--batch third` builds `gfs_native_day<N>_*` at days 0, 1, 2, 3, 5, 7, 10 and 14 from the native
+Dynamical.org GFS store (`GFS_NATIVE_DIR_NAME`), which no other batch reads; see `_gfs_native_frame`
+for which run and lead each day serves and how the store's radiation is converted.
 
 Every output row carries only the anonymised `site` label; no generator name, id or coordinate is
 read from the private roster in this script, except inside `studies.grid_sampling` (GEFS's
@@ -79,6 +82,15 @@ from verify_previous_runs_leads import PRODUCT_DIRS
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
 import ens_forecast_horizons as efh
+from studies.gfs_native import (
+    HOURLY_SERVED_LAST_DAY,
+    LAST_LEAD_HOURS,
+    gfs_leads,
+    served_init_time,
+    served_lead_hours,
+    step_means,
+    three_hour_means,
+)
 from studies.grid_sampling import nearest_cells
 from studies.hourly_means import hourly_from_snapshots
 from studies.resample import gefs_step_means
@@ -160,8 +172,8 @@ EXTRA_ENS_CONTROL_DAYS: Final[tuple[int, ...]] = (5, 7, 10, 14)
 published inputs."""
 
 
-ExtraBatchType = Literal["first", "second"]
-"""Which extra-lead build: the first batch's columns, or the second batch's."""
+ExtraBatchType = Literal["first", "second", "third"]
+"""Which extra-lead build: the first, second, or third batch's columns."""
 
 
 class ExtraLeadBuild(NamedTuple):
@@ -171,7 +183,11 @@ class ExtraLeadBuild(NamedTuple):
     ens_mean_days: tuple[int, ...]
     ens_control_days: tuple[int, ...]
     gefs_days: tuple[int, ...]
+    gfs_native_days: tuple[int, ...] = ()
 
+
+GFS_NATIVE_DAYS: Final[tuple[int, ...]] = (0, 1, 2, 3, 5, 7, 10, 14)
+"""The lead days the third batch reads the native GFS store at."""
 
 EXTRA_LEAD_BUILDS: Final[dict[ExtraBatchType, ExtraLeadBuild]] = {
     "first": ExtraLeadBuild(
@@ -186,11 +202,18 @@ EXTRA_LEAD_BUILDS: Final[dict[ExtraBatchType, ExtraLeadBuild]] = {
         ens_control_days=EXTRA_ENS_CONTROL_DAYS,
         gefs_days=(7,),
     ),
+    "third": ExtraLeadBuild(
+        product_day_offsets={},
+        ens_mean_days=(),
+        ens_control_days=(),
+        gefs_days=(),
+        gfs_native_days=GFS_NATIVE_DAYS,
+    ),
 }
-"""The first batch's columns (unchanged from its own build) and the second batch's: ENS mean at
-day 7, ENS control member at days 5, 7, 10 and 14, and GEFS mean at day 7. The second batch reads
-no Previous Runs column, because the arms it refits take their columns from the published
-inputs."""
+"""The first batch's columns (unchanged from its own build), the second batch's (ENS mean at day 7,
+ENS control member at days 5, 7, 10 and 14, and GEFS mean at day 7, with no Previous Runs column
+because the arms it refits take their columns from the published inputs), and the third batch's
+(the native GFS store at `GFS_NATIVE_DAYS`, and nothing else)."""
 
 SOLAR_ONLY_PRODUCTS: Final[frozenset[str]] = frozenset({"ARPEGE Europe", "AROME France"})
 """Products the plan scores for solar only: their 100 m wind offsets are missing on most rows."""
@@ -904,6 +927,298 @@ def _gefs_frame(
     return frame
 
 
+GFS_NATIVE_DIR_NAME: Final[str] = "GFS"
+"""Under `data/studies/weather/`, the native Dynamical.org GFS store: `GFS.parquet` (every run at
+00, 06, 12 and 18 UTC) and `_grid_cells.parquet`."""
+
+GFS_NATIVE_ARM_PREFIX: Final[str] = "gfs_native"
+"""The column prefix of the native GFS arms, `gfs_native_day<N>_<field>`."""
+
+GFS_NATIVE_MAX_MISSING_SHARE: Final[float] = 0.015
+"""The largest share of rows with a null in one native GFS arm's columns the build accepts, the same
+limit `fit_extra_leads.MAX_MISSING_SHARE` applies to the shared rows."""
+
+GFS_NATIVE_RUN_MARGIN_DAYS: Final[int] = 2
+"""How many days before the largest served day the store is read from, for the run cycles and the
+hour a solar label is taken from. The read never starts before `efh.SPAN`'s first hour, which is
+where the clear-sky table the band days' upsampling reads begins."""
+
+
+def gfs_native_arm(*, day: int) -> str:
+    """Return the column prefix of the native GFS arm at one lead day."""
+    return f"{GFS_NATIVE_ARM_PREFIX}_day{day}"
+
+
+def _long_radiation(*, index: pl.DataFrame, leads: np.ndarray, array: np.ndarray) -> pl.DataFrame:
+    """Turn radiation arrays over (series, lead) into one row per cell, run and lead.
+
+    Args:
+        index: `cell` and `init_time`, one row per array row.
+        leads: The array's columns' leads in hours.
+        array: Shape (index.height, len(leads)), NaN where missing.
+
+    Returns:
+        `cell`, `init_time`, `lead_hours`, `ghi_w_m2`, with each NaN replaced by a null.
+    """
+    return (
+        index[np.repeat(np.arange(index.height), len(leads))]
+        .with_columns(
+            lead_hours=pl.Series(np.tile(leads, index.height)).cast(pl.Int32),
+            ghi_w_m2=pl.Series(array.reshape(-1)),
+        )
+        .with_columns(pl.col("ghi_w_m2").fill_nan(None))
+    )
+
+
+def _gfs_native_step_radiation(*, radiation: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Convert the store's since-reset radiation to step means, per cell and run.
+
+    Args:
+        radiation: `cell`, `init_time`, `lead_hours` (1 or more) and `ghi_raw`, the store's mean
+            since the last reset, in W/m2.
+
+    Returns:
+        The mean over each step on the store's own steps (1 hour to lead 120, 3 hours beyond), and
+        the mean over each 3 hours at every multiple of 3 hours, both as `_long_radiation` returns
+        them. A run's missing lead leaves a null at its own step and at the next step of its reset
+        window, and nowhere else (`studies.gfs_native.step_means`).
+    """
+    leads = gfs_leads()
+    wide = radiation.pivot(on="lead_hours", index=["cell", "init_time"], values="ghi_raw")
+    values = np.full((wide.height, len(leads)), np.nan)
+    for position, lead in enumerate(leads):
+        if (name := str(int(lead))) in wide.columns:
+            values[:, position] = wide[name].cast(pl.Float64).fill_null(float("nan")).to_numpy()
+    index = wide.select("cell", "init_time")
+    hourly = step_means(values=values, leads=leads)
+    three_leads, three = three_hour_means(hourly=hourly, leads=leads)
+    return (
+        _long_radiation(index=index, leads=leads, array=hourly),
+        _long_radiation(index=index, leads=three_leads, array=three),
+    )
+
+
+def _gfs_native_weather(*, raw: pl.DataFrame) -> pl.DataFrame:
+    """Return the store's temperature and wind per cell, run and lead, in the GEFS extract's units.
+
+    Args:
+        raw: The store's rows with `cell`, `init_time` and `lead_hours` added.
+
+    Returns:
+        `cell`, `init_time`, `lead_hours`, `temp_c`, `speed_100m`, `direction_100m`, `speed_10m`,
+        `direction_10m` (m/s and degrees the wind blows from), with each NaN replaced by a null.
+    """
+    u100, v100 = pl.col("wind_u_100m").cast(pl.Float64), pl.col("wind_v_100m").cast(pl.Float64)
+    u10, v10 = pl.col("wind_u_10m").cast(pl.Float64), pl.col("wind_v_10m").cast(pl.Float64)
+    return raw.select(
+        "cell",
+        "init_time",
+        "lead_hours",
+        temp_c=pl.col("temperature_2m").cast(pl.Float64),
+        speed_100m=(u100**2 + v100**2).sqrt(),
+        direction_100m=pl.arctan2(-u100, -v100).degrees() % 360.0,
+        speed_10m=(u10**2 + v10**2).sqrt(),
+        direction_10m=pl.arctan2(-u10, -v10).degrees() % 360.0,
+    ).with_columns(pl.col(pl.Float64).fill_nan(None))
+
+
+def _gfs_native_direct_arm(
+    *, keys: pl.DataFrame, extract: pl.DataFrame, domain: DomainType, day: int
+) -> pl.DataFrame:
+    """Read one lead day straight from the store's hourly leads, with no upsampling.
+
+    Each target hour reads the run and lead `studies.gfs_native.served_init_time` and
+    `served_lead_hours` give. A solar hour's radiation is the store's step mean at that lead, which
+    is the mean over the hour ending at the label, and its temperature is read at the hour's
+    midpoint, the mean of the instantaneous values at the hour's two ends (the ENS arms read
+    temperature at the midpoint too). A wind hour reads the instantaneous values at its label.
+
+    Args:
+        keys: `site`, `time` for every row the study scores.
+        extract: `_gfs_native_extract`'s hourly-lead frame.
+        domain: `solar` or `wind`.
+        day: The lead day, at most `HOURLY_SERVED_LAST_DAY`.
+
+    Returns:
+        `site`, `time` and the arm's columns; a row whose run or lead the store lacks carries nulls.
+    """
+    targets = keys.select("site", "time").with_columns(
+        init_time=served_init_time(time=pl.col("time"), day=day, domain=domain),
+        lead_hours=served_lead_hours(time=pl.col("time"), day=day, domain=domain),
+    )
+    columns = efh.ens_columns(arm=gfs_native_arm(day=day), domain=domain)
+    join_keys = ["site", "init_time", "lead_hours"]
+    if domain == "solar":
+        earlier = extract.select(
+            "site",
+            "init_time",
+            lead_hours=pl.col("lead_hours") + 1,
+            temp_earlier="temp_c",
+        )
+        joined = targets.join(
+            extract.select(*join_keys, "ghi_w_m2", "temp_c"), on=join_keys, how="left"
+        ).join(earlier, on=join_keys, how="left")
+        return joined.select(
+            "site",
+            "time",
+            pl.col("ghi_w_m2").alias(columns[0]),
+            ((pl.col("temp_c") + pl.col("temp_earlier")) / 2.0).alias(columns[1]),
+        )
+    joined = targets.join(
+        extract.select(*join_keys, "speed_100m", "direction_100m", "speed_10m"),
+        on=join_keys,
+        how="left",
+    )
+    direction = pl.col("direction_100m").radians()
+    return joined.select(
+        "site",
+        "time",
+        pl.col("speed_100m").alias(columns[0]),
+        direction.sin().alias(columns[1]),
+        direction.cos().alias(columns[2]),
+        pl.col("speed_10m").alias(columns[3]),
+    )
+
+
+def _gfs_native_frame(
+    *,
+    keys: pl.DataFrame,
+    domain: DomainType,
+    days: Sequence[int],
+    gfs_dir: Path | None = None,
+) -> pl.DataFrame:
+    """Build the native GFS arms' columns from Dynamical.org's GFS store, at the given lead days.
+
+    **Which run and lead each day serves.** Day 0 reads the freshest run at or before the instant
+    each hour describes, one of the four runs a day (00, 06, 12, and 18 UTC), at a lead of 1 to 6
+    hours for a solar hour (labelled by its end, so the window ends at the label) and 0 to 5 hours
+    for a wind hour. Days 1 and above read the 00 UTC run issued that many days before the label's
+    own day (a solar hour's own day is the day of the instant an hour before its label), at a lead
+    of `24 * day + 1` to `24 * day + 24` for solar and `24 * day` to `24 * day + 23` for wind. The
+    served rule is `studies.gfs_native.served_init_time` and `served_lead_hours`. The rule is the
+    ENS and GEFS arms' (day `N` is the 00 UTC run's leads from `24 * N`), not the Previous Runs
+    archive's freshest run at least `N` days old.
+
+    **Radiation.** The store's value is the mean since the last 6-hourly reset, its lead labelling
+    the window's end. `studies.gfs_native.step_means` inverts the windows to the mean over each
+    step: exactly the hour before the label up to lead 120, and the 3 hours before it beyond (the
+    store steps 3-hourly from lead 123). Days 0 to 4 read those hourly means directly. Days 5, 7, 10
+    and 14 lie on the 3-hourly leads, so the same 3-hour means (the mean of three hourly steps to
+    lead 120, the store's own step beyond it) go through the ENS and GEFS arms' upsampling to hourly
+    (`clear_sky` for solar radiation, its straight-line temperature, `speed_components` for wind),
+    which reads a one-member ensemble. That upsampling is the only difference between days 0 to 4
+    and days 5 and above.
+
+    **Space.** Each site reads its nearest 0.25 degree grid cell by great-circle distance, as the
+    GEFS arms do (`nearest_cells`), not an H3 area mean. Wind is the speed and direction of the
+    10 m and 100 m components; temperature is at 2 m.
+
+    Args:
+        keys: `site`, `time` for every row the study scores.
+        domain: `solar` or `wind`.
+        days: The lead days to build.
+        gfs_dir: The store's folder; `None` reads `GFS_NATIVE_DIR_NAME` under the weather folder.
+
+    Returns:
+        `keys` with `gfs_native_day<N>_<field>` for every `N` in `days`, left-joined.
+
+    Raises:
+        RuntimeError: If any arm has a null in more than `GFS_NATIVE_MAX_MISSING_SHARE` of the rows.
+    """
+    directory = _weather_dir() / GFS_NATIVE_DIR_NAME if gfs_dir is None else gfs_dir
+    sites = sorted(keys["site"].unique().to_list())
+    cell_by_site = _gefs_cell_selection(
+        grid_cells=pl.read_parquet(directory / "_grid_cells.parquet"), domain=domain, sites=sites
+    )
+    site_cells = pl.DataFrame(
+        {"site": list(cell_by_site), "cell": list(cell_by_site.values())},
+        schema={"site": pl.String, "cell": pl.Int32},
+    )
+    time_range = keys.select(first=pl.col("time").min(), last=pl.col("time").max()).row(
+        0, named=True
+    )
+    time_dtype = keys.schema["time"]
+    first_init = max(
+        time_range["first"] - timedelta(days=max(days) + GFS_NATIVE_RUN_MARGIN_DAYS),
+        efh.SPAN[0],
+    )
+    raw = (
+        pl.scan_parquet(directory / "GFS.parquet")
+        .with_columns(
+            lead_hours=(pl.col("lead_time").dt.total_minutes() / 60).cast(pl.Int32),
+            cell=(pl.col("lat_index") * 10 + pl.col("lon_index")).cast(pl.Int32),
+            init_time=pl.col("init_time").dt.replace_time_zone("UTC").cast(time_dtype),
+        )
+        .filter(
+            pl.col("cell").is_in(site_cells["cell"].unique().to_list()),
+            pl.col("init_time") >= first_init,
+            pl.col("init_time") <= time_range["last"],
+        )
+        .collect()
+    )
+    hourly_radiation, three_radiation = _gfs_native_step_radiation(
+        radiation=raw.filter(pl.col("lead_hours") > 0).select(
+            "cell",
+            "init_time",
+            "lead_hours",
+            ghi_raw=pl.col("downward_short_wave_radiation_flux_surface")
+            .cast(pl.Float64)
+            .fill_nan(None),
+        )
+    )
+    weather = _gfs_native_weather(raw=raw)
+    cell_keys = ["cell", "init_time", "lead_hours"]
+    frame = keys
+    direct_days = [day for day in days if day <= HOURLY_SERVED_LAST_DAY]
+    if direct_days:
+        hourly_extract = weather.join(hourly_radiation, on=cell_keys, how="left").join(
+            site_cells, on="cell"
+        )
+        for day in direct_days:
+            frame = frame.join(
+                _gfs_native_direct_arm(keys=keys, extract=hourly_extract, domain=domain, day=day),
+                on=["site", "time"],
+                how="left",
+            )
+    band_days = tuple(day for day in days if day > HOURLY_SERVED_LAST_DAY)
+    if band_days:
+        band_extract = (
+            weather.filter(pl.col("lead_hours") % 3 == 0, pl.col("init_time").dt.hour() == 0)
+            .join(three_radiation, on=cell_keys, how="left")
+            .join(site_cells, on="cell")
+            .with_columns(ensemble_member=pl.lit(0, dtype=pl.Int8))
+        )
+        for arm_frame in _ens_member_arms(
+            extract=band_extract,
+            domain=domain,
+            days=band_days,
+            method=UPSAMPLING_METHODS[domain],
+            ensemble_size=1,
+            arm_name=lambda _way, day: gfs_native_arm(day=day),
+            ways=("mean",),
+            fine_step_last_lead=LAST_LEAD_HOURS,
+        ):
+            frame = frame.join(arm_frame, on=["site", "time"], how="left")
+    too_many = {}
+    for day in days:
+        columns = efh.ens_columns(arm=gfs_native_arm(day=day), domain=domain)
+        share = float(
+            frame.select(pl.any_horizontal(pl.col(c).is_null() for c in columns).mean()).item()
+        )
+        _LOG.info(
+            "%s: %s has a null in %.3f%% of rows", domain, gfs_native_arm(day=day), 100 * share
+        )
+        if share > GFS_NATIVE_MAX_MISSING_SHARE:
+            too_many[gfs_native_arm(day=day)] = share
+    if too_many:
+        msg = (
+            f"{domain}: native GFS arms with a null in more than "
+            f"{GFS_NATIVE_MAX_MISSING_SHARE:.1%} of rows: {too_many}"
+        )
+        raise RuntimeError(msg)
+    return frame
+
+
 def build_domain(*, domain: DomainType, output_dir: Path, gefs_window_dir: Path | None) -> Path:
     """Build one technology's arm-input parquet and write it under `output_dir`.
 
@@ -1007,6 +1322,7 @@ def build_extra_leads(
     output_dir: Path,
     gefs_window_dir: Path | None,
     batch: ExtraBatchType = "first",
+    gfs_dir: Path | None = None,
 ) -> Path:
     """Build the exploratory lead columns on the published inputs' own `(site, time)` keys.
 
@@ -1020,6 +1336,7 @@ def build_extra_leads(
         output_dir: The new folder to write `<domain>_extra_lead_inputs.parquet` into.
         gefs_window_dir: A `GEFS_window_*` test extract, or `None` for the month cache.
         batch: Which extra-lead build (`EXTRA_LEAD_BUILDS`).
+        gfs_dir: The native GFS store's folder for the third batch; `None` reads the shared one.
 
     Returns:
         The written file's path.
@@ -1060,7 +1377,14 @@ def build_extra_leads(
         mean_days=build.ens_mean_days,
         control_days=build.ens_control_days,
     )
-    frame = _gefs_frame(keys=frame, domain=domain, window_dir=gefs_window_dir, days=build.gefs_days)
+    if build.gefs_days:
+        frame = _gefs_frame(
+            keys=frame, domain=domain, window_dir=gefs_window_dir, days=build.gefs_days
+        )
+    if build.gfs_native_days:
+        frame = _gfs_native_frame(
+            keys=frame, domain=domain, days=build.gfs_native_days, gfs_dir=gfs_dir
+        )
     output_dir.mkdir(parents=True, exist_ok=True)
     frame.write_parquet(output_path)
     _LOG.info("%s: wrote %d rows, %d columns to %s", domain, frame.height, frame.width, output_path)
@@ -1086,10 +1410,18 @@ def main() -> int:
     )
     parser.add_argument(
         "--batch",
-        choices=("first", "second"),
+        choices=tuple(EXTRA_LEAD_BUILDS),
         default="first",
         help="With --extra-leads: which extra-lead build (the second adds ENS mean at day 7, the "
-        "ENS control member at days 5, 7, 10 and 14, and GEFS mean at day 7).",
+        "ENS control member at days 5, 7, 10 and 14, and GEFS mean at day 7; the third adds the "
+        "native GFS store at days 0, 1, 2, 3, 5, 7, 10 and 14).",
+    )
+    parser.add_argument(
+        "--gfs-dir",
+        type=Path,
+        default=None,
+        help="With --batch third: the native GFS store's folder, for development; production "
+        "reads the shared one.",
     )
     parser.add_argument(
         "--published-dir",
@@ -1113,6 +1445,7 @@ def main() -> int:
                 output_dir=args.output_dir,
                 gefs_window_dir=args.gefs_window_dir,
                 batch=args.batch,
+                gfs_dir=args.gfs_dir,
             )
         return 0
     args.output_dir.mkdir(parents=True, exist_ok=True)
