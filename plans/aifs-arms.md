@@ -50,7 +50,7 @@ found none before it). The issue's premises match the data on disk: I re-derived
    reference, and the row set each admit alternatives, which "Risks and open questions" lists.
 5. *Callers not nameable without a search:* does not fire. The one shared function this plan
   touches,
-   `_ens_member_arms`, gains a defaulted argument, and its callers are in
+   `ens_member_arms`, gains a defaulted argument, and its callers are in
    `build_forecast_inputs.py` (named by grep).
 
 Two triggers fire, so the issue is complex. Both plan reviews have run (see "Findings of plan
@@ -242,7 +242,7 @@ coordinate, cell id, weight, or generator name; the only site column is the `A` 
 `W3`
 label.
 
-**The extract is `_aifs_members_frame`, a sibling of `_gefs_members_frame`** (line 676), about 40
+**The extract is `aifs_members_frame`, a sibling of `_gefs_members_frame`** (line 676), about 40
 lines. The function scans the parquet lazily (`pl.scan_parquet`, because the AIFS ENS file holds 50
 million rows), filters to 00 UTC runs from the set's first run, to leads of at most `24 *
 max(AIFS_DAYS) + 30`
@@ -257,7 +257,7 @@ has none. It returns the shape `ens_forecast_horizons.members` returns (`site`, 
 `ensemble_member`, `lead_hours`, `ghi_w_m2`, `temp_c`, `speed_100m`, `direction_100m`, `speed_10m`,
 `direction_10m`).
 
-**The extract then enters through the same four functions as ENS and GEFS.** `_ens_member_arms`
+**The extract then enters through the same four functions as ENS and GEFS.** `ens_member_arms`
 calls `band_steps`, `upsampled_fields`, `combine`, `reduce_members`, and `prefixed`. The upsampling
 combination is read from `UPSAMPLING_METHODS` (`clear_sky` for solar, `speed_components` for wind),
 never re-chosen. So radiation is rebuilt through the clear-sky index, temperature is interpolated
@@ -285,7 +285,7 @@ page says so.
 ## The references
 
 **The fair IFS-physics comparison is ENS's mean and control member at AIFS's lead and steps.**
-`_ens_member_arms` gains one defaulted argument, `six_hourly: bool = False`, passed to `band_steps`,
+`ens_member_arms` gains one defaulted argument, `six_hourly: bool = False`, passed to `band_steps`,
 which calls `coarsen_to_six_hourly`. That keeps ENS's steps at multiples of 6 h and averages each
 pair of 3-hourly radiation steps into their exact 6-hour mean. Arm names are `ens_mean6_day<d>` and
 `ens_control6_day<d>`. The full-resolution `ens_mean_day1` (published column, refitted) shows how
@@ -412,11 +412,11 @@ changes a verdict by itself. The page reports them beside the contrast.
 
 ## What changes, file by file
 
-**Edit: `studies/nwp_forecast_comparison/build_forecast_inputs.py`.** Add `_aifs_members_frame`
+**Edit: `studies/nwp_forecast_comparison/build_forecast_inputs.py`.** Add `aifs_members_frame`
 (H3-weighted, plus a nearest-cell variant for the sensitivity arm),
 `_aifs_frame` (which also keeps `<arm>_init_time`), `build_aifs`, and a `--aifs` flag (with
 `--aifs-dir` for the AIFS store, as the
-existing flags name their inputs), plus the defaulted `six_hourly` argument on `_ens_member_arms`.
+existing flags name their inputs), plus the defaulted `six_hourly` argument on `ens_member_arms`.
 Update the module docstring's list of modes.
 
 **New: `studies/nwp_forecast_comparison/verify_aifs_steps.py`** (read-only checks, below) and
@@ -489,7 +489,7 @@ helper gains a defaulted argument, and no new package module is added.
 No `packages/` code changes, so there are no new unit tests, and the check is the printed report
 (`study` skill). Each read-only check below fails on the defect it exists for:
 
-- *Default path unchanged.* `_ens_member_arms(six_hourly=False)` for days 1 and 2, on the published
+- *Default path unchanged.* `ens_member_arms(six_hourly=False)` for days 1 and 2, on the published
   keys, equals the published parquet's `ens_mean_day{1,2}_*` and `ens_control_day{1,2}_*` columns
   (maximum absolute difference 0). This is a regression guard, and it passes on `main`.
 - *The 6-hour path is wired* (fails if `six_hourly` is ignored). For wind, at hours whose UTC hour
@@ -634,7 +634,7 @@ Per the `study` skill, the maintainer's authority is needed to merge.
    The page's lead states which comparison is which.
 6. **Spatial representation.** ENS is the overlap-weighted mean of the 0.25° cells under each
    generator's H3 resolution-5 cell, which is what the live service reads. The AIFS arms use the
-   same read: `_aifs_members_frame` computes each site's H3 resolution-5 cell weights over the
+   same read: `aifs_members_frame` computes each site's H3 resolution-5 cell weights over the
    crop's 9 cells with `geo.h3.compute_h3_grid_weights`, and raises unless the weights of each site
    sum to 1 within 1e-6. A nearest-cell AIFS Single arm at day 1 (`aifs_single_nearest_day1`) is
    fitted as an exploratory sensitivity arm, so the page can say how much the read moves the result.

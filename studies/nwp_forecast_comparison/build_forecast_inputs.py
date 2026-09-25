@@ -56,7 +56,7 @@ each AIFS version era.
 
 Every output row carries only the anonymised `site` label; no generator name, id or coordinate is
 read from the private roster in this script, except inside `studies.grid_sampling` (GEFS's and
-AIFS's nearest-cell match) and the H3 cell lookup of `_aifs_site_weights`, which never print what
+AIFS's nearest-cell match) and the H3 cell lookup of `aifs_site_weights`, which never print what
 they read.
 
 Run it with `uv run python studies/nwp_forecast_comparison/build_forecast_inputs.py --output-dir
@@ -354,7 +354,7 @@ def _previous_runs_frame(
     return frame
 
 
-def _ens_member_arms(
+def ens_member_arms(
     *,
     extract: pl.DataFrame,
     domain: DomainType,
@@ -446,7 +446,7 @@ def _ens_frame(*, keys: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
     baselined = efh.with_baselines(frame=efh.base_frame(domain=domain), domain=domain)
     sites = sorted(baselined["site"].unique().to_list())
     extract = efh.members(sites=sites)
-    arms = _ens_member_arms(
+    arms = ens_member_arms(
         extract=extract,
         domain=domain,
         days=ENS_DAYS,
@@ -905,7 +905,7 @@ def _gefs_frame(
     if extract.is_empty():
         _LOG.warning("GEFS: no rows matched at %s, no GEFS columns written.", path)
         return keys
-    arms = _ens_member_arms(
+    arms = ens_member_arms(
         extract=extract,
         domain=domain,
         days=build_days,
@@ -970,7 +970,7 @@ def _ens_extra_frame(*, keys: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
         row missing a band carries nulls.
     """
     sites = sorted(keys["site"].unique().to_list())
-    arms = _ens_member_arms(
+    arms = ens_member_arms(
         extract=efh.members(sites=sites),
         domain=domain,
         days=EXTRA_ENS_DAYS,
@@ -1082,7 +1082,7 @@ def _h3_crop_weights(*, site_cells: Mapping[str, int], grid_cells: pl.DataFrame)
     return weights
 
 
-def _aifs_site_weights(
+def aifs_site_weights(
     *, path: Path, domain: DomainType, sites: list[str], spatial: SpatialReadType
 ) -> pl.DataFrame:
     """Return each site's cell weights over one AIFS download's crop.
@@ -1122,7 +1122,7 @@ def _aifs_site_weights(
     return _h3_crop_weights(site_cells=site_cells, grid_cells=grid_cells)
 
 
-def _aifs_members_frame(
+def aifs_members_frame(
     *,
     store: Path,
     weights: pl.DataFrame,
@@ -1139,7 +1139,7 @@ def _aifs_members_frame(
 
     Args:
         store: The store's parquet.
-        weights: `_aifs_site_weights`'s result.
+        weights: `aifs_site_weights`'s result.
         ensemble: Whether the store has an `ensemble_member` column (AIFS ENS). AIFS Single gets
             member 0.
         first_init: The first run kept; earlier runs hold `NaN` radiation and 100 m wind.
@@ -1222,15 +1222,13 @@ def _aifs_frame(*, keys: pl.DataFrame, domain: DomainType, weather_dir: Path) ->
         ("h3", AIFS_DAYS, "aifs_single"),
         ("nearest", (1,), "aifs_single_nearest"),
     ):
-        extract = _aifs_members_frame(
+        extract = aifs_members_frame(
             store=single_dir / f"{AIFS_SINGLE_DIR_NAME}.parquet",
-            weights=_aifs_site_weights(
-                path=single_dir, domain=domain, sites=sites, spatial=spatial
-            ),
+            weights=aifs_site_weights(path=single_dir, domain=domain, sites=sites, spatial=spatial),
             ensemble=False,
             first_init=AIFS_SINGLE_FIRST_INIT,
         )
-        arm_frames += _ens_member_arms(
+        arm_frames += ens_member_arms(
             extract=extract,
             domain=domain,
             days=days,
@@ -1241,13 +1239,13 @@ def _aifs_frame(*, keys: pl.DataFrame, domain: DomainType, weather_dir: Path) ->
             fine_step_last_lead=0,
             keep_init_time=True,
         )
-    ens_extract = _aifs_members_frame(
+    ens_extract = aifs_members_frame(
         store=ens_dir / f"{AIFS_ENS_DIR_NAME}.parquet",
-        weights=_aifs_site_weights(path=ens_dir, domain=domain, sites=sites, spatial="h3"),
+        weights=aifs_site_weights(path=ens_dir, domain=domain, sites=sites, spatial="h3"),
         ensemble=True,
         first_init=AIFS_ENS_FIRST_INIT,
     )
-    arm_frames += _ens_member_arms(
+    arm_frames += ens_member_arms(
         extract=ens_extract,
         domain=domain,
         days=AIFS_DAYS,
@@ -1258,7 +1256,7 @@ def _aifs_frame(*, keys: pl.DataFrame, domain: DomainType, weather_dir: Path) ->
         fine_step_last_lead=0,
         keep_init_time=True,
     )
-    arm_frames += _ens_member_arms(
+    arm_frames += ens_member_arms(
         extract=efh.members(sites=sites),
         domain=domain,
         days=AIFS_DAYS,
