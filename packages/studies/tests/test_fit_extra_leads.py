@@ -1,4 +1,5 @@
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
 import polars as pl
@@ -15,14 +16,17 @@ from fit_extra_leads import (  # noqa: E402
     REFERENCE_PREFIXES,
     SECOND_NEW_PREFIXES,
     SECOND_REFERENCE_PREFIXES,
+    arm_rows,
     batch_prefixes,
     check_context_arms,
     check_saved_losses_hold_arms,
     contrast_arms,
     domain_prefixes,
+    intersection_contrast_line,
     noise_floor_lines,
+    shared_rows,
 )
-from nwp_forecast_comparison import DomainType  # noqa: E402
+from nwp_forecast_comparison import METRIC, DomainType, arm_columns  # noqa: E402
 
 
 def test_wind_prefixes_exclude_the_solar_only_products():
@@ -124,6 +128,8 @@ def _all_contrast_arms(*, batch: ExtraBatchType) -> set[str]:
         *selected.same_product_contrasts,
         *selected.ensemble_contrasts,
         *selected.open_meteo_gfs_contrasts,
+        *selected.ifs_025_contrasts,
+        *selected.icon_eu_contrasts,
         *selected.elsewhere_contrasts,
     )
     return {arm for pair in pairs for arm in pair}
@@ -216,3 +222,134 @@ def test_an_arm_in_two_batches_raises() -> None:
         check_context_arms(
             domain="solar", context_arms=[arms, {"ens_mean_day7"}], batch=BATCHES["third"]
         )
+
+
+def test_the_fourth_batch_fits_six_ifs_single_runs_arms_and_no_day_ten():
+    for domain in ("solar", "wind"):
+        arms = batch_prefixes(batch=BATCHES["fourth"], domain=domain)
+
+        assert arms == tuple(f"ifs_single_day{day}" for day in (0, 1, 2, 3, 5, 7))
+    assert not BATCHES["fourth"].reference_prefixes
+
+
+@pytest.mark.parametrize("domain", ["solar", "wind"])
+def test_the_first_two_batches_complete_the_fourth_batch_contrasts(domain: DomainType) -> None:
+    check_context_arms(
+        domain=domain,
+        context_arms=[
+            set(batch_prefixes(batch=BATCHES["first"], domain=domain)),
+            set(batch_prefixes(batch=BATCHES["second"], domain=domain)),
+        ],
+        batch=BATCHES["fourth"],
+    )
+
+
+def test_the_first_batch_alone_leaves_a_fourth_batch_contrast_arm_unfitted() -> None:
+    with pytest.raises(ValueError, match="fitted by no batch"):
+        check_context_arms(
+            domain="solar",
+            context_arms=[set(batch_prefixes(batch=BATCHES["first"], domain="solar"))],
+            batch=BATCHES["fourth"],
+        )
+
+
+def test_every_arm_a_fourth_batch_contrast_names_is_fitted_in_some_batch():
+    fitted = (
+        set(BATCHES["fourth"].new_prefixes)
+        | set(NEW_PREFIXES)
+        | set(REFERENCE_PREFIXES)
+        | set(SECOND_NEW_PREFIXES)
+        | set(SECOND_REFERENCE_PREFIXES)
+    )
+
+    assert _all_contrast_arms(batch="fourth") <= fitted
+
+
+def test_the_fourth_batch_contrasts_ifs_025_at_the_days_it_is_fitted_and_icon_eu_at_one_to_three():
+    batch = BATCHES["fourth"]
+
+    assert batch.ifs_025_contrasts == tuple(
+        (f"ifs_single_day{day}", f"ifs025_day{day}") for day in (1, 2, 3, 5, 7)
+    )
+    assert batch.icon_eu_contrasts == tuple(
+        (f"ifs_single_day{day}", f"icon_eu_day{day}") for day in (1, 2, 3)
+    )
+    assert batch.drop_gap_rows
+    assert not any(BATCHES[name].drop_gap_rows for name in ("first", "second", "third"))
+
+
+def test_the_fourth_batch_arms_have_the_column_counts_of_every_other_arm():
+    for domain in ("solar", "wind"):
+        ifs = arm_columns(domain=domain, prefixes=("ifs_single_day2",))
+        ens = arm_columns(domain=domain, prefixes=("ens_mean_day2",))
+
+        assert len(ifs) == len(ens)
+
+
+def test_a_batch_that_drops_gap_rows_drops_only_the_rows_with_a_null_in_the_arms_columns():
+    frame = pl.DataFrame(
+        {"a": [1.0, None, 3.0, 4.0], "b": [1.0, 2.0, None, 4.0], "other": [None, 1, 2, 3]}
+    )
+
+    assert arm_rows(frame=frame, columns=("a", "b"), drop_gap_rows=True)["a"].to_list() == [
+        1.0,
+        4.0,
+    ]
+    assert arm_rows(frame=frame, columns=("a", "b"), drop_gap_rows=False).height == 4
+
+
+def _losses(*, rows: dict[str, list[int]], errors: dict[str, float]) -> pl.DataFrame:
+    """Two seeds of per-row losses: each arm holds the given days (one site) at its own error."""
+    records = []
+    for arm, days in rows.items():
+        for day in days:
+            time = datetime(2025, 1, 1, tzinfo=UTC) + timedelta(days=day)
+            records.extend(
+                {
+                    "arm": arm,
+                    "site": "A",
+                    "time": time,
+                    "seed": seed,
+                    "month": time.strftime("%Y-%m"),
+                    METRIC: errors[arm] + 0.001 * day,
+                }
+                for seed in (0, 1)
+            )
+    return pl.DataFrame(records)
+
+
+def test_shared_rows_keeps_only_the_rows_both_arms_hold():
+    losses = _losses(
+        rows={"first": [0, 1, 2, 3], "second": [2, 3, 4]}, errors={"first": 0.1, "second": 0.2}
+    )
+
+    shared = shared_rows(losses=losses, treatment="first", reference="second")
+
+    assert sorted(shared["time"].dt.day().unique().to_list()) == [3, 4]
+    assert shared.filter(pl.col("arm") == "first").height == 4
+    assert shared.filter(pl.col("arm") == "second").height == 4
+
+
+def test_an_intersection_contrast_prints_the_shared_row_count_and_both_absolute_errors():
+    rows_first = list(range(48))
+    rows_second = list(range(24, 72))
+    losses = _losses(
+        rows={"first": rows_first, "second": rows_second}, errors={"first": 0.10, "second": 0.20}
+    )
+
+    line = intersection_contrast_line(losses=losses, treatment="first", reference="second")
+
+    assert line is not None
+    cells = [cell.strip() for cell in line.strip("|").split("|")]
+    # Days 24 to 47 are shared: 24 rows a seed, in January and February.
+    assert cells[0] == "first − second"
+    assert cells[4] == "24"
+    assert cells[5] == "2"
+    assert abs(float(cells[2]) - (10.0 + 0.1 * 35.5)) < 0.01
+    assert abs(float(cells[3]) - (20.0 + 0.1 * 35.5)) < 0.01
+
+
+def test_an_intersection_contrast_with_an_absent_arm_is_none():
+    losses = _losses(rows={"first": [0, 1]}, errors={"first": 0.1})
+
+    assert intersection_contrast_line(losses=losses, treatment="first", reference="gone") is None

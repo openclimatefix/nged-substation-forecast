@@ -11,9 +11,17 @@ than refitting, and refuses to overwrite `report.md`.
 
 The arms:
 
-Three batches run into three folders (`--batch first`, `--batch second`, and `--batch third`). The
-second and third batches take one `--context-dir` for each earlier batch's folder whose arms their
-contrast tables name. The third batch fits eight native GFS arms (`THIRD_NEW_PREFIXES`) and refits
+Four batches run into four folders (`--batch first` to `--batch fourth`). The second, third, and
+fourth batches take one `--context-dir` for each earlier batch's folder whose arms their contrast
+tables name.
+
+The fourth batch fits six IFS HRES (9 km, Open-Meteo) arms (`FOURTH_NEW_PREFIXES`) and refits no
+reference. Each arm is scored on the shared rows minus the target days whose serving run the
+archive lacks (`drop_gap_rows`). Every contrast the report tabulates is computed on the rows both
+arms score (`intersection_contrast_line`), with no refit of the other arm, whose fold training sets
+therefore contained those gap days.
+
+The third batch fits eight native GFS arms (`THIRD_NEW_PREFIXES`) and refits
 no reference, because every arm it is compared with is already a GPU fit in an earlier batch; its
 contrasts are against the ENS mean at the same day and against Open-Meteo's GFS at days 1, 2, 3, 5,
 and 7. The second batch's arms are `SECOND_NEW_PREFIXES` (ENS mean at day 7, ENS control member at
@@ -51,10 +59,12 @@ from typing import Final, NamedTuple
 import polars as pl
 from build_forecast_inputs import (
     GFS_NATIVE_DAYS,
+    IFS_SINGLE_DAYS,
     PRODUCT_SLUGS,
     SOLAR_ONLY_PRODUCTS,
     ExtraBatchType,
     gfs_native_arm,
+    ifs_single_arm,
 )
 from nwp_forecast_comparison import (
     METRIC,
@@ -325,6 +335,49 @@ THIRD_CLIMATOLOGY_CONTRASTS: Final[tuple[str, ...]] = (
 )
 """The long-lead native GFS arms compared with the published no-weather climatology baseline."""
 
+FOURTH_NEW_PREFIXES: Final[tuple[str, ...]] = tuple(
+    ifs_single_arm(day=day) for day in IFS_SINGLE_DAYS
+)
+"""The fourth batch's arms: ECMWF IFS HRES read from Open-Meteo's Single Runs archive at days 0, 1,
+2, 3, 5 and 7, whose columns `build_forecast_inputs.py --batch fourth` builds."""
+
+FOURTH_REFERENCE_PREFIXES: Final[tuple[str, ...]] = ()
+"""The fourth batch refits no reference: the arms it is compared with are GPU fits of the first
+three batches, read through `--context-dir`."""
+
+FOURTH_SAME_PRODUCT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = tuple(
+    (ifs_single_arm(day=day), ifs_single_arm(day=earlier))
+    for earlier, day in pairwise(IFS_SINGLE_DAYS)
+)
+"""Each IFS HRES (9 km, Open-Meteo) arm against the same product's arm at the next shorter lead
+fitted, as (treatment, reference)."""
+
+FOURTH_ENSEMBLE_CONTRASTS: Final[tuple[tuple[str, str], ...]] = tuple(
+    (ifs_single_arm(day=day), f"ens_mean_day{day}") for day in IFS_SINGLE_DAYS
+)
+"""Each IFS HRES (9 km, Open-Meteo) arm against the ENS mean at the same day, from the first two
+batches."""
+
+IFS_025_DAYS: Final[tuple[int, ...]] = (1, 2, 3, 5, 7)
+"""The days at which Open-Meteo's IFS 0.25 degree Previous Runs arm (`ifs025_day<N>`) is fitted on
+the GPU (day 0 is a freshest-run nowcast whose lead differs, so it is left out)."""
+
+FOURTH_IFS_025_CONTRASTS: Final[tuple[tuple[str, str], ...]] = tuple(
+    (ifs_single_arm(day=day), f"ifs025_day{day}") for day in IFS_025_DAYS
+)
+"""Each IFS HRES (9 km, Open-Meteo) arm against the IFS 0.25 degree Previous Runs arm at the same
+day."""
+
+ICON_EU_DAYS: Final[tuple[int, ...]] = (1, 2, 3)
+"""The days at which ICON-EU's Previous Runs arm (`icon_eu_day<N>`) is fitted on the GPU and the
+archive holds it (its archive ends at day 4)."""
+
+FOURTH_ICON_EU_CONTRASTS: Final[tuple[tuple[str, str], ...]] = tuple(
+    (ifs_single_arm(day=day), f"icon_eu_day{day}") for day in ICON_EU_DAYS
+)
+"""Each IFS HRES (9 km, Open-Meteo) arm against ICON-EU's arm at the same day, where the archive
+holds it."""
+
 ENSEMBLE_TITLE: Final[str] = (
     "Other products against ENS at the same day (Previous Runs day-0 rows mix "
     "weather models and leads; GEFS and the ENS control member share ENS's lead)"
@@ -342,6 +395,24 @@ OPEN_METEO_GFS_TITLE: Final[str] = (
     "freshest run at least N days old, a shorter lead)"
 )
 """The heading of the third batch's contrasts against Open-Meteo's GFS."""
+
+IFS_025_TITLE: Final[str] = (
+    "IFS HRES (9 km, Open-Meteo) against IFS 0.25 degree Previous Runs at the same day (a coarser "
+    "product; Previous Runs serves the freshest run at least N days old, a shorter lead)"
+)
+"""The heading of the fourth batch's contrasts against the IFS 0.25 degree arm."""
+
+ICON_EU_TITLE: Final[str] = (
+    "IFS HRES (9 km, Open-Meteo) against ICON-EU at the same day (a different weather model; "
+    "ICON-EU serves the freshest run at least N days old, a shorter lead)"
+)
+"""The heading of the fourth batch's contrasts against ICON-EU."""
+
+FOURTH_ENSEMBLE_TITLE: Final[str] = (
+    "IFS HRES (9 km, Open-Meteo) against the ENS mean at the same day (both read a 00 UTC run's "
+    "leads from 24 N hours, the same lead; day 0 is the 00 UTC run of the hour's own day)"
+)
+"""The heading of the fourth batch's contrasts against ENS."""
 
 FIRST_BATCH_NOTE: Final[str] = (
     "Every day-0 arm is a nowcast, not a day-ahead forecast: a Previous Runs "
@@ -366,6 +437,33 @@ THIRD_BATCH_NOTE: Final[str] = (
 )
 """The paragraph the third batch's report opens with, on which run and lead each arm reads."""
 
+FOURTH_BATCH_NOTE: Final[str] = (
+    "Every arm here is IFS HRES (9 km, Open-Meteo): ECMWF's IFS HRES as Open-Meteo's Single Runs "
+    "archive serves it (`ecmwf_ifs`, on ECMWF's O1280 grid), a finer product than the IFS 0.25° "
+    "arm and not another version of it, with its own row. The archive holds one 00 UTC run a day "
+    "and no other cycle, with hourly leads 0 to 240 hours, and Open-Meteo's processing of HRES "
+    "has not been checked against a native archive. Each solar generator reads its nearest cell "
+    "and each wind generator its nearest land cell (sites B and D share a source cell and carry "
+    "identical series). Day N reads the 00 UTC run issued N days before the hour's own day, at "
+    "leads 24 N + 1 to 24 N + 24 hours for solar and 24 N to 24 N + 23 hours for wind, the rule "
+    "the ENS arms follow, so day 0 is the run of the hour's own day and not a nowcast. Day 10 is "
+    "absent because the runs end at lead 240 hours. Radiation is clipped at zero; wind is the "
+    "served speed and the sine and cosine of the served direction, as the Open-Meteo Previous "
+    "Runs arms are. IFS HRES publishes every 3 hours after lead 90 and every 6 hours after lead "
+    "144, and Open-Meteo interpolates those steps to hourly, so hourly values at days 5 and 7, "
+    "and at the last hours of day 3, are interpolated. The IFS model cycle changed inside the "
+    "span (cycle 50r1 on 2026-05-12, from ECMWF's pages); this batch adds no era feature and "
+    "uses the shared rows' `era_code`, which is cut on the target hour's month and has no "
+    "boundary at that date. "
+    "**Row set.** Each arm is scored on the shared rows minus the target days whose serving run "
+    "the archive lacks, which are gaps and are never filled from another run. Every contrast "
+    "below is computed on the rows both arms score, from the existing out-of-fold losses with no "
+    "refit of the other arm, whose fold training sets contained the gap days; each prints its "
+    "row and month counts and the absolute error of both arms on those rows. All are "
+    "exploratory."
+)
+"""The paragraph the fourth batch's report opens with: what each arm reads and how it is scored."""
+
 
 class ArmBatch(NamedTuple):
     """One fit batch's arms and the contrasts its report tabulates."""
@@ -380,6 +478,11 @@ class ArmBatch(NamedTuple):
     note: str = ""
     ensemble_title: str = ENSEMBLE_TITLE
     open_meteo_gfs_contrasts: tuple[tuple[str, str], ...] = ()
+    ifs_025_contrasts: tuple[tuple[str, str], ...] = ()
+    icon_eu_contrasts: tuple[tuple[str, str], ...] = ()
+    drop_gap_rows: bool = False
+    """Whether each arm is fitted and scored without the rows where its own weather columns are
+    null, and every contrast is computed on the rows both arms score."""
 
 
 BATCHES: Final[dict[ExtraBatchType, ArmBatch]] = {
@@ -414,8 +517,22 @@ BATCHES: Final[dict[ExtraBatchType, ArmBatch]] = {
         ensemble_title=THIRD_ENSEMBLE_TITLE,
         open_meteo_gfs_contrasts=THIRD_OPEN_METEO_GFS_CONTRASTS,
     ),
+    "fourth": ArmBatch(
+        new_prefixes=FOURTH_NEW_PREFIXES,
+        reference_prefixes=FOURTH_REFERENCE_PREFIXES,
+        same_product_contrasts=FOURTH_SAME_PRODUCT_CONTRASTS,
+        ensemble_contrasts=FOURTH_ENSEMBLE_CONTRASTS,
+        near_analysis_contrasts=(),
+        elsewhere_contrasts=(),
+        climatology_contrasts=(),
+        note=FOURTH_BATCH_NOTE,
+        ensemble_title=FOURTH_ENSEMBLE_TITLE,
+        ifs_025_contrasts=FOURTH_IFS_025_CONTRASTS,
+        icon_eu_contrasts=FOURTH_ICON_EU_CONTRASTS,
+        drop_gap_rows=True,
+    ),
 }
-"""The three fit batches, by the name `--batch` takes."""
+"""The four fit batches, by the name `--batch` takes."""
 
 
 def batch_prefixes(*, batch: ArmBatch, domain: DomainType) -> tuple[str, ...]:
@@ -532,8 +649,31 @@ def missing_shares(*, frame: pl.DataFrame, domain: DomainType, batch: ArmBatch) 
     return result
 
 
+def arm_rows(*, frame: pl.DataFrame, columns: Sequence[str], drop_gap_rows: bool) -> pl.DataFrame:
+    """Return the rows one arm is fitted and scored on.
+
+    Args:
+        frame: `joined_rows`'s result.
+        columns: The arm's feature columns.
+        drop_gap_rows: Whether to drop the rows where any of `columns` is null: the target days
+            whose serving run the archive lacks, which are gaps and are neither interpolated nor
+            filled from another run.
+
+    Returns:
+        `frame` unchanged, or without the rows with a null in `columns`.
+    """
+    if not drop_gap_rows:
+        return frame
+    return frame.filter(pl.all_horizontal(pl.col(column).is_not_null() for column in columns))
+
+
 def fit_arms(
-    *, frame: pl.DataFrame, domain: DomainType, prefixes: tuple[str, ...], workers: int
+    *,
+    frame: pl.DataFrame,
+    domain: DomainType,
+    prefixes: tuple[str, ...],
+    workers: int,
+    drop_gap_rows: bool = False,
 ) -> pl.DataFrame:
     """Fit every arm at every site, out of fold, on the GPU, and stack the losses.
 
@@ -542,6 +682,7 @@ def fit_arms(
         domain: `solar` or `wind`.
         prefixes: The arms to fit.
         workers: How many (arm, site) fits run at once.
+        drop_gap_rows: Whether each arm drops its own null rows, as `arm_rows` does.
 
     Returns:
         Every fit's per-row losses, labelled with `arm`, `setting` and `device`.
@@ -563,7 +704,11 @@ def fit_arms(
             for site in sites:
                 future = pool.submit(
                     out_of_fold_losses,
-                    site_rows=frame.filter(pl.col("site") == site),
+                    site_rows=arm_rows(
+                        frame=frame.filter(pl.col("site") == site),
+                        columns=columns,
+                        drop_gap_rows=drop_gap_rows,
+                    ),
                     features=list(columns),
                     target=TARGET,
                     hyper_parameters=SETTINGS[SETTING],
@@ -582,13 +727,16 @@ def fit_arms(
     return pl.concat(outputs)
 
 
-def check_determinism(*, published_dir: Path, output_dir: Path, prefix: str) -> bool:
+def check_determinism(
+    *, published_dir: Path, output_dir: Path, prefix: str, drop_gap_rows: bool = False
+) -> bool:
     """Fit one arm at one site twice on the GPU and compare the two runs' fingerprints.
 
     Args:
         published_dir: The folder holding the published inputs.
         output_dir: The folder holding the extra-lead inputs.
         prefix: The arm to fit, which must have wind columns in the joined rows.
+        drop_gap_rows: Whether the arm drops its own null rows, as `arm_rows` does.
 
     Returns:
         Whether the two fingerprints agree.
@@ -602,6 +750,7 @@ def check_determinism(*, published_dir: Path, output_dir: Path, prefix: str) -> 
             domain="wind",
             prefixes=(prefix,),
             workers=1,
+            drop_gap_rows=drop_gap_rows,
         )
         fingerprints.append(fingerprint(frame=losses))
     _LOG.info("two GPU runs of one arm at one site: %s", fingerprints)
@@ -639,6 +788,71 @@ def contrast_line(*, losses: pl.DataFrame, treatment: str, reference: str) -> st
         point=result["difference"], lower=result["lower_95"], upper=result["upper_95"]
     )
     return f"| {treatment} − {reference} | {text} | {result['n_rows']} | {result['n_months']} |"
+
+
+INTERSECTION_HEADER: Final[tuple[str, str, str]] = (
+    "",
+    (
+        "| Contrast, exploratory, on the rows both arms score (points) | Difference [95% interval] "
+        "| Error of first arm (%) | Error of second arm (%) | Rows | Months |"
+    ),
+    "|---|---|---|---|---|---|",
+)
+"""The header of a contrast table computed on the rows two arms share."""
+
+
+def shared_rows(*, losses: pl.DataFrame, treatment: str, reference: str) -> pl.DataFrame:
+    """Restrict two arms' losses to the (site, time, seed) rows both hold.
+
+    Args:
+        losses: Per-row losses at one setting, carrying both arms.
+        treatment: One arm's name.
+        reference: The other arm's name.
+
+    Returns:
+        The two arms' rows whose (site, time, seed) is in both arms. `assert_equal_rows` holds on
+        the result, so `difference` accepts it.
+    """
+    keys = ["site", "time", "seed"]
+    both = pl.concat(
+        [losses.filter(pl.col("arm") == arm).select(keys) for arm in (treatment, reference)]
+    )
+    shared = both.group_by(keys).len().filter(pl.col("len") == 2).select(keys)
+    return losses.filter(pl.col("arm").is_in([treatment, reference])).join(
+        shared, on=keys, how="semi"
+    )
+
+
+def intersection_contrast_line(
+    *, losses: pl.DataFrame, treatment: str, reference: str
+) -> str | None:
+    """Format one paired contrast on the rows both arms score, or None if an arm is absent.
+
+    Args:
+        losses: Per-row losses at one setting.
+        treatment: The arm whose error is compared.
+        reference: The arm it is compared against.
+
+    Returns:
+        `| treatment − reference | difference [interval] | error | error | rows | months |`, where
+        both errors are absolute errors on the shared rows, in percent of capacity.
+    """
+    present = set(losses["arm"].unique().to_list())
+    if treatment not in present or reference not in present:
+        return None
+    shared = shared_rows(losses=losses, treatment=treatment, reference=reference)
+    result = difference(losses=shared, treatment=treatment, reference=reference)
+    text = interval_text(
+        point=result["difference"], lower=result["lower_95"], upper=result["upper_95"]
+    )
+    errors = [
+        bootstrap_absolute(losses=shared, arm=arm, metric=METRIC)["value"] * PERCENTAGE_POINTS
+        for arm in (treatment, reference)
+    ]
+    return (
+        f"| {treatment} − {reference} | {text} | {errors[0]:.3f} | {errors[1]:.3f} "
+        f"| {result['n_rows']} | {result['n_months']} |"
+    )
 
 
 def served_lead(*, domain: DomainType, remainder: int) -> int:
@@ -782,6 +996,9 @@ def report_domain(
         "| Contrast (points) | Difference [95% interval] | Rows | Months |",
         "|---|---|---|---|",
     ]
+    if batch.drop_gap_rows:
+        header = list(INTERSECTION_HEADER)
+    line_of = intersection_contrast_line if batch.drop_gap_rows else contrast_line
     for title, pairs in (
         (
             "Change with lead: each arm minus the same product at the lead named",
@@ -793,8 +1010,10 @@ def report_domain(
             if batch.open_meteo_gfs_contrasts
             else ()
         ),
+        *(((IFS_025_TITLE, batch.ifs_025_contrasts),) if batch.ifs_025_contrasts else ()),
+        *(((ICON_EU_TITLE, batch.icon_eu_contrasts),) if batch.icon_eu_contrasts else ()),
     ):
-        table = [contrast_line(losses=pooled, treatment=t, reference=r) for t, r in pairs]
+        table = [line_of(losses=pooled, treatment=t, reference=r) for t, r in pairs]
         lines += ["", f"### {title}", *header, *(line for line in table if line)]
     near = [*header]
     for treatment, reference in batch.near_analysis_contrasts:
@@ -819,12 +1038,13 @@ def report_domain(
         contrast_line(losses=with_climatology, treatment=arm, reference="climatology")
         for arm in batch.climatology_contrasts
     ]
-    lines += [
-        "",
-        "### Long leads against climatology, and other contrasts between arms fitted here",
-        *header,
-        *(line for line in elsewhere if line),
-    ]
+    if any(elsewhere):
+        lines += [
+            "",
+            "### Long leads against climatology, and other contrasts between arms fitted here",
+            *header,
+            *(line for line in elsewhere if line),
+        ]
     icon_arms = ("icon_d2_day0", "icon_eu_day0") if batch.near_analysis_contrasts else ()
     if icon_arms:
         lines += [
@@ -894,6 +1114,8 @@ def contrast_arms(*, batch: ArmBatch, domain: DomainType) -> set[str]:
         *batch.same_product_contrasts,
         *batch.ensemble_contrasts,
         *batch.open_meteo_gfs_contrasts,
+        *batch.ifs_025_contrasts,
+        *batch.icon_eu_contrasts,
         *batch.near_analysis_contrasts,
         *batch.elsewhere_contrasts,
     )
@@ -981,16 +1203,18 @@ def main() -> int:
         default="first",
         help="Which fit batch: the first (the day-0 to day-14 arms), the second (ENS mean at "
         "day 7, the ENS control member, GEFS mean at day 7, and GPU refits of the arms the first "
-        "batch left on the CPU), or the third (native GFS at days 0, 1, 2, 3, 5, 7, 10 and 14).",
+        "batch left on the CPU), the third (native GFS at days 0, 1, 2, 3, 5, 7, 10, and 14), or "
+        "the fourth (IFS HRES (9 km, Open-Meteo) at days 0, 1, 2, 3, 5, and 7).",
     )
     parser.add_argument(
         "--context-dir",
         type=Path,
         action="append",
         default=[],
-        help="With --batch second or third: an earlier batch's folder, whose losses the contrast "
-        "tables read for arms only that batch fitted. Repeat it for each earlier batch the "
-        "contrasts name (the third batch needs the first and the second).",
+        help="With --batch second, third, or fourth: an earlier batch's folder, whose losses the "
+        "contrast tables read for arms only that batch fitted. Repeat it for each earlier batch "
+        "the contrasts name (the third batch needs the first and the second, and so does the "
+        "fourth).",
     )
     parser.add_argument("--check", action="store_true", help="Compare two GPU runs of one arm.")
     parser.add_argument(
@@ -1013,6 +1237,7 @@ def main() -> int:
             published_dir=args.published_dir,
             output_dir=args.output_dir,
             prefix=domain_prefixes(domain="wind", prefixes=batch.new_prefixes)[0],
+            drop_gap_rows=batch.drop_gap_rows,
         )
         sys.stdout.write(f"two GPU runs agree: {agree}\n")
         return 0 if agree else 1
@@ -1060,6 +1285,7 @@ def main() -> int:
                 domain=domain,
                 prefixes=batch_prefixes(batch=batch, domain=domain),
                 workers=args.workers,
+                drop_gap_rows=batch.drop_gap_rows,
             )
             losses.write_parquet(path)
             predictions_from_losses(losses=losses, frame=frames[domain]).write_parquet(

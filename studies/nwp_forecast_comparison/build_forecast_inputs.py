@@ -49,6 +49,8 @@ ENS control member at days 5, 7, 10 and 14, and GEFS mean at day 7 (`EXTRA_LEAD_
 `--batch third` builds `gfs_native_day<N>_*` at days 0, 1, 2, 3, 5, 7, 10 and 14 from the native
 Dynamical.org GFS store (`GFS_NATIVE_DIR_NAME`), which no other batch reads; see `_gfs_native_frame`
 for which run and lead each day serves and how the store's radiation is converted.
+`--batch fourth` builds `ifs_single_day<N>_*` at `IFS_SINGLE_DAYS` from Open-Meteo's Single Runs
+archive of ECMWF IFS HRES (`IFS_SINGLE_DIR_NAME`); see `_ifs_single_frame`.
 
 Every output row carries only the anonymised `site` label; no generator name, id or coordinate is
 read from the private roster in this script, except inside `studies.grid_sampling` (GEFS's
@@ -93,6 +95,9 @@ from studies.gfs_native import (
 )
 from studies.grid_sampling import nearest_cells
 from studies.hourly_means import hourly_from_snapshots
+from studies.ifs_single_runs import clip_radiation, last_servable_day
+from studies.ifs_single_runs import served_init_time as ifs_single_init_time
+from studies.ifs_single_runs import served_lead_hours as ifs_single_lead_hours
 from studies.resample import gefs_step_means
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
@@ -172,8 +177,8 @@ EXTRA_ENS_CONTROL_DAYS: Final[tuple[int, ...]] = (5, 7, 10, 14)
 published inputs."""
 
 
-ExtraBatchType = Literal["first", "second", "third"]
-"""Which extra-lead build: the first, second, or third batch's columns."""
+ExtraBatchType = Literal["first", "second", "third", "fourth"]
+"""Which extra-lead build: the first, second, third, or fourth batch's columns."""
 
 
 class ExtraLeadBuild(NamedTuple):
@@ -184,10 +189,16 @@ class ExtraLeadBuild(NamedTuple):
     ens_control_days: tuple[int, ...]
     gefs_days: tuple[int, ...]
     gfs_native_days: tuple[int, ...] = ()
+    ifs_single_days: tuple[int, ...] = ()
 
 
 GFS_NATIVE_DAYS: Final[tuple[int, ...]] = (0, 1, 2, 3, 5, 7, 10, 14)
 """The lead days the third batch reads the native GFS store at."""
+
+IFS_SINGLE_DAYS: Final[tuple[int, ...]] = (0, 1, 2, 3, 5, 7)
+"""The lead days the fourth batch reads Open-Meteo's IFS HRES (9 km) archive at. Day 10 is absent
+because the archive's runs end at lead 240 hours, so day 10's leads (240 to 263 for wind, 241 to
+264 for solar) are almost all beyond them; `studies.ifs_single_runs.last_servable_day` is 9."""
 
 EXTRA_LEAD_BUILDS: Final[dict[ExtraBatchType, ExtraLeadBuild]] = {
     "first": ExtraLeadBuild(
@@ -209,11 +220,19 @@ EXTRA_LEAD_BUILDS: Final[dict[ExtraBatchType, ExtraLeadBuild]] = {
         gefs_days=(),
         gfs_native_days=GFS_NATIVE_DAYS,
     ),
+    "fourth": ExtraLeadBuild(
+        product_day_offsets={},
+        ens_mean_days=(),
+        ens_control_days=(),
+        gefs_days=(),
+        ifs_single_days=IFS_SINGLE_DAYS,
+    ),
 }
 """The first batch's columns (unchanged from its own build), the second batch's (ENS mean at day 7,
 ENS control member at days 5, 7, 10 and 14, and GEFS mean at day 7, with no Previous Runs column
 because the arms it refits take their columns from the published inputs), and the third batch's
-(the native GFS store at `GFS_NATIVE_DAYS`, and nothing else)."""
+(the native GFS store at `GFS_NATIVE_DAYS`, and nothing else), and the fourth batch's (Open-Meteo's
+Open-Meteo's IFS HRES archive at `IFS_SINGLE_DAYS`, and nothing else)."""
 
 SOLAR_ONLY_PRODUCTS: Final[frozenset[str]] = frozenset({"ARPEGE Europe", "AROME France"})
 """Products the plan scores for solar only: their 100 m wind offsets are missing on most rows."""
@@ -1228,6 +1247,177 @@ def _gfs_native_frame(
     return frame
 
 
+IFS_SINGLE_DIR_NAME: Final[str] = "ECMWF-IFS-SINGLE-RUNS"
+"""Under `data/studies/weather/`, Open-Meteo's Single Runs archive of ECMWF IFS HRES."""
+
+IFS_SINGLE_FILE_NAME: Final[str] = "ECMWF-IFS-SINGLE-RUNS.parquet"
+"""Inside `IFS_SINGLE_DIR_NAME`, the combined file: one 00 UTC run a day, hourly leads 0 to 240."""
+
+IFS_SINGLE_ARM_PREFIX: Final[str] = "ifs_single"
+"""The column prefix of the IFS HRES (9 km, Open-Meteo) arms, `ifs_single_day<N>_<field>`."""
+
+IFS_SINGLE_MAX_MISSING_SHARE: Final[float] = 0.015
+"""The largest share of rows with a null in one IFS HRES (9 km, Open-Meteo) arm's columns the build
+accepts, the limit `fit_extra_leads.MAX_MISSING_SHARE` applies to every new arm. The nulls are the
+days whose run the archive lacks (seven run days; each arm loses the target days those runs would
+serve)."""
+
+
+def ifs_single_arm(*, day: int) -> str:
+    """Return the column prefix of the IFS HRES (9 km, Open-Meteo) arm at one lead day."""
+    return f"{IFS_SINGLE_ARM_PREFIX}_day{day}"
+
+
+def _ifs_single_extract(
+    *, raw: pl.DataFrame, domain: DomainType, time_dtype: pl.DataType
+) -> pl.DataFrame:
+    """Turn the archive's rows into the fields an arm reads, per site, run and lead.
+
+    Args:
+        raw: The archive's rows: `site`, `init_time`, `lead_hours`, and the weather columns, with
+            the times timezone-naive UTC.
+        domain: `solar` or `wind`.
+        time_dtype: The dtype of the study's `time` column, which `init_time` is cast to.
+
+    Returns:
+        `site`, `init_time`, `lead_hours` and, for solar, `ghi` (clipped at zero) and `temp`, or
+        for wind, `speed_100m` and `speed_10m` in m/s and `sin_100m` and `cos_100m` of the 100 m
+        direction, as `_wind_columns` builds them from the Previous Runs archive.
+    """
+    init_time = pl.col("init_time").dt.replace_time_zone("UTC").cast(time_dtype)
+    if domain == "solar":
+        return raw.select(
+            "site",
+            init_time=init_time,
+            lead_hours=pl.col("lead_hours"),
+            ghi=clip_radiation(radiation=pl.col("shortwave_radiation")),
+            temp=pl.col("temperature_2m"),
+        )
+    direction = pl.col("wind_direction_100m").radians()
+    return raw.select(
+        "site",
+        init_time=init_time,
+        lead_hours=pl.col("lead_hours"),
+        speed_100m=pl.col("wind_speed_100m") * KMH_TO_MS,
+        sin_100m=direction.sin(),
+        cos_100m=direction.cos(),
+        speed_10m=pl.col("wind_speed_10m") * KMH_TO_MS,
+    )
+
+
+def _ifs_single_arm_columns(
+    *, keys: pl.DataFrame, extract: pl.DataFrame, domain: DomainType, day: int
+) -> pl.DataFrame:
+    """Read one lead day for every target hour from the run and lead its rule serves.
+
+    Args:
+        keys: `site`, `time` for every row the study scores.
+        extract: `_ifs_single_extract`'s result.
+        domain: `solar` or `wind`.
+        day: The lead day, at most `last_servable_day`.
+
+    Returns:
+        `site`, `time` and the arm's columns; a target hour whose run the archive lacks carries
+        nulls and keeps its row, which `fit_extra_leads` drops from this arm's fit and score.
+
+    Raises:
+        ValueError: If `day` is beyond `last_servable_day`.
+    """
+    if day > last_servable_day(domain=domain):
+        msg = f"day {day} is beyond the archive's 240-hour runs for {domain}"
+        raise ValueError(msg)
+    targets = keys.select("site", "time").with_columns(
+        init_time=ifs_single_init_time(time=pl.col("time"), day=day, domain=domain),
+        lead_hours=ifs_single_lead_hours(time=pl.col("time"), day=day, domain=domain),
+    )
+    columns = efh.ens_columns(arm=ifs_single_arm(day=day), domain=domain)
+    fields = efh.fields(domain=domain)
+    joined = targets.join(extract, on=["site", "init_time", "lead_hours"], how="left")
+    return joined.select(
+        "site",
+        "time",
+        *(pl.col(field).alias(column) for field, column in zip(fields, columns, strict=True)),
+    )
+
+
+def _ifs_single_frame(
+    *,
+    keys: pl.DataFrame,
+    domain: DomainType,
+    days: Sequence[int],
+    ifs_single_dir: Path | None = None,
+) -> pl.DataFrame:
+    """Build the IFS HRES (9 km, Open-Meteo) arms' columns from Open-Meteo's Single Runs archive.
+
+    **Which run and lead each day serves.** Day `N` reads the 00 UTC run issued `N` days before the
+    hour's own day (a solar hour's own day is the day of the instant an hour before its label), at a
+    lead of `24 * N + 1` to `24 * N + 24` for solar and `24 * N` to `24 * N + 23` for wind, the ENS
+    and GEFS arms' rule (`studies.ifs_single_runs.served_init_time`). Day 0 is the run of the
+    hour's own day, so it is the 00 UTC run and not the freshest run, and it is not a nowcast.
+
+    **The values.** Every value is used as the archive serves it, with no upsampling, because the
+    archive is already hourly. Radiation is the mean over the hour ending at the label, clipped at
+    zero, and temperature is read at the label, as the Previous Runs IFS 0.25 degree arm reads
+    them. Wind is the speed and the sine and cosine of the direction at 100 m and the speed at 10 m,
+    as `_wind_columns` builds the Previous Runs arms' wind, not `speed_components`, because the
+    archive serves speed and direction and no components.
+
+    **Gap days.** The archive lacks whole runs (four run days, and three whose runs were
+    incomplete and are absent). A target hour whose serving run is absent carries nulls in the arm's
+    columns, and never a value from another run.
+
+    Args:
+        keys: `site`, `time` for every row the study scores.
+        domain: `solar` or `wind`.
+        days: The lead days to build.
+        ifs_single_dir: The archive's folder; `None` reads `IFS_SINGLE_DIR_NAME` under the weather
+            folder.
+
+    Returns:
+        `keys` with `ifs_single_day<N>_<field>` for every `N` in `days`, left-joined.
+
+    Raises:
+        RuntimeError: If any arm has a null in more than `IFS_SINGLE_MAX_MISSING_SHARE` of the rows.
+    """
+    directory = _weather_dir() / IFS_SINGLE_DIR_NAME if ifs_single_dir is None else ifs_single_dir
+    time_dtype = keys.schema["time"]
+    time_range = keys.select(first=pl.col("time").min(), last=pl.col("time").max()).row(
+        0, named=True
+    )
+    first_init = time_range["first"] - timedelta(days=max(days) + 1)
+    raw = (
+        pl.scan_parquet(directory / IFS_SINGLE_FILE_NAME)
+        .filter(
+            pl.col("site").is_in(keys["site"].unique().to_list()),
+            pl.col("init_time").dt.replace_time_zone("UTC").cast(time_dtype) >= first_init,
+            pl.col("init_time").dt.replace_time_zone("UTC").cast(time_dtype) <= time_range["last"],
+        )
+        .collect()
+    )
+    extract = _ifs_single_extract(raw=raw, domain=domain, time_dtype=time_dtype)
+    frame = keys
+    too_many = {}
+    for day in days:
+        arm = _ifs_single_arm_columns(keys=keys, extract=extract, domain=domain, day=day)
+        frame = frame.join(arm, on=["site", "time"], how="left")
+        columns = efh.ens_columns(arm=ifs_single_arm(day=day), domain=domain)
+        share = float(
+            frame.select(pl.any_horizontal(pl.col(c).is_null() for c in columns).mean()).item()
+        )
+        _LOG.info(
+            "%s: %s has a null in %.3f%% of rows", domain, ifs_single_arm(day=day), 100 * share
+        )
+        if share > IFS_SINGLE_MAX_MISSING_SHARE:
+            too_many[ifs_single_arm(day=day)] = share
+    if too_many:
+        msg = (
+            f"{domain}: IFS HRES (9 km, Open-Meteo) arms with a null in more than "
+            f"{IFS_SINGLE_MAX_MISSING_SHARE:.1%} of rows: {too_many}"
+        )
+        raise RuntimeError(msg)
+    return frame
+
+
 def build_domain(*, domain: DomainType, output_dir: Path, gefs_window_dir: Path | None) -> Path:
     """Build one technology's arm-input parquet and write it under `output_dir`.
 
@@ -1332,6 +1522,7 @@ def build_extra_leads(
     gefs_window_dir: Path | None,
     batch: ExtraBatchType = "first",
     gfs_dir: Path | None = None,
+    ifs_single_dir: Path | None = None,
 ) -> Path:
     """Build the exploratory lead columns on the published inputs' own `(site, time)` keys.
 
@@ -1346,6 +1537,8 @@ def build_extra_leads(
         gefs_window_dir: A `GEFS_window_*` test extract, or `None` for the month cache.
         batch: Which extra-lead build (`EXTRA_LEAD_BUILDS`).
         gfs_dir: The native GFS store's folder for the third batch; `None` reads the shared one.
+        ifs_single_dir: The IFS HRES archive's folder for the fourth batch; `None` reads the
+            shared one.
 
     Returns:
         The written file's path.
@@ -1394,6 +1587,13 @@ def build_extra_leads(
         frame = _gfs_native_frame(
             keys=frame, domain=domain, days=build.gfs_native_days, gfs_dir=gfs_dir
         )
+    if build.ifs_single_days:
+        frame = _ifs_single_frame(
+            keys=frame,
+            domain=domain,
+            days=build.ifs_single_days,
+            ifs_single_dir=ifs_single_dir,
+        )
     output_dir.mkdir(parents=True, exist_ok=True)
     frame.write_parquet(output_path)
     _LOG.info("%s: wrote %d rows, %d columns to %s", domain, frame.height, frame.width, output_path)
@@ -1423,7 +1623,8 @@ def main() -> int:
         default="first",
         help="With --extra-leads: which extra-lead build (the second adds ENS mean at day 7, the "
         "ENS control member at days 5, 7, 10 and 14, and GEFS mean at day 7; the third adds the "
-        "native GFS store at days 0, 1, 2, 3, 5, 7, 10 and 14).",
+        "native GFS store at days 0, 1, 2, 3, 5, 7, 10 and 14; the fourth adds Open-Meteo's IFS "
+        "Single Runs archive at days 0, 1, 2, 3, 5 and 7).",
     )
     parser.add_argument(
         "--gfs-dir",
@@ -1431,6 +1632,13 @@ def main() -> int:
         default=None,
         help="With --batch third: the native GFS store's folder, for development; production "
         "reads the shared one.",
+    )
+    parser.add_argument(
+        "--ifs-single-dir",
+        type=Path,
+        default=None,
+        help="With --batch fourth: the IFS HRES archive's folder, for development; "
+        "production reads the shared one.",
     )
     parser.add_argument(
         "--published-dir",
@@ -1455,6 +1663,7 @@ def main() -> int:
                 gefs_window_dir=args.gefs_window_dir,
                 batch=args.batch,
                 gfs_dir=args.gfs_dir,
+                ifs_single_dir=args.ifs_single_dir,
             )
         return 0
     args.output_dir.mkdir(parents=True, exist_ok=True)

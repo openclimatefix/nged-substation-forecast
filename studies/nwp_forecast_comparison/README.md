@@ -79,6 +79,36 @@ lead?](../../docs/studies/nwp-forecasts-at-matched-leads.md).
 - `fit_extra_leads.py --batch third` fits the eight native GFS arms per technology on a GPU and
   refits nothing: its contrasts against the ENS mean and against Open-Meteo's GFS read the earlier
   batches' GPU fits, through one `--context-dir` for each earlier batch's folder.
+- `build_forecast_inputs.py --extra-leads --batch fourth` writes the arms `ifs_single_day<N>_*` at
+  days 0, 1, 2, 3, 5, and 7, read from Open-Meteo's Single Runs archive of ECMWF IFS HRES
+  (`data/studies/weather/ECMWF-IFS-SINGLE-RUNS/`): one 00 UTC run a day with hourly leads 0 to 240.
+  Day `N` reads the 00 UTC run issued `N` days before the hour's own day, at leads from 24 hours
+  per day, so day 0 is the run of the hour's own day and not a nowcast. There is no day 10, because
+  day 10 needs leads 240 to 264 hours and the runs end at 240 (`studies.ifs_single_runs`). Values
+  are used as the archive serves them: radiation clipped at zero, wind as speed and the sine and
+  cosine of the direction (the Previous Runs arms' method, not `speed_components`, because the
+  archive serves no components). Hourly values from lead 91 hours are interpolated from IFS HRES's
+  3-hourly and 6-hourly steps. Sites B and D share a source cell and carry identical series. The
+  arm is a row of its own, "IFS HRES (9 km, Open-Meteo)" (Open-Meteo's `ecmwf_ifs`, on ECMWF's O1280
+  grid), never merged with "IFS 0.25°", which is a coarser product and not another version of it.
+  The archive holds 00 UTC runs only, and Open-Meteo's processing of HRES has not been checked
+  against a native archive. The IFS cycle changed inside the span (cycle 50r1, 12 May 2026, from
+  ECMWF's pages); the arm adds no era feature and uses the shared rows' `era_code`, which is cut on
+  the target hour's month. Days on which the archive lacks the serving run are gaps: their columns
+  are null and they are never filled from another run.
+- `verify_ifs_single.py` reads only, and writes `ifs_single_source.md` (runs present and absent by
+  count, complete leads, radiation below zero, the hour-ending label, and the interpolated native
+  steps), `ifs_single_served_runs.md` (the run and lead each target hour reads, and that day 10 is
+  unservable), and, with `--built-dir`, `ifs_single_built_columns.md` (the gap rows by count, and a
+  sample of built values recomputed from the archive in plain Python) under
+  `<output-dir>/verification/`. It exits non-zero if any check fails.
+- `fit_extra_leads.py --batch fourth` fits the six IFS HRES (9 km, Open-Meteo) arms per technology
+  on a GPU and refits nothing. Each arm is fitted and scored on the shared rows minus the rows with
+  a gap in its own columns. Its contrasts against the ENS mean at the same day, IFS 0.25° at days 1,
+  2, 3, 5, and 7, and ICON-EU at days 1, 2, and 3 are computed on the rows both arms score, from the
+  earlier batches' losses read through `--context-dir` (the first and the second, and no refit).
+  Each prints its row and month counts and the absolute error of both arms, and all are exploratory.
+  The other arm's fold training sets contained the gap days.
 - `nwp_forecast_charts.py` reads the saved losses and predictions from `--input-dir`, and the extra
   lead days' losses from `--extra-dir`, and writes six SVG charts per technology to `--output-dir`,
   each optimised with `svgo` (skip with `--no-svgo`): the leaderboard of every product's absolute

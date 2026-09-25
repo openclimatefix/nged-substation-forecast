@@ -112,13 +112,17 @@ PRODUCT_NAMES: Final[dict[str, str]] = {
     **{slug: name for name, slug in PRODUCT_SLUGS.items()},
     "gfs": "GFS (Open-Meteo)",
     "gfs_native": "GFS (native)",
+    "ifs_single": "IFS HRES (9 km, Open-Meteo)",
     "ens_mean": "ENS mean",
     "ens_control": "ENS control member",
     "gefs_mean": "GEFS mean",
 }
 """Each column prefix's product name, up to its `_day<N>` suffix. Two rows are NOAA GFS: the one
 Open-Meteo serves (`gfs`, its GFS-SEAMLESS archive) and the one read from Dynamical.org's native
-store (`gfs_native`); each name says its source, because no row mixes the two."""
+store (`gfs_native`); each name says its source, because no row mixes the two. `ifs_single` is
+ECMWF IFS HRES read from Open-Meteo's Single Runs archive, a row of its own and never merged with
+`ifs025` ("IFS 0.25°", Open-Meteo's Previous Runs), a coarser product and not another version of
+it. The name states the source and the grid, as the two GFS names state their sources."""
 
 BASELINE_NAMES: Final[dict[str, str]] = {
     "persistence": "Persistence",
@@ -874,8 +878,16 @@ def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt
                 "and above reads the 00 UTC run that many days before, from Dynamical.org's "
                 "native store, and its radiation is a mean since the last 6-hourly reset, "
                 "converted to the mean over each hour or 3 hours before its label; GFS "
-                "(Open-Meteo) is NOAA GFS as Open-Meteo's archive serves it. Every mark is an "
-                "XGBoost model fitted "
+                "(Open-Meteo) is NOAA GFS as Open-Meteo's archive serves it. IFS HRES (9 km, "
+                "Open-Meteo) is ECMWF's IFS HRES as Open-Meteo's Single Runs archive serves it on "
+                "its 9 km grid, a finer product than IFS 0.25° and not another version of it. "
+                "It holds 00 UTC runs only, so its day 0 is the 00 UTC run of the hour's own "
+                "day, and it is fitted at days 0 to 7 (its runs end at lead 240 hours, so it has "
+                "no day 10). IFS HRES publishes 3-hourly steps after lead 90 hours and 6-hourly "
+                "steps after lead 144 hours, and Open-Meteo interpolates them to hourly, so "
+                "hourly values at day 5 and above, and at the last hours of day 3, are "
+                "interpolated. Open-Meteo's processing of HRES has not been checked against a "
+                "native archive. Every mark is an XGBoost model fitted "
                 "on a graphics processing unit (GPU) at the primary setting, so no mark mixes "
                 f"devices; {DEVICE_NOTES[domain]}. "
                 f"Overlapping intervals here can still hide a significant paired difference "
@@ -885,8 +897,12 @@ def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt
                 "Leads are not equal: a forecast from Open-Meteo's Previous Runs archive comes "
                 "from the freshest run made at least a day before the hour it describes, so its "
                 "day-1 lead is shorter than ENS's on most hours, which favours that product. "
-                "At days 1 and above, only GEFS, GFS (native), and the ENS control member share "
-                "ENS's lead; at day 0, GFS (native) reads the freshest of its four runs a day."
+                "At days 1 and above, only GEFS, GFS (native), IFS HRES (9 km, Open-Meteo), and "
+                "the ENS control member share ENS's lead; at day 0, GFS (native) reads the "
+                "freshest of its four runs a day. IFS HRES (9 km, Open-Meteo) is scored on the "
+                "shared hours minus the target days whose 00 UTC run the archive lacks (seven run "
+                "days), which the other rows include; contrasts with it are computed on the "
+                "hours both score."
             ),
             f"{scope_text(losses=losses, domain=domain)} {CAPACITY_NOTE}",
         ],
@@ -1153,6 +1169,7 @@ PRODUCT_COLOURS: Final[dict[str, str]] = {
     "ICON global": ocf.DATA_GREEN,
     "GFS (Open-Meteo)": ocf.DATA_AMBER,
     "GFS (native)": ocf.DATA_AMBER,
+    "IFS HRES (9 km, Open-Meteo)": ocf.DATA_BURNT_ORANGE,
     "ARPEGE Europe": ocf.BLACK_1,
 }
 """Each product's colour on the lead-day chart. The six coloured products pass the bundled
@@ -1169,14 +1186,20 @@ The two GFS rows are the same weather model from two sources, so they share Data
 native one is dashed. A seventh chromatic colour does not exist: adding Data Purple or Data Magenta
 to the six chromatic colours fails the colour-blind all-pairs check (worst ΔE 2.0 for Purple against
 Data Blue, 2.3 for Magenta against Data Blue, against a floor of 8), so the dash and the name beside
-each line's last point carry the difference."""
+each line's last point carry the difference.
+
+`IFS HRES (9 km, Open-Meteo)` reuses IFS 0.25°'s Data Burnt Orange and is dashed, for the same
+reason. No colour was added, so the palette check above is unchanged."""
 
 KEY_LABELS: Final[dict[str, str]] = {"ARPEGE Europe": "ARPEGE"}
 """Shorter names for the key above the lead-day chart, whose slots are narrow."""
 
-DASHED_PRODUCTS: Final[frozenset[str]] = frozenset({"ARPEGE Europe", "GFS (native)"})
+DASHED_PRODUCTS: Final[frozenset[str]] = frozenset(
+    {"ARPEGE Europe", "GFS (native)", "IFS HRES (9 km, Open-Meteo)"}
+)
 """Products drawn with a dashed line, because no seventh distinguishable colour exists: ARPEGE is
-black, and the native GFS row shares the Open-Meteo GFS row's amber."""
+black, and the native GFS and IFS HRES (9 km, Open-Meteo) rows share the amber of Open-Meteo's GFS
+row and the burnt orange of IFS 0.25°."""
 
 LEAD_BAND_COLOURS: Final[tuple[str, str]] = (ocf.DATA_BLUE_LIGHT, ocf.DATA_SKY_LIGHT)
 """The shading of ENS's day-0 and day-1 intervals."""
@@ -1293,7 +1316,8 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
         product: (index - (len(products) - 1) / 2) * DODGE_DAYS
         for index, product in enumerate(products)
     }
-    # Each product is its own line in its own colour; ARPEGE and native GFS are dashed.
+    # Each product is its own line in its own colour; ARPEGE, native GFS and IFS HRES (9 km,
+    # Open-Meteo) are dashed.
     drawn = rows.with_columns(
         x=pl.col("day") + pl.col("product").replace_strict(offsets, return_dtype=pl.Float64),
         line=pl.col("product"),
@@ -1313,9 +1337,9 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
         labelExpr="'Day ' + datum.value",
         grid=False,
         title=(
-            "Lead day (ENS and native GFS: a 24-hour band of leads of the 00 UTC run that many "
-            "days earlier; other products: the freshest run at least as many days old as the "
-            "lead day)"
+            "Lead day (ENS, native GFS, and IFS HRES (9 km, Open-Meteo): a 24-hour band of leads "
+            "of the 00 UTC run that many days earlier; other products: the freshest run at "
+            "least as many days old as the lead day)"
         ),
     )
     y = alt.Y(
@@ -1428,7 +1452,10 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
             ),
             (
                 f"{DOTS_NOTE} Products at one day are drawn side by side, and each product's "
-                "name is written beside its last point. The two GFS lines are one weather model "
+                "name is written beside its last point. The dashed orange line is IFS HRES (9 km, "
+                "Open-Meteo), 00 UTC runs only, scored without the target days whose run the "
+                "archive lacks, and not checked against a native archive; the solid orange line "
+                "is IFS 0.25°, a coarser product. The two GFS lines are one weather model "
                 "from two sources: the solid line is Open-Meteo's GFS-SEAMLESS archive, and the "
                 "dashed line is Dynamical.org's native GFS store, whose radiation is a mean since "
                 "the last 6-hourly reset and is converted to the mean over each hour before its "
