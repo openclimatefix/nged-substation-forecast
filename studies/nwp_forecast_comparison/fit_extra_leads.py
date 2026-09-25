@@ -143,8 +143,8 @@ SAME_PRODUCT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("knmi_harmonie_day0", "knmi_harmonie_day1"),
     ("dmi_harmonie_day0", "dmi_harmonie_day1"),
 )
-"""Each new arm against the same product at the longest lead already fitted, as (treatment,
-reference): the error's rise with lead."""
+"""Each new arm against the same product at the nearest lead already fitted (day 3 for days 5 to
+14, day 1 for day 0), as (treatment, reference)."""
 
 ENSEMBLE_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("gefs_mean_day5", "ens_mean_day5"),
@@ -245,6 +245,24 @@ def domain_prefixes(*, domain: DomainType, prefixes: tuple[str, ...]) -> tuple[s
         return prefixes
     solar_only = tuple(f"{PRODUCT_SLUGS[product]}_day" for product in SOLAR_ONLY_PRODUCTS)
     return tuple(prefix for prefix in prefixes if not prefix.startswith(solar_only))
+
+
+def check_saved_losses_hold_arms(*, losses: pl.DataFrame, domain: DomainType, path: Path) -> None:
+    """Raise if saved losses lack any arm this run reports.
+
+    Args:
+        losses: A domain's saved per-row losses, with an `arm` column.
+        domain: `solar` or `wind`.
+        path: Where the losses were read from, named in the error.
+
+    Raises:
+        ValueError: If an arm of `NEW_PREFIXES` or `REFERENCE_PREFIXES` for `domain` is absent.
+    """
+    expected = set(domain_prefixes(domain=domain, prefixes=(*NEW_PREFIXES, *REFERENCE_PREFIXES)))
+    lacking = sorted(expected - set(losses["arm"].unique().to_list()))
+    if lacking:
+        msg = f"{path} lacks arms {lacking}; use a new --output-dir"
+        raise ValueError(msg)
 
 
 def missing_shares(*, frame: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
@@ -473,10 +491,19 @@ def report_domain(
     ]
     for title, pairs in (
         (
-            "Error's rise with lead: each new arm minus the same product at day 3 (or day 1)",
+            (
+                "Change with lead: each new arm minus the same product at day 3 (day 0 and day 7 "
+                "arms: minus day 1 or day 3 as named)"
+            ),
             SAME_PRODUCT_CONTRASTS,
         ),
-        ("Other products against ENS at the same day", ENSEMBLE_CONTRASTS),
+        (
+            (
+                "Other products against ENS at the same day (Previous Runs day-0 rows mix "
+                "weather models and leads)"
+            ),
+            ENSEMBLE_CONTRASTS,
+        ),
     ):
         table = [contrast_line(losses=losses, treatment=t, reference=r) for t, r in pairs]
         lines += ["", f"### {title}", *header, *(line for line in table if line)]
@@ -608,7 +635,11 @@ def main() -> int:
             "Every arm is exploratory and fitted at the primary setting only, on the published "
             "shared rows and folds. Differences are first arm minus second, in percentage points "
             "of capacity; about 1 in 20 exploratory intervals reaches significance at the 5% level "
-            "by chance."
+            "by chance. Every day-0 arm is a nowcast, not a day-ahead forecast: a Previous Runs "
+            "product's day 0 is the freshest run covering each hour, at a lead set by that "
+            "product's own run cycle, and ENS's and GEFS's day 0 covers hours before the 00 UTC "
+            "run is published. The day-0 served lead is measured only for ICON-D2 and ICON-EU; "
+            "for every other product it is inferred from the run cycle."
         ),
         "",
     ]
@@ -617,6 +648,7 @@ def main() -> int:
         if path.exists():
             _LOG.info("%s exists; reporting from the saved losses", path)
             losses = pl.read_parquet(path)
+            check_saved_losses_hold_arms(losses=losses, domain=domain, path=path)
         elif args.report_only:
             msg = f"{path} does not exist; --report-only needs both domains' losses"
             raise FileNotFoundError(msg)
@@ -624,7 +656,9 @@ def main() -> int:
             losses = fit_arms(
                 frame=frames[domain],
                 domain=domain,
-                prefixes=(*NEW_PREFIXES, *REFERENCE_PREFIXES),
+                prefixes=domain_prefixes(
+                    domain=domain, prefixes=(*NEW_PREFIXES, *REFERENCE_PREFIXES)
+                ),
                 workers=args.workers,
             )
             losses.write_parquet(path)
