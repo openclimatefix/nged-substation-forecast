@@ -152,7 +152,7 @@ observations of the time. CAMS infers cloud from satellite images.
 
 The lead, archive start, and delay columns are taken from the
 [sunshine study's product
-table](weather-products-for-past-solar.md#where-each-product-comes-from-and-its-served-lead),
+table](past-weather/solar.md#where-each-product-comes-from-and-its-served-lead),
 which cites each service's own documentation.
 
 **The reanalysis and the satellite retrieval are different measurement systems rather than two

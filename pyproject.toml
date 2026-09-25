@@ -123,6 +123,10 @@ registry_modules = [
 # See https://docs.astral.sh/ruff/configuration/
 [tool.ruff]
 line-length = 100
+# The era-fold measurement scripts are a record of how `studies/era_fold_design/report.md` was made.
+# They hard-code a scratch directory and star-import a sibling helper, so they run only from that
+# directory and are not linted or formatted.
+extend-exclude = ["studies/era_fold_design/scripts"]
 
 [tool.ruff.lint]
 # `select` is always written out here, never inherited. Ruff's *default* rule set is a curated
@@ -373,6 +377,10 @@ exclude = '\.git|\.venv|packages/(notebooks|dashboard)/[^/]+\.py'
 # Without this, the same import that runs fine is an `unresolved-import` error under `ty` alone.
 # `studies/nwp_forecast_comparison` is here for `packages/studies/tests/test_fit_extra_leads.py`.
 extra-paths = ["tests", "studies/beam_diffuse_split", "studies/nwp_forecast_comparison"]
+
+[tool.ty.src]
+# The era-fold measurement scripts are a record, not maintained code (see the ruff exclude).
+exclude = ["studies/era_fold_design/scripts"]
 
 [tool.pytest.ini_options]
 # importlib mode lets test modules in different directories share a basename (e.g.

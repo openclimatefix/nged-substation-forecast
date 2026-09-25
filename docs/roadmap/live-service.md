@@ -411,7 +411,7 @@ months. At five of the six generators every post-upgrade row therefore fell in t
 the XGBoost model scoring that fold had trained on pre-upgrade UKV alone. Measured that way, [UKV's
 global irradiance scored about 1 percentage point worse than ERA5's from the upgrade
 onwards](data-sources.md#open-meteos-ukv-archive-is-the-t0-analysis-and-half-of-it-is-backfill). The
-[weather-products study](../studies/weather-products-for-past-solar.md) cut its folds separately
+[weather-products study](../studies/past-weather/solar.md) cut its folds separately
 before and after the upgrade, so every post-upgrade row was scored by a model that had trained on
 other post-upgrade months. There, XGBoost models trained on both sides of the upgrade put UKV 0.18
 percentage points of capacity behind ERA5 after the upgrade [+0.05, +0.42], and XGBoost models

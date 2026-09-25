@@ -118,7 +118,7 @@ Until that lands, the behaviour described below is what the pipeline does.
 
 The fixes' effect on a power forecast has been measured at nine farms, outside the pipeline, in [How
 accurate is a power forecast driven by ECMWF ENS at each
-horizon?](../studies/ens-forecast-horizons.md#turning-enss-steps-into-hourly-values).
+horizon?](../studies/forecasts/ens-horizons.md#turning-enss-steps-into-hourly-values).
 
 ### Wind direction is interpolated across the 0°/360° wrap
 

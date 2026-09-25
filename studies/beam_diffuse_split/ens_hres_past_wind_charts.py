@@ -1,7 +1,7 @@
 """Draw the charts for the ECMWF HRES and ENS section of the past-wind page.
 
 One-off throwaway script for the charts of the ECMWF addition to
-<https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-wind/>,
+<https://openclimatefix.github.io/nged-substation-forecast/studies/past-weather/wind/>,
 in `wind_icon_dream_charts.py`'s style. **Every number a chart shares with the page is read from
 `intervals.parquet` or `report.md`, both written by `ens_hres_past_wind.py`**, so a chart cannot
 disagree with the page. Before any chart is saved, `Source.verify` requires every interval a chart
@@ -35,9 +35,9 @@ import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 from ens_hres_past_wind import OUTPUT_DIR
+from figure_numbers import WIND_FIGURE_NUMBERS, wind_figure_number, wind_figure_title
 from studies.charts import (
     CONTENT_WIDTH_PX,
-    PLOT_WIDTH_PX,
     figure,
     interval_panel,
     leaderboard_panel,
@@ -61,6 +61,13 @@ from wind_product_charts import (
 )
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
+
+RATIO_PLOT_WIDTH_PX: Final[int] = CONTENT_WIDTH_PX - 74
+"""The plot width of a monthly-ratio panel, whose y axis title and tick labels take 74 px, so
+that the panel and its axes fill the text column as an interval figure does."""
+
+_CAPTION_CHARACTERS: Final[int] = 100
+"""The characters a caption line holds before wrapping, which keeps it inside a 680 px figure."""
 
 SITES: Final[tuple[str, ...]] = ("W1", "W2", "W3")
 """The anonymous wind farm labels."""
@@ -120,20 +127,12 @@ EXPLORATORY: Final[tuple[tuple[str, str], ...]] = (
 )
 """The two exploratory contrasts between the ECMWF products and the others."""
 
-FIGURE_LEADERBOARD: Final[int] = 13
-FIGURE_MODELS_WORK: Final[int] = 14
-FIGURE_PER_FARM_ERROR: Final[int] = 15
-FIGURE_ROBUSTNESS: Final[int] = 16
-FIGURE_RECONCILIATION: Final[int] = 17
-FIGURE_MONTHLY_RATIO: Final[int] = 18
-FIGURE_SPLIT: Final[int] = 19
-FIGURE_BY_FARM: Final[int] = 20
-
 MODELS_WORK_AXIS_PX: Final[int] = 88
 """The width of a week panel's y axis and gutter beyond its plot area, measured on the saved SVG."""
 
 MODELS_WORK_PANEL_WIDTH_PX: Final[int] = (CONTENT_WIDTH_PX - MODELS_WORK_AXIS_PX - 32) // 3
-"""The plot width of each of Figure 14's three week columns, so the figure fills the text column."""
+"""The plot width of each of the `models_work_timeseries` figure's three week columns, so the
+figure fills the text column."""
 
 DOMAIN_MARGIN: Final[float] = 0.15
 """How far past the lowest and highest value a difference chart's x domain extends."""
@@ -430,7 +429,7 @@ def _leaderboard_rows(*, source: Source, scope: str, products: tuple[str, ...]) 
 
 
 def _require_headline_claims(*, planned: pl.DataFrame) -> None:
-    """Stop unless the three planned contrasts support Figure 13's title.
+    """Stop unless the three planned contrasts support the leaderboard figure's title.
 
     Args:
         planned: The three planned contrasts' rows, P1 to P3 in order, with `difference`,
@@ -444,7 +443,8 @@ def _require_headline_claims(*, planned: pl.DataFrame) -> None:
     significant = ((planned["lower_95"] > 0) | (planned["upper_95"] < 0)).to_list()
     if signs != [1, 1, -1] or not all(significant):
         msg = (
-            "Figure 13's title says UKV beats HRES and ENS day 0 and HRES beats ERA5, each "
+            f"Figure {WIND_FIGURE_NUMBERS['leaderboard']}'s title says UKV beats HRES and ENS "
+            "day 0 and HRES beats ERA5, each "
             f"significantly; the signs are {signs} and significance is {significant}"
         )
         raise ValueError(msg)
@@ -457,7 +457,7 @@ def _headline(*, source: Source) -> tuple[alt.VConcatChart, str]:
         source: The saved results.
 
     Returns:
-        Figure 13, and its title.
+        The `leaderboard` figure of `figure_numbers.WIND_FIGURE_NUMBERS`, and its title.
     """
     board = _leaderboard_rows(source=source, scope="all", products=LEADERBOARD_ORDER)
     board_domain = (
@@ -512,7 +512,7 @@ def _headline(*, source: Source) -> tuple[alt.VConcatChart, str]:
     return (
         figure(
             panels=[leaderboard, *panels],
-            number=FIGURE_LEADERBOARD,
+            number=WIND_FIGURE_NUMBERS["leaderboard"],
             figure_planning="mixed",
             title=title,
             subtitle=[
@@ -565,14 +565,15 @@ def _models_work(*, losses: pl.DataFrame) -> tuple[alt.VConcatChart, str]:
 
     The prediction is the measured power plus the scored error, `signed_error_capped_mw`, which
     `studies.cross_validation` defines as the prediction held to the export cap minus the measured
-    value, averaged over the three fitting seeds. The weeks are chosen by the rule the page's
-    Figure 4 uses, from measured power alone, so the choice cannot favour either product.
+    value, averaged over the three fitting seeds. The weeks are chosen by the rule the main row
+    set's time-series figure uses, from measured power alone, so the choice cannot favour either
+    product.
 
     Args:
         losses: The pooled setting's losses, every arm.
 
     Returns:
-        Figure 14, and its title.
+        The `models_work_timeseries` figure of `figure_numbers.WIND_FIGURE_NUMBERS`, and its title.
     """
     measured = _pooled_week_frame(losses=losses)
     products = ("hres", "ens_mean_day0")
@@ -614,8 +615,8 @@ def _models_work(*, losses: pl.DataFrame) -> tuple[alt.VConcatChart, str]:
             week_order=WIND_WEEK_DISPLAY_ORDER,
             order=order,
             colours=(ocf.TEXT, HRES_COLOUR, ENS_COLOUR),
-            number=FIGURE_MODELS_WORK,
-            title=title,
+            number=wind_figure_number(key="models_work_timeseries", row_set="ecmwf"),
+            title=wind_figure_title(row_set="ecmwf", title=title),
             panel_width=MODELS_WORK_PANEL_WIDTH_PX,
             subtitle=[
                 "Out-of-fold power as a percentage of the generator's own capacity, days 1 to 7.",
@@ -639,7 +640,7 @@ def _per_farm_error(*, source: Source) -> tuple[alt.VConcatChart, str]:
         source: The saved results.
 
     Returns:
-        Figure 15, and its title.
+        The `models_work_error` figure of `figure_numbers.WIND_FIGURE_NUMBERS`, and its title.
 
     Raises:
         ValueError: If the title's claim does not hold in the saved results: ICON-D2's error is the
@@ -677,9 +678,9 @@ def _per_farm_error(*, source: Source) -> tuple[alt.VConcatChart, str]:
     return (
         figure(
             panels=panels,
-            number=FIGURE_PER_FARM_ERROR,
+            number=wind_figure_number(key="models_work_error", row_set="ecmwf"),
             figure_planning=None,
-            title=title,
+            title=wind_figure_title(row_set="ecmwf", title=title),
             subtitle=[
                 (
                     "Each product's own mean absolute error at one farm, best first. ICON global "
@@ -720,7 +721,7 @@ def _robustness(*, source: Source) -> tuple[alt.VConcatChart, str]:
         source: The saved results.
 
     Returns:
-        Figure 16, and its title.
+        The `robustness` figure of `figure_numbers.WIND_FIGURE_NUMBERS`, and its title.
 
     Raises:
         ValueError: If a contrast is not statistically significant at the 5% level under every
@@ -770,7 +771,7 @@ def _robustness(*, source: Source) -> tuple[alt.VConcatChart, str]:
     return (
         figure(
             panels=panels,
-            number=FIGURE_ROBUSTNESS,
+            number=WIND_FIGURE_NUMBERS["robustness"],
             figure_planning="mixed",
             title=title,
             subtitle=[
@@ -812,7 +813,7 @@ LONG_SCOPES: Final[tuple[tuple[str, str], ...]] = (
 """Each long-row-set scope's cell in the report, and its label."""
 
 LONG_TREATMENTS: Final[tuple[str, ...]] = ("ens_mean_day0_wind", "hres_wind")
-"""The two ECMWF arms Figure 17 draws against ERA5."""
+"""The two ECMWF arms the `reconciliation` figure draws against ERA5."""
 
 
 def _horizons_published(*, source: Source) -> pl.DataFrame:
@@ -938,8 +939,8 @@ def _require_reconciliation_claims(*, source: Source) -> None:
             if min(cut_moves) <= 0 or rotation_move >= min(cut_moves):
                 msg = (
                     f"{treatment} on {scope}: rotating folds moves the difference by "
-                    f"{rotation_move:.3f} and the era cut by {cut_moves}, so Figure 17's title "
-                    "is wrong"
+                    f"{rotation_move:.3f} and the era cut by {cut_moves}, so Figure "
+                    f"{WIND_FIGURE_NUMBERS['reconciliation']}'s title is wrong"
                 )
                 raise ValueError(msg)
 
@@ -951,7 +952,7 @@ def _reconciliation(*, source: Source) -> tuple[alt.VConcatChart, str]:
         source: The saved results.
 
     Returns:
-        Figure 17, and its title.
+        The `reconciliation` figure of `figure_numbers.WIND_FIGURE_NUMBERS`, and its title.
     """
     _require_reconciliation_claims(source=source)
     published = _horizons_published(source=source)
@@ -1004,7 +1005,7 @@ def _reconciliation(*, source: Source) -> tuple[alt.VConcatChart, str]:
     return (
         figure(
             panels=panels,
-            number=FIGURE_RECONCILIATION,
+            number=WIND_FIGURE_NUMBERS["reconciliation"],
             figure_planning="exploratory",
             title=title,
             subtitle=[
@@ -1138,7 +1139,7 @@ def _ratio_panel(
         .mark_text(align="left", baseline="top", dx=4, dy=2, color=ocf.BLACK_1, aria=False)
         .encode(x="date:T", y=alt.value(0), text="text:N")  # ty: ignore[unresolved-attribute]
     )
-    return alt.LayerChart(layer=[rule, label, line], width=PLOT_WIDTH_PX, height=200)
+    return alt.LayerChart(layer=[rule, label, line], width=RATIO_PLOT_WIDTH_PX, height=200)
 
 
 def _monthly_ratio_chart(*, source: Source) -> tuple[alt.VConcatChart, str]:
@@ -1148,7 +1149,7 @@ def _monthly_ratio_chart(*, source: Source) -> tuple[alt.VConcatChart, str]:
         source: The saved results.
 
     Returns:
-        Figure 18, and its title.
+        The `monthly_ratio` figure of `figure_numbers.WIND_FIGURE_NUMBERS`, and its title.
     """
     panels = [
         _ratio_panel(
@@ -1167,27 +1168,31 @@ def _monthly_ratio_chart(*, source: Source) -> tuple[alt.VConcatChart, str]:
         ),
     ]
     title = (
-        "ENS's and HRES's 10 m wind speeds fall against ERA5's between October and November 2024, "
+        "ENS's and HRES's 10 m wind speeds fall against ERA5's from October to November 2024, "
         "and UKV's does not"
     )
     return (
         figure(
             panels=panels,
-            number=FIGURE_MONTHLY_RATIO,
+            number=WIND_FIGURE_NUMBERS["monthly_ratio"],
             figure_planning=None,
             title=title,
             subtitle=[
-                (
-                    "Each month's mean wind speed of one product, over ERA5's mean for the same "
-                    "hours, pooled over the three farms. The upper panel is 10 m. The lower panel "
-                    "is 100 m, the height the XGBoost models are given, where the fall is "
-                    "smaller and gradual."
-                ),
-                (
-                    "Rows are the page's own from 12 August 2024, before any hour is dropped for "
-                    "the fold design. Each month's row count is in the report."
-                ),
-                "Three wind farms in Lincolnshire. Three farms are few independent sites.",
+                line
+                for text in (
+                    (
+                        "Each month's mean wind speed of one product, over ERA5's mean for the "
+                        "same hours, pooled over the three farms. The upper panel is 10 m. The "
+                        "lower panel is 100 m, the height the XGBoost models are given, where the "
+                        "fall is smaller and gradual."
+                    ),
+                    (
+                        "Rows are the page's own from 12 August 2024, before any hour is dropped "
+                        "for the fold design. Each month's row count is in the report."
+                    ),
+                    "Three wind farms in Lincolnshire. Three farms are few independent sites.",
+                )
+                for line in wrapped(text=text, width=_CAPTION_CHARACTERS)
             ],
         ),
         title,
@@ -1201,9 +1206,9 @@ SPLIT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("hres", "ukv"),
     ("ukv", "era5"),
 )
-"""The contrasts Figure 19 draws by label hour. The last two involve no ENS lead, and ERA5, an
-analysis, has no lead at all, so they show how much of a change between the halves is time of
-day."""
+"""The contrasts the `time_of_day` figure draws by label hour. The last two involve no ENS lead,
+and ERA5, an analysis, has no lead at all, so they show how much of a change between the halves
+is time of day."""
 
 SPLIT_GROUPS: Final[tuple[tuple[str, str], ...]] = (
     ("labels 00-08 UTC", "Labels 00-08 UTC"),
@@ -1213,7 +1218,7 @@ SPLIT_GROUPS: Final[tuple[tuple[str, str], ...]] = (
 
 
 def _require_split_claims(*, source: Source) -> None:
-    """Stop unless the saved results support Figure 19's title.
+    """Stop unless the saved results support the `time_of_day` figure's title.
 
     Args:
         source: The saved results.
@@ -1241,8 +1246,8 @@ def _require_split_claims(*, source: Source) -> None:
     ukv_lead_grows = value[late, "ukv", "era5"] < value[early, "ukv", "era5"]
     if len(grows) != 2 or not ukv_lead_grows:
         msg = (
-            f"Figure 19's title is wrong: the ENS gaps that grow in the later hours are {grows}, "
-            f"and UKV's lead over ERA5 grows: {ukv_lead_grows}"
+            f"Figure {WIND_FIGURE_NUMBERS['time_of_day']}'s title is wrong: the ENS gaps that grow "
+            f"in the later hours are {grows}, and UKV's lead over ERA5 grows: {ukv_lead_grows}"
         )
         raise ValueError(msg)
 
@@ -1287,7 +1292,7 @@ def _split_figure(*, source: Source) -> tuple[alt.VConcatChart, str]:
         source: The saved results.
 
     Returns:
-        Figure 19, and its title.
+        The `time_of_day` figure of `figure_numbers.WIND_FIGURE_NUMBERS`, and its title.
     """
     _require_split_claims(source=source)
     records = []
@@ -1327,7 +1332,7 @@ def _split_figure(*, source: Source) -> tuple[alt.VConcatChart, str]:
     return (
         figure(
             panels=[panel],
-            number=FIGURE_SPLIT,
+            number=WIND_FIGURE_NUMBERS["time_of_day"],
             figure_planning="exploratory",
             title=title,
             subtitle=[
@@ -1359,7 +1364,7 @@ def _farm_figure(*, source: Source) -> tuple[alt.VConcatChart, str]:
         source: The saved results.
 
     Returns:
-        Figure 20, and its title.
+        The `per_generator` figure of `figure_numbers.WIND_FIGURE_NUMBERS`, and its title.
     """
     farm_frames = []
     for label, treatment, reference in PLANNED:
@@ -1415,9 +1420,9 @@ def _farm_figure(*, source: Source) -> tuple[alt.VConcatChart, str]:
     return (
         figure(
             panels=panels,
-            number=FIGURE_BY_FARM,
+            number=wind_figure_number(key="per_generator", row_set="ecmwf"),
             figure_planning="mixed",
-            title=title,
+            title=wind_figure_title(row_set="ecmwf", title=title),
             subtitle=[
                 (
                     "Each planned contrast pooled over the three farms, which is the planned "

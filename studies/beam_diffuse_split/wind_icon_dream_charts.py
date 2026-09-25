@@ -24,6 +24,7 @@ from typing import Final
 
 import altair as alt
 import polars as pl
+from figure_numbers import WIND_FIGURE_NUMBERS
 from studies.bootstrap import bootstrap_absolute
 from studies.charts import (
     figure,
@@ -94,7 +95,7 @@ def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         errors: Each product's pooled mean absolute error, read from the report's first table.
 
     Returns:
-        Figure 11.
+        The `leaderboard` figure of `figure_numbers.WIND_FIGURE_NUMBERS`.
 
     Raises:
         ValueError: If a bootstrapped point estimate disagrees with the report's own number.
@@ -125,7 +126,7 @@ def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
     panel = leaderboard_panel(rows=rows, x_domain=domain, x_title=LEADERBOARD_X_TITLE)
     return figure(
         panels=[panel],
-        number=11,
+        number=WIND_FIGURE_NUMBERS["leaderboard"],
         figure_planning=None,
         title=(
             "ICON-DREAM-EU is statistically indistinguishable from ERA5, and beats only ICON "
@@ -148,7 +149,7 @@ def _planned_contrasts(*, report_path: Path) -> alt.VConcatChart:
         report_path: The `report.md` `wind_icon_dream.py` wrote.
 
     Returns:
-        Figure 12.
+        The `contrasts` figure of `figure_numbers.WIND_FIGURE_NUMBERS`.
     """
     contrasts = report_contrasts(report_path=report_path)
     # Order by each row's own `reference` column rather than by position: `treatment` is the same
@@ -191,7 +192,7 @@ def _planned_contrasts(*, report_path: Path) -> alt.VConcatChart:
     # PLANNING_NOTES line `figure_planning="planned"` would add repeats that a third time.
     return figure(
         panels=[panel],
-        number=12,
+        number=WIND_FIGURE_NUMBERS["contrasts"],
         figure_planning=None,
         title="ICON-DREAM-EU does not beat ERA5, and trails ICON-EU by 0.34 points",
         subtitle=[

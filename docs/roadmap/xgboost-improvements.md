@@ -169,14 +169,15 @@ than a correctness fix, and expect a smaller win than (a) or (b).
 **One study has measured (b), (c) inside a solar PV model, and the wind vector on XGBoost models
 given the ENS ensemble mean, at 6 solar farms and 3 wind farms in Lincolnshire from 2024 to 2026.**
 Against straight-line interpolation, the clear-sky-index resample lowered the solar error by 0.30
-points of capacity [0.22, 0.40] at day 1 and 0.16 points [0.02, 0.31] at day 7, and by amounts not
-statistically significant at the 5% level beyond day 7. A shape-preserving cubic for temperature
-moved the solar error by less than 0.02 points, which says little about (c)'s effect on the demand
-features, because temperature is a weak input to a PV model and the study has no demand target.
-Interpolating the wind as components moved the wind error's estimate by less than 0.1 points at
-every horizon, with intervals reaching 0.2 points at days 10 and 14. The measurements, and the ENS
-horizon study they come from, are in [How accurate is a power forecast driven by ECMWF ENS at each
-horizon?](../studies/ens-forecast-horizons.md#turning-enss-steps-into-hourly-values).
+points of capacity [0.22, 0.40] at day 1, 0.18 points [0.08, 0.30] at day 3, and 0.12 points [0.03,
+0.21] at day 10, and by amounts not statistically significant at the 5% level at days 5, 7, and 14.
+A shape-preserving cubic for temperature moved the solar error by less than 0.02 points, which says
+little about (c)'s effect on the demand features, because temperature is a weak input to a PV model
+and the study has no demand target. Interpolating the wind as components moved the wind error's
+estimate by less than 0.1 points at every horizon to day 7, and raised it by 0.12 points [0.01,
+0.25] at day 10 and 0.15 points [−0.03, 0.34] at day 14. The measurements, and the ENS horizon study
+they come from, are in [How accurate is a power forecast driven by ECMWF ENS at each
+horizon?](../studies/forecasts/ens-horizons.md#turning-enss-steps-into-hourly-values).
 
 The synoptic variables need no fix: `pressure_surface`, `pressure_reduced_to_mean_sea_level`, and
 `geopotential_height_500hpa` lose almost nothing at 6-hourly spacing ([MAE/SD
@@ -260,7 +261,7 @@ in a wind component or a clear-sky index is invisible to the leaderboard and obv
 
 The ENS horizon study measured arms 2 and 3, and the wind vector, outside the pipeline, on hourly
 XGBoost models per generator rather than on the leaderboard: [Turning ENS's steps into hourly
-values](../studies/ens-forecast-horizons.md#turning-enss-steps-into-hourly-values) has the
+values](../studies/forecasts/ens-horizons.md#turning-enss-steps-into-hourly-values) has the
 figures, by horizon, for its nine farms.
 
 ## Tier 1 — config-level changes (hours each)
@@ -1381,7 +1382,7 @@ describes a solar experiment from issue #800. The experiment gave an XGBoost mod
 and UKV's global irradiance, as past-weather values, and scored it against an XGBoost model given
 ICON-D2's alone: -0.30 points of capacity [-0.37, -0.24]. That experiment does not use day-ahead
 forecasts. The [matched-lead
-study](https://openclimatefix.github.io/nged-substation-forecast/studies/nwp-forecasts-at-matched-leads/)
+study](https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/matched-lead/)
 scores an XGBoost model given ENS's day-1 mean plus ICON-EU and IFS 0.25° forecasts against an
 XGBoost model given ENS alone, at 3 wind and 6 solar generators over 21 months. The contrast P4b
 (planned) gives the other products day-2 values, which are never fresher than a 09:00 UTC service
