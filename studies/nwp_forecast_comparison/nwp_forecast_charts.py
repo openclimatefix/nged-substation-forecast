@@ -1549,10 +1549,11 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
                 f"name is written beside its last point. {dashed_lines_note(domain=domain)} "
                 "IFS HRES 9 km is IFS HRES (9 km, Open-Meteo): 00 UTC runs only, not checked "
                 "against a native archive, and its day-3 values after lead 90 hours are "
-                "interpolated from 3-hourly steps. ICON-EU's day 0 is not drawn, because it "
-                "reads a run at most 3 hours old. Products fitted at fewer than three of days 0 "
-                "to 3 are left out, and days 5 to 14 and IFS HRES 9 km's day 0 appear only in "
-                f"Figure {FIGURE_NUMBERS[(domain, 'leaderboard')]}."
+                "interpolated from 3-hourly steps. Only the ENS mean's day 0 is drawn, as the "
+                "lower of the two ENS references; every other product's day 0, and every "
+                "product's days 5 to 14, appear only in "
+                f"Figure {FIGURE_NUMBERS[(domain, 'leaderboard')]}. Products fitted at fewer than "
+                "three of days 0 to 3 are left out."
             ),
             (
                 "Lead day: ENS, GFS (native), and IFS HRES 9 km read a 24-hour band of leads of "
@@ -1700,7 +1701,7 @@ AIFS_ARM_LABELS: Final[dict[str, str]] = {
     "ens_mean_day1": "ENS mean day 1, 3-hourly steps",
     "ifs025_day1": "IFS 0.25° day 1, hourly steps",
     "aifs_single_day1_permuted": "AIFS Single day 1, shuffled",
-    "aifs_single_day1_permuted_b": "AIFS Single day 1, shuffled again",
+    "aifs_single_day1_permuted_b": "AIFS Single day 1, shuffled with a second seed",
 }
 """Each AIFS-page arm's row label. The shuffled arms carry no weather beyond the month and hour of
 day, so their errors show what the forecasts add."""
@@ -1717,8 +1718,8 @@ AIFS_LEADERBOARD_ARMS: Final[tuple[str, ...]] = (
 """The arms whose own error the AIFS figure's top panels show, at day 1."""
 
 AIFS_SET_NAMES: Final[dict[str, str]] = {
-    "single": "Hours AIFS Single covers",
-    "ens": "Hours AIFS ENS also covers (descriptive only)",
+    "single": "AIFS Single hours",
+    "ens": "AIFS ENS hours (descriptive only)",
 }
 
 
@@ -1748,8 +1749,8 @@ def aifs_absolute_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
         losses: One row set's per-row losses.
 
     Returns:
-        `label`, `family`, `value`, `lower_95` and `upper_95` in percent of capacity, with the
-        arms present in `losses` only.
+        `label`, `family`, `condition`, `value`, `lower_95` and `upper_95` in percent of capacity,
+        with the arms present in `losses` only.
     """
     board = leaderboard(
         losses=by_setting(losses=losses)["primary"], arms=list(AIFS_LEADERBOARD_ARMS)
@@ -1759,9 +1760,10 @@ def aifs_absolute_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
             pl.col("value", "lower_95", "upper_95") * PERCENTAGE_POINTS,
             label=pl.col("arm").replace_strict(AIFS_ARM_LABELS, return_dtype=pl.String),
             family=pl.lit("weather model"),
+            condition=pl.lit(SETTING_NAMES["primary"]),
         )
         .sort("value")
-        .select("label", "family", "value", "lower_95", "upper_95")
+        .select("label", "family", "condition", "value", "lower_95", "upper_95")
     )
 
 
@@ -1778,6 +1780,8 @@ def aifs_contrast_rows(*, losses: pl.DataFrame, row_set: str) -> pl.DataFrame:
     by_name = by_setting(losses=losses)
     frames = []
     for contrast in aifs_contrasts(row_set=row_set):
+        if contrast.label == "exploratory (climatology)":
+            continue
         frame = contrast_rows(
             losses_by_setting=by_name,
             specs=[ContrastSpec(contrast.label, contrast.treatment, contrast.reference)],
@@ -1821,8 +1825,13 @@ def aifs(
                 rows=absolute,
                 x_domain=absolute_domain,
                 x_title=f"{MAE_TITLE}; {scope}",
+                conditions=list(SETTING_NAMES.values()),
+                condition_title="XGBoost hyperparameter setting",
+                solid=True,
                 keys=False,
-                panel_title=f"{AIFS_SET_NAMES[row_set]}: each forecast's own error at day 1",
+                panel_title=(
+                    f"{AIFS_SET_NAMES[row_set]}: own error at day 1 (primary XGBoost setting)"
+                ),
                 row_step_px=44,
             )
         )
@@ -1842,9 +1851,11 @@ def aifs(
             (
                 "Each mark is an XGBoost model's error, given one forecast product. The two row "
                 "sets hold different hours, so their axes are separate and their errors cannot be "
-                "read against each other or against the other figures. Every arm on a row set is "
-                "scored on the same hours. Points of capacity; negative means the first forecast "
-                "in a row is better."
+                "read against each other or against the other figures. Every forecast on one set of "
+                "hours is scored on exactly those hours. Points of capacity; negative means the "
+                "first forecast in a row is better. The shuffled forecast carries no weather, so "
+                "its own error is far higher than AIFS Single's (see the upper panels) and its "
+                "difference from AIFS Single is left off the paired panels."
             ),
             (
                 "AIFS steps every 6 hours, so the ENS references use 6-hourly steps too. "
@@ -2001,11 +2012,13 @@ TITLES: Final[dict[tuple[DomainType, str], str]] = {
     ),
     ("solar", "by_lead_day"): (
         "Solar error rises with lead day for every forecast; IFS 0.25° cannot be told apart from "
-        "the ENS mean at days 1 to 3, and every other product has a higher error than ENS"
+        "the ENS mean at days 1 to 3, and every other product compared with it has a higher "
+        "error than the ENS mean"
     ),
     ("wind", "by_lead_day"): (
         "Wind error rises with lead day for every forecast; IFS 0.25° has a lower error than the "
-        "ENS mean at days 2 and 3, at a lead shorter than ENS's on most hours"
+        "ENS mean at day 2, and a lower point estimate at day 3, at a lead shorter than ENS's "
+        "on most hours"
     ),
     ("solar", "aifs"): (
         "For solar power, AIFS Single cannot be told apart from ENS's control member at day 1, "

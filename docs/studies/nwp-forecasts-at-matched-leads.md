@@ -1189,12 +1189,13 @@ wind is +0.947 points [+0.796, +1.105].
 ![Solar error by lead day for each forecast, with ENS's day-0 and day-1 intervals shaded](assets/nwp_forecast_solar_by_lead_day.svg)
 
 Figure 11: Solar error rises with lead day for every forecast; IFS 0.25° cannot be told apart from
-the ENS mean at days 1 to 3, and every other product has a higher error than ENS.
+the ENS mean at days 1 to 3, and every other product compared with it has a higher error than the
+ENS mean.
 
 ![Wind error by lead day for each forecast, with ENS's day-0 and day-1 intervals shaded](assets/nwp_forecast_wind_by_lead_day.svg)
 
 Figure 12: Wind error rises with lead day for every forecast; IFS 0.25° has a lower error than the
-ENS mean at days 2 and 3, at a lead shorter than ENS's on most hours.
+ENS mean at day 2, and a lower point estimate at day 3, at a lead shorter than ENS's on most hours.
 
 ### UKV loses to ENS before and after its 2026-01-21 upgrade (exploratory)
 
