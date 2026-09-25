@@ -279,7 +279,7 @@ def test_the_icon_dream_eu_block_carries_the_post_scoring_note() -> None:
     notes = {key: setting.note for key, setting in module.BLOCK_SETTINGS.items()}
 
     assert notes["icon_dream_eu"] == (
-        "planned contrasts were written after the five products were scored."
+        "planned contrasts were written after the main block's five products were scored."
     )
     assert [key for key, note in notes.items() if note] == ["icon_dream_eu"]
 

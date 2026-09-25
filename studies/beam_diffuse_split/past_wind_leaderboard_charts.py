@@ -83,9 +83,10 @@ Source: `studies/era_fold_design/README.md` at commit fdddb065 on the `era-fold-
 
 FOLD_COVERING_EFFECT: Final[dict[str, str]] = {
     "icon_dream_eu": (
-        "covering those months moves its two planned contrasts by +0.009 and -0.028 points, with "
-        "no change of sign or of statistical significance; absolute errors under covering folds "
-        "are expected to be slightly lower, and were not measured for this block"
+        "covering those months moves its two planned contrasts by +0.009 and -0.028 points at the "
+        "primary setting, with no change of sign or of statistical significance; absolute errors "
+        "under covering folds are expected to be slightly lower, by analogy with the past-solar "
+        "study; not measured for this block"
     ),
 }
 """Blocks whose fold-covering refit was measured, with the measured bound the caption states."""

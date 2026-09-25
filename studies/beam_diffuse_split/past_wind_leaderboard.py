@@ -292,7 +292,9 @@ ROW_SETS: Final[tuple[leaderboard.RowSet, ...]] = (
 )
 """The four headline row sets, in the order the leaderboard stacks them."""
 
-DREAM_NOTE: Final[str] = "planned contrasts were written after the five products were scored."
+DREAM_NOTE: Final[str] = (
+    "planned contrasts were written after the main block's five products were scored."
+)
 """The caveat the ICON-DREAM-EU block's figures state."""
 
 BLOCK_SETTINGS: Final[dict[str, BlockSetting]] = {

@@ -91,19 +91,27 @@ def test_a_block_with_no_uncovered_month_share_stops_the_figure() -> None:
 
 def test_the_caption_states_each_blocks_uncovered_month_share() -> None:
     module = _load()
-    shares = {
-        "main": module.MonthShares(uncovered=16.4, one_year_only=0.0),
-        "icon_dream_eu": module.MonthShares(uncovered=25.1, one_year_only=0.0),
-        "ecmwf": module.MonthShares(uncovered=0.0, one_year_only=9.4),
-        "station": module.MonthShares(uncovered=0.0, one_year_only=42.2),
+    expected = {
+        "main": (16.4, 0.0),
+        "icon_dream_eu": (25.1, 0.0),
+        "ecmwf": (0.0, 9.4),
+        "station": (0.0, 42.2),
     }
+    shares = module.UNCOVERED_MONTH_SHARES
+    assert {
+        key: (share.uncovered, share.one_year_only) for key, share in shares.items()
+    } == expected
 
     lines = module.uncovered_month_note(shares=shares)
 
     assert [line.split(":")[0] for line in lines] == ["Main", "ICON-DREAM-EU", "ECMWF", "Station"]
     assert "16.4% of scored rows are in a calendar month, seen in two or more years" in lines[0]
     assert "42.2% are in a calendar month seen in one year only" in lines[3]
-    assert "+0.009 and -0.028 points" in lines[1]
+    assert "+0.009 and -0.028 points at the primary setting" in lines[1]
+    assert (
+        "absolute errors under covering folds are expected to be slightly lower, by analogy with "
+        "the past-solar study; not measured for this block"
+    ) in lines[1]
     assert "+0.009" not in lines[0]
 
 
