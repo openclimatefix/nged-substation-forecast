@@ -139,11 +139,14 @@ def test_the_caption_states_each_blocks_uncovered_month_share() -> None:
     assert "16.4% of scored rows are in a calendar month, seen in two or more years" in lines[0]
     assert "42.2% are in a calendar month seen in one year only" in lines[3]
     assert "+0.009 and -0.028 points at the primary setting" in lines[1]
+    assert "the effect on absolute errors was not measured" in lines[1]
+    assert not any("by analogy" in line for line in lines)
     assert (
-        "absolute errors under covering folds are expected to be slightly lower, by analogy with "
-        "the past-solar study; not measured for this block"
-    ) in lines[1]
+        "covering those months moves no planned contrast by more than 0.033 points at the "
+        "primary setting and 0.052 points at the second setting"
+    ) in lines[0]
     assert "+0.009" not in lines[0]
+    assert not any("covering those months" in line for line in lines[2:])
 
 
 def test_month_names_are_cut_to_three_letters_in_a_block_title() -> None:
@@ -249,9 +252,73 @@ def test_the_captions_state_each_blocks_wind_heights_and_the_dream_caveat() -> N
 
     assert notes[0] == "Wind heights of each block's arms:"
     assert "Main: 100 m; ICON 80 m." in notes
-    assert "Station: 10 m station and ERA5 arm; 100 m others." in notes
-    assert notes[-1].startswith("ICON-DREAM-EU: planned contrasts were written after")
-    assert sum("planned contrasts were written" in note for note in notes) == 1
+    assert notes[-1] == "Station: 10 m station and ERA5 arm; 100 m others."
+    assert not any("planned contrasts were written" in note for note in notes)
+    (caveat,) = module.block_caveats()
+    assert caveat.startswith("Caveat on the ICON-DREAM-EU block: planned contrasts were written")
+
+
+def _subtitle(*, figure: object) -> str:
+    """Return a figure's caption lines, joined."""
+    spec = figure.to_dict()  # ty: ignore[unresolved-attribute]
+    return " ".join(spec["title"]["subtitle"])
+
+
+def test_the_dream_caveat_is_not_a_line_under_the_wind_heights_lead() -> None:
+    # Catches the caveat reading as the fifth wind height in the caption.
+    module = _load()
+    figure = module.contrasts_figure(
+        blocks=[_block(reference_name="ERA5")], shares=_all_shares(), intervals=_intervals(rows=[])
+    )
+    lines = figure.to_dict()["title"]["subtitle"]
+    heights_at = lines.index("Wind heights of each block's arms:")
+
+    assert not any("Caveat on the" in line for line in lines[heights_at:])
+    assert any(line.startswith("Caveat on the ICON-DREAM-EU block:") for line in lines[:heights_at])
+
+
+def test_the_interval_sentence_says_what_is_resampled_and_what_is_not() -> None:
+    # Catches a caption that says only "whole months" and claims no more than the bootstrap does.
+    module = _load()
+
+    assert "whole calendar months" in module.DOTS
+    assert "a fitting seed" in module.DOTS
+    assert "does not cover variation between the three farms" in module.DOTS
+    assert "17 calendar months" in module.STATION_SCOPE
+
+
+def test_figure_1_says_overlap_does_not_show_equality_and_figure_2_says_where_errors_are() -> None:
+    module = _load()
+    leaderboard = module.leaderboard_figure(blocks=[_leaderboard_block()], shares=_all_shares())
+    contrasts = module.contrasts_figure(
+        blocks=[_block(reference_name="ERA5")], shares=_all_shares(), intervals=_intervals(rows=[])
+    )
+
+    first = _subtitle(figure=leaderboard)
+    assert (
+        "Overlapping intervals do not show that two arms are equal; Figure 2 tests each difference."
+    ) in first
+    assert "do not make two arms equal" not in first
+    assert "Each arm's own error is in Figure 1." in _subtitle(figure=contrasts)
+
+
+def test_the_second_setting_line_names_post_hoc_contrasts_and_the_both_arms_condition() -> None:
+    # Catches the solar wording, which leaves out post hoc contrasts and the second-setting
+    # losses a contrast near the 5% line needs.
+    module = _load()
+    block = _block(reference_name="ERA5")
+    block = block._replace(
+        planned_rows=block.planned_rows.with_columns(second_difference=pl.lit(-0.05))
+    )
+
+    figure = module.contrasts_figure(
+        blocks=[block], shares=_all_shares(), intervals=_intervals(rows=[])
+    )
+
+    assert (
+        "shown for planned and post hoc contrasts, and for contrasts near the 5% line where both "
+        "arms have second-setting losses"
+    ) in _subtitle(figure=figure)
 
 
 def test_a_contrast_that_loses_significance_at_the_second_setting_is_named_in_the_caption() -> None:

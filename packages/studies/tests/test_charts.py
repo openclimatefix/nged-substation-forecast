@@ -18,6 +18,7 @@ from studies.charts import (
     PLOT_WIDTH_PX,
     POST_HOC_PLANNING_NOTE,
     POST_HOC_SUFFIX,
+    SECOND_SETTING_NOTE,
     SECOND_SETTING_SHAPE,
     BlockArm,
     ContrastKey,
@@ -1574,3 +1575,21 @@ def test_a_stacked_contrast_figure_with_a_one_family_block_keeps_every_family_co
 
     assert condition_scale_drawn(colour_by_family=False)
     assert not condition_scale_drawn(colour_by_family=True)
+
+
+def test_stacked_contrasts_takes_its_own_second_setting_note_and_defaults_to_the_shared_one() -> (
+    None
+):
+    # Catches a wind caption stuck with the solar wording, and a default that no longer shows the
+    # shared note.
+    blocks = _blocks_with_planned(second=True)
+
+    def caption(**extra: object) -> str:
+        spec = stacked_contrasts(
+            blocks=blocks, number=2, title="A title", subtitle=["A subtitle."], **extra
+        ).to_dict()  # ty: ignore[invalid-argument-type]
+        return " ".join(spec["title"]["subtitle"])
+
+    assert SECOND_SETTING_NOTE in caption()
+    assert "A custom note." in caption(second_setting_note="A custom note.")
+    assert SECOND_SETTING_NOTE not in caption(second_setting_note="A custom note.")

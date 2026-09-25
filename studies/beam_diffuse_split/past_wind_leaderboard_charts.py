@@ -88,14 +88,23 @@ Source: `studies/era_fold_design/README.md` at commit fdddb065 on the `era-fold-
 """
 
 FOLD_COVERING_EFFECT: Final[dict[str, str]] = {
+    "main": (
+        "covering those months moves no planned contrast by more than 0.033 points at the primary "
+        "setting and 0.052 points at the second setting; the effect on absolute errors was not "
+        "measured"
+    ),
     "icon_dream_eu": (
         "covering those months moves its two planned contrasts by +0.009 and -0.028 points at the "
-        "primary setting, with no change of sign or of statistical significance; absolute errors "
-        "under covering folds are expected to be slightly lower, by analogy with the past-solar "
-        "study; not measured for this block"
+        "primary setting, with no change of sign or of statistical significance; the effect on "
+        "absolute errors was not measured"
     ),
 }
-"""Blocks whose fold-covering refit was measured, with the measured bound the caption states."""
+"""Blocks whose fold-covering refit was measured, with the measured bound the caption states.
+
+Source: `studies/era_fold_design/report.md` on the `era-fold-design` branch, which the folder's
+README names as the full report. The ECMWF and station blocks have no uncovered rows, so no refit
+was needed.
+"""
 
 POST_HOC_PLANNED_TITLE: Final[str] = "planned and post hoc contrasts"
 """What a block's lower panel is titled, after the block's label, where it holds post hoc rows."""
@@ -107,7 +116,11 @@ UNDRAWN_PLANNED_ICON_NOTE: Final[str] = (
 """The caption line that says where the plan's own ICON contrasts, which the figure lacks, are."""
 
 CAPACITY: Final[str] = "Capacity is each generator's 99th-percentile output."
-DOTS: Final[str] = "Dot: estimate. Line: 95% interval from resampling whole months."
+DOTS: Final[str] = (
+    "Dot: estimate. Line: 95% interval from resampling whole calendar months, each with all three "
+    "farms' rows, and a fitting seed. The interval does not cover variation between the three "
+    "farms."
+)
 SCOPE: Final[str] = "Three wind farms in Lincolnshire."
 BLOCKS_NOT_COMPARABLE: Final[str] = (
     "Compare arms only within a block: each block is scored on its own rows, so an error in one "
@@ -122,9 +135,15 @@ CONTRAST_REFERENCE_ROW_NOTE: Final[str] = (
     "block's, which are against ERA5's 10 m wind."
 )
 STATION_SCOPE: Final[str] = (
-    "The station rows rest on one nearby weather station per farm, and cover fewer months than the "
-    "other blocks."
+    "The station rows rest on one nearby weather station per farm, and cover 17 calendar months, "
+    "fewer than the other blocks."
 )
+WIND_SECOND_SETTING_NOTE: Final[str] = (
+    "Hollow triangle: the same contrast at the second hyperparameter setting, shown for planned "
+    "and post hoc contrasts, and for contrasts near the 5% line where both arms have "
+    "second-setting losses."
+)
+EACH_ARM_ERROR_NOTE: Final[str] = "Each arm's own error is in Figure {number}."
 
 
 def uncovered_month_note(*, shares: dict[str, MonthShares | None]) -> list[str]:
@@ -159,22 +178,30 @@ def uncovered_month_note(*, shares: dict[str, MonthShares | None]) -> list[str]:
 
 
 def block_notes() -> list[str]:
-    """State, for each block, the wind heights its arms carry and any caveat it has.
+    """State the wind heights each block's arms carry.
 
     Returns:
-        One caption line for the wind heights of each block, in the order of `ROW_SETS`, then one
-        line for each block that has a caveat.
+        A lead line, then one caption line for the wind heights of each block, in the order of
+        `ROW_SETS`.
     """
     heights = [
         f"{BLOCK_LABELS[row_set.key]}: {BLOCK_SETTINGS[row_set.key].hub_height}."
         for row_set in ROW_SETS
     ]
-    caveats = [
-        f"{BLOCK_LABELS[row_set.key]}: {BLOCK_SETTINGS[row_set.key].note}"
+    return ["Wind heights of each block's arms:", *heights]
+
+
+def block_caveats() -> list[str]:
+    """State each block's caveat on a caption line of its own, naming the block it is about.
+
+    Returns:
+        One line for each block that has a caveat, in the order of `ROW_SETS`.
+    """
+    return [
+        f"Caveat on the {BLOCK_LABELS[row_set.key]} block: {BLOCK_SETTINGS[row_set.key].note}"
         for row_set in ROW_SETS
         if BLOCK_SETTINGS[row_set.key].note
     ]
-    return ["Wind heights of each block's arms:", *heights, *caveats]
 
 
 def _excludes_zero(*, lower: float, upper: float) -> bool:
@@ -340,12 +367,14 @@ def leaderboard_figure(
             "Each arm's own mean absolute error, sorted best first within its block.",
             BLOCKS_NOT_COMPARABLE,
             (
-                "Overlapping intervals do not make two arms equal: the intervals are wide mainly "
-                "because every arm's error swings together from month to month, a swing that "
-                f"Figure {WIND_FIGURE_NUMBERS['contrasts']}'s paired contrasts cancel."
+                "Overlapping intervals do not show that two arms are equal; Figure "
+                f"{WIND_FIGURE_NUMBERS['contrasts']} tests each difference. The intervals are wide "
+                "mainly because every arm's error swings together from month to month, a swing "
+                f"that Figure {WIND_FIGURE_NUMBERS['contrasts']}'s paired contrasts cancel."
             ),
             STATION_SCOPE,
             *uncovered_month_note(shares=shares),
+            *block_caveats(),
             *block_notes(),
             DOTS,
             CAPACITY,
@@ -372,10 +401,12 @@ def contrasts_figure(
                 "arm's. Lower panel: that row set's planned contrasts, the first arm's error minus "
                 "the second's; each row names both arms."
             ),
+            EACH_ARM_ERROR_NOTE.format(number=WIND_FIGURE_NUMBERS["leaderboard"]),
             UNDRAWN_PLANNED_ICON_NOTE,
             BLOCKS_NOT_COMPARABLE,
             STATION_SCOPE,
             *uncovered_month_note(shares=shares),
+            *block_caveats(),
             *block_notes(),
             *significance_change_notes(intervals=intervals),
             DOTS,
@@ -384,6 +415,7 @@ def contrasts_figure(
         ],
         reference_note=CONTRAST_REFERENCE_ROW_NOTE,
         colour_by_family=True,
+        second_setting_note=WIND_SECOND_SETTING_NOTE,
     )
 
 

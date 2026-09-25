@@ -1721,6 +1721,7 @@ def stacked_contrasts(
     subtitle: Sequence[str],
     reference_note: str = CONTRAST_REFERENCE_ROW_NOTE,
     colour_by_family: bool = False,
+    second_setting_note: str = SECOND_SETTING_NOTE,
 ) -> alt.VConcatChart:
     """Stack, per row set, a panel of contrasts against ERA5 and a panel of planned contrasts.
 
@@ -1742,6 +1743,8 @@ def stacked_contrasts(
         subtitle: Short lines for the caption; `reference_note` is added, and
             `SECOND_SETTING_NOTE` where any row has a second setting.
         reference_note: The caption line saying what the hollow reference row is.
+        second_setting_note: The caption line explaining the hollow second-setting marker, for a
+            figure whose rule for showing one differs from `SECOND_SETTING_NOTE`'s.
         colour_by_family: Whether a block holding one family still colours its rows by family.
             Leave it unset and such a block's rows take the two condition colours, which replace
             the family colours in every panel of the figure, because the panels share one colour
@@ -1802,7 +1805,7 @@ def stacked_contrasts(
         "second_difference" in frame.columns and frame["second_difference"].is_not_null().any()
         for frame in frames
     )
-    notes = [reference_note, *([SECOND_SETTING_NOTE] if has_second_setting else [])]
+    notes = [reference_note, *([second_setting_note] if has_second_setting else [])]
     return figure(
         panels=panels,
         number=number,
