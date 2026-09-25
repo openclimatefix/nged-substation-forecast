@@ -988,20 +988,19 @@ while running the study -->
 
 ## Limitations
 
-**The UKV day-1 requirement removes most of spring 2026 from the rows.** The shared rows require
-UKV's day-1 value, because UKV is a planned product. The study did not investigate why the value is
-missing. The gap is in the Open-Meteo Previous Runs feed the study reads, and the cause is presumed
-to be a gap in that feed and not in the Met Office's forecasts, unless shown otherwise. UKV's day-1
-value is missing on 6.8% of the
-solar candidate rows (2,659 of 39,030) and 11.1% of the wind candidate rows (4,678 of 42,144).
-The gaps fall on 38 calendar dates between April and June 2026 for solar (16 in April, 18 in May,
-and 4 in June) and 70 for wind (27, 29, and 14), plus 1 date in 2025 for solar and 2 for wind. For
-solar, the requirement
-removes 47.8% of the rows of 2026-04, 50.5% of 2026-05, and 11.1% of 2026-06; for wind, 86.8%,
-89.4%, and 47.0%. The removal is nearly uniform across the hours of the day for wind (about 11%
-each hour) and heaviest at 05 and 06 UTC for solar (12.4% and 12.6%). Every arm is scored on the
-rows that remain, so spring 2026 is under-represented in every figure on this page, and the
-eight months after UKV's 2026-01-21 upgrade hold 12,642 solar rows and 10,484 wind rows.
+**The UKV day-1 requirement removes 47.8% and 50.5% of the solar rows of April and May 2026, and
+86.8% and 89.4% of the wind rows.** The shared rows require UKV's day-1 value, because UKV is a
+planned product. The study did not investigate why the value is missing. The values are missing
+from the Open-Meteo Previous Runs feed that the study reads. Unless shown otherwise, the study
+presumes that the gap lies in that feed and not in the Met Office's forecasts. UKV's day-1 value is
+missing on 6.8% of the solar candidate rows (2,659 of 39,030) and 11.1% of the wind candidate rows
+(4,678 of 42,144). The gaps fall on 38 calendar dates between April and June 2026 for solar (16 in
+April, 18 in May, and 4 in June) and 70 for wind (27, 29, and 14), plus 1 date in 2025 for solar and
+2 for wind. For solar, the requirement removes 47.8% of the rows of 2026-04, 50.5% of 2026-05, and
+11.1% of 2026-06; for wind, 86.8%, 89.4%, and 47.0%. The removal is nearly uniform across the hours
+of the day for wind (about 11% each hour) and heaviest at 05 and 06 UTC for solar (12.4% and 12.6%).
+Every arm is scored on the rows that remain, so spring 2026 is under-represented in every figure on
+this page. The 8 months after UKV's 2026-01-21 upgrade hold 12,642 solar rows and 10,484 wind rows.
 <!-- report: Solar and Wind, Rows; UKV day-1 requirement: rows removed; Exploratory: UKV P1 by era
 -->
 
@@ -1009,14 +1008,14 @@ eight months after UKV's 2026-01-21 upgrade hold 12,642 solar rows and 10,484 wi
 cells.** The coverage table has 124 (generator, fold, calendar month) cells for solar, of which 20
 are not covered by training data, and 63 for wind, of which 9 are. Every uncovered cell holds a
 calendar month that occurs in one year only at that generator, so no other fold can hold the month.
-January is one such month, because the part-month that straddles UKV's upgrade on 2026-01-21 is
-dropped, and October and November are others, because the rows run from December 2024 to September
-2026 and hold each of those two months once. Two of the 20 uncovered solar cells, at generator E
-(August in fold 1, September in fold 2), arise because E's rows cover 19 months, not 21. The
-uncovered cells hold from 69 to 356 scored rows for solar and from 539 to 729 for wind.
-`raise_on_uncovered_months` allows only such single-year cells and raises on any other, so the
-study scores them rather than dropping them, and the errors in those seasons are those of an
-XGBoost model that has not seen the season.
+January is a single-year month, because the part-month that straddles UKV's upgrade on 2026-01-21
+is dropped. October and November are single-year months too, because the rows run from December
+2024 to September 2026 and hold each of October and November once. Two of the 20 uncovered solar
+cells, at generator E (August in fold 1, September in fold 2), arise because E's rows cover 19
+months, not 21. The uncovered cells hold from 69 to 356 scored rows for solar and from 539 to 729
+for wind. `raise_on_uncovered_months` allows only single-year cells and raises on any other
+uncovered cell, so the study scores the single-year cells rather than dropping them. The errors in
+those seasons come from an XGBoost model that has not seen the season.
 <!-- report: Solar and Wind, Rows (coverage table); Exploratory: one generator at a time; plan:
 Rows, folds, and fairness -->
 
@@ -1050,9 +1049,9 @@ chance, so an isolated exploratory result deserves less weight than a planned on
 
 **Three statistical caveats limit how far the intervals can be trusted.**
 
-- **No multiplicity correction.** The study has 14 planned contrasts (seven for solar and seven for
-  wind, not counting the four blend guards) and many exploratory contrasts, among them which
-  product carries the wind blend gain, the 00-05 UTC subset, and the result at wind generator W3.
+- **No multiplicity correction.** The study has 18 planned contrasts (9 for solar and 9 for wind,
+  including the 4 blend guards) and many exploratory contrasts, among them which product carries
+  the wind blend gain, the 00-05 UTC subset, and the result at wind generator W3.
   No interval is adjusted for the number of comparisons.
 - **The sensitivity setting is not independent confirmation.** It changes the XGBoost
   hyperparameters and keeps the same rows, folds, and weather. Agreement between the two settings
@@ -1072,23 +1071,24 @@ dropped month still trained the XGBoost models that scored the other months.
 ## Scope
 
 **This study says nothing about the skill of any ensemble's spread, about the Met Office's ensemble
-MOGREPS-UK, about leads beyond day 3, or about generators outside the trial area.** It scores point
-forecasts, made by an XGBoost model fitted separately for each generator, of hourly solar and wind
-output at 6 solar and 3 wind generators, at a day-ahead lead that depends on each Previous Runs
-product's run cycle and at an exact lead for ENS and GEFS. It says nothing about substation demand,
-and because it scores generators and not substations, it does not show how the gaps carry into a
-forecast summed over a substation's generators. It gives the XGBoost model ENS's mean and none of
-its spread, so the uncertainty information in ENS is unused. It says nothing about a forecast
-issued at any time other than 09:00 UTC, or about the values an Open-Meteo archive would have
-served live rather than as a Previous Runs value. It does not test any product's grid, physics, or
-resolution as a cause of a gap, and it does not test the live service.
+MOGREPS-UK, about leads beyond day 3, or about generators outside the trial area.** The study
+scores point forecasts, made by an XGBoost model fitted separately for each generator, of hourly
+solar and wind output at 6 solar and 3 wind generators, at a day-ahead lead that depends on each
+Previous Runs product's run cycle and at an exact lead for ENS and GEFS. The study says nothing
+about substation demand, and because it scores generators and not substations, it does not show
+how the gaps carry into a forecast summed over a substation's generators. The study gives the
+XGBoost model ENS's mean and none of ENS's spread, so the uncertainty information in ENS is unused.
+The study says nothing about a forecast issued at any time other than 09:00 UTC, or about the
+values an Open-Meteo archive would have served live rather than as a Previous Runs value. The study
+does not test any product's grid, physics, or resolution as a cause of a gap, and it does not test
+the live service.
 <!-- plan: The question and the products; What no contrast here can separate -->
 
 ## Data and code availability
 
 **Most inputs are public, but the generator telemetry and the capacity table are private.** The
 public inputs are ECMWF ENS (from 2024-04-01) and NOAA GEFS (from 2020-10-01) from Dynamical.org,
-and the Previous Runs values of Open-Meteo, whose day-offset archive starts on 2024-01-19 for
+and the Previous Runs values of Open-Meteo. Open-Meteo's day-offset archive starts on 2024-01-19 for
 ICON-EU and ICON-D2, on 2024-03-06 for IFS 0.25°, and on 2024-08-06 for UKV (start dates from the
 [weather-products survey](../background/weather-products-survey.md)). Dynamical.org's access ends on
 2026-09-30. The generator telemetry and the `effective_capacity` table are private, because a
