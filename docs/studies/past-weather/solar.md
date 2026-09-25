@@ -1468,7 +1468,8 @@ weather product?](blending.md#solar-a-blend-beats-cams-given-its-neighbouring-ho
   The share for the weather-station row set was not measured, because the fold report holds no saved
   solar station losses. A check with the folds offset moves the main row set's planned contrasts by
   at most 0.03 points. On the extra row set, folds that cover every calendar month move the planned
-  contrasts by at most 0.06 points (0.10 at the second setting), with no change of sign or
+  contrasts by at most 0.06 points on the CPU, the device the published fits used, and by at most
+  0.10 points on cuda (0.076 at the first setting, 0.096 at the second), with no change of sign or
   significance. Every arm's absolute error is 0.12 to 0.20 points lower on the CPU (0.14 to 0.22 on
   cuda), so the absolute errors printed for the extra row set are slightly pessimistic, and the
   ranking is unchanged.
