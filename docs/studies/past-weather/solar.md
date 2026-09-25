@@ -77,18 +77,19 @@ irradiance, plus sun position, season, time of day, and ERA5's air temperature.
 - **Disaggregation, which separates hidden solar generation from demand at a substation: CAMS where
   its one-day delay allows, otherwise ICON-EU or rebuilt UKV.** See [Discussion: what to
   use](#discussion-what-to-use).
+
 **Separately from the four consumers, giving an XGBoost model CAMS, ERA5, UKV, ICON-D2, ICON-EU,
 and ICON global at once beats giving it CAMS alone (with CAMS's neighbouring hours and its
 direct-beam and diffuse-light split) by 0.13 points [0.10, 0.17] (post hoc).** See [Does blending
 weather products beat the best single weather
 product?](blending.md#solar-a-blend-beats-cams-given-its-neighbouring-hours).
 
-> **How this page was made.** The research question came from a human. Everything else — the code >
-behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's >
-AI model (for this page, Claude Opus 5.5 and Claude Sonnet 5, reusing the data-preparation and >
-model-fitting code that Claude Opus 5 wrote for the [beam/diffuse study](../beam-diffuse-split.md)).
-> Several independent Claude reviewers have checked the method, the evidence, and the prose >
-adversarially.
+> **How this page was made.** The research question came from a human. Everything else — the code
+> behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
+> AI model (for this page, Claude Opus 5.5 and Claude Sonnet 5, reusing the data-preparation and
+> model-fitting code that Claude Opus 5 wrote for the [beam/diffuse study](../beam-diffuse-split.md)).
+> Several independent Claude reviewers have checked the method, the evidence, and the prose
+> adversarially.
 
 ## Key findings
 
