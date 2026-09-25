@@ -67,7 +67,12 @@ import polars as pl
 from contracts.settings import PROJECT_ROOT
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from verify_extra_leads import gefs_window_table, gefs_window_verdict
+from verify_extra_leads import (
+    gefs_boundary_table,
+    gefs_boundary_verdict,
+    gefs_window_table,
+    gefs_window_verdict,
+)
 from verify_previous_runs_leads import PRODUCT_DIRS
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
@@ -952,7 +957,10 @@ def build_extra_leads(
     )
     last_month = keys.select(pl.col("time").max().dt.strftime("%Y-%m")).item()
     cache_files = list(_gefs_months_available(last_month=last_month).values())
-    failures = gefs_window_verdict(table=gefs_window_table(files=cache_files))
+    failures = [
+        *gefs_window_verdict(table=gefs_window_table(files=cache_files)),
+        *gefs_boundary_verdict(table=gefs_boundary_table(files=cache_files)),
+    ]
     if failures:
         msg = f"GEFS beyond 240 h is not a 6-hour window mean: {failures}"
         raise RuntimeError(msg)

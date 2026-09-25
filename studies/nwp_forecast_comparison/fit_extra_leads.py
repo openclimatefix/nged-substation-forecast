@@ -498,10 +498,6 @@ def main() -> int:
     shares = {domain: missing_shares(frame=frames[domain], domain=domain) for domain in DOMAINS}
     for domain in DOMAINS:
         require_arms(frame=frames[domain], domain=domain)
-        path = losses_path(output_dir=args.output_dir, domain=domain)
-        if path.exists() and not args.report_only:
-            msg = f"{path} exists; rerun with --report-only, or move it first"
-            raise FileExistsError(msg)
     report = [
         "# Extra lead days, GPU fits: report",
         "",
@@ -515,8 +511,12 @@ def main() -> int:
     ]
     for domain in DOMAINS:
         path = losses_path(output_dir=args.output_dir, domain=domain)
-        if args.report_only:
+        if path.exists():
+            _LOG.info("%s exists; reporting from the saved losses", path)
             losses = pl.read_parquet(path)
+        elif args.report_only:
+            msg = f"{path} does not exist; --report-only needs both domains' losses"
+            raise FileNotFoundError(msg)
         else:
             losses = fit_arms(
                 frame=frames[domain],
