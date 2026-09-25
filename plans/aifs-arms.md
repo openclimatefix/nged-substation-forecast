@@ -22,8 +22,9 @@ ENS mean), at the same lead and the same 6-hourly steps as AIFS. The already-fit
 day-1 column is a one-sided reference, because its hourly steps and its lead both favour IFS 0.25°.
 Every reference is refitted on the AIFS rows, on the same graphics processing unit (GPU) as the AIFS
 arms, at the primary hyperparameter setting only. Folds are cut inside the AIFS version eras, whose
-edges are whole months. Four contrasts, two per technology, are named deciding before any fit, and
-every other AIFS number is labelled exploratory and post hoc. The output is a
+edges are whole months. One contrast, `aifs_single − ens_control6` at day 1 (solar and wind), is named deciding before any
+fit, and every other AIFS number, including every AIFS ENS number, is labelled exploratory and post
+hoc. The output is a
 new write-once folder, `data/studies/nwp_forecast_comparison_aifs/`, a `report.md` that prints every
 number the page quotes, and one new results section on the page. Nothing under `packages/` changes,
 and no new module is added: the plan reuses `geo.h3.compute_h3_grid_weights` and the helpers named
@@ -118,7 +119,7 @@ found, identity first). I confirmed that `geo.h3.compute_h3_grid_weights`,
   `ens` set is exploratory throughout.
 - *M3, accepted:* the tests are rewritten so each fails on the bug it exists for.
 - *M4, accepted:* the era check reads the run that fed each row.
-- *M5, accepted:* two deciding contrasts per technology, and one invocation, so `report.md` is
+- *M5, accepted:* one deciding contrast per technology, and one invocation, so `report.md` is
   written once.
 - *S1 to S10, accepted:* each is applied in the section it names. S8 removes the device-floor
   sentences.
@@ -214,10 +215,12 @@ check is nearly vacuous here, because on `ens` 10 of 11 calendar months occur on
 identity rotation, 55 of 65 solar and 27 of 33 wind (site, fold, calendar month) cells on `ens` have
 no training row of their calendar month (37 of 95 and 18 of 48 on `single`). The report prints these
 counts for each set, and the page states them beside the published page's 20 of 124. The plan
-handles this in two ways. Every `ens` result is exploratory only, and the page says the XGBoost
-model extrapolates `day_of_year` on about 85% of scored `ens` cells. Every deciding contrast (see
-"Fit design") is also fitted with `day_of_year` removed from every arm, so each arm has six columns,
-and the page reports whether the sign and the 5% significance of the contrast survive. Fewer folds
+handles this in two ways. Every `ens` result is scored descriptively only, with no deciding label
+(the maintainer's decision, Risk 13), and the page states the limit plainly beside the absolute
+skill: the XGBoost model extrapolates `day_of_year` on about 85% of scored `ens` cells. The deciding
+contrast (see "Fit design") is also fitted with `day_of_year` removed from every arm, so each arm
+has six columns, and the page reports whether the sign and the 5% significance of the contrast
+survive. Fewer folds
 would not help, because 4 months per era is already the minimum.
 
 ## How the AIFS build reuses the published build
@@ -352,9 +355,9 @@ with a CPU fit. The Opus review of the fit code finishes before the first fit.
   either run, check CPU load (`uptime`; one spinning core oversubscribes an all-core XGBoost fit).
 - *Resume only if needed.* There is no per-arm cache. If the `--check` estimate says the full run
   takes hours, the plan adds one before the run, and says so in the PR.
-- *Second setting.* Two exploratory-labelled but deciding contrasts per technology are named before
-  any fit: `aifs_single_day1 − ens_control6_day1` on `single` and `aifs_ens_mean_day1 −
-  ens_mean6_day1` on `ens`. Their four arms are always fitted at the sensitivity setting too. In the
+- *Second setting.* One deciding contrast is named before any fit, for each technology:
+  `aifs_single_day1 − ens_control6_day1` on `single`. Its two arms are always fitted at the
+  sensitivity setting too. In the
   same invocation, before `report.md` is written, the script finds every other contrast near the 5%
   line (an interval bound within 20% of the interval's width from zero), fits both of its arms at
   the sensitivity setting, and then writes the report once. There is no `--setting` flag, so
@@ -362,7 +365,7 @@ with a CPU fit. The Opus review of the fit code finishes before the first fit.
   verdict needs both settings to agree, and a disagreement is stated.
 
 **The contrasts are listed here before any fit.** No AIFS contrast was written into the published
-plan, so none of these is "planned" in the published page's sense. Four are named deciding here,
+plan, so none of these is "planned" in the published page's sense. One (for each technology) is named deciding here,
 before any fit. The page may claim a difference for a deciding contrast when its interval excludes
 zero (statistically significant at the 5% level) at both settings, with the leave-one-month-out
 range and the `day_of_year`-removed refit agreeing in sign. It states that these are the only AIFS
@@ -373,8 +376,10 @@ claim on it. Each line of the report carries its row count and month count (from
 
 - *Deciding, on `single`:* `aifs_single_d1 − ens_control6_d1`. The page may claim which of the two
   forecasts has the lower error at day 1, on `single`'s rows.
-- *Deciding, on `ens`:* `aifs_ens_mean_d1 − ens_mean6_d1`, the closest pair. Exploratory in
-  strength, because of the fold-coverage limit above, and the page says so.
+- *Descriptive, on `ens`, with no deciding label:* `aifs_ens_mean_d1 − ens_mean6_d1`, the closest
+  pair. About 85% of scored `ens` cells have no training row of their calendar month, so the page
+  gives the point estimate and interval, states that limit beside the absolute skill, and builds no
+  claim on the contrast.
 - *Single against ENS on `single`, exploratory:* `aifs_single − ens_control6` at day 2 and
   `aifs_single − ens_mean6` at days 1 and 2.
 - *Single against IFS 0.25° on `single`, exploratory:* `aifs_single_d1 − ifs025_d1`, read one-sided
@@ -399,8 +404,8 @@ claim on it. Each line of the report carries its row count and month count (from
 
 **Multiplicity and robustness are reported, not gated.** About 32 intervals print across both
 technologies, and about 1 or 2 will exclude zero by chance at the 5% level. The report says so in
-its header. It prints the four deciding contrasts at 95% and, through
-`studies.bootstrap.bootstrap_difference_at_level`, at the Bonferroni level across the four (98.75%).
+its header. It prints the deciding contrast for both technologies at 95% and, through
+`studies.bootstrap.bootstrap_difference_at_level`, at the Bonferroni level across the two (97.5%).
 For each deciding contrast it prints the leave-one-month-out range (the pattern of
 `_leave_one_month_out_lines`), and the result of the `day_of_year`-removed refit. None of these
 changes a verdict by itself. The page reports them beside the contrast.
@@ -634,9 +639,9 @@ Per the `study` skill, the maintainer's authority is needed to merge.
    sum to 1 within 1e-6. A nearest-cell AIFS Single arm at day 1 (`aifs_single_nearest_day1`) is
    fitted as an exploratory sensitivity arm, so the page can say how much the read moves the result.
    IFS 0.25° stays a point read, and the page says so.
-7. **Multiplicity.** About 32 exploratory intervals print. The two deciding contrasts per technology
-   are named before the fit, and the report prints them at 95% and at the Bonferroni level across
-   the four (98.75%). For every other contrast, the page quotes only intervals the text needs,
+7. **Multiplicity.** About 32 exploratory intervals print. The deciding contrast, for each technology,
+   is named before the fit, and the report prints it at 95% and at the Bonferroni level across
+   the two (97.5%). For every other contrast, the page quotes only intervals the text needs,
    labels each exploratory and post hoc, and never builds a claim on a single interval near zero.
    With 11 to 16 month clusters, a month bootstrap interval is likely to be somewhat too narrow, so
    each deciding contrast also prints its leave-one-month-out range.
@@ -644,7 +649,7 @@ Per the `study` skill, the maintainer's authority is needed to merge.
    CPU-to-GPU floor does not bound any AIFS contrast. The page states the device in Limitations. It
    does not print that floor beside AIFS contrasts, because a reader would take it for a noise level
    those contrasts carry.
-9. **Sensitivity setting.** Fitted for the four deciding pairs and every near-line result, in the
+9. **Sensitivity setting.** Fitted for the two deciding pairs (solar and wind) and every near-line result, in the
    same invocation as the primary fits, so `report.md` is written once. The near-line rule is
    applied
    mechanically by the script, not by eye.
@@ -655,8 +660,7 @@ Per the `study` skill, the maintainer's authority is needed to merge.
     both products, and record in the new folder's `README.md` whether every run from 2025-02-26 was
     archived as ECMWF disseminated it, or whether any period was backfilled. If any period was
     backfilled, drop it and cite the source.
-13. **Maintainer decision: the `ens` set is exploratory only.** On `ens`, about 85% of scored
-    (site, fold, calendar month) cells have no training row of their calendar month, so
-    `aifs_ens_mean − ens_mean6` cannot carry a deciding claim at the strength `single` can.
-    *Recommendation: keep it as named, but state the limit plainly on the page. The alternative is
-    to drop AIFS ENS's deciding label and score it descriptively.*
+13. **Resolved by the maintainer: the `ens` set is scored descriptively only.** On `ens`, about 85%
+    of scored (site, fold, calendar month) cells have no training row of their calendar month, so
+    `aifs_ens_mean − ens_mean6` carries no deciding label. The page states the limit plainly beside
+    the absolute skill. The `single` contrast stays the deciding one.
