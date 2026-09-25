@@ -7,13 +7,15 @@ Every interval is computed here from those per-row losses, with the same functio
 uses (`difference`, `leaderboard`, `bracket` in `nwp_forecast_comparison.py`, which call
 `studies.bootstrap`), so no refit is needed and a chart cannot disagree with the report.
 
-Five charts per technology, each with its own title, subtitle, axis titles and key:
+Six charts per technology, each with its own title, subtitle, axis titles and key:
 
-1. `headline`: the seven planned contrasts P1a to P4b with 95% intervals, at both settings.
-2. `leaderboard`: every arm's own mean absolute error on the shared rows, best first.
+1. `leaderboard`: each product's own mean absolute error at every fitted lead day, one product per
+   row, best day-1 error first, with climatology and day-1 smart persistence as dashed lines.
+2. `headline`: the seven planned contrasts P1a to P4b with 95% intervals, at both settings.
 3. `models_work`: one week of out-of-fold day-1 ENS-mean forecasts against measured output.
 4. `by_lead_day`: error by lead day, with ENS's day-0 and day-1 intervals shaded.
 5. `blends`: the two blends against ENS alone and against their permutation controls.
+6. `per_generator`: the P1a, P2a and P4b contrasts at each generator.
 
 Generators appear only as `A` to `F` and `W1` to `W3`, every error is a fraction of the
 generator's own capacity, the time axes count days of the week rather than dates, and no data mark
@@ -941,15 +943,17 @@ PRODUCT_COLOURS: Final[dict[str, str]] = {
     "ICON-EU": ocf.DATA_DEEP_TEAL,
     "ICON global": ocf.DATA_GREEN,
     "GFS": ocf.DATA_AMBER,
-    "ARPEGE Europe": ocf.ENSEMBLE_LINE,
+    "ARPEGE Europe": ocf.BLACK_1,
 }
 """Each product's colour on the lead-day chart. The six coloured products pass the bundled
-`validate_palette.py` all-pairs checks except the lightness band, which Data Green misses (L 0.81
-against a ceiling of 0.77): the worst colour-blind distance is 10.5 and the worst normal-vision
-distance is 19.5, above the script's targets of 8 and 15. No seventh colour of the brand palette or
-the maintainer-approved extra colours passes, so ARPEGE, which only the solar chart holds, is grey
-and dashed. Every product's name is also written beside its last point. Data Amber, Data Deep Teal
-and Data Burnt Orange are internal-use colours, approved for this chart by the maintainer."""
+`validate_palette.py` all-pairs checks except two. Data Green misses the lightness band (L 0.81
+against a ceiling of 0.77), and Data Sky, Data Green and Data Amber have a contrast warning against
+the page background, so every product's name is also written beside its last point. The worst
+colour-blind distance is 10.5 and the worst normal-vision distance is 19.5, above the script's
+targets of 8 and 15. No seventh chromatic colour passes, so ARPEGE, which only the solar chart
+holds, is black and dashed (black passes both separation checks). Data Amber, Data Deep Teal and
+Data Burnt Orange are internal-use colours, approved for these charts by the maintainer; the
+`dataviz` skill records that the maintainer once swapped Burnt Orange for Magenta beside Amber."""
 
 KEY_LABELS: Final[dict[str, str]] = {"ARPEGE Europe": "ARPEGE"}
 """Shorter names for the key above the lead-day chart, whose slots are narrow."""
