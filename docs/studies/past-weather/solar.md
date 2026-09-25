@@ -698,8 +698,8 @@ CERRA, ERA5, and CAMS all have a value. Those 77,616 site-hours are joined from 
 set's eight products, UKV among them, so the rule that removes physically impossible UKV sunrise
 values applies to the CERRA row set as it does to the main row set. The main row set also requires
 a SARAH-3 and an ICON-DREAM-EU value, which the CERRA row set does not, so each of the 171
-site-hours outside the main row set lacks at least one of those two values. The hours span 43 calendar months. The
-CERRA row set ends two months before the main row set does, on 2026-08-31.
+site-hours outside the main row set lacks at least one of those two values. The hours span 43
+calendar months. The CERRA row set ends two months before the main row set does, on 2026-08-31.
 
 **The folds are cut so that every scored hour's calendar month occurs in the training rows.** The
 folds are cut inside two eras, one starting in December 2022 and one in February 2026 (after the Met
