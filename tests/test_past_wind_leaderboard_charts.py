@@ -77,11 +77,12 @@ def _block(*, reference_name: str) -> RowSetBlock:
 
 
 def test_a_block_with_no_uncovered_month_share_stops_the_figure() -> None:
-    # Catches a block drawn without the share of its rows that no fold design can cover.
+    # Catches a block drawn without the share of its rows whose month its fold never trains on.
     module = _load()
+    shares = {**module.UNCOVERED_MONTH_SHARES, "ecmwf": None}
 
     with pytest.raises(ValueError, match="ECMWF rows"):
-        module.uncovered_month_note(shares=module.UNCOVERED_MONTH_SHARES)
+        module.uncovered_month_note(shares=shares)
 
 
 def test_the_caption_states_each_blocks_uncovered_month_share() -> None:
@@ -91,6 +92,8 @@ def test_the_caption_states_each_blocks_uncovered_month_share() -> None:
 
     assert [line.split(":")[0] for line in lines] == ["Main", "ICON-DREAM-EU", "ECMWF", "Station"]
     assert "42.2%" in lines[3]
+    assert "not yet measured" in lines[1]
+    assert "not yet measured" not in lines[0]
 
 
 def test_the_contrast_figure_names_the_arm_the_station_block_is_against() -> None:

@@ -14,7 +14,7 @@ and the block's contrast panel names the arm each planned contrast is against. F
 under each block's contrasts, that block's planned contrasts.
 
 Each block's label states its wind heights, and the caption states the share of its scored rows
-that fall in a calendar month occurring in one year only, which no fold design can cover.
+that fall in a calendar month with no training row in their fold, under the published folds.
 `UNCOVERED_MONTH_SHARES` holds those shares. The script stops where one is unset, so a block is
 never drawn without its share.
 
@@ -59,16 +59,18 @@ BLOCK_LABELS: Final[dict[str, str]] = {
 UNCOVERED_MONTH_SHARES: Final[dict[str, float | None]] = {
     "main": 16.2,
     "icon_dream_eu": 25.1,
-    "ecmwf": None,
-    "station": 42.2,
+    "ecmwf": 0.0,
+    "station": 0.0,
 }
-"""Each block's share, in percent, of scored rows in a calendar month that occurs in one year only.
+"""Each block's share, in percent, of scored rows in a month with no training row in their fold.
 
-The station share is the one the station report prints. The main and ICON-DREAM-EU shares are
-measurements to check against those row sets' fold reports before a figure is drawn. The ECMWF
-share is not printed anywhere yet, so it is `None` until it is read from the ECMWF fold report;
-`uncovered_month_note` stops on a `None`.
+The shares come from the folds saved with each row set's published losses (main 8,603 of 52,996
+rows, ICON-DREAM-EU 12,570 of 50,041, ECMWF 0 of 43,555, station 0 of 34,156). They describe the
+published folds, which rotated folds would cover. `uncovered_month_note` stops on a `None`.
 """
+
+UNMEASURED_REFIT: Final[frozenset[str]] = frozenset({"icon_dream_eu"})
+"""Blocks whose fold-covering refit has not been measured, so the caption says so."""
 
 CAPACITY: Final[str] = "Capacity is each generator's 99th-percentile output."
 DOTS: Final[str] = "Dot: estimate. Line: 95% interval from resampling whole months."
@@ -92,7 +94,7 @@ STATION_SCOPE: Final[str] = (
 
 
 def uncovered_month_note(*, shares: dict[str, float | None]) -> list[str]:
-    """Say, for each block, what share of its scored rows no fold design can cover.
+    """Say, for each block, what share of its scored rows is in a month its fold never trains on.
 
     Args:
         shares: Each row set's key to its share in percent, or `None` where it is unset.
@@ -110,7 +112,12 @@ def uncovered_month_note(*, shares: dict[str, float | None]) -> list[str]:
     return [
         (
             f"{BLOCK_LABELS[row_set.key]}: {shares[row_set.key]:.1f}% of scored rows are in a "
-            "calendar month that occurs in one year only, so no fold trains on that month."
+            "calendar month with no training row in their fold"
+            + (
+                "; the effect of covering those months is not yet measured."
+                if row_set.key in UNMEASURED_REFIT
+                else "."
+            )
         )
         for row_set in ROW_SETS
     ]
