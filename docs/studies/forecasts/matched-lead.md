@@ -1620,8 +1620,8 @@ has a higher error than ENS's mean at the primary setting, and not at the sensit
 (+0.115 points [-0.075, +0.336]), so the wind blend at day 14 is unresolved.
 <!-- report (blends): Day-14 reading rule; Deciding contrasts H14, B14 -->
 
-**The AIFS-versus-IFS test at day 14 rests on the ENS control member, and not on IFS HRES.** The
-ENS control member is the same weather-model physics as IFS, at a coarser resolution, so a day-14
+**The AIFS-versus-IFS test at day 14 rests on the ENS control member, and not on IFS HRES.** The ENS
+control member is the IFS model run as an ensemble with perturbed initial conditions, so a day-14
 contrast with the control member says nothing about IFS HRES 9 km, which the study fits no further
 than day 7.
 
@@ -1656,8 +1656,9 @@ error and paired differences](../assets/nwp_forecast_wind_aifs_leads.svg)
 
 Figure 16: For the three wind farms, at day 7 AIFS Single cannot be told apart from ENS's control
 member and at day 14 there is no skill to compare. For a blend of ENS's mean and AIFS Single, at day
-7 the blend is unresolved and at day 14 the blend is unresolved. The day-14 reading rule finds no
-skill to compare at day 14.
+7 the blend shows no detectable difference when both settings are read together and at day 14 the
+blend shows no detectable difference when both settings are read together. The day-14 reading rule
+finds no skill to compare at day 14.
 
 ## Discussion: what to use
 
@@ -1962,8 +1963,8 @@ Rows, folds, and fairness -->
   offset check cannot discriminate there, because AIFS Single's correlation with ERA5's wind speed
   is 0.43 at day 7 and 0.15 at day 14.
 - **The day-14 comparison of AIFS Single with IFS rests on the ENS control member.** IFS 0.25° and
-  IFS HRES 9 km are not fitted at day 14, and the control member is the same physics as IFS at a
-  coarser resolution.
+  IFS HRES 9 km are not fitted at day 14, and the control member is the IFS model run as an ensemble
+  with perturbed initial conditions.
 - **AIFS is read on 6-hourly steps, and hourly IFS 0.25° favours IFS 0.25°.** The ENS references use
   6-hourly steps for a like-for-like comparison, and the AIFS ENS publication time was not measured.
 

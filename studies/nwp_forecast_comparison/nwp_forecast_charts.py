@@ -2177,7 +2177,7 @@ def blend_phrase(*, verdict: str, day: int) -> str:
     if verdict == NO_DETECTABLE_DIFFERENCE:
         return "the blend shows no detectable difference"
     if verdict == "unresolved":
-        return "the blend is unresolved"
+        return "the blend shows no detectable difference when both settings are read together"
     return f"the blend {verdict.removesuffix(f' at day {day}')}"
 
 
