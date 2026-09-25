@@ -605,13 +605,14 @@ as-issued archive and radiation with 100 m wind, and its coverage of Great Brita
 | Provider | Product | Archive of past forecasts, as the page states it | Notes | Source |
 |---|---|---|---|---|
 | **Jua** | EPT-2 model family (0.081° global, 4 runs a day, 20 days), plus third-party models including AIFS | Docs call all archives "hindcast datasets" and list EPT 2 data from 2023-01-01. The page does not say whether the runs are as issued | Global and direct shortwave flux; wind at 10 to 200 m; price unpublished. EPT 2.1 Helios is a solar-only 30-minute nowcast served over Europe from 2024-01-01, and EPT 2.1 Europa is a 16-member, 48 h hourly ensemble over Europe from 2025-08-14. Jua also lists hindcasts of third-party models, including AIFS and Aurora | [Jua docs](https://docs.jua.ai/models-and-products/models-and-products) |
-| **Brightband** | Archive of forecasts from GraphCast, Pangu-Weather, and AIFS-Single, all initialised from IFS HRES | 2021 to 2024, 280 TB, in Zarr with Icechunk on Google Cloud, with a subset on Arraylake that reproduces the ExtremeWeatherBench benchmark. Models published after 2021 can only have been run retrospectively, so we read these as re-runs, not as-issued forecasts | Brightband says it runs Aurora, Earth-2 Medium Range/FourCastNet-v3, and AIFS-ENS and will add them to the archive, but the page does not name AIFS-ENS as part of it today, and states no licence, grid, or variable list; none of these is verified. We could not list the Google Cloud bucket without credentials, so public access is unverified. The archive stops before most of our study window | [Brightband](https://www.brightband.com/company/news/brightband-ai-weather-data/) |
+| **Brightband** | Archive of forecasts from GraphCast, Pangu-Weather, and AIFS-Single, all initialised from IFS HRES | 2021 to 2024, 280 TB, in Zarr with Icechunk on Google Cloud, with a subset on Arraylake that reproduces the ExtremeWeatherBench benchmark. Models published after 2021 can only have been run retrospectively, so we read these as re-runs, not as-issued forecasts | Brightband says it runs Aurora, Earth-2 Medium Range/FourCastNet-v3, and AIFS-ENS and will add them to the archive, but the page does not name AIFS-ENS as part of it today, and states no licence, grid, or variable list; none of these is verified. We could not list the Google Cloud bucket without credentials, so public access is unverified. The archive stops before most of our study window. Its marketplace listing is not among the 24 datasets visible on the Earthmover marketplace on 2026-09-25, so the route to the full archive is unverified | [Brightband](https://www.brightband.com/company/news/brightband-ai-weather-data/), [marketplace](https://app.earthmover.io/marketplace) |
 | **Meteomatics** | REST API with AIFS (variant not stated) | "Historical forecasts from 2017", and ERA5 from 1940 | The page says "Meteomatics purchases and saves historical weather forecasts", which supports an as-issued reading that the page does not confirm. It does not say which variables AIFS carries | [Meteomatics](https://www.meteomatics.com/en/weather-api/historical-data-weather-api/), [AIFS](https://www.meteomatics.com/en/weather-api/ecmwfs-aifs-now-available/) |
 | **Prescient Weather** (World Climate Service) | Point-in-time archive of AIFS-ENS, AIFS-Single, ECMWF, GEFS, and GFS, aggregated to country and region level | "9+ years of as-issued history" | Capacity-weighted 100 m wind and solar radiation indices. The archive's start date differs by model, since AIFS did not exist for 9 years. The archive page lists "European Union: Country Level" and the point-in-time page names "UK NBP" (the National Balancing Point gas market), and the UK is outside the European Union, so whether Great Britain is a region is not established | [Prescient](https://www.worldclimateservice.com/weather-forecast-archive-api-for-commodity-trading/), [World Climate Service](https://www.worldclimateservice.com/pit-weather-forecast-api/) |
 | **meteoblue history+** | NEMS global model, ERA5, and local models | Each forecast is "archived by meteoblue at least once a day", and the history is a continuous hourly series built from one-day forecasts | A stitched series, not whole past runs | [meteoblue](https://content.meteoblue.com/en/research-education/specifications/data-sources/weather-simulation-data) |
 | **GribStream** | GraphCast-GFS through the 2026-05-05 run, and other models | From 2024-04-25 | Radiation not listed; the model is the experimental predecessor of AIGFS | [GribStream](https://gribstream.com/models/graphcast) |
 | **Solcast** | Irradiance, wind, and weather data | Historical time series from 2007 to 7 days ago; forecasts from now to 14 days | No archive of as-issued forecast runs found. Free historical data for researchers at public research institutions, for non-commercial use, through 50 free requests | [Solcast](https://solcast.com/data-for-researchers) |
-| **Zeus AI** (Helios) | Satellite-based global horizontal irradiance, 6 km, hourly | An open historical dataset "from 2020 onward"; a forecast listing on the Earthmover marketplace whose title reads "6 hour / 6 km", which we could not verify because the page needs JavaScript | Solar only, and coverage of Great Britain is not stated. The listing's terms are not readable without a login | [Zeus AI](https://myzeus.ai/announcing-helios-a-satellite-based-solar-analysis-and-forecast), [listing](https://app.earthmover.io/marketplace/69715b330ebee16423f1f0ed) |
+| **Zeus AI** (Helios) | Satellite-based global horizontal, direct normal, and diffuse horizontal irradiance, 6 km, hourly | The free marketplace listing "Helios Solar Irradiance - Historical (Americas)" is a static dataset from 2020-01-01 to 2023-12-31. Real-time actuals and 6-hour forecasts are available by contacting Zeus AI | The listing covers 80°S to 80°N and 5°W to 150°W, so it does not include Great Britain. It has no forecast archive | [Zeus AI](https://myzeus.ai/announcing-helios-a-satellite-based-solar-analysis-and-forecast), [listing](https://app.earthmover.io/marketplace/696a70c6b7bd57a837d66a1b) |
+| **Earthmover Datasets** | "ECMWF IFS HRES Archive": ECMWF's HRES surface forecasts at the native 0.1° (about 9 km), curated from ECMWF's MARS archive as an Icechunk cube | Forecasts initialised from 2023-01-01 00 UTC to the present, at 00, 06, 12, and 18 UTC, refreshed daily. Whether the runs are as issued is not stated, though the listing says the archive "faithfully reflects what ECMWF produced" | 12 surface variables, with 10 m and 100 m wind, 2 m temperature and dewpoint, total and convective precipitation, mean sea-level pressure, snow depth, downward surface solar radiation, and surface runoff. No direct-beam field is listed. Lead times run to 360 h for 00 and 12 UTC runs after the Cy49r1 upgrade (operational 2024-11-12 12 UTC), to 240 h for earlier 00 and 12 UTC runs, and to 90 h for 06 and 18 UTC runs. Steps are hourly to 90 h, 3-hourly from 93 to 144 h, and 6-hourly from 150 to 360 h. Paid: the price is shown only after login, and the licence tab reads "Earthmover commercial data license, available on request". The listing does not say what it holds for runs after ECMWF's 2026-05-12 change | [listing](https://app.earthmover.io/marketplace/6a36a72da245ebea09332ceb) |
 | **Beyond Weather** | A fine-tuned AIFS optimised for 100 m wind | Not stated | Terms not verified | [Earthmover](https://www.earthmover.io/blog/announcing-data-marketplace/) |
 | **Silurian** (Generative Forecasting Transformer, 1.5 billion parameters) | A research paper, not a data feed | Not applicable | Fine-tuned on Hydro-Québec's observations and tested on 65 wind-farm masts from January 2024 to January 2025 and on 534 temperature stations to March 2025, all in Québec. It is not a test in Great Britain | [Bodnar et al. (2025)](https://arxiv.org/abs/2509.25268) |
 | **Microsoft Aurora** | Model on Azure AI Foundry | Hindcasts listed by Jua and run by Brightband; none found from Microsoft | Hosted endpoint for running the model | [Aurora documentation](https://microsoft.github.io/aurora/foundry/intro.html) |
@@ -623,22 +624,42 @@ archive stops in 2024 and, we read, consists of re-runs. Prescient's archive is 
 aggregated to regions, with the coverage of Great Britain unclear. Meteomatics says it saves
 historical forecasts from 2017, without saying whether they are as issued.
 
+**Earthmover's "ECMWF IFS HRES Archive" differs from Open-Meteo's IFS HRES 9 km archives in start
+date, cycles, grid, and price.** Its runs start on 2023-01-01, against 2024-03-14 for Open-Meteo
+Single Runs, 2025-10-01 for Open-Meteo Previous Runs at 9 km, and 2024-03-06 for Open-Meteo
+Previous Runs of IFS 0.25°. It holds four cycles a day throughout, where Open-Meteo Single Runs
+began with 00 and 12 UTC and added 06 UTC on 2024-08-10. It serves the native 0.1° grid, and its 12
+variables include downward surface solar radiation but no direct-beam field, where Open-Meteo
+serves ECMWF's direct irradiance natively. The price is unknown, where Open-Meteo is free for
+non-commercial use. This survey does not assess buying it.
+
 **Open-Meteo's own documentation and the survey give different start dates for AIFS archives, and
 the survey's measured date governs.** For AIFS, Open-Meteo's [Previous Runs
 page](https://open-meteo.com/en/docs/previous-runs-api) says "Most models are archived from January
 2024". The [forecast-model table](#forecast-models) gives 2025-02-17 for AIFS Single, the first day
 with global irradiance at Lincoln, and that measured date governs.
 
-**Earthmover's data marketplace is a delivery route for several of these archives, and its listings
-are not readable without a login.** Any Arraylake account can subscribe instantly to a free listing.
-Paid listings are set up with the provider, and Earthmover "does not sell the data directly"
-([Earthmover documentation](https://docs.earthmover.io/marketplace/data-users)). The launch
-providers were Brightband, Dynamical.org, Zeus AI, Beyond Weather, Planette, the Climate Uncertainty
-Lab, and the Subseasonal Consortium
-([Earthmover](https://www.earthmover.io/blog/announcing-data-marketplace/)). Brightband also lists
-low-latency ECMWF IFS HRES data there. Searching the provider and Earthmover pages, which are the
-readable ones, we found no listing from Jua, Tomorrow.io, Spire, Salient, WindBorne, Excarta, or
-Silurian.
+**Earthmover's data marketplace is a delivery route for several of these archives, and its listing
+page can be read without a login.** The
+[listing page](https://app.earthmover.io/marketplace) showed 24 distinct datasets on 2026-09-25,
+with no pagination and no documented API or machine-readable index. Fetching a listing URL shows
+its README, dataset, and licence tabs, but subscribing needs a login. Any Arraylake account can
+subscribe instantly to a free listing. Paid listings are set up with the provider, and Earthmover
+"does not sell the data directly" ([Earthmover
+documentation](https://docs.earthmover.io/marketplace/data-users)). The launch providers were
+Brightband, Dynamical.org, Zeus AI, Beyond Weather, Planette, the Climate Uncertainty Lab, and the
+Subseasonal Consortium
+([Earthmover](https://www.earthmover.io/blog/announcing-data-marketplace/)).
+
+**On 2026-09-25 the marketplace listed datasets from seven providers.** Dynamical.org has 19
+(the GFS, GEFS, IFS ENS, AIFS Single, AIFS ENS, ICON-EU, HRRR, MRMS, and IMERG products and
+analyses that this survey already covers). Brightband has 2 free listings, "IFS 15-day forecast
+(open)" and "IFS ensemble initial conditions (open)". Spire has 1 free listing, an S2S hindcast of
+its SAIFS model at 0.5°. The Climate Uncertainty Lab has 2 free bias-corrected CMIP6 temperature
+datasets. CTrees has a biomass dataset, Zeus AI has 1 free irradiance dataset (Americas only), and
+Earthmover Datasets has 1 paid listing, the HRES archive above. Some entries appear twice as
+featured datasets. We found no listing from Jua, Tomorrow.io, Salient, WindBorne, Excarta, Beyond
+Weather, or Silurian.
 
 **We found nothing on archives, variables, or AI models from eight more providers:** Xweather and
 Vaisala, DTN, Vortex, Meteocontrol, Amperon, Nnergix, Enfor, and Meteologica. One Meteologica page
