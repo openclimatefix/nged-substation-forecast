@@ -712,18 +712,19 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
         title=title,
         subtitle=[
             (
-                "Each row is one forecast product; each mark is an XGBoost model's mean absolute "
+                "Each row is one forecast product. Each mark is an XGBoost model's mean absolute "
                 "error, as a percentage of capacity, given that product's forecast at one lead "
-                "day, on the hours every forecast is scored on. Primary XGBoost setting. Smaller "
-                "is better. A lead day with no mark was not fitted for that product; nothing is "
-                "filled in. Dashed lines: the no-weather baselines."
+                "day, on the hours every forecast is scored on. The XGBoost model uses the "
+                "primary setting. Smaller is better. A lead day with no mark was not fitted for "
+                "that product; nothing is filled in. Dashed lines mark the no-weather baselines."
             ),
             (
                 "Within each row, marks run from day 0 at the top to day 14 at the bottom. Day 0 "
                 "is read from a run that started 0 to 23 hours (ENS) or 0 to 3 hours (ICON-EU and "
                 "ICON-D2, Open-Meteo's freshest run) before the hour it describes, so it is not a "
                 "day-ahead forecast a service could read. Marks at days 5, 10, and 14, and the "
-                "day-0 marks of ICON-EU and ICON-D2, were fitted later, on a GPU, at the primary "
+                "day-0 marks of ICON-EU and ICON-D2, were fitted later, on a graphics processing "
+                "unit (GPU), at the primary "
                 f"setting only; {DEVICE_NOTES[domain]}. "
                 f"Overlapping intervals here can still hide a significant paired difference "
                 f"(Figure {FIGURE_NUMBERS[(domain, 'headline')]}). {DOTS_NOTE}"
@@ -731,8 +732,8 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
             (
                 "Leads are not equal: a forecast from Open-Meteo's Previous Runs archive comes "
                 "from the freshest run made at least a day before the hour it describes, so its "
-                "day-1 lead is shorter than ENS's on most hours, which favours it. Only GEFS "
-                "shares ENS's lead."
+                "day-1 lead is shorter than ENS's on most hours, which favours that product. "
+                "Of the products drawn here, only GEFS shares ENS's lead."
             ),
             f"{scope_text(losses=losses, domain=domain)} {CAPACITY_NOTE}",
         ],
@@ -976,8 +977,8 @@ def models_work(
             (
                 "Hourly output as a percentage of capacity, measured and as forecast out of "
                 "fold by the XGBoost model given the ENS ensemble mean at day 1, averaged over "
-                "its fitting seeds. Primary XGBoost setting. A gap in a line is an hour outside "
-                "the scored rows."
+                "its fitting seeds. The XGBoost model uses the primary setting. A gap in a line is "
+                "an hour outside the scored rows."
             ),
             (
                 f"The week is chosen by rule from measured output alone: {rule}. "
@@ -1152,7 +1153,7 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
         grid=False,
         title=(
             "Lead day (ENS: a 24-hour band of leads; other products: the freshest run at least "
-            "N days old)"
+            "as many days old as the lead day)"
         ),
     )
     y = alt.Y(
@@ -1258,10 +1259,10 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
         subtitle=[
             (
                 "Mean absolute error of an XGBoost model given each forecast product at each "
-                "lead day, as a percentage of capacity. Primary XGBoost setting. Smaller is "
-                "better. Shaded bands: the 95% intervals of the ENS mean's day-0 and day-1 "
-                "errors; the two ENS leads between which a Previous Runs product's day-1 lead "
-                "falls."
+                "lead day, as a percentage of capacity. The XGBoost model uses the primary "
+                "setting. Smaller is better. Shaded bands: the 95% intervals of the ENS mean's "
+                "day-0 and day-1 errors; the two ENS leads between which a Previous Runs "
+                "product's day-1 lead falls."
             ),
             (
                 f"{DOTS_NOTE} Products at one day are drawn side by side, and each product's "
@@ -1467,9 +1468,9 @@ def per_generator(
             (
                 "Difference in mean absolute error between two XGBoost models, first product "
                 "minus second, in points of capacity, at each generator alone. Negative means "
-                "the first product forecasts better. Primary XGBoost setting. The 95% interval "
-                "resamples whole months and a fitting seed within one generator, so it does not "
-                "cover differences between generators. All rows are exploratory."
+                "the first product forecasts better. The XGBoost model uses the primary setting. "
+                "The 95% interval resamples whole months and a fitting seed within one generator, "
+                "so it does not cover differences between generators. All rows are exploratory."
             ),
             f"{scope_text(losses=losses, domain=domain)} {CAPACITY_NOTE} {SHARED_ROWS_NOTE}",
         ],
@@ -1499,8 +1500,8 @@ then the planned contrasts."""
 TITLES: Final[dict[tuple[DomainType, str], str]] = {
     ("solar", "headline"): (
         "For solar power, ENS beats UKV and ICON-EU at matched lead and GEFS at equal lead. "
-        "A blend gains 0.35 points at an optimistic lead and shows no detectable gain at a "
-        "conservative lead"
+        "A blend lowers the error by 0.35 points at an optimistic lead and shows no "
+        "detectable gain at a conservative lead"
     ),
     ("wind", "headline"): (
         "For wind power, ENS beats UKV and GEFS, ICON-EU is unresolved against ENS, and a blend "
@@ -1538,12 +1539,14 @@ TITLES: Final[dict[tuple[DomainType, str], str]] = {
         "ENS mean at days 2 and 3, at a lead shorter than ENS's on most hours"
     ),
     ("solar", "blends"): (
-        "For solar power a blend of ENS, ICON-EU, and IFS 0.25° gains 0.35 points at an "
-        "optimistic lead, but its control is itself worse than ENS alone"
+        "For solar power a blend of ENS, ICON-EU, and IFS 0.25° lowers the error by 0.35 "
+        "percentage points at an optimistic lead, but the blend's control is itself worse than "
+        "ENS alone"
     ),
     ("wind", "blends"): (
-        "For wind power a blend of ENS, ICON-EU, and IFS 0.25° lowers the error by 0.66 points at "
-        "an optimistic lead and 0.18 points at a conservative lead, and its control does not"
+        "For wind power a blend of ENS, ICON-EU, and IFS 0.25° lowers the error by 0.66 "
+        "percentage points at an optimistic lead and 0.18 percentage points at a conservative "
+        "lead, and the blend's control does not"
     ),
 }
 """Each chart's title, stating the finding for the products tested. Every number is in
