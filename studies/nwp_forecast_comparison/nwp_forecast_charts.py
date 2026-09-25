@@ -938,19 +938,18 @@ def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt
                 "error, as a percentage of capacity, given that product's forecast at one lead "
                 "day. Smaller is better. Marks run from day 0 at the top to day 14 at the bottom; "
                 "day 7 is a grey diamond and day 0 is a black diamond. A lead day with no mark "
-                "was not fitted; nothing is filled in. Dashed lines mark the no-weather "
+                "was not fitted, because it is beyond the product's forecast range or not in "
+                "the archive we hold; nothing is filled in. Dashed lines mark the no-weather "
                 f"baselines. {DOTS_NOTE} Overlapping intervals can still hide a significant "
                 f"paired difference (Figure {FIGURE_NUMBERS[(domain, 'headline')]})."
             ),
             (
                 "Day 0 is not a day-ahead forecast a service could read, because each product "
-                "reads a run that started before the hour it describes. Every mark is a graphics "
-                "processing unit (GPU) fit, so no mark mixes devices. Leads are not equal: a "
+                "reads a run that started before the hour it describes. Leads are not equal: a "
                 "Previous Runs product reads the freshest run at least a day old, a shorter lead "
                 "than ENS's on most hours, which favours that product. IFS HRES (9 km, "
-                "Open-Meteo) is scored on the shared hours minus the target days its archive "
-                "lacks, which the other rows include. That difference alone moves the ENS mean's "
-                f"day-1 error by {ROW_SET_SHIFT_TEXT[domain]}."
+                "Open-Meteo) is scored on slightly fewer hours: the shared hours minus the target "
+                "days its archive lacks."
             ),
             f"{scope_text(losses=losses, domain=domain)} {CAPACITY_NOTE}",
         ],
@@ -1258,20 +1257,6 @@ KEY_LABELS: Final[dict[str, str]] = {
 """Shorter names for the key above the lead-day chart and for the names beside each line's last
 point, whose room is limited: the key wraps to `KEY_COLUMNS` entries a row, and the label beside a
 line has about 115 pixels."""
-
-ROW_SET_SHIFT_TEXT: Final[dict[DomainType, str]] = {
-    "solar": (
-        "+0.022 points (8.771% on all 35,263 shared rows, 8.792% on the 34,771 rows without "
-        "the gap days)"
-    ),
-    "wind": (
-        "+0.029 points (8.350% on all 37,407 shared rows, 8.379% on the 37,001 rows without "
-        "the gap days)"
-    ),
-}
-"""The row-set diagnostic's result for the leaderboard caption, by technology: the ENS mean's day-1
-error on all shared rows and without IFS HRES (9 km, Open-Meteo)'s day-1 gap days, as the fourth
-batch's fit report states them."""
 
 KEY_COLUMNS: Final[int] = 5
 """How many entries a row of the lead-day chart's key holds. The chart can hold nine products, and
@@ -1829,9 +1814,7 @@ def aifs(
                 condition_title="XGBoost hyperparameter setting",
                 solid=True,
                 keys=False,
-                panel_title=(
-                    f"{AIFS_SET_NAMES[row_set]}: own error at day 1 (primary XGBoost setting)"
-                ),
+                panel_title=(f"{AIFS_SET_NAMES[row_set]}: own error at day 1, primary setting"),
                 row_step_px=44,
             )
         )
@@ -1851,8 +1834,8 @@ def aifs(
             (
                 "Each mark is an XGBoost model's error, given one forecast product. The two row "
                 "sets hold different hours, so their axes are separate and their errors cannot be "
-                "read against each other or against the other figures. Every forecast on one set of "
-                "hours is scored on exactly those hours. Points of capacity; negative means the "
+                "read against each other or against the other figures. Every forecast on one set "
+                "of hours is scored on exactly those hours. Points of capacity; negative means the "
                 "first forecast in a row is better. The shuffled forecast carries no weather, so "
                 "its own error is far higher than AIFS Single's (see the upper panels) and its "
                 "difference from AIFS Single is left off the paired panels."
@@ -1867,8 +1850,8 @@ def aifs(
                 f"{CAPACITY_NOTE}"
             ),
             (
-                "No row was planned in the study's published plan. The row marked Deciding was "
-                "named before any AIFS fit; the AIFS ENS rows are descriptive; every other row is "
+                "No row was in the study's published plan. The row marked Deciding was planned "
+                "before any AIFS fit; the AIFS ENS rows are descriptive; every other row is "
                 "exploratory."
             ),
         ],
@@ -2016,9 +1999,8 @@ TITLES: Final[dict[tuple[DomainType, str], str]] = {
         "error than the ENS mean"
     ),
     ("wind", "by_lead_day"): (
-        "Wind error rises with lead day for every forecast; IFS 0.25° has a lower error than the "
-        "ENS mean at day 2, and a lower point estimate at day 3, at a lead shorter than ENS's "
-        "on most hours"
+        "Wind error rises with lead day for every forecast; IFS 0.25°, at a lead shorter than "
+        "ENS's on most hours, cannot be told apart from the ENS mean at days 2 and 3"
     ),
     ("solar", "aifs"): (
         "For solar power, AIFS Single cannot be told apart from ENS's control member at day 1, "
