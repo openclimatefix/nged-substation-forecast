@@ -51,13 +51,13 @@ Moving a page changes its slug, so the work list in PR B is: `git mv` the five p
 
 ## What changes, file by file
 
-PR A (code; reads saved `losses.parquet`, no refit):
+PR A (code; reads saved `losses.parquet`, no refit; the drift fixes below go out earlier as their own PR):
 
-- Drift fixes first, as their own commit: product table 12 -> 14, the three uses of "eight", generator-hours vs site-hours, "two" vs four exploratory comparisons, the ICON-D2 edge vs `weather_product_domains.py`, and the IFS-HRES vs ERA5 result `0.58 [0.36, 0.81]` stated only in "What to use". Prose-only, so it can land in PR A ahead of the charts.
-- `packages/studies/src/studies/leaderboard.py` (new): a list of row-set blocks (`RowSetBlock` with label, dates, site-hours, arm rows), the shared leaderboard and contrast-chart builders, and one `FIGURE_NUMBERS` map that every chart script imports. Tests in `packages/studies/tests/`.
+- Drift fixes first, as their own prose-only PR (PR 0), which can land before the fold-fix numbers are final: product table 12 -> 14, the three uses of "eight", generator-hours vs site-hours, "two" vs four exploratory comparisons, the ICON-D2 edge vs `weather_product_domains.py`, and the IFS-HRES vs ERA5 result `0.58 [0.36, 0.81]` stated only in "What to use". Prose-only, so it can land in PR A ahead of the charts.
+- `packages/studies/src/studies/charts.py` (extended, no new module): a `RowSetBlock` (label, dates, site-hours, arm rows) and a function that stacks blocks into one `leaderboard_panel` figure with a shared x range and hollow reference rows, and the same for the contrast chart, built on the existing `report_errors`, `bootstrap_absolute`, `leaderboard_panel` and `figure`. Each chart script's private `_leaderboard` is split into a function that returns rows, so the existing bootstrap-and-mismatch guards (`weather_product_charts.py`, `ens_past_solar_charts.py`) are reused rather than rewritten. One `FIGURE_NUMBERS` map replaces the scattered `FIGURE_*` constants and the figure numbers inside SVG text. Tests in `packages/studies/tests/`.
 - `studies/beam_diffuse_split/past_solar_leaderboard.py` (new): reads the saved losses of the four row sets, recomputes per-arm intervals on main and extra rows, CAMS minus ERA5 on ENS and station rows, CAMS+station minus ERA5, and UKV-two-snapshots minus ERA5; writes `past_weather_v2/solar_leaderboard/report.md`; stops unless recomputed numbers match every number already printed at printed precision.
 - `weather_product_charts.py`, `ens_past_solar_charts.py`, `station_past_solar_charts.py` and the other chart scripts: import `FIGURE_NUMBERS`; the four leaderboards become Figure 1 and the four contrast charts Figure 2. Redraw is held until the coordinator releases it.
-- Issue #904: teach `check_station_page_numbers.py` (or a shared parser in `packages/studies` with tests) the station report's signed three-decimal rows, so it covers the station numbers.
+- Issue #904: it concerns `check_page_numbers.py` and the past-wind station report (`station_wind_arms.py`), whose rows are signed and three-decimal against unsigned page figures, and whose `intervals.parquet` sits beside it. Teach `check_page_numbers.py` that format, moving the shared parsing into `packages/studies` with tests. The throwaway `check_station_page_numbers.py` (which reads the solar page by path and only checks lines added since `origin/main`, so it cannot survive the restructure) is deleted in PR B once PR A has shown that `check_page_numbers.py` covers the solar station report; the plan's earlier version wrongly aimed #904 at that throwaway.
 
 PR B (prose, nav, links) stacked on PR A:
 
@@ -104,3 +104,19 @@ Labels A-F only for generators; no MIDAS station names, coordinates, farm mappin
 3. Wrong row set on a number (5.20 is the extra rows' CAMS, not main's 5.09); Figure 1 inviting cross-block comparison (ENS 8.267 vs ICON-EU 8.386); a qualifier deleted with a duplicate; planned status lost when charts merge; the take-home overclaiming; recomputed intervals drifting from printed ones. Each has a gate above.
 4. If the fold fix moves past-solar numbers, the refit lands first and the leaderboard is computed on the new losses; the conservation gate then compares against the post-refit old page, and the planned-contrast diff table goes in the PR body.
 5. Second XGBoost setting (maintainer decision, via the coordinator): it runs only for planned and deciding contrasts and for any result near the 5% line, and is dropped for exploratory arms. It is shown as one table or one marker on the chart, never as a doubled chart, and the both-settings-must-agree rule for verdicts stays. The restructure applies this to Figures 1 and 2 (a marker on the planned and deciding contrasts and the near-threshold rows, none on exploratory arms), to the "What each error measures" text, and to the Methods page's second-setting paragraph. Two consequences to check in PR A: exploratory arms' second-setting numbers currently printed on the page must be classified as either dropped duplicates or kept because they sit near 5%, and the number-conservation gate signs off each dropped number. Which results count as "near the 5% line" is defined once on the Methods page (proposal: an interval whose bound lies within 20% of its width from zero); the maintainer confirms the rule.
+
+## Plan review 1 (simplicity): triage
+
+Adopted:
+
+- No new `studies.leaderboard` module: extend `studies.charts` and split each chart script's `_leaderboard` into a rows function (reuse of existing guards). Reason: the building blocks exist and the block registry has no second caller yet.
+- #904 targets `check_page_numbers.py` and the wind station report, not `check_station_page_numbers.py` (verified against the issue body).
+- Drift fixes as their own prose-only PR, ahead of PR A.
+
+Rejected, with reasons:
+
+- *Group the nav without moving page files.* Rejected: the maintainer asked for the new URLs, Methods and Overview pages under a Past weather section, and for every inbound link and anchor to be planned. The cost of the moves is real (five redirect entries, about 32 files of links) and is bounded by the docs-link check. Recorded as the fallback if the maintainer prefers grouping only.
+- *Drop `past_solar_leaderboard.py`; CAMS minus ERA5 on the ENS and station rows are new results.* Rejected: the brief names the script, per-arm intervals and these contrasts as approved (Figure 2 is every arm against ERA5 on its own rows). The reviewer is right that they are the only new numbers, which is why the script stops on any mismatch with printed numbers and its report is a write-once folder with those numbers marked exploratory.
+- *Drop the title-equals-caption, row-set-in-paragraph and planned-status gates.* Rejected: the gates are the maintainer's requirement. They stay as scratch scripts and a PR-body table, none committed except number conservation's inputs; if any turns out to be a one-line grep it is run as one.
+- *Adding IFS-HRES to Figure 12 and ENS per-generator to Figure 14 is scope growth.* Rejected as part of the approved figure map, but each is dropped if it needs a new run rather than saved numbers.
+- *Merge Overview and Methods into one page.* Rejected: the maintainer named both pages.
