@@ -283,8 +283,9 @@ def _check_block(*, block: dict[str, Any], position: int, n_blocks: int) -> None
     """Fail loudly unless one response block is in the position its label assumes, in known units.
 
     The label of a site comes from the block's position, so a reordered response would swap two
-    anonymised labels without any error. Every block of a multi-location response carries a
-    `location_id`, which must equal its position.
+    anonymised labels without any error. Every block of a multi-location response after the first
+    carries a `location_id` equal to its position. Open-Meteo omits it from the first block, so a
+    missing `location_id` counts as 0 at position 0 only.
 
     Args:
         block: One location's block of the response.
@@ -295,7 +296,7 @@ def _check_block(*, block: dict[str, Any], position: int, n_blocks: int) -> None
         RuntimeError: If `location_id` differs from the position, or `hourly_units` differs from
             `WIND_SPEED_UNIT` for wind speed or `RADIATION_UNITS` for radiation.
     """
-    if n_blocks > 1 and block.get("location_id") != position:
+    if n_blocks > 1 and block.get("location_id", 0 if position == 0 else None) != position:
         msg = (
             f"response block {position} is out of order or has no location_id, so site labels "
             "could be swapped: inspect the response layout (not the key or the coordinates)"
