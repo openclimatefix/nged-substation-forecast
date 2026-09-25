@@ -1626,7 +1626,7 @@ def _ukv_gap_date_lines(*, candidates: pl.DataFrame, domain: DomainType) -> list
 
 
 def _effective_capacity_lines(*, path: Path, input_dir: Path) -> list[str]:
-    """Return the `effective_capacity` table's version and commit time, and when inputs were built."""
+    """Return the `effective_capacity` table's version and commit time, and inputs' build time."""
     if not path.exists():
         return [f"`{path}` is absent."]
     table = DeltaTable(path)
