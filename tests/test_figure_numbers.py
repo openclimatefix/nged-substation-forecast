@@ -150,3 +150,46 @@ def test_a_stale_title_listing_names_only_svgs_whose_title_is_still_old() -> Non
     for stem in STALE_TITLE_SVGS:
         key = module.WIND_SVG_FIGURES[stem]
         assert _title_number(stem) != module.WIND_FIGURE_NUMBERS[key], stem
+
+
+WIND_CHART_SCRIPTS: Final[tuple[str, ...]] = (
+    "wind_product_charts.py",
+    "past_wind_leaderboard_charts.py",
+    "wind_icon_dream_charts.py",
+    "ens_hres_past_wind_charts.py",
+    "station_wind_arms_charts.py",
+)
+WRITTEN_STEM: Final[re.Pattern[str]] = re.compile(
+    r"^\s+\"((?:wind|ens_hres_wind|station_wind)_\w+)\":", re.MULTILINE
+)
+BLOCK_TITLE: Final[re.Pattern[str]] = re.compile(
+    r"Title text '(Main|ICON-DREAM-EU|ECMWF|Station): [^']*farm-hours'"
+)
+
+
+def _written_stems() -> dict[str, list[str]]:
+    """Return, for each wind chart script, the SVG stems its `charts` dict writes."""
+    scripts_dir = MODULE_PATH.parent
+    return {
+        script: WRITTEN_STEM.findall((scripts_dir / script).read_text())
+        for script in WIND_CHART_SCRIPTS
+    }
+
+
+def test_no_two_wind_chart_scripts_write_the_same_svg_stem() -> None:
+    # Catches a second script overwriting a figure's SVG with an older drawing of it.
+    written = _written_stems()
+    owners: dict[str, list[str]] = {}
+    for script, stems in written.items():
+        assert stems, script
+        for stem in stems:
+            owners.setdefault(stem, []).append(script)
+
+    assert {stem: scripts for stem, scripts in owners.items() if len(scripts) > 1} == {}
+
+
+def test_wind_leaderboard_svg_holds_the_four_block_titles() -> None:
+    # Catches the one-block leaderboard overwriting Figure 1's four-block chart.
+    text = (ASSETS_DIR / "wind_leaderboard.svg").read_text()
+
+    assert BLOCK_TITLE.findall(text) == ["Main", "ICON-DREAM-EU", "ECMWF", "Station"]
