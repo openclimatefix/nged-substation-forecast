@@ -428,9 +428,10 @@ def _reference_layers(
     # than a quarter of the axis, where the label would run off the plot.
     low, high = x_domain
     to_the_right = better_direction == "negative"
-    if to_the_right and high / (high - low) < _ZERO_LABEL_ROOM:
+    zero_room = max(_ZERO_LABEL_ROOM, _BETTER_LABEL_CHARACTER_PX * len(zero_label) / width)
+    if to_the_right and high / (high - low) < zero_room:
         to_the_right = False
-    if not to_the_right and -low / (high - low) < _ZERO_LABEL_ROOM:
+    if not to_the_right and -low / (high - low) < zero_room:
         to_the_right = True
     zero_text = (
         alt.Chart(anchor)
