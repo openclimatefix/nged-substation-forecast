@@ -232,15 +232,16 @@ physics-based IFS.** The claim would need AIFS version-to-version scores set bes
 cycle-to-cycle scores, computed the same way against the same truth. We found no version-to-version
 or cycle-to-cycle scores for 2 m temperature, wind, or radiation, from either model. The search
 covered ECMWF's implementation pages, newsletters, and blog, one independent industry analysis, and
-three journal papers or preprints, and searches of arXiv and OpenAlex for independent verification. It did not cover the wider peer-reviewed literature.
+three journal papers or preprints, and searches of arXiv and OpenAlex for independent verification.
+It did not cover the wider peer-reviewed literature.
 
 **ECMWF's own reports show AIFS ahead of the IFS at one point in time, not improving faster.** In
 [Forecast performance 2025](https://www.ecmwf.int/en/newsletter/187/news/forecast-performance-2025),
-ECMWF reports AIFS error reductions against the IFS that are "typically of the order of 5–15%" in the
-medium range, with AIFS leading for 2 m temperature and 10 m wind speed, especially over Europe. The
-same page reports that ECMWF's Technical Advisory Committee found AIFS skill decreased slightly over
-the preceding 12 months, as it did for several other machine-learned forecasts. For
-[AIFS ENS v1](https://www.ecmwf.int/en/newsletter/185/earth-system-science/aifs-ens-becomes-operational),
+ECMWF reports AIFS error reductions against the IFS that are "typically of the order of 5–15%" in
+the medium range, with AIFS leading for 2 m temperature and 10 m wind speed, especially over Europe.
+The same page reports that ECMWF's Technical Advisory Committee found AIFS skill decreased slightly
+over the preceding 12 months, as it did for several other machine-learned forecasts. For [AIFS ENS
+v1](https://www.ecmwf.int/en/newsletter/185/earth-system-science/aifs-ens-becomes-operational),
 ECMWF reports gains of up to 25% for upper-air variables and better 2 m temperature at all lead
 times against surface station observations, with degradations beyond day 7 in some regions. The same
 page reports 10 m wind and 100 hPa temperature as worse than the physics-based ensemble.
@@ -250,36 +251,42 @@ called its own dataset limited. Solcast found a bias of about -8% for AIFS again
 IFS, and about equal accuracy at day 1, 3, and 5. Every source in this paragraph except Solcast is
 ECMWF's own.
 
-**The journal paper on AIFS Single 1.1.0 shows a one-off margin over the IFS in 2023, and a gain over
-the pre-operational AIFS, neither of which is a rate comparison.**
-[Moldovan et al. (2026)](https://doi.org/10.5194/gmd-19-4703-2026) report that AIFS gains 12 to 24 hours
-of lead time at days 3 to 10 over the operational IFS (cycles 47r3 and 48r1), scored on Northern
-Hemisphere 500 hPa geopotential and 850 hPa temperature anomaly correlation against the IFS analysis
-for all of 2023. Moldovan et al. also report that the new AIFS improves on the pre-operational AIFS by around 4 to 6%, and that precipitation improves by up to 12% in the short range and gains about 1 day on the stable equitable error in probability space score over both the IFS and the pre-operational AIFS, against 24-hour surface station reports. Against the IFS, surface shortwave downwards radiation gains about 1 day in the medium range, scored against CM SAF geostationary satellite data. The paper reports 2 m temperature and 10 m wind
-as "similarly improved" against surface station observations. The truth data differ between scores,
-and the paper gives no year-on-year IFS cycle comparison.
+**The journal paper on AIFS Single 1.1.0 shows a one-off margin over the IFS in 2023, and a gain
+over the pre-operational AIFS, neither of which is a rate comparison.** [Moldovan et al.
+(2026)](https://doi.org/10.5194/gmd-19-4703-2026) report that AIFS gains 12 to 24 hours of lead time
+at days 3 to 10 over the operational IFS (cycles 47r3 and 48r1), scored on Northern Hemisphere 500
+hPa geopotential and 850 hPa temperature anomaly correlation against the IFS analysis for all of
+2023. Moldovan et al. also report that the new AIFS improves on the pre-operational AIFS by around 4
+to 6%, and that precipitation improves by up to 12% in the short range and gains about 1 day on the
+stable equitable error in probability space score over both the IFS and the pre-operational AIFS,
+against 24-hour surface station reports. Against the IFS, surface shortwave downwards radiation
+gains about 1 day in the medium range, scored against CM SAF geostationary satellite data. The paper
+reports 2 m temperature and 10 m wind as "similarly improved" against surface station observations.
+The truth data differ between scores, and the paper gives no year-on-year IFS cycle comparison.
 
 **Two independent preprints score AIFS against surface observations, and neither shows AIFS
-improving faster.** [Kocsis and Baran (2026)](https://arxiv.org/abs/2606.02508) scored raw 10 m
-wind speed from AIFS ENS v1 against raw IFS ensemble forecasts (cycle 49r1) at 9,246 surface
-stations from 2025-07-01 to 2025-11-30, using 12 UTC runs. The IFS ensemble scored better at every
-horizon, and the gap narrowed after post-processing. [Trotta et al. (2025)](https://arxiv.org/abs/2504.12672)
+improving faster.** [Kocsis and Baran (2026)](https://arxiv.org/abs/2606.02508) scored raw 10 m wind
+speed from AIFS ENS v1 against raw IFS ensemble forecasts (cycle 49r1) at 9,246 surface stations
+from 2025-07-01 to 2025-11-30, using 12 UTC runs. The IFS ensemble scored better at every horizon,
+and the gap narrowed after post-processing. [Trotta et al. (2025)](https://arxiv.org/abs/2504.12672)
 scored AIFS Single (the paper states no version) against the ECMWF HRES and ENS forecasts at
-Australian surface stations from 2024-03-01 to 2024-07-23 (569 stations, with scores from 2024-04-01), before AIFS Single was operational. Trotta et al. report that AIFS falls behind ENS as lead time grows. Apart from Solcast's, we found no independent verification of AIFS
-radiation in searches of arXiv and OpenAlex.
+Australian surface stations from 2024-03-01 to 2024-07-23 (569 stations, with scores from
+2024-04-01), before AIFS Single was operational. Trotta et al. report that AIFS falls behind ENS as
+lead time grows. Apart from Solcast's, we found no independent verification of AIFS radiation in
+searches of arXiv and OpenAlex.
 
-**AIFS Single v2 adds variables and recovers skill that IFS 50r1 took away.**
-[ECMWF's v2 announcement](https://www.ecmwf.int/en/newsletter/187/news/implementation-aifs-v2)
-adds wave variables, snow cover, and a 10 hPa level. It reports significant wave height errors about
-10% below IFS 50r1, and a 3-day gain in skill at 50 and 100 hPa over AIFS Single v1, with a small
-negative impact remaining for 2 m temperature in the Arctic. We found no headline v2-versus-v1.1
-numbers for 2 m temperature, wind, or radiation. ECMWF's
-[blog on adapting AIFS to IFS cycle 50r1](https://www.ecmwf.int/en/about/media-centre/aifs-blog/2026/adapting-aifs-50r1)
-reports that feeding the 50r1 analyses to AIFS Single v1.1 and AIFS ENS v1 adversely affected them,
-with degradations of 30% reported for Arctic 2 m temperature, and that fine-tuning on 50r1 data
-improved the situation. AIFS skill therefore depends on the IFS analysis that AIFS is fed. With both
-models started from 50r1 analyses, part of v2's lead over v1.1 is recovery from the degradation that
-50r1 caused.
+**AIFS Single v2 adds variables and recovers skill that IFS 50r1 took away.** [ECMWF's v2
+announcement](https://www.ecmwf.int/en/newsletter/187/news/implementation-aifs-v2) adds wave
+variables, snow cover, and a 10 hPa level. It reports significant wave height errors about 10% below
+IFS 50r1, and a 3-day gain in skill at 50 and 100 hPa over AIFS Single v1, with a small negative
+impact remaining for 2 m temperature in the Arctic. We found no headline v2-versus-v1.1 numbers for
+2 m temperature, wind, or radiation. ECMWF's [blog on adapting AIFS to IFS cycle
+50r1](https://www.ecmwf.int/en/about/media-centre/aifs-blog/2026/adapting-aifs-50r1) reports that
+feeding the 50r1 analyses to AIFS Single v1.1 and AIFS ENS v1 adversely affected them, with
+degradations of 30% reported for Arctic 2 m temperature, and that fine-tuning on 50r1 data improved
+the situation. AIFS skill therefore depends on the IFS analysis that AIFS is fed. With both models
+started from 50r1 analyses, part of v2's lead over v1.1 is recovery from the degradation that 50r1
+caused.
 
 ### Score each AIFS version separately
 
@@ -303,15 +310,15 @@ IFS analyses. A change in the AIFS-versus-IFS score across that date has at leas
 score cannot tell apart.
 
 **The failed first attempt at AIFS Single v1.1 is excluded, and AIFS Single v1.0 runs on both sides
-of it.** ECMWF implemented v1.1 with the 2025-07-31 06 UTC run and reverted to v1.0 on 2025-08-01 after
-a `stepRange` error on six accumulated variables, including `ssrd`. Forecasts initialised in
+of it.** ECMWF implemented v1.1 with the 2025-07-31 06 UTC run and reverted to v1.0 on 2025-08-01
+after a `stepRange` error on six accumulated variables, including `ssrd`. Forecasts initialised in
 between belong to neither era, so we drop them. ECMWF re-implemented v1.1 with the 2025-08-27 06 UTC
 run and reports skill and bias "equivalent (but not identical)" to v1.0 after cutting the
 soil-moisture loss weight by a factor of 100 to remove spurious point-rainfall artefacts. Even so,
 the two eras are separate trained models and are scored separately. The dated list of every version
 is in the [NWP model upgrades table](../roadmap/data-sources.md#nwp-model-upgrades-since-2019), and
-the journal paper on AIFS Single 1.1.0
-([Moldovan et al. 2026](https://doi.org/10.5194/gmd-19-4703-2026)) gives the same 2025-02-25 and 2025-08-27 dates.
+the journal paper on AIFS Single 1.1.0 ([Moldovan et al.
+2026](https://doi.org/10.5194/gmd-19-4703-2026)) gives the same 2025-02-25 and 2025-08-27 dates.
 
 ### Reanalyses, hindcasts, and satellite retrievals
 
