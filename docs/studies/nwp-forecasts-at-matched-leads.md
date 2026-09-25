@@ -1138,8 +1138,8 @@ Rows, folds, and fairness -->
 - **The downloaded GEFS store holds missing 100 m wind values at long leads, which the study does
   not read.** In the store, `wind_u_100m` and `wind_v_100m` are missing (NaN) for some runs from
   2026-01-15 onwards, at leads of 16 d 6 h and beyond. The planned arms read leads to 95 h and the
-  extra arms read leads to 366 h, so none of its rows uses a missing value. The download's README does not list this gap; it was found by
-  reading the store.
+  extra arms read leads to 366 h, so none of its rows uses a missing value. The download's README
+  does not list this gap; it was found by reading the store.
   <!-- checked directly against GEFS_window_2024-11-01_None/GEFS.parquet; not a report number -->
 - **The exploratory arms carry a small share of missing weather values, and the planned arms carry
   none.** The planned arms define the shared rows, so they hold every value. The exploratory arms
