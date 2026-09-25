@@ -141,9 +141,12 @@ more than the contrast the issue asked about: in the beam/diffuse study, the cho
 product moved the error by about 4 points and the choice of beam/diffuse split by about 0.1.
 
 **Run the second hyperparameter setting (`studies.cross_validation.SENSITIVITY_HYPER_PARAMETERS`) on
-every deciding contrast.** A second setting shows whether an ordering belongs to the features or to
-the settings. Where a contrast changes sign or significance under the second setting, the page says
-so.
+every planned contrast, every deciding contrast, and any result near the 5% line.** A second setting
+shows whether an ordering belongs to the features or to the settings. Drop it for exploratory arms
+that are not near the line. A result is near the line when one bound of its 95% interval lies within
+20% of the interval's width from zero. Show the second setting as one table or as a marker on the
+chart, never as a doubled chart. A verdict still needs both settings to agree. Where a contrast
+changes sign or significance under the second setting, the page says so.
 
 **Build in controls.** A negative control (an arm known to carry no new information) shows the size
 of difference the pipeline produces from nothing. A positive control (a synthetic target where the
@@ -278,7 +281,9 @@ the story without the prose around it.
   that shared swing, which pairing cancels, is the main reason an absolute interval is far wider
   than a paired difference's. Two products whose intervals overlap in Figure 1 can therefore still
   differ. Figure 2 is the test that shows which of those gaps is statistically significant, and the
-  page says so, once.
+  page says so, once. Where a study reads each product at several lead days, Figure 1 draws each
+  fitted lead as a coloured mark on the product's row and leaves a lead that was not fitted blank,
+  never interpolated.
   Where a study asks whether one input helps, rather than ranking products (the beam/diffuse
   study), the contrast stays the headline chart and the page carries no leaderboard.
   `studies.charts.leaderboard_panel` draws one, and `studies.bootstrap.bootstrap_absolute` intervals
@@ -315,24 +320,44 @@ the story without the prose around it.
 ## Writing the page
 
 The prose rules in `CLAUDE.md` apply, and the `long-form-prose` skill governs the page's order.
-Every study page takes this outline:
+Every study page follows the structure of an academic paper, in this order:
 
-1. **Summary.** At most two paragraphs stating the headline result, followed by the headline
-   figure — the leaderboard and then the paired contrasts, where the study ranks products. The
-   summary is the page's abstract.
-2. **The AI disclaimer** (below).
-3. **Key findings.** The finer conclusions, one bolded sentence each, each linking to its results
+1. **Title.** An `h1` that states the finding, scoped to the products tested. A page that ranks
+   products in answer to a question may instead title itself with that question.
+2. **Summary.** At most two paragraphs stating the headline result, the abstract of the page,
+   followed by the headline figure: the leaderboard and then the paired contrasts, where the study
+   ranks products. Scoped take-home bullets, one per use of the data, follow the two paragraphs. The
+   Summary bullets are the only place a recommendation appears without its evidence.
+3. **The AI disclaimer** (below).
+4. **Key findings.** The finer conclusions, one bolded sentence each, each linking to its results
    section.
-4. **Introduction.** The question, who needs the answer, and what is being compared, with a table
+5. **Introduction.** The question, who needs the answer, and what is being compared, with a table
    of each product's lead, grid, coverage, history, and delay.
-5. **Data and methods.** The rows, the XGBoost model or other forecasting model, the folds, the
-   normalisation, the intervals, and which contrasts are planned.
-6. **Results.** One section per finding, each with its chart, and "The models work" first.
-7. **What to use.** A recommendation for each use of the data, limited to what the evidence
-   supports.
-8. **Limitations.** The region, the period, the per-generator recalibration, the capacity table,
-   and every other scope a reader might over-read, such as equal leads.
-9. **Reproducing the figures.**
+6. **Data and methods.** Methods only: the rows, the XGBoost model or other forecasting model, the
+   folds, the normalisation, the intervals, which contrasts are planned, the controls, and how each
+   product was read or scored. No result appears here, and no heading states a finding. Where a
+   shared methods page exists for a family of studies, this section holds only what is specific to
+   the study and links the shared page for the rest.
+7. **Results.** One section per finding, each with its chart, and "The XGBoost models work" first.
+   Each heading states a result.
+8. **Discussion: what to use.** A recommendation for each use of the data, limited to what the
+   evidence supports, with what would change each one. The Discussion does not repeat the Summary's
+   bullets.
+9. **Limitations.** What the numbers depend on: the region, the period, the per-generator
+   recalibration, the capacity table, the sample size, the statistics, and every other scope a
+   reader might over-read, such as equal leads.
+10. **Scope.** What the study does not cover: the products, variables, leads, regions, and uses it
+    says nothing about.
+11. **Data and code availability.** Which inputs are public and where they come from, which are
+    private and why, the commit of the code, and the XGBoost version and settings. No generator's
+    name, identifier, or coordinates appears in this section.
+12. **Reproducing the figures.** The commands, in order.
+
+**Put a new study page where its question belongs.** A study of how well a weather product describes
+hours that have already passed goes under Studies > Past weather, and a study that scores forecasts
+at a lead goes under Studies > Forecasts. Where a family of studies shares its rows, planned
+contrasts, capacity normalisation, intervals, and second hyperparameter setting, the shared page
+holds the row-set table and each study adds its own rows to the table.
 
 **Every study page carries this disclaimer, as a blockquote after the summary and before the key
 findings:**
