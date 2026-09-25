@@ -10,7 +10,7 @@ month-and-seed resampling the report's contrasts use.
 
 Generators appear only as `A` to `F`, and every output is a fraction of the generator's own
 capacity. Follow the style of `blend_product_charts.py`. Figures are numbered 12 to 15, continuing
-`docs/studies/blending-weather-products.md`'s own Figures 1 to 11.
+`docs/studies/past-weather/blending.md`'s own Figures 1 to 11.
 
 Run it with `uv run python studies/beam_diffuse_split/blend_satellites_charts.py`, after
 `blend_satellites.py`. Optimise each SVG with `npx svgo@4 --multipass --precision=1

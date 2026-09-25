@@ -40,7 +40,7 @@ more columns.** A control that keeps the extra columns but replaces their weathe
 values from the same month does no better than the single product.
 
 ![Figure 1: An XGBoost model given several weather products has the lowest error of all the single
-products and blends tested](assets/blend_leaderboard.svg)
+products and blends tested](../assets/blend_leaderboard.svg)
 
 **Figure 1 ranks each single product and each blend by its own mean absolute error. Figure 2 tests
 each named blend against its best single product directly.** Figure 1's intervals are wide mainly
@@ -53,7 +53,7 @@ anywhere in Great Britain can read. For both solar and wind the best of those ro
 ICON-EU, each product given its neighbouring hours.
 
 ![Figure 2: At these nine farms, an XGBoost model given several weather products beats an XGBoost
-model given the best single product and its neighbouring hours](assets/blend_headline.svg)
+model given the best single product and its neighbouring hours](../assets/blend_headline.svg)
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
@@ -92,9 +92,9 @@ model given the best single product and its neighbouring hours](assets/blend_hea
 
 **Two earlier pages ranked weather products one at a time, and neither measured whether an XGBoost
 model given several products at once does better.** [Which weather product best describes past
-sunshine?](weather-products-for-past-solar.md) found that CAMS, the Copernicus Atmosphere Monitoring
+sunshine?](solar.md) found that CAMS, the Copernicus Atmosphere Monitoring
 Service's satellite retrieval, describes past sunshine far better than any weather model tested.
-[Which weather product best describes past wind?](weather-products-for-past-wind.md) found that
+[Which weather product best describes past wind?](wind.md) found that
 ICON-D2 and UKV describe past hub-height wind best of the five products tested. Both pages scored
 each product through an XGBoost model fitted per generator to predict hourly output from that
 product alone.
@@ -118,7 +118,7 @@ runs from about 2°W on the south coast to about 2.5°W in the Midlands.
 
 ![Figure 3: ICON-D2 has no data west of a line running from 1.8°W at 49.9°N to 3.9°W at 57.3°N, so a
 blend that needs ICON-D2 cannot serve the west of Great Britain. The map also draws AROME France,
-which this page does not test](../roadmap/assets/weather_product_domains.svg)
+which this page does not test](../../roadmap/assets/weather_product_domains.svg)
 
 **Each blend reads one set of products; the last column says which consumer the set could serve:**
 
@@ -241,10 +241,10 @@ it predicts were held out of its training. The prediction shown is the mean over
 seeds.
 
 ![Figure 4: XGBoost models given CAMS, or CAMS + ERA5 + UKV + ICON-D2 + ICON-EU + ICON global,
-track measured solar output](assets/blend_solar_weeks.svg)
+track measured solar output](../assets/blend_solar_weeks.svg)
 
 ![Figure 5: XGBoost models given UKV, or ERA5 + UKV + ICON-D2 + ICON-EU + ICON global, track
-measured wind output](assets/blend_wind_weeks.svg)
+measured wind output](../assets/blend_wind_weeks.svg)
 
 **The blend's error is lower than the best single product's at every generator, for every set in
 Figure 6.** The errors range from about 4% of capacity at the best solar farm to about 9% for the
@@ -252,7 +252,7 @@ four weather models at the worst. Generator W3's output swings for months at a t
 product's wind, which the wind page attributes to turbine availability the feed does not record.
 
 ![Figure 6: Each blend's error is lower than its best single product's at every
-generator](assets/blend_per_generator.svg)
+generator](../assets/blend_per_generator.svg)
 
 ### Solar: a blend beats CAMS given its neighbouring hours
 
@@ -310,7 +310,7 @@ at each hour, which carries a little real information, so a blend's gain over it
 anything understated.
 
 ![Figure 7: The gain comes from the other products' weather, not from the extra
-columns](assets/blend_decomposition.svg)
+columns](../assets/blend_decomposition.svg)
 
 ### The gain holds at every generator and in every season
 
@@ -328,7 +328,7 @@ enriched UKV by 0.39 to 0.58 points in each season. Since UKV's upgrade the sola
 points [0.03, 0.12] and the wind gain 0.40 points [0.33, 0.50], each resting on 8 months.
 
 ![Figure 8: Each named blend beats its best single product at every generator, in every season, and
-on each side of UKV's upgrade](assets/blend_splits.svg)
+on each side of UKV's upgrade](../assets/blend_splits.svg)
 
 ### The wind gain is spread across every level of output
 
@@ -348,7 +348,7 @@ net to about 1% of the gain. For UKV with ICON-EU the most-improved 5% carry 143
 and the running sum rises to 4.06 times the net gain before the other 95% of hours bring it back
 down. The bottom panel of Figure 9 shows both running sums.
 
-![Figure 9: The wind blends' gain is spread across every level of output](assets/blend_wind_bands.svg)
+![Figure 9: The wind blends' gain is spread across every level of output](../assets/blend_wind_bands.svg)
 
 ### An XGBoost blend beats a linear stack and simple averages
 
@@ -367,7 +367,7 @@ is 1.78 points worse [1.61, 1.96]. For wind, both averages of UKV and ICON-EU be
 0.22 points each. All of these comparisons are exploratory.
 
 ![Figure 10: Given every product's columns, an XGBoost model has the lowest error of the four blends
-in every named set](assets/blend_methods.svg)
+in every named set](../assets/blend_methods.svg)
 
 **The XGBoost blend has the lowest error of the four blends in every named set.** For UKV with
 ICON-EU the XGBoost blend leads the linear stack by 0.01 points [−0.02, +0.04], which is not
@@ -394,7 +394,7 @@ size. The comparison does not independently confirm the headline gain's magnitud
 where a large gain is known to exist, CAMS with ICON-D2 against ICON-D2 alone, shows a gain of 2.86
 points [2.64, 3.08] (exploratory).
 
-![Figure 11: A known small signal is recovered in full](assets/blend_synthetic.svg)
+![Figure 11: A known small signal is recovered in full](../assets/blend_synthetic.svg)
 
 ### Blending CAMS with SARAH-3 beats CAMS's own split
 
@@ -402,7 +402,7 @@ points [2.64, 3.08] (exploratory).
 CAMS's split with its own neighbouring hours by 0.18 points [0.16, 0.21] (post hoc), and beats plain
 CAMS's split by 0.20 points [0.17, 0.22] (planned); both gains survive a climatology control.**
 [Which weather product best describes past
-sunshine?](weather-products-for-past-solar.md#sarah-3-is-second-to-cams-under-every-satellite) found
+sunshine?](solar.md#sarah-3-is-second-to-cams-under-every-satellite) found
 CAMS the best single product and SARAH-3, the satellite climate data record from EUMETSAT's
 Satellite Application Facility on Climate Monitoring (CM SAF), the best of the rest, 0.43 points
 behind [0.35, 0.51] on these rows, for a reason the page could not identify. The two retrievals
@@ -415,7 +415,7 @@ alone, the same way ICON-EU added information to CAMS above despite being a weak
 for solar. This section tests that independence directly.
 
 **The rows are the past-solar page's [record
-panel](weather-products-for-past-solar.md#how-the-comparison-was-made): 115,594 common site-hours at
+panel](solar.md#how-the-comparison-was-made): 115,594 common site-hours at
 the same 6 solar farms, labelled A to F, from 1 January 2021 to 31 August 2026, the longer row set
 that page uses for its SARAH-3 comparison.** This row set is not the 77,616-row set the rest of this
 page scores: it holds four products only — CAMS, SARAH-3, ERA5, and ICON-DREAM-EU, DWD's
@@ -449,7 +449,7 @@ rather than from a shared column; all three are built on the two products' globa
 since this study reads no split for SARAH-3. CM SAF does publish a direct/diffuse split for
 SARAH-3, modelled from its own global irradiance rather than retrieved independently, as [the
 past-solar page
-explains](weather-products-for-past-solar.md#a-products-own-direct-beam-adds-little), so it is not
+explains](solar.md#a-products-own-direct-beam-adds-little), so it is not
 scored here. Two negative controls pair CAMS with a noised copy of itself: one noised at 48.2 W/m2,
 the measured root-mean-square difference between CAMS's and SARAH-3's global irradiance on these
 rows, so its two columns differ from each other about as much as the two products genuinely do; the
@@ -487,11 +487,11 @@ the two rarely see exactly the same patch of cloud. No comparison here separates
 averaging from weather one retrieval sees and the other misses.
 
 ![Figure 12: CAMS's split plus its own neighbouring hours plus SARAH-3 has the lowest error of the
-single products and blends tested here](assets/satellite_blend_leaderboard.svg)
+single products and blends tested here](../assets/satellite_blend_leaderboard.svg)
 
 ![Figure 13: CAMS's split plus SARAH-3 beats CAMS's split, with and without CAMS's own neighbouring
 hours, and beats its climatology control, at both XGBoost
-settings](assets/satellite_blend_headline.svg)
+settings](../assets/satellite_blend_headline.svg)
 
 **The gain holds at every generator, in every clearness band, and in every year since 2021, though
 its size varies.** Broken down by generator, CAMS's split with SARAH-3 beats CAMS's split by 0.10 to
@@ -549,7 +549,7 @@ adds.
 
 ![Figure 14: The all-global blend, a simple mean and a linear stack, both negative controls, and
 further comparisons among CAMS, CAMS's split, and
-SARAH-3](assets/satellite_blend_exploratory.svg)
+SARAH-3](../assets/satellite_blend_exploratory.svg)
 
 **Neither ERA5 nor ICON-DREAM-EU, the two other products on these rows, adds as much to CAMS's
 split as SARAH-3 does.** ERA5 and ICON-DREAM-EU each cover the same rows as SARAH-3, so both can be
@@ -564,7 +564,7 @@ over CAMS's split is about twice that of either weather product on the same rows
 test also confirms CAMS's split beats SARAH-3 alone: by 0.55 points [0.48, 0.62] (post hoc).
 
 ![Figure 15: Neither ERA5 nor ICON-DREAM-EU, the two other products tested here, adds as much to
-CAMS's split as SARAH-3 does](assets/satellite_blend_second_product.svg)
+CAMS's split as SARAH-3 does](../assets/satellite_blend_second_product.svg)
 
 ## What to use
 
@@ -595,7 +595,7 @@ over less than 4 years for solar and 2 years for wind.**
   models beat the best single weather model by 0.34 points for solar (post hoc) and 0.46 points for
   wind (exploratory). A live blend needs every product at run time, so a blend has more products
   that can go missing, and under this project's [inherent stability
-  rules](../design-philosophy/inherent-stability.md) each needs a fallback. Every result here scores
+  rules](../../design-philosophy/inherent-stability.md) each needs a fallback. Every result here scores
   the archive's freshest run for each hour, and at run time the last few hours come from an older
   run.
 - **Training history: CAMS with ICON-EU for solar anywhere in Great Britain from December 2022, or
@@ -661,7 +661,7 @@ over less than 4 years for solar and 2 years for wind.**
   not name.** Every set reading UKV, including UKV with ICON-EU, spans that boundary; the wind sets
   do not, because UKV's hub-height wind on Open-Meteo starts only in August 2024.
 - **The solar row set drops hours where UKV's archive holds a physically impossible sunrise value,
-  which the solar page's own [Limitations](weather-products-for-past-solar.md#limitations) section
+  which the solar page's own [Limitations](solar.md#limitations) section
   describes in full.** Every solar figure on this page inherits that row set, 77,616 generator-hours
   rather than 79,384, except the CAMS-with-SARAH-3 section: its 115,594 generator-hours are the
   past-solar page's `record` panel rows, built and filtered separately, and do not read UKV at all.

@@ -1,7 +1,7 @@
 """Draw the charts for the ECMWF HRES and ENS section of the past-wind page.
 
 One-off throwaway script for the charts of the ECMWF addition to
-<https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-wind/>,
+<https://openclimatefix.github.io/nged-substation-forecast/studies/past-weather/wind/>,
 in `wind_icon_dream_charts.py`'s style. **Every number a chart shares with the page is read from
 `intervals.parquet` or `report.md`, both written by `ens_hres_past_wind.py`**, so a chart cannot
 disagree with the page. Before any chart is saved, `Source.verify` requires every interval a chart

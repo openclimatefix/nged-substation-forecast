@@ -178,7 +178,7 @@ EXPLORATORY_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     (CONTROL_ARM, "era5_global"),
 )
 """What averaging all 51 members over the control member alone is worth, and how the control member
-alone compares with ERA5 (`docs/studies/ens-forecast-horizons.md` reports the same comparison at
+alone compares with ERA5 (`docs/studies/forecasts/ens-horizons.md` reports the same comparison at
 its day 0, on its own rows)."""
 
 CONFOUND_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
@@ -208,7 +208,7 @@ CONFOUND_HEADING: Final[str] = (
 
 FIRST_SERVABLE_HOUR_UTC: Final[int] = 9
 """The hour of day, UTC, from which a live service reading Dynamical.org's archive can read the
-00 UTC run: about 09:00 UTC (`docs/studies/ens-forecast-horizons.md`, "Horizons and issue time")."""
+00 UTC run: about 09:00 UTC (`docs/studies/forecasts/ens-horizons.md`, "Horizons and issue time")."""
 
 LAST_HOUR_BEFORE_DISSEMINATION_UTC: Final[int] = 6
 """The last hour label, UTC, whose hour ends before ECMWF disseminates the 00 UTC run's steps 0 to
@@ -237,7 +237,7 @@ SERVABLE_HEADING: Final[str] = (
 
 HORIZONS_RISE_POINTS: Final[float] = 0.61
 """The ENS horizons study's rise in solar error, in points of capacity, from day 0 to day 1
-(`docs/studies/ens-forecast-horizons.md`: 0.61 points [0.45, 0.79]), which is 24 hours of extra
+(`docs/studies/forecasts/ens-horizons.md`: 0.61 points [0.45, 0.79]), which is 24 hours of extra
 lead. Scaling it to this section's extra hours gives a rough guide with no interval, on that
 page's own rows."""
 

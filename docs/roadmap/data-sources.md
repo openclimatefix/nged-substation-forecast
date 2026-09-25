@@ -609,7 +609,7 @@ service's ICON-D2 scores 7.76%, ICON-EU 8.39%, ICON global 8.48%, its reanalysis
 advantage shrinks within hours of each run, and ICON-EU no longer beats UKV once UKV's hour is
 rebuilt from its own snapshots. Four more Open-Meteo models are scored on a shorter row set from
 November 2024. The write-up, with what each offline consumer should read, is [Which weather product
-best describes past sunshine?](../studies/weather-products-for-past-solar.md).
+best describes past sunshine?](../studies/past-weather/solar.md).
 
 **Figures measured on different row sets do not compose into a ranking.** ERA5 scores 9.08% on the
 eight-product row set and 8.87% on the shorter row set that adds four more Open-Meteo models: the

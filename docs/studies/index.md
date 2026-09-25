@@ -29,20 +29,20 @@ climates, so a result may not hold elsewhere.
   drift says about estimating a generator's effective capacity. It reads NGED's two records of
   active network management against each other and against the telemetry, and finds the setpoint
   history the one to build on.
-- [Which weather product best describes past sunshine?](weather-products-for-past-solar.md) — a
+- [Which weather product best describes past sunshine?](past-weather/solar.md) — a
   satellite retrieval describes past sunshine far better than any weather model tested; among the
   models, ICON-D2 is best as served but its advantage shrinks within hours of each run, and ICON-EU
   no longer beats UKV once UKV's hour is rebuilt from its own snapshots. The page says which product
   each offline consumer — capacity estimation, training history, historical features, and
   disaggregation — should read.
-- [Which weather product best describes past wind?](weather-products-for-past-wind.md) — at the
+- [Which weather product best describes past wind?](past-weather/wind.md) — at the
   three metered wind farms, the Met Office's UKV and the German weather service's ICON-D2 describe
   past hub-height wind best of the five products tested and both beat the ERA5 reanalysis, mostly
   from April to September; ICON-EU also beats ERA5; and ICON global has the largest error of the
   five, about half of its gap to ICON-EU a pair of steps in the wind Open-Meteo's archive serves for
   it at one generator.
 - [Does blending weather products beat the best single weather
-  product?](blending-weather-products.md) — at the six solar farms and three wind farms, an XGBoost
+  product?](past-weather/blending.md) — at the six solar farms and three wind farms, an XGBoost
   model given several weather products at once beats one given the best single product with its
   neighbouring hours: by 0.13 points of capacity for solar and 0.48 for wind. The gain comes from the
   other products' weather rather than from the extra columns, a blend of UKV and ICON-EU that a live
@@ -51,14 +51,14 @@ climates, so a result may not hold elsewhere.
   satellite retrievals the past-solar study compared, beats CAMS's split with its neighbouring hours
   by 0.18 points and plain CAMS's split by 0.20 points, on a longer row set from January 2021.
 - [How accurate is a power forecast driven by ECMWF ENS at each
-  horizon?](ens-forecast-horizons.md) — at the 6 solar farms and 3 wind farms, an XGBoost model
+  horizon?](forecasts/ens-horizons.md) — at the 6 solar farms and 3 wind farms, an XGBoost model
   given the ENS ensemble mean beats every forecast that reads no weather forecast to day 5 for solar
   and day 7 for wind; from day 7 for solar and day 10 for wind it no longer beats climatology, and by
   day 14 climatology is ahead, with the ensemble mean adding no statistically significant skill, in a
   post hoc check, over the same model given no weather at all. The ensemble mean beats the control
   member and beats training on every member, and rebuilding solar radiation through the clear-sky
   index beats the straight-line resample the live service uses today.
-- [Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?](nwp-forecasts-at-matched-leads.md)
+- [Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?](forecasts/matched-lead.md)
   — at the 6 solar farms and 3 wind farms, and reading each product as the study does, ECMWF's
   ensemble mean beats UKV, ICON-EU, and GEFS at matched lead for solar; for wind it beats UKV and
   GEFS, and ICON-EU cannot be separated from it. A blend of ENS, ICON-EU, and IFS 0.25° lowers the

@@ -40,7 +40,7 @@ hourly values. For solar, rebuilding the radiation through the clear-sky index l
 today. For wind, no way of interpolating tested moves the error by a tenth of a point.
 
 ![Figure 1: At these farms, an XGBoost model given the ENS ensemble mean beats every no-weather
-baseline to day 5 for solar and to day 7 for wind](assets/ens_horizons_leaderboard.svg)
+baseline to day 5 for solar and to day 7 for wind](../assets/ens_horizons_leaderboard.svg)
 
 **Figure 1 draws each forecast's own error at each horizon; Figure 2 tests each horizon against day
 0 directly.** Figure 1's intervals are wide mainly because every forecast's error rises and falls
@@ -50,7 +50,7 @@ therefore overlap in Figure 1 and still differ by a margin statistically signifi
 in Figure 2.
 
 ![Figure 2: Forecast error rises with horizon, fastest over the first
-week](assets/ens_horizons_against_day0.svg)
+week](../assets/ens_horizons_against_day0.svg)
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
@@ -105,7 +105,7 @@ weather input could be.**
 - **References, an analysis proxy for the weather rather than a genuine multi-day-ahead forecast:**
   ERA5, ECMWF's reanalysis of past weather, available about 5 days late; and UKV with ICON-EU,
   each with its neighbouring hours, the best of the inputs
-  [the blending page](blending-weather-products.md) compared. For solar, both reference rows are
+  [the blending page](../past-weather/blending.md) compared. For solar, both reference rows are
   also given ERA5's air temperature, as on the past-weather pages, so the solar UKV-and-ICON-EU row
   as scored could not be read until ERA5 is about 5 days late.
 
@@ -122,8 +122,8 @@ weather input could be.**
 **Every comparison is scored at hourly resolution, on the hours the past-weather studies scored:
 every daylight hour at 6 solar farms, labelled A to F, and every hour at 3 wind farms,
 labelled W1 to W3.** Hours with an exactly-zero half-hour, the commissioning ramp of one solar farm,
-and outages are dropped as on [the solar page](weather-products-for-past-solar.md) and [the wind
-page](weather-products-for-past-wind.md). An hour is also dropped from every forecast where any
+and outages are dropped as on [the solar page](../past-weather/solar.md) and [the wind
+page](../past-weather/wind.md). An hour is also dropped from every forecast where any
 horizon's ENS input or any baseline's input is missing, so every row of a panel is scored on the
 same hours. That leaves 50,643 of 54,791 solar hours, from 15 April 2024 to 10 September 2026, and
 50,268 of 50,734 wind hours, from 12 August 2024 to 10 September 2026. The ENS archive starts on 1
@@ -134,7 +134,7 @@ April 2024, and day 14 needs a run 14 days before the day it forecasts.
 **A horizon is a whole UTC day after the run's own day: day d forecasts a calendar day from the 00
 UTC run d days earlier.** The horizons scored are days 0, 1, 2, 3, 5, 7, 10, and 14: every day to
 day 3, then days 5, 7, and 10, which span the 3-to-10-day band [the
-roadmap](../roadmap/xgboost-improvements.md) names as the live service's primary band, and day 14,
+roadmap](../../roadmap/xgboost-improvements.md) names as the live service's primary band, and day 14,
 near the end of the run. The live service reads a 00 UTC run from about 09:00 UTC, so day 1, the
 day-ahead product, is 15 to 39 hours after the forecast is issued. Most of day 0 is over before the
 run can be read, so day 0 is a best case, not a product the live service can deliver.
@@ -144,7 +144,7 @@ run can be read, so day 0 is a best case, not a product the live service can del
 **ENS's radiation reaches this study as a mean over each 3- or 6-hour step, and its wind as a value at
 each step, so every ENS input is first upsampled to hourly values.** ECMWF publishes the radiation as
 an accumulation since the run's start, which Dynamical.org converts to step means. [NWP variable
-conventions](../architecture/nwp-variable-conventions.md) sets out why a straight line between steps
+conventions](../../architecture/nwp-variable-conventions.md) sets out why a straight line between steps
 misreads a period mean. Each member is upsampled before any is averaged. The techniques tested are
 straight-line interpolation of every field, which is what the live service does today; for solar
 radiation, the clear-sky-index resample that page describes, with and without scaling each step's
@@ -235,15 +235,15 @@ day 7 the solar forecast stays close to an average day, too high on dull days an
 ones, and the wind forecast mostly misses the swings.
 
 ![Figure 3: Given the day-1 ensemble mean, the XGBoost model follows the day-to-day swings at every
-solar farm; the day-7 forecast stays close to an average day](assets/ens_horizons_solar_week.svg)
+solar farm; the day-7 forecast stays close to an average day](../assets/ens_horizons_solar_week.svg)
 
 ![Figure 4: Given the day-1 ensemble mean, the XGBoost model follows the wind farms' swings; the
-day-7 forecast mostly does not](assets/ens_horizons_wind_week.svg)
+day-7 forecast mostly does not](../assets/ens_horizons_wind_week.svg)
 
 **Every generator's error rises between day 1 and day 7** (Figure 5).
 
 ![Figure 5: Every generator's error rises between day 1 and day
-7](assets/ens_horizons_per_generator.svg)
+7](../assets/ens_horizons_per_generator.svg)
 
 ### Turning ENS's steps into hourly values
 
@@ -251,13 +251,13 @@ day-7 forecast mostly does not](assets/ens_horizons_wind_week.svg)
 shifts it late and flattens it.** Figure 6a shows one solar day, in April 2025, at day 1 and day 7.
 
 ![Figure 6a: The clear-sky index keeps the solar day's shape, where linear interpolation shifts it
-late](assets/ens_upsampling_days_solar.svg)
+late](../assets/ens_upsampling_days_solar.svg)
 
 **For wind, every upsampling technique reproduces the day's swings almost identically.** Figure 6b
 shows one wind day, in September 2025, at day 1 and day 7.
 
 ![Figure 6b: For wind, every upsampling technique tracks the same day almost
-identically](assets/ens_upsampling_days_wind.svg)
+identically](../assets/ens_upsampling_days_wind.svg)
 
 **Rebuilding solar radiation through the clear-sky index lowers the error at every horizon to day 7:
 by 0.30 points [0.22, 0.40] at day 1 and 0.16 points [0.02, 0.31] at day 7.** Beyond day 7 the gain
@@ -266,7 +266,7 @@ raises the error by 0.04 points [0.02, 0.07] at day 1. The shape-preserving curv
 moves the error by less than 0.02 points at every horizon, and the rule did not adopt it.
 
 ![Figure 7: Rebuilding solar radiation through the clear-sky index lowers the error at every horizon
-to day 7](assets/ens_upsampling_solar.svg)
+to day 7](../assets/ens_upsampling_solar.svg)
 
 **For wind, no technique's estimate moves the error by as much as a tenth of a point at any horizon,
 and no interval excludes an effect of 0.2 points at days 10 and 14.** Taking the direction from
@@ -276,7 +276,7 @@ day 7, so the rule did not adopt it. Taking the speed from components moved the 
 both changes happened to point the same way, not because either was a statistically significant gain.
 
 ![Figure 8: No way of interpolating ENS's wind moves the wind error by a tenth of a
-point](assets/ens_upsampling_wind.svg)
+point](../assets/ens_upsampling_wind.svg)
 
 **ENS scored on its own steps is a reference, not a rival, because it is scored on different rows.**
 Scored on its own 3-hour steps, the day-1 ensemble mean gives 6.87% [6.36, 7.39] for solar and 8.11%
@@ -307,7 +307,7 @@ wind, and member by member loses to the ensemble mean by 0.48 points [0.34, 0.62
 [0.52, 0.99], all planned.
 
 ![Figure 9: The ensemble mean beats the control member, and beats feeding each member through the
-model, at almost every horizon](assets/ens_horizons_ways.svg)
+model, at almost every horizon](../assets/ens_horizons_ways.svg)
 
 **Training on every member makes the XGBoost model's response to the weather flatter at day 1, which
 is why member by member loses there.** This page does not establish why member by member also loses
@@ -362,7 +362,7 @@ of forecasting zero output all day.
 
 ![Figure 10: The ENS ensemble mean beats the best no-weather baseline by 1.4 points at day 5 for
 solar and 4.0 points for wind, and by day 14 climatology is
-ahead](assets/ens_horizons_against_baselines.svg)
+ahead](../assets/ens_horizons_against_baselines.svg)
 
 **A post hoc check separates that crossover with climatology from ENS itself: given the same
 non-weather columns and no weather at all, the same XGBoost model still loses to the ensemble mean at
@@ -380,7 +380,7 @@ way about whether ENS itself carries skill at that lead — the interval is wide
 difference, not narrow enough to rule one out.
 
 ![Figure 11: The ensemble mean beats the same model given no weather to day 10 with a day-of-year
-calendar column, and to day 7 with calendar month](assets/ens_horizons_against_calendar.svg)
+calendar column, and to day 7 with calendar month](../assets/ens_horizons_against_calendar.svg)
 
 **In a post hoc check, part of climatology's lead at day 14 comes from how the XGBoost model uses its
 calendar columns; the rest is consistent with ENS adding little skill at that lead.** Given no
@@ -422,7 +422,7 @@ model-version story alone would not predict either. Forecast lead may explain th
 wind is an hourly analysis, which assimilates observations of the hour it describes, while day 0
 spans leads of 0 to 23 hours. ERA5's radiation, by contrast, comes from forecasts 1 to 12 hours old,
 so lead does not favour ERA5 for solar by enough to explain the gaps above. The past-solar page's
-[ENS section](weather-products-for-past-solar.md#ecmwf-ens-a-longer-lead-forecast-than-any-other-product-on-this-page)
+[ENS section](../past-weather/solar.md#ecmwf-ens-a-longer-lead-forecast-than-any-other-product-on-this-page)
 estimates, on its own rows at leads 5 to 20 hours, that ENS's extra 6.11 hours of mean lead over
 ERA5 raises ENS's error by about 0.16 points, so lead does favour ERA5 slightly.
 

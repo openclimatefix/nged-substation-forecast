@@ -2,7 +2,7 @@
 
 One-off throwaway script for the charts in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/830>. The write-up is
-<https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-solar/>.
+<https://openclimatefix.github.io/nged-substation-forecast/studies/past-weather/solar/>.
 
 **Every number a chart shares with the report is read from the report `weather_products.py`
 wrote for the `long` panel**, so a chart cannot disagree with the page. Figure 8 and the satellite

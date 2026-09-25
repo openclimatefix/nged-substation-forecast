@@ -1,6 +1,6 @@
 """The figure numbers of the past-solar study page, in one place.
 
-The page `weather-products-for-past-solar` holds 17 figures. Its chart scripts
+The page `past-weather/solar` holds 17 figures. Its chart scripts
 (`weather_product_charts.py`, `ens_past_solar_charts.py`, `station_past_solar_charts.py`) read
 their figure numbers from `FIGURE_NUMBERS`, so renumbering a figure is one edit here, and a number
 written into an SVG's title or subtitle text is looked up rather than typed.

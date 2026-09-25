@@ -2,7 +2,7 @@
 
 One-off throwaway script for the study in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/826>. The write-up is
-<https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-wind/>.
+<https://openclimatefix.github.io/nged-substation-forecast/studies/past-weather/wind/>.
 
 **Every product gets one arm with the same four wind columns** — its native hub-height speed, that
 height's direction as sine and cosine, and its 10 m speed — plus the hour of day, the day of the

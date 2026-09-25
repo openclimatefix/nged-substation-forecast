@@ -1,7 +1,7 @@
 """Score the nearest weather station's 10 m wind against gridded products for past wind.
 
 One-off throwaway script, phase 2 of the past-wind study
-<https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-wind/>.
+<https://openclimatefix.github.io/nged-substation-forecast/studies/past-weather/wind/>.
 The Met Office's MIDAS Open archive holds hourly 10 m wind from stations in and around the trial
 area, and `candidate_stations` derives which ones from the download. This script gives an XGBoost
 model per wind farm the nearest wind-reporting station's wind, and compares it with ERA5's 10 m wind

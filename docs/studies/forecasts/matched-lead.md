@@ -44,12 +44,12 @@ sensitivity setting. The permutation controls of both blends, which shuffle the 
 setting (exploratory).
 <!-- report: Wind, P4, the blend -->
 
-![Paired differences in solar error with 95% intervals, both XGBoost settings](assets/nwp_forecast_solar_headline.svg)
+![Paired differences in solar error with 95% intervals, both XGBoost settings](../assets/nwp_forecast_solar_headline.svg)
 
 Figure 1: For solar power, ENS beats UKV and ICON-EU at matched lead and GEFS at equal lead. A blend
 gains 0.35 points at an optimistic lead and shows no detectable gain at a conservative lead.
 
-![Paired differences in wind error with 95% intervals, both XGBoost settings](assets/nwp_forecast_wind_headline.svg)
+![Paired differences in wind error with 95% intervals, both XGBoost settings](../assets/nwp_forecast_wind_headline.svg)
 
 Figure 2: For wind power, ENS beats UKV, ICON-EU is unresolved against ENS, and a blend lowers the
 error by 0.18 points even at a conservative lead.
@@ -136,9 +136,9 @@ model. ENS and GEFS start one run per day, at 00 UTC. UKV, ICON-EU, and IFS 0.25
 through Open-Meteo's Previous Runs archive, whose lead depends on n ([How the leads are
 matched](#how-the-leads-are-matched)). The scored rows start on 2024-12-01, after the archive start
 date of every product in the table. The grids, coverage, and delivery times of UKV, ICON-D2, and
-ICON-EU come from [the past-wind study](weather-products-for-past-wind.md), which measured the
+ICON-EU come from [the past-wind study](../past-weather/wind.md), which measured the
 delivery times for a different purpose. The archive start dates come from the [weather-products
-survey](../background/weather-products-survey.md). The study did not measure the delivery time of
+survey](../../background/weather-products-survey.md). The study did not measure the delivery time of
 ENS, GEFS, or IFS 0.25°, and ECMWF's published dissemination schedule was not checked against the
 09:00 UTC assumption.
 <!-- source: the past-wind study's product table and the weather-products survey; none of these
@@ -310,7 +310,7 @@ season.
 **Every error is divided by its own generator's capacity before any mean or difference, and every
 interval resamples whole year-months.** Capacity is the generator's `effective_capacity_mw`, its
 99th percentile of metered output, as [defined on the blending
-page](blending-weather-products.md#data-and-methods). Each of 2,000 resamples draws whole
+page](../past-weather/blending.md#data-and-methods). Each of 2,000 resamples draws whole
 year-months, and one of the three fitting seeds, paired across the two arms of a contrast. Each
 contrast asserts that both arms hold the same rows. The XGBoost model is fitted at two
 hyperparameter settings, called primary and sensitivity, and the sensitivity setting is run on
@@ -327,11 +327,11 @@ solar, the rule takes the week whose daily mean output varies most from day to d
 rule takes the week with the largest mean hour-to-hour change in output. Only weeks in which every
 generator has scored hours on all seven days qualify.
 
-![Day-1 forecasts against measured output at solar farms A to F](assets/nwp_forecast_solar_models_work.svg)
+![Day-1 forecasts against measured output at solar farms A to F](../assets/nwp_forecast_solar_models_work.svg)
 
 Figure 3: Out-of-fold day-1 ENS-mean forecasts follow the measured output at all six solar farms.
 
-![Day-1 forecasts against measured output at wind farms W1 to W3](assets/nwp_forecast_wind_models_work.svg)
+![Day-1 forecasts against measured output at wind farms W1 to W3](../assets/nwp_forecast_wind_models_work.svg)
 
 Figure 4: Out-of-fold day-1 ENS-mean forecasts follow the measured output at all three wind farms.
 
@@ -356,12 +356,12 @@ up to the run's 00 UTC initialisation time. Solar persistence on the run's own d
 observed hour, a night-time value near zero, across the whole day.
 <!-- report: Design constants (Baselines); Solar, Exploratory: the no-weather floor -->
 
-![Day-1 error of every solar forecast and baseline, with 95% intervals](assets/nwp_forecast_solar_leaderboard.svg)
+![Day-1 error of every solar forecast and baseline, with 95% intervals](../assets/nwp_forecast_solar_leaderboard.svg)
 
 Figure 5: At day 1 every weather forecast shown has a lower error than climatology (14.5%); ENS and
 IFS 0.25° have the lowest error of the single solar forecasts.
 
-![Day-1 error of every wind forecast and baseline, with 95% intervals](assets/nwp_forecast_wind_leaderboard.svg)
+![Day-1 error of every wind forecast and baseline, with 95% intervals](../assets/nwp_forecast_wind_leaderboard.svg)
 
 Figure 6: At day 1 every weather forecast shown has a lower error than climatology (18.5%), by more
 than 9 points; ENS, IFS 0.25°, and ICON-EU have the lowest error of the single wind forecasts.
@@ -456,7 +456,7 @@ differences between generators.
 <!-- report: Solar / X: P1a, P2a and P4b one generator at a time -->
 
 ![Six panels of paired differences at generators A to F: UKV and ICON-EU minus ENS at day 1, and
-the P4b blend minus ENS](assets/nwp_forecast_solar_per_generator.svg)
+the P4b blend minus ENS](../assets/nwp_forecast_solar_per_generator.svg)
 
 Figure 7: At each of the six solar farms UKV and ICON-EU have a higher error than ENS at day 1.
 
@@ -522,7 +522,7 @@ differences between generators.
 <!-- report: Wind / X: P1a, P2a and P4b one generator at a time -->
 
 ![Three panels of paired differences at generators W1 to W3: UKV and ICON-EU minus ENS at day 1,
-and the P4b blend minus ENS](assets/nwp_forecast_wind_per_generator.svg)
+and the P4b blend minus ENS](../assets/nwp_forecast_wind_per_generator.svg)
 
 Figure 8: At two of the three wind farms UKV has a higher error than ENS at day 1, and at two of the
 three wind farms the P4b blend has a lower error.
@@ -641,13 +641,13 @@ per-generator contrasts.
 <!-- report: Solar / X: P1a, P2a and P4b one generator at a time; Wind / same -->
 
 ![Two panels for solar: each forecast's own error, and paired differences of the blends minus ENS
-alone and minus their permutation controls](assets/nwp_forecast_solar_blends.svg)
+alone and minus their permutation controls](../assets/nwp_forecast_solar_blends.svg)
 
 Figure 9: For solar power a blend of ENS, ICON-EU, and IFS 0.25° gains 0.35 points at an optimistic
 lead, but its control is itself worse than ENS alone.
 
 ![Two panels for wind: each forecast's own error, and paired differences of the blends minus ENS
-alone and minus their permutation controls](assets/nwp_forecast_wind_blends.svg)
+alone and minus their permutation controls](../assets/nwp_forecast_wind_blends.svg)
 
 Figure 10: For wind power a blend of ENS, ICON-EU, and IFS 0.25° lowers the error by 0.66 points at
 an optimistic lead and 0.18 points at a conservative lead, and its control does not.
@@ -799,12 +799,12 @@ day 3. ICON-EU day 2 has upper sides of +0.906 points [+0.646, +1.157] for solar
 wind is +0.947 points [+0.796, +1.105].
 <!-- report: Solar / Exploratory brackets; Wind / same -->
 
-![Solar error by lead day for each forecast, with ENS's day-0 and day-1 intervals shaded](assets/nwp_forecast_solar_by_lead_day.svg)
+![Solar error by lead day for each forecast, with ENS's day-0 and day-1 intervals shaded](../assets/nwp_forecast_solar_by_lead_day.svg)
 
 Figure 11: Solar error rises with lead day for every forecast, and no product beats the ENS mean at
 matched lead.
 
-![Wind error by lead day for each forecast, with ENS's day-0 and day-1 intervals shaded](assets/nwp_forecast_wind_by_lead_day.svg)
+![Wind error by lead day for each forecast, with ENS's day-0 and day-1 intervals shaded](../assets/nwp_forecast_wind_by_lead_day.svg)
 
 Figure 12: Wind error rises with lead day for every forecast, and no product beats the ENS mean at
 matched lead.
@@ -1098,8 +1098,8 @@ the live service.
 public inputs are ECMWF ENS (from 2024-04-01) and NOAA GEFS (from 2020-10-01) from Dynamical.org,
 and the Previous Runs values of Open-Meteo. Open-Meteo's day-offset archive starts on 2024-01-19 for
 ICON-EU and ICON-D2, on 2024-03-06 for IFS 0.25°, and on 2024-08-06 for UKV (start dates from the
-[weather-products survey](../background/weather-products-survey.md)). Dynamical.org's access ends on
-2026-09-30. The generator telemetry and the `effective_capacity` table are private, because a
+[weather-products survey](../../background/weather-products-survey.md)). Dynamical.org's access
+ends on 2026-09-30. The generator telemetry and the `effective_capacity` table are private, because a
 single generator's output can be commercially sensitive.
 
 **The code is in the repository, at a fixed commit and with fixed XGBoost settings.** The scripts
