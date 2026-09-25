@@ -4,7 +4,9 @@ Each test is written to fail on the defect it names. The scripts are imported by
 `studies/` is not an importable package.
 """
 
+import hashlib
 import importlib
+import json
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -368,3 +370,82 @@ def test_aifs_members_frame_raises_when_a_weighted_cell_is_missing(tmp_path: Pat
             ensemble=False,
             first_init=datetime(2025, 3, 1, tzinfo=UTC),
         )
+
+
+def _losses_and_frame(*, row_set: str = "single") -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Return a frame of two rows and saved primary losses holding every arm of the row set."""
+    spec = fa.ROW_SETS[row_set]
+    arms = [*spec.arms, *(f"{arm}{fa.NO_DOY_SUFFIX}" for arm in spec.deciding or ())]
+    times = [datetime(2025, 3, 1, 12), datetime(2025, 3, 1, 13)]
+    frame = pl.DataFrame({"site": ["A", "A"], "time": times})
+    losses = pl.DataFrame(
+        [
+            {"setting": fa.PRIMARY, "arm": arm, "site": "A", "time": time}
+            for arm in arms
+            for time in times
+        ]
+    )
+    return losses, frame
+
+
+def _check(
+    *, tmp_path: Path, losses: pl.DataFrame, frame: pl.DataFrame, stamp_on_disk: dict | None
+):
+    stamp = {"inputs_sha256": "abc", "device": "cuda"}
+    stamp_file = tmp_path / "losses.json"
+    if stamp_on_disk is not None:
+        stamp_file.write_text(json.dumps(stamp_on_disk))
+    fa.check_saved_losses(
+        losses=losses, frame=frame, row_set="single", stamp_file=stamp_file, stamp=stamp
+    )
+
+
+def test_saved_losses_pass_when_stamp_arms_and_rows_match(tmp_path: Path) -> None:
+    losses, frame = _losses_and_frame()
+    _check(
+        tmp_path=tmp_path,
+        losses=losses,
+        frame=frame,
+        stamp_on_disk={"inputs_sha256": "abc", "device": "cuda"},
+    )
+
+
+@pytest.mark.parametrize(
+    "stamp_on_disk",
+    [None, {"inputs_sha256": "old", "device": "cuda"}, {"inputs_sha256": "abc", "device": "cpu"}],
+)
+def test_saved_losses_raise_on_a_missing_or_different_stamp(
+    tmp_path: Path, stamp_on_disk: dict | None
+) -> None:
+    losses, frame = _losses_and_frame()
+    with pytest.raises(ValueError, match="another build or device"):
+        _check(tmp_path=tmp_path, losses=losses, frame=frame, stamp_on_disk=stamp_on_disk)
+
+
+def test_saved_losses_raise_on_other_arms(tmp_path: Path) -> None:
+    losses, frame = _losses_and_frame()
+    losses = losses.filter(pl.col("arm") != "aifs_single_day1")
+    with pytest.raises(ValueError, match="other arms"):
+        _check(
+            tmp_path=tmp_path,
+            losses=losses,
+            frame=frame,
+            stamp_on_disk={"inputs_sha256": "abc", "device": "cuda"},
+        )
+
+
+def test_saved_losses_raise_on_other_rows(tmp_path: Path) -> None:
+    losses, frame = _losses_and_frame()
+    with pytest.raises(ValueError, match="other rows"):
+        _check(
+            tmp_path=tmp_path,
+            losses=losses,
+            frame=frame.head(1),
+            stamp_on_disk={"inputs_sha256": "abc", "device": "cuda"},
+        )
+
+
+def test_build_stamp_hashes_the_inputs_file_and_names_the_device(tmp_path: Path) -> None:
+    (tmp_path / "solar_aifs_inputs.parquet").write_bytes(b"abc")
+    stamp = fa.build_stamp(aifs_dir=tmp_path, domain="solar")
+    assert stamp == {"inputs_sha256": hashlib.sha256(b"abc").hexdigest(), "device": fa.DEVICE}

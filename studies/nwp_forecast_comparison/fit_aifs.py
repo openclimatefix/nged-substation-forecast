@@ -31,6 +31,8 @@ inputs there.
 
 import argparse
 import concurrent.futures
+import hashlib
+import json
 import logging
 import sys
 import time
@@ -819,6 +821,60 @@ def check_determinism(*, published_dir: Path, aifs_dir: Path) -> bool:
     return fingerprints[0] == fingerprints[1]
 
 
+def build_stamp(*, aifs_dir: Path, domain: DomainType) -> dict[str, str]:
+    """Return the AIFS inputs' SHA-256 and the device, which a saved losses file must match.
+
+    Args:
+        aifs_dir: The folder holding `<domain>_aifs_inputs.parquet`.
+        domain: `solar` or `wind`.
+
+    Returns:
+        `inputs_sha256` and `device`.
+    """
+    digest = hashlib.sha256((aifs_dir / f"{domain}_aifs_inputs.parquet").read_bytes()).hexdigest()
+    return {"inputs_sha256": digest, "device": DEVICE}
+
+
+def check_saved_losses(
+    *,
+    losses: pl.DataFrame,
+    frame: pl.DataFrame,
+    row_set: str,
+    stamp_file: Path,
+    stamp: dict[str, str],
+) -> None:
+    """Raise unless saved losses come from this build, this device, and exactly these rows.
+
+    Args:
+        losses: The saved losses.
+        frame: `aifs_rows`'s frame for the row set.
+        row_set: The row set's name.
+        stamp_file: The stamp written beside the losses file.
+        stamp: `build_stamp`'s result for the current inputs and device.
+
+    Raises:
+        ValueError: If the stamp is missing or differs, or the primary losses hold other arms or
+            cover other (site, time) rows than the row set.
+    """
+    if not stamp_file.exists() or json.loads(stamp_file.read_text()) != stamp:
+        msg = f"{stamp_file} is missing or names another build or device"
+        raise ValueError(msg)
+    spec = ROW_SETS[row_set]
+    arms = {*spec.arms, *(f"{arm}{NO_DOY_SUFFIX}" for arm in spec.deciding or ())}
+    primary = losses.filter(pl.col("setting") == PRIMARY)
+    if set(primary["arm"].unique().to_list()) != arms:
+        msg = f"{row_set}: the saved losses hold other arms than the set's"
+        raise ValueError(msg)
+    keys = frame.select("site", "time")
+    saved = primary.select("site", "time").unique()
+    if (
+        saved.join(keys, on=["site", "time"], how="anti").height
+        or keys.join(saved, on=["site", "time"], how="anti").height
+    ):
+        msg = f"{row_set}: the saved losses cover other rows than the set's"
+        raise ValueError(msg)
+
+
 def main() -> int:
     """Fit every arm on both row sets and both technologies, and write the outputs once."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -865,13 +921,24 @@ def main() -> int:
             predictions_file = path_for(
                 output_dir=args.output_dir, domain=domain, row_set=row_set, kind="predictions"
             )
+            stamp = build_stamp(aifs_dir=args.output_dir, domain=domain)
+            stamp_file = losses_file.with_suffix(".json")
             if losses_file.exists():
                 losses = pl.read_parquet(losses_file)
+                check_saved_losses(
+                    losses=losses,
+                    frame=frame,
+                    row_set=row_set,
+                    stamp_file=stamp_file,
+                    stamp=stamp,
+                )
             else:
+                refuse_to_overwrite(paths=[predictions_file, stamp_file])
                 losses = fit_row_set(
                     frame=frame, domain=domain, row_set=row_set, workers=args.workers
                 )
                 losses.write_parquet(losses_file)
+                stamp_file.write_text(json.dumps(stamp))
             if not predictions_file.exists():
                 predictions_from_losses(losses=losses, frame=frame).write_parquet(predictions_file)
             report += report_set(losses=losses, frame=frame, row_set=row_set, domain=domain)
