@@ -84,7 +84,12 @@ comparable with the recomputed ones.
 """
 
 PLANNED_CONTRAST_SECTION: Final[str] = "Planned contrasts, first product minus second"
-"""The `section` of a planned contrast in `intervals.parquet`."""
+"""The `section` of a planned contrast in `intervals.parquet`, unless its row set names another."""
+
+POST_HOC_PLANNED_CONTRAST_SECTION: Final[str] = (
+    "Planned and post hoc contrasts, first product minus second"
+)
+"""The `planned_heading` of a row set whose planned table holds rows marked `POST_HOC_SUFFIX`."""
 
 EXPLORATORY_CONTRAST_SECTION: Final[str] = "Exploratory contrasts, first product minus second"
 """The `section` of an exploratory contrast between two products in `intervals.parquet`."""
@@ -188,6 +193,9 @@ class RowSet(NamedTuple):
         leaderboard_section: The start of the heading above the report's table of errors, or
             `None` where that table is the first table in the report.
         intervals: How the report prints each arm's 95% interval.
+        planned_heading: The heading of the leaderboard report's table of planned contrasts, and
+            the `section` of those rows in `intervals.parquet`. A row set whose table holds post
+            hoc rows names `POST_HOC_PLANNED_CONTRAST_SECTION`.
         planned_section: The start of the headings of the tables that print the planned
             contrasts at the first setting.
         second_planned_section: The start of the headings of the tables that print the planned
@@ -220,6 +228,7 @@ class RowSet(NamedTuple):
     printed_decimals: int = PRINT_DECIMALS
     leaderboard_section: str | None = None
     intervals: IntervalsType = "solar"
+    planned_heading: str = PLANNED_CONTRAST_SECTION
     planned_section: str = PLANNED_SECTION_PREFIX
     second_planned_section: str | None = None
     second_scope: str = SECOND_SETTING_SCOPE
@@ -1326,7 +1335,7 @@ def render_report(
             )
         lines += [
             "",
-            "#### Planned contrasts, first product minus second",
+            f"#### {result.row_set.planned_heading}",
             "",
             PLANNED_HEADER,
             "|---|---|---|---|---|",
@@ -1358,7 +1367,7 @@ def intervals_frame(*, results: list[RowSetResult]) -> pl.DataFrame:
     Returns:
         One row per (row set, section, setting, arm). `section` is `Mean absolute error`,
         `contrast_section`'s heading for the row set's reference arm,
-        `PLANNED_CONTRAST_SECTION` (a planned contrast, with its second arm in `reference`), or
+        the row set's `planned_heading` (a planned contrast, with its second arm in `reference`), or
         `EXPLORATORY_CONTRAST_SECTION` (the same for an exploratory contrast, at the `pooled`
         setting only); `setting` is `pooled`, or `sensitivity` for a
         contrast's second setting; `treatment` is the arm and `reference` is null for an absolute
@@ -1423,7 +1432,7 @@ def intervals_frame(*, results: list[RowSetResult]) -> pl.DataFrame:
             ),
             result.planned.select(
                 **common,
-                section=pl.lit(PLANNED_CONTRAST_SECTION),
+                section=pl.lit(result.row_set.planned_heading),
                 setting=pl.lit("pooled"),
                 treatment="arm",
                 reference="reference_arm",
@@ -1449,7 +1458,7 @@ def intervals_frame(*, results: list[RowSetResult]) -> pl.DataFrame:
             ),
             result.planned.filter(pl.col("second_difference").is_not_null()).select(
                 **common,
-                section=pl.lit(PLANNED_CONTRAST_SECTION),
+                section=pl.lit(result.row_set.planned_heading),
                 setting=pl.lit(SECOND_SETTING_SCOPE),
                 treatment="arm",
                 reference="reference_arm",

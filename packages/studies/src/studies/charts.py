@@ -1300,7 +1300,8 @@ class RowSetBlock(NamedTuple):
     contrasts, which a contrast block draws in a lower panel; `None` draws no lower panel.
     `hours_unit` is what a row is called in the title, and `reference_name` is what a contrast
     block's zero rule and axis call the arm its contrasts are against, such as `ERA5` or
-    `ERA5's 10 m wind`.
+    `ERA5's 10 m wind`. `planned_title` is what the lower panel's title calls its rows after the
+    block's label: a block whose planned rows include post hoc ones says so.
     """
 
     label: str
@@ -1310,6 +1311,7 @@ class RowSetBlock(NamedTuple):
     planned_rows: pl.DataFrame | None = None
     hours_unit: str = "site-hours"
     reference_name: str = "ERA5"
+    planned_title: str = "planned contrasts"
 
     @property
     def title(self) -> str:
@@ -1790,7 +1792,7 @@ def stacked_contrasts(
                     zero_label="same as the second product",
                     better_label="first product better",
                     value_labels=True,
-                    panel_title=f"{block.label}: planned contrasts",
+                    panel_title=f"{block.label}: {block.planned_title}",
                     family_key=False,
                     condition_key=False,
                     figure_planning=figure_planning,

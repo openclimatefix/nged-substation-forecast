@@ -35,7 +35,7 @@ from typing import Final, NamedTuple
 import altair as alt
 import polars as pl
 from figure_numbers import WIND_FIGURE_NUMBERS
-from past_solar_leaderboard import ABSOLUTE_SECTION, PLANNED_CONTRAST_SECTION, contrast_section
+from past_solar_leaderboard import ABSOLUTE_SECTION, contrast_section
 from past_solar_leaderboard_charts import (
     ASSETS_DIR,
     absolute_rows,
@@ -46,7 +46,12 @@ from past_solar_leaderboard_charts import (
 )
 from past_wind_leaderboard import BLOCK_SETTINGS, ROW_SETS
 from sources import WIND_LEADERBOARD_DIR
-from studies.charts import RowSetBlock, stacked_contrasts, stacked_leaderboard
+from studies.charts import (
+    POST_HOC_SUFFIX,
+    RowSetBlock,
+    stacked_contrasts,
+    stacked_leaderboard,
+)
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -91,6 +96,15 @@ FOLD_COVERING_EFFECT: Final[dict[str, str]] = {
     ),
 }
 """Blocks whose fold-covering refit was measured, with the measured bound the caption states."""
+
+POST_HOC_PLANNED_TITLE: Final[str] = "planned and post hoc contrasts"
+"""What a block's lower panel is titled, after the block's label, where it holds post hoc rows."""
+
+UNDRAWN_PLANNED_ICON_NOTE: Final[str] = (
+    "The ICON contrasts that the study plan specified at 100 m are reported on the page, not "
+    "drawn here."
+)
+"""The caption line that says where the plan's own ICON contrasts, which the figure lacks, are."""
 
 CAPACITY: Final[str] = "Capacity is each generator's 99th-percentile output."
 DOTS: Final[str] = "Dot: estimate. Line: 95% interval from resampling whole months."
@@ -247,6 +261,7 @@ def _block(
     *, common: _CommonFields, rows: pl.DataFrame, planned: pl.DataFrame | None = None
 ) -> RowSetBlock:
     """Return a block holding `rows` and, for the contrast chart, its planned contrasts."""
+    post_hoc = planned is not None and planned["label"].str.ends_with(POST_HOC_SUFFIX).any()
     return RowSetBlock(
         label=common.label,
         dates=common.dates,
@@ -255,6 +270,7 @@ def _block(
         planned_rows=planned,
         hours_unit=common.hours_unit,
         reference_name=common.reference_name,
+        planned_title=POST_HOC_PLANNED_TITLE if post_hoc else "planned contrasts",
     )
 
 
@@ -306,7 +322,7 @@ def build_blocks(
             printed=printed.tables[contrast_section(reference_label=row_set.reference_label)],
         )
         planned = planned_rows(
-            frame=frame, row_set=row_set, printed=printed.tables[PLANNED_CONTRAST_SECTION]
+            frame=frame, row_set=row_set, printed=printed.tables[row_set.planned_heading]
         )
         contrast_blocks.append(_block(common=common, rows=contrasts, planned=planned))
     return leaderboard_blocks, contrast_blocks
@@ -356,6 +372,7 @@ def contrasts_figure(
                 "arm's. Lower panel: that row set's planned contrasts, the first arm's error minus "
                 "the second's; each row names both arms."
             ),
+            UNDRAWN_PLANNED_ICON_NOTE,
             BLOCKS_NOT_COMPARABLE,
             STATION_SCOPE,
             *uncovered_month_note(shares=shares),

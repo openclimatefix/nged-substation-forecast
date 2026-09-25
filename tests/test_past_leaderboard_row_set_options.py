@@ -322,6 +322,37 @@ def test_a_post_hoc_contrast_is_drawn_unplanned_even_if_its_interval_row_says_pl
     assert flags[ENS.arm] is False
 
 
+def test_a_row_sets_planned_heading_names_its_report_table_and_its_intervals_section(
+    tmp_path: Path,
+) -> None:
+    # Catches a report that heads a table holding post hoc rows "Planned contrasts", and a
+    # default row set whose heading moved.
+    module = _load()
+    charts = _charts_module()
+    plain = _score(tmp_path=tmp_path)
+    heading = module.POST_HOC_PLANNED_CONTRAST_SECTION
+    marked = _score(
+        tmp_path=tmp_path,
+        post_hoc_contrasts=((ENS.arm, REFERENCE.arm),),
+        planned_heading=heading,
+    )
+
+    assert plain.row_set.planned_heading == module.PLANNED_CONTRAST_SECTION
+    assert f"#### {module.PLANNED_CONTRAST_SECTION}" in module.render_report(results=[plain])
+    assert f"#### {heading}" in module.render_report(results=[marked])
+    assert heading.startswith("Planned and post hoc contrasts")
+    sections = set(module.intervals_frame(results=[marked])["section"])
+    assert heading in sections
+    assert module.PLANNED_CONTRAST_SECTION not in sections
+    report = charts.read_report(report_text=module.render_report(results=[marked]))
+    drawn = charts.planned_rows(
+        frame=module.intervals_frame(results=[marked]),
+        row_set=marked.row_set,
+        printed=report["Test farms"].tables[heading],
+    )
+    assert drawn["label"].to_list() == [f"{PLANNED.label} (post hoc)"]
+
+
 def test_a_farm_hours_heading_is_read() -> None:
     # Catches a heading regex that knows only "common site-hours".
     module = _load()

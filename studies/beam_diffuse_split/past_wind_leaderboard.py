@@ -222,6 +222,7 @@ ROW_SETS: Final[tuple[leaderboard.RowSet, ...]] = (
         other_fit_sections=(),
         exploratory_in_planned=(("icon_d2_wind", "ukv_wind"),),
         post_hoc_contrasts=POST_HOC_CONTRASTS,
+        planned_heading=leaderboard.POST_HOC_PLANNED_CONTRAST_SECTION,
         hours_unit="farm-hours",
     ),
     leaderboard.RowSet(

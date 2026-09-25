@@ -31,7 +31,6 @@ import polars as pl
 from figure_numbers import FIGURE_NUMBERS
 from past_solar_leaderboard import (
     ABSOLUTE_SECTION,
-    PLANNED_CONTRAST_SECTION,
     POST_HOC_ARMS,
     ROW_SETS,
     RowSet,
@@ -386,7 +385,7 @@ def planned_rows(
         post_hoc = label != contrast.label
         row = _one(
             frame=frame,
-            section=PLANNED_CONTRAST_SECTION,
+            section=row_set.planned_heading,
             setting="pooled",
             treatment=contrast.treatment.arm,
             reference=contrast.reference.arm,
@@ -394,7 +393,7 @@ def planned_rows(
         _check_row(name=label, row=row, printed=printed[label])
         second = _second(
             frame=frame,
-            section=PLANNED_CONTRAST_SECTION,
+            section=row_set.planned_heading,
             arm=contrast.treatment.arm,
             reference=contrast.reference.arm,
         )
@@ -456,7 +455,7 @@ def build_blocks(
             printed=printed.tables[contrast_section(reference_label=row_set.reference_label)],
         )
         planned = planned_rows(
-            frame=frame, row_set=row_set, printed=printed.tables[PLANNED_CONTRAST_SECTION]
+            frame=frame, row_set=row_set, printed=printed.tables[row_set.planned_heading]
         )
         contrast_blocks.append(
             RowSetBlock(

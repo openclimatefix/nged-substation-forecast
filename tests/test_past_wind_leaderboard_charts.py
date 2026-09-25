@@ -309,3 +309,69 @@ def test_the_contrast_figure_carries_the_significance_change_line() -> None:
     )
 
     assert "ICON-EU minus UKV is +0.126 points" in json.dumps(figure.to_dict())
+
+
+def _planned_titles(*, block: RowSetBlock, module: ModuleType) -> list[str]:
+    figure = module.contrasts_figure(
+        blocks=[block], shares=_all_shares(), intervals=_intervals(rows=[])
+    ).to_dict()
+    texts = [
+        title["text"] if isinstance(title["text"], str) else " ".join(title["text"])
+        for title in _titles(figure)
+    ]
+    return [text for text in texts if text.startswith(f"{block.label}:") and "contrasts" in text]
+
+
+def _titles(spec: object) -> list[dict]:
+    """Return every `title` object of a chart spec that carries a `text`, at any depth."""
+    found = []
+    if isinstance(spec, dict):
+        title = spec.get("title")
+        if isinstance(title, dict) and "text" in title:
+            found.append(title)
+        for value in spec.values():
+            found += _titles(value)
+    elif isinstance(spec, list):
+        for value in spec:
+            found += _titles(value)
+    return found
+
+
+def test_a_block_with_post_hoc_rows_titles_its_planned_panel_planned_and_post_hoc() -> None:
+    # Catches a panel holding post hoc rows called "planned contrasts", and a panel of purely
+    # planned rows that gains the post hoc wording.
+    module = _load()
+    plain = _block(reference_name="ERA5")
+    marked = plain._replace(
+        planned_rows=plain.planned_rows.with_columns(
+            label=pl.col("label") + " (post hoc)", planned=pl.lit(value=False)
+        )
+    )
+    build = module._block
+    common = module._CommonFields(
+        label="Main", dates="Aug 2024", site_hours=8, hours_unit="farm-hours", reference_name="ERA5"
+    )
+
+    plain_block = build(common=common, rows=plain.rows, planned=plain.planned_rows)
+    marked_block = build(common=common, rows=plain.rows, planned=marked.planned_rows)
+
+    assert _planned_titles(block=plain_block, module=module)[-1] == "Main: planned contrasts"
+    assert (
+        _planned_titles(block=marked_block, module=module)[-1]
+        == "Main: planned and post hoc contrasts"
+    )
+
+
+def test_the_contrast_figure_says_the_plans_100_m_icon_contrasts_are_not_drawn() -> None:
+    # Catches a figure whose planned-contrast panels leave out the ICON contrasts the plan named
+    # without saying that they are reported elsewhere.
+    module = _load()
+
+    figure = module.contrasts_figure(
+        blocks=[_block(reference_name="ERA5")], shares=_all_shares(), intervals=_intervals(rows=[])
+    )
+
+    assert (
+        "The ICON contrasts that the study plan specified at 100 m are reported on the page, not "
+        "drawn here." in json.dumps(figure.to_dict())
+    )
