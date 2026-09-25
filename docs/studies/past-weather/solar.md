@@ -38,8 +38,8 @@ impossible value are left out for every product; see [Limitations](#limitations)
 
 ![Figure 1: CAMS has the lowest error of the gridded products tested on each of the four row sets](../assets/sunshine_leaderboard.svg)
 
-![Figure 2: CAMS beats ERA5 on every row set (exploratory), and the lower panel of each block holds
-that row set's planned contrasts](../assets/sunshine_contrasts.svg)
+![Figure 2: CAMS beats ERA5 by 3.7 to 4.1 points on every row set (exploratory). The lower panel of
+each block holds that row set's planned contrasts](../assets/sunshine_contrasts.svg)
 
 **At these six farms, the page recommends the following products for the four consumers of past
 weather.**
@@ -386,9 +386,6 @@ November 2024, and it is higher in 8 of the 10 calendar months the report holds 
 change (`report.md`), roughly equal in June and 0.01 lower in April. The row set's November 2024
 start rests on the documented change of radiation scheme.
 
-<!-- TODO(rerun): the extra row set's numbers throughout this page come from the leaderboard re-run
-(solar_leaderboard_2) under folds that cover every calendar month; rewrite them from that report -->
-
 **The direct beam Open-Meteo serves for ARPEGE Europe and KNMI HARMONIE-AROME is not scored, because
 Open-Meteo derives it from each weather model's global irradiance with a separation model
 (exploratory).** Open-Meteo's documentation says so for both products: only global irradiance is
@@ -712,9 +709,9 @@ stamped 11:00, 11:30, and 12:00, was not tested, so part of the gap may belong t
 conversion rather than to SARAH-3. A steady bias could not explain the gap either, because the
 XGBoost model fitted to each generator corrects a steady bias.
 
-<!-- TODO(rerun): SARAH-3 minus CAMS on the extra row set (an exploratory contrast the
-solar_leaderboard_2 run prints) and its interval belong here; write nothing until that report exists
--->
+**On the extra row set, SARAH-3's error is 0.415 points higher than CAMS's [0.245, 0.582]
+(exploratory).** SARAH-3's own error there is 5.61% and CAMS's is 5.20%. The gap points the same way
+as on the main row set, where it is 0.402 points [0.294, 0.498].
 
 ### ICON-DREAM-EU beats ERA5 but not the ICON weather models
 
@@ -1007,9 +1004,12 @@ November 2024, inside this row set, which the panel's own splits do not separate
 set (5 of 5 folds, exploratory).** The gap is the difference between the two products' mean absolute
 errors above, 8.29% against 8.87%.
 
-<!-- TODO(rerun): the extra row set's ranking claims are unmeasured until the refit under folds that
-cover every calendar month; rewrite this section and the previous one from the solar_leaderboard_2
-report -->
+**The ranking of the five arms in the extra row set's planned contrasts is unchanged when the folds
+cover every calendar month.** The order is ICON-D2, ECMWF-IFS-HRES, ICON-EU, DMI HARMONIE-AROME,
+KNMI HARMONIE-AROME, on the CPU at the first XGBoost setting. Under such folds, none of the three
+planned contrasts changes sign or significance, and each moves by at most 0.06 points at the first
+setting. The [fold-design measurement](https://github.com/openclimatefix/nged-substation-forecast/blob/fdddb065/studies/era_fold_design/README.md)
+reports the check.
 
 ### A product's own direct beam adds little on the main row set
 
@@ -1027,8 +1027,8 @@ is modelled from its own global irradiance. ICON-DREAM-EU's own-beam gain of 0.0
 0.059] disappears on the record row set, where it is −0.005 points [−0.027, +0.018], so this result
 should not be read as settled.
 
-![Figure 12: On the main row set every product with its own direct beam, except ERA5, gains 0.03 to
-0.10 points from it; on the extra row set UKV and ICON-D2 gain and ECMWF-IFS-HRES
+![Figure 12: On the main rows every product with its own direct beam, except ERA5, gains 0.03 to
+0.10 points from it; on the extra rows UKV and ICON-D2 gain and ECMWF-IFS-HRES
 loses](../assets/sunshine_own_beam.svg)
 
 **SARAH-3's direct beam is modelled from its own global irradiance, so this page scores SARAH-3's
@@ -1045,8 +1045,10 @@ an exploratory result in the opposite direction to the finding on the main row s
 beam (+0.01 [−0.05, +0.07]) and ICON global's (+0.04 [−0.00, +0.08]) show no gain either, and only 2
 of the 5 folds agree in sign on ECMWF-IFS-HRES's own result, so not settled.
 
-<!-- TODO(rerun): the extra panel of Figure 12 and its numbers come from the solar_leaderboard_2
-re-run -->
+**On the extra rows, UKV and ICON-D2 gain from their own direct beam, exploratory.** UKV's own split
+is 0.144 points better than a synthetic Erbs split derived from its own global irradiance alone
+[0.085, 0.208], and ICON-D2's is 0.076 points better [0.031, 0.122]. Both gains hold in 5 of the 5
+folds.
 
 ### ECMWF ENS beats ERA5 and trails CAMS
 
@@ -1462,13 +1464,14 @@ weather product?](blending.md#solar-a-blend-beats-cams-given-its-neighbouring-ho
   cover.** The folds are blocks of whole months, so a held-out calendar month that occurs in more
   than one year can leave no training row for that calendar month. The share of site-hours in such
   months is 2.8% of the main row set (2,129 of 76,727 site-hours), 36.9% of the extra row set
-  (14,853 of 40,243, in April to June at every farm), 2.2% of the ENS row set (1,194 of 54,447), and
-  none of the weather-station row set. The extra row set's ranking claims are unmeasured until a
-  refit under folds that cover every calendar month. A check with the folds offset moves the main
-  row set's planned contrasts by at most 0.03 points.
-
-<!-- TODO(rerun): the extra row set's refit effect size under covering folds comes from the
-solar_leaderboard_2 run; state it in the extra-row-set bullet above -->
+  (14,853 of 40,243, in April to June at every farm), and 2.2% of the ENS row set (1,194 of 54,447).
+  The share for the weather-station row set was not measured, because the fold report holds no saved
+  solar station losses. A check with the folds offset moves the main row set's planned contrasts by
+  at most 0.03 points. On the extra row set, folds that cover every calendar month move the planned
+  contrasts by at most 0.06 points (0.10 at the second setting), with no change of sign or
+  significance. Every arm's absolute error is 0.12 to 0.20 points lower on the CPU (0.14 to 0.22 on
+  cuda), so the absolute errors printed for the extra row set are slightly pessimistic, and the
+  ranking is unchanged.
 
 ## Scope
 
@@ -1580,5 +1583,7 @@ and writes `report.md` and `losses.parquet` to
 `station_past_solar_charts.py`, which draws Figures 14 to 16 from those two files and stops unless
 the saved report matches the report the current code produces. The MIDAS Open files come from
 `studies/weather_downloads/fetch_midas_open.py`. `past_solar_leaderboard.py` reads every row set's
-saved losses and writes the leaderboard report that Figures 1 and 2 come from;
-`past_solar_leaderboard_charts.py` draws them.
+saved losses and writes the leaderboard report that Figures 1 and 2 come from, to
+`data/studies/beam_diffuse_split/past_weather_v2/solar_leaderboard_2/report.md`;
+`past_solar_leaderboard_charts.py` draws them. The two post hoc UKV rebuilds appear in the charts as
+"UKV, snapshot mean" and "UKV, both snapshots".
