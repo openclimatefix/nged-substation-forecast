@@ -20,12 +20,14 @@ Run it with `uv run python studies/beam_diffuse_split/ens_forecast_charts.py`, a
 --final-newline` before committing it.
 """
 
+import argparse
 import logging
 import math
 import re
 import sys
 from collections.abc import Sequence
 from datetime import datetime, timedelta
+from pathlib import Path
 from typing import Final, Literal
 
 import altair as alt
@@ -56,6 +58,10 @@ from weather_product_charts import ASSETS_DIR
 
 _LOG: Final[logging.Logger] = logging.getLogger("ens_forecast_charts")
 
+_results_dir: Path = OUTPUT_DIR
+"""The folder every chart reads its results from: `OUTPUT_DIR` unless `--results-dir` says
+otherwise. `main` sets it once, before any chart is drawn."""
+
 DomainType = Literal["solar", "wind"]
 DOMAINS: Final[tuple[DomainType, DomainType]] = ("solar", "wind")
 
@@ -64,10 +70,29 @@ SITES: Final[dict[DomainType, tuple[str, ...]]] = {
     "wind": ("W1", "W2", "W3"),
 }
 
-SCOPES: Final[dict[DomainType, str]] = {
-    "solar": "Six solar farms in Lincolnshire, every daylight hour, April 2024 to September 2026.",
-    "wind": "Three wind farms in Lincolnshire, every hour, August 2024 to September 2026.",
+SCOPE_PREFIX: Final[dict[DomainType, str]] = {
+    "solar": "Six solar farms in Lincolnshire, every daylight hour",
+    "wind": "Three wind farms in Lincolnshire, every hour",
 }
+
+
+def scope(*, domain: DomainType) -> str:
+    """Describe a technology's generators and the span of the rows in `_results_dir`.
+
+    Args:
+        domain: `solar` or `wind`.
+
+    Returns:
+        The scope line of a chart's subtitle, with the span read from the saved rows.
+    """
+    times = pl.read_parquet(_results_dir / f"{domain}_rows.parquet", columns=["time"])["time"]
+    return f"{SCOPE_PREFIX[domain]}, {times.min():%B %Y} to {times.max():%B %Y}."
+
+
+def both_scopes() -> str:
+    """Return the scope lines of both technologies, joined for a chart that draws both."""
+    return " ".join(scope(domain=domain) for domain in DOMAINS)
+
 
 CAPACITY: Final[str] = "Capacity is each generator's 99th-percentile output."
 DOTS: Final[str] = (
@@ -212,7 +237,7 @@ def _board(*, domain: DomainType, report: str) -> dict[str, dict[str, float]]:
     Returns:
         Arm to its `value`, `lower_95`, and `upper_95`, in percentage points.
     """
-    rows = pl.read_parquet(OUTPUT_DIR / "leaderboard.parquet").filter(
+    rows = pl.read_parquet(_results_dir / "leaderboard.parquet").filter(
         (pl.col("domain") == domain) & (pl.col("setting") == "pooled")
     )
     _check_printed(
@@ -242,7 +267,7 @@ def _contrasts(*, report: str) -> pl.DataFrame:
     Returns:
         One row per interval.
     """
-    rows = pl.read_parquet(OUTPUT_DIR / "intervals.parquet")
+    rows = pl.read_parquet(_results_dir / "intervals.parquet")
     _check_printed(
         report=report,
         texts=[
@@ -531,7 +556,7 @@ def leaderboard(
                 "inputs the blending page compared, scored on the same hours."
             ),
             f"{DOTS} {CAPACITY}",
-            f"{SCOPES['solar']} {SCOPES['wind']}",
+            both_scopes(),
             (
                 "The intervals are wide mainly because every row's error rises and falls together "
                 "from month to month; Figures 2, 9, and 10 compare rows on the same months."
@@ -673,7 +698,7 @@ def against_day0(*, contrasts: pl.DataFrame, title: str) -> alt.VConcatChart:
                 "is exploratory."
             ),
             f"{DOTS} {CAPACITY}",
-            f"{SCOPES['solar']} {SCOPES['wind']}",
+            both_scopes(),
         ],
         figure_planning=None,
     )
@@ -727,7 +752,7 @@ def ways(*, contrasts: pl.DataFrame, title: str) -> alt.VConcatChart:
                 "mark is exploratory."
             ),
             f"{DOTS} {CAPACITY}",
-            f"{SCOPES['solar']} {SCOPES['wind']}",
+            both_scopes(),
         ],
         figure_planning=None,
     )
@@ -803,7 +828,7 @@ def against_baselines(
                 f"{named}. {plan_note}"
             ),
             f"{DOTS} {CAPACITY}",
-            f"{SCOPES['solar']} {SCOPES['wind']}",
+            both_scopes(),
         ],
         figure_planning=None,
     )
@@ -861,7 +886,7 @@ def calendar_contrast(*, contrasts: pl.DataFrame, title: str) -> alt.VConcatChar
                 "are post hoc: added after the first and second science reviews."
             ),
             f"{DOTS} {CAPACITY}",
-            f"{SCOPES['solar']} {SCOPES['wind']}",
+            both_scopes(),
         ],
         figure_planning=None,
     )
@@ -957,7 +982,7 @@ def upsampling_contrasts(
                 "6-hour steps. All marks are exploratory."
             ),
             f"{DOTS} {CAPACITY}",
-            SCOPES[domain],
+            scope(domain=domain),
         ],
         figure_planning=None,
     )
@@ -1210,7 +1235,7 @@ def _example_days_figure(
                     "The panels pair the same calendar day at day 1 and at day 7, chosen by rule "
                     f"from measured output alone: {EXAMPLE_DAY_RULE[domain]}. Generator not named."
                 ),
-                SCOPES[domain],
+                scope(domain=domain),
                 CAPACITY,
             ],
             figure_planning=None,
@@ -1293,11 +1318,11 @@ def _seed_mean(*, domain: DomainType, arms: list[str]) -> pl.DataFrame:
     Returns:
         One row per (site, time, arm), with `measured` and `predicted`.
     """
-    capacity = pl.read_parquet(OUTPUT_DIR / f"{domain}_rows.parquet").select(
+    capacity = pl.read_parquet(_results_dir / f"{domain}_rows.parquet").select(
         "site", "time", "effective_capacity_mw"
     )
     return (
-        pl.scan_parquet(OUTPUT_DIR / f"{domain}_predictions.parquet")
+        pl.scan_parquet(_results_dir / f"{domain}_predictions.parquet")
         .filter(pl.col("setting") == "pooled", pl.col("arm").is_in(arms))
         .group_by("site", "time", "arm")
         .agg(pl.col("power_mw").first(), pl.col("prediction_mw").mean())
@@ -1459,7 +1484,7 @@ def per_generator(*, title: str, number: int) -> alt.VConcatChart:
     panels = []
     conditions = ("Day 1", "Day 7")
     for domain in DOMAINS:
-        losses = pl.read_parquet(OUTPUT_DIR / f"{domain}_losses.parquet").filter(
+        losses = pl.read_parquet(_results_dir / f"{domain}_losses.parquet").filter(
             pl.col("setting") == "pooled"
         )
         rows = []
@@ -1508,7 +1533,7 @@ def per_generator(*, title: str, number: int) -> alt.VConcatChart:
                 "day 7. Exploratory."
             ),
             f"{DOTS} {CAPACITY}",
-            f"{SCOPES['solar']} {SCOPES['wind']}",
+            both_scopes(),
         ],
         figure_planning=None,
     )
@@ -1538,8 +1563,21 @@ def _chosen(*, report: str) -> dict[DomainType, str]:
 
 def main() -> int:
     """Draw every chart and print the example periods' months for the page."""
+    global _results_dir  # noqa: PLW0603
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    report = (OUTPUT_DIR / "report.md").read_text()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--results-dir",
+        type=Path,
+        default=OUTPUT_DIR,
+        help=(
+            "The folder holding the horizons script's results. Defaults to the folder the "
+            "published page's results are in; pass `ens_forecast_horizons.RESULTS_DIR` for the "
+            "re-run on rows from 2024-12-01."
+        ),
+    )
+    _results_dir = parser.parse_args().results_dir
+    report = (_results_dir / "report.md").read_text()
     boards = {domain: _board(domain=domain, report=report) for domain in DOMAINS}
     contrasts = _contrasts(report=report)
     best = {
@@ -1559,7 +1597,7 @@ def main() -> int:
         for domain in DOMAINS
     }
     inputs = {
-        domain: pl.read_parquet(OUTPUT_DIR / f"{domain}_inputs.parquet") for domain in DOMAINS
+        domain: pl.read_parquet(_results_dir / f"{domain}_inputs.parquet") for domain in DOMAINS
     }
     solar_days_chart, solar_day_month = example_days_solar(
         inputs=inputs["solar"], title=TITLES["example_days_solar"]
@@ -1617,11 +1655,11 @@ TITLES: Final[dict[str, str]] = {
     ),
     "baselines": (
         "The ENS ensemble mean beats the best no-weather baseline by 1.4 points at day 5 for "
-        "solar and 4.0 points for wind, and by day 14 climatology is ahead"
+        "solar and 3.6 points for wind, and by day 14 climatology is ahead"
     ),
     "calendar": (
         "The ensemble mean beats the same model given no weather to day 10 with a day-of-year "
-        "calendar column, and to day 7 with calendar month"
+        "calendar column, and to day 7 for solar and day 5 for wind with calendar month"
     ),
     "example_days_solar": (
         "The clear-sky index keeps the solar day's shape, where linear interpolation shifts it late"
@@ -1630,11 +1668,11 @@ TITLES: Final[dict[str, str]] = {
         "For wind, every upsampling technique tracks the same day almost identically"
     ),
     "upsampling_solar": (
-        "Rebuilding solar radiation through the clear-sky index lowers the error at every horizon "
-        "to day 7"
+        "Rebuilding solar radiation through the clear-sky index lowers the error at days 0 to 3 "
+        "and at day 10"
     ),
     "upsampling_wind": (
-        "No way of interpolating ENS's wind moves the wind error by a tenth of a point"
+        "No way of interpolating ENS's wind moves the wind error by a tenth of a point to day 5"
     ),
     "solar_week": (
         "Given the day-1 ensemble mean, the XGBoost model follows the day-to-day swings at every "

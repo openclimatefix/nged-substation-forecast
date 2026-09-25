@@ -44,8 +44,9 @@ page](past-weather/methods.md) states the methods they share.
   disaggregation — should read.
 - [Which weather product best describes past wind?](past-weather/wind.md) — at the
   three metered wind farms, the Met Office's UKV and the German weather service's ICON-D2 describe
-  past hub-height wind best of the five products tested and both beat the ERA5 reanalysis, mostly
-  from April to September; ICON-EU also beats ERA5; and ICON global has the largest error of the
+  past hub-height wind best of the five products tested and both beat the ERA5 reanalysis, by
+  more from April to September in intervals estimated separately for each half of the year; ICON-EU
+  also beats ERA5; and ICON global has the largest error of the
   five, about half of its gap to ICON-EU a pair of steps in the wind Open-Meteo's archive serves for
   it at one generator.
 - [Does blending weather products beat the best single weather
@@ -72,7 +73,7 @@ by
 a
   post hoc check, over the same model given no weather at all. The ensemble mean beats the control
   member and beats training on every member, and rebuilding solar radiation through the clear-sky
-  index beats the straight-line resample the live service uses today.
+  index beats the straight-line resample the live service uses today at days 0 to 3.
 - [Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?](forecasts/matched-lead.md)
   — at the 6 solar farms and 3 wind farms, and reading each product as the study does, ECMWF's
   ensemble mean beats UKV, ICON-EU, and GEFS at matched lead for solar; for wind it beats UKV and

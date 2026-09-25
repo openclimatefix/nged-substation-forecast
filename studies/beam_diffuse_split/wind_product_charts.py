@@ -295,7 +295,11 @@ def _half_years(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         panels=[panel],
         number=WIND_FIGURE_NUMBERS["half_years"],
         figure_planning=figure_planning,
-        title="UKV's and ICON-D2's advantage over ERA5 is larger from April to September",
+        title=(
+            "UKV's and ICON-D2's advantage over ERA5 is estimated larger from April to September "
+            "than from October to March, from intervals resampled separately for each half of the "
+            "year"
+        ),
         subtitle=[DOTS, f"{CAPACITY} {SCOPE}"],
     )
 
@@ -359,7 +363,10 @@ def _icon_d2_against_ukv(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         panels=panels,
         number=WIND_FIGURE_NUMBERS["icon_d2_leads"],
         figure_planning=figure_planning,
-        title="ICON-D2 leads UKV across the window, but not since UKV's upgrade",
+        title=(
+            "ICON-D2 leads UKV across the window, and its lead is not statistically significant "
+            "since UKV's upgrade, from separately estimated periods"
+        ),
         subtitle=[
             (
                 "ICON-D2's mean absolute error minus UKV's. The UKV-at-80-m and "
@@ -686,8 +693,10 @@ def _era5_by_year() -> alt.VConcatChart:
         number=WIND_FIGURE_NUMBERS["era5_by_year"],
         figure_planning=figure_planning,
         title=(
-            "On January to September of each year, UKV's lead over ERA5 grew in 2026; ICON-EU's "
-            "and ICON-D2's did not"
+            "On January to September of each year, UKV's lead over ERA5 is larger in 2026 than in "
+            "2025, by a change whose interval resamples each year's months separately; ICON-EU's "
+            "and ICON-D2's leads did not change by a margin statistically significant at the 5% "
+            "level"
         ),
         subtitle=[
             (

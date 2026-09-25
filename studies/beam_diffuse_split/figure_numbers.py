@@ -2,7 +2,7 @@
 
 The page `past-weather/solar` holds 17 figures. `FIGURE_NUMBERS` gives each figure's
 number by name, so renumbering a figure is one edit here. The redraw script reads the numbers from
-this map when it draws each figure. The page `weather-products-for-past-wind` holds 15 figures,
+this map when it draws each figure. The page `past-weather/wind` holds 15 figures,
 numbered by `WIND_FIGURE_NUMBERS` in the same way.
 """
 
@@ -144,18 +144,6 @@ WIND_SVG_FIGURES: Final[dict[str, WindFigureKey]] = {
     "station_wind_season": "station_season",
 }
 """The figure each past-wind SVG in `docs/studies/assets/` feeds, by file stem."""
-
-WIND_SUPERSEDED_SVGS: Final[frozenset[str]] = frozenset(
-    {
-        "wind_headline",
-        "wind_icon_dream_leaderboard",
-        "wind_icon_dream_planned_contrasts",
-        "ens_hres_wind_leaderboard",
-        "station_wind_headline",
-    }
-)
-"""The SVGs no past-wind figure uses any more, still on disk because the past-wind page links them
-until its prose is rewritten. The leaderboard and contrast charts replace them."""
 
 WindRowSetType = Literal["main", "ecmwf", "station"]
 """The row sets that draw one panel each of a lettered past-wind figure."""
