@@ -242,6 +242,72 @@ has not been checked against DMI's own files.
 
 "Latency" in this table is how far the archive lags real time.
 
+### Weather-station observations
+
+**The studies also read one source of station observations, the Met Office's MIDAS Open, which has
+no row in the tables above because it is a set of points rather than a gridded product.** MIDAS is
+the Met Office Integrated Data Archive System. MIDAS Open is its open release, published by the
+Centre for Environmental Data Analysis (CEDA) under the [Open Government Licence
+v3.0](https://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/). The release read
+here is `dataset-version-202607`, quality-control version 1. The release covers 2017-01-01 to
+2025-12-31. CEDA releases MIDAS Open once a year, so the files hold only past weather. The
+[catalogue](../roadmap/data-sources.md#weather-data) lists no station source, and the project
+ingests none. See [the catalogue's summary of what the station arms
+found](../roadmap/data-sources.md#met-office-weather-station-observations-midas-open).
+
+**The studies downloaded 10 of the 86 radiation stations whose records overlap their years, and 38
+hourly-weather stations.** The lists were typed by hand, and one distance rule reproduces them: a
+station is included if its record runs into 2025 or later and it lies within 100 km of at least one
+of the nine anonymised study sites. That rule gives the 10 radiation stations and 37 of the 38
+hourly-weather stations. The 38th station's record ends in 2024, and the download holds it although
+it fails the record test. The other 76 radiation stations are all 107 km or more from every solar
+farm. See [how the stations were
+chosen](../studies/weather-products-for-past-solar.md#how-the-stations-were-chosen).
+
+**The variables are hourly global irradiation, 10 m wind, and air temperature.**
+
+- **Global horizontal irradiation** is an hourly total in kJ m⁻² over the hour ending at the
+  timestamp, in UTC. Dividing by 3.6 gives the hour's mean irradiance in W m⁻². The diffuse and
+  direct columns are empty at all 10 stations.
+- **10 m wind speed and direction** are a 10-minute mean over the window from 20 to 10 minutes
+  before the timestamp ("HH-20 to HH-10" in the Met Office's notation), with speeds in whole knots
+  and directions in steps of 10 degrees. Only 18 of the 38 stations report an hourly wind speed. The
+  wind study did not find the averaging window documented for the 4 stations that report the
+  automatic-weather-station hourly message type.
+- **Air temperature** is a spot reading at the timestamp, reported at all 38 stations. Some stations
+  report only once a day.
+
+**Measured against gridded products, a station's irradiance scores between CAMS and ERA5 on
+sunshine, and a station's 10 m wind scores worse than ERA5's on wind.** For six solar farms in
+Lincolnshire, all sharing one radiation station 17 to 31 km away, the station's irradiance and
+temperature score worse than CAMS and better than ERA5, and adding the station's irradiance to CAMS
+lowers CAMS's error. The figures and intervals are in [Met Office weather-station observations as a
+stand-in for a gridded
+product](../studies/weather-products-for-past-solar.md#met-office-weather-station-observations-as-a-stand-in-for-a-gridded-product).
+For three wind farms, each farm's nearest anemometer, 6 to 18 km away, gives a larger error than
+ERA5's 10 m wind, and lowers UKV's error when added to it. The figures are in [One nearby 10 m
+weather station trails ERA5's 10 m wind on its own, and lowers UKV's error when added to
+it](../studies/weather-products-for-past-wind.md#one-nearby-10-m-weather-station-trails-era5s-10-m-wind-on-its-own-and-lowers-ukvs-error-when-added-to-it).
+
+**Every station result shares four limits.**
+
+- **The data end on 2025-12-31.** The station arms therefore score fewer hours than the main arms
+  and end before the Met Office's UKV upgrade of January 2026. See [what the station files hold, and
+  where they
+  end](../studies/weather-products-for-past-solar.md#what-the-station-files-hold-and-where-they-end).
+- **The quality-control flags are kept as delivered, and no row is dropped on a flag.** Flag 106
+  marks whole stations or runs of several months rather than isolated bad hours. The wind study did
+  not check whether excluding a flagged station moves its contrasts, and the solar study checked
+  only the 107 site-hours whose flag differs from the usual value.
+- **Each planned contrast reads one nearest station per farm.** The six solar farms share one
+  radiation station, so the results do not say how a different station would compare.
+- **MIDAS Open's other wind datasets were not searched for the 12 hourly-weather stations with no
+  wind in the downloaded file,** so a nearer anemometer may exist. See [how nearby weather stations
+  were added](../studies/weather-products-for-past-wind.md#how-nearby-weather-stations-were-added).
+
+**The studies did not research whether a crowd-sourced observation dataset, such as a network of
+amateur weather stations, would add anything to a station arm.**
+
 ## Candidates for the past-sunshine study
 
 **Of the products surveyed, ECMWF IFS HRES 9 km, CERRA, and COSMO-R6G2 rank highest for the

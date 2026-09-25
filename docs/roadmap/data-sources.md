@@ -674,6 +674,18 @@ error by about 1.5% relative. On the 31 km reanalysis it added nothing detectabl
 retrieval's beam field is worth paying for depends on what a supplier charges for it, which that
 experiment does not know.
 
+### Met Office weather-station observations (MIDAS Open)
+
+**The project ingests no weather-station observations, and the studies read the Met Office's MIDAS
+Open only to test whether a nearby station stands in for a gridded product.** MIDAS Open is released
+once a year, and its current release ends on 2025-12-31. MIDAS Open can therefore feed offline work
+but not the live forecast. On sunshine, a nearby station's irradiance scored worse than CAMS and
+better than ERA5. On wind, a nearby anemometer scored worse than ERA5's 10 m wind. Adding a
+station's observations to a gridded product (CAMS on sunshine, UKV on wind) lowered that product's
+error, so neither result rules a station out as an extra input. The licence, the stations fetched,
+the variables, the results, and the limits of both studies are in the [weather products
+survey](../background/weather-products-survey.md#weather-station-observations).
+
 ### UKV assimilates satellite cloud, and carries a fixed aerosol climatology
 
 **UKV's radiation scheme sees no time-varying aerosol**, which matters because aerosol sets how
