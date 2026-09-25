@@ -29,19 +29,26 @@ def test_figure_numbers_run_from_1_to_17_with_no_gap_or_duplicate() -> None:
     assert numbers == list(range(1, 18))
 
 
-def test_every_previous_svg_feeds_a_figure_or_is_listed_as_dropped() -> None:
+def test_every_solar_svg_feeds_a_figure_or_is_listed_as_superseded() -> None:
     # Catches a solar-page SVG the map forgot, whose number would then be typed by hand.
     module = _load()
     stems = {
         path.stem for path in ASSETS_DIR.glob("*.svg") if path.stem.startswith(SOLAR_SVG_PREFIXES)
     }
 
-    assert stems <= set(module.SVG_FIGURES)
+    assert stems <= set(module.SVG_FIGURES) | module.SUPERSEDED_SVGS
+
+
+def test_a_superseded_svg_feeds_no_figure() -> None:
+    # Catches a stem that is both drawn for a figure and listed for deletion.
+    module = _load()
+
+    assert not set(module.SVG_FIGURES) & module.SUPERSEDED_SVGS
 
 
 def test_every_figure_key_named_by_an_svg_has_a_number() -> None:
     module = _load()
-    keys = {key for key in module.SVG_FIGURES.values() if key is not None}
+    keys = set(module.SVG_FIGURES.values())
 
     assert keys == set(module.FIGURE_NUMBERS)
 
@@ -65,12 +72,6 @@ def test_figure_numbers_follow_the_page_order_of_the_outline() -> None:
     assert numbers["contrasts"] == 2
 
 
-def test_the_dropped_station_models_work_figure_has_no_number() -> None:
-    module = _load()
-
-    assert module.SVG_FIGURES["station_past_solar_models_work"] is None
-
-
 def test_the_svgs_map_to_the_figures_the_outline_names() -> None:
     module = _load()
     figures = module.SVG_FIGURES
@@ -78,19 +79,9 @@ def test_the_svgs_map_to_the_figures_the_outline_names() -> None:
     def stems(key: str) -> set[str]:
         return {stem for stem, figure in figures.items() if figure == key}
 
-    assert stems("leaderboard") == {
-        "sunshine_leaderboard",
-        "sunshine_all_leaderboard",
-        "ens_past_solar_leaderboard",
-        "station_past_solar_leaderboard",
-    }
-    assert stems("contrasts") == {
-        "sunshine_headline",
-        "sunshine_all_contrasts",
-        "ens_past_solar_planned_contrasts",
-        "station_past_solar_planned_contrasts",
-    }
-    assert stems("weather_model_rivals") == {"sunshine_icon_eu_rivals", "sunshine_ukv_against_era5"}
+    assert stems("leaderboard") == {"sunshine_leaderboard"}
+    assert stems("contrasts") == {"sunshine_contrasts"}
+    assert stems("weather_model_rivals") == {"sunshine_weather_model_rivals"}
     assert stems("per_generator") == {"station_past_solar_per_generator"}
     assert figures["sunshine_own_beam"] == "own_beam"
     assert figures["station_past_solar_controls"] == "station_controls"

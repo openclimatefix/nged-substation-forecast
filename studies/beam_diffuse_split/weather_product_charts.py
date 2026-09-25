@@ -1,16 +1,18 @@
-"""Draw the fifteen anonymised charts for the write-up on which product best describes sunshine.
+"""Draw the anonymised charts of the past-solar page that read the panel reports.
 
 One-off throwaway script for the charts in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/830>. The write-up is
 <https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-solar/>.
+`figure_numbers.FIGURE_NUMBERS` gives each chart's number, and `past_solar_leaderboard_charts.py`
+draws the page's leaderboard and contrasts.
 
 **Every number a chart shares with the report is read from the report `weather_products.py`
-wrote for the `long` panel**, so a chart cannot disagree with the page. Figure 8 and the satellite
-rows of Figure 7 read the `record` panel's report and table instead, because only that panel reaches
-back to 2021. Figures 15 and 16 read the `all` panel's own report and table, because that panel's
-row set is shorter and starts later, from November 2024. Three charts also draw numbers the report
-does not print, computed from `losses.parquet` without refitting any model: the leaderboard's
-intervals, and the two "models work" charts' out-of-fold predictions and per-generator errors.
+wrote for the `long` panel**, so a chart cannot disagree with the page. The ERA5-by-year chart and
+the satellite rows of the SARAH-3 chart read the `record` panel's report and table instead,
+because only that panel reaches back to 2021. The own-beam chart's extra-rows panel reads the `all`
+panel's own report, because that panel's row set is shorter and starts later, from November 2024.
+The two "models work" charts also draw numbers the report does not print, computed from
+`losses.parquet` without refitting any model: the out-of-fold predictions and per-generator errors.
 
 Generators appear only as `A` to `F`. No chart plots output in megawatts or carries a calendar date
 beside a generator's output.
@@ -31,7 +33,7 @@ from typing import Final
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
-from studies.bootstrap import bootstrap_absolute
+from figure_numbers import FIGURE_NUMBERS
 from studies.charts import (
     CONTENT_WIDTH_PX,
     FAMILY_COLOURS,
@@ -39,11 +41,9 @@ from studies.charts import (
     PLOT_WIDTH_PX,
     ContrastKey,
     ProductFamily,
-    assert_matches_printed,
     figure,
     flip_contrast,
     interval_panel,
-    leaderboard_panel,
     planning,
     report_contrasts,
     report_errors,
@@ -516,12 +516,6 @@ SECTION_SATELLITE: Final[str] = (
     "SARAH-3 against CAMS, by the satellite behind SARAH-3 (exploratory)"
 )
 
-HEADLINE_DOMAIN: Final[tuple[float, float]] = (-4.5, 1.0)
-"""The x range of the headline's left panel."""
-
-LEADERBOARD_DOMAIN: Final[tuple[float, float]] = (4.0, 10.0)
-"""The x range of the leaderboard, covering every product's 95% interval with a small margin."""
-
 CAPACITY: Final[str] = "Capacity is each generator's 99th-percentile output."
 DOTS: Final[str] = "Dot: estimate. Line: 95% interval from resampling whole months."
 SCOPE: Final[str] = "Six solar farms in Lincolnshire, December 2022 to August 2026."
@@ -532,16 +526,16 @@ NEW_PRODUCTS_TITLE: Final[str] = (
     "CAMS beats SARAH-3 by about 0.4 points under every satellite, and ICON-DREAM-EU beats ERA5 by "
     "0.3 points"
 )
-"""Figure 7's title, which states the finding."""
+"""The title of the SARAH-3 and ICON-DREAM-EU figure, which states the finding."""
 
 ERA5_BY_YEAR_TITLE: Final[str] = (
     "On matched months, ERA5 trails both satellite retrievals by more than 3 points in every year "
     "from 2021 to 2026"
 )
-"""Figure 8's title, which states the finding."""
+"""The title of the ERA5-by-year figure, which states the finding."""
 
 ERA5_BY_YEAR_DOMAIN: Final[tuple[float, float]] = (-5.5, 0.5)
-"""Figure 8's x range, covering every year's interval with a small margin."""
+"""The ERA5-by-year figure's x range, covering every year's interval with a small margin."""
 
 LEADERBOARD_WIDTH: Final[str] = (
     "The intervals are wide mainly because every product's error swings together from month to "
@@ -551,7 +545,7 @@ LEADERBOARD_WIDTH: Final[str] = (
 
 def _product(arm: str) -> str:
     """Return the product an arm belongs to, such as `icon_eu` for `icon_eu_ctx_global`."""
-    return max((product for product in NAMES if arm.startswith(f"{product}_")), key=len)
+    return max((product for product in ALL_PANEL_NAMES if arm.startswith(f"{product}_")), key=len)
 
 
 def era5_by_year_rows(
@@ -609,7 +603,7 @@ def _rows(
     """
     return contrasts.with_columns(
         label=pl.Series(labels),
-        family=pl.Series([FAMILIES[_product(arm)] for arm in contrasts["treatment"]]),
+        family=pl.Series([ALL_PANEL_FAMILIES[_product(arm)] for arm in contrasts["treatment"]]),
         planned=pl.Series(planned or [False] * contrasts.height, dtype=pl.Boolean),
     )
 
@@ -630,141 +624,6 @@ def _served_contrast_name(*, treatment: str, reference: str) -> str:
     return name.replace("UKV", "Open-Meteo's hourly UKV")
 
 
-def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
-    """Draw every product's own mean absolute error, best first, with its 95% interval.
-
-    Bootstraps each product's absolute error from `losses.parquet` directly, the same
-    month-and-seed resampling `weather_products.py` uses for every contrast, because the report
-    prints only each product's point estimate, not its interval. No model is refitted.
-
-    Args:
-        losses: Every arm's rows from `losses.parquet`.
-        errors: Each product's pooled mean absolute error, read from the report.
-
-    Returns:
-        Figure 1.
-    """
-    order = sorted(errors, key=errors.__getitem__)
-    records = []
-    for product in order:
-        arm = f"{product}_global"
-        interval = bootstrap_absolute(losses=losses, arm=arm, metric=METRIC)
-        value = interval["value"] * PERCENTAGE_POINTS
-        assert_matches_printed(name=product, recomputed=value, printed=errors[product])
-        records.append(
-            {
-                "label": served_name(product),
-                "family": FAMILIES[product],
-                "value": value,
-                "lower_95": interval["lower_95"] * PERCENTAGE_POINTS,
-                "upper_95": interval["upper_95"] * PERCENTAGE_POINTS,
-            }
-        )
-    rows = pl.DataFrame(records)
-    panel = leaderboard_panel(rows=rows, x_domain=LEADERBOARD_DOMAIN, x_title=LEADERBOARD_X_TITLE)
-    return figure(
-        panels=[panel],
-        number=1,
-        figure_planning=None,
-        title=(
-            "CAMS has the lowest error of the eight products tested, SARAH-3 the second lowest, "
-            "and ERA5 the highest"
-        ),
-        subtitle=[
-            "Each product's own mean absolute error, sorted best first.",
-            DOTS,
-            LEADERBOARD_WIDTH,
-            CAPACITY,
-            SCOPE,
-            (
-                "UKV rebuilt from its snapshots, the page's live-service recommendation, scores "
-                "8.18% (post hoc; not drawn)."
-            ),
-        ],
-    )
-
-
-def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
-    """Draw every product against ERA5 above the four planned contrasts.
-
-    Args:
-        contrasts: Every contrast row in the report.
-        errors: Each product's mean absolute error.
-
-    Returns:
-        Figure 2.
-    """
-    order = sorted(errors, key=errors.__getitem__)
-    against_era5 = select_contrasts(
-        contrasts=contrasts,
-        wanted=[
-            ContrastKey(SECTION_AGAINST_ERA5, "all", f"{product}_global", "era5_global")
-            for product in order
-            if product != "era5"
-        ],
-    ).select("treatment", "difference", "lower_95", "upper_95")
-    era5 = pl.DataFrame(
-        {"treatment": ["era5_global"], "difference": [0.0], "lower_95": [0.0], "upper_95": [0.0]}
-    )
-    by_product = pl.concat([against_era5, era5]).sort(
-        pl.col("treatment").replace_strict({f"{p}_global": i for i, p in enumerate(order)})
-    )
-    left_rows = _rows(
-        contrasts=by_product,
-        labels=[f"{served_name(product)} · {_two_places(errors[product])}%" for product in order],
-    )
-    named = select_contrasts(
-        contrasts=contrasts,
-        wanted=[ContrastKey(SECTION_DECIDING, "all", t, r) for t, r in PLANNED],
-    )
-    right_rows = _rows(
-        contrasts=named,
-        labels=[_served_contrast_name(treatment=t, reference=r) for t, r in PLANNED],
-        planned=[True] * len(PLANNED),
-    )
-    figure_planning = planning(rows=[left_rows, right_rows])
-    left = interval_panel(
-        rows=left_rows,
-        x_domain=HEADLINE_DOMAIN,
-        x_title="Mean absolute error minus ERA5's (points of capacity)",
-        zero_label="same as ERA5",
-        better_label="better than ERA5",
-        panel_title="Every product against ERA5 (exploratory)",
-        figure_planning=figure_planning,
-    )
-    right = interval_panel(
-        rows=right_rows,
-        x_domain=(-3.0, 1.0),
-        x_title=X_TITLE,
-        zero_label="no difference",
-        better_label="first product better",
-        panel_title="The six planned contrasts",
-        family_key=False,
-        figure_planning=figure_planning,
-    )
-    return figure(
-        panels=[left, right],
-        number=2,
-        figure_planning=figure_planning,
-        title=(
-            "CAMS beats SARAH-3 by 0.4 points, and ICON-D2, the best of the four weather models "
-            "tested, by more than 2 points"
-        ),
-        subtitle=[
-            (
-                "Top: each product against ERA5 (exploratory); each label gives the product's own "
-                "error. Bottom: the six planned contrasts."
-            ),
-            f"{DOTS} {CAPACITY}",
-            SCOPE,
-            (
-                "UKV rebuilt from its snapshots, the page's live-service recommendation, scores "
-                "8.18% (post hoc; not drawn)."
-            ),
-        ],
-    )
-
-
 def _cams_breakdown(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     """Draw CAMS − ICON-D2 across the record, and by generator, season and calendar year.
 
@@ -774,7 +633,7 @@ def _cams_breakdown(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 6.
+        The figure.
     """
     groups = {
         "Whole record": [("all", "All hours", SECTION_DECIDING)],
@@ -818,7 +677,7 @@ def _cams_breakdown(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     ]
     return figure(
         panels=panels,
-        number=6,
+        number=FIGURE_NUMBERS["cams_breakdown"],
         figure_planning=figure_planning,
         title=(
             "CAMS's margin over ICON-D2 holds at every generator, in every season, and every year"
@@ -846,7 +705,7 @@ def _new_products(*, contrasts: pl.DataFrame, record_contrasts: pl.DataFrame) ->
         record_contrasts: Every contrast row in the `record` panel's report.
 
     Returns:
-        Figure 7.
+        The figure.
     """
     sarah, dream = NEW_PLANNED
     settings = ["All hours", "All hours, second XGBoost setting"]
@@ -900,7 +759,7 @@ def _new_products(*, contrasts: pl.DataFrame, record_contrasts: pl.DataFrame) ->
     ]
     return figure(
         panels=panels,
-        number=7,
+        number=FIGURE_NUMBERS["new_products"],
         figure_planning=figure_planning,
         title=NEW_PRODUCTS_TITLE,
         subtitle=[
@@ -925,7 +784,7 @@ def _era5_by_year() -> alt.VConcatChart:
     few months carries no interval and is left out.
 
     Returns:
-        Figure 8.
+        The figure.
     """
     by_year = pl.read_parquet(RECORD_DIR / "era5_by_year.parquet")
     products = ("cams", "sarah3", "icon_dream")
@@ -956,7 +815,7 @@ def _era5_by_year() -> alt.VConcatChart:
     ]
     return figure(
         panels=panels,
-        number=8,
+        number=FIGURE_NUMBERS["era5_by_year"],
         figure_planning=figure_planning,
         title=ERA5_BY_YEAR_TITLE,
         subtitle=[
@@ -1005,7 +864,7 @@ def _icon_d2_leads(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatC
         report_text: The report.
 
     Returns:
-        Figure 9.
+        The figure.
     """
     domain = (-2.0, 0.5)
     hourly_rows = _hourly_rows(contrasts=contrasts)
@@ -1055,7 +914,7 @@ def _icon_d2_leads(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatC
     )
     return figure(
         panels=[hourly, summary],
-        number=9,
+        number=FIGURE_NUMBERS["icon_d2_leads"],
         figure_planning=figure_planning,
         title="ICON-D2's advantage over ICON-EU shrinks within hours of each run",
         subtitle=[
@@ -1073,14 +932,14 @@ def _icon_d2_leads(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatC
     )
 
 
-def _icon_eu_rivals(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
-    """Draw ICON global and each UKV construction against ICON-EU, rival minus ICON-EU.
+def _icon_eu_rivals_rows(*, contrasts: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
+    """Return ICON global's and each UKV construction's rows against ICON-EU, rival minus ICON-EU.
 
     Args:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 10.
+        The ICON global rows, then the UKV rows.
     """
     icon_global = select_contrasts(
         contrasts=contrasts,
@@ -1125,59 +984,26 @@ def _icon_eu_rivals(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         ],
         planned=[True, False, False, False],
     )
-    figure_planning = planning(rows=[icon_global_rows, ukv_rows])
-    shared = {
-        "x_domain": (-0.6, 0.8),
-        "zero_label": "same as ICON-EU",
-        "better_label": "ICON-EU better",
-        "better_direction": "positive",
-        "width": 420,
-        "figure_planning": figure_planning,
-    }
-    panels = [
-        interval_panel(
-            rows=icon_global_rows,
-            x_title="",
-            panel_title="ICON global − ICON-EU",
-            **shared,  # ty: ignore[invalid-argument-type]
-        ),
-        interval_panel(
-            rows=ukv_rows,
-            x_title="Rival's mean absolute error minus ICON-EU's (points of capacity)",
-            panel_title="UKV − ICON-EU",
-            reference_labels=False,
-            **shared,  # ty: ignore[invalid-argument-type]
-        ),
-    ]
-    return figure(
-        panels=panels,
-        number=10,
-        figure_planning=figure_planning,
-        title=(
-            "UKV rebuilt from its snapshots beats ICON-EU, which beats ICON global and "
-            "Open-Meteo's hourly UKV"
-        ),
-        subtitle=[
-            (
-                "Each rival's mean absolute error minus ICON-EU's. Rows other than the two "
-                "all-hours rows were added after the first run."
-            ),
-            f"{DOTS} {CAPACITY}",
-            SCOPE,
-        ],
-    )
+    return icon_global_rows, ukv_rows
 
 
-def _ukv_against_era5(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
-    """Draw UKV − ERA5 by scope, for Open-Meteo's hourly value and for UKV rebuilt from snapshots.
+UKV_ERA5_CONDITIONS: Final[tuple[str, str]] = (
+    "Open-Meteo's hourly value",
+    "Rebuilt from its snapshots",
+)
+"""The two ways UKV's hourly value is built, as the UKV-against-ERA5 panel's conditions."""
+
+
+def _ukv_against_era5_rows(*, contrasts: pl.DataFrame) -> pl.DataFrame:
+    """Return UKV minus ERA5 by scope, for Open-Meteo's hourly value and for UKV rebuilt.
 
     Args:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 11.
+        The rows, with `condition` from `UKV_ERA5_CONDITIONS`.
     """
-    conditions = ("Open-Meteo's hourly value", "Rebuilt from its snapshots")
+    conditions = UKV_ERA5_CONDITIONS
     scopes = {
         "all": "All hours",
         "ukv_live": "Since August 2024",
@@ -1192,82 +1018,180 @@ def _ukv_against_era5(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     wanted.append(ContrastKey(SECTION_POST_ONLY, "post", "ukv_global", "era5_global"))
     labels = [label for label in scopes.values() for _ in conditions]
     labels.append("After the upgrade: XGBoost models trained on those 7 months")
-    rows = _rows(
+    return _rows(
         contrasts=select_contrasts(contrasts=contrasts, wanted=wanted), labels=labels
     ).with_columns(condition=pl.Series([*conditions * len(scopes), conditions[0]]))
-    figure_planning = planning(rows=[rows])
-    panel = interval_panel(
-        rows=rows,
-        x_domain=(-1.2, 0.6),
-        x_title="UKV's mean absolute error minus ERA5's (points of capacity)",
-        zero_label="same as ERA5",
-        better_label="UKV better",
-        conditions=conditions,
-        condition_title="UKV's hourly value",
-        figure_planning=figure_planning,
-    )
+
+
+def _weather_model_rivals(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
+    """Draw ICON-EU against ICON global and UKV, and UKV against ERA5, in one figure.
+
+    Args:
+        contrasts: Every contrast row in the report.
+
+    Returns:
+        The figure.
+    """
+    icon_global_rows, ukv_rows = _icon_eu_rivals_rows(contrasts=contrasts)
+    era5_rows = _ukv_against_era5_rows(contrasts=contrasts)
+    figure_planning = planning(rows=[icon_global_rows, ukv_rows, era5_rows])
+    shared = {"width": 420, "figure_planning": figure_planning}
+    against_icon_eu = {
+        "x_domain": (-0.6, 0.8),
+        "zero_label": "same as ICON-EU",
+        "better_label": "ICON-EU better",
+        "better_direction": "positive",
+    }
+    panels = [
+        interval_panel(
+            rows=icon_global_rows,
+            x_title="",
+            panel_title="ICON global − ICON-EU",
+            **against_icon_eu,  # ty: ignore[invalid-argument-type]
+            **shared,
+        ),
+        interval_panel(
+            rows=ukv_rows,
+            x_title="Rival's mean absolute error minus ICON-EU's (points of capacity)",
+            panel_title="UKV − ICON-EU",
+            reference_labels=False,
+            **against_icon_eu,  # ty: ignore[invalid-argument-type]
+            **shared,
+        ),
+        interval_panel(
+            rows=era5_rows,
+            x_domain=(-1.2, 0.6),
+            x_title="UKV's mean absolute error minus ERA5's (points of capacity)",
+            zero_label="same as ERA5",
+            better_label="UKV better",
+            conditions=UKV_ERA5_CONDITIONS,
+            condition_title="UKV's hourly value",
+            panel_title="UKV − ERA5",
+            family_key=False,
+            **shared,  # ty: ignore[invalid-argument-type]
+        ),
+    ]
     return figure(
-        panels=[panel],
-        number=11,
+        panels=panels,
+        number=FIGURE_NUMBERS["weather_model_rivals"],
         figure_planning=figure_planning,
         title=(
-            "UKV rebuilt from its snapshots beats ERA5 in every period; Open-Meteo's hourly UKV "
-            "does not since August 2024"
+            "UKV rebuilt from its snapshots beats ICON-EU, which beats ICON global and "
+            "Open-Meteo's hourly UKV; rebuilt UKV also beats ERA5 in every period"
         ),
         subtitle=[
-            (f"{DOTS} Rebuilt: the mean of UKV's two snapshots, added after the first run."),
+            (
+                "Top two panels: each rival's mean absolute error minus ICON-EU's. Bottom panel: "
+                "UKV's minus ERA5's, by period; UKV rebuilt is the mean of its two snapshots. Rows "
+                "other than the all-hours rows of the top two panels were added after the first "
+                "run."
+            ),
             (
                 "Since August 2024: Open-Meteo's own UKV download. The upgrade: January 2026; its "
                 "rows rest on 7 months, so their intervals are likely too narrow."
             ),
-            f"{CAPACITY} {SCOPE}",
+            f"{DOTS} {CAPACITY}",
+            SCOPE,
         ],
     )
 
 
-def _own_beam(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
-    """Draw each product's own beam/diffuse split against the Erbs split of its own global.
+OWN_BEAM_DOMAIN: Final[tuple[float, float]] = (-0.25, 0.2)
+"""The x range of both own-beam panels, covering every interval with a small margin."""
+
+
+def _own_beam_rows(
+    *, contrasts: pl.DataFrame, errors: dict[str, float], names: dict[str, str]
+) -> pl.DataFrame:
+    """Return each product's own beam/diffuse split minus the Erbs split of its own global.
 
     Args:
-        contrasts: Every contrast row in the report.
+        contrasts: Every contrast row in one panel's report.
         errors: Each product's mean absolute error, which sets the row order.
+        names: Each product's name as the page writes it.
 
     Returns:
-        Figure 12.
+        One row per product the report holds a split contrast for, best first, with `label`,
+        `family`, and `planned`.
     """
-    order = [p for p in sorted(errors, key=errors.__getitem__) if p not in UNUSABLE_SPLITS]
-    rows = _rows(
+    held = set(contrasts["treatment"])
+    order = [
+        p
+        for p in sorted(errors, key=errors.__getitem__)
+        if p not in UNUSABLE_SPLITS and f"{p}_split" in held
+    ]
+    return _rows(
         contrasts=select_contrasts(
             contrasts=contrasts,
             wanted=[ContrastKey(SECTION_SPLIT, "all", f"{p}_split", f"{p}_erbs") for p in order],
         ),
-        labels=[NAMES[product] for product in order],
+        labels=[names[product] for product in order],
     )
-    figure_planning = planning(rows=[rows])
-    panel = interval_panel(
-        rows=rows,
-        x_domain=(-0.2, 0.1),
-        x_title="Mean absolute error with its own beam minus with the Erbs split "
-        "(points of capacity)",
-        zero_label="no gain",
-        better_label="own beam better",
-        figure_planning=figure_planning,
+
+
+def _own_beam(
+    *,
+    contrasts: pl.DataFrame,
+    errors: dict[str, float],
+    all_contrasts: pl.DataFrame,
+    all_errors: dict[str, float],
+) -> alt.VConcatChart:
+    """Draw each product's own beam/diffuse split against the Erbs split, on two row sets.
+
+    The main row set's panel holds seven products. The extra row set's panel holds the same
+    products and ECMWF-IFS-HRES, scored on that row set's own rows.
+
+    Args:
+        contrasts: Every contrast row in the `long` panel's report.
+        errors: Each product's mean absolute error on the `long` panel, which sets the row order.
+        all_contrasts: Every contrast row in the `all` panel's report.
+        all_errors: Each product's mean absolute error on the `all` panel.
+
+    Returns:
+        The figure.
+    """
+    row_sets = (
+        ("Main rows: December 2022 to August 2026", contrasts, errors, NAMES),
+        ("Extra rows: November 2024 to August 2026", all_contrasts, all_errors, ALL_PANEL_NAMES),
     )
+    frames = [_own_beam_rows(contrasts=c, errors=e, names=names) for _, c, e, names in row_sets]
+    figure_planning = planning(rows=frames)
+    panels = [
+        interval_panel(
+            rows=rows,
+            x_domain=OWN_BEAM_DOMAIN,
+            x_title=(
+                "Mean absolute error with its own beam minus with the Erbs split "
+                "(points of capacity)"
+                if index == len(frames) - 1
+                else ""
+            ),
+            zero_label="no gain",
+            better_label="own beam better",
+            panel_title=title,
+            family_key=index == 0,
+            reference_labels=index == 0,
+            figure_planning=figure_planning,
+        )
+        for index, ((title, *_), rows) in enumerate(zip(row_sets, frames, strict=True))
+    ]
     return figure(
-        panels=[panel],
-        number=12,
+        panels=panels,
+        number=FIGURE_NUMBERS["own_beam"],
         figure_planning=figure_planning,
         title=(
-            "Every product with its own direct beam, except ERA5, gains 0.03 to 0.10 points from it"
+            "On the main rows every product with its own direct beam, except ERA5, gains 0.03 to "
+            "0.10 points from it; on the extra rows UKV and ICON-D2 gain and ECMWF-IFS-HRES loses"
         ),
         subtitle=[
             (
                 "Each product with its own published beam and diffuse, minus with the Erbs split "
                 "of its own global irradiance. SARAH-3 is left out: its direct beam is modelled "
-                "from its own global irradiance."
+                "from its own global irradiance. The two row sets are scored on their own rows, "
+                "so compare products within a panel."
             ),
             f"{DOTS} {CAPACITY}",
-            SCOPE,
+            "Six solar farms in Lincolnshire.",
         ],
     )
 
@@ -1279,7 +1203,7 @@ def _neighbours(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 13.
+        The figure.
     """
     conditions = (
         "Trained on the generator itself",
@@ -1317,7 +1241,7 @@ def _neighbours(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     )
     return figure(
         panels=[panel],
-        number=13,
+        number=FIGURE_NUMBERS["neighbours"],
         figure_planning=figure_planning,
         title="The ranking holds for a generator predicted from its neighbours",
         subtitle=[
@@ -1369,7 +1293,7 @@ def _implied_capacity_chart(*, report_text: str) -> alt.VConcatChart:
         report_text: The report.
 
     Returns:
-        Figure 14.
+        The figure.
     """
     rows = _implied_capacity_rows(report_text=report_text).with_columns(
         family=pl.col("product").replace_strict(FAMILIES),
@@ -1410,7 +1334,7 @@ def _implied_capacity_chart(*, report_text: str) -> alt.VConcatChart:
     grid = [alt.hconcat(*panels[i : i + 2], spacing=24) for i in range(0, len(panels), 2)]
     return figure(
         panels=grid,
-        number=14,
+        number=FIGURE_NUMBERS["implied_capacity"],
         figure_planning=None,
         title=(
             "Of the eight products tested, CAMS and SARAH-3 imply the steadiest capacity from "
@@ -1434,140 +1358,9 @@ def _implied_capacity_chart(*, report_text: str) -> alt.VConcatChart:
     )
 
 
-ALL_PANEL_LEADERBOARD_DOMAIN: Final[tuple[float, float]] = (4.5, 10.0)
-"""The x range of the `all`-panel leaderboard, covering every product's 95% interval.
-
-A tighter domain risks clipping a product's own interval: on this panel's twelve products, CAMS's
-lower bound and ARPEGE's upper bound sit closest to the edges, at 4.74 and 9.90.
-"""
-
-ALL_PANEL_SCOPE: Final[str] = "Six solar farms in Lincolnshire, November 2024 to August 2026."
-"""The `all` panel's row set is shorter than the other figures', which start December 2022."""
-
-
-def _all_product(arm: str) -> str:
-    """Return the `all`-panel product an arm belongs to, such as `ifs_hres` for `ifs_hres_split`.
-
-    Mirrors `_product`, against `ALL_PANEL_NAMES` rather than `NAMES`, because the `all` panel
-    scores four products `NAMES` does not carry.
-    """
-    return max((product for product in ALL_PANEL_NAMES if arm.startswith(f"{product}_")), key=len)
-
-
 def all_served_name(product: str) -> str:
     """Return an `all`-panel product's name, as `served_name` does, against `ALL_PANEL_NAMES`."""
     return "UKV, Open-Meteo's hourly value" if product == "ukv" else ALL_PANEL_NAMES[product]
-
-
-def _all_panel_leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
-    """Draw all twelve `all`-panel products' own mean absolute error, best first, with intervals.
-
-    Mirrors `_leaderboard`, on the `all` panel's own shorter row set (from November 2024), which
-    is what lets the four Open-Meteo models fetched at each site's own coordinates join the other
-    eight.
-
-    Args:
-        losses: Every arm's rows from the `all` panel's `losses.parquet`.
-        errors: Each product's pooled mean absolute error, read from the `all` panel's report.
-
-    Returns:
-        Figure 15.
-    """
-    order = sorted(errors, key=errors.__getitem__)
-    records = []
-    for product in order:
-        arm = f"{product}_global"
-        interval = bootstrap_absolute(losses=losses, arm=arm, metric=METRIC)
-        value = interval["value"] * PERCENTAGE_POINTS
-        assert_matches_printed(name=product, recomputed=value, printed=errors[product])
-        records.append(
-            {
-                "label": all_served_name(product),
-                "family": ALL_PANEL_FAMILIES[product],
-                "value": value,
-                "lower_95": interval["lower_95"] * PERCENTAGE_POINTS,
-                "upper_95": interval["upper_95"] * PERCENTAGE_POINTS,
-            }
-        )
-    rows = pl.DataFrame(records)
-    panel = leaderboard_panel(
-        rows=rows, x_domain=ALL_PANEL_LEADERBOARD_DOMAIN, x_title=LEADERBOARD_X_TITLE
-    )
-    return figure(
-        panels=[panel],
-        number=15,
-        figure_planning=None,
-        title="CAMS and SARAH-3 still lead when four more weather models are added",
-        subtitle=[
-            (
-                "Each product's own mean absolute error, sorted best first, on the 40,243 "
-                "generator-hours all 12 products share."
-            ),
-            DOTS,
-            (
-                "The intervals are wide mainly because every product's error swings together "
-                "from month to month, a swing Figure 16's paired contrasts cancel."
-            ),
-            CAPACITY,
-            ALL_PANEL_SCOPE,
-        ],
-    )
-
-
-def _all_panel_contrasts(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
-    """Draw the `all` panel's three planned contrasts, named before the run.
-
-    Args:
-        contrasts: Every contrast row in the `all` panel's report.
-        errors: Each product's mean absolute error, for each row's label.
-
-    Returns:
-        Figure 16.
-    """
-    planned = NEW_PLANNED_CONTRASTS["all"]
-    named = select_contrasts(
-        contrasts=contrasts,
-        wanted=[ContrastKey(SECTION_DECIDING, "all", t, r) for t, r in planned],
-    )
-    labels = [
-        f"{ALL_PANEL_NAMES[_all_product(t)]} − {ALL_PANEL_NAMES[_all_product(r)]} "
-        f"({_two_places(errors[_all_product(t)])}% vs {_two_places(errors[_all_product(r)])}%)"
-        for t, r in planned
-    ]
-    rows = named.with_columns(
-        label=pl.Series(labels),
-        family=pl.Series([ALL_PANEL_FAMILIES[_all_product(arm)] for arm in named["treatment"]]),
-        planned=pl.Series([True] * len(planned), dtype=pl.Boolean),
-    )
-    panel = interval_panel(
-        rows=rows,
-        x_domain=(-0.5, 1.5),
-        x_title=X_TITLE,
-        zero_label="no difference",
-        better_label="first product better",
-        panel_title="The three planned contrasts",
-        family_key=False,
-        figure_planning="planned",
-    )
-    return figure(
-        panels=[panel],
-        number=16,
-        figure_planning="planned",
-        title=(
-            "HARMONIE-AROME, as Open-Meteo serves it from DMI's and KNMI's feeds, trails the ICON "
-            "model of similar grid spacing; IFS-HRES against ICON-EU is not resolved"
-        ),
-        subtitle=[
-            "The three contrasts named in the study plan before any result existed.",
-            f"{DOTS} {CAPACITY}",
-            ALL_PANEL_SCOPE,
-            (
-                "DMI's feed updates every 3 hours, as ICON-D2 does, so the two sit at the same "
-                "served lead on every row. KNMI's feed is documented as hourly but not measured "
-                "here, so its contrast mixes weather-model skill with lead."
-            ),
-        ],
-    )
 
 
 MODELS_WORK_SITES: Final[tuple[str, ...]] = tuple("ABCDEF")
@@ -1608,7 +1401,7 @@ def _solar_models_work(
         errors: Each product's pooled mean absolute error.
 
     Returns:
-        Figures 4 and 5.
+        The time-series figure, then the error-by-generator figure.
     """
     measured = _models_work_frame()
     order = ("Measured", *(f"XGBoost model given {NAMES[p]}" for p in MODELS_WORK_PRODUCTS))
@@ -1639,7 +1432,7 @@ def _solar_models_work(
         week_order=SOLAR_WEEK_DISPLAY_ORDER,
         order=order,
         colours=(ocf.TEXT, *(FAMILY_COLOURS[FAMILIES[p]] for p in MODELS_WORK_PRODUCTS)),
-        number=4,
+        number=FIGURE_NUMBERS["models_work_timeseries"],
         title=(
             "An XGBoost model given CAMS tracks measured power at every generator, across a "
             "clear, a variable, and a dull week"
@@ -1665,7 +1458,7 @@ def _solar_models_work(
         names={product: served_name(product) for product in NAMES},
         errors=errors,
         x_domain=(4.0, 11.5),
-        number=5,
+        number=FIGURE_NUMBERS["models_work_error"],
         title=(
             "CAMS has the lowest error at each of the six generators, SARAH-3 the second lowest, "
             "and ICON-D2 the third"
@@ -1683,7 +1476,7 @@ def _solar_models_work(
 
 
 def main() -> int:
-    """Read the reports, compute the new numbers, and write the fifteen SVGs."""
+    """Read the reports and write the SVGs."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     argparse.ArgumentParser(description=__doc__).parse_args()
     report_path = RESULTS_DIR / "report.md"
@@ -1694,12 +1487,7 @@ def main() -> int:
     losses = pl.read_parquet(RESULTS_DIR / "losses.parquet").filter(pl.col("setting") == "pooled")
     models_work_timeseries, models_work_error = _solar_models_work(losses=losses, errors=errors)
     all_report_path = ALL_DIR / "report.md"
-    all_contrasts = report_contrasts(report_path=all_report_path)
-    all_errors = report_errors(report_path=all_report_path, column="Global only")
-    all_losses = pl.read_parquet(ALL_DIR / "losses.parquet").filter(pl.col("setting") == "pooled")
     charts = {
-        "sunshine_leaderboard": _leaderboard(losses=losses, errors=errors),
-        "sunshine_headline": _headline(contrasts=contrasts, errors=errors),
         "sunshine_models_work_timeseries": models_work_timeseries,
         "sunshine_models_work_error": models_work_error,
         "sunshine_cams_breakdown": _cams_breakdown(contrasts=contrasts),
@@ -1709,13 +1497,15 @@ def main() -> int:
         ),
         "sunshine_era5_by_year": _era5_by_year(),
         "sunshine_icon_d2_leads": _icon_d2_leads(contrasts=contrasts, report_text=report_text),
-        "sunshine_icon_eu_rivals": _icon_eu_rivals(contrasts=contrasts),
-        "sunshine_ukv_against_era5": _ukv_against_era5(contrasts=contrasts),
-        "sunshine_own_beam": _own_beam(contrasts=contrasts, errors=errors),
+        "sunshine_weather_model_rivals": _weather_model_rivals(contrasts=contrasts),
+        "sunshine_own_beam": _own_beam(
+            contrasts=contrasts,
+            errors=errors,
+            all_contrasts=report_contrasts(report_path=all_report_path),
+            all_errors=report_errors(report_path=all_report_path, column="Global only"),
+        ),
         "sunshine_neighbours": _neighbours(contrasts=contrasts),
         "sunshine_implied_capacity": _implied_capacity_chart(report_text=report_text),
-        "sunshine_all_leaderboard": _all_panel_leaderboard(losses=all_losses, errors=all_errors),
-        "sunshine_all_contrasts": _all_panel_contrasts(contrasts=all_contrasts, errors=all_errors),
     }
     for name, chart in charts.items():
         path = ASSETS_DIR / f"{name}.svg"

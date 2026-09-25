@@ -1241,3 +1241,50 @@ def test_each_panel_of_a_stacked_leaderboard_holds_only_its_own_blocks_rows() ->
         if shown:
             labels.append(shown)
     assert labels == [{"CAMS", "ERA5"}, {"ERA5", "UKV"}]
+
+
+def _key_labels(*, blocks: list[RowSetBlock], contrasts: bool) -> list[str]:
+    """Return the labels of the one family key a stacked figure draws above its first block."""
+    draw = stacked_contrasts if contrasts else stacked_leaderboard
+    spec = draw(blocks=blocks, number=1, title="A title", subtitle=["A subtitle."]).to_dict()
+    key, _ = spec["vconcat"][0]["vconcat"]
+    (text,) = _layer(key, "text")
+    return [row["label"] for row in _values(spec, text)]
+
+
+def test_the_stacked_leaderboard_key_lists_a_family_only_a_later_block_holds() -> None:
+    # Catches a key drawn from the first block alone, which left a station block's colour unnamed.
+    losses = _losses()
+
+    def block(*, label: str, arms: list[BlockArm]) -> RowSetBlock:
+        rows = block_leaderboard_rows(
+            losses=losses, arms=arms, setting="pooled", site_hours=SITE_HOURS, metric=METRIC
+        )
+        return RowSetBlock(label, "Jan 2025", SITE_HOURS, rows)
+
+    blocks = [block(label="First", arms=BLOCK_ARMS[:2]), block(label="Second", arms=BLOCK_ARMS[2:])]
+
+    assert _key_labels(blocks=blocks, contrasts=False) == [
+        "satellite",
+        "reanalysis",
+        "weather model",
+    ]
+
+
+def test_the_stacked_contrasts_key_lists_a_family_only_a_later_block_holds() -> None:
+    losses = _losses()
+
+    def block(*, label: str, arms: list[BlockArm]) -> RowSetBlock:
+        rows = block_contrast_rows(
+            losses=losses,
+            arms=arms,
+            reference_arm="era5_global",
+            setting="pooled",
+            site_hours=SITE_HOURS,
+            metric=METRIC,
+        )
+        return RowSetBlock(label, "Jan 2025", SITE_HOURS, rows)
+
+    blocks = [block(label="First", arms=BLOCK_ARMS[:1]), block(label="Second", arms=BLOCK_ARMS[2:])]
+
+    assert _key_labels(blocks=blocks, contrasts=True) == ["satellite", "weather model"]

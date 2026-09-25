@@ -504,6 +504,7 @@ def interval_panel(
     panel_title: str | Sequence[str] = "",
     reference_labels: bool = True,
     family_key: bool = True,
+    key_families: Sequence[ProductFamily] | None = None,
     condition_key: bool = True,
     width: int = PLOT_WIDTH_PX,
     figure_planning: PlanningType = "mixed",
@@ -553,6 +554,8 @@ def interval_panel(
             stacked under another that already carries them can leave out.
         family_key: Whether to draw the family key, which a panel stacked under another that
             already carries it can leave out.
+        key_families: The families the family key lists, where a stacked figure's key must cover
+            families the panel carrying it does not hold; `None` lists the panel's own.
         condition_key: Whether to draw the condition key, which a panel stacked under another
             that already carries it can leave out.
         width: The plot's width in pixels, `PLOT_WIDTH_PX` unless the panel shares a row.
@@ -703,14 +706,15 @@ def interval_panel(
         title=alt.TitleParams(panel_title, anchor="start", frame="group", fontSize=_PANEL_TITLE_PX),
     )
     keys = []
-    if family_key and len(families) > 1:
+    listed = list(key_families) if key_families is not None else families
+    if family_key and len(listed) > 1:
         keys.append(
             _key(
                 title="Product type",
-                labels=families,
-                shapes=["circle"] * len(families),
-                filled=[True] * len(families),
-                colours=[FAMILY_COLOURS[family] for family in families],
+                labels=listed,
+                shapes=["circle"] * len(listed),
+                filled=[True] * len(listed),
+                colours=[FAMILY_COLOURS[family] for family in listed],
             )
         )
     if conditions and condition_key:
@@ -752,6 +756,7 @@ def leaderboard_panel(
     kind_title: str = "",
     panel_title: str = "",
     keys: bool = True,
+    key_families: Sequence[ProductFamily] | None = None,
     solid: bool = False,
     row_step_px: int | None = None,
 ) -> alt.LayerChart | alt.VConcatChart:
@@ -790,6 +795,8 @@ def leaderboard_panel(
         panel_title: A title above this panel alone.
         keys: Whether to draw the keys, which a panel stacked under another that already carries
             them can leave out.
+        key_families: The families the family key lists, where a stacked figure's key must cover
+            families the panel carrying it does not hold; `None` lists the panel's own.
         solid: Whether every condition's point is drawn filled, with no hollow second style — the
             colour-first default this project's charts favour when colour alone can carry
             `conditions`. False keeps the first condition filled and the rest hollow.
@@ -920,14 +927,15 @@ def leaderboard_panel(
         title=alt.TitleParams(panel_title, anchor="start", frame="group", fontSize=_PANEL_TITLE_PX),
     )
     drawn_keys = []
-    if keys and not conditions and len(families) > 1:
+    listed = list(key_families) if key_families is not None else families
+    if keys and not conditions and len(listed) > 1:
         drawn_keys.append(
             _key(
                 title="Product type",
-                labels=families,
-                shapes=["circle"] * len(families),
-                filled=[True] * len(families),
-                colours=[FAMILY_COLOURS[family] for family in families],
+                labels=listed,
+                shapes=["circle"] * len(listed),
+                filled=[True] * len(listed),
+                colours=[FAMILY_COLOURS[family] for family in listed],
             )
         )
     if keys and conditions:
@@ -1440,6 +1448,18 @@ def shared_domain(*, blocks: Sequence[RowSetBlock], include_zero: bool) -> tuple
     return (math.floor(min(lows) / step) * step, math.ceil(max(highs) / step) * step)
 
 
+def _block_families(*, blocks: Sequence[RowSetBlock]) -> list[ProductFamily]:
+    """List every family any block draws, in `FAMILY_COLOURS` order, for the figure's one key."""
+    held = {
+        family
+        for block in blocks
+        for frame in (block.rows, block.planned_rows)
+        if frame is not None
+        for family in frame["family"].to_list()
+    }
+    return [family for family in FAMILY_COLOURS if family in held]
+
+
 def stacked_leaderboard(
     *,
     blocks: Sequence[RowSetBlock],
@@ -1471,6 +1491,7 @@ def stacked_leaderboard(
             x_title=ABSOLUTE_ERROR_X_TITLE if index == len(blocks) - 1 else "",
             panel_title=block.title,
             keys=index == 0,
+            key_families=_block_families(blocks=blocks),
             row_step_px=_BLOCK_ROW_STEP_PX,
         )
         for index, block in enumerate(blocks)
@@ -1550,6 +1571,7 @@ def stacked_contrasts(
                 conditions=conditions,
                 panel_title=block.title,
                 family_key=index == 0,
+                key_families=_block_families(blocks=blocks),
                 condition_key=False,
                 figure_planning=figure_planning,
             )

@@ -49,22 +49,15 @@ FIGURE_NUMBERS: Final[dict[FigureKey, int]] = {
 }
 """Each figure's number on the page.
 
-`leaderboard` and `contrasts` each combine four charts, one per row set: the
-stacked chart draws the main, extra, ENS and station row sets as blocks, and `contrasts` also
-draws each block's planned contrasts in a lower panel. `weather_model_rivals`
-combines the ICON-EU rivals chart with the UKV-against-ERA5 chart. `per_generator` holds the
-station per-generator chart and the ENS per-generator chart.
+`leaderboard` and `contrasts` draw the main, extra, ENS and station row sets as stacked blocks, and
+`contrasts` also draws each block's planned contrasts in a lower panel. `weather_model_rivals`
+holds the ICON-EU rivals panels and the UKV-against-ERA5 panel. `per_generator` holds the ENS
+per-generator panels and the station per-generator panels.
 """
 
-SVG_FIGURES: Final[dict[str, FigureKey | None]] = {
+SVG_FIGURES: Final[dict[str, FigureKey]] = {
     "sunshine_leaderboard": "leaderboard",
-    "sunshine_all_leaderboard": "leaderboard",
-    "ens_past_solar_leaderboard": "leaderboard",
-    "station_past_solar_leaderboard": "leaderboard",
-    "sunshine_headline": "contrasts",
-    "sunshine_all_contrasts": "contrasts",
-    "ens_past_solar_planned_contrasts": "contrasts",
-    "station_past_solar_planned_contrasts": "contrasts",
+    "sunshine_contrasts": "contrasts",
     "weather_product_domains": "domains",
     "sunshine_models_work_timeseries": "models_work_timeseries",
     "sunshine_models_work_error": "models_work_error",
@@ -72,15 +65,30 @@ SVG_FIGURES: Final[dict[str, FigureKey | None]] = {
     "sunshine_new_products": "new_products",
     "sunshine_era5_by_year": "era5_by_year",
     "sunshine_icon_d2_leads": "icon_d2_leads",
-    "sunshine_icon_eu_rivals": "weather_model_rivals",
-    "sunshine_ukv_against_era5": "weather_model_rivals",
-    "ens_past_solar_exploratory_contrasts": "ens_exploratory",
-    "sunshine_own_beam": "own_beam",
+    "sunshine_weather_model_rivals": "weather_model_rivals",
     "sunshine_neighbours": "neighbours",
-    "station_past_solar_per_generator": "per_generator",
+    "sunshine_own_beam": "own_beam",
+    "ens_past_solar_exploratory_contrasts": "ens_exploratory",
     "station_past_solar_controls": "station_controls",
     "station_past_solar_stations": "station_stations",
-    "station_past_solar_models_work": None,
+    "station_past_solar_per_generator": "per_generator",
     "sunshine_implied_capacity": "implied_capacity",
 }
-"""The figure each SVG in `docs/studies/assets/` feeds, by file stem; `None` marks a dropped SVG."""
+"""The figure each SVG in `docs/studies/assets/` feeds, by file stem."""
+
+SUPERSEDED_SVGS: Final[frozenset[str]] = frozenset(
+    {
+        "sunshine_all_leaderboard",
+        "ens_past_solar_leaderboard",
+        "station_past_solar_leaderboard",
+        "sunshine_headline",
+        "sunshine_all_contrasts",
+        "ens_past_solar_planned_contrasts",
+        "station_past_solar_planned_contrasts",
+        "sunshine_icon_eu_rivals",
+        "sunshine_ukv_against_era5",
+        "station_past_solar_models_work",
+    }
+)
+"""The SVGs no figure uses any more, still on disk because the past-solar page links them until
+its prose is rewritten. No chart script draws them."""
