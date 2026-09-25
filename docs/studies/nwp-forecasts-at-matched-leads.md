@@ -1298,7 +1298,7 @@ single generator's output can be commercially sensitive.
 
 **The code is in the repository, at a fixed commit and with fixed XGBoost settings.** The scripts
 under `studies/nwp_forecast_comparison/` and the shared code under `packages/studies/` last changed
-at commit 1773787a8a254be1e774f04c5f60273860253e5e. The XGBoost version is 3.4.1. The primary
+at commit b9d06cb4905b7ae03ac6cf1539ce9f6ff6abfc0c. The XGBoost version is 3.4.1. The primary
 setting has a maximum depth of 6, a learning rate of 0.05, 500 boosting rounds, a row subsample of
 0.8, a minimum child weight of 20, and an L2 penalty of 1. The sensitivity setting has a maximum
 depth of 4, a learning rate of 0.03, 1,200 rounds, a row subsample of 0.8, a minimum child weight of
