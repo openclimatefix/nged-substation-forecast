@@ -901,9 +901,9 @@ def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt
                 "the ENS control member share ENS's lead; at day 0, GFS (native) reads the "
                 "freshest of its four runs a day. IFS HRES (9 km, Open-Meteo) is scored on the "
                 "shared hours minus the target days whose 00 UTC run the archive lacks (seven run "
-                "days), which the other rows include; the report's row-set diagnostic gives how "
-                "far that difference alone moves a mark, and contrasts with it are computed on the "
-                "hours both score."
+                "days), which the other rows include. That difference alone moves the ENS mean's "
+                f"day-1 error by {ROW_SET_SHIFT_TEXT[domain]}. Contrasts with IFS HRES are "
+                "computed on the hours both score."
             ),
             f"{scope_text(losses=losses, domain=domain)} {CAPACITY_NOTE}",
         ],
@@ -1041,6 +1041,8 @@ def line_key(
     per_row = columns or len(labels)
     slot = width // per_row
     rows = -(-len(labels) // per_row)
+    # A one-row key keeps a constant y, so its SVG is byte-identical to a key drawn without rows.
+    y_encoding = alt.Y("y:Q", scale=None) if rows > 1 else alt.value(8)
     data = pl.DataFrame(
         {
             "label": list(labels),
@@ -1057,7 +1059,7 @@ def line_key(
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("x:Q", scale=None),
             x2="x2:Q",
-            y=alt.Y("y:Q", scale=None),
+            y=y_encoding,
             color=alt.Color("colour:N", scale=None),
             strokeDash=alt.StrokeDash(
                 "dashed:N",
@@ -1069,7 +1071,7 @@ def line_key(
     text = (
         alt.Chart(data)
         .mark_text(align="left", dx=22, color=ocf.BLACK_1, limit=slot - 24)
-        .encode(x=alt.X("x:Q", scale=None), y=alt.Y("y:Q", scale=None), text="label:N")  # ty: ignore[unresolved-attribute]
+        .encode(x=alt.X("x:Q", scale=None), y=y_encoding, text="label:N")  # ty: ignore[unresolved-attribute]
     )
     return alt.LayerChart(layer=[segments, text], width=width, height=16 + KEY_ROW_PX * (rows - 1))
 
@@ -1209,6 +1211,17 @@ KEY_LABELS: Final[dict[str, str]] = {
 """Shorter names for the key above the lead-day chart and for the names beside each line's last
 point, whose room is limited: the key wraps to `KEY_COLUMNS` entries a row, and the label beside a
 line has about 115 pixels."""
+
+ROW_SET_SHIFT_TEXT: Final[dict[DomainType, str]] = {
+    "solar": (
+        "+0.022 points (8.771% on all 35,263 shared rows, 8.792% on the 34,771 rows without "
+        "the gap days)"
+    ),
+    "wind": "[wind: fill from the fitted report's row-set diagnostic]",
+}
+"""The row-set diagnostic's result for the leaderboard caption, by technology: the ENS mean's day-1
+error on all shared rows and without IFS HRES (9 km, Open-Meteo)'s day-1 gap days. The wind slot is
+marked for filling from the fitted report, and must be replaced before the chart is published."""
 
 KEY_COLUMNS: Final[int] = 5
 """How many entries a row of the lead-day chart's key holds. The chart can hold nine products, and
@@ -1474,19 +1487,22 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
             ),
             (
                 f"{DOTS_NOTE} Products at one day are drawn side by side, and each product's "
-                "name is written beside its last point. Two dashed lines each sit beside a solid "
-                "line of the same colour. The dashed burnt-orange line, shown as IFS HRES 9 km, is "
+                "name is written beside its last point. Two of the dashed lines each sit beside a "
+                "solid line of the same colour; on the solar chart, the dashed black line is "
+                "ARPEGE Europe, shown as ARPEGE. The dashed burnt-orange line, shown as IFS HRES "
+                "9 km, is "
                 "IFS HRES (9 km, Open-Meteo): 00 UTC runs only, scored without the target days "
                 "whose run the archive lacks, not checked against a native archive, and its "
                 "day-3 values after lead 90 hours are interpolated from 3-hourly steps. The "
-                "solid burnt-orange line is IFS 0.25°, a coarser product. The dashed amber line "
-                "is GFS (native). The two GFS lines are one weather model "
-                "from two sources: the solid line is Open-Meteo's GFS-SEAMLESS archive, and the "
-                "dashed line is Dynamical.org's native GFS store, whose radiation is a mean since "
+                "solid burnt-orange line is IFS 0.25°, a coarser product. The two GFS lines are one "
+                "weather model from two sources: the solid line is Open-Meteo's GFS-SEAMLESS "
+                "archive, and the dashed line is Dynamical.org's native GFS store, whose radiation is a mean since "
                 "the last 6-hourly reset and is converted to the mean over each hour before its "
                 "label. ICON-EU's day 0 is not drawn here: it is "
                 "Open-Meteo's freshest ICON-EU run, a lead of at most 3 hours, fitted later on a "
-                "GPU. Products fitted at fewer than three of days 0 to 3, and days 5, 10, and 14, "
+                "GPU. IFS HRES 9 km is drawn at days 1 to 3 only: its day 0 and its day 7 are "
+                "left out, as day 7 is for every product. Products fitted at fewer than three of "
+                "days 0 to 3, and days 5, 10, and 14, "
                 f"are left out; Figure {FIGURE_NUMBERS[(domain, 'leaderboard')]} shows them. "
                 f"{SHARED_ROWS_NOTE}"
             ),

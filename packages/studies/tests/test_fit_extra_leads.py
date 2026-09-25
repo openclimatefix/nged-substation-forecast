@@ -410,6 +410,8 @@ def test_the_row_set_diagnostic_measures_the_reference_arm_on_both_row_sets() ->
     assert line is not None
     cells = [cell.strip() for cell in line.strip("|").split("|")]
     # All 48 days average 0.1 + 0.001 * 23.5, and the 24 shared days 0.1 + 0.001 * 35.5.
+    assert cells[0] == ROW_SET_REFERENCE_ARM
+    assert cells[3] == "+1.200"
     assert abs(float(cells[1]) - 12.35) < 0.01
     assert abs(float(cells[2]) - 13.55) < 0.01
     assert cells[4:] == ["48", "24"]

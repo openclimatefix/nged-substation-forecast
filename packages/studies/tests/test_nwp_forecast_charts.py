@@ -120,3 +120,6 @@ def test_a_key_of_more_entries_than_a_row_holds_wraps_and_grows_taller() -> None
     single = line_key(labels=labels[:KEY_COLUMNS], colours=["#000000"] * KEY_COLUMNS)
 
     assert wrapped.height == single.height + KEY_ROW_PX
+    entry = wrapped.data.row(KEY_COLUMNS, named=True)
+    assert (entry["x"], entry["y"]) == (0, 8 + KEY_ROW_PX)
+    assert wrapped.data["y"][0] == 8

@@ -1354,9 +1354,9 @@ def _ifs_single_frame(
     hour's own day (a solar hour's own day is the day of the instant an hour before its label), at a
     lead of `24 * N + 1` to `24 * N + 24` for solar and `24 * N` to `24 * N + 23` for wind, the ENS
     and GEFS arms' rule (`studies.ifs_single_runs.served_init_time`). Day 0 is the run of the
-    hour's own day, so it is the 00 UTC run and not the freshest run. Like ENS's day 0, it covers
-    hours before the 00 UTC run is published, so it is not a forecast that could have been used in
-    advance for those hours.
+    hour's own day, so it is the 00 UTC run and not the freshest run. Day 0 covers
+    hours before the 00 UTC run is published, as ENS's day 0 does, so day 0 is not a forecast that
+    could have been used in advance for those hours.
 
     **The values.** Every value is used as the archive serves it, with no upsampling, because the
     archive is already hourly. Radiation is the mean over the hour ending at the label, clipped at

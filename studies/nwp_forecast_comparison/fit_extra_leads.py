@@ -446,9 +446,9 @@ FOURTH_BATCH_NOTE: Final[str] = (
     "and each wind generator its nearest land cell (sites B and D share a source cell and carry "
     "identical series). Day N reads the 00 UTC run issued N days before the hour's own day, at "
     "leads 24 N + 1 to 24 N + 24 hours for solar and 24 N to 24 N + 23 hours for wind, the rule "
-    "the ENS arms follow, so day 0 is the run of the hour's own day. Like ENS's day 0, it covers "
-    "hours before the 00 UTC run is published, so it is not a forecast that could have been used "
-    "in advance for those hours. Day 10 is "
+    "the ENS arms follow, so day 0 is the run of the hour's own day. Day 0 covers hours before "
+    "the 00 UTC run is published, as ENS's day 0 does, so day 0 is not a forecast that could "
+    "have been used in advance for those hours. Day 10 is "
     "absent because the runs end at lead 240 hours. Radiation is clipped at zero; wind is the "
     "served speed and the sine and cosine of the served direction, as the Open-Meteo Previous "
     "Runs arms are. IFS HRES publishes every 3 hours after lead 90 and every 6 hours after lead "
@@ -1095,7 +1095,7 @@ def report_domain(
         for arm in batch.climatology_contrasts
     ]
     if batch.drop_gap_rows:
-        lines += row_set_diagnostic_lines(losses=pooled, gap_arm=batch.new_prefixes[1])
+        lines += row_set_diagnostic_lines(losses=pooled, gap_arm=ifs_single_arm(day=1))
     if any(elsewhere):
         lines += [
             "",

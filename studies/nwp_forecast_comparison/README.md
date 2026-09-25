@@ -83,14 +83,14 @@ lead?](../../docs/studies/nwp-forecasts-at-matched-leads.md).
   days 0, 1, 2, 3, 5, and 7, read from Open-Meteo's Single Runs archive of ECMWF IFS HRES
   (`data/studies/weather/ECMWF-IFS-SINGLE-RUNS/`): one 00 UTC run a day with hourly leads 0 to 240.
   Day `N` reads the 00 UTC run issued `N` days before the hour's own day, at leads from 24 hours per
-  day, so day 0 is the run of the hour's own day. Like ENS's day 0, it covers hours before the 00
-  UTC run is published, so it is not a forecast that could have been used in advance for those
-  hours. There is no day 10, because day 10 needs leads 240 to 264 hours and the runs end at 240
-  (`studies.ifs_single_runs`). Values are used as the archive serves them: radiation clipped at
-  zero, wind as speed and the sine and cosine of the direction (the Previous Runs arms' method, not
-  `speed_components`, because the archive serves no components). Hourly values from lead 91 hours
-  are interpolated from IFS HRES's 3-hourly and 6-hourly steps. Sites B and D share a source cell
-  and carry identical series. The arm is a row of its own, "IFS HRES (9 km, Open-Meteo)"
+  day, so day 0 is the run of the hour's own day. Day 0 covers hours before the 00 UTC run is
+  published, as ENS's day 0 does, so day 0 is not a forecast that could have been used in advance
+  for those hours. There is no day 10, because day 10 needs leads 240 to 264 hours and the runs end
+  at 240 (`studies.ifs_single_runs`). Values are used as the archive serves them: radiation clipped
+  at zero, wind as speed and the sine and cosine of the direction (the Previous Runs arms' method,
+  not `speed_components`, because the archive serves no components). Hourly values from lead 91
+  hours are interpolated from IFS HRES's 3-hourly and 6-hourly steps. Sites B and D share a source
+  cell and carry identical series. The arm is a row of its own, "IFS HRES (9 km, Open-Meteo)"
   (Open-Meteo's `ecmwf_ifs`, on ECMWF's O1280 grid), never merged with "IFS 0.25°", which is a
   coarser product and not another version of it. The archive holds 00 UTC runs only, and
   Open-Meteo's processing of HRES has not been checked against a native archive. The IFS cycle
