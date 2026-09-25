@@ -1524,9 +1524,10 @@ single weather product?](blending-weather-products.md#solar-a-blend-beats-cams-g
 - **The weather-station section is scored on its own shorter row set, and its result rests on one
   station.** The Met Office's MIDAS Open files end on 2025-12-31, so the section's 60,033 site-hours
   run from 2022-12-01 to 2025-12-31, against the main row set's 76,727 site-hours, which run to
-  2026-08-31. Only 10 radiation stations were downloaded, by a rule this page does not document, and
-  the station-metadata file lists 76 more whose record overlaps the section's years. The nearest of
-  those 76 is 107 km or more from every farm, so none is nearer than the station chosen. All six
+  2026-08-31. The download kept only the radiation stations that were still reporting in 2025 and lie
+  within 100 km of at least one study site, which gave 10 stations. The station-metadata file lists
+  76 more whose record overlaps the section's years. The nearest of those 76 is 107 km or more from
+  every farm, so none is nearer than the station chosen. All six
   farms take the same nearest radiation station, 17 to 31 km away, so the section compares one
   pyranometer with two gridded products. The section's intervals cover month-to-month weather and
   the fitting seed, not the choice of station. The second- and third-nearest stations differ from
