@@ -8,7 +8,9 @@ losses, without refitting anything, and writes for each
 - every arm's own mean absolute error with a 95% interval,
 - every arm's mean absolute error minus ERA5's with a 95% interval, and
 - every planned contrast the row set's report prints, the first product minus the second (14 in
-  all: 6 main, 3 extra, 2 ENS, 3 station), most of them not against ERA5,
+  all: 6 main, 3 extra, 2 ENS, 3 station), most of them not against ERA5, and
+- the exploratory contrasts the row set's report does not print (SARAH-3 minus CAMS on the extra
+  rows), at the first setting only,
 
 all from the same month-and-seed resampling `weather_products.py` uses. Contrasts that a row
 set's own report prints are labelled planned when the report names them before the run, and every
@@ -82,6 +84,9 @@ comparable with the recomputed ones.
 PLANNED_CONTRAST_SECTION: Final[str] = "Planned contrasts, first product minus second"
 """The `section` of a planned contrast in `intervals.parquet`."""
 
+EXPLORATORY_CONTRAST_SECTION: Final[str] = "Exploratory contrasts, first product minus second"
+"""The `section` of an exploratory contrast between two products in `intervals.parquet`."""
+
 ABSOLUTE_SECTION: Final[str] = "Mean absolute error"
 """The `section` of an arm's own error in `intervals.parquet`."""
 
@@ -100,7 +105,8 @@ REPORT_INTRODUCTION: Final[str] = (
     "hoc. `Second setting` is the same contrast at the second hyperparameter setting, "
     "shown only for planned contrasts and contrasts near the 5% line (an interval bound within "
     "20% of the interval's width from zero), and only where both arms have saved second-setting "
-    "losses."
+    "losses. `Exploratory contrasts` are contrasts between two products that no earlier report "
+    "prints, shown at the first setting only."
 )
 CONTRAST_HEADER: Final[str] = (
     "| Arm | Difference (pp of capacity) | 95% interval | Planned or exploratory "
@@ -111,9 +117,15 @@ PLANNED_HEADER: Final[str] = (
     "| Contrast | Difference (pp of capacity) | 95% interval | Near the 5% line | Second setting |"
 )
 
+EXPLORATORY_HEADER: Final[str] = (
+    "| Contrast | Difference (pp of capacity) | 95% interval | Near the 5% line | Second setting |"
+)
+
 _HEADING: Final[re.Pattern[str]] = re.compile(
     r"on ([\d,]+) common site-hours.*\((\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2})\)"
 )
+_PRINTED_REBUILD_ERRORS: Final[re.Pattern[str]] = re.compile(r"^MAE: (.+)$", re.MULTILINE)
+_PRINTED_ARM_ERROR: Final[re.Pattern[str]] = re.compile(r"(\w+) (\d+\.\d+)")
 _PRINTED_INTERVAL: Final[re.Pattern[str]] = re.compile(
     r"^\| (\w+) \| ([\d.]+) \| \[([\d.]+), ([\d.]+)\] \|$", re.MULTILINE
 )
@@ -133,6 +145,8 @@ class RowSet(NamedTuple):
         contrast_arms: The arms contrasted with ERA5.
         planned_contrasts: The contrasts the row set's report names before the run, each the
             first product's error minus the second's.
+        exploratory_contrasts: Contrasts between two products that the report does not print,
+            each the first product's error minus the second's, scored at the first setting only.
     """
 
     key: str
@@ -143,6 +157,7 @@ class RowSet(NamedTuple):
     leaderboard_arms: tuple[BlockArm, ...]
     contrast_arms: tuple[BlockArm, ...]
     planned_contrasts: tuple[PlannedContrast, ...]
+    exploratory_contrasts: tuple[PlannedContrast, ...] = ()
 
 
 class RowSetResult(NamedTuple):
@@ -158,6 +173,8 @@ class RowSetResult(NamedTuple):
             where none was computed or saved).
         planned: The output of `planned_contrast_rows`, with `near_line` and the same three
             second-setting columns.
+        exploratory: The output of `planned_contrast_rows` for the row set's exploratory
+            contrasts, with `planned` false and `near_line`.
     """
 
     row_set: RowSet
@@ -166,6 +183,7 @@ class RowSetResult(NamedTuple):
     absolute: pl.DataFrame
     contrasts: pl.DataFrame
     planned: pl.DataFrame
+    exploratory: pl.DataFrame
 
 
 def _main_arms(
@@ -195,7 +213,7 @@ UKV_REBUILDS: Final[tuple[BlockArm, ...]] = (
     BlockArm("ukv_trap_global", "UKV rebuilt from its snapshots", "weather model"),
     BlockArm("ukv_pair_global", "UKV, both snapshots as separate inputs", "weather model"),
 )
-"""The two rebuilds of UKV's hourly value, contrasted with ERA5 on the main rows only."""
+"""The two rebuilds of UKV's hourly value, scored and contrasted with ERA5 on the main rows only."""
 
 POST_HOC_ARMS: Final[list[str]] = [arm.arm for arm in UKV_REBUILDS]
 """The arms whose contrast against ERA5 the main report labels post hoc, not exploratory."""
@@ -270,6 +288,15 @@ Each set is the one its row set's report prints under its planned-contrast headi
 `score_row_set` stops unless the two agree.
 """
 
+EXTRA_EXPLORATORY: Final[tuple[PlannedContrast, ...]] = _planned(
+    arms=EXTRA_ARMS, pairs=(("sarah3_global", "cams_global"),)
+)
+"""SARAH-3 minus CAMS on the extra rows, which no report prints for that row set.
+
+The main rows' report names the same contrast as planned, so Figure 1's title (CAMS has the lowest
+error of the gridded products) rests on a number for the extra rows only if this script prints it.
+"""
+
 
 def _without_era5(*, arms: tuple[BlockArm, ...]) -> tuple[BlockArm, ...]:
     """Drop ERA5, which the zero rule stands for in a contrast against ERA5."""
@@ -283,7 +310,7 @@ ROW_SETS: Final[tuple[RowSet, ...]] = (
         directory=UPDATE_OUTPUT_DIR / "solar_long",
         printed_column="Global only",
         arm_suffix="_global",
-        leaderboard_arms=MAIN_ARMS,
+        leaderboard_arms=(*MAIN_ARMS, *UKV_REBUILDS),
         contrast_arms=(*_without_era5(arms=MAIN_ARMS), *UKV_REBUILDS),
         planned_contrasts=MAIN_PLANNED,
     ),
@@ -296,6 +323,7 @@ ROW_SETS: Final[tuple[RowSet, ...]] = (
         leaderboard_arms=EXTRA_ARMS,
         contrast_arms=_without_era5(arms=EXTRA_ARMS),
         planned_contrasts=EXTRA_PLANNED,
+        exploratory_contrasts=EXTRA_EXPLORATORY,
     ),
     RowSet(
         key="ens",
@@ -352,6 +380,25 @@ def printed_intervals(*, report_text: str) -> dict[str, tuple[float, float, floa
     return {
         match[1]: (float(match[2]), float(match[3]), float(match[4]))
         for match in _PRINTED_INTERVAL.finditer(report_text)
+    }
+
+
+def printed_rebuild_errors(*, report_text: str) -> dict[str, float]:
+    """Read the errors a report prints on one `MAE:` line after its table of contrasts.
+
+    The main report prints the two UKV rebuilds' errors this way (`MAE: ukv_trap_global 8.180,
+    ukv_pair_global 8.125.`) and in no table.
+
+    Args:
+        report_text: A row set's `report.md`.
+
+    Returns:
+        Each arm's printed error; empty for a report with no such line.
+    """
+    return {
+        arm: float(value)
+        for line in _PRINTED_REBUILD_ERRORS.findall(report_text)
+        for arm, value in _PRINTED_ARM_ERROR.findall(line)
     }
 
 
@@ -707,7 +754,10 @@ def score_row_set(
     """
     site_hours, dates = read_heading(report_text=report_text)
     errors = report_errors(report_path=report_path, column=row_set.printed_column)
-    printed_errors = {f"{key}{row_set.arm_suffix}": value for key, value in errors.items()}
+    printed_errors = {
+        **{f"{key}{row_set.arm_suffix}": value for key, value in errors.items()},
+        **printed_rebuild_errors(report_text=report_text),
+    }
     unprinted = [arm.arm for arm in row_set.leaderboard_arms if arm.arm not in printed_errors]
     if unprinted:
         msg = (
@@ -775,6 +825,13 @@ def score_row_set(
     if problems:
         msg = f"{row_set.label} does not reproduce its report:\n" + "\n".join(problems)
         raise ValueError(msg)
+    exploratory_rows = planned_contrast_rows(
+        losses=losses,
+        contrasts=row_set.exploratory_contrasts,
+        setting="pooled",
+        site_hours=site_hours,
+        metric=METRIC,
+    ).with_columns(planned=pl.lit(False), near_line=near_line())
     check_planned_contrasts(planned=planned_rows, printed=printed, site_hours=site_hours)
     check_planned_contrasts(
         planned=planned_rows,
@@ -790,6 +847,7 @@ def score_row_set(
         absolute=absolute,
         contrasts=contrasts,
         planned=planned_rows,
+        exploratory=exploratory_rows,
     )
 
 
@@ -803,6 +861,25 @@ def _interval(*, low: float | None, high: float | None) -> str:
     if low is None or high is None:
         return "—"
     return f"[{low:+.{PRINT_DECIMALS}f}, {high:+.{PRINT_DECIMALS}f}]"
+
+
+def _second_setting_cell(*, row: dict) -> str:
+    """Format a contrast's second setting as `value [low, high]`, or one dash where it has none."""
+    if row["second_difference"] is None:
+        return "—"
+    return (
+        f"{_signed(row['second_difference'])} "
+        f"{_interval(low=row['second_lower_95'], high=row['second_upper_95'])}"
+    )
+
+
+def _contrast_line(*, row: dict, second: str) -> str:
+    """Format one row of a table of contrasts between two products."""
+    return (
+        f"| {row['label']} | {_signed(row['difference'])} | "
+        f"{_interval(low=row['lower_95'], high=row['upper_95'])} | "
+        f"{'yes' if row['near_line'] else 'no'} | {second} |"
+    )
 
 
 def render_report(*, results: list[RowSetResult]) -> str:
@@ -843,10 +920,7 @@ def render_report(*, results: list[RowSetResult]) -> str:
             "|---|---|---|---|---|---|",
         ]
         for row in result.contrasts.iter_rows(named=True):
-            second = (
-                f"{_signed(row['second_difference'])} "
-                f"{_interval(low=row['second_lower_95'], high=row['second_upper_95'])}"
-            )
+            second = _second_setting_cell(row=row)
             lines.append(
                 f"| {row['label']} | {_signed(row['difference'])} | "
                 f"{_interval(low=row['lower_95'], high=row['upper_95'])} | {row['planning']} | "
@@ -860,15 +934,19 @@ def render_report(*, results: list[RowSetResult]) -> str:
             "|---|---|---|---|---|",
         ]
         for row in result.planned.iter_rows(named=True):
-            second = (
-                f"{_signed(row['second_difference'])} "
-                f"{_interval(low=row['second_lower_95'], high=row['second_upper_95'])}"
-            )
-            lines.append(
-                f"| {row['label']} | {_signed(row['difference'])} | "
-                f"{_interval(low=row['lower_95'], high=row['upper_95'])} | "
-                f"{'yes' if row['near_line'] else 'no'} | {second} |"
-            )
+            lines.append(_contrast_line(row=row, second=_second_setting_cell(row=row)))
+        if not result.exploratory.is_empty():
+            lines += [
+                "",
+                "#### Exploratory contrasts, first product minus second",
+                "",
+                EXPLORATORY_HEADER,
+                "|---|---|---|---|---|",
+            ]
+            lines += [
+                _contrast_line(row=row, second="—")
+                for row in result.exploratory.iter_rows(named=True)
+            ]
         lines.append("")
     return "\n".join(lines)
 
@@ -881,8 +959,9 @@ def intervals_frame(*, results: list[RowSetResult]) -> pl.DataFrame:
 
     Returns:
         One row per (row set, section, setting, arm). `section` is `Mean absolute error`,
-        `Mean absolute error minus ERA5's`, or `PLANNED_CONTRAST_SECTION` (a planned contrast, with
-        its second arm in `reference`); `setting` is `pooled`, or `sensitivity` for a
+        `Mean absolute error minus ERA5's`, `PLANNED_CONTRAST_SECTION` (a planned contrast, with its
+        second arm in `reference`), or `EXPLORATORY_CONTRAST_SECTION` (the same for an exploratory
+        contrast, at the `pooled` setting only); `setting` is `pooled`, or `sensitivity` for a
         contrast's second setting; `treatment` is the arm and `reference` is null for an absolute
         row. `value`, `lower` and `upper` are in percentage points of capacity at full precision,
         `level` is 95, and `n_rows` is the row set's site-hours. `row_set`, `label`, `planning`
@@ -948,6 +1027,19 @@ def intervals_frame(*, results: list[RowSetResult]) -> pl.DataFrame:
                 upper="upper_95",
                 label="label",
                 planning=pl.lit("planned"),
+                near_line="near_line",
+            ),
+            result.exploratory.select(
+                **common,
+                section=pl.lit(EXPLORATORY_CONTRAST_SECTION),
+                setting=pl.lit("pooled"),
+                treatment="arm",
+                reference="reference_arm",
+                value="difference",
+                lower="lower_95",
+                upper="upper_95",
+                label="label",
+                planning=pl.lit("exploratory"),
                 near_line="near_line",
             ),
             result.planned.filter(pl.col("second_difference").is_not_null()).select(

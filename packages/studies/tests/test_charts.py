@@ -15,6 +15,8 @@ from studies.charts import (
     NAMED_SUFFIX,
     PLANNING_NOTES,
     PLOT_WIDTH_PX,
+    POST_HOC_PLANNING_NOTE,
+    POST_HOC_SUFFIX,
     SECOND_SETTING_SHAPE,
     BlockArm,
     ContrastKey,
@@ -30,6 +32,7 @@ from studies.charts import (
     interval_panel,
     leaderboard_panel,
     planned_contrast_rows,
+    planned_domain,
     planning,
     report_contrasts,
     report_errors,
@@ -1164,6 +1167,72 @@ def test_the_shared_domain_covers_the_planned_rows_and_the_second_setting_marker
 
     assert high >= 7.2
     assert low <= -1.0
+
+
+def _x_domains(spec: dict) -> list[list[float]]:
+    """Return each data panel's x scale domain from top to bottom."""
+
+    def find(node: object) -> Iterator[list[float]]:
+        if isinstance(node, dict):
+            x = node.get("x")
+            if isinstance(x, dict) and "field" in x and (x.get("scale") or {}).get("domain"):
+                yield x["scale"]["domain"]
+            for value in node.values():
+                yield from find(value)
+        elif isinstance(node, list):
+            for value in node:
+                yield from find(value)
+
+    return [next(find(panel)) for panel in _leaf_panels(spec) if next(find(panel), None)]
+
+
+def test_a_planned_panel_has_its_own_x_range_and_the_contrast_panels_keep_the_shared_one() -> None:
+    blocks = _blocks_with_planned(second=False)
+    narrow = _planned(contrasts=[UKV_AGAINST_CAMS]).with_columns(
+        difference=pl.lit(0.1), lower_95=pl.lit(0.05), upper_95=pl.lit(0.15)
+    )
+    wide = _planned(contrasts=[UKV_AGAINST_CAMS]).with_columns(
+        difference=pl.lit(-3.0), lower_95=pl.lit(-4.0), upper_95=pl.lit(-2.0)
+    )
+    blocks = [blocks[0]._replace(planned_rows=narrow), blocks[1]._replace(planned_rows=wide)]
+
+    spec = stacked_contrasts(blocks=blocks, number=2, title="A", subtitle=["A."]).to_dict()
+
+    shared = list(shared_domain(blocks=blocks, include_zero=True))
+    assert _x_domains(spec) == [shared, [0.0, 0.25], shared, [-4.0, 0.0]]
+
+
+def test_planned_domain_holds_zero_and_the_second_setting_marker() -> None:
+    block = _blocks_with_planned(second=True)[0]
+    assert block.planned_rows is not None
+    planned = block.planned_rows.with_columns(
+        lower_95=pl.lit(0.05), upper_95=pl.lit(0.15), second_difference=pl.Series([0.9, None])
+    )
+
+    assert planned_domain(block=block._replace(planned_rows=planned)) == (0.0, 1.0)
+
+
+def test_a_mixed_contrast_figure_with_a_post_hoc_row_says_so_in_its_planning_line() -> None:
+    blocks = _blocks_with_planned(second=False)
+    marked = blocks[0].rows.with_columns(label=pl.col("label") + POST_HOC_SUFFIX)
+    plain = str(stacked_contrasts(blocks=blocks, number=2, title="A", subtitle=["A."]).to_dict())
+    post_hoc = str(
+        stacked_contrasts(
+            blocks=[blocks[0]._replace(rows=marked), blocks[1]],
+            number=2,
+            title="A",
+            subtitle=["A."],
+        ).to_dict()
+    )
+
+    assert "or, where marked, post hoc" in post_hoc
+    assert "or, where marked, post hoc" not in plain
+    assert POST_HOC_PLANNING_NOTE.startswith("Planned:")
+
+
+def test_planned_domain_needs_planned_rows() -> None:
+    with pytest.raises(ValueError, match="no planned rows"):
+        planned_domain(block=_blocks()[1][0])
 
 
 def test_block_leaderboard_rows_come_back_best_first_whatever_the_arm_order() -> None:

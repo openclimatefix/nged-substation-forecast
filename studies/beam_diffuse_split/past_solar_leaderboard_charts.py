@@ -40,6 +40,7 @@ from past_solar_leaderboard import (
 )
 from sources import SOLAR_LEADERBOARD_DIR
 from studies.charts import (
+    POST_HOC_SUFFIX,
     RowSetBlock,
     assert_matches_printed,
     stacked_contrasts,
@@ -64,15 +65,31 @@ DISPLAY_LABELS: Final[dict[str, str]] = {
 }
 """Labels the report prints that are too long for one line of a block's row-label column."""
 
-POST_HOC_SUFFIX: Final[str] = " (post hoc)"
-"""Ends the label of a contrast the main report labels post hoc."""
-
 CAPACITY: Final[str] = "Capacity is each generator's 99th-percentile output."
 DOTS: Final[str] = "Dot: estimate. Line: 95% interval from resampling whole months."
 SCOPE: Final[str] = "Six solar farms in Lincolnshire."
 BLOCKS_NOT_COMPARABLE: Final[str] = (
     "Compare products only within a block: each block is scored on its own rows, so an error in "
     "one block is not comparable with an error in another."
+)
+
+ENS_LEAD: Final[str] = (
+    "ECMWF ENS is a forecast 5 to 20 hours ahead from a 00 UTC run; ERA5's radiation is 1 to 12 "
+    "hours ahead."
+)
+STATION_SCOPE: Final[str] = (
+    "The station rows rest on one pyranometer: all six generators take the same nearest radiation "
+    "station, 17 to 31 km away."
+)
+UNEQUAL_LEADS: Final[str] = (
+    "KNMI HARMONIE-AROME's lead is not measured, and ECMWF-IFS-HRES's lead is longer than "
+    "ICON-EU's, so a contrast of either product mixes weather-model skill with lead."
+)
+POST_HOC_NOTE: Final[str] = (
+    "Rows marked (post hoc) were added after the first run: UKV rebuilt from its snapshots."
+)
+CAMS_EXPLORATORY: Final[str] = (
+    "The CAMS row is exploratory: no row set names CAMS against ERA5 as a planned contrast."
 )
 
 _BLOCK_HEADING: Final[re.Pattern[str]] = re.compile(
@@ -246,7 +263,8 @@ def absolute_rows(
         records.append(
             {
                 "arm": arm.arm,
-                "label": DISPLAY_LABELS.get(arm.label, arm.label),
+                "label": DISPLAY_LABELS.get(arm.label, arm.label)
+                + (POST_HOC_SUFFIX if arm.arm in POST_HOC_ARMS else ""),
                 "family": arm.family,
                 "reference": arm.reference,
                 "planned": False,
@@ -428,12 +446,30 @@ def build_blocks(
     return leaderboard_blocks, contrast_blocks
 
 
+def contrasts_not_comparable(*, cams_differences: list[float]) -> str:
+    """Say that a difference from ERA5 is not comparable across blocks, with the measured spread.
+
+    Args:
+        cams_differences: CAMS's error minus ERA5's in each block, in points of capacity.
+
+    Returns:
+        The subtitle sentence, quoting how far the same contrast moves between blocks.
+    """
+    spread = max(cams_differences) - min(cams_differences)
+    return (
+        "A difference from ERA5 is not comparable across blocks either: the same CAMS minus "
+        f"ERA5 contrast moves by {spread:.1f} points between blocks."
+    )
+
+
 def leaderboard_figure(*, blocks: list[RowSetBlock]) -> alt.VConcatChart:
     """Draw Figure 1, the leaderboard of the four row sets."""
     return stacked_leaderboard(
         blocks=blocks,
         number=FIGURE_NUMBERS["leaderboard"],
-        title="CAMS has the lowest error of the gridded products on each of the four row sets",
+        title=(
+            "CAMS has the lowest error of the gridded products tested on each of the four row sets"
+        ),
         subtitle=[
             "Each product's own mean absolute error, sorted best first within its block.",
             BLOCKS_NOT_COMPARABLE,
@@ -442,6 +478,9 @@ def leaderboard_figure(*, blocks: list[RowSetBlock]) -> alt.VConcatChart:
                 "mainly because every product's error swings together from month to month, a "
                 f"swing that Figure {FIGURE_NUMBERS['contrasts']}'s paired contrasts cancel."
             ),
+            ENS_LEAD,
+            STATION_SCOPE,
+            POST_HOC_NOTE,
             DOTS,
             CAPACITY,
             SCOPE,
@@ -461,7 +500,7 @@ def contrasts_figure(*, blocks: list[RowSetBlock]) -> alt.VConcatChart:
     return stacked_contrasts(
         blocks=blocks,
         number=FIGURE_NUMBERS["contrasts"],
-        title=(f"CAMS beats ERA5 by {low} to {high} points on every row set"),
+        title=f"CAMS beats ERA5 by {low} to {high} points on every row set (exploratory)",
         subtitle=[
             (
                 "Top panel of each block: each product's mean absolute error minus ERA5's. Lower "
@@ -469,6 +508,11 @@ def contrasts_figure(*, blocks: list[RowSetBlock]) -> alt.VConcatChart:
                 "second's."
             ),
             BLOCKS_NOT_COMPARABLE,
+            contrasts_not_comparable(cams_differences=cams),
+            CAMS_EXPLORATORY,
+            ENS_LEAD,
+            STATION_SCOPE,
+            UNEQUAL_LEADS,
             DOTS,
             CAPACITY,
             SCOPE,

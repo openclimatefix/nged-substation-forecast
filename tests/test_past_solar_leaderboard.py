@@ -741,3 +741,141 @@ def test_a_full_run_refuses_an_existing_folder_before_scoring(
     code, _ = _main_with(module=module, tmp_path=tmp_path, monkeypatch=monkeypatch, argv=[])
 
     assert code == 1
+
+
+def _score_with_exploratory(*, tmp_path: Path) -> Any:
+    module = _load()
+    losses = _losses()
+    report_path = tmp_path / "report.md"
+    text = _printed_report(losses=losses)
+    report_path.write_text(text)
+    row_set = _row_set(module, tmp_path)._replace(exploratory_contrasts=(CAMS_AGAINST_ENS,))
+    return module.score_row_set(
+        row_set=row_set, losses=losses, report_text=text, report_path=report_path
+    )
+
+
+def test_an_exploratory_contrast_is_scored_labelled_and_written_without_a_second_setting(
+    tmp_path: Path,
+) -> None:
+    module = _load()
+    result = _score_with_exploratory(tmp_path=tmp_path)
+
+    report = module.render_report(results=[result])
+    intervals = module.intervals_frame(results=[result])
+
+    assert result.exploratory["label"].to_list() == ["CAMS against ENS"]
+    assert result.exploratory["planned"].to_list() == [False]
+    assert result.exploratory["difference"].to_list() == pytest.approx([-0.8])
+    assert "#### Exploratory contrasts, first product minus second" in report
+    assert any(line.startswith("| CAMS against ENS | -0.800") for line in report.splitlines())
+    rows = intervals.filter(pl.col("section") == module.EXPLORATORY_CONTRAST_SECTION)
+    assert rows["planning"].to_list() == ["exploratory"]
+    assert rows["setting"].to_list() == ["pooled"]
+    assert rows["treatment"].to_list() == ["cams_global"]
+    assert rows["reference"].to_list() == ["ens_mean_t3"]
+
+
+def test_a_row_set_with_no_exploratory_contrast_writes_no_exploratory_section(
+    tmp_path: Path,
+) -> None:
+    module = _load()
+
+    result = _score(tmp_path=tmp_path)
+
+    assert "#### Exploratory contrasts" not in module.render_report(results=[result])
+    assert module.EXPLORATORY_CONTRAST_SECTION not in set(
+        module.intervals_frame(results=[result])["section"].to_list()
+    )
+
+
+def test_the_report_prints_one_dash_for_an_absent_second_setting(tmp_path: Path) -> None:
+    module = _load()
+    result = _score(tmp_path=tmp_path)
+
+    report = module.render_report(results=[result])
+
+    assert "| — |" in report
+    assert "— —" not in report
+
+
+def test_only_the_extra_rows_hold_the_exploratory_sarah3_minus_cams_contrast() -> None:
+    module = _load()
+
+    held = {
+        row_set.key: [(c.treatment.arm, c.reference.arm) for c in row_set.exploratory_contrasts]
+        for row_set in module.ROW_SETS
+    }
+
+    assert held == {
+        "main": [],
+        "extra": [("sarah3_global", "cams_global")],
+        "ens": [],
+        "station": [],
+    }
+
+
+def test_the_main_leaderboard_holds_the_two_ukv_rebuilds_after_the_products() -> None:
+    module = _load()
+
+    arms = [arm.arm for arm in module.ROW_SETS[0].leaderboard_arms]
+
+    assert arms[-2:] == ["ukv_trap_global", "ukv_pair_global"]
+    assert not any(arm.reference for arm in module.UKV_REBUILDS)
+
+
+def test_a_rebuilds_error_is_read_from_the_reports_mae_line() -> None:
+    module = _load()
+
+    printed = module.printed_rebuild_errors(
+        report_text="text\n\nMAE: ukv_trap_global 8.180, ukv_pair_global 8.125.\n\nmore"
+    )
+
+    assert printed == {"ukv_trap_global": 8.18, "ukv_pair_global": 8.125}
+
+
+def _report_with_ens_error_on_an_mae_line(*, losses: pl.DataFrame, printed: float | None) -> str:
+    """Return the synthetic report with the ENS row moved from its table to an `MAE:` line."""
+    text = _printed_report(losses=losses)
+    kept = [line for line in text.splitlines() if not line.startswith("| ens_mean_t3 | ")]
+    # The first table's ENS row is the only one with an absolute error of this shape.
+    assert len(kept) == len(text.splitlines()) - 1
+    if printed is not None:
+        kept.append(f"MAE: ens_mean_t3 {printed:.3f}.")
+    return "\n".join(kept) + "\n"
+
+
+def _score_text(*, tmp_path: Path, losses: pl.DataFrame, text: str) -> Any:
+    module = _load()
+    report_path = tmp_path / "report.md"
+    report_path.write_text(text)
+    return module.score_row_set(
+        row_set=_row_set(module, tmp_path),
+        losses=losses,
+        report_text=text,
+        report_path=report_path,
+    )
+
+
+def test_a_leaderboard_arm_printed_only_on_an_mae_line_is_scored_and_checked(
+    tmp_path: Path,
+) -> None:
+    losses = _losses()
+    absolute = block_leaderboard_rows(
+        losses=losses, arms=ARMS, setting="pooled", site_hours=SITE_HOURS, metric=METRIC
+    )
+    ens = absolute.filter(pl.col("arm") == "ens_mean_t3")["value"].item()
+
+    result = _score_text(
+        tmp_path=tmp_path,
+        losses=losses,
+        text=_report_with_ens_error_on_an_mae_line(losses=losses, printed=round(ens, 3)),
+    )
+    assert "ens_mean_t3" in result.absolute["arm"].to_list()
+
+    with pytest.raises(ValueError, match="ens_mean_t3"):
+        _score_text(
+            tmp_path=tmp_path,
+            losses=losses,
+            text=_report_with_ens_error_on_an_mae_line(losses=losses, printed=round(ens, 3) + 0.01),
+        )

@@ -89,6 +89,15 @@ Only a figure that mixes the two kinds labels each planned row with `NAMED_SUFFI
 row shares one kind, a label on each would repeat what one subtitle line says.
 """
 
+POST_HOC_SUFFIX: Final[str] = " (post hoc)"
+"""Ends the label of a row added after the first run, in a figure that also holds other rows."""
+
+POST_HOC_PLANNING_NOTE: Final[str] = (
+    "Planned: one of the comparisons written into the study plan before any result existed. "
+    "Every other row is exploratory or, where marked, post hoc."
+)
+"""The `mixed` line of `PLANNING_NOTES` for a figure that holds rows ending in `POST_HOC_SUFFIX`."""
+
 CONDITION_SHAPES: Final[tuple[str, ...]] = ("circle", "diamond", "square")
 """The point shape of each condition, in the order the conditions are given."""
 
@@ -1063,6 +1072,7 @@ def figure(
     title: str,
     subtitle: Sequence[str],
     figure_planning: PlanningType | None,
+    post_hoc: bool = False,
 ) -> alt.VConcatChart:
     """Stack panels, one above the other, under a "Figure N:" caption.
 
@@ -1078,17 +1088,26 @@ def figure(
         figure_planning: What `planning` returns for the figure's rows, which adds the matching
             `PLANNING_NOTES` line to the subtitle, or `None` for a figure with no planned or
             exploratory rows to describe.
+        post_hoc: Whether any row ends in `POST_HOC_SUFFIX`, which swaps a `mixed` figure's line
+            for `POST_HOC_PLANNING_NOTE`.
 
     Returns:
         The figure.
     """
+    note = (
+        POST_HOC_PLANNING_NOTE
+        if post_hoc and figure_planning == "mixed"
+        else None
+        if figure_planning is None
+        else PLANNING_NOTES[figure_planning]
+    )
     caption = alt.TitleParams(
         wrapped(text=f"Figure {number}: {title}", width=_TITLE_CHARACTERS),
         subtitle=[
             line
             for text in (
                 *subtitle,
-                *(() if figure_planning is None else (PLANNING_NOTES[figure_planning],)),
+                *(() if note is None else (note,)),
             )
             for line in wrapped(text=text)
         ],
@@ -1126,6 +1145,9 @@ CONTRAST_REFERENCE_ROW_NOTE: Final[str] = (
 
 _BLOCK_DOMAIN_STEP: Final[float] = 0.5
 """The multiple of percentage points a stacked figure's shared x range is rounded out to."""
+
+_PLANNED_DOMAIN_STEP: Final[float] = 0.25
+"""The multiple of percentage points a block's own planned-contrast x range is rounded out to."""
 
 _BLOCK_ROW_STEP_PX: Final[int] = 26
 """The height of each row of a stacked figure's blocks, which hold one-line labels."""
@@ -1416,17 +1438,23 @@ def planned_contrast_rows(
     )
 
 
-def shared_domain(*, blocks: Sequence[RowSetBlock], include_zero: bool) -> tuple[float, float]:
-    """Return one x range covering every block's intervals, rounded out to half a point.
+def shared_domain(
+    *,
+    blocks: Sequence[RowSetBlock],
+    include_zero: bool,
+    step: float = _BLOCK_DOMAIN_STEP,
+) -> tuple[float, float]:
+    """Return one x range covering every block's intervals, rounded out to a step.
 
     Args:
         blocks: The blocks of a stacked figure. A block's `planned_rows` count as well as its
             `rows`.
         include_zero: Whether the range must contain zero, as a contrast chart's does.
+        step: The multiple of percentage points the range is rounded outwards to.
 
     Returns:
         The lowest lower bound and highest upper bound over every block, each rounded outwards to
-        a multiple of half a percentage point.
+        a multiple of `step`.
     """
     frames = [
         frame for block in blocks for frame in (block.rows, block.planned_rows) if frame is not None
@@ -1444,8 +1472,33 @@ def shared_domain(*, blocks: Sequence[RowSetBlock], include_zero: bool) -> tuple
     if include_zero:
         lows.append(0.0)
         highs.append(0.0)
-    step = _BLOCK_DOMAIN_STEP
     return (math.floor(min(lows) / step) * step, math.ceil(max(highs) / step) * step)
+
+
+def planned_domain(*, block: RowSetBlock) -> tuple[float, float]:
+    """Return the x range of a block's own planned-contrast panel, from its planned rows alone.
+
+    The planned contrasts of one row set can be far narrower than the range every block shares,
+    which would draw a 0.1-point interval under its own marker. The range holds zero and each
+    second-setting marker, and rounds outwards to `_PLANNED_DOMAIN_STEP`.
+
+    Args:
+        block: A block with `planned_rows`.
+
+    Returns:
+        The range of the block's planned rows, in percentage points.
+
+    Raises:
+        ValueError: If the block has no planned rows.
+    """
+    if block.planned_rows is None:
+        msg = f"{block.label} has no planned rows"
+        raise ValueError(msg)
+    return shared_domain(
+        blocks=[block._replace(rows=block.planned_rows, planned_rows=None)],
+        include_zero=True,
+        step=_PLANNED_DOMAIN_STEP,
+    )
 
 
 def _block_families(*, blocks: Sequence[RowSetBlock]) -> list[ProductFamily]:
@@ -1532,7 +1585,9 @@ def stacked_contrasts(
     contrasts, each the first product's error minus the second's: a chart of differences from
     ERA5 cannot show whether two other products differ. A block with planned
     contrasts titles the x axis of both its panels, because the two measure different
-    differences; a block without them titles its axis only if it is the last block.
+    differences; a block without them titles its axis only if it is the last block. The contrast
+    panels share one x range; each planned-contrast panel has its own, from `planned_domain`, so
+    a narrow interval is not drawn under its marker.
 
     Args:
         blocks: The row-set blocks from top to bottom, each holding `block_contrast_rows`'s
@@ -1550,6 +1605,7 @@ def stacked_contrasts(
         frame for block in blocks for frame in (block.rows, block.planned_rows) if frame is not None
     ]
     figure_planning = planning(rows=frames)
+    post_hoc = any(label.endswith(POST_HOC_SUFFIX) for frame in frames for label in frame["label"])
     conditions = ("Product", "Reference row")
     panels = []
     for index, block in enumerate(blocks):
@@ -1580,7 +1636,7 @@ def stacked_contrasts(
             panels.append(
                 interval_panel(
                     rows=block.planned_rows,
-                    x_domain=domain,
+                    x_domain=planned_domain(block=block),
                     x_title=PLANNED_CONTRAST_X_TITLE,
                     zero_label="same as the second product",
                     better_label="first product better",
@@ -1601,4 +1657,5 @@ def stacked_contrasts(
         title=title,
         subtitle=[*subtitle, *notes],
         figure_planning=figure_planning,
+        post_hoc=post_hoc,
     )
