@@ -2033,9 +2033,9 @@ public inputs are ECMWF ENS (from 2024-04-01), NOAA GEFS (from 2020-10-01), NOAA
 and ECMWF's AIFS Single and AIFS ENS from Dynamical.org, and the Previous Runs values and the IFS
 HRES Single Runs archive of Open-Meteo. Open-Meteo's day-offset archive starts on 2024-01-19 for
 ICON-EU and ICON-D2, on 2024-03-06 for IFS 0.25°, and on 2024-08-06 for UKV (start dates from the
-[weather-products survey](../../background/weather-products-survey.md)). Dynamical.org's access ends on
-2026-09-30. The generator telemetry and the `effective_capacity` table are private, because a single
-generator's output can be commercially sensitive.
+[weather-products survey](../../background/weather-products-survey.md)). Dynamical.org's access ends
+on 2026-09-30. The generator telemetry and the `effective_capacity` table are private, because a
+single generator's output can be commercially sensitive.
 
 **The code is in the repository, at a fixed commit and with fixed XGBoost settings.** The scripts
 under `studies/nwp_forecast_comparison/` and the shared code under `packages/studies/` last changed
