@@ -199,6 +199,9 @@ class RowSet(NamedTuple):
             first setting's arms and rows from a fit whose losses `losses.parquet` does not hold.
         exploratory_in_planned: Contrasts that the report prints under `planned_section` and
             labels exploratory, each as (first arm, second arm).
+        post_hoc_contrasts: Planned contrasts, each as (first arm, second arm), whose arms were
+            chosen after the first run, so the report and the figures mark them `POST_HOC_SUFFIX`.
+            The arms of `POST_HOC_ARMS` are marked whatever this holds.
         wide_contrast_tables: Whether the report's contrast tables carry a `Months` column.
         hours_unit: What a row of the row set is called in headings: solar rows are site-hours.
     """
@@ -223,6 +226,7 @@ class RowSet(NamedTuple):
     second_section: str = ""
     other_fit_sections: tuple[str, ...] = OTHER_FIT_SECTION_PREFIXES
     exploratory_in_planned: tuple[tuple[str, str], ...] = ()
+    post_hoc_contrasts: tuple[tuple[str, str], ...] = ()
     wide_contrast_tables: bool = False
     hours_unit: str = "site-hours"
 
@@ -734,6 +738,12 @@ def _holds_rows(
     ).is_empty()
 
 
+def post_hoc_label(*, row_set: RowSet, contrast: PlannedContrast) -> str:
+    """Return a planned contrast's label, ending in `POST_HOC_SUFFIX` where the row set says so."""
+    is_post_hoc = (contrast.treatment.arm, contrast.reference.arm) in row_set.post_hoc_contrasts
+    return contrast.label + (POST_HOC_SUFFIX if is_post_hoc else "")
+
+
 def missing_planned_second_rows(
     *,
     contrasts: pl.DataFrame,
@@ -1137,6 +1147,14 @@ def score_row_set(
         contrasts=row_set.planned_contrasts,
         losses=losses,
         site_hours=site_hours,
+    ).with_columns(
+        label=pl.Series(
+            [
+                post_hoc_label(row_set=row_set, contrast=contrast)
+                for contrast in row_set.planned_contrasts
+            ],
+            dtype=pl.String,
+        )
     )
     problems = [
         *unlisted_planned_contrasts(

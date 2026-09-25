@@ -226,6 +226,41 @@ def test_the_charts_read_a_blocks_contrasts_under_its_own_heading(tmp_path: Path
     assert set(drawn["arm"]) == {ERA5.arm, ENS.arm}
 
 
+def test_a_post_hoc_planned_contrast_is_marked_in_the_report_and_the_figures(
+    tmp_path: Path,
+) -> None:
+    # Catches a planned contrast whose arms were chosen after the first run being printed and
+    # drawn as an unmarked planned contrast, and a mark that reaches a contrast it was not set for.
+    module = _load()
+    charts = _charts_module()
+    plain = _score(tmp_path=tmp_path)
+    marked = _score(tmp_path=tmp_path, post_hoc_contrasts=((ENS.arm, REFERENCE.arm),))
+    label = PLANNED.label
+
+    assert plain.planned["label"].to_list() == [label]
+    assert marked.planned["label"].to_list() == [f"{label} (post hoc)"]
+    assert f"| {label} (post hoc) |" in module.render_report(results=[marked])
+    assert f"| {label} |" in module.render_report(results=[plain])
+    report = charts.read_report(report_text=module.render_report(results=[marked]))
+    intervals = module.intervals_frame(results=[marked])
+    drawn_planned = charts.planned_rows(
+        frame=intervals,
+        row_set=marked.row_set,
+        printed=report["Test farms"].tables[module.PLANNED_CONTRAST_SECTION],
+    )
+    assert drawn_planned["label"].to_list() == [f"{label} (post hoc)"]
+    assert drawn_planned["planned"].to_list() == [False]
+    drawn_contrasts = charts.contrast_rows(
+        frame=intervals,
+        row_set=marked.row_set,
+        order=[],
+        printed=report["Test farms"].tables[module.CONTRAST_SECTION],
+    )
+    labels = dict(zip(drawn_contrasts["arm"], drawn_contrasts["label"], strict=True))
+    assert labels[ENS.arm].endswith(" (post hoc)")
+    assert not labels[ERA5.arm].endswith(" (post hoc)")
+
+
 def test_a_farm_hours_heading_is_read() -> None:
     # Catches a heading regex that knows only "common site-hours".
     module = _load()

@@ -66,13 +66,15 @@ class BlockSetting(NamedTuple):
     """What a block of the past-wind leaderboard states about its row set, beyond its arms.
 
     Attributes:
-        hub_height: The wind heights the block's arms carry, short enough for a panel title.
+        hub_height: The wind heights the block's arms carry, for the figures' captions.
         reference_name: What the block's contrasts are against, as a zero rule and an axis title
             name it.
+        note: A caveat about the block that its figures' captions state, or the empty string.
     """
 
     hub_height: str
     reference_name: str
+    note: str = ""
 
 
 def _arm(*, arm: str, reference: bool = False, label: str | None = None) -> BlockArm:
@@ -181,6 +183,17 @@ prints ICON-D2 minus UKV, which the report labels exploratory; the main row set'
 `exploratory_in_planned` declares it as such.
 """
 
+POST_HOC_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("icon_eu_wind", "era5_wind"),
+    ("icon_eu_wind", "ukv_wind"),
+    ("icon_d2_wind", "icon_eu_wind"),
+)
+"""The main row set's planned contrasts that use the 80 m ICON arms, chosen after the first run.
+
+The study plan specified the 100 m ICON arms. The report names these three contrasts as planned,
+and the report and the figures mark them post hoc.
+"""
+
 DECIDING_SECTION: Final[str] = "Deciding contrasts, named before the run"
 """The heading of the main and ICON-DREAM-EU reports' table of planned contrasts."""
 
@@ -208,6 +221,7 @@ ROW_SETS: Final[tuple[leaderboard.RowSet, ...]] = (
         second_section="Sensitivity",
         other_fit_sections=(),
         exploratory_in_planned=(("icon_d2_wind", "ukv_wind"),),
+        post_hoc_contrasts=POST_HOC_CONTRASTS,
         hours_unit="farm-hours",
     ),
     leaderboard.RowSet(
@@ -278,10 +292,18 @@ ROW_SETS: Final[tuple[leaderboard.RowSet, ...]] = (
 )
 """The four headline row sets, in the order the leaderboard stacks them."""
 
+DREAM_NOTE: Final[str] = (
+    "planned contrasts were written after the five products were scored; provisional until the "
+    "fold-covering refit is measured."
+)
+"""The caveat the ICON-DREAM-EU block's figures state."""
+
 BLOCK_SETTINGS: Final[dict[str, BlockSetting]] = {
     "main": BlockSetting(hub_height="100 m; ICON 80 m", reference_name="ERA5"),
     "icon_dream_eu": BlockSetting(
-        hub_height="100 m; ICON 80 m; ICON-DREAM-EU 96 m", reference_name="ERA5"
+        hub_height="100 m; ICON 80 m; ICON-DREAM-EU 96 m",
+        reference_name="ERA5",
+        note=DREAM_NOTE,
     ),
     "ecmwf": BlockSetting(hub_height="100 m; ICON 80 m", reference_name="ERA5"),
     "station": BlockSetting(

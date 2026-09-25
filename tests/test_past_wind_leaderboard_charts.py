@@ -117,3 +117,34 @@ def test_the_figures_carry_their_numbers_from_the_wind_map() -> None:
     leaderboard = str(module.contrasts_figure(blocks=blocks, shares=ALL_SHARES).to_dict())
 
     assert "Figure 2:" in leaderboard
+
+
+def test_no_block_title_carries_a_wind_height_or_runs_past_70_characters() -> None:
+    # Catches the hub heights moved back into the block titles, which then wrap or overflow.
+    module = _load()
+    longest_dates = "September 2026 to September 2026"
+
+    for key, label in module.BLOCK_LABELS.items():
+        setting = module.BLOCK_SETTINGS[key]
+        block = RowSetBlock(
+            label,
+            longest_dates,
+            999_999,
+            pl.DataFrame(),
+            hours_unit="farm-hours",
+            reference_name=setting.reference_name,
+        )
+        assert len(block.title) < 70, block.title
+        assert " m" not in block.title, block.title
+
+
+def test_the_captions_state_each_blocks_wind_heights_and_the_dream_caveat() -> None:
+    module = _load()
+
+    notes = module.block_notes()
+
+    assert notes[0] == "Wind heights of each block's arms:"
+    assert "Main: 100 m; ICON 80 m." in notes
+    assert "Station: 10 m station and ERA5 arm; 100 m others." in notes
+    assert notes[-1].startswith("ICON-DREAM-EU: planned contrasts were written after")
+    assert sum("planned contrasts were written" in note for note in notes) == 1

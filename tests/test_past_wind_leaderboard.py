@@ -302,3 +302,37 @@ def test_the_station_block_tells_its_two_era5_arms_apart() -> None:
         labels = {arm.arm: arm.label for arm in by_key[key].leaderboard_arms}
         assert labels["era5_wind"] == "ERA5", key
         assert by_key[key].reference_label == "ERA5's", key
+
+
+def test_only_the_main_block_marks_the_three_contrasts_that_use_the_80_m_icon_arms() -> None:
+    # Catches the post-hoc marks missing from the main block, or set on a block whose planned
+    # contrasts were written before the run.
+    module = _load()
+
+    marked = {row_set.key: row_set.post_hoc_contrasts for row_set in module.ROW_SETS}
+
+    assert marked == {
+        "main": (
+            ("icon_eu_wind", "era5_wind"),
+            ("icon_eu_wind", "ukv_wind"),
+            ("icon_d2_wind", "icon_eu_wind"),
+        ),
+        "icon_dream_eu": (),
+        "ecmwf": (),
+        "station": (),
+    }
+    main = module.ROW_SETS[0]
+    planned = {(c.treatment.arm, c.reference.arm) for c in main.planned_contrasts}
+    assert set(main.post_hoc_contrasts) <= planned
+
+
+def test_the_icon_dream_eu_block_carries_the_provisional_note() -> None:
+    module = _load()
+
+    notes = {key: setting.note for key, setting in module.BLOCK_SETTINGS.items()}
+
+    assert notes["icon_dream_eu"] == (
+        "planned contrasts were written after the five products were scored; provisional until "
+        "the fold-covering refit is measured."
+    )
+    assert [key for key, note in notes.items() if note] == ["icon_dream_eu"]

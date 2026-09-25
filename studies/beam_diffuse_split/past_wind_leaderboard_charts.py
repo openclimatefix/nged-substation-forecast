@@ -13,8 +13,9 @@ row. In the station block the reference is ERA5's 10 m wind, because the station
 and the block's contrast panel names the arm each planned contrast is against. Figure 2 adds,
 under each block's contrasts, that block's planned contrasts.
 
-Each block's label states its wind heights, and the caption states the share of its scored rows
-that fall in a calendar month with no training row in their fold, under the published folds.
+Each block's title is its row-set name, its dates, and its number of farm-hours. The caption
+states each block's wind heights and any caveat, and the share of its scored rows that fall in a
+calendar month with no training row in their fold, under the published folds.
 `UNCOVERED_MONTH_SHARES` holds those shares. The script stops where one is unset, so a block is
 never drawn without its share.
 
@@ -123,6 +124,25 @@ def uncovered_month_note(*, shares: dict[str, float | None]) -> list[str]:
     ]
 
 
+def block_notes() -> list[str]:
+    """State, for each block, the wind heights its arms carry and any caveat it has.
+
+    Returns:
+        One caption line for the wind heights of each block, in the order of `ROW_SETS`, then one
+        line for each block that has a caveat.
+    """
+    heights = [
+        f"{BLOCK_LABELS[row_set.key]}: {BLOCK_SETTINGS[row_set.key].hub_height}."
+        for row_set in ROW_SETS
+    ]
+    caveats = [
+        f"{BLOCK_LABELS[row_set.key]}: {BLOCK_SETTINGS[row_set.key].note}"
+        for row_set in ROW_SETS
+        if BLOCK_SETTINGS[row_set.key].note
+    ]
+    return ["Wind heights of each block's arms:", *heights, *caveats]
+
+
 class _CommonFields(NamedTuple):
     """The fields a block's leaderboard and contrast versions share."""
 
@@ -175,7 +195,7 @@ def build_blocks(
             )
             raise ValueError(msg)
         setting = BLOCK_SETTINGS[row_set.key]
-        label = f"{BLOCK_LABELS[row_set.key]} ({setting.hub_height})"
+        label = BLOCK_LABELS[row_set.key]
         dates = f"{month_year(iso_day=printed.first_day)} to {month_year(iso_day=printed.last_day)}"
         absolute = absolute_rows(
             frame=frame, row_set=row_set, printed=printed.tables[ABSOLUTE_SECTION]
@@ -219,6 +239,7 @@ def leaderboard_figure(
             ),
             STATION_SCOPE,
             *uncovered_month_note(shares=shares),
+            *block_notes(),
             DOTS,
             CAPACITY,
             SCOPE,
@@ -244,6 +265,7 @@ def contrasts_figure(
             BLOCKS_NOT_COMPARABLE,
             STATION_SCOPE,
             *uncovered_month_note(shares=shares),
+            *block_notes(),
             DOTS,
             CAPACITY,
             SCOPE,

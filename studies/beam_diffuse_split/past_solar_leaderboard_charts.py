@@ -36,6 +36,7 @@ from past_solar_leaderboard import (
     ROW_SETS,
     RowSet,
     contrast_section,
+    post_hoc_label,
 )
 from sources import SOLAR_LEADERBOARD_DIR
 from studies.charts import (
@@ -320,6 +321,10 @@ def contrast_rows(
             reference=row_set.reference_arm,
         )
         name = arm.label
+        post_hoc = (
+            arm.arm in POST_HOC_ARMS
+            or (arm.arm, row_set.reference_arm) in row_set.post_hoc_contrasts
+        )
         _check_row(name=name, row=row, printed=printed[name])
         second = _second(
             frame=frame,
@@ -331,11 +336,10 @@ def contrast_rows(
         records.append(
             {
                 "arm": arm.arm,
-                "label": DISPLAY_LABELS.get(name, name)
-                + (POST_HOC_SUFFIX if arm.arm in POST_HOC_ARMS else ""),
+                "label": DISPLAY_LABELS.get(name, name) + (POST_HOC_SUFFIX if post_hoc else ""),
                 "family": arm.family,
                 "reference": arm.reference,
-                "planned": row["planning"] == "planned",
+                "planned": row["planning"] == "planned" and not post_hoc,
                 "difference": row["value"],
                 "lower_95": row["lower"],
                 "upper_95": row["upper"],
@@ -364,6 +368,8 @@ def planned_rows(
     """
     records = []
     for contrast in row_set.planned_contrasts:
+        label = post_hoc_label(row_set=row_set, contrast=contrast)
+        post_hoc = label != contrast.label
         row = _one(
             frame=frame,
             section=PLANNED_CONTRAST_SECTION,
@@ -371,22 +377,22 @@ def planned_rows(
             treatment=contrast.treatment.arm,
             reference=contrast.reference.arm,
         )
-        _check_row(name=contrast.label, row=row, printed=printed[contrast.label])
+        _check_row(name=label, row=row, printed=printed[label])
         second = _second(
             frame=frame,
             section=PLANNED_CONTRAST_SECTION,
             arm=contrast.treatment.arm,
             reference=contrast.reference.arm,
         )
-        _check_second(name=contrast.label, second=second, printed=printed[contrast.label])
+        _check_second(name=label, second=second, printed=printed[label])
         records.append(
             {
                 "arm": contrast.treatment.arm,
                 "reference_arm": contrast.reference.arm,
-                "label": contrast.label,
+                "label": label,
                 "family": contrast.treatment.family,
                 "reference": False,
-                "planned": True,
+                "planned": not post_hoc,
                 "difference": row["value"],
                 "lower_95": row["lower"],
                 "upper_95": row["upper"],
