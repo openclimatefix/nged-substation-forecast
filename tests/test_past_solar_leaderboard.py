@@ -2,7 +2,8 @@
 
 Each test is built to fail on the bug it exists for: a report number the script no longer
 reproduces (which must stop the script before it writes), a planned contrast labelled exploratory,
-a near-the-line contrast missed, and a second write into the write-once folder.
+a near-the-line contrast missed, a printed row from another section's fit compared, and a second
+write into the write-once folder.
 """
 
 import importlib.util
@@ -15,6 +16,7 @@ from typing import Any, Final
 import polars as pl
 import pytest
 from studies.charts import BlockArm, block_contrast_rows, block_leaderboard_rows
+from studies.page_numbers import full_precision_values
 
 REPO_ROOT: Final[Path] = Path(__file__).parent.parent
 SCRIPT_DIR: Final[Path] = REPO_ROOT / "studies" / "beam_diffuse_split"
@@ -89,29 +91,83 @@ def _printed_report(*, losses: pl.DataFrame, tweak: str | None = None) -> str:
         if tweak == "interval" and row["label"] == "ENS":
             high += 0.001
         lines.append(f"| {by_label[row['label']]} | {value:.3f} | [{low:.3f}, {high:.3f}] |")
-    lines += [
+    lines += _contrast_section(
+        heading="Planned contrasts", contrast=contrast, label="ENS", by_label=by_label, tweak=tweak
+    )
+    if tweak != "no_second_setting":
+        second = block_contrast_rows(
+            losses=losses,
+            arms=ARMS[2:],
+            reference_arm="era5_global",
+            setting="sensitivity",
+            site_hours=SITE_HOURS,
+            metric=METRIC,
+        )
+        lines += _contrast_section(
+            heading="Planned contrasts at the second hyperparameter setting",
+            contrast=second,
+            label="ENS",
+            by_label=by_label,
+            scope="sensitivity",
+            tweak="contrast" if tweak == "second_setting" else None,
+        )
+    lines += _contrast_section(
+        heading="Every product against ERA5 (exploratory)",
+        contrast=contrast,
+        label="CAMS",
+        by_label=by_label,
+        tweak=None,
+    )
+    if tweak == "other_fit":
+        lines += _contrast_section(
+            heading="Leave one site out: the planned contrasts",
+            contrast=contrast,
+            label="ENS",
+            by_label=by_label,
+            tweak="contrast",
+        )
+    if tweak == "exploratory_fit":
+        lines += _contrast_section(
+            heading="A seasonal refit (exploratory)",
+            contrast=contrast,
+            label="ENS",
+            by_label=by_label,
+            tweak="contrast",
+        )
+    return "\n".join(lines) + "\n"
+
+
+def _contrast_section(
+    *,
+    heading: str,
+    contrast: pl.DataFrame,
+    label: str,
+    by_label: dict[str, str],
+    tweak: str | None,
+    scope: str = "all",
+) -> list[str]:
+    """Print one report section with a contrast table holding one arm's contrast against ERA5."""
+    lines = [
         "",
-        "#### Planned contrasts",
+        f"#### {heading}",
         "",
-    ]
-    lines += [
         (
             "| Scope | Contrast | ΔMAE (pp of capacity) | 95% interval | Excludes zero? "
             "| Folds agreeing | Rows |"
         ),
         "|---|---|---|---|---|---|---|",
     ]
-    for row in contrast.filter(pl.col("label") == "ENS").iter_rows(named=True):
+    for row in contrast.filter(pl.col("label") == label).iter_rows(named=True):
         difference, low, high = (
             round(row[name], 3) for name in ("difference", "lower_95", "upper_95")
         )
         if tweak == "contrast":
             low -= 0.001
         lines.append(
-            f"| all | {by_label[row['label']]} − era5_global | {difference:+.3f} "
+            f"| {scope} | {by_label[row['label']]} − era5_global | {difference:+.3f} "
             f"| [{low:+.3f}, {high:+.3f}] | no | 2 of 2 | {SITE_HOURS} |"
         )
-    return "\n".join(lines) + "\n"
+    return lines
 
 
 def _row_set(module: ModuleType, tmp_path: Path) -> Any:
@@ -151,26 +207,96 @@ def test_a_report_the_script_reproduces_scores_and_labels_the_planned_contrast(
     assert planning == {"CAMS": "exploratory", "ENS": "planned"}
 
 
-@pytest.mark.parametrize("tweak", ["error", "interval", "contrast"])
+@pytest.mark.parametrize("tweak", ["error", "interval", "contrast", "second_setting"])
 def test_one_printed_number_that_differs_stops_the_script(tmp_path: Path, tweak: str) -> None:
     with pytest.raises(ValueError, match="ens_mean_t3"):
         _score(tmp_path=tmp_path, tweak=tweak)
 
 
-def test_second_setting_is_computed_only_for_planned_or_near_line_rows(tmp_path: Path) -> None:
+def test_a_printed_row_from_an_exploratory_section_that_differs_stops_the_script(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ValueError, match="A seasonal refit"):
+        _score(tmp_path=tmp_path, tweak="exploratory_fit")
+
+
+def test_a_same_arms_row_in_a_section_that_refits_is_not_compared(tmp_path: Path) -> None:
+    """The row prints the planned contrast on the same rows, but from a different fit."""
+    result = _score(tmp_path=tmp_path, tweak="other_fit")
+
+    assert result.site_hours == SITE_HOURS
+
+
+def test_a_planned_contrast_with_a_second_setting_but_no_printed_second_row_stops_the_script(
+    tmp_path: Path,
+) -> None:
+    with pytest.raises(ValueError, match="planned, but the report prints no row"):
+        _score(tmp_path=tmp_path, tweak="no_second_setting")
+
+
+def test_a_leaderboard_arm_with_no_printed_error_stops_the_script(tmp_path: Path) -> None:
+    module = _load()
+    losses = _losses()
+    report_path = tmp_path / "report.md"
+    text = _printed_report(losses=losses)
+    report_path.write_text(text)
+    row_set = _row_set(module, tmp_path)._replace(arm_suffix="_typo")
+
+    with pytest.raises(ValueError, match="prints no error"):
+        module.score_row_set(
+            row_set=row_set, losses=losses, report_text=text, report_path=report_path
+        )
+
+
+def test_a_contrast_named_only_in_an_exploratory_section_stays_exploratory(
+    tmp_path: Path,
+) -> None:
+    """CAMS is printed in an exploratory section, so only the planned section may label ENS."""
     result = _score(tmp_path=tmp_path)
-    by_label = {row["label"]: row for row in result.contrasts.iter_rows(named=True)}
 
-    assert by_label["ENS"]["second_difference"] is not None
-    assert by_label["CAMS"]["near_line"] == (by_label["CAMS"]["second_difference"] is not None)
+    planning = dict(zip(result.contrasts["label"], result.contrasts["planning"], strict=True))
+    assert planning["CAMS"] == "exploratory"
 
 
-def test_is_near_line_uses_twenty_percent_of_the_interval_width() -> None:
+def test_a_post_hoc_arm_is_labelled_post_hoc(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load()
+    monkeypatch.setattr(module, "POST_HOC_ARMS", ["cams_global"])
+    losses = _losses()
+    report_path = tmp_path / "report.md"
+    text = _printed_report(losses=losses)
+    report_path.write_text(text)
+
+    result = module.score_row_set(
+        row_set=_row_set(module, tmp_path), losses=losses, report_text=text, report_path=report_path
+    )
+
+    planning = dict(zip(result.contrasts["label"], result.contrasts["planning"], strict=True))
+    assert planning == {"CAMS": "post hoc", "ENS": "planned"}
+
+
+def _contrasts_with_flags(*, near_line: dict[str, bool]) -> pl.DataFrame:
+    """Return exploratory contrast rows for two arms, each flagged near the line or not."""
+    return pl.DataFrame(
+        {"arm": arm, "planning": "exploratory", "near_line": flag}
+        for arm, flag in near_line.items()
+    )
+
+
+def test_second_setting_is_computed_for_an_exploratory_row_near_the_line() -> None:
     module = _load()
 
-    assert module.is_near_line(lower_95=-0.218 - 0.174, upper_95=-0.058)
-    assert not module.is_near_line(lower_95=-1.0, upper_95=1.0)
-    assert not module.is_near_line(lower_95=-4.294, upper_95=-3.666)
+    result = module._second_setting(
+        contrasts=_contrasts_with_flags(near_line={"cams_global": True, "ens_mean_t3": False}),
+        arms=ARMS,
+        losses=_losses(),
+        site_hours=SITE_HOURS,
+    )
+
+    second = dict(zip(result["arm"], result["second_difference"], strict=True))
+    assert second["cams_global"] is not None
+    assert second["ens_mean_t3"] is None
 
 
 def test_write_outputs_writes_report_and_intervals_and_refuses_a_second_write(
@@ -184,7 +310,24 @@ def test_write_outputs_writes_report_and_intervals_and_refuses_a_second_write(
 
     assert "exploratory" in (output / "report.md").read_text()
     intervals = pl.read_parquet(output / "intervals.parquet")
-    assert sorted(intervals["kind"].unique().to_list()) == ["absolute", "minus_era5"]
-    assert intervals.filter(pl.col("kind") == "absolute").height == len(ARMS)
+    assert intervals.group_by("section", "setting").len().sort("section", "setting").rows() == [
+        ("Mean absolute error", "pooled", len(ARMS)),
+        ("Mean absolute error minus ERA5's", "pooled", 2),
+        ("Mean absolute error minus ERA5's", "sensitivity", 1),
+    ]
     with pytest.raises(FileExistsError):
         module.write_outputs(results=[result], output_dir=output)
+
+
+def test_the_written_intervals_are_accepted_by_the_page_number_gate(tmp_path: Path) -> None:
+    module = _load()
+    result = _score(tmp_path=tmp_path)
+    module.write_outputs(results=[result], output_dir=tmp_path / "out")
+    intervals = pl.read_parquet(tmp_path / "out" / "intervals.parquet")
+    lower = float(intervals.filter(pl.col("treatment") == "ens_mean_t3")["lower"][0])
+
+    exact = full_precision_values(
+        intervals_path=tmp_path / "out" / "intervals.parquet", print_decimals=frozenset({3})
+    )
+
+    assert f"{lower:+.3f}" in exact
