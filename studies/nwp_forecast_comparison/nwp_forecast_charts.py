@@ -1170,7 +1170,7 @@ def blends(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.VConc
             (
                 "XGBoost models given the ENS mean alone, or ENS plus two more products. "
                 "A control has the same columns as its blend, with the two other products' "
-                "weather shuffled among hours of the same site, month and hour of day, so it "
+                "weather shuffled among hours of the same site, year-month and hour of day, so it "
                 "carries no real information from them. Points of capacity; negative means the "
                 "first forecast in a row is better."
             ),
@@ -1285,19 +1285,21 @@ FIGURE_NUMBERS: Final[dict[tuple[DomainType, str], int]] = {
 TITLES: Final[dict[tuple[DomainType, str], str]] = {
     ("solar", "headline"): (
         "For solar power, ENS beats UKV and ICON-EU at matched lead and GEFS at equal lead; "
-        "a blend gains 0.35 points at an optimistic lead and none at a conservative one"
+        "a blend gains 0.35 points at an optimistic lead and no detectable gain at a "
+        "conservative one"
     ),
     ("wind", "headline"): (
         "For wind power, ENS beats UKV, ICON-EU is unresolved against ENS, and a blend "
         "lowers the error by 0.18 points even at a conservative lead"
     ),
     ("solar", "leaderboard"): (
-        "At day 1 every forecast beats climatology (14.5%); ENS and IFS 0.25° have the lowest "
-        "error of the single solar forecasts"
+        "At day 1 every weather forecast shown has a lower error than climatology (14.5%); "
+        "ENS and IFS 0.25° have the lowest error of the single solar forecasts"
     ),
     ("wind", "leaderboard"): (
-        "At day 1 every forecast beats climatology (18.5%) by more than 9 points; ENS, IFS 0.25° "
-        "and ICON-EU have the lowest error of the single wind forecasts"
+        "At day 1 every weather forecast shown has a lower error than climatology (18.5%), by "
+        "more than 9 points; ENS, IFS 0.25° and ICON-EU have the lowest error of the single wind "
+        "forecasts"
     ),
     ("solar", "models_work"): (
         "Out-of-fold day-1 ENS-mean forecasts follow the measured output at all six solar farms"

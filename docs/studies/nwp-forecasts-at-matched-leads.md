@@ -1,4 +1,4 @@
-# At six solar and three wind farms, ECMWF's ensemble beat UKV, ICON-EU, and GEFS for solar and UKV and GEFS for wind, where ICON-EU and IFS 0.25° were not separable from it, and a blend helped wind at a lead a live service could use
+# ECMWF's ensemble mean, averaged over H3 cells, beat UKV and GEFS at six solar and three wind farms, and a blend helped wind
 
 **At six solar farms and three wind farms in Lincolnshire, none of the four single products we
 tested beat the mean of the European Centre for Medium-Range Weather Forecasts (ECMWF) ensemble
@@ -13,32 +13,33 @@ single-run 0.25° Integrated Forecasting System (IFS 0.25°). The study also tes
 ICON-EU and IFS 0.25°.
 
 **For solar power, ENS beat UKV, ICON-EU, and GEFS, and a blend gained only at an optimistic
-lead.** The XGBoost model's error given UKV's day-1 forecast is 1.242 points [0.824, 1.689] higher
-than given ENS's day-1 forecast, given ICON-EU's it is 0.817 points [0.584, 1.069] higher, and given
-GEFS's it is 1.272 points [0.937, 1.601] higher.
+lead.** The XGBoost model's error given UKV's day-1 forecast, minus its error given ENS's day-1
+forecast, is +1.242 points [+0.824, +1.689]. The same difference is +0.817 points [+0.584, +1.069]
+for ICON-EU and +1.272 points [+0.937, +1.601] for GEFS.
 <!-- report: Solar, Planned contrasts and verdicts (P1a, P2a, P3) -->
-A blend of ENS, ICON-EU, and IFS 0.25° lowered the error by 0.347 points [0.219, 0.482] when the
-other two products' forecasts came from runs that may have been published after the forecast is
+A blend of ENS, ICON-EU, and IFS 0.25° changed the error by -0.347 points [-0.482, -0.219] when
+the other two products' forecasts came from runs that may have been published after the forecast is
 issued (P4a). The blend changed the error by -0.033 points [-0.106, +0.033], which is not
 distinguishable from zero, when both products' forecasts were a day older (P4b, the deciding
 contrast).
 <!-- report: Solar, P4, the blend -->
 
-**For wind power, ENS beat UKV and GEFS, ICON-EU and IFS 0.25° were not separable from ENS, and a
-blend lowered the error even at a conservative lead.** The error given UKV's day-1 forecast is
-0.770 points [0.460, 1.057] higher than given ENS's, and given GEFS's it is 0.858 points [0.598,
-1.099] higher. ICON-EU's gap to ENS is 0.169 points [-0.064, 0.384], and IFS 0.25°'s is 0.003
-points [-0.163, 0.186].
+**For wind power, ENS beat UKV and GEFS, ICON-EU was not separable from ENS, and a blend lowered
+the error even at a conservative lead.** The error given UKV's day-1 forecast, minus the error
+given ENS's, is +0.770 points [+0.460, +1.057]. The same difference is +0.858 points [+0.598,
++1.099] for GEFS and +0.169 points [-0.064, +0.384] for ICON-EU. For IFS 0.25°, an exploratory
+comparison, it is +0.003 points [-0.163, +0.186].
 <!-- report: Wind, Planned contrasts and verdicts (P1a, P2a, P3); Wind, P4, the blend -->
-The blend lowered the error by 0.656 points [0.472, 0.851] at the optimistic lead and by 0.184
-points [0.087, 0.282] at the conservative lead, whose added runs a live service could read at 09:00
-UTC. The blend's permutation control was not worse than ENS alone at either setting.
+The blend changed the error by -0.656 points [-0.851, -0.472] at the optimistic lead and by -0.184
+points [-0.282, -0.087] at the conservative lead, whose added runs a live service could read at
+09:00 UTC. The blend's permutation control was not significantly worse than ENS alone at either
+setting (exploratory).
 <!-- report: Wind, P4, the blend -->
 
 ![Paired differences in solar error with 95% intervals, both XGBoost settings](assets/nwp_forecast_solar_headline.svg)
 
 Figure 1: For solar power, ENS beats UKV and ICON-EU at matched lead and GEFS at equal lead; a blend
-gains 0.35 points at an optimistic lead and none at a conservative one.
+gains 0.35 points at an optimistic lead and no detectable gain at a conservative one.
 
 ![Paired differences in wind error with 95% intervals, both XGBoost settings](assets/nwp_forecast_wind_headline.svg)
 
@@ -62,27 +63,30 @@ error by 0.18 points even at a conservative lead.
   ([solar results](#solar-does-any-product-beat-ens-at-matched-lead)).
 - **For wind power, ENS beats UKV and GEFS, and ICON-EU and IFS 0.25° cannot be separated from
   ENS** ([wind results](#wind-does-any-product-beat-ens-at-matched-lead)).
-- **IFS 0.25° is the closest rival to ENS, and the comparison favours it.** Its day-1 error minus
-  ENS's is 0.036 points [-0.225, 0.296] for solar and 0.003 points [-0.163, 0.186] for wind, and its
-  lead is shorter than ENS's on most hours ([other
+- **IFS 0.25° is the closest rival to ENS, and the comparison favours it** (exploratory). Its day-1
+  error minus ENS's is +0.036 points [-0.225, +0.296] for solar and +0.003 points [-0.163, +0.186]
+  for wind, and its lead is shorter than ENS's on most hours ([other
   products](#other-products-exploratory)).
-  <!-- report: Solar and Wind, P4, the blend (X-ifs025_day1) -->
-- **Adding ICON-EU and IFS 0.25° to ENS lowers the wind error by 0.184 points [-0.282, -0.087] at a
-  lead a live service could use, and lowers the solar error only at a lead it may not**
-  ([blending](#does-blending-products-help)).
-- **For wind, ICON-EU at day 2 carries most of the blend's gain** (exploratory): ENS plus ICON-EU
-  alone lowers the error by 0.169 points [-0.250, -0.090], and P4b, which adds IFS 0.25° as well,
+  <!-- report: Solar and Wind, P4, the blend (X-ifs025_day1 rows) -->
+- **Adding ICON-EU and IFS 0.25° to ENS changes the wind error by -0.184 points [-0.282, -0.087] at
+  a lead a live service could use, and changes the solar error detectably only at a lead it may
+  not** ([blending](#does-blending-products-help)).
+- **For wind, ICON-EU at day 2 carries most of the blend's gain** (exploratory, and post hoc,
+  because the two single-product blends were fitted after P4b's result was seen): ENS plus ICON-EU
+  alone changes the error by -0.169 points [-0.250, -0.090], and P4b, which adds IFS 0.25° as well,
   is not statistically distinguishable from it ([blending](#does-blending-products-help)).
 - **At the wind farms, part of ENS's lead over the single-run products may be timing noise that
   averaging removes, but at the solar farms averaging does not shrink the gaps relative to ENS's own
-  error** ([gaps](#are-the-gaps-about-model-quality)).
-- **Every weather forecast scored at day 1 beats the no-weather climatology baseline.** The XGBoost
-  model's error given ENS is 8.766% of capacity for solar and 8.427% for wind, against climatology's
-  14.458% and 18.460% ([the models work](#do-the-models-work)).
+  error** (exploratory; [gaps](#are-the-gaps-about-model-quality)).
+- **Every weather forecast shown in the day-1 leaderboards has a lower error than the no-weather
+  climatology baseline.** The XGBoost model's error given ENS is 8.766% of capacity for solar and
+  8.427% for wind, against climatology's 14.458% and 18.460% ([the models
+  work](#do-the-models-work)).
 - **Open-Meteo's Previous Runs day 1 gives UKV, ICON-EU, and IFS 0.25° a shorter lead than ENS's on
   most hours, which flatters them** ([matched leads](#how-the-leads-are-matched)).
 
-<!-- report: Solar and Wind, Leaderboard, primary setting; P4, the blend (X-ifs025_day1) -->
+<!-- report: Solar and Wind, Leaderboard, primary setting; P4, the blend; Exploratory: which
+product carries P4b's wind gain; Exploratory: each arm's own error over blocks of hours -->
 
 ## Introduction
 
@@ -92,10 +96,10 @@ ENS at 09:00 UTC, so the answer decides whether a second weather source is worth
 the incumbent. The table sets out each product that a headline contrast uses. The other products
 in the study are exploratory and appear in [Other products](#other-products-exploratory).
 
-| Product | Lead at day 1, in hours after the run starts | Grid | Covers | History read from | Delivery |
+| Product | Lead at day 1, in hours after the run starts | Grid | Covers | Archive read from | Delivery |
 |---|---|---|---|---|---|
-| ECMWF ENS, mean of 51 members | 24 + h | 0.25° cells, averaged over each farm's H3 cell | Global | 2024-04-01 | About 09:00 UTC for the 00 UTC run (an assumption; ECMWF disseminates it by about 06:55 UTC) |
-| NOAA GEFS, mean of 31 members | 24 + h | Nearest 0.25° cell | Global | 2020-10 | 00 UTC run, read as at 09:00 UTC |
+| ECMWF ENS, mean of 51 members | 24 + h | 0.25° cells, averaged over each farm's H3 cell | Global | 2024-04-01 | Not measured; the study assumes the 00 UTC run is readable at 09:00 UTC |
+| NOAA GEFS, mean of 31 members | 24 + h | Nearest 0.25° cell | Global | 2020-10-01 | Not measured; the study assumes the 00 UTC run is readable at 09:00 UTC |
 | UKV | 24 + (h mod n) | 1.5 km over the UK, served at 2 km | UK | 2024-08-06 | About 4 hours after the run starts |
 | ICON-EU | 24 + (h mod n) | 6.5 km, served at about 7 km | Great Britain | 2024-01-19 | About 3.5 hours after the run starts |
 | IFS 0.25° | 24 + (h mod n) | 0.25° | Great Britain | 2024-03-06 | Not measured |
@@ -105,9 +109,13 @@ model. ENS and GEFS start one run per day, at 00 UTC. UKV, ICON-EU, and IFS 0.25
 through Open-Meteo's Previous Runs archive, whose lead depends on n ([How the leads are
 matched](#how-the-leads-are-matched)). The scored rows start on 2024-12-01, so every history is long
 enough. The grids, coverage, and delivery times of UKV and ICON-EU come from [the past-wind
-study](weather-products-for-past-wind.md), which measured the delivery times for a
-different purpose; the delivery time of GEFS was not measured.
-<!-- plan: The question and the products; weather-products-for-past-wind.md product table -->
+study](weather-products-for-past-wind.md), which measured the delivery times for a different
+purpose. The archive start dates come from the [weather-products
+survey](../background/weather-products-survey.md). The study did not measure the delivery time of
+ENS, GEFS, or IFS 0.25°, and ECMWF's published dissemination schedule was not checked against the
+09:00 UTC assumption.
+<!-- source: the past-wind study's product table and the weather-products survey; none of these
+figures is measured here -->
 
 ## How the leads are matched
 
@@ -116,18 +124,18 @@ products with ENS at one lead.** A value labelled `previous_dayN` comes from the
 weather model that was initialised at least N × 24 hours before the hour it describes. For a weather
 model that starts a run every n hours, the lead of that value is 24N + (h mod n) hours, where h is
 the UTC hour of day. The lead therefore differs between products, and no Previous Runs value
-reproduces a forecast issued at a fixed time each day. The study's verification script (V1) checked this
-run-selection rule against NOAA's Global Forecast System (GFS) runs on two days at the nine
-generators, and the check passed. Served 100 m wind speed differed from the run initialised exactly
-24N hours before the hour by a mean absolute 0.102 km/h at N = 1 and 0.100 km/h at N = 2, against
-0.416 and 0.515 km/h for a run one hour older. Served radiation matched a run chosen by the hour's
-label (a mean absolute difference of 4.96 W/m² at N = 1) better than a run chosen by the hour's
-start (21.94 W/m²).
-<!-- report: Inputs and verification, V1 wind gate and V1 radiation -->
+reproduces a forecast issued at a fixed time each day. The study's verification script (V1) checked
+this run-selection rule against NOAA's Global Forecast System (GFS) runs on two days (2025-07-01 and
+2025-07-02) at the nine generators, and the check passed. Served 100 m wind speed differed from the
+run initialised exactly 24N hours before the hour by a mean absolute 0.102 km/h at N = 1 and 0.100
+km/h at N = 2, against 0.416 and 0.515 km/h for a run one hour older. Served radiation matched a run
+chosen by the hour's label (a mean absolute difference of 4.96 W/m² at N = 1) better than a run
+chosen by the hour's start (21.94 W/m²).
+<!-- report: Inputs and verification, V1 wind gate and V1 radiation; Design constants (V1 gate) -->
 The rule for every other product rests on the assumption that Open-Meteo applies one rule to every
 weather model. For UKV, the run-switch check (V1b) found no clear run cycle: its score was 1.07 for
 wind and 1.10 for temperature, and a cycle needs a score of 1.3.
-<!-- report: Inputs and verification, V1b; Solar, Rows (UKV straddle share) -->
+<!-- report: Inputs and verification, V1b; Design constants (V1b) -->
 
 **If Open-Meteo fills a missing run with an older run, a row's lead can exceed the lead the rule
 gives, and that would weaken the upper side of the bracket.** The upper side needs each product's
@@ -136,11 +144,11 @@ could exceed ENS day N's because of the run's age and not because of the weather
 check compared GFS with runs on two days only, so the study cannot rule out a fill for any product.
 
 **ENS and GEFS are compared at exactly matched lead, because both are whole-run archives.** Each
-contributes its 00 UTC run, read as though at 09:00 UTC on the run's day. A forecast for day d is the
-run's forecast for the calendar day d days after the run, so a row's lead is 24d + h hours for both
-ensembles. Both runs were published before 09:00 UTC, which is when the live service reads its ENS
-run. The GEFS contrast, P3, is therefore the only one in the study whose two arms have the same lead
-and could both have been read at the issue time.
+contributes its 00 UTC run, read as though at 09:00 UTC on the run's day. A forecast for day d is
+the run's forecast for the calendar day d days after the run, so a row's lead is 24d + h hours for
+both ensembles. The study assumes both runs were readable by 09:00 UTC, which is when the live
+service reads its ENS run, and did not measure when either run was published. The GEFS contrast, P3,
+is therefore the only one in the study whose two arms have exactly the same lead.
 
 **ENS at day N−1 and at day N brackets each Previous Runs product at day N.** On a row for hour h,
 ENS day N−1 has lead 24(N−1) + h hours, which is shorter than the product's 24N + (h mod n). ENS
@@ -163,69 +171,75 @@ settings give it.** These three verdicts were fixed in the plan before any fit:
 - **Unresolved at matched lead:** neither of those holds, so the product's error lies between the
   two ENS errors, and the study cannot place it more precisely.
 
-Where the two settings disagree, the verdict is unresolved and the page shows both. Planned
-contrasts are labelled "(planned)" everywhere on this page; every other figure is exploratory.
-About 1 in 20 exploratory intervals reaches significance at the 5% level by chance.
+Where the two settings disagree, the verdict is unresolved and the page shows both. The planned
+contrasts are P1a, P1b, P2a, P2b, P3, P4a, P4b, and the two blend guards (each blend minus its
+permutation control); all were written into the study plan before any result existed. The rule
+applies to the contrast tables and to the headline claims: every other contrast is exploratory, and
+so is any number that a paragraph quotes from an exploratory table. Analyses added after a result
+was seen, such as the two single-product wind blends, are exploratory and also post hoc. About 1 in
+20 exploratory intervals reaches significance at the 5% level by chance.
 <!-- report: header -->
 
 **The bracket assumes that ENS's own error does not fall as its lead lengthens, and the study tests
 that assumption band by band.** For each day pair the study uses (day 0 to 1, 1 to 2, and 2 to 3)
 and for each 3-hour band of UTC hours, the study computes the change in ENS's error. A band whose
-point estimate is zero or below is voided, and every bracket that rests on that pair loses that band.
-The check tests only ENS's own error, so it does not test whether the Previous Runs archive follows
-the lead rule above, and it does not test any product's error at all.
+point estimate is zero or below is voided, and every bracket that rests on that pair loses that
+band. The check tests only ENS's own error, so it does not test whether the Previous Runs archive
+follows the lead rule above, and it does not test any product's error at all.
 <!-- plan: Leads, and what matched means -->
 For solar, the day-0-to-day-1 pair fails in the band 03-06 UTC: the change is -0.025 points [-0.133,
-0.051] at the primary setting and -0.019 points [-0.155, 0.106] at the second setting, and every other
-band and pair has a positive point estimate. The second setting checks the day-0-to-day-1 pair only.
-For wind,
-every band and pair has a positive point estimate, and no band is voided.
+0.051] at the primary setting and -0.019 points [-0.155, 0.106] at the second setting, and every
+other band and pair has a positive point estimate. The second setting checks the day-0-to-day-1 pair
+only. For wind, every band and pair has a positive point estimate, and no band is voided.
 <!-- report: Solar and Wind, ENS monotonicity by band -->
 
-**Removing the voided band leaves the solar verdicts unchanged.** Without the band 03-06 UTC, UKV's
-upper-side difference is 1.261 points [0.840, 1.715] and its lower-side difference is 1.901 points
-[1.527, 2.284] at the primary setting, and ICON-EU's upper-side difference is 0.828 points [0.595,
-1.075], so UKV and ICON-EU still lose.
+**Removing the voided band leaves the solar verdicts unchanged (exploratory).** Without the band
+03-06 UTC, UKV's upper-side difference is +1.261 points [+0.840, +1.715] and its lower-side
+difference is +1.901 points [+1.527, +2.284] at the primary setting, and ICON-EU's upper-side
+difference is +0.828 points [+0.595, +1.075], so UKV and ICON-EU still lose.
 <!-- report: Solar, Exploratory: brackets without the hours where ENS's error did not rise -->
 Inside the voided band, no bracket resolves: UKV's own bracket at the primary setting is -0.013
-points [-0.088, 0.092] on the lower side and 0.012 points [-0.100, 0.145] on the upper side.
-<!-- report: Solar, Planned brackets (day 1) -->
+points [-0.088, +0.092] on the lower side and +0.012 points [-0.100, +0.145] on the upper side
+(exploratory, a subset of the planned bracket's rows).
+<!-- report: Solar, Exploratory: brackets without the hours where ENS's error did not rise -->
 
 ## The weather-to-power model and the rows
 
 **Every arm is the same XGBoost model given the same kinds of column, and only the weather product
 differs.** The model is fitted separately for each generator with an absolute-error objective and
-three fitting seeds, and forecasts are scored out of fold. Curtailed hours are left out of training
-and kept for scoring, and every prediction is held to the generator's export cap. Column
-subsampling is switched off (`colsample_bytree` is 1), because a wider arm otherwise wins without
-carrying more information. Each single-product arm has 7 columns:
+three fitting seeds (0, 1, and 2), and forecasts are scored out of fold. Curtailed hours are left
+out of training and kept for scoring, and every prediction is held to the generator's export cap.
+Column subsampling is switched off (`colsample_bytree` is 1), because a wider arm otherwise wins
+without carrying more information. Each single-product arm has 7 columns:
 
-- **Solar:** hour of day, day of year, an era code, the sun's elevation and azimuth, and the product's
-  global horizontal irradiance and 2 m air temperature at its own lead.
+- **Solar:** hour of day, day of year, an era code, the sun's elevation and azimuth, and the
+  product's global horizontal irradiance and 2 m air temperature at its own lead.
 - **Wind:** hour of day, day of year, an era code, and the product's wind speed at 100 m, the sine
   and cosine of its 100 m wind direction, and its 10 m wind speed at its own lead.
 
-<!-- report: Solar and Wind, Arm columns -->
+<!-- report: Solar and Wind, Arm columns; Design constants -->
 
 **A blend has more columns than a single-product arm, so each blend has a control with the same
 column count.** The solar blend has 11 columns and the wind blend has 15. ENS's columns stay real in
-the control, and the other products' columns are replaced by values shuffled among hours that share
-a generator, a year and month, and an hour of day, so no shuffled value crosses a fold. The blend
-minus its control isolates the other products' weather from the extra columns.
-<!-- report: Solar and Wind, Arm columns -->
+the control. Each other product's weather columns are replaced by values shuffled among the hours
+that share a generator, a year-month (a calendar month of one year, such as 2025-03), and a UTC hour
+of day, so no shuffled value crosses a fold. A wind product's direction sine and cosine move
+together under one shuffle, and every other column is shuffled separately. The blend minus its
+control isolates the other products' weather from the extra columns.
+<!-- report: Solar and Wind, Arm columns; Design constants (Permutation control) -->
 
-**Scoring is on the same hours for every arm.** Every arm is scored on the rows where the target, the
-no-weather baselines, and every planned product are present. Solar has 39,030 candidate rows from
-2024-12-01 and 35,263 shared rows, and wind has 42,144 candidate rows and 37,407 shared rows.
+**Scoring is on the same hours for every arm.** Every arm is scored on the rows where the target,
+the no-weather baselines, and every planned product are present. Solar has 39,030 candidate rows
+from 2024-12-01 and 35,263 shared rows, and wind has 42,144 candidate rows and 37,407 shared rows.
 <!-- report: Solar and Wind, Rows -->
 The UKV day-1 requirement removes the most rows: 6.8% of solar candidate rows and 11.1% of wind
-candidate rows, mostly in April, May, and June 2026. In 2026-05 it removes 50.5% of the month's solar
-rows and 89.4% of its wind rows, so the shared rows hold little of that spring.
+candidate rows, mostly in April, May, and June 2026. In 2026-05 it removes 50.5% of the month's
+solar rows and 89.4% of its wind rows, so the shared rows hold little of that spring.
 <!-- report: Solar and Wind, Rows; UKV day-1 requirement: rows removed -->
 Exploratory arms are fitted on the same rows with their few missing values left as missing, which
 XGBoost handles natively; the largest share on solar is 0.83% and on wind is 1.48%.
 <!-- report: Solar and Wind, Exploratory arms: missing weather on the shared rows -->
-The shared rows cover 21 calendar months.
+The shared rows cover 21 year-months.
 <!-- report: Solar and Wind, Leaderboard, primary setting -->
 
 **Folds are whole months, cut inside three eras, and the study prints which months no fold can
@@ -239,21 +253,23 @@ year only at that site, so no other fold holds that month and training never see
 <!-- report: Solar and Wind, Rows (coverage table) -->
 
 **Every error is divided by its own generator's capacity before any mean or difference, and every
-interval resamples whole calendar months.** Capacity is the generator's 99th percentile of metered
-output. Each of 2,000 resamples draws whole calendar months, and one of the three fitting seeds,
-paired across the two arms of a contrast. Each contrast asserts that both arms hold the same rows.
-The second XGBoost setting is run on every planned contrast.
-<!-- plan: Rows, folds, and fairness -->
+interval resamples whole year-months.** Capacity is the generator's `effective_capacity_mw`, its
+99th percentile of metered output, as [defined on the blending
+page](blending-weather-products.md#data-and-methods). Each of 2,000 resamples draws whole
+year-months, and one of the three fitting seeds, paired across the two arms of a contrast. Each
+contrast asserts that both arms hold the same rows. The second XGBoost setting is run on every
+planned contrast.
+<!-- report: Design constants (Intervals, Capacity) -->
 
 ## Do the models work?
 
-**The XGBoost models track the measured output at every farm, so contrasts of a few tenths of a point
-are contrasts between working forecasts.** Figure 3 shows out-of-fold day-1 forecasts given ENS
-against the measured output at all six solar farms, and Figure 4 shows the same for the three wind
-farms, across one week chosen by a stated rule from the measured output alone. For solar, the rule
-takes the week whose daily mean output varies most from day to day. For wind, the rule takes the week
-with the largest mean hour-to-hour change in output. Only weeks in which every generator has scored
-hours on all seven days qualify.
+**The XGBoost models track the measured output at every farm, so contrasts of a few tenths of a
+point are contrasts between working forecasts.** Figure 3 shows out-of-fold day-1 forecasts given
+ENS against the measured output at all six solar farms, and Figure 4 shows the same for the three
+wind farms, across one week chosen by a stated rule from the measured output alone. For solar, the
+rule takes the week whose daily mean output varies most from day to day. For wind, the rule takes
+the week with the largest mean hour-to-hour change in output. Only weeks in which every generator
+has scored hours on all seven days qualify.
 
 ![Day-1 forecasts against measured output at solar farms A to F](assets/nwp_forecast_solar_models_work.svg)
 
@@ -271,25 +287,26 @@ wind.
 <!-- report: Solar and Wind, Leaderboard, primary setting -->
 
 **Persistence baselines do no better than climatology on solar, and smart persistence beats it on
-wind.** Smart persistence at day 1 scores 15.274% [14.251, 16.272] on solar and 17.799% [15.824,
-19.614] on wind. Smart persistence at day 1 is 0.816 points [0.040, 1.609] worse than climatology
-on solar, and 0.662 points [0.390, 0.946] better than climatology on wind.
+wind (exploratory).** Smart persistence at day 1 scores 15.274% [14.251, 16.272] on solar and
+17.799% [15.824, 19.614] on wind. Its error minus climatology's is +0.816 points [+0.040, +1.609]
+on solar and -0.662 points [-0.946, -0.390] on wind.
 <!-- report: Solar and Wind, Leaderboard, primary setting; Exploratory: the no-weather floor -->
-Every baseline is issued at 09:00 UTC and reads only telemetry up to that time, the same
-information the live service has. Solar persistence on the run's own day (`persistence_day0`) is
-left off the leaderboards, because the baseline is cut off at the run's 00 UTC initialisation time,
-so it repeats the last observed hour, a night-time value near zero, across the whole day.
-<!-- report: Solar, Exploratory: the no-weather floor; plan: baselines -->
+A baseline for a day-1 to day-3 forecast reads only telemetry up to 09:00 UTC on the run's day,
+the same information the live service has. A baseline for the run's own day (day 0) reads
+telemetry only up to the run's 00 UTC initialisation time. Solar persistence on the run's own day
+(`persistence_day0`) is left off the leaderboards, because it repeats the last observed hour, a
+night-time value near zero, across the whole day.
+<!-- report: Design constants (Baselines); Solar, Exploratory: the no-weather floor -->
 
 ![Day-1 error of every solar forecast and baseline, with 95% intervals](assets/nwp_forecast_solar_leaderboard.svg)
 
-Figure 5: At day 1 every forecast beats climatology (14.5%); ENS and IFS 0.25° have the lowest error
-of the single solar forecasts.
+Figure 5: At day 1 every weather forecast shown has a lower error than climatology (14.5%); ENS and
+IFS 0.25° have the lowest error of the single solar forecasts.
 
 ![Day-1 error of every wind forecast and baseline, with 95% intervals](assets/nwp_forecast_wind_leaderboard.svg)
 
-Figure 6: At day 1 every forecast beats climatology (18.5%) by more than 9 points; ENS, IFS 0.25° and
-ICON-EU have the lowest error of the single wind forecasts.
+Figure 6: At day 1 every weather forecast shown has a lower error than climatology (18.5%), by more
+than 9 points; ENS, IFS 0.25° and ICON-EU have the lowest error of the single wind forecasts.
 
 **Overlapping intervals in Figures 5 and 6 do not mean two products are equal.** Every product's
 error rises and falls together from month to month, and pairing cancels that shared swing. The
@@ -346,12 +363,12 @@ for solar power.** From day 0 to day 1 the ENS error changes by -0.025 points [-
 the band 03-06 UTC at the primary setting, and by -0.019 points [-0.155, +0.106] at the sensitivity
 setting, so the study voids every bracket in that band. Within that band each product's own bracket
 is unresolved: for UKV the lower side is -0.013 [-0.088, +0.092] and the upper side is +0.012
-[-0.100, +0.145] at the primary setting. Dropping the voided band from the rows leaves the upper
-sides positive: +1.261 [+0.840, +1.715] for UKV and +0.828 [+0.595, +1.075] for ICON-EU at the
-primary setting, from 34,735 rows (exploratory). In every other band of the
-day-0-to-day-1 pair the point estimate is positive at both settings, and the interval is above zero
-in all but the band 18-21 UTC, where the change is +0.036 points [-0.062, +0.125] at the primary
-setting and +0.062 points [-0.048, +0.175] at the sensitivity setting.
+[-0.100, +0.145] at the primary setting (exploratory). Dropping the voided band from the rows leaves
+the upper sides positive: +1.261 [+0.840, +1.715] for UKV and +0.828 [+0.595, +1.075] for ICON-EU at
+the primary setting, from 34,735 rows (exploratory). In every other band of the day-0-to-day-1 pair
+the point estimate is positive at both settings, and the interval is above zero in all but the band
+18-21 UTC, where the change is +0.036 points [-0.062, +0.125] at the primary setting and +0.062
+points [-0.048, +0.175] at the sensitivity setting.
 <!-- report: Solar / ENS monotonicity by band; Solar / Planned verdicts;
 Solar / X: brackets without the hours where ENS's error did not rise -->
 
@@ -460,7 +477,7 @@ UTC issue time. P4a's IFS 0.25° day-1 value can come from a 06, 12, or 18 UTC r
 that issue time, so P4a may use weather that a live service could not have read, and P4b is the
 deciding contrast. Each blend is compared with ENS alone at day 1, and with a permutation control
 that has the same columns with the two added products' weather shuffled among hours of the same
-site, month, and hour of day.
+generator, year-month, and UTC hour of day.
 <!-- report: Solar / P4, the blend; Wind / P4, the blend -->
 
 | Contrast (points) | Solar, primary | Solar, sensitivity | Wind, primary | Wind, sensitivity |
@@ -512,38 +529,36 @@ can read from about 09:00 UTC. P4a's day-1 values can come from runs published a
 the study did not measure when those runs are published, so P4a's delivery time is not established.
 
 **For wind, ICON-EU at day 2 carries most of the gain, and IFS 0.25° at day 2 carries a smaller
-share (exploratory).** Two further XGBoost models were fitted on wind only: ENS's day-1 columns plus
-ICON-EU's day-2 columns, and ENS's day-1 columns plus IFS 0.25°'s day-2 columns. Each has 11 columns,
-whereas P4b has 15, so equal column counts with P4b are impossible. The fair reference for each is
-ENS alone at day 1, with 7 columns. ENS plus ICON-EU differs from ENS alone by -0.169 points [-0.250,
--0.090] at the primary setting and -0.180 [-0.284, -0.085] at the sensitivity setting. ENS plus IFS
-0.25° differs from ENS alone by -0.073 points [-0.132, -0.011] and -0.067 [-0.128, -0.006]. Against
-P4b, ENS plus ICON-EU is +0.015 points [-0.033, +0.065] and +0.018 [-0.022, +0.058], so the study
-cannot distinguish the two. ENS plus IFS 0.25° is +0.111 points [+0.035, +0.189] and +0.130 [+0.064,
-+0.200] worse than P4b, so ENS plus IFS 0.25° reaches only part of P4b's gain. The ICON-EU
-permutation guard is -0.142 points [-0.217, -0.066] and -0.181 [-0.273, -0.105], and its control is
-not worse than ENS alone (-0.027 [-0.081, +0.023] and +0.002 [-0.038, +0.036]), so the gain comes
-from ICON-EU's weather. The IFS 0.25° permutation guard is -0.040 points [-0.138, +0.074] and -0.058
-[-0.151, +0.033], which is not statistically significant at the 5% level, so the small IFS 0.25°
-gain is not clearly separated from what a shuffled column gives. Three differences between the added
-products and ENS could account for part of the ICON-EU gain. Both added products are read at one
-grid point, whereas ENS is an average over an H3 cell. ICON-EU's served "100 m" wind is its 120 m
-wind multiplied by about 0.98, so ICON-EU may add information about wind at a second height. ICON-EU
-is also a different weather model from ENS, whereas IFS 0.25° is ECMWF's own model, so an older IFS
-0.25° run may act like an extra ensemble member of ENS. The study has no contrast that separates
-these three explanations.
-<!-- report: Wind / Exploratory: which product carries P4b's wind gain; Wind / Arm columns; UKV
-radiation timestamp convention (V3), height convention -->
+share (exploratory and post hoc).** The study fitted two further XGBoost models on wind only after
+P4b's result was seen: ENS's day-1 columns plus ICON-EU's day-2 columns, and ENS's day-1 columns
+plus IFS 0.25°'s day-2 columns. Each has 11 columns, whereas P4b has 15, so equal column counts with
+P4b are impossible. The fair reference for each is ENS alone at day 1, with 7 columns. ENS plus
+ICON-EU differs from ENS alone by -0.169 points [-0.250, -0.090] at the primary setting and -0.180
+[-0.284, -0.085] at the sensitivity setting. ENS plus IFS 0.25° differs from ENS alone by -0.073
+points [-0.132, -0.011] and -0.067 [-0.128, -0.006]. Against P4b, ENS plus ICON-EU is +0.015 points
+[-0.033, +0.065] and +0.018 [-0.022, +0.058], so the study cannot distinguish the two. ENS plus IFS
+0.25° is +0.111 points [+0.035, +0.189] and +0.130 [+0.064, +0.200] worse than P4b, so ENS plus IFS
+0.25° reaches only part of P4b's gain. The ICON-EU permutation guard is -0.142 points [-0.217,
+-0.066] and -0.181 [-0.273, -0.105], and its control is not worse than ENS alone (-0.027 [-0.081,
++0.023] and +0.002 [-0.038, +0.036]), so the gain comes from ICON-EU's weather. The IFS 0.25°
+permutation guard is -0.040 points [-0.138, +0.074] and -0.058 [-0.151, +0.033], which is not
+statistically significant at the 5% level, so the small IFS 0.25° gain is not clearly separated from
+what a shuffled column gives. Two differences between the added products and ENS could account for
+part of the ICON-EU gain, and the study did not test either one. Both added products are read at one
+grid point, whereas ENS is an average over an H3 cell. ICON-EU is also a different weather model
+from ENS, whereas IFS 0.25° is ECMWF's own model, so an older IFS 0.25° run may act like an extra
+ensemble member of ENS. The study has no contrast that separates these two explanations.
+<!-- report: Wind / Exploratory: which product carries P4b's wind gain; Wind / Arm columns -->
 
 **Averaging over 3 hours or a day leaves the wind gain in place, and makes the solar gain at the
-conservative lead statistically significant over a day.** For wind, P4b minus ENS is -0.194 points
-[-0.285, -0.095] averaged over 3 hours and -0.188 points [-0.311, -0.066] averaged over a day,
-against -0.184 points [-0.282, -0.087] hourly. Its guard is -0.130 points [-0.253, -0.000] over 3
-hours and -0.164 points [-0.332, -0.000] over a day, so the guard's upper bound rounds to zero at
-both block lengths. For solar, P4b is -0.055 points [-0.124, +0.014] over 3 hours and -0.097 points
-[-0.190, -0.016] over a day, with a guard of -0.139 points [-0.200, -0.073] and -0.139 points
-[-0.218, -0.057]. These contrasts are exploratory, at the primary setting only, and the planned P4b
-remains the hourly one.
+conservative lead statistically significant over a day (exploratory).** For wind, P4b minus ENS is
+-0.194 points [-0.285, -0.095] averaged over 3 hours and -0.188 points [-0.311, -0.066] averaged
+over a day, against -0.184 points [-0.282, -0.087] hourly. Its guard is -0.130 points [-0.253,
+-0.000] over 3 hours and -0.164 points [-0.332, -0.000] over a day, so the guard's upper bound
+rounds to zero at both block lengths. For solar, P4b is -0.055 points [-0.124, +0.014] over 3 hours
+and -0.097 points [-0.190, -0.016] over a day, with a guard of -0.139 points [-0.200, -0.073] and
+-0.139 points [-0.218, -0.057]. These contrasts are exploratory, at the primary setting only, and
+the planned P4b remains the hourly one.
 <!-- report: Solar and Wind, Exploratory: each arm's own error over blocks of hours, and P4b
 over blocks -->
 
@@ -575,7 +590,8 @@ averaged over its ensemble members and over an H3 grid cell, whereas each Previo
 one run read at one grid point. The study has no contrast that separates the H3-cell average from
 the single grid point. The contrasts below show how much of each gap remains when the ensemble
 averaging or the hourly timing is removed.
-<!-- report: Solar / X: day-1 gap to ENS day 1 scored over blocks of hours -->
+<!-- report: Solar and Wind, Exploratory: ENS control against ENS mean; day-1 gap to ENS day 1
+scored over blocks of hours -->
 
 **A single ENS control run has a higher error than the ENS mean, and against the control run the
 wind differences for ICON-EU and ICON-D2 are not statistically significant.** The ENS control
@@ -584,7 +600,7 @@ is -0.300 points [-0.447, -0.130] for solar and -0.307 points [-0.440, -0.191] f
 averaging the ensemble members lowers the error (exploratory, primary setting only).
 <!-- report: Solar / X: ENS control against ENS mean, day 1; Wind / same -->
 
-| Day-1 product minus ENS control run (points, primary) | Solar | Wind |
+| Exploratory: day-1 product minus ENS control run (points, primary) | Solar | Wind |
 |---|---|---|
 | UKV | +0.942 [+0.545, +1.377] | +0.463 [+0.151, +0.733] |
 | ICON-D2 | +0.802 [+0.432, +1.281] | -0.098 [-0.364, +0.137] |
@@ -610,13 +626,13 @@ and use the primary setting only.
 <!-- report: Solar / X: day-1 products against the single ENS control run; Wind / same -->
 
 **Averaging the forecasts over 3 hours or a day shrinks the wind gaps to ENS relative to ENS's own
-error, and does not shrink the solar gaps.** Each product's predictions and the measurements are
-averaged over the block before the error is scored. ENS and GEFS reach the XGBoost model as smoothed
-3-hourly fields, so a gap that shrinks as the block lengthens may reflect that smoothing rather than
-forecast skill. Only GEFS shares ENS's lead.
+error, and does not shrink the solar gaps (exploratory).** Each product's predictions and the
+measurements are averaged over the block before the error is scored. ENS and GEFS reach the XGBoost
+model as smoothed 3-hourly fields, so a gap that shrinks as the block lengthens may reflect that
+smoothing rather than forecast skill. Only GEFS shares ENS's lead.
 <!-- report: Solar / X: day-1 gap to ENS day 1 scored over blocks of hours -->
 
-| Difference from ENS day 1 (points, primary) | 1 hour | 3 hours | 1 day |
+| Exploratory: difference from ENS day 1 (points, primary) | 1 hour | 3 hours | 1 day |
 |---|---|---|---|
 | Solar, UKV | +1.242 [+0.824, +1.689] | +0.984 [+0.560, +1.425] | +0.945 [+0.453, +1.480] |
 | Solar, ICON-EU | +0.817 [+0.584, +1.069] | +0.655 [+0.416, +0.904] | +0.590 [+0.296, +0.877] |
@@ -630,9 +646,9 @@ forecast skill. Only GEFS shares ENS's lead.
 <!-- report: Solar / X: day-1 gap to ENS day 1 scored over blocks of hours; Wind / same -->
 
 **Averaging shortens every error, so the table below states each gap as a share of ENS's own error
-at the same block length.**
+at the same block length (exploratory).**
 
-| Gap as % of ENS's own error at that block length (primary) | 1 hour | 3 hours | 1 day |
+| Exploratory: gap as % of ENS's own error at that block length (primary) | 1 hour | 3 hours | 1 day |
 |---|---|---|---|
 | Solar, ENS's own error (% of capacity) | 8.766 | 6.817 | 5.830 |
 | Solar, UKV | +14.2% | +14.4% | +16.2% |
@@ -648,15 +664,16 @@ at the same block length.**
 <!-- report: Solar and Wind, Exploratory: each arm's own error over blocks of hours -->
 
 **For solar, the gaps shrink in points but not relative to ENS's own error, so the block averages
-give no support for a timing-noise reading of the solar gaps.** Averaging over a day cuts ENS's own
-error from 8.766% to 5.830% of capacity. UKV's gap falls from +1.242 points to +0.945 points, but
-rises from 14.2% to 16.2% of ENS's own error, and ICON-EU's rises from 9.3% to 10.1%. GEFS, which
-has ENS's exact lead, keeps a gap of +1.300 points [+0.925, +1.673] over 1 day, which is 22.3% of
-ENS's own error. Every solar gap is statistically significant at every block length.
+give no support for a timing-noise reading of the solar gaps (exploratory).** Averaging over a day
+cuts ENS's own error from 8.766% to 5.830% of capacity. UKV's gap falls from +1.242 points to +0.945
+points, but rises from 14.2% to 16.2% of ENS's own error, and ICON-EU's rises from 9.3% to 10.1%.
+GEFS, which has ENS's exact lead, keeps a gap of +1.300 points [+0.925, +1.673] over 1 day, which is
+22.3% of ENS's own error. Every solar gap is statistically significant at every block length.
 <!-- report: Solar / X: day-1 gap to ENS day 1 scored over blocks of hours -->
 
 **For wind, the gaps of the Previous Runs products shrink relative to ENS's own error, which is
-consistent with timing noise accounting for part of them, and GEFS's gap does not shrink.** UKV's
+consistent with timing noise accounting for part of them, and GEFS's gap does not shrink
+(exploratory).** UKV's
 gap falls from 9.1% of ENS's own error at 1 hour to 5.8% over 1 day, and from +0.770 points [+0.460,
 +1.057] to +0.303 points [-0.119, +0.666], which is not statistically significant at the 5% level.
 ICON-EU's gap is +0.031 points [-0.194, +0.242] at 3 hours and -0.083 points [-0.393, +0.218] over
@@ -686,11 +703,11 @@ wind, 86.8%, 89.4%, and 47.0% of those months' rows.
 
 ## Other products (exploratory)
 
-**Among the other products, only IFS 0.25° avoids the verdict "loses" for solar, and only IFS 0.25°
-and ICON-D2 avoid it for wind.** The exploratory brackets repeat the planned bracket for every other
-Previous Runs product and every other day, at the primary setting only. The table gives the
-upper-side contrast at day 1: the product minus ENS at day 1. A positive, significant contrast is a
-verdict of "loses".
+**Among the other products (exploratory), only IFS 0.25° avoids the verdict "loses" for solar, and
+only IFS 0.25° and ICON-D2 avoid it for wind, as ICON-EU (planned) does.** The exploratory brackets
+repeat the planned bracket for every other Previous Runs product and every other day, at the primary
+setting only. The table gives the upper-side contrast at day 1: the product minus ENS at day 1. A
+positive, significant contrast is a verdict of "loses".
 <!-- report: Solar / Exploratory brackets; Wind / same -->
 
 | Product, day 1 minus ENS day 1 (points, primary) | Solar | Wind |
@@ -727,17 +744,19 @@ matched lead.
 Figure 12: Wind error rises with lead day for every forecast, and no product beats the ENS mean at
 matched lead.
 
-**UKV loses to ENS both before and after the upgrade of 2026-01-21.** Before the upgrade, UKV minus
-ENS day 1 is +1.056 points [+0.478, +1.674] for solar (22,621 rows in 13 months) and +0.772 points
-[+0.364, +1.145] for wind (26,923 rows in 13 months). After the upgrade, the differences are +1.577
-points [+1.116, +2.103] for solar (12,642 rows in 8 months) and +0.765 points [+0.406, +1.065] for
-wind (10,484 rows in 8 months). The lower sides are also positive in both eras. For solar the gap is
-larger after the upgrade, and for wind the gap is the same within the intervals.
+**UKV loses to ENS both before and after the upgrade of 2026-01-21 (exploratory).** Before the
+upgrade, UKV minus ENS day 1 is +1.056 points [+0.478, +1.674] for solar (22,621 rows in 13 months)
+and +0.772 points [+0.364, +1.145] for wind (26,923 rows in 13 months). After the upgrade, the
+differences are +1.577 points [+1.116, +2.103] for solar (12,642 rows in 8 months) and +0.765 points
+[+0.406, +1.065] for wind (10,484 rows in 8 months). The lower sides are also positive in both eras.
+For solar the point estimate is larger after the upgrade, but the two intervals overlap ([+0.478,
++1.674] before and [+1.116, +2.103] after), so the study does not show that the gap changed. For
+wind the two intervals overlap almost entirely.
 <!-- report: Solar / X: UKV P1 by era; Wind / X: UKV P1 by era -->
 
-**The ENS mean beats the ENS control run for both technologies.** The contrast is the one in the
-previous section: -0.300 points [-0.447, -0.130] for solar and -0.307 points [-0.440, -0.191] for
-wind. Averaging the ensemble members lowers the day-1 error.
+**The ENS mean beats the ENS control run for both technologies (exploratory).** The contrast is the
+one in the previous section: -0.300 points [-0.447, -0.130] for solar and -0.307 points [-0.440,
+-0.191] for wind. Averaging the ensemble members lowers the day-1 error.
 <!-- report: Solar / X: ENS control against ENS mean, day 1; Wind / same -->
 
 ## What to use
@@ -753,17 +772,17 @@ ENS's day-0 error, which no Previous Runs product did (the closest of them, IFS 
 points [+0.462, +0.852] behind, exploratory).
 <!-- report: Solar, Planned brackets (day 1); Leaderboard, primary setting; Exploratory brackets -->
 
-**For solar, adding ICON-EU and IFS 0.25° to ENS shows no detectable gain at the conservative
-lead, so the study gives no reason to ingest a second weather model.** The deciding contrast, P4b
-(planned), is -0.033 points [-0.106, +0.033] at the primary setting and +0.014 [-0.049, +0.068]
-at the sensitivity setting. A gain as large as 0.106 points is therefore not excluded, and a loss
-of 0.068 points is not excluded either. The optimistic contrast, P4a (planned), is -0.347 points
+**For solar, adding ICON-EU and IFS 0.25° to ENS shows no detectable gain at the conservative lead,
+so the study gives no reason to ingest a second weather model.** The deciding contrast, P4b
+(planned), is -0.033 points [-0.106, +0.033] at the primary setting and +0.014 [-0.049, +0.068] at
+the sensitivity setting. A gain as large as 0.106 points is therefore not excluded, and a loss of
+0.068 points is not excluded either. The optimistic contrast, P4a (planned), is -0.347 points
 [-0.482, -0.219], but its permutation guard is uninformative: the control is itself worse than ENS
 alone by +0.152 points [+0.097, +0.215], and P4a's IFS 0.25° value can come from a run newer than
-ENS's. P4b already gives the added products runs that a 09:00 UTC service can read, so fresher runs
-would probably enlarge the gain rather than reverse it. What would change the recommendation: a
-test that separates a second weather model from a newer ECMWF run, such as a solar blend given ICON-EU
-alone, which the study fitted for wind only.
+ENS's. P4b gives the added products runs that a 09:00 UTC service can read, and the study did not
+test whether fresher runs would enlarge or shrink the gain. What would change the recommendation: a
+test that separates a second weather model from a newer ECMWF run, such as a solar blend given
+ICON-EU alone, which the study fitted for wind only.
 <!-- report: Solar, P4, the blend -->
 
 **For solar, the free GEFS ensemble is not a substitute for ENS.** At the same lead, an XGBoost
@@ -797,20 +816,20 @@ ICON-EU.
 <!-- report: Wind, Planned brackets (day 1); Exploratory: ICON-EU day 1 against ENS day 1; day-1
 products against the single ENS control run -->
 
-**For wind, adding ICON-EU and IFS 0.25° to ENS is the one measured gain, and it is about 0.2
-points of capacity.** The deciding contrast, P4b (planned), is -0.184 points [-0.282, -0.087] at
-the primary setting and -0.197 [-0.311, -0.088] at the sensitivity setting, on an ENS day-1
-error of 8.427% of capacity. The guard is negative at both settings (-0.148 [-0.266, -0.026] and
--0.198 [-0.317, -0.087]), and the controls are not worse than ENS alone, so the gain comes from
-the other products' weather rather than from extra columns. The optimistic contrast, P4a, is
--0.656 points [-0.851, -0.472]. The gain is not the same at every generator: at W1 the P4b
-interval reaches zero (-0.073 [-0.164, +0.005]), at W2 it is -0.179 [-0.309, -0.073], and at W3 it
-is -0.304 [-0.536, -0.093] (exploratory; each interval covers month-to-month weather and the
-fitting seed, not differences between generators). P4b already gives the added products runs that
-a 09:00 UTC service can read, so fresher runs would probably enlarge the gain rather than reverse
-it. ICON-EU at day 2 alone, added to ENS, gives -0.169 points [-0.250, -0.090] (exploratory), which
-is not statistically distinguishable from P4b, so a service that ingests one added product gets
-most of the gain from ICON-EU. What would change the recommendation: more than 3 wind generators.
+**For wind, adding ICON-EU and IFS 0.25° to ENS is the one measured gain, and it is about 0.2 points
+of capacity.** The deciding contrast, P4b (planned), is -0.184 points [-0.282, -0.087] at the
+primary setting and -0.197 [-0.311, -0.088] at the sensitivity setting, on an ENS day-1 error of
+8.427% of capacity. The guard is negative at both settings (-0.148 [-0.266, -0.026] and -0.198
+[-0.317, -0.087]), and the controls are not worse than ENS alone, so the gain comes from the other
+products' weather rather than from extra columns. The optimistic contrast, P4a, is -0.656 points
+[-0.851, -0.472]. The gain is not the same at every generator: at W1 the P4b interval reaches zero
+(-0.073 [-0.164, +0.005]), at W2 it is -0.179 [-0.309, -0.073], and at W3 it is -0.304 [-0.536,
+-0.093] (exploratory; each interval covers month-to-month weather and the fitting seed, not
+differences between generators). P4b gives the added products runs that a 09:00 UTC service can
+read, and the study did not test whether fresher runs would enlarge or shrink the gain. ICON-EU at
+day 2 alone, added to ENS, gives -0.169 points [-0.250, -0.090] (exploratory), which is not
+statistically distinguishable from P4b, so a service that ingests one added product gets most of the
+gain from ICON-EU. What would change the recommendation: more than 3 wind generators.
 <!-- report: Wind, P4, the blend; Exploratory: one generator at a time -->
 
 ## What this study cannot separate
@@ -825,23 +844,23 @@ not know UKV's run cycle: the run-switch check found no clear cycle, so the shar
 whose two snapshots straddle a run change is 33.3% at a 3-hour cycle and 16.9% at a 6-hour cycle.
 <!-- report: Solar, P4, the blend; Solar, Rows -->
 
-**At the wind farms, a Previous Runs product's gap to ENS may include timing noise and ENS's
-spatial averaging, and the study cannot say how much.** ENS and GEFS reach the XGBoost model as
-smoothed 3-hourly fields, and ENS is an average over an H3 cell, whereas each Previous Runs product
-is read at one grid point. For wind, averaging the forecasts and the measurements over longer
-blocks shrinks the gaps relative to ENS's own error: ICON-EU's gap to ENS goes from +0.169 points
-[-0.064, +0.384] at 1 hour to +0.031 [-0.194, +0.242] at 3 hours and -0.083 [-0.393, +0.218] over 1
-day, and UKV's goes from 9.1% of ENS's own error to 5.8%. For solar the gaps do not shrink relative
-to ENS's own error: UKV's goes from 14.2% to 16.2% of it and ICON-EU's from 9.3% to 10.1%, so the
-block averages give no support for a timing-noise reading of the solar gaps.
+**At the wind farms, a Previous Runs product's gap to ENS may include timing noise and ENS's spatial
+averaging, and the study cannot say how much (exploratory).** ENS and GEFS reach the XGBoost model
+as smoothed 3-hourly fields, and ENS is an average over an H3 cell, whereas each Previous Runs
+product is read at one grid point. For wind, averaging the forecasts and the measurements over
+longer blocks shrinks the gaps relative to ENS's own error: ICON-EU's gap to ENS goes from +0.169
+points [-0.064, +0.384] at 1 hour to +0.031 [-0.194, +0.242] at 3 hours and -0.083 [-0.393, +0.218]
+over 1 day, and UKV's goes from 9.1% of ENS's own error to 5.8%. For solar the gaps do not shrink
+relative to ENS's own error: UKV's goes from 14.2% to 16.2% of it and ICON-EU's from 9.3% to 10.1%,
+so the block averages give no support for a timing-noise reading of the solar gaps.
 <!-- report: Solar and Wind, Exploratory: day-1 gap to ENS day 1 scored over blocks of hours -->
 
-**ENS's standing cannot be separated from ensemble averaging.** The mean of ENS's members is
-better than its single control run by 0.300 points for solar [-0.447, -0.130] and 0.307 points
-for wind [-0.440, -0.191] (exploratory). Mean absolute error rewards a smoother forecast, so part
-of ENS's lead over each single-run product is averaging rather than weather-model quality. The
-ICON-EU and IFS 0.25° results against the control run show the size of that part: for solar,
-ICON-EU is +0.517 points [+0.284, +0.778] behind the control run and IFS 0.25° is -0.264
+**ENS's standing cannot be separated from ensemble averaging.** The error given the mean of ENS's
+members, minus the error given its single control run, is -0.300 points [-0.447, -0.130] for solar
+and -0.307 points [-0.440, -0.191] for wind (exploratory). Mean absolute error rewards a smoother
+forecast, so part of ENS's lead over each single-run product is averaging rather than weather-model
+quality. The ICON-EU and IFS 0.25° results against the control run show the size of that part: for
+solar, ICON-EU is +0.517 points [+0.284, +0.778] behind the control run and IFS 0.25° is -0.264
 [-0.498, -0.033] ahead of it. Both comparisons favour the two Previous Runs products, whose leads
 are shorter than the control run's on most hours, so ICON-EU's deficit is probably larger at equal
 lead and IFS 0.25°'s advantage probably smaller.
@@ -860,8 +879,8 @@ alike. ENS is averaged over each generator's H3 cell, GEFS is read at the neares
 own grid, and the two ensembles have different numbers of members. The GEFS gap does not shrink
 with the block as the Previous Runs gaps do (solar +1.272 points [+0.937, +1.601] at 1 hour and
 +1.300 [+0.925, +1.673] over 1 day; wind +0.858 [+0.598, +1.099] and +0.689 [+0.397, +1.006]),
-which points away from timing noise. The study cannot separate weather-model quality from the
-sampling differences.
+which points away from timing noise (exploratory). The study cannot separate weather-model quality
+from the sampling differences.
 <!-- report: Solar and Wind, P3, GEFS against ENS; day-1 gap over blocks; plan: Rows, folds, and
 fairness -->
 
@@ -921,20 +940,10 @@ time, and that the study's inputs were built on 2026-09-24, after the commit. A 
 move every number.
 <!-- report: Inputs and verification -->
 
-**GEFS's 100 m wind holds NaN at leads over 16 days in January 2026, and the study never reads
-those leads.** The study reads GEFS's 00 UTC runs at 3-hourly leads from 0 to 95 hours, so a NaN
-beyond 16 days cannot reach an arm. The build also raises if any 00 UTC run the rows need is
-missing or holds fewer than all 31 members at every lead and grid cell, so a NaN inside the used
-leads would stop the build rather than pass as a value.
-<!-- plan and build_forecast_inputs.py docstring; the January 2026 NaN observation is not in
-report.md -->
-
-**The GEFS download's last month is partial.** The download writes `2026-09.partial.parquet` for
-the month still arriving. The build accepts a partial file only for the last month, and only
-because the rows end on 2026-09-10. A run the rows need that has not arrived stops the build, so
-the partial month cannot turn into empty GEFS columns. Runs after the rows' last date are never
-read.
-<!-- plan: Rows, folds, and fairness; build_forecast_inputs.py docstring -->
+**The GEFS build stops if a run the rows need is missing or incomplete.** The build script raises
+unless every 00 UTC run the rows need holds all 31 members, so a gap in the GEFS download cannot
+become empty GEFS columns. The report does not print this check.
+<!-- build_forecast_inputs.py docstring; not a report number -->
 
 **The exploratory arms carry a small share of missing weather values, and the planned arms
 carry none.** The planned arms define the shared rows, so they hold every value. The exploratory
@@ -958,11 +967,11 @@ less weight than a planned one.
 **This study says nothing about the skill of any ensemble's spread, about leads beyond day 3, or
 about generators outside the trial area.** It scores point forecasts, made by an XGBoost model
 fitted separately for each generator, of hourly solar and wind output at 6 solar and 3 wind
-generators, at a day-ahead lead that depends on each Previous Runs product's run cycle and at an exact
-lead for ENS and GEFS. It says nothing about substation demand, about a forecast issued at any
-time other than 09:00 UTC, or about the values an Open-Meteo archive would have served live
-rather than as a Previous Runs value. It does not test any product's grid, physics, or
-resolution as a cause of a gap, and it does not test the live service.
+generators, at a day-ahead lead that depends on each Previous Runs product's run cycle and at an
+exact lead for ENS and GEFS. It says nothing about substation demand, about a forecast issued at any
+time other than 09:00 UTC, or about the values an Open-Meteo archive would have served live rather
+than as a Previous Runs value. It does not test any product's grid, physics, or resolution as a
+cause of a gap, and it does not test the live service.
 <!-- plan: The question and the products; What no contrast here can separate -->
 
 ## Reproducing this page

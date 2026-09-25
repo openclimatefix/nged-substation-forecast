@@ -42,12 +42,13 @@ import logging
 import os
 import sys
 import zlib
-from datetime import UTC, datetime
+from datetime import UTC, date, datetime
 from pathlib import Path
 from typing import Final, Literal, NamedTuple, TypedDict
 
 import numpy as np
 import polars as pl
+import xgboost
 from build_forecast_inputs import (
     ENS_DAYS,
     GEFS_DAYS,
@@ -60,12 +61,14 @@ from deltalake import DeltaTable
 from studies.baselines import climatology, shrunk_persistence
 from studies.blending import climatology_permutation
 from studies.bootstrap import (
+    N_BOOTSTRAP_RESAMPLES,
     NO_DETECTABLE_DIFFERENCE,
     BootstrapInterval,
     bootstrap_absolute,
     bootstrap_difference,
     bracket_verdict,
     combine_setting_verdicts,
+    paired_differences,
 )
 from studies.bootstrap import blend_verdict as blend_verdict_from_intervals
 from studies.cross_validation import (
@@ -78,6 +81,11 @@ from studies.cross_validation import (
     out_of_fold_losses,
     raise_on_uncovered_months,
     score_prediction,
+)
+from verify_previous_runs_leads import (
+    GFS_WINDOW_DIR_NAME,
+    V1_DAYS_N,
+    V1B_SIGNATURE_THRESHOLD,
 )
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
@@ -1428,7 +1436,8 @@ def _wind_single_product_blend_lines(*, by_setting: dict[str, pl.DataFrame]) -> 
         (
             "Each blend below is ENS's day-1 mean plus one product at day 2, with 11 columns; P4b "
             "has 15, so equal column counts with P4b are impossible. The fair reference for each "
-            "is ENS mean day 1 alone (7 columns). All rows are exploratory."
+            "is ENS mean day 1 alone (7 columns). All rows are exploratory and post hoc: these two "
+            "blends were added after P4b's result was seen."
         ),
         "",
         *CONTRAST_HEADER,
@@ -1633,7 +1642,7 @@ def _block_error_lines(
     own = [
         (
             "| Arm | Averaged over | Own error (% of capacity) | Gap to ENS mean day 1 (points) | "
-            "Gap as % of ENS's own error at that block length |"
+            "Gap as % of ENS's own error at that block length [95% interval] |"
         ),
         "|---|---|---|---|---|",
     ]
@@ -1647,7 +1656,14 @@ def _block_error_lines(
         ens = means["ens_mean_day1"]
         for arm in arms:
             gap = means[arm] - ens
-            share = "" if arm == "ens_mean_day1" else f"{gap / ens:+.1%}"
+            if arm == "ens_mean_day1":
+                share = ""
+            else:
+                gap_interval = difference(losses=blocked, treatment=arm, reference="ens_mean_day1")
+                share = (
+                    f"{gap / ens:+.1%} [{gap_interval['lower_95'] / ens:+.1%}, "
+                    f"{gap_interval['upper_95'] / ens:+.1%}]"
+                )
             gap_text = "" if arm == "ens_mean_day1" else _pp(value=gap)
             own.append(
                 f"| {arm} | {label} | {means[arm] * PERCENTAGE_POINTS:.3f} | {gap_text} | {share} |"
@@ -1663,7 +1679,11 @@ def _block_error_lines(
                     f"{interval['n_rows']:,} | {interval['n_months']} |"
                 )
     return [
-        "Each arm's own error, and each gap as a share of ENS's own error at that block length:",
+        (
+            "Each arm's own error, and each gap as a share of ENS's own error at that block "
+            "length. A share's interval is the gap's own paired interval divided by ENS's own "
+            "error at that block length, which is treated as fixed:"
+        ),
         "",
         *own,
         "",
@@ -1981,6 +2001,113 @@ class DomainInputs(NamedTuple):
     coverage: pl.DataFrame
 
 
+LEAVE_ONE_MONTH_OUT_CONTRASTS: Final[dict[str, tuple[str, str]]] = {
+    "P1a": ("ukv_day1", "ens_mean_day1"),
+    "P2a": ("icon_eu_day1", "ens_mean_day1"),
+    "P3": ("gefs_mean_day1", "ens_mean_day1"),
+    "P4b": ("blend_p4b", "ens_mean_day1"),
+}
+"""The planned contrasts whose point estimate is re-read with each year-month dropped in turn."""
+
+
+def _leave_one_month_out_lines(*, losses: pl.DataFrame) -> list[str]:
+    """Return each contrast's point estimate range when each year-month is dropped in turn.
+
+    No arm is refitted: the saved out-of-fold losses of the months that remain are averaged. The
+    range shows how far one month of weather moves the point estimate.
+
+    Args:
+        losses: Per-row losses at the primary setting.
+
+    Returns:
+        A markdown table with one row per contrast whose arms are present.
+    """
+    lines = [
+        (
+            "| Contrast | Point estimate, all months (points) | Lowest with one month dropped | "
+            "Highest with one month dropped | Same sign in every drop |"
+        ),
+        "|---|---|---|---|---|",
+    ]
+    for identifier, (treatment, reference) in LEAVE_ONE_MONTH_OUT_CONTRASTS.items():
+        if not arms_present(losses=losses, arms=(treatment, reference)):
+            continue
+        assert_equal_rows(losses=losses, treatment=treatment, reference=reference)
+        differences, months = paired_differences(
+            losses=losses, treatment=treatment, reference=reference, metric=METRIC
+        )
+        full = float(differences.mean())
+        without = {
+            str(month): float(differences[:, months != month].mean()) for month in np.unique(months)
+        }
+        lowest = min(without, key=lambda month: without[month])
+        highest = max(without, key=lambda month: without[month])
+        same_sign = all(value * full > 0.0 for value in without.values())
+        lines.append(
+            f"| {identifier}: {treatment} − {reference} | {_pp(value=full)} | "
+            f"{_pp(value=without[lowest])} (without {lowest}) | "
+            f"{_pp(value=without[highest])} (without {highest}) | "
+            f"{'yes' if same_sign else 'no'} |"
+        )
+    return lines
+
+
+def _design_lines() -> list[str]:
+    """Return the constants and rules the page numbers rest on, printed from the code using them.
+
+    Returns:
+        The markdown lines of the report's design section.
+    """
+    window_start, window_end = GFS_WINDOW_DIR_NAME.removeprefix("GFS_window_").split("_")
+    window_days = (date.fromisoformat(window_end) - date.fromisoformat(window_start)).days + 1
+    seeds = ", ".join(str(seed) for seed in SEEDS)
+    v1_days = " and ".join(str(day) for day in V1_DAYS_N)
+    return [
+        "## Design constants",
+        "",
+        (
+            f"- **XGBoost version:** {xgboost.__version__}. **Objective:** "
+            f"`reg:absoluteerror`. **Fitting seeds:** {seeds}. `colsample_bytree` is not "
+            f"set, so XGBoost's default of 1 applies and no column is dropped at random."
+        ),
+        (f"- **Primary setting:** {dict(PRIMARY_HYPER_PARAMETERS)}."),
+        (f"- **Sensitivity setting:** {dict(SENSITIVITY_HYPER_PARAMETERS)}."),
+        (
+            f"- **Intervals:** each is read from {N_BOOTSTRAP_RESAMPLES:,} resamples, each "
+            f"drawing whole year-months (a calendar month of one year, such as 2025-03) and "
+            f"one fitting seed, paired across the two arms of a contrast."
+        ),
+        (
+            "- **Capacity:** each error is divided by the row's `effective_capacity_mw`, "
+            "read from the `effective_capacity` table."
+        ),
+        (
+            "- **Permutation control:** `studies.blending.climatology_permutation` shuffles "
+            "each non-ENS product's weather columns among the rows that share a generator, "
+            "a year-month (the `month` column, such as 2025-03), and a UTC hour of day. A "
+            "wind product's direction sine and cosine move together under one shuffle, and "
+            "every other column (each speed, or each solar column) is shuffled separately. "
+            "ENS's columns are left real."
+        ),
+        (
+            "- **Baselines:** a baseline for a day-1 to day-3 forecast reads telemetry up "
+            "to 09:00 UTC on the run's day. A baseline for the run's own day (day 0) reads "
+            "telemetry only up to the run's 00 UTC initialisation time."
+        ),
+        (
+            f"- **V1 gate:** Open-Meteo's GFS `previous_dayN` values for N = {v1_days} are "
+            f"compared with the Dynamical.org GFS extract `{GFS_WINDOW_DIR_NAME}`, which "
+            f"holds {window_days} days."
+        ),
+        (
+            f"- **V1b:** a run cycle is read only where the best switch-hour ratio is at "
+            f"least {V1B_SIGNATURE_THRESHOLD}; a lower score is reported as no clear "
+            f"signature."
+        ),
+        "",
+    ]
+
+
 def _domain_lines(
     *, domain: DomainType, inputs: DomainInputs, losses: pl.DataFrame, verification: Path
 ) -> list[str]:
@@ -2068,6 +2195,16 @@ def _domain_lines(
         "### Exploratory: UKV P1 by era",
         "",
         *_era_lines(losses=by_setting["primary"]),
+        "",
+        "### Exploratory: leave-one-month-out (primary setting, no refit)",
+        "",
+        (
+            "Each planned contrast's point estimate is recomputed from the saved out-of-fold "
+            "losses with one year-month dropped at a time. Nothing is refitted, so each dropped "
+            "month still trained the XGBoost models that scored the other months."
+        ),
+        "",
+        *_leave_one_month_out_lines(losses=by_setting["primary"]),
         "",
     ]
     if domain == "wind":
@@ -2214,6 +2351,7 @@ def write_report(
         "",
     ]
     lines += [
+        *_design_lines(),
         "## Inputs and verification",
         "",
         *_effective_capacity_lines(
