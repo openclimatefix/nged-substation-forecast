@@ -1,6 +1,6 @@
 # Era-fold design measurement (issues #868 and #892)
 
-This folder holds the measurement behind `plans/era-fold-design.md` (PR #906): how many scored hours have a calendar month held out of every training row under today's era folds, and how planned contrasts move when the folds cover every month. `report.md` is the full report, produced by `scripts/`, with a device table per fit batch. `solar_all_D1_effect.md` is the past-solar `all` panel's table. The scripts were run from a scratch directory and read the published per-row losses under `data/studies/`; `saved_cov.py` and `two_shares.py` recompute the shares below from the folds saved with each published loss file.
+This folder holds the measurement behind the plan in PR #906: how many scored hours have a calendar month held out of every training row under today's era folds, and how planned contrasts move when the folds cover every month. `report.md` is the full report, produced by `scripts/`, with a device table per fit batch. `solar_all_D1_effect.md` is the past-solar `all` panel's table. The scripts were run from a scratch directory and read the published per-row losses under `data/studies/`; `saved_cov.py` and `two_shares.py` recompute the shares below from the folds saved with each published loss file.
 
 ## Definitions
 
