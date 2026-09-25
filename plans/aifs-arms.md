@@ -677,9 +677,8 @@ forecast lowers the error at those leads.** The AIFS Single and AIFS ENS stores 
 both leads can be scored. The section adds three things to the plan above. It names two tests of
 the maintainer's hypothesis, one per lead, of whether AIFS Single has a lower error than the ENS
 control member at day 7 and at day 14. It adds blends of the ENS mean with AIFS Single, and with
-the AIFS ENS mean, at days 1, 2, 7, and 14, each with a permutation control. It states which contrasts are planned, which are
-exploratory, and why. No fit for any arm named here has run, and the section is written before one
-does.
+the AIFS ENS mean, at days 1, 2, 7, and 14, each with a permutation control. It states which contrasts are planned, which are exploratory,
+and why. No fit for any arm named here has run, and the section is written before one does.
 
 **The wording rule stands.** The survey page's stance is that [AIFS has not been shown to improve
 faster than the physics-based
@@ -925,7 +924,8 @@ lacks, and every blend and control at all four days are fitted new.
 in the extra-lead batches solar differed by within ±0.02 points, and wind by 0.04 to 0.09 points lower
 on GPU. Every arm in every contrast here is on the GPU, so the difference cancels within a
 contrast, and the page states the device once, in Limitations. The report does not print the
-CPU-versus-GPU figures beside a contrast, because a reader would take them for a noise level the contrast carries. Absolute
+CPU-versus-GPU figures beside a contrast, because a reader would take them for a noise level the
+contrast carries. Absolute
 errors here are not compared with the published CPU-fitted page's, because the rows differ.
 
 **Sizes.** The AIFS fit's speed is about 9 s per arm-site fit at the primary setting (the setting with
