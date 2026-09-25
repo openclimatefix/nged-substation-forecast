@@ -1,14 +1,15 @@
-"""One leaderboard and one set of contrasts against ERA5 for the four headline past-solar row sets.
+"""One leaderboard and one set of contrasts against ERA5 for the five headline past-solar row sets.
 
-The past-solar page scores four row sets, each on its own common rows: the main rows
-(`solar_long`), the extra rows (`solar_all`), the ECMWF ENS rows (`ens_past_solar`), and the
-weather-station rows (`station_past_solar`). This script reads each row set's saved `pooled`
+The past-solar page scores five row sets, each on its own common rows: the main rows
+(`solar_long`), the extra rows (`solar_all`), the ECMWF ENS rows (`ens_past_solar`), the
+weather-station rows (`station_past_solar`), and the CERRA rows (`cerra_past_solar`). This script
+reads each row set's saved `pooled`
 losses, without refitting anything, and writes for each
 
 - every arm's own mean absolute error with a 95% interval,
 - every arm's mean absolute error minus ERA5's with a 95% interval, and
-- every planned contrast the row set's report prints, the first product minus the second (14 in
-  all: 6 main, 3 extra, 2 ENS, 3 station), most of them not against ERA5, and
+- every planned contrast the row set's report prints, the first product minus the second (18 in
+  all: 6 main, 3 extra, 2 ENS, 3 station, 4 CERRA), most of them not against ERA5, and
 - the exploratory contrasts the row set's report does not print (SARAH-3 minus CAMS on the extra
   rows), at the first setting only,
 
@@ -42,6 +43,10 @@ from typing import Final, Literal, NamedTuple
 import polars as pl
 import station_past_solar_charts as station_charts
 import weather_product_charts as main_charts
+from cerra_past_solar import ARM_ORDER as CERRA_ARM_ORDER
+from cerra_past_solar import FAMILIES as CERRA_FAMILIES
+from cerra_past_solar import NAMES as CERRA_NAMES
+from cerra_past_solar import PLANNED_CONTRASTS as CERRA_PLANNED_PAIRS
 from ens_past_solar_charts import NAMES as ENS_NAMES
 from sources import SOLAR_LEADERBOARD_DIR, UPDATE_OUTPUT_DIR
 from studies.charts import (
@@ -124,7 +129,7 @@ REPORT_TITLE: Final[str] = "Past-solar leaderboard and contrasts against ERA5"
 """The heading of the past-solar leaderboard's `report.md`."""
 
 REPORT_INTRODUCTION: Final[str] = (
-    "Every number is recomputed from the saved `pooled` losses of four row sets, by resampling "
+    "Every number is recomputed from the saved `pooled` losses of five row sets, by resampling "
     "whole months and a fitting seed. Each row set is scored on its own common rows, so a value "
     "is comparable within a row set and not across row sets. Mean absolute error is a percentage "
     "of each generator's 99th-percentile output. Every contrast not named before the run is "
@@ -313,6 +318,15 @@ STATION_ARMS: Final[tuple[BlockArm, ...]] = tuple(
     )
     for arm in station_charts.LEADERBOARD_ARMS
 )
+CERRA_ARMS: Final[tuple[BlockArm, ...]] = tuple(
+    BlockArm(
+        arm=arm,
+        label=CERRA_NAMES[arm],
+        family=CERRA_FAMILIES[arm],
+        reference=arm in ("cams_global", "era5_global"),
+    )
+    for arm in CERRA_ARM_ORDER
+)
 
 
 def _planned(
@@ -361,6 +375,9 @@ STATION_PLANNED: Final[tuple[PlannedContrast, ...]] = _planned(
         (station_charts.STATION_ARM, "era5_global"),
         (station_charts.BLEND_ARM, station_charts.BLEND_CONTROL_ARM),
     ),
+)
+CERRA_PLANNED: Final[tuple[PlannedContrast, ...]] = _planned(
+    arms=CERRA_ARMS, pairs=CERRA_PLANNED_PAIRS
 )
 """The planned contrasts of each row set, each the first arm's error minus the second's.
 
@@ -426,8 +443,18 @@ ROW_SETS: Final[tuple[RowSet, ...]] = (
         contrast_arms=_without_era5(arms=STATION_ARMS),
         planned_contrasts=STATION_PLANNED,
     ),
+    RowSet(
+        key="cerra",
+        label="CERRA rows",
+        directory=UPDATE_OUTPUT_DIR / "cerra_past_solar",
+        printed_column="All sites",
+        arm_suffix="",
+        leaderboard_arms=CERRA_ARMS,
+        contrast_arms=_without_era5(arms=CERRA_ARMS),
+        planned_contrasts=CERRA_PLANNED,
+    ),
 )
-"""The four headline row sets, in the order the leaderboard stacks them."""
+"""The five headline row sets, in the order the leaderboard stacks them."""
 
 
 def read_heading(*, report_text: str) -> tuple[int, str]:
@@ -1552,7 +1579,7 @@ def run(
 
 
 def main() -> int:
-    """Score the four past-solar row sets, check them against their reports, and write them."""
+    """Score the five past-solar row sets, check them against their reports, and write them."""
     return run(
         row_sets=ROW_SETS,
         output_dir=SOLAR_LEADERBOARD_DIR,

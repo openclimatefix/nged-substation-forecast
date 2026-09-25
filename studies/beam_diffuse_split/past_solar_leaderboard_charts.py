@@ -1,4 +1,4 @@
-"""Draw the past-solar page's leaderboard (Figure 1) and contrasts (Figure 2), four row sets each.
+"""Draw the past-solar page's leaderboard (Figure 1) and contrasts (Figure 2), five row sets each.
 
 Both figures read `past_solar_leaderboard.py`'s write-once folder, `intervals.parquet` for every
 number and `report.md` for the check. **The script stops before drawing unless every number it
@@ -56,6 +56,7 @@ BLOCK_LABELS: Final[dict[str, str]] = {
     "extra": "Extra",
     "ens": "ENS",
     "station": "Stations",
+    "cerra": "CERRA",
 }
 """Each row set's block label, the term the page uses for the row set."""
 
@@ -80,6 +81,15 @@ ENS_LEAD: Final[str] = (
     "ECMWF ENS is a forecast 5 to 20 hours ahead from a 00 UTC run; ERA5's radiation is 1 to 12 "
     "hours ahead."
 )
+CERRA_LEAD: Final[str] = (
+    "CERRA publishes 3-hour accumulations only, so its hourly values are rebuilt from windows that "
+    "lead by 0 to 3 hours; its window ends at 00:00 UTC on 1 July 2026, shorter than the main "
+    "rows' window."
+)
+CERRA_STEP: Final[str] = (
+    "The step width is unmatched in CERRA's contrasts against ERA5 and CAMS, and matched only "
+    "against ERA5 and CAMS averaged to 3-hour steps."
+)
 STATION_SCOPE: Final[str] = (
     "The station rows rest on one pyranometer: all six generators take the same nearest radiation "
     "station, 17 to 31 km away."
@@ -99,7 +109,7 @@ EXTRA_FOLDS: Final[str] = (
     "run about 0.12 to 0.20 points high; see Limitations."
 )
 NESTED_BLOCKS: Final[str] = (
-    "The extra, ENS and station rows are almost entirely subsets of the main rows."
+    "The extra, ENS, station and CERRA rows are almost entirely subsets of the main rows."
 )
 POST_HOC_NOTE: Final[str] = (
     "Rows marked (post hoc) were added after the first run: two ways of rebuilding UKV's hourly "
@@ -486,12 +496,12 @@ def contrasts_not_comparable(*, cams_differences: list[float]) -> str:
 
 
 def leaderboard_figure(*, blocks: list[RowSetBlock]) -> alt.VConcatChart:
-    """Draw Figure 1, the leaderboard of the four row sets."""
+    """Draw Figure 1, the leaderboard of the five row sets."""
     return stacked_leaderboard(
         blocks=blocks,
         number=FIGURE_NUMBERS["leaderboard"],
         title=(
-            "CAMS has the lowest error of the gridded products tested on each of the four row sets"
+            "CAMS has the lowest error of the gridded products tested on each of the five row sets"
         ),
         subtitle=[
             "Each product's own mean absolute error, sorted best first within its block.",
@@ -504,6 +514,8 @@ def leaderboard_figure(*, blocks: list[RowSetBlock]) -> alt.VConcatChart:
                 f"swing that Figure {FIGURE_NUMBERS['contrasts']}'s paired contrasts cancel."
             ),
             ENS_LEAD,
+            CERRA_LEAD,
+            CERRA_STEP,
             STATION_SCOPE,
             POST_HOC_NOTE,
             DOTS,
@@ -537,6 +549,8 @@ def contrasts_figure(*, blocks: list[RowSetBlock]) -> alt.VConcatChart:
             contrasts_not_comparable(cams_differences=cams),
             CAMS_EXPLORATORY,
             ENS_LEAD,
+            CERRA_LEAD,
+            CERRA_STEP,
             STATION_SCOPE,
             UNEQUAL_LEADS,
             DOTS,
