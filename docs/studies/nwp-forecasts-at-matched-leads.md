@@ -2,7 +2,8 @@
 
 **At six solar farms and three wind farms in Lincolnshire, none of the four single products we
 tested beat the mean of the European Centre for Medium-Range Weather Forecasts (ECMWF) ensemble
-forecast (ENS) at a matched lead.** Each comparison gives an XGBoost model, a gradient-boosted tree
+forecast (ENS) at a matched lead, and a blend of products lowered the wind error at a lead a live
+service could use.** Each comparison gives an XGBoost model, a gradient-boosted tree
 model, one product's weather forecast and scores the power forecast it makes as a mean absolute
 error, in percentage points of the generator's capacity. A difference is the first product's error
 minus the second's, so a positive difference means the first product forecasts worse. Each bracketed
@@ -10,17 +11,16 @@ pair is a 95% interval. The four single products are the Met Office's UK variabl
 (UKV), ICON-EU from the German weather service's (DWD's) Icosahedral Nonhydrostatic (ICON) model
 family, the National Oceanic and Atmospheric Administration's (NOAA's) Global Ensemble Forecast
 System (GEFS), and ECMWF's own single-run 0.25° Integrated Forecasting System (IFS 0.25°). The study
-also tests blends of ENS with ICON-EU and IFS 0.25°. The study reads the products in three ways:
-UKV, ICON-EU, and IFS 0.25° are single deterministic runs read at one grid point, ENS is a 51-member
-mean averaged over an H3 cell (one hexagon of the H3 global hexagonal grid), and GEFS is a 31-member
-mean read at the nearest 0.25° cell. The live lead of UKV and ICON-EU is unmeasured, and would
-probably strengthen the verdicts against UKV and ICON-EU. The effect of the live lead on the blends
-was not tested.
+also tests blends of ENS with ICON-EU and IFS 0.25°. The live lead of UKV and ICON-EU is unmeasured,
+and would probably strengthen the verdicts against UKV and ICON-EU. The effect of the live lead on
+the blends was not tested. The study fits every XGBoost model at two hyperparameter settings, a
+primary setting and a more heavily regularised sensitivity setting.
 
-**For solar power, ENS beat UKV, ICON-EU, and GEFS, and a blend gained only at an optimistic
-lead.** The XGBoost model's error given UKV's day-1 forecast, minus its error given ENS's day-1
-forecast, is +1.242 points [+0.824, +1.689]. The same difference is +0.817 points [+0.584, +1.069]
-for ICON-EU and +1.272 points [+0.937, +1.601] for GEFS.
+**For solar power, ENS beat UKV, ICON-EU, and GEFS, and a blend gained only at an optimistic lead;
+for wind power, ENS beat UKV and GEFS, ICON-EU was not separable from ENS, and a blend lowered the
+error even at a conservative lead.** For solar, the XGBoost model's error given UKV's day-1 forecast,
+minus its error given ENS's day-1 forecast, is +1.242 points [+0.824, +1.689]. The same difference is
++0.817 points [+0.584, +1.069] for ICON-EU and +1.272 points [+0.937, +1.601] for GEFS.
 <!-- report: Solar, Planned contrasts and verdicts (P1a, P2a, P3) -->
 A blend of ENS, ICON-EU, and IFS 0.25° changed the error by -0.347 points [-0.482, -0.219] when the
 other two products' forecasts came from runs that may have been published after the forecast is
@@ -28,30 +28,43 @@ issued (P4a). When the ICON-EU and IFS 0.25° forecasts were both a day older (P
 contrast), the blend changed the error by -0.033 points [-0.106, +0.033], which is not
 distinguishable from zero.
 <!-- report: Solar, P4, the blend -->
-
-**For wind power, ENS beat UKV and GEFS, ICON-EU was not separable from ENS, and a blend lowered the
-error even at a conservative lead.** The error given UKV's day-1 forecast, minus the error given
-ENS's, is +0.770 points [+0.460, +1.057]. The same difference is +0.858 points [+0.598, +1.099] for
-GEFS and +0.169 points [-0.064, +0.384] for ICON-EU. For IFS 0.25°, an exploratory comparison, the
-difference is +0.003 points [-0.163, +0.186].
+For wind, the error given UKV's day-1 forecast, minus the error given ENS's, is +0.770 points
+[+0.460, +1.057]. The same difference is +0.858 points [+0.598, +1.099] for GEFS and +0.169 points
+[-0.064, +0.384] for ICON-EU. For IFS 0.25°, an exploratory comparison, the difference is +0.003
+points [-0.163, +0.186].
 <!-- report: Wind, Planned contrasts and verdicts (P1a, P2a, P3); Wind, P4, the blend -->
 The blend changed the error by -0.656 points [-0.851, -0.472] at the optimistic lead and by -0.184
 points [-0.282, -0.087] at the conservative lead. At the conservative lead, a live service could
-read the added ICON-EU and IFS 0.25° runs at 09:00 Coordinated Universal Time (UTC). The study fits
-every XGBoost model at two hyperparameter settings, a primary setting and a more heavily regularised
-sensitivity setting. The permutation controls of both blends, which shuffle the ICON-EU and IFS
-0.25° weather columns among comparable hours, were not significantly worse than ENS alone at either
-setting (exploratory).
+read the added ICON-EU and IFS 0.25° runs at 09:00 Coordinated Universal Time (UTC).
 <!-- report: Wind, P4, the blend -->
+
+The recommendations below hold at these nine farms only, and rest on archived forecasts scored
+against past output, not on a test of a live service ([Discussion: what to use](#discussion-what-to-use)
+gives the evidence and what would change each one).
+
+- **For solar power, keep ENS as the day-ahead weather input.**
+- **For wind power, keep ENS, and do not use UKV.**
+- **A second weather source lowered the wind error by about 0.2 points at a lead a live service could
+  use, and no gain was detected for solar at that lead.**
+
+![Each solar forecast product's error at each fitted lead day, with 95% intervals](assets/nwp_forecast_solar_leaderboard.svg)
+
+Figure 1: At day 1 every weather forecast shown has a lower error than climatology (14.5%); ENS and
+IFS 0.25° have the lowest error of the single solar forecasts.
+
+![Each wind forecast product's error at each fitted lead day, with 95% intervals](assets/nwp_forecast_wind_leaderboard.svg)
+
+Figure 2: At day 1 every weather forecast shown has a lower error than climatology (18.5%), by more
+than 9 points; ENS, IFS 0.25°, and ICON-EU have the lowest error of the single wind forecasts.
 
 ![Paired differences in solar error with 95% intervals, both XGBoost settings](assets/nwp_forecast_solar_headline.svg)
 
-Figure 1: For solar power, ENS beats UKV and ICON-EU at matched lead and GEFS at equal lead. A blend
+Figure 3: For solar power, ENS beats UKV and ICON-EU at matched lead and GEFS at equal lead. A blend
 gains 0.35 points at an optimistic lead and shows no detectable gain at a conservative lead.
 
 ![Paired differences in wind error with 95% intervals, both XGBoost settings](assets/nwp_forecast_wind_headline.svg)
 
-Figure 2: For wind power, ENS beats UKV, ICON-EU is unresolved against ENS, and a blend lowers the
+Figure 4: For wind power, ENS beats UKV, ICON-EU is unresolved against ENS, and a blend lowers the
 error by 0.18 points even at a conservative lead.
 
 > **How this page was made.** The research question came from a human. Everything else — the code
@@ -74,29 +87,29 @@ cell. A finding is therefore not a ranking of the weather
 models that produce these forecasts.
 
 - **For solar power, ENS beats UKV, ICON-EU, and GEFS at matched lead, at both XGBoost settings**
-  ([solar results](#solar-does-any-product-beat-ens-at-matched-lead)).
+  ([solar results](#for-solar-power-ens-beats-ukv-and-icon-eu-at-matched-lead-and-gefs-at-equal-lead)).
 - **For wind power, ENS beats UKV and GEFS, and ICON-EU and IFS 0.25° cannot be separated from
-  ENS** ([wind results](#wind-does-any-product-beat-ens-at-matched-lead)).
+  ENS** ([wind results](#for-wind-power-ens-beats-ukv-and-gefs-and-icon-eu-is-unresolved-against-ens)).
 - **IFS 0.25° is the closest rival to ENS among the single products tested, and the lead the
   comparison uses favours IFS 0.25°** (exploratory). IFS 0.25°'s day-1 error minus ENS's is +0.036
   points [-0.225, +0.296] for solar and +0.003 points [-0.163, +0.186] for wind. IFS 0.25°'s lead is
-  shorter than ENS's on most hours ([other products](#other-products-exploratory)).
+  shorter than ENS's on most hours ([other products](#among-the-other-products-ifs-025-comes-closest-to-ens-exploratory)).
   <!-- report: Solar and Wind, P4, the blend (X-ifs025_day1 rows) -->
 - **Adding ICON-EU and IFS 0.25° to ENS changes the wind error by -0.184 points [-0.282, -0.087] at
   a lead a live service could use, and changes the solar error detectably only at a lead a live
-  service may not be able to use** ([blending](#does-blending-products-help)).
+  service may not be able to use** ([blending](#a-blend-lowers-the-wind-error-at-both-leads-tested-and-the-solar-error-only-at-an-optimistic-lead)).
 - **For wind, ICON-EU at day 2 carries most of the blend's gain** (exploratory, and post hoc,
   because the two single-product blends were fitted after P4b's result was seen): ENS plus ICON-EU
   alone changes the error by -0.169 points [-0.250, -0.090], and P4b, which adds IFS 0.25° as well,
   is not statistically distinguishable from the ENS plus ICON-EU blend
-  ([blending](#does-blending-products-help)).
+  ([blending](#a-blend-lowers-the-wind-error-at-both-leads-tested-and-the-solar-error-only-at-an-optimistic-lead)).
 - **At the wind farms, part of ENS's advantage over the single-run products may be timing noise that
   averaging removes, but at the solar farms averaging does not shrink the gaps relative to ENS's own
-  error** (exploratory; [gaps](#how-much-of-enss-advantage-is-ensemble-averaging-and-timing)).
-- **Every weather forecast shown in the day-1 leaderboards has a lower error than the no-weather
+  error** (exploratory; [gaps](#part-of-enss-advantage-is-ensemble-averaging-and-timing)).
+- **Every day-1 weather forecast shown in Figures 1 and 2 has a lower error than the no-weather
   climatology baseline.** The XGBoost model's error given ENS is 8.766% of capacity for solar and
   8.427% for wind, against climatology's 14.458% and 18.460% ([the XGBoost
-  forecasts work](#do-the-xgboost-power-forecasts-work)).
+  forecasts work](#the-xgboost-models-track-measured-output-and-every-day-1-weather-forecast-beats-climatology)).
 - **Open-Meteo's Previous Runs day 1 gives UKV, ICON-EU, and IFS 0.25° a shorter lead than ENS's on
   most hours, which flatters those three products** ([matched leads](#how-the-leads-are-matched)).
 
@@ -109,7 +122,7 @@ product carries P4b's wind gain; Exploratory: each arm's own error over blocks o
 power forecast at the six solar farms and three wind farms.** Flexpectation's live service reads
 ENS at 09:00 UTC, so the answer decides whether a second weather source is worth ingesting. ENS is
 the incumbent. The table sets out each product a headline contrast uses, plus ICON-D2. The other
-products in the study are exploratory and appear in [Other products](#other-products-exploratory).
+products in the study are exploratory and appear in [Other products](#among-the-other-products-ifs-025-comes-closest-to-ens-exploratory).
 
 | Product | Lead at day 1, in hours after the run starts | Grid | Domain (the study reads Great Britain) | Archive read from | Delivery |
 |---|---|---|---|---|---|
@@ -144,7 +157,9 @@ ENS, GEFS, or IFS 0.25°, and ECMWF's published dissemination schedule was not c
 <!-- source: the past-wind study's product table and the weather-products survey; none of these
 figures is measured here -->
 
-## How the leads are matched
+## Data and methods
+
+### How the leads are matched
 
 **Open-Meteo's Previous Runs archive is not a fixed-lead instrument, so the study cannot compare its
 products with ENS at one lead.** A value labelled `previous_dayN` comes from the freshest run of the
@@ -248,11 +263,12 @@ where the interval contains zero. The check tests only ENS's own error, so it do
 the Previous Runs archive follows the lead rule above, and it does not test any product's error at
 all.
 <!-- plan: Leads, and what matched means -->
-The [solar](#solar-does-any-product-beat-ens-at-matched-lead) and
-[wind](#wind-does-any-product-beat-ens-at-matched-lead) sections give the result of this check.
+The [solar](#for-solar-power-ens-beats-ukv-and-icon-eu-at-matched-lead-and-gefs-at-equal-lead) and
+[wind](#for-wind-power-ens-beats-ukv-and-gefs-and-icon-eu-is-unresolved-against-ens)
+sections give the result of this check.
 <!-- report: Solar and Wind, ENS monotonicity by band -->
 
-## The XGBoost model, the scored hours, and the folds
+### The XGBoost model, the scored hours, and the folds
 
 **Every arm is the same XGBoost model given the same kinds of column, and only the weather product
 differs.** The XGBoost model is fitted separately for each generator with an absolute-error
@@ -317,11 +333,13 @@ hyperparameter settings, called primary and sensitivity, and the sensitivity set
 every planned contrast.
 <!-- report: Design constants (Intervals, Capacity) -->
 
-## Do the XGBoost power forecasts work?
+## Results
+
+### The XGBoost models track measured output, and every day-1 weather forecast beats climatology
 
 **The XGBoost models track the measured output at every farm, so contrasts of a few tenths of a
-point are contrasts between working forecasts.** Figure 3 shows out-of-fold day-1 forecasts given
-ENS against the measured output at all six solar farms, and Figure 4 shows the same for the three
+point are contrasts between working forecasts.** Figure 5 shows out-of-fold day-1 forecasts given
+ENS against the measured output at all six solar farms, and Figure 6 shows the same for the three
 wind farms. Each figure covers one week, chosen by a stated rule from the measured output alone. For
 solar, the rule takes the week whose daily mean output varies most from day to day. For wind, the
 rule takes the week with the largest mean hour-to-hour change in output. Only weeks in which every
@@ -329,11 +347,11 @@ generator has scored hours on all seven days qualify.
 
 ![Day-1 forecasts against measured output at solar farms A to F](assets/nwp_forecast_solar_models_work.svg)
 
-Figure 3: Out-of-fold day-1 ENS-mean forecasts follow the measured output at all six solar farms.
+Figure 5: Out-of-fold day-1 ENS-mean forecasts follow the measured output at all six solar farms.
 
 ![Day-1 forecasts against measured output at wind farms W1 to W3](assets/nwp_forecast_wind_models_work.svg)
 
-Figure 4: Out-of-fold day-1 ENS-mean forecasts follow the measured output at all three wind farms.
+Figure 6: Out-of-fold day-1 ENS-mean forecasts follow the measured output at all three wind farms.
 
 **At day 1, an XGBoost model given ENS beats climatology by a wide margin.** Given ENS's day-1 mean,
 the error is 8.766% of capacity [8.096, 9.355] for solar and 8.427% [7.444, 9.503] for wind. The
@@ -352,33 +370,23 @@ wind.
 A baseline for a day-1 to day-3 forecast reads only telemetry up to 09:00 UTC on the run's day, the
 same information the live service has. A baseline for the run's own day (day 0) reads telemetry only
 up to the run's 00 UTC initialisation time. Solar persistence on the run's own day
-(`persistence_day0`) is left off the leaderboards, because day-0 solar persistence repeats the last
+(`persistence_day0`) is left off Figures 1 and 2, because day-0 solar persistence repeats the last
 observed hour, a night-time value near zero, across the whole day.
 <!-- report: Design constants (Baselines); Solar, Exploratory: the no-weather floor -->
 
-![Day-1 error of every solar forecast and baseline, with 95% intervals](assets/nwp_forecast_solar_leaderboard.svg)
-
-Figure 5: At day 1 every weather forecast shown has a lower error than climatology (14.5%); ENS and
-IFS 0.25° have the lowest error of the single solar forecasts.
-
-![Day-1 error of every wind forecast and baseline, with 95% intervals](assets/nwp_forecast_wind_leaderboard.svg)
-
-Figure 6: At day 1 every weather forecast shown has a lower error than climatology (18.5%), by more
-than 9 points; ENS, IFS 0.25°, and ICON-EU have the lowest error of the single wind forecasts.
-
-**Overlapping intervals in Figures 5 and 6 do not mean two products are equal.** The errors of all
+**Overlapping intervals in Figures 1 and 2 do not mean two products are equal.** The errors of all
 the products rise and fall together from month to month, and pairing the two arms of a contrast
-cancels that shared swing. The paired differences in Figures 1 and 2 are the test of which gaps are
+cancels that shared swing. The paired differences in Figures 3 and 4 are the test of which gaps are
 statistically significant.
 
-**Figures 5 and 6 favour the Previous Runs products, because their day-1 leads are shorter than
+**Figures 1 and 2 favour the Previous Runs products, because their day-1 leads are shorter than
 ENS's on most hours.** Only GEFS has ENS's exact lead on every row. UKV, ICON-EU, IFS 0.25°, and the
 other products from Open-Meteo's Previous Runs archive have a lead of 24 + (h mod n) hours, against
 ENS's 24 + h. IFS 0.25° day 1 can also come from a newer ECMWF run than ENS's 00 UTC run. The
-ordering of those products against ENS in Figures 5 and 6 is therefore not an ordering at equal
+ordering of those products against ENS in Figures 1 and 2 is therefore not an ordering at equal
 lead.
 
-## Solar: does any product beat ENS at matched lead?
+### For solar power, ENS beats UKV and ICON-EU at matched lead and GEFS at equal lead
 
 **For solar power, no product tested beats the European Centre for Medium-Range Weather Forecasts
 ensemble (ENS) at matched lead: UKV and ICON-EU both lose, at both XGBoost hyperparameter
@@ -460,7 +468,7 @@ the P4b blend minus ENS](assets/nwp_forecast_solar_per_generator.svg)
 
 Figure 7: At each of the six solar farms UKV and ICON-EU have a higher error than ENS at day 1.
 
-## Wind: does any product beat ENS at matched lead?
+### For wind power, ENS beats UKV and GEFS, and ICON-EU is unresolved against ENS
 
 **For wind power, UKV loses to ENS at matched lead, and ICON-EU is unresolved against ENS.** The
 verdict for UKV is "loses" at both settings, and the verdict for ICON-EU is "unresolved" at both
@@ -527,7 +535,7 @@ and the P4b blend minus ENS](assets/nwp_forecast_wind_per_generator.svg)
 Figure 8: At two of the three wind farms UKV has a higher error than ENS at day 1, and at two of the
 three wind farms the P4b blend has a lower error.
 
-## Does blending products help?
+### A blend lowers the wind error at both leads tested, and the solar error only at an optimistic lead
 
 **A blend of ENS, ICON-EU, and IFS 0.25° lowers the wind error at both leads tested, and lowers the
 solar error only at the optimistic lead.**
@@ -652,7 +660,7 @@ alone and minus their permutation controls](assets/nwp_forecast_wind_blends.svg)
 Figure 10: For wind power a blend of ENS, ICON-EU, and IFS 0.25° lowers the error by 0.66 points at
 an optimistic lead and 0.18 points at a conservative lead, and its control does not.
 
-## How much of ENS's advantage is ensemble averaging and timing?
+### Part of ENS's advantage is ensemble averaging and timing
 
 **The gaps between ENS and the other products are partly gaps in ensemble averaging and timing, not
 only gaps in weather-model quality, and the evidence differs between solar and wind.** ENS is
@@ -763,7 +771,7 @@ at 1 hour also overlaps its interval over 1 day for every wind product, so the s
 that any wind share changed.
 <!-- report: Wind / X: day-1 gap to ENS day 1 scored over blocks of hours -->
 
-## Other products (exploratory)
+### Among the other products, IFS 0.25° comes closest to ENS (exploratory)
 
 **Among the remaining products, with IFS 0.25° for comparison (all exploratory), only IFS 0.25°
 avoids the verdict "loses" for solar, and only IFS 0.25° and ICON-D2 avoid the verdict "loses" for
@@ -819,7 +827,7 @@ For solar the point estimate is larger after the upgrade, but the two intervals 
 wind the two intervals overlap almost entirely.
 <!-- report: Solar / X: UKV P1 by era; Wind / X: UKV P1 by era -->
 
-## What to use
+## Discussion: what to use
 
 **Each recommendation below is about a product as this study reads it, and rests on an XGBoost model
 fitted at nine generators in one area.** Each paragraph gives the size of the effect beside ENS's
@@ -927,7 +935,9 @@ and not a test of a live service. [Scope](#scope) lists what else the study does
 
 <!-- design of the study, not a report number -->
 
-## What this study cannot separate
+## Limitations
+
+### What this study cannot separate
 
 **A blend's gain cannot be split between a second weather model and a newer run.** P4a reads
 ICON-EU and IFS 0.25° at day 1 and P4b at day 2, so the two contrasts differ in lead and in the
@@ -941,14 +951,14 @@ ECMWF information. Only P4b (-0.033 and -0.184) is a conservative bound.
 averaging, and the study cannot say how much (exploratory).** Averaging over longer blocks shrinks
 the wind gaps relative to ENS's own error, but the study cannot say whether timing noise or
 grid-point sampling accounts for more of the wind gaps ([the block-average
-contrasts](#how-much-of-enss-advantage-is-ensemble-averaging-and-timing)). For solar the gaps do not
+contrasts](#part-of-enss-advantage-is-ensemble-averaging-and-timing)). For solar the gaps do not
 shrink relative to ENS's own error, so the block averages give no support for a timing-noise
 reading of the solar gaps.
 <!-- report: Solar and Wind, Exploratory: day-1 gap to ENS day 1 scored over blocks of hours -->
 
 **ENS's standing cannot be separated from ensemble averaging.** The error given the mean of ENS's
 members is lower than the error given its single control run, for solar and for wind
-([the control-run contrast](#how-much-of-enss-advantage-is-ensemble-averaging-and-timing),
+([the control-run contrast](#part-of-enss-advantage-is-ensemble-averaging-and-timing),
 exploratory). Mean absolute error rewards a smoother forecast, so part of ENS's advantage over each
 single-run product is averaging rather than weather-model quality. The comparisons against the
 control run favour the Previous Runs products, whose leads are shorter than the control run's on
@@ -986,7 +996,7 @@ weather at all: climatology, whose error is 14.458% of capacity for solar and 18
 <!-- report: Solar and Wind, Leaderboard, primary setting; plan: Departures from the plan found
 while running the study -->
 
-## Limitations
+### What the numbers depend on
 
 **The UKV day-1 requirement removes 47.8% and 50.5% of the solar rows of April and May 2026, and
 86.8% and 89.4% of the wind rows.** The shared rows require UKV's day-1 value, because UKV is a

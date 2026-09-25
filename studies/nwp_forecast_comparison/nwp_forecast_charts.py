@@ -101,11 +101,7 @@ SETTING_NAMES: Final[dict[str, str]] = {
 SETTING_COLOURS: Final[tuple[str, str]] = (ocf.BRAND_ORANGE, ocf.DATA_BLUE)
 """The colour of the primary and the second setting, in that order."""
 
-FORECAST_CONDITION: Final[str] = "Forecast product"
-BASELINE_CONDITION: Final[str] = "No-weather baseline"
-
 TIME_PANEL_HEIGHT_PX: Final[int] = 70
-LEADERBOARD_ROW_PX: Final[int] = 28
 LEAD_PANEL_HEIGHT_PX: Final[int] = 300
 
 PRODUCT_NAMES: Final[dict[str, str]] = {
@@ -298,7 +294,7 @@ def padded_domain(*, low: float, high: float, include_zero: bool) -> tuple[float
     return (math.floor((low - pad) * 10) / 10, math.ceil((high + pad) * 10) / 10)
 
 
-# --- Chart 1: headline contrasts ------------------------------------------------------------------
+# --- Chart 2: headline contrasts ------------------------------------------------------------------
 
 
 class ContrastSpec(NamedTuple):
@@ -469,7 +465,7 @@ def headline(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.VCo
     )
 
 
-# --- Chart 2: leaderboard -------------------------------------------------------------------------
+# --- Chart 1: leaderboard -------------------------------------------------------------------------
 
 
 LEAD_COLOURS: Final[dict[int, str]] = {
@@ -477,13 +473,17 @@ LEAD_COLOURS: Final[dict[int, str]] = {
     1: ocf.DATA_BLUE,
     2: ocf.DATA_SKY,
     3: ocf.DATA_DEEP_TEAL,
-    5: ocf.DATA_AMBER,
+    5: ocf.DATA_GREEN,
+    10: ocf.DATA_AMBER,
     14: ocf.DATA_BURNT_ORANGE,
 }
-"""Each lead day's mark colour on the leaderboard. Days 1, 2, 3, 5 and 14 pass every check of the
-bundled `validate_palette.py` (all pairs, light mode). Day 0 is ENS's run-day forecast, a bracket
-side and not a product a service could read, so it is black. Data Amber, Data Deep Teal and Data
-Burnt Orange are internal-use colours, approved for the lead-day charts by the maintainer."""
+"""Each lead day's mark colour on the leaderboard. Days 1, 2, 3, 10 and 14 with Data Sky, Data
+Deep Teal, Data Amber and Data Burnt Orange pass every check of the bundled `validate_palette.py`
+(all pairs, light mode) except contrast against the background, and adding Data Green for day 5
+adds the script's lightness-band failure (L 0.81), which the marks' position beside the axis
+carries. Day 0 is ENS's run-day forecast, a bracket side and not a product a service could read, so
+it is black. Data Amber, Data Deep Teal and Data Burnt Orange are internal-use colours, approved for
+the lead-day charts by the maintainer."""
 
 LEAD_LABEL_ROOM: Final[float] = 1.5
 """How far right of the baselines the leaderboard's x axis runs, in percentage points of capacity,
@@ -516,7 +516,9 @@ def lead_board_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
     parsed = {
         arm: (match["slug"], int(match["day"]))
         for arm in sorted(primary["arm"].unique().to_list())
-        if (match := LEAD_ARM.match(arm)) and match["slug"] in PRODUCT_NAMES
+        if (match := LEAD_ARM.match(arm))
+        and match["slug"] in PRODUCT_NAMES
+        and (int(match["day"]) > 0 or match["slug"] == "ens_mean")
     }
     board = leaderboard(losses=primary, arms=list(parsed))
     return (
@@ -542,7 +544,7 @@ def lead_board_products(*, rows: pl.DataFrame) -> list[str]:
         rows: What `lead_board_rows` returns.
 
     Returns:
-        Every product's name; each has a day-1 row.
+        Every product's name; each has a day-1 row (a product without one makes the figure raise).
     """
     return rows.filter(pl.col("day") == 1).sort("value")["product"].to_list()
 
@@ -581,7 +583,11 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
     lead_names = [f"Day {day}" for day in days]
     x_domain = padded_domain(
         low=float(rows["lower_95"].min()),  # ty: ignore[invalid-argument-type]
-        high=float(baselines["value"].max()) + LEAD_LABEL_ROOM,  # ty: ignore[invalid-argument-type]
+        high=max(
+            float(rows["upper_95"].max()),  # ty: ignore[invalid-argument-type]
+            float(baselines["value"].max()),  # ty: ignore[invalid-argument-type]
+        )
+        + LEAD_LABEL_ROOM,
         include_zero=False,
     )
     x_scale = alt.Scale(domain=list(x_domain), nice=False, zero=False)
@@ -638,13 +644,17 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
         )
     )
     reference = baselines.with_columns(
-        y=pl.Series([0.0, 1.0][: baselines.height]), text=pl.col("label")
+        y=pl.col("arm").replace_strict(
+            {"climatology": 0.0, "smart_persistence_day1": 1.0}, return_dtype=pl.Float64
+        ),
+        text=pl.col("label"),
     )
     reference_rules = (
         alt.Chart(reference)
         .mark_rule(strokeDash=[5, 3], strokeWidth=1.5, color=ocf.BLACK_1, aria=False)
         .encode(x=alt.X("value:Q", scale=x_scale, axis=x_axis, title=x_title))  # ty: ignore[unresolved-attribute]
     )
+    low_arm, high_arm = baselines.sort("value")["arm"].to_list()
     reference_text = [
         alt.Chart(reference.filter(pl.col("arm") == arm))
         .mark_text(align=align, dx=dx, baseline="middle", fontSize=10, aria=False)
@@ -654,7 +664,7 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
             text="text:N",
             color=alt.value(ocf.BLACK_1),
         )
-        for arm, align, dx in (("climatology", "right", -5), ("smart_persistence_day1", "left", 5))
+        for arm, align, dx in ((low_arm, "right", -5), (high_arm, "left", 5))
     ]
     panel = alt.LayerChart(
         layer=[rules, reference_rules, intervals, points, *reference_text],
@@ -681,7 +691,8 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
                 "filled in. Dashed lines: the no-weather baselines."
             ),
             (
-                "Day 0 (ENS only) is a bracket side, not a forecast a service could read. "
+                "Day 0 is ENS's run-day forecast, a bracket side, not a forecast a service could "
+                "read. "
                 f"Overlapping intervals here can still hide a significant paired difference "
                 f"(Figure {FIGURE_NUMBERS[(domain, 'headline')]}). {DOTS_NOTE}"
             ),
@@ -799,7 +810,11 @@ def choose_week(*, series: pl.DataFrame, domain: DomainType) -> datetime:
 
 
 def line_key(
-    *, labels: Sequence[str], colours: Sequence[str], width: int = CONTENT_WIDTH_PX - 60
+    *,
+    labels: Sequence[str],
+    colours: Sequence[str],
+    width: int = CONTENT_WIDTH_PX - 60,
+    dashed: Sequence[bool] | None = None,
 ) -> alt.LayerChart:
     """Draw a one-row key of short line segments above a chart.
 
@@ -807,6 +822,7 @@ def line_key(
         labels: Each entry's label.
         colours: Each entry's colour.
         width: The key's width in pixels.
+        dashed: Whether each entry's segment is dashed; None draws every segment solid.
 
     Returns:
         A one-row chart.
@@ -818,6 +834,7 @@ def line_key(
             "colour": list(colours),
             "x": [index * slot for index in range(len(labels))],
             "x2": [index * slot + 18 for index in range(len(labels))],
+            "dashed": [str(flag).lower() for flag in (dashed or [False] * len(labels))],
         }
     )
     segments = (
@@ -828,6 +845,11 @@ def line_key(
             x2="x2:Q",
             y=alt.value(8),
             color=alt.Color("colour:N", scale=None),
+            strokeDash=alt.StrokeDash(
+                "dashed:N",
+                scale=alt.Scale(domain=["false", "true"], range=[[1, 0], [5, 3]]),
+                legend=None,
+            ),
         )
     )
     text = (
@@ -1071,7 +1093,7 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
         product: (index - (len(products) - 1) / 2) * DODGE_DAYS
         for index, product in enumerate(products)
     }
-    # Each product is drawn as its own line, coloured by its group; the key names the group.
+    # Each product is its own line in its own colour; ARPEGE is dashed.
     drawn = rows.with_columns(
         x=pl.col("day") + pl.col("product").replace_strict(offsets, return_dtype=pl.Float64),
         line=pl.col("product"),
@@ -1185,6 +1207,7 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
             line_key(
                 labels=[KEY_LABELS.get(name, name) for name in names],
                 colours=[PRODUCT_COLOURS[name] for name in names],
+                dashed=[name in DASHED_PRODUCTS for name in names],
             ),
             panel,
         ],
@@ -1201,7 +1224,8 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
                 "Dot: estimate. Line: 95% interval from resampling whole months and a fitting "
                 "seed. Products at one day are drawn side by side, and the name of each is "
                 "written beside its last point. Products with a day-1 forecast only are left "
-                f"out; the day-1 leaderboard shows them. {SHARED_ROWS_NOTE}"
+                f"out; Figure {FIGURE_NUMBERS[(domain, 'leaderboard')]} shows them. "
+                f"{SHARED_ROWS_NOTE}"
             ),
             f"{scope_text(losses=losses, domain=domain)} {CAPACITY_NOTE}",
         ],
@@ -1425,7 +1449,8 @@ FIGURE_NUMBERS: Final[dict[tuple[DomainType, str], int]] = {
     ("solar", "blends"): 9,
     ("wind", "blends"): 10,
 }
-"""Each chart's figure number on the page, in the page's order: the headline pair opens the page."""
+"""Each chart's figure number on the page, in the page's order: the leaderboard pair opens the page,
+then the planned contrasts."""
 
 TITLES: Final[dict[tuple[DomainType, str], str]] = {
     ("solar", "headline"): (
