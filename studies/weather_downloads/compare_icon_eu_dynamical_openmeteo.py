@@ -35,7 +35,7 @@ import logging
 import os
 import sys
 import time
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime
 from pathlib import Path
 from typing import Final, Literal
 
@@ -66,6 +66,27 @@ accepts both names and returns identical values."""
 
 SINGLE_RUNS_FIRST_DATE: Final[datetime] = datetime(2026, 4, 2)  # noqa: DTZ001  (naive UTC, as numpy holds it)
 """Open-Meteo's Single Runs archive holds most models from this date, per its docs page."""
+
+LAST_SAMPLED_RUN: Final[datetime] = datetime(2026, 9, 24, 18)  # noqa: DTZ001
+"""The newest run the sample may hold: the latest 18 UTC run complete on 2026-09-25, when the
+sample was pinned. Pinning it keeps the sample the same however late the script is re-run."""
+
+LAST_STITCH_DAY: Final[str] = "2026-09-23"
+"""The newest day the freshest-run test may sample, pinned for the same reason."""
+
+FIRST_STITCH_DAY: Final[str] = "2026-04-06"
+"""The first day the freshest-run test may sample: four days after the Single Runs archive starts,
+so every candidate run for the day lies inside the overlap."""
+
+INSTANT_SCORED_HOURS: Final[frozenset[int]] = frozenset({0, 1, 2})
+"""Valid hours (modulo 6) whose freshest Open-Meteo run is a 00, 06, 12, or 18 UTC run, so one the
+Dynamical.org store holds. Open-Meteo also runs at 03, 09, 15, and 21 UTC, which the store lacks,
+and serves those runs' first leads for the other valid hours. Applies to 2 m temperature and 10 m
+wind, which are instants."""
+
+RADIATION_SCORED_HOURS: Final[frozenset[int]] = frozenset({1, 2, 3})
+"""The same hours for radiation, shifted by one because radiation is stamped at the end of its
+hour."""
 
 MAX_LEAD_HOURS: Final[int] = 78
 N_LEADS: Final[int] = MAX_LEAD_HOURS + 1
@@ -194,15 +215,22 @@ def _init_times(*, store: xr.Dataset) -> np.ndarray:
     return store["init_time"].to_numpy()
 
 
-def _is_complete(*, frame: pl.DataFrame) -> bool:
-    """Return whether a loaded run holds a value at every site and lead of every variable.
+def _is_complete(*, frame: pl.DataFrame, prefix: str = "") -> bool:
+    """Return whether one side of a loaded run holds a value at every site and lead.
 
-    A missing value is `NaN` in the store and null here. Radiation has no lead 0, so one null per
-    site is allowed there.
+    A missing value is `NaN` in the Dynamical.org store and null here. Radiation has no lead 0 on
+    the Dynamical.org side, so one null per site is allowed there.
+
+    Args:
+        frame: One run's frame.
+        prefix: `om_` to check Open-Meteo's columns, empty for the Dynamical.org columns.
+
+    Returns:
+        Whether every variable's null count is exactly what a complete run holds.
     """
     n_sites = frame["site"].n_unique()
     return all(
-        frame[name].null_count() == (n_sites if name in RADIATION_VARIABLES else 0)
+        frame[f"{prefix}{name}"].null_count() <= (n_sites if name in RADIATION_VARIABLES else 0)
         for name in VARIABLES
     )
 
@@ -371,8 +399,7 @@ def _single_run_frame(*, sites: pl.DataFrame, init_time: np.datetime64) -> pl.Da
 def _sample_runs(*, store: xr.Dataset, n_runs: int, seed: int) -> list[np.datetime64]:
     """Sample `n_runs` overlap runs, evenly over the four cycles, with a fixed seed.
 
-    The overlap runs from the later of the store's first run and Open-Meteo's Single Runs start to
-    the newest run at least 12 hours old.
+    The overlap runs from Open-Meteo's Single Runs start to `LAST_SAMPLED_RUN`.
 
     Args:
         store: The opened store.
@@ -382,7 +409,7 @@ def _sample_runs(*, store: xr.Dataset, n_runs: int, seed: int) -> list[np.dateti
     Returns:
         The sampled `init_time`s, ascending.
     """
-    latest = np.datetime64(datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=12), "us")
+    latest = np.datetime64(LAST_SAMPLED_RUN, "us")
     complete = _init_times(store=store)
     overlap = complete[
         (complete >= np.datetime64(SINGLE_RUNS_FIRST_DATE, "us")) & (complete <= latest)
@@ -391,8 +418,8 @@ def _sample_runs(*, store: xr.Dataset, n_runs: int, seed: int) -> list[np.dateti
     generator = np.random.default_rng(seed)
     picked: list[np.datetime64] = []
     for cycle_hour, count in zip((0, 6, 12, 18), _split_evenly(total=n_runs, parts=4), strict=True):
-        pool = overlap[hours == cycle_hour]
-        picked.extend(generator.choice(pool, size=min(count, len(pool)), replace=False))
+        pool = generator.permutation(overlap[hours == cycle_hour])
+        picked.extend(pool[:count])
     return sorted(picked)
 
 
@@ -437,6 +464,10 @@ def _run_runs_stage(*, n_runs: int, seed: int, max_runs: int | None) -> None:
             marker.write_text("open_meteo_run_not_available")
             _LOG.warning("%s: Open-Meteo does not hold this run, skipped", stamp)
             continue
+        if not _is_complete(frame=open_meteo, prefix="om_"):
+            marker.write_text("open_meteo_run_null_filled")
+            _LOG.warning("%s: Open-Meteo returned nulls for this run, skipped", stamp)
+            continue
         joined = dynamical.join(open_meteo, on=["site", "valid_time"], how="full", coalesce=True)
         _write_atomically(frame=joined.sort("site", "valid_time"), path=target)
         _LOG.info("%s: fetched", stamp)
@@ -445,6 +476,14 @@ def _run_runs_stage(*, n_runs: int, seed: int, max_runs: int | None) -> None:
 # ---------------------------------------------------------------------------------------------
 # Stage 2: freshest-run question
 # ---------------------------------------------------------------------------------------------
+
+
+def _stitch_days(*, n_days: int, seed: int) -> list[np.datetime64]:
+    """Sample `n_days` days between `FIRST_STITCH_DAY` and `LAST_STITCH_DAY`, fixed by the seed."""
+    days = np.arange(
+        np.datetime64(FIRST_STITCH_DAY), np.datetime64(LAST_STITCH_DAY) + np.timedelta64(1, "D")
+    )
+    return sorted(np.random.default_rng(seed).permutation(days)[:n_days])
 
 
 def _run_stitch_stage(*, n_days: int, seed: int) -> None:
@@ -460,11 +499,7 @@ def _run_stitch_stage(*, n_days: int, seed: int) -> None:
     store = _open_store()
     indexers = _nearest_cell_indexers(store=store, sites=sites)
     complete = _init_times(store=store)
-    first_day = np.datetime64(SINGLE_RUNS_FIRST_DATE, "D") + np.timedelta64(4, "D")
-    last_day = complete.astype("datetime64[D]").max() - np.timedelta64(1, "D")
-    days = np.arange(first_day, last_day)
-    chosen = sorted(np.random.default_rng(seed).choice(days, size=n_days, replace=False))
-    for day in chosen:
+    for day in _stitch_days(n_days=n_days, seed=seed):
         target = STITCH_CACHE_DIR / f"{day}.parquet"
         if target.exists():
             _LOG.info("stitch %s: already cached, skipping", day)
@@ -480,9 +515,16 @@ def _run_stitch_stage(*, n_days: int, seed: int) -> None:
             )
             for init_time in candidates
         ]
-        dynamical = pl.concat(frame for frame in loaded if _is_complete(frame=frame)).filter(
-            pl.col("valid_time").dt.date() == day.astype(object)
+        kept = [frame for frame in loaded if _is_complete(frame=frame)]
+        _LOG.info(
+            "stitch %s: %d Dynamical.org candidate runs in the store (%d expected at 6-hourly "
+            "spacing), %d dropped as incomplete",
+            day,
+            len(loaded),
+            (MAX_LEAD_HOURS + 24) // 6,
+            len(loaded) - len(kept),
         )
+        dynamical = pl.concat(kept).filter(pl.col("valid_time").dt.date() == day.astype(object))
         served = pl.concat(
             _open_meteo_blocks(
                 url=PREVIOUS_RUNS_URL,
@@ -511,44 +553,58 @@ def _run_stitch_stage(*, n_days: int, seed: int) -> None:
 
 
 def _freshest_run_verdicts(*, stitched: pl.DataFrame) -> pl.DataFrame:
-    """Classify each informative (site, variable, valid hour) by the run Open-Meteo's value matches.
+    """Classify each scorable (site, variable, valid hour) by the run Open-Meteo's value matches.
 
-    An hour is informative when the candidate runs' values spread by more than two match tolerances,
-    so the freshest run is distinguishable from an older one. The freshest run is the candidate with
-    the shortest lead, with leads under 1 h excluded for radiation because its lead 0 is null.
+    **Only hours whose freshest Open-Meteo run the store holds are scored.** Open-Meteo also runs
+    ICON-EU at 03, 09, 15, and 21 UTC, which the Dynamical.org store lacks, so at other valid hours
+    the freshest Open-Meteo run is one no candidate can match. `INSTANT_SCORED_HOURS` and
+    `RADIATION_SCORED_HOURS` keep the hours where it is a run the store holds.
+
+    **An hour is informative only if the freshest candidate differs from the second-freshest by
+    more than two match tolerances**, one rounding step of Open-Meteo's served value each. Without
+    that gap a match to the freshest run cannot be told from a match to the previous one. The
+    freshest candidate is the one with the shortest lead; radiation has no lead 0, so its freshest
+    candidate has lead 1 h at the earliest.
 
     Args:
         stitched: Rows of `site`, `init_time`, `valid_time`, `variable`, `dynamical`, `open_meteo`.
 
     Returns:
-        One row per informative hour with `variable`, `verdict` (`freshest`, `older`, or
-        `none_match`), and `lag_hours`, the freshest candidate's `init_time` minus the best
-        candidate's, in hours (0 when the freshest matches).
+        One row per scorable informative hour with `variable`, `hour_in_cycle` (the valid hour
+        modulo 6), `verdict` (`freshest`, `older`, or `none_match`), and `lag_hours`, the freshest
+        candidate's `init_time` minus the best candidate's, in hours (0 when the freshest matches).
     """
     tolerance = pl.col("variable").replace_strict(MATCH_TOLERANCE, return_dtype=pl.Float64)
+    hour_in_cycle = pl.col("valid_time").dt.hour() % 6
+    is_scored = (
+        pl.when(pl.col("variable").is_in(RADIATION_VARIABLES))
+        .then(hour_in_cycle.is_in(RADIATION_SCORED_HOURS))
+        .otherwise(hour_in_cycle.is_in(INSTANT_SCORED_HOURS))
+    )
     rows = (
         stitched.drop_nulls("dynamical")
         .with_columns(
             tolerance=tolerance,
             error=(pl.col("open_meteo") - pl.col("dynamical")).abs(),
             init_hour=pl.col("init_time").dt.epoch("s") / 3600,
+            hour_in_cycle=hour_in_cycle,
         )
-        .with_columns(
-            spread=pl.col("dynamical").max().over("site", "variable", "valid_time")
-            - pl.col("dynamical").min().over("site", "variable", "valid_time")
-        )
-        .filter(pl.col("spread") > 2 * pl.col("tolerance"))
+        .filter(is_scored)
     )
-    group = ["site", "variable", "valid_time"]
+    by_freshness = pl.col("dynamical").sort_by("init_hour", descending=True)
     return (
-        rows.group_by(group)
+        rows.group_by("site", "variable", "valid_time")
         .agg(
             tolerance=pl.col("tolerance").first(),
+            hour_in_cycle=pl.col("hour_in_cycle").first(),
+            freshest_value=by_freshness.first(),
+            second_value=by_freshness.get(1, null_on_oob=True),
             freshest_hour=pl.col("init_hour").max(),
             freshest_error=pl.col("error").sort_by("init_hour").last(),
             best_error=pl.col("error").min(),
             best_hour=pl.col("init_hour").filter(pl.col("error") == pl.col("error").min()).max(),
         )
+        .filter((pl.col("freshest_value") - pl.col("second_value")).abs() > 2 * pl.col("tolerance"))
         .with_columns(
             verdict=pl.when(pl.col("freshest_error") <= pl.col("tolerance"))
             .then(pl.lit("freshest"))
@@ -557,24 +613,39 @@ def _freshest_run_verdicts(*, stitched: pl.DataFrame) -> pl.DataFrame:
             .otherwise(pl.lit("none_match")),
             lag_hours=(pl.col("freshest_hour") - pl.col("best_hour")).cast(pl.Int64),
         )
-        .select("variable", "verdict", "lag_hours")
+        .select("variable", "hour_in_cycle", "verdict", "lag_hours")
     )
 
 
 def _freshest_run_summary(*, verdicts: pl.DataFrame) -> pl.DataFrame:
-    """Summarise verdicts per variable: hour counts, shares, and the median lag of `older`."""
+    """Summarise verdicts per variable and hour within the cycle, with an `all` row per variable.
+
+    Args:
+        verdicts: The frame from `_freshest_run_verdicts`.
+
+    Returns:
+        Per group: hour count, the shares of each verdict, and the median lag of `older` hours.
+    """
+    aggregations = [
+        pl.len().alias("n_informative_hours"),
+        (pl.col("verdict") == "freshest").mean().alias("share_freshest"),
+        (pl.col("verdict") == "older").mean().alias("share_older"),
+        (pl.col("verdict") == "none_match").mean().alias("share_none_match"),
+        pl.col("lag_hours")
+        .filter(pl.col("verdict") == "older")
+        .median()
+        .alias("median_lag_hours_when_older"),
+    ]
+    per_hour = verdicts.group_by("variable", "hour_in_cycle").agg(aggregations)
+    overall = (
+        verdicts.group_by("variable").agg(aggregations).with_columns(hour_in_cycle=pl.lit(None))
+    )
     return (
-        verdicts.group_by("variable")
-        .agg(
-            n_informative_hours=pl.len(),
-            share_freshest=(pl.col("verdict") == "freshest").mean(),
-            share_older=(pl.col("verdict") == "older").mean(),
-            share_none_match=(pl.col("verdict") == "none_match").mean(),
-            median_lag_hours_when_older=pl.col("lag_hours")
-            .filter(pl.col("verdict") == "older")
-            .median(),
+        pl.concat([per_hour, overall.select(per_hour.columns)])
+        .with_columns(
+            hour_in_cycle=pl.col("hour_in_cycle").cast(pl.Utf8).fill_null("all"),
         )
-        .sort("variable")
+        .sort("variable", "hour_in_cycle")
     )
 
 
@@ -583,24 +654,48 @@ def _freshest_run_summary(*, verdicts: pl.DataFrame) -> pl.DataFrame:
 # ---------------------------------------------------------------------------------------------
 
 
-def _read_runs() -> pl.DataFrame:
-    """Read every cached run into one frame."""
-    paths = sorted(RUN_CACHE_DIR.glob("*.parquet"))
+def _read_runs(*, sampled: list[np.datetime64]) -> tuple[pl.DataFrame, dict[str, int]]:
+    """Read the cached runs among the sampled ones, and count what the sample lost.
+
+    Runs cached under other stamps, such as a trial with a different sample, are ignored.
+
+    Args:
+        sampled: The sampled `init_time`s.
+
+    Returns:
+        The runs' frame, and counts of the sampled runs by outcome: `compared`, one key per skip
+        reason, and `not_fetched`.
+
+    Raises:
+        RuntimeError: If no sampled run is cached.
+    """
+    counts = {"compared": 0, "not_fetched": 0}
+    paths: list[Path] = []
+    for init_time in sampled:
+        stamp = _run_stamp(init_time=init_time)
+        marker = RUN_CACHE_DIR / f"{stamp}.skipped"
+        if (RUN_CACHE_DIR / f"{stamp}.parquet").exists():
+            paths.append(RUN_CACHE_DIR / f"{stamp}.parquet")
+            counts["compared"] += 1
+        elif marker.exists():
+            reason = marker.read_text()
+            counts[reason] = counts.get(reason, 0) + 1
+        else:
+            counts["not_fetched"] += 1
     if not paths:
-        msg = f"no run cached under {RUN_CACHE_DIR.name}; run the `runs` stage first"
+        msg = f"none of the {len(sampled)} sampled runs is cached; run the `runs` stage first"
         raise RuntimeError(msg)
-    return pl.concat(pl.read_parquet(path) for path in paths)
+    return pl.concat(pl.read_parquet(path) for path in paths), counts
 
 
 def _validate_runs(*, runs: pl.DataFrame) -> None:
-    """Raise if the cached runs break a shape or plausibility expectation.
+    """Raise if the cached runs break a shape, completeness, or plausibility expectation.
 
-    Checks, per run and site, that there are 79 hourly rows; that both sides hold no more than a
-    tenth null in temperature, and every radiation lead 0 is the only null radiation on the
-    Dynamical.org side; and that every served value of each side lies inside `PLAUSIBLE_RANGE`.
+    Checks, per run, that every site has 79 hourly rows and that each side is complete
+    (`_is_complete`); and that every value of each side lies inside `PLAUSIBLE_RANGE`.
 
     Args:
-        runs: Every cached run, from `_read_runs`.
+        runs: The compared runs, from `_read_runs`.
 
     Raises:
         ValueError: On the first failed expectation, naming it and its measured value.
@@ -611,18 +706,16 @@ def _validate_runs(*, runs: pl.DataFrame) -> None:
             f"expected {N_LEADS} hourly rows per run and site, found {counts.min()}-{counts.max()}"
         )
         raise ValueError(msg)
+    for init_time, run in runs.partition_by("init_time", as_dict=True).items():
+        for prefix in ("", "om_"):
+            if not _is_complete(frame=run, prefix=prefix):
+                msg = f"the run at {init_time} has nulls on the {prefix or 'dynamical_'} side"
+                raise ValueError(msg)
     for name in VARIABLES:
         low, high = PLAUSIBLE_RANGE[name]
         for side, column in (("dynamical", name), ("open_meteo", f"om_{name}")):
-            values = runs[column].drop_nulls()
-            null_share = runs[column].null_count() / runs.height
-            expected_null = (
-                1 / N_LEADS if side == "dynamical" and name in RADIATION_VARIABLES else 0.0
-            )
-            if null_share > expected_null + 0.1:
-                msg = f"{side} {name} is {null_share:.1%} null, expected {expected_null:.1%}"
-                raise ValueError(msg)
-            lowest, highest = float(np.min(values.to_numpy())), float(np.max(values.to_numpy()))
+            values = runs[column].drop_nulls().to_numpy()
+            lowest, highest = float(np.min(values)), float(np.max(values))
             if lowest < low - 1e-6 or highest > high:
                 msg = f"{side} {name} spans {lowest:.2f} to {highest:.2f}, outside {low} to {high}"
                 raise ValueError(msg)
@@ -691,16 +784,28 @@ def _chosen_pairs(*, runs: pl.DataFrame, shifts: dict[str, int]) -> pl.DataFrame
 
 
 def _metrics(*, pairs: pl.DataFrame, by: list[str]) -> pl.DataFrame:
-    """Return count and difference statistics of `open_meteo - dynamical` per group."""
+    """Return count and difference statistics of `open_meteo - dynamical` per group.
+
+    `ratio_of_means` is null where the Dynamical.org mean is not above the daylight threshold
+    (radiation) or above zero (other variables), and `correlation` is null where either side is
+    constant, as in a night-only lead bucket.
+    """
     difference = pl.col("open_meteo") - pl.col("dynamical")
+    floor = (
+        pl.when(pl.col("variable").first().is_in(RADIATION_VARIABLES))
+        .then(pl.lit(DAYLIGHT_THRESHOLD_W_M2))
+        .otherwise(pl.lit(0.0))
+    )
     return pairs.group_by(by).agg(
         n=pl.len(),
         mean_abs_diff=difference.abs().mean(),
         rms_diff=difference.pow(2).mean().sqrt(),
         mean_signed_diff=difference.mean(),
         max_abs_diff=difference.abs().max(),
-        correlation=pl.corr("open_meteo", "dynamical"),
-        ratio_of_means=pl.col("open_meteo").mean() / pl.col("dynamical").mean(),
+        correlation=pl.corr("open_meteo", "dynamical").fill_nan(None),
+        ratio_of_means=pl.when(pl.col("dynamical").mean() > floor)
+        .then(pl.col("open_meteo").mean() / pl.col("dynamical").mean())
+        .otherwise(None),
     )
 
 
@@ -773,8 +878,7 @@ def _markdown_table(*, frame: pl.DataFrame) -> str:
 def _write_readme(
     *,
     runs: pl.DataFrame,
-    n_sampled: int,
-    n_skipped: int,
+    outcomes: dict[str, int],
     first_run: str,
     shift_table: pl.DataFrame,
     shifts: dict[str, int],
@@ -785,7 +889,9 @@ def _write_readme(
     overall = summary.filter((pl.col("grouping") == "all") & (pl.col("subset") == "all")).drop(
         "subset", "grouping", "group"
     )
-    n_runs = runs["init_time"].n_unique()
+    n_sampled = sum(outcomes.values())
+    n_runs = outcomes["compared"]
+    outcome_text = ", ".join(f"{count} {reason}" for reason, count in sorted(outcomes.items()))
     freshest_text = (
         _markdown_table(frame=freshest)
         if freshest is not None
@@ -812,7 +918,9 @@ holds a coordinate or a grid-cell index: sites are labelled `A`-`F` (photovoltai
 ## Design
 
 - {n_sampled} runs were sampled with a fixed seed, evenly over the four cycles, from the overlap of
-  the two archives. {n_skipped} were skipped because a side lacked them; {n_runs} are compared.
+  the two archives, ending at the pinned run `{LAST_SAMPLED_RUN:%Y-%m-%d %H:%M}` UTC. {n_runs} are
+  compared. Outcomes: {outcome_text}. A run is skipped when Dynamical.org's values are incomplete
+  or Open-Meteo lacks the run or returns nulls for it.
 - Each run compares leads 0 to 78 h at each site's nearest Dynamical.org grid cell. Open-Meteo is
   queried at the site's own coordinates with `cell_selection=nearest` (photovoltaic sites) or `land`
   (wind sites), and `wind_speed_unit=ms`, so a cell chosen by Open-Meteo can differ from the
@@ -827,44 +935,65 @@ holds a coordinate or a grid-cell index: sites are labelled `A`-`F` (photovoltai
   of the hour, so lead 0 is null. Open-Meteo derives its `direct_radiation` and `diffuse_radiation`
   from the same DWD fields and serves a mean over the hour ending at the stamp.
 - Temperature at 2 m (degrees Celsius) and 10 m wind speed (m/s) are instants on both sides.
-  Dynamical.org's wind speed is `hypot(u, v)` of its 10 m components. Open-Meteo adjusts 2 m
-  temperature to the site's elevation, so the two temperatures can differ by that adjustment.
+  Dynamical.org's wind speed is `hypot(u, v)` of its 10 m components.
 - Alignment was tested at Open-Meteo offsets of -1, 0, and +1 h. The chosen offset per variable is
   the one with the smallest RMS difference: {shifts_text}.
 
 {_markdown_table(frame=shift_table)}
 
+## Rounding noise floor
+
+Open-Meteo serves rounded values, and Dynamical.org's are unrounded, so a perfect match still has
+a difference. Rounding to a step of `h` gives an expected RMS difference of `h / sqrt(12)`: 0.029
+m/s for wind (step 0.1 m/s), 0.029 degrees Celsius for temperature (step 0.1), and 0.29 W/m2 for
+radiation (step 1). An RMS difference near these values means a match to within rounding.
+
 ## Results over all pairs
 
 {_markdown_table(frame=overall)}
 
+`ratio_of_means` is blank where the Dynamical.org mean is not above 10 W/m2 (radiation) or 0
+(other variables), and `correlation` is blank where either side is constant.
 `summary.csv` holds the same statistics per site, per lead bucket (0-6, 6-24, 24-48, and 48-78 h),
 and for a daylight subset of the radiation pairs.
 
 ## Freshest-run question
 
 For sampled days, Open-Meteo's Previous Runs day-0 series is compared with the value each
-Dynamical.org run covering that hour holds. An hour counts only if the candidate runs differ by
-more than two rounding steps of Open-Meteo's served value. `freshest` means the freshest
+Dynamical.org run covering that hour holds. An hour counts only if the freshest candidate run
+differs from the second-freshest by more than two rounding steps of Open-Meteo's served value (0.1
+m/s wind, 1 W/m2 radiation, 0.1 degrees Celsius temperature), because otherwise a match to the
+freshest run cannot be told from a match to the previous one. `freshest` means the freshest
 Dynamical.org run matches within one rounding step, `older` means only an older run does, and
 `none_match` means no Dynamical.org run does. Open-Meteo also runs ICON-EU at 03, 09, 15, and 21
-UTC, which the Dynamical.org store lacks, so its freshest run can be one no candidate can match.
+UTC, which the Dynamical.org store lacks. **Only the hours whose freshest Open-Meteo run the store
+holds are scored**: valid hours 0, 1, and 2 modulo 6 for temperature and wind, and hours 1, 2, and
+3 modulo 6 for radiation, which is stamped at the end of its hour. At other hours the freshest
+Open-Meteo run is one no candidate can match. `hour_in_cycle` is the valid hour modulo 6.
 
 {freshest_text}
 
 ## Files
 
-- `pairs.parquet`: matched pairs, keyed by `site`, `init_time`, `valid_time`, and `variable`, with
-  `lead_hours`, `dynamical`, and `open_meteo`, at each variable's chosen offset.
+- `pairs.parquet`: private, never to be published. Matched pairs keyed by `site`, `init_time`,
+  `valid_time`, and `variable`, with `lead_hours`, `dynamical`, and `open_meteo`, at each
+  variable's chosen offset.
 - `summary.csv`: the statistics above.
 - `freshest_run_summary.csv`: the freshest-run table (after the `stitch` stage).
+
+Everything here stays under the private `data/` tree. `pairs.parquet` holds each site's time
+series under an anonymous label and must not be published.
 """
     (OUTPUT_DIR / "README.md").write_text(text)
 
 
-def _run_analyse_stage() -> None:
+def _run_analyse_stage(*, n_runs: int, n_days: int, seed: int) -> None:
     """Validate the cached runs, then write the pairs, summary, and README."""
-    runs = _read_runs()
+    store = _open_store()
+    sampled = _sample_runs(store=store, n_runs=n_runs, seed=seed)
+    runs, outcomes = _read_runs(sampled=sampled)
+    if outcomes["not_fetched"]:
+        _LOG.warning("%d sampled runs have not been fetched yet", outcomes["not_fetched"])
     _validate_runs(runs=runs)
     shift_table = _shift_table(runs=runs)
     shifts = _best_shifts(shift_table=shift_table)
@@ -872,7 +1001,11 @@ def _run_analyse_stage() -> None:
     summary = _summary(pairs=pairs)
     _write_atomically(frame=pairs, path=OUTPUT_DIR / "pairs.parquet")
     summary.write_csv(OUTPUT_DIR / "summary.csv")
-    stitch_paths = sorted(STITCH_CACHE_DIR.glob("*.parquet"))
+    stitch_paths = [
+        path
+        for day in _stitch_days(n_days=n_days, seed=seed)
+        if (path := STITCH_CACHE_DIR / f"{day}.parquet").exists()
+    ]
     freshest = None
     if stitch_paths:
         verdicts = _freshest_run_verdicts(
@@ -880,13 +1013,10 @@ def _run_analyse_stage() -> None:
         )
         freshest = _freshest_run_summary(verdicts=verdicts)
         freshest.write_csv(OUTPUT_DIR / "freshest_run_summary.csv")
-    n_skipped = len(list(RUN_CACHE_DIR.glob("*.skipped")))
-    store = _open_store()
     first_run = str(store["init_time"].to_numpy().min().astype("datetime64[m]"))
     _write_readme(
         runs=runs,
-        n_sampled=runs["init_time"].n_unique() + n_skipped,
-        n_skipped=n_skipped,
+        outcomes=outcomes,
         first_run=first_run,
         shift_table=shift_table,
         shifts=shifts,
@@ -899,8 +1029,8 @@ def _run_analyse_stage() -> None:
                 "generated_at_utc": datetime.now(UTC).isoformat(),
                 "dynamical_dataset": DATASET_ID,
                 "open_meteo_endpoints": ["single-runs-api", "previous-runs-api"],
-                "runs_compared": runs["init_time"].n_unique(),
-                "runs_skipped": n_skipped,
+                "run_outcomes": outcomes,
+                "stitch_days_used": len(stitch_paths),
                 "chosen_shift_hours": shifts,
             },
             indent=2,
@@ -924,7 +1054,9 @@ def main() -> int:
     if stage in ("stitch", "all"):
         _run_stitch_stage(n_days=arguments.stitch_days, seed=arguments.seed)
     if stage in ("analyse", "all"):
-        _run_analyse_stage()
+        _run_analyse_stage(
+            n_runs=arguments.n_runs, n_days=arguments.stitch_days, seed=arguments.seed
+        )
     return 0
 
 
