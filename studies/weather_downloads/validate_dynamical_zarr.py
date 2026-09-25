@@ -1,4 +1,4 @@
-"""Validate the GFS/GEFS parquets that `fetch_dynamical_zarr.py` wrote.
+"""Validate the GFS, GEFS, and ECMWF AIFS parquets that `fetch_dynamical_zarr.py` wrote.
 
 One-off throwaway script for
 <https://github.com/openclimatefix/nged-substation-forecast/issues/841>, following the
@@ -9,23 +9,30 @@ fails names the months it failed in. **The report never prints a row count, a ce
 coordinate,** because those reveal the size of the private trial-area box.
 
 Checks per month file: every `init_time` falls inside the file's month; runs are regularly spaced
-(6 hours for GFS, 24 hours for GEFS), and a month that is neither the first nor the last has every
-run of every day; the row count equals the product of the axis lengths; no duplicate key; no null;
-`NaN` only in the two radiation fields and only at lead time 0, where those fields are all `NaN`;
-each value inside a physical range; the lead-time axis starts at 0, ends at the model's last lead
-time, and changes step width at the documented lead time and not later; shortwave radiation is near
-zero for night-time valid hours, and positive at midday in April to September (which catches only a
-gross shift such as 12 hours or a timezone error, and does not verify the exact hour convention).
-On a `.partial` month, `NaN` in a value column only warns, because the newest run may still be
-being written. Checks across months: the months are contiguous, every file carries the same
-grid-cell hash, and the combined file's row count equals the sum of the files. Where a complete
-`M.parquet` and a stale `M.partial.parquet` both exist, only the complete file is validated.
+(`RUN_SPACING_HOURS`: 6 hours for GFS and both AIFS models, 24 hours for GEFS), and a month that is
+neither the first nor the last has every run of every day; the row count equals the product of the
+axis lengths; no duplicate key; no null; AIFS ENS has exactly 51 distinct `ensemble_member` values,
+0 to 50 (`ensemble_members`); `NaN` only in the two radiation fields and only at lead time 0, where
+those fields are all `NaN`; each value inside a physical range; the lead-time axis starts at 0,
+ends at the model's last lead time, and changes step width at the documented lead time and not
+later (`LEAD_AXIS_HOURS`); shortwave radiation is near zero for night-time valid hours and positive
+at midday in April to September. Night-time valid hours are 01 to 03 UTC for GFS and GEFS. For AIFS
+they are 00 and 06 UTC in November to February only, because the 6-hourly AIFS radiation windows
+ending then are dark only in winter. These two checks catch only a gross shift such as 12 hours or a
+timezone error, and do not verify the exact hour convention. For AIFS Single, shortwave and longwave
+radiation and both 100 m winds are expected `NaN` before the 2025-02-24 06 UTC run
+(`EXPECTED_NAN`): those rows must be `NaN` there (`expected_nan_absent_before_start` fails if any
+is finite) and are excluded from the `NaN` checks, and the same fields are checked as usual from
+that run on. On a `.partial` month, `NaN` in a value column only warns, because the newest run may
+still be being written. Checks across months: the months are contiguous, every file carries the
+same grid-cell hash, and the combined file's row count equals the sum of the files. Where a
+complete `M.parquet` and a stale `M.partial.parquet` both exist, only the complete file is
+validated. A check that finds no qualifying rows in a month is skipped for that month: the report
+prints SKIP if that held for every month, and `PASS (n months skipped)` otherwise.
 
 Run it with `uv run python studies/weather_downloads/validate_dynamical_zarr.py --directory
 <directory under data/studies/weather>`, for example `--directory GEFS` or `--directory
-ECMWF-AIFS-ENS`. A level shift at a model-version change is not tested. For AIFS Single, the
-shortwave and longwave radiation and 100 m winds are expected `NaN` before the 2025-02-24 06 UTC run
-(`EXPECTED_NAN`), and the validator checks they are `NaN` there and finite after.
+ECMWF-AIFS-ENS`. A level shift at a model-version change is not tested.
 """
 
 import argparse
@@ -76,7 +83,8 @@ RUN_SPACING_HOURS: Final[dict[str, int]] = {
     "ECMWF-AIFS": 6,
     "ECMWF-AIFS-ENS": 6,
 }
-"""Per model: the gap between successive `init_time`s (4 runs a day for GFS, 1 for GEFS)."""
+"""Per model: the gap between successive `init_time`s (4 runs a day for GFS and both AIFS models,
+1 for GEFS)."""
 
 NIGHT_HOURS: Final[tuple[int, ...]] = (1, 2, 3)
 """UTC valid hours whose averaging window ends before sunrise everywhere in Great Britain."""
@@ -296,8 +304,10 @@ def main() -> int:
         elif real:
             failed += 1
             print(f"FAIL {check}: {', '.join(real)}")
+        elif len(failures) == len(months):
+            print(f"SKIP {check}: no qualifying rows in any month")
         elif failures:
-            print(f"SKIP {check}: no qualifying rows in some months")
+            print(f"PASS {check} ({len(failures)} months skipped)")
         else:
             print(f"PASS {check}")
     print("validation passed" if not failed else f"{failed} checks failed")

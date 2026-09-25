@@ -1,9 +1,10 @@
-"""Download whole GFS/GEFS runs from Dynamical.org's Zarr catalog, cropped to the trial-area box.
+"""Download whole GFS, GEFS, and ECMWF AIFS runs from Dynamical.org, cropped to the trial-area box.
 
 One-off throwaway script for
 <https://github.com/openclimatefix/nged-substation-forecast/issues/841>, covering the "GFS and GEFS
-whole runs" row: the forecast study (#810) needs every lead time of every run, from 2021-05 for GFS
-and 2020-10 for GEFS. Both datasets are opened lazily through `dynamical_catalog.open`, the same
+whole runs" row and the ECMWF AIFS Single and AIFS ENS rows: the forecast study (#810) needs every
+lead time of every run, from 2021-05 for GFS, 2020-10 for GEFS, 2024-04 for AIFS Single, and
+2025-07 for AIFS ENS. Every dataset is opened lazily through `dynamical_catalog.open`, the same
 entry point `dynamical_data.ecmwf_ens.download` uses for production ECMWF ENS, then cropped by a
 `.sel()` on `latitude`/`longitude` before any array chunk is requested. The box appears only in the
 arguments to that one `.sel()` call in this process.
@@ -18,14 +19,17 @@ complete. A month counts as complete only if its last day is earlier than the ne
 the store minus `PUBLICATION_LAG_DAYS`; any other month is written as `<month>.partial.parquet` and
 re-fetched on the next run. The final file is built from this run's months with `scan_parquet` and
 `sink_parquet`, so its peak memory does not depend on the length of the archive. One month of GEFS
-(30 runs, 31 members, 181 lead times) held in memory needs a few GB of RAM, well within this
+(30 runs, 31 members, 181 lead times) held in memory needs a few GB of RAM, so the up to
+`--workers` (default 3) months in flight at once need up to three times that, well within this
 workstation's 61 GB, where a year would need tens of GB. Every month file records a hash of the
 crop's grid cells in its parquet metadata, and the combine step refuses to mix months whose hash
 differs.
 
 **The Zarr stores are chunked far larger than the box, so the bytes transferred exceed the bytes
 kept.** GFS stores 105 lead times by 121 by 121 grid cells per chunk, and GEFS stores 64 lead times
-by 17 by 16 grid cells (all 31 members in one chunk). Every chunk the box touches is transferred
+by 17 by 16 grid cells (all 31 members in one chunk). AIFS Single stores all 61 lead times by 241
+by 240 grid cells per chunk, and AIFS ENS stores all 61 lead times and 51 members by 32 by 32 grid
+cells per chunk. Every chunk the box touches is transferred
 whole.
 
 **Row counts, cell counts, and the crop's hash go only to the private lineage note and the parquet
@@ -87,7 +91,11 @@ PUBLICATION_LAG_DAYS: Final[int] = 2
 """A month is complete once its last day is this many days older than the newest `init_time`."""
 
 MAX_ATTEMPTS: Final[int] = 5
+"""Attempts at loading one month before the error is raised."""
+
 BACKOFF_SECONDS: Final[float] = 5.0
+"""Base of the exponential backoff: the first retry sleeps twice this (10 s), the next four
+times."""
 
 _BYTES_PER_MB: Final[float] = 1e6
 
@@ -109,7 +117,7 @@ def _cropped_dataset(*, dataset_id: str) -> xr.Dataset:
     )
 
 
-def _load_with_retries(*, dataset: xr.Dataset, month: str) -> xr.Dataset:
+def _load_with_retries(*, dataset: xr.Dataset, month: str, label: str) -> xr.Dataset:
     """Load a lazy dataset, retrying with exponential backoff on any failure.
 
     A transient network error partway through a month would otherwise abandon the whole run. The
@@ -120,6 +128,7 @@ def _load_with_retries(*, dataset: xr.Dataset, month: str) -> xr.Dataset:
     Args:
         dataset: The lazy, cropped slice to load.
         month: The `YYYY-MM` label, for the retry log line.
+        label: The product label, for the retry log line.
 
     Returns:
         The same slice, in memory.
@@ -134,7 +143,8 @@ def _load_with_retries(*, dataset: xr.Dataset, month: str) -> xr.Dataset:
             if attempt == MAX_ATTEMPTS:
                 raise
             print(
-                f"{month}: load attempt {attempt} failed ({type(error).__name__}); retrying",
+                f"{label} {month}: load attempt {attempt} failed "
+                f"({type(error).__name__}); retrying",
                 flush=True,
             )
             time.sleep(BACKOFF_SECONDS * 2**attempt)
@@ -311,8 +321,7 @@ VERSION_NOTES: Final[dict[str, list[str]]] = {
             "`downward_long_wave_radiation_flux_surface`, `wind_u_100m` and `wind_v_100m` are "
             "`NaN` in every run before the 2025-02-24 06 UTC run: the store holds no values "
             "for those fields before then. That is one day before the operational v1.0 date "
-            "(2025-02-25 06 UTC) read from ECMWF's pages, so the store's start of these four "
-            "fields does not coincide with that date. Those rows are kept as `NaN`; "
+            "(2025-02-25 06 UTC) read from ECMWF's pages. Those rows are kept as `NaN`; "
             "`validate_dynamical_zarr.py` treats exactly those `NaN`s as expected."
         ),
     ],
@@ -378,7 +387,7 @@ def _write_documentation(
 
     Args:
         output_dir: The product directory.
-        label: `GFS` or `GEFS`.
+        label: A value of `DATASETS`, such as `GFS` or `ECMWF-AIFS-ENS`.
         dataset_id: The Dynamical.org catalog key.
         init_times: The `init_time`s this run fetched.
         is_window: Whether a start or end date restricted the run.
@@ -515,7 +524,7 @@ def main() -> int:
         # A string bound is expanded by xarray to the whole month; a `np.datetime64` bound would
         # be an exact instant and drop later init_times on the last day.
         month_slice = _load_with_retries(
-            dataset=cropped.sel(init_time=slice(month, month)), month=month
+            dataset=cropped.sel(init_time=slice(month, month)), month=month, label=label
         )
         frame = _to_long_frame(dataset=month_slice)
         target = complete_path if complete else partial_path
