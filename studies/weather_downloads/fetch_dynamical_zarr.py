@@ -38,7 +38,10 @@ metadata, never to stdout,** because they reveal the size of the trial-area box.
 Run it with `uv run python studies/weather_downloads/fetch_dynamical_zarr.py --dataset
 noaa-gfs-forecast`, `--dataset noaa-gefs-forecast-35-day`, `--dataset ecmwf-aifs-single-forecast`,
 or `--dataset ecmwf-aifs-ens-forecast` (the last two land in `ECMWF-AIFS/` and `ECMWF-AIFS-ENS/`).
-`--workers` sets how many months are fetched concurrently. Passing `--start-date` and `--end-date`
+`--workers` sets how many months are fetched concurrently. `--extra-east-columns N` widens the crop
+by `N` grid columns on the east side and `--output-suffix=-WIDE` appends a suffix to the product
+directory name, so a wider crop lands beside the default one; `check_aifs_crop_covers_sites.py`
+checks that a crop covers every study site's H3 cell. Passing `--start-date` and `--end-date`
 (both `YYYY-MM-DD`, inclusive) fetches only that window, into its own directory, for a trial run.
 Then check the output with `validate_dynamical_zarr.py`.
 """
@@ -100,20 +103,32 @@ times."""
 _BYTES_PER_MB: Final[float] = 1e6
 
 
-def _cropped_dataset(*, dataset_id: str) -> xr.Dataset:
+def _cropped_dataset(*, dataset_id: str, extra_east_columns: int) -> xr.Dataset:
     """Open one Dynamical.org catalog entry and crop it to the trial-area box.
 
     Args:
         dataset_id: A key of `DATASETS`.
+        extra_east_columns: How many grid columns to add on the east side of the box's own crop.
+            Zero gives the box's crop unchanged.
 
     Returns:
-        The catalog's dataset, sliced to `VARIABLES` and to the box's lat/lon extent, still lazy.
+        The catalog's dataset, sliced to `VARIABLES` and to the box's lat/lon extent (plus the
+        extra east columns), still lazy.
     """
     box = load_trial_area_box()
     dataset = dynamical_catalog.open(dataset_id, chunks=None)[list(VARIABLES)]
+    east_edge = box.lon_max
+    if extra_east_columns:
+        # Extend from the crop's own last column, not from the box edge, so that the result is
+        # exactly `extra_east_columns` whole columns wider whatever the grid alignment. The extra
+        # half step keeps the slice's inclusive label bound clear of floating-point error.
+        longitudes = dataset["longitude"].to_numpy()
+        step = float(longitudes[1] - longitudes[0])
+        last_column = float(longitudes[longitudes <= box.lon_max].max())
+        east_edge = last_column + (extra_east_columns + 0.5) * step
     # Latitude is stored descending (90 to -90), so the slice bounds are given high-to-low.
     return dataset.sel(
-        latitude=slice(box.lat_max, box.lat_min), longitude=slice(box.lon_min, box.lon_max)
+        latitude=slice(box.lat_max, box.lat_min), longitude=slice(box.lon_min, east_edge)
     )
 
 
@@ -370,6 +385,20 @@ SOURCE_GAP_NOTES: Final[dict[str, str]] = {
 """Source gaps found by validation of the full run, added to each README's gotchas."""
 
 
+def _crop_notes(*, extra_east_columns: int) -> list[str]:
+    """Return the README gotcha explaining a widened crop, or nothing for the default crop."""
+    if not extra_east_columns:
+        return []
+    columns = f"{extra_east_columns} grid column{'s' if extra_east_columns > 1 else ''}"
+    note = (
+        f"The crop is {columns} wider on the east side than the crop of the trial-area box alone. "
+        "The box's own crop covered only part of the H3 resolution-5 cell of some study sites, so "
+        "an area-weighted mean over that cell could not be built for them. The extra width makes "
+        "every study site's cell lie fully inside the crop."
+    )
+    return [note]
+
+
 def _write_documentation(
     *,
     output_dir: Path,
@@ -377,6 +406,7 @@ def _write_documentation(
     dataset_id: str,
     init_times: np.ndarray,
     is_window: bool,
+    extra_east_columns: int,
     has_members: bool,
     used_paths: list[Path],
     fingerprint: dict[str, str],
@@ -391,6 +421,7 @@ def _write_documentation(
         dataset_id: The Dynamical.org catalog key.
         init_times: The `init_time`s this run fetched.
         is_window: Whether a start or end date restricted the run.
+        extra_east_columns: Grid columns added on the east side of the default crop.
         has_members: Whether the dataset has an `ensemble_member` dimension.
         used_paths: The month files combined.
         fingerprint: The crop's cell count and hash (private, lineage only).
@@ -424,6 +455,7 @@ def _write_documentation(
             "rows": rows,
             "output_size_mb": round(size_mb, 2),
             "cell_count": fingerprint["cell_count"],
+            "extra_east_columns": extra_east_columns,
             "significand_bits_kept": KEEP_BITS,
             "note": f"{lead_step_note} {averaging_note}",
         },
@@ -477,6 +509,7 @@ def _write_documentation(
                 "`<month>.partial.parquet` and re-fetched on the next run, so the newest runs of "
                 "the final month may be missing."
             ),
+            *_crop_notes(extra_east_columns=extra_east_columns),
             SOURCE_GAP_NOTES[label],
             *VERSION_NOTES.get(label, []),
         ],
@@ -493,20 +526,36 @@ def main() -> int:
     parser.add_argument("--dataset", choices=tuple(DATASETS), required=True)
     parser.add_argument("--start-date", help="First init date to fetch, YYYY-MM-DD (trial run).")
     parser.add_argument("--end-date", help="Last init date to fetch, YYYY-MM-DD (trial run).")
+    parser.add_argument(
+        "--extra-east-columns",
+        type=int,
+        default=0,
+        help="Grid columns to add on the east side of the box's crop (default 0).",
+    )
+    parser.add_argument(
+        "--output-suffix",
+        default="",
+        help="Appended to the product directory name, e.g. -WIDE (default none).",
+    )
     parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS, help="Concurrent months.")
     arguments = parser.parse_args()
     label = DATASETS[arguments.dataset]
     is_window = arguments.start_date is not None or arguments.end_date is not None
 
-    full = _cropped_dataset(dataset_id=arguments.dataset)
+    full = _cropped_dataset(
+        dataset_id=arguments.dataset, extra_east_columns=arguments.extra_east_columns
+    )
     newest_init_time = full["init_time"].to_numpy().max()
     cropped = full.sel(init_time=slice(arguments.start_date, arguments.end_date))
     init_times = cropped["init_time"].to_numpy()
     months = _months(init_times=init_times)
     print(f"{label}: {len(months)} months to fetch, month by month")
 
+    product_name = f"{label}{arguments.output_suffix}"
     directory_name = (
-        f"{label}_window_{arguments.start_date}_{arguments.end_date}" if is_window else label
+        f"{product_name}_window_{arguments.start_date}_{arguments.end_date}"
+        if is_window
+        else product_name
     )
     output_dir = WEATHER_DOWNLOADS_DIR / directory_name
     month_cache_dir = output_dir / "_month_cache"
@@ -558,6 +607,7 @@ def main() -> int:
         dataset_id=arguments.dataset,
         init_times=init_times,
         is_window=is_window,
+        extra_east_columns=arguments.extra_east_columns,
         has_members="ensemble_member" in cropped.sizes,
         used_paths=used_paths,
         fingerprint=fingerprint,
