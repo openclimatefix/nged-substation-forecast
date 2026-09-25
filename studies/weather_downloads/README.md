@@ -65,6 +65,9 @@ way):
       because it fixes the end of the `init_time` axis for good. Later invocations clip their
       window to that stored range. `--init-hours` (any of `0 6 12 18`, default all four),
       `--workers` (default 16), and `--max-external-gb` (default 5.0) complete the arguments.
+      A test of one 00 UTC run from outside us-east1 needs `--max-external-gb 60` (about $6 of
+      egress). The validator then needs the same `--start-date`, `--end-date` and `--init-hours 0`,
+      or its check that skipped runs cover every unwritten slot fails.
     - **Outputs.** One Icechunk repository with seven `Float32` arrays (one per variable, dimensions
       `(init_time, lead_time, latitude, longitude)`, one shard per run), the arrays `run_written`
       and `source_init_time`, and the lineage and skipped runs in the group attributes. The fetch

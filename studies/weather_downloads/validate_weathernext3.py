@@ -450,12 +450,12 @@ def _compare_run_with_source(
     longitudes = np.asarray(_array(root=root, name=LONGITUDE)[:]) % 360.0
     lat_positions = np.abs(source[LATITUDE_DIM].to_numpy()[:, None] - latitudes).argmin(axis=0)
     lon_positions = np.abs(source[LONGITUDE_DIM].to_numpy()[:, None] - longitudes).argmin(axis=0)
-    assert np.allclose(source[LATITUDE_DIM].to_numpy()[lat_positions], latitudes, atol=1e-6), (
-        "a stored latitude has no source cell"
-    )
-    assert np.allclose(source[LONGITUDE_DIM].to_numpy()[lon_positions], longitudes, atol=1e-6), (
-        "a stored longitude has no source cell"
-    )
+    assert np.allclose(
+        source[LATITUDE_DIM].to_numpy()[lat_positions], latitudes, atol=fetch.AXIS_TOLERANCE
+    ), "a stored latitude has no source cell"
+    assert np.allclose(
+        source[LONGITUDE_DIM].to_numpy()[lon_positions], longitudes, atol=fetch.AXIS_TOLERANCE
+    ), "a stored longitude has no source cell"
     for variable in VARIABLES:
         for lead_hours in (1, LEADS):
             expected = (
@@ -602,7 +602,7 @@ def main() -> int:
     except KeyboardInterrupt:
         print("interrupted", file=sys.stderr)
         return fetch.INTERRUPTED_EXIT_CODE
-    except Exception as error:  # noqa: BLE001  # the message can carry the project or a bucket
+    except BaseException as error:  # noqa: BLE001  # a panic in the Rust core is not an Exception
         print(f"FAILED ({fetch._describe(error=error)})", file=sys.stderr)
         return 1
 

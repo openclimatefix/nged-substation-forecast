@@ -122,7 +122,9 @@ LONGITUDES: Final[np.ndarray] = (
 )
 """The stored longitudes in signed degrees, ascending, rounded to 0.1 degrees."""
 
-AXIS_TOLERANCE: Final[float] = 1e-6
+# The source axes are float32, which is off by up to about 2e-5 degrees near 350; a tenth of a cell
+# is far tighter than the 0.1 degree spacing and still far looser than that float32 error.
+AXIS_TOLERANCE: Final[float] = 1e-2
 """The largest difference, in degrees, between a source coordinate and the stored value."""
 
 VARIABLES: Final[tuple[str, ...]] = (
@@ -230,7 +232,7 @@ _METADATA_TIMEOUT_SECONDS: Final[float] = 2.0
 _SECONDS_PER_HOUR: Final[int] = 3600
 
 
-def _describe(*, error: Exception) -> str:
+def _describe(*, error: BaseException) -> str:
     """Return what may be printed about `error`: its type name, plus the message of an assertion.
 
     The message of an `AssertionError` is a fixed string written in this module, with no data
@@ -951,7 +953,7 @@ def main() -> int:
     except KeyboardInterrupt:
         print("interrupted", file=sys.stderr)
         return INTERRUPTED_EXIT_CODE
-    except Exception as error:  # noqa: BLE001  # the message can carry the project or an account
+    except BaseException as error:  # noqa: BLE001  # a panic in the Rust core is not an Exception
         print(f"FAILED ({_describe(error=error)})", file=sys.stderr)
         return 1
 
