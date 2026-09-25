@@ -64,7 +64,7 @@ CHECK_NAMES: Final[tuple[str, ...]] = (
     "nine_sites_every_month",
     "no_duplicate_leads",
     "valid_time_matches_lead",
-    "sites_have_distinct_series",
+    "sites_not_constant",
 )
 """Every check, in report order."""
 
@@ -223,21 +223,37 @@ def _check_valid_time(*, frame: pl.DataFrame) -> str | None:
     )
 
 
-def _check_distinct_series(*, frame: pl.DataFrame) -> str | None:
-    """Fail if two site labels carry an identical series in every variable.
-
-    Identical series would mean a swapped or repeated block, although two sites in one 9 km grid
-    cell could carry them legitimately, so a failure names the labels for a manual look.
-    """
+def _site_series(*, frame: pl.DataFrame) -> dict[str, tuple[tuple[float | None, ...], ...]]:
+    """Return each site's series of every variable, in run then lead order."""
     per_site = (
         frame.sort("init_time", "lead_hours")
         .group_by("site")
         .agg(pl.col(name) for name in BASE_VARIABLES)
     )
-    series = {
+    return {
         site: tuple(tuple(row[name]) for name in BASE_VARIABLES)
         for site, row in zip(per_site["site"], per_site.iter_rows(named=True), strict=True)
     }
+
+
+def _check_not_constant(*, frame: pl.DataFrame) -> str | None:
+    """Fail if any site's temperature or wind speed at 100 m never changes."""
+    constant = [
+        site
+        for site, series in _site_series(frame=frame).items()
+        if len(set(series[BASE_VARIABLES.index("temperature_2m")])) <= 1
+        or len(set(series[BASE_VARIABLES.index("wind_speed_100m")])) <= 1
+    ]
+    return f"constant series for sites {sorted(constant)}" if constant else None
+
+
+def _warn_identical_series(*, frame: pl.DataFrame) -> str | None:
+    """Warn, without failing, about site labels that carry an identical series in every variable.
+
+    Two sites whose nearest 9 km grid cell is the same carry identical series legitimately, so this
+    lists the label pairs for a manual look and is never a failure.
+    """
+    series = _site_series(frame=frame)
     sites = sorted(series)
     pairs = [
         f"{first}/{second}"
@@ -265,11 +281,17 @@ def main() -> int:
         "nine_sites_every_month": _check_sites_every_month(frame=frame),
         "no_duplicate_leads": _check_duplicate_leads(frame=frame),
         "valid_time_matches_lead": _check_valid_time(frame=frame),
-        "sites_have_distinct_series": _check_distinct_series(frame=frame),
+        "sites_not_constant": _check_not_constant(frame=frame),
     }
     for name in CHECK_NAMES:
         reason = failures[name]
         print(f"PASS {name}" if reason is None else f"FAIL {name}: {reason}")
+    warning = _warn_identical_series(frame=frame)
+    print(
+        "PASS identical_series_sites"
+        if warning is None
+        else f"WARN identical_series_sites: {warning}"
+    )
     print(f"runs: {len(days)}, first {days[0]}, last {days[-1]}")
     unavailable = _read_ledger(filename=UNAVAILABLE_FILENAME)
     incomplete = _read_ledger(filename=INCOMPLETE_FILENAME)

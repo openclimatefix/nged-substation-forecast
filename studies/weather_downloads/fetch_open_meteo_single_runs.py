@@ -296,7 +296,10 @@ def _check_block(*, block: dict[str, Any], position: int, n_blocks: int) -> None
             `WIND_SPEED_UNIT` for wind speed or `RADIATION_UNITS` for radiation.
     """
     if n_blocks > 1 and block.get("location_id") != position:
-        msg = f"response block {position} carries a different location_id: sites would be swapped"
+        msg = (
+            f"response block {position} is out of order or has no location_id, so site labels "
+            "could be swapped: inspect the response layout (not the key or the coordinates)"
+        )
         raise RuntimeError(msg)
     units = block["hourly_units"]
     for name in BASE_VARIABLES:
@@ -628,7 +631,9 @@ def _write_docs(
             ),
             (
                 "**Cell selection.** The six PV sites use `cell_selection=nearest` and the three "
-                "wind sites use `cell_selection=land`."
+                "wind sites use `cell_selection=land`. Two sites whose selected 9 km cell is the "
+                "same carry identical series, so identical series for a pair of site labels are "
+                "expected and are not a defect."
             ),
             (
                 "**Units.** The API's defaults: wind speeds in km/h, temperature in degC. "
