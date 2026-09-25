@@ -1089,6 +1089,13 @@ _BLOCK_ROW_STEP_PX: Final[int] = 26
 """The height of each row of a stacked figure's blocks, which hold one-line labels."""
 
 
+CONTRAST_X_TITLE: Final[str] = "Mean absolute error minus ERA5's (points of capacity)"
+"""The x axis title of a stacked contrast figure."""
+
+REPORT_PRINT_DECIMALS: Final[int] = 3
+"""The decimal places every study report prints its numbers at."""
+
+
 class BlockArm(NamedTuple):
     """One arm of a row-set block, and how the block draws it."""
 
@@ -1102,7 +1109,7 @@ class BlockArm(NamedTuple):
 class RowSetBlock(NamedTuple):
     """One block of a stacked figure: the arms scored on one row set.
 
-    `rows` holds one row per arm, with `label`, `family`, `reference`, `planned`, and either
+    `rows` holds one row per arm, with `arm`, `label`, `family`, `reference`, `planned`, and either
     `value` (a leaderboard block) or `difference` (a contrast block), each with `lower_95` and
     `upper_95`, all in percentage points of capacity.
     """
@@ -1118,9 +1125,7 @@ class RowSetBlock(NamedTuple):
         return f"{self.label}: {self.dates}, {self.site_hours:,} site-hours"
 
 
-def assert_matches_printed(
-    *, name: str, recomputed: float, printed: float, decimals: int = 3
-) -> None:
+def assert_matches_printed(*, name: str, recomputed: float, printed: float) -> None:
     """Stop unless a recomputed value rounds to the number a report printed.
 
     A chart draws numbers it recomputes from `losses.parquet`, the report prints the page's
@@ -1130,14 +1135,17 @@ def assert_matches_printed(
     Args:
         name: The product or arm the value belongs to, for the error message.
         recomputed: The value recomputed from the saved losses.
-        printed: The value the report prints.
-        decimals: The report's print precision.
+        printed: The value the report prints, at `REPORT_PRINT_DECIMALS` places.
 
     Raises:
-        ValueError: If the recomputed value, rounded to `decimals` places, differs from `printed`.
+        ValueError: If the recomputed value, rounded to `REPORT_PRINT_DECIMALS` places, differs
+            from `printed`.
     """
-    if round(recomputed, decimals) != printed:
-        msg = f"{name}: bootstrapped {recomputed:.{decimals}f} but the report says {printed}"
+    if round(recomputed, REPORT_PRINT_DECIMALS) != printed:
+        msg = (
+            f"{name}: bootstrapped {recomputed:.{REPORT_PRINT_DECIMALS}f} "
+            f"but the report says {printed}"
+        )
         raise ValueError(msg)
 
 
@@ -1197,8 +1205,8 @@ def block_leaderboard_rows(
             recomputed values against; `None` skips the check.
 
     Returns:
-        One row per arm with `label`, `family`, `reference`, `planned`, `value`, `lower_95` and
-        `upper_95`, in percentage points of capacity.
+        One row per arm with `arm`, `label`, `family`, `reference`, `planned`, `value`, `lower_95`
+        and `upper_95`, in percentage points of capacity.
 
     Raises:
         ValueError: If the setting is absent, an arm's bootstrap does not rest on `site_hours`
@@ -1216,6 +1224,7 @@ def block_leaderboard_rows(
             )
         records.append(
             {
+                "arm": block_arm.arm,
                 "label": block_arm.label,
                 "family": block_arm.family,
                 "reference": block_arm.reference,
@@ -1252,8 +1261,8 @@ def block_contrast_rows(
         metric: The loss column to difference.
 
     Returns:
-        One row per arm with `label`, `family`, `reference`, `planned`, `difference`, `lower_95`
-        and `upper_95`, in percentage points of capacity.
+        One row per arm with `arm`, `label`, `family`, `reference`, `planned`, `difference`,
+        `lower_95` and `upper_95`, in percentage points of capacity.
 
     Raises:
         ValueError: If the setting is absent or a contrast does not rest on `site_hours` rows.
@@ -1267,6 +1276,7 @@ def block_contrast_rows(
         _check_rows(arm=block_arm.arm, n_rows=interval["n_rows"], site_hours=site_hours)
         records.append(
             {
+                "arm": block_arm.arm,
                 "label": block_arm.label,
                 "family": block_arm.family,
                 "reference": block_arm.reference,
@@ -1305,7 +1315,6 @@ def stacked_leaderboard(
     number: int | str,
     title: str,
     subtitle: Sequence[str],
-    x_domain: tuple[float, float] | None = None,
 ) -> alt.VConcatChart:
     """Stack one leaderboard panel per row set, on one x range, under one caption.
 
@@ -1319,12 +1328,11 @@ def stacked_leaderboard(
         number: The figure's number on its page.
         title: The finding the figure shows.
         subtitle: Short lines for the caption; `REFERENCE_ROW_NOTE` is added.
-        x_domain: The shared x range; `None` takes `shared_domain`.
 
     Returns:
         The figure.
     """
-    domain = x_domain or shared_domain(blocks=blocks, include_zero=False)
+    domain = shared_domain(blocks=blocks, include_zero=False)
     panels = [
         leaderboard_panel(
             rows=block.rows,
@@ -1351,8 +1359,6 @@ def stacked_contrasts(
     number: int | str,
     title: str,
     subtitle: Sequence[str],
-    x_title: str = "Mean absolute error minus ERA5's (points of capacity)",
-    x_domain: tuple[float, float] | None = None,
 ) -> alt.VConcatChart:
     """Stack one panel of contrasts against ERA5 per row set, on one x range.
 
@@ -1365,13 +1371,11 @@ def stacked_contrasts(
         number: The figure's number on its page.
         title: The finding the figure shows.
         subtitle: Short lines for the caption; `CONTRAST_REFERENCE_ROW_NOTE` is added.
-        x_title: The x axis title, naming the quantity and its unit.
-        x_domain: The shared x range; `None` takes `shared_domain`.
 
     Returns:
         The figure.
     """
-    domain = x_domain or shared_domain(blocks=blocks, include_zero=True)
+    domain = shared_domain(blocks=blocks, include_zero=True)
     figure_planning = planning(rows=[block.rows for block in blocks])
     conditions = ("Product", "Reference row")
     panels = [
@@ -1382,7 +1386,7 @@ def stacked_contrasts(
                 .otherwise(pl.lit(conditions[0]))
             ),
             x_domain=domain,
-            x_title=x_title if index == 0 else "",
+            x_title=CONTRAST_X_TITLE if index == len(blocks) - 1 else "",
             zero_label="same as ERA5",
             better_label="better than ERA5",
             conditions=conditions,

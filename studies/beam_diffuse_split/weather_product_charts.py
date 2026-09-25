@@ -619,7 +619,7 @@ def _contrast_name(*, treatment: str, reference: str) -> str:
     return f"{NAMES[_product(treatment)]} − {NAMES[_product(reference)]}"
 
 
-def _served_name(product: str) -> str:
+def served_name(product: str) -> str:
     """Return a product's name, saying where UKV's value is Open-Meteo's hourly construction."""
     return "UKV, Open-Meteo's hourly value" if product == "ukv" else NAMES[product]
 
@@ -653,7 +653,7 @@ def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         assert_matches_printed(name=product, recomputed=value, printed=errors[product])
         records.append(
             {
-                "label": _served_name(product),
+                "label": served_name(product),
                 "family": FAMILIES[product],
                 "value": value,
                 "lower_95": interval["lower_95"] * PERCENTAGE_POINTS,
@@ -711,7 +711,7 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
     )
     left_rows = _rows(
         contrasts=by_product,
-        labels=[f"{_served_name(product)} · {_two_places(errors[product])}%" for product in order],
+        labels=[f"{served_name(product)} · {_two_places(errors[product])}%" for product in order],
     )
     named = select_contrasts(
         contrasts=contrasts,
@@ -1454,8 +1454,8 @@ def _all_product(arm: str) -> str:
     return max((product for product in ALL_PANEL_NAMES if arm.startswith(f"{product}_")), key=len)
 
 
-def _all_served_name(product: str) -> str:
-    """Return an `all`-panel product's name, as `_served_name` does, against `ALL_PANEL_NAMES`."""
+def all_served_name(product: str) -> str:
+    """Return an `all`-panel product's name, as `served_name` does, against `ALL_PANEL_NAMES`."""
     return "UKV, Open-Meteo's hourly value" if product == "ukv" else ALL_PANEL_NAMES[product]
 
 
@@ -1482,7 +1482,7 @@ def _all_panel_leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) ->
         assert_matches_printed(name=product, recomputed=value, printed=errors[product])
         records.append(
             {
-                "label": _all_served_name(product),
+                "label": all_served_name(product),
                 "family": ALL_PANEL_FAMILIES[product],
                 "value": value,
                 "lower_95": interval["lower_95"] * PERCENTAGE_POINTS,
@@ -1662,7 +1662,7 @@ def _solar_models_work(
         losses=losses,
         arm_suffix="_global",
         sites=MODELS_WORK_SITES,
-        names={product: _served_name(product) for product in NAMES},
+        names={product: served_name(product) for product in NAMES},
         errors=errors,
         x_domain=(4.0, 11.5),
         number=5,

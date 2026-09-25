@@ -1,9 +1,8 @@
 """The figure numbers of the past-solar study page, in one place.
 
-The page `weather-products-for-past-solar` holds 17 figures. Its chart scripts
-(`weather_product_charts.py`, `ens_past_solar_charts.py`, `station_past_solar_charts.py`) read
-their figure numbers from `FIGURE_NUMBERS`, so renumbering a figure is one edit here, and a number
-written into an SVG's title or subtitle text is looked up rather than typed.
+The page `weather-products-for-past-solar` holds 17 figures. `FIGURE_NUMBERS` gives each figure's
+number by name, so renumbering a figure is one edit here. The redraw script reads the numbers from
+this map when it draws each figure.
 """
 
 from typing import Final, Literal

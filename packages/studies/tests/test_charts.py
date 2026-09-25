@@ -1,4 +1,5 @@
 import re
+from collections.abc import Iterator
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -959,3 +960,42 @@ def _leaf_panels(spec: dict) -> list[dict]:
     for child in spec.get("vconcat", []):
         found.extend(_leaf_panels(child) if "vconcat" in child else [child])
     return found
+
+
+def _x_titles_in(node: object) -> Iterator[list[str]]:
+    """Yield the title of every x encoding under `node`, each as its list of lines."""
+    if isinstance(node, dict):
+        x = node.get("x")
+        if isinstance(x, dict) and "field" in x and x.get("title") is not None:
+            yield x["title"]
+        for value in node.values():
+            yield from _x_titles_in(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _x_titles_in(value)
+
+
+def _x_axis_titles(spec: dict) -> list[str]:
+    """Return each data panel's x axis title from top to bottom, `""` where a panel has none.
+
+    A panel with no x encoding at all (the colour key) is skipped.
+    """
+    titles = []
+    for panel in _leaf_panels(spec):
+        lines = next(_x_titles_in(panel), None)
+        if lines is not None:
+            titles.append(" ".join(lines))
+    return titles
+
+
+def test_stacked_contrasts_puts_the_x_axis_title_under_the_last_block_only() -> None:
+    _, blocks = _blocks()
+
+    spec = stacked_contrasts(
+        blocks=blocks, number=2, title="A title", subtitle=["A subtitle."]
+    ).to_dict()
+
+    titles = _x_axis_titles(spec)
+    assert len(titles) == len(blocks)
+    assert titles[-1].startswith("Mean absolute error minus ERA5's (points of capacity")
+    assert titles[:-1] == [""]
