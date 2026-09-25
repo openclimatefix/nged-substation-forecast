@@ -228,17 +228,26 @@ def check_anonymised(*, frame: pl.DataFrame, domain: DomainType) -> None:
         raise ValueError(msg)
 
 
-def load(*, input_dir: Path, domain: DomainType) -> tuple[pl.DataFrame, pl.DataFrame]:
+def load(
+    *, input_dir: Path, domain: DomainType, extra_dir: Path | None = None
+) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Read one technology's saved losses and predictions.
 
     Args:
         input_dir: The directory `nwp_forecast_comparison.py` wrote to.
         domain: `solar` or `wind`.
+        extra_dir: The directory `fit_extra_leads.py` wrote to, or None. Its arms that the published
+            losses do not hold (the extra lead days, fitted later on a GPU) are appended to the
+            losses; an arm both hold is taken from `input_dir`, so no contrast mixes devices.
 
     Returns:
         The per-row losses and the per-row predictions, after the anonymisation check.
     """
     losses = pl.read_parquet(losses_path(output_dir=input_dir, domain=domain))
+    if extra_dir is not None:
+        extra = pl.read_parquet(losses_path(output_dir=extra_dir, domain=domain))
+        new = extra.filter(~pl.col("arm").is_in(losses["arm"].unique().to_list()))
+        losses = pl.concat([losses, new], how="diagonal_relaxed")
     predictions = pl.read_parquet(predictions_path(output_dir=input_dir, domain=domain))
     check_anonymised(frame=losses, domain=domain)
     check_anonymised(frame=predictions, domain=domain)
@@ -485,9 +494,24 @@ carries. Day 0 is ENS's run-day forecast, a bracket side and not a product a ser
 it is black. Data Amber, Data Deep Teal and Data Burnt Orange are internal-use colours, approved for
 the lead-day charts by the maintainer."""
 
+MAX_LINE_DAY: Final[int] = 3
+"""The last lead day the lead-day lines draw: every product plotted there is fitted at every day up
+to it, so no line spans a lead that was not fitted."""
+
+LEAD_LABEL_ROWS: Final[float] = 1.0
+"""How many rows of room the leaderboard leaves above its first product for the names of the
+baseline lines."""
+
 LEAD_LABEL_ROOM: Final[float] = 1.5
 """How far right of the baselines the leaderboard's x axis runs, in percentage points of capacity,
 leaving room for the name written beside the smart-persistence line."""
+
+DEVICE_NOTES: Final[dict[DomainType, str]] = {
+    "solar": "at most 0.02 points",
+    "wind": "0.04 to 0.09 points, lower",
+}
+"""How far a GPU fit of an arm lies from its published CPU fit (the extra-lead report's device noise
+floor), for the leaderboard's subtitle."""
 
 LEAD_POINT_SIZE: Final[int] = 70
 """The area of one lead-day mark, in square pixels."""
@@ -516,9 +540,7 @@ def lead_board_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
     parsed = {
         arm: (match["slug"], int(match["day"]))
         for arm in sorted(primary["arm"].unique().to_list())
-        if (match := LEAD_ARM.match(arm))
-        and match["slug"] in PRODUCT_NAMES
-        and (int(match["day"]) > 0 or match["slug"] == "ens_mean")
+        if (match := LEAD_ARM.match(arm)) and match["slug"] in PRODUCT_NAMES
     }
     board = leaderboard(losses=primary, arms=list(parsed))
     return (
@@ -592,7 +614,7 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
     )
     x_scale = alt.Scale(domain=list(x_domain), nice=False, zero=False)
     x_axis = alt.Axis(values=ticks(x_domain=x_domain), format=".2~f", grid=False)
-    y_scale = alt.Scale(domain=[len(products) - 0.5, -0.5], nice=False)
+    y_scale = alt.Scale(domain=[len(products) - 0.5, -LEAD_LABEL_ROWS], nice=False)
     labels = {str(index): name for index, name in enumerate(products)}
     y_axis = alt.Axis(
         values=list(range(len(products))),
@@ -644,9 +666,7 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
         )
     )
     reference = baselines.with_columns(
-        y=pl.col("arm").replace_strict(
-            {"climatology": 0.0, "smart_persistence_day1": 1.0}, return_dtype=pl.Float64
-        ),
+        y=pl.lit(-LEAD_LABEL_ROWS + 0.25, dtype=pl.Float64),
         text=pl.col("label"),
     )
     reference_rules = (
@@ -669,7 +689,7 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
     panel = alt.LayerChart(
         layer=[rules, reference_rules, intervals, points, *reference_text],
         width=PLOT_WIDTH_PX,
-        height=LEAD_ROW_PX * len(products),
+        height=LEAD_ROW_PX * (len(products) + LEAD_LABEL_ROWS - 0.5),
     )
     return figure(
         panels=[
@@ -691,8 +711,11 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
                 "filled in. Dashed lines: the no-weather baselines."
             ),
             (
-                "Day 0 is ENS's run-day forecast, a bracket side, not a forecast a service could "
-                "read. "
+                "Day 0 is a forecast made hours before the hour it describes (ENS's run-day "
+                "forecast, or Open-Meteo's freshest ICON run), not a day-ahead forecast a service "
+                "could read. Marks at days 5, 10 and 14 and ICON's day 0 were fitted later, on a "
+                "GPU, at the primary setting only; a GPU fit of the same arm differs from its CPU "
+                f"fit by {DEVICE_NOTES[domain]}. "
                 f"Overlapping intervals here can still hide a significant paired difference "
                 f"(Figure {FIGURE_NUMBERS[(domain, 'headline')]}). {DOTS_NOTE}"
             ),
@@ -1052,7 +1075,11 @@ def lead_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
         `value`, `lower_95` and `upper_95` in percent of capacity.
     """
     primary = by_setting(losses=losses)["primary"]
-    arms = [arm for arm in sorted(primary["arm"].unique().to_list()) if lead_series_name(arm=arm)]
+    arms = [
+        arm
+        for arm in sorted(primary["arm"].unique().to_list())
+        if lead_series_name(arm=arm) and int(arm.rpartition("_day")[2]) <= MAX_LINE_DAY
+    ]
     days_held = Counter(arm.rpartition("_day")[0] for arm in arms)
     arms = [arm for arm in arms if days_held[arm.rpartition("_day")[0]] >= 3]
     board = leaderboard(losses=primary, arms=arms)
@@ -1463,13 +1490,14 @@ TITLES: Final[dict[tuple[DomainType, str], str]] = {
         "lowers the error by 0.18 points even at a conservative lead"
     ),
     ("solar", "leaderboard"): (
-        "At day 1 every weather forecast shown has a lower error than climatology (14.5%); "
-        "ENS and IFS 0.25° have the lowest error of the single solar forecasts"
+        "Error rises with lead: at day 1 every weather forecast shown has a lower error than "
+        "climatology (14.5%), but at day 14 the ENS mean's error is not lower; ENS and IFS 0.25° "
+        "have the lowest error of the single day-1 forecasts"
     ),
     ("wind", "leaderboard"): (
-        "At day 1 every weather forecast shown has a lower error than climatology (18.5%), by "
-        "more than 9 points; ENS, IFS 0.25° and ICON-EU have the lowest error of the single wind "
-        "forecasts"
+        "Error rises with lead: at day 1 every weather forecast shown has a lower error than "
+        "climatology (18.5%), but at day 14 the ENS mean's error is not lower; ENS, IFS 0.25° "
+        "and ICON-EU have the lowest error of the single day-1 forecasts"
     ),
     ("solar", "models_work"): (
         "Out-of-fold day-1 ENS-mean forecasts follow the measured output at all six solar farms"
@@ -1522,18 +1550,19 @@ def optimise(*, path: Path) -> None:
 
 
 def draw_domain(
-    *, input_dir: Path, domain: DomainType
+    *, input_dir: Path, domain: DomainType, extra_dir: Path | None = None
 ) -> tuple[dict[str, alt.VConcatChart], str | None]:
     """Draw every chart of one technology that its saved losses can support.
 
     Args:
         input_dir: The directory `nwp_forecast_comparison.py` wrote to.
         domain: `solar` or `wind`.
+        extra_dir: The directory `fit_extra_leads.py` wrote to, or None.
 
     Returns:
         Each chart keyed by its name, and the chosen week's month and year.
     """
-    losses, predictions = load(input_dir=input_dir, domain=domain)
+    losses, predictions = load(input_dir=input_dir, domain=domain, extra_dir=extra_dir)
     week_month: str | None = None
     charts: dict[str, alt.VConcatChart | None] = {
         "headline": headline(losses=losses, domain=domain, title=TITLES[(domain, "headline")]),
@@ -1564,12 +1593,17 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-dir", type=Path, required=True, help="Saved losses' directory.")
+    parser.add_argument(
+        "--extra-dir", type=Path, default=None, help="The extra lead days' losses directory."
+    )
     parser.add_argument("--output-dir", type=Path, required=True, help="Where SVGs are written.")
     parser.add_argument("--no-svgo", action="store_true", help="Skip the svgo optimisation.")
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     for domain in DOMAINS:
-        charts, week_month = draw_domain(input_dir=args.input_dir, domain=domain)
+        charts, week_month = draw_domain(
+            input_dir=args.input_dir, domain=domain, extra_dir=args.extra_dir
+        )
         for name, chart in charts.items():
             path = args.output_dir / f"nwp_forecast_{domain}_{name}.svg"
             chart.save(path)

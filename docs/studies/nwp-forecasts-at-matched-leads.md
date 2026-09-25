@@ -337,6 +337,22 @@ lead), and for any exploratory result near the 5% line, which is one with a 95% 
 setting only.
 <!-- report: Design constants (Intervals, Capacity) -->
 
+**The extra lead days and ICON's day 0 were fitted later, on a GPU, as exploratory arms.** Each
+extra arm is the same XGBoost model given one product's forecast, at the primary setting only, on
+the same shared rows, folds, and eras as every other arm. The extra arms are ENS at days 5 and 14;
+GEFS at days 5, 10, and 14; IFS 0.25°, GFS, and ICON global at day 5; and ICON-D2 and ICON-EU at
+day 0, which is Open-Meteo's freshest run covering each hour. The Previous Runs archive holds no
+day-5 or later value for ICON-EU and no day-2 or later value for UKV and ICON-D2, and the other
+products were not fitted beyond day 1 or day 3, so Figures 1 and 2 leave those leads blank. Every
+contrast among the extra arms uses references refitted on the same device, because a GPU fit is not
+bit-identical to a CPU fit. The device noise floor is the difference between a GPU refit and the
+published CPU fit of the same arm. For solar it lies between -0.016 and +0.014 points. For wind
+every difference is negative, between -0.087 and -0.040 points, so a wind mark from a GPU fit sits
+slightly below where a CPU fit would put it. Days 5 and 14 of ENS, and ICON's day 0, use this study's
+rows, which start after the IFS Cycle 49r1 change, so the ENS numbers here are not comparable with
+the [ENS horizons study](ens-forecast-horizons.md), whose ENS rows span that change.
+<!-- report (extra leads): Device noise floor; Absolute error of every arm fitted here -->
+
 ## Results
 
 ### The XGBoost models track measured output, and every day-1 weather forecast beats climatology
@@ -389,6 +405,75 @@ other products from Open-Meteo's Previous Runs archive have a lead of 24 + (h mo
 ENS's 24 + h. IFS 0.25° day 1 can also come from a newer ECMWF run than ENS's 00 UTC run. The
 ordering of those products against ENS in Figures 1 and 2 is therefore not an ordering at equal
 lead.
+
+### Error rises with lead, and at day 14 the ENS mean is no better than climatology (exploratory)
+
+**Every product's error rises with lead, and by day 14 the ENS mean's error is not lower than
+climatology's.** For solar, the XGBoost model given the ENS mean has an error of 8.766% of capacity
+[8.096, 9.355] at day 1, 12.560% [11.639, 13.448] at day 5, and 14.876% [13.797, 15.870] at day 14,
+against climatology's 14.458% [13.205, 15.592]. For wind the errors are 8.427% [7.444, 9.503],
+14.251% [12.774, 15.777], and 18.867% [16.664, 21.091], against climatology's 18.460% [16.341,
+20.389]. The day-14 intervals include climatology's error, so the study shows no gain from ENS over
+climatology at day 14, and does not show a loss. Figures 1 and 2 draw every fitted mark, and the two
+tables below give the numbers, with "not fitted" where a product has no fit at that lead.
+<!-- report: Solar and Wind, Leaderboard, primary setting; extra-lead report: Absolute error of
+every arm fitted here -->
+
+**GEFS is worse than ENS at day 5 and cannot be told apart from ENS at day 14.** GEFS and ENS have
+the same lead on every row. GEFS minus ENS is +1.118 points [+0.704, +1.569] for solar and +1.290
+points [+0.804, +1.791] for wind at day 5, and -0.002 points [-0.284, +0.256] and +0.143 points
+[-0.323, +0.560] at day 14. IFS 0.25° minus ENS at day 5 is +0.088 points [-0.377, +0.575] for solar
+and +0.507 points [+0.081, +0.937] for wind, and IFS 0.25°'s Previous Runs lead is shorter than
+ENS's on most hours, which favours IFS 0.25°.
+<!-- report (extra leads): Other products against ENS at the same day -->
+
+Solar, mean absolute error in % of capacity with 95% interval (primary setting):
+
+| Product | Day 0 | Day 1 | Day 2 | Day 3 | Day 5 | Day 10 | Day 14 |
+|---|---|---|---|---|---|---|---|
+| ENS mean | 8.137 [7.475, 8.728] | 8.766 [8.096, 9.355] | 9.760 [8.937, 10.426] | 10.796 [9.882, 11.574] | 12.560 [11.639, 13.448] | not fitted | 14.876 [13.797, 15.870] |
+| IFS 0.25° | not fitted | 8.803 [8.034, 9.478] | 9.628 [8.882, 10.267] | 10.916 [10.032, 11.679] | 12.648 [11.747, 13.429] | not fitted | not fitted |
+| ENS control member | not fitted | 9.067 [8.349, 9.682] | not fitted | not fitted | not fitted | not fitted | not fitted |
+| ICON-EU | 8.487 [7.850, 9.071] | 9.583 [8.819, 10.290] | 10.666 [9.855, 11.405] | 11.770 [10.939, 12.534] | not fitted | not fitted | not fitted |
+| ICON global | not fitted | 9.761 [8.935, 10.546] | 10.830 [9.962, 11.638] | 11.911 [11.026, 12.754] | 13.846 [12.834, 14.840] | not fitted | not fitted |
+| DMI HARMONIE-AROME | not fitted | 9.850 [9.005, 10.613] | not fitted | not fitted | not fitted | not fitted | not fitted |
+| ICON-D2 | 7.776 [7.201, 8.305] | 9.868 [9.000, 10.747] | not fitted | not fitted | not fitted | not fitted | not fitted |
+| AROME France | not fitted | 9.872 [9.209, 10.461] | not fitted | not fitted | not fitted | not fitted | not fitted |
+| UKV | not fitted | 10.009 [9.178, 10.750] | not fitted | not fitted | not fitted | not fitted | not fitted |
+| GEFS mean | not fitted | 10.039 [9.234, 10.689] | 10.990 [10.073, 11.750] | 12.001 [11.066, 12.771] | 13.679 [12.702, 14.655] | 15.027 [13.941, 15.946] | 14.874 [13.790, 15.878] |
+| KNMI HARMONIE-AROME | not fitted | 10.097 [9.345, 10.792] | not fitted | not fitted | not fitted | not fitted | not fitted |
+| ARPEGE Europe | not fitted | 10.315 [9.567, 10.940] | 11.175 [10.263, 11.942] | 12.264 [11.362, 13.067] | not fitted | not fitted | not fitted |
+| GFS | not fitted | 10.918 [10.090, 11.678] | 12.022 [11.126, 12.790] | 12.589 [11.659, 13.371] | 13.884 [12.932, 14.796] | not fitted | not fitted |
+
+Wind, mean absolute error in % of capacity with 95% interval (primary setting):
+
+| Product | Day 0 | Day 1 | Day 2 | Day 3 | Day 5 | Day 10 | Day 14 |
+|---|---|---|---|---|---|---|---|
+| ENS mean | 7.483 [6.566, 8.511] | 8.427 [7.444, 9.503] | 9.563 [8.444, 10.763] | 11.176 [9.891, 12.553] | 14.251 [12.774, 15.777] | not fitted | 18.867 [16.664, 21.091] |
+| IFS 0.25° | not fitted | 8.430 [7.420, 9.556] | 9.283 [8.229, 10.441] | 10.898 [9.722, 12.136] | 14.758 [13.268, 16.241] | not fitted | not fitted |
+| ICON-EU | 7.224 [6.329, 8.221] | 8.595 [7.588, 9.707] | 9.993 [8.908, 11.111] | 11.594 [10.329, 12.922] | not fitted | not fitted | not fitted |
+| ICON-D2 | 6.826 [5.901, 7.864] | 8.636 [7.614, 9.734] | not fitted | not fitted | not fitted | not fitted | not fitted |
+| ENS control member | not fitted | 8.734 [7.719, 9.811] | not fitted | not fitted | not fitted | not fitted | not fitted |
+| ICON global | not fitted | 8.946 [7.770, 10.272] | 10.224 [9.033, 11.545] | 11.687 [10.425, 13.056] | 15.956 [14.282, 17.607] | not fitted | not fitted |
+| GFS | not fitted | 9.062 [8.049, 10.151] | 10.488 [9.421, 11.624] | 12.150 [10.888, 13.506] | 15.724 [14.205, 17.207] | not fitted | not fitted |
+| KNMI HARMONIE-AROME | not fitted | 9.111 [8.172, 10.163] | not fitted | not fitted | not fitted | not fitted | not fitted |
+| DMI HARMONIE-AROME | not fitted | 9.173 [8.211, 10.237] | not fitted | not fitted | not fitted | not fitted | not fitted |
+| UKV | not fitted | 9.197 [8.213, 10.279] | not fitted | not fitted | not fitted | not fitted | not fitted |
+| GEFS mean | not fitted | 9.285 [8.333, 10.273] | 10.670 [9.588, 11.811] | 11.834 [10.701, 13.001] | 15.541 [13.908, 17.106] | 18.288 [16.156, 20.379] | 19.010 [16.873, 21.146] |
+
+**The day-0 marks of ICON-D2 and ICON-EU are the lowest errors in Figures 1 and 2.** Day 0 is a
+forecast made one to three hours before the hour it describes, so it is not a day-ahead forecast a
+service could read. The XGBoost model given ICON-D2's day-0 value has an error of 7.776% of
+capacity [7.201, 8.305] for solar and 6.826% [5.901, 7.864] for wind. ICON-EU's day-0 errors are
+8.487% [7.850, 9.071] and 7.224% [6.329, 8.221]. ICON-D2 minus ICON-EU is -0.711 points [-0.871,
+-0.557] for solar and -0.398 points [-0.503, -0.290] for wind at day 0, against +0.302 points
+[+0.061, +0.665] and +0.046 points [-0.079, +0.166] at day 1 (exploratory). The ICON-D2 advantage
+shrinks as the served lead grows. For solar it is -1.071 points [-1.241, -0.898] at a served lead of
+1 hour, -0.599 points [-0.786, -0.428] at 2 hours, and -0.462 points [-0.670, -0.246] at 3 hours;
+for wind it is -0.454 points [-0.582, -0.317] at 0 hours, -0.454 points [-0.573, -0.336] at 1 hour,
+and -0.287 points [-0.413, -0.158] at 2 hours. ICON-D2 runs every 3 hours, so the served lead of a
+radiation value at label hour h is ((h - 1) mod 3) + 1 hours and of a wind value h mod 3 hours.
+<!-- report (extra leads): ICON-D2 against ICON-EU, whole and by hour of day modulo 3 -->
 
 ### For solar power, ENS beats UKV and ICON-EU at matched lead and GEFS at equal lead
 
@@ -927,6 +1012,12 @@ the recommendation: more than three wind generators.
 <!-- report: Wind, P4, the blend; Exploratory: one generator at a time; which product carries P4b's
 wind gain; each arm's own error over blocks of hours -->
 
+**A near-analysis feed from a rapidly updated weather model such as ICON-D2 beats every product
+here, but that skill does not carry to day-ahead use.** For hours that have already passed, the
+ICON-D2 day-0 error is the lowest fitted (7.776% of capacity for solar and 6.826% for wind, against
+8.487% and 7.224% for ICON-EU). At day 1 ICON-D2 sits mid-ranking, +0.302 points [+0.061, +0.665]
+behind ICON-EU for solar and +0.046 points [-0.079, +0.166] for wind (exploratory).
+
 **A distribution-network planner acting on these recommendations needs answers to two questions the
 study does not cover.** The study is a comparison of archived forecasts scored against past output,
 and not a test of a live service. [Scope](#scope) lists what else the study does not cover.
@@ -1046,8 +1137,8 @@ Rows, folds, and fairness -->
   <!-- build_forecast_inputs.py docstring; not a report number -->
 - **The downloaded GEFS store holds missing 100 m wind values at long leads, which the study does
   not read.** In the store, `wind_u_100m` and `wind_v_100m` are missing (NaN) for some runs from
-  2026-01-15 onwards, at leads of 16 d 6 h and beyond. The study reads leads to 95 h, so none of
-  its rows uses a missing value. The download's README does not list this gap; it was found by
+  2026-01-15 onwards, at leads of 16 d 6 h and beyond. The planned arms read leads to 95 h and the
+  extra arms read leads to 366 h, so none of its rows uses a missing value. The download's README does not list this gap; it was found by
   reading the store.
   <!-- checked directly against GEFS_window_2024-11-01_None/GEFS.parquet; not a report number -->
 - **The exploratory arms carry a small share of missing weather values, and the planned arms carry
@@ -1092,7 +1183,7 @@ dropped month still trained the XGBoost models that scored the other months.
 ## Scope
 
 **This study says nothing about the skill of any ensemble's spread, about the Met Office's ensemble
-MOGREPS-UK, about leads beyond day 3, or about generators outside the trial area.** The study
+MOGREPS-UK, about leads beyond day 14, or about generators outside the trial area.** The study
 scores point forecasts, made by an XGBoost model fitted separately for each generator, of hourly
 solar and wind output at 6 solar and 3 wind generators, at a day-ahead lead that depends on each
 Previous Runs product's run cycle and at an exact lead for ENS and GEFS. The study says nothing
@@ -1139,8 +1230,20 @@ uv run python studies/nwp_forecast_comparison/check_input_steps.py \
 uv run python studies/nwp_forecast_comparison/build_forecast_inputs.py
 uv run python studies/nwp_forecast_comparison/nwp_forecast_comparison.py
 uv run python studies/nwp_forecast_comparison/nwp_forecast_comparison.py --report-only
+uv run python studies/nwp_forecast_comparison/verify_extra_leads.py \
+    --output-dir data/studies/nwp_forecast_comparison_leads
+uv run python studies/nwp_forecast_comparison/build_forecast_inputs.py --extra-leads \
+    --published-dir data/studies/nwp_forecast_comparison \
+    --output-dir data/studies/nwp_forecast_comparison_leads
+uv run python studies/nwp_forecast_comparison/fit_extra_leads.py --check \
+    --published-dir data/studies/nwp_forecast_comparison \
+    --output-dir data/studies/nwp_forecast_comparison_leads
+uv run python studies/nwp_forecast_comparison/fit_extra_leads.py \
+    --published-dir data/studies/nwp_forecast_comparison \
+    --output-dir data/studies/nwp_forecast_comparison_leads --workers 2
 uv run python studies/nwp_forecast_comparison/nwp_forecast_charts.py \
-    --input-dir data/studies/nwp_forecast_comparison --output-dir docs/studies/assets
+    --input-dir data/studies/nwp_forecast_comparison \
+    --extra-dir data/studies/nwp_forecast_comparison_leads --output-dir docs/studies/assets
 ```
 
 The third command writes `solar_forecast_inputs.parquet` and `wind_forecast_inputs.parquet`
@@ -1148,7 +1251,12 @@ under `data/studies/nwp_forecast_comparison/`. The fourth command fits every arm
 `<domain>_losses.parquet` and `<domain>_predictions.parquet` there. The fifth command rewrites
 `report.md` from the saved losses without fitting again. The chart script runs
 `npx svgo@4 --multipass --precision=1 --final-newline` on every SVG it writes, so no separate
-optimisation step follows.
+optimisation step follows. The sixth to ninth commands are the extra lead days. The sixth checks
+the GEFS radiation window and the day-0 columns, and writes `verification/` in the new folder. The
+seventh builds the extra inputs on the published inputs' own `(site, time)` keys. The eighth fits
+one arm twice on a GPU and stops unless the two runs agree, and the ninth fits the extra arms. The
+new folder is write-once: the scripts refuse to overwrite it, and never write to the published
+folder. The chart script, run last, reads both folders.
 
 **The inputs are on disk and cannot all be downloaded again.** The build reads the finished GEFS
 download in `data/studies/weather/GEFS_window_2024-11-01_None/` and each Previous Runs product's
