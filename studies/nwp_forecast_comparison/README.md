@@ -3,7 +3,8 @@
 Study for [issue #810](https://github.com/openclimatefix/nged-substation-forecast/issues/810). The
 question is which forecast product, or which blend of products, gives the most accurate power
 forecast at the day-ahead lead the live service delivers, and at the two days after it. The design
-is in `plans/nwp-forecast-comparison.md` on the study's branch.
+and the results are on the published page, [Which weather forecast is best at day-ahead
+lead?](../../docs/studies/nwp-forecasts-at-matched-leads.md).
 
 ## Scripts
 

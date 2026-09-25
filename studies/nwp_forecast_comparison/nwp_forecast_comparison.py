@@ -4,7 +4,8 @@ One-off throwaway script for the study in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/810>. Reads the per-technology
 arm-input frames `build_forecast_inputs.py` writes, assigns folds, fits every arm out of fold,
 brackets each Previous Runs product against ECMWF ENS, blends the open-data forecasts against ENS
-alone, and writes `report.md`. `plans/nwp-forecast-comparison.md` holds the design.
+alone, and writes `report.md`. `docs/studies/nwp-forecasts-at-matched-leads.md` holds the design and
+the results.
 
 **Rows.** `rows()` reads `<domain>_forecast_inputs.parquet`, keeps 2024-12-01 onwards (the first
 whole month after IFS Cycle 49r1), drops the part-month that straddles the UKV PS47 upgrade
