@@ -14,20 +14,29 @@ null and no `NaN` in any column, because the store documents no missing value; e
 physical range (`RANGES`); the row count equals the number of leads times the cell count recorded
 in the file's parquet metadata; radiation is near zero for night-time valid hours and positive at
 midday in April to September; and direct radiation does not exceed total radiation by more than a
-small tolerance. Across runs: every file carries the same grid hash. The night and midday checks
-catch only a gross shift such as 12 hours or a timezone error, and do not verify the exact hour
-convention.
+small tolerance; and no (variable, lead time) slice is constant across the crop, except dark
+radiation slices. Radiation may dip to -1000 J/m2, because an ensemble mean from a machine-learning
+weather model can be slightly negative at night. Across runs: every file carries the same grid
+hash; the run labels cover every init hour in the first-to-last date range, except runs that
+`lineage.json` lists as skipped for a missing `success` marker; the combined `WeatherNext3.parquet`
+has as many rows as the run files together; and `_grid_cells.parquet` has the recorded cell count
+and hash. The night and midday checks catch only a gross shift such as 12 hours or a timezone
+error, and do not verify the exact hour convention.
 
 Run it with `uv run python studies/weather_downloads/validate_weathernext3.py --directory
 <directory under data/studies/weather>`, for example `--directory WeatherNext3`.
 """
 
 import argparse
+import hashlib
+import json
 import sys
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
 import polars as pl
+import pyarrow.parquet as pq
 from fetch_weathernext3 import LONG_RUN_HOURS, LONG_RUN_LEADS, SHORT_RUN_LEADS, VARIABLES
 from paths import WEATHER_DOWNLOADS_DIR
 
@@ -38,6 +47,9 @@ RADIATION_FIELDS: Final[tuple[str, str]] = (TOTAL_RADIATION, DIRECT_RADIATION)
 
 WIND_LIMIT_M_S: Final[float] = 80.0
 MAX_HOURLY_RADIATION_J_M2: Final[float] = 4.0e6
+MIN_HOURLY_RADIATION_J_M2: Final[float] = -1000.0
+"""An ensemble mean from a machine-learning weather model may dip slightly below zero at night, so
+the lower bound allows -1000 J/m2 (a mean of about -0.3 W/m2 over the hour)."""
 
 RANGES: Final[dict[str, tuple[float, float]]] = {
     "temperature_2m_mean": (230.0, 320.0),
@@ -45,8 +57,8 @@ RANGES: Final[dict[str, tuple[float, float]]] = {
     "v_component_of_wind_10m_mean": (-WIND_LIMIT_M_S, WIND_LIMIT_M_S),
     "u_component_of_wind_100m_mean": (-WIND_LIMIT_M_S, WIND_LIMIT_M_S),
     "v_component_of_wind_100m_mean": (-WIND_LIMIT_M_S, WIND_LIMIT_M_S),
-    TOTAL_RADIATION: (0.0, MAX_HOURLY_RADIATION_J_M2),
-    DIRECT_RADIATION: (0.0, MAX_HOURLY_RADIATION_J_M2),
+    TOTAL_RADIATION: (MIN_HOURLY_RADIATION_J_M2, MAX_HOURLY_RADIATION_J_M2),
+    DIRECT_RADIATION: (MIN_HOURLY_RADIATION_J_M2, MAX_HOURLY_RADIATION_J_M2),
 }
 """Physical bounds in each variable's stored unit (K, m/s, and J/m2 accumulated over one hour).
 Rounding to 13 bits moves a value by at most 1.2e-4 of itself, so a value outside these bounds is
@@ -77,9 +89,9 @@ CHECKS: Final[tuple[str, ...]] = (
     "night_total",
     "night_direct",
     "midday_total",
-    "midday_direct",
     "direct_le_total",
     "row_count",
+    "constant_slice",
 )
 """Every per-run check, so that a check no run failed still prints a PASS line."""
 
@@ -130,26 +142,44 @@ def _check_radiation(*, frame: pl.DataFrame, label: str, results: Results) -> No
     hour = pl.col("valid_time").dt.hour()
     for field in ("total", "direct"):
         night = valid.filter(hour.is_in(NIGHT_HOURS)).select(pl.col(field).median()).item()
-        midday = (
-            valid.filter((hour == 12) & pl.col("valid_time").dt.month().is_in(SUMMER_MONTHS))
-            .select(pl.col(field).mean())
-            .item()
-        )
-        night_check, midday_check = f"night_{field}", f"midday_{field}"
+        night_check = f"night_{field}"
         if night is None:
             results.setdefault(night_check, []).append(_SKIPPED)
         elif night >= NIGHT_MEDIAN_LIMIT_J_M2:
             _fail(results=results, check=night_check, label=label)
-        if midday is None:
-            results.setdefault(midday_check, []).append(_SKIPPED)
-        elif midday <= MIDDAY_MEAN_MINIMUM_J_M2 and field == "total":
-            _fail(results=results, check=midday_check, label=label)
+    midday = (
+        valid.filter((hour == 12) & pl.col("valid_time").dt.month().is_in(SUMMER_MONTHS))
+        .select(pl.col("total").mean())
+        .item()
+    )
+    if midday is None:
+        results.setdefault("midday_total", []).append(_SKIPPED)
+    elif midday <= MIDDAY_MEAN_MINIMUM_J_M2:
+        _fail(results=results, check="midday_total", label=label)
     excess = valid.filter(
         pl.col("direct")
         > pl.col("total") * (1.0 + DIRECT_EXCESS_FRACTION) + DIRECT_EXCESS_FLOOR_J_M2
     )
     if excess.height:
         _fail(results=results, check="direct_le_total", label=label)
+
+
+def _check_constant_slices(*, frame: pl.DataFrame, label: str, results: Results) -> None:
+    """Check no (variable, lead time) slice has the same value in every cell of the crop.
+
+    A constant slice is a sign of a fill value or a broken read. A radiation slice at night is
+    legitimately constant (near zero everywhere), so a radiation slice is exempt when its largest
+    value is below `NIGHT_MEDIAN_LIMIT_J_M2`.
+    """
+    for variable in VARIABLES:
+        spread = frame.group_by("lead_time").agg(
+            low=pl.col(variable).min(), high=pl.col(variable).max()
+        )
+        constant = spread.filter(pl.col("low") == pl.col("high"))
+        if variable in RADIATION_FIELDS:
+            constant = constant.filter(pl.col("high") >= NIGHT_MEDIAN_LIMIT_J_M2)
+        if constant.height:
+            _fail(results=results, check="constant_slice", label=label)
 
 
 def _validate_run(*, path: Path, results: Results) -> str | None:
@@ -160,10 +190,58 @@ def _validate_run(*, path: Path, results: Results) -> str | None:
     _check_axes(frame=frame, label=label, results=results)
     _check_values(frame=frame, label=label, results=results)
     _check_radiation(frame=frame, label=label, results=results)
+    _check_constant_slices(frame=frame, label=label, results=results)
     n_cells = int(metadata.get("cell_count", "0"))
     if frame.height != frame["lead_time"].n_unique() * n_cells:
         _fail(results=results, check="row_count", label=label)
     return metadata.get("cell_hash")
+
+
+def _check_completeness(*, paths: list[Path], product_dir: Path, results: Results) -> None:
+    """Check every init hour selected by the files' first-to-last date range has a run file.
+
+    The selected hours are the init hours that occur in the file names. A run whose `success`
+    marker was missing is listed in `lineage.json` and is allowed to be absent.
+    """
+    labels = {path.stem for path in paths}
+    days = sorted({label.split("_")[0] for label in labels})
+    hours = sorted({label.split("_")[1] for label in labels})
+    first = datetime.strptime(days[0], "%Y%m%d").replace(tzinfo=UTC).date()
+    last = datetime.strptime(days[-1], "%Y%m%d").replace(tzinfo=UTC).date()
+    expected = {
+        f"{first + timedelta(days=offset):%Y%m%d}_{hour}"
+        for offset in range((last - first).days + 1)
+        for hour in hours
+    }
+    lineage_path = product_dir / "lineage.json"
+    skipped: set[str] = set()
+    if lineage_path.exists():
+        note = json.loads(lineage_path.read_text())
+        skipped = set(note.get("runs_skipped_missing_success_marker", []))
+    missing = sorted(expected - labels - skipped)
+    results["complete"] = missing
+
+
+def _check_combined_and_grid(*, paths: list[Path], product_dir: Path, results: Results) -> None:
+    """Check the combined file's rows, and the grid cells file, against the run files."""
+    run_rows = sum(pq.ParquetFile(path).metadata.num_rows for path in paths)
+    combined_path = product_dir / "WeatherNext3.parquet"
+    combined = pq.ParquetFile(combined_path).metadata.num_rows if combined_path.exists() else None
+    results["combined_rows"] = [] if combined == run_rows else ["all"]
+    metadata = pl.read_parquet_metadata(paths[0])
+    grid_path = product_dir / "_grid_cells.parquet"
+    grid_ok = False
+    if grid_path.exists():
+        grid = pl.read_parquet(grid_path)
+        latitudes = grid.filter(pl.col("lon_index") == 0).sort("lat_index")["latitude"]
+        longitudes = grid.filter(pl.col("lat_index") == 0).sort("lon_index")["longitude"]
+        digest = hashlib.sha256()
+        digest.update(latitudes.to_numpy().tobytes())
+        digest.update(longitudes.to_numpy().tobytes())
+        grid_ok = str(grid.height) == metadata.get("cell_count") and digest.hexdigest() == (
+            metadata.get("cell_hash")
+        )
+    results["grid_cells_match"] = [] if grid_ok else ["all"]
 
 
 def main() -> int:
@@ -171,11 +249,15 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", required=True, help="Product directory name.")
     arguments = parser.parse_args()
-    paths = sorted((WEATHER_DOWNLOADS_DIR / arguments.directory / "_run_cache").glob("*.parquet"))
+    product_dir = WEATHER_DOWNLOADS_DIR / arguments.directory
+    paths = sorted((product_dir / "_run_cache").glob("*.parquet"))
     results: Results = {check: [] for check in CHECKS}
     hashes: set[str | None] = set()
     for path in paths:
         hashes.add(_validate_run(path=path, results=results))
+    if paths:
+        _check_completeness(paths=paths, product_dir=product_dir, results=results)
+        _check_combined_and_grid(paths=paths, product_dir=product_dir, results=results)
     results["cell_hash_same"] = [] if len(hashes) == 1 and None not in hashes else ["all"]
 
     failed = 0
