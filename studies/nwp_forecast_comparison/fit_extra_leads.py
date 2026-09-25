@@ -131,7 +131,8 @@ ELSEWHERE_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("ens_mean_day0", "icon_eu_day0"),
 )
 """Contrasts between two arms fitted here, as (treatment, reference): the error's rise from day 5 to
-day 14, GEFS's fall from day 10 to day 14, and ICON-D2 and ICON-EU at day 0 against ENS at day 0."""
+day 14, GEFS's fall from day 10 to day 14, ICON-D2 at day 0 against ENS at day 0, and ENS at day 0
+against ICON-EU at day 0."""
 
 CLIMATOLOGY_CONTRASTS: Final[tuple[str, ...]] = (
     "ens_mean_day14",
@@ -434,7 +435,7 @@ def report_domain(
     ]
     lines += [
         "",
-        "### Long leads against climatology, and day 0 against ENS at day 0 (GPU fits)",
+        "### Long leads against climatology, and day 0 against ENS at day 0",
         *header,
         *(line for line in elsewhere if line),
     ]
