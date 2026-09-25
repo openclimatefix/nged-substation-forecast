@@ -39,18 +39,19 @@ FIGURE_NUMBERS: Final[dict[FigureKey, int]] = {
     "era5_by_year": 8,
     "icon_d2_leads": 9,
     "weather_model_rivals": 10,
-    "ens_exploratory": 11,
+    "neighbours": 11,
     "own_beam": 12,
-    "neighbours": 13,
-    "per_generator": 14,
-    "station_controls": 15,
-    "station_stations": 16,
+    "ens_exploratory": 13,
+    "station_controls": 14,
+    "station_stations": 15,
+    "per_generator": 16,
     "implied_capacity": 17,
 }
 """Each figure's number on the page.
 
 `leaderboard` and `contrasts` each combine four charts, one per row set: the
-stacked chart draws the main, extra, ENS and station row sets as blocks. `weather_model_rivals`
+stacked chart draws the main, extra, ENS and station row sets as blocks, and `contrasts` also
+draws each block's planned contrasts in a lower panel. `weather_model_rivals`
 combines the ICON-EU rivals chart with the UKV-against-ERA5 chart. `per_generator` holds the
 station per-generator chart and the ENS per-generator chart.
 """

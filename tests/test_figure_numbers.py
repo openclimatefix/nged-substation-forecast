@@ -44,3 +44,28 @@ def test_every_figure_key_named_by_an_svg_has_a_number() -> None:
     keys = {key for key in module.SVG_FIGURES.values() if key is not None}
 
     assert keys == set(module.FIGURE_NUMBERS)
+
+
+def test_figure_numbers_follow_the_page_order_of_the_outline() -> None:
+    # Catches a figure numbered against the order its section comes in on the page.
+    numbers = _load().FIGURE_NUMBERS
+
+    order = sorted(numbers, key=numbers.__getitem__)
+
+    assert order[-8:] == [
+        "weather_model_rivals",
+        "neighbours",
+        "own_beam",
+        "ens_exploratory",
+        "station_controls",
+        "station_stations",
+        "per_generator",
+        "implied_capacity",
+    ]
+    assert numbers["contrasts"] == 2
+
+
+def test_the_dropped_station_models_work_figure_has_no_number() -> None:
+    module = _load()
+
+    assert module.SVG_FIGURES["station_past_solar_models_work"] is None
