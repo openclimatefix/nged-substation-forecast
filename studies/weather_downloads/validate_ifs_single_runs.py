@@ -1,0 +1,214 @@
+"""Validate the combined IFS Single Runs parquet that `fetch_open_meteo_single_runs.py` wrote.
+
+One-off throwaway script for
+<https://github.com/openclimatefix/nged-substation-forecast/issues/810>. It reads
+`data/studies/weather/ECMWF-IFS-SINGLE-RUNS/ECMWF-IFS-SINGLE-RUNS.parquet` and runs the checks in
+`CHECK_NAMES`: run spacing (every gap between the first and last run listed, and any gap that is
+not a documented unavailable run a failure), 241 leads per run per site, all seven variables, nulls
+only in radiation at lead 0, physical ranges, a diurnal check on radiation, and nine site labels in
+every month file.
+
+**The script prints one PASS or FAIL line per check, then every gap.** Gaps are listed rather than
+hidden. It prints no coordinate. It exits non-zero when any check fails.
+
+Run it with `uv run python studies/weather_downloads/validate_ifs_single_runs.py`.
+"""
+
+import json
+import sys
+from datetime import date, timedelta
+from pathlib import Path
+from typing import Final
+
+import polars as pl
+from fetch_open_meteo_single_runs import (
+    BASE_VARIABLES,
+    COMBINED_FILENAME,
+    LEADS_PER_RUN,
+    PRODUCT_DIR,
+    RADIATION_VARIABLES,
+    UNAVAILABLE_FILENAME,
+)
+from studies.anonymise import SITE_LABELS, WIND_SITE_LABELS
+
+EXPECTED_SITES: Final[frozenset[str]] = frozenset(SITE_LABELS + WIND_SITE_LABELS)
+
+MAX_RADIATION_W_M2: Final[float] = 1400.0
+TEMPERATURE_RANGE_C: Final[tuple[float, float]] = (-40.0, 50.0)
+MAX_WIND_SPEED_KM_H: Final[float] = 200.0
+MAX_DIRECTION_DEG: Final[float] = 360.0
+"""Physical bounds. A value outside them is a fault, not an extreme."""
+
+NIGHT_HOURS_UTC: Final[tuple[int, ...]] = (0, 1, 2, 22, 23)
+NIGHT_MAX_MEAN_RADIATION_W_M2: Final[float] = 1.0
+"""Around midnight UTC the sun is below the horizon in Great Britain all year."""
+
+NOON_HOURS_UTC: Final[tuple[int, ...]] = (11, 12, 13)
+NOON_MIN_MEAN_RADIATION_W_M2: Final[float] = 20.0
+"""The mean over all runs and sites around solar noon, which is well above this even when the data
+covers only December."""
+
+CHECK_NAMES: Final[tuple[str, ...]] = (
+    "run_spacing",
+    "leads_per_run_per_site",
+    "columns_present",
+    "no_unexpected_nulls",
+    "lead_zero_radiation_null",
+    "value_ranges",
+    "diurnal_radiation",
+    "nine_sites_every_month",
+)
+"""Every check, in report order."""
+
+
+def _run_days(*, frame: pl.DataFrame) -> list[date]:
+    """Return the distinct run days in the frame, sorted."""
+    return sorted(frame["init_time"].dt.date().unique().to_list())
+
+
+def _gaps(*, days: list[date]) -> list[date]:
+    """Return every run day missing between the first and last run."""
+    present = set(days)
+    span = (days[-1] - days[0]).days
+    return [
+        days[0] + timedelta(days=n)
+        for n in range(span + 1)
+        if days[0] + timedelta(days=n) not in present
+    ]
+
+
+def _documented_unavailable() -> set[date]:
+    """Return the run days the fetch script recorded as refused by the API."""
+    path = PRODUCT_DIR / UNAVAILABLE_FILENAME
+    if not path.exists():
+        return set()
+    return {date.fromisoformat(day) for day in json.loads(path.read_text())}
+
+
+def _check_run_spacing(*, frame: pl.DataFrame, gaps: list[date]) -> str | None:
+    """Fail on a non-00-UTC init or a gap that is not a documented unavailable run."""
+    off_hour = frame.filter(pl.col("init_time").dt.hour() != 0)
+    if not off_hour.is_empty():
+        return "some init_time is not 00 UTC"
+    undocumented = sorted(set(gaps) - _documented_unavailable())
+    if undocumented:
+        return f"{len(undocumented)} run days missing without a documented reason"
+    return None
+
+
+def _check_leads(*, frame: pl.DataFrame) -> str | None:
+    """Fail unless every (site, init_time) has exactly leads 0 to 240."""
+    per_group = frame.group_by("site", "init_time").agg(
+        pl.len().alias("n"),
+        pl.col("lead_hours").min().alias("lo"),
+        pl.col("lead_hours").max().alias("hi"),
+    )
+    wrong = per_group.filter(
+        (pl.col("n") != LEADS_PER_RUN) | (pl.col("lo") != 0) | (pl.col("hi") != LEADS_PER_RUN - 1)
+    )
+    if wrong.is_empty():
+        return None
+    return f"{wrong.height} (site, run) groups do not hold leads 0..{LEADS_PER_RUN - 1}"
+
+
+def _check_columns(*, frame: pl.DataFrame) -> str | None:
+    """Fail unless every expected column is present."""
+    expected = {"site", "init_time", "valid_time", "lead_hours", *BASE_VARIABLES}
+    missing = expected - set(frame.columns)
+    return f"missing columns {sorted(missing)}" if missing else None
+
+
+def _check_nulls(*, frame: pl.DataFrame) -> str | None:
+    """Fail on any null outside radiation at lead 0."""
+    offenders = []
+    for name in BASE_VARIABLES:
+        column = (
+            frame if name not in RADIATION_VARIABLES else frame.filter(pl.col("lead_hours") > 0)
+        )
+        n_null = column[name].null_count()
+        if n_null:
+            offenders.append(f"{name}: {n_null}")
+    return f"nulls found ({', '.join(offenders)})" if offenders else None
+
+
+def _check_lead_zero_radiation(*, frame: pl.DataFrame) -> str | None:
+    """Fail unless radiation at lead 0 is null everywhere, the documented convention."""
+    lead_zero = frame.filter(pl.col("lead_hours") == 0)
+    filled = [
+        name for name in RADIATION_VARIABLES if lead_zero[name].null_count() != lead_zero.height
+    ]
+    return f"radiation at lead 0 is populated for {filled}" if filled else None
+
+
+def _check_ranges(*, frame: pl.DataFrame) -> str | None:
+    """Fail on any value outside its physical range."""
+    bounds: dict[str, tuple[float, float]] = dict.fromkeys(
+        RADIATION_VARIABLES, (0.0, MAX_RADIATION_W_M2)
+    )
+    bounds["temperature_2m"] = TEMPERATURE_RANGE_C
+    bounds["wind_speed_10m"] = (0.0, MAX_WIND_SPEED_KM_H)
+    bounds["wind_speed_100m"] = (0.0, MAX_WIND_SPEED_KM_H)
+    bounds["wind_direction_10m"] = (0.0, MAX_DIRECTION_DEG)
+    bounds["wind_direction_100m"] = (0.0, MAX_DIRECTION_DEG)
+    offenders = []
+    for name, (low, high) in bounds.items():
+        n_out = frame.filter((pl.col(name) < low) | (pl.col(name) > high)).height
+        if n_out:
+            offenders.append(f"{name}: {n_out}")
+    return f"values out of range ({', '.join(offenders)})" if offenders else None
+
+
+def _check_diurnal(*, frame: pl.DataFrame) -> str | None:
+    """Fail unless radiation is near zero around midnight UTC and clearly positive around noon."""
+    by_hour = (
+        frame.filter(pl.col("lead_hours") > 0)
+        .group_by(pl.col("valid_time").dt.hour().alias("hour"))
+        .agg(pl.col("shortwave_radiation").mean().alias("mean"))
+    )
+    night_raw = by_hour.filter(pl.col("hour").is_in(NIGHT_HOURS_UTC))["mean"].max()
+    noon_raw = by_hour.filter(pl.col("hour").is_in(NOON_HOURS_UTC))["mean"].min()
+    if night_raw is None or noon_raw is None:
+        return "no night or noon hours in the data"
+    night, noon = float(night_raw), float(noon_raw)  # ty: ignore[invalid-argument-type]
+    if night > NIGHT_MAX_MEAN_RADIATION_W_M2:
+        return f"mean night radiation {night:.2f} W/m^2 exceeds {NIGHT_MAX_MEAN_RADIATION_W_M2}"
+    if noon < NOON_MIN_MEAN_RADIATION_W_M2:
+        return f"mean noon radiation {noon:.1f} W/m^2 is below {NOON_MIN_MEAN_RADIATION_W_M2}"
+    return None
+
+
+def _check_sites_every_month(*, frame: pl.DataFrame) -> str | None:
+    """Fail unless every month holds exactly the nine site labels."""
+    by_month = frame.group_by(pl.col("init_time").dt.strftime("%Y-%m").alias("month")).agg(
+        pl.col("site").unique().alias("sites")
+    )
+    wrong = [month for month, sites in by_month.iter_rows() if frozenset(sites) != EXPECTED_SITES]
+    return f"months without exactly the nine sites: {sorted(wrong)}" if wrong else None
+
+
+def main() -> int:
+    """Run every check, print one line each, then list every gap. Return non-zero on a failure."""
+    path: Path = PRODUCT_DIR / COMBINED_FILENAME
+    frame = pl.read_parquet(path)
+    days = _run_days(frame=frame)
+    gaps = _gaps(days=days)
+    failures = {
+        "run_spacing": _check_run_spacing(frame=frame, gaps=gaps),
+        "leads_per_run_per_site": _check_leads(frame=frame),
+        "columns_present": _check_columns(frame=frame),
+        "no_unexpected_nulls": _check_nulls(frame=frame),
+        "lead_zero_radiation_null": _check_lead_zero_radiation(frame=frame),
+        "value_ranges": _check_ranges(frame=frame),
+        "diurnal_radiation": _check_diurnal(frame=frame),
+        "nine_sites_every_month": _check_sites_every_month(frame=frame),
+    }
+    for name in CHECK_NAMES:
+        reason = failures[name]
+        print(f"PASS {name}" if reason is None else f"FAIL {name}: {reason}")
+    print(f"runs: {len(days)}, first {days[0]}, last {days[-1]}")
+    print(f"gaps ({len(gaps)}): {', '.join(day.isoformat() for day in gaps) or 'none'}")
+    return 1 if any(reason is not None for reason in failures.values()) else 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
