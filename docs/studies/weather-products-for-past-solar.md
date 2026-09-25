@@ -6,7 +6,7 @@
 > result on this page may not hold elsewhere.
 
 **At six metered solar farms in Lincolnshire, two satellite retrievals describe past sunshine far
-better than any of the weather models or reanalyses tested.** For each of eight weather products, an
+better than any of the weather models or reanalyses tested.** For each of eight products, an
 XGBoost model, a gradient-boosted tree, was fitted per generator to predict hourly output from that
 product's sunshine, and scored by its mean absolute error as a percentage of the generator's
 capacity (its 99th percentile of metered output). The error is 5.09% of capacity given the
@@ -28,7 +28,7 @@ These four consumers of past weather are parts of this project, described in the
 [introduction](#introduction). ICON-EU is the German weather service's European model. Rebuilt UKV
 is the Met Office's UK variable-resolution model (UKV) with its hourly value rebuilt from its own
 snapshots. The evidence is six metered solar farms inside one 25 km by 23 km box in Lincolnshire,
-and 76,727 generator-hours from December 2022 to August 2026. Hours near sunrise where Open-Meteo's
+and 76,727 site-hours from December 2022 to August 2026. Hours near sunrise where Open-Meteo's
 UKV archive holds a physically impossible value are left out for every product; see
 [Limitations](#limitations). Four more weather models, available from Open-Meteo's archive, are
 scored separately, on a shorter, more recent row set: see [The four extra Open-Meteo
@@ -143,13 +143,14 @@ weather model that started a few hours earlier.
   radiation is 1 to 12 hours ahead and CAMS is a satellite retrieval whose cloud information has no
   forecast step. ENS's scored leads are 5 to 20 hours from a 00 UTC run. A live service reading
   Dynamical.org's archive gets that run from about 09:00 UTC, so 12,648 of the 54,447 scored
-  site-hours (23%) ended before the run became readable there. For those hours the ENS value
-  reaches a live service up to 4 hours after the hour it describes. Two exploratory comparisons were
-  added after the first results. With CAMS averaged over the 3-hour
-  steps of ENS's open-data subset, ENS still trails CAMS by 2.434 points [2.145, 2.729]. That
-  averaging makes CAMS worse by 0.837 points [0.728, 0.942], but the same treatment makes ERA5
-  better by 0.287 points [0.219, 0.359], so how much of the gap the 3-hourly steps explain is not
-  measured here. See [ECMWF ENS: a longer-lead forecast than any other product on this
+  site-hours (23%) ended before the run became readable there. For those hours the ENS value reaches
+  a live service up to 4 hours after the hour it describes. Three exploratory XGBoost models were
+  added after the first results. With CAMS averaged over the 3-hour steps of ENS's open-data subset,
+  ENS still trails CAMS by 2.434 points [2.145, 2.729]. That averaging makes CAMS worse by 0.837
+  points [0.728, 0.942], but the same treatment makes ERA5 better by 0.287 points [0.219, 0.359],
+  and averaging ERA5 over a 3 by 3 block of cells makes it better by 0.157 points [0.117, 0.196], so
+  how much of the gap the 3-hourly steps explain is not measured here. See [ECMWF ENS: a longer-lead
+  forecast than any other product on this
   page](#ecmwf-ens-a-longer-lead-forecast-than-any-other-product-on-this-page).
 - **At six solar farms in Lincolnshire, an XGBoost model given the nearest Met Office weather
   station's irradiance and air temperature trails an XGBoost model given CAMS by 2.007 points
@@ -169,8 +170,9 @@ electricity customers. Capacity estimation infers a generator's size from how it
 sunshine. Training history is the years of past weather that pre-training a forecasting model needs.
 Historical features give a forecasting model the weather of hours already past. Disaggregation
 separates hidden solar generation from demand at a substation. Each consumer reads one weather
-product, and the project has to choose which. This page measures how well 12 products describe
-past sunshine at six metered solar farms, and says which product each consumer should read.
+product, and the project has to choose which. This page measures how well 14 products, including
+ECMWF ENS and nearby weather stations, describe past sunshine at six metered solar farms, and says
+which product each consumer should read.
 
 **The products differ in how far ahead each value was forecast and in what area they cover, as well
 as in accuracy, and both properties matter to a consumer.** A weather model run is one of the
@@ -179,7 +181,8 @@ product's value as served was forecast is the served lead. A lead of zero, writt
 analysis: the weather model's best estimate of the weather at the moment the run starts. ICON-D2
 does not cover South West England or South Wales, which are inside the licence area of National Grid
 Electricity Distribution (NGED), the distribution network operator this project forecasts for.
-ICON-D2's western edge runs from about 2°W on the south coast to about 2.5°W in the Midlands.
+ICON-D2's western edge runs from 1.8°W at 49.9°N, on the south coast, through 2.6°W at 53.2°N, in
+the Midlands, to 3.9°W at 57.3°N.
 
 ![Figure 3: ICON-D2 has no data west of a line running from 1.8°W at 49.9°N to 3.9°W at 57.3°N.
 The map also draws AROME France, which this page does not test](../roadmap/assets/weather_product_domains.svg)
@@ -314,7 +317,7 @@ difference between two products is a difference between their irradiance alone.*
   snapshot recovered from Open-Meteo's archive at either end of the hour, or at a neighbouring
   hour, exceeds what the sun's geometry allows (see [Limitations](#limitations)). An hour is also
   dropped where SARAH-3 marks either of
-  its two snapshots as unusable, which removes 426 of the 300,960 generator-hours SARAH-3's files
+  its two snapshots as unusable, which removes 426 of the 300,960 site-hours SARAH-3's files
   cover (0.14%), all of them in daylight. CAMS is read in full, not only on the hours it
   rates as reliable.
 - **One treatment of UKV's change of source.** Open-Meteo's UKV archive before 12 August 2024 is a
@@ -369,7 +372,7 @@ difference between two products is a difference between their irradiance alone.*
 - **A longer record for two questions.** The year-by-year comparison with ERA5 and SARAH-3's
   comparison by satellite use a second row set, built the same way from the four products whose
   records reach back to January 2021: ERA5, CAMS, SARAH-3, and ICON-DREAM-EU. That row set holds
-  115,594 generator-hours from January 2021 to August 2026. Every other figure on this page uses
+  115,594 site-hours from January 2021 to August 2026. Every other figure on this page uses
   the eight-product row set, except the section [The four extra Open-Meteo
   models](#the-four-extra-open-meteo-models), which uses its own 12-product row set from November
   2024.
@@ -540,7 +543,7 @@ hours.
 **Before any power model sees it, the raw irradiance already ranks the products almost exactly as
 the power-model contrasts above do, which is why ICON-DREAM-EU's modest lead over ERA5 is not an
 artefact of the power model.** Each product's own served global irradiance, compared row for row
-against CAMS's on the 76,727 daylight generator-hours every product on this page shares — no
+against CAMS's on the 76,727 daylight site-hours every product on this page shares — no
 XGBoost model, no per-generator recalibration — orders the products almost exactly as the
 mean-absolute-error table above does: SARAH-3 closest to CAMS, then ICON-D2, ICON-EU, ICON global,
 ICON-DREAM-EU, ERA5, with Open-Meteo's hourly value for UKV the furthest from CAMS. Correlation
@@ -762,7 +765,7 @@ has a lower error than CAMS or is shown to beat ICON-EU, and one of the three pl
 not resolved.** ECMWF-IFS-HRES, ARPEGE Europe, and the UWC-West HARMONIE-AROME run as DMI and KNMI
 each distribute it are fetched at each generator's own coordinates, the same way as UKV and the
 three ICON weather models above, but score here on a shorter, later row set: 40,243 common
-generator-hours, November 2024 to August 2026, all 12 products sharing every hour. Two of the four
+site-hours, November 2024 to August 2026, all 12 products sharing every hour. Two of the four
 weather models, DMI's and KNMI's HARMONIE-AROME, cover only from July 2024, which the row set's
 later start already accommodates.
 
@@ -867,6 +870,10 @@ both document.
 7.81%, ECMWF-IFS-HRES 8.29%, ICON-EU 8.38%, ICON global 8.52%, UKV (Open-Meteo's hourly value)
 8.79%, ICON-DREAM-EU 8.81%, DMI HARMONIE-AROME 8.83%, ERA5 8.87%, KNMI HARMONIE-AROME 8.94%, and
 ARPEGE Europe 9.30%, the highest.
+
+**ECMWF-IFS-HRES beats ERA5 by 0.58 points [0.36, 0.81] on the 40,243 site-hours of this row set (5
+of 5 folds, exploratory).** The gap is the difference between the two products' mean absolute errors
+above, 8.29% against 8.87%.
 
 ![Figure 15: CAMS and SARAH-3 still lead when four more weather models are added, November 2024 to
 August 2026](assets/sunshine_all_leaderboard.svg)
@@ -1387,8 +1394,8 @@ against availability and coverage.**
   forecasts and reaches back to 2010, narrows the mismatch.
   ICON-DREAM-EU beats ERA5 as a reanalysis, but by less than any of the three ICON weather models
   does. ECMWF-IFS-HRES is archived from 2017, further back than any weather model this page tests
-  except ICON-DREAM-EU, and on its own shorter row set it beats ERA5 by 0.58 points [0.36, 0.81]
-  (5 of 5 folds, exploratory).
+  except ICON-DREAM-EU, and on the four extra Open-Meteo models' row set it beats ERA5 by 0.58 points
+  [0.36, 0.81] (see [The four extra Open-Meteo models](#the-four-extra-open-meteo-models)).
 - **Historical features in the live service: ICON-EU, or UKV with its two snapshots averaged;
   with either product, include the neighbouring hours.** Rebuilding UKV's hour from Open-Meteo's
   snapshots produces physically impossible values in the first hours after sunrise (see
@@ -1459,7 +1466,7 @@ single weather product?](blending-weather-products.md#solar-a-blend-beats-cams-g
   built from one. Every dropped hour falls between 05:00 and 10:00 UTC, and almost all of them
   predate UKV's January 2026 upgrade — 2.8% of pre-upgrade hours against 0.1% after it, and none
   from April 2026 onwards. Because every product is scored on one shared row set, dropping these
-  snapshots removes 1,768 generator-hours (2.3%) from every product's figures on this page, not
+  snapshots removes 1,768 site-hours (2.3%) from every product's figures on this page, not
   only UKV's, leaving 76,727 common rows. Two smaller defects in Open-Meteo's UKV archive are not
   corrected here: at 318 raw hours (186 of the 76,727 scored rows) the served UKV beam exceeds the
   served global irradiance, which is physically impossible and bears on the own-beam figure above,
