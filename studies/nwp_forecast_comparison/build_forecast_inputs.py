@@ -44,7 +44,8 @@ With `--extra-leads` the script instead builds the exploratory lead columns (ENS
 global, and at days 5 and 7 for IFS 0.25° and GFS) on the published inputs' own `(site, time)`
 keys, into a new write-once `--output-dir`, and never writes to the published folder. The new days
 are separate constants (`EXTRA_ENS_DAYS`, `EXTRA_GEFS_DAYS`), never added to `ENS_DAYS`, so the
-shared rows cannot move.
+shared rows cannot move. `--batch second` builds the second batch instead: ENS mean at day 7, the
+ENS control member at days 5, 7, 10 and 14, and GEFS mean at day 7 (`EXTRA_LEAD_BUILDS`).
 
 Every output row carries only the anonymised `site` label; no generator name, id or coordinate is
 read from the private roster in this script, except inside `studies.grid_sampling` (GEFS's
@@ -61,7 +62,7 @@ import sys
 from collections.abc import Callable, Mapping, Sequence
 from datetime import date, timedelta
 from pathlib import Path
-from typing import Final, Literal
+from typing import Final, Literal, NamedTuple
 
 import numpy as np
 import polars as pl
@@ -153,6 +154,43 @@ baseline columns every shared row must hold, so adding them there would move the
 
 EXTRA_GEFS_DAYS: Final[tuple[int, ...]] = (0, 5, 10, 14)
 """The GEFS bands the extra-lead build adds."""
+
+EXTRA_ENS_CONTROL_DAYS: Final[tuple[int, ...]] = (5, 7, 10, 14)
+"""The ENS control-member bands the second extra-lead build adds. Days 0 to 3 are already in the
+published inputs."""
+
+
+ExtraBatchType = Literal["first", "second"]
+"""Which extra-lead build: the first batch's columns, or the second batch's."""
+
+
+class ExtraLeadBuild(NamedTuple):
+    """The columns one extra-lead build adds on top of the published inputs."""
+
+    product_day_offsets: Mapping[str, tuple[int, ...]]
+    ens_mean_days: tuple[int, ...]
+    ens_control_days: tuple[int, ...]
+    gefs_days: tuple[int, ...]
+
+
+EXTRA_LEAD_BUILDS: Final[dict[ExtraBatchType, ExtraLeadBuild]] = {
+    "first": ExtraLeadBuild(
+        product_day_offsets=EXTRA_PRODUCT_DAY_OFFSETS,
+        ens_mean_days=EXTRA_ENS_DAYS,
+        ens_control_days=(),
+        gefs_days=EXTRA_GEFS_DAYS,
+    ),
+    "second": ExtraLeadBuild(
+        product_day_offsets={},
+        ens_mean_days=(7,),
+        ens_control_days=EXTRA_ENS_CONTROL_DAYS,
+        gefs_days=(7,),
+    ),
+}
+"""The first batch's columns (unchanged from its own build) and the second batch's: ENS mean at
+day 7, ENS control member at days 5, 7, 10 and 14, and GEFS mean at day 7. The second batch reads
+no Previous Runs column, because the arms it refits take their columns from the published
+inputs."""
 
 SOLAR_ONLY_PRODUCTS: Final[frozenset[str]] = frozenset({"ARPEGE Europe", "AROME France"})
 """Products the plan scores for solar only: their 100 m wind offsets are missing on most rows."""
@@ -903,35 +941,72 @@ def build_domain(*, domain: DomainType, output_dir: Path, gefs_window_dir: Path 
     return output_path
 
 
-def _ens_extra_frame(*, keys: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
-    """Build ECMWF ENS's mean columns at `EXTRA_ENS_DAYS` on `keys`.
+def _ens_extra_frame(
+    *,
+    keys: pl.DataFrame,
+    domain: DomainType,
+    mean_days: tuple[int, ...],
+    control_days: tuple[int, ...],
+) -> pl.DataFrame:
+    """Build ECMWF ENS's mean and control-member columns at the given days on `keys`.
 
     Args:
         keys: `site`, `time` for every row the study scores.
         domain: `solar` or `wind`.
+        mean_days: The days to build the ENS mean at.
+        control_days: The days to build the ENS control member at.
 
     Returns:
-        `keys` with `ens_mean_day<N>_<field>` for every `N` in `EXTRA_ENS_DAYS`, left-joined. A
-        row missing a band carries nulls.
+        `keys` with `ens_mean_day<N>_<field>` for every `N` in `mean_days` and
+        `ens_control_day<N>_<field>` for every `N` in `control_days`, left-joined. A row missing a
+        band carries nulls. `keys` unchanged if both are empty.
     """
+    if not (mean_days or control_days):
+        return keys
     sites = sorted(keys["site"].unique().to_list())
-    arms = _ens_member_arms(
-        extract=efh.members(sites=sites),
-        domain=domain,
-        days=EXTRA_ENS_DAYS,
-        method=UPSAMPLING_METHODS[domain],
-        ensemble_size=efh.ENSEMBLE_SIZE,
-        arm_name=lambda way, day: efh.ens_arm(way=way, day=day),
-        ways=("mean",),
-    )
+    extract = efh.members(sites=sites)
+    arms: list[pl.DataFrame] = []
+    for day in sorted({*mean_days, *control_days}):
+        arms += _ens_member_arms(
+            extract=extract,
+            domain=domain,
+            days=(day,),
+            method=UPSAMPLING_METHODS[domain],
+            ensemble_size=efh.ENSEMBLE_SIZE,
+            arm_name=lambda way, band: efh.ens_arm(way=way, day=band),
+            ways=extra_ens_ways(day=day, mean_days=mean_days, control_days=control_days),
+        )
     frame = keys
     for arm_frame in arms:
         frame = frame.join(arm_frame, on=["site", "time"], how="left")
     return frame
 
 
+def extra_ens_ways(
+    *, day: int, mean_days: tuple[int, ...], control_days: tuple[int, ...]
+) -> tuple[str, ...]:
+    """Return which ENS reductions one day's band is built for.
+
+    Args:
+        day: The band.
+        mean_days: The days the ENS mean is wanted at.
+        control_days: The days the ENS control member is wanted at.
+
+    Returns:
+        `"mean"` if `day` is in `mean_days`, then `"control"` if it is in `control_days`.
+    """
+    return tuple(
+        way for way, days in (("mean", mean_days), ("control", control_days)) if day in days
+    )
+
+
 def build_extra_leads(
-    *, domain: DomainType, published_dir: Path, output_dir: Path, gefs_window_dir: Path | None
+    *,
+    domain: DomainType,
+    published_dir: Path,
+    output_dir: Path,
+    gefs_window_dir: Path | None,
+    batch: ExtraBatchType = "first",
 ) -> Path:
     """Build the exploratory lead columns on the published inputs' own `(site, time)` keys.
 
@@ -944,6 +1019,7 @@ def build_extra_leads(
         published_dir: The folder holding the published `<domain>_forecast_inputs.parquet`.
         output_dir: The new folder to write `<domain>_extra_lead_inputs.parquet` into.
         gefs_window_dir: A `GEFS_window_*` test extract, or `None` for the month cache.
+        batch: Which extra-lead build (`EXTRA_LEAD_BUILDS`).
 
     Returns:
         The written file's path.
@@ -962,18 +1038,29 @@ def build_extra_leads(
     keys = pl.read_parquet(published_dir / f"{domain}_forecast_inputs.parquet").select(
         "site", "time"
     )
-    last_month = keys.select(pl.col("time").max().dt.strftime("%Y-%m")).item()
-    cache_files = list(_gefs_months_available(last_month=last_month).values())
-    failures = [
-        *gefs_window_verdict(table=gefs_window_table(files=cache_files)),
-        *gefs_boundary_verdict(table=gefs_boundary_table(files=cache_files)),
-    ]
-    if failures:
-        msg = f"GEFS beyond 240 h is not a 6-hour window mean: {failures}"
-        raise RuntimeError(msg)
-    frame = _previous_runs_frame(keys=keys, domain=domain, day_offsets=EXTRA_PRODUCT_DAY_OFFSETS)
-    frame = _ens_extra_frame(keys=frame, domain=domain)
-    frame = _gefs_frame(keys=frame, domain=domain, window_dir=gefs_window_dir, days=EXTRA_GEFS_DAYS)
+    build = EXTRA_LEAD_BUILDS[batch]
+    if max(gefs_band_leads(days=build.gefs_days), default=0) > GEFS_STEP_MEAN_MAX_LEAD_HOURS:
+        last_month = keys.select(pl.col("time").max().dt.strftime("%Y-%m")).item()
+        cache_files = list(_gefs_months_available(last_month=last_month).values())
+        failures = [
+            *gefs_window_verdict(table=gefs_window_table(files=cache_files)),
+            *gefs_boundary_verdict(table=gefs_boundary_table(files=cache_files)),
+        ]
+        if failures:
+            msg = f"GEFS beyond 240 h is not a 6-hour window mean: {failures}"
+            raise RuntimeError(msg)
+    frame = (
+        _previous_runs_frame(keys=keys, domain=domain, day_offsets=build.product_day_offsets)
+        if build.product_day_offsets
+        else keys
+    )
+    frame = _ens_extra_frame(
+        keys=frame,
+        domain=domain,
+        mean_days=build.ens_mean_days,
+        control_days=build.ens_control_days,
+    )
+    frame = _gefs_frame(keys=frame, domain=domain, window_dir=gefs_window_dir, days=build.gefs_days)
     output_dir.mkdir(parents=True, exist_ok=True)
     frame.write_parquet(output_path)
     _LOG.info("%s: wrote %d rows, %d columns to %s", domain, frame.height, frame.width, output_path)
@@ -998,6 +1085,13 @@ def main() -> int:
         "the published inputs' keys, into a new --output-dir.",
     )
     parser.add_argument(
+        "--batch",
+        choices=("first", "second"),
+        default="first",
+        help="With --extra-leads: which extra-lead build (the second adds ENS mean at day 7, the "
+        "ENS control member at days 5, 7, 10 and 14, and GEFS mean at day 7).",
+    )
+    parser.add_argument(
         "--published-dir",
         type=Path,
         default=_repo_data_dir() / "studies" / DEFAULT_OUTPUT_DIR_NAME,
@@ -1018,6 +1112,7 @@ def main() -> int:
                 published_dir=args.published_dir,
                 output_dir=args.output_dir,
                 gefs_window_dir=args.gefs_window_dir,
+                batch=args.batch,
             )
         return 0
     args.output_dir.mkdir(parents=True, exist_ok=True)

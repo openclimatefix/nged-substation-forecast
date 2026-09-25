@@ -11,6 +11,13 @@ than refitting, and refuses to overwrite `report.md`.
 
 The arms:
 
+Two batches run into two folders (`--batch first` and `--batch second`, the latter with
+`--first-batch-dir` so its contrast tables can name the first batch's arms). The second batch's
+arms are `SECOND_NEW_PREFIXES` (ENS mean at day 7, ENS control member at days 2, 3, 5, 7, 10 and
+14, GEFS mean at day 7) and `SECOND_REFERENCE_PREFIXES` (GPU refits of the published arms the
+first batch left on the CPU), so that every mark on the leaderboard is a GPU fit. The first batch's
+arms:
+
 - **New arms:** ENS mean at days 5, 10 and 14; GEFS mean at days 0, 5, 10 and 14; IFS 0.25° and GFS
   at days 0, 5 and 7; ICON global at days 0 and 5; every other Previous Runs product at day 0
   (Open-Meteo's freshest run covering each hour); and the ENS control member at day 0, whose
@@ -34,10 +41,10 @@ import concurrent.futures
 import logging
 import sys
 from pathlib import Path
-from typing import Final
+from typing import Final, NamedTuple
 
 import polars as pl
-from build_forecast_inputs import PRODUCT_SLUGS, SOLAR_ONLY_PRODUCTS
+from build_forecast_inputs import PRODUCT_SLUGS, SOLAR_ONLY_PRODUCTS, ExtraBatchType
 from nwp_forecast_comparison import (
     METRIC,
     PERCENTAGE_POINTS,
@@ -202,6 +209,119 @@ MAX_MISSING_SHARE: Final[float] = 0.015
 published exploratory arms reach at most 1.48%."""
 
 
+SECOND_NEW_PREFIXES: Final[tuple[str, ...]] = (
+    "ens_mean_day7",
+    "ens_control_day2",
+    "ens_control_day3",
+    "ens_control_day5",
+    "ens_control_day7",
+    "ens_control_day10",
+    "ens_control_day14",
+    "gefs_mean_day7",
+)
+"""The second batch's arms with no fit yet. `ens_control_day2` and `ens_control_day3` take their
+columns from the published inputs; the rest take theirs from the second batch's build. The ENS
+control member's day 0 and day 1 arms are not here: the first batch fits them (`ens_control_day0`,
+`ens_control_day1`)."""
+
+SECOND_REFERENCE_PREFIXES: Final[tuple[str, ...]] = (
+    "ens_mean_day2",
+    "gefs_mean_day2",
+    "ifs025_day2",
+    "gfs_day2",
+    "icon_global_day2",
+    "icon_eu_day2",
+    "icon_eu_day3",
+    "arpege_day2",
+    "arpege_day3",
+)
+"""The published arms that the leaderboard draws and that the first batch did not refit on the GPU,
+so that no mark on the leaderboard mixes devices. Climatology and the persistence baselines are not
+XGBoost fits and have no device."""
+
+SECOND_SAME_PRODUCT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("ens_mean_day7", "ens_mean_day5"),
+    ("ens_mean_day10", "ens_mean_day7"),
+    ("gefs_mean_day7", "gefs_mean_day5"),
+    ("gefs_mean_day10", "gefs_mean_day7"),
+    ("ens_control_day3", "ens_control_day2"),
+    ("ens_control_day5", "ens_control_day3"),
+    ("ens_control_day7", "ens_control_day5"),
+    ("ens_control_day10", "ens_control_day7"),
+    ("ens_control_day14", "ens_control_day10"),
+)
+"""Each arm against the same product at the next shorter lead fitted, as (treatment, reference). The
+first four take an arm of the first batch, read through `--first-batch-dir`."""
+
+SECOND_ENSEMBLE_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("gefs_mean_day7", "ens_mean_day7"),
+    ("ens_control_day2", "ens_mean_day2"),
+    ("ens_control_day3", "ens_mean_day3"),
+    ("ens_control_day5", "ens_mean_day5"),
+    ("ens_control_day7", "ens_mean_day7"),
+    ("ens_control_day10", "ens_mean_day10"),
+    ("ens_control_day14", "ens_mean_day14"),
+)
+"""GEFS mean and the ENS control member against the ENS mean at the same day, which share ENS's
+lead."""
+
+SECOND_CLIMATOLOGY_CONTRASTS: Final[tuple[str, ...]] = (
+    "ens_mean_day7",
+    "gefs_mean_day7",
+    "ens_control_day10",
+    "ens_control_day14",
+)
+"""The second batch's arms compared with the published no-weather climatology baseline."""
+
+
+class ArmBatch(NamedTuple):
+    """One fit batch's arms and the contrasts its report tabulates."""
+
+    new_prefixes: tuple[str, ...]
+    reference_prefixes: tuple[str, ...]
+    same_product_contrasts: tuple[tuple[str, str], ...]
+    ensemble_contrasts: tuple[tuple[str, str], ...]
+    near_analysis_contrasts: tuple[tuple[str, str], ...]
+    elsewhere_contrasts: tuple[tuple[str, str], ...]
+    climatology_contrasts: tuple[str, ...]
+
+
+BATCHES: Final[dict[ExtraBatchType, ArmBatch]] = {
+    "first": ArmBatch(
+        new_prefixes=NEW_PREFIXES,
+        reference_prefixes=REFERENCE_PREFIXES,
+        same_product_contrasts=SAME_PRODUCT_CONTRASTS,
+        ensemble_contrasts=ENSEMBLE_CONTRASTS,
+        near_analysis_contrasts=NEAR_ANALYSIS_CONTRASTS,
+        elsewhere_contrasts=ELSEWHERE_CONTRASTS,
+        climatology_contrasts=CLIMATOLOGY_CONTRASTS,
+    ),
+    "second": ArmBatch(
+        new_prefixes=SECOND_NEW_PREFIXES,
+        reference_prefixes=SECOND_REFERENCE_PREFIXES,
+        same_product_contrasts=SECOND_SAME_PRODUCT_CONTRASTS,
+        ensemble_contrasts=SECOND_ENSEMBLE_CONTRASTS,
+        near_analysis_contrasts=(),
+        elsewhere_contrasts=(),
+        climatology_contrasts=SECOND_CLIMATOLOGY_CONTRASTS,
+    ),
+}
+"""The two fit batches, by the name `--batch` takes."""
+
+
+def batch_prefixes(*, batch: ArmBatch, domain: DomainType) -> tuple[str, ...]:
+    """Return every arm a batch fits for one technology, new arms first.
+
+    Args:
+        batch: One of `BATCHES`.
+        domain: `solar` or `wind`.
+
+    Returns:
+        The batch's new and reference arms, without the arms of solar-only products for wind.
+    """
+    return domain_prefixes(domain=domain, prefixes=(*batch.new_prefixes, *batch.reference_prefixes))
+
+
 def joined_rows(*, published_dir: Path, output_dir: Path, domain: DomainType) -> pl.DataFrame:
     """Return the published shared rows with the extra-lead columns joined on.
 
@@ -247,30 +367,34 @@ def domain_prefixes(*, domain: DomainType, prefixes: tuple[str, ...]) -> tuple[s
     return tuple(prefix for prefix in prefixes if not prefix.startswith(solar_only))
 
 
-def check_saved_losses_hold_arms(*, losses: pl.DataFrame, domain: DomainType, path: Path) -> None:
+def check_saved_losses_hold_arms(
+    *, losses: pl.DataFrame, domain: DomainType, path: Path, batch: ArmBatch
+) -> None:
     """Raise if saved losses lack any arm this run reports.
 
     Args:
         losses: A domain's saved per-row losses, with an `arm` column.
         domain: `solar` or `wind`.
         path: Where the losses were read from, named in the error.
+        batch: The batch whose arms the losses must hold.
 
     Raises:
-        ValueError: If an arm of `NEW_PREFIXES` or `REFERENCE_PREFIXES` for `domain` is absent.
+        ValueError: If an arm of `batch` for `domain` is absent.
     """
-    expected = set(domain_prefixes(domain=domain, prefixes=(*NEW_PREFIXES, *REFERENCE_PREFIXES)))
+    expected = set(batch_prefixes(batch=batch, domain=domain))
     lacking = sorted(expected - set(losses["arm"].unique().to_list()))
     if lacking:
         msg = f"{path} lacks arms {lacking}; use a new --output-dir"
         raise ValueError(msg)
 
 
-def missing_shares(*, frame: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
+def missing_shares(*, frame: pl.DataFrame, domain: DomainType, batch: ArmBatch) -> pl.DataFrame:
     """Return each new arm's share of rows with any missing weather value.
 
     Args:
         frame: `joined_rows`'s result.
         domain: `solar` or `wind`.
+        batch: The batch whose new arms are checked.
 
     Returns:
         One row per new arm present in `frame`, with `arm` and `share`.
@@ -280,7 +404,7 @@ def missing_shares(*, frame: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
             lead with coverage.
     """
     records = []
-    for prefix in domain_prefixes(domain=domain, prefixes=NEW_PREFIXES):
+    for prefix in domain_prefixes(domain=domain, prefixes=batch.new_prefixes):
         columns = arm_columns(domain=domain, prefixes=(prefix,))
         weather = [name for name in columns if name.startswith(f"{prefix}_")]
         if not weather or not all(name in frame.columns for name in weather):
@@ -311,7 +435,7 @@ def fit_arms(
         workers: How many (arm, site) fits run at once.
 
     Returns:
-        Every fit's per-row losses, labelled with `arm` and `setting`.
+        Every fit's per-row losses, labelled with `arm`, `setting` and `device`.
 
     Raises:
         ValueError: If an arm's columns are absent from `frame`, which would otherwise drop the
@@ -341,7 +465,9 @@ def fit_arms(
         for done, future in enumerate(concurrent.futures.as_completed(futures), start=1):
             prefix, site = futures[future]
             outputs.append(
-                future.result().with_columns(arm=pl.lit(prefix), setting=pl.lit(SETTING))
+                future.result().with_columns(
+                    arm=pl.lit(prefix), setting=pl.lit(SETTING), device=pl.lit(DEVICE)
+                )
             )
             _LOG.info("%s: %d/%d done: %s / site %s", domain, done, len(futures), prefix, site)
     return pl.concat(outputs)
@@ -447,7 +573,13 @@ def by_hour_modulo(
 
 
 def report_domain(
-    *, domain: DomainType, losses: pl.DataFrame, published: pl.DataFrame, shares: pl.DataFrame
+    *,
+    domain: DomainType,
+    losses: pl.DataFrame,
+    published: pl.DataFrame,
+    shares: pl.DataFrame,
+    batch: ArmBatch,
+    context: pl.DataFrame | None = None,
 ) -> list[str]:
     """Write one technology's report section.
 
@@ -456,12 +588,21 @@ def report_domain(
         losses: The new fits' per-row losses at the primary setting.
         published: The published CPU fits' per-row losses at the primary setting.
         shares: `missing_shares`'s result.
+        batch: The batch whose contrasts the report tabulates.
+        context: Another batch's GPU losses at the primary setting, or None. The contrast tables
+            read the arms of `losses` and `context` together, so a contrast can name an arm the
+            other batch fitted.
 
     Returns:
         The section's Markdown lines.
     """
-    arms = list(domain_prefixes(domain=domain, prefixes=(*NEW_PREFIXES, *REFERENCE_PREFIXES)))
+    arms = list(batch_prefixes(batch=batch, domain=domain))
     board = leaderboard(losses=losses, arms=arms)
+    pooled = (
+        losses
+        if context is None
+        else pl.concat([losses, context.drop("device", strict=False)], how="diagonal_relaxed")
+    )
     lines = [
         f"## {domain.capitalize()}",
         "",
@@ -491,56 +632,61 @@ def report_domain(
     ]
     for title, pairs in (
         (
-            (
-                "Change with lead: each new arm minus the same product at day 3 (day 0 and day 7 "
-                "arms: minus day 1 or day 3 as named)"
-            ),
-            SAME_PRODUCT_CONTRASTS,
+            "Change with lead: each arm minus the same product at the lead named",
+            batch.same_product_contrasts,
         ),
         (
             (
                 "Other products against ENS at the same day (Previous Runs day-0 rows mix "
-                "weather models and leads)"
+                "weather models and leads; GEFS and the ENS control member share ENS's lead)"
             ),
-            ENSEMBLE_CONTRASTS,
+            batch.ensemble_contrasts,
         ),
     ):
-        table = [contrast_line(losses=losses, treatment=t, reference=r) for t, r in pairs]
+        table = [contrast_line(losses=pooled, treatment=t, reference=r) for t, r in pairs]
         lines += ["", f"### {title}", *header, *(line for line in table if line)]
     near = [*header]
-    for treatment, reference in NEAR_ANALYSIS_CONTRASTS:
-        line = contrast_line(losses=losses, treatment=treatment, reference=reference)
+    for treatment, reference in batch.near_analysis_contrasts:
+        line = contrast_line(losses=pooled, treatment=treatment, reference=reference)
         if line:
             near.append(line)
             near.extend(
                 by_hour_modulo(
-                    domain=domain, losses=losses, treatment=treatment, reference=reference
+                    domain=domain, losses=pooled, treatment=treatment, reference=reference
                 )
             )
-    lines += ["", "### ICON-D2 against ICON-EU, whole and by hour of day modulo 3", *near]
+    if batch.near_analysis_contrasts:
+        lines += ["", "### ICON-D2 against ICON-EU, whole and by hour of day modulo 3", *near]
     climatology = published.filter(pl.col("arm") == "climatology")
-    with_climatology = pl.concat([losses, climatology], how="vertical_relaxed")
+    with_climatology = pl.concat(
+        [pooled.drop("device", strict=False), climatology], how="vertical_relaxed"
+    )
     elsewhere = [
-        contrast_line(losses=losses, treatment=t, reference=r) for t, r in ELSEWHERE_CONTRASTS
+        contrast_line(losses=pooled, treatment=t, reference=r) for t, r in batch.elsewhere_contrasts
     ]
     elsewhere += [
         contrast_line(losses=with_climatology, treatment=arm, reference="climatology")
-        for arm in CLIMATOLOGY_CONTRASTS
+        for arm in batch.climatology_contrasts
     ]
     lines += [
         "",
-        "### Long leads against climatology, and day 0 against ENS at day 0",
+        "### Long leads against climatology, and other contrasts between arms fitted here",
         *header,
         *(line for line in elsewhere if line),
     ]
-    lines += [
-        "",
-        "### Absolute error by hour of day modulo 3, ICON-D2 and ICON-EU at day 0",
-        "",
-        "| Arm | Hour of day mod 3 (served lead) | Error (% of capacity) | 95% interval | Rows |",
-        "|---|---|---|---|---|",
-    ]
-    for arm in ("icon_d2_day0", "icon_eu_day0"):
+    icon_arms = ("icon_d2_day0", "icon_eu_day0") if batch.near_analysis_contrasts else ()
+    if icon_arms:
+        lines += [
+            "",
+            "### Absolute error by hour of day modulo 3, ICON-D2 and ICON-EU at day 0",
+            "",
+            (
+                "| Arm | Hour of day mod 3 (served lead) | Error (% of capacity) "
+                "| 95% interval | Rows |"
+            ),
+            "|---|---|---|---|---|",
+        ]
+    for arm in icon_arms:
         for remainder in range(HOUR_MODULO):
             subset = losses.filter(pl.col("time").dt.hour() % HOUR_MODULO == remainder)
             if arm not in set(subset["arm"].unique().to_list()):
@@ -555,7 +701,7 @@ def report_domain(
                 f"| [{text.split(' [')[1]} | {result['n_rows']} |"
             )
     noise = ["", "### Device noise floor: GPU fit minus published CPU fit, same arm", *header]
-    for prefix in domain_prefixes(domain=domain, prefixes=REFERENCE_PREFIXES):
+    for prefix in domain_prefixes(domain=domain, prefixes=batch.reference_prefixes):
         both = pl.concat(
             [
                 losses.filter(pl.col("arm") == prefix).with_columns(arm=pl.lit("gpu")),
@@ -575,12 +721,13 @@ def report_domain(
     return [*lines, *noise, ""]
 
 
-def require_arms(*, frame: pl.DataFrame, domain: DomainType) -> None:
+def require_arms(*, frame: pl.DataFrame, domain: DomainType, batch: ArmBatch) -> None:
     """Raise unless every arm to fit has all its columns in `frame`.
 
     Args:
         frame: `joined_rows`'s result.
         domain: `solar` or `wind`.
+        batch: The batch whose arms are fitted.
 
     Raises:
         ValueError: If any arm is missing columns, which a GEFS gate that returned the keys
@@ -588,7 +735,7 @@ def require_arms(*, frame: pl.DataFrame, domain: DomainType) -> None:
     """
     absent = [
         prefix
-        for prefix in domain_prefixes(domain=domain, prefixes=(*NEW_PREFIXES, *REFERENCE_PREFIXES))
+        for prefix in batch_prefixes(batch=batch, domain=domain)
         if not all(name in frame.columns for name in arm_columns(domain=domain, prefixes=(prefix,)))
     ]
     if absent:
@@ -603,15 +750,37 @@ def main() -> int:
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--published-dir", type=Path, required=True)
     parser.add_argument("--workers", type=int, default=2, help="(arm, site) fits run at once.")
+    parser.add_argument(
+        "--batch",
+        choices=tuple(BATCHES),
+        default="first",
+        help="Which fit batch: the first (the day-0 to day-14 arms) or the second (ENS mean at "
+        "day 7, the ENS control member, GEFS mean at day 7, and GPU refits of the arms the first "
+        "batch left on the CPU).",
+    )
+    parser.add_argument(
+        "--first-batch-dir",
+        type=Path,
+        default=None,
+        help="With --batch second: the first batch's folder, whose losses the contrast tables "
+        "read for arms only that batch fitted.",
+    )
     parser.add_argument("--check", action="store_true", help="Compare two GPU runs of one arm.")
     parser.add_argument(
         "--report-only", action="store_true", help="Write the report from the saved losses."
     )
     args = parser.parse_args()
+    batch = BATCHES[args.batch]
     if args.output_dir.resolve() == args.published_dir.resolve():
         msg = "the output folder must not be the published folder"
         raise ValueError(msg)
     if args.check:
+        for domain in DOMAINS:
+            checked = joined_rows(
+                published_dir=args.published_dir, output_dir=args.output_dir, domain=domain
+            )
+            require_arms(frame=checked, domain=domain, batch=batch)
+            missing_shares(frame=checked, domain=domain, batch=batch)
         agree = check_determinism(published_dir=args.published_dir, output_dir=args.output_dir)
         sys.stdout.write(f"two GPU runs agree: {agree}\n")
         return 0 if agree else 1
@@ -625,30 +794,40 @@ def main() -> int:
         )
         for domain in DOMAINS
     }
-    shares = {domain: missing_shares(frame=frames[domain], domain=domain) for domain in DOMAINS}
+    shares = {
+        domain: missing_shares(frame=frames[domain], domain=domain, batch=batch)
+        for domain in DOMAINS
+    }
     for domain in DOMAINS:
-        require_arms(frame=frames[domain], domain=domain)
+        require_arms(frame=frames[domain], domain=domain, batch=batch)
     report = [
-        "# Extra lead days, GPU fits: report",
+        f"# Extra lead days, GPU fits, {args.batch} batch: report",
         "",
         (
             "Every arm is exploratory and fitted at the primary setting only, on the published "
             "shared rows and folds. Differences are first arm minus second, in percentage points "
             "of capacity; about 1 in 20 exploratory intervals reaches significance at the 5% level "
-            "by chance. Every day-0 arm is a nowcast, not a day-ahead forecast: a Previous Runs "
-            "product's day 0 is the freshest run covering each hour, at a lead set by that "
-            "product's own run cycle, and ENS's and GEFS's day 0 covers hours before the 00 UTC "
-            "run is published. The day-0 served lead is measured only for ICON-D2 and ICON-EU; "
-            "for every other product it is inferred from the run cycle."
+            "by chance."
         ),
         "",
     ]
+    if any(prefix.endswith("_day0") for prefix in batch.new_prefixes):
+        report += [
+            (
+                "Every day-0 arm is a nowcast, not a day-ahead forecast: a Previous Runs "
+                "product's day 0 is the freshest run covering each hour, at a lead set by that "
+                "product's own run cycle, and ENS's and GEFS's day 0 covers hours before the 00 "
+                "UTC run is published. The day-0 served lead is measured only for ICON-D2 and "
+                "ICON-EU; for every other product it is inferred from the run cycle."
+            ),
+            "",
+        ]
     for domain in DOMAINS:
         path = losses_path(output_dir=args.output_dir, domain=domain)
         if path.exists():
             _LOG.info("%s exists; reporting from the saved losses", path)
             losses = pl.read_parquet(path)
-            check_saved_losses_hold_arms(losses=losses, domain=domain, path=path)
+            check_saved_losses_hold_arms(losses=losses, domain=domain, path=path, batch=batch)
         elif args.report_only:
             msg = f"{path} does not exist; --report-only needs both domains' losses"
             raise FileNotFoundError(msg)
@@ -656,9 +835,7 @@ def main() -> int:
             losses = fit_arms(
                 frame=frames[domain],
                 domain=domain,
-                prefixes=domain_prefixes(
-                    domain=domain, prefixes=(*NEW_PREFIXES, *REFERENCE_PREFIXES)
-                ),
+                prefixes=batch_prefixes(batch=batch, domain=domain),
                 workers=args.workers,
             )
             losses.write_parquet(path)
@@ -668,8 +845,20 @@ def main() -> int:
         published = pl.read_parquet(
             losses_path(output_dir=args.published_dir, domain=domain)
         ).filter(pl.col("setting") == SETTING)
+        context = (
+            None
+            if args.first_batch_dir is None
+            else pl.read_parquet(
+                losses_path(output_dir=args.first_batch_dir, domain=domain)
+            ).filter(pl.col("setting") == SETTING)
+        )
         report += report_domain(
-            domain=domain, losses=losses, published=published, shares=shares[domain]
+            domain=domain,
+            losses=losses,
+            published=published,
+            shares=shares[domain],
+            batch=batch,
+            context=context,
         )
     report_path.write_text("\n".join(report))
     return 0

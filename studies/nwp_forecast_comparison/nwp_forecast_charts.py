@@ -23,8 +23,9 @@ writes its values into the SVG's accessibility text. The script stops if a site 
 of the anonymised labels.
 
 Run it with `uv run python studies/nwp_forecast_comparison/nwp_forecast_charts.py --input-dir
-DIR --output-dir DIR`. Each SVG is optimised with `npx svgo@4 --multipass --precision=1
---final-newline` unless `--no-svgo` is given. Charts belong under `docs/studies/assets/` only once a
+DIR --extra-dir DIR --extra-dir DIR --output-dir DIR`, with one `--extra-dir` per extra-lead fit
+folder. Each SVG is optimised with `npx svgo@4 --multipass --precision=1 --final-newline` unless
+`--no-svgo` is given. Charts belong under `docs/studies/assets/` only once a
 real report exists.
 """
 
@@ -36,7 +37,7 @@ import re
 import subprocess
 import sys
 from collections import Counter
-from collections.abc import Sequence
+from collections.abc import Collection, Mapping, Sequence
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Final, NamedTuple
@@ -231,30 +232,142 @@ def check_anonymised(*, frame: pl.DataFrame, domain: DomainType) -> None:
         raise ValueError(msg)
 
 
-def load(
-    *, input_dir: Path, domain: DomainType, extra_dir: Path | None = None
-) -> tuple[pl.DataFrame, pl.DataFrame]:
+PUBLISHED_DEVICE: Final[str] = "cpu"
+"""The device of the published fits, which `nwp_forecast_comparison.py` ran on the CPU."""
+
+EXTRA_DEVICE: Final[str] = "cuda"
+"""The device of an extra-lead fit that carries no `device` column: `fit_extra_leads.py` always ran
+on the GPU."""
+
+
+def extra_arm_devices(*, extras: Sequence[pl.DataFrame]) -> dict[str, str]:
+    """Map each arm the extra-lead folders hold to the device that fitted it.
+
+    Args:
+        extras: One losses frame per extra-lead folder, each with an `arm` column and optionally a
+            `device` column (`EXTRA_DEVICE` where absent).
+
+    Returns:
+        Each arm's device.
+
+    Raises:
+        ValueError: If an arm appears in two folders, or on two devices within one, which would
+            put two fits of one arm, possibly on different devices, into one figure.
+    """
+    devices: dict[str, str] = {}
+    for index, extra in enumerate(extras):
+        column = "device" if "device" in extra.columns else None
+        pairs = (
+            extra.select("arm", device=pl.col(column) if column else pl.lit(EXTRA_DEVICE))
+            .unique()
+            .iter_rows()
+        )
+        for arm, device in pairs:
+            if arm in devices:
+                msg = (
+                    f"arm {arm} is fitted twice: on {devices[arm]} before extra folder {index}, "
+                    f"and on {device} in it"
+                )
+                raise ValueError(msg)
+            devices[arm] = device
+    return devices
+
+
+def combine_losses(
+    *, published: pl.DataFrame, extras: Sequence[pl.DataFrame], prefer_extras: bool
+) -> pl.DataFrame:
+    """Stack the published losses and the extra-lead folders' losses.
+
+    Args:
+        published: The published CPU fits' losses.
+        extras: One losses frame per extra-lead folder.
+        prefer_extras: Whether an arm that both the published losses and an extra folder hold is
+            taken from the extra folder (its GPU refit) rather than from `published`.
+
+    Returns:
+        The stacked losses, without any `device` column.
+    """
+    extra = pl.concat(
+        [frame.drop("device", strict=False) for frame in extras], how="diagonal_relaxed"
+    )
+    held = extra["arm"].unique().to_list()
+    if prefer_extras:
+        published = published.filter(~pl.col("arm").is_in(held))
+    else:
+        extra = extra.filter(~pl.col("arm").is_in(published["arm"].unique().to_list()))
+    return pl.concat([published, extra], how="diagonal_relaxed")
+
+
+def check_single_device(
+    *, arms: Sequence[str], extra_devices: Mapping[str, str], published_arms: Collection[str]
+) -> None:
+    """Raise unless every arm drawn as a mark was fitted on one device.
+
+    Args:
+        arms: The arms the figure draws.
+        extra_devices: `extra_arm_devices`'s result.
+        published_arms: The arms of the published (CPU) fits.
+
+    Raises:
+        ValueError: If the arms were fitted on more than one device, or an arm has no fit.
+    """
+    by_device: dict[str, list[str]] = {}
+    for arm in arms:
+        device = extra_devices.get(arm, PUBLISHED_DEVICE if arm in published_arms else None)
+        by_device.setdefault(device or "unknown", []).append(arm)
+    if len(by_device) > 1 or "unknown" in by_device:
+        summary = {device: sorted(names) for device, names in sorted(by_device.items())}
+        msg = f"the leaderboard's marks mix devices: {summary}"
+        raise ValueError(msg)
+
+
+class Loaded(NamedTuple):
+    """One technology's saved outputs, as `load` returns them."""
+
+    losses: pl.DataFrame
+    predictions: pl.DataFrame
+    leaderboard_losses: pl.DataFrame
+    extra_devices: dict[str, str]
+    published_arms: frozenset[str]
+
+
+def load(*, input_dir: Path, domain: DomainType, extra_dirs: Sequence[Path] = ()) -> Loaded:
     """Read one technology's saved losses and predictions.
 
     Args:
         input_dir: The directory `nwp_forecast_comparison.py` wrote to.
         domain: `solar` or `wind`.
-        extra_dir: The directory `fit_extra_leads.py` wrote to, or None. Its arms that the published
-            losses do not hold (the extra lead days, fitted later on a GPU) are appended to the
-            losses; an arm both hold is taken from `input_dir`, so no contrast mixes devices.
+        extra_dirs: The directories `fit_extra_leads.py` wrote to. Their arms that the published
+            losses do not hold (the extra lead days, fitted later on a GPU) are appended to
+            `losses`, and an arm both hold is taken from `input_dir`, so no contrast mixes devices.
+            `leaderboard_losses` instead takes an arm both hold from the extra folder, so the
+            leaderboard's marks all come from GPU refits.
 
     Returns:
-        The per-row losses and the per-row predictions, after the anonymisation check.
+        The per-row losses, the per-row predictions, the losses for the leaderboard, each extra
+        arm's device, and the published arms, after the anonymisation check.
+
+    Raises:
+        ValueError: If an arm appears in two extra folders.
     """
-    losses = pl.read_parquet(losses_path(output_dir=input_dir, domain=domain))
-    if extra_dir is not None:
-        extra = pl.read_parquet(losses_path(output_dir=extra_dir, domain=domain))
-        new = extra.filter(~pl.col("arm").is_in(losses["arm"].unique().to_list()))
-        losses = pl.concat([losses, new], how="diagonal_relaxed")
+    published = pl.read_parquet(losses_path(output_dir=input_dir, domain=domain))
+    extras = [pl.read_parquet(losses_path(output_dir=path, domain=domain)) for path in extra_dirs]
+    devices = extra_arm_devices(extras=extras)
+    if extras:
+        losses = combine_losses(published=published, extras=extras, prefer_extras=False)
+        board = combine_losses(published=published, extras=extras, prefer_extras=True)
+    else:
+        losses = board = published
     predictions = pl.read_parquet(predictions_path(output_dir=input_dir, domain=domain))
     check_anonymised(frame=losses, domain=domain)
     check_anonymised(frame=predictions, domain=domain)
-    return losses, predictions
+    return Loaded(
+        losses=losses,
+        predictions=predictions,
+        leaderboard_losses=board,
+        extra_devices=devices,
+        published_arms=frozenset(published["arm"].unique().to_list()),
+    )
 
 
 def by_setting(*, losses: pl.DataFrame) -> dict[str, pl.DataFrame]:
@@ -486,6 +599,7 @@ LEAD_COLOURS: Final[dict[int, str]] = {
     2: ocf.DATA_SKY,
     3: ocf.DATA_DEEP_TEAL,
     5: ocf.DATA_GREEN,
+    7: ocf.ENSEMBLE_LINE,
     10: ocf.DATA_AMBER,
     14: ocf.DATA_BURNT_ORANGE,
 }
@@ -495,7 +609,9 @@ the bundled `validate_palette.py` all-pairs separation checks in light mode on t
 (worst colour-blind distance 10.5, worst normal-vision distance 19.5). Data Green fails the script's
 lightness band (L 0.81 against a ceiling of 0.77), and Data Sky, Data Green, and Data Amber are
 below 3:1 contrast against the background, so each lead's fixed slot within its row and the page's
-tables of every number carry the reading as well. Day 0 is black. Data Amber, Data Deep Teal, and
+tables of every number carry the reading as well. Day 0 is black. Day 7 is a neutral grey, the
+brand palette's mid grey, and a diamond like day 0, and carries a direct label as well, because no
+chromatic colour is left for it. Data Amber, Data Deep Teal, and
 Data Burnt Orange are internal-use colours, approved for the lead-day charts by the maintainer."""
 
 MAX_LINE_DAY: Final[int] = 3
@@ -511,15 +627,25 @@ LEAD_LABEL_ROOM: Final[float] = 1.5
 leaving room for the name written beside the smart-persistence line."""
 
 DEVICE_NOTES: Final[dict[DomainType, str]] = {
-    "solar": "a GPU refit of an arm differs from its CPU fit by at most 0.02 points",
+    "solar": "a GPU fit of an arm differs from its CPU fit by at most 0.02 points",
     "wind": (
-        "a GPU refit of an arm has an error 0.04 to 0.09 points lower than its CPU fit, in every "
+        "a GPU fit of an arm has an error 0.04 to 0.09 points lower than its CPU fit, in every "
         "estimate"
     ),
 }
 """How far a GPU refit of an arm lies from its published CPU fit (the extra-lead report's device
 noise floor), for the leaderboard's subtitle. For wind every estimate is lower, though no single
 interval excludes zero."""
+
+DAY_SEVEN: Final[int] = 7
+"""The lead day whose marks carry a direct label as well as the grey diamond."""
+
+DAY_SEVEN_LABEL: Final[str] = "day 7"
+"""The direct label written beside each day-7 mark's interval."""
+
+DIAMOND_DAYS: Final[frozenset[int]] = frozenset({0, 7})
+"""The lead days drawn as diamonds, a second encoding beside the colour: day 0 (black) and day 7
+(grey), the two days that are not one of the chromatic circles."""
 
 LEAD_POINT_SIZE: Final[int] = 45
 """The area of one lead-day mark, in square pixels."""
@@ -531,6 +657,22 @@ LEAD_DODGE_ROWS: Final[float] = 0.135
 """The vertical spacing between the marks of one product's lead days, in rows."""
 
 LEAD_ARM: Final[re.Pattern[str]] = re.compile(r"^(?P<slug>.+)_day(?P<day>\d+)$")
+
+
+def parsed_lead_arms(*, losses: pl.DataFrame) -> dict[str, tuple[str, int]]:
+    """Map each arm the leaderboard draws to its product slug and lead day.
+
+    Args:
+        losses: Saved per-row losses.
+
+    Returns:
+        `{arm: (slug, day)}` for every arm named `<slug>_day<N>` whose slug is a product.
+    """
+    return {
+        arm: (match["slug"], int(match["day"]))
+        for arm in sorted(losses["arm"].unique().to_list())
+        if (match := LEAD_ARM.match(arm)) and match["slug"] in PRODUCT_NAMES
+    }
 
 
 def lead_board_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
@@ -545,11 +687,7 @@ def lead_board_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
         fitted at has no row, so it is left blank rather than filled.
     """
     primary = by_setting(losses=losses)["primary"]
-    parsed = {
-        arm: (match["slug"], int(match["day"]))
-        for arm in sorted(primary["arm"].unique().to_list())
-        if (match := LEAD_ARM.match(arm)) and match["slug"] in PRODUCT_NAMES
-    }
+    parsed = parsed_lead_arms(losses=primary)
     board = leaderboard(losses=primary, arms=list(parsed))
     return (
         board.with_columns(
@@ -579,17 +717,26 @@ def lead_board_products(*, rows: pl.DataFrame) -> list[str]:
     return rows.filter(pl.col("day") == 1).sort("value")["product"].to_list()
 
 
-def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.VConcatChart:
+def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt.VConcatChart:
     """Draw each product's mean absolute error at each fitted lead day, one product per row.
 
     Args:
-        losses: Saved per-row losses.
+        loaded: `load`'s result; the marks come from `loaded.leaderboard_losses`.
         domain: `solar` or `wind`.
         title: The figure's title.
 
     Returns:
         The figure.
+
+    Raises:
+        ValueError: If the marks were fitted on more than one device.
     """
+    losses = loaded.leaderboard_losses
+    check_single_device(
+        arms=list(parsed_lead_arms(losses=by_setting(losses=losses)["primary"])),
+        extra_devices=loaded.extra_devices,
+        published_arms=loaded.published_arms,
+    )
     rows = lead_board_rows(losses=losses)
     products = lead_board_products(rows=rows)
     baselines = leaderboard(
@@ -667,10 +814,22 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
             shape=alt.Shape(
                 "lead:N",
                 scale=alt.Scale(
-                    domain=lead_names, range=["diamond" if day == 0 else "circle" for day in days]
+                    domain=lead_names,
+                    range=["diamond" if day in DIAMOND_DAYS else "circle" for day in days],
                 ),
                 legend=None,
             ),
+        )
+    )
+    day_seven = data.filter(pl.col("day") == DAY_SEVEN).with_columns(text=pl.lit(DAY_SEVEN_LABEL))
+    day_seven_labels = (
+        alt.Chart(day_seven)
+        .mark_text(align="left", dx=6, baseline="middle", fontSize=9, clip=True, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("upper_95:Q", scale=x_scale, axis=x_axis, title=x_title),
+            y=alt.Y("y:Q", scale=y_scale, axis=y_axis),
+            text="text:N",
+            color=alt.value(LEAD_COLOURS[DAY_SEVEN]),
         )
     )
     reference = baselines.with_columns(
@@ -695,7 +854,7 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
         for arm, align, dx in ((low_arm, "right", -5), (high_arm, "left", 5))
     ]
     panel = alt.LayerChart(
-        layer=[rules, reference_rules, intervals, points, *reference_text],
+        layer=[rules, reference_rules, intervals, points, day_seven_labels, *reference_text],
         width=PLOT_WIDTH_PX,
         height=LEAD_ROW_PX * (len(products) + LEAD_LABEL_ROWS - 0.5),
     )
@@ -719,13 +878,13 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
                 "that product; nothing is filled in. Dashed lines mark the no-weather baselines."
             ),
             (
-                "Within each row, marks run from day 0 at the top to day 14 at the bottom. Day 0 "
+                "Within each row, marks run from day 0 at the top to day 14 at the bottom; day 7 "
+                'is a grey diamond, labelled "day 7", and day 0 is a black diamond. Day 0 '
                 "is read from a run that started 0 to 23 hours (ENS) or 0 to 3 hours (ICON-EU and "
                 "ICON-D2, Open-Meteo's freshest run) before the hour it describes, so it is not a "
-                "day-ahead forecast a service could read. Marks at days 5, 10, and 14, and the "
-                "day-0 marks of ICON-EU and ICON-D2, were fitted later, on a graphics processing "
-                "unit (GPU), at the primary "
-                f"setting only; {DEVICE_NOTES[domain]}. "
+                "day-ahead forecast a service could read. Every mark is an XGBoost model fitted "
+                "on a graphics processing unit (GPU) at the primary setting, so no mark mixes "
+                f"devices; {DEVICE_NOTES[domain]}. "
                 f"Overlapping intervals here can still hide a significant paired difference "
                 f"(Figure {FIGURE_NUMBERS[(domain, 'headline')]}). {DOTS_NOTE}"
             ),
@@ -733,7 +892,7 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
                 "Leads are not equal: a forecast from Open-Meteo's Previous Runs archive comes "
                 "from the freshest run made at least a day before the hour it describes, so its "
                 "day-1 lead is shorter than ENS's on most hours, which favours that product. "
-                "Of the products drawn here, only GEFS shares ENS's lead."
+                "Of the products drawn here, only GEFS and the ENS control member share ENS's lead."
             ),
             f"{scope_text(losses=losses, domain=domain)} {CAPACITY_NOTE}",
         ],
@@ -1508,14 +1667,14 @@ TITLES: Final[dict[tuple[DomainType, str], str]] = {
         "lowers the error by 0.18 points even at a conservative lead"
     ),
     ("solar", "leaderboard"): (
-        "Error rises with lead to day 10: at day 1 every weather forecast shown has a lower error "
-        "than climatology (14.5%), but at day 14 neither the ENS mean nor the GEFS mean does; ENS "
-        "and IFS 0.25° have the lowest day-1 errors"
+        "For solar power, error rises with lead to day 10: at day 1 every weather forecast shown "
+        "has a lower error than climatology (14.5%), but at day 14 neither the ENS mean nor the "
+        "GEFS mean does; ENS and IFS 0.25° have the lowest day-1 errors"
     ),
     ("wind", "leaderboard"): (
-        "Error rises with lead: at day 1 every weather forecast shown has a lower error than "
-        "climatology (18.5%), but at day 14 neither the ENS mean nor the GEFS mean does; ENS "
-        "and IFS 0.25° have the lowest day-1 errors"
+        "For wind power, error rises with lead: at day 1 every weather forecast shown has a lower "
+        "error than climatology (18.5%), but at day 14 neither the ENS mean nor the GEFS mean "
+        "does; ENS and IFS 0.25° have the lowest day-1 errors"
     ),
     ("solar", "models_work"): (
         "Out-of-fold day-1 ENS-mean forecasts follow the measured output at all six solar farms"
@@ -1570,24 +1729,25 @@ def optimise(*, path: Path) -> None:
 
 
 def draw_domain(
-    *, input_dir: Path, domain: DomainType, extra_dir: Path | None = None
+    *, input_dir: Path, domain: DomainType, extra_dirs: Sequence[Path] = ()
 ) -> tuple[dict[str, alt.VConcatChart], str | None]:
     """Draw every chart of one technology that its saved losses can support.
 
     Args:
         input_dir: The directory `nwp_forecast_comparison.py` wrote to.
         domain: `solar` or `wind`.
-        extra_dir: The directory `fit_extra_leads.py` wrote to, or None.
+        extra_dirs: The directories `fit_extra_leads.py` wrote to.
 
     Returns:
         Each chart keyed by its name, and the chosen week's month and year.
     """
-    losses, predictions = load(input_dir=input_dir, domain=domain, extra_dir=extra_dir)
+    loaded = load(input_dir=input_dir, domain=domain, extra_dirs=extra_dirs)
+    losses, predictions = loaded.losses, loaded.predictions
     week_month: str | None = None
     charts: dict[str, alt.VConcatChart | None] = {
         "headline": headline(losses=losses, domain=domain, title=TITLES[(domain, "headline")]),
         "leaderboard": leaderboard_figure(
-            losses=losses, domain=domain, title=TITLES[(domain, "leaderboard")]
+            loaded=loaded, domain=domain, title=TITLES[(domain, "leaderboard")]
         ),
         "by_lead_day": by_lead_day(
             losses=losses, domain=domain, title=TITLES[(domain, "by_lead_day")]
@@ -1614,7 +1774,11 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-dir", type=Path, required=True, help="Saved losses' directory.")
     parser.add_argument(
-        "--extra-dir", type=Path, default=None, help="The extra lead days' losses directory."
+        "--extra-dir",
+        type=Path,
+        action="append",
+        default=[],
+        help="An extra lead days' losses directory; repeat it for each fit batch.",
     )
     parser.add_argument("--output-dir", type=Path, required=True, help="Where SVGs are written.")
     parser.add_argument("--no-svgo", action="store_true", help="Skip the svgo optimisation.")
@@ -1622,7 +1786,7 @@ def main() -> int:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     for domain in DOMAINS:
         charts, week_month = draw_domain(
-            input_dir=args.input_dir, domain=domain, extra_dir=args.extra_dir
+            input_dir=args.input_dir, domain=domain, extra_dirs=args.extra_dir
         )
         for name, chart in charts.items():
             path = args.output_dir / f"nwp_forecast_{domain}_{name}.svg"

@@ -8,9 +8,14 @@ _STUDY_DIR = Path(__file__).resolve().parents[3] / "studies" / "nwp_forecast_com
 sys.path.insert(0, str(_STUDY_DIR))
 sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
 
+from build_forecast_inputs import EXTRA_LEAD_BUILDS, extra_ens_ways  # noqa: E402
 from fit_extra_leads import (  # noqa: E402
+    BATCHES,
     NEW_PREFIXES,
     REFERENCE_PREFIXES,
+    SECOND_NEW_PREFIXES,
+    SECOND_REFERENCE_PREFIXES,
+    batch_prefixes,
     check_saved_losses_hold_arms,
     domain_prefixes,
 )
@@ -32,10 +37,78 @@ def test_solar_prefixes_keep_every_arm():
 def test_saved_losses_missing_a_new_arm_raise():
     arms = domain_prefixes(domain="wind", prefixes=(*NEW_PREFIXES, *REFERENCE_PREFIXES))
     complete = pl.DataFrame({"arm": list(arms)})
-    check_saved_losses_hold_arms(losses=complete, domain="wind", path=Path("wind_losses.parquet"))
+    check_saved_losses_hold_arms(
+        losses=complete, domain="wind", path=Path("wind_losses.parquet"), batch=BATCHES["first"]
+    )
 
     incomplete = complete.filter(pl.col("arm") != NEW_PREFIXES[0])
     with pytest.raises(ValueError, match=NEW_PREFIXES[0]):
         check_saved_losses_hold_arms(
-            losses=incomplete, domain="wind", path=Path("wind_losses.parquet")
+            losses=incomplete,
+            domain="wind",
+            path=Path("wind_losses.parquet"),
+            batch=BATCHES["first"],
         )
+
+
+def test_saved_losses_of_the_first_batch_lack_the_second_batchs_arms():
+    first = pl.DataFrame({"arm": list(batch_prefixes(batch=BATCHES["first"], domain="solar"))})
+
+    with pytest.raises(ValueError, match="ens_mean_day7"):
+        check_saved_losses_hold_arms(
+            losses=first,
+            domain="solar",
+            path=Path("solar_losses.parquet"),
+            batch=BATCHES["second"],
+        )
+
+
+def test_the_two_batches_fit_disjoint_arms():
+    first = set(NEW_PREFIXES) | set(REFERENCE_PREFIXES)
+    second = set(SECOND_NEW_PREFIXES) | set(SECOND_REFERENCE_PREFIXES)
+
+    assert not first & second
+
+
+def test_the_second_batch_leaves_the_control_members_first_batch_arms_alone():
+    second = set(SECOND_NEW_PREFIXES)
+
+    assert {"ens_control_day0", "ens_control_day1"}.isdisjoint(second)
+    assert {"ens_control_day2", "ens_control_day3", "ens_control_day14"} <= second
+
+
+def test_the_second_batch_leaves_the_days_the_plan_omits_absent():
+    arms = set(batch_prefixes(batch=BATCHES["second"], domain="solar"))
+
+    assert not {arm for arm in arms if arm.startswith(("ifs025", "gfs"))} - {
+        "ifs025_day2",
+        "gfs_day2",
+    }
+    assert not {arm for arm in arms if arm.endswith(("_day10", "_day14"))} - {
+        "ens_control_day10",
+        "ens_control_day14",
+    }
+
+
+def test_the_second_batch_drops_the_solar_only_products_for_wind():
+    wind = batch_prefixes(batch=BATCHES["second"], domain="wind")
+
+    assert not [arm for arm in wind if arm.startswith(("arpege", "arome"))]
+    assert "icon_eu_day3" in wind
+
+
+def test_the_second_build_adds_the_control_member_and_reads_no_previous_runs():
+    build = EXTRA_LEAD_BUILDS["second"]
+
+    assert build.ens_control_days == (5, 7, 10, 14)
+    assert build.ens_mean_days == (7,)
+    assert build.gefs_days == (7,)
+    assert not build.product_day_offsets
+
+
+def test_ens_ways_follow_the_days_each_reduction_is_wanted_at():
+    kwargs = {"mean_days": (7,), "control_days": (5, 7)}
+
+    assert extra_ens_ways(day=7, **kwargs) == ("mean", "control")
+    assert extra_ens_ways(day=5, **kwargs) == ("control",)
+    assert extra_ens_ways(day=10, **kwargs) == ()
