@@ -6,29 +6,30 @@
 > does not compare results across many regions or climates, so a result on this page may not hold
 > elsewhere.
 
-**At 6 solar farms and 3 wind farms in Lincolnshire, an XGBoost model given the ECMWF
-ensemble's mean forecast beats every forecast that reads no weather forecast out to day 5 for solar
-and day 7 for wind. From day 7 for solar and from day 10 for wind it no longer beats climatology, and
-by day 14 climatology is ahead. In a post hoc check, at day 14 the ensemble mean adds no statistically
-significant skill over the same model given no weather at all.** ENS is built to forecast a
-probability distribution, and this page scores only point forecasts made from it, so the day-14
-result says nothing about the skill of ENS's spread. ENS is ECMWF's ensemble forecast: one control
-run from ECMWF's unperturbed analysis of the current weather, run at about 9 km, and 50 runs started
-from perturbed initial conditions and run with stochastically perturbed model physics. The live
-service reads its 00 UTC run each day. Every error on this page is a mean absolute error as a
-percentage of each generator's capacity, taken as its 99th percentile of measured output rather than
-its nameplate rating; a difference between two errors is in percentage points of capacity, written
-"points"; and a bracketed pair after a figure is its 95% interval. At day 1, the day after the run,
-the ensemble mean gives an error of 8.80% [8.32, 9.27] for solar and 8.23% [7.45, 9.15] for wind. The
-error grows with every day of horizon: by day 7 it is 14.33% [13.40, 15.27] for solar and 16.76%
-[15.18, 18.53] for wind. At day 7 the best forecast that reads no weather forecast is climatology,
-each generator's typical output for the month and hour, at 14.50% [13.55, 15.49] for solar and 17.90%
-[16.09, 19.86] for wind; at days 0 to 3 for wind it is smart persistence. By day 14, climatology beats
-the ensemble mean by 0.72 points [0.15, 1.22] for solar and 1.24 points [0.56, 1.93] for wind. See
-["Where ENS stops beating the no-weather baselines"](#where-ens-stops-beating-the-no-weather-baselines)
-for the calendar-only check behind that last claim. The evidence is 50,643 generator-hours of solar
-from April 2024 to September 2026 and 43,089 generator-hours of wind from December 2024 to September
-2026.
+**At 6 solar farms and 3 wind farms in Lincolnshire, an XGBoost model given the ECMWF ensemble's
+mean forecast beats every forecast that reads no weather forecast out to day 5 for solar and day 7
+for wind. From day 7 for solar and from day 10 for wind it is no longer statistically significantly
+better than climatology at the main setting, and by day 14 climatology is ahead. The solar day-7 and
+day-14 results depend on the row set (see Limitations). In a post hoc check, at day 14 the ensemble
+mean adds no statistically significant skill over the same model given no weather at all.** ENS is
+built to forecast a probability distribution, and this page scores only point forecasts made from
+it, so the day-14 result says nothing about the skill of ENS's spread. ENS is ECMWF's ensemble
+forecast: one control run from ECMWF's unperturbed analysis of the current weather, run at about 9
+km, and 50 runs started from perturbed initial conditions and run with stochastically perturbed
+model physics. The live service reads its 00 UTC run each day. Every error on this page is a mean
+absolute error as a percentage of each generator's capacity, taken as its 99th percentile of
+measured output rather than its nameplate rating; a difference between two errors is in percentage
+points of capacity, written "points"; and a bracketed pair after a figure is its 95% interval. At
+day 1, the day after the run, the ensemble mean gives an error of 8.80% [8.32, 9.27] for solar and
+8.23% [7.45, 9.15] for wind. The error grows with every day of horizon: by day 7 it is 14.33%
+[13.40, 15.27] for solar and 16.76% [15.18, 18.53] for wind. At day 7 the best forecast that reads
+no weather forecast is climatology, each generator's typical output for the month and hour, at
+14.50% [13.55, 15.49] for solar and 17.90% [16.09, 19.86] for wind; at days 0 to 3 for wind it is
+smart persistence. By day 14, climatology beats the ensemble mean by 0.72 points [0.15, 1.22] for
+solar and 1.24 points [0.56, 1.93] for wind. See ["Where ENS stops beating the no-weather
+baselines"](#where-ens-stops-beating-the-no-weather-baselines) for the calendar-only check behind
+that last claim. The evidence is 50,643 generator-hours of solar from April 2024 to September 2026
+and 43,089 generator-hours of wind from December 2024 to September 2026.
 
 **Of three ways of using the ensemble, feeding the mean of its members to the XGBoost model does
 best at almost every horizon, as expected of an ensemble mean scored by mean absolute error.** It
@@ -75,13 +76,12 @@ forecast "beats" another, the difference is statistically significant at the 5% 
 - **[The ensemble mean beats the control member, and beats training on every member and averaging
   the forecasts, at almost every
   horizon.](#the-ensemble-mean-is-the-best-of-the-three-ways-tested)**
-- **[The ensemble mean beats the best no-weather baseline to day 5 for solar and to day 7 for wind;
-  by day 14 climatology is ahead. In a post hoc check, part of that ground is how the XGBoost model
-  uses its calendar columns; the rest is consistent with ENS adding little skill at that
-  lead.](#where-ens-stops-beating-the-no-weather-baselines)**
-- **[At day 1 the ensemble mean beats ERA5 for solar and loses to it for wind, and loses to UKV with
-  ICON-EU, the best of the inputs the blending page
-  compared.](#ens-against-past-weather)**
+- **[The ensemble mean beats the best no-weather baseline to day 5 for solar and to day 7 for wind
+  (for solar, at the main setting); by day 14 climatology is ahead. In a post hoc check, part of
+  that ground is how the XGBoost model uses its calendar columns; the rest is consistent with ENS
+  adding little skill at that lead.](#where-ens-stops-beating-the-no-weather-baselines)**
+- **[At day 1 the ensemble mean is level with ERA5 for solar and loses to it for wind, and loses to
+  UKV with ICON-EU, the best of the inputs the blending page compared.](#ens-against-past-weather)**
 
 ## Introduction
 
@@ -129,8 +129,9 @@ same hours. That leaves 50,643 of 54,791 solar hours, from 15 April 2024 to 10 S
 43,089 of 43,555 wind hours, from 1 December 2024 to 10 September 2026. The ENS archive starts on 1
 April 2024, and day 14 needs a run 14 days before the day it forecasts. Wind starts on 1 December
 2024, three weeks after ECMWF's Cycle 49r1 upgrade of 12 November 2024, so that no wind fit trains
-on one version of the ensemble and is scored on another. Solar keeps every row, because on solar the
-upgrade date is not treated as a break (see Limitations).
+on one version of the ensemble before Cycle 49r1 and is scored on another after it. Solar keeps every
+row. An era cut at Cycle 49r1 on all solar rows gives the same day-7 and day-14 results as no cut
+(see Limitations).
 
 ### Horizons and issue time
 
@@ -156,7 +157,7 @@ the direction, or both, taken from interpolated eastward and northward component
 before any result chose the combination every later comparison uses: starting from straight lines,
 try one change at a time, and keep it only if it lowers the ensemble-mean model's error at both day
 1 and day 7. The rule chose the clear-sky index for solar radiation, straight lines for solar
-temperature, and the components for wind speed.
+temperature, and the components for both wind direction and wind speed.
 
 ### The forecasts
 
@@ -316,7 +317,7 @@ planned. By day 14 the solar error is 15.22% [14.21, 16.16] and the wind error 1
 
 **The ensemble mean beats the control member at every horizon to day 10 for solar and to day 7 for
 wind.** Training on every member loses to the ensemble mean at every horizon to day 10, and to the
-control member at days 1 to 7 for solar and days 1 to 10 for wind. At day 1, the ensemble mean
+control member at days 1 to 7 for solar and days 0 to 10 for wind. At day 1, the ensemble mean
 beats the control member by 0.33 points [0.23, 0.44] for solar and 0.28 points [0.16, 0.40] for
 wind, and member by member loses to the ensemble mean by 0.48 points [0.35, 0.62] and 0.86 points
 [0.57, 1.18], all planned.
@@ -412,17 +413,17 @@ this. Swapping the ensemble mean's own day-of-year column for calendar month mov
 at short lead: `calendar_only_month` beats `calendar_only` by 0.52 points [0.14, 0.86] for solar and
 1.85 points [0.87, 3.08] for wind, a bigger gain than swapping the same column brings the ensemble
 mean at day 0 or day 1, though the ensemble mean gains 0.08 to 0.39 points from the swap at days 2
-to 7 for solar. For wind the swap lowers the ensemble mean's error at no horizon, and at day 5
-raises it by 0.23 points [0.05, 0.44]. Even with both arms on calendar month, the ensemble mean
-stops beating the no-weather arm after day 7 for solar and after day 5 for wind: at day 14 it is
-0.16 points [-0.07, 0.39] behind for solar (not significant) and 1.18 points [0.68, 1.73] behind for
-wind (statistically significant: with month controlled for, adding the day-14 ensemble mean makes
-this XGBoost model's wind forecast worse, not better). Against climatology itself, the month-based
-ensemble mean is also significantly behind at day 14: by 0.54 points [0.11, 0.98] for solar and 1.19
-points [0.57, 1.84] for wind. On this evidence, the ensemble mean carries no statistically
-significant point-forecast skill at day 14 for either technology, and for wind it is significantly
-worse than the no-weather model once the calendar feature is controlled for. Whether ENS's
-probability distribution carries skill at that lead is a question this page does not test.
+to 7 for solar. For wind the swap lowers the ensemble mean's error significantly at no horizon, and
+at day 5 raises it by 0.23 points [0.05, 0.44]. Even with both arms on calendar month, the ensemble
+mean stops beating the no-weather arm after day 7 for solar and after day 5 for wind: at day 14 it
+is 0.16 points [-0.07, 0.39] behind for solar (not significant) and 1.18 points [0.68, 1.73] behind
+for wind (statistically significant: with month controlled for, adding the day-14 ensemble mean
+makes this XGBoost model's wind forecast worse, not better). Against climatology itself, the
+month-based ensemble mean is also significantly behind at day 14: by 0.54 points [0.11, 0.98] for
+solar and 1.19 points [0.57, 1.84] for wind. On this evidence, the ensemble mean carries no
+statistically significant point-forecast skill at day 14 for either technology, and for wind it is
+significantly worse than the no-weather model once the calendar feature is controlled for. Whether
+ENS's probability distribution carries skill at that lead is a question this page does not test.
 
 ### ENS against past weather
 
@@ -467,13 +468,14 @@ ENS alone.**
 - **Do not train on every member and average, as tested here, to make the point forecast.** Whether a
   model trained on the mean and applied to each member is better is a lead for the next step, not a
   finding. This page does not score the members as a source of uncertainty bands.
-- **From day 7 for solar and day 10 for wind, climatology was at least as accurate as an ENS-driven
-  point forecast from this set-up.** At day 14 it adds no statistically significant skill, in a post
-  hoc check, over the same model given no weather at all, and for wind it is significantly worse than
-  that model once both use calendar month instead of day of year. Whether the production model should
-  use calendar month rather than day of year is a lead worth testing directly: in a post hoc check,
-  the swap lowered the solar ensemble-mean error by 0.17 to 0.39 points at days 3 to 7, inside the live
-  service's primary band, and lowered the wind error at no horizon.
+- **From day 7 for solar and day 10 for wind, an ENS-driven point forecast from this set-up was not
+  significantly more accurate than climatology.** At day 14 it adds no statistically significant
+  skill, in a post hoc check, over the same model given no weather at all, and for wind it is
+  significantly worse than that model once both use calendar month instead of day of year (one post
+  hoc contrast among many). Whether the production model should use calendar month rather than day
+  of year is a lead worth testing directly: in a post hoc check, the swap lowered the solar
+  ensemble-mean error by 0.17 to 0.39 points at days 3 to 7, inside the live service's primary band,
+  and lowered the wind error significantly at no horizon.
 
 ## Limitations
 
@@ -501,11 +503,16 @@ ENS alone.**
   rows start on 1 December 2024, after Cycle 49r1. On the [past-wind page](../past-weather/wind.md),
   an extra era cut at Cycle 50r1 moves none of the planned contrasts, nor ENS day 0 minus HRES, by
   more than 0.04 points (its fold-design table); this page has not re-run its wind fits with that
-  cut. **The solar day-7 comparison with climatology depends on the row set.** On every solar row it
-  is −0.17 points [−0.57, 0.23]; refitted on the rows from 1 December 2024 with covering folds, it
-  is −0.87 points [−1.60, −0.19], statistically significant (`studies/era_fold_design/report.md`,
-  design IIr). On those rows the day-1 comparison with ERA5 is also not significant, and the day-14
-  comparison with climatology is +0.19 points [−0.67, 0.93], not significant.
+  cut. **The solar day-7 and day-14 comparisons with climatology depend on the row set.** On every
+  solar row the ensemble mean's day-7 error is 0.17 points below climatology's [−0.23, 0.57], not
+  significant; refitted on the rows from 1 December 2024 with covering folds it is 0.87 points below
+  [0.19, 1.60], significant (`studies/era_fold_design/report.md`, design IIr). On those rows the
+  day-14 comparison with climatology is +0.19 points [−0.67, 0.93], not significant. An era cut at
+  Cycle 49r1 on all solar rows (design I) leaves day 7 at 0.18 points below [not significant] and
+  day 14 at +0.59 points [0.08, 1.07], as on the main rows, so the difference comes from the shorter
+  record that climatology is fitted on, not from the Cycle 49r1 cut. **The wind day-14 comparison
+  also depends on the design:** climatology is ahead by 1.24 points [0.56, 1.93] here and by 0.62
+  points [−0.49, 1.60], not significant, under a three-era cut.
 - **Some hours cannot be scored by a model that trained on their calendar month.** The fold numbers
   of the hours after the UKV upgrade are shifted so that every calendar month that occurs in two or
   more years has training rows. The hours whose calendar month occurs in one year only, 3,783 wind
