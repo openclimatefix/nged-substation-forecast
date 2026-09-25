@@ -886,22 +886,23 @@ day-0 and day-1 errors. The upper end of the P2a interval means that ICON-EU cou
 points worse than ENS, which is 4.6% of ENS's own error of 8.427% (exploratory share). On the hours
 where the two leads are exactly equal, 00 to 05 UTC, ENS wins by +0.540 points [+0.237, +0.840]
 (exploratory). Against a single ENS control run, which has no ensemble averaging, ICON-EU is -0.138
-points [-0.403, +0.100] (exploratory), so the study cannot separate ICON-EU from one ENS run: the
-interval runs from an error 0.403 points lower to one 0.100 points higher. The Previous Runs day-1
-lead of ICON-EU is probably shorter than a 09:00 UTC service would get for most hours of the day,
-so the control-run comparison favours ICON-EU. The unmeasured live lead would therefore probably
-move ICON-EU towards a "loses" verdict, and would strengthen the case for keeping ENS.
+points [-0.403, +0.100] (exploratory), so the study cannot separate ICON-EU from one ENS run.
+ICON-EU's Previous Runs day-1 lead is shorter than the control run's lead on most hours of the day,
+so the control-run comparison favours ICON-EU. ICON-EU's Previous Runs day-1 lead is also probably
+shorter than the lead a 09:00 UTC service would get. The unmeasured live lead would therefore
+probably move ICON-EU towards a "loses" verdict, and would strengthen the case for keeping ENS.
 <!-- report: Wind, Planned brackets (day 1); Exploratory: ICON-EU day 1 against ENS day 1; day-1
 products against the single ENS control run; each arm's own error over blocks of hours -->
 
-**For wind, adding ICON-EU and IFS 0.25° to ENS is the one measured gain, and it is about 0.2 points
-of capacity.** The deciding contrast, P4b (planned), is -0.184 points [-0.282, -0.087] at the
-primary setting and -0.197 [-0.311, -0.088] at the sensitivity setting, on an ENS day-1 error of
-8.427% of capacity. The primary-setting gain is -2.2% [-3.3%, -1.0%] of ENS's own error (exploratory
-share). The guard is negative at both settings (-0.148 [-0.266, -0.026] and -0.198 [-0.317,
--0.087]), and the controls are not significantly worse than ENS alone (exploratory), so the gain
-comes from the other products' weather rather than from extra columns. The optimistic contrast, P4a,
-is -0.656 points [-0.851, -0.472]. The gain is not the same at every generator: at W1 the P4b
+**For wind, adding ICON-EU and IFS 0.25° to ENS is the one planned contrast against ENS alone that
+shows a gain at the conservative lead, and the gain is about 0.2 points of capacity.** The deciding
+contrast, P4b (planned), is -0.184 points [-0.282, -0.087] at the primary setting and -0.197
+[-0.311, -0.088] at the sensitivity setting, on an ENS day-1 error of 8.427% of capacity. The
+primary-setting gain is -2.2% [-3.3%, -1.0%] of ENS's own error (exploratory share). The guard is
+negative at both settings (-0.148 [-0.266, -0.026] and -0.198 [-0.317, -0.087]). The controls are
+not significantly worse than ENS alone (exploratory), so the gain comes from the weather of ICON-EU
+and IFS 0.25° rather than from extra columns. The optimistic contrast, P4a, is -0.656 points
+[-0.851, -0.472]. The gain is not the same at every generator: at W1 the P4b
 interval reaches zero (-0.073 [-0.164, +0.005]), at W2 it is -0.179 [-0.309, -0.073], and at W3 it
 is -0.304 [-0.536, -0.093] (exploratory; each interval covers month-to-month weather and the fitting
 seed, not differences between generators). The study did not test how the live lead would move
@@ -911,13 +912,13 @@ P4b, so the effect of the live lead on this verdict is unknown.
 (exploratory and post hoc).** ICON-EU at day 2 alone, added to ENS, gives -0.169 points [-0.250,
 -0.090], which is not statistically distinguishable from P4b. Against P4b, ENS plus ICON-EU alone is
 +0.015 points [-0.033, +0.065], so it could be up to 0.065 points worse than P4b. What would change
-the recommendation: more than 3 wind generators.
+the recommendation: more than three wind generators.
 <!-- report: Wind, P4, the blend; Exploratory: one generator at a time; which product carries P4b's
 wind gain; each arm's own error over blocks of hours -->
 
-**A network planner acting on these recommendations needs two things the study does not cover.**
-The study is a comparison of archived forecasts scored against past output, and not a test of a live
-service. [Scope](#scope) lists what else the study does not cover.
+**A distribution-network planner acting on these recommendations needs answers to two questions the
+study does not cover.** The study is a comparison of archived forecasts scored against past output,
+and not a test of a live service. [Scope](#scope) lists what else the study does not cover.
 
 - **Fetch latency and outage behaviour.** Previous Runs values come from an archive, so the study
   says nothing about how late a live feed arrives or what happens when a second feed is down.
@@ -931,15 +932,15 @@ service. [Scope](#scope) lists what else the study does not cover.
 **A blend's gain cannot be split between a second weather model and a newer run.** P4a reads
 ICON-EU and IFS 0.25° at day 1 and P4b at day 2, so the two contrasts differ in lead and in the
 age of the run behind each value at once. IFS 0.25°'s day-1 value can come from a 06, 12, or 18
-UTC run, all newer than ENS's 00 UTC run, and the later two are published after the 09:00 UTC
+UTC run, all newer than ENS's 00 UTC run. The 12 and 18 UTC runs are published after the 09:00 UTC
 issue time. P4a's gain (-0.347 points for solar, -0.656 for wind) may therefore reflect newer
-ECMWF information, and only P4b (-0.033 and -0.184) is a conservative bound.
+ECMWF information. Only P4b (-0.033 and -0.184) is a conservative bound.
 <!-- report: Solar, P4, the blend; Solar, Rows -->
 
 **At the wind farms, a Previous Runs product's gap to ENS may include timing noise and ENS's spatial
 averaging, and the study cannot say how much (exploratory).** Averaging over longer blocks shrinks
 the wind gaps relative to ENS's own error, but the study cannot say whether timing noise or
-grid-point sampling accounts for more of them ([the block-average
+grid-point sampling accounts for more of the wind gaps ([the block-average
 contrasts](#how-much-of-enss-advantage-is-ensemble-averaging-and-timing)). For solar the gaps do not
 shrink relative to ENS's own error, so the block averages give no support for a timing-noise
 reading of the solar gaps.
@@ -948,38 +949,40 @@ reading of the solar gaps.
 **ENS's standing cannot be separated from ensemble averaging.** The error given the mean of ENS's
 members is lower than the error given its single control run, for solar and for wind
 ([the control-run contrast](#how-much-of-enss-advantage-is-ensemble-averaging-and-timing),
-exploratory). Mean absolute error rewards a smoother forecast, so part of ENS's lead over each
+exploratory). Mean absolute error rewards a smoother forecast, so part of ENS's advantage over each
 single-run product is averaging rather than weather-model quality. The comparisons against the
 control run favour the Previous Runs products, whose leads are shorter than the control run's on
 most hours, so ICON-EU's deficit is probably larger at equal lead and IFS 0.25°'s advantage
 probably smaller. UKV, a single deterministic run, is behind the control run too, so UKV's loss to
-ENS is not only ensemble averaging, but the study cannot say how much of it is.
+ENS is not only ensemble averaging. The study cannot say how much of UKV's loss is ensemble
+averaging.
 <!-- report: Solar and Wind, Exploratory: ENS control against ENS mean; day-1 products against the
 single ENS control run -->
 
 **ICON's "100 m" wind is not an independent 100 m level.** ICON-D2, ICON-EU, and ICON global
-serve a native 120 m wind rescaled by about 0.98. An XGBoost model treats that speed exactly as
-the 120 m speed, so the ICON arms read a wind from a different height than the other products'
-native 100 m wind, and the study cannot say how much of any ICON gap comes from the height.
+serve a native 120 m wind rescaled by about 0.98. An XGBoost model treats the rescaled speed exactly
+as the 120 m speed, so the ICON arms read a wind from a different height than the other products'
+native 100 m wind. The study cannot say how much of any ICON gap comes from the height.
 <!-- report: UKV radiation timestamp convention (V3), height convention -->
 
 **GEFS against ENS cannot be separated from the two ensembles' spatial sampling.** P3 is exact
-in lead, because both ensembles' 00 UTC runs are read at 09:00 UTC, but the two are not sampled
-alike. ENS is averaged over each generator's H3 cell, GEFS is read at the nearest cell of its
-own grid, and the two ensembles have different numbers of members. The GEFS gap does not shrink
-with the block as the Previous Runs gaps do (solar +1.272 points [+0.937, +1.601] at 1 hour and
-+1.300 [+0.925, +1.673] over 1 day; wind +0.858 [+0.598, +1.099] and +0.689 [+0.397, +1.006]),
-which points away from timing noise (exploratory). The study cannot separate weather-model quality
-from the sampling differences.
+in lead, because both ensembles' 00 UTC runs are read at 09:00 UTC. The two ensembles are not
+sampled alike, though. ENS is averaged over each generator's H3 cell, GEFS is read at the nearest
+cell of its own grid, and the two ensembles have different numbers of members. Relative to ENS's own
+error, the GEFS gap does not shrink as the averaging block lengthens, whereas the wind gaps of the
+Previous Runs products do (solar +1.272 points [+0.937, +1.601] at 1 hour and +1.300 [+0.925,
++1.673] over 1 day; wind +0.858 [+0.598, +1.099] and +0.689 [+0.397, +1.006]). A gap that keeps its
+share of ENS's error as the block lengthens points away from timing noise (exploratory). The study
+cannot separate weather-model quality from the sampling differences.
 <!-- report: Solar and Wind, P3, GEFS against ENS; day-1 gap over blocks; plan: Rows, folds, and
 fairness -->
 
-**The ERA5 and CAMS reference rows are not fitted, so the study has no past-weather ceiling.** The
-earlier past-weather studies score ERA5 and CAMS as descriptions of hours that have already
-happened, and no forecast could have had that information. This study fits no XGBoost model
-given either product, so it cannot say how far the best day-ahead forecast lies from perfect
-weather. The lowest floor it does report is the no-weather one: climatology's error is 14.458%
-of capacity for solar and 18.460% for wind.
+**This study fits no XGBoost model given ECMWF's ERA5 reanalysis or Copernicus Atmosphere Monitoring
+Service (CAMS) data, so the study has no past-weather ceiling.** The earlier past-weather studies
+score ERA5 and CAMS as descriptions of hours that have already happened, and no forecast could have
+had that information. Without an XGBoost model given either product, the study cannot say how far
+the best day-ahead forecast lies from perfect weather. The study does report a reference given no
+weather at all: climatology, whose error is 14.458% of capacity for solar and 18.460% for wind.
 <!-- report: Solar and Wind, Leaderboard, primary setting; plan: Departures from the plan found
 while running the study -->
 
