@@ -1743,12 +1743,12 @@ def stacked_contrasts(
         subtitle: Short lines for the caption; `reference_note` is added, and
             `SECOND_SETTING_NOTE` where any row has a second setting.
         reference_note: The caption line saying what the hollow reference row is.
-        second_setting_note: The caption line explaining the hollow second-setting marker, for a
-            figure whose rule for showing one differs from `SECOND_SETTING_NOTE`'s.
         colour_by_family: Whether a block holding one family still colours its rows by family.
             Leave it unset and such a block's rows take the two condition colours, which replace
             the family colours in every panel of the figure, because the panels share one colour
             scale.
+        second_setting_note: The caption line explaining the hollow second-setting marker, for a
+            figure whose rule for showing one differs from `SECOND_SETTING_NOTE`'s.
 
     Returns:
         The figure.
