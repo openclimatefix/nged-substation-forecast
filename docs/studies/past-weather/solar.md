@@ -16,29 +16,31 @@ satellite climate data record from EUMETSAT's Satellite Application Facility on 
 (CM SAF). The error is 7.76% given ICON-D2, the best of the four weather models on the main row set.
 It is 8.77% given ICON-DREAM-EU, the German weather service's reanalysis, and 9.08% given ERA5, the
 reanalysis from the European Centre for Medium-Range Weather Forecasts (ECMWF). ICON-D2 is the
-German weather service's model for Germany and neighbouring countries, and it stays the best of all
-eight weather models on the extra row set, which adds four more weather models. A satellite observes
-the clouds of the hour itself, where every weather model and reanalysis simulates them from a run
-started before the hour, so a large gap is expected.
+German weather service's model for Germany and neighbouring countries, and it has the lowest error
+of all eight weather models on the extra row set, which adds four more weather models (exploratory;
+not paired against ECMWF-IFS-HRES). A satellite observes the clouds of the hour itself, where every
+weather model and reanalysis simulates them from a run started before the hour, so a large gap is
+expected.
 
-**The evidence is six farms in one 25 km by 23 km box, scored on four row sets that each hold a
-different subset of the 14 products, so an absolute error on one row set is not comparable with an
-error on another.** A site-hour is one hour of one generator's metered output. Figure 1 draws one
-block for each row set: the main row set (December 2022 to August 2026, 76,727 site-hours), the
-extra row set (November 2024 to August 2026, 40,243 site-hours), the ENS row set (April 2024 to
-September 2026, 54,447 site-hours), and the weather-station row set (December 2022 to December 2025,
-60,033 site-hours). A difference between two errors is in percentage points of capacity, written
-"points", and a bracketed pair after a figure, such as [2.42, 2.90], is its 95% interval. A weather
-model's value "as served" is the value Open-Meteo's archive holds for an hour, which comes from a
-run of the weather model that started a few hours earlier. Overlapping intervals in Figure 1 do not
-make two products equal, because Figure 2 tests each gap on the same hours. The lower panel of each
-block of Figure 2 holds that row set's planned contrasts, which were written into the study plan
-before any result existed. Hours near sunrise where Open-Meteo's UKV archive holds a physically
-impossible value are left out for every product; see [Limitations](#limitations).
+**The evidence is six farms in one 25 km by 23 km box, scored on four headline row sets that each
+hold a different subset of the 14 products, so an absolute error on one row set is not comparable
+with an error on another.** A site-hour is one hour of one generator's metered output. Figure 1
+draws one block for each of the four headline row sets: the main row set (December 2022 to August
+2026, 76,727 site-hours), the extra row set (November 2024 to August 2026, 40,243 site-hours), the
+ENS row set (April 2024 to September 2026, 54,447 site-hours), and the weather-station row set
+(December 2022 to December 2025, 60,033 site-hours). A fifth, the record row set from January 2021,
+feeds only Figures 7 and 8. A difference between two errors is in percentage points of capacity,
+written "points", and a bracketed pair after a figure, such as [2.42, 2.90], is its 95% interval. A
+weather model's value "as served" is the value Open-Meteo's archive holds for an hour, which comes
+from a run of the weather model that started a few hours earlier. Overlapping intervals in Figure 1
+do not make two products equal, because Figure 2 tests each gap on the same hours. The lower panel
+of each block of Figure 2 holds that row set's planned contrasts, which were written down before any
+result existed. Hours near sunrise where Open-Meteo's UKV archive holds a physically impossible
+value are left out for every product; see [Limitations](#limitations).
 
 ![Figure 1: CAMS has the lowest error of the gridded products tested on each of the four row sets](../assets/sunshine_leaderboard.svg)
 
-![Figure 2: CAMS beats ERA5 by 3.7 to 4.1 points on every row set (exploratory). The lower panel of
+![Figure 2: CAMS beats ERA5 by 3.7 to 4.1 points in each block (exploratory). The lower panel of
 each block holds that row set's planned contrasts](../assets/sunshine_contrasts.svg)
 
 **At these six farms, the page recommends the following products for the four consumers of past
@@ -81,8 +83,8 @@ Figure 2 holds that row set's planned ones.
 
 <!-- SLOT: CERRA solar and WeatherNext 3 each add one Key findings bullet here -->
 
-- **On the main row set, CAMS beats ICON-D2, the best of the weather models tested, by 2.68 points
-  [2.42, 2.90] (planned), and the gap holds at every generator, in every season, and in each
+- **On the main row set, CAMS beats ICON-D2, the best of the four weather models tested, by 2.68
+  points [2.42, 2.90] (planned), and the gap holds at every generator, in every season, and in each
   calendar year from 2023 to 2026.** See [CAMS describes past sunshine
   best](#cams-describes-past-sunshine-best-of-the-eight-main-row-set-products-by-a-wide-margin).
 - **On the main row set, CAMS beats SARAH-3, the second satellite retrieval, by 0.40 points [0.29,
@@ -98,23 +100,26 @@ Figure 2 holds that row set's planned ones.
   between 3.2 and 4.3 points.** See [ERA5 trails both satellite
   retrievals](#era5-trails-both-satellite-retrievals-by-more-than-3-points-in-every-year-from-2021-to-2026).
 - **On the main row set, ICON-D2 (from the German weather service's Icosahedral Nonhydrostatic model
-  family) is the best of the four weather models tested as served, beating ICON-EU by 0.62 points
-  [0.48, 0.76] (planned) across the record.** In a breakdown added after the first run, ICON-D2's
-  advantage over ICON-EU shrinks from 1.03 points 1 hour into each run to 0.32 points 3 hours in.
-  See [ICON-D2 is the best weather
+  family) has the lowest error of the four weather models tested as served, beating ICON-EU by 0.62
+  points [0.48, 0.76] (planned) across the record.** In a breakdown added after the first run,
+  ICON-D2's advantage over ICON-EU shrinks from 1.03 points 1 hour into each run to 0.32 points 3
+  hours in. See [ICON-D2 is the best weather
   model](#icon-d2-is-the-best-weather-model-on-the-main-and-extra-row-sets-and-its-advantage-shrinks-within-hours-of-each-run).
 - **On the main row set, ICON-EU is 0.10 points ahead of ICON global, the same service's global
   model, as served [0.05, 0.15] (planned).** In a split added after the first run, most of that
-  small gap sits in the hours ICON global is served further ahead than ICON-EU. See [UKV rebuilt
-  from its snapshots](#once-ukvs-hour-is-rebuilt-from-its-snapshots-ukv-beats-icon-eu-and-era5).
+  small gap sits in the hours ICON global is served further ahead than ICON-EU. See [ICON-EU against
+  ICON global and UKV](#icon-eu-against-icon-global-and-ukv).
 - **Once UKV's hourly value is rebuilt from its own snapshots, UKV is ahead of ICON-EU on the main
-  row set, by a margin close to the 5% threshold.** Against Open-Meteo's hourly value for UKV,
-  ICON-EU is 0.48 points ahead [0.29, 0.65] (planned). See [UKV rebuilt from its
-  snapshots](#once-ukvs-hour-is-rebuilt-from-its-snapshots-ukv-beats-icon-eu-and-era5).
-- **On the main row set, rebuilt UKV also beats ERA5, by 0.90 points [0.72, 1.09], but Open-Meteo's
-  hourly value for UKV beats ERA5 only across the whole record, not since August 2024.** See [UKV
-  rebuilt from its
-  snapshots](#once-ukvs-hour-is-rebuilt-from-its-snapshots-ukv-beats-icon-eu-and-era5).
+  row set, by a margin close to the 5% threshold: 0.21 points [0.03, 0.38] rebuilt as the mean of
+  its two snapshots, and 0.26 [0.09, 0.43] given both snapshots (post hoc; not statistically
+  significant at the 5% level after the January 2026 upgrade).** Every rebuild of UKV was added
+  after the first run. Against Open-Meteo's hourly value for UKV, ICON-EU is 0.48 points ahead
+  [0.29, 0.65] (planned). See [UKV rebuilt from its
+  snapshots](#icon-eu-against-icon-global-and-ukv).
+- **On the main row set, rebuilt UKV also beats ERA5, by 0.90 points [0.72, 1.09] (post hoc), but
+  Open-Meteo's hourly value for UKV beats ERA5 only across the whole record, not since August
+  2024.** See [UKV rebuilt from its
+  snapshots](#icon-eu-against-icon-global-and-ukv).
 - **On the main row set, a product's own published direct beam improves the XGBoost model by 0.03 to
   0.10 points for every product except ERA5 and SARAH-3.** SARAH-3's direct beam is not tested,
   because CM SAF models it from SARAH-3's own global irradiance. See [A product's own direct beam
@@ -144,8 +149,9 @@ Figure 2 holds that row set's planned ones.
   irradiance and air temperature trails an XGBoost model given CAMS by 2.007 points [1.699, 2.248]
   and beats an XGBoost model given ERA5 by 2.082 points [1.817, 2.363] (both planned), but all six
   farms share one nearest station, 17 to 31 km away.** Adding the station's irradiance to CAMS
-  lowers CAMS's error by a further 0.340 points [0.277, 0.420] (planned). See [The nearest station
-  is a worse input than CAMS and a better input than
+  lowers CAMS's error by a further 0.340 points [0.277, 0.420] (planned), against CAMS given a
+  shuffled copy of the station's irradiance. See [The nearest station is a worse input than CAMS and
+  a better input than
   ERA5](#the-nearest-station-is-a-worse-input-than-cams-and-a-better-input-than-era5).
 
 ## Introduction
@@ -433,12 +439,12 @@ forecast's start. An operational ENS run uses no observation after its start tim
 gap in mean lead is not like for like with an operational ENS lead.
 
 **A live service reading Dynamical.org's archive gets the 00 UTC run from about 09:00 UTC, so 12,648
-of the 54,447 scored site-hours (23.2%) ended before the run became readable there.** ECMWF itself
-disseminates the run's steps 0 to 90 by about 06:55 UTC, and 2,582 of the scored site-hours (4.7%)
-end at or before that time. The [ENS horizons study](../forecasts/ens-horizons.md) takes the 09:00
-UTC time from Dynamical.org's archive. Every consumer on this page reads a value after its hour has
-passed, so for the 12,648 site-hours the ENS value reaches a live service up to 4 hours after the
-hour it describes. That delay is shorter than CAMS's one-day delay.
+of the 54,447 scored site-hours (23.2%) ended at or before the time the run became readable there.**
+ECMWF itself disseminates the run's steps 0 to 90 by about 06:55 UTC, and 2,582 of the scored
+site-hours (4.7%) end at or before that time. The [ENS horizons study](../forecasts/ens-horizons.md)
+takes the 09:00 UTC time from Dynamical.org's archive. Every consumer on this page reads a value
+after its hour has passed, so for the 12,648 site-hours the ENS value reaches a live service up to 4
+hours after the hour it describes. That delay is shorter than CAMS's one-day delay.
 
 **The row set is ENS's own, shorter and later than the rest of the page, so each pooled interval
 resamples 30 calendar months, against 45 for the main row set.** Generator E covers 23 of the 30
@@ -472,8 +478,8 @@ contrasts, the `T+3` band, the member mean, and the clear-sky-index reconstructi
 written instructions for the first run, before the first model was fitted. Those instructions are a
 working file outside the repository, so, unlike the other 12 planned contrasts, the repository does
 not record the ordering. ERA5's and CAMS's results on the main row set were published before ENS was
-planned, so a large gap between ENS and CAMS was predictable. Both contrasts hold at the second
-hyperparameter setting. At that setting Every other comparison in the ENS results is exploratory.
+planned, so a large gap between ENS and CAMS was predictable. Every other comparison in the ENS
+results is exploratory.
 
 ### The weather-station arms
 
@@ -630,8 +636,8 @@ ICON-D2 the third](../assets/sunshine_models_work_error.svg)
 
 ### CAMS describes past sunshine best of the eight main-row-set products, by a wide margin
 
-**On the [main row set](methods.md#row-sets), CAMS beats the best of the weather models tested by
-2.68 points [2.42, 2.90] (planned), and the gap holds at every generator, in every season, and in
+**On the [main row set](methods.md#row-sets), CAMS beats the best of the four weather models tested
+by 2.68 points [2.42, 2.90] (planned), and the gap holds at every generator, in every season, and in
 each calendar year from 2023 to 2026.** At the second set of XGBoost settings, CAMS's error minus
 ICON-D2's is −2.649 points [−2.868, −2.395], and all 5 folds agree in sign.
 
@@ -666,11 +672,12 @@ from 4.00 to 4.40 points.
 
 ### SARAH-3 is second to CAMS under every satellite
 
-**CAMS beats SARAH-3 by 0.40 points [0.29, 0.50], one of the six planned contrasts, and by about as
-much under each satellite SARAH-3 has used since 2021.** With the second set of XGBoost settings,
-CAMS is 0.42 points ahead [0.32, 0.52]. For a generator predicted from its neighbours, CAMS is 0.45
-points ahead [0.34, 0.54]. For XGBoost models trained on the 7 months since UKV's upgrade alone,
-CAMS is 0.29 points ahead [0.02, 0.53], an interval that rests on 7 months and is likely too narrow.
+**CAMS beats SARAH-3 by 0.40 points [0.29, 0.50], one of the main row set's six planned contrasts,
+and by about as much under each satellite SARAH-3 has used since 2021.** With the second set of
+XGBoost settings, CAMS is 0.42 points ahead [0.32, 0.52]. For a generator predicted from its
+neighbours, CAMS is 0.45 points ahead [0.34, 0.54]. For XGBoost models trained on the 7 months since
+UKV's upgrade alone, CAMS is 0.29 points ahead [0.02, 0.53], an interval that rests on 7 months and
+is likely too narrow.
 
 **SARAH-3 trails CAMS by about 0.4 points in every period since 2021.** SARAH-3's retrieval over
 Europe moved from Meteosat-11 to Meteosat-10 on 21 March 2023, and Meteosat-9 stood in for a
@@ -716,14 +723,14 @@ as on the main row set, where it is 0.402 points [0.294, 0.498].
 ### ICON-DREAM-EU beats ERA5 but not the ICON weather models
 
 **On the [main row set](methods.md#row-sets), ICON-DREAM-EU beats ERA5 by 0.32 points [0.12, 0.52],
-one of the six planned contrasts, but its error of 8.77% is higher than that of each of the three
-ICON weather models.** The two reanalyses, like SARAH-3, a satellite climate data record, are built
-to be consistent over time, each with one fixed version of its weather model or retrieval, though
-the observations and satellites each uses change over time. With the second set of XGBoost settings,
-ICON-DREAM-EU is 0.33 points ahead of ERA5 [0.14, 0.52], and for a generator predicted from its
-neighbours 0.37 points ahead [0.17, 0.58]. At the first setting only 4 of the 5 folds agree in sign,
-and at the second setting all 5 agree. On the record row set from January 2021, ICON-DREAM-EU is
-0.39 points ahead [0.23, 0.54].
+one of the main row set's six planned contrasts, but its error of 8.77% is higher than that of each
+of the three ICON weather models.** The two reanalyses, like SARAH-3, a satellite climate data
+record, are built to be consistent over time, each with one fixed version of its weather model or
+retrieval, though the observations and satellites each uses change over time. With the second set of
+XGBoost settings, ICON-DREAM-EU is 0.33 points ahead of ERA5 [0.14, 0.52], and for a generator
+predicted from its neighbours 0.37 points ahead [0.17, 0.58]. At the first setting only 4 of the 5
+folds agree in sign, and at the second setting all 5 agree. On the record row set from January 2021,
+ICON-DREAM-EU is 0.39 points ahead [0.23, 0.54].
 
 **Since August 2024, ICON-DREAM-EU's advantage over ERA5 is not statistically significant at the 5%
 level. But every product's lead over ERA5 is smaller in 2025 and in 2026 than in 2024, in point
@@ -806,7 +813,7 @@ starting state would be expected to decay over the run's first hours. By a 3-hou
 points of the advantage remain, so the as-served advantage should not be assumed to hold a day
 ahead.
 
-### Once UKV's hour is rebuilt from its snapshots, UKV beats ICON-EU and ERA5
+### ICON-EU against ICON global and UKV
 
 **On the [main row set](methods.md#row-sets), most of ICON global's 0.10-point deficit to ICON-EU
 (planned; +0.094 points [+0.051, +0.134] at the second set of XGBoost settings, with all 5 folds
@@ -819,25 +826,27 @@ difference as large as 0.08 points is not excluded. The split also divides the h
 longer leads fall at 10 to 12 and 16 to 18 UTC, so a difference in either weather model's skill by
 time of day would show up here as an effect of lead.
 
-**ICON-EU beats Open-Meteo's hourly value for UKV by 0.48 points [0.29, 0.65], one of the six
-planned contrasts, but UKV is ahead of ICON-EU, by a margin close to the 5% threshold, once UKV's
-hour is rebuilt from its own snapshots.** At the second set of XGBoost settings, ICON-EU's error
-minus Open-Meteo's hourly UKV's is −0.433 points [−0.602, −0.255], and all 5 folds agree in sign.
-Each ICON product's archived value for an hour is a mean over that hour. UKV publishes a snapshot
-each hour, and Open-Meteo builds UKV's hourly value from the snapshot at the hour's end, rescaled by
-the change in the sun's angle. In comparisons added after the first run, averaging UKV's snapshots
-at both ends of the hour cuts UKV's error by 0.68 points, which puts UKV 0.21 points ahead of
-ICON-EU [0.03, 0.38]. The interval's lower end, 0.03 points, is close to zero, so this result should
-not be read as settled. An XGBoost model given the two snapshots as separate inputs puts UKV 0.26
-points ahead of ICON-EU [0.09, 0.43].
+**ICON-EU beats Open-Meteo's hourly value for UKV by 0.48 points [0.29, 0.65], one of the main row
+set's six planned contrasts, but UKV is ahead of ICON-EU, by a margin close to the 5% threshold,
+once UKV's hour is rebuilt from its own snapshots.** At the second set of XGBoost settings,
+ICON-EU's error minus Open-Meteo's hourly UKV's is −0.433 points [−0.602, −0.255], and all 5 folds
+agree in sign. Each ICON product's archived value for an hour is a mean over that hour. UKV
+publishes a snapshot each hour, and Open-Meteo builds UKV's hourly value from the snapshot at the
+hour's end, rescaled by the change in the sun's angle. In comparisons added after the first run,
+averaging UKV's snapshots at both ends of the hour cuts UKV's error by 0.68 points, which puts UKV
+0.21 points ahead of ICON-EU [0.03, 0.38]. The interval's lower end, 0.03 points, is close to zero,
+so this result should not be read as settled. An XGBoost model given the two snapshots as separate
+inputs puts UKV 0.26 points ahead of ICON-EU [0.09, 0.43]. No second XGBoost setting was saved for
+the rebuilt-UKV contrast against ICON-EU, so that verdict does not rest on both settings.
 
 **Giving each XGBoost model the neighbouring hours improves both products by about 0.2 points, and
 leaves rebuilt UKV about as far ahead of ICON-EU.** An XGBoost model given ICON-EU's hourly mean for
 the hour before and after, as well as the hour itself, improves by 0.18 points. The same context
 improves UKV's rebuilt hour by 0.19 points. With context on both, ICON-EU is 0.23 points behind
-rebuilt UKV [0.05, 0.39], and since August 2024 0.26 points behind [0.02, 0.50]. With context,
-ICON-EU is 0.09 points behind UKV's two snapshots given as separate inputs [−0.08, +0.25], a
-difference that is not statistically significant at the 5% level.
+rebuilt UKV [0.05, 0.39], and since August 2024 0.26 points behind [0.02, 0.50]. No second setting
+was saved for the since-August-2024 contrast either. With context, ICON-EU is 0.09 points behind
+UKV's two snapshots given as separate inputs [−0.08, +0.25], a difference that is not statistically
+significant at the 5% level.
 
 **Every rebuilt UKV construction scores ahead of ICON-EU across the record, and UKV is also served
 at the shorter lead.** UKV is served at T+0 and ICON-EU 1 to 3 hours ahead, so equal leads would if
@@ -845,7 +854,7 @@ anything favour ICON-EU. On the 7 months after UKV's upgrade alone, ICON-EU is 0
 rebuilt UKV in point estimate [−0.23, +0.57], with only 2 of 5 folds agreeing in sign. That interval
 rests on 7 months and is likely too narrow.
 
-![Figure 10: UKV rebuilt from its snapshots beats ICON-EU, which beats ICON global and Open-Meteo's
+![Figure 10: UKV rebuilt from its snapshots (post hoc) beats ICON-EU, which beats ICON global and Open-Meteo's
 hourly UKV; rebuilt UKV also beats ERA5 in every
 period](../assets/sunshine_weather_model_rivals.svg)
 
@@ -879,7 +888,7 @@ neighbour test.**
 **Before any power model sees it, the raw irradiance already ranks the products almost exactly as
 the power-model contrasts above do, which is why ICON-DREAM-EU's modest lead over ERA5 is not an
 artefact of the power model.** Each product's own served global irradiance, compared row for row
-against CAMS's on the 76,727 daylight site-hours every product on this page shares — no XGBoost
+against CAMS's on the 76,727 daylight site-hours every main-row-set product shares — no XGBoost
 model, no per-generator recalibration — orders the products almost exactly as the
 mean-absolute-error table above does: SARAH-3 closest to CAMS, then ICON-D2, ICON-EU, ICON global,
 ICON-DREAM-EU, ERA5, with Open-Meteo's hourly value for UKV the furthest from CAMS. Correlation with
@@ -957,9 +966,9 @@ each also refitted at a second XGBoost setting:**
   lead](#where-each-product-comes-from-and-its-served-lead)), so the two sit at the same served lead
   on every row if that inference holds: DMI trails ICON-D2 by 1.09 points [0.78, 1.35] on 07–19 UTC,
   close to the unsplit figure above, and the loss is positive in 21 of 22 months (point estimates,
-  no interval; three months are below 0.2 points) and at all six farms (0.77 to 1.19 points,
-  exploratory). DMI's 2 km native grid is matched in resolution to ICON-D2's 2.2 km, as KNMI's
-  reduced 0.05° output grid, about 5.5 km, is to ICON-EU's 6.5 km, so a coarser grid cell is
+  no interval; three of the positive months are below 0.2 points) and at all six farms (0.77 to 1.19
+  points, exploratory). DMI's 2 km native grid is matched in resolution to ICON-D2's 2.2 km, as
+  KNMI's reduced 0.05° output grid, about 5.5 km, is to ICON-EU's 6.5 km, so a coarser grid cell is
   unlikely to explain either loss.
 
 **The loss is larger at the first hour after each run than at the rest of the day, where DMI's and
@@ -1054,12 +1063,12 @@ folds.
 
 **On the ENS row set, an XGBoost model given the mean of ECMWF ENS's 51 members, from the 00 UTC
 run's shortest-lead band (`T+3`), beats an XGBoost model given ERA5 by 0.877 points of capacity
-[0.677, 1.080], and trails one given CAMS, the best product on this page, by 3.270 points [2.942,
-3.585].** Both contrasts are planned and statistically significant at the 5% level. The control
-member alone, the one member run from ECMWF's unperturbed best estimate of the atmosphere, beats
-ERA5 by 0.637 points [0.437, 0.836]. The other 50 members each start from a slightly perturbed
-state. The comparison differs in five ways besides forecast skill, listed under [The ECMWF ENS
-arms](#the-ecmwf-ens-arms).
+[0.677, 1.080], and trails one given CAMS, the gridded product with the lowest error on every row
+set, by 3.270 points [2.942, 3.585].** Both contrasts are planned and statistically significant at
+the 5% level. The control member alone, the one member run from ECMWF's unperturbed best estimate of
+the atmosphere, beats ERA5 by 0.637 points [0.437, 0.836]. The other 50 members each start from a
+slightly perturbed state. The comparison differs in five ways besides forecast skill, listed under
+[The ECMWF ENS arms](#the-ecmwf-ens-arms).
 
 Both contrasts hold at the second hyperparameter setting. At that setting ENS beats ERA5 by 0.816
 points [0.612, 1.024] and trails CAMS by 3.244 points [2.912, 3.568], each within 0.07 points of the
@@ -1135,8 +1144,8 @@ the run was readable (exploratory, post hoc).** In the split, ENS beats ERA5 by 
 end after 09:00 UTC and by 1.553 points [1.333, 1.746] on the hours that end at or before it. ENS's
 gain is 9.6% of ERA5's error on the hours that end after 09:00 UTC and 9.3% on the hours that end at
 or before it, so the split mostly separates midday hours from morning hours. The delay itself, that
-12,648 of the 54,447 scored site-hours ended before the run became readable, is stated under [The
-ECMWF ENS arms](#the-ecmwf-ens-arms).
+12,648 of the 54,447 scored site-hours ended at or before the time the run became readable, is
+stated under [The ECMWF ENS arms](#the-ecmwf-ens-arms).
 
 <!-- SLOT: WeatherNext 3 follows the ENS results here -->
 
@@ -1159,9 +1168,6 @@ hyperparameter setting (+1.957 [+1.657, +2.193], −2.084 [−2.357, −1.828], 
 one station's pyranometer record, from an instrument that measures global horizontal irradiance, set
 against two gridded products.** The 95% intervals cover month-to-month weather and the fitting seed.
 They do not cover the choice of station, or how a different station or region would compare.
-
-**An XGBoost model given the nearest station follows measured power at every generator across a
-clear, a variable, and a dull week.**
 
 **CAMS and ERA5 both score worse on this section's shorter row set than on the main row set, so this
 section's absolute errors are not comparable with the page's main leaderboard.** CAMS scores 5.299%
@@ -1246,7 +1252,7 @@ to 89 km, against 17 to 31 km for the nearest. But the stations at the three ran
 different instruments at different places, with different records, and at one or more farms the
 third rank skipped a nearer station that failed the coverage rule.
 
-### Every planned contrast keeps its sign at the second XGBoost setting, and each has the same sign at all six generators
+### Every planned contrast keeps its sign at the second XGBoost setting, and the ENS and station contrasts have the same sign at all six generators
 
 **Every planned contrast that is statistically significant at the 5% level at the first XGBoost
 setting keeps its sign and is statistically significant at the second setting.** ECMWF-IFS-HRES
@@ -1275,7 +1281,7 @@ site-hours, 4 of 5 folds agree in sign for the CAMS contrast and for the blend c
 For the main row set, Figure 5 plots every product's mean absolute error at each generator, and
 Figure 6 shows CAMS's margin over ICON-D2 at every generator.
 
-![Figure 16: Each planned contrast has the same sign at all six
+![Figure 16: Each weather-station planned contrast has the same sign at all six
 generators](../assets/station_past_solar_per_generator.svg)
 
 ### CAMS and SARAH-3 imply the steadiest capacity from month to month once the seasonal cycle is removed, but swing the most with the seasons
@@ -1327,8 +1333,8 @@ changes forecast accuracy, nor whether pre-training on ICON-DREAM-EU, which is b
 ICON weather model as the ICON forecasts and reaches back to 2010, narrows the mismatch.
 ICON-DREAM-EU beats ERA5 as a reanalysis, but by less than any of the three ICON weather models
 does. ECMWF-IFS-HRES is archived from 2017, further back than any weather model this page tests
-except ICON-DREAM-EU, and on the extra row set it beats ERA5 (see [ECMWF-IFS-HRES against ICON-EU is
-not resolved, and IFS-HRES beats
+except ICON-DREAM-EU, and on the extra row set it beats ERA5 by 0.58 points [0.36, 0.81]
+(exploratory; see [ECMWF-IFS-HRES against ICON-EU is not resolved, and IFS-HRES beats
 ERA5](#ecmwf-ifs-hres-against-icon-eu-is-not-resolved-and-ifs-hres-beats-era5)).
 
 **Latency rules out CAMS and ERA5 at run time, and coverage rules out ICON-D2 west of its edge.**
@@ -1337,7 +1343,7 @@ hours after sunrise (see [Limitations](#limitations)), mostly before the January
 service reading rebuilt UKV has to screen those values as this study did. Since the upgrade, the
 difference between rebuilt UKV and ICON-EU is not statistically significant at the 5% level (see
 [Once UKV's hour is rebuilt from its
-snapshots](#once-ukvs-hour-is-rebuilt-from-its-snapshots-ukv-beats-icon-eu-and-era5)). CAMS arrives
+snapshots](#icon-eu-against-icon-global-and-ukv)). CAMS arrives
 a day late and ERA5 about 5 days late, so neither can supply the last few hours at run time. ICON-D2
 was more accurate at the six generators, all of which sit inside its domain. Reading ICON-D2 at
 generators east of ICON-D2's western edge, and ICON-EU elsewhere, is therefore an option, though a
@@ -1358,9 +1364,14 @@ hours after each run starts, later than ICON-EU's about 3.5 hours (see [ECMWF's 
 schedule](https://confluence.ecmwf.int/display/DAC/Dissemination+schedule)), so at run time its last
 hours come from an older run at a longer lead than scored here.
 
-**The neighbour test supports the ranking, not the size of the error.** The ranking holds for a
-generator predicted from its neighbours, as the [neighbour
-test](#the-main-ranking-survives-a-raw-irradiance-comparison-and-a-neighbour-test) shows.
+**For disaggregation, which reads a product at sites with no metered output, the neighbour test
+supports the ranking but not the size of the error.** An XGBoost model trained on five generators
+ranks the products the same way at the sixth, with errors 0.10 to 0.20 points larger ([neighbour
+test](#the-main-ranking-survives-a-raw-irradiance-comparison-and-a-neighbour-test)). The test
+assumes the held-out generator's capacity is known, and its training generators lie within 34 km.
+The error at a site further from any metered generator is therefore not measured here. CAMS serves
+where its one-day delay allows; elsewhere, ICON-EU or rebuilt UKV, for the reasons under historical
+features.
 
 **None of the four uses above follows from this page's evidence alone for ECMWF ENS.** ENS was
 compared only with ERA5 and CAMS, on rows from April 2024, so its error must not be set against the
@@ -1400,15 +1411,16 @@ ERA5](#averaging-the-three-nearest-stations-beats-the-nearest-station-and-the-th
 
 **Giving an XGBoost model CAMS, ERA5, UKV, ICON-D2, ICON-EU, and ICON global at once beats giving it
 CAMS alone, with CAMS's neighbouring hours and its split of sunlight into direct beam and diffuse
-light, in a post hoc comparison written up in [Does blending weather products beat the best single
-weather product?](blending.md#solar-a-blend-beats-cams-given-its-neighbouring-hours)**
+light, by 0.13 points [0.10, 0.17], in a post hoc comparison written up in [Does blending weather
+products beat the best single weather
+product?](blending.md#solar-a-blend-beats-cams-given-its-neighbouring-hours)**
 
 ## Limitations
 
 - **Hours where Open-Meteo's UKV archive holds a physically impossible sunrise value are dropped for
   every product.** Open-Meteo stores UKV's hourly value rounded to 1 W m⁻² and serves each snapshot
   by undoing the rescaling for the sun's angle described under [Once UKV's hour is rebuilt from its
-  snapshots](#once-ukvs-hour-is-rebuilt-from-its-snapshots-ukv-beats-icon-eu-and-era5). In the first
+  snapshots](#icon-eu-against-icon-global-and-ukv). In the first
   hours after sunrise that rescaling ratio can reach the hundreds, so undoing it turns the stored
   mean, and its rounding, into a value with no physical meaning — up to 16,537 W m⁻² against a real
   GHI ceiling of about 1,400 W m⁻². The study drops each snapshot that exceeds 1.1 times the
@@ -1425,7 +1437,8 @@ weather product?](blending.md#solar-a-blend-beats-cams-given-its-neighbouring-ho
 - **The evidence is regional.** All six generators sit in one 25 km by 23 km box, inside ICON-D2's
   domain, about 160 to 200 km east of its western edge, and in only two ERA5 grid cells. The ranking
   is untested elsewhere in Great Britain, and nothing here measures a site near ICON-D2's edge or
-  outside its domain.
+  outside its domain. The extra row set's intervals rest on 22 months against 45 on the main row
+  set, so they are less reliable.
 - **Every product except CAMS is read at a grid cell, not at the generator.** ERA5 at its nearest
   0.25° cell, the Open-Meteo weather models at the cell Open-Meteo serves, SARAH-3 at a cell 0.8 km
   to 2.8 km away, and ICON-DREAM-EU at a cell 1.6 km to 5.0 km away. A cell that misses a
@@ -1434,9 +1447,9 @@ weather product?](blending.md#solar-a-blend-beats-cams-given-its-neighbouring-ho
   main row set.** ENS's own archive here starts on 1 April 2024, so the ENS row set says nothing
   about the ranking above, from December 2022. ICON-EU and rebuilt UKV also beat ERA5, on the main
   row set, so ENS's gain over ERA5 does not show that ENS competes with the products the
-  [Discussion: what to use](#discussion-what-to-use) section recommends. The section scores ENS
+  [Discussion: what to use](#discussion-what-to-use) section recommends. This page scores ENS
   because it is the live service's own forecast product, and this page is where this project
-  compares weather products. The section does not separate ENS's lead, step width, native
+  compares weather products. The ENS results do not separate ENS's lead, step width, native
   resolution, spatial support, and model version, so ENS's gaps to ERA5 and CAMS are not a measure
   of forecasting skill alone.
 - **ECMWF's IFS Cycles 49r1 and 50r1 fall inside the ENS section's window and are not treated as
@@ -1464,15 +1477,17 @@ weather product?](blending.md#solar-a-blend-beats-cams-given-its-neighbouring-ho
   cover.** The folds are blocks of whole months, so a held-out calendar month that occurs in more
   than one year can leave no training row for that calendar month. The share of site-hours in such
   months is 2.8% of the main row set (2,129 of 76,727 site-hours), 36.9% of the extra row set
-  (14,853 of 40,243, in April to June at every farm), and 2.2% of the ENS row set (1,194 of 54,447).
-  The share for the weather-station row set was not measured, because the fold report holds no saved
-  solar station losses. A check with the folds offset moves the main row set's planned contrasts by
-  at most 0.03 points. On the extra row set, folds that cover every calendar month move the planned
-  contrasts by at most 0.06 points on the CPU, the device the published fits used, and by at most
-  0.10 points on cuda (0.076 at the first setting, 0.096 at the second), with no change of sign or
-  significance. Every arm's absolute error is 0.12 to 0.20 points lower on the CPU (0.14 to 0.22 on
-  cuda), so the absolute errors printed for the extra row set are slightly pessimistic, and the
-  ranking is unchanged.
+  (14,853 of 40,243, in April to June), and 2.2% of the ENS row set (1,194 of 54,447). The share for
+  the weather-station row set was not measured, because the fold report holds no saved solar station
+  losses. A check with the folds offset moves the main row set's planned contrasts by at most 0.03
+  points. On the extra row set, folds that cover every calendar month move the planned contrasts by
+  at most 0.06 points on the CPU, the device the published fits used, and by at most 0.10 points on
+  cuda (0.076 at the first setting, 0.096 at the second), with no change of sign or significance.
+  Every arm's absolute error is 0.12 to 0.20 points lower on the CPU (0.14 to 0.22 on cuda) under
+  folds that cover every calendar month, so the absolute errors printed for the extra row set are
+  slightly pessimistic, and the ranking of the five arms in the planned contrasts is unchanged. The
+  extra row set's other seven arms, and its contrasts against ERA5, were not refitted under covering
+  folds.
 
 ## Scope
 
