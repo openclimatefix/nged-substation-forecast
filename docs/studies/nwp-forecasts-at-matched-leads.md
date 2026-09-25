@@ -23,9 +23,11 @@ sensitivity setting. The further XGBoost models read more lead days (up to day 1
 products, NOAA's Global Forecast System (GFS) read from its native store, ECMWF's single
 high-resolution forecast run at 9 km (IFS HRES 9 km), and ECMWF's machine-learned Artificial
 Intelligence Forecasting System (AIFS Single and AIFS ENS). Every result from them is exploratory
-and fitted at the primary setting only, except one contrast per technology, AIFS Single against the
-ENS control member at day 1, which was planned before any AIFS fit and is also fitted at the
-sensitivity setting.
+and fitted at the primary setting only, except two groups of contrasts. One contrast per technology,
+AIFS Single against the ENS control member at day 1, was planned before any AIFS fit. Four further
+contrasts per technology were named before the fit of the AIFS blends and days 7 and 14, but after
+the day-1 and day-2 AIFS results were known, so they are deciding contrasts and not planned ones.
+Both groups are also fitted at the sensitivity setting.
 
 **For solar power, ENS beat UKV, ICON-EU, and GEFS, and a blend gained only when it could read runs
 published after the forecast is issued; for wind power, ENS beat UKV and GEFS, ICON-EU was not
@@ -114,7 +116,9 @@ models that produce these forecasts.
   <!-- report: Solar and Wind, P4, the blend (X-ifs025_day1 rows) -->
 - **Adding ICON-EU and IFS 0.25° to ENS changes the wind error by -0.184 points [-0.282, -0.087] at
   a lead a live service could use, and changes the solar error detectably only at a lead a live
-  service may not be able to use** ([blending](#a-blend-lowers-the-wind-error-at-both-leads-tested-and-the-solar-error-only-at-an-optimistic-lead)).
+  service may not be able to use.** A refit of the blends on the GPU with a second shuffle seed
+  agrees for wind, and shows that every solar control is itself worse than ENS alone
+  ([blending](#a-blend-lowers-the-wind-error-at-both-leads-tested-and-the-solar-error-only-at-an-optimistic-lead)).
 - **For wind, ICON-EU at day 2 carries most of the blend's gain** (exploratory, and post hoc,
   because the two single-product blends were fitted after the result of the planned day-2 blend was
   seen): ENS plus ICON-EU alone changes the error by -0.169 points [-0.250, -0.090], and the planned
@@ -160,6 +164,12 @@ models that produce these forecasts.
   against 8.916% of capacity) and -0.094 points [-0.426, +0.260] for solar (9.402% against 9.496%).
   Against the ENS mean on the same steps, AIFS Single is not better
   ([AIFS](#aifs-single-has-a-lower-wind-error-than-enss-control-member-at-day-1-and-no-solar-difference-is-claimable)).
+- **At day 7, an XGBoost model given both ENS's mean and AIFS Single has a lower solar error than
+  one given ENS's mean alone, and the wind difference is not claimable** (a deciding contrast
+  named before the fit, not a planned one). The solar difference is -0.396 points [-0.578, -0.201]
+  (13.901% against 14.297% of capacity). The wind difference is -0.274 points [-0.586, +0.064]
+  (16.281% against 16.555%). At day 14 neither technology has any skill to compare, so no AIFS
+  contrast is read ([AIFS at days 7 and 14](#at-day-7-a-blend-of-ens-and-aifs-single-lowers-the-solar-error-and-at-day-14-no-forecast-has-skill-to-compare)).
 - **The day-1 value in Open-Meteo's Previous Runs archive (Open-Meteo is a third-party service that
   archives past weather forecasts) gives UKV, ICON-EU, and IFS 0.25° a shorter lead than ENS's on
   most hours, which flatters those three products** ([matched leads](#how-the-leads-are-matched)).
@@ -546,6 +556,54 @@ descriptive only, because about 84% of the scored (generator, fold, calendar mon
 `ens` row set have no training row of their calendar month (55 of 65 solar cells and 27 of 33 wind
 cells). Every other AIFS number is exploratory and post hoc. Every AIFS fit is on the GPU.
 <!-- report (AIFS): header; row sets; deciding contrast -->
+
+**The conventions of AIFS Single's radiation and wind were checked at days 1 and 2 only.** The
+script `verify_aifs_steps.py` compares AIFS Single with ERA5 at several offsets to find the hour at
+which each field is stamped. At days 7 and 14 the check fails, because AIFS Single's correlation
+with ERA5's wind speed is only 0.43 at day 7 and 0.15 at day 14, so an offset test cannot tell one
+offset from another. The checks pass at days 1 and 2, and the wiring check, which compares the built
+columns with the raw store, passes at every day. This study therefore assumes, and did not check,
+that the same radiation window and wind reading hold at days 7 and 14.
+<!-- verification: aifs_steps.md, aifs_wiring.md (blends folder) -->
+
+**AIFS Single is also read at days 7 and 14, and blended with ENS's mean at days 1, 2, 7, and 14.**
+Days 7 and 14 read the 00 UTC run 7 and 14 days before the hour's own day, at ENS's own leads, so
+the ENS control member and the ENS mean are natively 6-hourly there and share AIFS Single's steps.
+A row is dropped when its run lies outside the AIFS version era of its hour. That drops 362 solar
+and 454 wind hours at day 7 and 1,121 and 1,433 at day 14. The `single` row set then holds 28,208
+solar and 28,419 wind rows at day 7, and 27,449 and 27,440 at day 14, all over 16 months. A blend
+gives one XGBoost model ENS's mean and AIFS Single's forecast at the same day. A solar blend has 9
+columns and a wind blend 11, against 7 for ENS's mean alone, so the study also fits two controls
+with the blend's number of columns. The blend's control shuffles AIFS Single's weather
+among hours of the same generator, year-month, and hour of day, and the mirror control shuffles
+ENS's mean instead. Because two shuffles of the same weather can differ (see the
+[AIFS section](#aifs-single-has-a-lower-wind-error-than-enss-control-member-at-day-1-and-no-solar-difference-is-claimable)),
+a shuffled arm's interval may understate the noise. The blends fit and the P4 second-seed refit
+below were fitted on the GPU.
+
+**Four contrasts per technology are deciding contrasts, and the page does not call them planned.**
+Each was named before the fit of this section, but after the day-1 and day-2 AIFS results and the
+ENS results at days 7 and 14 were known. They are:
+
+- **H7 and H14:** AIFS Single minus the ENS control member at day 7 and at day 14.
+- **B7 and B14:** the blend of ENS's mean and AIFS Single minus ENS's mean alone at day 7 and at
+  day 14, with the blend minus its control as the guard.
+
+A deciding contrast is claimable only if its interval is statistically significant at the 5% level
+at both hyperparameter settings with the same sign, and every dropped month keeps the sign. For H7
+and H14 the refit without day of year in either arm must also agree in sign. For B7 and B14 the
+guard must also be statistically significant at both settings. The report also prints each deciding
+contrast at 99.375%, the Bonferroni level across the eight deciding contrasts (four per technology).
+Every other contrast in the section is exploratory and post hoc, and AIFS ENS rows are descriptive.
+
+**A day-14 reading rule decides whether there is any skill to compare at day 14.** Skill exists at
+day 14 only if AIFS Single or the ENS control member has an error that is statistically
+significantly below both shuffled-AIFS arms (two seeds, primary setting, 95% interval). Where the
+rule finds no skill, the page does not read H14 or B14, and prints their intervals only for
+completeness. A second reading rule applies beside H7 and H14: AIFS Single having a lower error
+than the control member but not than the ENS mean is consistent with smoothing, and is not
+described as a better weather forecast.
+<!-- report (blends): header; deciding contrasts; day-14 reading rule; smoothing reading -->
 
 ## Results
 
@@ -1050,13 +1108,52 @@ Figure 10: For wind power a blend of ENS, ICON-EU, and IFS 0.25° lowers the err
 percentage points at an optimistic lead and 0.18 percentage points at a conservative lead, and the
 blend's control does not.
 
-**Each blend guard subtracts one shuffled control, and the shuffle-to-shuffle noise in those
-controls is not yet known.** In the AIFS arms, two different shuffles of the same weather differ by
-+0.453 [+0.223, +0.696] points for solar and +0.266 [-0.051, +0.626] points for wind (see [the AIFS
+**A second-shuffle refit of the blends on the GPU leaves the wind blend claim in place, and shows
+that every solar control is worse than ENS alone.** Each published blend guard subtracts one
+shuffled control, and two shuffles of the same AIFS Single weather differ by +0.453 [+0.223, +0.696]
+points for solar and +0.266 [-0.051, +0.626] points for wind (see [the AIFS
 section](#aifs-single-has-a-lower-wind-error-than-enss-control-member-at-day-1-and-no-solar-difference-is-claimable)).
-Each published blend control was shuffled once, so a blend-minus-control interval in this section
-may miss noise of that size. A second-shuffle refit of the controls has not been run, and until it
-is, the verdicts on the blend guards carry that caveat.
+The study therefore refitted P4a and P4b on the published rows and folds on the GPU, with the
+published shuffle and a second shuffle under another seed, both within generator, year-month, and
+hour of day. Every contrast in the refit is exploratory. The published CPU numbers above stay as
+published, and the GPU refit sits beside them, not in place of them, because a GPU fit is not
+bit-identical to a CPU fit.
+
+| Refit on the GPU, primary setting (points) | Solar P4a | Solar P4b | Wind P4a | Wind P4b |
+|---|---|---|---|---|
+| Blend minus ENS day 1 | -0.348 [-0.477, -0.222] | -0.029 [-0.097, +0.040] | -0.605 [-0.808, -0.387] | -0.175 [-0.289, -0.076] |
+| Blend minus first control (published shuffle) | -0.495 [-0.596, -0.385] | -0.161 [-0.224, -0.096] | -0.574 [-0.778, -0.354] | -0.169 [-0.272, -0.068] |
+| Blend minus second control (second seed) | -0.437 [-0.560, -0.313] | -0.123 [-0.216, -0.033] | -0.605 [-0.790, -0.405] | -0.182 [-0.273, -0.094] |
+| First control minus ENS day 1 | +0.147 [+0.080, +0.215] | +0.133 [+0.059, +0.209] | -0.031 [-0.094, +0.023] | -0.007 [-0.076, +0.054] |
+| Second control minus ENS day 1 | +0.088 [+0.025, +0.175] | +0.094 [+0.028, +0.176] | -0.000 [-0.072, +0.065] | +0.007 [-0.070, +0.084] |
+| Seed-to-seed gap: first control minus second | +0.059 [-0.008, +0.125] | +0.039 [-0.021, +0.096] | -0.031 [-0.099, +0.031] | -0.013 [-0.087, +0.055] |
+
+The GPU refit's ENS day-1 error is 8.771% [8.096, 9.373] for solar and 8.350% [7.373, 9.364] for
+wind, and the blends' errors are 8.422% and 8.742% for solar (P4a and P4b) and 7.745% and 8.175% for
+wind. <!-- report (P4 seeds): Solar and Wind, Absolute error of every arm; Contrasts at the primary
+setting -->
+
+**The two shuffle seeds agree on every guard, at both settings.** The seed-to-seed gap is not
+statistically significant at the 5% level for either blend or technology at the primary setting,
+and its interval includes zero at the sensitivity setting too (solar P4a +0.050 [-0.005, +0.099],
+solar P4b +0.039 [-0.008, +0.084], wind P4a +0.035 [-0.021, +0.097], wind P4b +0.014 [-0.046,
++0.077]). The blend minus each control has the same sign and significance at both seeds and both
+settings. The seed noise that the AIFS null control showed is therefore not visible in these
+controls.
+
+**For wind, the blend claim stands: the blend beats both controls, and neither control is worse than
+ENS alone.** Neither wind control differs significantly from ENS alone at either setting, so each
+guard can discriminate. P4b, the blend a live service could read, has a lower error than ENS alone
+by -0.175 points [-0.289, -0.076] on the GPU (-0.184 [-0.282, -0.087] on the CPU), and than each
+control by -0.169 and -0.182 points.
+
+**For solar, all four controls are significantly worse than ENS alone at the primary setting, so
+their guards are uninformative for the blend claim, and the verdict stays "may lower the error".**
+The controls are worse than ENS alone by +0.088 to +0.147 points, and the same holds at the
+sensitivity setting. A blend that beats a control that is itself worse than ENS alone does not show
+that the added weather carries information. P4b minus ENS alone is -0.029 points [-0.097, +0.040],
+which includes zero, so the solar blend claim rests on P4a, whose added runs a live service may not be
+able to read. The refit removes neither limit.
 
 ### Part of ENS's advantage is ensemble averaging and timing
 
@@ -1420,12 +1517,147 @@ beside each contrast, and none of these results is a claim.
 Figure 13: For solar power, AIFS Single cannot be told apart from ENS's control member at day 1, and
 the AIFS ENS rows are descriptive only.
 
-![AIFS Single and AIFS ENS on wind power: each forecast's own error and paired differences](assets/nwp_forecast_wind_aifs.svg)
+![AIFS Single and AIFS ENS on wind power: each forecast's own
+error and paired differences](assets/nwp_forecast_wind_aifs.svg)
 
 Figure 14: For wind power, AIFS Single has a lower error than ENS's control member at day 1, and the
 AIFS ENS rows are descriptive only.
 
 <!-- report (AIFS): Solar and Wind, row sets `single` and `ens` -->
+
+### At day 7 a blend of ENS and AIFS Single lowers the solar error, and at day 14 no forecast has skill to compare
+
+**At day 7, giving an XGBoost model both ENS's mean and AIFS Single lowers the solar error, and the
+wind difference is not claimable. At day 14, neither technology has any skill to compare.** This
+section is exploratory, except the four deciding contrasts per technology (H7, H14, B7, and B14)
+that [How AIFS is read](#how-aifs-is-read) names. Those four were named before the fit but after the
+day-1 and day-2 AIFS results were known, so the page does not call them planned. Every number is at
+the primary setting unless a row says otherwise. The rows are the `single` row set, 6 solar farms
+and 3 wind farms, 16 months, and the AIFS Single versions those months hold. The survey page says
+that [AIFS has not been shown to improve faster than the physics-based
+IFS](../background/weather-products-survey.md#aifs-has-not-been-shown-to-improve-faster-than-the-physics-based-ifs)
+and that [each AIFS version should be scored
+separately](../background/weather-products-survey.md#score-each-aifs-version-separately), and this
+section treats AIFS Single as a forecast that has a lower or higher error, never as one that has
+improved.
+
+| Row set `single`: each arm's own error (% of capacity, primary) | Solar day 7 | Solar day 14 | Wind day 7 | Wind day 14 |
+|---|---|---|---|---|
+| AIFS Single | 14.198% [13.023, 15.531] | 15.287% [14.187, 16.562] | 17.355% [15.186, 19.546] | 19.426% [16.763, 22.161] |
+| ENS control member | 14.638% [13.572, 15.812] | 15.321% [14.164, 16.604] | 17.909% [16.009, 19.796] | 18.892% [16.472, 21.526] |
+| ENS mean | 14.297% [13.188, 15.561] | 15.207% [14.114, 16.446] | 16.555% [14.754, 18.423] | 18.599% [16.262, 21.033] |
+| Blend of ENS mean and AIFS Single | 13.901% [12.753, 15.236] | 15.236% [14.154, 16.465] | 16.281% [14.401, 18.155] | 18.901% [16.465, 21.376] |
+| Blend with AIFS Single's weather shuffled | 14.338% [13.257, 15.604] | 15.311% [14.215, 16.565] | 16.605% [14.754, 18.488] | 18.522% [16.221, 20.882] |
+| AIFS Single with its weather shuffled (first seed) | 15.351% [14.218, 16.651] | 15.441% [14.287, 16.738] | 18.966% [16.390, 21.512] | 18.856% [16.247, 21.508] |
+| IFS 0.25° (hourly steps) | 14.929% [13.835, 16.171] | not fitted | 17.966% [15.752, 20.141] | not fitted |
+| IFS HRES 9 km | 14.701% [13.626, 15.822] | not fitted | 17.858% [15.993, 19.701] | not fitted |
+
+The table's rows differ by day in the rows scored (28,208 solar and 28,419 wind rows at day 7,
+27,449 and 27,440 at day 14). IFS HRES 9 km lacks some target days, so on the 28,041 solar rows and
+28,294 wind rows it has, its error is 14.674% [13.606, 15.813] and 17.839% [15.960, 19.695]. IFS
+0.25° and IFS HRES 9 km are not fitted at day 14 (their archives stop at day 7 and day 10).
+<!-- report (blends): Solar and Wind, `single`, day 7 and day 14, Absolute error of every arm -->
+
+**For solar power at day 7, the blend of ENS's mean and AIFS Single lowers the error against ENS's
+mean alone, and the shuffled control shows the gain comes from AIFS Single's weather (B7, deciding).**
+The blend's error is 13.901% against 14.297% for ENS's mean alone, a difference of -0.396 points
+[-0.578, -0.201]. The difference is -0.258 points [-0.432, -0.077] at the sensitivity setting, and
+-0.396 points [-0.632, -0.118] at the 99.375% Bonferroni level. With each month dropped in turn the
+estimate runs from -0.454 to -0.359 points, so no month reverses the sign. The guard, the blend
+minus the blend given shuffled AIFS Single weather, is -0.437 points [-0.674, -0.169] at the primary
+setting and -0.342 points [-0.547, -0.128] at the sensitivity setting. The shuffled control is not
+significantly worse than ENS's mean alone (+0.041 points [-0.126, +0.198]), so the guard can
+discriminate. The verdict is that the blend lowers the error at day 7 for these six solar farms.
+The gain is 0.396 points of capacity, about 2.8% of ENS's mean's own error.
+<!-- report (blends): Deciding contrast B7, solar -->
+
+**For wind power at day 7, the blend's gain over ENS's mean is not claimable.** The difference is
+-0.274 points [-0.586, +0.064] at the primary setting, which includes zero, and -0.361 points
+[-0.529, -0.183] at the sensitivity setting, which does not. The guard is -0.325 points [-0.667,
+-0.007] at the primary setting and -0.414 points [-0.621, -0.199] at the sensitivity setting. The
+verdict is no detectable difference, and a gain as large as 0.586 points is not excluded. Every
+dropped month keeps the sign of the estimate.
+<!-- report (blends): Deciding contrast B7, wind -->
+
+**AIFS Single alone has a significantly lower solar error than ENS's control member at day 7 at the
+primary setting only, and neither technology's difference is claimable (H7, deciding).** For solar
+the difference is -0.440 points [-0.759, -0.074] at the primary setting and -0.412 points [-0.784,
++0.072] at the sensitivity setting, and without day of year in either arm it is -0.257 points
+[-0.567, +0.073]. The primary interval is statistically significant at the 5% level and the other
+two are not, so H7 fails the rule. For wind the difference is -0.554 points [-1.234, +0.195], and
+-0.431 points [-0.969, +0.091] at the sensitivity setting. Against ENS's mean, AIFS Single at day 7
+does not have a significantly lower error for either technology (exploratory): -0.099 points
+[-0.419, +0.276] for solar, and +0.800 points [+0.015, +1.586] for wind, where AIFS Single has the
+higher error. AIFS Single and the ENS mean are close for solar, and the ENS control member is the
+noisier forecast (positive control, control minus ENS mean: +0.341 points [+0.061, +0.619] for solar
+and +1.354 points [+0.859, +1.949] for wind). The solar H7 result is therefore consistent with AIFS
+Single being smoother than the control member, and the page does not describe it as a better weather
+forecast. AIFS Single's day-7 solar radiation has a standard deviation of 199.0 W/m², against 213.7
+for the control member and 191.5 for the ENS mean. <!-- report (blends): Deciding contrast;
+Smoothing reading; Spread of weather columns -->
+
+**AIFS Single has a lower day-7 error than IFS 0.25° for both technologies, and than IFS HRES 9 km
+for solar only at one setting (exploratory).** The comparison with IFS 0.25° is one-sided, because
+IFS 0.25° reads hourly steps and a shorter lead, both of which favour IFS 0.25°. AIFS Single minus
+IFS 0.25° is -0.731 points [-1.112, -0.341] for solar (14.198% against 14.929%) and -0.611 points
+[-1.019, -0.227] for wind (17.355% against 17.966%). On the rows IFS HRES 9 km has, AIFS Single minus
+IFS HRES 9 km is -0.441 points [-0.784, -0.017] for solar (14.232% against 14.674%) and -0.442
+points [-1.080, +0.202] for wind (17.397% against 17.839%). The solar difference against IFS HRES 9
+km is -0.447 points [-0.841, +0.046] at the sensitivity setting, so it lies near the 5% line. AIFS
+Single's weather carries information at day 7: shuffling it raises the error by 1.153 points
+[+0.706, +1.574] for solar and 1.610 points [+0.835, +2.511] for wind.
+<!-- report (blends): Listed contrasts (primary setting), solar and wind, day 7 -->
+
+**At day 14, neither AIFS Single nor the ENS control member has an error below the shuffled arms, so
+there is no skill to compare, for solar or for wind.** Under the reading rule, ENS's control member
+minus AIFS Single with shuffled weather is -0.120 points [-0.403, +0.154] and +0.078 points [-0.160,
++0.339] for solar (two shuffle seeds), and +0.035 points [-0.545, +0.570] and +0.055 points [-0.701,
++0.736] for wind. The same contrasts for AIFS Single itself include zero too. H14 and B14 are
+therefore not read. Their intervals are for completeness: for solar, AIFS Single minus the control
+member is -0.035 points [-0.305, +0.216] and the blend minus ENS's mean is +0.029 points [-0.239,
++0.267]; for wind, +0.534 points [-0.334, +1.535] and +0.302 points [+0.015, +0.644]. The wind blend
+has a higher error than ENS's mean at the primary setting, and not at the sensitivity setting
+(+0.115 points [-0.075, +0.336]), so the wind blend at day 14 is unresolved.
+<!-- report (blends): Day-14 reading rule; Deciding contrasts H14, B14 -->
+
+**The AIFS-versus-IFS test at day 14 rests on the ENS control member, and not on IFS HRES.** The
+ENS control member is the same weather-model physics as IFS, at a coarser resolution, so a day-14
+contrast with the control member says nothing about IFS HRES 9 km, which the study fits no further
+than day 7.
+
+**The gap between AIFS Single and the ENS control member moves against AIFS Single from day 7 to day
+14 (exploratory and post hoc).** On the day-14 rows, the difference in that gap is +0.468 points
+[+0.047, +0.818] for solar and +1.136 points [-0.023, +2.359] for wind. On those rows the solar gap
+is -0.503 points at day 7 (14.098% against 14.601%) and -0.034 points at day 14 (15.287% against
+15.321%). The wind gap is -0.601 points at day 7 (17.343% against 17.944%) and +0.534 points at day
+14 (19.426% against 18.892%).
+<!-- report (blends): Gap at day 14 minus gap at day 7 -->
+
+**At days 1 and 2 the blend's gain over ENS's mean varies by technology and day (exploratory and
+post hoc).** Solar: the blend minus ENS's mean is -0.044 points [-0.162, +0.073] at
+day 1 and -0.325 points [-0.479, -0.181] at day 2, with guards of -0.116 points [-0.241, +0.009]
+and -0.385 points [-0.512, -0.263]. Wind: -0.305 points [-0.603, -0.099] at day 1 and -0.211 points
+[-0.383, -0.049] at day 2, with guards of -0.292 points [-0.504, -0.123] and -0.140 points [-0.347,
++0.075]. At day 1 the solar guard's sensitivity-setting interval is -0.130 points [-0.242, -0.021].
+Blending AIFS ENS's mean with ENS's mean is descriptive only, for the fold-coverage reason above.
+<!-- report (blends): Solar and Wind, `single` and `ens`, days 1 and 2 -->
+
+![AIFS Single, ENS, and their blend at days 1, 2, 7, and 14 on solar power: each forecast's own
+error and paired differences](assets/nwp_forecast_solar_aifs_leads.svg)
+
+Figure 15: For the six solar farms, at day 7 AIFS Single is unresolved against ENS's control member,
+which is consistent with smoothing: it is not lower than the ENS mean's and at day 14 there is no
+skill to compare. For a blend of ENS's mean and AIFS Single, at day 7 the blend lowers the error and
+at day 14 the blend shows no detectable difference. The day-14 reading rule finds no skill to
+compare at day 14.
+
+![AIFS Single, ENS, and their blend at days 1, 2, 7, and 14 on wind power: each forecast's own
+error and paired differences](assets/nwp_forecast_wind_aifs_leads.svg)
+
+Figure 16: For the three wind farms, at day 7 AIFS Single cannot be told apart from ENS's control
+member and at day 14 there is no skill to compare. For a blend of ENS's mean and AIFS Single, at day
+7 the blend is unresolved and at day 14 the blend is unresolved. The day-14 reading rule finds no
+skill to compare at day 14.
 
 ## Discussion: what to use
 
@@ -1726,6 +1958,12 @@ Rows, folds, and fairness -->
   (generator, fold, calendar month) cells, 37 of 95 solar cells and 18 of 48 wind cells of the
   `single` row set have no training row of their calendar month, and 55 of 65 and 27 of 33 of the
   `ens` row set.
+- **AIFS Single's radiation window and wind reading were not checked at days 7 and 14.** The
+  offset check cannot discriminate there, because AIFS Single's correlation with ERA5's wind speed
+  is 0.43 at day 7 and 0.15 at day 14.
+- **The day-14 comparison of AIFS Single with IFS rests on the ENS control member.** IFS 0.25° and
+  IFS HRES 9 km are not fitted at day 14, and the control member is the same physics as IFS at a
+  coarser resolution.
 - **AIFS is read on 6-hourly steps, and hourly IFS 0.25° favours IFS 0.25°.** The ENS references use
   6-hourly steps for a like-for-like comparison, and the AIFS ENS publication time was not measured.
 
@@ -1741,19 +1979,23 @@ chance, so an isolated exploratory result deserves less weight than a planned on
 **Four statistical caveats limit how far the intervals can be trusted.**
 
 - **No multiplicity correction.** The study has 18 planned contrasts (9 for solar and 9 for wind,
-  including the 4 blend guards), the two AIFS deciding contrasts, which carry their own Bonferroni
-  interval, and many exploratory contrasts, among them which product carries the wind blend gain,
-  the 00-05 UTC subset, and the result at wind generator W3. No interval is adjusted for the number
-  of comparisons.
+  including the 4 blend guards), the two AIFS day-1 deciding contrasts, which carry their own
+  Bonferroni interval, the eight deciding contrasts of the AIFS blends and days 7 and 14 (four per
+  technology, printed at a 99.375% Bonferroni interval beside the 95% one), and many exploratory
+  contrasts, among them which product carries the wind blend gain, the 00-05 UTC subset, and the
+  result at wind generator W3. No interval is adjusted for the number of comparisons.
 - **The sensitivity setting is not independent confirmation.** It changes the XGBoost
   hyperparameters and keeps the same rows, folds, and weather. Agreement between the two settings
   shows only that a verdict does not depend on the hyperparameters.
 - **The voiding rule reacts to noise.** A band is voided when its point estimate is zero or below,
   which a noisy estimate can reach by chance.
-- **A shuffled control carries shuffle noise that its interval does not show.** Two shuffles of the
-  same AIFS Single weather differ by +0.453 [+0.223, +0.696] points for solar, so the
-  month-and-seed intervals do not cover the difference between one shuffle and another. The blend
-  guards each subtract one shuffled control, so their intervals may miss noise of that size.
+- **A shuffled control can carry shuffle noise that its interval does not show, and the P4 blends'
+  second-seed refit found none.** Two shuffles of the same AIFS Single weather differ by +0.453
+  [+0.223, +0.696] points for solar. Two shuffles of the P4 blends' added weather differ by +0.059
+  [-0.008, +0.125] and +0.039 [-0.021, +0.096] points for solar and by -0.031 [-0.099, +0.031] and
+  -0.013 [-0.087, +0.055] points for wind, at the primary setting, so the P4 guards' verdicts agree
+  across two seeds. The AIFS-blend guards each subtract one shuffled control, and their seed noise
+  was not measured.
 
 **One month can move a point estimate a little, and no month reverses one.** With each year-month
 dropped in turn, and no refit, P1a runs from +1.127 to +1.343 points for solar and from +0.713 to
@@ -1772,17 +2014,17 @@ scores point forecasts, made by an XGBoost model fitted separately for each gene
 solar and wind output at 6 solar and 3 wind generators, at day-ahead leads that depend on each
 Previous Runs product's run cycle, at exact leads for ENS and GEFS, and, in exploratory arms, at
 days 0, 5, 7, 10, and 14 for the products listed in [the extra
-arms](#the-extra-lead-days-day-0-and-the-products-added-later), and at days 1 and 2 for AIFS. The
-study says nothing about substation demand, and because it scores generators and not substations, it
-does not show how the gaps carry into a forecast summed over a substation's generators. The study
-gives the XGBoost model ENS's mean and none of ENS's spread, so the uncertainty information in ENS
-is unused. The study says nothing about a forecast issued at any time other than 09:00 UTC, apart
-from the exploratory day-0 arms, which read the freshest run (ICON, UKV, native GFS, and the other
-Previous Runs products) or the 00 UTC run of the hour's own day (ENS, GEFS, and IFS HRES 9 km). The
-study also says nothing about the values an Open-Meteo archive would have served live rather than as
-a Previous Runs value. The study does not test any product's grid, physics, or resolution as a cause
-of a gap, and it does not test the live service.
-<!-- plan: The question and the products; What no contrast here can separate -->
+arms](#the-extra-lead-days-day-0-and-the-products-added-later), and at days 1, 2, 7, and 14 for
+AIFS. The study says nothing about substation demand, and because it scores generators and not
+substations, it does not show how the gaps carry into a forecast summed over a substation's
+generators. The study gives the XGBoost model ENS's mean and none of ENS's spread, so the
+uncertainty information in ENS is unused. The study says nothing about a forecast issued at any time
+other than 09:00 UTC, apart from the exploratory day-0 arms, which read the freshest run (ICON, UKV,
+native GFS, and the other Previous Runs products) or the 00 UTC run of the hour's own day (ENS,
+GEFS, and IFS HRES 9 km). The study also says nothing about the values an Open-Meteo archive would
+have served live rather than as a Previous Runs value. The study does not test any product's grid,
+physics, or resolution as a cause of a gap, and it does not test the live service. <!-- plan: The
+question and the products; What no contrast here can separate -->
 
 ## Data and code availability
 
@@ -1797,17 +2039,21 @@ generator's output can be commercially sensitive.
 
 **The code is in the repository, at a fixed commit and with fixed XGBoost settings.** The scripts
 under `studies/nwp_forecast_comparison/` and the shared code under `packages/studies/` last changed
-at commit c1d6bd526263cc6681170b319948c9193cf61be7. The XGBoost version is 3.4.1. The primary
+at commit c8f54229484d0190f771fd7231c1a074f610ff50. The XGBoost version is 3.4.1. The primary
 setting has a maximum depth of 6, a learning rate of 0.05, 500 boosting rounds, a row subsample of
 0.8, a minimum child weight of 20, and an L2 penalty of 1. The sensitivity setting has a maximum
 depth of 4, a learning rate of 0.03, 1,200 rounds, a row subsample of 0.8, a minimum child weight of
 50, and an L2 penalty of 5. Both settings use the absolute-error objective, no column subsampling,
 and the seeds 0, 1, and 2. Every extra and AIFS fit uses the primary setting on a GPU, and the AIFS
-deciding pair and every AIFS pair near the 5% line are also fitted at the sensitivity setting.
+deciding pair, every deciding contrast of the blends fit, and every AIFS pair near the 5% line are
+also fitted at the sensitivity setting, and the P4 refit is fitted at both settings.
 
-**The outputs of the extra arms are in five write-once folders.** Batches 1 to 4 write to
+**The outputs of the extra arms are in seven write-once folders.** Batches 1 to 4 write to
 `data/studies/nwp_forecast_comparison_leads_day10`, `..._day10b`, `..._day10c`, and `..._day10d`,
-and the AIFS arms write to `data/studies/nwp_forecast_comparison_aifs`. Each folder holds the extra
+the day-1 and day-2 AIFS arms write to `data/studies/nwp_forecast_comparison_aifs`, the AIFS
+blends and the day-7 and day-14 AIFS arms write to `data/studies/nwp_forecast_comparison_aifs_blends`,
+and the GPU refit of the P4 blends with two shuffle seeds writes to
+`data/studies/nwp_forecast_comparison_p4_seeds`. Each folder holds the extra
 inputs, the losses and predictions, `report.md`, and a `verification/` directory. The folder
 `data/studies/nwp_forecast_comparison_leads` holds an earlier run of batch 1's arms, and the charts
 and tables do not read it.
@@ -1815,11 +2061,12 @@ and tables do not read it.
 
 ## Reproducing this page
 
-**Every number on this page comes from one of six `report.md` files or the `verification/` files
+**Every number on this page comes from one of eight `report.md` files or the `verification/` files
 beside them, or is derived from them, except the three the page marks in place (the GEFS store's
 missing long-lead wind, the day-by-day coverage shares in the lead-day table, and the repeat of the
-23 GPU arms), and the commands below rebuild the reports and the figures.** The six files are the
-published run's, one for each of the four extra-lead batches, and the AIFS arms'. Run the commands
+23 GPU arms), and the commands below rebuild the reports and the figures.** The eight files are the
+published run's, one for each of the four extra-lead batches, the day-1 and day-2 AIFS arms', the
+AIFS blends and long leads', and the P4 refit's. Run the commands
 from the repository root, in this order. The verification scripts write the `verification/`
 directories that the reports quote.
 
@@ -1830,6 +2077,8 @@ D2=data/studies/nwp_forecast_comparison_leads_day10b
 D3=data/studies/nwp_forecast_comparison_leads_day10c
 D4=data/studies/nwp_forecast_comparison_leads_day10d
 A=data/studies/nwp_forecast_comparison_aifs
+AB=data/studies/nwp_forecast_comparison_aifs_blends
+PS=data/studies/nwp_forecast_comparison_p4_seeds
 R=studies/nwp_forecast_comparison
 
 # The published run
@@ -1871,9 +2120,20 @@ uv run python $R/verify_aifs_steps.py --published-dir $P --output-dir $A --wirin
 uv run python $R/fit_aifs.py --check --published-dir $P --output-dir $A
 uv run python $R/fit_aifs.py --published-dir $P --output-dir $A
 
+# AIFS blends, days 7 and 14, and the P4 second-seed refit
+uv run python $R/build_forecast_inputs.py --aifs --aifs-days 1 2 7 14 --published-dir $P \
+    --output-dir $AB
+uv run python $R/verify_aifs_steps.py --published-dir $P --output-dir $AB
+uv run python $R/verify_aifs_steps.py --wiring --published-dir $P --output-dir $AB
+uv run python $R/fit_aifs.py --blends --check --published-dir $P --output-dir $AB
+uv run python $R/fit_aifs.py --blends --workers 1 --published-dir $P --output-dir $AB
+uv run python $R/fit_aifs.py --p4-controls --check --published-dir $P --output-dir $PS
+uv run python $R/fit_aifs.py --p4-controls --workers 1 --published-dir $P --output-dir $PS
+
 # Figures
 uv run python $R/nwp_forecast_charts.py --input-dir $P --extra-dir $D1 --extra-dir $D2 \
     --extra-dir $D3 --extra-dir $D4 --aifs-dir $A --output-dir docs/studies/assets
+uv run python $R/nwp_forecast_charts.py --aifs-blends-dir $AB --output-dir docs/studies/assets
 ```
 
 The third command writes `solar_forecast_inputs.parquet` and `wind_forecast_inputs.parquet` under
@@ -1885,9 +2145,11 @@ twice on a GPU and stops unless the two runs agree. Each later batch takes one `
 each earlier batch whose arms its contrasts name. Batches 3 and 4 run their verification script
 before the build and again, with `--built-dir`, after it. The AIFS commands check AIFS Single's
 radiation window, wind reading, units, and grid orientation, build the AIFS columns, check the
-wiring, and fit. Every extra folder is write-once: the scripts refuse to overwrite it, and never
-write to the published folder. The chart script runs `npx svgo@4 --multipass --precision=1
---final-newline` on every SVG it writes, reads every folder, and runs last.
+wiring, and fit. The blends commands do the same at days 1, 2, 7, and 14, and the P4 commands refit
+the published blends on the GPU with two shuffle seeds. The last chart command draws only the two
+AIFS lead charts (Figures 15 and 16). Every extra folder is write-once: the scripts refuse to
+overwrite it, and never write to the published folder. The chart script runs `npx svgo@4 --multipass
+--precision=1 --final-newline` on every SVG it writes, reads every folder, and runs last.
 
 **The inputs are on disk and cannot all be downloaded again.** The build reads the finished GEFS
 download in `data/studies/weather/GEFS_window_2024-11-01_None/`, each Previous Runs product's
