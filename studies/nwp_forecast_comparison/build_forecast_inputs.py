@@ -34,8 +34,16 @@ One-off throwaway script for the study in
   for any earlier month does not count as covering it. After loading, every 00 UTC run the rows need
   (init dates from the rows' first date minus the largest day offset to their last date minus the
   smallest, clipped to the first cached month) must hold all 31 members at every 3-hourly lead from
-  0 to 95 h at every grid cell, or the build raises with the missing or incomplete runs listed. A
-  run still arriving therefore stops the build instead of turning into null GEFS columns.
+  0 to 95 h at every grid cell (with `--extra-leads`, at every lead `gefs_band_leads` returns:
+  3-hourly to 240 h and each band's 6-hourly leads beyond), or the build raises with the missing
+  or incomplete runs listed. A run still arriving therefore stops the build instead of turning
+  into null GEFS columns.
+
+With `--extra-leads` the script instead builds the exploratory lead columns (ENS at days 5 and 14,
+GEFS at days 5, 10 and 14, Previous Runs at day 0 for ICON-D2 and ICON-EU and at day 5 for ICON
+global, IFS 0.25° and GFS) on the published inputs' own `(site, time)` keys, into a new write-once
+`--output-dir`, and never writes to the published folder. The new days are separate constants
+(`EXTRA_ENS_DAYS`, `EXTRA_GEFS_DAYS`), never added to `ENS_DAYS`, so the shared rows cannot move.
 
 Every output row carries only the anonymised `site` label; no generator name, id or coordinate is
 read from the private roster in this script, except inside `studies.grid_sampling` (GEFS's
@@ -49,7 +57,7 @@ import argparse
 import logging
 import os
 import sys
-from collections.abc import Callable
+from collections.abc import Callable, Mapping, Sequence
 from datetime import date, timedelta
 from pathlib import Path
 from typing import Final, Literal
@@ -59,6 +67,12 @@ import polars as pl
 from contracts.settings import PROJECT_ROOT
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from verify_extra_leads import (
+    gefs_boundary_table,
+    gefs_boundary_verdict,
+    gefs_window_table,
+    gefs_window_verdict,
+)
 from verify_previous_runs_leads import PRODUCT_DIRS
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
@@ -115,6 +129,24 @@ PRODUCT_DAY_OFFSETS: Final[dict[str, tuple[int, ...]]] = {
 }
 """Each product's `previous_dayN` offsets this study reads, from the plan's product table."""
 
+EXTRA_PRODUCT_DAY_OFFSETS: Final[dict[str, tuple[int, ...]]] = {
+    "ICON-D2": (0,),
+    "ICON-EU": (0,),
+    "ICON global": (5,),
+    "IFS 0.25°": (5,),
+    "GFS": (5,),
+}
+"""The exploratory `previous_dayN` offsets the extra-lead build reads on top of
+`PRODUCT_DAY_OFFSETS`. Day 0 is Open-Meteo's unsuffixed series, the freshest run that covers each
+hour; ICON-EU's archive ends at day 4, and ICON-D2's holds only days 0 and 1."""
+
+EXTRA_ENS_DAYS: Final[tuple[int, ...]] = (5, 14)
+"""The ENS bands the extra-lead build adds. They never join `ENS_DAYS`, which also decides the
+baseline columns every shared row must hold, so adding them there would move the shared rows."""
+
+EXTRA_GEFS_DAYS: Final[tuple[int, ...]] = (5, 10, 14)
+"""The GEFS bands the extra-lead build adds."""
+
 SOLAR_ONLY_PRODUCTS: Final[frozenset[str]] = frozenset({"ARPEGE Europe", "AROME France"})
 """Products the plan scores for solar only: their 100 m wind offsets are missing on most rows."""
 
@@ -147,6 +179,20 @@ def _weather_dir() -> Path:
     return _repo_data_dir() / "studies" / "weather"
 
 
+def _previous_column(*, name: str, day: int) -> str:
+    """Return Open-Meteo's column for a variable at a day offset.
+
+    Args:
+        name: The variable, such as `shortwave_radiation`.
+        day: The offset: 0 for the unsuffixed series (the freshest run covering each hour), else N
+            for `<name>_previous_day<N>`.
+
+    Returns:
+        The column's name.
+    """
+    return name if day == 0 else f"{name}_previous_day{day}"
+
+
 def _solar_columns(*, frame: pl.DataFrame, day: int, snapshot: bool) -> pl.DataFrame:
     """Return one product's day-N radiation and temperature, on the rows both are present.
 
@@ -159,8 +205,8 @@ def _solar_columns(*, frame: pl.DataFrame, day: int, snapshot: bool) -> pl.DataF
     Returns:
         `site`, `time`, `ghi`, `temp`.
     """
-    ghi_column = f"shortwave_radiation_previous_day{day}"
-    temp_column = f"temperature_2m_previous_day{day}"
+    ghi_column = _previous_column(name="shortwave_radiation", day=day)
+    temp_column = _previous_column(name="temperature_2m", day=day)
     if snapshot:
         snapshots = frame.select(
             key=pl.col("site"), time="time", value=pl.col(ghi_column)
@@ -189,9 +235,9 @@ def _wind_columns(*, frame: pl.DataFrame, day: int) -> pl.DataFrame:
     Returns:
         `site`, `time`, `speed_100m`, `sin_100m`, `cos_100m`, `speed_10m`, speeds in m/s.
     """
-    speed_100m_column = f"wind_speed_100m_previous_day{day}"
-    direction_100m_column = f"wind_direction_100m_previous_day{day}"
-    speed_10m_column = f"wind_speed_10m_previous_day{day}"
+    speed_100m_column = _previous_column(name="wind_speed_100m", day=day)
+    direction_100m_column = _previous_column(name="wind_direction_100m", day=day)
+    speed_10m_column = _previous_column(name="wind_speed_10m", day=day)
     return (
         frame.select(
             "site",
@@ -209,12 +255,18 @@ def _wind_columns(*, frame: pl.DataFrame, day: int) -> pl.DataFrame:
     )
 
 
-def _previous_runs_frame(*, keys: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
+def _previous_runs_frame(
+    *,
+    keys: pl.DataFrame,
+    domain: DomainType,
+    day_offsets: Mapping[str, tuple[int, ...]] = PRODUCT_DAY_OFFSETS,
+) -> pl.DataFrame:
     """Join every Previous Runs product's arm columns onto the shared rows.
 
     Args:
         keys: `site`, `time` for every row the study might score.
         domain: `solar` or `wind`.
+        day_offsets: Each product's `previous_dayN` offsets to read; a product it omits is skipped.
 
     Returns:
         `keys` with `<slug>_day<N>_<field>` for every product and offset that applies to `domain`,
@@ -223,7 +275,7 @@ def _previous_runs_frame(*, keys: pl.DataFrame, domain: DomainType) -> pl.DataFr
     """
     frame = keys
     for product, dir_name in PRODUCT_DIRS.items():
-        if domain == "wind" and product in SOLAR_ONLY_PRODUCTS:
+        if product not in day_offsets or (domain == "wind" and product in SOLAR_ONLY_PRODUCTS):
             continue
         path = _weather_dir() / dir_name / "previous_runs" / "combined.parquet"
         if not path.exists():
@@ -231,9 +283,9 @@ def _previous_runs_frame(*, keys: pl.DataFrame, domain: DomainType) -> pl.DataFr
             continue
         slug = PRODUCT_SLUGS[product]
         combined = pl.read_parquet(path)
-        for day in PRODUCT_DAY_OFFSETS[product]:
+        for day in day_offsets[product]:
             if domain == "solar":
-                ghi_column = f"shortwave_radiation_previous_day{day}"
+                ghi_column = _previous_column(name="shortwave_radiation", day=day)
                 if ghi_column not in combined.columns:
                     continue
                 columns = _solar_columns(
@@ -241,7 +293,7 @@ def _previous_runs_frame(*, keys: pl.DataFrame, domain: DomainType) -> pl.DataFr
                 )
                 rename = {"ghi": f"{slug}_day{day}_ghi", "temp": f"{slug}_day{day}_temp"}
             else:
-                speed_column = f"wind_speed_100m_previous_day{day}"
+                speed_column = _previous_column(name="wind_speed_100m", day=day)
                 if speed_column not in combined.columns:
                     continue
                 columns = _wind_columns(frame=combined, day=day)
@@ -264,6 +316,7 @@ def _ens_member_arms(
     ensemble_size: int,
     arm_name: Callable[[str, int], str],
     ways: tuple[str, ...] = ("mean", "control"),
+    fine_step_last_lead: int = efh.FINE_STEP_LAST_LEAD,
 ) -> list[pl.DataFrame]:
     """Upsample, combine and reduce one ensemble's members at several bands and ways.
 
@@ -280,6 +333,7 @@ def _ens_member_arms(
         arm_name: Given a way (`"mean"` or `"control"`) and a day, returns that arm's name.
         ways: Which reductions to build; ENS wants both, GEFS only the mean (no control-member arm
             is planned for GEFS).
+        fine_step_last_lead: The last lead on 3-hour steps: 144 for ENS, 240 for GEFS.
 
     Returns:
         One frame per (day, way) with `site`, `time` and that arm's own weather columns.
@@ -287,7 +341,13 @@ def _ens_member_arms(
     clear_sky = efh.clear_sky_table(domain=domain)
     frames: list[pl.DataFrame] = []
     for day in days:
-        steps = efh.band_steps(members=extract, day=day, domain=domain, ensemble_size=ensemble_size)
+        steps = efh.band_steps(
+            members=extract,
+            day=day,
+            domain=domain,
+            ensemble_size=ensemble_size,
+            fine_step_last_lead=fine_step_last_lead,
+        )
         upsampled = efh.upsampled_fields(steps=steps, day=day, domain=domain, clear_sky=clear_sky)
         combined = efh.combine(
             steps=steps, upsampled=upsampled, day=day, domain=domain, method=method
@@ -447,15 +507,36 @@ GEFS_ENSEMBLE_SIZE: Final[int] = 31
 """How many members a GEFS run holds (ENS holds 51)."""
 
 GEFS_STEP_MEAN_MAX_LEAD_HOURS: Final[int] = 240
-"""GEFS steps 3-hourly to this lead and 6-hourly beyond it; `gefs_step_means` only applies inside
-the 3-hourly part, which comfortably covers every band this study reads (day 3's steps end at lead
-24*3+30 = 102 h)."""
+"""GEFS steps 3-hourly to this lead and 6-hourly beyond it. `gefs_step_means` inverts the
+alternating windows up to this lead; beyond it each value is already a 6-hour mean and passes
+through (`verify_extra_leads.py` checks that reading)."""
 
 GEFS_DAYS: Final[dict[DomainType, tuple[int, ...]]] = {
     "solar": (1, 2, 3),
     "wind": (1, 2, 3),
 }
 """The bands GEFS is built at (the plan's product table: day offsets 1-3, from 2024-11-30)."""
+
+
+def gefs_band_leads(*, days: Sequence[int]) -> list[int]:
+    """Return every lead of a GEFS run that the bands for `days` need, in hours.
+
+    Radiation is inverted from windows to step means along a whole run, so every 3-hourly lead from
+    0 to `GEFS_STEP_MEAN_MAX_LEAD_HOURS` is needed whatever the days. Beyond that lead GEFS steps
+    every 6 hours, and a band reads the 6-hourly leads that fall in its window (`band_steps` reads
+    from `24 * day - 6` to `24 * day + 30`).
+
+    Args:
+        days: The bands to build.
+
+    Returns:
+        The needed leads, sorted and without repeats.
+    """
+    leads = set(range(0, GEFS_STEP_MEAN_MAX_LEAD_HOURS + 1, GEFS_REQUIRED_LEAD_STEP_HOURS))
+    for day in days:
+        window = range(max(24 * day - 6, 0), 24 * day + 31)
+        leads |= {lead for lead in window if lead > GEFS_STEP_MEAN_MAX_LEAD_HOURS and lead % 6 == 0}
+    return sorted(leads)
 
 
 def _gefs_cell_selection(
@@ -480,37 +561,41 @@ def _gefs_cell_selection(
 
 
 def _gefs_step_mean_radiation(*, radiation: pl.DataFrame) -> pl.DataFrame:
-    """Convert one cell's GEFS radiation from alternating windows to plain 3-hour step means.
+    """Convert one cell's GEFS radiation from alternating windows to plain step means.
 
-    Runs `studies.resample.gefs_step_means` on each (run, member) series in lead order, on the
-    whole run before any band slicing, as the plan requires.
+    Runs `studies.resample.gefs_step_means` on each (run, member) series up to
+    `GEFS_STEP_MEAN_MAX_LEAD_HOURS`, in lead order, on the whole run before any band slicing, as
+    the plan requires. Beyond that lead GEFS steps every 6 hours and every value is already a plain
+    6-hour mean (`verify_extra_leads.py` checks that reading), so those leads pass through
+    unchanged.
 
     Args:
-        radiation: `init_time`, `ensemble_member`, `lead_hours`, `ghi_raw`, restricted to leads
-            `<= GEFS_STEP_MEAN_MAX_LEAD_HOURS`, with the null value at lead 0 already excluded.
+        radiation: `init_time`, `ensemble_member`, `lead_hours`, `ghi_raw`, with the null value at
+            lead 0 already excluded.
 
     Returns:
         `init_time`, `ensemble_member`, `lead_hours`, `ghi_w_m2`: the same (run, member, lead)
-        rows, radiation replaced by 3-hour step means. A (run, member) missing any lead in its
-        series is dropped whole, as `ens_forecast_horizons.band_steps` drops an incomplete run.
+        rows, radiation replaced by step means. A (run, member) missing any lead up to
+        `GEFS_STEP_MEAN_MAX_LEAD_HOURS` is dropped whole, as `ens_forecast_horizons.band_steps`
+        drops an incomplete run.
     """
-    leads = np.sort(radiation["lead_hours"].unique().to_numpy())
+    fine_radiation = radiation.filter(pl.col("lead_hours") <= GEFS_STEP_MEAN_MAX_LEAD_HOURS)
+    schema = {
+        "init_time": pl.Datetime("us", "UTC"),
+        "ensemble_member": pl.Int8,
+        "lead_hours": pl.Int32,
+        "ghi_w_m2": pl.Float64,
+    }
+    leads = np.sort(fine_radiation["lead_hours"].unique().to_numpy())
     lead_columns = [str(int(lead)) for lead in leads]
-    wide = radiation.pivot(
+    wide = fine_radiation.pivot(
         on="lead_hours", index=["init_time", "ensemble_member"], values="ghi_raw", sort_columns=True
     ).drop_nulls(lead_columns)
     if wide.is_empty():
-        return pl.DataFrame(
-            schema={
-                "init_time": pl.Datetime("us", "UTC"),
-                "ensemble_member": pl.Int8,
-                "lead_hours": pl.Int32,
-                "ghi_w_m2": pl.Float64,
-            }
-        )
+        return pl.DataFrame(schema=schema)
     values = wide.select(lead_columns).to_numpy()
     step_means = gefs_step_means(values=values, leads=leads.astype(np.float64))
-    return (
+    fine = (
         wide.select("init_time", "ensemble_member")
         .with_columns(
             [pl.Series(lead_columns[index], step_means[:, index]) for index in range(len(leads))]
@@ -523,23 +608,44 @@ def _gefs_step_mean_radiation(*, radiation: pl.DataFrame) -> pl.DataFrame:
         )
         .with_columns(lead_hours=pl.col("lead_hours").cast(pl.Int32))
     )
+    coarse = (
+        radiation.filter(pl.col("lead_hours") > GEFS_STEP_MEAN_MAX_LEAD_HOURS)
+        .join(wide.select("init_time", "ensemble_member"), on=["init_time", "ensemble_member"])
+        .select("init_time", "ensemble_member", "lead_hours", ghi_w_m2="ghi_raw")
+        .cast(
+            {
+                "ensemble_member": fine.schema["ensemble_member"],
+                "ghi_w_m2": fine.schema["ghi_w_m2"],
+            }
+        )
+    )
+    return pl.concat([fine, coarse], how="vertical")
 
 
-def _gefs_missing_runs(*, files: list[Path], first_init: date, last_init: date) -> list[str]:
+def _gefs_missing_runs(
+    *,
+    files: list[Path],
+    first_init: date,
+    last_init: date,
+    leads: Sequence[int] | None = None,
+) -> list[str]:
     """Return the 00 UTC runs in `first_init` to `last_init` that are absent or incomplete.
 
-    A run is complete when every grid cell holds all `GEFS_ENSEMBLE_SIZE` members at every lead from
-    0 to `GEFS_REQUIRED_MAX_LEAD_HOURS` in steps of `GEFS_REQUIRED_LEAD_STEP_HOURS`.
+    A run is complete when every grid cell holds all `GEFS_ENSEMBLE_SIZE` members at every lead in
+    `leads`, by default 0 to `GEFS_REQUIRED_MAX_LEAD_HOURS` in steps of
+    `GEFS_REQUIRED_LEAD_STEP_HOURS`.
 
     Args:
         files: The month parquets (or the extract's `GEFS.parquet`) to read.
         first_init: The first init date the study needs.
         last_init: The last init date the study needs.
+        leads: The leads every run must hold, in hours; `None` reads the default above.
 
     Returns:
         One `YYYY-MM-DD: <reason>` line per missing or incomplete run, sorted by date.
     """
-    leads = range(0, GEFS_REQUIRED_MAX_LEAD_HOURS + 1, GEFS_REQUIRED_LEAD_STEP_HOURS)
+    if leads is None:
+        leads = range(0, GEFS_REQUIRED_MAX_LEAD_HOURS + 1, GEFS_REQUIRED_LEAD_STEP_HOURS)
     expected = GEFS_ENSEMBLE_SIZE * len(leads)
     lead_hours = (pl.col("lead_time").dt.total_minutes() / 60).cast(pl.Int32)
     present = (
@@ -568,7 +674,12 @@ def _gefs_missing_runs(*, files: list[Path], first_init: date, last_init: date) 
 
 
 def _gefs_members_frame(
-    *, path: Path, files: list[Path], domain: DomainType, sites: list[str]
+    *,
+    path: Path,
+    files: list[Path],
+    domain: DomainType,
+    sites: list[str],
+    max_lead_hours: int = GEFS_STEP_MEAN_MAX_LEAD_HOURS,
 ) -> pl.DataFrame:
     """Read one GEFS extract and reshape it to `ens_forecast_horizons.band_steps`'s input shape.
 
@@ -582,6 +693,7 @@ def _gefs_members_frame(
             files.
         domain: `solar` or `wind`.
         sites: The sites to build.
+        max_lead_hours: The longest lead to keep.
 
     Returns:
         One row per (site, init_time, ensemble_member, lead_hours), with `ghi_w_m2`, `temp_c`,
@@ -596,7 +708,7 @@ def _gefs_members_frame(
             cell=pl.col("lat_index") * 10 + pl.col("lon_index"),
             init_time=pl.col("init_time").dt.replace_time_zone("UTC"),
         )
-        .filter(pl.col("lead_hours") <= GEFS_STEP_MEAN_MAX_LEAD_HOURS)
+        .filter(pl.col("lead_hours") <= max_lead_hours)
     )
     frames: list[pl.DataFrame] = []
     for site, cell_id in cell_by_site.items():
@@ -649,7 +761,13 @@ def _gefs_members_frame(
     return pl.concat(frames, how="diagonal")
 
 
-def _gefs_frame(*, keys: pl.DataFrame, domain: DomainType, window_dir: Path | None) -> pl.DataFrame:
+def _gefs_frame(
+    *,
+    keys: pl.DataFrame,
+    domain: DomainType,
+    window_dir: Path | None,
+    days: Sequence[int] | None = None,
+) -> pl.DataFrame:
     """Build NOAA GEFS's mean columns, gated on a complete month cache or a test window extract.
 
     In production (`window_dir=None`) this only runs once `GEFS_WINDOW_DIR_NAME`'s `_month_cache/`
@@ -664,14 +782,23 @@ def _gefs_frame(*, keys: pl.DataFrame, domain: DomainType, window_dir: Path | No
         keys: `site`, `time` for every row the study might score.
         domain: `solar` or `wind`.
         window_dir: A `GEFS_window_*` test extract, for development only. `None` in production.
+        days: The bands to build. `None` builds `GEFS_DAYS[domain]`, reading leads to 240 h; any
+            other days read every lead they need (`gefs_band_leads`) and check every run holds
+            them.
 
     Returns:
-        `keys` with `gefs_mean_day<N>_<field>` for every `N` in `GEFS_DAYS[domain]`, left-joined.
+        `keys` with `gefs_mean_day<N>_<field>` for every `N` in `days`, left-joined.
         Unchanged (no GEFS columns) while the production gate does not pass.
 
     Raises:
         RuntimeError: If any needed 00 UTC run is missing or incomplete.
     """
+    default_days = days is None
+    build_days = tuple(GEFS_DAYS[domain] if days is None else days)
+    required_leads = None if default_days else gefs_band_leads(days=build_days)
+    max_lead_hours = (
+        GEFS_STEP_MEAN_MAX_LEAD_HOURS if required_leads is None else max(required_leads)
+    )
     time_range = keys.select(first=pl.col("time").min(), last=pl.col("time").max()).row(
         0, named=True
     )
@@ -693,11 +820,13 @@ def _gefs_frame(*, keys: pl.DataFrame, domain: DomainType, window_dir: Path | No
         path = _weather_dir() / GEFS_WINDOW_DIR_NAME
         files = list(months.values())
         first_init = max(
-            time_range["first"].date() - timedelta(days=max(GEFS_DAYS[domain])),
+            time_range["first"].date() - timedelta(days=max(build_days)),
             date.fromisoformat(f"{GEFS_FIRST_MONTH}-01"),
         )
-        last_init = time_range["last"].date() - timedelta(days=min(GEFS_DAYS[domain]))
-        missing = _gefs_missing_runs(files=files, first_init=first_init, last_init=last_init)
+        last_init = time_range["last"].date() - timedelta(days=min(build_days))
+        missing = _gefs_missing_runs(
+            files=files, first_init=first_init, last_init=last_init, leads=required_leads
+        )
         if missing:
             raise RuntimeError(
                 f"GEFS: {len(missing)} of the 00 UTC runs the rows need are missing or incomplete "
@@ -708,18 +837,21 @@ def _gefs_frame(*, keys: pl.DataFrame, domain: DomainType, window_dir: Path | No
         path = window_dir
         files = [path / "GEFS.parquet"]
     sites = sorted(keys["site"].unique().to_list())
-    extract = _gefs_members_frame(path=path, files=files, domain=domain, sites=sites)
+    extract = _gefs_members_frame(
+        path=path, files=files, domain=domain, sites=sites, max_lead_hours=max_lead_hours
+    )
     if extract.is_empty():
         _LOG.warning("GEFS: no rows matched at %s, no GEFS columns written.", path)
         return keys
     arms = _ens_member_arms(
         extract=extract,
         domain=domain,
-        days=GEFS_DAYS[domain],
+        days=build_days,
         method=UPSAMPLING_METHODS[domain],
         ensemble_size=GEFS_ENSEMBLE_SIZE,
         arm_name=lambda way, day: f"gefs_{way}_day{day}",
         ways=("mean",),
+        fine_step_last_lead=GEFS_STEP_MEAN_MAX_LEAD_HOURS,
     )
     frame = keys
     for arm_frame in arms:
@@ -764,6 +896,83 @@ def build_domain(*, domain: DomainType, output_dir: Path, gefs_window_dir: Path 
     return output_path
 
 
+def _ens_extra_frame(*, keys: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
+    """Build ECMWF ENS's mean columns at `EXTRA_ENS_DAYS` on `keys`.
+
+    Args:
+        keys: `site`, `time` for every row the study scores.
+        domain: `solar` or `wind`.
+
+    Returns:
+        `keys` with `ens_mean_day<N>_<field>` for every `N` in `EXTRA_ENS_DAYS`, left-joined. A
+        row missing a band carries nulls.
+    """
+    sites = sorted(keys["site"].unique().to_list())
+    arms = _ens_member_arms(
+        extract=efh.members(sites=sites),
+        domain=domain,
+        days=EXTRA_ENS_DAYS,
+        method=UPSAMPLING_METHODS[domain],
+        ensemble_size=efh.ENSEMBLE_SIZE,
+        arm_name=lambda way, day: efh.ens_arm(way=way, day=day),
+        ways=("mean",),
+    )
+    frame = keys
+    for arm_frame in arms:
+        frame = frame.join(arm_frame, on=["site", "time"], how="left")
+    return frame
+
+
+def build_extra_leads(
+    *, domain: DomainType, published_dir: Path, output_dir: Path, gefs_window_dir: Path | None
+) -> Path:
+    """Build the exploratory lead columns on the published inputs' own `(site, time)` keys.
+
+    The published `<domain>_forecast_inputs.parquet` is read for its keys only, so the new columns
+    sit on exactly the rows the published study scored, whatever has changed on disk since.
+    Nothing is written to `published_dir`, and the output is write-once.
+
+    Args:
+        domain: `solar` or `wind`.
+        published_dir: The folder holding the published `<domain>_forecast_inputs.parquet`.
+        output_dir: The new folder to write `<domain>_extra_lead_inputs.parquet` into.
+        gefs_window_dir: A `GEFS_window_*` test extract, or `None` for the month cache.
+
+    Returns:
+        The written file's path.
+
+    Raises:
+        ValueError: If `output_dir` is `published_dir`.
+        FileExistsError: If the output file already exists.
+    """
+    if output_dir.resolve() == published_dir.resolve():
+        msg = f"the extra-lead output must not be the published folder {published_dir}"
+        raise ValueError(msg)
+    output_path = output_dir / f"{domain}_extra_lead_inputs.parquet"
+    if output_path.exists():
+        msg = f"{output_path} exists; the extra-lead inputs are write-once, move it first"
+        raise FileExistsError(msg)
+    keys = pl.read_parquet(published_dir / f"{domain}_forecast_inputs.parquet").select(
+        "site", "time"
+    )
+    last_month = keys.select(pl.col("time").max().dt.strftime("%Y-%m")).item()
+    cache_files = list(_gefs_months_available(last_month=last_month).values())
+    failures = [
+        *gefs_window_verdict(table=gefs_window_table(files=cache_files)),
+        *gefs_boundary_verdict(table=gefs_boundary_table(files=cache_files)),
+    ]
+    if failures:
+        msg = f"GEFS beyond 240 h is not a 6-hour window mean: {failures}"
+        raise RuntimeError(msg)
+    frame = _previous_runs_frame(keys=keys, domain=domain, day_offsets=EXTRA_PRODUCT_DAY_OFFSETS)
+    frame = _ens_extra_frame(keys=frame, domain=domain)
+    frame = _gefs_frame(keys=frame, domain=domain, window_dir=gefs_window_dir, days=EXTRA_GEFS_DAYS)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    frame.write_parquet(output_path)
+    _LOG.info("%s: wrote %d rows, %d columns to %s", domain, frame.height, frame.width, output_path)
+    return output_path
+
+
 def main() -> int:
     """Build the solar and wind arm-input frames and write them under `--output-dir`."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -775,6 +984,18 @@ def main() -> int:
         help="Directory the two arm-input parquets are written to.",
     )
     parser.add_argument(
+        "--extra-leads",
+        action="store_true",
+        help="Build the exploratory lead columns (ENS at days 5 and 14, GEFS at days 5, 10 and 14, "
+        "Previous Runs day 0 and day 5) on the published inputs' keys, into a new --output-dir.",
+    )
+    parser.add_argument(
+        "--published-dir",
+        type=Path,
+        default=_repo_data_dir() / "studies" / DEFAULT_OUTPUT_DIR_NAME,
+        help="With --extra-leads: the folder holding the published arm-input parquets.",
+    )
+    parser.add_argument(
         "--gefs-window-dir",
         type=Path,
         default=None,
@@ -782,6 +1003,15 @@ def main() -> int:
         "cache once it is complete.",
     )
     args = parser.parse_args()
+    if args.extra_leads:
+        for domain in ("solar", "wind"):
+            build_extra_leads(
+                domain=domain,
+                published_dir=args.published_dir,
+                output_dir=args.output_dir,
+                gefs_window_dir=args.gefs_window_dir,
+            )
+        return 0
     args.output_dir.mkdir(parents=True, exist_ok=True)
 
     for domain in ("solar", "wind"):

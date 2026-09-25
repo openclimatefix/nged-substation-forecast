@@ -7,13 +7,15 @@ Every interval is computed here from those per-row losses, with the same functio
 uses (`difference`, `leaderboard`, `bracket` in `nwp_forecast_comparison.py`, which call
 `studies.bootstrap`), so no refit is needed and a chart cannot disagree with the report.
 
-Five charts per technology, each with its own title, subtitle, axis titles and key:
+Six charts per technology, each with its own title, subtitle, axis titles and key:
 
-1. `headline`: the seven planned contrasts P1a to P4b with 95% intervals, at both settings.
-2. `leaderboard`: every arm's own mean absolute error on the shared rows, best first.
+1. `leaderboard`: each product's own mean absolute error at every fitted lead day, one product per
+   row, best day-1 error first, with climatology and day-1 smart persistence as dashed lines.
+2. `headline`: the seven planned contrasts P1a to P4b with 95% intervals, at both settings.
 3. `models_work`: one week of out-of-fold day-1 ENS-mean forecasts against measured output.
 4. `by_lead_day`: error by lead day, with ENS's day-0 and day-1 intervals shaded.
 5. `blends`: the two blends against ENS alone and against their permutation controls.
+6. `per_generator`: the P1a, P2a and P4b contrasts at each generator.
 
 Generators appear only as `A` to `F` and `W1` to `W3`, every error is a fraction of the
 generator's own capacity, the time axes count days of the week rather than dates, and no data mark
@@ -27,8 +29,10 @@ real report exists.
 """
 
 import argparse
+import json
 import logging
 import math
+import re
 import subprocess
 import sys
 from collections import Counter
@@ -49,7 +53,6 @@ from nwp_forecast_comparison import (
     DomainType,
     arms_present,
     difference,
-    is_baseline_arm,
     leaderboard,
     losses_path,
     predictions_path,
@@ -57,10 +60,13 @@ from nwp_forecast_comparison import (
 from studies.anonymise import SITE_LABELS, WIND_SITE_LABELS
 from studies.charts import (
     CONTENT_WIDTH_PX,
+    LABEL_WIDTH_PX,
+    PLOT_WIDTH_PX,
     figure,
     interval_panel,
     leaderboard_panel,
     planning,
+    ticks,
 )
 
 _LOG: Final[logging.Logger] = logging.getLogger("nwp_forecast_charts")
@@ -78,7 +84,10 @@ TECHNOLOGY_NAMES: Final[dict[DomainType, str]] = {
     "wind": "the three wind farms",
 }
 
-CAPACITY_NOTE: Final[str] = "Every error is a fraction of the generator's own capacity."
+CAPACITY_NOTE: Final[str] = (
+    "Every error is a fraction of the generator's own capacity, taken as its 99th percentile of "
+    "metered output."
+)
 SHARED_ROWS_NOTE: Final[str] = "Every product is scored on exactly the same hours."
 DOTS_NOTE: Final[str] = (
     "Dot: estimate. Line: 95% interval from resampling whole months and a fitting seed."
@@ -88,18 +97,14 @@ DIFFERENCE_TITLE: Final[str] = "Difference in mean absolute error (points of cap
 
 SETTING_NAMES: Final[dict[str, str]] = {
     "primary": "Primary XGBoost setting",
-    "sensitivity": "Second XGBoost setting",
+    "sensitivity": "Sensitivity XGBoost setting",
 }
 """Each hyperparameter setting's name in a chart key."""
 
 SETTING_COLOURS: Final[tuple[str, str]] = (ocf.BRAND_ORANGE, ocf.DATA_BLUE)
 """The colour of the primary and the second setting, in that order."""
 
-FORECAST_CONDITION: Final[str] = "Forecast product"
-BASELINE_CONDITION: Final[str] = "No-weather baseline"
-
 TIME_PANEL_HEIGHT_PX: Final[int] = 70
-LEADERBOARD_ROW_PX: Final[int] = 28
 LEAD_PANEL_HEIGHT_PX: Final[int] = 300
 
 PRODUCT_NAMES: Final[dict[str, str]] = {
@@ -226,17 +231,26 @@ def check_anonymised(*, frame: pl.DataFrame, domain: DomainType) -> None:
         raise ValueError(msg)
 
 
-def load(*, input_dir: Path, domain: DomainType) -> tuple[pl.DataFrame, pl.DataFrame]:
+def load(
+    *, input_dir: Path, domain: DomainType, extra_dir: Path | None = None
+) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Read one technology's saved losses and predictions.
 
     Args:
         input_dir: The directory `nwp_forecast_comparison.py` wrote to.
         domain: `solar` or `wind`.
+        extra_dir: The directory `fit_extra_leads.py` wrote to, or None. Its arms that the published
+            losses do not hold (the extra lead days, fitted later on a GPU) are appended to the
+            losses; an arm both hold is taken from `input_dir`, so no contrast mixes devices.
 
     Returns:
         The per-row losses and the per-row predictions, after the anonymisation check.
     """
     losses = pl.read_parquet(losses_path(output_dir=input_dir, domain=domain))
+    if extra_dir is not None:
+        extra = pl.read_parquet(losses_path(output_dir=extra_dir, domain=domain))
+        new = extra.filter(~pl.col("arm").is_in(losses["arm"].unique().to_list()))
+        losses = pl.concat([losses, new], how="diagonal_relaxed")
     predictions = pl.read_parquet(predictions_path(output_dir=input_dir, domain=domain))
     check_anonymised(frame=losses, domain=domain)
     check_anonymised(frame=predictions, domain=domain)
@@ -292,7 +306,7 @@ def padded_domain(*, low: float, high: float, include_zero: bool) -> tuple[float
     return (math.floor((low - pad) * 10) / 10, math.ceil((high + pad) * 10) / 10)
 
 
-# --- Chart 1: headline contrasts ------------------------------------------------------------------
+# --- Chart 2: headline contrasts ------------------------------------------------------------------
 
 
 class ContrastSpec(NamedTuple):
@@ -452,7 +466,7 @@ def headline(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.VCo
                 f"{SHARED_ROWS_NOTE} {CAPACITY_NOTE}"
             ),
             (
-                "P1a, P2a, P3, P4a and P4b compare at the ENS mean's day-1 lead; P1b and P2b "
+                "P1a, P2a, P3, P4a, and P4b compare at the ENS mean's day-1 lead; P1b and P2b "
                 "compare with the ENS mean at day 0, so a product's day-1 error lies between the "
                 "two ENS errors when it is bracketed. "
                 f"{DOTS_NOTE}"
@@ -463,70 +477,110 @@ def headline(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.VCo
     )
 
 
-# --- Chart 2: leaderboard -------------------------------------------------------------------------
+# --- Chart 1: leaderboard -------------------------------------------------------------------------
 
 
-def leaderboard_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
-    """Return every arm's absolute error and interval at the primary setting, best first.
+LEAD_COLOURS: Final[dict[int, str]] = {
+    0: ocf.BLACK_1,
+    1: ocf.DATA_BLUE,
+    2: ocf.DATA_SKY,
+    3: ocf.DATA_DEEP_TEAL,
+    5: ocf.DATA_GREEN,
+    10: ocf.DATA_AMBER,
+    14: ocf.DATA_BURNT_ORANGE,
+}
+"""Each lead day's mark colour on the leaderboard. The six chromatic colours, Data Blue, Data Sky,
+Data Deep Teal, Data Green, Data Amber, and Data Burnt Orange for days 1, 2, 3, 5, 10, and 14, pass
+the bundled `validate_palette.py` all-pairs separation checks in light mode on the page background
+(worst colour-blind distance 10.5, worst normal-vision distance 19.5). Data Green fails the script's
+lightness band (L 0.81 against a ceiling of 0.77), and Data Sky, Data Green, and Data Amber are
+below 3:1 contrast against the background, so each lead's fixed slot within its row and the page's
+tables of every number carry the reading as well. Day 0 is black. Data Amber, Data Deep Teal, and
+Data Burnt Orange are internal-use colours, approved for the lead-day charts by the maintainer."""
+
+MAX_LINE_DAY: Final[int] = 3
+"""The last lead day the lead-day lines draw: every product plotted there is fitted at every day up
+to it, so no line spans a lead that was not fitted."""
+
+LEAD_LABEL_ROWS: Final[float] = 1.0
+"""How many rows of room the leaderboard leaves above its first product for the names of the
+baseline lines."""
+
+LEAD_LABEL_ROOM: Final[float] = 1.5
+"""How far right of the baselines the leaderboard's x axis runs, in percentage points of capacity,
+leaving room for the name written beside the smart-persistence line."""
+
+DEVICE_NOTES: Final[dict[DomainType, str]] = {
+    "solar": "a GPU refit of an arm differs from its CPU fit by at most 0.02 points",
+    "wind": (
+        "a GPU refit of an arm has an error 0.04 to 0.09 points lower than its CPU fit, in every "
+        "estimate"
+    ),
+}
+"""How far a GPU refit of an arm lies from its published CPU fit (the extra-lead report's device
+noise floor), for the leaderboard's subtitle. For wind every estimate is lower, though no single
+interval excludes zero."""
+
+LEAD_POINT_SIZE: Final[int] = 45
+"""The area of one lead-day mark, in square pixels."""
+
+LEAD_ROW_PX: Final[int] = 60
+"""The height of one product's row on the leaderboard, which holds one mark per fitted lead."""
+
+LEAD_DODGE_ROWS: Final[float] = 0.135
+"""The vertical spacing between the marks of one product's lead days, in rows."""
+
+LEAD_ARM: Final[re.Pattern[str]] = re.compile(r"^(?P<slug>.+)_day(?P<day>\d+)$")
+
+
+def lead_board_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
+    """Return every product's error and interval at every lead day it was fitted at.
 
     Args:
         losses: Saved per-row losses.
 
     Returns:
-        One row per arm with `label`, `family`, `condition`, `value`, `lower_95`, `upper_95` in
-        percent of capacity, sorted by `value`.
+        One row per fitted product and lead day, at the primary setting, with `product`, `day`,
+        `value`, `lower_95` and `upper_95` in percent of capacity. A lead day a product was not
+        fitted at has no row, so it is left blank rather than filled.
     """
     primary = by_setting(losses=losses)["primary"]
-    arms = sorted(arm for arm in primary["arm"].unique().to_list() if on_leaderboard(arm=arm))
-    board = leaderboard(losses=primary, arms=arms)
+    parsed = {
+        arm: (match["slug"], int(match["day"]))
+        for arm in sorted(primary["arm"].unique().to_list())
+        if (match := LEAD_ARM.match(arm)) and match["slug"] in PRODUCT_NAMES
+    }
+    board = leaderboard(losses=primary, arms=list(parsed))
     return (
         board.with_columns(
             pl.col("value", "lower_95", "upper_95") * PERCENTAGE_POINTS,
-            label=pl.col("arm").map_elements(
-                lambda arm: (
-                    short_blend_label(arm=arm)
-                    if arm.startswith("blend_")
-                    else "ENS mean day 0 (a bracket side, not a product)"
-                    if arm == "ens_mean_day0"
-                    else arm_label(arm=arm)
-                ),
+            product=pl.col("arm").replace_strict(
+                {arm: PRODUCT_NAMES[slug] for arm, (slug, _) in parsed.items()},
                 return_dtype=pl.String,
             ),
-            family=pl.lit("weather model"),
-            condition=pl.when(pl.col("arm").map_elements(_is_baseline, return_dtype=pl.Boolean))
-            .then(pl.lit(BASELINE_CONDITION))
-            .otherwise(pl.lit(FORECAST_CONDITION)),
+            day=pl.col("arm").replace_strict(
+                {arm: day for arm, (_, day) in parsed.items()}, return_dtype=pl.Int64
+            ),
         )
-        .sort("value")
-        .select("label", "family", "condition", "value", "lower_95", "upper_95")
+        .select("product", "day", "value", "lower_95", "upper_95")
+        .sort("product", "day")
     )
 
 
-def on_leaderboard(*, arm: str) -> bool:
-    """Whether the leaderboard draws `arm`: the day-1 forecasts, ENS at day 0, and two baselines.
-
-    Days 2 and 3 are on the lead-day chart, and the other no-weather baselines are far above the
-    products and would stretch the axis.
+def lead_board_products(*, rows: pl.DataFrame) -> list[str]:
+    """Order the leaderboard's products by their day-1 error, best first.
 
     Args:
-        arm: An arm in the saved losses.
+        rows: What `lead_board_rows` returns.
 
     Returns:
-        True for a blend, a day-1 arm, `ens_mean_day0`, `climatology` and `smart_persistence_day1`.
+        Every product's name; each has a day-1 row (a product without one makes the figure raise).
     """
-    if is_baseline_arm(arm=arm):
-        return arm in ("climatology", "smart_persistence_day1")
-    is_planned_blend = arm.removesuffix("_control") in BLEND_ARMS
-    return is_planned_blend or arm == "ens_mean_day0" or arm.endswith("_day1")
-
-
-def _is_baseline(arm: str) -> bool:
-    """Whether `arm` names a no-weather baseline; `map_elements` passes the value positionally."""
-    return is_baseline_arm(arm=arm)
+    return rows.filter(pl.col("day") == 1).sort("value")["product"].to_list()
 
 
 def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.VConcatChart:
-    """Draw every arm's own mean absolute error with its 95% interval, best first.
+    """Draw each product's mean absolute error at each fitted lead day, one product per row.
 
     Args:
         losses: Saved per-row losses.
@@ -536,43 +590,150 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
     Returns:
         The figure.
     """
-    rows = leaderboard_rows(losses=losses)
+    rows = lead_board_rows(losses=losses)
+    products = lead_board_products(rows=rows)
+    baselines = leaderboard(
+        losses=by_setting(losses=losses)["primary"], arms=["climatology", "smart_persistence_day1"]
+    ).with_columns(
+        pl.col("value") * PERCENTAGE_POINTS,
+        label=pl.col("arm").replace_strict(
+            {"climatology": "Climatology", "smart_persistence_day1": "Smart persistence, day 1"},
+            return_dtype=pl.String,
+        ),
+    )
+    days = sorted(set(rows["day"].to_list()))
+    offsets = {day: (rank - (len(days) - 1) / 2) * LEAD_DODGE_ROWS for rank, day in enumerate(days)}
+    data = rows.with_columns(
+        y=pl.col("product").replace_strict(
+            {name: float(index) for index, name in enumerate(products)}, return_dtype=pl.Float64
+        )
+        + pl.col("day").replace_strict(offsets, return_dtype=pl.Float64),
+        lead=pl.format("Day {}", pl.col("day")),
+    )
+    lead_names = [f"Day {day}" for day in days]
     x_domain = padded_domain(
         low=float(rows["lower_95"].min()),  # ty: ignore[invalid-argument-type]
-        high=float(rows["upper_95"].max()),  # ty: ignore[invalid-argument-type]
+        high=max(
+            float(rows["upper_95"].max()),  # ty: ignore[invalid-argument-type]
+            float(baselines["value"].max()),  # ty: ignore[invalid-argument-type]
+        )
+        + LEAD_LABEL_ROOM,
         include_zero=False,
     )
-    panel = leaderboard_panel(
-        rows=rows,
-        x_domain=x_domain,
-        x_title=MAE_TITLE,
-        conditions=[FORECAST_CONDITION, BASELINE_CONDITION],
-        condition_title="Kind of forecast",
-        solid=True,
-        row_step_px=LEADERBOARD_ROW_PX,
+    x_scale = alt.Scale(domain=list(x_domain), nice=False, zero=False)
+    x_axis = alt.Axis(values=ticks(x_domain=x_domain), format=".2~f", grid=False)
+    y_scale = alt.Scale(domain=[len(products) - 0.5, -LEAD_LABEL_ROWS], nice=False)
+    labels = {str(index): name for index, name in enumerate(products)}
+    y_axis = alt.Axis(
+        values=list(range(len(products))),
+        labelExpr=f"{json.dumps(labels)}[datum.value]",
+        labelLimit=LABEL_WIDTH_PX,
+        minExtent=LABEL_WIDTH_PX,
+        maxExtent=LABEL_WIDTH_PX,
+        labelPadding=6,
+        ticks=False,
+        domain=False,
+        title=None,
+    )
+    colour = alt.Color(
+        "lead:N",
+        scale=alt.Scale(domain=lead_names, range=[LEAD_COLOURS[day] for day in days]),
+        legend=None,
+    )
+    x_title = MAE_TITLE
+    separators = pl.DataFrame({"y": [index + 0.5 for index in range(len(products) - 1)]})
+    rules = (
+        alt.Chart(separators)
+        .mark_rule(color=ocf.GRID, strokeWidth=1, aria=False)
+        .encode(y=alt.Y("y:Q", scale=y_scale, axis=y_axis))  # ty: ignore[unresolved-attribute]
+    )
+    intervals = (
+        alt.Chart(data)
+        .mark_rule(strokeWidth=2, clip=True, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("lower_95:Q", scale=x_scale, axis=x_axis, title=x_title),
+            x2="upper_95:Q",
+            y=alt.Y("y:Q", scale=y_scale, axis=y_axis),
+            color=colour,
+        )
+    )
+    points = (
+        alt.Chart(data)
+        .mark_point(filled=True, size=LEAD_POINT_SIZE, opacity=1, clip=True, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("value:Q", scale=x_scale, axis=x_axis, title=x_title),
+            y=alt.Y("y:Q", scale=y_scale, axis=y_axis),
+            color=colour,
+            shape=alt.Shape(
+                "lead:N",
+                scale=alt.Scale(
+                    domain=lead_names, range=["diamond" if day == 0 else "circle" for day in days]
+                ),
+                legend=None,
+            ),
+        )
+    )
+    reference = baselines.with_columns(
+        y=pl.lit(-LEAD_LABEL_ROWS + 0.25, dtype=pl.Float64),
+        text=pl.col("label"),
+    )
+    reference_rules = (
+        alt.Chart(reference)
+        .mark_rule(strokeDash=[5, 3], strokeWidth=1.5, color=ocf.BLACK_1, aria=False)
+        .encode(x=alt.X("value:Q", scale=x_scale, axis=x_axis, title=x_title))  # ty: ignore[unresolved-attribute]
+    )
+    low_arm, high_arm = baselines.sort("value")["arm"].to_list()
+    reference_text = [
+        alt.Chart(reference.filter(pl.col("arm") == arm))
+        .mark_text(align=align, dx=dx, baseline="middle", fontSize=10, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("value:Q", scale=x_scale, axis=x_axis, title=x_title),
+            y=alt.Y("y:Q", scale=y_scale, axis=y_axis),
+            text="text:N",
+            color=alt.value(ocf.BLACK_1),
+        )
+        for arm, align, dx in ((low_arm, "right", -5), (high_arm, "left", 5))
+    ]
+    panel = alt.LayerChart(
+        layer=[rules, reference_rules, intervals, points, *reference_text],
+        width=PLOT_WIDTH_PX,
+        height=LEAD_ROW_PX * (len(products) + LEAD_LABEL_ROWS - 0.5),
     )
     return figure(
-        panels=[panel],
+        panels=[
+            line_key(
+                labels=lead_names,
+                colours=[LEAD_COLOURS[day] for day in days],
+                width=PLOT_WIDTH_PX,
+            ),
+            panel,
+        ],
         number=FIGURE_NUMBERS[(domain, "leaderboard")],
         title=title,
         subtitle=[
             (
-                "Each row is one forecast's own mean absolute error, as a percentage of "
-                "capacity, on the hours every forecast is scored on, with no weather forecast "
-                "given for the baselines. Primary XGBoost setting. Smaller is better."
+                "Each row is one forecast product. Each mark is an XGBoost model's mean absolute "
+                "error, as a percentage of capacity, given that product's forecast at one lead "
+                "day, on the hours every forecast is scored on. The XGBoost model uses the "
+                "primary setting. Smaller is better. A lead day with no mark was not fitted for "
+                "that product; nothing is filled in. Dashed lines mark the no-weather baselines."
             ),
             (
-                "Only day-1 forecasts, ENS at day 0, climatology and smart persistence at day 1 "
-                "are shown; the other days are in the lead-day figure. P4a blends ENS with the "
-                "day-1 ICON-EU and IFS 0.25°; P4b uses their day-2 forecasts. A control gives "
-                "an XGBoost model the same columns with the shuffled products' values moved "
-                "among matched hours. Overlapping intervals here can still hide a significant "
-                f"paired difference (Figure {FIGURE_NUMBERS[(domain, 'headline')]}). {DOTS_NOTE}"
+                "Within each row, marks run from day 0 at the top to day 14 at the bottom. Day 0 "
+                "is read from a run that started 0 to 23 hours (ENS) or 0 to 3 hours (ICON-EU and "
+                "ICON-D2, Open-Meteo's freshest run) before the hour it describes, so it is not a "
+                "day-ahead forecast a service could read. Marks at days 5, 10, and 14, and the "
+                "day-0 marks of ICON-EU and ICON-D2, were fitted later, on a graphics processing "
+                "unit (GPU), at the primary "
+                f"setting only; {DEVICE_NOTES[domain]}. "
+                f"Overlapping intervals here can still hide a significant paired difference "
+                f"(Figure {FIGURE_NUMBERS[(domain, 'headline')]}). {DOTS_NOTE}"
             ),
             (
-                "Leads are not equal: a forecast from Open-Meteo's Previous Runs archive has a "
-                "day-1 lead of 24 + (h mod n) hours, shorter than ENS's 24 + h on most hours, "
-                "so the comparison favours those forecasts. Only GEFS shares ENS's lead."
+                "Leads are not equal: a forecast from Open-Meteo's Previous Runs archive comes "
+                "from the freshest run made at least a day before the hour it describes, so its "
+                "day-1 lead is shorter than ENS's on most hours, which favours that product. "
+                "Of the products drawn here, only GEFS shares ENS's lead."
             ),
             f"{scope_text(losses=losses, domain=domain)} {CAPACITY_NOTE}",
         ],
@@ -682,17 +843,24 @@ def choose_week(*, series: pl.DataFrame, domain: DomainType) -> datetime:
     return chosen
 
 
-def line_key(*, labels: Sequence[str], colours: Sequence[str]) -> alt.LayerChart:
+def line_key(
+    *,
+    labels: Sequence[str],
+    colours: Sequence[str],
+    width: int = CONTENT_WIDTH_PX - 60,
+    dashed: Sequence[bool] | None = None,
+) -> alt.LayerChart:
     """Draw a one-row key of short line segments above a chart.
 
     Args:
         labels: Each entry's label.
         colours: Each entry's colour.
+        width: The key's width in pixels.
+        dashed: Whether each entry's segment is dashed; None draws every segment solid.
 
     Returns:
         A one-row chart.
     """
-    width = CONTENT_WIDTH_PX - 60
     slot = width // len(labels)
     data = pl.DataFrame(
         {
@@ -700,6 +868,7 @@ def line_key(*, labels: Sequence[str], colours: Sequence[str]) -> alt.LayerChart
             "colour": list(colours),
             "x": [index * slot for index in range(len(labels))],
             "x2": [index * slot + 18 for index in range(len(labels))],
+            "dashed": [str(flag).lower() for flag in (dashed or [False] * len(labels))],
         }
     )
     segments = (
@@ -710,11 +879,16 @@ def line_key(*, labels: Sequence[str], colours: Sequence[str]) -> alt.LayerChart
             x2="x2:Q",
             y=alt.value(8),
             color=alt.Color("colour:N", scale=None),
+            strokeDash=alt.StrokeDash(
+                "dashed:N",
+                scale=alt.Scale(domain=["false", "true"], range=[[1, 0], [5, 3]]),
+                legend=None,
+            ),
         )
     )
     text = (
         alt.Chart(data)
-        .mark_text(align="left", dx=24, color=ocf.BLACK_1, limit=slot - 30)
+        .mark_text(align="left", dx=22, color=ocf.BLACK_1, limit=slot - 24)
         .encode(x=alt.X("x:Q", scale=None), y=alt.value(8), text="label:N")  # ty: ignore[unresolved-attribute]
     )
     return alt.LayerChart(layer=[segments, text], width=width, height=16)
@@ -803,8 +977,8 @@ def models_work(
             (
                 "Hourly output as a percentage of capacity, measured and as forecast out of "
                 "fold by the XGBoost model given the ENS ensemble mean at day 1, averaged over "
-                "its fitting seeds. Primary XGBoost setting. A gap in a line is an hour outside "
-                "the scored rows."
+                "its fitting seeds. The XGBoost model uses the primary setting. A gap in a line is "
+                "an hour outside the scored rows."
             ),
             (
                 f"The week is chosen by rule from measured output alone: {rule}. "
@@ -818,16 +992,30 @@ def models_work(
 
 # --- Chart 4: error by lead day -------------------------------------------------------------------
 
-ENSEMBLE_SERIES: Final[str] = "Ensemble mean (ENS or GEFS)"
-PREVIOUS_RUNS_SERIES: Final[str] = "Previous Runs product (single run)"
-
-SERIES_COLOURS: Final[dict[str, str]] = {
-    ENSEMBLE_SERIES: ocf.DATA_BLUE,
-    PREVIOUS_RUNS_SERIES: ocf.BRAND_ORANGE,
+PRODUCT_COLOURS: Final[dict[str, str]] = {
+    "ENS mean": ocf.DATA_BLUE,
+    "GEFS mean": ocf.DATA_SKY,
+    "IFS 0.25°": ocf.DATA_BURNT_ORANGE,
+    "ICON-EU": ocf.DATA_DEEP_TEAL,
+    "ICON global": ocf.DATA_GREEN,
+    "GFS": ocf.DATA_AMBER,
+    "ARPEGE Europe": ocf.BLACK_1,
 }
-"""Each group of products' colour. Nine single products need more colours than the brand palette
-holds apart under colour-vision deficiency, so colour marks the group and every product's name is
-written beside its last point."""
+"""Each product's colour on the lead-day chart. The six coloured products pass the bundled
+`validate_palette.py` all-pairs checks except two. Data Green misses the lightness band (L 0.81
+against a ceiling of 0.77), and Data Sky, Data Green and Data Amber have a contrast warning against
+the page background, so every product's name is also written beside its last point. The worst
+colour-blind distance is 10.5 and the worst normal-vision distance is 19.5, above the script's
+targets of 8 and 15. No seventh chromatic colour passes, so ARPEGE, which only the solar chart
+holds, is black and dashed (black passes both separation checks). Data Amber, Data Deep Teal and
+Data Burnt Orange are internal-use colours, approved for these charts by the maintainer; the
+`dataviz` skill records that the maintainer once swapped Burnt Orange for Magenta beside Amber."""
+
+KEY_LABELS: Final[dict[str, str]] = {"ARPEGE Europe": "ARPEGE"}
+"""Shorter names for the key above the lead-day chart, whose slots are narrow."""
+
+DASHED_PRODUCTS: Final[frozenset[str]] = frozenset({"ARPEGE Europe"})
+"""Products drawn with a dashed line, because no seventh distinguishable colour exists."""
 
 LEAD_BAND_COLOURS: Final[tuple[str, str]] = (ocf.DATA_BLUE_LIGHT, ocf.DATA_SKY_LIGHT)
 """The shading of ENS's day-0 and day-1 intervals."""
@@ -835,7 +1023,7 @@ LEAD_BAND_COLOURS: Final[tuple[str, str]] = (ocf.DATA_BLUE_LIGHT, ocf.DATA_SKY_L
 X_MAX_DAYS: Final[float] = 4.3
 """The lead-day chart's right edge, leaving room for the product names beside day 3."""
 
-DODGE_DAYS: Final[float] = 0.03
+DODGE_DAYS: Final[float] = 0.06
 """Horizontal spacing between series at one lead day, in days, so intervals do not overprint."""
 
 
@@ -871,21 +1059,20 @@ def spread_labels(*, values: Sequence[float], min_gap: float) -> list[float]:
 
 
 def lead_series_name(*, arm: str) -> str | None:
-    """Name the series an arm belongs in on the lead-day chart.
+    """Name the product an arm belongs to on the lead-day chart.
 
     Args:
         arm: An arm in the saved losses.
 
     Returns:
-        The series' key in `SERIES_COLOURS` for a product read at a whole day, or None for a
+        The product's key in `PRODUCT_COLOURS` for a product read at a whole day, or None for a
         baseline, a blend, a control member and any arm the chart leaves out.
     """
     slug, _, day = arm.rpartition("_day")
     if not day.isdigit() or slug == "ens_control":
         return None
-    if slug in ("ens_mean", "gefs_mean"):
-        return ENSEMBLE_SERIES
-    return PREVIOUS_RUNS_SERIES if slug in PRODUCT_NAMES else None
+    name = PRODUCT_NAMES.get(slug)
+    return name if name in PRODUCT_COLOURS else None
 
 
 def lead_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
@@ -899,7 +1086,12 @@ def lead_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
         `value`, `lower_95` and `upper_95` in percent of capacity.
     """
     primary = by_setting(losses=losses)["primary"]
-    arms = [arm for arm in sorted(primary["arm"].unique().to_list()) if lead_series_name(arm=arm)]
+    arms = [
+        arm
+        for arm in sorted(primary["arm"].unique().to_list())
+        if lead_series_name(arm=arm)
+        and (arm == "ens_mean_day0" or 1 <= int(arm.rpartition("_day")[2]) <= MAX_LINE_DAY)
+    ]
     days_held = Counter(arm.rpartition("_day")[0] for arm in arms)
     arms = [arm for arm in arms if days_held[arm.rpartition("_day")[0]] >= 3]
     board = leaderboard(losses=primary, arms=arms)
@@ -934,16 +1126,17 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
     ens = rows.filter(pl.col("product") == PRODUCT_NAMES["ens_mean"])
     if not {0, 1} <= set(ens["day"].to_list()):
         return None
-    names = [name for name in SERIES_COLOURS if name in set(rows["series"].to_list())]
+    names = [name for name in PRODUCT_COLOURS if name in set(rows["series"].to_list())]
     products = rows["product"].unique(maintain_order=True).to_list()
     offsets = {
         product: (index - (len(products) - 1) / 2) * DODGE_DAYS
         for index, product in enumerate(products)
     }
-    # Each product is drawn as its own line, coloured by its group; the key names the group.
+    # Each product is its own line in its own colour; ARPEGE is dashed.
     drawn = rows.with_columns(
         x=pl.col("day") + pl.col("product").replace_strict(offsets, return_dtype=pl.Float64),
         line=pl.col("product"),
+        dashed=pl.col("product").is_in(list(DASHED_PRODUCTS)).cast(pl.String),
     )
     low = float(rows["lower_95"].min())  # ty: ignore[invalid-argument-type]
     high = float(rows["upper_95"].max())  # ty: ignore[invalid-argument-type]
@@ -951,14 +1144,17 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
     x_scale = alt.Scale(domain=[-0.5, X_MAX_DAYS], nice=False)
     colour = alt.Color(
         "series:N",
-        scale=alt.Scale(domain=names, range=[SERIES_COLOURS[name] for name in names]),
+        scale=alt.Scale(domain=names, range=[PRODUCT_COLOURS[name] for name in names]),
         legend=None,
     )
     x_axis = alt.Axis(
         values=[0, 1, 2, 3],
         labelExpr="'Day ' + datum.value",
         grid=False,
-        title="Lead day (ENS: 24-hour band; other products: whole-day lead)",
+        title=(
+            "Lead day (ENS: a 24-hour band of leads; other products: the freshest run at least "
+            "as many days old as the lead day)"
+        ),
     )
     y = alt.Y(
         "value:Q",
@@ -974,7 +1170,6 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
             "label": ["ENS mean day-0 interval", "ENS mean day-1 interval"],
             "x0": [-0.5, -0.5],
             "x1": [X_MAX_DAYS, X_MAX_DAYS],
-            "y_text": [float(ens.filter(pl.col("day") == day)["lower_95"][0]) for day in (0, 1)],
         }
     )
     shading = (
@@ -988,19 +1183,30 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
             color=alt.Color("colour:N", scale=None),
         )
     )
-    band_text = (
-        alt.Chart(bands)
-        .mark_text(align="left", baseline="top", dx=4, dy=2, color=ocf.BLACK_1, aria=False)
+    band_text = [
+        alt.Chart(bands.filter(pl.col("day") == day))
+        .mark_text(align="right", baseline=baseline, dx=-4, dy=dy, color=ocf.BLACK_1, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("x0:Q", scale=x_scale),
-            y=alt.Y("y_text:Q", scale=alt.Scale(domain=list(y_domain), nice=False)),
+            x=alt.X("x1:Q", scale=x_scale),
+            y=alt.Y(f"{edge}:Q", scale=alt.Scale(domain=list(y_domain), nice=False)),
             text="label:N",
         )
-    )
+        for day, edge, baseline, dy in ((0, "lower", "bottom", -2), (1, "upper", "top", 2))
+    ]
     lines = (
         alt.Chart(drawn)
         .mark_line(strokeWidth=1.5, aria=False)
-        .encode(x=alt.X("x:Q", scale=x_scale, axis=x_axis), y=y, color=colour, detail="line:N")  # ty: ignore[unresolved-attribute]
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("x:Q", scale=x_scale, axis=x_axis),
+            y=y,
+            color=colour,
+            detail="line:N",
+            strokeDash=alt.StrokeDash(
+                "dashed:N",
+                scale=alt.Scale(domain=["false", "true"], range=[[1, 0], [5, 3]]),
+                legend=None,
+            ),
+        )
     )
     rules = (
         alt.Chart(drawn)
@@ -1019,28 +1225,33 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
     )
     ends = drawn.sort("day").group_by("product", maintain_order=True).last()
     ends = ends.with_columns(
+        label_x=pl.lit(MAX_LINE_DAY + max(offsets.values()), dtype=pl.Float64),
         label_y=pl.Series(
-            spread_labels(values=ends["value"].to_list(), min_gap=(y_domain[1] - y_domain[0]) / 24)
-        )
+            spread_labels(values=ends["value"].to_list(), min_gap=(y_domain[1] - y_domain[0]) / 16)
+        ),
     )
     end_text = (
         alt.Chart(ends)
         .mark_text(align="left", dx=12, fontSize=10, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("x:Q", scale=x_scale, axis=x_axis),
+            x=alt.X("label_x:Q", scale=x_scale, axis=x_axis),
             y=alt.Y("label_y:Q", scale=alt.Scale(domain=list(y_domain), nice=False)),
             text="product:N",
             color=colour,
         )
     )
     panel = alt.LayerChart(
-        layer=[shading, band_text, lines, rules, points, end_text],
+        layer=[shading, *band_text, lines, rules, points, end_text],
         width=CONTENT_WIDTH_PX - 100,
         height=LEAD_PANEL_HEIGHT_PX,
     )
     return figure(
         panels=[
-            line_key(labels=names, colours=[SERIES_COLOURS[name] for name in names]),
+            line_key(
+                labels=[KEY_LABELS.get(name, name) for name in names],
+                colours=[PRODUCT_COLOURS[name] for name in names],
+                dashed=[name in DASHED_PRODUCTS for name in names],
+            ),
             panel,
         ],
         number=FIGURE_NUMBERS[(domain, "by_lead_day")],
@@ -1048,15 +1259,18 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
         subtitle=[
             (
                 "Mean absolute error of an XGBoost model given each forecast product at each "
-                "lead day, as a percentage of capacity. Primary XGBoost setting. Smaller is "
-                "better. Shaded bands: the 95% intervals of the ENS mean's day-0 and day-1 "
-                "errors; a whole-day product at day 1 lies between them when it is bracketed."
+                "lead day, as a percentage of capacity. The XGBoost model uses the primary "
+                "setting. Smaller is better. Shaded bands: the 95% intervals of the ENS mean's "
+                "day-0 and day-1 errors; the two ENS leads between which a Previous Runs "
+                "product's day-1 lead falls."
             ),
             (
-                "Dot: estimate. Line: 95% interval from resampling whole months and a fitting "
-                "seed. Products at one day are drawn side by side, and the name of each is "
-                "written beside its last point. Products with a day-1 forecast only are left "
-                f"out; the day-1 leaderboard shows them. {SHARED_ROWS_NOTE}"
+                f"{DOTS_NOTE} Products at one day are drawn side by side, and each product's "
+                "name is written beside its last point. ICON-EU's day 0 is not drawn here: it is "
+                "Open-Meteo's freshest ICON-EU run, a lead of at most 3 hours, fitted later on a "
+                "GPU. Products fitted at fewer than three of days 0 to 3, and days 5, 10, and 14, "
+                f"are left out; Figure {FIGURE_NUMBERS[(domain, 'leaderboard')]} shows them. "
+                f"{SHARED_ROWS_NOTE}"
             ),
             f"{scope_text(losses=losses, domain=domain)} {CAPACITY_NOTE}",
         ],
@@ -1160,7 +1374,7 @@ def blends(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.VConc
     )
     contrast_panel = _contrast_panel(
         rows=contrasts,
-        panel_title="Paired differences: blend minus ENS alone, blend minus its own control",
+        panel_title="Paired differences: blend minus ENS, blend minus control",
     )
     return figure(
         panels=[level_panel, contrast_panel],
@@ -1170,7 +1384,7 @@ def blends(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.VConc
             (
                 "XGBoost models given the ENS mean alone, or ENS plus two more products. "
                 "A control has the same columns as its blend, with the two other products' "
-                "weather shuffled among hours of the same site, year-month and hour of day, so it "
+                "weather shuffled among hours of the same site, year-month, and hour of day, so it "
                 "carries no real information from them. Points of capacity; negative means the "
                 "first forecast in a row is better."
             ),
@@ -1254,9 +1468,9 @@ def per_generator(
             (
                 "Difference in mean absolute error between two XGBoost models, first product "
                 "minus second, in points of capacity, at each generator alone. Negative means "
-                "the first product forecasts better. Primary XGBoost setting. The 95% interval "
-                "resamples whole months and a fitting seed within one generator, so it does not "
-                "cover differences between generators. All rows are exploratory."
+                "the first product forecasts better. The XGBoost model uses the primary setting. "
+                "The 95% interval resamples whole months and a fitting seed within one generator, "
+                "so it does not cover differences between generators. All rows are exploratory."
             ),
             f"{scope_text(losses=losses, domain=domain)} {CAPACITY_NOTE} {SHARED_ROWS_NOTE}",
         ],
@@ -1267,39 +1481,41 @@ def per_generator(
 # --- Output -------------------------------------------------------------------------------------
 
 FIGURE_NUMBERS: Final[dict[tuple[DomainType, str], int]] = {
-    ("solar", "headline"): 1,
-    ("wind", "headline"): 2,
-    ("solar", "models_work"): 3,
-    ("wind", "models_work"): 4,
+    ("solar", "leaderboard"): 1,
+    ("wind", "leaderboard"): 2,
+    ("solar", "headline"): 3,
+    ("wind", "headline"): 4,
+    ("solar", "models_work"): 5,
+    ("wind", "models_work"): 6,
     ("solar", "per_generator"): 7,
     ("wind", "per_generator"): 8,
-    ("solar", "leaderboard"): 5,
-    ("wind", "leaderboard"): 6,
     ("solar", "by_lead_day"): 11,
     ("wind", "by_lead_day"): 12,
     ("solar", "blends"): 9,
     ("wind", "blends"): 10,
 }
-"""Each chart's figure number on the page, in the page's order: the headline pair opens the page."""
+"""Each chart's figure number on the page, in the page's order: the leaderboard pair opens the page,
+then the planned contrasts."""
 
 TITLES: Final[dict[tuple[DomainType, str], str]] = {
     ("solar", "headline"): (
-        "For solar power, ENS beats UKV and ICON-EU at matched lead and GEFS at equal lead; "
-        "a blend gains 0.35 points at an optimistic lead and no detectable gain at a "
-        "conservative one"
+        "For solar power, ENS beats UKV and ICON-EU at matched lead and GEFS at equal lead. "
+        "A blend lowers the error by 0.35 points at an optimistic lead and shows no "
+        "detectable gain at a conservative lead"
     ),
     ("wind", "headline"): (
-        "For wind power, ENS beats UKV, ICON-EU is unresolved against ENS, and a blend "
+        "For wind power, ENS beats UKV and GEFS, ICON-EU is unresolved against ENS, and a blend "
         "lowers the error by 0.18 points even at a conservative lead"
     ),
     ("solar", "leaderboard"): (
-        "At day 1 every weather forecast shown has a lower error than climatology (14.5%); "
-        "ENS and IFS 0.25° have the lowest error of the single solar forecasts"
+        "Error rises with lead to day 10: at day 1 every weather forecast shown has a lower error "
+        "than climatology (14.5%), but at day 14 neither the ENS mean nor the GEFS mean does; ENS "
+        "and IFS 0.25° have the lowest day-1 errors"
     ),
     ("wind", "leaderboard"): (
-        "At day 1 every weather forecast shown has a lower error than climatology (18.5%), by "
-        "more than 9 points; ENS, IFS 0.25° and ICON-EU have the lowest error of the single wind "
-        "forecasts"
+        "Error rises with lead: at day 1 every weather forecast shown has a lower error than "
+        "climatology (18.5%), but at day 14 neither the ENS mean nor the GEFS mean does; ENS "
+        "and IFS 0.25° have the lowest day-1 errors"
     ),
     ("solar", "models_work"): (
         "Out-of-fold day-1 ENS-mean forecasts follow the measured output at all six solar farms"
@@ -1312,23 +1528,25 @@ TITLES: Final[dict[tuple[DomainType, str], str]] = {
     ),
     ("wind", "per_generator"): (
         "At two of the three wind farms UKV has a higher error than ENS at day 1, "
-        "and at two the P4b blend has a lower error"
+        "and at two of the three wind farms the P4b blend has a lower error"
     ),
     ("solar", "by_lead_day"): (
-        "Solar error rises with lead day for every forecast, and no product beats the ENS mean "
-        "at matched lead"
+        "Solar error rises with lead day for every forecast; IFS 0.25° cannot be told apart from "
+        "the ENS mean at days 1 to 3, and every other product has a higher error than ENS"
     ),
     ("wind", "by_lead_day"): (
-        "Wind error rises with lead day for every forecast, and no product beats the ENS mean "
-        "at matched lead"
+        "Wind error rises with lead day for every forecast; IFS 0.25° has a lower error than the "
+        "ENS mean at days 2 and 3, at a lead shorter than ENS's on most hours"
     ),
     ("solar", "blends"): (
-        "For solar power a blend of ENS, ICON-EU and IFS 0.25° gains 0.35 points at an "
-        "optimistic lead, but its control is itself worse than ENS alone"
+        "For solar power a blend of ENS, ICON-EU, and IFS 0.25° lowers the error by 0.35 "
+        "percentage points at an optimistic lead, but the blend's control is itself worse than "
+        "ENS alone"
     ),
     ("wind", "blends"): (
-        "For wind power a blend of ENS, ICON-EU and IFS 0.25° lowers the error by 0.66 points at "
-        "an optimistic lead and 0.18 points at a conservative lead, and its control does not"
+        "For wind power a blend of ENS, ICON-EU, and IFS 0.25° lowers the error by 0.66 "
+        "percentage points at an optimistic lead and 0.18 percentage points at a conservative "
+        "lead, and the blend's control does not"
     ),
 }
 """Each chart's title, stating the finding for the products tested. Every number is in
@@ -1352,18 +1570,19 @@ def optimise(*, path: Path) -> None:
 
 
 def draw_domain(
-    *, input_dir: Path, domain: DomainType
+    *, input_dir: Path, domain: DomainType, extra_dir: Path | None = None
 ) -> tuple[dict[str, alt.VConcatChart], str | None]:
     """Draw every chart of one technology that its saved losses can support.
 
     Args:
         input_dir: The directory `nwp_forecast_comparison.py` wrote to.
         domain: `solar` or `wind`.
+        extra_dir: The directory `fit_extra_leads.py` wrote to, or None.
 
     Returns:
         Each chart keyed by its name, and the chosen week's month and year.
     """
-    losses, predictions = load(input_dir=input_dir, domain=domain)
+    losses, predictions = load(input_dir=input_dir, domain=domain, extra_dir=extra_dir)
     week_month: str | None = None
     charts: dict[str, alt.VConcatChart | None] = {
         "headline": headline(losses=losses, domain=domain, title=TITLES[(domain, "headline")]),
@@ -1394,12 +1613,17 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--input-dir", type=Path, required=True, help="Saved losses' directory.")
+    parser.add_argument(
+        "--extra-dir", type=Path, default=None, help="The extra lead days' losses directory."
+    )
     parser.add_argument("--output-dir", type=Path, required=True, help="Where SVGs are written.")
     parser.add_argument("--no-svgo", action="store_true", help="Skip the svgo optimisation.")
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     for domain in DOMAINS:
-        charts, week_month = draw_domain(input_dir=args.input_dir, domain=domain)
+        charts, week_month = draw_domain(
+            input_dir=args.input_dir, domain=domain, extra_dir=args.extra_dir
+        )
         for name, chart in charts.items():
             path = args.output_dir / f"nwp_forecast_{domain}_{name}.svg"
             chart.save(path)
