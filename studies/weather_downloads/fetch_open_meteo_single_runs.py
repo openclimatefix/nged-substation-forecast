@@ -550,6 +550,18 @@ def _column_descriptions() -> dict[str, str]:
     }
 
 
+def _gap_gotcha(*, unavailable: dict[date, str], incomplete: dict[date, str]) -> str:
+    """Return the README gotcha listing the run days that have no rows, and why."""
+    refused = ", ".join(day.isoformat() for day in sorted(unavailable)) or "none"
+    short = ", ".join(day.isoformat() for day in sorted(incomplete)) or "none"
+    return (
+        f"**Missing run days.** The API refused these run days as not available: {refused}. "
+        f"These run days came back incomplete, so none of their rows were stored: {short}. "
+        "`lineage.json` records the reason for each incomplete run, such as null radiation. The "
+        "validator lists every missing day as a gap."
+    )
+
+
 def _write_docs(
     *,
     frame: pl.DataFrame,
@@ -627,14 +639,24 @@ def _write_docs(
                 "Hourly values at lead days 5, 7, and 10 are therefore not native model output."
             ),
             (
+                "**Radiation of exactly -1.0 W/m^2.** In the fetch through 2026-09-25, 244 "
+                "`shortwave_radiation` values and 64 `direct_radiation` values equal exactly -1.0 "
+                "W/m^2, at leads 73 to 90 h, at all nine sites, in init months 1, 3, 9, 11, and "
+                "12 for shortwave and 3 and 12 for direct. They sit where the native IFS output "
+                "step coarsens and Open-Meteo interpolates, so they are interpolation artefacts, "
+                "not fetch faults. A study should clip them to 0. `validate_ifs_single_runs.py` "
+                "accepts exactly -1.0 and fails on any other negative value."
+            ),
+            _gap_gotcha(unavailable=unavailable, incomplete=incomplete),
+            (
                 "**Horizon.** The IFS HRES horizon is 10 days, so there is no lead day 14. AIFS "
                 "is not substituted."
             ),
             (
                 "**Cell selection.** The six PV sites use `cell_selection=nearest` and the three "
                 "wind sites use `cell_selection=land`. Two sites whose selected 9 km cell is the "
-                "same carry identical series, so identical series for a pair of site labels are "
-                "expected and are not a defect."
+                "same carry identical series, and are not a defect. In the fetch through "
+                "2026-09-25 the validator's WARN named sites B and D, which share a source cell."
             ),
             (
                 "**Units.** The API's defaults: wind speeds in km/h, temperature in degC. "

@@ -5,8 +5,8 @@ One-off throwaway script for
 `data/studies/weather/ECMWF-IFS-SINGLE-RUNS/ECMWF-IFS-SINGLE-RUNS.parquet` and runs the checks in
 `CHECK_NAMES`: run spacing (every run day missing from the first day the archive serves listed,
 and any gap in neither ledger a failure), 241 leads per run per site, all seven variables, nulls
-only in radiation at lead 0, physical ranges, a diurnal check on radiation, and nine site labels in
-every month file.
+only in radiation at lead 0, physical ranges (radiation may equal exactly -1.0 W/m^2, counted and
+reported), a diurnal check on radiation, and nine site labels in every month file.
 
 **The script prints one PASS or FAIL line per check, then every gap.** Gaps are listed rather than
 hidden. It prints no coordinate. It exits non-zero when any check fails.
@@ -42,6 +42,16 @@ MAX_WIND_SPEED_KM_H: Final[float] = 200.0
 MAX_DIRECTION_DEG: Final[float] = 360.0
 """Physical bounds. A value outside them is a fault, not an extreme."""
 
+EXPECTED_NEGATIVE_RADIATION_W_M2: Final[float] = -1.0
+"""The one negative radiation value accepted, exactly, at any lead.
+
+Checked against the full fetch (runs 2024-03-14 to 2026-09-25, nine sites): `shortwave_radiation`
+holds 244 values below zero and `direct_radiation` 64, every one exactly -1.0 W/m^2. They sit at
+leads 73 to 90 h, in init months 1, 3, 9, 11, and 12 for shortwave and 3 and 12 for direct, at all
+nine sites and never above 1400. That is where the native IFS output step coarsens from 1 h to
+3 h and Open-Meteo interpolates, so the values are an interpolation artefact, not a fetch fault.
+A study clips them to 0. Any other negative radiation value, including -1.0000001, still fails."""
+
 NIGHT_HOURS_UTC: Final[tuple[int, ...]] = (0, 1, 2, 22, 23)
 NIGHT_MAX_MEAN_RADIATION_W_M2: Final[float] = 1.0
 """Around midnight UTC the sun is below the horizon in Great Britain all year, so a mean above 1
@@ -60,6 +70,7 @@ CHECK_NAMES: Final[tuple[str, ...]] = (
     "no_unexpected_nulls",
     "lead_zero_radiation_null",
     "value_ranges",
+    "expected_negative_radiation",
     "diurnal_radiation",
     "nine_sites_every_month",
     "no_duplicate_leads",
@@ -164,7 +175,7 @@ def _check_lead_zero_radiation(*, frame: pl.DataFrame) -> str | None:
 def _check_ranges(*, frame: pl.DataFrame) -> str | None:
     """Fail on any value outside its physical range."""
     bounds: dict[str, tuple[float, float]] = dict.fromkeys(
-        RADIATION_VARIABLES, (0.0, MAX_RADIATION_W_M2)
+        RADIATION_VARIABLES, (EXPECTED_NEGATIVE_RADIATION_W_M2, MAX_RADIATION_W_M2)
     )
     bounds["temperature_2m"] = TEMPERATURE_RANGE_C
     bounds["wind_speed_10m"] = (0.0, MAX_WIND_SPEED_KM_H)
@@ -177,6 +188,34 @@ def _check_ranges(*, frame: pl.DataFrame) -> str | None:
         if n_out:
             offenders.append(f"{name}: {n_out}")
     return f"values out of range ({', '.join(offenders)})" if offenders else None
+
+
+def _expected_negative_radiation(*, frame: pl.DataFrame) -> tuple[str | None, str]:
+    """Count the accepted -1.0 W/m^2 radiation values and check nothing else is negative.
+
+    `_check_ranges` already lets exactly `EXPECTED_NEGATIVE_RADIATION_W_M2` through as the lower
+    bound; this fails on any other negative value, such as -0.5, and reports what was accepted.
+
+    Args:
+        frame: The combined frame.
+
+    Returns:
+        A failure reason or `None`, and the line to print after `PASS` or `FAIL`.
+    """
+    counts: list[str] = []
+    other_negative = 0
+    for name in RADIATION_VARIABLES:
+        negative = frame.filter(pl.col(name) < 0)
+        other_negative += negative.filter(pl.col(name) != EXPECTED_NEGATIVE_RADIATION_W_M2).height
+        if negative.height:
+            counts.append(
+                f"{name}: {negative.height} values at leads {negative['lead_hours'].min()} to "
+                f"{negative['lead_hours'].max()} h"
+            )
+    summary = "; ".join(counts) or "none found"
+    if other_negative:
+        return f"{other_negative} negative radiation values other than -1.0 ({summary})", summary
+    return None, f"only exactly -1.0 W/m^2 (interpolation artefact): {summary}"
 
 
 def _check_diurnal(*, frame: pl.DataFrame) -> str | None:
@@ -283,9 +322,12 @@ def main() -> int:
         "valid_time_matches_lead": _check_valid_time(frame=frame),
         "sites_not_constant": _check_not_constant(frame=frame),
     }
+    negative_reason, negative_summary = _expected_negative_radiation(frame=frame)
+    failures["expected_negative_radiation"] = negative_reason
     for name in CHECK_NAMES:
         reason = failures[name]
-        print(f"PASS {name}" if reason is None else f"FAIL {name}: {reason}")
+        detail = f": {negative_summary}" if name == "expected_negative_radiation" else ""
+        print(f"PASS {name}{detail}" if reason is None else f"FAIL {name}: {reason}")
     warning = _warn_identical_series(frame=frame)
     print(
         "PASS identical_series_sites"
