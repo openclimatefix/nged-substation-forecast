@@ -92,6 +92,12 @@ row shares one kind, a label on each would repeat what one subtitle line says.
 CONDITION_SHAPES: Final[tuple[str, ...]] = ("circle", "diamond", "square")
 """The point shape of each condition, in the order the conditions are given."""
 
+SECOND_SETTING_SHAPE: Final[str] = "triangle-up"
+"""The hollow shape that marks a contrast at the second hyperparameter setting.
+
+It is none of `CONDITION_SHAPES`, so a marker never reads as a reference row's diamond.
+"""
+
 CONTRAST_COLUMNS: Final[tuple[str, ...]] = (
     "Scope",
     "Contrast",
@@ -525,9 +531,11 @@ def interval_panel(
 
     Args:
         rows: One row per mark, with `label`, `family` (a `ProductFamily`), `difference`,
-            `lower_95` and `upper_95`, `condition` if `conditions` is given, and a Boolean
-            `planned` if any row is planned. Rows sharing a label share `planned`. Rows are drawn
-            top to bottom in the order given.
+            `lower_95` and `upper_95`, `condition` if `conditions` is given, a Boolean
+            `planned` if any row is planned, and `second_difference` if any row has a second
+            hyperparameter setting (drawn as a hollow `SECOND_SETTING_SHAPE`, null for a row with
+            none). Rows sharing a label share `planned`. Rows are drawn top to bottom in the
+            order given.
         x_domain: The x axis's range, set explicitly so two panels can share it.
         x_title: The x axis's title, naming the quantity and its unit. The better direction is
             added to it in words by `axis_title_with_direction`.
@@ -574,7 +582,12 @@ def interval_panel(
             .then(pl.col("family"))
             .otherwise(pl.col("family") + ", light")
         )
-    data = rows.with_columns(pl.col("difference", "lower_95", "upper_95").round(3), shade=shade)
+    rounded = [
+        name
+        for name in ("difference", "lower_95", "upper_95", "second_difference")
+        if name in rows.columns
+    ]
+    data = rows.with_columns(pl.col(rounded).round(3), shade=shade)
     labels = list(dict.fromkeys(data["label"].to_list()))
     lines = {label: wrapped(text=label, width=_LABEL_CHARACTERS) for label in labels}
     encodings: dict[str, object] = {
@@ -654,6 +667,27 @@ def interval_panel(
             .encode(x=x, tooltip=tooltip, **encodings),  # ty: ignore[unresolved-attribute]
         ]
     )
+    if "second_difference" in data.columns and data["second_difference"].is_not_null().any():
+        points.append(
+            alt.Chart(data.filter(pl.col("second_difference").is_not_null()))
+            .mark_point(
+                shape=SECOND_SETTING_SHAPE,
+                filled=False,
+                size=_POINT_SIZE,
+                strokeWidth=2,
+                opacity=1,
+                clip=True,
+                aria=False,
+            )
+            .encode(  # ty: ignore[unresolved-attribute]
+                x=alt.X("second_difference:Q", scale=x_scale, title=x_title_lines, axis=x_axis),
+                tooltip=[
+                    alt.Tooltip("label:N", title="Row"),
+                    alt.Tooltip("second_difference:Q", title="Second setting"),
+                ],
+                **{key: value for key, value in encodings.items() if key != "shape"},
+            )
+        )
     reference = _reference_layers(
         x_domain=x_domain,
         zero_label=zero_label,
@@ -1111,13 +1145,17 @@ class RowSetBlock(NamedTuple):
 
     `rows` holds one row per arm, with `arm`, `label`, `family`, `reference`, `planned`, and either
     `value` (a leaderboard block) or `difference` (a contrast block), each with `lower_95` and
-    `upper_95`, all in percentage points of capacity.
+    `upper_95`, all in percentage points of capacity. A contrast block's `rows` may also carry
+    `second_difference`, the same contrast at the second hyperparameter setting, null where none
+    was computed. `planned_rows` is `planned_contrast_rows`'s output for the row set's planned
+    contrasts, which a contrast block draws in a lower panel; `None` draws no lower panel.
     """
 
     label: str
     dates: str
     site_hours: int
     rows: pl.DataFrame
+    planned_rows: pl.DataFrame | None = None
 
     @property
     def title(self) -> str:
@@ -1289,19 +1327,99 @@ def block_contrast_rows(
     return pl.DataFrame(records)
 
 
+class PlannedContrast(NamedTuple):
+    """One planned contrast: the treatment arm's error minus the reference arm's."""
+
+    treatment: BlockArm
+    reference: BlockArm
+
+    @property
+    def label(self) -> str:
+        """The row's label, naming the treatment first."""
+        return f"{self.treatment.label} against {self.reference.label}"
+
+
+def planned_contrast_rows(
+    *,
+    losses: pl.DataFrame,
+    contrasts: Sequence[PlannedContrast],
+    setting: str,
+    site_hours: int,
+    metric: str,
+) -> pl.DataFrame:
+    """Compute each planned contrast, treatment minus reference, with its 95% interval.
+
+    Filters to `setting` before any bootstrap, and checks that each contrast rests on exactly
+    `site_hours` rows. Every row is planned, and its colour is its treatment's family. The rows
+    keep the order of `contrasts`.
+
+    Args:
+        losses: A `losses.parquet`.
+        contrasts: The planned contrasts. Unlike `block_contrast_rows`, each names its own
+            reference arm.
+        setting: The hyperparameter setting to score, such as `pooled`.
+        site_hours: The row set's number of site-hours.
+        metric: The loss column to difference.
+
+    Returns:
+        One row per contrast with `arm` (the treatment), `reference_arm`, `label`, `family`,
+        `reference` (always false), `planned` (always true), `difference`, `lower_95` and
+        `upper_95`, in percentage points of capacity.
+
+    Raises:
+        ValueError: If the setting is absent or a contrast does not rest on `site_hours` rows.
+    """
+    at_setting = _rows_at_setting(losses=losses, setting=setting)
+    records = []
+    for contrast in contrasts:
+        interval = bootstrap_difference(
+            losses=at_setting,
+            treatment=contrast.treatment.arm,
+            reference=contrast.reference.arm,
+            metric=metric,
+        )
+        _check_rows(arm=contrast.label, n_rows=interval["n_rows"], site_hours=site_hours)
+        records.append(
+            {
+                "arm": contrast.treatment.arm,
+                "reference_arm": contrast.reference.arm,
+                "label": contrast.label,
+                "family": contrast.treatment.family,
+                "reference": False,
+                "planned": True,
+                "difference": interval["difference"] * PERCENTAGE_POINTS,
+                "lower_95": interval["lower_95"] * PERCENTAGE_POINTS,
+                "upper_95": interval["upper_95"] * PERCENTAGE_POINTS,
+            }
+        )
+    return pl.DataFrame(records)
+
+
 def shared_domain(*, blocks: Sequence[RowSetBlock], include_zero: bool) -> tuple[float, float]:
     """Return one x range covering every block's intervals, rounded out to half a point.
 
     Args:
-        blocks: The blocks of a stacked figure.
+        blocks: The blocks of a stacked figure. A block's `planned_rows` count as well as its
+            `rows`.
         include_zero: Whether the range must contain zero, as a contrast chart's does.
 
     Returns:
         The lowest lower bound and highest upper bound over every block, each rounded outwards to
         a multiple of half a percentage point.
     """
-    lows = [low for block in blocks for low in block.rows["lower_95"].to_list()]
-    highs = [high for block in blocks for high in block.rows["upper_95"].to_list()]
+    frames = [
+        frame for block in blocks for frame in (block.rows, block.planned_rows) if frame is not None
+    ]
+    lows = [low for frame in frames for low in frame["lower_95"].to_list()]
+    highs = [high for frame in frames for high in frame["upper_95"].to_list()]
+    seconds = [
+        value
+        for frame in frames
+        if "second_difference" in frame.columns
+        for value in frame["second_difference"].drop_nulls().to_list()
+    ]
+    lows += seconds
+    highs += seconds
     if include_zero:
         lows.append(0.0)
         highs.append(0.0)
@@ -1353,6 +1471,18 @@ def stacked_leaderboard(
     )
 
 
+PLANNED_CONTRAST_X_TITLE: Final[str] = (
+    "Mean absolute error of the first product minus the second's (points of capacity)"
+)
+"""The x axis title of a block's lower panel of planned contrasts."""
+
+SECOND_SETTING_NOTE: Final[str] = (
+    "Hollow triangle: the same contrast at the second hyperparameter setting, shown for planned "
+    "contrasts and for contrasts near the 5% line."
+)
+"""The subtitle line a stacked contrast chart adds to explain its second-setting markers."""
+
+
 def stacked_contrasts(
     *,
     blocks: Sequence[RowSetBlock],
@@ -1360,47 +1490,80 @@ def stacked_contrasts(
     title: str,
     subtitle: Sequence[str],
 ) -> alt.VConcatChart:
-    """Stack one panel of contrasts against ERA5 per row set, on one x range.
+    """Stack, per row set, a panel of contrasts against ERA5 and a panel of planned contrasts.
 
     Each block is an `interval_panel` titled with its row set, dates and site-hours. A block's
-    reference rows (CAMS) are drawn hollow, in the light shade of their family's colour.
+    reference rows (CAMS) are drawn hollow, in the light shade of their family's colour. A block
+    with `planned_rows` gets a second panel under the first, holding that row set's planned
+    contrasts, each the first product's error minus the second's: a chart of differences from
+    ERA5 cannot show whether two other products differ. A block with planned
+    contrasts titles the x axis of both its panels, because the two measure different
+    differences; a block without them titles its axis only if it is the last block.
 
     Args:
         blocks: The row-set blocks from top to bottom, each holding `block_contrast_rows`'s
-            output.
+            output, and optionally `planned_contrast_rows`'s.
         number: The figure's number on its page.
         title: The finding the figure shows.
-        subtitle: Short lines for the caption; `CONTRAST_REFERENCE_ROW_NOTE` is added.
+        subtitle: Short lines for the caption; `CONTRAST_REFERENCE_ROW_NOTE` is added, and
+            `SECOND_SETTING_NOTE` where any row has a second setting.
 
     Returns:
         The figure.
     """
     domain = shared_domain(blocks=blocks, include_zero=True)
-    figure_planning = planning(rows=[block.rows for block in blocks])
-    conditions = ("Product", "Reference row")
-    panels = [
-        interval_panel(
-            rows=block.rows.with_columns(
-                condition=pl.when(pl.col("reference"))
-                .then(pl.lit(conditions[1]))
-                .otherwise(pl.lit(conditions[0]))
-            ),
-            x_domain=domain,
-            x_title=CONTRAST_X_TITLE if index == len(blocks) - 1 else "",
-            zero_label="same as ERA5",
-            better_label="better than ERA5",
-            conditions=conditions,
-            panel_title=block.title,
-            family_key=index == 0,
-            condition_key=False,
-            figure_planning=figure_planning,
-        )
-        for index, block in enumerate(blocks)
+    frames = [
+        frame for block in blocks for frame in (block.rows, block.planned_rows) if frame is not None
     ]
+    figure_planning = planning(rows=frames)
+    conditions = ("Product", "Reference row")
+    panels = []
+    for index, block in enumerate(blocks):
+        panels.append(
+            interval_panel(
+                rows=block.rows.with_columns(
+                    condition=pl.when(pl.col("reference"))
+                    .then(pl.lit(conditions[1]))
+                    .otherwise(pl.lit(conditions[0]))
+                ),
+                x_domain=domain,
+                x_title=(
+                    CONTRAST_X_TITLE
+                    if block.planned_rows is not None or index == len(blocks) - 1
+                    else ""
+                ),
+                zero_label="same as ERA5",
+                better_label="better than ERA5",
+                conditions=conditions,
+                panel_title=block.title,
+                family_key=index == 0,
+                condition_key=False,
+                figure_planning=figure_planning,
+            )
+        )
+        if block.planned_rows is not None:
+            panels.append(
+                interval_panel(
+                    rows=block.planned_rows,
+                    x_domain=domain,
+                    x_title=PLANNED_CONTRAST_X_TITLE,
+                    zero_label="same as the second product",
+                    better_label="first product better",
+                    panel_title=f"{block.label}: planned contrasts",
+                    family_key=False,
+                    condition_key=False,
+                    figure_planning=figure_planning,
+                )
+            )
+    has_second_setting = any(
+        "second_difference" in frame.columns and frame["second_difference"].is_not_null().any()
+        for frame in frames
+    )
+    notes = [CONTRAST_REFERENCE_ROW_NOTE, *([SECOND_SETTING_NOTE] if has_second_setting else [])]
     return figure(
         panels=panels,
         number=number,
         title=title,
-        subtitle=[*subtitle, CONTRAST_REFERENCE_ROW_NOTE],
+        subtitle=[*subtitle, *notes],
         figure_planning=figure_planning,
     )

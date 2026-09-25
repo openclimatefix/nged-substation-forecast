@@ -15,9 +15,11 @@ from studies.charts import (
     NAMED_SUFFIX,
     PLANNING_NOTES,
     PLOT_WIDTH_PX,
+    SECOND_SETTING_SHAPE,
     BlockArm,
     ContrastKey,
     Panel,
+    PlannedContrast,
     PlanningType,
     RowSetBlock,
     assert_matches_printed,
@@ -27,10 +29,12 @@ from studies.charts import (
     flip_contrast,
     interval_panel,
     leaderboard_panel,
+    planned_contrast_rows,
     planning,
     report_contrasts,
     report_errors,
     select_contrasts,
+    shared_domain,
     stacked_contrasts,
     stacked_leaderboard,
     ticks,
@@ -999,3 +1003,149 @@ def test_stacked_contrasts_puts_the_x_axis_title_under_the_last_block_only() -> 
     assert len(titles) == len(blocks)
     assert titles[-1].startswith("Mean absolute error minus ERA5's (points of capacity")
     assert titles[:-1] == [""]
+
+
+UKV_AGAINST_CAMS = PlannedContrast(treatment=BLOCK_ARMS[2], reference=BLOCK_ARMS[0])
+CAMS_AGAINST_ERA5 = PlannedContrast(treatment=BLOCK_ARMS[0], reference=BLOCK_ARMS[1])
+
+
+def _planned(*, contrasts: list[PlannedContrast], setting: str = "pooled") -> pl.DataFrame:
+    return planned_contrast_rows(
+        losses=_losses(),
+        contrasts=contrasts,
+        setting=setting,
+        site_hours=SITE_HOURS,
+        metric=METRIC,
+    )
+
+
+def test_planned_contrast_rows_are_treatment_minus_reference_not_the_other_way_round() -> None:
+    # UKV loses 0.03 and CAMS 0.01, so UKV minus CAMS is +2 points and CAMS minus UKV would be -2.
+    rows = _planned(contrasts=[UKV_AGAINST_CAMS, CAMS_AGAINST_ERA5])
+
+    assert rows["difference"].to_list() == pytest.approx([2.0, -1.0])
+    assert rows["arm"].to_list() == ["ukv_global", "cams_global"]
+    assert rows["reference_arm"].to_list() == ["cams_global", "era5_global"]
+    assert rows["label"].to_list() == ["UKV against CAMS", "CAMS against ERA5"]
+    assert rows["planned"].to_list() == [True, True]
+
+
+def test_planned_contrast_rows_use_the_asked_setting_only() -> None:
+    losses = _losses(sensitivity_offset=0.05)
+    shifted = losses.with_columns(
+        pl.when((pl.col("setting") == "sensitivity") & (pl.col("arm") == "ukv_global"))
+        .then(pl.col(METRIC) + 0.01)
+        .otherwise(pl.col(METRIC))
+        .alias(METRIC)
+    )
+
+    rows = planned_contrast_rows(
+        losses=shifted,
+        contrasts=[UKV_AGAINST_CAMS],
+        setting="sensitivity",
+        site_hours=SITE_HOURS,
+        metric=METRIC,
+    )
+
+    assert rows["difference"].to_list() == pytest.approx([3.0])
+
+
+def test_planned_contrast_rows_raise_when_the_site_hours_differ() -> None:
+    with pytest.raises(ValueError, match="rows per seed"):
+        planned_contrast_rows(
+            losses=_losses(),
+            contrasts=[UKV_AGAINST_CAMS],
+            setting="pooled",
+            site_hours=SITE_HOURS + 1,
+            metric=METRIC,
+        )
+
+
+def _blocks_with_planned(*, second: bool) -> list[RowSetBlock]:
+    _, blocks = _blocks()
+    planned = _planned(contrasts=[UKV_AGAINST_CAMS, CAMS_AGAINST_ERA5])
+    if second:
+        planned = planned.with_columns(second_difference=pl.Series([1.5, None]))
+    return [block._replace(planned_rows=planned) for block in blocks]
+
+
+def test_stacked_contrasts_draws_each_blocks_planned_contrasts_in_a_lower_panel() -> None:
+    blocks = _blocks_with_planned(second=False)
+
+    spec = stacked_contrasts(
+        blocks=blocks, number=2, title="A title", subtitle=["A subtitle."]
+    ).to_dict()
+
+    titles = [
+        panel["title"]["text"]
+        for panel in _leaf_panels(spec)
+        if "title" in panel and panel["title"]["text"] != "Product type"
+    ]
+    assert titles == [
+        "Main rows: Jan 2025, 8 site-hours",
+        "Main rows: planned contrasts",
+        "Extra rows: Jan 2025, 8 site-hours",
+        "Extra rows: planned contrasts",
+    ]
+    text = str(spec)
+    for label in ("UKV against CAMS", "CAMS against ERA5"):
+        assert f"{label}{NAMED_SUFFIX}" in text
+    # The plotted estimates are treatment minus reference; the opposite sign would show -2.0.
+    assert "'difference': 2.0" in text
+    assert "'difference': -2.0" not in text
+
+
+def test_a_planned_row_dropped_from_the_data_is_dropped_from_the_chart() -> None:
+    blocks = _blocks_with_planned(second=False)
+    fewer = [
+        block._replace(planned_rows=_planned(contrasts=[UKV_AGAINST_CAMS])) for block in blocks
+    ]
+
+    text = str(
+        stacked_contrasts(blocks=fewer, number=2, title="A title", subtitle=["A."]).to_dict()
+    )
+
+    assert "CAMS against ERA5" not in text
+    assert f"UKV against CAMS{NAMED_SUFFIX}" in text
+
+
+def test_every_panel_of_a_block_with_planned_contrasts_titles_its_own_x_axis() -> None:
+    spec = stacked_contrasts(
+        blocks=_blocks_with_planned(second=False), number=2, title="A", subtitle=["A."]
+    ).to_dict()
+
+    titles = _x_axis_titles(spec)
+    assert len(titles) == 4
+    assert titles[0].startswith("Mean absolute error minus ERA5's")
+    assert titles[1].startswith("Mean absolute error of the first product minus the second's")
+
+
+def test_a_second_setting_is_a_hollow_marker_not_a_second_chart() -> None:
+    with_second = str(
+        stacked_contrasts(
+            blocks=_blocks_with_planned(second=True), number=2, title="A", subtitle=["A."]
+        ).to_dict()
+    )
+    without = str(
+        stacked_contrasts(
+            blocks=_blocks_with_planned(second=False), number=2, title="A", subtitle=["A."]
+        ).to_dict()
+    )
+
+    assert SECOND_SETTING_SHAPE in with_second
+    assert "second hyperparameter setting" in with_second
+    assert SECOND_SETTING_SHAPE not in without
+    assert "second hyperparameter setting" not in without
+    assert "'second_difference': 1.5" in with_second
+
+
+def test_the_shared_domain_covers_the_planned_rows_and_the_second_setting_markers() -> None:
+    blocks = _blocks_with_planned(second=True)
+    wide = _planned(contrasts=[UKV_AGAINST_CAMS, CAMS_AGAINST_ERA5]).with_columns(
+        second_difference=pl.Series([7.2, None])
+    )
+
+    low, high = shared_domain(blocks=[blocks[0]._replace(planned_rows=wide)], include_zero=True)
+
+    assert high >= 7.2
+    assert low <= -1.0
