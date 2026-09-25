@@ -677,8 +677,9 @@ forecast lowers the error at those leads.** The AIFS Single and AIFS ENS stores 
 both leads can be scored. The section adds three things to the plan above. It names two tests of
 the maintainer's hypothesis, one per lead, of whether AIFS Single has a lower error than the ENS
 control member at day 7 and at day 14. It adds blends of the ENS mean with AIFS Single, and with
-the AIFS ENS mean, at days 1, 2, 7, and 14, each with a permutation control. It states which contrasts are planned, which are exploratory,
-and why. No fit for any arm named here has run, and the section is written before one does.
+the AIFS ENS mean, at days 1, 2, 7, and 14, each with a permutation control. It states which contrasts are planned, which are
+exploratory, and why. No fit for any arm named here has run, and the section is written before
+one does.
 
 **The wording rule stands.** The survey page's stance is that [AIFS has not been shown to improve
 faster than the physics-based
