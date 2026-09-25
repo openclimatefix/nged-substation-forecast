@@ -317,6 +317,10 @@ def test_ticks_are_round_and_inside_the_range():
     assert ticks(x_domain=(-0.6, 0.4)) == [-0.6, -0.4, -0.2, 0.0, 0.2, 0.4]
 
 
+def test_ticks_widens_its_step_for_a_range_over_20_wide():
+    assert ticks(x_domain=(5.5, 26.5)) == [7.5, 10.0, 12.5, 15.0, 17.5, 20.0, 22.5, 25.0]
+
+
 def test_ticks_returns_at_most_ten_values():
     assert len(ticks(x_domain=(0.0, 0.45))) == 10
 

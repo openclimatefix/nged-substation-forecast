@@ -912,7 +912,7 @@ def ticks(*, x_domain: tuple[float, float]) -> list[float]:
         Every multiple of the smallest round step giving at most 10 ticks, inside the range.
     """
     low, high = x_domain
-    for step in (0.05, 0.1, 0.2, 0.25, 0.5, 1.0, 2.0):
+    for step in (0.05, 0.1, 0.2, 0.25, 0.5, 1.0, 2.0, 2.5, 5.0):
         first = math.ceil(round(low / step, 9))
         last = math.floor(round(high / step, 9))
         if last - first < 10:

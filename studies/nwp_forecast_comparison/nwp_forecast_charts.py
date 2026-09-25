@@ -2008,12 +2008,12 @@ TITLES: Final[dict[tuple[DomainType, str], str]] = {
         "ENS mean at days 2 and 3, at a lead shorter than ENS's on most hours"
     ),
     ("solar", "aifs"): (
-        "AIFS Single and AIFS ENS, scored at days 1 and 2 on the hours each is available for, "
-        "against ENS on the same hours: solar power"
+        "For solar power, AIFS Single cannot be told apart from ENS's control member at day 1, "
+        "and the AIFS ENS rows are descriptive only"
     ),
     ("wind", "aifs"): (
-        "AIFS Single and AIFS ENS, scored at days 1 and 2 on the hours each is available for, "
-        "against ENS on the same hours: wind power"
+        "For wind power, AIFS Single has a lower error than ENS's control member at day 1, "
+        "and the AIFS ENS rows are descriptive only"
     ),
     ("solar", "blends"): (
         "For solar power a blend of ENS, ICON-EU, and IFS 0.25° lowers the error by 0.35 "
@@ -2027,8 +2027,7 @@ TITLES: Final[dict[tuple[DomainType, str], str]] = {
     ),
 }
 """Each chart's title, stating the finding for the products tested. Every number is in
-`report.md`. The two AIFS titles describe the figure and are rewritten to state the finding once
-the AIFS report exists."""
+`report.md`."""
 
 
 def optimise(*, path: Path) -> None:
