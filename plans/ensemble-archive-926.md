@@ -46,7 +46,7 @@ The maintainer requires one array per product, so a study opens a single array a
 
 **Compute on the small instance is modest.** The reviewer measured about 15 ms to decode one ICON-D2-EPS file and 7 ms for a per-step chunk write on a fast workstation, and about 200,000 files a day, so decode and write come to roughly one to two vCPU-hours a day against a `t4g.small` baseline of 9.6 (a Graviton core is slower, so the dry run measures it). The design avoids the expensive case, rewriting per-member chunks step by step, by caching raw files until the run is complete and then building it member by member so each chunk is written once. The instance never stores the raw files long-term: keeping raw GRIB would be about 45 TB a year, roughly 4 to 6 times the cropped size.
 
-**Risks specific to Icechunk, for the diff reviews:** commit conflicts (single recorder, so none expected); the size of the chunk-reference manifests, which grow with each run (per-member chunks give about 800 chunk references per ICON-D2-EPS run and variable); and whether the repository can be written through Source Cooperative's direct-write route (Option 3) rather than only its proxy, which is confirmed by the first dry run against the real bucket.
+**Risks specific to Icechunk, for the diff reviews:** commit conflicts (single recorder, so none expected); the size of the chunk-reference manifests, which grow with each run (per-member chunks give about 20 chunk references per ICON-D2-EPS run and variable); and whether the repository can be written through Source Cooperative's direct-write route (Option 3) rather than only its proxy, which is confirmed by the first dry run against the real bucket.
 
 ## Where the code lives
 
