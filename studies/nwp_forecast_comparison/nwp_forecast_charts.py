@@ -610,9 +610,9 @@ the bundled `validate_palette.py` all-pairs separation checks in light mode on t
 lightness band (L 0.81 against a ceiling of 0.77), and Data Sky, Data Green, and Data Amber are
 below 3:1 contrast against the background, so each lead's fixed slot within its row and the page's
 tables of every number carry the reading as well. Day 0 is black. Day 7 is a neutral grey, the
-brand palette's mid grey, and a diamond like day 0, and carries a direct label as well, because no
-chromatic colour is left for it. Data Amber, Data Deep Teal, and
-Data Burnt Orange are internal-use colours, approved for the lead-day charts by the maintainer."""
+brand palette's mid grey, and a diamond like day 0, because no chromatic colour is left for it.
+Data Amber, Data Deep Teal, and Data Burnt Orange are internal-use colours, approved for the
+lead-day charts by the maintainer."""
 
 MAX_LINE_DAY: Final[int] = 3
 """The last lead day the lead-day lines draw: every product plotted there is fitted at every day up
@@ -636,12 +636,6 @@ DEVICE_NOTES: Final[dict[DomainType, str]] = {
 """How far a GPU refit of an arm lies from its published CPU fit (the extra-lead report's device
 noise floor), for the leaderboard's subtitle. For wind every estimate is lower, though no single
 interval excludes zero."""
-
-DAY_SEVEN: Final[int] = 7
-"""The lead day whose marks carry a direct label as well as the grey diamond."""
-
-DAY_SEVEN_LABEL: Final[str] = "day 7"
-"""The direct label written beside each day-7 mark's interval."""
 
 DIAMOND_DAYS: Final[frozenset[int]] = frozenset({0, 7})
 """The lead days drawn as diamonds, a second encoding beside the colour: day 0 (black) and day 7
@@ -821,17 +815,6 @@ def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt
             ),
         )
     )
-    day_seven = data.filter(pl.col("day") == DAY_SEVEN).with_columns(text=pl.lit(DAY_SEVEN_LABEL))
-    day_seven_labels = (
-        alt.Chart(day_seven)
-        .mark_text(align="left", dx=6, baseline="middle", fontSize=9, clip=True, aria=False)
-        .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("upper_95:Q", scale=x_scale, axis=x_axis, title=x_title),
-            y=alt.Y("y:Q", scale=y_scale, axis=y_axis),
-            text="text:N",
-            color=alt.value(LEAD_COLOURS[DAY_SEVEN]),
-        )
-    )
     reference = baselines.with_columns(
         y=pl.lit(-LEAD_LABEL_ROWS + 0.25, dtype=pl.Float64),
         text=pl.col("label"),
@@ -854,7 +837,7 @@ def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt
         for arm, align, dx in ((low_arm, "right", -5), (high_arm, "left", 5))
     ]
     panel = alt.LayerChart(
-        layer=[rules, reference_rules, intervals, points, day_seven_labels, *reference_text],
+        layer=[rules, reference_rules, intervals, points, *reference_text],
         width=PLOT_WIDTH_PX,
         height=LEAD_ROW_PX * (len(products) + LEAD_LABEL_ROWS - 0.5),
     )
@@ -863,7 +846,6 @@ def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt
             line_key(
                 labels=lead_names,
                 colours=[LEAD_COLOURS[day] for day in days],
-                width=PLOT_WIDTH_PX,
             ),
             panel,
         ],
@@ -879,10 +861,12 @@ def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt
             ),
             (
                 "Within each row, marks run from day 0 at the top to day 14 at the bottom; day 7 "
-                'is a grey diamond, labelled "day 7", and day 0 is a black diamond. Day 0 '
-                "is read from a run that started 0 to 23 hours (ENS) or 0 to 3 hours (ICON-EU and "
-                "ICON-D2, Open-Meteo's freshest run) before the hour it describes, so it is not a "
-                "day-ahead forecast a service could read. Every mark is an XGBoost model fitted "
+                "is a grey diamond and day 0 is a black diamond. Day 0 is not a day-ahead "
+                "forecast a service could read: ENS's and GEFS's day 0 comes from the 00 UTC run, "
+                "0 to 23 hours before the hour it describes, and every other product's from "
+                "Open-Meteo's freshest run, 0 to 3 hours before for ICON-EU and ICON-D2 and at a "
+                "lead set by each product's own run cycle for the rest. Every mark is an XGBoost "
+                "model fitted "
                 "on a graphics processing unit (GPU) at the primary setting, so no mark mixes "
                 f"devices; {DEVICE_NOTES[domain]}. "
                 f"Overlapping intervals here can still hide a significant paired difference "
@@ -1669,12 +1653,12 @@ TITLES: Final[dict[tuple[DomainType, str], str]] = {
     ("solar", "leaderboard"): (
         "For solar power, error rises with lead to day 10: at day 1 every weather forecast shown "
         "has a lower error than climatology (14.5%), but at day 14 neither the ENS mean nor the "
-        "GEFS mean does; ENS and IFS 0.25° have the lowest day-1 errors"
+        "GEFS mean does; the ENS mean and IFS 0.25° have the lowest day-1 errors"
     ),
     ("wind", "leaderboard"): (
         "For wind power, error rises with lead: at day 1 every weather forecast shown has a lower "
         "error than climatology (18.5%), but at day 14 neither the ENS mean nor the GEFS mean "
-        "does; ENS and IFS 0.25° have the lowest day-1 errors"
+        "does; the ENS mean and IFS 0.25° have the lowest day-1 errors"
     ),
     ("solar", "models_work"): (
         "Out-of-fold day-1 ENS-mean forecasts follow the measured output at all six solar farms"

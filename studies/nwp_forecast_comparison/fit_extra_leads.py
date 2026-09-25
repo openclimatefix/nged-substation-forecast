@@ -743,6 +743,68 @@ def require_arms(*, frame: pl.DataFrame, domain: DomainType, batch: ArmBatch) ->
         raise ValueError(msg)
 
 
+def check_first_batch_arms(
+    *, domain: DomainType, first_batch_arms: set[str], batch: ArmBatch
+) -> None:
+    """Raise unless the first batch's arms and the batch's own arms cover every contrast arm once.
+
+    Args:
+        domain: `solar` or `wind`.
+        first_batch_arms: The arms held by the first batch's saved losses.
+        batch: The second batch, whose contrast tables read the first batch's losses.
+
+    Raises:
+        ValueError: If an arm is in both batches, or a contrast names an arm that neither batch
+            fits, which would otherwise drop that contrast row from the report or make
+            `assert_equal_rows` raise only at report time.
+    """
+    own = set(batch_prefixes(batch=batch, domain=domain))
+    both = sorted(first_batch_arms & own)
+    if both:
+        msg = f"{domain}: arms in both batches: {both}"
+        raise ValueError(msg)
+    named = {
+        arm
+        for pairs in (batch.same_product_contrasts, batch.ensemble_contrasts)
+        for pair in pairs
+        for arm in pair
+    } | set(batch.climatology_contrasts)
+    wanted = set(domain_prefixes(domain=domain, prefixes=tuple(sorted(named))))
+    lacking = sorted(wanted - own - first_batch_arms)
+    if lacking:
+        msg = f"{domain}: contrast arms fitted by neither batch: {lacking}"
+        raise ValueError(msg)
+
+
+def check_first_batch_dir(*, args: argparse.Namespace, batch: ArmBatch) -> None:
+    """Raise unless `--first-batch-dir` holds a finished first batch that complements `batch`.
+
+    Args:
+        args: The parsed command line.
+        batch: The chosen batch; the check applies only to the second.
+
+    Raises:
+        ValueError: If the flag is missing, names the output or published folder, or the arms
+            do not fit together (see `check_first_batch_arms`).
+        FileNotFoundError: If the first batch has not written its losses.
+    """
+    if args.batch != "second":
+        return
+    if args.first_batch_dir is None:
+        msg = "--batch second needs --first-batch-dir, or its contrast tables lose rows"
+        raise ValueError(msg)
+    if args.first_batch_dir.resolve() in {args.output_dir.resolve(), args.published_dir.resolve()}:
+        msg = "--first-batch-dir must be the first batch's own folder"
+        raise ValueError(msg)
+    for domain in DOMAINS:
+        path = losses_path(output_dir=args.first_batch_dir, domain=domain)
+        if not path.exists():
+            msg = f"{path} does not exist; let the first batch finish first"
+            raise FileNotFoundError(msg)
+        arms = set(pl.scan_parquet(path).select("arm").unique().collect()["arm"].to_list())
+        check_first_batch_arms(domain=domain, first_batch_arms=arms, batch=batch)
+
+
 def main() -> int:
     """Fit the arms for both technologies and write the losses and report once."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -774,6 +836,7 @@ def main() -> int:
     if args.output_dir.resolve() == args.published_dir.resolve():
         msg = "the output folder must not be the published folder"
         raise ValueError(msg)
+    check_first_batch_dir(args=args, batch=batch)
     if args.check:
         for domain in DOMAINS:
             checked = joined_rows(

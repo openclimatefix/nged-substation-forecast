@@ -16,9 +16,11 @@ from fit_extra_leads import (  # noqa: E402
     SECOND_NEW_PREFIXES,
     SECOND_REFERENCE_PREFIXES,
     batch_prefixes,
+    check_first_batch_arms,
     check_saved_losses_hold_arms,
     domain_prefixes,
 )
+from nwp_forecast_comparison import DomainType  # noqa: E402
 
 
 def test_wind_prefixes_exclude_the_solar_only_products():
@@ -112,3 +114,39 @@ def test_ens_ways_follow_the_days_each_reduction_is_wanted_at():
     assert extra_ens_ways(day=7, **kwargs) == ("mean", "control")
     assert extra_ens_ways(day=5, **kwargs) == ("control",)
     assert extra_ens_ways(day=10, **kwargs) == ()
+
+
+def _all_contrast_arms(domain: DomainType) -> set[str]:
+    batch = BATCHES["second"]
+    named = {
+        arm
+        for pairs in (batch.same_product_contrasts, batch.ensemble_contrasts)
+        for pair in pairs
+        for arm in pair
+    } | set(batch.climatology_contrasts)
+    own = set(batch_prefixes(batch=batch, domain=domain))
+    return set(domain_prefixes(domain=domain, prefixes=tuple(sorted(named)))) - own
+
+
+@pytest.mark.parametrize("domain", ["solar", "wind"])
+def test_first_batch_arms_that_complete_the_contrasts_pass(domain: DomainType) -> None:
+    check_first_batch_arms(
+        domain=domain, first_batch_arms=_all_contrast_arms(domain), batch=BATCHES["second"]
+    )
+
+
+def test_a_contrast_arm_fitted_by_neither_batch_raises() -> None:
+    arms = _all_contrast_arms("solar")
+    with pytest.raises(ValueError, match="fitted by neither batch"):
+        check_first_batch_arms(
+            domain="solar", first_batch_arms=arms - {min(arms)}, batch=BATCHES["second"]
+        )
+
+
+def test_an_arm_in_both_batches_raises() -> None:
+    batch = BATCHES["second"]
+    own = batch_prefixes(batch=batch, domain="solar")[0]
+    with pytest.raises(ValueError, match="both batches"):
+        check_first_batch_arms(
+            domain="solar", first_batch_arms=_all_contrast_arms("solar") | {own}, batch=batch
+        )
