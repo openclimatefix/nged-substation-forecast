@@ -285,7 +285,18 @@ def test_every_fold_and_seed_is_fitted_on_the_requested_device(monkeypatch: pyte
     _, fit = _run(monkeypatch, site_rows=_site_rows(), device="cuda")
     assert fit.devices
     assert set(fit.devices) == {"cuda"}
-    _, cpu_fit = _run(monkeypatch, site_rows=_site_rows())
+    # Called without `device`, so the assertion pins `out_of_fold_losses`'s own default rather
+    # than `_run`'s.
+    cpu_fit = _RecordingFit(offset_mw=1.0)
+    monkeypatch.setattr(cross_validation, "fit_one_fold", cpu_fit)
+    out_of_fold_losses(
+        site_rows=_site_rows(),
+        features=["x"],
+        target="power_mw",
+        hyper_parameters=PRIMARY_HYPER_PARAMETERS,
+        with_quantiles=True,
+    )
+    assert cpu_fit.devices
     assert set(cpu_fit.devices) == {"cpu"}
 
 
