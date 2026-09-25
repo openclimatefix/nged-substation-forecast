@@ -86,64 +86,92 @@ done for the three-era design or the solar fits (about 1.7 hours at 16 cores).
 
 ### Recommendation
 
-Adopt D1, era-wise folds with a searched rotation that covers every calendar month, as the option
-for any re-run, and keep D0 as the default so no published figure changes by accident. Reject D2,
-because it scores most post-upgrade solar hours with a model that never saw the new UKV, which is
-the failure era-cutting exists to prevent. For #892, the ENS-horizons page needs its wind claims
-rewritten around an IFS 49r1 era cut (or rows from 2024-12-01), because its headline wind contrast
-does not survive one. A re-run of the other pages under D1 moves no planned contrast by more than
-0.05 points, so those pages need at most a limitation sentence unless the maintainer prefers a full
-re-run; the maintainer decides that.
+Keep today's folds (design D0) as the default and change no library code for #868. Publish the
+measurement on #868 as the answer to its "measure the effect first" option. Where a study is
+re-run for another reason, pin a covering offset map for that study's own row set, in the way
+`ens_hres_past_wind.py` does (`rotate_folds` on top of `with_eras`, with a pinned offsets constant,
+and `raise_on_uncovered_months` before the first fit), so a change of row set fails loudly instead
+of moving folds silently. Reject whole-record folds (D2), because they score most post-upgrade
+solar hours with a model that never saw the new UKV, which is the failure era-cutting exists to
+prevent. Under D1 no planned contrast of the past-wind or past-solar study moves by more than 0.03
+points (0.05 at the second setting) or changes sign, so those pages need a limitation sentence and
+no re-run.
+
+For #892, rewrite the ENS-horizons page's wind claims around rows from 2024-12-01 (design II),
+because its headline wind contrast, +0.170 [+0.021, +0.322], does not survive an IFS 49r1 era cut
+under any of the three designs tried. Design II is the simplest design to write into the study,
+and it gives the page the same row set as the past-wind study, so the two pages compare directly.
+The cost is 3.5 months of rows, and the shorter record weakens climatology, so the page must say
+that its solar day-7 result against climatology moves from −0.157 to −1.778 for that reason.
+
+## Departures from the first draft of this plan
+
+The first simplicity review found that the first draft's library API had no caller, since the plan
+re-runs nothing and keeps every default. The draft is replaced as follows:
+
+- **Dropped:** `cut_eras_covering`, `allow_uncovered`, `with_eras(covering=)`, the `_complete`
+  option, and `IFS_CYCLE_49R1_FIRST_MONTH`. Existing calls already express the covering design
+  (`rotate_folds` over `with_eras`, as at `ens_hres_past_wind.py:2340`), and
+  `IFS_CYCLE_49R1_CUT_MONTH` already exists in that script. If a second study needs it, move that
+  constant into `studies.cross_validation` then.
+- **Dropped:** the planned package tests, which repeated existing tests of `cut_eras`,
+  `rotate_folds` and `search_fold_offsets`.
+- **Kept, changed:** the ENS-horizons fix becomes a row filter, not an era option, because the
+  script cuts folds a second time for its native-step-width arms (`ens_forecast_horizons.py`, the
+  `assign_folds` call near line 1338), and a flag on `_complete` would not reach that cut, nor drop
+  the straddle rows from 2024-11-12 to 2024-11-30.
+- **Not adopted:** a run-time `search_fold_offsets`. A search moves folds silently when the row set
+  changes, and a pinned constant fails loudly.
 
 ## What changes, file by file
 
-- `packages/studies/src/studies/cross_validation.py`: add `cut_eras_covering(frame, first_months)`,
-  which returns `cut_eras` with the first offsets `search_fold_offsets` finds, and raises
-  `ValueError` if no offsets cover every calendar month unless `allow_uncovered=True`. Add
-  `IFS_CYCLE_49R1_FIRST_MONTH = "2024-12"`. `assign_folds`, `rotate_folds`, `cut_eras`,
-  `search_fold_offsets` and `ENS_HRES_WIND_ERA_FOLD_OFFSETS` keep today's behaviour.
-- `packages/studies/tests/test_cross_validation.py`: pin today's behaviour (a synthetic two-era
-  frame where `with_eras`-style cutting holds a calendar month out of both eras, so
-  `uncovered_months` is non-empty), and test `cut_eras_covering` (result covers, the
-  smallest-rotation design is chosen, the error path, `allow_uncovered`).
-- `studies/beam_diffuse_split/weather_products.py`: `with_eras` gains a keyword-only `covering: bool
-  = False`. The default keeps every existing caller's folds unchanged, and a test compares fold
-  assignments with and without the keyword on a fixed frame.
-- `studies/beam_diffuse_split/ens_forecast_horizons.py`: `_complete` gains an option to add an IFS
-  49r1 era boundary, off by default. No published figure moves unless the maintainer chooses a
-  re-run.
-- `docs/studies/`: no page changes in this PR. The measurement report is summarised in the PR body
-  and the maintainer's decision is recorded in issues #868 and #892.
+- **#868:** a comment on issue #868 with the measurement tables and the recommendation above. No
+  code changes.
+- `studies/beam_diffuse_split/ens_forecast_horizons.py`: `_complete` drops rows before
+  `2024-12-01`, a named constant `ROW_SET_FIRST_HOUR` states that date and why, and a coverage check
+  (`calendar_month_coverage`, `raise_on_uncovered_months`) runs on the new row set before any fit.
+  If the check finds uncovered cells, the script pins an offsets map found once with
+  `search_fold_offsets` and applies it with `rotate_folds` to both fold cuts (the main one and the
+  native-arm one). The script's default-run behaviour is otherwise unchanged.
+- `docs/studies/` (the ENS-horizons page, at its new path if PR #917 has landed): rewrite the wind
+  claims and the affected figures from a re-run under design II, at both hyperparameter settings for
+  the planned and deciding contrasts. Re-check every solar claim. Say that the record starts on
+  2024-12-01 and why, and report the day-7 climatology change.
+- **No change** to `packages/studies`, `weather_products.with_eras`, or any other study.
+
+**The ENS-horizons re-run writes new outputs under `data/studies/`, so it needs the coordinator's
+go-ahead first.** It uses a new write-once output folder, moves nothing a merged page quotes until
+the
+page is rewritten, and runs on one device (the measurement used the CPU).
 
 ## Design-philosophy check
 
-This is R&D code, so it fails fast: `cut_eras_covering` raises when no design covers, as the wind
-study's coverage check does. No production path, asset or asset check is touched.
+This is R&D code, so it fails fast: the coverage check raises before the first fit, as the
+past-wind study's does. No production path, asset or asset check is touched.
 
 ## Tests
 
-Each new test states the assertion that fails on `main` today:
-
-- `cut_eras_covering` returns a design with `uncovered_months(...)` empty on a frame where
-  `cut_eras` with zero offsets leaves cells uncovered (`cut_eras_covering` does not exist on
-  `main`).
-- The default `with_eras` fold assignment equals `assign_folds(by=("site", "era"))` on a fixed
-  frame, so a change of default is caught.
-- `IFS_CYCLE_49R1_FIRST_MONTH` is the first whole month after 2024-11-12.
+Study scripts have no unit tests, so the script's own output is its check. The re-run prints the
+row count, the coverage result (zero uncovered cells) and each arm's columns into the report, and
+the page's numbers are checked against that report by the number guard. Nothing changes in
+`packages/studies`, so no mutation pass is planned; the PR body says so.
 
 ## Verification
 
 `uv run ruff check .`, `uv run ruff format --check .`, `uv run ty check`, `pydoclint` (pinned
-0.9.1), `uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md`, `uv run pytest`,
-`uv run mkdocs build --strict`, and `scripts/lint/check_docs_links.py`. A mutation pass over the
-`packages/studies` change.
+0.9.1), `uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md`,
+`uv run pytest`, `uv run mkdocs build --strict` with a read of the rendered page, and
+`scripts/lint/check_docs_links.py`.
 
 ## Risks and open questions
 
-- **Which design to recommend depends on the measurement.** Whole-record folds (D2) leave
-  post-upgrade rows scored by models that trained on no post-upgrade rows, which is the failure
-  era-cutting exists to prevent, so D1 is the working recommendation.
-- **A covering offset may not exist for a row set.** The offsets found for the past-wind row set do
-  not transfer, so each study must search on its own rows.
-- **Published pages.** A re-run of every page that uses `with_eras` is large. The recommendation
-  goes to the maintainer with the effect sizes.
+- **Design II versus the three-era cut (I).** Both make the headline wind contrast
+  non-significant. Design II is simpler and comparable with the past-wind study, and the three-era
+  cut keeps 3.5 more months of rows. The maintainer can choose the other; the recommendation is II.
+- **Second-setting fits are incomplete for the three-era cut and for solar.** They run now, and
+  their results go into the report before the re-run is designed.
+- **Whether the past-weather and past-solar pages need a re-run.** The recommendation is a
+  limitation sentence only. The maintainer decides.
+- **Coverage on the shorter record.** With 22 calendar months, the covering offsets may differ from
+  the long record's. The script must search once and pin the result.
+
