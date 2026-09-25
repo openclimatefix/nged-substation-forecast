@@ -75,15 +75,27 @@ class BlockSetting(NamedTuple):
     reference_name: str
 
 
-def _arm(*, arm: str, reference: bool = False) -> BlockArm:
-    """Return the block arm for one arm name, labelled and coloured from `ARM_LABELS`."""
-    label, family = ARM_LABELS[arm]
-    return BlockArm(arm=arm, label=label, family=family, reference=reference)
+def _arm(*, arm: str, reference: bool = False, label: str | None = None) -> BlockArm:
+    """Return the block arm for one arm name, labelled and coloured from `ARM_LABELS`.
+
+    `label` replaces the arm's label from `ARM_LABELS`, where a block needs to tell two ERA5 arms
+    apart.
+    """
+    default_label, family = ARM_LABELS[arm]
+    return BlockArm(arm=arm, label=label or default_label, family=family, reference=reference)
 
 
-def _arms(*, arms: tuple[str, ...], reference_arm: str) -> tuple[BlockArm, ...]:
-    """Return one block arm per name, the reference arm marked as such."""
-    return tuple(_arm(arm=arm, reference=arm == reference_arm) for arm in arms)
+def _arms(
+    *, arms: tuple[str, ...], reference_arm: str, labels: dict[str, str] | None = None
+) -> tuple[BlockArm, ...]:
+    """Return one block arm per name, the reference arm marked as such.
+
+    `labels` maps an arm name to the label this block gives it instead of its `ARM_LABELS` label.
+    """
+    labels = labels or {}
+    return tuple(
+        _arm(arm=arm, reference=arm == reference_arm, label=labels.get(arm)) for arm in arms
+    )
 
 
 def _without_reference(*, arms: tuple[BlockArm, ...], reference_arm: str) -> tuple[BlockArm, ...]:
@@ -98,6 +110,13 @@ def _planned(
     by_arm = {arm.arm: arm for arm in arms}
     return tuple(PlannedContrast(by_arm[first], by_arm[second]) for first, second in pairs)
 
+
+STATION_LABELS: Final[dict[str, str]] = {"era5_wind": "ERA5 100\u00a0m"}
+"""Labels the station block gives an arm instead of its `ARM_LABELS` label.
+
+The station block scores ERA5's 10 m wind as its reference beside ERA5's 100 m wind, so both cannot
+be labelled `ERA5`.
+"""
 
 MAIN_ARMS: Final[tuple[BlockArm, ...]] = _arms(
     arms=("era5_wind", "ukv_wind", "icon_d2_wind", "icon_eu_wind", "icon_global_wind"),
@@ -120,6 +139,7 @@ STATION_ARMS: Final[tuple[BlockArm, ...]] = _arms(
         "ukv_padded_wind",
     ),
     reference_arm=STATION_REFERENCE_ARM,
+    labels=STATION_LABELS,
 )
 """The arms each block scores, in the order its report lists them where the report has an order.
 
@@ -244,6 +264,7 @@ ROW_SETS: Final[tuple[leaderboard.RowSet, ...]] = (
         contrast_arms=_without_reference(arms=STATION_ARMS, reference_arm=STATION_REFERENCE_ARM),
         planned_contrasts=STATION_PLANNED,
         reference_arm=STATION_REFERENCE_ARM,
+        reference_label="ERA5's 10 m wind",
         leaderboard_section="Leaderboard at the primary setting",
         intervals="table",
         planned_section=f"{STATION_PLANNED_SECTION} primary setting",

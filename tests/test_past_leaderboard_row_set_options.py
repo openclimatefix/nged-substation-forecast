@@ -6,6 +6,8 @@ heading, four printed decimals, a `farm-hours` heading, second-setting rows in a
 own), and fails on the solar parser, which reads none of those shapes.
 """
 
+import importlib.util
+import sys
 from pathlib import Path
 from typing import Any, Final
 
@@ -13,12 +15,12 @@ import polars as pl
 import pytest
 from studies.charts import (
     CONTRAST_COLUMNS_WITH_MONTHS,
-    report_contrasts,
     BlockArm,
     PlannedContrast,
     block_contrast_rows,
     block_leaderboard_rows,
     planned_contrast_rows,
+    report_contrasts,
 )
 from test_past_solar_leaderboard import ARMS, METRIC, SITE_HOURS, _load, _losses
 
@@ -162,6 +164,66 @@ def test_a_wind_shaped_report_is_scored_against_its_own_reference_arm(tmp_path: 
     intervals = _load().intervals_frame(results=[result])
     contrast_rows = intervals.filter(pl.col("section") == "Mean absolute error minus ERA5's")
     assert set(contrast_rows["reference"]) == {REFERENCE.arm}
+
+
+def _charts_module() -> Any:
+    """Load `past_solar_leaderboard_charts.py`, which reads the report and the intervals."""
+    module = _load()
+    script_dir = Path(module.__file__).parent
+    spec = importlib.util.spec_from_file_location(
+        "past_solar_leaderboard_charts", script_dir / "past_solar_leaderboard_charts.py"
+    )
+    assert spec is not None
+    assert spec.loader is not None
+    charts = importlib.util.module_from_spec(spec)
+    sys.modules[spec.name] = charts
+    spec.loader.exec_module(charts)
+    return charts
+
+
+def test_a_blocks_contrast_heading_names_its_own_reference_arm(tmp_path: Path) -> None:
+    # Catches a station-style block whose contrasts against ERA5's 10 m wind are headed "minus
+    # ERA5's", in the report and in the `section` column of the intervals, and a default block
+    # whose heading changed.
+    module = _load()
+    default = _score(tmp_path=tmp_path)
+    named = _score(tmp_path=tmp_path, reference_label="ERA5's 10 m wind")
+
+    default_text = module.render_report(results=[default])
+    named_text = module.render_report(results=[named])
+
+    assert "#### Mean absolute error minus ERA5's\n" in default_text
+    assert "#### Mean absolute error minus ERA5's 10 m wind\n" in named_text
+    assert "#### Mean absolute error minus ERA5's\n" not in named_text
+    contrast_sections = {
+        section
+        for section in module.intervals_frame(results=[named])["section"]
+        if section.startswith("Mean absolute error minus")
+    }
+    assert contrast_sections == {"Mean absolute error minus ERA5's 10 m wind"}
+    default_sections = set(module.intervals_frame(results=[default])["section"])
+    assert module.CONTRAST_SECTION in default_sections
+    assert module.CONTRAST_SECTION == "Mean absolute error minus ERA5's"
+
+
+def test_the_charts_read_a_blocks_contrasts_under_its_own_heading(tmp_path: Path) -> None:
+    # Catches the chart script looking for the contrasts under the fixed "minus ERA5's" heading, so
+    # a block with its own reference heading is found empty or stops with a KeyError.
+    module = _load()
+    charts = _charts_module()
+    result = _score(tmp_path=tmp_path, reference_label="ERA5's 10 m wind")
+    report = charts.read_report(report_text=module.render_report(results=[result]))
+    printed = report["Test farms"]
+    intervals = module.intervals_frame(results=[result])
+
+    assert "Mean absolute error minus ERA5's 10 m wind" in printed.tables
+    drawn = charts.contrast_rows(
+        frame=intervals,
+        row_set=result.row_set,
+        order=[],
+        printed=printed.tables["Mean absolute error minus ERA5's 10 m wind"],
+    )
+    assert set(drawn["arm"]) == {ERA5.arm, ENS.arm}
 
 
 def test_a_farm_hours_heading_is_read() -> None:

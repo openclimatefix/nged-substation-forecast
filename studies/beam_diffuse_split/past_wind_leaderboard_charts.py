@@ -33,7 +33,7 @@ from typing import Final, NamedTuple
 import altair as alt
 import polars as pl
 from figure_numbers import WIND_FIGURE_NUMBERS
-from past_solar_leaderboard import ABSOLUTE_SECTION, CONTRAST_SECTION, PLANNED_CONTRAST_SECTION
+from past_solar_leaderboard import ABSOLUTE_SECTION, PLANNED_CONTRAST_SECTION, contrast_section
 from past_solar_leaderboard_charts import (
     ASSETS_DIR,
     absolute_rows,
@@ -192,7 +192,7 @@ def build_blocks(
             frame=frame,
             row_set=row_set,
             order=absolute["arm"].to_list(),
-            printed=printed.tables[CONTRAST_SECTION],
+            printed=printed.tables[contrast_section(reference_label=row_set.reference_label)],
         )
         planned = planned_rows(
             frame=frame, row_set=row_set, printed=printed.tables[PLANNED_CONTRAST_SECTION]

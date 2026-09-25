@@ -92,8 +92,25 @@ EXPLORATORY_CONTRAST_SECTION: Final[str] = "Exploratory contrasts, first product
 ABSOLUTE_SECTION: Final[str] = "Mean absolute error"
 """The `section` of an arm's own error in `intervals.parquet`."""
 
-CONTRAST_SECTION: Final[str] = "Mean absolute error minus ERA5's"
-"""The `section` of a contrast against ERA5 in `intervals.parquet`."""
+DEFAULT_REFERENCE_LABEL: Final[str] = "ERA5's"
+"""What a block's contrast heading calls its reference arm, unless the row set says otherwise."""
+
+
+def contrast_section(*, reference_label: str = DEFAULT_REFERENCE_LABEL) -> str:
+    """Return the heading, and the `section` in `intervals.parquet`, of a block's contrasts.
+
+    Args:
+        reference_label: The reference arm as the heading names it, with its possessive, such as
+            `ERA5's` or `ERA5's 10 m wind`.
+
+    Returns:
+        `Mean absolute error minus` and the label.
+    """
+    return f"Mean absolute error minus {reference_label}"
+
+
+CONTRAST_SECTION: Final[str] = contrast_section()
+"""The `section` of a contrast against ERA5 in `intervals.parquet`, for a row set on the default."""
 
 SECOND_SETTING_SCOPE: Final[str] = "sensitivity"
 """The scope a report gives a contrast at the second hyperparameter setting."""
@@ -165,6 +182,8 @@ class RowSet(NamedTuple):
         exploratory_contrasts: Contrasts between two products that the report does not print,
             each the first product's error minus the second's, scored at the first setting only.
         reference_arm: The arm every contrast in `contrast_arms` is taken against.
+        reference_label: The reference arm as the block's contrast heading names it, with its
+            possessive: `ERA5's`, or `ERA5's 10 m wind` where the reference is ERA5's 10 m wind.
         printed_decimals: The decimal places the report prints its numbers at.
         leaderboard_section: The start of the heading above the report's table of errors, or
             `None` where that table is the first table in the report.
@@ -194,6 +213,7 @@ class RowSet(NamedTuple):
     planned_contrasts: tuple[PlannedContrast, ...]
     exploratory_contrasts: tuple[PlannedContrast, ...] = ()
     reference_arm: str = REFERENCE_ARM
+    reference_label: str = DEFAULT_REFERENCE_LABEL
     printed_decimals: int = PRINT_DECIMALS
     leaderboard_section: str | None = None
     intervals: IntervalsType = "solar"
@@ -1271,7 +1291,7 @@ def render_report(
             )
         lines += [
             "",
-            "#### Mean absolute error minus ERA5's",
+            f"#### {contrast_section(reference_label=result.row_set.reference_label)}",
             "",
             CONTRAST_HEADER,
             "|---|---|---|---|---|---|",
@@ -1316,9 +1336,10 @@ def intervals_frame(*, results: list[RowSetResult]) -> pl.DataFrame:
 
     Returns:
         One row per (row set, section, setting, arm). `section` is `Mean absolute error`,
-        `Mean absolute error minus ERA5's`, `PLANNED_CONTRAST_SECTION` (a planned contrast, with its
-        second arm in `reference`), or `EXPLORATORY_CONTRAST_SECTION` (the same for an exploratory
-        contrast, at the `pooled` setting only); `setting` is `pooled`, or `sensitivity` for a
+        `contrast_section`'s heading for the row set's reference arm,
+        `PLANNED_CONTRAST_SECTION` (a planned contrast, with its second arm in `reference`), or
+        `EXPLORATORY_CONTRAST_SECTION` (the same for an exploratory contrast, at the `pooled`
+        setting only); `setting` is `pooled`, or `sensitivity` for a
         contrast's second setting; `treatment` is the arm and `reference` is null for an absolute
         row. `value`, `lower` and `upper` are in percentage points of capacity at full precision,
         `level` is 95, and `n_rows` is the row set's site-hours. `row_set`, `label`, `planning`
@@ -1333,6 +1354,7 @@ def intervals_frame(*, results: list[RowSetResult]) -> pl.DataFrame:
             "n_rows": pl.lit(result.site_hours),
         }
         contrasts = result.contrasts
+        section = contrast_section(reference_label=result.row_set.reference_label)
         frames += [
             result.absolute.select(
                 **common,
@@ -1349,7 +1371,7 @@ def intervals_frame(*, results: list[RowSetResult]) -> pl.DataFrame:
             ),
             contrasts.select(
                 **common,
-                section=pl.lit(CONTRAST_SECTION),
+                section=pl.lit(section),
                 setting=pl.lit("pooled"),
                 treatment="arm",
                 reference=pl.lit(result.row_set.reference_arm),
@@ -1362,7 +1384,7 @@ def intervals_frame(*, results: list[RowSetResult]) -> pl.DataFrame:
             ),
             contrasts.filter(pl.col("second_difference").is_not_null()).select(
                 **common,
-                section=pl.lit(CONTRAST_SECTION),
+                section=pl.lit(section),
                 setting=pl.lit(SECOND_SETTING_SCOPE),
                 treatment="arm",
                 reference=pl.lit(result.row_set.reference_arm),

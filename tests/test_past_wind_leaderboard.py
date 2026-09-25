@@ -286,3 +286,19 @@ def test_each_blocks_second_setting_scope_is_the_scope_its_report_prints(tmp_pat
             for contrast in row_set.planned_contrasts
         }
         assert declared <= pairs, row_set.key
+
+
+def test_the_station_block_tells_its_two_era5_arms_apart() -> None:
+    # Catches two arms both labelled "ERA5" in the station block, and a station contrast heading
+    # that says "minus ERA5's" when the reference is ERA5's 10 m wind.
+    module = _load()
+    by_key = {row_set.key: row_set for row_set in module.ROW_SETS}
+
+    station_labels = {arm.arm: arm.label for arm in by_key["station"].leaderboard_arms}
+    assert station_labels["era5_10m_wind"] == "ERA5 10\u00a0m"
+    assert station_labels["era5_wind"] == "ERA5 100\u00a0m"
+    assert by_key["station"].reference_label == "ERA5's 10 m wind"
+    for key in ("main", "icon_dream_eu", "ecmwf"):
+        labels = {arm.arm: arm.label for arm in by_key[key].leaderboard_arms}
+        assert labels["era5_wind"] == "ERA5", key
+        assert by_key[key].reference_label == "ERA5's", key

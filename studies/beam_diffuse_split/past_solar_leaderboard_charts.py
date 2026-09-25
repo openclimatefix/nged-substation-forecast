@@ -31,11 +31,11 @@ import polars as pl
 from figure_numbers import FIGURE_NUMBERS
 from past_solar_leaderboard import (
     ABSOLUTE_SECTION,
-    CONTRAST_SECTION,
     PLANNED_CONTRAST_SECTION,
     POST_HOC_ARMS,
     ROW_SETS,
     RowSet,
+    contrast_section,
 )
 from sources import SOLAR_LEADERBOARD_DIR
 from studies.charts import (
@@ -304,6 +304,7 @@ def contrast_rows(
     Raises:
         ValueError: If an arm has no row, or a number differs from the report's.
     """
+    section = contrast_section(reference_label=row_set.reference_label)
     rank = {
         arm.arm: order.index(arm.arm) if arm.arm in order else len(order) + index
         for index, arm in enumerate(row_set.contrast_arms)
@@ -313,7 +314,7 @@ def contrast_rows(
     for arm in ordered:
         row = _one(
             frame=frame,
-            section=CONTRAST_SECTION,
+            section=section,
             setting="pooled",
             treatment=arm.arm,
             reference=row_set.reference_arm,
@@ -322,7 +323,7 @@ def contrast_rows(
         _check_row(name=name, row=row, printed=printed[name])
         second = _second(
             frame=frame,
-            section=CONTRAST_SECTION,
+            section=section,
             arm=arm.arm,
             reference=row_set.reference_arm,
         )
@@ -432,7 +433,7 @@ def build_blocks(
             frame=frame,
             row_set=row_set,
             order=absolute["arm"].to_list(),
-            printed=printed.tables[CONTRAST_SECTION],
+            printed=printed.tables[contrast_section(reference_label=row_set.reference_label)],
         )
         planned = planned_rows(
             frame=frame, row_set=row_set, printed=printed.tables[PLANNED_CONTRAST_SECTION]
