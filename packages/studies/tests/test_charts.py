@@ -1450,3 +1450,35 @@ def test_assert_matches_printed_compares_at_the_decimals_it_is_given() -> None:
     assert_matches_printed(name="a", recomputed=6.66714, printed=6.6671, decimals=4)
     with pytest.raises(ValueError, match=r"bootstrapped 6\.667 but"):
         assert_matches_printed(name="a", recomputed=6.66714, printed=6.6671)
+
+
+def test_a_block_names_its_row_unit_and_its_reference_arm_where_the_row_set_says_so() -> None:
+    # Catches wind blocks titled "site-hours" and drawn against "ERA5" when they are farm-hours
+    # contrasted with ERA5's 10 m wind.
+    _, blocks = _blocks()
+    wind = [
+        block._replace(hours_unit="farm-hours", reference_name="ERA5's 10 m wind")
+        for block in blocks
+    ]
+
+    spec = stacked_contrasts(
+        blocks=wind, number=2, title="A title", subtitle=["A subtitle."], reference_note="A note."
+    ).to_dict()
+
+    text = str(spec)
+    assert "Main rows: Jan 2025, 8 farm-hours" in text
+    assert "same as ERA5's 10 m wind" in text
+    assert _x_axis_titles(spec)[-1].startswith("Mean absolute error minus ERA5's 10 m wind (")
+    assert "A note." in text
+    assert "The lighter, hollow row is CAMS" not in text
+
+
+def test_stacked_leaderboard_takes_its_own_reference_note() -> None:
+    blocks, _ = _blocks()
+
+    spec = stacked_leaderboard(
+        blocks=blocks, number=1, title="A title", subtitle=["A."], reference_note="ERA5 repeats."
+    ).to_dict()
+
+    assert "ERA5 repeats." in str(spec)
+    assert "CAMS and ERA5, repeated" not in str(spec)

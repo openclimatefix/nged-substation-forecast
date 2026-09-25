@@ -1267,6 +1267,13 @@ class BlockArm(NamedTuple):
     planned: bool = False
 
 
+def _contrast_x_title(*, reference_name: str) -> str:
+    """Return a contrast panel's x axis title, naming the arm the contrasts are against."""
+    if reference_name == "ERA5":
+        return CONTRAST_X_TITLE
+    return f"Mean absolute error minus {reference_name} (points of capacity)"
+
+
 class RowSetBlock(NamedTuple):
     """One block of a stacked figure: the arms scored on one row set.
 
@@ -1276,6 +1283,9 @@ class RowSetBlock(NamedTuple):
     `second_difference`, the same contrast at the second hyperparameter setting, null where none
     was computed. `planned_rows` is `planned_contrast_rows`'s output for the row set's planned
     contrasts, which a contrast block draws in a lower panel; `None` draws no lower panel.
+    `hours_unit` is what a row is called in the title, and `reference_name` is what a contrast
+    block's zero rule and axis call the arm its contrasts are against, such as `ERA5` or
+    `ERA5's 10 m wind`.
     """
 
     label: str
@@ -1283,11 +1293,13 @@ class RowSetBlock(NamedTuple):
     site_hours: int
     rows: pl.DataFrame
     planned_rows: pl.DataFrame | None = None
+    hours_unit: str = "site-hours"
+    reference_name: str = "ERA5"
 
     @property
     def title(self) -> str:
-        """The block's panel title, naming its row set, its dates, and its site-hours."""
-        return f"{self.label}: {self.dates}, {self.site_hours:,} site-hours"
+        """The block's panel title, naming its row set, its dates, and its row count."""
+        return f"{self.label}: {self.dates}, {self.site_hours:,} {self.hours_unit}"
 
 
 def assert_matches_printed(
@@ -1631,6 +1643,7 @@ def stacked_leaderboard(
     number: int | str,
     title: str,
     subtitle: Sequence[str],
+    reference_note: str = REFERENCE_ROW_NOTE,
 ) -> alt.VConcatChart:
     """Stack one leaderboard panel per row set, on one x range, under one caption.
 
@@ -1643,7 +1656,8 @@ def stacked_leaderboard(
             output.
         number: The figure's number on its page.
         title: The finding the figure shows.
-        subtitle: Short lines for the caption; `REFERENCE_ROW_NOTE` is added.
+        subtitle: Short lines for the caption; `reference_note` is added.
+        reference_note: The caption line saying what the hollow reference rows are.
 
     Returns:
         The figure.
@@ -1665,7 +1679,7 @@ def stacked_leaderboard(
         panels=panels,
         number=number,
         title=title,
-        subtitle=[*subtitle, REFERENCE_ROW_NOTE],
+        subtitle=[*subtitle, reference_note],
         figure_planning=None,
     )
 
@@ -1688,6 +1702,7 @@ def stacked_contrasts(
     number: int | str,
     title: str,
     subtitle: Sequence[str],
+    reference_note: str = CONTRAST_REFERENCE_ROW_NOTE,
 ) -> alt.VConcatChart:
     """Stack, per row set, a panel of contrasts against ERA5 and a panel of planned contrasts.
 
@@ -1706,8 +1721,9 @@ def stacked_contrasts(
             output, and optionally `planned_contrast_rows`'s.
         number: The figure's number on its page.
         title: The finding the figure shows.
-        subtitle: Short lines for the caption; `CONTRAST_REFERENCE_ROW_NOTE` is added, and
+        subtitle: Short lines for the caption; `reference_note` is added, and
             `SECOND_SETTING_NOTE` where any row has a second setting.
+        reference_note: The caption line saying what the hollow reference row is.
 
     Returns:
         The figure.
@@ -1730,12 +1746,12 @@ def stacked_contrasts(
                 ),
                 x_domain=domain,
                 x_title=(
-                    CONTRAST_X_TITLE
+                    _contrast_x_title(reference_name=block.reference_name)
                     if block.planned_rows is not None or index == len(blocks) - 1
                     else ""
                 ),
-                zero_label="same as ERA5",
-                better_label="better than ERA5",
+                zero_label=f"same as {block.reference_name}",
+                better_label=f"better than {block.reference_name}",
                 conditions=conditions,
                 panel_title=block.title,
                 family_key=index == 0,
@@ -1763,7 +1779,7 @@ def stacked_contrasts(
         "second_difference" in frame.columns and frame["second_difference"].is_not_null().any()
         for frame in frames
     )
-    notes = [CONTRAST_REFERENCE_ROW_NOTE, *([SECOND_SETTING_NOTE] if has_second_setting else [])]
+    notes = [reference_note, *([SECOND_SETTING_NOTE] if has_second_setting else [])]
     return figure(
         panels=panels,
         number=number,

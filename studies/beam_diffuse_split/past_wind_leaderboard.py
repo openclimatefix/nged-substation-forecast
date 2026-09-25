@@ -66,12 +66,13 @@ class BlockSetting(NamedTuple):
     """What a block of the past-wind leaderboard states about its row set, beyond its arms.
 
     Attributes:
-        hub_height: The wind height the block's arms carry, as a block label states it.
-        reference_note: What the block's reference row is, as a caption states it.
+        hub_height: The wind heights the block's arms carry, short enough for a panel title.
+        reference_name: What the block's contrasts are against, as a zero rule and an axis title
+            name it.
     """
 
     hub_height: str
-    reference_note: str
+    reference_name: str
 
 
 def _arm(*, arm: str, reference: bool = False) -> BlockArm:
@@ -254,24 +255,16 @@ ROW_SETS: Final[tuple[leaderboard.RowSet, ...]] = (
 """The four headline row sets, in the order the leaderboard stacks them."""
 
 BLOCK_SETTINGS: Final[dict[str, BlockSetting]] = {
-    "main": BlockSetting(
-        hub_height="100 m wind for ERA5 and UKV, 80 m for ICON",
-        reference_note="ERA5 at 100 m",
-    ),
+    "main": BlockSetting(hub_height="100 m; ICON 80 m", reference_name="ERA5"),
     "icon_dream_eu": BlockSetting(
-        hub_height="100 m wind for ERA5 and UKV, 80 m for ICON, 96 m for ICON-DREAM-EU",
-        reference_note="ERA5 at 100 m",
+        hub_height="100 m; ICON 80 m; ICON-DREAM-EU 96 m", reference_name="ERA5"
     ),
-    "ecmwf": BlockSetting(
-        hub_height="100 m wind for ERA5, UKV, HRES, and ENS, 80 m for ICON",
-        reference_note="ERA5 at 100 m",
-    ),
+    "ecmwf": BlockSetting(hub_height="100 m; ICON 80 m", reference_name="ERA5"),
     "station": BlockSetting(
-        hub_height="10 m wind for the station and ERA5's 10 m arm, 100 m for the other arms",
-        reference_note="ERA5's 10 m wind",
+        hub_height="10 m station and ERA5 arm; 100 m others", reference_name="ERA5's 10\u00a0m wind"
     ),
 }
-"""What each block's label and caption state beyond its dates and row count, by row set `key`."""
+"""What each block's label and axis state beyond its dates and row count, by row set `key`."""
 
 REPORT_TITLE: Final[str] = "Past-wind leaderboard and contrasts against ERA5"
 """The heading of the past-wind leaderboard's `report.md`."""

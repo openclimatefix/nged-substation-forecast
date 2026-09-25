@@ -346,7 +346,7 @@ def test_the_shared_run_writes_the_title_it_is_given(tmp_path: Path) -> None:
 def test_the_arm_suffix_is_added_to_the_names_of_the_printed_intervals(tmp_path: Path) -> None:
     # Catches interval names read without the suffix, so a product's interval is never checked:
     # the wind reports print `era5`, and the arm is `era5_wind`.
-    row_set = {"arm_suffix": "_global", "leaderboard_arms": ARMS[:2]}
+    row_set: dict[str, Any] = {"arm_suffix": "_global", "leaderboard_arms": ARMS[:2]}
     result = _score(tmp_path=tmp_path, suffix="_global", **row_set)
 
     assert result.site_hours == SITE_HOURS

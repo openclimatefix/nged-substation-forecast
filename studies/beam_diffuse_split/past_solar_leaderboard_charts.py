@@ -34,7 +34,6 @@ from past_solar_leaderboard import (
     CONTRAST_SECTION,
     PLANNED_CONTRAST_SECTION,
     POST_HOC_ARMS,
-    REFERENCE_ARM,
     ROW_SETS,
     RowSet,
 )
@@ -98,7 +97,7 @@ CAMS_EXPLORATORY: Final[str] = (
 )
 
 _BLOCK_HEADING: Final[re.Pattern[str]] = re.compile(
-    r"^### (.+?): (\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2}), ([\d,]+) site-hours$"
+    r"^### (.+?): (\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2}), ([\d,]+) (?:site|farm)-hours$"
 )
 _SECOND: Final[re.Pattern[str]] = re.compile(r"^(\S+) \[(\S+), (\S+)\]$")
 _INTERVAL: Final[re.Pattern[str]] = re.compile(r"^\[(\S+), (\S+)\]$")
@@ -172,7 +171,7 @@ def read_report(*, report_text: str) -> dict[str, PrintedBlock]:
     return blocks
 
 
-def _month_year(*, iso_day: str) -> str:
+def month_year(*, iso_day: str) -> str:
     """Return `2022-12-01` as `December 2022`."""
     return datetime.date.fromisoformat(iso_day).strftime("%B %Y")
 
@@ -289,7 +288,7 @@ def contrast_rows(
     order: list[str],
     printed: dict[str, PrintedRow],
 ) -> pl.DataFrame:
-    """Return the row set's contrasts against ERA5, each checked against the report.
+    """Return the row set's contrasts against its reference arm, each checked against the report.
 
     Args:
         frame: The row set's rows of `intervals.parquet`.
@@ -317,7 +316,7 @@ def contrast_rows(
             section=CONTRAST_SECTION,
             setting="pooled",
             treatment=arm.arm,
-            reference=REFERENCE_ARM,
+            reference=row_set.reference_arm,
         )
         name = arm.label
         _check_row(name=name, row=row, printed=printed[name])
@@ -325,7 +324,7 @@ def contrast_rows(
             frame=frame,
             section=CONTRAST_SECTION,
             arm=arm.arm,
-            reference=REFERENCE_ARM,
+            reference=row_set.reference_arm,
         )
         _check_second(name=name, second=second, printed=printed[name])
         records.append(
@@ -420,9 +419,7 @@ def build_blocks(
         if set(frame["n_rows"].to_list()) != {site_hours}:
             msg = f"{row_set.label}: intervals.parquet disagrees with {site_hours:,} site-hours"
             raise ValueError(msg)
-        dates = (
-            f"{_month_year(iso_day=printed.first_day)} to {_month_year(iso_day=printed.last_day)}"
-        )
+        dates = f"{month_year(iso_day=printed.first_day)} to {month_year(iso_day=printed.last_day)}"
         absolute = absolute_rows(
             frame=frame, row_set=row_set, printed=printed.tables[ABSOLUTE_SECTION]
         )
