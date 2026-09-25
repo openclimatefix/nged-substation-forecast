@@ -9,8 +9,8 @@ entry point `dynamical_data.ecmwf_ens.download` uses for production ECMWF ENS, t
 arguments to that one `.sel()` call in this process.
 
 **No lead-time or ensemble-member subsetting is applied.** The output is every `init_time`, every
-ensemble member (GEFS only), every lead time, and the eight variables in `VARIABLES`, for the grid
-cells inside the box.
+ensemble member (GEFS and ECMWF AIFS ENS only), every lead time, and the eight variables in
+`VARIABLES`, for the grid cells inside the box.
 
 **The script fetches and checkpoints one calendar month of `init_time` at a time.** Each month is
 written to `_month_cache/` as soon as it lands, and a re-run skips every month already cached as
@@ -32,7 +32,9 @@ whole.
 metadata, never to stdout,** because they reveal the size of the trial-area box.
 
 Run it with `uv run python studies/weather_downloads/fetch_dynamical_zarr.py --dataset
-noaa-gfs-forecast` or `--dataset noaa-gefs-forecast-35-day`. Passing `--start-date` and `--end-date`
+noaa-gfs-forecast`, `--dataset noaa-gefs-forecast-35-day`, `--dataset ecmwf-aifs-single-forecast`,
+or `--dataset ecmwf-aifs-ens-forecast` (the last two land in `ECMWF-AIFS/` and `ECMWF-AIFS-ENS/`).
+`--workers` sets how many months are fetched concurrently. Passing `--start-date` and `--end-date`
 (both `YYYY-MM-DD`, inclusive) fetches only that window, into its own directory, for a trial run.
 Then check the output with `validate_dynamical_zarr.py`.
 """
@@ -40,6 +42,8 @@ Then check the output with `validate_dynamical_zarr.py`.
 import argparse
 import hashlib
 import sys
+import time
+from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from typing import Final
 
@@ -68,13 +72,22 @@ for the physical checks every arm in `studies/beam_diffuse_split` runs."""
 DATASETS: Final[dict[str, str]] = {
     "noaa-gfs-forecast": "GFS",
     "noaa-gefs-forecast-35-day": "GEFS",
+    "ecmwf-aifs-single-forecast": "ECMWF-AIFS",
+    "ecmwf-aifs-ens-forecast": "ECMWF-AIFS-ENS",
 }
+
+DEFAULT_WORKERS: Final[int] = 3
+"""Months fetched concurrently. Each month is a separate set of Zarr chunk requests, so threads
+overlap the network waits."""
 
 KEEP_BITS: Final[int] = 13
 """Significand bits kept in every value column, as in production NWP storage."""
 
 PUBLICATION_LAG_DAYS: Final[int] = 2
 """A month is complete once its last day is this many days older than the newest `init_time`."""
+
+MAX_ATTEMPTS: Final[int] = 5
+BACKOFF_SECONDS: Final[float] = 5.0
 
 _BYTES_PER_MB: Final[float] = 1e6
 
@@ -94,6 +107,31 @@ def _cropped_dataset(*, dataset_id: str) -> xr.Dataset:
     return dataset.sel(
         latitude=slice(box.lat_max, box.lat_min), longitude=slice(box.lon_min, box.lon_max)
     )
+
+
+def _load_with_retries(*, dataset: xr.Dataset) -> xr.Dataset:
+    """Load a lazy dataset, retrying with exponential backoff on any failure.
+
+    A transient network error partway through a month would otherwise abandon the whole run.
+
+
+    Args:
+        dataset: The lazy, cropped slice to load.
+
+    Returns:
+        The same slice, in memory.
+
+    Raises:
+        Exception: The last error, after `MAX_ATTEMPTS` failed attempts.
+    """
+    for attempt in range(1, MAX_ATTEMPTS + 1):
+        try:
+            return dataset.load()
+        except Exception:
+            if attempt == MAX_ATTEMPTS:
+                raise
+            time.sleep(BACKOFF_SECONDS * 2**attempt)
+    raise AssertionError  # unreachable: the loop returns or raises
 
 
 def _axis_column(*, values: np.ndarray, axis: int, shape: tuple[int, ...]) -> np.ndarray:
@@ -191,6 +229,75 @@ def _is_complete(*, month: str, newest_init_time: np.datetime64) -> bool:
     return bool(last_day < newest_day - np.timedelta64(PUBLICATION_LAG_DAYS, "D"))
 
 
+LEAD_STEP_NOTES: Final[dict[str, str]] = {
+    "GFS": "GFS lead times are hourly to 120 h, then 3-hourly to 384 h.",
+    "GEFS": "GEFS lead times are 3-hourly to 240 h, then 6-hourly to 840 h.",
+    "ECMWF-AIFS": "AIFS Single lead times are 6-hourly from 0 h to 360 h.",
+    "ECMWF-AIFS-ENS": "AIFS ENS lead times are 6-hourly from 0 h to 360 h.",
+}
+
+AVERAGING_NOTES: Final[dict[str, str]] = {
+    "GFS": (
+        "GFS radiation is the average since the last 6-hourly reset (00, 06, 12, 18 UTC), so a "
+        "lead time labels the END of an averaging window of 1 to 6 hours."
+    ),
+    "GEFS": (
+        "GEFS radiation is the average over the preceding 6-hour period (00, 06, 12, 18 UTC "
+        "valid times) or 3-hour period (03, 09, 15, 21 UTC), and a lead time labels the END of "
+        "that window."
+    ),
+    "ECMWF-AIFS": (
+        "AIFS Single radiation is the average flux since the previous forecast step, so a lead "
+        "time labels the END of a 6-hour averaging window (00, 06, 12, 18 UTC valid times)."
+    ),
+    "ECMWF-AIFS-ENS": (
+        "AIFS ENS radiation is the average flux since the previous forecast step, so a lead time "
+        "labels the END of a 6-hour averaging window (00, 06, 12, 18 UTC valid times)."
+    ),
+}
+
+STEP_CHANGES: Final[frozenset[str]] = frozenset({"GFS", "GEFS"})
+"""Labels whose lead-time axis changes step width part-way. The AIFS axes do not."""
+
+EXTERNAL_DOCS: Final[dict[str, dict[str, str]]] = {
+    "ECMWF-AIFS": {
+        "ECMWF AIFS Single v1.1 paper": "https://gmd.copernicus.org/articles/19/4703/2026/",
+        "ECMWF IFS Cycle 50r1 and AIFS v2 announcement": (
+            "https://forum.ecmwf.int/t/confirmation-ifs-cycle-50r1-and-aifs-v2-joint-implementation-on-12-may-2026/14937"
+        ),
+    },
+    "ECMWF-AIFS-ENS": {
+        "Implementation of AIFS ENS v2": (
+            "https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+ENS+v2"
+        ),
+    },
+}
+
+_VERSION_READ_NOT_VERIFIED: Final[str] = (
+    "The dates are read from ECMWF release pages, not verified in the data. A level shift in "
+    "these fields at a version change was not tested."
+)
+
+VERSION_NOTES: Final[dict[str, list[str]]] = {
+    "ECMWF-AIFS": [
+        "Model versions inside this history: AIFS Single v1 became operational with the "
+        "2025-02-25 06 UTC run, v1.1 on 2025-08-27, and v2 on 2026-05-12 (the same day as IFS "
+        "Cycle 50r1). Runs before 2025-02-25 06 UTC pre-date the operational v1; which model "
+        "version produced them was not checked. " + _VERSION_READ_NOT_VERIFIED,
+        (
+            "The store starts on 2024-04-01, but `downward_short_wave_radiation_flux_surface`, "
+            "`downward_long_wave_radiation_flux_surface`, `wind_u_100m` and `wind_v_100m` are "
+            "`NaN` in every run before the 2025-02-24 06 UTC run: the store holds no values "
+            "for those fields before then. Those rows are kept as `NaN`; "
+            "`validate_dynamical_zarr.py` treats exactly those `NaN`s as expected."
+        ),
+    ],
+    "ECMWF-AIFS-ENS": [
+        "Model versions inside this history: AIFS ENS v1 became operational on 2025-07-01 (the "
+        "store starts on 2025-07-02) and v2 on 2026-05-12. " + _VERSION_READ_NOT_VERIFIED,
+    ],
+}
+
 SOURCE_GAP_NOTES: Final[dict[str, str]] = {
     "GEFS": (
         "`validate_dynamical_zarr.py` on 2026-09-25 found `NaN` in nine months of the full "
@@ -203,6 +310,8 @@ SOURCE_GAP_NOTES: Final[dict[str, str]] = {
         "gap was confirmed in the Dynamical.org store itself, so it is not a crop artefact. "
         "Missing values were kept as `NaN`, not masked or dropped."
     ),
+    "ECMWF-AIFS": "Missing values were kept as `NaN`, not masked or dropped.",
+    "ECMWF-AIFS-ENS": "Missing values were kept as `NaN`, not masked or dropped.",
     "GFS": (
         "`validate_dynamical_zarr.py` on 2026-09-25 found `NaN` in one month of the full "
         "2020-10 to 2026-09 run: 2022-11, on four init_times. The 2022-11-29 12:00 UTC run is "
@@ -244,19 +353,8 @@ def _write_documentation(
     first_init = str(init_times.min())
     last_init = str(init_times.max())
     lineage_filename = "lineage.json"
-    lead_step_note = (
-        "GFS lead times are hourly to 120 h, then 3-hourly to 384 h."
-        if label == "GFS"
-        else "GEFS lead times are 3-hourly to 240 h, then 6-hourly to 840 h."
-    )
-    averaging_note = (
-        "GFS radiation is the average since the last 6-hourly reset (00, 06, 12, 18 UTC), so a "
-        "lead time labels the END of an averaging window of 1 to 6 hours."
-        if label == "GFS"
-        else "GEFS radiation is the average over the preceding 6-hour period (00, 06, 12, 18 UTC "
-        "valid times) or 3-hour period (03, 09, 15, 21 UTC), and a lead time labels the END of "
-        "that window."
-    )
+    lead_step_note = LEAD_STEP_NOTES[label]
+    averaging_note = AVERAGING_NOTES[label]
     init_scope = (
         f"every init_time from {first_init} to {last_init}"
         if is_window
@@ -292,7 +390,9 @@ def _write_documentation(
         lineage_filenames=[lineage_filename],
         columns={
             "init_time": "Timezone-naive (implicitly UTC) start time of the model run.",
-            "ensemble_member": "Ensemble member number (GEFS only; 0 is the control run).",
+            "ensemble_member": (
+                "Ensemble member number (GEFS and ECMWF AIFS ENS only; 0 is the control run)."
+            ),
             "lead_time": "Duration since init_time. The valid time is init_time + lead_time.",
             "lat_index": "Rank of the cell's latitude in the crop, ascending. Not a coordinate.",
             "lon_index": "Rank of the cell's longitude in the crop, ascending. Not a coordinate.",
@@ -313,7 +413,12 @@ def _write_documentation(
         ),
         gotchas=[
             averaging_note,
-            f"{lead_step_note} The step width changes inside the lead-time axis.",
+            lead_step_note
+            + (
+                " The step width changes inside the lead-time axis."
+                if label in STEP_CHANGES
+                else ""
+            ),
             f"Value columns are rounded to {KEEP_BITS} significand bits (relative error 1.2e-4).",
             (
                 "`_grid_cells.parquet` maps `lat_index` and `lon_index` to coordinates. It is "
@@ -326,12 +431,11 @@ def _write_documentation(
                 "the final month may be missing."
             ),
             SOURCE_GAP_NOTES[label],
+            *VERSION_NOTES.get(label, []),
         ],
         external_docs={
-            "Dynamical.org GFS forecast": "https://dynamical.org/catalog/noaa-gfs-forecast/",
-            "Dynamical.org GEFS 35-day forecast": (
-                "https://dynamical.org/catalog/noaa-gefs-forecast-35-day/"
-            ),
+            f"Dynamical.org {dataset_id}": f"https://dynamical.org/catalog/{dataset_id}/",
+            **EXTERNAL_DOCS.get(label, {}),
         },
     )
 
@@ -342,6 +446,7 @@ def main() -> int:
     parser.add_argument("--dataset", choices=tuple(DATASETS), required=True)
     parser.add_argument("--start-date", help="First init date to fetch, YYYY-MM-DD (trial run).")
     parser.add_argument("--end-date", help="Last init date to fetch, YYYY-MM-DD (trial run).")
+    parser.add_argument("--workers", type=int, default=DEFAULT_WORKERS, help="Concurrent months.")
     arguments = parser.parse_args()
     label = DATASETS[arguments.dataset]
     is_window = arguments.start_date is not None or arguments.end_date is not None
@@ -362,25 +467,30 @@ def main() -> int:
     _write_grid_cells(dataset=cropped, path=output_dir / "_grid_cells.parquet")
     fingerprint = _cell_fingerprint(dataset=cropped)
 
-    used_paths: list[Path] = []
-    for month in months:
+    def fetch_month(month: str) -> Path:
+        """Fetch, or skip if already cached, one month; return the file holding it."""
         complete_path, partial_path = _month_paths(month_cache_dir=month_cache_dir, month=month)
         complete = _is_complete(month=month, newest_init_time=newest_init_time)
         if complete and complete_path.exists():
-            print(f"{label} {month}: already cached, skipping")
-            used_paths.append(complete_path)
-            continue
+            print(f"{label} {month}: already cached, skipping", flush=True)
+            return complete_path
         # A string bound is expanded by xarray to the whole month; a `np.datetime64` bound would
         # be an exact instant and drop later init_times on the last day.
-        month_slice = cropped.sel(init_time=slice(month, month)).load()
+        month_slice = _load_with_retries(dataset=cropped.sel(init_time=slice(month, month)))
         frame = _to_long_frame(dataset=month_slice)
         target = complete_path if complete else partial_path
         temporary = target.with_suffix(".parquet.tmp")
         frame.write_parquet(temporary, compression="zstd", metadata=fingerprint)
         temporary.rename(target)
         (partial_path if complete else complete_path).unlink(missing_ok=True)
-        used_paths.append(target)
-        print(f"{label} {month}: fetched" + ("" if complete else " (partial, will be re-fetched)"))
+        print(
+            f"{label} {month}: fetched" + ("" if complete else " (partial, will be re-fetched)"),
+            flush=True,
+        )
+        return target
+
+    with ThreadPoolExecutor(max_workers=arguments.workers) as executor:
+        used_paths = list(executor.map(fetch_month, months))
 
     for path in used_paths:
         stored = pl.read_parquet_metadata(path)
