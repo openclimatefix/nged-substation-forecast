@@ -15,7 +15,14 @@ from typing import Any, Final
 
 import polars as pl
 import pytest
-from studies.charts import BlockArm, block_contrast_rows, block_leaderboard_rows
+from studies.charts import (
+    BlockArm,
+    PlannedContrast,
+    block_contrast_rows,
+    block_leaderboard_rows,
+    planned_contrast_rows,
+    report_contrasts,
+)
 from studies.page_numbers import full_precision_values
 
 REPO_ROOT: Final[Path] = Path(__file__).parent.parent
@@ -27,6 +34,8 @@ ARMS: Final[tuple[BlockArm, ...]] = (
     BlockArm("era5_global", "ERA5", "reanalysis", reference=True),
     BlockArm("ens_mean_t3", "ENS", "weather model"),
 )
+ENS_AGAINST_ERA5: Final[PlannedContrast] = PlannedContrast(ARMS[2], ARMS[1])
+CAMS_AGAINST_ENS: Final[PlannedContrast] = PlannedContrast(ARMS[0], ARMS[2])
 
 
 def _load() -> ModuleType:
@@ -179,6 +188,7 @@ def _row_set(module: ModuleType, tmp_path: Path) -> Any:
         arm_suffix="",
         leaderboard_arms=ARMS,
         contrast_arms=(ARMS[0], ARMS[2]),
+        planned_contrasts=(ENS_AGAINST_ERA5,),
     )
 
 
@@ -314,6 +324,8 @@ def test_write_outputs_writes_report_and_intervals_and_refuses_a_second_write(
         ("Mean absolute error", "pooled", len(ARMS)),
         ("Mean absolute error minus ERA5's", "pooled", 2),
         ("Mean absolute error minus ERA5's", "sensitivity", 1),
+        ("Planned contrasts, first product minus second", "pooled", 1),
+        ("Planned contrasts, first product minus second", "sensitivity", 1),
     ]
     with pytest.raises(FileExistsError):
         module.write_outputs(results=[result], output_dir=output)
@@ -331,3 +343,166 @@ def test_the_written_intervals_are_accepted_by_the_page_number_gate(tmp_path: Pa
     )
 
     assert f"{lower:+.3f}" in exact
+
+
+PLANNED_TWO: Final[tuple[PlannedContrast, ...]] = (ENS_AGAINST_ERA5, CAMS_AGAINST_ENS)
+
+
+def _planned_report(
+    *, tmp_path: Path, contrasts: tuple[PlannedContrast, ...], flip: bool = False
+) -> pl.DataFrame:
+    """Print the planned contrasts as a report would, and read them back; `flip` swaps the sign."""
+    rows = planned_contrast_rows(
+        losses=_losses(),
+        contrasts=contrasts,
+        setting="pooled",
+        site_hours=SITE_HOURS,
+        metric=METRIC,
+    )
+    lines = [
+        "#### Planned contrasts",
+        "",
+        (
+            "| Scope | Contrast | ΔMAE (pp of capacity) | 95% interval | Excludes zero? "
+            "| Folds agreeing | Rows |"
+        ),
+        "|---|---|---|---|---|---|---|",
+    ]
+    for row in rows.iter_rows(named=True):
+        difference, low, high = (
+            round(row[name], 3) for name in ("difference", "lower_95", "upper_95")
+        )
+        if flip:
+            difference, low, high = -difference, -high, -low
+        lines.append(
+            f"| all | {row['arm']} − {row['reference_arm']} | {difference:+.3f} "
+            f"| [{low:+.3f}, {high:+.3f}] | no | 2 of 2 | {SITE_HOURS} |"
+        )
+    path = tmp_path / "planned.md"
+    path.write_text("\n".join(lines) + "\n")
+    return report_contrasts(report_path=path)
+
+
+def _planned_frame(*, contrasts: tuple[PlannedContrast, ...]) -> pl.DataFrame:
+    return planned_contrast_rows(
+        losses=_losses(),
+        contrasts=contrasts,
+        setting="pooled",
+        site_hours=SITE_HOURS,
+        metric=METRIC,
+    ).with_columns(second_difference=pl.lit(None, dtype=pl.Float64))
+
+
+def test_a_planned_contrast_against_another_product_is_checked_against_its_printed_row(
+    tmp_path: Path,
+) -> None:
+    module = _load()
+    printed = _planned_report(tmp_path=tmp_path, contrasts=PLANNED_TWO)
+
+    module.check_planned_contrasts(
+        planned=_planned_frame(contrasts=PLANNED_TWO), printed=printed, site_hours=SITE_HOURS
+    )
+
+
+def test_a_planned_contrast_drawn_with_the_wrong_sign_stops_the_script(tmp_path: Path) -> None:
+    module = _load()
+    printed = _planned_report(tmp_path=tmp_path, contrasts=PLANNED_TWO, flip=True)
+
+    with pytest.raises(
+        ValueError,
+        match=r"all difference: bootstrapped -0\.200 but the report says 0\.2",
+    ):
+        module.check_planned_contrasts(
+            planned=_planned_frame(contrasts=PLANNED_TWO), printed=printed, site_hours=SITE_HOURS
+        )
+
+
+def test_a_planned_contrast_with_no_printed_row_stops_the_script(tmp_path: Path) -> None:
+    module = _load()
+    printed = _planned_report(tmp_path=tmp_path, contrasts=(ENS_AGAINST_ERA5,))
+
+    with pytest.raises(ValueError, match="planned, but the report prints no row"):
+        module.check_planned_contrasts(
+            planned=_planned_frame(contrasts=PLANNED_TWO), printed=printed, site_hours=SITE_HOURS
+        )
+
+
+def test_the_two_lists_of_planned_contrasts_must_agree_in_both_directions(
+    tmp_path: Path,
+) -> None:
+    module = _load()
+    printed = _planned_report(tmp_path=tmp_path, contrasts=PLANNED_TWO)
+
+    dropped = module.unlisted_planned_contrasts(
+        contrasts=(ENS_AGAINST_ERA5,), printed=printed, site_hours=SITE_HOURS
+    )
+    invented = module.unlisted_planned_contrasts(
+        contrasts=(*PLANNED_TWO, PlannedContrast(ARMS[1], ARMS[0])),
+        printed=printed,
+        site_hours=SITE_HOURS,
+    )
+    agreed = module.unlisted_planned_contrasts(
+        contrasts=PLANNED_TWO, printed=printed, site_hours=SITE_HOURS
+    )
+
+    assert len(dropped) == 1
+    assert "cams_global - ens_mean_t3" in dropped[0]
+    assert "the script does not list it" in dropped[0]
+    assert len(invented) == 1
+    assert "era5_global - cams_global" in invented[0]
+    assert "the report does not print it" in invented[0]
+    assert agreed == []
+
+
+def test_a_row_set_whose_report_prints_a_planned_contrast_the_script_omits_stops_the_script(
+    tmp_path: Path,
+) -> None:
+    module = _load()
+    losses = _losses()
+    report_path = tmp_path / "report.md"
+    text = _printed_report(losses=losses)
+    report_path.write_text(text)
+    row_set = _row_set(module, tmp_path)._replace(planned_contrasts=())
+
+    with pytest.raises(ValueError, match="the script does not list it"):
+        module.score_row_set(
+            row_set=row_set, losses=losses, report_text=text, report_path=report_path
+        )
+
+
+def test_score_row_set_holds_each_planned_contrast_with_its_second_setting(
+    tmp_path: Path,
+) -> None:
+    result = _score(tmp_path=tmp_path)
+
+    planned = result.planned
+    assert planned["label"].to_list() == ["ENS against ERA5"]
+    assert planned["difference"].to_list() == pytest.approx([-0.2], abs=0.05)
+    assert planned["second_difference"][0] is not None
+
+
+def test_the_written_report_and_intervals_hold_the_planned_contrasts(tmp_path: Path) -> None:
+    module = _load()
+    result = _score(tmp_path=tmp_path)
+    output = tmp_path / "solar_leaderboard"
+
+    module.write_outputs(results=[result], output_dir=output)
+
+    report = (output / "report.md").read_text()
+    assert "#### Planned contrasts, first product minus second" in report
+    assert "| ENS against ERA5 |" in report
+    intervals = pl.read_parquet(output / "intervals.parquet").filter(
+        pl.col("section") == module.PLANNED_CONTRAST_SECTION
+    )
+    assert intervals.sort("setting").select("setting", "treatment", "reference").rows() == [
+        ("pooled", "ens_mean_t3", "era5_global"),
+        ("sensitivity", "ens_mean_t3", "era5_global"),
+    ]
+
+
+def test_every_row_set_lists_the_planned_contrasts_the_study_names() -> None:
+    module = _load()
+
+    counts = {row_set.key: len(row_set.planned_contrasts) for row_set in module.ROW_SETS}
+
+    assert counts == {"main": 6, "extra": 3, "ens": 2, "station": 3}

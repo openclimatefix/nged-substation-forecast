@@ -1392,7 +1392,20 @@ def planned_contrast_rows(
                 "upper_95": interval["upper_95"] * PERCENTAGE_POINTS,
             }
         )
-    return pl.DataFrame(records)
+    return pl.DataFrame(
+        records,
+        schema={
+            "arm": pl.String,
+            "reference_arm": pl.String,
+            "label": pl.String,
+            "family": pl.String,
+            "reference": pl.Boolean,
+            "planned": pl.Boolean,
+            "difference": pl.Float64,
+            "lower_95": pl.Float64,
+            "upper_95": pl.Float64,
+        },
+    )
 
 
 def shared_domain(*, blocks: Sequence[RowSetBlock], include_zero: bool) -> tuple[float, float]:
