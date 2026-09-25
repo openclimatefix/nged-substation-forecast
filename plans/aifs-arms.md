@@ -678,14 +678,16 @@ both leads can be scored. The section adds three things to the plan above. It na
 the maintainer's hypothesis, one per lead, of whether AIFS Single has a lower error than the ENS
 control member at day 7 and at day 14. It adds blends of the ENS mean with AIFS Single, and with
 the AIFS ENS mean, at days 1, 2, 7, and 14, each with a permutation control. It states which
-contrasts are planned, which are exploratory, and why. No fit for any arm named here has run, and
+contrasts are deciding, which are exploratory, and why. No fit for any arm named here has run, and
 the section is written before one does.
 
 **The wording rule stands.** The survey page's stance is that [AIFS has not been shown to improve
 faster than the physics-based
-IFS](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-survey/#aifs-has-not-been-shown-to-improve-faster-than-the-physics-based-ifs)
+IFS](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-
+survey/#aifs-has-not-been-shown-to-improve-faster-than-the-physics-based-ifs)
 and that [each AIFS version is scored
-separately](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-survey/#score-each-aifs-version-separately).
+separately](https://openclimatefix.github.io/nged-substation-forecast/background/weather-products-
+survey/#score-each-aifs-version-separately).
 The hypotheses below are worded as "has a lower error than" and never as "improves". Every result
 sentence carries its scope: 6 solar farms, 3 wind farms, the months of the row set, and the AIFS
 versions in those months. The same anonymised labels (A to F, W1 to W3) are used everywhere, and no
@@ -693,20 +695,22 @@ output holds a generator's name, identifier, or coordinates.
 
 ### Verdict, size, and the five triggers
 
-**Verdict: worth doing, as an addition to the AIFS plan and the same pull request.** The AIFS data is
+**Verdict: worth doing, as an addition to the AIFS plan and the same pull request.** The AIFS data
+is
 on disk, the fit machinery exists in `fit_aifs.py`, and the long-lead question is the reason NGED
 would use the result. No other branch or pull request covers it.
 
 **Size: complex, by the same five triggers as above.** The answers change from the AIFS plan in one
 place.
 
-1. *What gets stored:* fires. A new write-once folder, `data/studies/nwp_forecast_comparison_aifs_blends/`,
+1. *What gets stored:* fires. A new write-once folder,
+   `data/studies/nwp_forecast_comparison_aifs_blends/`,
    and new page text.
 2. *Production serving path:* does not fire. Nothing under `src/`, `packages/ml_core/`, or
    `packages/xgboost_forecaster/` changes.
 3. *Degradation rule:* does not fire. This is R&D code, which fails fast.
 4. *More than one defensible design:* fires. The row rule at long leads, the blend's control, the
-   reference for a blend, and which contrasts are planned each admit alternatives, listed under
+   reference for a blend, and which contrasts are deciding each admit alternatives, listed under
    "Risks and open questions" below.
 5. *Callers not nameable without a search:* does not fire. No shared function changes signature.
    `check_runs` in `fit_aifs.py` has one caller, `aifs_rows`, and the build's `--aifs` mode has one
@@ -727,7 +731,8 @@ checks read-only, on 00 UTC runs only, and printed no coordinates.
 | `ECMWF-AIFS-ENS` | 451 | 2025-07-02 to 2026-09-25 | 61, 0 h to 360 h in 6-hour steps | 12 | 51 | 37,332 |
 
 - **Completeness.** Every 00 UTC run holds every lead to 360 h. Rows per lead are 6,924 (577 runs of
-  12 cells) for AIFS Single from 2025-02-26 and 276,012 (451 runs of 51 members of 12 cells) for AIFS
+  12 cells) for AIFS Single from 2025-02-26 and 276,012 (451 runs of 51 members of 12 cells) for
+  AIFS
   ENS, at each of the leads 174, 192, 342, 354, and 360 h I counted.
 - **Missing values.** From the first usable Single run (2025-02-26 00 UTC) to the last, no run has a
   `NaN` in shortwave radiation (leads 6 h and beyond), 2 m temperature, or the 10 m and 100 m wind
@@ -742,7 +747,8 @@ run that belongs to the previous era.** Hour `t` at day `N` reads the 00 UTC run
 hour's own day. The era check of the AIFS plan asks that run to lie inside the run dates of the
 hour's era (`ROW_SETS[...].era_runs`). Two months break the rule at long leads: 2025-03, whose first
 target hours need a run before AIFS Single's first usable run (2025-02-26), and 2025-09, whose first
-target hours need a run from before the v1.1 start (2025-08-28). The plan drops those rows one row at
+target hours need a run from before the v1.1 start (2025-08-28). The plan drops those rows one row
+at
 a time and keeps the month. I counted the results on the published shared rows with the plan's own
 month rule and the era windows in `fit_aifs.py`:
 
@@ -770,7 +776,8 @@ sorted by `(site, time)` as `aifs_rows` does.
 ### The served lead at each day, and which arms have it
 
 **Day `N` reads the 00 UTC run `N` days before the hour's own day, for AIFS Single, the AIFS ENS
-mean, the ENS control member, and the ENS mean alike.** That is the rule `band_steps` applies and the
+mean, the ENS control member, and the ENS mean alike.** That is the rule `band_steps` applies and
+the
 rule the extra-lead batches state for ENS. The leads follow.
 
 | Day | Solar leads (hour ending at the label) | Wind leads (instant at the label) |
@@ -786,18 +793,21 @@ throughout, so **at days 7 and 14 AIFS and ENS have the same step width without 
 coarsening the day 1 and day 2 references need**, and ENS's radiation is already a 6-hour mean. The
 lead chart therefore mixes `ens_control6_day1` and `ens_control6_day2` (coarsened) with
 `ens_control_day7` and `ens_control_day14` (native), and the page says so under the chart. The ENS
-control member's own leads at days 7 and 14 are those in the table. `verify_aifs_steps.py` asserts
-the equality for the ENS columns already built (`ens_control_day7` and `ens_control_day14`), by
-recomputing their run dates from the `_init_time` stamps in the extra-lead inputs, if the build kept
-them, and otherwise from the ENS source store.
+control member's own leads at days 7 and 14 are those in the table. The AIFS build makes the ENS
+columns at days 7 and 14 itself (see "What changes, file by file"), stamps each with its run's
+`_init_time`, and `check_runs` verifies the ENS run dates as it verifies the AIFS run dates.
 
-**The AIFS ENS mean at days 7 and 14 is read as the ENS mean is.** Each of the 51 members is upsampled
+**The AIFS ENS mean at days 7 and 14 is read as the ENS mean is.** Each of the 51 members is
+upsampled
 from 6-hourly steps to hourly targets with `UPSAMPLING_METHODS` (radiation through the clear-sky
 index, temperature linearly, wind as vector components), and then `reduce_members` averages the
-members. AIFS radiation is a mean over the 6 hours ending at the lead, so no window inversion applies
+members. AIFS radiation is a mean over the 6 hours ending at the lead, so no window inversion
+applies
 (`README.md` of the store), and `verify_aifs_steps.py` re-runs its ERA5 offset check at days 7 and
 14. The build must not filter leads above `24 * 2 + 30`: the `aifs_members_frame` lead cap becomes
-`24 * max(AIFS_DAYS) + 30 = 366 h`, which is above the store's last lead.
+`24 * max(AIFS_DAYS) + 30 = 366 h`, which is above the store's last lead. The scan also filters
+from below to each band, `[24 N − 6, 24 N + 30]` h for each day `N` requested, because the AIFS ENS
+file holds 50 million rows and a scan of every lead reads about 10 times the rows used.
 
 ### Design: the P4 pattern with a permutation control
 
@@ -808,7 +818,8 @@ P4a and P4b (`BLEND_ARMS`, `add_blend_guard_columns`, `blend_verdict` in
 product's columns. The control gives the same model ENS's real columns and the second product's
 columns shuffled among the hours that share a site, a year-month, and an hour of day
 (`studies.blending.climatology_permutation`), so the control keeps the column count and removes the
-second product's information. A blend gain is believed only if the blend beats its control as well as
+second product's information. A blend gain is believed only if the blend beats its control as well
+as
 ENS alone.
 
 **Each blend reads the full-resolution ENS mean and one AIFS forecast at the same day.**
@@ -831,30 +842,46 @@ or `ens`, and the references are fitted on that same frame.
 **Three references for each blend, all fitted on the blend's frame, on the GPU.**
 
 1. *ENS mean alone* (7 columns). The gain the blend is judged against. It has fewer columns than the
-   blend, so the blend minus this reference is favoured by the extra columns, and the control removes
+   blend, so the blend minus this reference is favoured by the extra columns, and the control
+   removes
    that favour.
-2. *AIFS alone* (7 columns): `aifs_single_dayN` or `aifs_ens_mean_dayN`. The blend minus AIFS alone
-   is favoured by the extra columns for the same reason. The plan adds a **mirror control** for it:
-   AIFS real and ENS's columns shuffled, on `single` only, at all four days. This mirror control is not
-   in the published P4 pattern, which guards only the ENS side. Open question 1 asks whether to keep
-   it.
+2. *AIFS alone* (7 columns): `aifs_single_dayN` or `aifs_ens_mean_dayN`. The plan adds a **mirror
+   control** as its column-matched reference:
+   AIFS real and ENS's columns shuffled (seed 0, which moves ENS's columns as the blend control
+   moves
+   AIFS's, and does no harm), on `single` only, at all four days. The mirror control is not in the
+   published P4 pattern, which guards only the ENS side, and the maintainer has approved keeping it.
+   The report gives "blend against AIFS alone" only as the blend minus its mirror control, because
+   the
+   extra columns favour the blend minus the 7-column AIFS-alone arm, and that interval adds nothing
+   the
+   mirror contrast lacks. AIFS alone's absolute error stays in the leaderboard.
 3. *The control* (ENS real, AIFS shuffled), for the guard contrast.
 
 **Shuffle seeds, folds, and rows.** The shuffle uses seed 0, the seed of `aifs_single_day1_permuted`
 in the existing fit, applied to each lead's own frame (the groups are within site, year-month, and
 hour of day, so a shuffled value never crosses a fold). The pure AIFS climatology arm
 (`aifs_single_dayN_permuted`, 7 columns) and the blend control's shuffled columns are therefore the
-same values. The null arm (`..._permuted_b`, seed 1000) is fitted at days 7 and 14 only. Folds are the
+same values. The null arm (`..._permuted_b`, seed 1000) is fitted at days 7 and 14 only. Folds are
+the
 era-aware folds of `aifs_rows` (three eras for `single`, two for `ens`), recut on each lead's frame.
 Fitting seeds are XGBoost's 0, 1, and 2, as in every fit of this study.
 
-**The blend verdict for one lead reuses `studies.bootstrap.blend_verdict`.** The function takes a
-"P4a" and a "P4b" bound. A one-lead blend has one bound, so the script passes the same interval and
-guard for both, and the verdict is "lowers the error" when both upper bounds are below 0 at both
-settings, and "no detectable difference" otherwise, with the largest gain not excluded. The
-"may lower the error" outcome cannot occur, and a short comment in the script says so. As in the
-published report, a control that is itself significantly worse than ENS alone makes the guard
-uninformative, and the report lists such controls.
+**The verdict for one lead is a four-line function in `fit_aifs.py`.** It returns "lowers the error
+at day N" when the blend minus ENS alone and the blend minus its control both have an upper 95%
+bound
+below 0. Otherwise it returns "no detectable difference", with the largest gain the blend's lower
+bound leaves open. `combine_setting_verdicts` joins the two settings, as the published blend does.
+`studies.bootstrap.blend_verdict` is not reused, because its label, "lowers the day-ahead error",
+names the day-ahead lead and would print at days 7 and 14. As in the published report, a control
+that
+is itself significantly worse than ENS alone makes the guard uninformative, and the report lists
+such
+controls.
+
+**Two departures from the published P4 pattern are stated on the page.** The shuffle seed is 0,
+where
+the published guard uses 20260920 plus the product's index, and the verdict label names the lead.
 
 ### Design: AIFS at long leads, and the references at days 7 and 14
 
@@ -864,46 +891,86 @@ control member, an unperturbed forecast of the same physics as IFS, from the sam
 time, at the same lead and, beyond 144 h, the same 6-hourly steps. The contrast at day `N` is
 `aifs_single_dayN − ens_control_dayN`, N = 7 and 14, both arms fitted on the same GPU on the same
 frame. The page may say "AIFS Single's forecast against the ENS control member's". It may not say
-"machine learning against physics" or that AIFS "improves", because the two forecasts differ in native
+"machine learning against physics" or that AIFS "improves", because the two forecasts differ in
+native
 grid and in what they were trained on. Before the page states the resolution difference, the
 resolution of the control member is checked against ECMWF's release notes, as for days 1 and 2.
+
+**AIFS Single may have the lower error because it is smoother, not because its weather is better.**
+At day 7 the ENS mean beats the ENS control member by about 0.7 points on the published rows
+(`ens_control_day7 − ens_mean_day7` is +0.656 [+0.292, +0.998] for solar and +0.764 [+0.155, +1.485]
+for wind). AIFS Single is a deterministic forecast from a machine-learned weather model trained on a
+squared-error loss, and such models are widely reported to blur their fields as lead grows. H7's
+reference, the control member, is the sharp single physics forecast, so H7 can come out significant
+in
+AIFS's favour because AIFS Single is smoother. The day-1 wind results already fit that pattern: AIFS
+Single against the control member is −0.581 [−1.126, −0.150] and against the 6-hourly ENS mean is
+−0.182 [−0.514, +0.100]. H7 and H14 are therefore always reported beside
+`aifs_single_dayN − ens_mean_dayN`, which compares AIFS with a physics forecast that averaging has
+smoothed. If AIFS Single has a lower error than the control member but not than the ENS mean, the
+page says the result is consistent with smoothing, and does not describe AIFS as the better weather
+forecast. The report prints, for each arm and lead, the standard deviation of the arm's weather
+columns over the scored rows (no fit needed), so that a reader can see which forecast is smoother.
+`aifs_single − ens_mean` stays exploratory: it is the interpreting companion, and adds nothing to
+the
+deciding count.
 
 **The reference that lets the page say "IFS" at day 14 is the ENS control member only.** The archive
 limits the other IFS references, and the page states the limits plainly:
 
 | Reference | Day 7 | Day 14 |
 |---|---|---|
-| ENS control member (`ens_control_dayN`, native steps) | fitted in `nwp_forecast_comparison_leads_day10b`; refitted here | same |
-| ENS mean (`ens_mean_dayN`) | in the same folder (day 7) and in `nwp_forecast_comparison_leads_day10` (day 14); refitted here | same |
-| IFS 0.25° (`ifs025_dayN`, Open-Meteo Previous Runs) | in `nwp_forecast_comparison_leads_day10` (`_previous_day7`); refitted here; hourly, lead `24 * 7 + (h mod n)` | **none**: the API stops at `_previous_day7` |
-| IFS HRES 9 km (`ifs_single_dayN`, Open-Meteo Single Runs) | in `nwp_forecast_comparison_leads_day10d`; refitted here as an exploratory reference | **none**: the archive's leads end at 240 h |
+| ENS control member (`ens_control_dayN`, native steps) | the AIFS build's own column; refitted here | same |
+| ENS mean (`ens_mean_dayN`) | the AIFS build's own column; refitted here | same |
+| IFS 0.25° (`ifs025_dayN`, Open-Meteo Previous Runs) | joined from `nwp_forecast_comparison_leads_day10` (`_previous_day7`); refitted here; hourly, lead `24 * 7 + (h mod n)` | **none**: the API stops at `_previous_day7` |
+| IFS HRES 9 km (`ifs_single_dayN`, Open-Meteo Single Runs) | joined from `nwp_forecast_comparison_leads_day10d`; refitted here as an exploratory reference | **none**: the archive's leads end at 240 h |
+
+The AIFS build's ENS columns at days 7 and 14 (`ens_mean6_dayN`, `ens_control6_dayN`) equal the
+native `ens_mean_dayN` and `ens_control_dayN` of the extra-lead folders, because ENS has no step to
+coarsen beyond 144 h. This section writes `ens_mean_dayN` and `ens_control_dayN` for them, and a
+check
+asserts the equality on every row (see "Tests").
 
 At day 14, the AIFS-versus-IFS test rests on the ENS control member. The control member is the same
 physics model as IFS HRES, read from ECMWF's ensemble product, and the plan does not present it as
-HRES. Neither IFS 0.25° nor IFS HRES 9 km reaches day 10 or day 14 in the archives read, and the page
+HRES. Neither IFS 0.25° nor IFS HRES 9 km reaches day 10 or day 14 in the archives read, and the
+page
 says the day-14 result cannot be checked against either. At day 7 the two IFS references are
 secondary: IFS 0.25° serves hourly values and a lead that is never longer than AIFS's 24N + h, and
 both differences favour IFS 0.25°, so the one-sided reading of the day 1 plan applies (a result in
 AIFS's favour survives the bias, and a result against AIFS is unresolved). IFS HRES's missing target
-days (batch 4 report) are left missing in its arm, and its contrasts run on the rows both arms score,
+days (batch 4 report) are left missing in its arm, and its contrasts run on the rows both arms
+score,
 as batch 4 did.
 
 **A reading rule fixed before any fit protects the day-14 test from its likely null.** The published
 extra-lead reports show that, on the published shared rows, the ENS mean's day-14 error is not lower
 than climatology's (+0.418 points [-0.325, +1.108] for solar, +0.406 [-0.571, +1.341] for wind), and
-neither is the ENS control member's. If neither AIFS Single nor the ENS control member has an
-error significantly below the shuffled-AIFS climatology arm (`aifs_single_day14_permuted`) on the
-day-14 frame, the day-14 hypothesis is reported as "no skill to compare at day 14, so the contrast
-says nothing about which forecast is better", whatever the interval of the contrast. A wide interval
-that spans zero is then bounded, not read as equal skill: the page states the largest difference the
-interval does not exclude, following the study's rule for null results.
+neither is the ENS control member's (+0.307 and +0.349). The reference in that evidence,
+`studies.baselines.climatology`, is the out-of-fold median power per site, calendar month, and hour,
+with no XGBoost model. The rule's reference is stricter: an XGBoost model given AIFS's weather
+shuffled within each year-month and hour, which keeps each month's mean AIFS value at each hour. The
+page names the reference that way. If neither AIFS Single nor the ENS control member has an error
+significantly below **both** shuffled-AIFS arms (`aifs_single_day14_permuted` and `_permuted_b`,
+seeds
+0 and 1000, primary setting, 95%) on the day-14 frame, the day-14 hypothesis is reported as "no
+skill
+to compare at day 14", and H14's interval is still printed. Two shuffle seeds gate the rule because
+the existing AIFS fit found the two seeds of the same shuffle differ significantly (+0.453
+[+0.223, +0.696] for solar at day 1), which is about the size of the quantity the rule reads. A wide
+interval that spans zero is then bounded, not read as equal skill: the page states the largest
+difference the interval does not exclude, following the study's rule for null results.
 
 **The intervals at days 1 and 2 give a sense of the power.** The existing fit's contrasts at day 1
-and day 2 (solar) have 95% intervals 0.69 and 0.62 points wide. The plan expects intervals at least as
-wide at day 14, where error is larger, so a gap under about 0.3 points is unlikely to be resolved,
-and the page says so where it reports a null.
+and day 2 (solar) have 95% intervals 0.69 and 0.62 points wide. The plan expects intervals at least
+as
+wide at day 14, where error is larger, so a gap under about 0.3 points is unlikely to be resolved
+for solar, and a gap under about 0.5
+points for wind (the day-1 and day-2 wind intervals are about 0.98 and 1.0 points wide). The page
+says so where it reports a null.
 
-**Positive control and instrument check.** The ENS control member minus the ENS mean at day 7 must be
+**Positive control and instrument check.** The ENS control member minus the ENS mean at day 7 must
+be
 positive, as in the published reports (+0.656 points [+0.292, +0.998] solar, +0.764 [+0.155, +1.485]
 wind). If either is not positive on the new frames, the write-up stops until the difference is
 explained. Day 14 has no expected sign (published -0.110 and -0.057, both unresolved), so the
@@ -911,54 +978,61 @@ day-14 instrument check is the climatology contrast above.
 
 ### Fit design: devices, sizes, and resuming
 
-**Device rules.** Every arm is fitted with `device="cuda"`, one device per contrast. The references
-for days 1 and 2 (`aifs_single_day1`, `aifs_single_day2`, `ens_mean_day1`, `aifs_ens_mean_day1` and
-`_day2`, and the day 1 and day 2 climatology arms) are read from the existing AIFS fit's saved
-losses (`nwp_forecast_comparison_aifs`, read only), because that fit is on the GPU, at the same
-settings, on frames identical to the new day 1 and day 2 frames. The script checks that before it
-reads: the companion `*_losses.json` must state `device` `cuda`, equal `settings`, and the `inputs`
-checksum of the AIFS inputs; and the loaded row keys `(site, time)` must equal the new frame's. Any
-mismatch raises. Every arm at days 7 and 14 is fitted new. `ens_mean_day2`, which the existing fit
-lacks, and every blend and control at all four days are fitted new.
+**Device rules.** Every arm is fitted with `device="cuda"`, one device per contrast, and every arm
+is
+refitted in this folder, days 1 and 2 included, so no contrast reads a fit from another run. The
+build writes days 1, 2, 7, and 14 into the new folder. An optional check asserts that the refitted
+`aifs_single_day1` losses equal the saved ones in `nwp_forecast_comparison_aifs`, a free determinism
+check across runs.
 
-**The GPU-versus-CPU difference is stated, not corrected.** GPU XGBoost gives a different fit from CPU:
-in the extra-lead batches solar differed by within ±0.02 points, and wind by 0.04 to 0.09 points lower
+**The GPU-versus-CPU difference is stated, not corrected.** GPU XGBoost gives a different fit from
+CPU:
+in the extra-lead batches solar differed by within ±0.02 points, and wind by 0.04 to 0.09 points
+lower
 on GPU. Every arm in every contrast here is on the GPU, so the difference cancels within a
 contrast, and the page states the device once, in Limitations. The report does not print the
 CPU-versus-GPU figures beside a contrast, because a reader would take them for a noise level the
 contrast carries. Absolute
 errors here are not compared with the published CPU-fitted page's, because the rows differ.
 
-**Sizes.** The AIFS fit's speed is about 9 s per arm-site fit at the primary setting (the setting with
+**Sizes.** The AIFS fit's speed is about 9 s per arm-site fit at the primary setting (the setting
+with
 500 boosting rounds; the sensitivity setting has 1,200 rounds and is slower).
 
 | Stage | Arms per technology (primary) | Arm-site fits, solar (6 sites) | Arm-site fits, wind (3 sites) |
 |---|---|---|---|
-| `single`, primary | 25 (2 AIFS Single at days 7 and 14; 12 blends, controls, and mirror controls at 4 days; `ens_mean` at days 2, 7, 14; `ens_control` at days 7 and 14; `ifs025` and IFS HRES at day 7; 4 climatology and null arms at days 7 and 14) | 150 | 75 |
-| `single`, sensitivity and `day_of_year`-removed refits of the planned contrasts | 14 (10 sensitivity, 4 refit) | 84 | 42 |
+| `single`, primary | 30 (AIFS Single, ENS mean, and ENS control at days 1, 2, 7, 14; 12 blends, controls, and mirror controls; `ifs025` and IFS HRES at day 7; 4 climatology and null arms at days 7 and 14) | 180 | 90 |
+| `single`, sensitivity and `day_of_year`-removed refits of the deciding contrasts | 14 (10 sensitivity, 4 refit) | 84 | 42 |
 | `single`, near-line extras, upper estimate | 10 | 60 | 30 |
-| `ens`, primary | 26 (2 AIFS ENS, 2 AIFS Single, 16 blends and controls at 4 days, `ens_mean` at days 2, 7, 14, `ens_control` at days 7 and 14, `ifs025` at day 7) | 156 | 78 |
-| Total | 75 | 450 | 225 |
+| `ens`, primary | 16 (AIFS ENS mean and ENS mean at days 1, 2, 7, 14; the AIFS ENS blend and its control at the same days) | 96 | 48 |
+| Total | 70 | 420 | 210 |
 
-That is 675 arm-site fits, about 1.7 hours at 9 s each and at most 3 hours after the slower sensitivity
+That is 630 arm-site fits, about 1.6 hours at 9 s each and at most 3 hours after the slower
+sensitivity
 fits. `--check` prints the measured estimate before the full run. `--workers 1`.
 
-**Resuming.** The script writes each stage's losses file (`<domain>_<row_set>_<stage>_losses.parquet`
-plus its `.json`) when the stage finishes, and skips a stage whose file exists, so a crash costs at
-most one stage of about 30 minutes. `report.md` refuses to be overwritten and is written once, after
-the last stage. The published folder and `nwp_forecast_comparison_aifs` are never written. The plan
-records the published folder's checksums before the run (`/tmp/claude-1000/pub-sha-before.txt`) and
-compares them after it with `sha256sum -c`, and does the same for `nwp_forecast_comparison_aifs`'s
-losses files.
+**Resuming.** The script writes each stage's losses file
+(`<domain>_<row_set>_<stage>_losses.parquet`
+plus its `.json`) and its `_predictions.parquet` (so a later chart needs no refit) when the stage
+finishes, and skips a stage whose file exists, so a crash costs at most one stage of about 30
+minutes. `report.md` refuses to be overwritten and is written once, after the last stage.
+
+**Folders the run reads but must not write.** These are the published folder,
+`nwp_forecast_comparison_aifs`, and the extra-lead folders `nwp_forecast_comparison_leads_day10` and
+`nwp_forecast_comparison_leads_day10d`. The existing baseline `/tmp/claude-1000/pub-sha-before.txt`
+is never overwritten. A new baseline, written to a new file under absolute paths, covers every file
+of
+every one of those folders (see "Verification commands").
 
 **Determinism check.** `--check` fits `aifs_single_day7` at one wind site twice on the GPU and stops
-unless the two fingerprints agree. Check CPU load with `uptime` first. Only one agent runs a published
+unless the two fingerprints agree. Check CPU load with `uptime` first. Only one agent runs a
+published
 study script at a time.
 
 ### Contrasts named before any fit
 
-**Four contrasts per technology are planned (deciding), eight in all, and every other contrast is
-exploratory.** The planned contrasts are:
+**Four contrasts per technology are deciding, eight in all, and every other contrast is
+exploratory.** The deciding contrasts are:
 
 - **H7:** `aifs_single_day7 − ens_control_day7`, on `single`.
 - **H14:** `aifs_single_day14 − ens_control_day14`, on `single`, read under the day-14 reading rule
@@ -967,30 +1041,43 @@ exploratory.** The planned contrasts are:
   blend minus its control), on `single`.
 - **B14:** the same at day 14.
 
-**Each planned contrast is claimable only if the study's full rule agrees.** Its 95% interval is
+**These four are deciding contrasts named before any fit of this section, not planned contrasts in
+the page's sense.** The day-1 and day-2 AIFS results and the ENS extra-lead results at days 7 and 14
+were known when they were named: AIFS Single minus the ENS control member at day 2 is −0.608
+[−0.925, −0.302] (solar) and −0.643 [−1.195, −0.188] (wind), and the ENS control member minus the
+ENS mean at day 7 is +0.656 (solar) and +0.764 (wind). The page says so beside each result.
+
+**Each deciding contrast is claimable only if the study's full rule agrees.** Its 95% interval is
 statistically significant at the 5% level at both hyperparameter settings, with the same sign. The
 range of the leave-one-month-out point estimates keeps that sign. For H7 and H14, the refit without
 `day_of_year` in either arm agrees in sign. For B7 and B14, the guard is significant too at both
-settings. The report also prints each planned contrast's interval at the Bonferroni level across all
+settings. The report also prints each deciding contrast's interval at the Bonferroni level across
+all
 eight (99.375%), as robustness that changes no verdict on its own. The near-the-line rule applies to
-every other contrast: any with an interval bound within 20% of the interval's width from zero gets its
+every other contrast: any with an interval bound within 20% of the interval's width from zero gets
+its
 two arms fitted at the sensitivity setting, in the same invocation.
 
-**Reasons for the planned set.** H7 and H14 are the maintainer's hypothesis, one per lead, on the row
+**Reasons for the deciding set.** H7 and H14 are the maintainer's hypothesis, one per lead, on the
+row
 set (`single`) where the fold-coverage limit is smaller than on `ens`. B7 and B14 are the blends at
-the two leads that NGED's longer-lead interest names. Days 1 and 2 are exploratory for blends because
-the existing fit already covers the day-1 deciding contrast and the AIFS plan did not name blends
-before its fit. `ens` results are descriptive for the reason in the AIFS plan (about 85% of scored
+the two leads that NGED's longer-lead interest names. Days 1 and 2 are exploratory for blends to
+hold the deciding set to four per technology. `ens` results are descriptive for the reason in the
+AIFS plan (about 85% of scored
 (site, fold, calendar month) cells have no training row of their calendar month).
 
 ### What changes, file by file
 
 **Edit: `studies/nwp_forecast_comparison/build_forecast_inputs.py`.** `--aifs` gains `--aifs-days`
 (default `1 2`, so the existing behaviour is unchanged), and `AIFS_DAYS` becomes an argument of
-`aifs_members_frame`, `_aifs_frame`, and `build_aifs`. The lead cap becomes `24 * max(days) + 30`.
-The build writes `aifs_single_dayN` and `aifs_ens_mean_dayN` with `_init_time` for N in 7 and 14 to
-`<domain>_aifs_inputs.parquet` in the new output folder. `build_aifs` refuses an output folder
-equal to `nwp_forecast_comparison_aifs`.
+`aifs_members_frame`, `_aifs_frame`, and `build_aifs`. The lead cap becomes `24 * max(days) + 30`,
+with the lower bound per band described above. The build writes `aifs_single_dayN`,
+`aifs_ens_mean_dayN`, `ens_mean6_dayN`, and `ens_control6_dayN` for every requested day, each with
+its
+`_init_time` (`keep_init_time=True` on the ENS `ens_member_arms` call), to
+`<domain>_aifs_inputs.parquet` in the new output folder, and builds the nearest-cell arm only when
+day 1 is requested. The run uses `--aifs-days 1 2 7 14`. `build_aifs` refuses an output folder equal
+to `nwp_forecast_comparison_aifs`.
 
 **Edit: `studies/nwp_forecast_comparison/verify_aifs_steps.py`.** The ERA5 window-offset, wind-lag,
 unit, grid-orientation, and `NaN` checks run at days 7 and 14 as well as 1 and 2, and a new check
@@ -998,37 +1085,54 @@ recomputes the H3-weighted mean from the raw store for a sample of (site, run, l
 
 **Edit: `studies/nwp_forecast_comparison/fit_aifs.py`.**
 
-- `check_runs`: parse the day from the prefix's `_day<digits>` suffix. Today it reads `prefix[-1]`,
-  which gives 4 for `aifs_single_day14` and would make the day-14 check either raise on correct rows
-  or pass a wrong offset.
-- `RowSet` and `aifs_rows` gain a lead argument `day`, and `aifs_rows` drops rows whose run lies outside
+- `check_runs`: derive the checked prefixes from the row set's arms (every arm that carries a run
+  stamp and is not a shuffled copy), and parse each prefix's day with
+  `re.fullmatch(r".*_day(\d+)", prefix)`, raising if there is no match. Today `int(prefix[-1])`
+  reads
+  4 for `aifs_single_day14`, and the hard-coded `AIFS_ARM_PREFIXES` tuple would skip the day-7 and
+  day-14 arms without a word, because the loop skips any prefix not in the tuple. The ENS arms'
+  `_init_time` stamps are checked the same way.
+- `fit_jobs`: the expected column count comes from the arm's kind (7 for a single product, 6 without
+  `day_of_year`, 9 for a solar blend or control, 11 for a wind blend or control), not a fixed 7.
+  Today the fixed check raises on every blend.
+- `RowSet` and `aifs_rows` gain a lead argument `day`, and `aifs_rows` drops rows whose run lies
+  outside
   the era window (a row filter, before the fold recut).
-- A `--blends` mode reads the days-7/14 AIFS inputs, joins the references from the extra-lead folders
-  by `(site, time)` (raising if a shared row is missing), and builds the arms, controls, mirror
-  controls, and stages of the table above.
-- The contrast list, the verdict wrapper around `blend_verdict`, the day-14 reading rule, the
-  Bonferroni line, the leave-one-month-out lines, and the printed feature columns of every arm are
-  written into `report.md`, with rows and months on every line and the absolute error of every arm
-  first.
-- The read of the existing AIFS fit's losses, with the device, settings, and row-key checks above.
+- A `--blends` mode reads the days-1/2/7/14 inputs from the new folder, joins only `ifs025_day7`
+  (from
+  `nwp_forecast_comparison_leads_day10`) and `ifs_single_day7` (from
+  `nwp_forecast_comparison_leads_day10d`) by `(site, time)` (raising if a shared row is missing),
+  and
+  builds the arms, controls, mirror controls, and stages of the table above. It also asserts that
+  the
+  build's `ens_mean6_day{7,14}` and `ens_control6_day{7,14}` equal the extra-lead folders'
+  `ens_mean_day7`, `ens_control_day7`, `ens_mean_day14`, and `ens_control_day14` on every row, to
+  Float32 precision.
+- The contrast list, the one-lead verdict function, the day-14 reading rule, the smoothness
+  diagnostic, the Bonferroni line, the leave-one-month-out lines, and the printed feature columns of
+  every arm are written into `report.md`, with rows and months on every line and the absolute error
+  of every arm first.
 
 **Edit: `studies/nwp_forecast_comparison/nwp_forecast_charts.py`.** Per technology: one panel of
-absolute error against lead (days 1, 2, 7, 14) for AIFS Single, ENS control, ENS mean, the blend, and
-the day-7 IFS references, with 95% intervals; a second panel of the four planned contrasts and the
-exploratory contrasts of the same kind, drawn with `interval_panel`, marked "(planned)" where a panel
-mixes planned and exploratory rows; row and month counts in the axis titles; `ens` rows in a separate
+absolute error against lead (days 1, 2, 7, 14) for AIFS Single, ENS control, ENS mean, the blend,
+and
+the day-7 IFS references, with 95% intervals; a second panel of the four deciding contrasts and the
+exploratory contrasts of the same kind, drawn with `interval_panel`, each row marked deciding or
+exploratory; row and month counts in the axis titles; `ens` rows in a separate
 panel. Output `docs/studies/assets/nwp_forecast_{solar,wind}_aifs_leads.svg`, optimised with `svgo`.
 The chart code refuses a site label that is not an anonymised label.
 
-**Edit: `studies/nwp_forecast_comparison/README.md`** (the new flag, mode, folder, and what each file
-holds) and **`docs/studies/nwp-forecasts-at-matched-leads.md`** (see "Docs to update"). No file under
+**Edit: `studies/nwp_forecast_comparison/README.md`** (the new flag, mode, folder, and what each
+file
+holds) and **`docs/studies/nwp-forecasts-at-matched-leads.md`** (see "Docs to update"). No file
+under
 `packages/` changes and no Patito contract changes.
 
 ### Design-philosophy check
 
 This is R&D code and fails fast. The build and the fit raise on a missing value in an arm, an era
-mismatch, an existing output file, a mismatch in a reused fit's device, settings, or rows, and a
-shared row missing from a reference folder. No asset, serving path, or degradation rule changes,
+mismatch, an existing output file, and a shared row missing from a reference folder. No asset,
+serving path, or degradation rule changes,
 and no hypothesis label (`H1` to `T5.1`) is delivered or affected. The change trades away no
 principle in `design-principles.md`.
 
@@ -1037,34 +1141,53 @@ principle in `design-principles.md`.
 The scripts have no unit tests, so each check below is a read-only run whose output goes into the
 report, and each names the defect it would fail on. The first two fail on today's code.
 
-- *Day-14 run check.* `check_runs` on a frame whose `aifs_single_day14_init_time` is 14 days before
-  the hour's day passes; with 13 days it raises. On today's code the correct day-14 rows raise, because
-  the expected date is computed from 4 days.
-- *Days 7 and 14 exist.* `build_forecast_inputs.py --aifs --aifs-days 7 14` writes
-  `aifs_single_day7`, `aifs_single_day14`, `aifs_ens_mean_day7`, `aifs_ens_mean_day14`, and their
-  `_init_time` columns. Today the flag does not exist and the columns are absent.
+- *Day-14 run check (fails on today's `int(prefix[-1])` parsing).* `check_runs` on a frame whose
+  `aifs_single_day14_init_time` is 14 days before the hour's day passes, and with 13 days raises. On
+  today's code the correct 14-day frame raises, because the expected date is computed from 4 days,
+  and
+  a 4-day frame passes. The same test asserts that `check_runs` inspects `aifs_single_day7` and
+  `aifs_single_day14`: a frame whose `aifs_single_day7_init_time` is wrong raises. On today's code
+  the
+  hard-coded prefix tuple skips day 7, so the wrong frame passes. The negative half cannot live in
+  `report.md`, so it runs as a throwaway invocation whose output goes in the PR body.
+- *Blend columns.* `fit_jobs` accepts a 9-column solar blend and an 11-column wind blend, and still
+  raises on an arm whose column count differs from its kind. Today it raises on every blend.
+- *Days 7 and 14 exist.* `build_forecast_inputs.py --aifs --aifs-days 1 2 7 14` writes
+  `aifs_single_dayN`, `aifs_ens_mean_dayN`, `ens_mean6_dayN`, `ens_control6_dayN`, and their
+  `_init_time` columns for N in 1, 2, 7, and 14. Today the flag does not exist and the day-7 and
+  day-14 columns are absent.
+- *ENS columns equal the extra-lead folders'.* The build's `ens_mean6_day{7,14}` and
+  `ens_control6_day{7,14}` equal `ens_mean_day7`, `ens_control_day7`, `ens_mean_day14`, and
+  `ens_control_day14` from the extra-lead folders on every row, to Float32 precision. A wrong run
+  day, lead offset, or step handling in the ENS read fails it.
 - *Wiring.* For wind hours whose UTC hour is a multiple of 6, the weighted 100 m speed at day `N`
-  equals an independent recomputation from the raw store at init date `− N` days and lead `24 N + h`,
+  equals an independent recomputation from the raw store at init date `− N` days and lead `24 N +
+  h`,
   to Float32 precision, for N = 7 and 14. It fails on a wrong run day, a 6-hour lead offset, or a
   time-zone slip.
-- *Radiation window.* The ERA5 offset check has its minimum at offset 0 at days 7 and 14. It fails if
+- *Radiation window.* The ERA5 offset check has its minimum at offset 0 at days 7 and 14. It fails
+  if
   AIFS's window convention changes with lead.
 - *Row counts.* The report's row and month counts equal the table above (for example 28,208 rows at
   day 7 and 27,449 at day 14 for solar `single`), and every kept row's run lies in its era window.
-- *Shuffle and column counts.* Each control has the same column count as its blend (9 solar, 11 wind);
+- *Shuffle and column counts.* Each control has the same column count as its blend (9 solar, 11
+  wind);
   its shuffled columns hold the same multiset of values as the real columns within every (site,
   year-month, hour) group and differ from them on at least 90% of rows; no shuffled value moves
   between year-months. The seed-0 blend control and `aifs_single_dayN_permuted` hold identical
   shuffled values.
-- *Same rows.* `assert_equal_rows` passes for every pair in a contrast, and `check_no_missing` passes
+- *Same rows.* `assert_equal_rows` passes for every pair in a contrast, and `check_no_missing`
+  passes
   on every arm except IFS HRES, whose missing values are left missing on purpose.
-- *Reused fit.* The read of `nwp_forecast_comparison_aifs` raises when the companion file says CPU, when
-  the settings differ, or when the row keys differ, checked by pointing the check at a temporary copy
-  with one field changed.
 - *Positive control.* `ens_control_day7 − ens_mean_day7` is positive on both technologies.
 - *Determinism.* `--check` fingerprints agree across two GPU fits of `aifs_single_day7`.
-- *Published folder untouched.* `sha256sum -c` of `/tmp/claude-1000/pub-sha-before.txt` passes after
-  the run.
+- *Published folders untouched.* The old baseline `/tmp/claude-1000/pub-sha-before.txt` passes
+  `sha256sum -c` before the run, and the new baseline
+  `.claude/worktrees/scratch/matched-lead/sha-before-aifs-blends.txt` passes after it. The new
+  baseline lists every file of every folder the run reads but must not write.
+- *Smoothness diagnostic.* The report prints the standard deviation of each arm's weather columns
+  per
+  lead over the scored rows, for every arm of H7, H14, and their `ens_mean` companions.
 
 ### Docs to update
 
@@ -1072,19 +1195,25 @@ report, and each names the defect it would fail on. The first two fail on today'
 months, and AIFS versions scored.
 
 - *Data and methods:* extend "How AIFS is read" with the days 7 and 14 leads and the row-level era
-  rule, the blend and its control (the columns, the shuffle, and the seeds), the references at each day
-  and their limits (IFS 0.25° and IFS HRES stop before day 14), the day-14 reading rule, and the list
-  of planned contrasts, in the page's own definition of "planned".
-- *Results:* a section "AIFS at days 7 and 14 and blends of AIFS with the ENS mean", with the two new
+  rule, the blend and its control (the columns, the shuffle, and the seeds), the references at each
+  day
+  and their limits (IFS 0.25° and IFS HRES stop before day 14), the day-14 reading rule, the
+  smoothing reading
+  rule, and the list of deciding contrasts with what was already known when they were named. The
+  page's definition of "planned" is not used for them.
+- *Results:* a section "AIFS at days 7 and 14 and blends of AIFS with the ENS mean", with the two
+  new
   charts. The bolded lead of each subsection states the finding for the row set and technology, with
   its interval, rows, and months. Nothing says AIFS improves.
-- *Key findings:* one bullet per planned contrast, each labelled planned and each carrying its interval.
+- *Key findings:* one bullet per deciding contrast, each labelled deciding and each carrying its
+  interval.
   Exploratory bullets are labelled exploratory and post hoc.
 - *Discussion: what to use:* what the day 7 and day 14 result means for a user reading forecasts at
   long leads, limited to the rows scored, with the survey page's stance quoted and linked (the two
   anchors above, rechecked before the page ships).
 - *Limitations and Scope:* the day-14 limit on IFS references, the version blend and the IFS Cycle
-  50r1 confound in the last era, the device, the `ens` fold-coverage limit, the missing HRES days, and
+  50r1 confound in the last era, the device, the `ens` fold-coverage limit, the missing HRES days,
+  and
   that AIFS Single's version varies by month.
 - *Data and code availability and Reproducing the figures:* the new commands, the folder, and the
   commit hash of the last code change.
@@ -1100,75 +1229,106 @@ The AIFS plan's verification set applies unchanged (`ruff`, `ty`, `pytest packag
 order, one job at a time after the Opus review of the fit code:
 
 ```bash
-sha256sum data/studies/nwp_forecast_comparison/*.parquet > /tmp/claude-1000/pub-sha-before.txt
-uv run python studies/nwp_forecast_comparison/build_forecast_inputs.py --aifs --aifs-days 7 14 \
-  --published-dir data/studies/nwp_forecast_comparison \
-  --output-dir data/studies/nwp_forecast_comparison_aifs_blends
+D=/home/jack/dev/nged-substation-forecast/data/studies
+B=/home/jack/dev/nged-substation-forecast/.claude/worktrees/scratch/matched-lead
+sha256sum -c /tmp/claude-1000/pub-sha-before.txt   # the existing baseline must still pass first
+find $D/nwp_forecast_comparison $D/nwp_forecast_comparison_aifs \
+  $D/nwp_forecast_comparison_leads_day10 $D/nwp_forecast_comparison_leads_day10b \
+  $D/nwp_forecast_comparison_leads_day10d -type f -print0 | sort -z | xargs -0 sha256sum \
+  > $B/sha-before-aifs-blends.txt
+uv run python studies/nwp_forecast_comparison/build_forecast_inputs.py --aifs \
+  --aifs-days 1 2 7 14 --published-dir $D/nwp_forecast_comparison \
+  --output-dir $D/nwp_forecast_comparison_aifs_blends
 uv run python studies/nwp_forecast_comparison/verify_aifs_steps.py \
-  --published-dir data/studies/nwp_forecast_comparison \
-  --output-dir data/studies/nwp_forecast_comparison_aifs_blends
+  --published-dir $D/nwp_forecast_comparison --output-dir $D/nwp_forecast_comparison_aifs_blends
 uv run python studies/nwp_forecast_comparison/fit_aifs.py --blends --check \
-  --published-dir data/studies/nwp_forecast_comparison \
-  --output-dir data/studies/nwp_forecast_comparison_aifs_blends
+  --published-dir $D/nwp_forecast_comparison --output-dir $D/nwp_forecast_comparison_aifs_blends
 uv run python studies/nwp_forecast_comparison/fit_aifs.py --blends --workers 1 \
-  --published-dir data/studies/nwp_forecast_comparison \
-  --output-dir data/studies/nwp_forecast_comparison_aifs_blends
-sha256sum -c /tmp/claude-1000/pub-sha-before.txt
+  --published-dir $D/nwp_forecast_comparison --output-dir $D/nwp_forecast_comparison_aifs_blends
+sha256sum -c $B/sha-before-aifs-blends.txt
+uv run python studies/nwp_forecast_comparison/nwp_forecast_charts.py \
+  --input-dir $D/nwp_forecast_comparison --aifs-dir $D/nwp_forecast_comparison_aifs_blends \
+  --output-dir docs/studies/assets
+git diff --stat docs/studies/assets/   # only the two new SVGs
 ```
 
 Every number on the page is checked against the printed `report.md`, and the page's marker comments
 name the report section. Flag names above (`--aifs-days`, `--blends`) are proposals for the
-implementer.
+implementer, and the chart command's flags follow the AIFS plan's chart command.
 
 ### Risks and open questions
 
-1. **Keep the mirror control?** It guards the blend-minus-AIFS-alone contrast, and adds 4 fits per
-   technology on `single`. The published P4 pattern guards only the ENS side. *Recommendation: keep it,
-   because two of the maintainer's three comparisons for each blend would otherwise rest on an
-   unguarded contrast.*
-2. **Row-level era drop or dropping the first weeks of 2025-03 and 2025-09.** The plan drops the rows
-   whose run is outside the era and keeps the month (1.3% to 5.0% of `single` rows). *Recommendation:
-   row-level.*
-3. **Day 14 may hold no skill to compare.** The published reports found no ENS skill over climatology
+1. **Mirror control and row-level era drop: decided.** The maintainer has approved keeping the
+   mirror
+   control and the row-level era drop (1.3% to 5.0% of `single` rows).
+2. **Day 14 may hold no skill to compare.** The published reports found no ENS skill over
+   climatology
    at day 14. The reading rule makes a bounded null a stated result rather than a hidden one.
    *Recommendation: run day 14 regardless, because a bounded null at the lead NGED cares about is
    itself the finding.*
-4. **IFS HRES at day 7 as an exploratory reference.** It adds one arm per technology, and the finest
+3. **IFS HRES at day 7 as an exploratory reference.** It adds one arm per technology, and the finest
    IFS available. *Recommendation: keep.*
-5. **The ENS control member's resolution.** The page states a resolution difference between AIFS and
+4. **The ENS control member's resolution.** The page states a resolution difference between AIFS and
    the control member only after ECMWF's release notes confirm it.
-6. **Blends read the full-resolution ENS mean at days 1 and 2.** The blend then has finer ENS steps than
-   the AIFS reference. The report prints `ens_mean_dayN` and the blend on the same rows, and the page
+5. **Blends read the full-resolution ENS mean at days 1 and 2.** The blend then has finer ENS steps
+   than
+   the AIFS reference. The report prints `ens_mean_dayN` and the blend on the same rows, and the
+   page
    states which references share step width. *Recommendation: keep, because a user blends the ENS
    product as served.*
-7. **Multiplicity.** About 60 intervals print across both technologies. About 3 will be significant at
-   the 5% level by chance among the exploratory ones. The page quotes only the intervals its text needs
+6. **Multiplicity.** The report header prints the exact count of printed intervals, computed from
+   the
+   contrast list, and the expected number significant at the 5% level by chance (the review counted
+   about 45 per technology before the sensitivity lines, so about 4 to 5 by chance across both). The
+   page quotes only the intervals its text needs
    and never builds a claim on a single exploratory interval near zero.
-8. **Versions.** AIFS Single's version changes by month inside the row set, and the last era is
+7. **Versions.** AIFS Single's version changes by month inside the row set, and the last era is
    confounded with IFS Cycle 50r1. The exploratory by-era contrasts print a point estimate and an
    interval only for eras of at least 6 months, as in the AIFS plan.
-9. **Data access ends on 2026-09-30.** Everything the plan reads is on disk, so no download is needed.
+8. **Data access ends on 2026-09-30.** Everything the plan reads is on disk, so no download is
+   needed.
 
-### Planned and exploratory contrasts
+### Deciding and exploratory contrasts
 
-Differences are first minus second, in percentage points of capacity, and a negative difference means
-the first arm has the lower error. Every contrast prints its rows, its months, and the absolute error
+Differences are first minus second, in percentage points of capacity, and a negative difference
+means
+the first arm has the lower error. Every contrast prints its rows, its months, and the absolute
+error
 of both arms.
 
 | Contrast | Row set | Status | Reason |
 |---|---|---|---|
-| H7: `aifs_single_day7 − ens_control_day7` | `single` | **planned** | The maintainer's hypothesis at day 7, between two single forecasts of the same lead and steps |
-| H14: `aifs_single_day14 − ens_control_day14` | `single` | **planned**, under the day-14 reading rule | The same at day 14, where only the control member is an IFS reference |
-| B7: blend of ENS mean and AIFS Single at day 7 − `ens_mean_day7`, and its guard | `single` | **planned** | NGED's long-lead interest; the P4 pattern names the blend and its control |
-| B14: the same at day 14 | `single` | **planned** | The same at day 14 |
-| `aifs_single_dayN − ens_mean_dayN`, N = 7 and 14 | `single` | exploratory | A single forecast against an ensemble mean mixes weather model and averaging |
+| H7: `aifs_single_day7 − ens_control_day7` | `single` | **deciding** | The maintainer's hypothesis at day 7, between two single forecasts of the same lead and steps |
+| H14: `aifs_single_day14 − ens_control_day14` | `single` | **deciding**, under the day-14 reading rule | The same at day 14, where only the control member is an IFS reference |
+| B7: blend of ENS mean and AIFS Single at day 7 − `ens_mean_day7`, and its guard | `single` | **deciding** | NGED's long-lead interest; the P4 pattern names the blend and its control |
+| B14: the same at day 14 | `single` | **deciding** | The same at day 14 |
+| `aifs_single_dayN − ens_mean_dayN`, N = 7 and 14 | `single` | exploratory, reported beside H7 and H14 | Interprets H7 and H14: a lower error than the control member but not the ENS mean is consistent with smoothing |
 | `aifs_single_day7 − ifs025_day7`, and `− ifs_single_day7` | `single` | exploratory, one-sided | The IFS references favour IFS, so only a result in AIFS's favour survives |
-| `aifs_single_dayN − aifs_single_dayN_permuted`, and permuted minus permuted_b (N = 7, 14) | `single` | exploratory | Climatology reference and the pipeline's null, which the day-14 rule reads |
+| `aifs_single_dayN − aifs_single_dayN_permuted` and `− _permuted_b`, and permuted minus permuted_b (N = 7, 14) | `single` | exploratory | Climatology references and the pipeline's null |
+| `ens_control_day14 − aifs_single_day14_permuted` and `− _permuted_b` | `single` | exploratory (day-14 reading rule) | Read by the day-14 reading rule, which needs both shuffle seeds |
 | `ens_control_day7 − ens_mean_day7` | `single` | exploratory, positive control | Must be positive at day 7 |
-| Blend of ENS mean and AIFS Single at days 1 and 2, minus `ens_mean_dayN` and minus its control | `single` | exploratory | Days 1 and 2 were not named before the AIFS fit |
-| Blend at days 1, 2, 7, 14 minus `aifs_single_dayN`, and minus its mirror control | `single` | exploratory | Guarded comparison with AIFS alone |
+| Blend of ENS mean and AIFS Single at days 1 and 2, minus `ens_mean_dayN` and minus its control | `single` | exploratory | Kept exploratory to hold the deciding set to four per technology |
+| Blend at days 1, 2, 7, 14 minus its mirror control | `single` | exploratory | The column-matched comparison with AIFS alone |
 | `aifs_single_dayN − ens_control_dayN` by version era, N = 7 and 14 | `single` | exploratory | Interval only for eras of at least 6 months; not read as a version effect |
 | The gap at day 14 minus the gap at day 7, on the day-14 rows | `single` | exploratory | Does the gap widen with lead (built as a difference of summed per-row losses, then `bootstrap_difference`) |
 | `aifs_ens_mean_dayN − ens_mean_dayN`, N = 7 and 14 | `ens` | descriptive | About 85% of scored cells have no training row of their calendar month |
-| Blend of ENS mean and AIFS ENS mean at days 1, 2, 7, 14 minus ENS mean alone, AIFS ENS mean alone, and its control | `ens` | descriptive | The same limit; the AIFS Single blend on `ens` shares the frame, so the two blends compare on identical rows |
+| Blend of ENS mean and AIFS ENS mean at days 1, 2, 7, 14 minus ENS mean alone and minus its control | `ens` | descriptive | The same limit. The AIFS Single blend is scored on `single` only |
 | Absolute error of every arm | both | reported | The first table of the report, since which input is best can matter more than a contrast |
+
+### Review findings triaged
+
+An Opus review of this section found six must-fix and seven should-fix items, and every one was
+checked against the code and the data before it was applied.
+
+- *M1 to M6 (deciding label and what was known; both shuffle seeds; the smoothing confound; the
+  checksum command; the `check_runs` and `fit_jobs` traps; the verdict label):* applied.
+- *S1 (one source for the ENS columns), S2 (refit days 1 and 2 instead of reusing the old fit), S3
+  (drop the `ens` arms that feed no listed contrast), S4 (interval count), S5 (wind power figure),
+  S6
+  (lead filter, predictions files, chart command, mirror seed), S7 (blend against AIFS alone through
+  the mirror control only):* applied.
+- *Rejected:* the reviewer's alternative, blending saved out-of-fold forecasts with fold-wise
+  weights
+  (`studies.blending.simplex_weights`), which the reviewer did not recommend. It departs from the P4
+  pattern and answers a different question. At most it is one exploratory line after the fits.
+- *Rejected in part:* S2's optional determinism assertion is an optional check, not a gate.
