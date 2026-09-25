@@ -517,7 +517,8 @@ rests on about 12 of the 2,000 bootstrap resamples.
 ### The XGBoost models work
 
 **Given either ICON-D2 or ERA5, the XGBoost model follows the shape of measured power at every
-generator, in a windy, a variable, and a calm week.** The two predictions run close together,
+generator, in a windy, a variable, and a calm week, except that at W3 both run too high in the
+windiest week.** The two predictions run close together,
 because ICON-D2's advantage over ERA5 is a small fraction of the error. Figure 4 plots both XGBoost
 models' out-of-fold predictions against measured power. At Generator W3 both predictions run well
 above measured power for days at a time, most visibly in the windiest week. Generator W3's output
@@ -538,8 +539,8 @@ output on known dates could be matched against publicly available generation dat
 would undo the anonymisation that names the generators only as Generator W1 to W3. The page
 therefore gives each week's month and year in the text and no finer date.
 
-![Figure 4: An XGBoost model given ICON-D2 follows measured power at every generator, across a
-windy, a variable, and a calm week](../assets/wind_models_work_timeseries.svg)
+![Figure 4: An XGBoost model given ICON-D2 follows the shape of measured power at each generator,
+except in W3's windiest week, when it predicts too high](../assets/wind_models_work_timeseries.svg)
 
 **ICON-D2, UKV, ICON-EU, and ERA5 rank in the same order at each of the three generators.** Figure 5
 plots each product's mean absolute error at each generator separately, one dot per product per
@@ -1096,7 +1097,7 @@ Over the 28 days on each side of the split, HRES's 100 m ratio falls from 0.96 t
 day 0's, and a change in Open-Meteo's archive is possible. These are exploratory ratios of means
 with no interval.
 
-![Figure 18: ENS's and HRES's 10 m wind speeds fall against ERA5's between October and November
+![Figure 18: ENS's and HRES's 10 m wind speeds fall against ERA5's from October to November
 2024, and UKV's does not](../assets/ens_hres_wind_monthly_ratio.svg)
 
 #### How the ECMWF wind was read, and what the contrasts mix

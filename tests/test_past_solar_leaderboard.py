@@ -301,7 +301,7 @@ def test_a_post_hoc_arm_is_labelled_post_hoc(
 def _contrasts_with_flags(*, near_line: dict[str, bool]) -> pl.DataFrame:
     """Return exploratory contrast rows for two arms, each flagged near the line or not."""
     return pl.DataFrame(
-        {"arm": arm, "planning": "exploratory", "near_line": flag}
+        {"arm": arm, "planning": "exploratory", "planned": False, "near_line": flag}
         for arm, flag in near_line.items()
     )
 
@@ -546,7 +546,9 @@ def test_a_contrast_gets_no_second_setting_where_era5_has_no_sensitivity_losses(
     losses = _losses().filter(
         ~((pl.col("arm") == "era5_global") & (pl.col("setting") == "sensitivity"))
     )
-    contrasts = pl.DataFrame({"arm": ["ens_mean_t3"], "planning": ["planned"], "near_line": [True]})
+    contrasts = pl.DataFrame(
+        {"arm": ["ens_mean_t3"], "planning": ["planned"], "planned": [True], "near_line": [True]}
+    )
 
     result = module._second_setting(
         contrasts=contrasts, arms=ARMS, losses=losses, site_hours=SITE_HOURS

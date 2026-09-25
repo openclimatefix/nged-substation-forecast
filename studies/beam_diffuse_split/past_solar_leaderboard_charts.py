@@ -31,12 +31,11 @@ import polars as pl
 from figure_numbers import FIGURE_NUMBERS
 from past_solar_leaderboard import (
     ABSOLUTE_SECTION,
-    CONTRAST_SECTION,
-    PLANNED_CONTRAST_SECTION,
     POST_HOC_ARMS,
-    REFERENCE_ARM,
     ROW_SETS,
     RowSet,
+    contrast_section,
+    post_hoc_label,
 )
 from sources import SOLAR_LEADERBOARD_DIR
 from studies.charts import (
@@ -112,7 +111,7 @@ CAMS_EXPLORATORY: Final[str] = (
 )
 
 _BLOCK_HEADING: Final[re.Pattern[str]] = re.compile(
-    r"^### (.+?): (\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2}), ([\d,]+) site-hours$"
+    r"^### (.+?): (\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2}), ([\d,]+) (?:site|farm)-hours$"
 )
 _SECOND: Final[re.Pattern[str]] = re.compile(r"^(\S+) \[(\S+), (\S+)\]$")
 _INTERVAL: Final[re.Pattern[str]] = re.compile(r"^\[(\S+), (\S+)\]$")
@@ -186,7 +185,7 @@ def read_report(*, report_text: str) -> dict[str, PrintedBlock]:
     return blocks
 
 
-def _month_year(*, iso_day: str) -> str:
+def month_year(*, iso_day: str) -> str:
     """Return `2022-12-01` as `December 2022`."""
     return datetime.date.fromisoformat(iso_day).strftime("%B %Y")
 
@@ -303,7 +302,7 @@ def contrast_rows(
     order: list[str],
     printed: dict[str, PrintedRow],
 ) -> pl.DataFrame:
-    """Return the row set's contrasts against ERA5, each checked against the report.
+    """Return the row set's contrasts against its reference arm, each checked against the report.
 
     Args:
         frame: The row set's rows of `intervals.parquet`.
@@ -319,6 +318,7 @@ def contrast_rows(
     Raises:
         ValueError: If an arm has no row, or a number differs from the report's.
     """
+    section = contrast_section(reference_label=row_set.reference_label)
     rank = {
         arm.arm: order.index(arm.arm) if arm.arm in order else len(order) + index
         for index, arm in enumerate(row_set.contrast_arms)
@@ -328,28 +328,31 @@ def contrast_rows(
     for arm in ordered:
         row = _one(
             frame=frame,
-            section=CONTRAST_SECTION,
+            section=section,
             setting="pooled",
             treatment=arm.arm,
-            reference=REFERENCE_ARM,
+            reference=row_set.reference_arm,
         )
         name = arm.label
+        post_hoc = (
+            arm.arm in POST_HOC_ARMS
+            or (arm.arm, row_set.reference_arm) in row_set.post_hoc_contrasts
+        )
         _check_row(name=name, row=row, printed=printed[name])
         second = _second(
             frame=frame,
-            section=CONTRAST_SECTION,
+            section=section,
             arm=arm.arm,
-            reference=REFERENCE_ARM,
+            reference=row_set.reference_arm,
         )
         _check_second(name=name, second=second, printed=printed[name])
         records.append(
             {
                 "arm": arm.arm,
-                "label": DISPLAY_LABELS.get(name, name)
-                + (POST_HOC_SUFFIX if arm.arm in POST_HOC_ARMS else ""),
+                "label": DISPLAY_LABELS.get(name, name) + (POST_HOC_SUFFIX if post_hoc else ""),
                 "family": arm.family,
                 "reference": arm.reference,
-                "planned": row["planning"] == "planned",
+                "planned": row["planning"] == "planned" and not post_hoc,
                 "difference": row["value"],
                 "lower_95": row["lower"],
                 "upper_95": row["upper"],
@@ -378,29 +381,31 @@ def planned_rows(
     """
     records = []
     for contrast in row_set.planned_contrasts:
+        label = post_hoc_label(row_set=row_set, contrast=contrast)
+        post_hoc = label != contrast.label
         row = _one(
             frame=frame,
-            section=PLANNED_CONTRAST_SECTION,
+            section=row_set.planned_heading,
             setting="pooled",
             treatment=contrast.treatment.arm,
             reference=contrast.reference.arm,
         )
-        _check_row(name=contrast.label, row=row, printed=printed[contrast.label])
+        _check_row(name=label, row=row, printed=printed[label])
         second = _second(
             frame=frame,
-            section=PLANNED_CONTRAST_SECTION,
+            section=row_set.planned_heading,
             arm=contrast.treatment.arm,
             reference=contrast.reference.arm,
         )
-        _check_second(name=contrast.label, second=second, printed=printed[contrast.label])
+        _check_second(name=label, second=second, printed=printed[label])
         records.append(
             {
                 "arm": contrast.treatment.arm,
                 "reference_arm": contrast.reference.arm,
-                "label": contrast.label,
+                "label": label,
                 "family": contrast.treatment.family,
                 "reference": False,
-                "planned": True,
+                "planned": not post_hoc,
                 "difference": row["value"],
                 "lower_95": row["lower"],
                 "upper_95": row["upper"],
@@ -434,9 +439,7 @@ def build_blocks(
         if set(frame["n_rows"].to_list()) != {site_hours}:
             msg = f"{row_set.label}: intervals.parquet disagrees with {site_hours:,} site-hours"
             raise ValueError(msg)
-        dates = (
-            f"{_month_year(iso_day=printed.first_day)} to {_month_year(iso_day=printed.last_day)}"
-        )
+        dates = f"{month_year(iso_day=printed.first_day)} to {month_year(iso_day=printed.last_day)}"
         absolute = absolute_rows(
             frame=frame, row_set=row_set, printed=printed.tables[ABSOLUTE_SECTION]
         )
@@ -449,10 +452,10 @@ def build_blocks(
             frame=frame,
             row_set=row_set,
             order=absolute["arm"].to_list(),
-            printed=printed.tables[CONTRAST_SECTION],
+            printed=printed.tables[contrast_section(reference_label=row_set.reference_label)],
         )
         planned = planned_rows(
-            frame=frame, row_set=row_set, printed=printed.tables[PLANNED_CONTRAST_SECTION]
+            frame=frame, row_set=row_set, printed=printed.tables[row_set.planned_heading]
         )
         contrast_blocks.append(
             RowSetBlock(

@@ -393,6 +393,17 @@ its `report.md` and `intervals.parquet` cannot be overwritten by a later run.
 """
 
 
+WIND_LEADERBOARD_DIR: Final[Path] = UPDATE_OUTPUT_DIR / "wind_leaderboard_2"
+"""Where `past_wind_leaderboard.py` writes the past-wind page's leaderboard and contrasts.
+
+The first run's folder, `wind_leaderboard`, holds a contrast heading that the main block no longer
+uses, so the script writes to `wind_leaderboard_2`.
+
+Write-once: the script refuses to run where this folder exists, so the numbers a page quotes from
+its `report.md` and `intervals.parquet` cannot be overwritten by a later run.
+"""
+
+
 def point_output_path_for(*, source: SourceType) -> Path:
     """Return where one per-site download is written.
 
