@@ -68,7 +68,9 @@ DISPLAY_LABELS: Final[dict[str, str]] = {
 """Labels the report prints that are too long for one line of a block's row-label column."""
 
 CAPACITY: Final[str] = "Capacity is each generator's 99th-percentile output."
-DOTS: Final[str] = "Dot: estimate. Line: 95% interval from resampling whole months."
+DOTS: Final[str] = (
+    "Dot: estimate. Line: 95% interval from resampling whole months and a fitting seed."
+)
 SCOPE: Final[str] = "Six solar farms in Lincolnshire."
 BLOCKS_NOT_COMPARABLE: Final[str] = (
     "Compare products only within a block: each block is scored on its own rows, so an error in "
@@ -84,9 +86,21 @@ STATION_SCOPE: Final[str] = (
     "station, 17 to 31 km away."
 )
 UNEQUAL_LEADS: Final[str] = (
-    "KNMI HARMONIE-AROME's lead is not measured, and ECMWF-IFS-HRES's lead is never shorter than "
-    "ICON-EU's and often longer, so their planned contrasts against ICON-EU mix weather-model "
-    "skill with lead."
+    "Several planned contrasts compare unequal leads: ICON global is served up to 6 hours ahead "
+    "against ICON-EU's 3, and at equal leads its gap closes to 0.02 points; ICON-DREAM-EU's 1 to 3 "
+    "hours against ERA5's 1 to 12; ECMWF-IFS-HRES never shorter than ICON-EU's; KNMI "
+    "HARMONIE-AROME's lead not measured."
+)
+NOT_GRIDDED: Final[str] = (
+    "In the Stations block, CAMS combined with a station observation is not a gridded product, "
+    "so the title does not cover it."
+)
+EXTRA_FOLDS: Final[str] = (
+    "Extra block: 36.9% of its hours fall in calendar months unseen in training, so its errors "
+    "run about 0.12 to 0.20 points high; see Limitations."
+)
+NESTED_BLOCKS: Final[str] = (
+    "The extra, ENS and station rows are almost entirely subsets of the main rows."
 )
 POST_HOC_NOTE: Final[str] = (
     "Rows marked (post hoc) were added after the first run: two ways of rebuilding UKV's hourly "
@@ -483,6 +497,8 @@ def leaderboard_figure(*, blocks: list[RowSetBlock]) -> alt.VConcatChart:
         subtitle=[
             "Each product's own mean absolute error, sorted best first within its block.",
             BLOCKS_NOT_COMPARABLE,
+            NOT_GRIDDED,
+            EXTRA_FOLDS,
             (
                 "Overlapping intervals do not make two products equal: the intervals are wide "
                 "mainly because every product's error swings together from month to month, a "
@@ -510,7 +526,7 @@ def contrasts_figure(*, blocks: list[RowSetBlock]) -> alt.VConcatChart:
     return stacked_contrasts(
         blocks=blocks,
         number=FIGURE_NUMBERS["contrasts"],
-        title=f"CAMS beats ERA5 by {low} to {high} points on every row set (exploratory)",
+        title=f"CAMS beats ERA5 by {low} to {high} points in each block (exploratory)",
         subtitle=[
             (
                 "Top panel of each block: each product's mean absolute error minus ERA5's. Lower "
@@ -518,6 +534,7 @@ def contrasts_figure(*, blocks: list[RowSetBlock]) -> alt.VConcatChart:
                 "second's."
             ),
             BLOCKS_NOT_COMPARABLE,
+            NESTED_BLOCKS,
             contrasts_not_comparable(cams_differences=cams),
             CAMS_EXPLORATORY,
             ENS_LEAD,

@@ -385,7 +385,7 @@ forecast study read as their reference rows, so no run of the second round can o
 """
 
 
-SOLAR_LEADERBOARD_DIR: Final[Path] = UPDATE_OUTPUT_DIR / "solar_leaderboard"
+SOLAR_LEADERBOARD_DIR: Final[Path] = UPDATE_OUTPUT_DIR / "solar_leaderboard_2"
 """Where `past_solar_leaderboard.py` writes the past-solar page's leaderboard and contrasts.
 
 Write-once: the script refuses to run where this folder exists, so the numbers a page quotes from
