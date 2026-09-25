@@ -73,6 +73,10 @@ The rule: keep the second setting for planned contrasts, for deciding contrasts 
 - Dropped unless near the line: the exploratory rows of the blending table (control minus ENS, IFS 0.25° minus ENS), and any other exploratory sensitivity figure. Each exploratory row is checked against the definition; a script prints which rows qualify, so the page states the rule and lists the rows that stay.
 - The headline charts keep the primary setting as the dot and the second setting as a marker, since they show only planned contrasts. Figure 1 (leaderboard) is primary only.
 
+## ECMWF AIFS (added by the maintainer after the plan was committed)
+
+The maintainer wants ECMWF's AIFS (its machine-learning weather model), the ensemble and the single run, in the page. No AIFS data is on disk. The download coordinator is fetching it and will report the path, cadence, lead range and start date. The plan adds AIFS as new arms once that message arrives: if the archive window is shorter than the study's rows, AIFS gets its own row set with the references (ENS day 1, and the arms it is compared with) refitted on that row set; the era rule is the study's own (rows from 2024-12-01, three eras, the rotated fold offsets); planned and exploratory are labelled (no AIFS contrast was written into the plan before a result existed, so every AIFS number is exploratory and post hoc); the second setting is shown only if a result is near the 5% line. The AIFS arms go into the same runner request as the day 5 and day 14 arms.
+
 ## What changes, file by file
 
 PR 1 (`study-skill-page-structure`):
@@ -97,12 +101,27 @@ R&D and documentation only; nothing runs in production, so nothing degrades. The
 Study scripts have no unit tests; the check is their own output. The gates are:
 
 - **Number conservation:** every decimal, and every integer of 10 or more, on the revised page appears in `git show origin/main:docs/studies/nwp-forecasts-at-matched-leads.md`, in `data/studies/nwp_forecast_comparison/report.md`, or in the new leads report. This fails if a sentence is rewritten with a number the report does not hold. Blind spots (a number attached to the wrong row; a deleted qualifier) go in the PR body.
-- **Page-number guard:** `studies/beam_diffuse_split/check_page_numbers.py` is run if it supports this report; it has run on the wind page only.
 - **SVG title against caption:** for every figure, the figure number in the SVG title equals the number in the caption, and the grep for `Figure \d+` inside SVG text matches `FIGURE_NUMBERS`.
-- **Second-setting rule:** a script lists every exploratory row on the page that shows a second setting, and each must satisfy the near-the-line definition.
-- **Lead absence:** the figure script asserts that every drawn mark has a saved arm and that no interval is computed for a lead with no arm (nothing is filled).
+- **Second-setting rule:** every exploratory row that still shows a second setting is checked by hand against the near-the-line definition (about five places on the page); the check is not committed.
+- **Lead absence:** the figure script draws a mark only for an arm present in the saved losses, so an absent lead is blank by construction and nothing is filled.
 - **Docs gates:** `uv run mkdocs build --strict` with the rendered HTML read, the docs-link check, `uv run pre-commit run --all-files`, and `pymarkdown scan`.
 - **Refit check (if it runs):** the shared-row count in the new losses equals the published run's shared rows, and each new arm's per-row loss frame joins the published ENS day-1 losses on `(site, time, seed)` with no missing key.
+
+## Plan review 1 (simplicity): triage
+
+Adopted:
+
+- The page restructure keeps sentences verbatim and moves whole sections: a new "Data and methods" H2 holds the lead rule and the XGBoost model sections, a new "Results" H2 holds the rest, existing sections drop one level, and an anchor changes only where a heading is renamed. The summary is still cut to two paragraphs, because the study skill now says so.
+- The second-setting check and the lead-absence check are cheaper: by hand, and by construction. The page-number guard is dropped (it has only ever run on the wind page).
+- The fact check and the one-rule prose sweeps cover the sentences the diff changes, not the whole page.
+
+Rejected, with reasons:
+
+- *Drop the day 5 and day 14 refit; the issue asks only for fitted leads, and the ENS-horizons page has ENS at days 5 and 14.* Rejected: the maintainer asked, through the coordinator, for refits to get the multi-lead figure, and the ENS-horizons numbers span the IFS 49r1 change (issue #892) so they are not comparable with this study's rows.
+- *Extend `studies.charts.leaderboard_panel` with a condition-colour option.* Rejected: one study calls it, and a change to `packages/studies` brings a mutation pass. The panel is drawn in the study's chart script.
+- *Merge the skill change into this PR.* Rejected: the coordinator set the skill edit as its own small PR (#915), agreed with the Past weather: Solar session.
+- *Drop the network-planner persona review.* Rejected: the coordinator specified it.
+- *Drop Figures 11 and 12.* Deferred to the maintainer: the maintainer asked for them to be recoloured, so they stay, and the PR body asks whether to drop them once the rows figure exists.
 
 ## Docs to update
 
