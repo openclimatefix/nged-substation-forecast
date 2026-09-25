@@ -483,6 +483,10 @@ bundled `validate_palette.py` (all pairs, light mode). Day 0 is ENS's run-day fo
 side and not a product a service could read, so it is black. Data Amber, Data Deep Teal and Data
 Burnt Orange are internal-use colours, approved for the lead-day charts by the maintainer."""
 
+LEAD_LABEL_ROOM: Final[float] = 1.5
+"""How far right of the baselines the leaderboard's x axis runs, in percentage points of capacity,
+leaving room for the name written beside the smart-persistence line."""
+
 LEAD_POINT_SIZE: Final[int] = 70
 """The area of one lead-day mark, in square pixels."""
 
@@ -575,7 +579,7 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
     lead_names = [f"Day {day}" for day in days]
     x_domain = padded_domain(
         low=float(rows["lower_95"].min()),  # ty: ignore[invalid-argument-type]
-        high=float(baselines["value"].max()),  # ty: ignore[invalid-argument-type]
+        high=float(baselines["value"].max()) + LEAD_LABEL_ROOM,  # ty: ignore[invalid-argument-type]
         include_zero=False,
     )
     x_scale = alt.Scale(domain=list(x_domain), nice=False, zero=False)
@@ -603,7 +607,7 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
     rules = (
         alt.Chart(separators)
         .mark_rule(color=ocf.GRID, strokeWidth=1, aria=False)
-        .encode(y=alt.Y("y:Q", scale=y_scale, axis=None))  # ty: ignore[unresolved-attribute]
+        .encode(y=alt.Y("y:Q", scale=y_scale, axis=y_axis))  # ty: ignore[unresolved-attribute]
     )
     intervals = (
         alt.Chart(data)
@@ -639,23 +643,31 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
         .mark_rule(strokeDash=[5, 3], strokeWidth=1.5, color=ocf.BLACK_1, aria=False)
         .encode(x=alt.X("value:Q", scale=x_scale, axis=x_axis, title=x_title))  # ty: ignore[unresolved-attribute]
     )
-    reference_text = (
-        alt.Chart(reference)
-        .mark_text(align="right", dx=-5, baseline="middle", fontSize=10, aria=False)
+    reference_text = [
+        alt.Chart(reference.filter(pl.col("arm") == arm))
+        .mark_text(align=align, dx=dx, baseline="middle", fontSize=10, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("value:Q", scale=x_scale, axis=x_axis, title=x_title),
             y=alt.Y("y:Q", scale=y_scale, axis=y_axis),
             text="text:N",
             color=alt.value(ocf.BLACK_1),
         )
-    )
+        for arm, align, dx in (("climatology", "right", -5), ("smart_persistence_day1", "left", 5))
+    ]
     panel = alt.LayerChart(
-        layer=[rules, reference_rules, intervals, points, reference_text],
+        layer=[rules, reference_rules, intervals, points, *reference_text],
         width=PLOT_WIDTH_PX,
         height=LEAD_ROW_PX * len(products),
     )
     return figure(
-        panels=[line_key(labels=lead_names, colours=[LEAD_COLOURS[day] for day in days]), panel],
+        panels=[
+            line_key(
+                labels=lead_names,
+                colours=[LEAD_COLOURS[day] for day in days],
+                width=PLOT_WIDTH_PX,
+            ),
+            panel,
+        ],
         number=FIGURE_NUMBERS[(domain, "leaderboard")],
         title=title,
         subtitle=[
@@ -784,17 +796,19 @@ def choose_week(*, series: pl.DataFrame, domain: DomainType) -> datetime:
     return chosen
 
 
-def line_key(*, labels: Sequence[str], colours: Sequence[str]) -> alt.LayerChart:
+def line_key(
+    *, labels: Sequence[str], colours: Sequence[str], width: int = CONTENT_WIDTH_PX - 60
+) -> alt.LayerChart:
     """Draw a one-row key of short line segments above a chart.
 
     Args:
         labels: Each entry's label.
         colours: Each entry's colour.
+        width: The key's width in pixels.
 
     Returns:
         A one-row chart.
     """
-    width = CONTENT_WIDTH_PX - 60
     slot = width // len(labels)
     data = pl.DataFrame(
         {
@@ -816,7 +830,7 @@ def line_key(*, labels: Sequence[str], colours: Sequence[str]) -> alt.LayerChart
     )
     text = (
         alt.Chart(data)
-        .mark_text(align="left", dx=24, color=ocf.BLACK_1, limit=slot - 30)
+        .mark_text(align="left", dx=22, color=ocf.BLACK_1, limit=slot - 24)
         .encode(x=alt.X("x:Q", scale=None), y=alt.value(8), text="label:N")  # ty: ignore[unresolved-attribute]
     )
     return alt.LayerChart(layer=[segments, text], width=width, height=16)
@@ -936,6 +950,9 @@ distance is 19.5, above the script's targets of 8 and 15. No seventh colour of t
 the maintainer-approved extra colours passes, so ARPEGE, which only the solar chart holds, is grey
 and dashed. Every product's name is also written beside its last point. Data Amber, Data Deep Teal
 and Data Burnt Orange are internal-use colours, approved for this chart by the maintainer."""
+
+KEY_LABELS: Final[dict[str, str]] = {"ARPEGE Europe": "ARPEGE"}
+"""Shorter names for the key above the lead-day chart, whose slots are narrow."""
 
 DASHED_PRODUCTS: Final[frozenset[str]] = frozenset({"ARPEGE Europe"})
 """Products drawn with a dashed line, because no seventh distinguishable colour exists."""
@@ -1141,7 +1158,7 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
     ends = drawn.sort("day").group_by("product", maintain_order=True).last()
     ends = ends.with_columns(
         label_y=pl.Series(
-            spread_labels(values=ends["value"].to_list(), min_gap=(y_domain[1] - y_domain[0]) / 24)
+            spread_labels(values=ends["value"].to_list(), min_gap=(y_domain[1] - y_domain[0]) / 16)
         )
     )
     end_text = (
@@ -1161,7 +1178,10 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
     )
     return figure(
         panels=[
-            line_key(labels=names, colours=[PRODUCT_COLOURS[name] for name in names]),
+            line_key(
+                labels=[KEY_LABELS.get(name, name) for name in names],
+                colours=[PRODUCT_COLOURS[name] for name in names],
+            ),
             panel,
         ],
         number=FIGURE_NUMBERS[(domain, "by_lead_day")],
