@@ -73,7 +73,7 @@ by
 a
   post hoc check, over the same model given no weather at all. The ensemble mean beats the control
   member and beats training on every member, and rebuilding solar radiation through the clear-sky
-  index beats the straight-line resample the live service uses today.
+  index beats the straight-line resample the live service uses today at days 0 to 3.
 - [Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?](forecasts/matched-lead.md)
   — at the 6 solar farms and 3 wind farms, and reading each product as the study does, ECMWF's
   ensemble mean beats UKV, ICON-EU, and GEFS at matched lead for solar; for wind it beats UKV and

@@ -73,12 +73,14 @@ repos:
         entry: uv run pymarkdown scan
         language: system
         types: [markdown]
-        exclude: ^plans/
+        # The era-fold folder holds a generated report and one-line-paragraph notes.
+        exclude: ^(plans/|studies/era_fold_design/)
       - id: lint-docstring-markdown
         name: pymarkdown (Python docstrings)
         entry: uv run python scripts/lint/lint_docstring_markdown.py
         language: system
         types: [python]
+        exclude: ^studies/era_fold_design/scripts/
       # `mkdocs build --strict` only validates links *inside* docs/, so a link to the published
       # site from a docstring, a comment, or a workflow file can point at a page a rename moved,
       # or an anchor a heading rewrite killed, with nothing to catch it. This hook does — see the

@@ -411,6 +411,9 @@ def compare_ens_rebuild(*, domain: DomainType) -> float:
     Run once by hand (not by `main`) to confirm `_ens_frame`'s direct build agrees with the
     previous implementation on the rows both hold, before relying on the direct build.
 
+    `efh.build_inputs` keeps wind only from `ROW_SET_FIRST_HOUR["wind"]` (December 2024), so the
+    wind check now covers the rows from that date only.
+
     Args:
         domain: `solar` or `wind`.
 
