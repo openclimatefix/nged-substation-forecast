@@ -191,6 +191,29 @@ def _is_complete(*, month: str, newest_init_time: np.datetime64) -> bool:
     return bool(last_day < newest_day - np.timedelta64(PUBLICATION_LAG_DAYS, "D"))
 
 
+SOURCE_GAP_NOTES: Final[dict[str, str]] = {
+    "GEFS": (
+        "`validate_dynamical_zarr.py` on 2026-09-25 found `NaN` in nine months of the full "
+        "2020-10 to 2026-09 run. Most are gaps in `wind_u_100m` and `wind_v_100m`: 2020-10 (1 "
+        "init_time, from lead 8 d 15 h), 2020-11 (3, from 4 d 3 h), 2020-12 (2, from 8 d 21 h), "
+        "2021-01 (1, from 9 d 3 h), 2021-02 (4, from 1 d 15 h), 2023-05 (1, from 16 d 6 h), "
+        "2024-10 (1, 9 rows, from 34 d 18 h), and 2026-01 (8, from 16 d 6 h; the 2026-01-25 run "
+        "only from 31 d 6 h and only for 6 members). In 2021-10 one init_time has 9 rows that "
+        "are `NaN` in every variable except the 100 m winds, from lead 24 d 12 h. The 2026-01 "
+        "gap was confirmed in the Dynamical.org store itself, so it is not a crop artefact. "
+        "Missing values were kept as `NaN`, not masked or dropped."
+    ),
+    "GFS": (
+        "`validate_dynamical_zarr.py` on 2026-09-25 found `NaN` in one month of the full "
+        "2020-10 to 2026-09 run: 2022-11, on four init_times. The 2022-11-29 12:00 UTC run is "
+        "`NaN` from lead 4 d 22 h (153 rows), and the 2022-11-29 18:00, 2022-11-30 00:00, and "
+        "2022-11-30 06:00 UTC runs from lead 2 h (522, 612, and 477 rows), in every variable. "
+        "Missing values were kept as `NaN`, not masked or dropped."
+    ),
+}
+"""Source gaps found by validation of the full run, added to each README's gotchas."""
+
+
 def _write_documentation(
     *,
     output_dir: Path,
@@ -302,6 +325,7 @@ def _write_documentation(
                 "`<month>.partial.parquet` and re-fetched on the next run, so the newest runs of "
                 "the final month may be missing."
             ),
+            SOURCE_GAP_NOTES[label],
         ],
         external_docs={
             "Dynamical.org GFS forecast": "https://dynamical.org/catalog/noaa-gfs-forecast/",
