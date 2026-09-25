@@ -31,6 +31,7 @@ import logging
 import math
 import subprocess
 import sys
+from collections import Counter
 from collections.abc import Sequence
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -42,6 +43,7 @@ import polars as pl
 from build_forecast_inputs import PRODUCT_SLUGS
 from nwp_forecast_comparison import (
     BLEND_ARMS,
+    GENERATOR_CONTRASTS,
     PERCENTAGE_POINTS,
     SETTINGS,
     DomainType,
@@ -440,7 +442,7 @@ def headline(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.VCo
         return None
     return figure(
         panels=[_contrast_panel(rows=rows, panel_title="Planned contrasts")],
-        number=1,
+        number=FIGURE_NUMBERS[(domain, "headline")],
         title=title,
         subtitle=[
             (
@@ -475,14 +477,18 @@ def leaderboard_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
         percent of capacity, sorted by `value`.
     """
     primary = by_setting(losses=losses)["primary"]
-    arms = sorted(primary["arm"].unique().to_list())
+    arms = sorted(arm for arm in primary["arm"].unique().to_list() if on_leaderboard(arm=arm))
     board = leaderboard(losses=primary, arms=arms)
     return (
         board.with_columns(
             pl.col("value", "lower_95", "upper_95") * PERCENTAGE_POINTS,
             label=pl.col("arm").map_elements(
                 lambda arm: (
-                    short_blend_label(arm=arm) if arm.startswith("blend_") else arm_label(arm=arm)
+                    short_blend_label(arm=arm)
+                    if arm.startswith("blend_")
+                    else "ENS mean day 0 (a bracket side, not a product)"
+                    if arm == "ens_mean_day0"
+                    else arm_label(arm=arm)
                 ),
                 return_dtype=pl.String,
             ),
@@ -494,6 +500,23 @@ def leaderboard_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
         .sort("value")
         .select("label", "family", "condition", "value", "lower_95", "upper_95")
     )
+
+
+def on_leaderboard(*, arm: str) -> bool:
+    """Whether the leaderboard draws `arm`: the day-1 forecasts, ENS at day 0, and two baselines.
+
+    Days 2 and 3 are on the lead-day chart, and the other no-weather baselines are far above the
+    products and would stretch the axis.
+
+    Args:
+        arm: An arm in the saved losses.
+
+    Returns:
+        True for a blend, a day-1 arm, `ens_mean_day0`, `climatology` and `smart_persistence_day1`.
+    """
+    if is_baseline_arm(arm=arm):
+        return arm in ("climatology", "smart_persistence_day1")
+    return arm.startswith("blend_") or arm == "ens_mean_day0" or arm.endswith("_day1")
 
 
 def _is_baseline(arm: str) -> bool:
@@ -529,7 +552,7 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
     )
     return figure(
         panels=[panel],
-        number=2,
+        number=FIGURE_NUMBERS[(domain, "leaderboard")],
         title=title,
         subtitle=[
             (
@@ -538,11 +561,12 @@ def leaderboard_figure(*, losses: pl.DataFrame, domain: DomainType, title: str) 
                 "given for the baselines. Primary XGBoost setting. Smaller is better."
             ),
             (
-                "Day N is the forecast's lead band in whole days. P4a blends ENS with the "
+                "Only day-1 forecasts, ENS at day 0, climatology and smart persistence at day 1 "
+                "are shown; the other days are in the lead-day figure. P4a blends ENS with the "
                 "day-1 ICON-EU and IFS 0.25°; P4b uses their day-2 forecasts. A control gives "
                 "an XGBoost model the same columns with the shuffled products' values moved "
                 "among matched hours. Overlapping intervals here can still hide a significant "
-                f"paired difference (Figure 1). {DOTS_NOTE}"
+                f"paired difference (Figure {FIGURE_NUMBERS[(domain, 'headline')]}). {DOTS_NOTE}"
             ),
             f"{scope_text(losses=losses, domain=domain)} {CAPACITY_NOTE}",
         ],
@@ -767,7 +791,7 @@ def models_work(
     )
     chart = figure(
         panels=[line_key(labels=names, colours=colours), alt.vconcat(*panels, spacing=4)],
-        number=3,
+        number=FIGURE_NUMBERS[(domain, "models_work")],
         title=title,
         subtitle=[
             (
@@ -801,6 +825,9 @@ written beside its last point."""
 
 LEAD_BAND_COLOURS: Final[tuple[str, str]] = (ocf.DATA_BLUE_LIGHT, ocf.DATA_SKY_LIGHT)
 """The shading of ENS's day-0 and day-1 intervals."""
+
+X_MAX_DAYS: Final[float] = 4.3
+"""The lead-day chart's right edge, leaving room for the product names beside day 3."""
 
 DODGE_DAYS: Final[float] = 0.03
 """Horizontal spacing between series at one lead day, in days, so intervals do not overprint."""
@@ -867,6 +894,8 @@ def lead_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
     """
     primary = by_setting(losses=losses)["primary"]
     arms = [arm for arm in sorted(primary["arm"].unique().to_list()) if lead_series_name(arm=arm)]
+    days_held = Counter(arm.rpartition("_day")[0] for arm in arms)
+    arms = [arm for arm in arms if days_held[arm.rpartition("_day")[0]] >= 3]
     board = leaderboard(losses=primary, arms=arms)
     return (
         board.with_columns(
@@ -913,7 +942,7 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
     low = float(rows["lower_95"].min())  # ty: ignore[invalid-argument-type]
     high = float(rows["upper_95"].max())  # ty: ignore[invalid-argument-type]
     y_domain = padded_domain(low=low, high=high, include_zero=False)
-    x_scale = alt.Scale(domain=[-0.5, 3.9], nice=False)
+    x_scale = alt.Scale(domain=[-0.5, X_MAX_DAYS], nice=False)
     colour = alt.Color(
         "series:N",
         scale=alt.Scale(domain=names, range=[SERIES_COLOURS[name] for name in names]),
@@ -938,7 +967,7 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
             "colour": list(LEAD_BAND_COLOURS),
             "label": ["ENS mean day-0 interval", "ENS mean day-1 interval"],
             "x0": [-0.5, -0.5],
-            "x1": [3.9, 3.9],
+            "x1": [X_MAX_DAYS, X_MAX_DAYS],
             "y_text": [float(ens.filter(pl.col("day") == day)["lower_95"][0]) for day in (0, 1)],
         }
     )
@@ -990,7 +1019,7 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
     )
     end_text = (
         alt.Chart(ends)
-        .mark_text(align="left", dx=8, fontSize=10, aria=False)
+        .mark_text(align="left", dx=12, fontSize=10, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("x:Q", scale=x_scale, axis=x_axis),
             y=alt.Y("label_y:Q", scale=alt.Scale(domain=list(y_domain), nice=False)),
@@ -1008,7 +1037,7 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
             line_key(labels=names, colours=[SERIES_COLOURS[name] for name in names]),
             panel,
         ],
-        number=4,
+        number=FIGURE_NUMBERS[(domain, "by_lead_day")],
         title=title,
         subtitle=[
             (
@@ -1020,7 +1049,8 @@ def by_lead_day(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.
             (
                 "Dot: estimate. Line: 95% interval from resampling whole months and a fitting "
                 "seed. Products at one day are drawn side by side, and the name of each is "
-                f"written beside its last point. {SHARED_ROWS_NOTE}"
+                "written beside its last point. Products with a day-1 forecast only are left "
+                f"out; the day-1 leaderboard shows them. {SHARED_ROWS_NOTE}"
             ),
             f"{scope_text(losses=losses, domain=domain)} {CAPACITY_NOTE}",
         ],
@@ -1128,7 +1158,7 @@ def blends(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.VConc
     )
     return figure(
         panels=[level_panel, contrast_panel],
-        number=5,
+        number=FIGURE_NUMBERS[(domain, "blends")],
         title=title,
         subtitle=[
             (
@@ -1148,20 +1178,153 @@ def blends(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.VConc
     )
 
 
+# --- Chart 6: one generator at a time ---------------------------------------------------------
+
+GENERATOR_CONDITIONS: Final[dict[str, str]] = {
+    "P1a": "UKV day 1 minus ENS day 1",
+    "P2a": "ICON-EU day 1 minus ENS day 1",
+    "P4b": "P4b blend minus ENS day 1",
+}
+"""Each per-generator contrast's key text; the contrasts are the report's `GENERATOR_CONTRASTS`."""
+
+GENERATOR_COLOURS: Final[tuple[str, str, str]] = (ocf.BRAND_ORANGE, ocf.DATA_BLUE, ocf.DATA_PURPLE)
+
+
+def per_generator(
+    *, losses: pl.DataFrame, domain: DomainType, title: str
+) -> alt.VConcatChart | None:
+    """Draw P1a, P2a and P4b one generator at a time, each with its 95% interval.
+
+    Args:
+        losses: Saved per-row losses.
+        domain: `solar` or `wind`.
+        title: The figure's title.
+
+    Returns:
+        The figure, or None where the contrasts' arms are absent from the losses.
+    """
+    primary = by_setting(losses=losses)["primary"]
+    records = []
+    for site in SITES[domain]:
+        site_losses = primary.filter(pl.col("site") == site)
+        for identifier, (treatment, reference) in GENERATOR_CONTRASTS.items():
+            if not arms_present(losses=site_losses, arms=(treatment, reference)):
+                continue
+            interval = difference(losses=site_losses, treatment=treatment, reference=reference)
+            records.append(
+                {
+                    "label": f"Generator {site}",
+                    "family": "weather model",
+                    "difference": interval["difference"] * PERCENTAGE_POINTS,
+                    "lower_95": interval["lower_95"] * PERCENTAGE_POINTS,
+                    "upper_95": interval["upper_95"] * PERCENTAGE_POINTS,
+                    "condition": GENERATOR_CONDITIONS[identifier],
+                }
+            )
+    if not records:
+        return None
+    rows = pl.DataFrame(records)
+    x_domain = padded_domain(
+        low=float(rows["lower_95"].min()),  # ty: ignore[invalid-argument-type]
+        high=float(rows["upper_95"].max()),  # ty: ignore[invalid-argument-type]
+        include_zero=True,
+    )
+    panel = interval_panel(
+        rows=rows,
+        x_domain=x_domain,
+        x_title=DIFFERENCE_TITLE,
+        zero_label="same error",
+        better_label="first product better",
+        conditions=list(GENERATOR_CONDITIONS.values()),
+        condition_colours=GENERATOR_COLOURS,
+        condition_title="Contrast at one generator",
+        family_key=False,
+    )
+    return figure(
+        panels=[panel],
+        number=FIGURE_NUMBERS[(domain, "per_generator")],
+        title=title,
+        subtitle=[
+            (
+                "Difference in mean absolute error between two XGBoost models, first product "
+                "minus second, in points of capacity, at each generator alone. Negative means "
+                "the first product forecasts better. Primary XGBoost setting. The 95% interval "
+                "resamples whole months and a fitting seed within one generator, so it does not "
+                "cover differences between generators. All rows are exploratory."
+            ),
+            f"{scope_text(losses=losses, domain=domain)} {CAPACITY_NOTE} {SHARED_ROWS_NOTE}",
+        ],
+        figure_planning=None,
+    )
+
+
 # --- Output -------------------------------------------------------------------------------------
 
-TITLES: Final[dict[str, str]] = {
-    "headline": (
-        "Paired differences in forecast error between the planned pairs of weather forecasts, "
-        "at two XGBoost settings"
-    ),
-    "leaderboard": "Each forecast's own error on the shared hours, best first",
-    "models_work": "Out-of-fold day-1 ENS-mean forecasts follow the measured output",
-    "by_lead_day": "Forecast error by lead day, with ENS's day-0 and day-1 errors shaded",
-    "blends": "ENS blended with two more products, against ENS alone and against its controls",
+FIGURE_NUMBERS: Final[dict[tuple[DomainType, str], int]] = {
+    ("solar", "headline"): 1,
+    ("wind", "headline"): 2,
+    ("solar", "models_work"): 3,
+    ("wind", "models_work"): 4,
+    ("solar", "per_generator"): 5,
+    ("wind", "per_generator"): 6,
+    ("solar", "leaderboard"): 7,
+    ("wind", "leaderboard"): 8,
+    ("solar", "by_lead_day"): 9,
+    ("wind", "by_lead_day"): 10,
+    ("solar", "blends"): 11,
+    ("wind", "blends"): 12,
 }
-"""Each chart's title. The plan fixes the contrasts, not their outcome, so a title names what the
-chart compares; the page's headings and bolded leads carry the finding once the report exists."""
+"""Each chart's figure number on the page, in the page's order: the headline pair opens the page."""
+
+TITLES: Final[dict[tuple[DomainType, str], str]] = {
+    ("solar", "headline"): (
+        "For solar power, ENS beats UKV and ICON-EU at matched lead and GEFS at equal lead; "
+        "a blend gains 0.35 points at an optimistic lead and none at a conservative one"
+    ),
+    ("wind", "headline"): (
+        "For wind power, ENS beats UKV, ICON-EU is unresolved against ENS, and a blend "
+        "lowers the error by 0.18 points even at a conservative lead"
+    ),
+    ("solar", "leaderboard"): (
+        "At day 1 every forecast beats climatology (14.5%); ENS and IFS 0.25° have the lowest "
+        "error of the single solar forecasts"
+    ),
+    ("wind", "leaderboard"): (
+        "At day 1 every forecast beats climatology (18.5%) by more than 9 points; ENS, IFS 0.25° "
+        "and ICON-EU have the lowest error of the single wind forecasts"
+    ),
+    ("solar", "models_work"): (
+        "Out-of-fold day-1 ENS-mean forecasts follow the measured output at all six solar farms"
+    ),
+    ("wind", "models_work"): (
+        "Out-of-fold day-1 ENS-mean forecasts follow the measured output at all three wind farms"
+    ),
+    ("solar", "per_generator"): (
+        "At each of the six solar farms UKV and ICON-EU have a higher error than ENS at day 1"
+    ),
+    ("wind", "per_generator"): (
+        "At two of the three wind farms UKV has a higher error than ENS at day 1, "
+        "and at two the P4b blend has a lower error"
+    ),
+    ("solar", "by_lead_day"): (
+        "Solar error rises with lead day for every forecast, and no product beats the ENS mean "
+        "at matched lead"
+    ),
+    ("wind", "by_lead_day"): (
+        "Wind error rises with lead day for every forecast, and no product beats the ENS mean "
+        "at matched lead"
+    ),
+    ("solar", "blends"): (
+        "For solar power a blend of ENS, ICON-EU and IFS 0.25° gains 0.35 points at an "
+        "optimistic lead, but its control is itself worse than ENS alone"
+    ),
+    ("wind", "blends"): (
+        "For wind power a blend of ENS, ICON-EU and IFS 0.25° lowers the error by 0.66 points at "
+        "an optimistic lead and 0.18 points at a conservative lead, and its control does not"
+    ),
+}
+"""Each chart's title, stating the finding for the products tested. Every number is in
+`report.md`."""
 
 
 def optimise(*, path: Path) -> None:
@@ -1195,15 +1358,20 @@ def draw_domain(
     losses, predictions = load(input_dir=input_dir, domain=domain)
     week_month: str | None = None
     charts: dict[str, alt.VConcatChart | None] = {
-        "headline": headline(losses=losses, domain=domain, title=TITLES["headline"]),
+        "headline": headline(losses=losses, domain=domain, title=TITLES[(domain, "headline")]),
         "leaderboard": leaderboard_figure(
-            losses=losses, domain=domain, title=TITLES["leaderboard"]
+            losses=losses, domain=domain, title=TITLES[(domain, "leaderboard")]
         ),
-        "by_lead_day": by_lead_day(losses=losses, domain=domain, title=TITLES["by_lead_day"]),
-        "blends": blends(losses=losses, domain=domain, title=TITLES["blends"]),
+        "by_lead_day": by_lead_day(
+            losses=losses, domain=domain, title=TITLES[(domain, "by_lead_day")]
+        ),
+        "blends": blends(losses=losses, domain=domain, title=TITLES[(domain, "blends")]),
+        "per_generator": per_generator(
+            losses=losses, domain=domain, title=TITLES[(domain, "per_generator")]
+        ),
     }
     work, week_month = models_work(
-        losses=losses, predictions=predictions, domain=domain, title=TITLES["models_work"]
+        losses=losses, predictions=predictions, domain=domain, title=TITLES[(domain, "models_work")]
     )
     charts["models_work"] = work
     return {name: chart for name, chart in charts.items() if chart is not None}, week_month
