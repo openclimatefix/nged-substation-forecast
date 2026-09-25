@@ -8,16 +8,16 @@ with no era cut, although the past-wind study found a step in ENS's and HRES's 1
 date (#892).
 
 **The plan.** Measure both effects first, in scratch, on one wind study and one solar study. Then
-add opt-in options to `packages/studies` (a covering era-fold design, and an IFS 49r1 boundary
-constant), pin today's default behaviour with tests, and stop with a recommendation. Whether to
-re-run published pages is the maintainer's decision after the measurement, so this plan writes no
-study re-run.
+publish the measurement on #868 with a recommendation and no library change, and rewrite the
+ENS-horizons page's wind claims (#892) from a re-run on rows from 2024-12-01. The re-run needs the
+maintainer's go-ahead, because it writes new outputs under `data/studies/`.
 
 ## Verdict, size and departures
 
 - **Verdict:** worth doing. The past-wind study (PR #885) already solved the problem for its own row
   set with `cut_eras` and `ENS_HRES_WIND_ERA_FOLD_OFFSETS`, so the machinery exists and the
-  remaining work is generalising it and measuring the effect on the other pages.
+  remaining work is measuring the effect on the other pages and applying the same pinned-offsets
+  pattern where a study is re-run.
 - **Size: complex.** The five triggers:
     - *What gets stored:* fires. It adds options to `studies.cross_validation`, and a published
       page's numbers can change if the maintainer chooses to re-run.
