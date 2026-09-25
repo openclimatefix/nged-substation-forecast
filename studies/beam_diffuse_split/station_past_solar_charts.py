@@ -1,4 +1,4 @@
-"""Draw the station-arm charts for the past-solar study.
+"""Draw the station-arm charts for the past-solar study, and the per-generator chart.
 
 One-off throwaway script for the charts of the weather-station addition to
 <https://github.com/openclimatefix/nged-substation-forecast/issues/810>, in
@@ -27,9 +27,13 @@ from pathlib import Path
 from typing import Final
 
 import altair as alt
-import plotting.ocf_theme as ocf
 import polars as pl
 from build_dataset import _pv_sites
+from ens_past_solar import DECIDING_CONTRASTS
+from ens_past_solar import OUTPUT_DIR as ENS_OUTPUT_DIR
+from ens_past_solar_charts import NAMES as ENS_NAMES
+from ens_past_solar_charts import per_generator_rows
+from figure_numbers import FIGURE_NUMBERS, FigureKey
 from station_past_solar import (
     BLEND_ARM,
     BLEND_CONTROL_ARM,
@@ -42,29 +46,15 @@ from station_past_solar import (
     build_rows,
     jobs,
 )
-from studies.bootstrap import bootstrap_absolute
 from studies.charts import (
-    FAMILY_COLOURS,
     ProductFamily,
-    assert_matches_printed,
     figure,
     interval_panel,
-    leaderboard_panel,
     report_contrasts,
-    report_errors,
 )
 from weather_product_charts import (
-    MODELS_WORK_MIN_DAYLIGHT_HOURS,
-    MODELS_WORK_MONTHS,
     MODELS_WORK_SITES,
-    SOLAR_WEEK_CRITERIA,
-    SOLAR_WEEK_DISPLAY_ORDER,
-    _models_work_long_frame,
-    _models_work_timeseries,
-    _pick_weeks,
-    _reconstruct_predicted,
 )
-from weather_products import METRIC, PERCENTAGE_POINTS
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
@@ -132,17 +122,9 @@ ONE_STATION: Final[str] = (
     "All six generators take the same nearest radiation station, {low} to {high} km away, so the "
     "station rows rest on one pyranometer."
 )
-LEADERBOARD_X_TITLE: Final[str] = "Mean absolute error (% of capacity; smaller is better)"
 X_TITLE: Final[str] = "Difference in mean absolute error (points of capacity)"
 DOMAIN_MARGIN: Final[float] = 0.3
 """How far past the lowest and highest value a figure's x domain extends."""
-
-FIGURE_LEADERBOARD: Final[int] = 21
-FIGURE_PLANNED: Final[int] = 22
-FIGURE_MODELS_WORK: Final[int] = 20
-FIGURE_PER_GENERATOR: Final[int] = 23
-FIGURE_STATIONS: Final[int] = 25
-FIGURE_CONTROLS: Final[int] = 24
 
 
 def _check_report(
@@ -193,15 +175,6 @@ def _check_report(
         raise ValueError(msg)
 
 
-def _row_count(*, report: str) -> int:
-    """Read the number of common site-hours from the report's heading."""
-    match = re.search(r"on ([\d,]+) common site-hours", report)
-    if match is None:
-        msg = "report.md has no 'on N common site-hours' heading"
-        raise ValueError(msg)
-    return int(match[1].replace(",", ""))
-
-
 def _nearest_range(*, report: str) -> tuple[str, str]:
     """Read the pooled distance range of the nearest radiation station from the report."""
     match = re.search(r"The nearest radiation station is (\d+) to (\d+) km", report)
@@ -244,139 +217,25 @@ def _domain(*, rows: pl.DataFrame) -> tuple[float, float]:
     )
 
 
-def _leaderboard(
-    *, losses: pl.DataFrame, errors: dict[str, float], report: str
-) -> alt.VConcatChart:
-    """Draw every real input's own mean absolute error, best first, with its 95% interval.
+def _per_generator(*, contrasts: pl.DataFrame, ens_rows: list[pl.DataFrame]) -> alt.VConcatChart:
+    """Draw each planned contrast at each generator, one panel per contrast: ENS's, then stations'.
 
     Args:
-        losses: Every arm's losses at the `pooled` setting.
-        errors: Each arm's pooled mean absolute error, read from the report's first table.
-        report: The report's text.
+        contrasts: Every contrast table the station report holds.
+        ens_rows: `ens_past_solar_charts.per_generator_rows`'s output, one frame per planned ENS
+            contrast, in `ens_past_solar.DECIDING_CONTRASTS` order.
 
     Returns:
         The figure.
 
     Raises:
-        ValueError: If a bootstrapped point estimate disagrees with the report's own number.
-    """
-    order = sorted(LEADERBOARD_ARMS, key=errors.__getitem__)
-    records = []
-    for arm in order:
-        interval = bootstrap_absolute(losses=losses, arm=arm, metric=METRIC)
-        value = interval["value"] * PERCENTAGE_POINTS
-        assert_matches_printed(name=arm, recomputed=value, printed=errors[arm])
-        records.append(
-            {
-                "label": NAMES[arm],
-                "family": FAMILIES[arm],
-                "value": value,
-                "lower_95": interval["lower_95"] * PERCENTAGE_POINTS,
-                "upper_95": interval["upper_95"] * PERCENTAGE_POINTS,
-            }
-        )
-    rows = pl.DataFrame(records)
-    domain = (
-        min(rows["lower_95"].to_list()) - DOMAIN_MARGIN,
-        max(rows["upper_95"].to_list()) + DOMAIN_MARGIN,
-    )
-    panel = leaderboard_panel(rows=rows, x_domain=domain, x_title=LEADERBOARD_X_TITLE)
-    return figure(
-        panels=[panel],
-        number=FIGURE_LEADERBOARD,
-        figure_planning=None,
-        title="The nearest station beats ERA5 but not CAMS, and adds to CAMS",
-        subtitle=[
-            (
-                f"Every input scored on the same {_row_count(report=report):,} site-hours, "
-                "each through its own XGBoost model."
-            ),
-            (
-                "The station rows also read the station's own air temperature. The top row is "
-                "CAMS with the station's irradiance added."
-            ),
-            _one_station_line(report=report),
-            DOTS,
-            CAPACITY,
-            SCOPE,
-        ],
-    )
-
-
-def _planned_contrasts(*, contrasts: pl.DataFrame, report: str) -> alt.VConcatChart:
-    """Draw the three planned contrasts.
-
-    Args:
-        contrasts: Every contrast table the report holds.
-        report: The report's text.
-
-    Returns:
-        The figure.
-
-    Raises:
-        ValueError: If the report does not hold exactly the three planned contrasts.
-    """
-    selected = _contrast_rows(contrasts=contrasts, section=SECTION_PLANNED)
-    if selected.height != len(PLANNED_CONTRASTS):
-        msg = f"expected {len(PLANNED_CONTRASTS)} planned contrasts, found {selected.height}"
-        raise ValueError(msg)
-    rows = _labelled(rows=selected, planned=True)
-    difference = {
-        (t, r): d
-        for t, r, d in zip(rows["treatment"], rows["reference"], rows["difference"], strict=True)
-    }
-    panel = interval_panel(
-        rows=rows,
-        x_domain=_domain(rows=rows),
-        x_title=X_TITLE,
-        zero_label="no difference",
-        better_label="first input better",
-        panel_title="The three planned contrasts",
-        figure_planning="planned",
-    )
-    against_cams = difference[PLANNED_CONTRASTS[0]]
-    against_era5 = -difference[PLANNED_CONTRASTS[1]]
-    added = -difference[PLANNED_CONTRASTS[2]]
-    return figure(
-        panels=[panel],
-        number=FIGURE_PLANNED,
-        figure_planning=None,
-        title=(
-            f"The nearest station trails CAMS by {against_cams:.3f} points, beats ERA5 by "
-            f"{against_era5:.3f}, and lowers CAMS's error by {added:.3f}"
-        ),
-        subtitle=[
-            (
-                "All rows are planned: written into the study plan before any station model was "
-                "fitted. Each contrast holds at the second hyperparameter setting."
-            ),
-            (
-                "The last row pairs CAMS and the station with CAMS and a shuffled copy of the "
-                "station's irradiance, which carries the same number of columns."
-            ),
-            _one_station_line(report=report),
-            f"{DOTS} {CAPACITY}",
-            SCOPE,
-        ],
-    )
-
-
-def _per_generator(*, contrasts: pl.DataFrame, report: str) -> alt.VConcatChart:
-    """Draw each planned contrast at each generator, one panel per contrast.
-
-    Args:
-        contrasts: Every contrast table the report holds.
-        report: The report's text.
-
-    Returns:
-        The figure.
-
-    Raises:
-        ValueError: If a contrast lacks a row for a generator.
+        ValueError: If a station contrast lacks a row for a generator.
     """
     per_site = contrasts.filter(pl.col("section") == SECTION_PER_GENERATOR)
-    panels = []
-    frames = []
+    panel_rows = [
+        (f"ENS rows: {ENS_NAMES[t]} − {ENS_NAMES[r]}", "weather model", rows)
+        for (t, r), rows in zip(DECIDING_CONTRASTS, ens_rows, strict=True)
+    ]
     for treatment, reference in PLANNED_CONTRASTS:
         selected = per_site.filter(
             pl.col("treatment") == treatment, pl.col("reference") == reference
@@ -384,33 +243,37 @@ def _per_generator(*, contrasts: pl.DataFrame, report: str) -> alt.VConcatChart:
         if selected.height != len(MODELS_WORK_SITES):
             msg = f"{treatment} − {reference}: expected one row per generator"
             raise ValueError(msg)
-        frames.append(
-            selected.select(
-                "difference",
-                "lower_95",
-                "upper_95",
-                label=pl.col("scope").str.replace("site ", "Generator "),
-                family=pl.lit(FAMILIES[treatment]),
-                planned=pl.lit(value=False),
+        panel_rows.append(
+            (
+                f"Station rows: {NAMES[treatment]} − {NAMES[reference]}",
+                FAMILIES[treatment],
+                selected.select(
+                    "difference",
+                    "lower_95",
+                    "upper_95",
+                    label=pl.col("scope").str.replace("site ", "Generator "),
+                    family=pl.lit(FAMILIES[treatment]),
+                    planned=pl.lit(value=False),
+                ),
             )
         )
-    domain = _domain(rows=pl.concat(frames))
-    for (treatment, reference), rows in zip(PLANNED_CONTRASTS, frames, strict=True):
-        panels.append(
-            interval_panel(
-                rows=rows,
-                x_domain=domain,
-                x_title=X_TITLE,
-                zero_label="no difference",
-                better_label="first input better",
-                panel_title=f"{NAMES[treatment]} − {NAMES[reference]}",
-                figure_planning="exploratory",
-                family_key=False,
-            )
+    domain = _domain(rows=pl.concat([rows.select(_DOMAIN_COLUMNS) for _, _, rows in panel_rows]))
+    panels = [
+        interval_panel(
+            rows=rows,
+            x_domain=domain,
+            x_title=X_TITLE if index == len(panel_rows) - 1 else "",
+            zero_label="no difference",
+            better_label="first input better",
+            panel_title=title,
+            figure_planning="exploratory",
+            family_key=False,
         )
+        for index, (title, _, rows) in enumerate(panel_rows)
+    ]
     return figure(
         panels=panels,
-        number=FIGURE_PER_GENERATOR,
+        number=FIGURE_NUMBERS["per_generator"],
         figure_planning="exploratory",
         title="Each planned contrast has the same sign at all six generators",
         subtitle=[
@@ -420,9 +283,16 @@ def _per_generator(*, contrasts: pl.DataFrame, report: str) -> alt.VConcatChart:
                 "six independent replications."
             ),
             f"{DOTS} {CAPACITY}",
-            SCOPE,
+            (
+                "Six solar farms in Lincolnshire. The ENS and station panels are scored on "
+                "different rows."
+            ),
         ],
     )
+
+
+_DOMAIN_COLUMNS: Final[tuple[str, str]] = ("lower_95", "upper_95")
+"""The columns a shared x range must cover."""
 
 
 def _bound(*, contrasts: pl.DataFrame, keys: tuple[tuple[str, str], ...]) -> float:
@@ -458,7 +328,7 @@ def _exploratory(
     *,
     contrasts: pl.DataFrame,
     keys: list[tuple[str, str]],
-    number: int,
+    number: FigureKey,
     title: str,
     subtitle: list[str],
     panel_title: str,
@@ -468,7 +338,7 @@ def _exploratory(
     Args:
         contrasts: Every contrast table the report holds.
         keys: The (treatment, reference) pairs to draw, top to bottom.
-        number: The figure's number.
+        number: The figure's key in `FIGURE_NUMBERS`.
         title: The finding the figure shows.
         subtitle: Short lines for the caption.
         panel_title: The panel's title.
@@ -499,89 +369,15 @@ def _exploratory(
     )
     return figure(
         panels=[panel],
-        number=number,
+        number=FIGURE_NUMBERS[number],
         figure_planning="exploratory",
         title=title,
         subtitle=[*subtitle, f"{DOTS} {CAPACITY}", SCOPE],
     )
 
 
-def _models_work(*, frame: pl.DataFrame, losses: pl.DataFrame) -> alt.VConcatChart:
-    """Draw out-of-fold power against measured power, for the station and CAMS inputs.
-
-    The weeks come from measured power alone, by the rule `weather_product_charts.py` uses, so no
-    input's values enter the choice. The x axis counts days 1 to 7 and every mark has
-    `aria=False`.
-
-    Args:
-        frame: This section's row set, carrying measured power.
-        losses: Every arm's losses at the `pooled` setting.
-
-    Returns:
-        The figure.
-    """
-    measured = frame.select(
-        "site", "time", "power_mw", "effective_capacity_mw", "extraterrestrial_horizontal_w_m2"
-    )
-    labels = {
-        STATION_ARM: "XGBoost model given the nearest station",
-        "cams_global": "XGBoost model given CAMS",
-    }
-    order = ("Measured", *labels.values())
-    predicted = tuple(
-        (_reconstruct_predicted(losses=losses, measured=measured, arm=arm), label)
-        for arm, label in labels.items()
-    )
-    hourly = measured.filter(
-        (pl.col("extraterrestrial_horizontal_w_m2") > 0)
-        & pl.col("time").dt.month().is_in(MODELS_WORK_MONTHS)
-    ).with_columns(
-        output_frac=pl.col("power_mw").cast(pl.Float64) / pl.col("effective_capacity_mw")
-    )
-    weeks = _pick_weeks(
-        hourly=hourly,
-        min_hours=MODELS_WORK_MIN_DAYLIGHT_HOURS,
-        agg="sum",
-        criteria=SOLAR_WEEK_CRITERIA,
-    )
-    long_frame = (
-        _models_work_long_frame(measured=measured, predicted=predicted)
-        .with_columns(week=pl.col("time").dt.truncate("1w"))
-        .join(weeks, on="week", how="inner")
-    )
-    return _models_work_timeseries(
-        long_frame=long_frame,
-        sites=MODELS_WORK_SITES,
-        week_order=SOLAR_WEEK_DISPLAY_ORDER,
-        order=order,
-        colours=(
-            ocf.TEXT,
-            FAMILY_COLOURS[FAMILIES[STATION_ARM]],
-            FAMILY_COLOURS[FAMILIES["cams_global"]],
-        ),
-        number=FIGURE_MODELS_WORK,
-        title=(
-            "An XGBoost model given the nearest station follows measured power at every "
-            "generator, across a clear, a variable, and a dull week"
-        ),
-        subtitle=[
-            (
-                "Out-of-fold power as a percentage of the generator's own capacity, each "
-                "prediction held to the export cap as the scores are."
-            ),
-            (
-                "Weeks are picked from measured power alone, pooled over the six generators, "
-                "April to September: the clearest has the most output, the dullest the least, "
-                "and the most variable the largest swing in daily output."
-            ),
-            CAPACITY,
-            SCOPE,
-        ],
-    )
-
-
 def main() -> int:
-    """Check the report, then write the six SVGs."""
+    """Check the report, then write the station SVGs."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     argparse.ArgumentParser(description=__doc__).parse_args()
     report_path = OUTPUT_DIR / "report.md"
@@ -604,8 +400,6 @@ def main() -> int:
         candidates=candidates,
     )
     contrasts = report_contrasts(report_path=report_path)
-    errors = report_errors(report_path=report_path, column="All sites")
-    losses = all_losses.filter(pl.col("setting") == "pooled")
     era5_gain = -_difference(contrasts=contrasts, key=("station_era5_xgb", "station_era5_control"))
     cams_gain = -_difference(contrasts=contrasts, key=(BLEND_ARM, "cams_global"))
     null_bound = max(
@@ -613,12 +407,10 @@ def main() -> int:
         _bound(contrasts=contrasts, keys=TEMPERATURE_KEYS),
     )
     charts = {
-        "station_past_solar_leaderboard": _leaderboard(losses=losses, errors=errors, report=report),
-        "station_past_solar_planned_contrasts": _planned_contrasts(
-            contrasts=contrasts, report=report
+        "station_past_solar_per_generator": _per_generator(
+            contrasts=contrasts,
+            ens_rows=per_generator_rows(report_path=ENS_OUTPUT_DIR / "report.md"),
         ),
-        "station_past_solar_models_work": _models_work(frame=frame, losses=losses),
-        "station_past_solar_per_generator": _per_generator(contrasts=contrasts, report=report),
         "station_past_solar_stations": _exploratory(
             contrasts=contrasts,
             keys=[
@@ -630,7 +422,7 @@ def main() -> int:
                 ("station_rank2", "era5_global"),
                 ("station_rank3", "era5_global"),
             ],
-            number=FIGURE_STATIONS,
+            number="station_stations",
             title=(
                 "Averaging three stations beats the nearest station alone, and the third-nearest "
                 "station scores no better than ERA5"
@@ -653,7 +445,7 @@ def main() -> int:
                 ("station_era5_xgb", "station_era5_control"),
                 (BLEND_ARM, "cams_global"),
             ],
-            number=FIGURE_CONTROLS,
+            number="station_controls",
             title=(
                 f"The real station column lowers ERA5's error by {era5_gain:.3f} points against "
                 f"a shuffled column, and CAMS's error by {cams_gain:.3f} points against plain "

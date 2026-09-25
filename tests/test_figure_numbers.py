@@ -29,18 +29,59 @@ def test_figure_numbers_run_from_1_to_17_with_no_gap_or_duplicate() -> None:
     assert numbers == list(range(1, 18))
 
 
-def test_every_previous_svg_feeds_a_figure_or_is_listed_as_dropped() -> None:
+def test_every_solar_svg_feeds_a_figure_or_is_listed_as_superseded() -> None:
     # Catches a solar-page SVG the map forgot, whose number would then be typed by hand.
     module = _load()
     stems = {
         path.stem for path in ASSETS_DIR.glob("*.svg") if path.stem.startswith(SOLAR_SVG_PREFIXES)
     }
 
-    assert stems <= set(module.SVG_FIGURES)
+    assert stems <= set(module.SVG_FIGURES) | module.SUPERSEDED_SVGS
+
+
+def test_a_superseded_svg_feeds_no_figure() -> None:
+    # Catches a stem that is both drawn for a figure and listed for deletion.
+    module = _load()
+
+    assert not set(module.SVG_FIGURES) & module.SUPERSEDED_SVGS
 
 
 def test_every_figure_key_named_by_an_svg_has_a_number() -> None:
     module = _load()
-    keys = {key for key in module.SVG_FIGURES.values() if key is not None}
+    keys = set(module.SVG_FIGURES.values())
 
     assert keys == set(module.FIGURE_NUMBERS)
+
+
+def test_figure_numbers_follow_the_page_order_of_the_outline() -> None:
+    # Catches a figure numbered against the order its section comes in on the page.
+    numbers = _load().FIGURE_NUMBERS
+
+    order = sorted(numbers, key=numbers.__getitem__)
+
+    assert order[-8:] == [
+        "weather_model_rivals",
+        "neighbours",
+        "own_beam",
+        "ens_exploratory",
+        "station_controls",
+        "station_stations",
+        "per_generator",
+        "implied_capacity",
+    ]
+    assert numbers["contrasts"] == 2
+
+
+def test_the_svgs_map_to_the_figures_the_outline_names() -> None:
+    module = _load()
+    figures = module.SVG_FIGURES
+
+    def stems(key: str) -> set[str]:
+        return {stem for stem, figure in figures.items() if figure == key}
+
+    assert stems("leaderboard") == {"sunshine_leaderboard"}
+    assert stems("contrasts") == {"sunshine_contrasts"}
+    assert stems("weather_model_rivals") == {"sunshine_weather_model_rivals"}
+    assert stems("per_generator") == {"station_past_solar_per_generator"}
+    assert figures["sunshine_own_beam"] == "own_beam"
+    assert figures["station_past_solar_controls"] == "station_controls"

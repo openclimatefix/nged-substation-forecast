@@ -508,12 +508,13 @@ STATION_INTERVAL: Final[list[float]] = [0.994766, 0.58524, 1.45206]
 """The full-precision value, lower and upper end behind `STATION_REPORT`'s row."""
 
 
-def _check_station_page(*, directory: Path, page_number: str) -> int:
+def _check_station_page(*, directory: Path, page_number: str, report: str = STATION_REPORT) -> int:
     """Check a one-triple page against `STATION_REPORT` and its `intervals.parquet`.
 
     Args:
         directory: Where to write the files.
         page_number: The triple as the page quotes it, such as `0.99 [0.59, 1.45]`.
+        report: The report text.
 
     Returns:
         How many numbers were checked.
@@ -524,7 +525,7 @@ def _check_station_page(*, directory: Path, page_number: str) -> int:
     page_path, report_path = _write(
         directory=directory,
         page=f"## ECMWF wind\n\nThe gap was {page_number}.\n",
-        report=STATION_REPORT,
+        report=report,
     )
     return page_numbers.check_page_numbers(
         page_path=page_path, report_path=report_path, heading=HEADING, intervals_path=intervals
@@ -546,6 +547,17 @@ def test_a_three_decimal_report_row_rejects_a_page_number_that_is_0_01_off(
 ) -> None:
     with pytest.raises(ValueError, match=r"not in report\.md"):
         _check_station_page(directory=tmp_path, page_number=page_number)
+
+
+def test_an_unsigned_report_row_is_matched_through_its_full_precision_values(
+    tmp_path: Path,
+) -> None:
+    """The leaderboard report prints absolute errors unsigned, and 0.995 would round up to 1.00."""
+    report = "| `ukv_station_wind` | 7 | 0.995 | [0.585, 1.452] | 34,156 |\n"
+
+    assert (
+        _check_station_page(directory=tmp_path, page_number="0.99 [0.59, 1.45]", report=report) == 1
+    )
 
 
 def test_print_decimals_are_read_from_the_report_brackets() -> None:
