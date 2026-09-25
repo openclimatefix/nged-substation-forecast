@@ -347,7 +347,9 @@ snapshot rebuilds, the hour-by-hour and by-lead breakdowns, and the split of ICO
 were added after the first run.
 - **A longer record for two questions.** The year-by-year comparison with ERA5 and SARAH-3's
   comparison by satellite use the record row set, described under [Row sets](methods.md#row-sets).
-  Every other figure on this page uses
+  Every other figure on this page uses the eight-product row set, except the section [The four extra
+  Open-Meteo models](#the-four-extra-open-meteo-models), which uses its own 12-product row set from
+  November 2024.
 
 The [Methods page](methods.md#bootstrap-intervals) says where the fold-cutting and bootstrap code
 lives and how it is tested.
