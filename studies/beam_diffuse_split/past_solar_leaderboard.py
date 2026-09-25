@@ -181,6 +181,7 @@ class RowSet(NamedTuple):
         exploratory_in_planned: Contrasts that the report prints under `planned_section` and
             labels exploratory, each as (first arm, second arm).
         wide_contrast_tables: Whether the report's contrast tables carry a `Months` column.
+        hours_unit: What a row of the row set is called in headings: solar rows are site-hours.
     """
 
     key: str
@@ -203,6 +204,7 @@ class RowSet(NamedTuple):
     other_fit_sections: tuple[str, ...] = OTHER_FIT_SECTION_PREFIXES
     exploratory_in_planned: tuple[tuple[str, str], ...] = ()
     wide_contrast_tables: bool = False
+    hours_unit: str = "site-hours"
 
 
 class RowSetResult(NamedTuple):
@@ -1088,7 +1090,7 @@ def score_row_set(
                 report_text=report_text,
                 section_prefix=row_set.leaderboard_section,
                 column=row_set.printed_column,
-                arm_suffix="",
+                arm_suffix=row_set.arm_suffix,
                 intervals=row_set.intervals,
             ),
             decimals=row_set.printed_decimals,
@@ -1207,7 +1209,10 @@ def render_report(
     lines = [f"# {title}", "", introduction, ""]
     for result in results:
         lines += [
-            f"### {result.row_set.label}: {result.dates}, {result.site_hours:,} site-hours",
+            (
+                f"### {result.row_set.label}: {result.dates}, {result.site_hours:,} "
+                f"{result.row_set.hours_unit}"
+            ),
             "",
             "#### Mean absolute error",
             "",

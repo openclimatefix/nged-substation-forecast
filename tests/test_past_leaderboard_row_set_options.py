@@ -55,7 +55,7 @@ def _contrast_values(*, losses: pl.DataFrame, setting: str) -> tuple[float, ...]
     return row["difference"], row["lower_95"], row["upper_95"]
 
 
-def _report(*, losses: pl.DataFrame, tweak: str | None = None) -> str:
+def _report(*, losses: pl.DataFrame, tweak: str | None = None, suffix: str = "") -> str:
     """Print a report the script recomputes exactly, optionally with one edit."""
     absolute = block_leaderboard_rows(
         losses=losses, arms=ARMS, setting="pooled", site_hours=SITE_HOURS, metric=METRIC
@@ -83,9 +83,10 @@ def _report(*, losses: pl.DataFrame, tweak: str | None = None) -> str:
         "| Arm | Wind columns | MAE (pp of capacity) | 95% interval | Rows |",
         "|---|---|---|---|---|",
     ]
-    by_label = {arm.label: arm.arm for arm in ARMS}
+    by_label = {arm.label: arm.arm.removesuffix(suffix) for arm in ARMS}
     for row in absolute.iter_rows(named=True):
         value, low, high = (round(row[name], 4) for name in ("value", "lower_95", "upper_95"))
+        high += 0.01 if tweak == "wrong_interval" and row["label"] == "ERA5" else 0.0
         interval = "" if tweak == "blank_interval" else f"[{low:.4f}, {high:.4f}]"
         lines.append(
             f"| `{by_label[row['label']]}` | 3 | {value:.4f} | {interval} | {SITE_HOURS} |"
@@ -139,11 +140,11 @@ def _row_set(module: Any, tmp_path: Path) -> Any:
     )
 
 
-def _score(*, tmp_path: Path, tweak: str | None = None, **changes: Any) -> Any:
+def _score(*, tmp_path: Path, tweak: str | None = None, suffix: str = "", **changes: Any) -> Any:
     module = _load()
     losses = _fine_losses()
     report_path = tmp_path / "report.md"
-    text = _report(losses=losses, tweak=tweak)
+    text = _report(losses=losses, tweak=tweak, suffix=suffix)
     report_path.write_text(text)
     row_set = _row_set(module, tmp_path)._replace(**changes)
     return module.score_row_set(
@@ -340,3 +341,14 @@ def test_the_shared_run_writes_the_title_it_is_given(tmp_path: Path) -> None:
 
     text = (tmp_path / "out" / "report.md").read_text()
     assert text.startswith("# Wind title\n\nIntro.\n")
+
+
+def test_the_arm_suffix_is_added_to_the_names_of_the_printed_intervals(tmp_path: Path) -> None:
+    # Catches interval names read without the suffix, so a product's interval is never checked:
+    # the wind reports print `era5`, and the arm is `era5_wind`.
+    row_set = {"arm_suffix": "_global", "leaderboard_arms": ARMS[:2]}
+    result = _score(tmp_path=tmp_path, suffix="_global", **row_set)
+
+    assert result.site_hours == SITE_HOURS
+    with pytest.raises(ValueError, match="interval"):
+        _score(tmp_path=tmp_path, suffix="_global", tweak="wrong_interval", **row_set)
