@@ -4,6 +4,8 @@ import numpy as np
 import polars as pl
 import pytest
 from studies.gfs_native import (
+    HOURLY_SERVED_LAST_DAY,
+    LAST_HOURLY_LEAD_HOURS,
     DomainType,
     gfs_leads,
     served_init_time,
@@ -178,3 +180,42 @@ def test_day_zero_reads_the_freshest_run_at_a_lead_of_zero_to_five_hours_for_win
 
     assert served["lead"].to_list() == [0, 1, 2, 3, 4, 5] * 4
     assert served["init"][6] == datetime(2025, 3, 10, 6, tzinfo=UTC)
+
+
+@pytest.mark.parametrize(
+    ("missing", "spoiled"),
+    [(12, [12]), (120, [120]), (123, [123, 126]), (126, [126])],
+)
+def test_a_missing_mean_at_a_reset_spoils_no_step_of_the_next_window(
+    missing: int, spoiled: list[int]
+) -> None:
+    leads = gfs_leads(last_lead=132)
+    served, _ = _windows_and_steps(hourly=_truth()[:, :132], leads=leads)
+    served[:, list(leads).index(missing)] = np.nan
+
+    nan_steps = np.isnan(step_means(values=served, leads=leads)).all(axis=0)
+
+    assert leads[nan_steps].tolist() == spoiled
+
+
+@pytest.mark.parametrize("last_lead", [0, -3, 385])
+def test_a_lead_outside_the_run_raises_a_value_error(last_lead: int) -> None:
+    with pytest.raises(ValueError, match="not a GFS lead"):
+        gfs_leads(last_lead=last_lead)
+
+
+@pytest.mark.parametrize("domain", ["solar", "wind"])
+def test_the_last_directly_read_day_is_the_last_whose_leads_are_all_hourly(
+    domain: DomainType,
+) -> None:
+    frame = _times(start=datetime(2025, 3, 10, 0)).vstack(_times(start=datetime(2025, 3, 11, 0)))
+
+    def longest(day: int) -> int:
+        return (
+            frame.select(served_lead_hours(time=pl.col("time"), day=day, domain=domain))
+            .max()
+            .item()
+        )
+
+    assert longest(HOURLY_SERVED_LAST_DAY) <= LAST_HOURLY_LEAD_HOURS
+    assert longest(HOURLY_SERVED_LAST_DAY + 1) > LAST_HOURLY_LEAD_HOURS

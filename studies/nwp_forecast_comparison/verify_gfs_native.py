@@ -16,7 +16,7 @@ it after `build_forecast_inputs.py --extra-leads --batch third` and before `fit_
    window mean by at least 15%, so a 3-hourly value that were a plain 3-hour mean would sit closer
    to the 3-hour figure, and the check fails. A second table gives, for each window length of 1 to
    6 hours (hours where the window is shorter than 6 hours included), the share of recovered step
-   means below -1 W/m2 before clipping, which must be small if the windows are right, and shows
+   means below -3 W/m2 before clipping, which must be small if the windows are right, and shows
    that lead 0 holds no radiation while it holds temperature and wind.
 2. `gfs_served_runs.md`: the run and lead each target hour reads at each lead day, for solar and
    wind, worked out twice (`studies.gfs_native`'s expressions and plain Python) and required to
@@ -84,8 +84,12 @@ area, so the recovered step mean must be near zero."""
 MAX_NIGHT_W_M2: Final[float] = 5.0
 """The largest mean recovered step radiation at a night hour."""
 
-NEGATIVE_W_M2: Final[float] = -1.0
-"""A recovered step mean below this before clipping counts as negative."""
+NEGATIVE_W_M2: Final[float] = -3.0
+"""A recovered step mean below this before clipping counts as negative. The store's radiation is
+quantised to about 1 W/m2, and inverting a 6-hour window multiplies that error by up to 11, so a
+dark hour at the end of a sunlit window comes back as low as -8 W/m2 (winter, 17 to 18 UTC). On the
+full store 0.13% of 6-hour steps fall below -3 W/m2; a window offset by 3 hours puts 10.6% below
+-8 W/m2."""
 
 MAX_NEGATIVE_SHARE: Final[float] = 0.01
 """The largest share of recovered step means below `NEGATIVE_W_M2` at one window length."""
@@ -227,6 +231,9 @@ def window_verdict(*, table: pl.DataFrame) -> list[str]:
 
 def negative_share_table(*, path: Path) -> pl.DataFrame:
     """Return, by window length, how often a recovered step mean is negative before clipping.
+
+    This check cannot detect two plausible defects on its own: values that are already step
+    means, or resets every 3 hours. Both produce no negatives. The night check catches them.
 
     Args:
         path: The store's `GFS.parquet`.

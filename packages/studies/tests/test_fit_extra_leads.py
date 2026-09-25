@@ -16,9 +16,9 @@ from fit_extra_leads import (  # noqa: E402
     SECOND_NEW_PREFIXES,
     SECOND_REFERENCE_PREFIXES,
     batch_prefixes,
-    contrast_arms,
     check_context_arms,
     check_saved_losses_hold_arms,
+    contrast_arms,
     domain_prefixes,
     noise_floor_lines,
 )
@@ -207,9 +207,7 @@ def test_the_first_two_batches_complete_the_third_batch_contrasts(domain: Domain
 def test_a_contrast_arm_fitted_by_no_batch_raises(batch: ExtraBatchType) -> None:
     arms = _earlier_arms(batch=batch, domain="solar")
     with pytest.raises(ValueError, match="fitted by no batch"):
-        check_context_arms(
-            domain="solar", context_arms=[arms - {min(arms)}], batch=BATCHES[batch]
-        )
+        check_context_arms(domain="solar", context_arms=[arms - {min(arms)}], batch=BATCHES[batch])
 
 
 def test_an_arm_in_two_batches_raises() -> None:

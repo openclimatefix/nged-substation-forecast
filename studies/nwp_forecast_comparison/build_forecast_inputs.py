@@ -1202,11 +1202,20 @@ def _gfs_native_frame(
     too_many = {}
     for day in days:
         columns = efh.ens_columns(arm=gfs_native_arm(day=day), domain=domain)
+        in_span = frame.filter(
+            served_init_time(time=pl.col("time"), day=day, domain=domain) >= first_init
+        )
         share = float(
-            frame.select(pl.any_horizontal(pl.col(c).is_null() for c in columns).mean()).item()
+            in_span.select(pl.any_horizontal(pl.col(c).is_null() for c in columns).mean()).item()
         )
         _LOG.info(
-            "%s: %s has a null in %.3f%% of rows", domain, gfs_native_arm(day=day), 100 * share
+            "%s: %s has a null in %.3f%% of the %d rows whose run is in the store's read span "
+            "(%d earlier rows have no run by construction)",
+            domain,
+            gfs_native_arm(day=day),
+            100 * share,
+            in_span.height,
+            frame.height - in_span.height,
         )
         if share > GFS_NATIVE_MAX_MISSING_SHARE:
             too_many[gfs_native_arm(day=day)] = share
