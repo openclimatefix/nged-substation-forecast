@@ -56,6 +56,7 @@ from build_forecast_inputs import (
     SOLAR_ONLY_PRODUCTS,
 )
 from contracts.settings import PROJECT_ROOT
+from deltalake import DeltaTable
 from studies.baselines import climatology, shrunk_persistence
 from studies.blending import climatology_permutation
 from studies.bootstrap import (
@@ -1548,6 +1549,119 @@ def _block_lines(*, losses: pl.DataFrame, frame: pl.DataFrame, domain: DomainTyp
     return lines
 
 
+def _block_error_lines(
+    *, losses: pl.DataFrame, frame: pl.DataFrame, domain: DomainType
+) -> list[str]:
+    """Return each arm's own error per block length, each gap as a share of ENS's, and P4b."""
+    products = [arm for arm in BLOCK_PRODUCTS if arms_present(losses=losses, arms=(arm,))]
+    blend_arms = [
+        arm
+        for arm in ("blend_p4b", "blend_p4b_control")
+        if arms_present(losses=losses, arms=(arm,))
+    ]
+    arms = ["ens_mean_day1", "ens_control_day1", *products, *blend_arms]
+    own = [
+        (
+            "| Arm | Averaged over | Own error (% of capacity) | Gap to ENS mean day 1 (points) | "
+            "Gap as % of ENS's own error at that block length |"
+        ),
+        "|---|---|---|---|---|",
+    ]
+    blend = [
+        "| Contrast | Averaged over | Difference (points) [95% interval] | Blocks | Months |",
+        "|---|---|---|---|---|",
+    ]
+    for label, every in BLOCKS.items():
+        blocked = blocked_losses(losses=losses, frame=frame, arms=arms, every=every, domain=domain)
+        means = dict(blocked.group_by("arm").agg(pl.col(METRIC).mean()).iter_rows())
+        ens = means["ens_mean_day1"]
+        for arm in arms:
+            gap = means[arm] - ens
+            share = "" if arm == "ens_mean_day1" else f"{gap / ens:+.1%}"
+            gap_text = "" if arm == "ens_mean_day1" else _pp(value=gap)
+            own.append(
+                f"| {arm} | {label} | {means[arm] * PERCENTAGE_POINTS:.3f} | {gap_text} | {share} |"
+            )
+        if len(blend_arms) == 2:
+            for treatment, reference, name in (
+                ("blend_p4b", "ens_mean_day1", "P4b: blend − ENS mean day 1"),
+                ("blend_p4b", "blend_p4b_control", "P4b guard: blend − its permutation control"),
+            ):
+                interval = difference(losses=blocked, treatment=treatment, reference=reference)
+                blend.append(
+                    f"| {name} | {label} | {_interval_text(interval=interval)} | "
+                    f"{interval['n_rows']:,} | {interval['n_months']} |"
+                )
+    return [
+        "Each arm's own error, and each gap as a share of ENS's own error at that block length:",
+        "",
+        *own,
+        "",
+        "P4b and its guard over blocks of hours (primary setting, exploratory):",
+        "",
+        *blend,
+    ]
+
+
+def _ukv_gap_date_lines(*, candidates: pl.DataFrame, domain: DomainType) -> list[str]:
+    """Return how many calendar dates hold a candidate row without UKV's day-1 value."""
+    fields = _weather_fields(domain=domain, prefix="ukv_day1")
+    if not all(column in candidates.columns for column in fields):
+        return ["No UKV day-1 columns."]
+    missing = candidates.filter(pl.any_horizontal(pl.col(column).is_null() for column in fields))
+    dates = missing.select(date=pl.col("time").dt.date()).unique()
+    by_month = (
+        dates.group_by(month=pl.col("date").dt.strftime("%Y-%m")).agg(dates=pl.len()).sort("month")
+    )
+    return [
+        (
+            f"{dates.height} distinct calendar dates hold at least one candidate row without "
+            "UKV's day-1 value. Dates by month:"
+        ),
+        "",
+        "| Month | Dates with a UKV day-1 gap |",
+        "|---|---|",
+        *(f"| {row['month']} | {row['dates']} |" for row in by_month.iter_rows(named=True)),
+    ]
+
+
+def _effective_capacity_lines(*, path: Path) -> list[str]:
+    """Return the `effective_capacity` Delta table's version and commit time."""
+    if not path.exists():
+        return [f"`{path}` is absent."]
+    table = DeltaTable(path)
+    commit = table.history(limit=1)[0]
+    committed = datetime.fromtimestamp(commit["timestamp"] / 1000, tz=UTC)
+    return [
+        (
+            f"The `effective_capacity` Delta table is at version {table.version()}, committed "
+            f"{committed:%Y-%m-%d %H:%M} UTC. It is read when the study's inputs are built, so "
+            "the table's own age bounds the capacities every figure rests on."
+        )
+    ]
+
+
+def _verification_lines(*, directory: Path) -> list[str]:
+    """Return the V1 gate's tables and UKV's V1b rows from `verify_previous_runs_leads.py`."""
+    lines: list[str] = []
+    for name, title in (
+        ("v1_wind.md", "V1, wind gate (GFS `_previous_dayN` against candidate runs)"),
+        ("v1_radiation.md", "V1, radiation: run selected by the hour's label or its start"),
+    ):
+        path = directory / name
+        lines += [f"### {title}", ""]
+        lines += path.read_text().splitlines() if path.exists() else [f"`{name}` is absent."]
+        lines.append("")
+    path = directory / "v1b_run_switches.md"
+    lines += ["### V1b, UKV run-switch signature", ""]
+    if path.exists():
+        rows = path.read_text().splitlines()
+        lines += [rows[0], rows[1], *(row for row in rows[2:] if row.startswith("| UKV |"))]
+    else:
+        lines.append("`v1b_run_switches.md` is absent.")
+    return [*lines, ""]
+
+
 def _control_lines(*, losses: pl.DataFrame, domain: DomainType) -> list[str]:
     """Return every day-1 Previous Runs product's and GEFS's gap to the single ENS control run."""
     arms = [
@@ -1944,6 +2058,14 @@ def _domain_lines(
         "",
         *_block_lines(losses=primary, frame=inputs.frame, domain=domain),
         "",
+        "### Exploratory: each arm's own error over blocks of hours, and P4b over blocks",
+        "",
+        *_block_error_lines(losses=primary, frame=inputs.frame, domain=domain),
+        "",
+        "### UKV day-1 requirement: dates affected",
+        "",
+        *_ukv_gap_date_lines(candidates=inputs.candidates, domain=domain),
+        "",
         "### Exploratory: brackets without the hours where ENS's error did not rise",
         "",
         *_without_voided_band_lines(by_setting=by_setting, monotonicity=monotonicity),
@@ -2009,6 +2131,13 @@ def write_report(
             "20 exploratory intervals reaches significance at 5% by chance."
         ),
         "",
+    ]
+    lines += [
+        "## Inputs and verification",
+        "",
+        *_effective_capacity_lines(path=_repo_data_dir() / "effective_capacity"),
+        "",
+        *_verification_lines(directory=output_dir / "verification"),
     ]
     for domain, domain_inputs in inputs.items():
         lines += _domain_lines(
