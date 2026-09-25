@@ -696,10 +696,9 @@ also in the main row set.** The row set is the main study's 77,616 common site-h
 ending at or before CERRA's last window, which ends at 2026-07-01 00:00 UTC, and to hours where
 CERRA, ERA5, and CAMS all have a value. Those 77,616 site-hours are joined from six of the main row
 set's eight products, UKV among them, so the rule that removes physically impossible UKV sunrise
-values applies to the CERRA row set as it does to the main row set. The 171 site-hours outside the
-main row set are hours that the main row set drops because of its two further products, SARAH-3 and
-ICON-DREAM-EU, which the CERRA row set does not need (this follows from how the two row sets are
-built; the page has not counted the 171 hours one by one). The hours span 43 calendar months. The
+values applies to the CERRA row set as it does to the main row set. The main row set also requires
+a SARAH-3 and an ICON-DREAM-EU value, which the CERRA row set does not, so each of the 171
+site-hours outside the main row set lacks at least one of those two values. The hours span 43 calendar months. The
 CERRA row set ends two months before the main row set does, on 2026-08-31.
 
 **The folds are cut so that every scored hour's calendar month occurs in the training rows.** The
