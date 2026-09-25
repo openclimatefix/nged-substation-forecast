@@ -454,10 +454,7 @@ def contrasts_figure(*, blocks: list[RowSetBlock]) -> alt.VConcatChart:
     return stacked_contrasts(
         blocks=blocks,
         number=FIGURE_NUMBERS["contrasts"],
-        title=(
-            f"CAMS beats ERA5 by {low} to {high} points on every row set, far more than any "
-            "other gridded product does"
-        ),
+        title=(f"CAMS beats ERA5 by {low} to {high} points on every row set"),
         subtitle=[
             (
                 "Top panel of each block: each product's mean absolute error minus ERA5's. Lower "
