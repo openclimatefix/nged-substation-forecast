@@ -513,9 +513,12 @@ def default_path_check(*, published_dir: Path, domain: DomainType) -> tuple[str,
             both = joined.filter(
                 pl.col(column).is_not_null() & pl.col(f"{column}_rebuilt").is_not_null()
             )
-            largest = max(
-                largest, cast("float", (both[column] - both[f"{column}_rebuilt"]).abs().max())
-            )
+            # The published columns are stored as Float32, so equality holds at that precision;
+            # a Float64 rebuild differs from them by rounding of about 1e-13.
+            difference = (
+                both[column].cast(pl.Float32) - both[f"{column}_rebuilt"].cast(pl.Float32)
+            ).abs()
+            largest = max(largest, cast("float", difference.max()))
     if largest != 0.0:
         failures.append(f"{domain}: the default ENS path differs from the published columns")
     return f"| {domain} | default ENS path against published columns | {largest:g} |", failures
