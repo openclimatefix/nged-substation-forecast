@@ -74,12 +74,10 @@ PREVIOUS_RUNS_URL: Final[str] = (
     if open_meteo_api_key()
     else "https://previous-runs-api.open-meteo.com/v1/forecast"
 )
-"""The commercial host once `OPEN_METEO_API_KEY` is set (see `paths.open_meteo_api_key`), which
+"""The commercial host once `OPEN_METEO_TOKEN` is set (see `paths.open_meteo_api_key`), which
 lifts the free tier's daily/hourly/minutely rate limits entirely; the free host otherwise."""
-# Logged at import time (never the key itself): `open_meteo_api_key()` reads `.env` from
-# `PROJECT_ROOT` of whichever checkout this script runs in, so a silent fall-back to the free host
-# and its rate limits is otherwise easy to miss when running from a checkout other than the one
-# holding the key.
+# Logged at import time (never the key itself): `open_meteo_api_key()` reads the environment, so a
+# silent fall-back to the free host and its rate limits is otherwise easy to miss.
 _LOG.info(
     "Using %s Open-Meteo host: %s",
     "the commercial" if open_meteo_api_key() else "the free",

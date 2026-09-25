@@ -26,13 +26,12 @@ per run. `stitch` answers the freshest-run question against Open-Meteo's Previou
 runs the three in order. `--max-runs` restricts `runs` to the last few sampled runs, for a trial.
 
 Run it with `uv run python studies/weather_downloads/compare_icon_eu_dynamical_openmeteo.py --stage
-all`, after exporting `OPEN_METEO_API_KEY` into the environment.
+all`, after exporting `OPEN_METEO_TOKEN` into the environment.
 """
 
 import argparse
 import json
 import logging
-import os
 import sys
 import time
 from datetime import UTC, datetime
@@ -44,7 +43,7 @@ import numpy as np
 import polars as pl
 import xarray as xr
 from fetch_open_meteo_previous_runs import _get_json, _pv_sites, _wind_sites
-from paths import REPO_DATA_DIR
+from paths import REPO_DATA_DIR, open_meteo_api_key
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("compare_icon_eu")
@@ -153,11 +152,11 @@ def _require_api_key() -> str:
         The key.
 
     Raises:
-        RuntimeError: If `OPEN_METEO_API_KEY` is not exported. The customer hosts need it.
+        RuntimeError: If `OPEN_METEO_TOKEN` is not exported. The customer hosts need it.
     """
-    key = os.environ.get("OPEN_METEO_API_KEY")
+    key = open_meteo_api_key()
     if not key:
-        msg = "export OPEN_METEO_API_KEY into the environment first (its value is never logged)"
+        msg = "export OPEN_METEO_TOKEN into the environment first (its value is never logged)"
         raise RuntimeError(msg)
     return key
 

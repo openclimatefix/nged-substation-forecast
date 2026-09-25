@@ -13,7 +13,7 @@ the IFS HRES horizon is 10 days.
 `nearest` and the three wind sites with `land`, the settings the sibling per-site fetchers use. The
 sites come from the private roster at run time and stay in memory. Rows carry only the anonymised
 `site` label. No coordinate, and never the API key, reaches a log line, a file, or the lineage note;
-`OPEN_METEO_API_KEY` must be exported into the environment (or set in `.env`).
+`OPEN_METEO_TOKEN` must be exported into the environment (see `paths.open_meteo_api_key`).
 
 **A run is stored only if it is complete.** Every site must have `LEADS_PER_RUN` hourly leads and
 every variable non-null, except the two radiation variables at lead 0, which are null by the
@@ -63,7 +63,7 @@ logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(mess
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_open_meteo_single_runs")
 
 SINGLE_RUNS_URL: Final[str] = "https://customer-single-runs-api.open-meteo.com/v1/forecast"
-"""The commercial Single Runs host. It needs `OPEN_METEO_API_KEY`."""
+"""The commercial Single Runs host. It needs `OPEN_METEO_TOKEN`."""
 
 MODELS_PARAMETER: Final[str] = "ecmwf_ifs"
 """The `models=` value for IFS HRES. `ecmwf_ifs025` answers "run not available" on this API."""
@@ -208,11 +208,11 @@ def _require_api_key() -> str:
         The key.
 
     Raises:
-        RuntimeError: If `OPEN_METEO_API_KEY` is neither exported nor in `.env`.
+        RuntimeError: If `OPEN_METEO_TOKEN` is not exported.
     """
     key = open_meteo_api_key()
     if not key:
-        msg = "export OPEN_METEO_API_KEY into the environment first (its value is never logged)"
+        msg = "export OPEN_METEO_TOKEN into the environment first (its value is never logged)"
         raise RuntimeError(msg)
     return key
 

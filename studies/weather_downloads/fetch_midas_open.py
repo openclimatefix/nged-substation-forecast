@@ -16,10 +16,10 @@ station name, a coordinate, or a download URL, because the URL contains the stat
 The raw directory tree mirrors CEDA's layout, so the station's file name does appear in directory
 names on disk.
 
-**Downloads need a CEDA access token.** The token is read from `CEDA_TOKEN` in the main checkout's
-`.env` and sent in an `Authorization` header that is never logged, never written to disk, and never
-placed in an exception message. No HTTP redirect is followed, because CEDA answers a bad or expired
-token by redirecting to its login page.
+**Downloads need a CEDA access token.** The token is read from the `CEDA_TOKEN` environment
+variable (exported from `~/.bashrc`, never `.env`) and sent in an `Authorization` header that is
+never logged, never written to disk, and never placed in an exception message. No HTTP redirect is
+followed, because CEDA answers a bad or expired token by redirecting to its login page.
 
 **The station lists are hand-typed.** The rule that reproduces them is: `last_year` 2025 or later
 in the station-metadata CSV, and within 100 km of at least one of the nine anonymised study sites.
@@ -66,9 +66,8 @@ from pathlib import Path
 from typing import IO, Any, Final, Literal
 
 import polars as pl
-from dotenv import load_dotenv
 from lineage import write_lineage_note, write_readme
-from paths import REPO_DATA_DIR, WEATHER_DOWNLOADS_DIR
+from paths import WEATHER_DOWNLOADS_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_midas_open")
@@ -178,10 +177,6 @@ PRODUCT_DIR: Final[Path] = WEATHER_DOWNLOADS_DIR / "MIDAS-OPEN"
 RAW_DIR: Final[Path] = PRODUCT_DIR / "raw"
 STATION_METADATA_DIR: Final[Path] = PRODUCT_DIR / "_station_metadata"
 """Read only. Holds CEDA's station-metadata CSVs, which carry coordinates and station names."""
-
-ENV_PATH: Final[Path] = REPO_DATA_DIR.parent / ".env"
-"""The main checkout's `.env`, which holds `CEDA_TOKEN`. A linked worktree has no `.env` of its
-own, and `paths.py` loads only the running checkout's, so this path is loaded explicitly."""
 
 REQUEST_TIMEOUT_SECONDS: Final[float] = 120.0
 MAX_ATTEMPTS: Final[int] = 5
@@ -603,7 +598,7 @@ def _listed_files(*, dataset: DatasetType, station: StationMetadata) -> dict[str
 
 
 def _ceda_token() -> str:
-    """Return `CEDA_TOKEN` from the main checkout's `.env`. Never log or print the result.
+    """Return `CEDA_TOKEN` from the environment. Never log or print the result.
 
     Returns:
         The CEDA access token.
@@ -611,10 +606,9 @@ def _ceda_token() -> str:
     Raises:
         RuntimeError: If `CEDA_TOKEN` is unset or empty.
     """
-    load_dotenv(ENV_PATH)
     token = os.environ.get("CEDA_TOKEN", "").strip()
     if not token:
-        msg = f"CEDA_TOKEN is not set: add it to {ENV_PATH} (a CEDA access token)"
+        msg = "CEDA_TOKEN is not set: export it from ~/.bashrc (a CEDA access token)"
         raise RuntimeError(msg)
     return token
 
@@ -670,7 +664,7 @@ def _request_once(*, url: str, token: str | None) -> bytes | None:
         if code in {401, 403} or 300 <= code < 400:
             msg = (
                 f"CEDA refused the access token (HTTP {code}; a 3xx is a redirect to its login "
-                f"page); renew CEDA_TOKEN in {ENV_PATH}"
+                f"page); renew CEDA_TOKEN in ~/.bashrc"
             )
             raise CedaAuthError(msg) from None
         if code == 429 or code >= 500:

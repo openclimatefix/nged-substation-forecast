@@ -14,7 +14,6 @@ from typing import Final
 
 import polars as pl
 from contracts.settings import PROJECT_ROOT
-from dotenv import load_dotenv
 
 
 def _main_checkout(root: Path) -> Path:
@@ -44,18 +43,19 @@ rationale; this is the same resolution, duplicated rather than imported."""
 WEATHER_DOWNLOADS_DIR: Final[Path] = REPO_DATA_DIR / "studies" / "weather"
 """One subdirectory per product, e.g. `ECMWF-IFS-HRES`, `NORA3`, `ICON-DREAM-EU`."""
 
-load_dotenv(PROJECT_ROOT / ".env")
-
 
 def open_meteo_api_key() -> str | None:
-    """Return the Open-Meteo commercial API key from `.env`/the environment, or `None` if unset.
+    """Return the Open-Meteo commercial API key from the environment, or `None` if unset.
+
+    The key is read from `OPEN_METEO_TOKEN`, then from `OPEN_METEO_API_KEY`. Both are exported from
+    `~/.bashrc`; neither belongs in `.env`, because Dagster reads that file.
 
     A caller with a key switches from the free `<name>-api.open-meteo.com` host to
     `customer-<name>-api.open-meteo.com` and appends `&apikey=<key>` to the request, which lifts
     the free tier's daily/hourly/minutely rate limits entirely (confirmed against both the
     Previous Runs and Historical Forecast customer hosts). Never log or print the returned value.
     """
-    return os.environ.get("OPEN_METEO_API_KEY")
+    return os.environ.get("OPEN_METEO_TOKEN") or os.environ.get("OPEN_METEO_API_KEY")
 
 
 _TRIAL_AREA_BOX_PATH: Final[Path] = WEATHER_DOWNLOADS_DIR / "_trial_area_box.json"
