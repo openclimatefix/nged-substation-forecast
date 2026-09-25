@@ -516,7 +516,8 @@ def on_leaderboard(*, arm: str) -> bool:
     """
     if is_baseline_arm(arm=arm):
         return arm in ("climatology", "smart_persistence_day1")
-    return arm.startswith("blend_") or arm == "ens_mean_day0" or arm.endswith("_day1")
+    is_planned_blend = arm.removesuffix("_control") in BLEND_ARMS
+    return is_planned_blend or arm == "ens_mean_day0" or arm.endswith("_day1")
 
 
 def _is_baseline(arm: str) -> bool:

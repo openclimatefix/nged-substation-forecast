@@ -402,6 +402,16 @@ BLEND_ARMS: Final[dict[str, tuple[str, str, str]]] = {
 """The two planned blends' product prefixes: ENS's own day-1 mean plus the other two products, at
 the optimistic (P4a) and conservative (P4b) lead."""
 
+WIND_SINGLE_PRODUCT_BLENDS: Final[dict[str, tuple[str, str]]] = {
+    "blend_wind_icon_eu_day2": ("ens_mean_day1", "icon_eu_day2"),
+    "blend_wind_ifs025_day2": ("ens_mean_day1", "ifs025_day2"),
+}
+"""The two exploratory wind-only blends that separate which product carries P4b's gain: ENS's own
+day-1 mean plus one other product at day 2. Each has 11 columns against P4b's 15, so the fair
+reference is ENS day 1 alone (7 columns). Each one's permutation control shuffles the other
+product with the permutation P4b's guard already uses, so `add_blend_guard_columns` adds nothing
+for them."""
+
 BLEND_GUARD_SUFFIX: Final[str] = "_permuted"
 """Appended to a permuted product's prefix, forming each guard's own column names."""
 
@@ -453,6 +463,22 @@ def jobs(*, domain: DomainType, frame: pl.DataFrame) -> list[Job]:
         guard_columns = arm_columns(domain=domain, prefixes=_blend_guard_prefixes(blend=blend))
         if not all(column in available for column in guard_columns):
             msg = f"{blend}: its guard columns are missing; call add_blend_guard_columns first"
+            raise ValueError(msg)
+        output.extend(
+            (f"{blend}_control", setting, guard_columns, SETTINGS[setting]) for setting in SETTINGS
+        )
+    if domain != "wind":
+        return output
+    for blend, (ens_prefix, other) in WIND_SINGLE_PRODUCT_BLENDS.items():
+        columns = arm_columns(domain=domain, prefixes=(ens_prefix, other))
+        if not all(column in available for column in columns):
+            continue
+        output.extend((blend, setting, columns, SETTINGS[setting]) for setting in SETTINGS)
+        guard_columns = arm_columns(
+            domain=domain, prefixes=(ens_prefix, f"{other}{BLEND_GUARD_SUFFIX}")
+        )
+        if not all(column in available for column in guard_columns):
+            msg = f"{blend}: its guard columns are missing; P4b's guard must be built first"
             raise ValueError(msg)
         output.extend(
             (f"{blend}_control", setting, guard_columns, SETTINGS[setting]) for setting in SETTINGS
@@ -559,6 +585,10 @@ SYNTHETIC_SIGMA: Final[dict[str, float]] = {
     "blend_p4b": 0.097,
     "blend_p4a_control": 0.101,
     "blend_p4b_control": 0.102,
+    "blend_wind_icon_eu_day2": 0.11,
+    "blend_wind_ifs025_day2": 0.105,
+    "blend_wind_icon_eu_day2_control": 0.11,
+    "blend_wind_ifs025_day2_control": 0.11,
 }
 """Each fabricated arm's error standard deviation as a fraction of capacity, chosen so the
 synthetic report shows a mixture of verdicts. Any other arm gets `SYNTHETIC_DEFAULT_SIGMA`."""
@@ -1387,6 +1417,46 @@ def _blend_lines(*, by_setting: dict[str, pl.DataFrame]) -> list[str]:
     return lines
 
 
+def _wind_single_product_blend_lines(*, by_setting: dict[str, pl.DataFrame]) -> list[str]:
+    """Return the exploratory wind blends' contrasts, or nothing where the arms are not fitted."""
+    arms = tuple(WIND_SINGLE_PRODUCT_BLENDS)
+    if not arms_present(losses=by_setting["primary"], arms=("ens_mean_day1", "blend_p4b", *arms)):
+        return []
+    lines = [
+        "#### Exploratory: which product carries P4b's wind gain",
+        "",
+        (
+            "Each blend below is ENS's day-1 mean plus one product at day 2, with 11 columns; P4b "
+            "has 15, so equal column counts with P4b are impossible. The fair reference for each "
+            "is ENS mean day 1 alone (7 columns). All rows are exploratory."
+        ),
+        "",
+        *CONTRAST_HEADER,
+    ]
+    for setting, losses in by_setting.items():
+        for arm in arms:
+            name = arm.removeprefix("blend_wind_")
+            for suffix, label_suffix, reference, reference_name in (
+                ("", "", "ens_mean_day1", "ENS mean day 1"),
+                ("", "", "blend_p4b", "P4b blend"),
+                ("", "", f"{arm}_control", "its permutation control"),
+                ("_control", " control", "ens_mean_day1", "ENS mean day 1"),
+            ):
+                treatment = f"{arm}{suffix}"
+                interval = difference(losses=losses, treatment=treatment, reference=reference)
+                lines.append(
+                    _contrast_line(
+                        identifier=f"X-{name}{'-control' if suffix else ''}-vs-{reference}",
+                        status="exploratory",
+                        label=f"{name}{label_suffix} − {reference_name}",
+                        setting=setting,
+                        interval=interval,
+                    )
+                )
+    lines.append("")
+    return lines
+
+
 def _era_lines(*, losses: pl.DataFrame) -> list[str]:
     """Return UKV's P1 bracket split by UKV era."""
     if not arms_present(losses=losses, arms=("ukv_day1", "ens_mean_day0", "ens_mean_day1")):
@@ -1990,6 +2060,7 @@ def _domain_lines(
         "",
         *_blend_lines(by_setting=by_setting),
         "",
+        *_wind_single_product_blend_lines(by_setting=by_setting),
         "### ENS monotonicity by band",
         "",
         *_monotonicity_lines(monotonicity=monotonicity),
