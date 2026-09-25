@@ -1655,11 +1655,11 @@ TITLES: Final[dict[str, str]] = {
     ),
     "baselines": (
         "The ENS ensemble mean beats the best no-weather baseline by 1.4 points at day 5 for "
-        "solar and 4.0 points for wind, and by day 14 climatology is ahead"
+        "solar and 3.6 points for wind, and by day 14 climatology is ahead"
     ),
     "calendar": (
         "The ensemble mean beats the same model given no weather to day 10 with a day-of-year "
-        "calendar column, and to day 7 with calendar month"
+        "calendar column, and to day 7 for solar and day 5 for wind with calendar month"
     ),
     "example_days_solar": (
         "The clear-sky index keeps the solar day's shape, where linear interpolation shifts it late"
@@ -1668,11 +1668,11 @@ TITLES: Final[dict[str, str]] = {
         "For wind, every upsampling technique tracks the same day almost identically"
     ),
     "upsampling_solar": (
-        "Rebuilding solar radiation through the clear-sky index lowers the error at every horizon "
-        "to day 7"
+        "Rebuilding solar radiation through the clear-sky index lowers the error at days 0 to 3 "
+        "and at day 10"
     ),
     "upsampling_wind": (
-        "No way of interpolating ENS's wind moves the wind error by a tenth of a point"
+        "No way of interpolating ENS's wind moves the wind error by a tenth of a point to day 5"
     ),
     "solar_week": (
         "Given the day-1 ensemble mean, the XGBoost model follows the day-to-day swings at every "
