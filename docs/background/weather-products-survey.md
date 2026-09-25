@@ -232,7 +232,7 @@ physics-based IFS.** The claim would need AIFS version-to-version scores set bes
 cycle-to-cycle scores, computed the same way against the same truth. We found no version-to-version
 or cycle-to-cycle scores for 2 m temperature, wind, or radiation, from either model. The search
 covered ECMWF's implementation pages, newsletters, and blog, one independent industry analysis, and
-three journal papers or preprints. It did not cover the wider peer-reviewed literature.
+three journal papers or preprints, and searches of arXiv and OpenAlex for independent verification. It did not cover the wider peer-reviewed literature.
 
 **ECMWF's own reports show AIFS ahead of the IFS at one point in time, not improving faster.** In
 [Forecast performance 2025](https://www.ecmwf.int/en/newsletter/187/news/forecast-performance-2025),
@@ -251,15 +251,11 @@ IFS, and about equal accuracy at day 1, 3, and 5. Every source in this paragraph
 ECMWF's own.
 
 **The journal paper on AIFS Single 1.1.0 shows a one-off margin over the IFS in 2023, and a gain over
-the previous AIFS version, neither of which is a rate comparison.**
-[Lang et al. (2026)](https://doi.org/10.5194/gmd-19-4703-2026) report that AIFS gains 12 to 24 hours
+the pre-operational AIFS, neither of which is a rate comparison.**
+[Moldovan et al. (2026)](https://doi.org/10.5194/gmd-19-4703-2026) report that AIFS gains 12 to 24 hours
 of lead time at days 3 to 10 over the operational IFS (cycles 47r3 and 48r1), scored on Northern
 Hemisphere 500 hPa geopotential and 850 hPa temperature anomaly correlation against the IFS analysis
-for all of 2023. Lang et al. also report that the new AIFS improves on the previous AIFS version by
-4 to 6% (the paper's abstract), that precipitation improves by about 12% and about 1 day of lead
-time on the stable equitable error in probability space score against 24-hour surface station
-reports, and that surface shortwave downwards radiation gains about 1 day in the medium range,
-scored against CM SAF geostationary satellite data. The paper reports 2 m temperature and 10 m wind
+for all of 2023. Moldovan et al. also report that the new AIFS improves on the pre-operational AIFS by around 4 to 6%, and that precipitation improves by up to 12% in the short range and gains about 1 day on the stable equitable error in probability space score over both the IFS and the pre-operational AIFS, against 24-hour surface station reports. Against the IFS, surface shortwave downwards radiation gains about 1 day in the medium range, scored against CM SAF geostationary satellite data. The paper reports 2 m temperature and 10 m wind
 as "similarly improved" against surface station observations. The truth data differ between scores,
 and the paper gives no year-on-year IFS cycle comparison.
 
@@ -269,9 +265,8 @@ wind speed from AIFS ENS v1 against raw IFS ensemble forecasts (cycle 49r1) at 9
 stations from 2025-07-01 to 2025-11-30, using 12 UTC runs. The IFS ensemble scored better at every
 horizon, and the gap narrowed after post-processing. [Trotta et al. (2025)](https://arxiv.org/abs/2504.12672)
 scored AIFS Single (the paper states no version) against the ECMWF HRES and ENS forecasts at
-Australian surface stations from 2024-03-01 to 2024-07-23, before AIFS Single was operational. They
-report that AIFS falls behind ENS as lead time grows. We found no independent verification of AIFS
-radiation in ECMWF's pages, arXiv, or OpenAlex.
+Australian surface stations from 2024-03-01 to 2024-07-23 (569 stations, with scores from 2024-04-01), before AIFS Single was operational. Trotta et al. report that AIFS falls behind ENS as lead time grows. Apart from Solcast's, we found no independent verification of AIFS
+radiation in searches of arXiv and OpenAlex.
 
 **AIFS Single v2 adds variables and recovers skill that IFS 50r1 took away.**
 [ECMWF's v2 announcement](https://www.ecmwf.int/en/newsletter/187/news/implementation-aifs-v2)
@@ -295,12 +290,12 @@ defined by initialisation time, never by valid time. The eras and their dates ar
 
 | Era | Initialisation times | Notes |
 |---|---|---|
-| AIFS Single v1.0, first period | 2025-02-25 06 UTC to 2025-07-31 00 UTC | First operational AIFS Single |
-| AIFS Single v1.0, after the revert | 2025-08-01 (ECMWF states no revert hour) to 2025-08-27 00 UTC | ECMWF reverted to v1.0 after the first v1.1 attempt |
-| AIFS Single v1.1 | 2025-08-27 06 UTC to 2026-05-12 00 UTC | Runs from 2025-07-31 06 UTC until the revert on 2025-08-01 are excluded (see below) |
-| AIFS Single v2 | 2026-05-12 06 UTC onwards | Introduced together with IFS 50r1 |
-| AIFS ENS v1 | 2025-07-01 06 UTC to 2026-05-12 00 UTC | First operational AIFS ENS |
-| AIFS ENS v2 | 2026-05-12 06 UTC onwards | Introduced together with IFS 50r1 |
+| AIFS Single v1.0, first period | from the 2025-02-25 06 UTC run up to, but not including, the 2025-07-31 06 UTC run | First operational AIFS Single |
+| AIFS Single v1.0, after the revert | 2025-08-01 (ECMWF states no hour) up to, but not including, the 2025-08-27 06 UTC run | ECMWF reverted to v1.0 after the first v1.1 attempt |
+| AIFS Single v1.1 | from the 2025-08-27 06 UTC run up to, but not including, the 2026-05-12 06 UTC run | Runs from 2025-07-31 06 UTC until the revert on 2025-08-01 are excluded (see below) |
+| AIFS Single v2 | from the 2026-05-12 06 UTC run | Introduced together with IFS 50r1 |
+| AIFS ENS v1 | from the 2025-07-01 06 UTC run up to, but not including, the 2026-05-12 06 UTC run | First operational AIFS ENS |
+| AIFS ENS v2 | from the 2026-05-12 06 UTC run | Introduced together with IFS 50r1 |
 
 **The v2 boundary coincides with IFS 50r1, so an AIFS change cannot be separated from an IFS change
 after 2026-05-12.** ECMWF introduced AIFS v2 and IFS cycle 50r1 on the same day, and AIFS ingests
@@ -316,7 +311,7 @@ soil-moisture loss weight by a factor of 100 to remove spurious point-rainfall a
 the two eras are separate trained models and are scored separately. The dated list of every version
 is in the [NWP model upgrades table](../roadmap/data-sources.md#nwp-model-upgrades-since-2019), and
 the journal paper on AIFS Single 1.1.0
-([Lang et al. 2026](https://doi.org/10.5194/gmd-19-4703-2026)) gives the same dates.
+([Moldovan et al. 2026](https://doi.org/10.5194/gmd-19-4703-2026)) gives the same 2025-02-25 and 2025-08-27 dates.
 
 ### Reanalyses, hindcasts, and satellite retrievals
 
