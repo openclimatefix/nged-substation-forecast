@@ -133,3 +133,18 @@ Rejected, with reasons:
 ## Plan review 2 (correctness): triage
 
 The reviewer read the saved losses (read-only) and found nine defects; all nine are real and applied above. (1) The two hyperparameter settings share arm names in every saved `losses.parquet`, so an unfiltered contrast silently cross-joins them; the rows function now takes `setting`, asserts `n_rows`, and has a test. (2) `ens-forecast-horizons` and the matched-lead page also move; the file list, `../` link fixes, Figure 3 asset path and the repo-wide `git grep` gate are added, and the inventory count is 11 distinct anchors carried by 20 links into the solar page. (3) There are five row sets; the record row set is defined in the row-set table. (4) #904 needs per-report print precision and an `intervals` frame in its fixture; retiring `check_station_page_numbers.py` is conditional on the counts being covered. (5)-(7) Gate definitions tightened (reports named per section, baseline fetched at run time, union of new pages, integers checked, full SVG title text, mechanical definition of an absolute error). (8) Tests restated, guard moved into `packages/studies`. (9) Second-setting precedence and the skill edit added. Also adopted from the smaller points: `FIGURE_NUMBERS` beside the chart scripts, `ukv_pair_global` named, IFS-HRES label naming its row set, PR 0 separate, and the row-set table regenerated from the losses because #892 may move the ENS block's start date. Nothing was rejected.
+
+## Progress and changes since approval
+
+Built on this branch, reading saved losses only (nothing run against `data/`, no SVG redrawn): the stacked leaderboard and contrast helpers in `studies.charts`, the shared `assert_matches_printed` guard, `studies/beam_diffuse_split/figure_numbers.py`, `past_solar_leaderboard.py` (with `--check-only`), and the #904 fix (merged from `page-number-guard-904`). The prose drift fixes went out as PR #913.
+
+Departures from the plan, from the implementer's report:
+
+- The rows function filters to `setting` first, so two settings under one arm name return the single-setting values instead of raising; the tests cover an absent setting and a same-setting duplicate (the `n_rows` assertion).
+- The contrast chart's reference row is CAMS only, since the zero rule stands for ERA5; the leaderboard repeats both.
+- Old figure 20 maps to no new figure (dropped). The ENS per-generator chart for new Figure 14 has no chart yet and is written at redraw time.
+- `past_solar_leaderboard.py` computes every arm minus ERA5 on every row set and checks each against any printed row with the same arms, scope and row count. On the main rows only ICON-DREAM-EU minus ERA5 is planned against ERA5, so CAMS minus ERA5 there is labelled exploratory.
+- The second setting is recomputed only for planned or near-the-line contrasts, and only where both arms have saved sensitivity losses. The extra rows have no saved ERA5 sensitivity arm, so they get none.
+- The wind scripts keep their inline guard.
+
+PR B page structure (agreed with the session that owns the study skill): Title; Summary (at most two paragraphs plus the headline figures, then the take-home bullets, one per consumer); AI disclaimer; Key findings; Introduction (with the products table); Data and methods (study-specific only, linking the shared Methods page); Results (one subsection per finding, "The XGBoost models work" first, "why products differ", "robustness" and "implied capacity" as Results subsections); Discussion ("What to use", the evidence-limited reasoning without repeating the Summary bullets); Limitations; Scope; Data and code availability; Reproducing the figures. This replaces the outline's separate take-home section.
