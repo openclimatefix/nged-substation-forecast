@@ -115,6 +115,13 @@ def test_the_caption_states_each_blocks_uncovered_month_share() -> None:
     assert "+0.009" not in lines[0]
 
 
+def test_month_names_are_cut_to_three_letters_in_a_block_title() -> None:
+    # Catches a block title so long that the panel clips it ("50,041 farm-hour").
+    module = _load()
+
+    assert module.short_months(text="August 2024 to September 2026") == "Aug 2024 to Sep 2026"
+
+
 def test_the_contrast_figure_names_the_arm_the_station_block_is_against() -> None:
     # Catches the station block's zero rule reading "same as ERA5" when it is ERA5's 10 m wind.
     module = _load()
@@ -183,10 +190,10 @@ def test_each_figure_carries_its_own_number_from_the_wind_map(
     assert _title_and_cross_reference(figure=moved_contrasts)[0] == "Figure 9"
 
 
-def test_no_block_title_carries_a_wind_height_or_runs_past_70_characters() -> None:
+def test_no_block_title_carries_a_wind_height_or_runs_past_55_characters() -> None:
     # Catches the hub heights moved back into the block titles, which then wrap or overflow.
     module = _load()
-    longest_dates = "September 2026 to September 2026"
+    longest_dates = module.short_months(text="September 2026 to September 2026")
 
     for key, label in module.BLOCK_LABELS.items():
         setting = module.BLOCK_SETTINGS[key]
@@ -198,7 +205,7 @@ def test_no_block_title_carries_a_wind_height_or_runs_past_70_characters() -> No
             hours_unit="farm-hours",
             reference_name=setting.reference_name,
         )
-        assert len(block.title) < 70, block.title
+        assert len(block.title) < 56, block.title
         assert " m" not in block.title, block.title
 
 

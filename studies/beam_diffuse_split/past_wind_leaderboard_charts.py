@@ -28,6 +28,7 @@ Run it with `uv run python studies/beam_diffuse_split/past_wind_leaderboard_char
 
 import argparse
 import logging
+import re
 import sys
 from typing import Final, NamedTuple
 
@@ -172,6 +173,11 @@ class _CommonFields(NamedTuple):
     reference_name: str
 
 
+def short_months(*, text: str) -> str:
+    """Return `text` with each month name cut to its first three letters, so a block title fits."""
+    return re.sub(r"\b([A-Z][a-z]{2})[a-z]+ (\d{4})", r"\1 \2", text)
+
+
 def _block(
     *, common: _CommonFields, rows: pl.DataFrame, planned: pl.DataFrame | None = None
 ) -> RowSetBlock:
@@ -215,7 +221,8 @@ def build_blocks(
             raise ValueError(msg)
         setting = BLOCK_SETTINGS[row_set.key]
         label = BLOCK_LABELS[row_set.key]
-        dates = f"{month_year(iso_day=printed.first_day)} to {month_year(iso_day=printed.last_day)}"
+        first = month_year(iso_day=printed.first_day)
+        dates = short_months(text=f"{first} to {month_year(iso_day=printed.last_day)}")
         absolute = absolute_rows(
             frame=frame, row_set=row_set, printed=printed.tables[ABSOLUTE_SECTION]
         )
