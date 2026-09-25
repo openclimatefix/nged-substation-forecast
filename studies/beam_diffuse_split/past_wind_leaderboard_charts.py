@@ -297,6 +297,7 @@ def contrasts_figure(
             SCOPE,
         ],
         reference_note=CONTRAST_REFERENCE_ROW_NOTE,
+        colour_by_family=True,
     )
 
 

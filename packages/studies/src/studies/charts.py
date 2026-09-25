@@ -550,6 +550,7 @@ def interval_panel(
     width: int = PLOT_WIDTH_PX,
     figure_planning: PlanningType = "mixed",
     value_labels: bool = False,
+    colour_by_family: bool = False,
 ) -> alt.LayerChart | alt.VConcatChart:
     """Draw one panel of dots and 95% interval lines beside a labelled zero rule.
 
@@ -564,7 +565,10 @@ def interval_panel(
     text column: the family key only where the panel holds more than one family, and the
     condition key where `conditions` is given. A panel of one family, with no more conditions
     than `CONDITION_COLOURS` holds, colours its conditions with those colours instead of a light
-    shade, still with a hollow point of a second shape.
+    shade, still with a hollow point of a second shape. `colour_by_family` turns that off, so a
+    panel of one family keeps its family's colour. A stacked figure needs it, because its panels
+    share one colour scale, and the one-family panel's condition colours would replace the family
+    colours in every other panel.
 
     Passing `condition_colours` overrides all of that with the colour-first encoding this
     project's charts default to: every condition gets its own solid colour, drawn filled with one
@@ -606,6 +610,8 @@ def interval_panel(
         value_labels: Whether to print each row's estimate and interval, signed and to two
             decimal places, beside the row, so an interval narrower than its own marker is still
             readable.
+        colour_by_family: Whether a panel of one family colours its rows by family, as every
+            other panel does, instead of by condition.
 
     Returns:
         The panel, under its keys where it has any.
@@ -613,7 +619,11 @@ def interval_panel(
     rows = _labelled(rows=rows, figure_planning=figure_planning)
     families = [family for family in FAMILY_COLOURS if family in set(rows["family"].to_list())]
     explicit_colours = condition_colours is not None
-    colour_conditions = 0 < len(conditions) <= len(CONDITION_COLOURS) and len(families) == 1
+    colour_conditions = (
+        0 < len(conditions) <= len(CONDITION_COLOURS)
+        and len(families) == 1
+        and not colour_by_family
+    )
     shade = pl.col("family")
     shade_scale = _shade_scale()
     if explicit_colours:
@@ -1708,6 +1718,7 @@ def stacked_contrasts(
     title: str,
     subtitle: Sequence[str],
     reference_note: str = CONTRAST_REFERENCE_ROW_NOTE,
+    colour_by_family: bool = False,
 ) -> alt.VConcatChart:
     """Stack, per row set, a panel of contrasts against ERA5 and a panel of planned contrasts.
 
@@ -1729,6 +1740,10 @@ def stacked_contrasts(
         subtitle: Short lines for the caption; `reference_note` is added, and
             `SECOND_SETTING_NOTE` where any row has a second setting.
         reference_note: The caption line saying what the hollow reference row is.
+        colour_by_family: Whether a block holding one family still colours its rows by family.
+            Leave it unset and such a block's rows take the two condition colours, which replace
+            the family colours in every panel of the figure, because the panels share one colour
+            scale.
 
     Returns:
         The figure.
@@ -1763,6 +1778,7 @@ def stacked_contrasts(
                 key_families=_block_families(blocks=blocks),
                 condition_key=False,
                 figure_planning=figure_planning,
+                colour_by_family=colour_by_family,
             )
         )
         if block.planned_rows is not None:

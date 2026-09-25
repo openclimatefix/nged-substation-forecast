@@ -1506,3 +1506,71 @@ def test_stacked_leaderboard_takes_its_own_reference_note() -> None:
 
     assert "ERA5 repeats." in str(spec)
     assert "CAMS and ERA5, repeated" not in str(spec)
+
+
+def test_colour_by_family_keeps_a_one_family_panels_family_colour() -> None:
+    # Catches a one-family panel drawn in the two condition colours, which in a stacked figure
+    # replaced the family colours of every panel and left marks with no legend entry.
+    rows = pl.DataFrame(
+        {
+            "label": ["row"] * 2,
+            "family": ["weather model"] * 2,
+            "difference": [-1.5, -1.0],
+            "lower_95": [-2.0, -1.5],
+            "upper_95": [-1.0, -0.5],
+            "condition": ["a", "b"],
+        }
+    )
+
+    by_condition = _panel(rows, conditions=("a", "b"))
+    by_family = _panel(rows, conditions=("a", "b"), colour_by_family=True)
+
+    def shades(spec: dict) -> list[str]:
+        panel = spec["vconcat"][-1]
+        (interval,) = [
+            layer
+            for layer in panel["layer"]
+            if layer["mark"]["type"] == "rule" and "x2" in layer["encoding"]
+        ]
+        return [row["shade"] for row in _values(spec, interval)]
+
+    assert shades(by_condition) == ["a", "b"]
+    assert shades(by_family) == ["weather model", "weather model, light"]
+
+
+def test_a_stacked_contrast_figure_with_a_one_family_block_keeps_every_family_colour() -> None:
+    # Catches the one-family block's condition colours becoming the figure's shared colour scale.
+    losses = _losses()
+    one_family = block_contrast_rows(
+        losses=losses,
+        arms=[BLOCK_ARMS[2]],
+        reference_arm="era5_global",
+        setting="pooled",
+        site_hours=SITE_HOURS,
+        metric=METRIC,
+    )
+    two_families = block_contrast_rows(
+        losses=losses,
+        arms=[BLOCK_ARMS[0], BLOCK_ARMS[2]],
+        reference_arm="era5_global",
+        setting="pooled",
+        site_hours=SITE_HOURS,
+        metric=METRIC,
+    )
+    blocks = [
+        RowSetBlock("One", "Jan 2025", SITE_HOURS, one_family),
+        RowSetBlock("Two", "Jan 2025", SITE_HOURS, two_families),
+    ]
+
+    def condition_scale_drawn(*, colour_by_family: bool) -> bool:
+        spec = stacked_contrasts(
+            blocks=blocks,
+            number=2,
+            title="A title",
+            subtitle=["A subtitle."],
+            colour_by_family=colour_by_family,
+        ).to_dict()
+        return str(list(CONDITION_COLOURS)) in str(spec)
+
+    assert condition_scale_drawn(colour_by_family=False)
+    assert not condition_scale_drawn(colour_by_family=True)
