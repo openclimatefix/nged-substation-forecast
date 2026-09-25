@@ -230,7 +230,7 @@ excludes it, matching the daytime filter `check_direct_is_not_a_separation_model
 def _dmi_beam_defect_lines(*, frames: dict[SourceType, pl.DataFrame]) -> list[str]:
     """Report how often DMI HARMONIE-AROME's published direct beam is zero or exceeds global flux.
 
-    The page cites both counts (`weather-products-for-past-solar.md`, "The four extra Open-Meteo
+    The page cites both counts (`past-weather/solar.md`, "The four extra Open-Meteo
     models"), and the study skill requires every page number to come from a script-printed report
     rather than a docstring.
 

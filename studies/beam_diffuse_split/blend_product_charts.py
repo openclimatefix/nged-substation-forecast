@@ -2,7 +2,7 @@
 
 One-off throwaway script for the charts in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/836>. The write-up is
-<https://openclimatefix.github.io/nged-substation-forecast/studies/blending-weather-products/>.
+<https://openclimatefix.github.io/nged-substation-forecast/studies/past-weather/blending/>.
 
 **Every interval and every error a chart shares with the page is read from the report
 `blend_products.py` wrote**, so a chart cannot disagree with the page. Before drawing, the script
