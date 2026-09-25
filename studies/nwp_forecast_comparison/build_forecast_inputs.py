@@ -39,11 +39,12 @@ One-off throwaway script for the study in
   or incomplete runs listed. A run still arriving therefore stops the build instead of turning
   into null GEFS columns.
 
-With `--extra-leads` the script instead builds the exploratory lead columns (ENS at days 5 and 14,
-GEFS at days 5, 10 and 14, Previous Runs at day 0 for ICON-D2 and ICON-EU and at day 5 for ICON
-global, IFS 0.25° and GFS) on the published inputs' own `(site, time)` keys, into a new write-once
-`--output-dir`, and never writes to the published folder. The new days are separate constants
-(`EXTRA_ENS_DAYS`, `EXTRA_GEFS_DAYS`), never added to `ENS_DAYS`, so the shared rows cannot move.
+With `--extra-leads` the script instead builds the exploratory lead columns (ENS at days 5, 10 and
+14, GEFS at days 0, 5, 10 and 14, Previous Runs at day 0 for every product, at day 5 for ICON
+global, and at days 5 and 7 for IFS 0.25° and GFS) on the published inputs' own `(site, time)`
+keys, into a new write-once `--output-dir`, and never writes to the published folder. The new days
+are separate constants (`EXTRA_ENS_DAYS`, `EXTRA_GEFS_DAYS`), never added to `ENS_DAYS`, so the
+shared rows cannot move.
 
 Every output row carries only the anonymised `site` label; no generator name, id or coordinate is
 read from the private roster in this script, except inside `studies.grid_sampling` (GEFS's
@@ -130,21 +131,27 @@ PRODUCT_DAY_OFFSETS: Final[dict[str, tuple[int, ...]]] = {
 """Each product's `previous_dayN` offsets this study reads, from the plan's product table."""
 
 EXTRA_PRODUCT_DAY_OFFSETS: Final[dict[str, tuple[int, ...]]] = {
+    "UKV": (0,),
     "ICON-D2": (0,),
     "ICON-EU": (0,),
-    "ICON global": (5,),
-    "IFS 0.25°": (5,),
-    "GFS": (5,),
+    "ICON global": (0, 5),
+    "IFS 0.25°": (0, 5, 7),
+    "GFS": (0, 5, 7),
+    "ARPEGE Europe": (0,),
+    "AROME France": (0,),
+    "KNMI HARMONIE-AROME": (0,),
+    "DMI HARMONIE-AROME": (0,),
 }
 """The exploratory `previous_dayN` offsets the extra-lead build reads on top of
 `PRODUCT_DAY_OFFSETS`. Day 0 is Open-Meteo's unsuffixed series, the freshest run that covers each
-hour; ICON-EU's archive ends at day 4, and ICON-D2's holds only days 0 and 1."""
+hour, so its served lead depends on each product's run cycle; ICON-EU's archive ends at day 4,
+ICON-D2's holds only days 0 and 1, and IFS 0.25°'s and GFS's end at day 7."""
 
-EXTRA_ENS_DAYS: Final[tuple[int, ...]] = (5, 14)
+EXTRA_ENS_DAYS: Final[tuple[int, ...]] = (5, 10, 14)
 """The ENS bands the extra-lead build adds. They never join `ENS_DAYS`, which also decides the
 baseline columns every shared row must hold, so adding them there would move the shared rows."""
 
-EXTRA_GEFS_DAYS: Final[tuple[int, ...]] = (5, 10, 14)
+EXTRA_GEFS_DAYS: Final[tuple[int, ...]] = (0, 5, 10, 14)
 """The GEFS bands the extra-lead build adds."""
 
 SOLAR_ONLY_PRODUCTS: Final[frozenset[str]] = frozenset({"ARPEGE Europe", "AROME France"})
@@ -986,8 +993,9 @@ def main() -> int:
     parser.add_argument(
         "--extra-leads",
         action="store_true",
-        help="Build the exploratory lead columns (ENS at days 5 and 14, GEFS at days 5, 10 and 14, "
-        "Previous Runs day 0 and day 5) on the published inputs' keys, into a new --output-dir.",
+        help="Build the exploratory lead columns (ENS at days 5, 10 and 14, GEFS at days 0, 5, 10 "
+        "and 14, Previous Runs day 0 for every product, day 5, and day 7 for IFS 0.25° and GFS) on "
+        "the published inputs' keys, into a new --output-dir.",
     )
     parser.add_argument(
         "--published-dir",

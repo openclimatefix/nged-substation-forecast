@@ -11,8 +11,10 @@ than refitting, and refuses to overwrite `report.md`.
 
 The arms:
 
-- **New arms:** ENS mean at days 5 and 14; GEFS mean at days 5, 10 and 14; IFS 0.25°, GFS and ICON
-  global at day 5; ICON-D2 and ICON-EU at day 0 (Open-Meteo's freshest run covering each hour).
+- **New arms:** ENS mean at days 5, 10 and 14; GEFS mean at days 0, 5, 10 and 14; IFS 0.25° and GFS
+  at days 0, 5 and 7; ICON global at days 0 and 5; every other Previous Runs product at day 0
+  (Open-Meteo's freshest run covering each hour); and the ENS control member at day 0, whose
+  columns the published inputs already hold. ARPEGE Europe and AROME France are solar only.
 - **References:** every published arm the new arms are compared with, refitted here on the same
   device, because a GPU fit is not bit-identical to a CPU fit and a contrast must not mix them.
   Each reference's difference from its published CPU fit is the device noise floor.
@@ -35,6 +37,7 @@ from pathlib import Path
 from typing import Final
 
 import polars as pl
+from build_forecast_inputs import PRODUCT_SLUGS, SOLAR_ONLY_PRODUCTS
 from nwp_forecast_comparison import (
     METRIC,
     PERCENTAGE_POINTS,
@@ -66,28 +69,48 @@ SETTING: Final[str] = "primary"
 
 NEW_PREFIXES: Final[tuple[str, ...]] = (
     "ens_mean_day5",
+    "ens_mean_day10",
     "ens_mean_day14",
+    "ens_control_day0",
+    "gefs_mean_day0",
     "gefs_mean_day5",
     "gefs_mean_day10",
     "gefs_mean_day14",
+    "ukv_day0",
+    "ifs025_day0",
     "ifs025_day5",
+    "ifs025_day7",
+    "gfs_day0",
     "gfs_day5",
+    "gfs_day7",
+    "icon_global_day0",
     "icon_global_day5",
     "icon_d2_day0",
     "icon_eu_day0",
+    "arpege_day0",
+    "arome_day0",
+    "knmi_harmonie_day0",
+    "dmi_harmonie_day0",
 )
-"""The arms whose columns `build_forecast_inputs.py --extra-leads` builds."""
+"""The arms not fitted in the published run: `build_forecast_inputs.py --extra-leads` builds their
+columns, except `ens_control_day0`, whose columns the published inputs already hold."""
 
 REFERENCE_PREFIXES: Final[tuple[str, ...]] = (
     "ens_mean_day0",
     "ens_mean_day1",
     "ens_mean_day3",
+    "ens_control_day1",
     "gefs_mean_day1",
     "gefs_mean_day3",
     "ifs025_day1",
     "ifs025_day3",
     "gfs_day1",
     "gfs_day3",
+    "ukv_day1",
+    "arpege_day1",
+    "arome_day1",
+    "knmi_harmonie_day1",
+    "dmi_harmonie_day1",
     "icon_global_day1",
     "icon_global_day3",
     "icon_eu_day1",
@@ -97,26 +120,51 @@ REFERENCE_PREFIXES: Final[tuple[str, ...]] = (
 
 SAME_PRODUCT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("ens_mean_day5", "ens_mean_day3"),
+    ("ens_mean_day10", "ens_mean_day3"),
     ("ens_mean_day14", "ens_mean_day3"),
     ("gefs_mean_day5", "gefs_mean_day3"),
     ("gefs_mean_day10", "gefs_mean_day3"),
     ("gefs_mean_day14", "gefs_mean_day3"),
     ("ifs025_day5", "ifs025_day3"),
+    ("ifs025_day7", "ifs025_day3"),
     ("gfs_day5", "gfs_day3"),
+    ("gfs_day7", "gfs_day3"),
     ("icon_global_day5", "icon_global_day3"),
     ("icon_d2_day0", "icon_d2_day1"),
     ("icon_eu_day0", "icon_eu_day1"),
+    ("ens_control_day0", "ens_control_day1"),
+    ("gefs_mean_day0", "gefs_mean_day1"),
+    ("ukv_day0", "ukv_day1"),
+    ("ifs025_day0", "ifs025_day1"),
+    ("gfs_day0", "gfs_day1"),
+    ("icon_global_day0", "icon_global_day1"),
+    ("arpege_day0", "arpege_day1"),
+    ("arome_day0", "arome_day1"),
+    ("knmi_harmonie_day0", "knmi_harmonie_day1"),
+    ("dmi_harmonie_day0", "dmi_harmonie_day1"),
 )
 """Each new arm against the same product at the longest lead already fitted, as (treatment,
 reference): the error's rise with lead."""
 
 ENSEMBLE_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("gefs_mean_day5", "ens_mean_day5"),
+    ("gefs_mean_day10", "ens_mean_day10"),
     ("gefs_mean_day14", "ens_mean_day14"),
     ("ifs025_day5", "ens_mean_day5"),
+    ("gefs_mean_day0", "ens_mean_day0"),
+    ("ens_control_day0", "ens_mean_day0"),
+    ("ukv_day0", "ens_mean_day0"),
+    ("ifs025_day0", "ens_mean_day0"),
+    ("gfs_day0", "ens_mean_day0"),
+    ("icon_global_day0", "ens_mean_day0"),
+    ("arpege_day0", "ens_mean_day0"),
+    ("arome_day0", "ens_mean_day0"),
+    ("knmi_harmonie_day0", "ens_mean_day0"),
+    ("dmi_harmonie_day0", "ens_mean_day0"),
 )
-"""The other products against ENS at the same day (GEFS has ENS's exact lead; IFS 0.25° day 5 does
-not)."""
+"""The other products against ENS at the same day. GEFS and the ENS control member have ENS's exact
+lead. A Previous Runs product's day-0 lead follows its own run cycle, so its contrast with ENS mean
+at day 0 mixes weather models and leads. IFS 0.25° day 5 does not have ENS's lead either."""
 
 NEAR_ANALYSIS_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
     ("icon_d2_day0", "icon_eu_day0"),
@@ -125,16 +173,19 @@ NEAR_ANALYSIS_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
 """ICON-D2 against ICON-EU at day 0 and day 1, also split by the hour of day modulo 3."""
 
 ELSEWHERE_CONTRASTS: Final[tuple[tuple[str, str], ...]] = (
+    ("ens_mean_day10", "ens_mean_day5"),
     ("ens_mean_day14", "ens_mean_day5"),
+    ("ens_mean_day14", "ens_mean_day10"),
     ("gefs_mean_day14", "gefs_mean_day10"),
     ("icon_d2_day0", "ens_mean_day0"),
     ("ens_mean_day0", "icon_eu_day0"),
 )
-"""Contrasts between two arms fitted here, as (treatment, reference): the error's rise from day 5 to
-day 14, GEFS's fall from day 10 to day 14, ICON-D2 at day 0 against ENS at day 0, and ENS at day 0
-against ICON-EU at day 0."""
+"""Contrasts between two arms fitted here, as (treatment, reference): ENS's error rise from day 5 to
+day 10 and day 14 and from day 10 to day 14, GEFS's fall from day 10 to day 14, ICON-D2 at day 0
+against ENS at day 0, and ENS at day 0 against ICON-EU at day 0."""
 
 CLIMATOLOGY_CONTRASTS: Final[tuple[str, ...]] = (
+    "ens_mean_day10",
     "ens_mean_day14",
     "gefs_mean_day10",
     "gefs_mean_day14",
@@ -180,6 +231,22 @@ def joined_rows(*, published_dir: Path, output_dir: Path, domain: DomainType) ->
     return joined
 
 
+def domain_prefixes(*, domain: DomainType, prefixes: tuple[str, ...]) -> tuple[str, ...]:
+    """Drop the arms of solar-only products from a wind run.
+
+    Args:
+        domain: `solar` or `wind`.
+        prefixes: Arm prefixes such as `arpege_day0`.
+
+    Returns:
+        `prefixes` unchanged for solar; for wind, without the arms of `SOLAR_ONLY_PRODUCTS`.
+    """
+    if domain == "solar":
+        return prefixes
+    solar_only = tuple(f"{PRODUCT_SLUGS[product]}_day" for product in SOLAR_ONLY_PRODUCTS)
+    return tuple(prefix for prefix in prefixes if not prefix.startswith(solar_only))
+
+
 def missing_shares(*, frame: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
     """Return each new arm's share of rows with any missing weather value.
 
@@ -195,7 +262,7 @@ def missing_shares(*, frame: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
             lead with coverage.
     """
     records = []
-    for prefix in NEW_PREFIXES:
+    for prefix in domain_prefixes(domain=domain, prefixes=NEW_PREFIXES):
         columns = arm_columns(domain=domain, prefixes=(prefix,))
         weather = [name for name in columns if name.startswith(f"{prefix}_")]
         if not weather or not all(name in frame.columns for name in weather):
@@ -375,7 +442,7 @@ def report_domain(
     Returns:
         The section's Markdown lines.
     """
-    arms = [*NEW_PREFIXES, *REFERENCE_PREFIXES]
+    arms = list(domain_prefixes(domain=domain, prefixes=(*NEW_PREFIXES, *REFERENCE_PREFIXES)))
     board = leaderboard(losses=losses, arms=arms)
     lines = [
         f"## {domain.capitalize()}",
@@ -461,7 +528,7 @@ def report_domain(
                 f"| [{text.split(' [')[1]} | {result['n_rows']} |"
             )
     noise = ["", "### Device noise floor: GPU fit minus published CPU fit, same arm", *header]
-    for prefix in REFERENCE_PREFIXES:
+    for prefix in domain_prefixes(domain=domain, prefixes=REFERENCE_PREFIXES):
         both = pl.concat(
             [
                 losses.filter(pl.col("arm") == prefix).with_columns(arm=pl.lit("gpu")),
@@ -494,7 +561,7 @@ def require_arms(*, frame: pl.DataFrame, domain: DomainType) -> None:
     """
     absent = [
         prefix
-        for prefix in (*NEW_PREFIXES, *REFERENCE_PREFIXES)
+        for prefix in domain_prefixes(domain=domain, prefixes=(*NEW_PREFIXES, *REFERENCE_PREFIXES))
         if not all(name in frame.columns for name in arm_columns(domain=domain, prefixes=(prefix,)))
     ]
     if absent:
