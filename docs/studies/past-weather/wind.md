@@ -417,16 +417,41 @@ measure when each product's data arrive.** The assumption is this repository's
 hourly steps 0 to 90 at 06:40 to 06:55 UTC and the 00 UTC HRES steps 0 to 90 at 05:45 to 06:12 UTC.
 Open-data publication and the ingest of Dynamical.org and Open-Meteo come later than those times.
 
-**HRES is read from Open-Meteo's Previous Runs interface, and this study infers its served lead.**
-HRES is read at each farm's point, at Open-Meteo's default land cell (the Previous Runs fetch sets
-no `cell_selection`), as every other Open-Meteo product on this page is (`fetch_wind_point.py` sets
-`land`). Open-Meteo's documentation says only that each run's first few hours are stitched into a
-continuous hourly series, so HRES's served lead is inferred. Open-Meteo's announcement says that
-from 1 October 2025 it redistributes HRES at 9 km "without any additional delay". This study places
-a change of HRES's archive source on 1 October 2025, the date given in both Open-Meteo's and ECMWF's
-announcements, because the served series' hour-to-hour jumps change there. Before that date the
-served series hands over between runs twice a day. That handover describes how Open-Meteo's archive
-assembles the series, and this study does not attribute it to ECMWF.
+**HRES is read from Open-Meteo's Previous Runs interface at each farm's land cell, and this study
+infers its served lead.** HRES is read at each farm's point, at Open-Meteo's default land cell (the
+Previous Runs fetch sets no `cell_selection`), as every other Open-Meteo product on this page is
+(`fetch_wind_point.py` sets `land`). Open-Meteo's documentation says only that each run's first few
+hours are stitched into a continuous hourly series, so HRES's served lead is inferred. Open-Meteo's
+announcement says that from 1 October 2025 it redistributes HRES at 9 km "without any additional
+delay". This study places a change of HRES's archive source on 1 October 2025, the date given in
+both Open-Meteo's and ECMWF's announcements, because the served series' hour-to-hour jumps change
+there. Before that date the served series hands over between runs twice a day. That handover
+describes how Open-Meteo's archive assembles the series, and this study does not attribute it to
+ECMWF.
+
+**HRES's served lead is inferred from where hour-to-hour jumps fall: 1 to 12 hours before 1 October
+2025, and 0 to 5 hours from that date.** Before 1 October 2025 the 100 m wind speed's hour-to-hour
+change at 01 UTC is 1.32 times the mean of its two neighbouring hours' changes, and at 13 UTC 1.29
+times, the arrival hours of the 00 and 12 UTC runs.
+
+**The 07 UTC jump is consistent with the morning boundary-layer transition and is not read as a
+handover.** A jump of 1.19 at 07 UTC is not explained by a run schedule. It is concentrated in May
+to August: on the main row set HRES's 07 UTC ratio is 1.39 in May, 1.11 in June, 1.49 in July, and
+1.12 in August, and below 1.08 in every other calendar month. The same ratio for ERA5, an analysis
+with no handover between runs, is 1.28 in May and 1.30 in August, and UKV's does not exceed 1.18 in
+any month. No jump appears at 19 UTC.
+
+From 1 October 2025 the jumps fall at 00 UTC (1.20), 06 UTC (1.15), and 18 UTC (1.14), and the jump
+at 12 UTC (1.08) is below the report's threshold of 1.10 for wind. The plan wrote the threshold as
+1.15, and 1.10 was chosen after the results were seen. At the plan's threshold both expected hours
+before 1 October 2025 reach it at 100 m, and one of the four expected hours from that date does. An
+hour above the threshold is evidence of a handover, not proof of one.
+
+**The Previous Runs file's null pattern gives stronger evidence for the change of source than the
+hour-to-hour jumps do.** Of the 1,072,512 values in its 49 `_previous_day*` columns before 1 October
+2025, 1,320 are not null (the last on 2025-01-07), against 1,191,935 of 1,263,024 from that date,
+and from that date the one-day-earlier 100 m wind speed jumps at 00 UTC (1.30), 06 UTC (1.21), 12
+UTC (1.23), and 18 UTC (1.21), all four expected hours.
 
 **IFS Cycle 49r1 went live on 12 November 2024, and Cycle 50r1 on 12 May 2026.** Cycle 49r1 went
 live with the 06 UTC run of its day, according to ECMWF's [implementation
@@ -1196,40 +1221,6 @@ and UKV's does not](../assets/ens_hres_wind_monthly_ratio.svg)
 
 #### The choice of ENS interpolation moves ENS day 0's error by at most 0.02 points
 
-**None of the planned contrasts isolates which difference between an ECMWF product and its
-comparator causes the gap.** Each contrast mixes served lead, step width, native and served grid,
-IFS cycle, the source of HRES's archive, and how each value is read. ENS day 0's lead is 0 to 23
-hours from the 00 UTC run, its steps are 3-hourly and rebuilt to hourly, and each value is the
-area-weighted mean of the 0.25° cells that a farm's H3 resolution-5 cell overlaps. ENS day 0's speed
-is the magnitude of the cell-mean wind vector, which can lower the speed relative to a point read.
-HRES is a single land cell that Open-Meteo picks. UKV is read at T+0, and ERA5 is an analysis. The
-ENS-against-HRES contrast also mixes ensemble averaging with a single run, so the contrast's result
-cannot be attributed to ensemble averaging alone.
-
-**HRES's served lead is inferred from where hour-to-hour jumps fall: 1 to 12 hours before 1 October
-2025, and 0 to 5 hours from that date.** Before 1 October 2025 the 100 m wind speed's hour-to-hour
-change at 01 UTC is 1.32 times the mean of its two neighbouring hours' changes, and at 13 UTC 1.29
-times, the arrival hours of the 00 and 12 UTC runs.
-
-**The 07 UTC jump is consistent with the morning boundary-layer transition and is not read as a
-handover.** A jump of 1.19 at 07 UTC is not explained by a run schedule. It is concentrated in May
-to August: on the main row set HRES's 07 UTC ratio is 1.39 in May, 1.11 in June, 1.49 in July, and
-1.12 in August, and below 1.08 in every other calendar month. The same ratio for ERA5, an analysis
-with no handover between runs, is 1.28 in May and 1.30 in August, and UKV's does not exceed 1.18 in
-any month. No jump appears at 19 UTC.
-
-From 1 October 2025 the jumps fall at 00 UTC (1.20), 06 UTC (1.15), and 18 UTC (1.14), and the jump
-at 12 UTC (1.08) is below the report's threshold of 1.10 for wind. The plan wrote the threshold as
-1.15, and 1.10 was chosen after the results were seen. At the plan's threshold both expected hours
-before 1 October 2025 reach it at 100 m, and one of the four expected hours from that date does. An
-hour above the threshold is evidence of a handover, not proof of one.
-
-**The Previous Runs file's null pattern gives stronger evidence for the change of source than the
-hour-to-hour jumps do.** Of the 1,072,512 values in its 49 `_previous_day*` columns before 1 October
-2025, 1,320 are not null (the last on 2025-01-07), against 1,191,935 of 1,263,024 from that date,
-and from that date the one-day-earlier 100 m wind speed jumps at 00 UTC (1.30), 06 UTC (1.21), 12
-UTC (1.23), and 18 UTC (1.21), all four expected hours.
-
 **The choice of ENS interpolation does not move ENS day 0's error by a margin statistically
 significant at the 5% level.** Each of the ENS horizons page's three alternative interpolations
 moves ENS day 0's error by no more than 0.02 points from the planned combination: +0.02 points
@@ -1579,13 +1570,20 @@ product?](blending.md#wind-a-blend-beats-ukv-given-its-neighbouring-hours)**
   other calendar month. Three fold designs in the ECMWF section keep cells without training rows on
   purpose, and the report counts them: 6 for three eras with no fold rotation, 12 for the page's
   two-UKV-era design, and 6 for the horizons page's own folds on the longer row set.
-- **ECMWF's products are compared over three farms, with different leads, grids, and archive
-  sources.** HRES's archive source changed on 1 October 2025. IFS Cycle 49r1 went live before the
-  main row set starts, and Cycle 50r1 went live inside it, on 12 May 2026. An XGBoost model given
-  HRES or ENS day 0 therefore trains across cycle changes that only the era cuts described in the
-  results partly separate. The study's three eras do not separate Cycle 50r1, and an extra era cut
-  there moves none of the planned contrasts, nor ENS day 0 minus HRES, by more than 0.04 points (the
-  fold-design table).
+- **None of the planned ECMWF contrasts isolates which difference between an ECMWF product and its
+  comparator causes the gap.** Each contrast mixes served lead, step width, native and served grid,
+  IFS cycle, the source of HRES's archive, and how each value is read. ENS day 0's lead is 0 to 23
+  hours from the 00 UTC run, its steps are 3-hourly and rebuilt to hourly, and each value is the
+  area-weighted mean of the 0.25° cells that a farm's H3 resolution-5 cell overlaps. ENS day 0's
+  speed is the magnitude of the cell-mean wind vector, which can lower the speed relative to a point
+  read. HRES is a single land cell that Open-Meteo picks. UKV is read at T+0, and ERA5 is an
+  analysis. The ENS-against-HRES contrast also mixes ensemble averaging with a single run, so the
+  contrast's result cannot be attributed to ensemble averaging alone. HRES's archive source changed
+  on 1 October 2025. IFS Cycle 49r1 went live before the main row set starts, and Cycle 50r1 went
+  live inside it, on 12 May 2026. An XGBoost model given HRES or ENS day 0 therefore trains across
+  cycle changes that only the era cuts described in the results partly separate. The study's three
+  eras do not separate Cycle 50r1, and an extra era cut there moves none of the planned contrasts,
+  nor ENS day 0 minus HRES, by more than 0.04 points (the fold-design table).
 - **ENS day 0's read time.** At this repository's assumed 09:00 UTC read time, only ENS day 0's
   hours 00 to 08 UTC have passed; hours 09 to 23 are still a forecast up to 14 hours ahead. The ENS
   day-0 scores are therefore past weather delivered late for the early hours, and the best a 00
