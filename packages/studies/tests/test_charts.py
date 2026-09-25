@@ -9,6 +9,7 @@ import pytest
 from studies.charts import (
     CONDITION_COLOURS,
     CONTENT_WIDTH_PX,
+    CONTRAST_COLUMNS_WITH_MONTHS,
     FAMILY_COLOURS,
     FAMILY_COLOURS_LIGHT,
     LABEL_WIDTH_PX,
@@ -1412,3 +1413,40 @@ def _walk(node: object) -> Iterator[dict]:
     elif isinstance(node, list):
         for value in node:
             yield from _walk(value)
+
+
+WIDE_HEADER = "| " + " | ".join(CONTRAST_COLUMNS_WITH_MONTHS) + " |\n" + "|---" * 8 + "|\n"
+
+
+def test_a_contrast_table_with_a_months_column_is_read_only_when_its_header_is_passed(
+    tmp_path: Path,
+) -> None:
+    # Catches a wide table skipped without a word, and one read where the caller never asked.
+    path = tmp_path / "report.md"
+    path.write_text(
+        WIDE_HEADER
+        + "| all | a_wind − b_wind | +0.995 | [+0.585, +1.452] | **yes** | 5 of 5 | 34,156 | 17 |\n"
+    )
+
+    assert report_contrasts(report_path=path).is_empty()
+    wide = report_contrasts(report_path=path, extra_headers=(CONTRAST_COLUMNS_WITH_MONTHS,))
+    assert wide.row(0, named=True)["n_rows"] == 34156
+
+
+def test_report_contrasts_reads_a_too_few_months_row_as_not_excluding_zero(tmp_path: Path) -> None:
+    path = tmp_path / "report.md"
+    path.write_text(
+        HEADER + "| from 2026-05-12 | a_wind − b_wind | +0.3852 | [+0.1484, +0.5874] "
+        "| too few months | 4 of 4 | 8,279 |\n"
+    )
+
+    row = report_contrasts(report_path=path).row(0, named=True)
+
+    assert row["excludes_zero"] is False
+
+
+def test_assert_matches_printed_compares_at_the_decimals_it_is_given() -> None:
+    # Catches a four-decimal report compared at three decimals: 6.6671 never rounds to 6.667.
+    assert_matches_printed(name="a", recomputed=6.66714, printed=6.6671, decimals=4)
+    with pytest.raises(ValueError, match=r"bootstrapped 6\.667 but"):
+        assert_matches_printed(name="a", recomputed=6.66714, printed=6.6671)

@@ -37,7 +37,7 @@ import re
 import sys
 from collections.abc import Callable, Sequence
 from pathlib import Path
-from typing import Final, NamedTuple
+from typing import Final, Literal, NamedTuple
 
 import polars as pl
 import station_past_solar_charts as station_charts
@@ -45,6 +45,7 @@ import weather_product_charts as main_charts
 from ens_past_solar_charts import NAMES as ENS_NAMES
 from sources import SOLAR_LEADERBOARD_DIR, UPDATE_OUTPUT_DIR
 from studies.charts import (
+    CONTRAST_COLUMNS_WITH_MONTHS,
     POST_HOC_SUFFIX,
     REPORT_PRINT_DECIMALS,
     BlockArm,
@@ -97,6 +98,9 @@ CONTRAST_SECTION: Final[str] = "Mean absolute error minus ERA5's"
 SECOND_SETTING_SCOPE: Final[str] = "sensitivity"
 """The scope a report gives a contrast at the second hyperparameter setting."""
 
+REPORT_TITLE: Final[str] = "Past-solar leaderboard and contrasts against ERA5"
+"""The heading of the past-solar leaderboard's `report.md`."""
+
 REPORT_INTRODUCTION: Final[str] = (
     "Every number is recomputed from the saved `pooled` losses of four row sets, by resampling "
     "whole months and a fitting seed. Each row set is scored on its own common rows, so a value "
@@ -123,13 +127,25 @@ EXPLORATORY_HEADER: Final[str] = (
 )
 
 _HEADING: Final[re.Pattern[str]] = re.compile(
-    r"on ([\d,]+) common site-hours.*\((\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2})\)"
+    r"on ([\d,]+) (?:common )?(?:site|farm)-hours.*\((\d{4}-\d{2}-\d{2}) to (\d{4}-\d{2}-\d{2})\)"
 )
+INTERVAL_COLUMN: Final[str] = "95% interval"
+"""The header of a table's column of 95% intervals."""
+
+_INTERVAL_CELL: Final[re.Pattern[str]] = re.compile(r"^\[([\d.]+), ([\d.]+)\]$")
 _PRINTED_REBUILD_ERRORS: Final[re.Pattern[str]] = re.compile(r"^MAE: (.+)$", re.MULTILINE)
 _PRINTED_ARM_ERROR: Final[re.Pattern[str]] = re.compile(r"(\w+) (\d+\.\d+)")
 _PRINTED_INTERVAL: Final[re.Pattern[str]] = re.compile(
     r"^\| (\w+) \| ([\d.]+) \| \[([\d.]+), ([\d.]+)\] \|$", re.MULTILINE
 )
+
+
+IntervalsType = Literal["solar", "table", "none"]
+"""How a report prints each arm's 95% interval.
+
+`solar` is a three-cell row `| arm | error | [low, high] |` anywhere in the report. `table` is a
+`95% interval` column in the table that holds the errors. `none` is no interval at all.
+"""
 
 
 class RowSet(NamedTuple):
@@ -148,6 +164,23 @@ class RowSet(NamedTuple):
             first product's error minus the second's.
         exploratory_contrasts: Contrasts between two products that the report does not print,
             each the first product's error minus the second's, scored at the first setting only.
+        reference_arm: The arm every contrast in `contrast_arms` is taken against.
+        printed_decimals: The decimal places the report prints its numbers at.
+        leaderboard_section: The start of the heading above the report's table of errors, or
+            `None` where that table is the first table in the report.
+        intervals: How the report prints each arm's 95% interval.
+        planned_section: The start of the headings of the tables that print the planned
+            contrasts at the first setting.
+        second_planned_section: The start of the headings of the tables that print the planned
+            contrasts at the second setting, or `None` where they sit under `planned_section`.
+        second_scope: The `Scope` cell of a printed row at the second setting.
+        second_section: The start of the headings a row at the second setting is compared
+            under; the empty string compares a row from any section.
+        other_fit_sections: The starts of the headings of sections that print a contrast on the
+            first setting's arms and rows from a fit whose losses `losses.parquet` does not hold.
+        exploratory_in_planned: Contrasts that the report prints under `planned_section` and
+            labels exploratory, each as (first arm, second arm).
+        wide_contrast_tables: Whether the report's contrast tables carry a `Months` column.
     """
 
     key: str
@@ -159,6 +192,17 @@ class RowSet(NamedTuple):
     contrast_arms: tuple[BlockArm, ...]
     planned_contrasts: tuple[PlannedContrast, ...]
     exploratory_contrasts: tuple[PlannedContrast, ...] = ()
+    reference_arm: str = REFERENCE_ARM
+    printed_decimals: int = PRINT_DECIMALS
+    leaderboard_section: str | None = None
+    intervals: IntervalsType = "solar"
+    planned_section: str = PLANNED_SECTION_PREFIX
+    second_planned_section: str | None = None
+    second_scope: str = SECOND_SETTING_SCOPE
+    second_section: str = ""
+    other_fit_sections: tuple[str, ...] = OTHER_FIT_SECTION_PREFIXES
+    exploratory_in_planned: tuple[tuple[str, str], ...] = ()
+    wide_contrast_tables: bool = False
 
 
 class RowSetResult(NamedTuple):
@@ -358,14 +402,14 @@ def read_heading(*, report_text: str) -> tuple[int, str]:
         report_text: A row set's `report.md`.
 
     Returns:
-        The number of common site-hours, and the dates as `2022-12-01 to 2026-08-31`.
+        The number of common site-hours or farm-hours, and the dates as `2022-12-01 to 2026-08-31`.
 
     Raises:
         ValueError: If no line holds both.
     """
     match = _HEADING.search(report_text)
     if match is None:
-        msg = "the report has no 'on N common site-hours (first to last)' heading"
+        msg = "the report has no 'on N common site-hours (first to last)' or 'farm-hours' heading"
         raise ValueError(msg)
     return int(match[1].replace(",", "")), f"{match[2]} to {match[3]}"
 
@@ -383,6 +427,126 @@ def printed_intervals(*, report_text: str) -> dict[str, tuple[float, float, floa
         match[1]: (float(match[2]), float(match[3]), float(match[4]))
         for match in _PRINTED_INTERVAL.finditer(report_text)
     }
+
+
+def leaderboard_table(
+    *, report_text: str, section_prefix: str | None
+) -> tuple[tuple[str, ...], list[tuple[str, ...]]]:
+    """Return the header and the rows of the table that holds a report's errors.
+
+    Args:
+        report_text: A row set's `report.md`.
+        section_prefix: The start of the heading above the table, or `None` for the first table
+            in the report.
+
+    Returns:
+        The table's header cells, and each body row's cells with padding and backticks removed.
+
+    Raises:
+        ValueError: If no heading starts with `section_prefix`, or no table follows it.
+    """
+    lines = report_text.splitlines()
+    start = 0
+    if section_prefix is not None:
+        headings = [
+            index
+            for index, line in enumerate(lines)
+            if line.startswith("#") and line.lstrip("#").strip().startswith(section_prefix)
+        ]
+        if not headings:
+            msg = f"the report has no heading starting {section_prefix!r}"
+            raise ValueError(msg)
+        start = headings[0]
+    table = []
+    for line in lines[start:]:
+        if line.startswith("|"):
+            table.append(tuple(cell.strip().strip("`") for cell in line.strip("|").split("|")))
+        elif table:
+            break
+    if len(table) < 3:
+        msg = f"no table follows the heading starting {section_prefix!r}"
+        raise ValueError(msg)
+    return table[0], table[2:]
+
+
+def printed_table_errors(
+    *, report_text: str, section_prefix: str | None, column: str, arm_suffix: str
+) -> dict[str, float]:
+    """Read each arm's error from the column of a report's table of errors.
+
+    Args:
+        report_text: A row set's `report.md`.
+        section_prefix: The start of the heading above the table, or `None` for the first table.
+        column: The header of the column of errors.
+        arm_suffix: What the key column leaves off an arm's name.
+
+    Returns:
+        Each arm's printed error.
+
+    Raises:
+        ValueError: If the table has no such column.
+    """
+    header, rows = leaderboard_table(report_text=report_text, section_prefix=section_prefix)
+    if column not in header:
+        msg = f"the table under {section_prefix!r} has no column {column!r}: {header}"
+        raise ValueError(msg)
+    index = header.index(column)
+    return {f"{cells[0]}{arm_suffix}": float(cells[index]) for cells in rows}
+
+
+def printed_table_intervals(
+    *,
+    report_text: str,
+    section_prefix: str | None,
+    column: str,
+    arm_suffix: str,
+    intervals: IntervalsType,
+) -> dict[str, tuple[float, float, float]]:
+    """Read each arm's error and 95% interval from the report, in whichever shape it prints them.
+
+    Args:
+        report_text: A row set's `report.md`.
+        section_prefix: The start of the heading above the table of errors, or `None` for the
+            first table.
+        column: The header of the column of errors.
+        arm_suffix: What the key column leaves off an arm's name.
+        intervals: How the report prints intervals, as declared by the row set.
+
+    Returns:
+        Each arm's (error, lower bound, upper bound); empty where `intervals` is `none`. An arm
+        whose interval cell is blank is left out.
+
+    Raises:
+        ValueError: If the report's table has a `95% interval` column that `intervals` does not
+            expect, or lacks one that it does, or holds an interval cell that is not `[low, high]`.
+    """
+    if intervals == "solar":
+        return printed_intervals(report_text=report_text)
+    header, rows = leaderboard_table(report_text=report_text, section_prefix=section_prefix)
+    has_column = INTERVAL_COLUMN in header
+    if has_column != (intervals == "table"):
+        msg = (
+            f"the row set declares intervals={intervals!r} but the table under "
+            f"{section_prefix!r} has header {header}"
+        )
+        raise ValueError(msg)
+    if intervals == "none":
+        return {}
+    error_index, interval_index = header.index(column), header.index(INTERVAL_COLUMN)
+    printed = {}
+    for cells in rows:
+        if not cells[interval_index]:
+            continue
+        match = _INTERVAL_CELL.match(cells[interval_index])
+        if match is None:
+            msg = f"{cells[0]}: the interval cell {cells[interval_index]!r} is not '[low, high]'"
+            raise ValueError(msg)
+        printed[f"{cells[0]}{arm_suffix}"] = (
+            float(cells[error_index]),
+            float(match[1]),
+            float(match[2]),
+        )
+    return printed
 
 
 def printed_rebuild_errors(*, report_text: str) -> dict[str, float]:
@@ -404,24 +568,35 @@ def printed_rebuild_errors(*, report_text: str) -> dict[str, float]:
     }
 
 
-def check_intervals(*, absolute: pl.DataFrame, report_text: str) -> list[str]:
+def check_intervals(
+    *,
+    absolute: pl.DataFrame,
+    report_text: str,
+    printed: dict[str, tuple[float, float, float]] | None = None,
+    decimals: int = PRINT_DECIMALS,
+) -> list[str]:
     """List every recomputed interval that differs from the interval the report prints.
 
     Args:
         absolute: `block_leaderboard_rows`'s output.
         report_text: The row set's `report.md`.
+        printed: Each arm's printed (error, lower bound, upper bound), where the report prints
+            them in a shape `printed_intervals` does not read; `None` reads them from
+            `report_text`.
+        decimals: The decimal places the report prints its numbers at.
 
     Returns:
-        One message per difference at `PRINT_DECIMALS` places; empty where all agree or the report
+        One message per difference at `decimals` places; empty where all agree or the report
         prints no intervals.
     """
-    printed = printed_intervals(report_text=report_text)
+    if printed is None:
+        printed = printed_intervals(report_text=report_text)
     problems = []
     for row in absolute.iter_rows(named=True):
         arm = row["arm"]
         if arm not in printed:
             continue
-        recomputed = tuple(round(row[name], PRINT_DECIMALS) for name in ("lower_95", "upper_95"))
+        recomputed = tuple(round(row[name], decimals) for name in ("lower_95", "upper_95"))
         if recomputed != printed[arm][1:]:
             problems.append(
                 f"{arm}: interval {recomputed} but the report prints {printed[arm][1:]}"
@@ -436,12 +611,16 @@ def check_contrasts(
     site_hours: int,
     scope: str = "all",
     column_prefix: str = "",
+    reference_arm: str = REFERENCE_ARM,
+    other_fit_sections: tuple[str, ...] = OTHER_FIT_SECTION_PREFIXES,
+    section_prefix: str = "",
+    decimals: int = PRINT_DECIMALS,
 ) -> list[str]:
     """List every recomputed contrast that differs from a printed contrast on the same rows.
 
     A printed row is compared where it has the same scope, treatment, reference, and number of
-    rows, and sits in a section that reports the main fit: a section starting with one of
-    `OTHER_FIT_SECTION_PREFIXES` prints a different fit's numbers.
+    rows, and sits in a section that reports the fit being checked: a section starting with one of
+    `other_fit_sections` prints a different fit's numbers.
 
     Args:
         contrasts: `block_contrast_rows`'s output, with `arm`.
@@ -452,10 +631,15 @@ def check_contrasts(
         column_prefix: What precedes `difference`, `lower_95` and `upper_95` in the columns to
             compare: empty for the main setting, `second_` for the second setting. A row whose
             value is null is skipped.
+        reference_arm: The arm every contrast is taken against.
+        other_fit_sections: The starts of the headings of sections to leave out.
+        section_prefix: The start of the headings of the only sections to compare with; the
+            empty string compares every section.
+        decimals: The decimal places the report prints its numbers at.
 
     Returns:
-        One message per difference at `PRINT_DECIMALS` places; a contrast the report does not
-        print is not checked.
+        One message per difference at `decimals` places; a contrast the report does not print is
+        not checked.
     """
     names = tuple(f"{column_prefix}{name}" for name in ("difference", "lower_95", "upper_95"))
     problems = []
@@ -466,24 +650,33 @@ def check_contrasts(
         matches = printed.filter(
             pl.col("scope") == scope,
             pl.col("treatment") == arm,
-            pl.col("reference") == REFERENCE_ARM,
+            pl.col("reference") == reference_arm,
             pl.col("n_rows") == site_hours,
+            pl.col("section").str.starts_with(section_prefix),
             ~pl.any_horizontal(
-                pl.col("section").str.starts_with(prefix) for prefix in OTHER_FIT_SECTION_PREFIXES
+                pl.lit(False),
+                *(pl.col("section").str.starts_with(prefix) for prefix in other_fit_sections),
             ),
         )
-        recomputed = tuple(round(row[name], PRINT_DECIMALS) for name in names)
+        recomputed = tuple(round(row[name], decimals) for name in names)
         for match in matches.iter_rows(named=True):
             shown = (match["difference"], match["lower_95"], match["upper_95"])
             if recomputed != shown:
                 problems.append(
-                    f"{arm} - {REFERENCE_ARM} at scope {scope}: {recomputed} but section "
+                    f"{arm} - {reference_arm} at scope {scope}: {recomputed} but section "
                     f"{match['section']!r} prints {shown}"
                 )
     return problems
 
 
-def missing_planned_second_rows(*, contrasts: pl.DataFrame, printed: pl.DataFrame) -> list[str]:
+def missing_planned_second_rows(
+    *,
+    contrasts: pl.DataFrame,
+    printed: pl.DataFrame,
+    reference_arm: str = REFERENCE_ARM,
+    second_scope: str = SECOND_SETTING_SCOPE,
+    section_prefix: str = "",
+) -> list[str]:
     """List every planned contrast with a second setting that the report prints no row for.
 
     A report names each planned contrast against ERA5 at the second setting, so a planned contrast
@@ -492,17 +685,23 @@ def missing_planned_second_rows(*, contrasts: pl.DataFrame, printed: pl.DataFram
     Args:
         contrasts: The scored contrasts, with `arm`, `planning` and `second_difference`.
         printed: `report_contrasts`'s output for the row set's report.
+        reference_arm: The arm every contrast is taken against.
+        second_scope: The `Scope` cell of a printed row at the second setting.
+        section_prefix: The start of the headings a second-setting row is looked for under; the
+            empty string looks in every section.
 
     Returns:
         One message per planned contrast with a second-setting value and no printed row.
     """
     on_second = printed.filter(
-        pl.col("scope") == SECOND_SETTING_SCOPE, pl.col("reference") == REFERENCE_ARM
+        pl.col("scope") == second_scope,
+        pl.col("reference") == reference_arm,
+        pl.col("section").str.starts_with(section_prefix),
     )
     printed_arms = set(on_second["treatment"].to_list())
     return [
-        f"{row['arm']} - {REFERENCE_ARM}: planned, but the report prints no row at scope "
-        f"{SECOND_SETTING_SCOPE}"
+        f"{row['arm']} - {reference_arm}: planned, but the report prints no row at scope "
+        f"{second_scope}"
         for row in contrasts.iter_rows(named=True)
         if row["planning"] == "planned"
         and row["second_difference"] is not None
@@ -510,26 +709,38 @@ def missing_planned_second_rows(*, contrasts: pl.DataFrame, printed: pl.DataFram
     ]
 
 
-def planned_arms(*, printed: pl.DataFrame) -> set[str]:
-    """Return the arms whose contrast against ERA5 the report names before the run.
+def planned_arms(
+    *,
+    printed: pl.DataFrame,
+    reference_arm: str = REFERENCE_ARM,
+    section_prefix: str = PLANNED_SECTION_PREFIX,
+) -> set[str]:
+    """Return the arms whose contrast against the reference arm the report names before the run.
 
     Args:
         printed: `report_contrasts`'s output.
+        reference_arm: The arm every contrast is taken against.
+        section_prefix: The start of the headings of the planned-contrast tables.
 
     Returns:
-        Each treatment arm with a row against ERA5, scope `all`, under a heading that starts with
-        `PLANNED_SECTION_PREFIX`.
+        Each treatment arm with a row against the reference arm, scope `all`, under a heading
+        that starts with `section_prefix`.
     """
     rows = printed.filter(
-        pl.col("section").str.starts_with(PLANNED_SECTION_PREFIX),
+        pl.col("section").str.starts_with(section_prefix),
         pl.col("scope") == "all",
-        pl.col("reference") == REFERENCE_ARM,
+        pl.col("reference") == reference_arm,
     )
     return set(rows["treatment"].to_list())
 
 
 def _printed_planned_row(
-    *, printed: pl.DataFrame, contrast: PlannedContrast, site_hours: int, scope: str
+    *,
+    printed: pl.DataFrame,
+    contrast: PlannedContrast,
+    site_hours: int,
+    scope: str,
+    section_prefix: str = PLANNED_SECTION_PREFIX,
 ) -> dict[str, float] | None:
     """Return the printed row of a planned contrast, or None where the report prints none.
 
@@ -537,7 +748,8 @@ def _printed_planned_row(
         printed: `report_contrasts`'s output.
         contrast: The planned contrast.
         site_hours: The row set's number of site-hours.
-        scope: The printed scope to read: `all`, or `SECOND_SETTING_SCOPE`.
+        scope: The printed scope to read: `all`, or the row set's second-setting scope.
+        section_prefix: The start of the headings of the tables to read from.
 
     Returns:
         The row's `difference`, `lower_95` and `upper_95`; None if no row matches.
@@ -546,7 +758,7 @@ def _printed_planned_row(
         ValueError: If more than one row matches.
     """
     matches = printed.filter(
-        pl.col("section").str.starts_with(PLANNED_SECTION_PREFIX),
+        pl.col("section").str.starts_with(section_prefix),
         pl.col("scope") == scope,
         pl.col("treatment") == contrast.treatment.arm,
         pl.col("reference") == contrast.reference.arm,
@@ -561,7 +773,12 @@ def _printed_planned_row(
 
 
 def unlisted_planned_contrasts(
-    *, contrasts: Sequence[PlannedContrast], printed: pl.DataFrame, site_hours: int
+    *,
+    contrasts: Sequence[PlannedContrast],
+    printed: pl.DataFrame,
+    site_hours: int,
+    section_prefix: str = PLANNED_SECTION_PREFIX,
+    exploratory: Sequence[tuple[str, str]] = (),
 ) -> list[str]:
     """List the planned contrasts a report prints that `contrasts` does not hold, and the reverse.
 
@@ -569,16 +786,21 @@ def unlisted_planned_contrasts(
         contrasts: The row set's `planned_contrasts`.
         printed: `report_contrasts`'s output.
         site_hours: The row set's number of site-hours.
+        section_prefix: The start of the headings of the planned-contrast tables.
+        exploratory: Contrasts that a planned-contrast table prints and labels exploratory, each
+            as (first arm, second arm); they are not planned, so the script need not list them.
 
     Returns:
         One message per planned contrast in one place and not the other.
     """
     in_report = printed.filter(
-        pl.col("section").str.starts_with(PLANNED_SECTION_PREFIX),
+        pl.col("section").str.starts_with(section_prefix),
         pl.col("scope") == "all",
         pl.col("n_rows") == site_hours,
     )
-    reported = set(zip(in_report["treatment"], in_report["reference"], strict=True))
+    reported = set(zip(in_report["treatment"], in_report["reference"], strict=True)) - set(
+        exploratory
+    )
     listed = {(row.treatment.arm, row.reference.arm) for row in contrasts}
     return [
         *(
@@ -599,6 +821,8 @@ def check_planned_contrasts(
     site_hours: int,
     scope: str = "all",
     column_prefix: str = "",
+    section_prefix: str = PLANNED_SECTION_PREFIX,
+    decimals: int = PRINT_DECIMALS,
 ) -> None:
     """Stop unless every planned contrast rounds to the row the report prints for it.
 
@@ -606,9 +830,11 @@ def check_planned_contrasts(
         planned: `planned_contrast_rows`'s output, with `arm` and `reference_arm`.
         printed: `report_contrasts`'s output for the row set's report.
         site_hours: The row set's number of site-hours.
-        scope: The printed scope to compare with: `all`, or `SECOND_SETTING_SCOPE`.
+        scope: The printed scope to compare with: `all`, or the row set's second-setting scope.
         column_prefix: What precedes `difference`, `lower_95` and `upper_95`: empty for the main
             setting, `second_` for the second. A row whose value is null is skipped.
+        section_prefix: The start of the headings of the tables to compare with.
+        decimals: The decimal places the report prints its numbers at.
 
     Raises:
         ValueError: If a planned contrast has a value and the report prints no row for it, or a
@@ -622,7 +848,11 @@ def check_planned_contrasts(
             BlockArm(row["reference_arm"], row["label"], row["family"]),
         )
         shown = _printed_planned_row(
-            printed=printed, contrast=contrast, site_hours=site_hours, scope=scope
+            printed=printed,
+            contrast=contrast,
+            site_hours=site_hours,
+            scope=scope,
+            section_prefix=section_prefix,
         )
         if shown is None:
             msg = (
@@ -635,6 +865,7 @@ def check_planned_contrasts(
                 name=f"{row['label']} ({row['arm']} - {row['reference_arm']}) {scope} {name}",
                 recomputed=row[f"{column_prefix}{name}"],
                 printed=shown[name],
+                decimals=decimals,
             )
 
 
@@ -691,7 +922,12 @@ def near_line() -> pl.Expr:
 
 
 def _second_setting(
-    *, contrasts: pl.DataFrame, arms: tuple[BlockArm, ...], losses: pl.DataFrame, site_hours: int
+    *,
+    contrasts: pl.DataFrame,
+    arms: tuple[BlockArm, ...],
+    losses: pl.DataFrame,
+    site_hours: int,
+    reference_arm: str = REFERENCE_ARM,
 ) -> pl.DataFrame:
     """Add the second hyperparameter setting's contrast to each planned or near-line row.
 
@@ -703,6 +939,7 @@ def _second_setting(
         arms: The arms contrasted.
         losses: The row set's `losses.parquet`.
         site_hours: The row set's number of site-hours.
+        reference_arm: The arm every contrast is taken against.
 
     Returns:
         The rows with `second_difference`, `second_lower_95` and `second_upper_95`.
@@ -713,7 +950,7 @@ def _second_setting(
         for row in contrasts.iter_rows(named=True)
         if (row["planning"] == "planned" or row["near_line"])
         and row["arm"] in saved
-        and REFERENCE_ARM in saved
+        and reference_arm in saved
     }
     columns = ("second_difference", "second_lower_95", "second_upper_95")
     if not wanted_arms:
@@ -723,7 +960,7 @@ def _second_setting(
     second = block_contrast_rows(
         losses=losses,
         arms=[arm for arm in arms if arm.arm in wanted_arms],
-        reference_arm=REFERENCE_ARM,
+        reference_arm=reference_arm,
         setting="sensitivity",
         site_hours=site_hours,
         metric=METRIC,
@@ -751,11 +988,20 @@ def score_row_set(
         The row set's scores.
 
     Raises:
-        ValueError: If a leaderboard arm has no printed error, or a recomputed error, interval, or
-            contrast differs from the report's, naming every difference.
+        ValueError: If a leaderboard arm has no printed error, the report has no contrast table,
+            or a recomputed error, interval, or contrast differs from the report's, naming every
+            difference.
     """
     site_hours, dates = read_heading(report_text=report_text)
-    errors = report_errors(report_path=report_path, column=row_set.printed_column)
+    if row_set.leaderboard_section is None and row_set.intervals == "solar":
+        errors = report_errors(report_path=report_path, column=row_set.printed_column)
+    else:
+        errors = printed_table_errors(
+            report_text=report_text,
+            section_prefix=row_set.leaderboard_section,
+            column=row_set.printed_column,
+            arm_suffix="",
+        )
     printed_errors = {
         **{f"{key}{row_set.arm_suffix}": value for key, value in errors.items()},
         **printed_rebuild_errors(report_text=report_text),
@@ -767,8 +1013,21 @@ def score_row_set(
             f"for {unprinted}; its arm names are {sorted(printed_errors)}"
         )
         raise ValueError(msg)
-    printed = report_contrasts(report_path=report_path)
-    planned = planned_arms(printed=printed)
+    printed = report_contrasts(
+        report_path=report_path,
+        extra_headers=(CONTRAST_COLUMNS_WITH_MONTHS,) if row_set.wide_contrast_tables else (),
+    )
+    if printed.is_empty():
+        msg = (
+            f"{row_set.label}: no contrast table read from the report; its tables may carry "
+            "a `Months` column, which `RowSet.wide_contrast_tables` says"
+        )
+        raise ValueError(msg)
+    reference_arm = row_set.reference_arm
+    second_planned_section = row_set.second_planned_section or row_set.planned_section
+    planned = planned_arms(
+        printed=printed, reference_arm=reference_arm, section_prefix=row_set.planned_section
+    )
     absolute = block_leaderboard_rows(
         losses=losses,
         arms=row_set.leaderboard_arms,
@@ -776,12 +1035,13 @@ def score_row_set(
         site_hours=site_hours,
         metric=METRIC,
         printed=printed_errors,
+        decimals=row_set.printed_decimals,
     )
     contrast_arms = tuple(arm._replace(planned=arm.arm in planned) for arm in row_set.contrast_arms)
     contrasts = block_contrast_rows(
         losses=losses,
         arms=contrast_arms,
-        reference_arm=REFERENCE_ARM,
+        reference_arm=reference_arm,
         setting="pooled",
         site_hours=site_hours,
         metric=METRIC,
@@ -794,7 +1054,11 @@ def score_row_set(
         near_line=near_line(),
     )
     contrasts = _second_setting(
-        contrasts=contrasts, arms=contrast_arms, losses=losses, site_hours=site_hours
+        contrasts=contrasts,
+        arms=contrast_arms,
+        losses=losses,
+        site_hours=site_hours,
+        reference_arm=reference_arm,
     )
     planned_rows = planned_contrast_rows(
         losses=losses,
@@ -811,18 +1075,50 @@ def score_row_set(
     )
     problems = [
         *unlisted_planned_contrasts(
-            contrasts=row_set.planned_contrasts, printed=printed, site_hours=site_hours
+            contrasts=row_set.planned_contrasts,
+            printed=printed,
+            site_hours=site_hours,
+            section_prefix=row_set.planned_section,
+            exploratory=row_set.exploratory_in_planned,
         ),
-        *check_intervals(absolute=absolute, report_text=report_text),
-        *check_contrasts(contrasts=contrasts, printed=printed, site_hours=site_hours),
+        *check_intervals(
+            absolute=absolute,
+            report_text=report_text,
+            printed=printed_table_intervals(
+                report_text=report_text,
+                section_prefix=row_set.leaderboard_section,
+                column=row_set.printed_column,
+                arm_suffix="",
+                intervals=row_set.intervals,
+            ),
+            decimals=row_set.printed_decimals,
+        ),
         *check_contrasts(
             contrasts=contrasts,
             printed=printed,
             site_hours=site_hours,
-            scope=SECOND_SETTING_SCOPE,
-            column_prefix="second_",
+            reference_arm=reference_arm,
+            other_fit_sections=row_set.other_fit_sections,
+            decimals=row_set.printed_decimals,
         ),
-        *missing_planned_second_rows(contrasts=contrasts, printed=printed),
+        *check_contrasts(
+            contrasts=contrasts,
+            printed=printed,
+            site_hours=site_hours,
+            scope=row_set.second_scope,
+            column_prefix="second_",
+            reference_arm=reference_arm,
+            other_fit_sections=row_set.other_fit_sections,
+            section_prefix=row_set.second_section,
+            decimals=row_set.printed_decimals,
+        ),
+        *missing_planned_second_rows(
+            contrasts=contrasts,
+            printed=printed,
+            reference_arm=reference_arm,
+            second_scope=row_set.second_scope,
+            section_prefix=row_set.second_section,
+        ),
     ]
     if problems:
         msg = f"{row_set.label} does not reproduce its report:\n" + "\n".join(problems)
@@ -834,13 +1130,21 @@ def score_row_set(
         site_hours=site_hours,
         metric=METRIC,
     ).with_columns(planned=pl.lit(False), near_line=near_line())
-    check_planned_contrasts(planned=planned_rows, printed=printed, site_hours=site_hours)
     check_planned_contrasts(
         planned=planned_rows,
         printed=printed,
         site_hours=site_hours,
-        scope=SECOND_SETTING_SCOPE,
+        section_prefix=row_set.planned_section,
+        decimals=row_set.printed_decimals,
+    )
+    check_planned_contrasts(
+        planned=planned_rows,
+        printed=printed,
+        site_hours=site_hours,
+        scope=row_set.second_scope,
         column_prefix="second_",
+        section_prefix=second_planned_section,
+        decimals=row_set.printed_decimals,
     )
     return RowSetResult(
         row_set=row_set,
@@ -884,21 +1188,23 @@ def _contrast_line(*, row: dict, second: str) -> str:
     )
 
 
-def render_report(*, results: list[RowSetResult]) -> str:
+def render_report(
+    *,
+    results: list[RowSetResult],
+    title: str = REPORT_TITLE,
+    introduction: str = REPORT_INTRODUCTION,
+) -> str:
     """Write the leaderboard report, one section per row set.
 
     Args:
         results: Each row set's scores.
+        title: The report's heading.
+        introduction: The paragraph under the heading.
 
     Returns:
         The report's markdown.
     """
-    lines = [
-        "# Past-solar leaderboard and contrasts against ERA5",
-        "",
-        REPORT_INTRODUCTION,
-        "",
-    ]
+    lines = [f"# {title}", "", introduction, ""]
     for result in results:
         lines += [
             f"### {result.row_set.label}: {result.dates}, {result.site_hours:,} site-hours",
@@ -998,7 +1304,7 @@ def intervals_frame(*, results: list[RowSetResult]) -> pl.DataFrame:
                 section=pl.lit(CONTRAST_SECTION),
                 setting=pl.lit("pooled"),
                 treatment="arm",
-                reference=pl.lit(REFERENCE_ARM),
+                reference=pl.lit(result.row_set.reference_arm),
                 value="difference",
                 lower="lower_95",
                 upper="upper_95",
@@ -1011,7 +1317,7 @@ def intervals_frame(*, results: list[RowSetResult]) -> pl.DataFrame:
                 section=pl.lit(CONTRAST_SECTION),
                 setting=pl.lit(SECOND_SETTING_SCOPE),
                 treatment="arm",
-                reference=pl.lit(REFERENCE_ARM),
+                reference=pl.lit(result.row_set.reference_arm),
                 value="second_difference",
                 lower="second_lower_95",
                 upper="second_upper_95",
@@ -1062,36 +1368,66 @@ def intervals_frame(*, results: list[RowSetResult]) -> pl.DataFrame:
     return pl.concat(frames)
 
 
-def write_outputs(*, results: list[RowSetResult], output_dir: Path) -> None:
+def write_outputs(
+    *,
+    results: list[RowSetResult],
+    output_dir: Path,
+    title: str = REPORT_TITLE,
+    introduction: str = REPORT_INTRODUCTION,
+) -> None:
     """Write `report.md` and `intervals.parquet` into a new folder.
 
     Args:
         results: Each row set's scores.
         output_dir: The folder to create.
+        title: The report's heading.
+        introduction: The paragraph under the heading.
 
     Raises:
         FileExistsError: If the folder exists, so an earlier run's numbers are never overwritten.
     """
     output_dir.mkdir(parents=True, exist_ok=False)
-    (output_dir / "report.md").write_text(render_report(results=results))
+    (output_dir / "report.md").write_text(
+        render_report(results=results, title=title, introduction=introduction)
+    )
     intervals_frame(results=results).write_parquet(output_dir / "intervals.parquet")
 
 
-def main() -> int:
-    """Score the four row sets, check them against their reports, and write the results."""
+def run(
+    *,
+    row_sets: Sequence[RowSet],
+    output_dir: Path,
+    title: str,
+    introduction: str,
+    description: str | None,
+) -> int:
+    """Score each row set, check it against its report, and write the results.
+
+    Reads the command line: `--check-only` verifies every number and writes nothing.
+
+    Args:
+        row_sets: The row sets to score, in the order the leaderboard stacks them.
+        output_dir: The write-once folder for `report.md` and `intervals.parquet`.
+        title: The report's heading.
+        introduction: The paragraph under the report's heading.
+        description: The command's help text.
+
+    Returns:
+        The process exit code: 1 where `output_dir` exists, else 0.
+    """
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser(description=description)
     parser.add_argument(
         "--check-only",
         action="store_true",
         help="Read and verify every number against the reports, and write nothing.",
     )
     args = parser.parse_args()
-    if not args.check_only and SOLAR_LEADERBOARD_DIR.exists():
-        _LOG.error("%s exists; this script never overwrites it", SOLAR_LEADERBOARD_DIR)
+    if not args.check_only and output_dir.exists():
+        _LOG.error("%s exists; this script never overwrites it", output_dir)
         return 1
     results = []
-    for row_set in ROW_SETS:
+    for row_set in row_sets:
         report_path = row_set.directory / "report.md"
         losses = pl.read_parquet(row_set.directory / "losses.parquet")
         results.append(
@@ -1105,9 +1441,20 @@ def main() -> int:
         _LOG.info("%s reproduces its report", row_set.label)
     if args.check_only:
         return 0
-    write_outputs(results=results, output_dir=SOLAR_LEADERBOARD_DIR)
-    _LOG.info("wrote %s", SOLAR_LEADERBOARD_DIR)
+    write_outputs(results=results, output_dir=output_dir, title=title, introduction=introduction)
+    _LOG.info("wrote %s", output_dir)
     return 0
+
+
+def main() -> int:
+    """Score the four past-solar row sets, check them against their reports, and write them."""
+    return run(
+        row_sets=ROW_SETS,
+        output_dir=SOLAR_LEADERBOARD_DIR,
+        title=REPORT_TITLE,
+        introduction=REPORT_INTRODUCTION,
+        description=__doc__,
+    )
 
 
 if __name__ == "__main__":

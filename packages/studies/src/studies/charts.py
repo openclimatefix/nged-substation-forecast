@@ -118,6 +118,16 @@ CONTRAST_COLUMNS: Final[tuple[str, ...]] = (
 )
 """The header of every contrast table a study report writes, cell by cell."""
 
+CONTRAST_COLUMNS_WITH_MONTHS: Final[tuple[str, ...]] = (*CONTRAST_COLUMNS, "Months")
+"""The header of a contrast table that also counts the calendar months it rests on.
+
+`report_contrasts` reads a table with this header only where the caller passes it as an extra
+header, so a report that prints such tables and a caller that does not expect them are unaffected.
+"""
+
+TOO_FEW_MONTHS: Final[str] = "too few months"
+"""What a report's `Excludes zero?` cell says where the rows are too few months to say."""
+
 CONTENT_WIDTH_PX: Final[int] = 680
 """The width of a published docs page's text column, which every figure is drawn to fill.
 
@@ -200,11 +210,13 @@ def _contrast_row(*, cells: tuple[str, ...], section: str, line_number: int) -> 
         ValueError: If any cell does not read as the contrast table's format.
     """
     try:
-        scope, contrast, difference, interval, excludes, folds, n_rows = cells
+        scope, contrast, difference, interval, excludes, folds, n_rows, *months = cells
+        if len(months) > 1 or (months and not months[0].isdigit()):
+            raise ValueError(cells)  # noqa: TRY301 - reported with the line number below
         treatment, reference = contrast.split(" − ")
         bounds = _INTERVAL.match(interval)
         agreeing = _FOLDS.match(folds)
-        if bounds is None or agreeing is None or excludes not in ("**yes**", "no"):
+        if bounds is None or agreeing is None or excludes not in ("**yes**", "no", TOO_FEW_MONTHS):
             raise ValueError(cells)  # noqa: TRY301 - reported with the line number below
         return {
             "section": section,
@@ -224,14 +236,21 @@ def _contrast_row(*, cells: tuple[str, ...], section: str, line_number: int) -> 
         raise ValueError(msg) from error
 
 
-def report_contrasts(*, report_path: Path) -> pl.DataFrame:
+def report_contrasts(
+    *, report_path: Path, extra_headers: Sequence[tuple[str, ...]] = ()
+) -> pl.DataFrame:
     """Read every contrast table in a study report, and nothing else.
 
-    A table counts as a contrast table only when its header is `CONTRAST_COLUMNS`, so the error
-    table and the implied-capacity table are skipped.
+    A table counts as a contrast table only when its header is `CONTRAST_COLUMNS` or one of
+    `extra_headers`, so the error table and the implied-capacity table are skipped. A row of a
+    table with the `CONTRAST_COLUMNS_WITH_MONTHS` header is read the same way, and its month count
+    is dropped. A row whose `Excludes zero?` cell says `TOO_FEW_MONTHS` reads as not excluding
+    zero.
 
     Args:
         report_path: The `report.md` a study script wrote.
+        extra_headers: Further headers to read as contrast tables, such as
+            `CONTRAST_COLUMNS_WITH_MONTHS`.
 
     Returns:
         One row per contrast-table row, with `section` (the text of the nearest heading above the
@@ -249,7 +268,7 @@ def report_contrasts(*, report_path: Path) -> pl.DataFrame:
             in_contrast_table = False
             continue
         cells = _cells(line)
-        if cells == CONTRAST_COLUMNS:
+        if cells == CONTRAST_COLUMNS or cells in extra_headers:
             in_contrast_table = True
         elif in_contrast_table and not set(line) <= set("|-"):
             rows.append(_contrast_row(cells=cells, section=section, line_number=line_number))
@@ -1271,7 +1290,9 @@ class RowSetBlock(NamedTuple):
         return f"{self.label}: {self.dates}, {self.site_hours:,} site-hours"
 
 
-def assert_matches_printed(*, name: str, recomputed: float, printed: float) -> None:
+def assert_matches_printed(
+    *, name: str, recomputed: float, printed: float, decimals: int = REPORT_PRINT_DECIMALS
+) -> None:
     """Stop unless a recomputed value rounds to the number a report printed.
 
     A chart draws numbers it recomputes from `losses.parquet`, the report prints the page's
@@ -1281,17 +1302,15 @@ def assert_matches_printed(*, name: str, recomputed: float, printed: float) -> N
     Args:
         name: The product or arm the value belongs to, for the error message.
         recomputed: The value recomputed from the saved losses.
-        printed: The value the report prints, at `REPORT_PRINT_DECIMALS` places.
+        printed: The value the report prints.
+        decimals: The decimal places the report prints it at.
 
     Raises:
-        ValueError: If the recomputed value, rounded to `REPORT_PRINT_DECIMALS` places, differs
-            from `printed`.
+        ValueError: If the recomputed value, rounded to `decimals` places, differs from
+            `printed`.
     """
-    if round(recomputed, REPORT_PRINT_DECIMALS) != printed:
-        msg = (
-            f"{name}: bootstrapped {recomputed:.{REPORT_PRINT_DECIMALS}f} "
-            f"but the report says {printed}"
-        )
+    if round(recomputed, decimals) != printed:
+        msg = f"{name}: bootstrapped {recomputed:.{decimals}f} but the report says {printed}"
         raise ValueError(msg)
 
 
@@ -1335,6 +1354,7 @@ def block_leaderboard_rows(
     site_hours: int,
     metric: str,
     printed: dict[str, float] | None = None,
+    decimals: int = REPORT_PRINT_DECIMALS,
 ) -> pl.DataFrame:
     """Compute each arm's own mean absolute error and 95% interval on one row set.
 
@@ -1349,6 +1369,7 @@ def block_leaderboard_rows(
         metric: The loss column to average.
         printed: Each arm's mean absolute error as the row set's report prints it, to check the
             recomputed values against; `None` skips the check.
+        decimals: The decimal places `printed` is given at.
 
     Returns:
         One row per arm with `arm`, `label`, `family`, `reference`, `planned`, `value`, `lower_95`
@@ -1366,7 +1387,10 @@ def block_leaderboard_rows(
         value = interval["value"] * PERCENTAGE_POINTS
         if printed is not None:
             assert_matches_printed(
-                name=block_arm.arm, recomputed=value, printed=printed[block_arm.arm]
+                name=block_arm.arm,
+                recomputed=value,
+                printed=printed[block_arm.arm],
+                decimals=decimals,
             )
         records.append(
             {
