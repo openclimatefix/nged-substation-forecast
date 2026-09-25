@@ -173,6 +173,9 @@ def _parse_run_name(*, name: str) -> tuple[date, int] | None:
 def _filesystem() -> gcsfs.GCSFileSystem:
     """Return a Requester Pays Cloud Storage filesystem, billed to `GOOGLE_CLOUD_PROJECT`.
 
+    Returns:
+        A filesystem whose reads are billed to the project named by `GOOGLE_CLOUD_PROJECT`.
+
     Raises:
         SystemExit: If `GOOGLE_CLOUD_PROJECT` is unset.
     """
@@ -418,6 +421,9 @@ def _candidate_runs(
         end: Last init date, or `None` for the newest listed run's date.
         init_hours: Wanted init hours, UTC.
         listed: Every run directory name found in the bucket.
+
+    Returns:
+        The sorted (day, hour) pairs of the runs to fetch.
     """
     parsed = [run for name in listed if (run := _parse_run_name(name=name)) is not None]
     last = end or max(day for day, _ in parsed)
@@ -563,6 +569,10 @@ def _fetch_run(
 
 def _combine_runs(*, used_paths: list[Path], output_dir: Path) -> tuple[dict[str, str], int, float]:
     """Combine run files into `WeatherNext3.parquet` after checking they share one grid hash.
+
+    Args:
+        used_paths: The per-run Parquet files to combine.
+        output_dir: The directory that receives `WeatherNext3.parquet`.
 
     Returns:
         The shared cell fingerprint, the combined row count, and the combined file's size in MB.
