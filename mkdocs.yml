@@ -91,7 +91,7 @@ nav:
       - "Which weather product best describes past wind?": studies/weather-products-for-past-wind.md
       - "Does blending weather products beat the best single weather product?": studies/blending-weather-products.md
       - "How accurate is a power forecast driven by ECMWF ENS at each horizon?": studies/ens-forecast-horizons.md
-      - "Which weather forecast is best at day-ahead lead?": studies/nwp-forecasts-at-matched-leads.md
+      - "Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?": studies/nwp-forecasts-at-matched-leads.md
   - ML experimentation:
       - Overview: ml_experimentation/index.md
       - Model configuration: ml_experimentation/model-configuration.md
