@@ -1625,18 +1625,26 @@ def _ukv_gap_date_lines(*, candidates: pl.DataFrame, domain: DomainType) -> list
     ]
 
 
-def _effective_capacity_lines(*, path: Path) -> list[str]:
-    """Return the `effective_capacity` Delta table's version and commit time."""
+def _effective_capacity_lines(*, path: Path, input_dir: Path) -> list[str]:
+    """Return the `effective_capacity` table's version and commit time, and when inputs were built."""
     if not path.exists():
         return [f"`{path}` is absent."]
     table = DeltaTable(path)
     commit = table.history(limit=1)[0]
     committed = datetime.fromtimestamp(commit["timestamp"] / 1000, tz=UTC)
+    written = {
+        name: datetime.fromtimestamp((input_dir / name).stat().st_mtime, tz=UTC)
+        for name in ("solar_forecast_inputs.parquet", "wind_forecast_inputs.parquet")
+        if (input_dir / name).exists()
+    }
+    built = "; ".join(
+        f"`{name}` written {time:%Y-%m-%d %H:%M} UTC" for name, time in written.items()
+    )
     return [
         (
             f"The `effective_capacity` Delta table is at version {table.version()}, committed "
-            f"{committed:%Y-%m-%d %H:%M} UTC. It is read when the study's inputs are built, so "
-            "the table's own age bounds the capacities every figure rests on."
+            f"{committed:%Y-%m-%d %H:%M} UTC. The study's inputs read the table when they are "
+            f"built: {built or 'no input file found'}."
         )
     ]
 
@@ -2112,6 +2120,7 @@ def _domain_lines(
 def write_report(
     *,
     output_dir: Path,
+    input_dir: Path,
     inputs: dict[DomainType, DomainInputs],
     losses: dict[DomainType, pl.DataFrame],
 ) -> None:
@@ -2119,6 +2128,7 @@ def write_report(
 
     Args:
         output_dir: Where `report.md` is written.
+        input_dir: Where the arm-input parquets were built, whose write times the report quotes.
         inputs: Each domain's rows, jobs and coverage.
         losses: Each domain's stacked losses, baselines included.
     """
@@ -2135,7 +2145,9 @@ def write_report(
     lines += [
         "## Inputs and verification",
         "",
-        *_effective_capacity_lines(path=_repo_data_dir() / "effective_capacity"),
+        *_effective_capacity_lines(
+            path=_repo_data_dir() / "effective_capacity", input_dir=input_dir
+        ),
         "",
         *_verification_lines(directory=output_dir / "verification"),
     ]
@@ -2247,7 +2259,7 @@ def main() -> int:
                 losses=losses[domain],
                 frame=domain_inputs.frame,
             )
-    write_report(output_dir=output_dir, inputs=inputs, losses=losses)
+    write_report(output_dir=output_dir, input_dir=args.input_dir, inputs=inputs, losses=losses)
     return 0
 
 
