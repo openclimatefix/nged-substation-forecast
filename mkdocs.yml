@@ -93,6 +93,7 @@ nav:
       - Overview: studies/index.md
       - "Does a weather product's beam/diffuse split help a PV forecast?": studies/beam-diffuse-split.md
       - Past weather:
+          - Methods shared by the past-weather studies: studies/past-weather/methods.md
           - "Which weather product best describes past sunshine?": studies/past-weather/solar.md
           - "Which weather product best describes past wind?": studies/past-weather/wind.md
           - "Does blending weather products beat the best single weather product?": studies/past-weather/blending.md

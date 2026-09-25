@@ -245,11 +245,9 @@ product](#met-office-weather-station-observations-as-a-stand-in-for-a-gridded-pr
 
 ### What each error measures
 
-**Every error on this page is a mean absolute error as a percentage of each generator's own 99th
-percentile of output, which the page calls its capacity.** That capacity is a statistic of the
-metered output, not the generator's registered or export capacity. Each error is that of an XGBoost
-model fitted per generator to predict hourly output from one product, so the figures rank how much
-each product's sunshine says about the output once that XGBoost model has been fitted.
+**Every error on this page is a mean absolute error as a percentage of each generator's own
+capacity.** [Capacity normalisation](methods.md#capacity-normalisation) on the Methods page defines
+the capacity and the XGBoost model each error comes from.
 
 ### Where each product comes from, and its served lead
 
@@ -327,58 +325,32 @@ difference between two products is a difference between their irradiance alone.*
 - **One XGBoost model per generator.** A gradient-boosted tree (XGBoost) is fitted per generator on
   one product's global horizontal irradiance plus sun position, season, time of day, and ERA5's air
   temperature. Every XGBoost model is given the same temperature.
-- **Folds that respect an upgrade.** Each XGBoost model is trained on some blocks of whole months
-  and scored on the others, which it has never seen; each held-out block is called a fold. The Met
-  Office's PS47 upgrade of UKV went live on 21 January 2026. The record is cut into five folds
-  separately before and after that date, so every fold is scored by an XGBoost model trained on both
-  versions. Every XGBoost model is also told which side of the date an hour falls. The 11 days from
-  21 to 31 January are dropped, because the folds are cut by whole month and January counts as a
-  pre-upgrade month.
-- **One normalisation.** Each hour's error is divided by its own generator's capacity before any
-  mean or difference.
-- **Intervals from whole months.** The six generators share their weather, so each 95% interval
-  comes from resampling whole calendar months 2,000 times, each time also drawing one of three
-  XGBoost fits that differ only in their random seed. This page calls a difference statistically
-  significant at the 5% level when its 95% interval from resampling whole months lies wholly on one
-  side of zero, and not statistically significant at the 5% level when the interval includes zero.
-  The test covers month-to-month variation in the weather and the fitting seed only, not variation
-  between generators. The intervals are not corrected for the number of comparisons, so among the
-  many exploratory rows some will reach significance by chance.
+- **Folds that respect an upgrade.** Each fold is a block of whole months, as the [Methods
+  page](methods.md#month-block-folds) describes. The Met Office's PS47 upgrade of UKV went live on
+  21 January 2026. The record is cut into five folds separately before and after that date, so every
+  fold is scored by an XGBoost model trained on both versions. Every XGBoost model is also told
+  which side of the date an hour falls. The 11 days from 21 to 31 January are dropped, because the
+  folds are cut by whole month and January counts as a pre-upgrade month.
+- **One normalisation.** Each error is normalised by its generator's capacity: see [Capacity
+  normalisation](methods.md#capacity-normalisation).
+- **Intervals from whole months.** The intervals are the [bootstrap
+  intervals](methods.md#bootstrap-intervals) of the Methods page: the six generators share their
+  weather, so each 95% interval resamples whole calendar months and one of three fitting seeds.
 - **Six planned contrasts on the main, eight-product row set, three more on the four extra
   Open-Meteo models' own, shorter row set, two more on ENS's own row set, and three more on the
-  weather-station section's own row set.** A contrast is the
-  difference between two products' errors on the same hours. A comparison is planned when it was
-  written down before any result existed; every other figure is exploratory, chosen
-  or added after results were seen. The distinction matters because with many comparisons, about 1
-  in 20 exploratory rows reaches significance at the 5% level by chance, so an exploratory result is
-  a lead to follow up rather than a finding. A chart holding both kinds marks each planned row
-  "(planned)". A chart whose rows are all one kind says so once, in its subtitle. The ranking rests
-  on four planned contrasts: CAMS against ICON-D2, ICON-EU against ICON-D2, ICON-EU against UKV,
-  and ICON global against ICON-EU. Two more were written before SARAH-3 and ICON-DREAM-EU were
-  scored: SARAH-3 against CAMS, and ICON-DREAM-EU against ERA5. Each planned contrast is also
-  refitted with a second set of XGBoost settings, and every one keeps its sign and its statistical
-  significance at the 5% level. Every other figure on this page is exploratory. The UKV snapshot
-  rebuilds, the hour-by-hour and by-lead breakdowns, and the split of ICON global by lead were
-  added after the first run. Three more planned contrasts, including ECMWF's 9 km global model
-  against ICON-EU, are scored on the four extra Open-Meteo models' own, shorter row set: see [The
-  four extra Open-Meteo models](#the-four-extra-open-meteo-models). Two further planned contrasts,
-  ECMWF ENS against ERA5 and against CAMS, are scored on ENS's own row set: see [ECMWF ENS: a
-  longer-lead forecast than any other product on this
-  page](#ecmwf-ens-a-longer-lead-forecast-than-any-other-product-on-this-page). Three further planned
-  contrasts are scored on the weather-station section's own row set: the nearest weather station
-  against CAMS and against ERA5, and CAMS with the station against CAMS with a shuffled copy of the
-  station's irradiance. See [Met Office weather-station observations as a stand-in for a gridded
-  product](#met-office-weather-station-observations-as-a-stand-in-for-a-gridded-product).
+  weather-station section's own row set.** The [Methods
+page](methods.md#planned-and-exploratory-comparisons) defines planned and exploratory comparisons
+and lists the [14 planned contrasts](methods.md#the-14-planned-contrasts). Each planned contrast is
+also refitted with a second set of XGBoost settings, and every one keeps its sign and its
+statistical significance at the 5% level. Every other figure on this page is exploratory. The UKV
+snapshot rebuilds, the hour-by-hour and by-lead breakdowns, and the split of ICON global by lead
+were added after the first run.
 - **A longer record for two questions.** The year-by-year comparison with ERA5 and SARAH-3's
-  comparison by satellite use a second row set, built the same way from the four products whose
-  records reach back to January 2021: ERA5, CAMS, SARAH-3, and ICON-DREAM-EU. That row set holds
-  115,594 site-hours from January 2021 to August 2026. Every other figure on this page uses
-  the eight-product row set, except the section [The four extra Open-Meteo
-  models](#the-four-extra-open-meteo-models), which uses its own 12-product row set from November
-  2024.
+  comparison by satellite use the record row set, described under [Row sets](methods.md#row-sets).
+  Every other figure on this page uses
 
-**The folds are cut by `studies.cross_validation` and the intervals computed by `studies.bootstrap`,
-both covered by tests.**
+The [Methods page](methods.md#bootstrap-intervals) says where the fold-cutting and bootstrap code
+lives and how it is tested.
 
 ## Results
 
@@ -1476,8 +1448,6 @@ single weather product?](blending.md#solar-a-blend-beats-cams-given-its-neighbou
   is untested elsewhere in Great Britain, and nothing here measures a site near ICON-D2's edge or
   outside its domain. Wind is measured separately on [Which weather product best describes past
   wind?](wind.md).
-- **The intervals describe these six generators only.** The intervals resample months, not
-  generators, so they say nothing about how a generator elsewhere would rank the products.
 - **Every product except CAMS is read at a grid cell, not at the generator.** ERA5 at its nearest
   0.25° cell, the Open-Meteo weather models at the cell Open-Meteo serves, SARAH-3 at a cell 0.8 km
   to 2.8 km away, and ICON-DREAM-EU at a cell 1.6 km to 5.0 km away. A cell that misses a
@@ -1492,11 +1462,6 @@ single weather product?](blending.md#solar-a-blend-beats-cams-given-its-neighbou
   attribute to the weather model or to Open-Meteo's archive of it, so no split or Erbs arm is fitted
   for them. See [The four extra Open-Meteo
   models](#the-four-extra-open-meteo-models).
-- **The comparison is not lead-equal.** The served lead is part of what a consumer receives, so the
-  as-served ranking answers the consumer's question. A comparison at a held-equal lead is a forecast
-  comparison, and belongs to
-  [#810](https://github.com/openclimatefix/nged-substation-forecast/issues/810), the study comparing
-  weather models for UK power forecasting.
 - **The ECMWF ENS section is scored on its own shorter, later, and separate row set, and its
   product is a forecast, not past weather.** ENS's own archive here starts on 1 April 2024, so its
   54,447 common site-hours say nothing about the ranking above, from December 2022. ENS is compared
@@ -1517,9 +1482,9 @@ single weather product?](blending.md#solar-a-blend-beats-cams-given-its-neighbou
   section's folds and its `era_code` feature are cut around the Met Office's UKV upgrade only, so an
   XGBoost model given ENS trains and scores across three ECMWF model versions without being told
   which version produced each run.
-- **Every accuracy figure is recalibrated per generator.** A product with a large but stable bias
-  scores well here. The implied-capacity measure is the only evidence on this page about each
-  product's uncorrected bias.
+- **Three limits are shared by every past-weather study:** every accuracy figure is recalibrated per
+  generator, the intervals describe these six generators only, and the comparison is not lead-equal.
+  The [Methods page](methods.md#limits-shared-by-the-past-weather-studies) states each.
 - **The figures rest on the capacity table as rebuilt in September 2026.** Each generator's capacity
   is its 99th percentile of output from the `effective_capacity` table.
   [#825](https://github.com/openclimatefix/nged-substation-forecast/issues/825), which refreshes the
