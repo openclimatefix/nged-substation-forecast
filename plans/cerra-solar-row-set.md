@@ -139,9 +139,9 @@ hyperparameter setting):**
 
 **Exploratory (labelled so in the report):** `cerra_global − cams_3h`; `era5_global − era5_3h`
 and `cams_global − cams_3h` (the cost of the step width); the four planned contrasts per
-generator (sign only, labels A to F, no coordinates or distances); CERRA's error by month of
-year; the rebuild's check numbers (share of rebuilt hours below −1 W m⁻², the hour at which the
-rebuilt series peaks relative to the sun). The planned/exploratory split is stated in the
+generator (sign only, labels A to F, no coordinates or distances); the rebuild's check numbers
+(share of rebuilt hours below −1 W m⁻², the hour at which the rebuilt series peaks relative to
+the sun). The planned/exploratory split is stated in the
 report's first lines, and the leaderboard script's `RowSet.planned_contrasts` holds exactly the
 four above.
 
@@ -268,7 +268,37 @@ The green-before-push set from `implement-issue`, plus the studies gates:
    are asked to grep the report and page for coordinates, distances per generator and station
    names before merge.
 
+**The limit of not downloading leads 1 and 2, stated plainly (maintainer's coordinator, decided
+before the reviews).** CERRA is scored from 3-hour window means only. The rebuild to hourly values
+is a model, so CERRA's hourly values inside a window are not CERRA's own. `era5_3h` and `cams_3h`
+match the step width for ERA5 and CAMS, so `cerra_global − era5_3h` is the like-for-like contrast,
+and `cerra_global − era5_global` and `cerra_global − cams_global` carry an unmatched step width
+that the page states beside each. The page never reads CERRA's error as a limit on CERRA's
+physics at hourly resolution.
+
 ## Reviews
 
-Filled in as each finishes: simplicity review, correctness review, and the triage of each
-(findings kept and findings rejected with a one-line reason).
+### Simplicity review, and its triage
+
+Seven findings, triaged against the code:
+
+1. *Cut `era5_3h` and `cams_3h`.* Rejected. Without a step-width-matched arm, the headline contrast
+   confounds CERRA's physics with the 3-hour step, and the ENS section already measures that the
+   step alone moves ERA5's error by 0.287 points. The arms are imported code, not new plumbing.
+2. *Cut `cerra_split` and `cerra_erbs`.* Rejected. CERRA's own direct field is what the survey
+   ranks it on, and the brief asks what CERRA does and does not provide.
+3. *Cut the exploratory list.* Accepted in part: the by-month-of-year table is dropped. The
+   per-generator sign check stays, because the page reports every planned contrast at all six
+   generators (labels only), and so do the other row sets.
+4. *`search_fold_offsets` is unnecessary.* Rejected on the saved evidence: the main row set's own
+   folds leave 2,129 of 76,727 scored hours (2.8%, one farm, May to July) with no training row for
+   their calendar month, and this row set is a near-subset of main's rows. Step 1 computes the
+   uncovered share on the frame with `calendar_month_coverage` first, and uses
+   `search_fold_offsets` only for the offsets that remove it.
+5. *Do not make CERRA a `weather_products.py` panel; import rather than copy.* Accepted: the new
+   script imports `_three_hourly_rebuilt`-style helpers and `_era5_and_cams_hourly` from
+   `ens_past_solar.py`'s module (moving them to a shared module only if the import creates a
+   cycle), never copies them.
+6. *Keep the fifth block.* Accepted as planned.
+7. *Smallest equivalent change.* Not adopted whole: it drops the matched arm (finding 1) and the
+   beam contrast (finding 2).
