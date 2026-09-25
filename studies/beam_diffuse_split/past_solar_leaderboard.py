@@ -642,12 +642,19 @@ def check_contrasts(
     Returns:
         One message per difference at `decimals` places; a contrast the report does not print is
         not checked.
+
+    Raises:
+        ValueError: If `column_prefix` names the second setting, recomputed second-setting values
+            exist, the report prints rows at the scope and section, and no contrast was compared.
     """
     names = tuple(f"{column_prefix}{name}" for name in ("difference", "lower_95", "upper_95"))
     problems = []
+    compared = 0
+    scored = 0
     for row in contrasts.iter_rows(named=True):
         if row[names[0]] is None:
             continue
+        scored += 1
         arm = row["arm"]
         matches = printed.filter(
             pl.col("scope") == scope,
@@ -660,6 +667,7 @@ def check_contrasts(
                 *(pl.col("section").str.starts_with(prefix) for prefix in other_fit_sections),
             ),
         )
+        compared += matches.height
         recomputed = tuple(round(row[name], decimals) for name in names)
         for match in matches.iter_rows(named=True):
             shown = (match["difference"], match["lower_95"], match["upper_95"])
@@ -668,7 +676,42 @@ def check_contrasts(
                     f"{arm} - {reference_arm} at scope {scope}: {recomputed} but section "
                     f"{match['section']!r} prints {shown}"
                 )
+    if (
+        column_prefix
+        and scored
+        and not compared
+        and _holds_rows(
+            printed=printed,
+            scope=scope,
+            reference_arm=reference_arm,
+            site_hours=site_hours,
+            section_prefix=section_prefix,
+        )
+    ):
+        msg = (
+            f"the report prints contrasts at scope {scope!r} under {section_prefix!r}, and "
+            f"{scored} recomputed contrasts have second-setting values, but none was compared: "
+            "the scope, the section prefix, or the excluded sections match no printed row"
+        )
+        raise ValueError(msg)
     return problems
+
+
+def _holds_rows(
+    *,
+    printed: pl.DataFrame,
+    scope: str,
+    reference_arm: str,
+    site_hours: int,
+    section_prefix: str,
+) -> bool:
+    """Return whether the report prints any contrast at a scope, section and number of rows."""
+    return not printed.filter(
+        pl.col("scope") == scope,
+        pl.col("reference") == reference_arm,
+        pl.col("n_rows") == site_hours,
+        pl.col("section").str.starts_with(section_prefix),
+    ).is_empty()
 
 
 def missing_planned_second_rows(
@@ -1110,7 +1153,7 @@ def score_row_set(
             scope=row_set.second_scope,
             column_prefix="second_",
             reference_arm=reference_arm,
-            other_fit_sections=row_set.other_fit_sections,
+            other_fit_sections=(),
             section_prefix=row_set.second_section,
             decimals=row_set.printed_decimals,
         ),

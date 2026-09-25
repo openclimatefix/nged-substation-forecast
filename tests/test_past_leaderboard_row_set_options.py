@@ -13,6 +13,7 @@ import polars as pl
 import pytest
 from studies.charts import (
     CONTRAST_COLUMNS_WITH_MONTHS,
+    report_contrasts,
     BlockArm,
     PlannedContrast,
     block_contrast_rows,
@@ -288,6 +289,52 @@ def test_second_setting_rows_are_read_by_the_rows_own_scope_and_section(tmp_path
 
     with pytest.raises(ValueError, match="Elsewhere"):
         _score(tmp_path=tmp_path, second_section="")
+
+
+def test_a_second_setting_section_that_is_also_listed_as_another_fit_is_still_compared(
+    tmp_path: Path,
+) -> None:
+    # Catches the second-setting pass dropping the very section it keeps: the wind row sets list
+    # their second-setting heading among `other_fit_sections` (to keep it out of the first-setting
+    # pass), so a pass that applied that list to itself compared nothing and passed.
+    _score(tmp_path=tmp_path, other_fit_sections=("Other fit", SENSITIVITY))
+
+    with pytest.raises(ValueError, match="Elsewhere"):
+        _score(
+            tmp_path=tmp_path,
+            other_fit_sections=("Other fit", SENSITIVITY),
+            second_section="",
+        )
+
+
+def test_a_second_setting_pass_that_compares_nothing_although_rows_exist_stops_the_script(
+    tmp_path: Path,
+) -> None:
+    # Catches a second-setting check that silently compares zero contrasts: every printed row is
+    # filtered out by the section options, so a wrong second-setting number would pass.
+    module = _load()
+    result = _score(tmp_path=tmp_path)
+    printed = report_contrasts(report_path=tmp_path / "report.md")
+    options: dict[str, Any] = {
+        "contrasts": result.contrasts,
+        "printed": printed,
+        "site_hours": SITE_HOURS,
+        "scope": "second setting",
+        "column_prefix": "second_",
+        "reference_arm": REFERENCE.arm,
+        "decimals": 4,
+    }
+
+    assert module.check_contrasts(**options, section_prefix=SENSITIVITY) == []
+    with pytest.raises(ValueError, match="none was compared"):
+        module.check_contrasts(
+            **options, section_prefix=SENSITIVITY, other_fit_sections=(SENSITIVITY,)
+        )
+    # A scope the report prints no row for is the report's own gap, not a filtered-out check.
+    assert (
+        module.check_contrasts(**{**options, "scope": "no such scope"}, section_prefix=SENSITIVITY)
+        == []
+    )
 
 
 def test_a_second_setting_row_the_report_does_not_print_stops_the_script(tmp_path: Path) -> None:
