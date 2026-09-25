@@ -92,4 +92,3 @@ if sys.argv[1] != "analyse":
     frame.select("site", "time", "month", "fold").write_parquet(OUT / f"panel_{panel}_{design}_folds.parquet")
     print("done", losses.height, flush=True)
     raise SystemExit
-
