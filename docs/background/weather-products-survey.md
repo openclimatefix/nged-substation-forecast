@@ -208,7 +208,7 @@ ERA5 and ICON-DREAM-EU, both already scored, do.**
 | **DMI HARMONIE-AROME DINI** | Not on the roadmap | [sunshine](../studies/weather-products-for-past-solar.md#the-four-extra-open-meteo-models) only, on a shorter window | The Danish Meteorological Institute (DMI) for the United Weather Centres West (UWC-West) consortium; HARMONIE-AROME is the convection-permitting regional model several European weather services share | 2 km (Open-Meteo's figure) | Yes (39.7–62.7°N, 25.4°W–40.1°E) | 2024-06-28 | Global; a field Open-Meteo serves as direct, probably not DMI's direct beam (note below) | 10, 50, 100, 150, 250, 350, 450 m (Open-Meteo interpolates 80 m) | 8 a day; 2.5 days | 2.8 h (Open-Meteo, 06 UTC run) | Previous Runs from 2024-06-29 | Open-Meteo | CC BY 4.0 | [Open-Meteo](https://open-meteo.com/en/docs/dmi-api), [domain](https://api.open-meteo.com/data/dmi_harmonie_arome_europe/static/meta.json), [downloader](https://github.com/open-meteo/open-meteo/blob/main/Sources/App/Dmi/DmiDownloader.swift) |
 | **KNMI HARMONIE-AROME Europe** | Not on the roadmap | [sunshine](../studies/weather-products-for-past-solar.md#the-four-extra-open-meteo-models) only, on a shorter window | The Royal Netherlands Meteorological Institute (KNMI) for UWC-West | 5.5 km, as KNMI publishes the grid | Yes (39.7–62.6°N, 25.2°W–38.8°E) | Global irradiance 2024-06-26; 100 m wind 2024-10-09 | Global; direct and diffuse by separation | 10 to 300 m, including 80 and 100 m | Hourly; 2.5 days | 2.6 h (Open-Meteo, 06 UTC run) | Previous Runs from 2024-06-27 | Open-Meteo | CC BY 4.0 | [Open-Meteo](https://open-meteo.com/en/docs/knmi-api), [domain](https://api.open-meteo.com/data/knmi_harmonie_arome_europe/static/meta.json) |
 | **Met Office global 10 km** (`ukmo_global_deterministic_10km`) | Not on the roadmap ([why no request has been made](../roadmap/data-sources.md#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost)) | Not scored | Met Office Unified Model, global | ~10 km (0.09° served) | Yes (global) | Direct and 10 m wind 2022-03-01; global irradiance from 2025-01-02 | Global; direct native; diffuse = global − direct | 10 m only | 4 a day; 7 days (Open-Meteo) | 8.4 h (Open-Meteo) | Previous Runs from 2025-01-03 | Open-Meteo; AWS | CC BY-SA 4.0 (AWS) | [Open-Meteo](https://open-meteo.com/en/docs/ukmo-api) |
-| **Google WeatherNext 3** | [🔬 Research (after v2, unlikely)](../roadmap/data-sources.md#weather-data) | Not scored | Google DeepMind, machine-learned 64-member ensemble | 0.1° | Yes (global) | 2026-01-01, with 2024 and 2025 being back-filled | Global; direct native (`fdir`); diffuse = global − direct | Not checked | 4 a day to 15 days, plus hourly interim runs to 48 h; hourly | Not established | Not established | Access request; members only in the Cloud Storage Zarr store | CC BY 4.0 once at least 1 h old; real-time data under Google DeepMind's experimental terms | [model specs](https://developers.google.com/weathernext/guides/models), [access](https://developers.google.com/weathernext/guides/access-forecast) |
+| **Google WeatherNext 3** | [🔬 Research (after v2, unlikely)](../roadmap/data-sources.md#weather-data) | Not scored | Google DeepMind, machine-learned 64-member ensemble | 0.1° | Yes (global) | 2026-01-01, with 2024 and 2025 being back-filled | Global; direct native (`fdir`); diffuse = global − direct | 10, 100 m | 4 a day to 15 days, plus hourly interim runs to 48 h; hourly | Not established | Not established | Access request; members only in the Cloud Storage Zarr store | CC BY 4.0 once at least 1 h old; real-time data under Google DeepMind's experimental terms | [model specs](https://developers.google.com/weathernext/guides/models), [access](https://developers.google.com/weathernext/guides/access-forecast) |
 | **Google WeatherNext 2** | Not on the roadmap (the catalogue's Google row is WeatherNext 3) | Not scored | Google DeepMind, machine-learned 64-member ensemble; Google marks the data experimental, "not intended, validated, or approved for real world use" | 0.25° | Yes (global) | 2022-01-01 to 2026-09-22 in the Earth Engine catalogue | None | 10, 100 m | 4 a day; 15 days; 6-hourly | About 7.5 h (Google's dissemination schedule) | Whole runs | Earth Engine, BigQuery, Cloud Storage Zarr; all need an access request | CC BY 4.0 for data over 48 h old; real-time data under Google DeepMind's experimental terms | [Earth Engine](https://developers.google.com/earth-engine/datasets/catalog/projects_gcp-public-data-weathernext_assets_weathernext_2_0_0) |
 | **CEDA NWP-UKV** (the UK's Centre for Environmental Data Analysis) | Not on the roadmap (the catalogue's UKV row is the Met Office's AWS feed: 🔬 Research (uncertain)) | Not scored (the studies score Open-Meteo's UKV) | Met Office UKV as archived at CEDA; statistically different from the UKV served live on AWS and Open-Meteo, so not interchangeable with it for training and inference | ~0.018° (CEDA's figure) | Yes | 2016-03-16 to present | Not listed on the catalogue record | Surface and pressure levels | Up to 8 a day; 120 h | Archive, ongoing | Whole runs | CEDA, by application | Met Office licence via CEDA | [CEDA](https://catalogue.ceda.ac.uk/uuid/78f23c539d304591b137cf986b69a525/) |
 | **CEDA Met Office global** (`global-grib`) | Not on the roadmap | Not scored | Met Office global model, raw output | Not established | Yes (global) | Directories from 2016-03 to 2026-09 | Not established; the README needs a login | Not established | Not established | Archive | Not established | CEDA, by application | Not established | [CEDA](https://data.ceda.ac.uk/badc/ukmo-nwp/data/) |
@@ -524,6 +524,125 @@ rows, IFS HRES 9 km, Dynamical.org's own GFS, and Open-Meteo Single Runs.
 
 Dynamical.org's ICON-EU whole runs carry native direct and diffuse irradiance, but start only on
 2026-02-10, too short a history to list.
+
+## AI weather models beyond AIFS
+
+**Of the AI weather models with an open or free-on-request data feed that we checked on 2026-09-25,
+other than AIFS, only WeatherNext 3 carries both solar radiation and 100 m wind, and its archive
+starts on 2026-01-01.** This section lists the other AI models that could feed a forecast of
+substation load, and the commercial providers that sell AI forecasts or archives of them. The search
+was not exhaustive, and an absence claim below means "not found in what we searched". Vendor
+accuracy claims are the vendor's own and are not repeated here. We have no score comparison between
+any of these models, so the section says nothing about which is more accurate. The [forecast-model
+table](#forecast-models) already covers AIFS Single, AIFS-ENS, GFS, GEFS, and WeatherNext 3, and
+this section does not repeat those rows. "The weather-product studies" here means the [past-sunshine
+study](../studies/weather-products-for-past-solar.md) and the [past-wind
+study](../studies/weather-products-for-past-wind.md).
+
+### Open AI forecasts from DWD and NOAA carry no radiation, and little 100 m wind
+
+| Model | Status | Radiation | 100 m wind | Archive of past runs | Licence | Source |
+|---|---|---|---|---|---|---|
+| **DWD AICON** (Deutscher Wetterdienst) | Operational since 2026-03-02; 13 km, 3-hourly to 48 h then 6-hourly to 180 h | None in the open-data listing | No height-level field; 10 m wind, plus `U` and `V` on native model levels (per the paper) | None: 4 runs kept, about 1 day | CC BY 4.0 ([DWD open-data terms](https://www.dwd.de/EN/service/legal_notice/legal_notice_node.html), linked from the [server's README](https://opendata.dwd.de/README.txt)) | [Paper](https://arxiv.org/abs/2608.24651), [open data](https://opendata.dwd.de/weather/nwp/v1/m/aicon/p/) |
+| **NOAA AIGFS** | Operational; 4 runs a day, 6-hourly steps to 384 h | None in the surface file | From the 2026-07-30 00 UTC run; absent from earlier folders | Bucket folders from 2026-04-16; re-runs from 2025-01-01 in `hindcast_aigfsdev2.5/` | CC0 ([AWS registry](https://registry.opendata.aws/noaa-nws-graphcastgfs-pds/)) | [NOAA registry entry](https://registry.opendata.aws/noaa-nws-graphcastgfs-pds/), [bucket](https://noaa-nws-graphcastgfs-pds.s3.amazonaws.com/?delimiter=/&prefix=aigfs.) |
+| **NOAA GraphCast-GFS** (experimental predecessor of AIGFS) | Bucket folders from 2024-02-05 to 2026-05-05 | None (surface file, 2026-05-04 00 UTC run) | None (10 m only) | Bucket folders, and [GribStream](https://gribstream.com/models/graphcast) from 2024-04-25 | CC0 ([AWS registry](https://registry.opendata.aws/noaa-nws-graphcastgfs-pds/)) | [NOAA registry entry](https://registry.opendata.aws/noaa-nws-graphcastgfs-pds/) |
+| **AIWP reforecasts** (NOAA and CIRA, the Cooperative Institute for Research in the Atmosphere) | Research reforecast archive of FourCastNet v2-small, Pangu-Weather, and GraphCast, started from GFS and IFS analyses; 00 and 12 UTC runs to 240 h, 6-hourly | None listed | FourCastNet v2-small only | From 10/2020 (FourCastNet, Pangu-Weather) or 01/2022 (GraphCast) | "Open Data. There are no restrictions on the use of this data" | [AWS registry](https://registry.opendata.aws/aiwp/) |
+
+**AICON cannot serve either of the weather-product studies, and its open-data listing keeps only the
+latest four runs.** The listing at `opendata.dwd.de/weather/nwp/v1/m/aicon/p/` holds 12 variables.
+Among them are `T_2M`, `U_10M`, and `V_10M`, and none is a radiation field. The only other wind
+variables are `U` and `V`, and the paper says output is stored on native model levels. The `T_2M`
+directory held the runs of 2026-09-24 12 UTC to 2026-09-25 06 UTC when we listed it, so a backtest
+cannot be built from DWD's server. The [paper](https://arxiv.org/abs/2608.24651) describes an
+operational model trained on DWD's ICON-DREAM reanalysis, with a re-forecast for March to September
+2025 used only for evaluation.
+
+**AIGFS acquired 100 m wind in the surface file during 2026 and has no radiation field.** The
+2026-04-16 folder holds `UGRD` and `VGRD` at 10 m, `TMP` at 2 m, `PRMSL`, and `APCP`. Files from the
+2026-09-24 00, 06, 12, and 18 UTC runs add 100 m `UGRD` and `VGRD` and 2 m `DPT`. We checked the 00
+UTC run's 24-hour surface index in each folder, and the first folder with 100 m wind is
+`aigfs.20260730`, so the archive holds about 8 weeks of 100 m wind. NOAA's registry entry says the
+AIGFS, the AI Global Ensemble Forecast System (AIGEFS), and the Hybrid Global Ensemble Forecast
+System (HGEFS) became operational on 2025-12-17, and [GribStream's
+blog](https://gribstream.com/blog/noaa-ai-gfs-aigfs-aigefs-hgefs-operational) gives the same date,
+starting with the 12 UTC cycle. The bucket's earliest `aigfs.*` folder is 2026-04-16, and that
+folder holds only the 06 UTC run. The next folder is 2026-04-21. AIGEFS is under
+`EAGLE_ensemble/aigefs.*`, from 2025-06-01 to 2026-09-25, and its surface file has 10 m wind and no
+radiation or 100 m wind. The bucket also holds `hindcast_aigfsdev2.5/`, re-runs from 2025-01-01 to
+2026-02-28 that carry 10 m wind and no radiation or 100 m wind.
+
+**The AIWP archive has no radiation for any of its three models and 100 m wind for one.**
+FourCastNet v2-small is the only model in the listing with 100 m wind components. The archive is a
+research reforecast and not a set of as-issued operational forecasts, and its own page says data
+"may be missing and is not guaranteed to be available at any given time".
+
+### Three more AI models publish weights or research results, and none has a public forecast feed we found
+
+| Model | What is published | Source |
+|---|---|---|
+| **ECMWF AIFS-DOP** (Direct Observation Prediction) | Research paper: a model trained on 40 years of gridded observations alone, on an O96 grid of about 100 km with 6-hour slices, scored against radiosondes aloft and SYNOP surface observations, including 2 m temperature and 10 m wind. The paper does not present it as operational, and we found no public forecast data | [Paper](https://arxiv.org/abs/2606.19093) |
+| **ECMWF machine-learned reanalysis prototype** (made with AIFS-DOP) | ECMWF's news item says a prototype reanalysis for 1981 to 2022, on a grid of about 112 km every 6 hours, was produced "in the course of a single working day". It is a proof of concept | [ECMWF](https://www.ecmwf.int/en/about/media-centre/news/2026/machine-learning-opens-new-opportunities-global-reanalysis) |
+| **Met Office and Alan Turing Institute FastNet** | Model weights for inference only, under the Open Government Licence v3.0, on an O96 grid of about 104 km; described as the first experimental release | [Hugging Face](https://huggingface.co/MetOffice/FastNet-global) |
+| **NVIDIA Earth-2** (Atlas, StormScope, HealDA) | Announced on 2026-01-26 as open models, to be licensed for commercial and noncommercial use and released on GitHub and Hugging Face. We found no hosted forecast archive | [SiliconANGLE](https://siliconangle.com/2026/01/26/nvidia-launches-earth-2-open-ai-weather-forecast-models-tools/) |
+
+**Running a published model ourselves would produce forecasts that no weather service issued.** A
+model with public weights gives us a forecast only for the days we run it, and re-running past days
+starts from an analysis chosen by us. Whether a re-run counts as a forecast for backtesting is the
+question the next section asks of commercial archives. Searches for public AI feeds covering Great
+Britain from Météo-France, KNMI (the Royal Netherlands Meteorological Institute), MeteoSwiss, DMI
+(the Danish Meteorological Institute), Environment and Climate Change Canada, and the China
+Meteorological Administration found none. [Dynamical.org's
+catalogue](https://dynamical.org/catalog/) lists AIFS Single and AIFS-ENS and no other AI model.
+
+### For backtesting, the deciding property is an archive of as-issued forecasts with radiation and 100 m wind
+
+**The question to ask any provider is whether "historical forecast" means the runs as they were
+issued, or a re-analysis or a re-run.** A series stitched from successive one-day forecasts, or
+re-run from a later analysis, is not the forecast a substation-load model would have received on the
+day. The rows below say what each provider's own page states. Only Prescient states both an
+as-issued archive and radiation with 100 m wind, and its coverage of Great Britain is unclear.
+
+| Provider | Product | Archive of past forecasts, as the page states it | Notes | Source |
+|---|---|---|---|---|
+| **Jua** | EPT-2 model family (0.081° global, 4 runs a day, 20 days), plus third-party models including AIFS | Docs call all archives "hindcast datasets" and list EPT 2 data from 2023-01-01. The page does not say whether the runs are as issued | Global and direct shortwave flux; wind at 10 to 200 m; price unpublished. EPT 2.1 Helios is a solar-only 30-minute nowcast served over Europe from 2024-01-01, and EPT 2.1 Europa is a 16-member, 48 h hourly ensemble over Europe from 2025-08-14. Jua also lists hindcasts of third-party models, including AIFS and Aurora | [Jua docs](https://docs.jua.ai/models-and-products/models-and-products) |
+| **Brightband** | Archive of forecasts from GraphCast, Pangu-Weather, and AIFS-Single, all initialised from IFS HRES | 2021 to 2024, 280 TB, in Zarr with Icechunk on Google Cloud, with a subset on Arraylake that reproduces the ExtremeWeatherBench benchmark. Models published after 2021 can only have been run retrospectively, so we read these as re-runs, not as-issued forecasts | Brightband says it runs Aurora, Earth-2 Medium Range/FourCastNet-v3, and AIFS-ENS and will add them to the archive, but the page does not name AIFS-ENS as part of it today, and states no licence, grid, or variable list; none of these is verified. We could not list the Google Cloud bucket without credentials, so public access is unverified. The archive stops before most of our study window | [Brightband](https://www.brightband.com/company/news/brightband-ai-weather-data/) |
+| **Meteomatics** | REST API with AIFS (variant not stated) | "Historical forecasts from 2017", and ERA5 from 1940 | The page says "Meteomatics purchases and saves historical weather forecasts", which supports an as-issued reading that the page does not confirm. It does not say which variables AIFS carries | [Meteomatics](https://www.meteomatics.com/en/weather-api/historical-data-weather-api/), [AIFS](https://www.meteomatics.com/en/weather-api/ecmwfs-aifs-now-available/) |
+| **Prescient Weather** (World Climate Service) | Point-in-time archive of AIFS-ENS, AIFS-Single, ECMWF, GEFS, and GFS, aggregated to country and region level | "9+ years of as-issued history" | Capacity-weighted 100 m wind and solar radiation indices. The archive's start date differs by model, since AIFS did not exist for 9 years. The archive page lists "European Union: Country Level" and the point-in-time page names "UK NBP" (the National Balancing Point gas market), and the UK is outside the European Union, so whether Great Britain is a region is not established | [Prescient](https://www.worldclimateservice.com/weather-forecast-archive-api-for-commodity-trading/), [World Climate Service](https://www.worldclimateservice.com/pit-weather-forecast-api/) |
+| **meteoblue history+** | NEMS global model, ERA5, and local models | Each forecast is "archived by meteoblue at least once a day", and the history is a continuous hourly series built from one-day forecasts | A stitched series, not whole past runs | [meteoblue](https://content.meteoblue.com/en/research-education/specifications/data-sources/weather-simulation-data) |
+| **GribStream** | GraphCast-GFS through the 2026-05-05 run, and other models | From 2024-04-25 | Radiation not listed; the model is the experimental predecessor of AIGFS | [GribStream](https://gribstream.com/models/graphcast) |
+| **Solcast** | Irradiance, wind, and weather data | Historical time series from 2007 to 7 days ago; forecasts from now to 14 days | No archive of as-issued forecast runs found. Free historical data for researchers at public research institutions, for non-commercial use, through 50 free requests | [Solcast](https://solcast.com/data-for-researchers) |
+| **Zeus AI** (Helios) | Satellite-based global horizontal irradiance, 6 km, hourly | An open historical dataset "from 2020 onward"; a forecast listing on the Earthmover marketplace whose title reads "6 hour / 6 km", which we could not verify because the page needs JavaScript | Solar only, and coverage of Great Britain is not stated. The listing's terms are not readable without a login | [Zeus AI](https://myzeus.ai/announcing-helios-a-satellite-based-solar-analysis-and-forecast), [listing](https://app.earthmover.io/marketplace/69715b330ebee16423f1f0ed) |
+| **Beyond Weather** | A fine-tuned AIFS optimised for 100 m wind | Not stated | Terms not verified | [Earthmover](https://www.earthmover.io/blog/announcing-data-marketplace/) |
+| **Silurian** (Generative Forecasting Transformer, 1.5 billion parameters) | A research paper, not a data feed | Not applicable | Fine-tuned on Hydro-Québec's observations and tested on 65 wind-farm masts from January 2024 to January 2025 and on 534 temperature stations to March 2025, all in Québec. It is not a test in Great Britain | [Bodnar et al. (2025)](https://arxiv.org/abs/2509.25268) |
+| **Microsoft Aurora** | Model on Azure AI Foundry | Hindcasts listed by Jua and run by Brightband; none found from Microsoft | Hosted endpoint for running the model | [Aurora documentation](https://microsoft.github.io/aurora/foundry/intro.html) |
+| **Huawei Pangu-Weather** | Weights | Not applicable | Weights under CC BY-NC-SA 4.0, which forbids commercial use | [GitHub](https://github.com/198808xc/Pangu-Weather) |
+
+**Three of these providers state an archive that could serve a backtest, and each has a gap.** Jua's
+archive starts in 2023 but its page does not say whether the runs are as issued. Brightband's
+archive stops in 2024 and, we read, consists of re-runs. Prescient's archive is as issued but
+aggregated to regions, with the coverage of Great Britain unclear. Meteomatics says it saves
+historical forecasts from 2017, without saying whether they are as issued.
+
+**Open-Meteo's own documentation and the survey give different start dates for AIFS archives, and
+the survey's measured date governs.** For AIFS, Open-Meteo's [Previous Runs
+page](https://open-meteo.com/en/docs/previous-runs-api) says "Most models are archived from January
+2024". The [forecast-model table](#forecast-models) gives 2025-02-17 for AIFS Single, the first day
+with global irradiance at Lincoln, and that measured date governs.
+
+**Earthmover's data marketplace is a delivery route for several of these archives, and its listings
+are not readable without a login.** Any Arraylake account can subscribe instantly to a free listing.
+Paid listings are set up with the provider, and Earthmover "does not sell the data directly"
+([Earthmover documentation](https://docs.earthmover.io/marketplace/data-users)). The launch
+providers were Brightband, Dynamical.org, Zeus AI, Beyond Weather, Planette, the Climate Uncertainty
+Lab, and the Subseasonal Consortium
+([Earthmover](https://www.earthmover.io/blog/announcing-data-marketplace/)). Brightband also lists
+low-latency ECMWF IFS HRES data there. Searching the provider and Earthmover pages, which are the
+readable ones, we found no listing from Jua, Tomorrow.io, Spire, Salient, WindBorne, Excarta, or
+Silurian.
+
+**We found nothing on archives, variables, or AI models from eight more providers:** Xweather and
+Vaisala, DTN, Vortex, Meteocontrol, Amperon, Nnergix, Enfor, and Meteologica. One Meteologica page
+returned an access error.
 
 ## Products ruled out
 
