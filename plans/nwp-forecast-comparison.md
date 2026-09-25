@@ -565,3 +565,8 @@ Rejected: none.
   measured shares are higher because the requirement drops a row missing any UKV day-1 column: for
   solar the temperature and the snapshots at both ends of the hour, for wind the 100 m speed, the
   100 m direction and the 10 m speed.
+- The `study` skill's leaderboard-first rule for Figure 1 does not apply: this study answers a
+  contrast question (does any product beat ENS at a matched lead?) rather than ranking products, so
+  Figures 1 and 2 stay the headline paired contrasts and the leaderboards are Figures 5 and 6. The
+  page adds an Introduction with a product table, and a Key findings list, as the skill's outline
+  asks.

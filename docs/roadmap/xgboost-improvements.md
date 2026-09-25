@@ -1374,9 +1374,13 @@ arrived; [masking whole
 sources](../techniques/encoders.md#handling-missing-inputs-remove-the-token-dont-zero-fill) sets out
 what that precedent does and does not cover.
 
-**Two measurements of adding weather products to ECMWF ENS point the same way, and the day-ahead
-study puts a size on the wind gain.** An earlier multi-source measurement found -0.30 points of
-capacity [-0.37, -0.24]. The [matched-lead
+**A second weather product helped a past-weather solar measurement, but the day-ahead study finds
+no detectable solar gain at a conservative lead, and it puts a size on the wind gain.** A
+[comment on issue #810](https://github.com/openclimatefix/nged-substation-forecast/issues/810#issuecomment-5785179619)
+describes a solar experiment from issue #800. The experiment gave an XGBoost model both ICON-D2's
+and UKV's global irradiance, as past-weather values, and scored it against an XGBoost model given
+ICON-D2's alone: -0.30 points of capacity [-0.37, -0.24]. That experiment does not use day-ahead
+forecasts. The [matched-lead
 study](https://openclimatefix.github.io/nged-substation-forecast/studies/nwp-forecasts-at-matched-leads/)
 scores an XGBoost model given ENS's day-1 mean plus ICON-EU and IFS 0.25° forecasts against an
 XGBoost model given ENS alone, at 3 wind and 6 solar generators over 21 months. The contrast P4b
