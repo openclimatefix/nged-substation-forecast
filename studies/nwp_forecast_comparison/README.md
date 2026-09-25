@@ -111,15 +111,35 @@ lead?](../../docs/studies/nwp-forecasts-at-matched-leads.md).
   earlier batches' losses read through `--context-dir` (the first and the second, and no refit).
   Each prints its row and month counts and the absolute error of both arms, and all are exploratory.
   The other arm's fold training sets contained the gap days.
+- `verify_aifs_steps.py --published-dir PUBLISHED --output-dir DIR` reads only. It checks that AIFS
+  Single's radiation is a 6-hour mean ending at the lead and its wind is instantaneous (both
+  against ERA5), the units, and the crop's grid orientation (against GEFS), and writes
+  `verification/aifs_steps.md`. With `--wiring`, after the build, it checks that the default ENS
+  path is unchanged, the 6-hourly ENS columns are wired, and the nearest-cell AIFS arm equals the
+  raw store's row at the day-1 run, and writes `verification/aifs_wiring.md`. It exits non-zero on
+  a failed check.
+- `build_forecast_inputs.py --aifs --published-dir PUBLISHED --output-dir DIR` writes the AIFS
+  Single and AIFS ENS columns at days 1 and 2 (the 00 UTC run of the day before, as ENS is read),
+  ENS's mean and control member on 6-hourly steps, and each AIFS arm's run time, onto the published
+  inputs' `(site, time)` keys, to a new folder. Each site reads the H3 resolution-5
+  overlap-weighted mean of the crop's cells, as ENS's stored table does; AIFS Single also has a
+  nearest-cell arm. `--aifs-weather-dir` names the folder holding the two downloads.
+- `fit_aifs.py` fits every AIFS arm and reference on a GPU, on two nested row sets (`single`, and
+  `ens` where AIFS ENS also exists), with folds cut inside the AIFS version eras. One contrast is
+  deciding (AIFS Single against ENS's control member at day 1); AIFS ENS contrasts are
+  descriptive; all others are exploratory. `--check` fits one arm twice and prints a time
+  estimate. A row set whose losses file exists is not refitted, so a rerun after a crash resumes
+  where it stopped; `report.md` is always written once.
 - `nwp_forecast_charts.py` reads the saved losses and predictions from `--input-dir`, and the extra
-  lead days' losses from `--extra-dir`, and writes six SVG charts per technology to `--output-dir`,
-  each optimised with `svgo` (skip with `--no-svgo`): the leaderboard of every product's absolute
-  error at every fitted lead day, the planned contrasts P1a to P4b at both settings, one chosen
-  week of out-of-fold forecasts against measured output, the contrasts at each generator alone,
-  the blends against ENS alone and their controls, and error by lead day with ENS's day-0 and
-  day-1 intervals shaded. It computes every interval itself with the report's own functions and
-  refuses any site label that is not an anonymised label. It has no default output directory:
-  charts go to `docs/studies/assets/` only once a real report exists.
+  lead days' losses from `--extra-dir`, and, with `--aifs-dir`, the AIFS losses, and writes six SVG
+  charts per technology (seven with the AIFS chart) to `--output-dir`, each optimised with `svgo`
+  (skip with `--no-svgo`): the leaderboard of every product's absolute error at every fitted lead
+  day, the planned contrasts P1a to P4b at both settings, one chosen week of out-of-fold forecasts
+  against measured output, the contrasts at each generator alone, the blends against ENS alone and
+  their controls, and error by lead day with ENS's day-0 and day-1 intervals shaded. It computes
+  every interval itself with the report's own functions and refuses any site label that is not an
+  anonymised label. It has no default output directory: charts go to `docs/studies/assets/` only
+  once a real report exists.
 
 ## Outputs
 
@@ -137,6 +157,12 @@ lead?](../../docs/studies/nwp-forecasts-at-matched-leads.md).
   `<domain>_predictions.parquet` the GPU fits in the same layout as the published files,
   `report.md` the absolute errors, contrasts, and device noise floor, and `verification/` the two
   checks of `verify_extra_leads.py`.
+- `data/studies/nwp_forecast_comparison_aifs/` holds the AIFS arms and is write-once.
+  `<domain>_aifs_inputs.parquet` holds the AIFS columns, `<domain>_<row_set>_losses.parquet` and
+  `<domain>_<row_set>_predictions.parquet` the GPU fits in the published layout (`row_set` is
+  `single` or `ens`), `report.md` the absolute errors, the deciding contrast at both settings, the
+  listed contrasts, and the per-era contrasts, and `verification/` the checks of
+  `verify_aifs_steps.py`.
 
 ## Folds
 

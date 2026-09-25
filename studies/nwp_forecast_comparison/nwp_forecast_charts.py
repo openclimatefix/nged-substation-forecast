@@ -7,7 +7,8 @@ Every interval is computed here from those per-row losses, with the same functio
 uses (`difference`, `leaderboard`, `bracket` in `nwp_forecast_comparison.py`, which call
 `studies.bootstrap`), so no refit is needed and a chart cannot disagree with the report.
 
-Six charts per technology, each with its own title, subtitle, axis titles and key:
+Seven charts per technology (the seventh only with `--aifs-dir`), each with its own title, subtitle,
+axis titles and key:
 
 1. `leaderboard`: each product's own mean absolute error at every fitted lead day, one product per
    row, best day-1 error first, with climatology and day-1 smart persistence as dashed lines.
@@ -16,6 +17,9 @@ Six charts per technology, each with its own title, subtitle, axis titles and ke
 4. `by_lead_day`: error by lead day, with ENS's day-0 and day-1 intervals shaded.
 5. `blends`: the two blends against ENS alone and against their permutation controls.
 6. `per_generator`: the P1a, P2a and P4b contrasts at each generator.
+7. `aifs`: AIFS Single and AIFS ENS at days 1 and 2 on their own row sets, read from
+   `fit_aifs.py`'s saved losses: each forecast's own error on each set, then each set's paired
+   differences. The two sets never share an axis.
 
 Generators appear only as `A` to `F` and `W1` to `W3`, every error is a fraction of the
 generator's own capacity, the time axes count days of the week rather than dates, and no data mark
@@ -30,7 +34,6 @@ real report exists.
 """
 
 import argparse
-import json
 import logging
 import math
 import re
@@ -46,6 +49,8 @@ import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 from build_forecast_inputs import PRODUCT_SLUGS
+from fit_aifs import ROW_SETS
+from fit_aifs import contrasts as aifs_contrasts
 from nwp_forecast_comparison import (
     BLEND_ARMS,
     GENERATOR_CONTRASTS,
@@ -61,8 +66,6 @@ from nwp_forecast_comparison import (
 from studies.anonymise import SITE_LABELS, WIND_SITE_LABELS
 from studies.charts import (
     CONTENT_WIDTH_PX,
-    LABEL_WIDTH_PX,
-    PLOT_WIDTH_PX,
     figure,
     interval_panel,
     leaderboard_panel,
@@ -194,6 +197,8 @@ def arm_label(*, arm: str) -> str:
     Raises:
         ValueError: If `arm` is none of the arm kinds the study fits or scores.
     """
+    if arm in AIFS_ARM_LABELS:
+        return AIFS_ARM_LABELS[arm]
     if arm.startswith("blend_"):
         return blend_label(arm=arm)
     if arm == "climatology":
@@ -630,13 +635,51 @@ MAX_LINE_DAY: Final[int] = 3
 """The last lead day the lead-day lines draw: every product plotted there is fitted at every day up
 to it, so no line spans a lead that was not fitted."""
 
-LEAD_LABEL_ROWS: Final[float] = 1.0
+LEAD_LABEL_ROWS: Final[float] = 1.5
 """How many rows of room the leaderboard leaves above its first product for the names of the
-baseline lines."""
+baseline lines, which sit on two levels so that the higher baseline's name, written to the left of
+its line, does not cross the lower baseline's line."""
 
-LEAD_LABEL_ROOM: Final[float] = 1.5
-"""How far right of the baselines the leaderboard's x axis runs, in percentage points of capacity,
-leaving room for the name written beside the smart-persistence line."""
+LEAD_PLOT_WIDTH_PX: Final[int] = CONTENT_WIDTH_PX - 10
+"""The leaderboard's plot width in pixels. The plot starts at the left edge of the figure's text,
+and the product names sit inside it, to the left of the smallest error."""
+
+LEAD_NAME_PX_PER_CHARACTER: Final[float] = 6.2
+"""The width of one character of a product's name, in pixels, at the leaderboard's name font size:
+a monospaced font at 10 px is 6 px wide, plus a little slack."""
+
+LEAD_NAME_GAP_PX: Final[int] = 14
+"""The clear space between the longest product name and the leftmost interval, in pixels."""
+
+LEAD_NAME_FONT_PX: Final[int] = 10
+"""The font size of the leaderboard's product names and baseline names, in pixels."""
+
+
+def lead_board_x_domain(
+    *, lowest: float, highest: float, longest_name: int
+) -> tuple[tuple[float, float], list[float]]:
+    """Choose the leaderboard's x range and the ticks and vertical grid inside its data area.
+
+    The range runs from below the smallest error, leaving room on the left for the product names, up
+    to the largest error rounded up to a half point.
+
+    Args:
+        lowest: The smallest interval end to show.
+        highest: The largest interval end or baseline to show.
+        longest_name: The number of characters in the longest product name.
+
+    Returns:
+        The x range, and the tick values whose grid lines fall to the right of the product names.
+    """
+    high = math.ceil((highest + 0.05) * 2) / 2
+    need = longest_name * LEAD_NAME_PX_PER_CHARACTER + LEAD_NAME_GAP_PX
+    low = (
+        math.floor((lowest * LEAD_PLOT_WIDTH_PX - need * high) / (LEAD_PLOT_WIDTH_PX - need) * 10)
+        / 10
+    )
+    first_visible = low + need * (high - low) / LEAD_PLOT_WIDTH_PX
+    return (low, high), ticks(x_domain=(first_visible, high))
+
 
 DIAMOND_DAYS: Final[frozenset[int]] = frozenset({0, 7})
 """The lead days drawn as diamonds, a second encoding beside the colour: day 0 (black) and day 7
@@ -753,41 +796,70 @@ def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt
         lead=pl.format("Day {}", pl.col("day")),
     )
     lead_names = [f"Day {day}" for day in days]
-    x_domain = padded_domain(
-        low=float(rows["lower_95"].min()),  # ty: ignore[invalid-argument-type]
-        high=max(
+    x_domain, x_ticks = lead_board_x_domain(
+        lowest=float(rows["lower_95"].min()),  # ty: ignore[invalid-argument-type]
+        highest=max(
             float(rows["upper_95"].max()),  # ty: ignore[invalid-argument-type]
             float(baselines["value"].max()),  # ty: ignore[invalid-argument-type]
-        )
-        + LEAD_LABEL_ROOM,
-        include_zero=False,
+        ),
+        longest_name=max(len(name) for name in products),
     )
     x_scale = alt.Scale(domain=list(x_domain), nice=False, zero=False)
-    x_axis = alt.Axis(values=ticks(x_domain=x_domain), format=".2~f", grid=False)
+    x_axis = alt.Axis(values=x_ticks, format=".2~f", grid=False)
     y_scale = alt.Scale(domain=[len(products) - 0.5, -LEAD_LABEL_ROWS], nice=False)
-    labels = {str(index): name for index, name in enumerate(products)}
-    y_axis = alt.Axis(
-        values=list(range(len(products))),
-        labelExpr=f"{json.dumps(labels)}[datum.value]",
-        labelLimit=LABEL_WIDTH_PX,
-        minExtent=LABEL_WIDTH_PX,
-        maxExtent=LABEL_WIDTH_PX,
-        labelPadding=6,
-        ticks=False,
-        domain=False,
-        title=None,
-    )
+    y_axis = alt.Axis(labels=False, ticks=False, domain=False, grid=False, title=None)
     colour = alt.Color(
         "lead:N",
         scale=alt.Scale(domain=lead_names, range=[LEAD_COLOURS[day] for day in days]),
         legend=None,
     )
     x_title = MAE_TITLE
-    separators = pl.DataFrame({"y": [index + 0.5 for index in range(len(products) - 1)]})
+    separators = pl.DataFrame(
+        {
+            "y": [index - 0.5 for index in range(len(products))],
+            "x_start": x_domain[0],
+            "x_end": x_domain[1],
+        }
+    )
     rules = (
         alt.Chart(separators)
         .mark_rule(color=ocf.GRID, strokeWidth=1, aria=False)
-        .encode(y=alt.Y("y:Q", scale=y_scale, axis=y_axis))  # ty: ignore[unresolved-attribute]
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("x_start:Q", scale=x_scale, axis=x_axis, title=x_title),
+            x2="x_end:Q",
+            y=alt.Y("y:Q", scale=y_scale, axis=y_axis),
+        )
+    )
+    # The vertical grid is drawn as rules, not as the axis's grid, so that it starts below the
+    # baselines' names instead of running through them.
+    grid = (
+        alt.Chart(pl.DataFrame({"x": x_ticks, "y_start": -0.5, "y_end": len(products) - 0.5}))
+        .mark_rule(color=ocf.GRID, strokeWidth=1, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("x:Q", scale=x_scale, axis=x_axis, title=x_title),
+            y=alt.Y("y_start:Q", scale=y_scale, axis=y_axis),
+            y2="y_end:Q",
+        )
+    )
+    names = (
+        alt.Chart(
+            pl.DataFrame(
+                {"y": [float(index) for index in range(len(products))], "text": products}
+            ).with_columns(x=pl.lit(x_domain[0]))
+        )
+        .mark_text(
+            align="left",
+            baseline="middle",
+            font=ocf.FONT_LABEL,
+            fontSize=LEAD_NAME_FONT_PX,
+            color=ocf.BLACK_1,
+            aria=False,
+        )
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("x:Q", scale=x_scale, axis=x_axis, title=x_title),
+            y=alt.Y("y:Q", scale=y_scale, axis=y_axis),
+            text="text:N",
+        )
     )
     intervals = (
         alt.Chart(data)
@@ -816,30 +888,37 @@ def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt
             ),
         )
     )
-    reference = baselines.with_columns(
-        y=pl.lit(-LEAD_LABEL_ROWS + 0.25, dtype=pl.Float64),
+    # The higher baseline's name sits on the upper level and the lower baseline's on the lower one,
+    # each right-aligned to its own line, and each line starts just below its name.
+    reference = baselines.sort("value").with_columns(
+        name_y=pl.Series([-LEAD_LABEL_ROWS / 2, 0.25 - LEAD_LABEL_ROWS]),
         text=pl.col("label"),
+    )
+    reference = reference.with_columns(
+        line_start=pl.col("name_y") + 0.2, line_end=pl.lit(len(products) - 0.5)
     )
     reference_rules = (
         alt.Chart(reference)
         .mark_rule(strokeDash=[5, 3], strokeWidth=1.5, color=ocf.BLACK_1, aria=False)
-        .encode(x=alt.X("value:Q", scale=x_scale, axis=x_axis, title=x_title))  # ty: ignore[unresolved-attribute]
-    )
-    low_arm, high_arm = baselines.sort("value")["arm"].to_list()
-    reference_text = [
-        alt.Chart(reference.filter(pl.col("arm") == arm))
-        .mark_text(align=align, dx=dx, baseline="middle", fontSize=10, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
             x=alt.X("value:Q", scale=x_scale, axis=x_axis, title=x_title),
-            y=alt.Y("y:Q", scale=y_scale, axis=y_axis),
+            y=alt.Y("line_start:Q", scale=y_scale, axis=y_axis),
+            y2="line_end:Q",
+        )
+    )
+    reference_text = (
+        alt.Chart(reference)
+        .mark_text(align="right", dx=-5, baseline="middle", fontSize=LEAD_NAME_FONT_PX, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("value:Q", scale=x_scale, axis=x_axis, title=x_title),
+            y=alt.Y("name_y:Q", scale=y_scale, axis=y_axis),
             text="text:N",
             color=alt.value(ocf.BLACK_1),
         )
-        for arm, align, dx in ((low_arm, "right", -5), (high_arm, "left", 5))
-    ]
+    )
     panel = alt.LayerChart(
-        layer=[rules, reference_rules, intervals, points, *reference_text],
-        width=PLOT_WIDTH_PX,
+        layer=[grid, rules, reference_rules, intervals, points, names, reference_text],
+        width=LEAD_PLOT_WIDTH_PX,
         height=LEAD_ROW_PX * (len(products) + LEAD_LABEL_ROWS - 0.5),
     )
     return figure(
@@ -847,6 +926,7 @@ def leaderboard_figure(*, loaded: Loaded, domain: DomainType, title: str) -> alt
             line_key(
                 labels=lead_names,
                 colours=[LEAD_COLOURS[day] for day in days],
+                width=LEAD_PLOT_WIDTH_PX,
             ),
             panel,
         ],
@@ -1605,6 +1685,186 @@ def blends(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.VConc
     )
 
 
+# --- Chart 7: AIFS on its own rows ----------------------------------------------------------------
+
+AIFS_ARM_LABELS: Final[dict[str, str]] = {
+    "aifs_single_day1": "AIFS Single day 1",
+    "aifs_single_day2": "AIFS Single day 2",
+    "aifs_single_nearest_day1": "AIFS Single day 1, nearest cell",
+    "aifs_ens_mean_day1": "AIFS ENS mean day 1",
+    "aifs_ens_mean_day2": "AIFS ENS mean day 2",
+    "ens_mean6_day1": "ENS mean day 1, 6-hourly steps",
+    "ens_mean6_day2": "ENS mean day 2, 6-hourly steps",
+    "ens_control6_day1": "ENS control member day 1, 6-hourly steps",
+    "ens_control6_day2": "ENS control member day 2, 6-hourly steps",
+    "ens_mean_day1": "ENS mean day 1, 3-hourly steps",
+    "ifs025_day1": "IFS 0.25° day 1, hourly steps",
+    "aifs_single_day1_permuted": "AIFS Single day 1, shuffled",
+    "aifs_single_day1_permuted_b": "AIFS Single day 1, shuffled again",
+}
+"""Each AIFS-page arm's row label. The shuffled arms carry no weather beyond the month and hour of
+day, so their errors show what the forecasts add."""
+
+AIFS_LEADERBOARD_ARMS: Final[tuple[str, ...]] = (
+    "aifs_single_day1",
+    "aifs_ens_mean_day1",
+    "ens_control6_day1",
+    "ens_mean6_day1",
+    "ens_mean_day1",
+    "ifs025_day1",
+    "aifs_single_day1_permuted",
+)
+"""The arms whose own error the AIFS figure's top panels show, at day 1."""
+
+AIFS_SET_NAMES: Final[dict[str, str]] = {
+    "single": "Hours AIFS Single covers",
+    "ens": "Hours AIFS ENS also covers (descriptive only)",
+}
+
+
+def load_aifs(*, aifs_dir: Path, domain: DomainType) -> dict[str, pl.DataFrame]:
+    """Read one technology's AIFS losses for each row set.
+
+    Args:
+        aifs_dir: The directory `fit_aifs.py` wrote to.
+        domain: `solar` or `wind`.
+
+    Returns:
+        Each row set's per-row losses, keyed by row set, after the anonymisation check.
+    """
+    losses = {
+        row_set: pl.read_parquet(aifs_dir / f"{domain}_{row_set}_losses.parquet")
+        for row_set in ROW_SETS
+    }
+    for frame in losses.values():
+        check_anonymised(frame=frame, domain=domain)
+    return losses
+
+
+def aifs_absolute_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
+    """Return the day-1 arms' own errors on one row set, best first.
+
+    Args:
+        losses: One row set's per-row losses.
+
+    Returns:
+        `label`, `family`, `value`, `lower_95` and `upper_95` in percent of capacity, with the
+        arms present in `losses` only.
+    """
+    board = leaderboard(
+        losses=by_setting(losses=losses)["primary"], arms=list(AIFS_LEADERBOARD_ARMS)
+    )
+    return (
+        board.with_columns(
+            pl.col("value", "lower_95", "upper_95") * PERCENTAGE_POINTS,
+            label=pl.col("arm").replace_strict(AIFS_ARM_LABELS, return_dtype=pl.String),
+            family=pl.lit("weather model"),
+        )
+        .sort("value")
+        .select("label", "family", "value", "lower_95", "upper_95")
+    )
+
+
+def aifs_contrast_rows(*, losses: pl.DataFrame, row_set: str) -> pl.DataFrame:
+    """Return one row set's listed contrasts at both settings, as chart rows.
+
+    Args:
+        losses: One row set's per-row losses.
+        row_set: `single` or `ens`.
+
+    Returns:
+        `contrast_rows`'s frame, all exploratory, the deciding label starting "Deciding: ".
+    """
+    by_name = by_setting(losses=losses)
+    frames = []
+    for contrast in aifs_contrasts(row_set=row_set):
+        frame = contrast_rows(
+            losses_by_setting=by_name,
+            specs=[ContrastSpec(contrast.label, contrast.treatment, contrast.reference)],
+            planned=False,
+        ).with_columns(
+            label=pl.lit(
+                f"{'Deciding: ' if contrast.label == 'deciding' else ''}"
+                f"{AIFS_ARM_LABELS[contrast.treatment]} minus {AIFS_ARM_LABELS[contrast.reference]}"
+            )
+        )
+        frames.append(frame)
+    return pl.concat(frames)
+
+
+def aifs(
+    *, losses_by_set: dict[str, pl.DataFrame], domain: DomainType, title: str
+) -> alt.VConcatChart:
+    """Draw AIFS's own errors and paired differences, one pair of panels per row set.
+
+    Args:
+        losses_by_set: Each row set's per-row losses.
+        domain: `solar` or `wind`.
+        title: The figure's title.
+
+    Returns:
+        The figure.
+    """
+    panels = []
+    for row_set, losses in losses_by_set.items():
+        primary = by_setting(losses=losses)["primary"]
+        sizes = leaderboard(losses=primary, arms=["aifs_single_day1"]).row(0, named=True)
+        scope = f"{sizes['n_rows']:,} hours, {sizes['n_months']} months"
+        absolute = aifs_absolute_rows(losses=losses)
+        absolute_domain = padded_domain(
+            low=float(absolute["lower_95"].min()),  # ty: ignore[invalid-argument-type]
+            high=float(absolute["upper_95"].max()),  # ty: ignore[invalid-argument-type]
+            include_zero=False,
+        )
+        panels.append(
+            leaderboard_panel(
+                rows=absolute,
+                x_domain=absolute_domain,
+                x_title=f"{MAE_TITLE}; {scope}",
+                keys=False,
+                panel_title=f"{AIFS_SET_NAMES[row_set]}: each forecast's own error at day 1",
+                row_step_px=44,
+            )
+        )
+        contrasts = aifs_contrast_rows(losses=losses, row_set=row_set)
+        panels.append(
+            _contrast_panel(
+                rows=contrasts,
+                panel_title=f"{AIFS_SET_NAMES[row_set]}: paired differences",
+                x_title=f"{DIFFERENCE_TITLE}; {scope}",
+            )
+        )
+    return figure(
+        panels=panels,
+        number=FIGURE_NUMBERS[(domain, "aifs")],
+        title=title,
+        subtitle=[
+            (
+                "Each mark is an XGBoost model's error, given one forecast product. The two row "
+                "sets hold different hours, so their axes are separate and their errors cannot be "
+                "read against each other or against the other figures. Every arm on a row set is "
+                "scored on the same hours. Points of capacity; negative means the first forecast "
+                "in a row is better."
+            ),
+            (
+                "AIFS steps every 6 hours, so the ENS references use 6-hourly steps too. "
+                "Hourly-step IFS 0.25° has a lead no longer than AIFS's and favours IFS 0.25°. "
+                f"The XGBoost models ran on a graphics processing unit. {DOTS_NOTE}"
+            ),
+            (
+                f"{scope_text(losses=next(iter(losses_by_set.values())), domain=domain)} "
+                f"{CAPACITY_NOTE}"
+            ),
+            (
+                "No row was planned in the study's published plan. The row marked Deciding was "
+                "named before any AIFS fit; the AIFS ENS rows are descriptive; every other row is "
+                "exploratory."
+            ),
+        ],
+        figure_planning=None,
+    )
+
+
 # --- Chart 6: one generator at a time ---------------------------------------------------------
 
 GENERATOR_CONDITIONS: Final[dict[str, str]] = {
@@ -1700,6 +1960,8 @@ FIGURE_NUMBERS: Final[dict[tuple[DomainType, str], int]] = {
     ("wind", "by_lead_day"): 12,
     ("solar", "blends"): 9,
     ("wind", "blends"): 10,
+    ("solar", "aifs"): 13,
+    ("wind", "aifs"): 14,
 }
 """Each chart's figure number on the page, in the page's order: the leaderboard pair opens the page,
 then the planned contrasts."""
@@ -1745,6 +2007,14 @@ TITLES: Final[dict[tuple[DomainType, str], str]] = {
         "Wind error rises with lead day for every forecast; IFS 0.25° has a lower error than the "
         "ENS mean at days 2 and 3, at a lead shorter than ENS's on most hours"
     ),
+    ("solar", "aifs"): (
+        "AIFS Single and AIFS ENS, scored at days 1 and 2 on the hours each is available for, "
+        "against ENS on the same hours: solar power"
+    ),
+    ("wind", "aifs"): (
+        "AIFS Single and AIFS ENS, scored at days 1 and 2 on the hours each is available for, "
+        "against ENS on the same hours: wind power"
+    ),
     ("solar", "blends"): (
         "For solar power a blend of ENS, ICON-EU, and IFS 0.25° lowers the error by 0.35 "
         "percentage points at an optimistic lead, but the blend's control is itself worse than "
@@ -1757,7 +2027,8 @@ TITLES: Final[dict[tuple[DomainType, str], str]] = {
     ),
 }
 """Each chart's title, stating the finding for the products tested. Every number is in
-`report.md`."""
+`report.md`. The two AIFS titles describe the figure and are rewritten to state the finding once
+the AIFS report exists."""
 
 
 def optimise(*, path: Path) -> None:
@@ -1777,7 +2048,11 @@ def optimise(*, path: Path) -> None:
 
 
 def draw_domain(
-    *, input_dir: Path, domain: DomainType, extra_dirs: Sequence[Path] = ()
+    *,
+    input_dir: Path,
+    domain: DomainType,
+    extra_dirs: Sequence[Path] = (),
+    aifs_dir: Path | None = None,
 ) -> tuple[dict[str, alt.VConcatChart], str | None]:
     """Draw every chart of one technology that its saved losses can support.
 
@@ -1785,6 +2060,7 @@ def draw_domain(
         input_dir: The directory `nwp_forecast_comparison.py` wrote to.
         domain: `solar` or `wind`.
         extra_dirs: The directories `fit_extra_leads.py` wrote to.
+        aifs_dir: The directory `fit_aifs.py` wrote to, or None to leave the AIFS chart out.
 
     Returns:
         Each chart keyed by its name, and the chosen week's month and year.
@@ -1809,6 +2085,12 @@ def draw_domain(
         losses=losses, predictions=predictions, domain=domain, title=TITLES[(domain, "models_work")]
     )
     charts["models_work"] = work
+    if aifs_dir is not None:
+        charts["aifs"] = aifs(
+            losses_by_set=load_aifs(aifs_dir=aifs_dir, domain=domain),
+            domain=domain,
+            title=TITLES[(domain, "aifs")],
+        )
     return {name: chart for name, chart in charts.items() if chart is not None}, week_month
 
 
@@ -1828,13 +2110,19 @@ def main() -> int:
         default=[],
         help="An extra lead days' losses directory; repeat it for each fit batch.",
     )
+    parser.add_argument(
+        "--aifs-dir", type=Path, default=None, help="The AIFS arms' losses directory."
+    )
     parser.add_argument("--output-dir", type=Path, required=True, help="Where SVGs are written.")
     parser.add_argument("--no-svgo", action="store_true", help="Skip the svgo optimisation.")
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     for domain in DOMAINS:
         charts, week_month = draw_domain(
-            input_dir=args.input_dir, domain=domain, extra_dirs=args.extra_dir
+            input_dir=args.input_dir,
+            domain=domain,
+            extra_dirs=args.extra_dir,
+            aifs_dir=args.aifs_dir,
         )
         for name, chart in charts.items():
             path = args.output_dir / f"nwp_forecast_{domain}_{name}.svg"
