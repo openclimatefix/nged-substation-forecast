@@ -37,6 +37,7 @@ from typing import Any, Final, cast
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
+from figure_numbers import WIND_FIGURE_NUMBERS
 from station_wind_arms import OUTPUT_DIR, PLANNED_CONTRASTS
 from studies.charts import (
     CONDITION_COLOURS,
@@ -67,15 +68,6 @@ DOTS: Final[str] = (
     "Dot: estimate. Line: 95% interval from resampling whole calendar months and a fitting seed."
 )
 """The subtitle line saying what a dot and a line mean."""
-
-FIGURE_HEADLINE: Final[int] = 21
-"""The headline figure's number on the page."""
-
-FIGURE_SEASON: Final[int] = 22
-"""The season figure's number on the page."""
-
-FIGURE_BY_FARM: Final[int] = 23
-"""The per-farm figure's number on the page."""
 
 LEADERBOARD_ARMS: Final[Mapping[str, str]] = {
     "station_wind": "Nearest station",
@@ -401,7 +393,7 @@ def _headline(
         months: Calendar months those rows cover.
 
     Returns:
-        Figure 21, and its title.
+        The `contrasts` figure of `figure_numbers.WIND_FIGURE_NUMBERS`, and its title.
     """
     records = []
     for arm, label in LEADERBOARD_ARMS.items():
@@ -499,7 +491,7 @@ def _headline(
     return (
         figure(
             panels=panels,
-            number=FIGURE_HEADLINE,
+            number=WIND_FIGURE_NUMBERS["contrasts"],
             figure_planning="mixed",
             title=title,
             subtitle=[
@@ -694,7 +686,7 @@ def _season(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
         scope: The scope sentence every chart states.
 
     Returns:
-        Figure 22, and its title.
+        The `station_season` figure of `figure_numbers.WIND_FIGURE_NUMBERS`, and its title.
 
     Raises:
         ValueError: If S1 is not positive in both halves of the year, so the title's "trails" is
@@ -767,7 +759,7 @@ def _season(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
     return (
         figure(
             panels=panels,
-            number=FIGURE_SEASON,
+            number=WIND_FIGURE_NUMBERS["station_season"],
             figure_planning="mixed",
             title=title,
             subtitle=[
@@ -797,7 +789,7 @@ def _by_farm(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
         scope: The scope sentence every chart states.
 
     Returns:
-        Figure 23, and its title.
+        The `per_generator` figure of `figure_numbers.WIND_FIGURE_NUMBERS`, and its title.
 
     Raises:
         ValueError: If the count of farms at which a contrast is statistically significant at the
@@ -864,7 +856,7 @@ def _by_farm(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
     return (
         figure(
             panels=panels,
-            number=FIGURE_BY_FARM,
+            number=WIND_FIGURE_NUMBERS["per_generator"],
             figure_planning="exploratory",
             title=title,
             subtitle=[
