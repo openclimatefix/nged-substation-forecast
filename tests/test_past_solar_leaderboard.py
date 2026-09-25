@@ -517,7 +517,7 @@ def test_every_row_set_lists_the_planned_contrasts_the_study_names() -> None:
 
     counts = {row_set.key: len(row_set.planned_contrasts) for row_set in module.ROW_SETS}
 
-    assert counts == {"main": 6, "extra": 3, "ens": 2, "station": 3}
+    assert counts == {"main": 6, "extra": 3, "ens": 2, "station": 3, "cerra": 4}
 
 
 def test_the_second_setting_is_bootstrapped_from_the_sensitivity_losses(tmp_path: Path) -> None:
@@ -814,6 +814,7 @@ def test_only_the_extra_rows_hold_the_exploratory_sarah3_minus_cams_contrast() -
         "extra": [("sarah3_global", "cams_global")],
         "ens": [],
         "station": [],
+        "cerra": [],
     }
 
 
@@ -881,3 +882,59 @@ def test_a_leaderboard_arm_printed_only_on_an_mae_line_is_scored_and_checked(
             losses=losses,
             text=_report_with_ens_error_on_an_mae_line(losses=losses, printed=round(ens, 3) + 0.01),
         )
+
+
+def test_the_five_row_sets_stack_in_the_page_order_and_the_fifth_reads_the_cerra_folder() -> None:
+    module = _load()
+
+    assert [row_set.key for row_set in module.ROW_SETS] == [
+        "main",
+        "extra",
+        "ens",
+        "station",
+        "cerra",
+    ]
+    assert module.ROW_SETS[-1].directory.name == "cerra_past_solar"
+
+
+def test_the_cerra_planned_contrasts_are_the_four_named_before_the_run() -> None:
+    module = _load()
+
+    pairs = {(c.treatment.arm, c.reference.arm) for c in module.CERRA_PLANNED}
+
+    assert pairs == {
+        ("cerra_global", "era5_global"),
+        ("cerra_global", "cams_global"),
+        ("cerra_global", "era5_3h"),
+        ("cerra_split", "cerra_erbs"),
+    }
+    assert module.ROW_SETS[-1].planned_contrasts == module.CERRA_PLANNED
+
+
+def test_the_cerra_leaderboard_holds_every_fitted_arm_and_contrasts_all_but_era5() -> None:
+    module = _load()
+    row_set = module.ROW_SETS[-1]
+
+    assert [arm.arm for arm in row_set.leaderboard_arms] == [
+        "cerra_global",
+        "cerra_split",
+        "cerra_erbs",
+        "era5_global",
+        "cams_global",
+        "era5_3h",
+        "cams_3h",
+    ]
+    assert {arm.arm for arm in row_set.contrast_arms} == {
+        "cerra_global",
+        "cerra_split",
+        "cerra_erbs",
+        "cams_global",
+        "era5_3h",
+        "cams_3h",
+    }
+
+
+def test_the_past_solar_leaderboard_writes_to_the_third_write_once_folder() -> None:
+    module = _load()
+
+    assert module.SOLAR_LEADERBOARD_DIR.name == "solar_leaderboard_3"

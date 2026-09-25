@@ -10,7 +10,7 @@ page that repeats the sentence.
 
 ## Row sets
 
-**Five row sets are used across the studies, and every product in a study is scored on the study's
+**Six row sets are used across the studies, and every product in a study is scored on the study's
 own row set.** A site-hour is one hour of one generator's metered output. The counts below are the
 solar page's.
 
@@ -20,6 +20,7 @@ solar page's.
 | Extra Open-Meteo models | All 12 products, including four more weather models | November 2024 to August 2026 | 40,243 |
 | ECMWF ENS | ENS, with ERA5 and CAMS refit on the same hours | 1 April 2024 to 10 September 2026 | 54,447 |
 | Weather stations | The nearest Met Office weather station, with CAMS and ERA5 | 2022-12-01 to 2025-12-31 | 60,033 |
+| CERRA | CERRA, with ERA5 and CAMS refit on the same hours, and ERA5 and CAMS averaged to 3-hour steps | 2022-12-01 to 2026-06-30 | 72,105 |
 | Record | ERA5, CAMS, SARAH-3, and ICON-DREAM-EU | January 2021 to August 2026 | 115,594 |
 
 **A longer record for two questions.** The year-by-year comparison with ERA5 and SARAH-3's
@@ -81,8 +82,12 @@ planned contrasts are scored on the weather-station section's own row set: the n
 station against CAMS and against ERA5, and CAMS with the station against CAMS with a shuffled copy
 of the station's irradiance. See [The nearest station is a worse input than CAMS and a better input
 than ERA5](solar.md#the-nearest-station-is-a-worse-input-than-cams-and-a-better-input-than-era5).
+Four further planned contrasts are scored on the CERRA section's own row set: CERRA against ERA5,
+against CAMS, and against ERA5 averaged to 3-hour steps, and CERRA with its own direct beam against
+CERRA with Erbs separation. See [CERRA is no better than ERA5, and trails CAMS by about 4
+points](solar.md#cerra-is-no-better-than-era5-and-trails-cams-by-about-4-points).
 
-### The 14 planned contrasts
+### The 18 planned contrasts
 
 | Row set | Planned contrast |
 |---|---|
@@ -100,6 +105,10 @@ than ERA5](solar.md#the-nearest-station-is-a-worse-input-than-cams-and-a-better-
 | Weather stations | The nearest weather station's irradiance and temperature against CAMS |
 | Weather stations | The same against ERA5 |
 | Weather stations | CAMS with the nearest station against CAMS with a shuffled copy of the station's irradiance |
+| CERRA | CERRA against ERA5 |
+| CERRA | CERRA against CAMS |
+| CERRA | CERRA against ERA5 averaged to 3-hour steps |
+| CERRA | CERRA with its own direct beam against CERRA with Erbs separation |
 
 ## The second hyperparameter setting
 

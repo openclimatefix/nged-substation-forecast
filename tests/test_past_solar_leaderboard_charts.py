@@ -6,6 +6,7 @@ post hoc row drawn without its label, and a headline that states an exploratory 
 
 import importlib.util
 import sys
+from collections import defaultdict
 from pathlib import Path
 from types import ModuleType
 from typing import Final
@@ -201,3 +202,144 @@ def test_the_figures_carry_the_scope_caveats_added_after_review() -> None:
     assert "almost entirely subsets of the main rows" in _caption(spec=contrasts)
     assert "ICON global is served up to 6 hours ahead" in _caption(spec=contrasts)
     assert "and a fitting seed" in _caption(spec=contrasts)
+
+
+def _widths(*, spec: object) -> set[float]:
+    """Return every numeric `width` in a Vega-Lite spec."""
+    found: set[float] = set()
+    if isinstance(spec, dict):
+        found |= {value for key, value in spec.items() if key == "width" and isinstance(value, int)}
+        for value in spec.values():
+            found |= _widths(spec=value)
+    elif isinstance(spec, list):
+        for value in spec:
+            found |= _widths(spec=value)
+    return found
+
+
+def _five_blocks() -> list[RowSetBlock]:
+    block = _contrast_block(cams=-3.7)
+    cerra = RowSetBlock("CERRA", "January 2025", 8, block.rows, block.planned_rows)
+    return [block, block, block, block, cerra]
+
+
+def test_the_cerra_row_set_has_a_block_label_and_both_figures_draw_five_blocks() -> None:
+    module = _load()
+    contrasts = module.contrasts_figure(blocks=_five_blocks()).to_dict()
+    leaderboard = module.leaderboard_figure(
+        blocks=[
+            RowSetBlock(b.label, b.dates, b.site_hours, b.rows.rename({"difference": "value"}))
+            for b in _five_blocks()
+        ]
+    ).to_dict()
+
+    assert module.BLOCK_LABELS["cerra"] == "CERRA"
+    assert set(module.BLOCK_LABELS) == {row_set.key for row_set in module.ROW_SETS}
+    assert "CERRA: January 2025, 8 site-hours" in str(contrasts)
+    assert "CERRA: January 2025, 8 site-hours" in str(leaderboard)
+    assert "on each of the five row sets" in _caption(spec=leaderboard)
+    assert "four row sets" not in _caption(spec=leaderboard)
+
+
+def test_the_two_figures_draw_their_plots_at_the_same_width() -> None:
+    module = _load()
+    blocks = _five_blocks()
+
+    contrasts = module.contrasts_figure(blocks=blocks).to_dict()
+    leaderboard = module.leaderboard_figure(
+        blocks=[
+            RowSetBlock(b.label, b.dates, b.site_hours, b.rows.rename({"difference": "value"}))
+            for b in blocks
+        ]
+    ).to_dict()
+
+    assert _widths(spec=contrasts)
+    assert _widths(spec=contrasts) == _widths(spec=leaderboard)
+
+
+@pytest.mark.parametrize(
+    "caveat",
+    [
+        "3-hour accumulations only",
+        "lead by 0 to 3 hours",
+        "00:00 UTC on 1 July 2026",
+        "shorter than the main rows' window",
+        "almost entirely subsets of the main rows",
+        "The step width is unmatched in CERRA's contrasts against ERA5 and CAMS",
+    ],
+)
+def test_both_figures_carry_the_cerra_row_set_caveats(caveat: str) -> None:
+    module = _load()
+    blocks = _five_blocks()
+    leaderboard = module.leaderboard_figure(
+        blocks=[
+            RowSetBlock(b.label, b.dates, b.site_hours, b.rows.rename({"difference": "value"}))
+            for b in blocks
+        ]
+    ).to_dict()
+    contrasts = module.contrasts_figure(blocks=blocks).to_dict()
+
+    assert caveat in _caption(spec=contrasts)
+    if "subsets" not in caveat:
+        assert caveat in _caption(spec=leaderboard)
+
+
+def _absolute(*, values: dict[str, tuple[float, str]]) -> pl.DataFrame:
+    return pl.DataFrame(
+        {"arm": arm, "family": family, "value": value} for arm, (value, family) in values.items()
+    )
+
+
+def test_the_title_check_raises_when_a_cerra_arm_beats_cams() -> None:
+    module = _load()
+    rows = _absolute(
+        values={
+            "cams_global": (7.0, "satellite"),
+            "cerra_global": (6.5, "reanalysis"),
+            "era5_global": (8.0, "reanalysis"),
+        }
+    )
+
+    with pytest.raises(ValueError, match=r"CERRA: .*cerra_global does"):
+        module.check_cams_lowest_of_gridded(label="CERRA", rows=rows)
+
+
+def test_the_title_check_accepts_cams_averaged_to_3_hour_steps_and_ignores_station_arms() -> None:
+    module = _load()
+    rows = _absolute(
+        values={
+            "station_blend": (5.0, "station observations"),
+            "cams_3h": (6.5, "satellite"),
+            "cerra_global": (7.0, "reanalysis"),
+        }
+    )
+
+    module.check_cams_lowest_of_gridded(label="Stations", rows=rows)
+
+
+def test_build_blocks_stops_before_drawing_when_a_cerra_arm_beats_cams(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load()
+    row_set = module.ROW_SETS[-1]
+    absolute = _absolute(
+        values={"cams_global": (7.0, "satellite"), "cerra_global": (6.5, "reanalysis")}
+    )
+    monkeypatch.setattr(module, "ROW_SETS", (row_set,))
+    monkeypatch.setattr(module, "absolute_rows", lambda **_: absolute)
+    monkeypatch.setattr(module, "contrast_rows", lambda **_: absolute)
+    monkeypatch.setattr(module, "planned_rows", lambda **_: absolute)
+    printed = module.PrintedBlock(
+        first_day="2025-01-01", last_day="2025-06-30", site_hours=8, tables=defaultdict(dict)
+    )
+    intervals = pl.DataFrame({"row_set": row_set.key, "n_rows": [8]})
+
+    with pytest.raises(ValueError, match="cerra_global does"):
+        module.build_blocks(intervals=intervals, report={row_set.label: printed})
+
+    passing = _absolute(
+        values={"cams_global": (6.0, "satellite"), "cerra_global": (6.5, "reanalysis")}
+    )
+    monkeypatch.setattr(module, "absolute_rows", lambda **_: passing)
+    leaderboard, _ = module.build_blocks(intervals=intervals, report={row_set.label: printed})
+    assert [block.label for block in leaderboard] == ["CERRA"]

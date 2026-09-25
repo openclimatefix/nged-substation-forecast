@@ -1,4 +1,4 @@
-"""Draw the past-solar page's leaderboard (Figure 1) and contrasts (Figure 2), four row sets each.
+"""Draw the past-solar page's leaderboard (Figure 1) and contrasts (Figure 2), five row sets each.
 
 Both figures read `past_solar_leaderboard.py`'s write-once folder, `intervals.parquet` for every
 number and `report.md` for the check. **The script stops before drawing unless every number it
@@ -56,6 +56,7 @@ BLOCK_LABELS: Final[dict[str, str]] = {
     "extra": "Extra",
     "ens": "ENS",
     "station": "Stations",
+    "cerra": "CERRA",
 }
 """Each row set's block label, the term the page uses for the row set."""
 
@@ -80,6 +81,15 @@ ENS_LEAD: Final[str] = (
     "ECMWF ENS is a forecast 5 to 20 hours ahead from a 00 UTC run; ERA5's radiation is 1 to 12 "
     "hours ahead."
 )
+CERRA_LEAD: Final[str] = (
+    "CERRA publishes 3-hour accumulations only, so its hourly values are rebuilt from windows that "
+    "lead by 0 to 3 hours; its window ends at 00:00 UTC on 1 July 2026, shorter than the main "
+    "rows' window."
+)
+CERRA_STEP: Final[str] = (
+    "The step width is unmatched in CERRA's contrasts against ERA5 and CAMS, and matched only "
+    "against ERA5 and CAMS averaged to 3-hour steps."
+)
 STATION_SCOPE: Final[str] = (
     "The station rows rest on one pyranometer: all six generators take the same nearest radiation "
     "station, 17 to 31 km away."
@@ -99,7 +109,7 @@ EXTRA_FOLDS: Final[str] = (
     "run about 0.12 to 0.20 points high; see Limitations."
 )
 NESTED_BLOCKS: Final[str] = (
-    "The extra, ENS and station rows are almost entirely subsets of the main rows."
+    "The extra, ENS, station and CERRA rows are almost entirely subsets of the main rows."
 )
 POST_HOC_NOTE: Final[str] = (
     "Rows marked (post hoc) were added after the first run: two ways of rebuilding UKV's hourly "
@@ -415,6 +425,32 @@ def planned_rows(
     return pl.DataFrame(records, schema_overrides={"second_difference": pl.Float64})
 
 
+CAMS_ARMS: Final[tuple[str, ...]] = ("cams_global", "cams_3h")
+"""The arms that are CAMS: its hourly product, and CAMS averaged to 3-hour steps."""
+
+STATION_FAMILY: Final[str] = "station observations"
+"""The family of an arm that reads a weather station, which Figure 1's title does not cover."""
+
+
+def check_cams_lowest_of_gridded(*, label: str, rows: pl.DataFrame) -> None:
+    """Raise unless a block's lowest-error gridded arm is CAMS, which Figure 1's title states.
+
+    Args:
+        label: The block's label, for the error message.
+        rows: The block's leaderboard rows, with `arm`, `family` and `value`.
+
+    Raises:
+        ValueError: If an arm that is not CAMS and not a station arm has the lowest error.
+    """
+    best = rows.filter(pl.col("family") != STATION_FAMILY).sort("value").row(0, named=True)
+    if best["arm"] not in CAMS_ARMS:
+        msg = (
+            f"{label}: Figure 1's title says CAMS has the lowest error of the gridded products, "
+            f"but {best['arm']} does ({best['value']:.3f} points)"
+        )
+        raise ValueError(msg)
+
+
 def build_blocks(
     *, intervals: pl.DataFrame, report: dict[str, PrintedBlock]
 ) -> tuple[list[RowSetBlock], list[RowSetBlock]]:
@@ -428,7 +464,8 @@ def build_blocks(
         The leaderboard blocks and the contrast blocks, both in the order of `ROW_SETS`.
 
     Raises:
-        ValueError: If a row set's site-hours or a drawn number disagrees with the report.
+        ValueError: If a row set's site-hours or a drawn number disagrees with the report, or a
+            gridded product other than CAMS has a block's lowest error.
     """
     leaderboard_blocks = []
     contrast_blocks = []
@@ -443,6 +480,7 @@ def build_blocks(
         absolute = absolute_rows(
             frame=frame, row_set=row_set, printed=printed.tables[ABSOLUTE_SECTION]
         )
+        check_cams_lowest_of_gridded(label=BLOCK_LABELS[row_set.key], rows=absolute)
         leaderboard_blocks.append(
             RowSetBlock(
                 label=BLOCK_LABELS[row_set.key], dates=dates, site_hours=site_hours, rows=absolute
@@ -486,12 +524,12 @@ def contrasts_not_comparable(*, cams_differences: list[float]) -> str:
 
 
 def leaderboard_figure(*, blocks: list[RowSetBlock]) -> alt.VConcatChart:
-    """Draw Figure 1, the leaderboard of the four row sets."""
+    """Draw Figure 1, the leaderboard of the five row sets."""
     return stacked_leaderboard(
         blocks=blocks,
         number=FIGURE_NUMBERS["leaderboard"],
         title=(
-            "CAMS has the lowest error of the gridded products tested on each of the four row sets"
+            "CAMS has the lowest error of the gridded products tested on each of the five row sets"
         ),
         subtitle=[
             "Each product's own mean absolute error, sorted best first within its block.",
@@ -504,6 +542,8 @@ def leaderboard_figure(*, blocks: list[RowSetBlock]) -> alt.VConcatChart:
                 f"swing that Figure {FIGURE_NUMBERS['contrasts']}'s paired contrasts cancel."
             ),
             ENS_LEAD,
+            CERRA_LEAD,
+            CERRA_STEP,
             STATION_SCOPE,
             POST_HOC_NOTE,
             DOTS,
@@ -537,6 +577,8 @@ def contrasts_figure(*, blocks: list[RowSetBlock]) -> alt.VConcatChart:
             contrasts_not_comparable(cams_differences=cams),
             CAMS_EXPLORATORY,
             ENS_LEAD,
+            CERRA_LEAD,
+            CERRA_STEP,
             STATION_SCOPE,
             UNEQUAL_LEADS,
             DOTS,

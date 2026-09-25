@@ -24,30 +24,34 @@ It is 8.77% given ICON-DREAM-EU, the German weather service's reanalysis, and 9.
 reanalysis from the European Centre for Medium-Range Weather Forecasts (ECMWF). ICON-D2 is the
 German weather service's model for Germany and neighbouring countries. ICON-D2 has the lowest error
 of all eight weather models on the extra row set, which adds four weather models to the main row
-set's four (exploratory; not paired against ECMWF-IFS-HRES). A satellite observes the clouds of the
+set's four (exploratory; not paired against ECMWF-IFS-HRES). On the CERRA row set, the error is
+9.164% of capacity given CERRA, the Copernicus regional reanalysis for Europe, against 9.135% given
+ERA5 (planned; not statistically significant at the 5% level), and 4.045 points above CAMS's 5.118%
+(planned). A satellite observes the clouds of the
 hour itself, where every weather model and reanalysis simulates them from a run started before the
 hour, so a large gap is expected. The satellites cannot serve the live service, however: CAMS
 arrives about 1 day after the hour, and SARAH-3 2 to 5 days after it, by manual order.
 
-**The evidence is six farms in one 25 km by 23 km box, scored on four headline row sets that each
-hold a different subset of the 14 products (the eight main-row-set products plus six more), so an
+**The evidence is six farms in one 25 km by 23 km box, scored on five headline row sets that each
+hold a different subset of the 15 products (the eight main-row-set products plus seven more), so an
 absolute error on one row set is not comparable with an error on another.** Figure 1 draws one block
-for each of the four headline row sets: the main row set (December 2022 to August 2026, 76,727
+for each of the five headline row sets: the main row set (December 2022 to August 2026, 76,727
 site-hours), the extra row set (November 2024 to August 2026, 40,243 site-hours), the ENS row set
-(April 2024 to September 2026, 54,447 site-hours), and the weather-station row set (December 2022 to
-December 2025, 60,033 site-hours). A fifth, the record row set from January 2021, feeds only Figures
-7 and 8. A difference between two errors is in percentage points of capacity, written "points", and
-a bracketed pair after a figure, such as [2.42, 2.90], is its 95% interval. A weather model's value
-"as served" is the value Open-Meteo's archive holds for an hour, which comes from a run of the
-weather model that started a few hours earlier. Overlapping intervals in Figure 1 do not make two
-products equal, because Figure 2 tests each gap on the same hours. The lower panel of each block of
-Figure 2 holds that row set's planned contrasts, which were written down before any result existed.
-Hours near sunrise where Open-Meteo's UKV archive holds a physically impossible value are left out
-for every product; see [Limitations](#limitations). Absolute errors on the extra row set are
-slightly pessimistic, for a reason the Limitations section gives, and everything on this page holds
-only for six farms in Lincolnshire.
+(April 2024 to September 2026, 54,447 site-hours), the weather-station row set (December 2022 to
+December 2025, 60,033 site-hours), and the CERRA row set (December 2022 to June 2026, 72,105
+site-hours). A sixth, the record row set from January 2021, feeds only Figures 7 and 8. A difference
+between two errors is in percentage points of capacity, written "points", and a bracketed pair after
+a figure, such as [2.42, 2.90], is its 95% interval. A weather model's value "as served" is the
+value Open-Meteo's archive holds for an hour, which comes from a run of the weather model that
+started a few hours earlier. Overlapping intervals in Figure 1 do not make two products equal,
+because Figure 2 tests each gap on the same hours. The lower panel of each block of Figure 2 holds
+that row set's planned contrasts, which were written down before any result existed. Hours near
+sunrise where Open-Meteo's UKV archive holds a physically impossible value are left out for every
+product on every row set, the CERRA row set included; see [Limitations](#limitations). Absolute
+errors on the extra row set are slightly pessimistic, for a reason the Limitations section gives,
+and everything on this page holds only for six farms in Lincolnshire.
 
-![Figure 1: CAMS has the lowest error of the gridded products tested on each of the four row sets](../assets/sunshine_leaderboard.svg)
+![Figure 1: CAMS has the lowest error of the gridded products tested on each of the five row sets](../assets/sunshine_leaderboard.svg)
 
 ![Figure 2: CAMS beats ERA5 by 3.7 to 4.1 points in each block (exploratory). The lower panel of
 each block holds that row set's planned contrasts](../assets/sunshine_contrasts.svg)
@@ -110,7 +114,7 @@ Figure 2, can therefore still differ by a margin that is statistically significa
 Only a contrast pairing those two products tests them directly, and the lower panel of each block of
 Figure 2 holds that row set's planned contrasts.
 
-<!-- SLOT: CERRA solar and WeatherNext 3 each add one Key findings bullet here -->
+<!-- SLOT: WeatherNext 3 adds one Key findings bullet here -->
 
 - **On the main row set, CAMS beats ICON-D2, the best of the four weather models tested, by 2.68
   points [2.42, 2.90] (planned), and the gap holds at every generator, in every season, and in each
@@ -187,6 +191,13 @@ Figure 2 holds that row set's planned contrasts.
   day so that it keeps the station's monthly average and loses its hour-to-hour weather. See [The
   nearest station is a worse input than CAMS and a better input than
   ERA5](#the-nearest-station-is-a-worse-input-than-cams-and-a-better-input-than-era5).
+- **On the CERRA row set, an XGBoost model given CERRA's global irradiance is no better than one
+  given ERA5, and trails one given CAMS by 4.045 points [3.700, 4.382] (both planned).** CERRA's
+  error is 9.164%, against 9.135% given ERA5 and 5.118% given CAMS. CERRA's error minus ERA5's is
+  +0.029 points [-0.251, +0.341], which is not statistically significant at the 5% level at either
+  XGBoost setting, and CERRA's own direct beam against Erbs separation, and CERRA against ERA5
+  averaged to 3-hour steps, are unresolved. See [CERRA is no better than ERA5, and trails CAMS by
+  about 4 points](#cerra-is-no-better-than-era5-and-trails-cams-by-about-4-points).
 
 ## Introduction
 
@@ -196,9 +207,9 @@ electricity customers. Capacity estimation infers a generator's size from how it
 sunshine. Training history is the years of past weather that pre-training a forecasting model needs.
 Historical features give a forecasting model the weather of hours already past. Disaggregation
 separates hidden solar generation from demand at a substation. Each consumer reads one weather
-product, and the project has to choose which. This page measures how well 14 products, including
-ECMWF ENS and nearby weather stations, describe past sunshine at six metered solar farms, and says
-which product each consumer should read.
+product, and the project has to choose which. This page measures how well 15 products, including
+ECMWF ENS, CERRA, and nearby weather stations, describe past sunshine at six metered solar farms,
+and says which product each consumer should read.
 
 **The products differ in how far ahead each value was forecast and in what area they cover, as well
 as in accuracy, and both properties matter to a consumer.** A weather model run is one of the
@@ -230,20 +241,23 @@ The map also draws AROME France, which this page does not test](../../roadmap/as
 | KNMI HARMONIE-AROME | The same UWC-West HARMONIE-AROME run, as distributed hourly by the Royal Netherlands Meteorological Institute (KNMI) | not measured here; KNMI and Open-Meteo document an hourly update, which would give 1 hour | yes | 2 km model, distributed on a reduced 0.05° grid, about 5.5 km | July 2024; read here from November 2024 | not established |
 | ECMWF ENS (`T+3` band) | ECMWF's 51-member global ensemble forecast, from Dynamical.org's IFS ENS catalogue, which archives only the 00 UTC run of ENS's four daily runs; a forecast from a 00 UTC run, where ERA5 and ECMWF-IFS-HRES also serve forecast leads of 1 to 12 hours | 3 to 21 hours, its shortest available band in this download; 5 to 20 hours on the hours scored here | yes | about 9 km native (O1280); served on the open-data 0.25° grid, about 28 km north to south here, and read as the overlap-weighted mean of the 0.25° cells that each generator's H3 resolution-5 cell overlaps | April 2024 | about 09:00 UTC on the run's day, from Dynamical.org's archive, as the [ENS horizons study](../forecasts/ens-horizons.md) finds; ECMWF disseminates the run's steps 0 to 90 by about 06:55 UTC |
 | Met Office weather stations (MIDAS Open, the open release of the Met Office Integrated Data Archive System) | Observations from Met Office stations, read one station at a time, not as a gridded product: the 10 radiation stations and 38 air-temperature stations downloaded for these studies, a subset of the Met Office's network of weather stations; some of the air-temperature stations report only once a day | no forecast step (an observation of the hour itself) | no: sparse points across the UK, and the nearest radiation station is 17 to 31 km from a farm | point observations at each station | 2017; the files read here end on 2025-12-31 | not established; MIDAS Open `dataset-version-202607` ends on 2025-12-31 |
+| CERRA | Copernicus regional reanalysis for Europe, run with the HARMONIE-ALADIN weather model and three-dimensional variational data assimilation, forced by ERA5 ([Ridal et al., 2024](https://doi.org/10.1002/qj.4764)) | 0 to 3 hours after each 3-hourly analysis: the download holds 3-hour accumulations only, each the mean over the 3 hours ending at 00, 03, ..., or 21 UTC | yes (the domain covers all of Europe) | 5.5 km native; read at each generator's nearest of 190 cells, 1.0 km to 3.5 km away (pooled range) | September 1984; read here from December 2022 | about 12 weeks on 2026-09-23 |
 
-<!-- SLOT: CERRA solar and WeatherNext 3 each add one row to this products table, and the count of
-14 products changes in each place it is written -->
+<!-- SLOT: WeatherNext 3 adds one row to this products table, and the count of products (15) changes
+in each place it is written -->
 
-**Most of the latencies come from each service's own documentation:** CAMS's [radiation-service
+**Most of the latencies come from each service's own documentation, and CERRA's latency is the
+[weather-products
+survey's](../../background/weather-products-survey.md#reanalyses-hindcasts-and-satellite-retrievals)
+check of the Copernicus Climate Data Store on 2026-09-23:** CAMS's [radiation-service
 notes](https://confluence.ecmwf.int/x/jOLjDw), the [ERA5 dataset
 page](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels?tab=overview),
 Open-Meteo's [UKV documentation](https://open-meteo.com/en/docs/ukmo-api), and the publication times
-of the German weather service's own open-data files for ICON-D2, ICON-EU and ICON global.
-SARAH-3 is CM SAF's [Surface Solar Radiation Data Set – Heliosat, Edition
-3](https://doi.org/10.5676/EUM_SAF_CM/SARAH/V003), published by the European Organisation for
-the Exploitation of Meteorological Satellites (EUMETSAT) and available by manual order from CM
-SAF; its 2-to-5-day figure is this project's own tracking, cross-referenced in the
-[disaggregation
+of the German weather service's own open-data files for ICON-D2, ICON-EU and ICON global. SARAH-3 is
+CM SAF's [Surface Solar Radiation Data Set – Heliosat, Edition
+3](https://doi.org/10.5676/EUM_SAF_CM/SARAH/V003), published by the European Organisation for the
+Exploitation of Meteorological Satellites (EUMETSAT) and available by manual order from CM SAF; its
+2-to-5-day figure is this project's own tracking, cross-referenced in the [disaggregation
 roadmap](../../roadmap/disaggregation.md#an-irradiance-nowcast-would-be-a-more-useful-product), not
 a figure CM SAF itself publishes. DWD publishes ICON-DREAM-EU a month at a time, after the month
 ends: its readme states 2 to 3 months' delay, but August 2026 was on DWD's server by 23 September
@@ -365,11 +379,11 @@ irradiance alone.**
   hours it rates as reliable. The main row set holds 76,727 site-hours.
 - **Record.** The year-by-year comparison with ERA5 and SARAH-3's comparison by satellite use the
   record row set, described under [Row sets](methods.md#row-sets).
-- **Extra, ENS, and Stations.** The extra Open-Meteo models, ECMWF ENS, and the Met Office weather
-  stations are each scored on their own row set, described under [the row set of the four extra
-  Open-Meteo models](#row-set-of-the-four-extra-open-meteo-models), [the ECMWF ENS
-  arms](#the-ecmwf-ens-arms), and [the weather-station arms](#the-weather-station-arms). The
-  [Methods page](methods.md#row-sets) lists all five row sets.
+- **Extra, ENS, Stations, and CERRA.** The extra Open-Meteo models, ECMWF ENS, the Met Office
+  weather stations, and CERRA are each scored on their own row set, described under [the row set of
+  the four extra Open-Meteo models](#row-set-of-the-four-extra-open-meteo-models), [the ECMWF ENS
+  arms](#the-ecmwf-ens-arms), [the weather-station arms](#the-weather-station-arms), and [the CERRA
+  arms](#the-cerra-arms). The [Methods page](methods.md#row-sets) lists all six row sets.
 - **One treatment of UKV's change of source.** Open-Meteo's UKV archive before 12 August 2024 is a
   backfill from a source Open-Meteo does not name. Every product's comparison with ERA5 is also
   reported on the hours since that date, and no XGBoost model is told which side of the date an hour
@@ -386,13 +400,13 @@ irradiance alone.**
   is likely too narrow, and each section that quotes such an interval says how many months it rests
   on.
 - **Six planned contrasts on the main row set, three more on the extra row set, two more on the ENS
-  row set, and three more on the weather-station row set.** The [Methods
-  page](methods.md#planned-and-exploratory-comparisons) defines planned and exploratory comparisons
-  and lists the [14 planned contrasts](methods.md#the-14-planned-contrasts). Each planned contrast
-  is also refitted with a second set of XGBoost settings, and the second-setting figure is printed
-  beside the contrast. Every other figure on this page is exploratory. The UKV snapshot rebuilds,
-  the hour-by-hour and by-lead breakdowns, and the split of ICON global by lead are post hoc: they
-  were added after the first run.
+  row set, three more on the weather-station row set, and four more on the CERRA row set.** The
+  [Methods page](methods.md#planned-and-exploratory-comparisons) defines planned and exploratory
+  comparisons and lists the [18 planned contrasts](methods.md#the-18-planned-contrasts). Each
+  planned contrast is also refitted with a second set of XGBoost settings, and the second-setting
+  figure is printed beside the contrast. Every other figure on this page is exploratory. The UKV
+  snapshot rebuilds, the hour-by-hour and by-lead breakdowns, and the split of ICON global by lead
+  are post hoc: they were added after the first run.
 
 The [Methods page](methods.md#bootstrap-intervals) says where the fold-cutting and bootstrap code
 lives and how it is tested.
@@ -509,7 +523,7 @@ between the steps, then multiplies the ratio by each hour's clear-sky radiation.
 **Two contrasts are planned: ENS's mean-of-members forecast against ERA5, and against CAMS.** Both
 contrasts, the `T+3` band, the member mean, and the clear-sky-index reconstruction were fixed in the
 written instructions for the first run, before the first model was fitted. Those instructions are a
-working file outside the repository, so, unlike the other 12 planned contrasts, the repository does
+working file outside the repository, so, unlike the other 16 planned contrasts, the repository does
 not record the ordering. ERA5's and CAMS's results on the main row set were published before ENS was
 planned, so a large gap between ENS and CAMS was predictable. Every other comparison in the ENS
 results is exploratory.
@@ -627,6 +641,85 @@ with `colsample_bytree` at 1, so every tree sees every column. The three excepti
 with a shuffled station column against plain CAMS, ERA5 padded the same way against plain ERA5, and
 the blend against plain CAMS. The report prints every arm's feature columns. The nearest-station arm
 reads the station's air temperature where the CAMS and ERA5 arms read ERA5's air temperature.
+
+### The CERRA arms
+
+**CERRA is scored on its own row set, from 3-hour accumulations that are rebuilt to hourly values,
+and every XGBoost model there carries eight feature columns, except the two given CERRA's split of
+global irradiance into direct beam and diffuse light, which carry ten.** CERRA is the Copernicus
+regional reanalysis for Europe, on a 5.5 km grid, forced by ERA5
+([Ridal et al., 2024](https://doi.org/10.1002/qj.4764)). Its
+[dataset page](https://cds.climate.copernicus.eu/datasets/reanalysis-cerra-single-levels) documents
+the fields. The download holds two of them: global irradiance on a horizontal surface, and the
+producer's own direct beam. The dataset page does not say whether the direct beam is measured on a
+horizontal surface; the data are consistent with a horizontal surface, because the direct beam never
+exceeds global irradiance in a scored hour. Both are forecast fields, accumulated over 3
+hours, and the download holds forecast lead 3 only. Each value is therefore the energy over the
+window (valid time minus 3 hours, valid time], with valid times at 00, 03, ..., and 21 UTC only.
+Dividing by the 10,800 seconds of a window gives the window's mean flux in W m⁻².
+
+**The download holds no diffuse, temperature, or cloud field, so diffuse light is global irradiance
+minus direct beam, and every XGBoost model reads ERA5's air temperature.** ERA5's air temperature is
+the shared feature every product on this page reads. CERRA's direct beam exceeds its global
+irradiance in none of the scored hours, so no diffuse value is clipped to zero. The row set covers
+190 CERRA grid cells, and each generator is read at its nearest cell, 1.0 km to 3.5 km away (pooled
+range).
+
+**The rebuild from 3-hour windows to hourly values is a model, and its measured limit is that the
+rebuilt hours do not conserve each window's energy.** The rebuild is the clear-sky-index
+reconstruction used for ENS's steps: the ratio of irradiance to clear-sky irradiance is interpolated
+between the midpoints of neighbouring windows, then multiplied by each hour's clear-sky irradiance,
+with no rescaling to the window mean. For windows whose mean is at least 50 W m⁻², the mean of a
+window's three rebuilt hours differs from the window mean by more than 10% in 10.3% of CERRA's
+global-irradiance windows and in 26.0% of CERRA's direct-beam windows (median gaps 3.01% and 5.27%).
+CERRA's hourly values inside a window are therefore not CERRA's own values. The report checks that
+the clear-day composite of the rebuilt CERRA peaks in the same hour as ERA5's (12:00 UTC for both),
+and stops the run otherwise.
+
+**ERA5 and CAMS are given the same 3-hour treatment, so that CERRA can be compared with the step
+width matched.** The two extra XGBoost models take ERA5's and CAMS's hourly means, average each over
+CERRA's own windows, and rebuild hourly values with the same function. Both are written "averaged to
+3-hour steps" on this page. ERA5 and CAMS at their hourly values are also refitted on this row set.
+Seven XGBoost models are fitted per generator:
+
+- **CERRA:** global irradiance rebuilt to hourly values.
+- **CERRA with its own direct beam:** rebuilt global irradiance, rebuilt direct beam, and diffuse
+  light as their difference (10 columns).
+- **CERRA with Erbs separation:** rebuilt global irradiance, with the direct beam and diffuse light
+  estimated by the [Erbs et al. (1982)](https://doi.org/10.1016/0038-092X(82)90302-4) correlation
+  (10 columns).
+- **ERA5 and CAMS:** each product's hourly global irradiance.
+- **ERA5 averaged to 3-hour steps and CAMS averaged to 3-hour steps:** as above.
+
+**The CERRA row set holds 72,105 site-hours from 2022-12-01 to 2026-06-30, and 71,934 of them are
+also in the main row set.** The row set is the main study's 77,616 common site-hours, cut to those
+ending at or before CERRA's last window, which ends at 2026-07-01 00:00 UTC, and to hours where
+CERRA, ERA5, and CAMS all have a value. Those 77,616 site-hours are joined from six of the main row
+set's eight products, UKV among them, so the rule that removes physically impossible UKV sunrise
+values applies to the CERRA row set as it does to the main row set. The main row set also requires
+a SARAH-3 and an ICON-DREAM-EU value, which the CERRA row set does not, so each of the 171
+site-hours outside the main row set lacks at least one of those two values. The hours span 43
+calendar months. The CERRA row set ends two months before the main row set does, on 2026-08-31.
+
+**The folds are cut so that every scored hour's calendar month occurs in the training rows.** The
+folds are cut inside two eras, one starting in December 2022 and one in February 2026 (after the Met
+Office's UKV upgrade), with offsets chosen so that 0.0% of the scored hours fall in a calendar month
+with no training row. Under the main row set's own published folds, carried over to these rows,
+1.1% would. A further 322 scored hours sit in a calendar month that occurs in one year only for
+their generator, which no fold design can cover.
+
+**Four contrasts are planned, and every other contrast is exploratory.** The four were written into
+the study plan before the first fit, and each is refitted at the second XGBoost setting:
+
+1. CERRA against ERA5.
+2. CERRA against CAMS.
+3. CERRA against ERA5 averaged to 3-hour steps, which matches the step width but not the grid
+   spacing, radiation scheme, or lead.
+4. CERRA with its own direct beam against CERRA with Erbs separation.
+
+Contrasts 1 and 2 compare CERRA with products read at hourly values, so they differ from the
+comparison by more than the product: CERRA's step width, grid spacing, radiation scheme, and lead
+also differ. The page does not read either gap as CERRA's physics alone.
 
 ## Results
 
@@ -1183,6 +1276,56 @@ stated under [The ECMWF ENS arms](#the-ecmwf-ens-arms).
 
 <!-- SLOT: WeatherNext 3 follows the ENS results here -->
 
+### CERRA is no better than ERA5, and trails CAMS by about 4 points
+
+**On the CERRA row set, an XGBoost model given CERRA's global irradiance has a mean absolute error
+of 9.164% of capacity [8.675, 9.600], no better than the 9.135% [8.630, 9.576] of one given ERA5:
+the difference is +0.029 points [-0.251, +0.341] (planned).** The difference is not statistically
+significant at the 5% level at either XGBoost setting: at the second setting it is -0.007 points
+[-0.289, +0.287]. An advantage for CERRA as large as 0.25 points (0.29 at the second setting) is
+therefore not excluded. Among the six generators, CERRA is worse than ERA5 at generator E by 0.661
+points [+0.207, +1.142] (exploratory) and not significantly different at the other five, where the
+signs differ.
+
+| XGBoost model given | Error (% of capacity) | 95% interval |
+|---|---|---|
+| CAMS | 5.118 | [4.872, 5.358] |
+| CAMS averaged to 3-hour steps | 5.900 | [5.594, 6.183] |
+| ERA5 averaged to 3-hour steps | 8.839 | [8.343, 9.274] |
+| CERRA with Erbs separation | 9.087 | [8.601, 9.514] |
+| CERRA with its own direct beam | 9.129 | [8.639, 9.567] |
+| ERA5 | 9.135 | [8.630, 9.576] |
+| CERRA | 9.164 | [8.675, 9.600] |
+
+Figures 1 and 2 draw the CERRA row set as their fifth block. The intervals in the table resample 43
+months and are not comparable with the intervals of another row set.
+
+**CAMS beats CERRA by 4.045 points [3.700, 4.382] (planned, statistically significant at the 5% level),
+and the gap holds at the second setting, 3.949 points [3.598, 4.284].** The gap holds at each of the
+six generators, from 3.717 to 4.634 points (exploratory). CAMS also beats CERRA when CAMS is
+averaged to 3-hour steps: by 3.264 points [2.947, 3.589] (exploratory). Averaging to 3-hour steps
+therefore does not explain most of the gap between CERRA and CAMS.
+
+**The contrast of CERRA with ERA5 averaged to 3-hour steps is unresolved, because the two XGBoost
+settings disagree.** The contrast is +0.325 points [+0.030, +0.635] (planned) at the first setting,
+which is statistically significant at the 5% level, and +0.273 points [-0.015, +0.575] at the
+second, which is not. The page claims no sign for it. The step width alone moves ERA5's error: ERA5
+at hourly values is 0.296 points worse than ERA5 averaged to 3-hour steps [0.232, 0.362] (9.164%
+against 8.839%; exploratory; +0.280 [+0.225, +0.340] at the second setting), close to the 0.287
+points measured on ENS's step phase under [Averaging ERA5 and CAMS over 3-hour
+steps](#averaging-era5-and-cams-over-3-hour-steps-narrows-both-of-enss-gaps), but a separate
+measurement on CERRA's own windows. CAMS at hourly values is 0.781 points better than CAMS averaged
+to 3-hour steps [0.673, 0.881] (exploratory; 5.900% for CAMS averaged to 3-hour steps).
+
+**CERRA's own direct beam against Erbs separation is unresolved, because the two XGBoost settings
+disagree.** An XGBoost model given CERRA with its own direct beam scores 9.129% and one given CERRA
+with Erbs separation scores 9.087%. The difference is +0.042 points [-0.003, +0.091] (planned) at
+the first setting and +0.047 points [+0.003, +0.098] at the second, where it is statistically
+significant at the 5% level. The two settings disagree, so the page claims no sign for it. The
+difference is of the same size as the gains for other products in [A product's own direct beam
+adds little on the main row set](#a-products-own-direct-beam-adds-little-on-the-main-row-set),
+which are 0.03 to 0.10 points.
+
 ### The nearest station is a worse input than CAMS and a better input than ERA5
 
 **On the station row set, at six solar farms in Lincolnshire, an XGBoost model given the nearest Met
@@ -1526,6 +1669,18 @@ product?](blending.md#solar-a-blend-beats-cams-given-its-neighbouring-hours)**
   extra row set's other seven arms, and its contrasts against ERA5, were not refitted under covering
   folds.
 
+- **The CERRA results rest on 3-hour accumulations rebuilt to hourly values, on a shorter window
+  than the main row set, and on leads that differ.** CERRA's row set holds 72,105 site-hours to
+  2026-06-30, against the main row set's 76,727 to 2026-08-31, so the page compares CERRA only with
+  ERA5 and CAMS refitted on the CERRA row set (9.135% and 5.118%, against 9.080% and 5.085% on the
+  main row set). The 3-hour step is matched only in the contrast of CERRA with ERA5 averaged to
+  3-hour steps, which the two settings leave unresolved; the contrasts with ERA5 and with CAMS at
+  hourly values carry the step width as well. CERRA's lead is the window's own span, 0 to 3 hours
+  after each analysis, against ERA5's radiation forecasts of 1 to 12 hours, and the page makes no
+  comparison at matched lead. The rebuild does not conserve each window's energy (see [The CERRA
+  arms](#the-cerra-arms)), so a better rebuild, or the hourly values of forecast leads 1 and 2,
+  which the download does not hold, could change CERRA's error.
+
 ## Scope
 
 **The page says nothing about wind, forecast leads, the spread of ENS members, regions other than
@@ -1543,8 +1698,11 @@ Lincolnshire, or a comparison of ENS or the weather stations with every other pr
   are scored, and the spread is what makes ENS a probabilistic forecast.
 - **Regions other than Lincolnshire are not covered,** as [Limitations](#limitations) explains.
 
-<!-- SLOT: CERRA solar and WeatherNext 3 each add one Scope bullet here if the product leaves a use
-unscored -->
+- **CERRA is not scored for consumers that need a recent hour.** CERRA arrives about 12 weeks after
+  the hour it describes (on 2026-09-23), so the page says nothing about CERRA for historical features
+  in the live service.
+
+<!-- SLOT: WeatherNext 3 adds one Scope bullet here if the product leaves a use unscored -->
 
 ## Data and code availability
 
@@ -1560,7 +1718,7 @@ in `packages/studies/`.
 - **Private inputs:** the six generators' metered output and coordinates (the generators appear only
   as A to F), the `effective_capacity` table, and the station-to-farm mapping, which is withheld
   because it would narrow where a metered generator is.
-- **Planned contrasts:** the 12 planned contrasts other than ENS's were recorded in the study plans
+- **Planned contrasts:** the 16 planned contrasts other than ENS's were recorded in the study plans
   in the repository's git history, and the two ENS contrasts were fixed in a working file outside
   the repository, so their ordering is not public.
 - **XGBoost:** version 3.4.1. The primary setting is `max_depth` 6, `learning_rate` 0.05,
@@ -1570,7 +1728,11 @@ in `packages/studies/`.
   stopping. Each fit is repeated with three seeds. The settings are
   `studies.cross_validation.PRIMARY_HYPER_PARAMETERS` and `SENSITIVITY_HYPER_PARAMETERS`.
 
-<!-- SLOT: CERRA solar and WeatherNext 3 each add one source line here -->
+- **CERRA:** from the Copernicus Climate Data Store's [CERRA single-levels
+  dataset](https://cds.climate.copernicus.eu/datasets/reanalysis-cerra-single-levels), under a CC BY
+  4.0 licence. The download holds forecast lead 3 only.
+
+<!-- SLOT: WeatherNext 3 adds one source line here -->
 
 ## Reproducing the figures
 
@@ -1597,6 +1759,7 @@ studies/beam_diffuse_split/ens_past_solar.py uv run python
 studies/beam_diffuse_split/ens_past_solar_charts.py uv run python
 studies/beam_diffuse_split/station_past_solar.py uv run python
 studies/beam_diffuse_split/station_past_solar_charts.py uv run python
+studies/beam_diffuse_split/cerra_past_solar.py uv run python
 studies/beam_diffuse_split/past_solar_leaderboard.py uv run python
 studies/beam_diffuse_split/past_solar_leaderboard_charts.py ```
 
@@ -1625,6 +1788,11 @@ fetch needed) and the saved solar dataset that `weather_products.py` writes, and
 to `past_weather_v2/ens_past_solar/report.md`. `--report-only` rebuilds the report from the saved
 losses without refitting, checking a fingerprint against what a fresh run would now fit.
 
+The CERRA script `cerra_past_solar.py` reads the CERRA files under `data/studies/weather/CERRA/`,
+fits every XGBoost model, and writes `report.md`, `losses.parquet`, and `losses.fingerprint` to
+`data/studies/beam_diffuse_split/past_weather_v2/cerra_past_solar/`. It refuses to overwrite an
+existing output.
+
 The weather-station scripts are `station_past_solar.py`, which builds the row set, fits every arm,
 and writes `report.md` and `losses.parquet` to
 `data/studies/beam_diffuse_split/past_weather_v2/station_past_solar/`, and
@@ -1632,6 +1800,6 @@ and writes `report.md` and `losses.parquet` to
 the saved report matches the report the current code produces. The MIDAS Open files come from
 `studies/weather_downloads/fetch_midas_open.py`. `past_solar_leaderboard.py` reads every row set's
 saved losses and writes the leaderboard report that Figures 1 and 2 come from, to
-`data/studies/beam_diffuse_split/past_weather_v2/solar_leaderboard_2/report.md`;
+`data/studies/beam_diffuse_split/past_weather_v2/solar_leaderboard_3/report.md`;
 `past_solar_leaderboard_charts.py` draws them. The two post hoc UKV rebuilds appear in the charts as
 "UKV, snapshot mean" and "UKV, both snapshots".
