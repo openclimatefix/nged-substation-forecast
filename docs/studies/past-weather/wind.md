@@ -118,13 +118,13 @@ from the freshest run of that weather model that Open-Meteo's archive holds for 
   [−0.24, +0.15] on the rows from December 2024, against −0.27 points [−0.40, −0.12] in the planned
   contrast. ENS day 0 minus ERA5, an exploratory contrast, is −0.07 points [−0.19, +0.06] in the
   study's own design. That interval bounds the difference and does not show that the two products
-  are equal. The figure for the same contrast on the [ENS forecast horizons
-  page](../forecasts/ens-horizons.md), +0.170 points [+0.021, +0.322], comes from different rows and
-  folds. An era cut gives the XGBoost model a separate era code and separate folds on each side of 1
-  December 2024, the first whole month after the upgrade. It changes ENS day 0 minus ERA5 by −0.16
-  points [−0.27, −0.06] on the rows from 12 August 2024. Three wind farms are few independent sites,
-  so these intervals describe these farms and this window only. See [How ECMWF's HRES and ENS day 0
-  compare with UKV and ERA5](#how-ecmwfs-hres-and-ens-day-0-compare-with-ukv-and-era5).
+  are equal. The [ENS forecast horizons page](../forecasts/ens-horizons.md) also finds this contrast
+  not statistically significant, on its own wind rows from 1 December 2024. An era cut gives the
+  XGBoost model a separate era code and separate folds on each side of 1 December 2024, the first
+  whole month after the upgrade. It changes ENS day 0 minus ERA5 by −0.16 points [−0.27, −0.06] on
+  the rows from 12 August 2024. Three wind farms are few independent sites, so these intervals
+  describe these farms and this window only. See [How ECMWF's HRES and ENS day 0 compare with UKV
+  and ERA5](#how-ecmwfs-hres-and-ens-day-0-compare-with-ukv-and-era5).
 - **At three farms over 17 months (34,156 farm-hours), one nearby 10 m weather station gives a
   larger error than ERA5's 10 m wind by 0.99 points [0.59, 1.45], and lowers UKV's error by 0.64
   points [0.46, 0.81] against a control with the same number of columns.** The 0.99 points is
@@ -983,27 +983,27 @@ years. The report counts the cells whose held-out month has no training row from
 study's design leaves 0 cells, as do the study's folds with a two-valued era code and the design
 with an extra cut at IFS Cycle 50r1. Three eras with no fold rotation leave 6 cells (July and
 September), and two UKV eras, the rest of the page's design, leave 12 (February, April, May, and
-June). On the longer row set, the horizons page's own folds leave 6 (June and July), and the other
-two long-row designs leave 0. In the study's design the covered cell with the fewest training rows
-holds 229 training rows, for September at one farm, where 680 rows are scored.
+June). On the longer row set, the horizons page's folds before their rotation leave 6 (June and
+July), and the other two long-row designs leave 0. In the study's design the covered cell with the
+fewest training rows holds 229 training rows, for September at one farm, where 680 rows are scored.
 
 ![Figure 16: Each planned contrast keeps its sign and stays statistically significant at the 5%
 level under five fold designs and one row subset](../assets/ens_hres_wind_robustness.svg)
 
-**The ENS horizons page's figure for ENS day 0 against ERA5 differs from this section's because the
-two differ in row set and in how the folds treat IFS Cycle 49r1, and the era cut moves the result
-more than the fold numbering does.** The horizons page reports ENS day 0 minus ERA5 as +0.170 points
-[+0.021, +0.322] on 50,268 farm-hours from 12 August 2024. This section finds −0.07 points [−0.19,
-+0.06] on 43,555 farm-hours from 1 December 2024. The 466 farm-hours that the horizons inputs hold
-no power for, 299 in November 2025 and 167 in June 2026, explain the difference in row count. Three
-refits on the page's own rows from 12 August 2024 (50,734 farm-hours in 26 calendar months) separate
-the causes:
+**The ENS horizons page's figure for ENS day 0 against ERA5 agrees with this section's because its
+wind rows start on 1 December 2024 and its folds cover every calendar month that occurs in two or
+more years, and the era cut moves the result more than the fold numbering does.** This section
+finds −0.07 points [−0.19, +0.06] on 43,555 farm-hours from 1 December 2024. The horizons inputs
+hold no power for 466 of those farm-hours, 299 in November 2025 and 167 in June 2026, so the
+horizons page scores fewer farm-hours. Three refits on this page's own rows from 12 August 2024
+(50,734 farm-hours in 26 calendar months) show what the era cut and the fold numbering change when
+the rows begin before the upgrade:
 
-- **The horizons page's folds.** The first refit uses the horizons page's folds, which do not cut at
-  IFS Cycle 49r1, and gives +0.16 points [+0.01, +0.31] for this study's ENS wind and +0.17 points
-  [+0.03, +0.32] for the horizons page's own combination, which closely reproduces the published
-  +0.170 (on 50,734 rather than 50,268 farm-hours). Scoring only the rows from 1 December 2024 under
-  those folds gives +0.10 points [−0.05, +0.25].
+- **The horizons page's folds before their rotation.** The first refit uses the fold numbering the
+  horizons page used before it rotated the post-upgrade folds, which does not cut at IFS Cycle 49r1,
+  and gives +0.16 points [+0.01, +0.31] for this study's ENS wind and +0.17 points [+0.03, +0.32]
+  for the horizons page's own combination of upsampling techniques. Scoring only the rows from 1
+  December 2024 under those folds gives +0.10 points [−0.05, +0.25].
 - **Two eras, rotated folds.** The second refit keeps the two eras and rotates the folds of the
   second era, and gives +0.147 points [−0.005, +0.302] on all rows and +0.08 points [−0.07, +0.25]
   from December. For the horizons page's own combination the second refit gives +0.16 points [+0.01,
@@ -1011,11 +1011,10 @@ the causes:
 - **One era cut at 1 December 2024.** The third refit adds one era cut at 1 December 2024, and gives
   +0.00 points [−0.12, +0.13] on all rows and −0.01 points [−0.14, +0.14] from December.
 
-The horizons page's folds leave 6 cells without training rows (June and July), and the other two
-designs leave 0. These refits are exploratory, added after the first results. Three wind farms are
-few independent sites, so these intervals describe these farms and this window only.
-[Issue #892](https://github.com/openclimatefix/nged-substation-forecast/issues/892) tracks the
-horizons page's treatment of the cycle change.
+The horizons page's folds before their rotation leave 6 cells without training rows (June and
+July), and the other two designs leave 0. These refits are exploratory, added after the first
+results. Three wind farms are few independent sites, so these intervals describe these farms and
+this window only.
 
 **Paired differences between the designs separate the era cut from the fold numbering.** Each figure
 below is one design's contrast minus another design's contrast on the same rows and seeds, from the
@@ -1037,17 +1036,17 @@ an effect of its own.
 
 **In exploratory refits, HRES's lead over ERA5 is no longer statistically significant at the 5%
 level when the XGBoost model trains across IFS Cycle 49r1 without an era cut.** HRES minus ERA5 is
-+0.05 points [−0.14, +0.26] on all rows from 12 August 2024 with the horizons page's folds, and
-−0.06 points [−0.24, +0.15] on the rows from December. With the two eras and rotated folds, HRES
-minus ERA5 is +0.03 points [−0.18, +0.26] on all rows and −0.09 points [−0.27, +0.14] from December.
-With the extra era cut, HRES minus ERA5 is −0.19 points [−0.32, −0.04] on all rows and −0.23 points
-[−0.37, −0.06] from December. Paired, rotating the folds changes HRES minus ERA5 by −0.02 points
-[−0.07, +0.02] on all rows and −0.03 points [−0.08, +0.02] from December, and adding the cut changes
-it by −0.23 points [−0.39, −0.08] and −0.15 points [−0.28, −0.03]. HRES's advantage over ERA5
-therefore depends on the era cut, not on the fold numbering. On these rows, a training history risks
-losing HRES's advantage over ERA5 if it reads HRES across a cycle change without telling the XGBoost
-model which side each hour falls on. Three wind farms are few independent sites, so these intervals
-describe these farms and this window only.
++0.05 points [−0.14, +0.26] on all rows from 12 August 2024 with the horizons page's folds before
+their rotation, and −0.06 points [−0.24, +0.15] on the rows from December. With the two eras and
+rotated folds, HRES minus ERA5 is +0.03 points [−0.18, +0.26] on all rows and −0.09 points [−0.27,
++0.14] from December. With the extra era cut, HRES minus ERA5 is −0.19 points [−0.32, −0.04] on all
+rows and −0.23 points [−0.37, −0.06] from December. Paired, rotating the folds changes HRES minus
+ERA5 by −0.02 points [−0.07, +0.02] on all rows and −0.03 points [−0.08, +0.02] from December, and
+adding the cut changes it by −0.23 points [−0.39, −0.08] and −0.15 points [−0.28, −0.03]. HRES's
+advantage over ERA5 therefore depends on the era cut, not on the fold numbering. On these rows, a
+training history risks losing HRES's advantage over ERA5 if it reads HRES across a cycle change
+without telling the XGBoost model which side each hour falls on. Three wind farms are few
+independent sites, so these intervals describe these farms and this window only.
 
 ![Figure 17: An extra era cut at 1 December 2024, the first whole month after IFS Cycle
 49r1, changes ENS day 0's and HRES's scores against ERA5 far more than rotating the folds
@@ -1444,8 +1443,8 @@ product?](blending.md#wind-a-blend-beats-ukv-given-its-neighbouring-hours)**
   that holds either month out has no training row for that calendar month. The third era's fold
   numbers are rotated to cover every other calendar month. Three fold designs in the ECMWF section
   keep cells without training rows on purpose, and the report counts them: 6 for three eras with no
-  fold rotation, 12 for the page's two-UKV-era design, and 6 for the horizons page's own folds on
-  the longer row set.
+  fold rotation, 12 for the page's two-UKV-era design, and 6 for the horizons page's folds before
+  their rotation on the longer row set.
 - **ECMWF's products are compared over three farms, with different leads, grids, and archive
   sources.** HRES's archive source changed on 1 October 2025. IFS Cycle 49r1 went live before the
   main row set starts, and Cycle 50r1 went live inside it, on 12 May 2026. An XGBoost model given
