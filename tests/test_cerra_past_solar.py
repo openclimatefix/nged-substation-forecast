@@ -303,12 +303,16 @@ def test_join_rows_drops_hours_after_the_window_end_and_hours_any_product_lacks(
         .otherwise(pl.col("ghi_cams_3h"))
     )
 
-    joined = module.join_rows(
+    joined, lost = module.join_rows(
         base=base, cerra=cerra, era5_3h=era5_3h, cams_3h=cams_3h, window_end=end
     )
 
     assert joined["time"].to_list() == [end]
     assert {"era", "era_code", "fold"}.isdisjoint(joined.columns)
+    assert "main_fold" in joined.columns
+    # The four hours ending at or before the end lose one row at each of three joins in turn: the
+    # hour CERRA lacks, the hour ERA5's copy lacks, and the hour CAMS's copy holds a null for.
+    assert lost == {"cerra": 1, "era5_3h": 1, "cams_3h": 0, "null_or_nan": 1}
 
 
 def test_join_rows_raises_on_a_naive_or_wrongly_united_time_column() -> None:
@@ -455,6 +459,94 @@ def test_folds_raise_where_no_rotation_covers_every_calendar_month() -> None:
         module.choose_fold_offsets(frame=frame)
 
 
+def _clear_day_hours(*, peak: int = 12) -> pl.DataFrame:
+    """Return 3 days of each month of 2025-02 to 06 and 2026-02 to 06, hours ending 1 to 24.
+
+    Every row carries a daylight-shaped `ghi_era5`, `ghi_cams`, the published `month`, and the
+    columns the arms are shown, so the whole row-set tail can run on it.
+    """
+    months = [f"2025-{m:02d}" for m in range(2, 7)] + [f"2026-{m:02d}" for m in range(2, 7)]
+    rows = [
+        {
+            "site": "A",
+            "month": month,
+            "time": datetime(int(month[:4]), int(month[5:]), day, tzinfo=UTC)
+            + timedelta(hours=hour),
+            "ghi_era5": (1.0 + day / 20.0) * max(0.0, 100.0 - 20.0 * abs(hour - peak)),
+        }
+        for month in months
+        for day in (10, 11, 12)
+        for hour in range(1, 25)
+    ]
+    return pl.DataFrame(rows, schema_overrides={"time": UTC_US}).with_columns(
+        ghi_cams=pl.col("ghi_era5") * 0.9, power_mw=1.0, solar_zenith_deg=40.0
+    )
+
+
+def _tail_inputs(*, main_fold_all_zero: bool) -> dict[str, pl.DataFrame]:
+    """Return the four frames `assemble_rows` takes, shaped like the study's own."""
+    module = _load()
+    plain = _clear_day_hours()
+    for column in module.SOLAR.shared_features:
+        if column not in plain.columns and column != "era_code":
+            plain = plain.with_columns(pl.lit(1.0).alias(column))
+    base, _ = module.with_covering_folds(frame=plain)
+    if main_fold_all_zero:
+        base = base.with_columns(fold=pl.lit(0))
+    keys = base.select("site", "time")
+    return {
+        "base": base,
+        "cerra": keys.with_columns(ghi_cerra=base["ghi_era5"], bhi_cerra=base["ghi_era5"] * 0.5),
+        "era5_3h": keys.with_columns(ghi_era5_3h=base["ghi_era5"]),
+        "cams_3h": keys.with_columns(ghi_cams_3h=base["ghi_cams"]),
+    }
+
+
+def test_the_row_set_tail_runs_end_to_end_and_checks_the_columns_after_the_folds_are_cut() -> None:
+    module = _load()
+    inputs = _tail_inputs(main_fold_all_zero=False)
+
+    rows = module.assemble_rows(**inputs)
+
+    assert rows.frame.height == inputs["base"].height
+    assert {"era_code", "fold", "dhi_cerra", "erbs_bhi_cerra"} <= set(rows.frame.columns)
+    assert "main_fold" not in rows.frame.columns
+    assert uncovered_months(coverage=calendar_month_coverage(frame=rows.frame)).is_empty()
+    assert rows.rows_lost == {"cerra": 0, "era5_3h": 0, "cams_3h": 0, "null_or_nan": 0}
+    assert rows.months_dropped == []
+
+
+def test_the_main_rows_uncovered_share_is_taken_on_the_published_fold_column() -> None:
+    module = _load()
+
+    covered = module.assemble_rows(**_tail_inputs(main_fold_all_zero=False))
+    uncovered = module.assemble_rows(**_tail_inputs(main_fold_all_zero=True))
+
+    # A recut of the shorter row set would give the same share whatever the published folds were.
+    assert covered.uncovered_main_folds == 0.0
+    assert uncovered.uncovered_main_folds == 1.0
+
+
+def test_the_report_names_the_rows_each_input_lost_and_the_months_dropped() -> None:
+    module = _load()
+    inputs = _tail_inputs(main_fold_all_zero=False)
+    inputs["cerra"] = inputs["cerra"].filter(pl.col("time").dt.strftime("%Y-%m") != "2025-03")
+
+    rows = module.assemble_rows(**inputs)
+
+    assert rows.rows_lost["cerra"] == 3 * 24
+    assert rows.months_dropped == ["2025-03"]
+
+
+def test_a_missing_value_in_an_arms_column_stops_the_tail_after_the_folds_are_cut() -> None:
+    module = _load()
+    inputs = _tail_inputs(main_fold_all_zero=False)
+    inputs["base"] = inputs["base"].with_columns(temp_c=pl.lit(None, dtype=pl.Float64))
+
+    with pytest.raises(ValueError, match="missing values in columns an arm is shown"):
+        module.assemble_rows(**inputs)
+
+
 def _profile_frame(*, cerra_peak: int, era5_peak: int) -> pl.DataFrame:
     rows = [
         {
@@ -524,8 +616,14 @@ def test_cells_that_differ_from_the_saved_table_stop_the_run_without_naming_a_ce
     assert "21" not in str(error.value)
 
 
-def _synthetic_losses(*, arms: tuple[str, ...]) -> pl.DataFrame:
-    """Return capped fractional losses for every arm at both settings: 2 generators, 8 months."""
+def _synthetic_losses(
+    *, arms: tuple[str, ...], second_setting_arms: tuple[str, ...]
+) -> pl.DataFrame:
+    """Return capped fractional losses: all arms at `pooled`, some at `sensitivity`.
+
+    Only `second_setting_arms` are fitted at `sensitivity`, as `jobs()` fits only the planned
+    contrasts' arms there. There are 2 generators and 8 months.
+    """
     months = [f"2025-{m:02d}" for m in range(1, 9)]
     return pl.DataFrame(
         {
@@ -545,6 +643,7 @@ def _synthetic_losses(*, arms: tuple[str, ...]) -> pl.DataFrame:
         }
         for arm_index, arm in enumerate(arms)
         for setting in ("pooled", "sensitivity")
+        if setting == "pooled" or arm in second_setting_arms
         for site in ("A", "B")
         for index, month in enumerate(months)
         for hour in (10, 11)
@@ -557,7 +656,7 @@ def test_the_report_the_script_writes_is_reproduced_by_the_leaderboard_scoring(
 ) -> None:
     module = _load()
     leaderboard = _load_leaderboard()
-    losses = _synthetic_losses(arms=module.ARM_ORDER)
+    losses = _synthetic_losses(arms=module.ARM_ORDER, second_setting_arms=module.PLANNED_ARMS)
     frame = losses.filter(
         pl.col("arm") == "cerra_global", pl.col("setting") == "pooled", pl.col("seed") == 0
     ).select("site", "time")
@@ -568,6 +667,8 @@ def test_the_report_the_script_writes_is_reproduced_by_the_leaderboard_scoring(
         clipped_diffuse_hours=0,
         fold_offsets={0: 0, 1: 0},
         uncovered_main_folds=0.0,
+        rows_lost={},
+        months_dropped=[],
         rebuilt_negative_shares={},
         window_gaps={},
         grid_cells=1,
@@ -600,6 +701,13 @@ def test_the_report_the_script_writes_is_reproduced_by_the_leaderboard_scoring(
     assert planning["cerra_split"] == "exploratory"
     assert planning["cams_3h"] == "exploratory"
     assert result.planned["second_difference"].null_count() == 0
+    # The exploratory pairs with an arm not refitted at the second setting are named, not scored.
+    assert (
+        "Not fitted at the second setting: cerra_global − cams_3h, cams_global − cams_3h." in report
+    )
+    second = report.split("The same contrasts at the second hyperparameter setting")[1]
+    assert "| sensitivity | era5_global − era5_3h |" in second
+    assert "| sensitivity | cerra_global − cams_3h |" not in second
 
 
 def _load_leaderboard() -> ModuleType:

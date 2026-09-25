@@ -425,6 +425,32 @@ def planned_rows(
     return pl.DataFrame(records, schema_overrides={"second_difference": pl.Float64})
 
 
+CAMS_ARMS: Final[tuple[str, ...]] = ("cams_global", "cams_3h")
+"""The arms that are CAMS: its hourly product, and CAMS averaged to 3-hour steps."""
+
+STATION_FAMILY: Final[str] = "station observations"
+"""The family of an arm that reads a weather station, which Figure 1's title does not cover."""
+
+
+def check_cams_lowest_of_gridded(*, label: str, rows: pl.DataFrame) -> None:
+    """Raise unless a block's lowest-error gridded arm is CAMS, which Figure 1's title states.
+
+    Args:
+        label: The block's label, for the error message.
+        rows: The block's leaderboard rows, with `arm`, `family` and `value`.
+
+    Raises:
+        ValueError: If an arm that is not CAMS and not a station arm has the lowest error.
+    """
+    best = rows.filter(pl.col("family") != STATION_FAMILY).sort("value").row(0, named=True)
+    if best["arm"] not in CAMS_ARMS:
+        msg = (
+            f"{label}: Figure 1's title says CAMS has the lowest error of the gridded products, "
+            f"but {best['arm']} does ({best['value']:.3f} points)"
+        )
+        raise ValueError(msg)
+
+
 def build_blocks(
     *, intervals: pl.DataFrame, report: dict[str, PrintedBlock]
 ) -> tuple[list[RowSetBlock], list[RowSetBlock]]:
@@ -438,7 +464,8 @@ def build_blocks(
         The leaderboard blocks and the contrast blocks, both in the order of `ROW_SETS`.
 
     Raises:
-        ValueError: If a row set's site-hours or a drawn number disagrees with the report.
+        ValueError: If a row set's site-hours or a drawn number disagrees with the report, or a
+            gridded product other than CAMS has a block's lowest error.
     """
     leaderboard_blocks = []
     contrast_blocks = []
@@ -453,6 +480,7 @@ def build_blocks(
         absolute = absolute_rows(
             frame=frame, row_set=row_set, printed=printed.tables[ABSOLUTE_SECTION]
         )
+        check_cams_lowest_of_gridded(label=BLOCK_LABELS[row_set.key], rows=absolute)
         leaderboard_blocks.append(
             RowSetBlock(
                 label=BLOCK_LABELS[row_set.key], dates=dates, site_hours=site_hours, rows=absolute

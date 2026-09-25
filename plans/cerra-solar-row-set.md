@@ -121,7 +121,8 @@ shared-rows rule). CERRA is on disk from 2019, and the row set starts in Decembe
 power data, ERA5 and CAMS limit it, about 43 months to June 2026. CERRA ends about 10 weeks before
 the main row
 set (2026-09-10), so this row set is a near-subset of main's rows and a shorter window; the report
-prints its row count, its first and last day, and the months dropped. The page says so in the
+prints its row count, its first and last day, the rows each inner join removed, and the months
+dropped. The page says so in the
 block's caption, as it does for the ENS and station blocks.
 
 **Folds cover every calendar month.** The frame is folded with `studies.cross_validation.cut_eras`
@@ -161,11 +162,11 @@ hyperparameter setting):**
 
 **Exploratory (labelled so in the report):** `cerra_global − cams_3h`; `era5_global − era5_3h`
 and `cams_global − cams_3h` (the cost of the step width); the four planned contrasts per
-generator (sign only, labels A to F, no coordinates or distances); the rebuild's check numbers
-(share of rebuilt hours below −1 W m⁻², the hour at which the rebuilt series peaks relative to
-the sun). The planned/exploratory split is stated in the
-report's first lines, and the leaderboard script's `RowSet.planned_contrasts` holds exactly the
-four above.
+generator (each difference with its 95% interval, labels A to F, no coordinates or
+distances); the rebuild's check numbers (share of rebuilt hours below −1 W m⁻², the hour at
+which the rebuilt series peaks relative to the sun). The planned/exploratory split is stated in
+the report's first lines, and the leaderboard script's `RowSet.planned_contrasts` holds exactly
+the four above.
 
 ## What changes, file by file
 

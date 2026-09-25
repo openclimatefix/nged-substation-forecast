@@ -47,7 +47,8 @@ is a near-subset of the main rows and ends about 10 weeks before them.
 **Folds cover every calendar month.** The rows are cut into eras at `UKV_UPGRADE_MONTH` (the one
 era boundary in this window), and `search_fold_offsets` picks the fold rotation that leaves no
 calendar month without a training row. `raise_on_uncovered_months` runs before any fit, and the
-report prints the uncovered share this row set would have under the main rows' own fold design.
+report prints the uncovered share this row set would have under the main study's published `fold`
+column.
 
 **Nearest cells.** `derive_nearest_cells` finds each generator's nearest CERRA cell from the grid's
 latitude and longitude (`GRID_PATH`), and `check_cells_match` stops the run unless the cells equal
@@ -71,9 +72,9 @@ use.
 Run it with `uv run python studies/beam_diffuse_split/cerra_past_solar.py`, after
 `weather_products.py` has built its datasets and `fetch_cerra.py` has written the CERRA files.
 `--report-only` rebuilds `report.md` from the saved `losses.parquet` alone, still checking the saved
-fingerprint. A re-run first moves `losses.parquet`, `losses.fingerprint` and `report.md` to a
-`superseded/` subfolder (`refuse_to_overwrite`). Only one agent may run it at a time, because every
-worktree shares one data folder.
+fingerprint. A re-run stops (`refuse_to_overwrite`) while `losses.parquet`, `losses.fingerprint` or
+`report.md` exists, until they are moved to a `superseded/` subfolder. Only one agent may run it at
+a time, because every worktree shares one data folder.
 """
 
 import argparse
@@ -113,7 +114,7 @@ from studies.cross_validation import (
 from studies.grid_sampling import nearest_cells
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.resample import DEFAULT_DAYLIGHT_FLOOR_W_M2, clear_sky_index_resample
-from weather_products import CONTRAST_HEADER, _contrast_line, geometry_lines, with_eras
+from weather_products import CONTRAST_HEADER, _contrast_line, geometry_lines
 
 _LOG: Final[logging.Logger] = logging.getLogger("cerra_past_solar")
 
@@ -231,6 +232,26 @@ SITE_HOURS_HEADING: Final[str] = "CERRA's 3-hour accumulations"
 """The report heading's subject, before its row count and dates."""
 
 
+class AssembledRows(NamedTuple):
+    """The row set `assemble_rows` returns, and the counts about how it was cut.
+
+    Attributes:
+        frame: One row per (site, time), with every arm's columns, `era_code` and `fold`.
+        clipped_diffuse_hours: The hours where CERRA's direct beam exceeds its global irradiance.
+        fold_offsets: The rotation of each era's folds.
+        uncovered_main_folds: `uncovered_share` on the main study's published `fold` column.
+        rows_lost: `join_rows`'s count of the rows each input removed.
+        months_dropped: The `%Y-%m` months with a row in the window-cut main rows and none here.
+    """
+
+    frame: pl.DataFrame
+    clipped_diffuse_hours: int
+    fold_offsets: Mapping[int, int]
+    uncovered_main_folds: float
+    rows_lost: dict[str, int]
+    months_dropped: list[str]
+
+
 class Built(NamedTuple):
     """The row set and the counts the report prints about how it was built.
 
@@ -242,7 +263,11 @@ class Built(NamedTuple):
             rebuilt global irradiance, so diffuse is clipped to zero.
         fold_offsets: The rotation of each era's folds.
         uncovered_main_folds: The share of scored hours in calendar months with no training row
-            under the main rows' own fold design.
+            under the main study's published `fold` column, on this row set's rows.
+        rows_lost: The rows of the window-cut main rows that each inner join removed in turn
+            (`cerra`, `era5_3h`, `cams_3h`), and those then removed for a null or NaN in an arm's
+            irradiance column (`null_or_nan`).
+        months_dropped: The `%Y-%m` months with a row in the window-cut main rows and none here.
         rebuilt_negative_shares: Each rebuilt column's share of hours below `NEGATIVE_FLOOR_W_M2`.
         window_gaps: Each rebuilt column's relative gap between the mean of its rebuilt hours and
             the window mean, per daylight window.
@@ -256,6 +281,8 @@ class Built(NamedTuple):
     clipped_diffuse_hours: int
     fold_offsets: Mapping[int, int]
     uncovered_main_folds: float
+    rows_lost: dict[str, int]
+    months_dropped: list[str]
     rebuilt_negative_shares: dict[str, float]
     window_gaps: dict[str, pl.Series]
     grid_cells: int
@@ -506,7 +533,7 @@ def join_rows(
     era5_3h: pl.DataFrame,
     cams_3h: pl.DataFrame,
     window_end: datetime = WINDOW_END,
-) -> pl.DataFrame:
+) -> tuple[pl.DataFrame, dict[str, int]]:
     """Cut the main rows to the hours every arm covers.
 
     Keeps the main study's site-hours that end at or before `window_end` and have a value in CERRA,
@@ -520,7 +547,9 @@ def join_rows(
         window_end: The last hour's end.
 
     Returns:
-        The joined rows, sorted by site and time, with `era`, `era_code` and `fold` dropped.
+        The joined rows, sorted by site and time, with `era` and `era_code` dropped and `fold`
+        renamed `main_fold`, and the rows removed by each input in turn: `cerra`, `era5_3h`,
+        `cams_3h`, and then `null_or_nan` for a null or NaN in any of the six irradiance columns.
 
     Raises:
         ValueError: If any `time` column is not `Datetime("us", "UTC")`, or a (site, time) repeats.
@@ -543,19 +572,24 @@ def join_rows(
             "ghi_cams",
         )
     ]
+    rows_lost: dict[str, int] = {}
+    joined = base.filter(pl.col("time") <= window_end)
+    for name, frame in (("cerra", cerra), ("era5_3h", era5_3h), ("cams_3h", cams_3h)):
+        before = joined.height
+        joined = joined.join(frame, on=["site", "time"], how="inner")
+        rows_lost[name] = before - joined.height
+    before = joined.height
+    joined = joined.filter(*present)
+    rows_lost["null_or_nan"] = before - joined.height
     joined = (
-        base.filter(pl.col("time") <= window_end)
-        .join(cerra, on=["site", "time"], how="inner")
-        .join(era5_3h, on=["site", "time"], how="inner")
-        .join(cams_3h, on=["site", "time"], how="inner")
-        .filter(*present)
-        .drop("era", "era_code", "fold", strict=False)
+        joined.drop("era", "era_code", strict=False)
+        .rename({"fold": "main_fold"}, strict=False)
         .sort("site", "time")
     )
     if joined.select("site", "time").is_duplicated().any():
         msg = "join_rows: a (site, time) is duplicated"
         raise ValueError(msg)
-    return joined
+    return joined, rows_lost
 
 
 def with_diffuse_and_erbs(*, frame: pl.DataFrame) -> tuple[pl.DataFrame, int]:
@@ -738,6 +772,59 @@ def check_column_counts(
             raise ValueError(msg)
 
 
+def assemble_rows(
+    *,
+    base: pl.DataFrame,
+    cerra: pl.DataFrame,
+    era5_3h: pl.DataFrame,
+    cams_3h: pl.DataFrame,
+    window_end: datetime = WINDOW_END,
+) -> AssembledRows:
+    """Join the products onto the main rows, add CERRA's derived columns, and cut the folds.
+
+    The steps run in one order: the join, CERRA's diffuse and Erbs columns, the peak-hour check, the
+    main rows' uncovered share on their published folds, the covering folds, and last the check that
+    no arm's column holds a missing value, because that check reads `era_code`, which the fold cut
+    adds.
+
+    Args:
+        base: The main study's site-hours (`blend_products._solar_frame`), carrying its published
+            `fold`, `month` and the columns every arm shares.
+        cerra: `site`, `time`, `ghi_cerra` and `bhi_cerra`, the rebuilt hourly means.
+        era5_3h: `site`, `time` and `ghi_era5_3h`.
+        cams_3h: `site`, `time` and `ghi_cams_3h`.
+        window_end: The last hour's end.
+
+    Returns:
+        The row set and the counts the report prints about how it was cut.
+
+    Raises:
+        ValueError: If `join_rows` refuses an input, CERRA's and ERA5's peak hours differ, no fold
+            design covers every calendar month, or an arm's column holds a missing value.
+    """
+    joined, rows_lost = join_rows(
+        base=base, cerra=cerra, era5_3h=era5_3h, cams_3h=cams_3h, window_end=window_end
+    )
+    with_columns, clipped = with_diffuse_and_erbs(frame=joined)
+    check_peak_hours_agree(frame=with_columns)
+    uncovered_main = uncovered_share(
+        frame=with_columns.select("site", "time", fold=pl.col("main_fold"))
+    )
+    frame, offsets = with_covering_folds(frame=with_columns.drop("main_fold"))
+    check_no_missing(
+        frame=frame, columns=[column for columns in _arm_features().values() for column in columns]
+    )
+    window_months = set(base.filter(pl.col("time") <= window_end)["month"].to_list())
+    return AssembledRows(
+        frame=frame,
+        clipped_diffuse_hours=clipped,
+        fold_offsets=offsets,
+        uncovered_main_folds=uncovered_main,
+        rows_lost=rows_lost,
+        months_dropped=sorted(window_months - set(frame["month"].to_list())),
+    )
+
+
 def jobs() -> list[Job]:
     """Return every arm at `pooled`, and each arm of a planned contrast at `sensitivity` too.
 
@@ -846,22 +933,13 @@ def build_rows() -> Built:
         ERA5_3H_COLUMN: era5_windows,
         CAMS_3H_COLUMN: cams_windows,
     }
-    joined = join_rows(
+    assembled = assemble_rows(
         base=base,
         cerra=rebuilt[GHI_COLUMN].join(rebuilt[BHI_COLUMN], on=["site", "time"], how="inner"),
         era5_3h=rebuilt[ERA5_3H_COLUMN],
         cams_3h=rebuilt[CAMS_3H_COLUMN],
     )
-    with_columns, clipped = with_diffuse_and_erbs(frame=joined)
-    check_no_missing(
-        frame=with_columns,
-        columns=[column for columns in _arm_features().values() for column in columns],
-    )
-    check_peak_hours_agree(frame=with_columns)
-    uncovered_main = uncovered_share(
-        frame=with_eras(frame=with_columns.drop("era", "era_code", "fold", strict=False))
-    )
-    frame, offsets = with_covering_folds(frame=with_columns)
+    frame = assembled.frame
     _LOG.info("%d rows in this section's own row set", frame.height)
     grid_cells = int(
         pl.scan_parquet(GHI_PATH)
@@ -874,9 +952,11 @@ def build_rows() -> Built:
         frame=frame,
         candidates=base.height,
         within_window=base.filter(pl.col("time") <= WINDOW_END).height,
-        clipped_diffuse_hours=clipped,
-        fold_offsets=offsets,
-        uncovered_main_folds=uncovered_main,
+        clipped_diffuse_hours=assembled.clipped_diffuse_hours,
+        fold_offsets=assembled.fold_offsets,
+        uncovered_main_folds=assembled.uncovered_main_folds,
+        rows_lost=assembled.rows_lost,
+        months_dropped=assembled.months_dropped,
         rebuilt_negative_shares={
             column: _negative_share(rebuilt=frame_, column=column)
             for column, frame_ in rebuilt.items()
@@ -906,6 +986,7 @@ def _row_lines(*, built: Built) -> list[str]:
     per_site = frame.group_by("site").agg(n=pl.len()).sort("site")
     coverage = calendar_month_coverage(frame=frame)
     smallest_training = cast("int", coverage["n_train"].min())
+    dropped = ", ".join(built.months_dropped) or "none"
     return [
         "#### The row set and its folds",
         "",
@@ -925,8 +1006,16 @@ def _row_lines(*, built: Built) -> list[str]:
             f"The folds are cut inside the two eras that begin at the first month and at "
             f"{FIRST_MONTHS[0]}, rotated by {dict(built.fold_offsets)} (era code to rotation). "
             f"Under these folds {uncovered_share(frame=frame):.1%} of the scored hours fall in a "
-            f"calendar month with no training row, and under the main rows' own fold design "
-            f"{built.uncovered_main_folds:.1%} would."
+            f"calendar month with no training row, and under the main study's published `fold` "
+            f"column, carried over on these rows, {built.uncovered_main_folds:.1%} would."
+        ),
+        "",
+        (
+            f"The inner joins removed, in order, {built.rows_lost['cerra']:,} rows with no CERRA "
+            f"value, {built.rows_lost['era5_3h']:,} with no ERA5 3-hour value and "
+            f"{built.rows_lost['cams_3h']:,} with no CAMS 3-hour value. A further "
+            f"{built.rows_lost['null_or_nan']:,} rows held a null or NaN in an irradiance column. "
+            f"Calendar months with a row in the window-cut main rows and none here: {dropped}."
         ),
         "",
         (
@@ -989,6 +1078,8 @@ def _rebuild_lines(*, built: Built) -> list[str]:
     lines += [
         "",
         (
+            "The share of hours and the gap cover every rebuilt hour of the cropped series, nights "
+            "and hours outside the row set included, and every window of it. "
             "The gap is the difference between the mean of a window's three rebuilt hours and the "
             "window mean, over the window mean, for windows whose mean is at least "
             f"{DEFAULT_DAYLIGHT_FLOOR_W_M2:.0f} W m⁻²."
@@ -1098,6 +1189,8 @@ def _report(*, built: Built, losses: pl.DataFrame, sites: pl.DataFrame, job_list
             )
             for site in site_labels
         ]
+    second_setting = [pair for pair in EXPLORATORY_CONTRASTS if set(pair) <= set(PLANNED_ARMS)]
+    not_fitted = [pair for pair in EXPLORATORY_CONTRASTS if pair not in second_setting]
     lines += [
         "",
         "#### What the 3-hour step does to ERA5 and CAMS, and CERRA against CAMS (exploratory)",
@@ -1113,7 +1206,13 @@ def _report(*, built: Built, losses: pl.DataFrame, sites: pl.DataFrame, job_list
         *CONTRAST_HEADER,
         *(
             _contrast_line(losses=sensitivity, treatment=t, reference=r, label="sensitivity")
-            for t, r in EXPLORATORY_CONTRASTS
+            for t, r in second_setting
+        ),
+        "",
+        (
+            "Not fitted at the second setting: "
+            + ", ".join(f"{t} − {r}" for t, r in not_fitted)
+            + "."
         ),
         "",
         *_row_lines(built=built),

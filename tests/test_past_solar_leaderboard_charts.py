@@ -6,6 +6,7 @@ post hoc row drawn without its label, and a headline that states an exploratory 
 
 import importlib.util
 import sys
+from collections import defaultdict
 from pathlib import Path
 from types import ModuleType
 from typing import Final
@@ -281,3 +282,64 @@ def test_both_figures_carry_the_cerra_row_set_caveats(caveat: str) -> None:
     assert caveat in _caption(spec=contrasts)
     if "subsets" not in caveat:
         assert caveat in _caption(spec=leaderboard)
+
+
+def _absolute(*, values: dict[str, tuple[float, str]]) -> pl.DataFrame:
+    return pl.DataFrame(
+        {"arm": arm, "family": family, "value": value} for arm, (value, family) in values.items()
+    )
+
+
+def test_the_title_check_raises_when_a_cerra_arm_beats_cams() -> None:
+    module = _load()
+    rows = _absolute(
+        values={
+            "cams_global": (7.0, "satellite"),
+            "cerra_global": (6.5, "reanalysis"),
+            "era5_global": (8.0, "reanalysis"),
+        }
+    )
+
+    with pytest.raises(ValueError, match=r"CERRA: .*cerra_global does"):
+        module.check_cams_lowest_of_gridded(label="CERRA", rows=rows)
+
+
+def test_the_title_check_accepts_cams_averaged_to_3_hour_steps_and_ignores_station_arms() -> None:
+    module = _load()
+    rows = _absolute(
+        values={
+            "station_blend": (5.0, "station observations"),
+            "cams_3h": (6.5, "satellite"),
+            "cerra_global": (7.0, "reanalysis"),
+        }
+    )
+
+    module.check_cams_lowest_of_gridded(label="Stations", rows=rows)
+
+
+def test_build_blocks_stops_before_drawing_when_a_cerra_arm_beats_cams(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    module = _load()
+    row_set = module.ROW_SETS[-1]
+    absolute = _absolute(
+        values={"cams_global": (7.0, "satellite"), "cerra_global": (6.5, "reanalysis")}
+    )
+    monkeypatch.setattr(module, "ROW_SETS", (row_set,))
+    monkeypatch.setattr(module, "absolute_rows", lambda **_: absolute)
+    monkeypatch.setattr(module, "contrast_rows", lambda **_: absolute)
+    monkeypatch.setattr(module, "planned_rows", lambda **_: absolute)
+    printed = module.PrintedBlock(
+        first_day="2025-01-01", last_day="2025-06-30", site_hours=8, tables=defaultdict(dict)
+    )
+    intervals = pl.DataFrame({"row_set": row_set.key, "n_rows": [8]})
+
+    with pytest.raises(ValueError, match="cerra_global does"):
+        module.build_blocks(intervals=intervals, report={row_set.label: printed})
+
+    passing = _absolute(
+        values={"cams_global": (6.0, "satellite"), "cerra_global": (6.5, "reanalysis")}
+    )
+    monkeypatch.setattr(module, "absolute_rows", lambda **_: passing)
+    leaderboard, _ = module.build_blocks(intervals=intervals, report={row_set.label: printed})
+    assert [block.label for block in leaderboard] == ["CERRA"]
