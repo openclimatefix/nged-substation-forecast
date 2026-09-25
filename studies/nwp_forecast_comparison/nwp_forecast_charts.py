@@ -1481,9 +1481,9 @@ then the planned contrasts."""
 
 TITLES: Final[dict[tuple[DomainType, str], str]] = {
     ("solar", "headline"): (
-        "For solar power, ENS beats UKV and ICON-EU at matched lead and GEFS at equal lead; "
-        "a blend gains 0.35 points at an optimistic lead and no detectable gain at a "
-        "conservative one"
+        "For solar power, ENS beats UKV and ICON-EU at matched lead and GEFS at equal lead. "
+        "A blend gains 0.35 points at an optimistic lead and shows no detectable gain at a "
+        "conservative lead"
     ),
     ("wind", "headline"): (
         "For wind power, ENS beats UKV, ICON-EU is unresolved against ENS, and a blend "
@@ -1496,7 +1496,7 @@ TITLES: Final[dict[tuple[DomainType, str], str]] = {
     ),
     ("wind", "leaderboard"): (
         "Error rises with lead: at day 1 every weather forecast shown has a lower error than "
-        "climatology (18.5%), but at day 14 the ENS mean's error is not lower; ENS, IFS 0.25° "
+        "climatology (18.5%), but at day 14 the ENS mean's error is not lower; ENS, IFS 0.25°, "
         "and ICON-EU have the lowest error of the single day-1 forecasts"
     ),
     ("solar", "models_work"): (
@@ -1510,7 +1510,7 @@ TITLES: Final[dict[tuple[DomainType, str], str]] = {
     ),
     ("wind", "per_generator"): (
         "At two of the three wind farms UKV has a higher error than ENS at day 1, "
-        "and at two the P4b blend has a lower error"
+        "and at two of the three wind farms the P4b blend has a lower error"
     ),
     ("solar", "by_lead_day"): (
         "Solar error rises with lead day for every forecast, and no product beats the ENS mean "
@@ -1521,11 +1521,11 @@ TITLES: Final[dict[tuple[DomainType, str], str]] = {
         "at matched lead"
     ),
     ("solar", "blends"): (
-        "For solar power a blend of ENS, ICON-EU and IFS 0.25° gains 0.35 points at an "
+        "For solar power a blend of ENS, ICON-EU, and IFS 0.25° gains 0.35 points at an "
         "optimistic lead, but its control is itself worse than ENS alone"
     ),
     ("wind", "blends"): (
-        "For wind power a blend of ENS, ICON-EU and IFS 0.25° lowers the error by 0.66 points at "
+        "For wind power a blend of ENS, ICON-EU, and IFS 0.25° lowers the error by 0.66 points at "
         "an optimistic lead and 0.18 points at a conservative lead, and its control does not"
     ),
 }

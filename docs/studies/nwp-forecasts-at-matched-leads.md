@@ -49,13 +49,15 @@ gives the evidence and what would change each one).
 
 ![Each solar forecast product's error at each fitted lead day, with 95% intervals](assets/nwp_forecast_solar_leaderboard.svg)
 
-Figure 1: At day 1 every weather forecast shown has a lower error than climatology (14.5%); ENS and
-IFS 0.25° have the lowest error of the single solar forecasts.
+Figure 1: Error rises with lead: at day 1 every weather forecast shown has a lower error than
+climatology (14.5%), but at day 14 the ENS mean's error is not lower; ENS and IFS 0.25° have the
+lowest error of the single day-1 forecasts.
 
 ![Each wind forecast product's error at each fitted lead day, with 95% intervals](assets/nwp_forecast_wind_leaderboard.svg)
 
-Figure 2: At day 1 every weather forecast shown has a lower error than climatology (18.5%), by more
-than 9 points; ENS, IFS 0.25°, and ICON-EU have the lowest error of the single wind forecasts.
+Figure 2: Error rises with lead: at day 1 every weather forecast shown has a lower error than
+climatology (18.5%), but at day 14 the ENS mean's error is not lower; ENS, IFS 0.25°, and ICON-EU
+have the lowest error of the single day-1 forecasts.
 
 ![Paired differences in solar error with 95% intervals, both XGBoost settings](assets/nwp_forecast_solar_headline.svg)
 
