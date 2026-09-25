@@ -38,10 +38,10 @@ two of the parts of this project that read past weather, described in the
 makes no recommendation. The evidence is three wind farms in flat Lincolnshire, and 50,734
 generator-hours from August 2024 to September 2026.
 
-![Figure 1: ICON-D2 and UKV have the lowest errors of the five products tested, and ICON global the highest](assets/wind_leaderboard.svg)
+![Figure 1: ICON-D2 and UKV have the lowest errors of the five products tested, and ICON global the highest](../assets/wind_leaderboard.svg)
 
 ![Figure 2: UKV, ICON-D2, and ICON-EU each beat ERA5 by a margin statistically significant at the
-5% level](assets/wind_headline.svg)
+5% level](../assets/wind_headline.svg)
 
 **Figure 1's intervals are wide mainly because every product's error rises and falls together from
 month to month.** Some months are harder to describe than others for every product, and resampling
@@ -56,7 +56,7 @@ products tests them directly, and the bottom panel of Figure 2 holds the four pl
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
 > AI model (for this page, Claude Opus 5.5 and Claude Sonnet 5, reusing the data-preparation and
 > model-fitting code that Claude Opus 5 wrote for the [beam/diffuse
-> study](beam-diffuse-split.md)). Several independent Claude reviewers have checked the method, the
+> study](../beam-diffuse-split.md)). Several independent Claude reviewers have checked the method, the
 > evidence, and the prose adversarially.
 
 ## Key findings
@@ -119,7 +119,7 @@ from the freshest run of that weather model that Open-Meteo's archive holds for 
   contrast. ENS day 0 minus ERA5, an exploratory contrast, is −0.07 points [−0.19, +0.06] in the
   study's own design. That interval bounds the difference and does not show that the two products
   are equal. The figure for the same contrast on the [ENS forecast horizons
-  page](ens-forecast-horizons.md), +0.170 points [+0.021, +0.322], comes from different rows and
+  page](../forecasts/ens-horizons.md), +0.170 points [+0.021, +0.322], comes from different rows and
   folds. An era cut gives the XGBoost model a separate era code and separate folds on each side of 1
   December 2024, the first whole month after the upgrade. It changes ENS day 0 minus ERA5 by −0.16
   points [−0.27, −0.06] on the rows from 12 August 2024. Three wind farms are few independent sites,
@@ -140,7 +140,7 @@ from the freshest run of that weather model that Open-Meteo's archive holds for 
 ## Introduction
 
 This page is the wind counterpart of [Which weather product best describes past
-sunshine?](weather-products-for-past-solar.md). Several parts of this project read an estimate of
+sunshine?](solar.md). Several parts of this project read an estimate of
 weather that has already happened: capacity estimation, training history, historical features in the
 live service, and disaggregation. The solar page describes each of these consumers of past weather,
 which are parts of the project, not electricity customers. Two of the four can use a result about
@@ -210,7 +210,7 @@ page](https://confluence.ecmwf.int/display/FCST/Implementation+of+IFS+Cycle+49r1
 with the 06 UTC run of its day.
 
 ![Figure 3: ICON-D2 has no data west of a line running from 1.8°W at 49.9°N to 3.9°W at 57.3°N.
-The map also draws AROME France, which this page does not test](../roadmap/assets/weather_product_domains.svg)
+The map also draws AROME France, which this page does not test](../../roadmap/assets/weather_product_domains.svg)
 
 ## Data and methods
 
@@ -324,7 +324,7 @@ carries wind direction, where the 9 km grid file holds wind speed only, in kilom
 grid file serves one cross-check: at each farm, one of the five nearest grid points reproduced the
 Previous Runs speeds on every hour (71,712 farm-hours), which shows that two Open-Meteo downloads
 agree and does not show that the grid or the served lead is right. ENS day 0 is read from the saved
-inputs of the [ENS forecast horizons page](ens-forecast-horizons.md).
+inputs of the [ENS forecast horizons page](../forecasts/ens-horizons.md).
 `fetch_ens_forecast_horizons.py` extracts those inputs from the production NWP Delta table, which
 the Dagster `ecmwf_ens` asset fills from Dynamical.org's ECMWF ENS archive (00 UTC run, 0.25°), and
 `ens_forecast_horizons.py` writes them to `wind_inputs.parquet`.
@@ -539,7 +539,7 @@ would undo the anonymisation that names the generators only as Generator W1 to W
 therefore gives each week's month and year in the text and no finer date.
 
 ![Figure 4: An XGBoost model given ICON-D2 follows measured power at every generator, across a
-windy, a variable, and a calm week](assets/wind_models_work_timeseries.svg)
+windy, a variable, and a calm week](../assets/wind_models_work_timeseries.svg)
 
 **ICON-D2, UKV, ICON-EU, and ERA5 rank in the same order at each of the three generators.** Figure 5
 plots each product's mean absolute error at each generator separately, one dot per product per
@@ -549,7 +549,7 @@ a pair of steps in its served
 wind](#about-half-of-icon-globals-gap-to-icon-eu-is-a-pair-of-steps-in-its-served-wind), and this
 page does not name that generator.
 
-![Figure 5: ICON-D2, UKV, ICON-EU, and ERA5 rank in the same order at each of the three generators](assets/wind_models_work_error.svg)
+![Figure 5: ICON-D2, UKV, ICON-EU, and ERA5 rank in the same order at each of the three generators](../assets/wind_models_work_error.svg)
 
 ### UKV and ICON-D2 describe past wind best of the five products tested
 
@@ -557,7 +557,7 @@ page does not name that generator.
 points [0.40, 0.75].** ICON-D2 also beats ICON-EU at every generator, by 0.26 points [0.19, 0.33]
 across the three. ERA5 trails every product except ICON global, and [Why ERA5 describes past
 sunshine and wind worse than most current weather
-products](../roadmap/data-sources.md#why-era5-describes-past-sunshine-and-wind-worse-than-most-current-weather-products)
+products](../../roadmap/data-sources.md#why-era5-describes-past-sunshine-and-wind-worse-than-most-current-weather-products)
 sets out ERA5's documented weaknesses.
 
 | Product | Mean absolute error, % of capacity |
@@ -575,7 +575,7 @@ ICON-D2 beats ERA5 by 0.77 points [0.63, 0.90] from April to September and by 0.
 0.64] from October to March. The seasonal split rests on parts of three summers and two winters, and
 its cause was not examined.
 
-![Figure 6: UKV's and ICON-D2's advantage over ERA5 is larger from April to September](assets/wind_half_years.svg)
+![Figure 6: UKV's and ICON-D2's advantage over ERA5 is larger from April to September](../assets/wind_half_years.svg)
 
 **UKV's advantage over ERA5 is larger since its upgrade, and ICON-D2's is not.** Since the upgrade
 UKV beats ERA5 by 0.79 points [0.63, 0.97], against 0.53 points [0.29, 0.72] over the same months of
@@ -589,7 +589,7 @@ That generator's output swings for months at a time against every product's wind
 attributes to turbine availability the feed does not record.
 
 ![Figure 7: UKV's advantage over ERA5 is statistically significant at the 5% level at two of the three
-generators](assets/wind_per_generator.svg)
+generators](../assets/wind_per_generator.svg)
 
 ### ICON-D2 leads UKV across the window, but not since UKV's upgrade
 
@@ -615,7 +615,7 @@ every comparison in this paragraph was chosen after the first run.
 weather at its boundaries from ICON-EU, and the three farms sit about 150 to 200 km east of
 ICON-D2's western boundary.
 
-![Figure 8: ICON-D2 leads UKV across the window, but not since UKV's upgrade](assets/wind_icon_d2_against_ukv.svg)
+![Figure 8: ICON-D2 leads UKV across the window, but not since UKV's upgrade](../assets/wind_icon_d2_against_ukv.svg)
 
 ### ICON-EU beats ERA5 at 80 m and at 100 m, mostly from April to September
 
@@ -647,7 +647,7 @@ same flag lowers ICON-EU's error by 0.06 points and ERA5's by 0.07, so every com
 flag gives the flag to both products.
 
 ![Figure 9: About half of ICON global's gap to ICON-EU is a pair of steps in its served wind at one
-generator](assets/wind_icon_global_steps.svg)
+generator](../assets/wind_icon_global_steps.svg)
 
 **The steps may belong to the archive rather than to ICON global, and their cause is not
 identified.** The steps do not come from this study's choice of land cell, because at the generator
@@ -710,7 +710,7 @@ early June 2025 and early June 2026, so each year holds part of the stepped peri
 is ICON global's difference from ERA5 statistically significant at the 5% level.
 
 ![Figure 10: On January to September of each year, UKV's lead over ERA5 grew in 2026; ICON-EU's and
-ICON-D2's did not](assets/wind_era5_by_year.svg)
+ICON-D2's did not](../assets/wind_era5_by_year.svg)
 
 ### ICON-DREAM-EU does not beat ERA5, and trails ICON-EU
 
@@ -781,7 +781,7 @@ or minus one hour (0.345 and 0.322) or plus or minus two hours (0.194 and 0.181)
 ICON-DREAM-EU's served value carries no whole-hour offset relative to ERA5.
 
 ![Figure 11: ICON-DREAM-EU is statistically indistinguishable from ERA5, and beats only ICON global
-of the other five products](assets/wind_icon_dream_leaderboard.svg)
+of the other five products](../assets/wind_icon_dream_leaderboard.svg)
 
 **ICON-DREAM-EU's error is statistically indistinguishable from ERA5's.** Across the window
 ICON-DREAM-EU is 0.001 points behind ERA5 [−0.119, +0.131], not statistically significant at the 5%
@@ -792,7 +792,7 @@ paired contrast, ICON-DREAM-EU beats ICON global, the lowest-ranked of the other
 
 **Over the window the two pages share, neither finds ICON-DREAM-EU statistically distinguishable
 from ERA5, and both find it behind ICON-EU.** The [past-solar
-page](weather-products-for-past-solar.md#icon-dream-eu-beats-era5-but-not-the-icon-weather-models)
+page](solar.md#icon-dream-eu-beats-era5-but-not-the-icon-weather-models)
 finds ICON-DREAM-EU ahead of ERA5 by 0.32 points [0.12, 0.52] over its longer window, back to
 September 2019, but by 0.16 points [−0.09, +0.38] since August 2024, the window shared with the
 past-solar page, not statistically significant at the 5% level. On both pages ICON-DREAM-EU trails
@@ -804,7 +804,7 @@ setting the gap is 0.340 points [0.266, 0.405], and at the second setting 0.338 
 0.391]; both are statistically significant at the 5% level, with every fold agreeing.
 
 ![Figure 12: ICON-DREAM-EU does not beat ERA5, and trails ICON-EU by 0.34
-points](assets/wind_icon_dream_planned_contrasts.svg)
+points](../assets/wind_icon_dream_planned_contrasts.svg)
 
 **The rest of this section is exploratory: chosen after the results were seen, not named in the
 plan.**
@@ -912,7 +912,7 @@ against them by own error alone.
 intervals describe these farms and this window only.
 
 ![Figure 13: UKV beats ECMWF's HRES by 0.20 points and ENS day 0 by 0.41, and HRES beats ERA5 by
-0.27](assets/ens_hres_wind_leaderboard.svg)
+0.27](../assets/ens_hres_wind_leaderboard.svg)
 
 **ENS day 0 minus ERA5 is −0.07 points [−0.19, +0.06], so this section does not resolve whether ENS
 day 0 differs from ERA5.** The interval bounds the difference. An ENS error from 0.19 points below
@@ -931,7 +931,7 @@ product records. Figure 14 shows days 1 to 7 with no calendar date, for the reas
 section gives.
 
 ![Figure 14: XGBoost models given HRES's or ENS day 0's wind follow the shape of measured
-power at W1 and W2, and at W3 outside its windiest week](assets/ens_hres_wind_models_work.svg)
+power at W1 and W2, and at W3 outside its windiest week](../assets/ens_hres_wind_models_work.svg)
 
 **ICON-D2 has the lowest own error at each of the three farms, and HRES's own error is lower than
 ENS day 0's at each.** HRES's error is 5.94% against ENS day 0's 6.06% at Generator W1, 6.96%
@@ -941,7 +941,7 @@ ranking rests on own errors alone. Figure 15 leaves ICON global out, as Figure 5
 global's dots would show which generator carries the steps in ICON global's served wind.
 
 ![Figure 15: ICON-D2 has the lowest error at each of the three farms, and ECMWF HRES's error is
-lower than ENS day 0's at each](assets/ens_hres_wind_per_farm_error.svg)
+lower than ENS day 0's at each](../assets/ens_hres_wind_per_farm_error.svg)
 
 #### How far the results depend on the training design
 
@@ -987,7 +987,7 @@ two long-row designs leave 0. In the study's design the covered cell with the fe
 holds 229 training rows, for September at one farm, where 680 rows are scored.
 
 ![Figure 16: Each planned contrast keeps its sign and stays statistically significant at the 5%
-level under five fold designs and one row subset](assets/ens_hres_wind_robustness.svg)
+level under five fold designs and one row subset](../assets/ens_hres_wind_robustness.svg)
 
 **The ENS horizons page's figure for ENS day 0 against ERA5 differs from this section's because the
 two differ in row set and in how the folds treat IFS Cycle 49r1, and the era cut moves the result
@@ -1050,7 +1050,7 @@ describe these farms and this window only.
 
 ![Figure 17: An extra era cut at 1 December 2024, the first whole month after IFS Cycle
 49r1, changes ENS day 0's and HRES's scores against ERA5 far more than rotating the folds
-does](assets/ens_hres_wind_reconciliation.svg)
+does](../assets/ens_hres_wind_reconciliation.svg)
 
 #### The step in ECMWF's wind at IFS Cycle 49r1
 
@@ -1097,7 +1097,7 @@ day 0's, and a change in Open-Meteo's archive is possible. These are exploratory
 with no interval.
 
 ![Figure 18: ENS's and HRES's 10 m wind speeds fall against ERA5's between October and November
-2024, and UKV's does not](assets/ens_hres_wind_monthly_ratio.svg)
+2024, and UKV's does not](../assets/ens_hres_wind_monthly_ratio.svg)
 
 #### How the ECMWF wind was read, and what the contrasts mix
 
@@ -1173,7 +1173,7 @@ Three wind farms are few independent sites, so these intervals describe these fa
 only.
 
 ![Figure 19: ENS day 0's gap to UKV and HRES is larger in the later hours of the day, as is ERA5's
-gap to UKV](assets/ens_hres_wind_split.svg)
+gap to UKV](../assets/ens_hres_wind_split.svg)
 
 **HRES minus ERA5 is statistically significant at the 5% level at one farm of three, Generator W2,
 and only one pair of farms differs in it.** HRES minus ERA5 is −0.54 points [−0.72, −0.35] at
@@ -1189,7 +1189,7 @@ Per-farm rows are exploratory, and the three farms share their weather, so they 
 replications.
 
 ![Figure 20: The three planned contrasts pooled over the three farms and at each
-farm](assets/ens_hres_wind_by_farm.svg)
+farm](../assets/ens_hres_wind_by_farm.svg)
 
 **The period splits do not settle which difference drives the gap between HRES and UKV.** HRES minus
 UKV is +0.10 points [−0.13, +0.31] before 1 October 2025 (10 calendar months, 20,703 farm-hours) and
@@ -1227,7 +1227,7 @@ sites, so each interval describes these farms only, on 34,156 farm-hours in 17 c
 
 ![Figure 21: The nearest weather station trails ERA5's 10 m wind by 0.99 points, and adding the
 station to UKV lowers UKV's error by 0.64 points against a control with the same number of
-columns](assets/station_wind_headline.svg)
+columns](../assets/station_wind_headline.svg)
 
 **The nearest station has the largest own error of the 11 arms in Figure 21, at 9.14% of capacity
 [7.98, 10.40], against 8.15% [7.29, 9.09] for ERA5's 10 m wind.** ICON global, at 8.35%, has the
@@ -1301,10 +1301,10 @@ is 1.40 points [0.63, 2.40] and W1 minus W2 is 0.76 points [0.20, 1.43]. W2 minu
 
 ![Figure 22: In exploratory splits, the nearest station trails ERA5's 10 m wind by 1.53 points in
 August to December, and by less in January to July (0.26 points at the main XGBoost setting, and not
-statistically significant at the 5% level at the second)](assets/station_wind_season.svg)
+statistically significant at the 5% level at the second)](../assets/station_wind_season.svg)
 
 ![Figure 23: The nearest station's deficit against ERA5's 10 m wind is larger at W1 than at W3, and
-adding it to UKV lowers UKV's error at all three farms](assets/station_wind_by_farm.svg)
+adding it to UKV lowers UKV's error at all three farms](../assets/station_wind_by_farm.svg)
 
 **S2 is negative in both halves of the year and at every farm.** From January to July S2 is −0.77
 points [−1.10, −0.41], from August to December −0.54 points [−0.68, −0.38], and with every calendar
@@ -1410,7 +1410,7 @@ supply real-time observations by other routes that this page did not check.
 **Giving an XGBoost model all five products at once beats giving it UKV alone, with UKV's
 neighbouring hours, by 0.48 points [0.40, 0.56], a post hoc comparison written up in [Does blending
 weather products beat the best single weather
-product?](blending-weather-products.md#wind-a-blend-beats-ukv-given-its-neighbouring-hours)**
+product?](blending.md#wind-a-blend-beats-ukv-given-its-neighbouring-hours)**
 
 ## Limitations
 
@@ -1537,7 +1537,7 @@ uv run python studies/beam_diffuse_split/ens_hres_past_wind.py --extra-fits
 uv run python studies/beam_diffuse_split/ens_hres_past_wind.py --report-only
 uv run python studies/beam_diffuse_split/ens_hres_past_wind_charts.py
 uv run python studies/beam_diffuse_split/check_page_numbers.py \
-    docs/studies/weather-products-for-past-wind.md \
+    docs/studies/past-weather/wind.md \
     data/studies/beam_diffuse_split/past_weather_v2/ens_hres_past_wind/report.md \
     --section "### How ECMWF's HRES and ENS day 0 compare with UKV and ERA5" \
     --section "### How ECMWF's ENS and HRES were added" \
@@ -1589,7 +1589,7 @@ uv run python studies/beam_diffuse_split/station_wind_arms.py
 uv run python studies/beam_diffuse_split/station_wind_arms.py --report-only
 uv run python studies/beam_diffuse_split/station_wind_arms_charts.py
 uv run python studies/beam_diffuse_split/check_page_numbers.py \
-    docs/studies/weather-products-for-past-wind.md \
+    docs/studies/past-weather/wind.md \
     data/studies/beam_diffuse_split/past_weather_v2/station_wind_arms/report.md \
     --section "### One nearby 10 m weather station trails ERA5's 10 m wind on its own, and lowers UKV's error when added to it"
 ```

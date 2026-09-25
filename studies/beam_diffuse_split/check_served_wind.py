@@ -2,7 +2,7 @@
 
 One-off throwaway script for the study in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/826>. The write-up is
-<https://openclimatefix.github.io/nged-substation-forecast/studies/weather-products-for-past-wind/>.
+<https://openclimatefix.github.io/nged-substation-forecast/studies/past-weather/wind/>.
 
 **Which grid cell ICON global is read from.** The study reads every product from its nearest land
 cell. This script compares ICON global's nearest cell with its nearest land cell at each
