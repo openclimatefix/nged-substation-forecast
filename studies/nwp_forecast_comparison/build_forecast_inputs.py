@@ -53,13 +53,15 @@ for which run and lead each day serves and how the store's radiation is converte
 archive of ECMWF IFS HRES (`IFS_SINGLE_DIR_NAME`); see `_ifs_single_frame`.
 
 With `--aifs` the script instead builds the AIFS inputs (issue #923) on the published inputs' own
-`(site, time)` keys, into a new write-once `--output-dir`: ECMWF AIFS Single and AIFS ENS at days 1
-and 2, and ENS's mean and control member on the same 6-hourly steps as the AIFS reads. AIFS is read
+`(site, time)` keys, into a new write-once `--output-dir`: ECMWF AIFS Single and AIFS ENS at the
+days `--aifs-days` names (default 1 and 2), and ENS's mean and control member on the same 6-hourly
+steps as the AIFS reads (ENS's native steps beyond 144 hours). AIFS is read
 as ENS is: the 00 UTC run of day `D - d` for a target hour on day `D`, so the lead is `24d + h`.
 Each site's value is the H3 resolution-5 overlap-weighted mean of the crop's 0.25 degree cells, the
 read ENS's stored table has, plus (AIFS Single only) a nearest-cell arm for the spatial-read
-sensitivity. Every AIFS arm also carries its run's `init_time`, which `fit_aifs.py` checks against
-each AIFS version era.
+sensitivity, built only when day 1 is built. Every AIFS arm and ENS arm also carries its run's
+`init_time`, which `fit_aifs.py` checks against the run it should read and against each AIFS version
+era.
 
 Every output row carries only the anonymised `site` label; no generator name, id or coordinate is
 read from the private roster in this script, except inside `studies.grid_sampling` (GEFS's and
@@ -249,7 +251,17 @@ because the arms it refits take their columns from the published inputs), and th
 IFS HRES archive at `IFS_SINGLE_DAYS`, and nothing else)."""
 
 AIFS_DAYS: Final[tuple[int, ...]] = (1, 2)
-"""The bands the AIFS build reads: day 1 (the day-ahead product) and day 2."""
+"""The bands the AIFS build reads unless `--aifs-days` names others: day 1 (the day-ahead product)
+and day 2."""
+
+AIFS_BAND_MARGIN_BEFORE: Final[int] = 6
+AIFS_BAND_MARGIN_AFTER: Final[int] = 30
+"""Day `N` reads leads from `24 N - 6` to `24 N + 30` hours, as `ens_forecast_horizons.band_steps`
+does, so the upsampling has a step on each side of every target hour."""
+
+EXISTING_AIFS_DIR_NAME: Final[str] = "nwp_forecast_comparison_aifs"
+"""Under `data/studies/`, the folder of the day-1 and day-2 AIFS fit, which a later build never
+writes to."""
 
 AIFS_SINGLE_DIR_NAME: Final[str] = "ECMWF-AIFS"
 AIFS_ENS_DIR_NAME: Final[str] = "ECMWF-AIFS-ENS"
@@ -1758,7 +1770,7 @@ def aifs_members_frame(
     weights: pl.DataFrame,
     ensemble: bool,
     first_init: datetime,
-    max_lead_hours: int = 24 * max(AIFS_DAYS) + 30,
+    days: tuple[int, ...] = AIFS_DAYS,
 ) -> pl.DataFrame:
     """Read one AIFS store's 00 UTC runs and reshape them to `band_steps`'s input shape.
 
@@ -1773,7 +1785,9 @@ def aifs_members_frame(
         ensemble: Whether the store has an `ensemble_member` column (AIFS ENS). AIFS Single gets
             member 0.
         first_init: The first run kept; earlier runs hold `NaN` radiation and 100 m wind.
-        max_lead_hours: The longest lead kept.
+        days: The bands to read. A lead is kept only if it lies in one band, from `24 N - 6` to
+            `24 N + 30` hours for a day `N`, so a scan of days 7 and 14 does not read the other
+            leads of the 50-million-row AIFS ENS file.
 
     Returns:
         One row per (site, init_time, ensemble_member, lead_hours), with `ghi_w_m2` (null at lead
@@ -1786,7 +1800,13 @@ def aifs_members_frame(
     scan = pl.scan_parquet(store).filter(
         pl.col("init_time").dt.hour() == 0,
         pl.col("init_time") >= first_init.replace(tzinfo=None),
-        pl.col("lead_time") <= pl.duration(hours=max_lead_hours),
+        pl.any_horizontal(
+            pl.col("lead_time").is_between(
+                pl.duration(hours=max(24 * day - AIFS_BAND_MARGIN_BEFORE, 0)),
+                pl.duration(hours=24 * day + AIFS_BAND_MARGIN_AFTER),
+            )
+            for day in days
+        ),
     )
     if not ensemble:
         scan = scan.with_columns(ensemble_member=pl.lit(0, dtype=pl.Int8))
@@ -1837,18 +1857,23 @@ def aifs_members_frame(
     return frame
 
 
-def _aifs_frame(*, keys: pl.DataFrame, domain: DomainType, weather_dir: Path) -> pl.DataFrame:
+def _aifs_frame(
+    *, keys: pl.DataFrame, domain: DomainType, weather_dir: Path, days: tuple[int, ...]
+) -> pl.DataFrame:
     """Build the AIFS arms and their like-for-like ENS references on `keys`.
 
     Args:
         keys: `site`, `time` for every row the study might score.
         domain: `solar` or `wind`.
         weather_dir: The folder holding the two AIFS downloads' directories.
+        days: The bands to build.
 
     Returns:
         `keys` with `aifs_single_day<N>`, `aifs_ens_mean_day<N>`, `ens_mean6_day<N>` and
-        `ens_control6_day<N>` columns for every `N` in `AIFS_DAYS`, `aifs_single_nearest_day1`, and
-        `<arm>_init_time` for each AIFS arm, left-joined.
+        `ens_control6_day<N>` columns for every `N` in `days`, `aifs_single_nearest_day1` when day 1
+        is built, and `<arm>_init_time` for every one of those arms, left-joined. Beyond 144 hours
+        ENS has no 3-hourly step to coarsen, so the ENS columns at days 7 and 14 are ENS's native
+        reads.
 
     Raises:
         ValueError: If a written column is not one of those.
@@ -1858,20 +1883,23 @@ def _aifs_frame(*, keys: pl.DataFrame, domain: DomainType, weather_dir: Path) ->
     single_dir = weather_dir / AIFS_SINGLE_DIR_NAME
     ens_dir = weather_dir / AIFS_ENS_DIR_NAME
     arm_frames: list[pl.DataFrame] = []
-    for spatial, days, name in (
-        ("h3", AIFS_DAYS, "aifs_single"),
-        ("nearest", (1,), "aifs_single_nearest"),
+    for spatial, spatial_days, name in (
+        ("h3", days, "aifs_single"),
+        ("nearest", tuple(day for day in days if day == 1), "aifs_single_nearest"),
     ):
+        if not spatial_days:
+            continue
         extract = aifs_members_frame(
             store=single_dir / f"{AIFS_SINGLE_DIR_NAME}.parquet",
             weights=aifs_site_weights(path=single_dir, domain=domain, sites=sites, spatial=spatial),
             ensemble=False,
             first_init=AIFS_SINGLE_FIRST_INIT,
+            days=spatial_days,
         )
         arm_frames += ens_member_arms(
             extract=extract,
             domain=domain,
-            days=days,
+            days=spatial_days,
             method=method,
             ensemble_size=1,
             arm_name=lambda way, day, name=name: f"{name}_day{day}",
@@ -1884,11 +1912,12 @@ def _aifs_frame(*, keys: pl.DataFrame, domain: DomainType, weather_dir: Path) ->
         weights=aifs_site_weights(path=ens_dir, domain=domain, sites=sites, spatial="h3"),
         ensemble=True,
         first_init=AIFS_ENS_FIRST_INIT,
+        days=days,
     )
     arm_frames += ens_member_arms(
         extract=ens_extract,
         domain=domain,
-        days=AIFS_DAYS,
+        days=days,
         method=method,
         ensemble_size=efh.ENSEMBLE_SIZE,
         arm_name=lambda way, day: f"aifs_ens_{way}_day{day}",
@@ -1899,11 +1928,12 @@ def _aifs_frame(*, keys: pl.DataFrame, domain: DomainType, weather_dir: Path) ->
     arm_frames += ens_member_arms(
         extract=efh.members(sites=sites),
         domain=domain,
-        days=AIFS_DAYS,
+        days=days,
         method=method,
         ensemble_size=efh.ENSEMBLE_SIZE,
         arm_name=lambda way, day: f"ens_{way}6_day{day}",
         six_hourly=True,
+        keep_init_time=True,
     )
     frame = keys
     for arm_frame in arm_frames:
@@ -1920,7 +1950,12 @@ def _aifs_frame(*, keys: pl.DataFrame, domain: DomainType, weather_dir: Path) ->
 
 
 def build_aifs(
-    *, domain: DomainType, published_dir: Path, output_dir: Path, weather_dir: Path
+    *,
+    domain: DomainType,
+    published_dir: Path,
+    output_dir: Path,
+    weather_dir: Path,
+    days: tuple[int, ...] = AIFS_DAYS,
 ) -> Path:
     """Build the AIFS columns on the published inputs' own `(site, time)` keys.
 
@@ -1929,23 +1964,31 @@ def build_aifs(
         published_dir: The folder holding the published `<domain>_forecast_inputs.parquet`.
         output_dir: The new folder to write `<domain>_aifs_inputs.parquet` into.
         weather_dir: The folder holding the two AIFS downloads' directories.
+        days: The bands to build.
 
     Returns:
         The written file's path.
 
     Raises:
-        ValueError: If `output_dir` is `published_dir`.
+        ValueError: If `output_dir` is `published_dir` or the folder of the day-1 and day-2 AIFS
+            fit, or `days` is empty or holds a day below 1.
         FileExistsError: If the output file already exists.
     """
     if output_dir.resolve() == published_dir.resolve():
         msg = f"the AIFS output must not be the published folder {published_dir}"
+        raise ValueError(msg)
+    if output_dir.resolve() == published_dir.resolve().parent / EXISTING_AIFS_DIR_NAME:
+        msg = f"the AIFS output must not be the existing AIFS folder {output_dir}"
+        raise ValueError(msg)
+    if not days or min(days) < 1:
+        msg = f"days must be a non-empty tuple of days from 1, got {days}"
         raise ValueError(msg)
     output_path = output_dir / f"{domain}_aifs_inputs.parquet"
     refuse_to_overwrite(paths=[output_path])
     keys = pl.read_parquet(published_dir / f"{domain}_forecast_inputs.parquet").select(
         "site", "time"
     )
-    frame = _aifs_frame(keys=keys, domain=domain, weather_dir=weather_dir)
+    frame = _aifs_frame(keys=keys, domain=domain, weather_dir=weather_dir, days=days)
     output_dir.mkdir(parents=True, exist_ok=True)
     frame.write_parquet(output_path)
     _LOG.info("%s: wrote %d rows, %d columns to %s", domain, frame.height, frame.width, output_path)
@@ -1999,6 +2042,13 @@ def main() -> int:
         "published inputs' keys, into a new --output-dir.",
     )
     parser.add_argument(
+        "--aifs-days",
+        type=int,
+        nargs="+",
+        default=list(AIFS_DAYS),
+        help="With --aifs: the bands to build (day N reads the 00 UTC run N days before the hour).",
+    )
+    parser.add_argument(
         "--aifs-weather-dir",
         type=Path,
         default=_weather_dir(),
@@ -2025,6 +2075,7 @@ def main() -> int:
                 published_dir=args.published_dir,
                 output_dir=args.output_dir,
                 weather_dir=args.aifs_weather_dir,
+                days=tuple(args.aifs_days),
             )
         return 0
     if args.extra_leads:
