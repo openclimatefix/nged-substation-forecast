@@ -17,9 +17,16 @@ sites come from the private roster at run time and stay in memory. Rows carry on
 
 **A run is stored only if it is complete.** Every site must have `LEADS_PER_RUN` hourly leads and
 every variable non-null, except the two radiation variables at lead 0, which are null by the
-averaging convention. A run the API refuses as not available is recorded in `_unavailable_runs.json`
-and counted as a documented gap. A trailing run that is not yet complete is skipped and retried on
-the next invocation.
+averaging convention. A run the API refuses with HTTP 400 "requested model run is not available" is
+recorded in `_unavailable_runs.json`. A historical run that comes back incomplete is recorded with
+its reason in `_incomplete_runs.json` and the backfill continues. Both ledgers hold dates only. A
+trailing run that is not yet published or complete is skipped and retried on the next invocation.
+
+**Refusals and errors.** Every refusal counts against `--max-runs`. After
+`MAX_CONSECUTIVE_REFUSALS` in a row the script stops, because a run of refusals means the request is
+wrong or the archive has ended, not that many days are missing. HTTP 429 stops the script cleanly
+and it resumes from the checkpoints. HTTP 5xx and transport failures are retried with backoff. The
+URL, the key and any coordinate are never printed, and any refusal reason is truncated.
 
 **Resuming.** One parquet per month. A month with every run day fetched or documented unavailable is
 `YYYY-MM.parquet`; otherwise it is `YYYY-MM.partial.parquet`, rewritten atomically after every run,
@@ -32,17 +39,20 @@ Run it with `uv run python studies/weather_downloads/fetch_open_meteo_single_run
 import argparse
 import json
 import logging
+import re
 import sys
 import time
+import urllib.error
+import urllib.request
+from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Final
+from typing import Any, Final
 
 import polars as pl
 from fetch_open_meteo_previous_runs import (
     BASE_VARIABLES,
     _check_timestamp_convention,
-    _get_json,
     _pv_sites,
     _wind_sites,
 )
@@ -61,6 +71,7 @@ MODELS_PARAMETER: Final[str] = "ecmwf_ifs"
 PRODUCT_DIR: Final[Path] = WEATHER_DOWNLOADS_DIR / "ECMWF-IFS-SINGLE-RUNS"
 COMBINED_FILENAME: Final[str] = "ECMWF-IFS-SINGLE-RUNS.parquet"
 UNAVAILABLE_FILENAME: Final[str] = "_unavailable_runs.json"
+INCOMPLETE_FILENAME: Final[str] = "_incomplete_runs.json"
 
 FIRST_RUN_DATE: Final[date] = date(2024, 3, 14)
 """The first day the Single Runs archive serves for IFS."""
@@ -76,16 +87,109 @@ TRAILING_DAYS_MAY_BE_INCOMPLETE: Final[int] = 2
 """The newest run days may not be published in full yet; a shortfall there is skipped, not fatal."""
 
 REQUEST_SLEEP_SECONDS: Final[float] = 0.5
-NOT_AVAILABLE_PHRASE: Final[str] = "not available"
-"""Substring of the API's refusal reason for a run it does not hold."""
+REQUEST_TIMEOUT_SECONDS: Final[float] = 120.0
+MAX_ATTEMPTS: Final[int] = 5
+"""Attempts per request for a transport failure or an HTTP 5xx."""
+
+MAX_CONSECUTIVE_REFUSALS: Final[int] = 5
+NOT_AVAILABLE_PHRASE: Final[str] = "requested model run is not available"
+"""Substring of the reason in the API's HTTP 400 refusal for a run it does not hold."""
+
+MAX_REASON_CHARS: Final[int] = 100
+DECIMAL_NUMBER: Final[re.Pattern[str]] = re.compile(r"-?\d+\.\d+")
+"""A refusal reason can quote a request parameter back, and a coordinate is a decimal number, so
+`_safe_reason` masks every decimal number and truncates."""
+
+WIND_SPEED_UNIT: Final[str] = "km/h"
+RADIATION_UNITS: Final[frozenset[str]] = frozenset({"W/m\u00b2", "W/m2"})
+"""The units the API must report in `hourly_units`; anything else fails loudly."""
 
 
 class RunNotAvailableError(RuntimeError):
-    """The API does not hold the requested run."""
+    """The API refused the run with HTTP 400 "requested model run is not available"."""
 
 
 class IncompleteRunError(RuntimeError):
     """The API returned a run with missing leads or null values."""
+
+
+class RateLimitedError(RuntimeError):
+    """The API answered HTTP 429. The script stops and resumes from its checkpoints."""
+
+
+class TooManyRefusalsError(RuntimeError):
+    """`MAX_CONSECUTIVE_REFUSALS` runs in a row were refused."""
+
+
+@dataclass
+class FetchProgress:
+    """The mutable counters shared by every month of one invocation."""
+
+    runs_remaining: int | None
+    """Runs (fetched or refused) still allowed by `--max-runs`, or `None` for no limit."""
+    consecutive_refusals: int = 0
+    n_fetched: int = 0
+
+
+def _safe_reason(*, text: str) -> str:
+    """Return `text` with decimal numbers masked, cut to `MAX_REASON_CHARS`."""
+    return DECIMAL_NUMBER.sub("<number>", text)[:MAX_REASON_CHARS]
+
+
+def _read_reason(*, refusal: urllib.error.HTTPError) -> str:
+    """Return the `reason` of an error response, or a note that the body was not JSON."""
+    body = refusal.read()
+    try:
+        parsed = json.loads(body or b"{}")
+    except ValueError:
+        return "response body was not JSON"
+    return str(parsed.get("reason", "no reason given")) if isinstance(parsed, dict) else "no reason"
+
+
+def _get_json(*, url: str) -> Any:
+    """Fetch one URL, retrying 5xx and transport failures, and classifying every refusal.
+
+    Args:
+        url: The full request URL, which carries coordinates and the key and is never logged.
+
+    Returns:
+        The decoded JSON payload.
+
+    Raises:
+        RunNotAvailableError: On HTTP 400 whose reason contains `NOT_AVAILABLE_PHRASE`.
+        RateLimitedError: On HTTP 429.
+        RuntimeError: On any other refusal, a non-JSON success body, or `MAX_ATTEMPTS` failures.
+    """
+    for attempt in range(MAX_ATTEMPTS):
+        try:
+            with urllib.request.urlopen(url, timeout=REQUEST_TIMEOUT_SECONDS) as response:
+                payload = json.loads(response.read())
+        except urllib.error.HTTPError as refusal:
+            reason = _read_reason(refusal=refusal)
+            if refusal.code == 429:
+                msg = "Open-Meteo answered HTTP 429 (rate limited)"
+                raise RateLimitedError(msg) from None
+            if refusal.code == 400 and NOT_AVAILABLE_PHRASE in reason.lower():
+                msg = "HTTP 400: requested model run is not available"
+                raise RunNotAvailableError(msg) from None
+            if refusal.code >= 500:
+                _LOG.warning("attempt %d failed with HTTP %d, retrying", attempt + 1, refusal.code)
+                time.sleep(5.0 * (attempt + 1))
+                continue
+            shown = _safe_reason(text=reason)
+            msg = f"Open-Meteo refused the request with HTTP {refusal.code}: {shown}"
+            raise RuntimeError(msg) from None
+        except (urllib.error.URLError, TimeoutError, ConnectionError, ValueError) as failure:
+            _LOG.warning("attempt %d failed (%s), retrying", attempt + 1, type(failure).__name__)
+            time.sleep(5.0 * (attempt + 1))
+        else:
+            if isinstance(payload, dict) and payload.get("error"):
+                shown = _safe_reason(text=str(payload.get("reason")))
+                msg = f"Open-Meteo refused the request: {shown}"
+                raise RuntimeError(msg)
+            return payload
+    msg = f"Open-Meteo failed after {MAX_ATTEMPTS} attempts"
+    raise RuntimeError(msg)
 
 
 def _require_api_key() -> str:
@@ -139,8 +243,8 @@ def fetch_run_group(*, sites: pl.DataFrame, run_date: date) -> pl.DataFrame:
 
     Raises:
         RunNotAvailableError: If the API refuses the run as not available.
-        RuntimeError: If the response does not carry one block per site, or the API refuses the
-            request for any other reason.
+        RuntimeError: If the response does not carry one block per site, a block is out of
+            position or in unexpected units, or the API refuses the request for any other reason.
     """
     init_time = _run_time(run_date=run_date)
     cell_selection = sites["cell_selection"][0]
@@ -152,17 +256,13 @@ def fetch_run_group(*, sites: pl.DataFrame, run_date: date) -> pl.DataFrame:
         f"&hourly={','.join(BASE_VARIABLES)}&models={MODELS_PARAMETER}&timezone=UTC"
         f"&cell_selection={cell_selection}&apikey={_require_api_key()}"
     )
-    try:
-        payload = _get_json(url=request)
-    except RuntimeError as refusal:
-        if NOT_AVAILABLE_PHRASE in str(refusal).lower():
-            msg = f"run {run_date} refused as not available"
-            raise RunNotAvailableError(msg) from None
-        raise
+    payload = _get_json(url=request)
     blocks = payload if isinstance(payload, list) else [payload]
     if len(blocks) != sites.height:
         msg = f"asked for {sites.height} sites and got {len(blocks)} blocks"
         raise RuntimeError(msg)
+    for position, block in enumerate(blocks):
+        _check_block(block=block, position=position, n_blocks=len(blocks))
     frame = pl.concat(
         pl.DataFrame(
             {"site": site, "valid_time": block["hourly"]["time"]}
@@ -174,7 +274,38 @@ def fetch_run_group(*, sites: pl.DataFrame, run_date: date) -> pl.DataFrame:
     return frame.with_columns(
         pl.col("valid_time").str.to_datetime("%Y-%m-%dT%H:%M", time_unit="us"),
         init_time=pl.lit(init_time, dtype=pl.Datetime("us")),
-    ).with_columns(lead_hours=((pl.col("valid_time") - pl.col("init_time")) / timedelta(hours=1)))
+    ).with_columns(
+        lead_hours=(pl.col("valid_time") - pl.col("init_time")).dt.total_hours().cast(pl.Int32)
+    )
+
+
+def _check_block(*, block: dict[str, Any], position: int, n_blocks: int) -> None:
+    """Fail loudly unless one response block is in the position its label assumes, in known units.
+
+    The label of a site comes from the block's position, so a reordered response would swap two
+    anonymised labels without any error. Every block of a multi-location response carries a
+    `location_id`, which must equal its position.
+
+    Args:
+        block: One location's block of the response.
+        position: The block's index in the response list.
+        n_blocks: How many blocks the response holds.
+
+    Raises:
+        RuntimeError: If `location_id` differs from the position, or `hourly_units` differs from
+            `WIND_SPEED_UNIT` for wind speed or `RADIATION_UNITS` for radiation.
+    """
+    if n_blocks > 1 and block.get("location_id") != position:
+        msg = f"response block {position} carries a different location_id: sites would be swapped"
+        raise RuntimeError(msg)
+    units = block["hourly_units"]
+    for name in BASE_VARIABLES:
+        if name.startswith("wind_speed") and units[name] != WIND_SPEED_UNIT:
+            msg = f"{name} is reported in {units[name]!r}, expected {WIND_SPEED_UNIT!r}"
+            raise RuntimeError(msg)
+        if name in RADIATION_VARIABLES and units[name] not in RADIATION_UNITS:
+            msg = f"{name} is reported in {units[name]!r}, expected W/m2"
+            raise RuntimeError(msg)
 
 
 def _shortfall(*, frame: pl.DataFrame) -> str | None:
@@ -187,7 +318,7 @@ def _shortfall(*, frame: pl.DataFrame) -> str | None:
         A sentence naming the shortfall, without any coordinate, or `None`.
     """
     per_site = frame.group_by("site").agg(pl.col("lead_hours").sort().alias("leads"))
-    expected_leads = [float(lead) for lead in range(LEADS_PER_RUN)]
+    expected_leads = list(range(LEADS_PER_RUN))
     wrong = per_site.filter(pl.col("leads").list.len() != LEADS_PER_RUN)
     if not wrong.is_empty():
         return f"sites {sorted(wrong['site'])} do not have {LEADS_PER_RUN} leads"
@@ -240,12 +371,20 @@ def _month_paths(*, month: str) -> tuple[Path, Path]:
     return PRODUCT_DIR / f"{month}.parquet", PRODUCT_DIR / f"{month}.partial.parquet"
 
 
-def _read_unavailable() -> set[date]:
-    """Return the run days already recorded as refused by the API."""
-    path = PRODUCT_DIR / UNAVAILABLE_FILENAME
+def _read_ledger(*, filename: str) -> dict[date, str]:
+    """Return a ledger of run days to reasons, or an empty one if the file does not exist."""
+    path = PRODUCT_DIR / filename
     if not path.exists():
-        return set()
-    return {date.fromisoformat(day) for day in json.loads(path.read_text())}
+        return {}
+    return {date.fromisoformat(day): reason for day, reason in json.loads(path.read_text()).items()}
+
+
+def _write_ledger(*, ledger: dict[date, str], filename: str) -> None:
+    """Write a ledger of run days to reasons atomically. It holds dates and reasons only."""
+    path = PRODUCT_DIR / filename
+    temporary = path.with_name(path.name + ".tmp")
+    temporary.write_text(json.dumps({day.isoformat(): ledger[day] for day in sorted(ledger)}))
+    temporary.rename(path)
 
 
 def _write_atomically(*, frame: pl.DataFrame, path: Path) -> None:
@@ -283,9 +422,10 @@ def _fetch_month(
     sites: pl.DataFrame,
     first: date,
     last: date,
-    unavailable: set[date],
-    runs_remaining: int | None,
-) -> int:
+    unavailable: dict[date, str],
+    incomplete: dict[date, str],
+    progress: FetchProgress,
+) -> None:
     """Fetch every missing run of one month, checkpointing after each run.
 
     Args:
@@ -293,61 +433,78 @@ def _fetch_month(
         sites: The roster with `cell_selection`.
         first: The first run day wanted.
         last: The last run day wanted.
-        unavailable: The run days recorded as refused by the API. Updated in place.
-        runs_remaining: The most runs to fetch in this call, or `None` for no limit.
-
-    Returns:
-        The number of runs fetched.
+        unavailable: The run days refused by the API, mapped to a reason. Updated in place.
+        incomplete: The historical run days that came back incomplete, mapped to the shortfall.
+            Updated in place.
+        progress: The counters shared by every month. Updated in place.
 
     Raises:
-        IncompleteRunError: If a run older than `TRAILING_DAYS_MAY_BE_INCOMPLETE` days is
-            incomplete.
+        TooManyRefusalsError: If `MAX_CONSECUTIVE_REFUSALS` runs in a row are refused.
     """
     complete_path, partial_path = _month_paths(month=month)
     days = _month_days(month=month, first=first, last=last)
     if complete_path.exists():
-        return 0
+        return
     cache = pl.read_parquet(partial_path) if partial_path.exists() else None
     fetched_days = (
         set(cache["init_time"].dt.date().unique().to_list()) if cache is not None else set()
     )
-    today = datetime.now(UTC).date()
-    n_fetched = 0
+    trailing_from = datetime.now(UTC).date() - timedelta(days=TRAILING_DAYS_MAY_BE_INCOMPLETE)
     for day in days:
-        if day in fetched_days or day in unavailable:
+        if day in fetched_days or day in unavailable or day in incomplete:
             continue
-        if runs_remaining is not None and n_fetched >= runs_remaining:
+        if progress.runs_remaining is not None and progress.runs_remaining <= 0:
             break
         started = time.monotonic()
         try:
             frame = fetch_run(sites=sites, run_date=day)
         except RunNotAvailableError:
-            if day > today - timedelta(days=TRAILING_DAYS_MAY_BE_INCOMPLETE):
+            if day > trailing_from:
                 _LOG.info("run %s not published yet, skipping", day)
                 continue
-            _LOG.warning("run %s is not available from the API: recorded as a gap", day)
-            unavailable.add(day)
-            (PRODUCT_DIR / UNAVAILABLE_FILENAME).write_text(
-                json.dumps(sorted(d.isoformat() for d in unavailable))
-            )
+            _count_run(progress=progress)
+            progress.consecutive_refusals += 1
+            _LOG.warning("run %s refused as not available: recorded as a gap", day)
+            unavailable[day] = "HTTP 400: requested model run is not available"
+            _write_ledger(ledger=unavailable, filename=UNAVAILABLE_FILENAME)
+            if progress.consecutive_refusals >= MAX_CONSECUTIVE_REFUSALS:
+                msg = (
+                    f"{MAX_CONSECUTIVE_REFUSALS} runs in a row were refused, the last one {day}: "
+                    "stopping. Check the request settings and the archive's start before resuming."
+                )
+                raise TooManyRefusalsError(msg) from None
             continue
-        except IncompleteRunError:
-            if day > today - timedelta(days=TRAILING_DAYS_MAY_BE_INCOMPLETE):
+        except IncompleteRunError as shortfall:
+            if day > trailing_from:
                 _LOG.info("run %s not complete yet, skipping", day)
                 continue
-            raise
+            _count_run(progress=progress)
+            _LOG.warning("run %s is incomplete: recorded as a gap and skipped", day)
+            incomplete[day] = _safe_reason(text=str(shortfall))
+            _write_ledger(ledger=incomplete, filename=INCOMPLETE_FILENAME)
+            continue
+        _count_run(progress=progress)
+        progress.consecutive_refusals = 0
+        progress.n_fetched += 1
         cache = frame if cache is None else pl.concat([cache, frame]).sort("init_time", "site")
         fetched_days.add(day)
         _write_atomically(frame=cache, path=partial_path)
-        n_fetched += 1
         _LOG.info(
             "run %s: 2 requests, %.1f s, %d rows", day, time.monotonic() - started, frame.height
         )
     every_day = _month_days(month=month, first=FIRST_RUN_DATE, last=date.max)
-    if cache is not None and set(every_day) <= fetched_days | unavailable:
+    if (
+        cache is not None
+        and set(every_day) <= fetched_days | unavailable.keys() | incomplete.keys()
+    ):
         partial_path.rename(complete_path)
         _LOG.info("%s: month complete", month)
-    return n_fetched
+
+
+def _count_run(*, progress: FetchProgress) -> None:
+    """Count one attempted run (fetched, refused, or incomplete) against `--max-runs`."""
+    if progress.runs_remaining is not None:
+        progress.runs_remaining -= 1
 
 
 def _combine() -> pl.DataFrame:
@@ -376,7 +533,7 @@ def _column_descriptions() -> dict[str, str]:
         "site": "Anonymised meter label (`A`-`F` for solar, `W1`-`W3` for wind), not a coordinate.",
         "init_time": "The model run's 00 UTC start, UTC, timezone-naive.",
         "valid_time": "The hour the values describe, UTC, timezone-naive.",
-        "lead_hours": "`valid_time - init_time` in hours, 0 to 240.",
+        "lead_hours": "`valid_time - init_time` in hours, 0 to 240, `Int32`.",
         "shortwave_radiation": "Global horizontal irradiance, W/m^2, mean over the hour ending at "
         "`valid_time` (null at lead 0).",
         "direct_radiation": "Direct (beam) horizontal irradiance, W/m^2, averaged as above "
@@ -389,7 +546,13 @@ def _column_descriptions() -> dict[str, str]:
     }
 
 
-def _write_docs(*, frame: pl.DataFrame, sites: pl.DataFrame, unavailable: set[date]) -> None:
+def _write_docs(
+    *,
+    frame: pl.DataFrame,
+    sites: pl.DataFrame,
+    unavailable: dict[date, str],
+    incomplete: dict[date, str],
+) -> None:
     """Write `lineage.json` and `README.md` from the combined frame."""
     runs = frame["init_time"].unique().sort()
     lead_one_hour = frame.filter(pl.col("lead_hours") > 0).select(
@@ -413,6 +576,7 @@ def _write_docs(*, frame: pl.DataFrame, sites: pl.DataFrame, unavailable: set[da
             "first_init_time": str(runs.min()),
             "last_init_time": str(runs.max()),
             "unavailable_runs": sorted(day.isoformat() for day in unavailable),
+            "incomplete_runs": {day.isoformat(): incomplete[day] for day in sorted(incomplete)},
             "note": (
                 "Clear-sky correlation of shortwave_radiation at leads 1-240 against the label "
                 "itself, the label shifted 30 minutes earlier, and the label shifted 30 minutes "
@@ -441,9 +605,22 @@ def _write_docs(*, frame: pl.DataFrame, sites: pl.DataFrame, unavailable: set[da
                 "so there is one row per (site, run, lead)."
             ),
             (
-                "**Model version changes.** ECMWF changed the IFS cycle inside the 2024 to 2026 "
-                "span. The dates were read from ECMWF's own pages and are not verified in this "
-                "data, so assign a model era from `init_time` when comparing across the span."
+                "**Model version changes.** The IFS cycle changed before and inside the span. "
+                "ECMWF's IFS cycle 48r1 went live on 2023-06-27 06 UTC. Cycle 49r1 went live on "
+                "2024-11-12, at 06 UTC on one project page and 12 UTC on another, so the hour is "
+                "to be confirmed. Cycle 50r1 went live on 2026-05-12 06 UTC, together with AIFS "
+                "v2. These dates are read from ECMWF pages, not verified in this data. Assign a "
+                "model era from `init_time` when comparing across the span."
+            ),
+            (
+                "**Archive start.** The archive starts on 2024-03-14, and Open-Meteo labels the "
+                "runs from that date as cycle 49r1 hindcasts, which predates the operational 49r1 "
+                "date above. Whether the start reflects a grid or source change is unverified."
+            ),
+            (
+                "**Hourly values at long leads are not native.** IFS HRES output steps coarsen at "
+                "longer leads, and Open-Meteo interpolates or disaggregates them to hourly. "
+                "Hourly values at lead days 5, 7, and 10 are therefore not native model output."
             ),
             (
                 "**Horizon.** The IFS HRES horizon is 10 days, so there is no lead day 14. AIFS "
@@ -455,6 +632,8 @@ def _write_docs(*, frame: pl.DataFrame, sites: pl.DataFrame, unavailable: set[da
             ),
             (
                 "**Units.** The API's defaults: wind speeds in km/h, temperature in degC. "
+                "The fetch fails if `hourly_units` reports another unit for wind speed or "
+                "radiation. "
                 "Radiation is a mean over the hour ending at `valid_time`; `lineage.json`'s "
                 "`note` records the convention measured from the data."
             ),
@@ -479,28 +658,34 @@ def main() -> int:
 
     sites = _sites()
     PRODUCT_DIR.mkdir(parents=True, exist_ok=True)
-    unavailable = _read_unavailable()
-    remaining = arguments.max_runs
+    progress = FetchProgress(runs_remaining=arguments.max_runs)
+    unavailable = _read_ledger(filename=UNAVAILABLE_FILENAME)
+    incomplete = _read_ledger(filename=INCOMPLETE_FILENAME)
     started = time.monotonic()
-    total = 0
-    for month in _months(first=arguments.start, last=arguments.end):
-        fetched = _fetch_month(
-            month=month,
-            sites=sites,
-            first=arguments.start,
-            last=arguments.end,
-            unavailable=unavailable,
-            runs_remaining=remaining,
-        )
-        total += fetched
-        if remaining is not None:
-            remaining -= fetched
-            if remaining <= 0:
+    try:
+        for month in _months(first=arguments.start, last=arguments.end):
+            _fetch_month(
+                month=month,
+                sites=sites,
+                first=arguments.start,
+                last=arguments.end,
+                unavailable=unavailable,
+                incomplete=incomplete,
+                progress=progress,
+            )
+            if progress.runs_remaining is not None and progress.runs_remaining <= 0:
                 break
-    _LOG.info("fetched %d runs in %.1f s", total, time.monotonic() - started)
+    except (RateLimitedError, TooManyRefusalsError) as stop:
+        _LOG.error(
+            "stopped after %d runs: %s. Re-run the same command to resume.",
+            progress.n_fetched,
+            stop,
+        )
+        return 1
+    _LOG.info("fetched %d runs in %.1f s", progress.n_fetched, time.monotonic() - started)
     frame = _combine()
     _write_atomically(frame=frame, path=PRODUCT_DIR / COMBINED_FILENAME)
-    _write_docs(frame=frame, sites=sites, unavailable=unavailable)
+    _write_docs(frame=frame, sites=sites, unavailable=unavailable, incomplete=incomplete)
     return 0
 
 

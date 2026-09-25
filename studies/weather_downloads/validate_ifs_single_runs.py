@@ -3,8 +3,8 @@
 One-off throwaway script for
 <https://github.com/openclimatefix/nged-substation-forecast/issues/810>. It reads
 `data/studies/weather/ECMWF-IFS-SINGLE-RUNS/ECMWF-IFS-SINGLE-RUNS.parquet` and runs the checks in
-`CHECK_NAMES`: run spacing (every gap between the first and last run listed, and any gap that is
-not a documented unavailable run a failure), 241 leads per run per site, all seven variables, nulls
+`CHECK_NAMES`: run spacing (every run day missing from the first day the archive serves listed,
+and any gap in neither ledger a failure), 241 leads per run per site, all seven variables, nulls
 only in radiation at lead 0, physical ranges, a diurnal check on radiation, and nine site labels in
 every month file.
 
@@ -16,7 +16,7 @@ Run it with `uv run python studies/weather_downloads/validate_ifs_single_runs.py
 
 import json
 import sys
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Final
 
@@ -24,9 +24,12 @@ import polars as pl
 from fetch_open_meteo_single_runs import (
     BASE_VARIABLES,
     COMBINED_FILENAME,
+    FIRST_RUN_DATE,
+    INCOMPLETE_FILENAME,
     LEADS_PER_RUN,
     PRODUCT_DIR,
     RADIATION_VARIABLES,
+    TRAILING_DAYS_MAY_BE_INCOMPLETE,
     UNAVAILABLE_FILENAME,
 )
 from studies.anonymise import SITE_LABELS, WIND_SITE_LABELS
@@ -41,12 +44,14 @@ MAX_DIRECTION_DEG: Final[float] = 360.0
 
 NIGHT_HOURS_UTC: Final[tuple[int, ...]] = (0, 1, 2, 22, 23)
 NIGHT_MAX_MEAN_RADIATION_W_M2: Final[float] = 1.0
-"""Around midnight UTC the sun is below the horizon in Great Britain all year."""
+"""Around midnight UTC the sun is below the horizon in Great Britain all year, so a mean above 1
+W/m^2 means the timestamps are shifted. The ceiling holds for a subset of months as well as for the
+whole archive, because the sun is below the horizon at 22 to 02 UTC even at the June solstice."""
 
 NOON_HOURS_UTC: Final[tuple[int, ...]] = (11, 12, 13)
 NOON_MIN_MEAN_RADIATION_W_M2: Final[float] = 20.0
-"""The mean over all runs and sites around solar noon, which is well above this even when the data
-covers only December."""
+"""The mean over all runs and sites around solar noon. A December-only subset still averages well
+above this (short days, low sun, cloud), so a mean below it means night values at midday."""
 
 CHECK_NAMES: Final[tuple[str, ...]] = (
     "run_spacing",
@@ -57,6 +62,9 @@ CHECK_NAMES: Final[tuple[str, ...]] = (
     "value_ranges",
     "diurnal_radiation",
     "nine_sites_every_month",
+    "no_duplicate_leads",
+    "valid_time_matches_lead",
+    "sites_have_distinct_series",
 )
 """Every check, in report order."""
 
@@ -67,22 +75,27 @@ def _run_days(*, frame: pl.DataFrame) -> list[date]:
 
 
 def _gaps(*, days: list[date]) -> list[date]:
-    """Return every run day missing between the first and last run."""
+    """Return every run day missing from `FIRST_RUN_DATE` to `TRAILING_DAYS_MAY_BE_INCOMPLETE` ago.
+
+    The span starts at the first day the archive serves, not at the first run fetched, so days
+    missing before the first run and after the last run count as gaps too.
+    """
     present = set(days)
-    span = (days[-1] - days[0]).days
+    end = datetime.now(UTC).date() - timedelta(days=TRAILING_DAYS_MAY_BE_INCOMPLETE)
+    span = (end - FIRST_RUN_DATE).days
     return [
-        days[0] + timedelta(days=n)
-        for n in range(span + 1)
-        if days[0] + timedelta(days=n) not in present
+        day
+        for day in (FIRST_RUN_DATE + timedelta(days=n) for n in range(span + 1))
+        if day not in present
     ]
 
 
-def _documented_unavailable() -> set[date]:
-    """Return the run days the fetch script recorded as refused by the API."""
-    path = PRODUCT_DIR / UNAVAILABLE_FILENAME
+def _read_ledger(*, filename: str) -> dict[date, str]:
+    """Return the fetch script's ledger of run days to reasons, or an empty one."""
+    path = PRODUCT_DIR / filename
     if not path.exists():
-        return set()
-    return {date.fromisoformat(day) for day in json.loads(path.read_text())}
+        return {}
+    return {date.fromisoformat(day): reason for day, reason in json.loads(path.read_text()).items()}
 
 
 def _check_run_spacing(*, frame: pl.DataFrame, gaps: list[date]) -> str | None:
@@ -90,7 +103,11 @@ def _check_run_spacing(*, frame: pl.DataFrame, gaps: list[date]) -> str | None:
     off_hour = frame.filter(pl.col("init_time").dt.hour() != 0)
     if not off_hour.is_empty():
         return "some init_time is not 00 UTC"
-    undocumented = sorted(set(gaps) - _documented_unavailable())
+    documented = (
+        _read_ledger(filename=UNAVAILABLE_FILENAME).keys()
+        | _read_ledger(filename=INCOMPLETE_FILENAME).keys()
+    )
+    undocumented = sorted(set(gaps) - documented)
     if undocumented:
         return f"{len(undocumented)} run days missing without a documented reason"
     return None
@@ -100,11 +117,15 @@ def _check_leads(*, frame: pl.DataFrame) -> str | None:
     """Fail unless every (site, init_time) has exactly leads 0 to 240."""
     per_group = frame.group_by("site", "init_time").agg(
         pl.len().alias("n"),
+        pl.col("lead_hours").n_unique().alias("n_unique"),
         pl.col("lead_hours").min().alias("lo"),
         pl.col("lead_hours").max().alias("hi"),
     )
     wrong = per_group.filter(
-        (pl.col("n") != LEADS_PER_RUN) | (pl.col("lo") != 0) | (pl.col("hi") != LEADS_PER_RUN - 1)
+        (pl.col("n") != LEADS_PER_RUN)
+        | (pl.col("n_unique") != LEADS_PER_RUN)
+        | (pl.col("lo") != 0)
+        | (pl.col("hi") != LEADS_PER_RUN - 1)
     )
     if wrong.is_empty():
         return None
@@ -186,6 +207,47 @@ def _check_sites_every_month(*, frame: pl.DataFrame) -> str | None:
     return f"months without exactly the nine sites: {sorted(wrong)}" if wrong else None
 
 
+def _check_duplicate_leads(*, frame: pl.DataFrame) -> str | None:
+    """Fail on any (site, init_time, lead_hours) key that appears more than once."""
+    n_duplicated = frame.height - frame.select("site", "init_time", "lead_hours").n_unique()
+    return f"{n_duplicated} duplicated (site, run, lead) rows" if n_duplicated else None
+
+
+def _check_valid_time(*, frame: pl.DataFrame) -> str | None:
+    """Fail unless every row has `valid_time == init_time + lead_hours`."""
+    wrong = frame.filter(
+        pl.col("valid_time") != pl.col("init_time") + pl.duration(hours=pl.col("lead_hours"))
+    )
+    return (
+        f"{wrong.height} rows where valid_time != init_time + lead_hours" if wrong.height else None
+    )
+
+
+def _check_distinct_series(*, frame: pl.DataFrame) -> str | None:
+    """Fail if two site labels carry an identical series in every variable.
+
+    Identical series would mean a swapped or repeated block, although two sites in one 9 km grid
+    cell could carry them legitimately, so a failure names the labels for a manual look.
+    """
+    per_site = (
+        frame.sort("init_time", "lead_hours")
+        .group_by("site")
+        .agg(pl.col(name) for name in BASE_VARIABLES)
+    )
+    series = {
+        site: tuple(tuple(row[name]) for name in BASE_VARIABLES)
+        for site, row in zip(per_site["site"], per_site.iter_rows(named=True), strict=True)
+    }
+    sites = sorted(series)
+    pairs = [
+        f"{first}/{second}"
+        for index, first in enumerate(sites)
+        for second in sites[index + 1 :]
+        if series[first] == series[second]
+    ]
+    return f"identical series for {pairs}" if pairs else None
+
+
 def main() -> int:
     """Run every check, print one line each, then list every gap. Return non-zero on a failure."""
     path: Path = PRODUCT_DIR / COMBINED_FILENAME
@@ -201,12 +263,25 @@ def main() -> int:
         "value_ranges": _check_ranges(frame=frame),
         "diurnal_radiation": _check_diurnal(frame=frame),
         "nine_sites_every_month": _check_sites_every_month(frame=frame),
+        "no_duplicate_leads": _check_duplicate_leads(frame=frame),
+        "valid_time_matches_lead": _check_valid_time(frame=frame),
+        "sites_have_distinct_series": _check_distinct_series(frame=frame),
     }
     for name in CHECK_NAMES:
         reason = failures[name]
         print(f"PASS {name}" if reason is None else f"FAIL {name}: {reason}")
     print(f"runs: {len(days)}, first {days[0]}, last {days[-1]}")
-    print(f"gaps ({len(gaps)}): {', '.join(day.isoformat() for day in gaps) or 'none'}")
+    unavailable = _read_ledger(filename=UNAVAILABLE_FILENAME)
+    incomplete = _read_ledger(filename=INCOMPLETE_FILENAME)
+    print(f"gaps ({len(gaps)}) from {FIRST_RUN_DATE} to the newest expected run:")
+    for day in gaps:
+        if day in unavailable:
+            kind = f"refused by the API ({unavailable[day]})"
+        elif day in incomplete:
+            kind = f"incomplete ({incomplete[day]})"
+        else:
+            kind = "UNDOCUMENTED"
+        print(f"  {day}: {kind}")
     return 1 if any(reason is not None for reason in failures.values()) else 0
 
 
