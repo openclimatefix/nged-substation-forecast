@@ -3283,6 +3283,7 @@ dev = [
     { name = "dagster-dg-cli" },
     { name = "dashboard" },
     { name = "gcsfs" },
+    { name = "icechunk" },
     { name = "mkdocs-include-markdown-plugin" },
     { name = "mkdocs-material" },
     { name = "mkdocs-redirects" },
@@ -3298,6 +3299,7 @@ dev = [
     { name = "studies" },
     { name = "ty" },
     { name = "unittest-xml-reporting" },
+    { name = "zarr" },
 ]
 
 [package.metadata]
@@ -3329,6 +3331,7 @@ dev = [
     { name = "dagster-dg-cli" },
     { name = "dashboard", editable = "packages/dashboard" },
     { name = "gcsfs" },
+    { name = "icechunk", specifier = ">=2.2.0" },
     { name = "mkdocs-include-markdown-plugin", specifier = ">=7.2.2" },
     { name = "mkdocs-material", specifier = ">=9.7.6" },
     { name = "mkdocs-redirects", specifier = ">=1.1.0,<1.2.3" },
@@ -3344,6 +3347,7 @@ dev = [
     { name = "studies", editable = "packages/studies" },
     { name = "ty", specifier = ">=0.0.16" },
     { name = "unittest-xml-reporting", specifier = ">=4.0.0" },
+    { name = "zarr", specifier = ">=3.4.0" },
 ]
 
 [[package]]

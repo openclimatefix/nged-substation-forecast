@@ -65,6 +65,10 @@ dev = [
     "studies",
     # gcsfs reads the WeatherNext 3 Zarr stores in `studies/weather_downloads/fetch_weathernext3.py`.
     "gcsfs",
+    # icechunk and zarr write the WeatherNext 3 store in `fetch_weathernext3.py` and read it back
+    # in `validate_weathernext3.py`.
+    "icechunk>=2.2.0",
+    "zarr>=3.4.0",
     "pytest-xdist>=3.6.1",
     # Pinned below 1.2.3: that release and later pull in `properdocs` as a transitive dependency,
     # which prints an unsolicited warning urging a switch away from MkDocs on every build.

@@ -52,11 +52,28 @@ way):
 - `fetch_nora3.py` and `validate_nora3.py` — NORA3 hourly wind at 50 m and 100 m over OPeNDAP, cut
   server-side to the box, from the aggregated dataset and then MET Norway's monthly files, needs
   `uv run --with pydap`.
-- `fetch_weathernext3.py` and `validate_weathernext3.py` — WeatherNext 3 ensemble-mean runs from a
-  Requester Pays Google Cloud Storage bucket, cropped to the box. The Zarr chunks are whole-globe,
-  so a run reads about 50 GB and keeps about 15 MB. Run it only on a Compute Engine machine in
-  us-east1, with `GOOGLE_CLOUD_PROJECT` set, because reads from elsewhere are billed as egress
-  (`--dry-run` prints the estimate first).
+- `fetch_weathernext3.py` and `validate_weathernext3.py` — WeatherNext 3 ensemble-mean runs (00,
+  06, 12, and 18 UTC) from a Requester Pays Google Cloud Storage bucket, cropped to a wide United
+  Kingdom box (49.0 to 61.5 degrees north, 10.0 degrees west to 3.5 degrees east, which is public
+  and unrelated to the private trial-area box) and written to an Icechunk store. The Zarr chunks
+  are whole-globe, so a run reads about 50 GB and keeps about 15 MB. Run the fetch only on a
+  Compute Engine machine in us-east1, with `GOOGLE_CLOUD_PROJECT` set, because reads from elsewhere
+  are billed as egress (`--dry-run` prints the estimate first).
+    - **Arguments.** `--bucket` (a Cloud Storage bucket in us-east1) or `--local-store` (a
+      directory, for tests) names the output; exactly one is required. `--start-date` and
+      `--end-date` give the window, and `--end-date` is required when the repository is created,
+      because it fixes the end of the `init_time` axis for good. Later invocations clip their
+      window to that stored range. `--init-hours` (any of `0 6 12 18`, default all four),
+      `--workers` (default 16), and `--max-external-gb` (default 5.0) complete the arguments.
+    - **Outputs.** One Icechunk repository with seven `Float32` arrays (one per variable, dimensions
+      `(init_time, lead_time, latitude, longitude)`, one shard per run), the arrays `run_written`
+      and `source_init_time`, and the lineage and skipped runs in the group attributes. The fetch
+      makes one commit per run on the `staging` branch and never moves `main`. Re-running the fetch
+      skips every run already written.
+    - **Validating and publishing.** `validate_weathernext3.py` checks `staging` and prints one
+      PASS or FAIL line per check. `--compare-source` also compares sampled runs with the source
+      store, and `--publish` moves `main` to the validated snapshot. Run it in us-east1 as well,
+      because it reads every shard.
 
 Every script resolves `data/` the way `sources.REPO_DATA_DIR` does — the main checkout's `data/`,
 shared by every worktree, not a per-worktree copy — so run each script once, from whichever worktree
