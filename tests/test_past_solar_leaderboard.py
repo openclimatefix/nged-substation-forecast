@@ -7,6 +7,7 @@ write into the write-once folder.
 """
 
 import importlib.util
+import re
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -52,7 +53,11 @@ def _load() -> ModuleType:
 
 
 def _losses() -> pl.DataFrame:
-    """Return 2 sites x 4 hours x 2 seeds for three arms at two settings sharing arm names."""
+    """Return 2 sites x 4 hours x 2 seeds for three arms at two settings sharing arm names.
+
+    Each arm's `sensitivity` losses sit a different distance above its `pooled` losses, so a
+    contrast differs between the two settings.
+    """
     start = datetime(2025, 1, 1, tzinfo=UTC)
     base = {"cams_global": 0.010, "era5_global": 0.020, "ens_mean_t3": 0.018}
     return pl.DataFrame(
@@ -63,9 +68,12 @@ def _losses() -> pl.DataFrame:
             "time": start + timedelta(hours=hour),
             "seed": seed,
             "month": "2025-01" if hour < 2 else "2025-02",
-            METRIC: value + 0.001 * hour + 0.002 * seed + (0.05 if setting == "sensitivity" else 0),
+            METRIC: value
+            + 0.001 * hour
+            + 0.002 * seed
+            + (0.05 + 0.01 * index if setting == "sensitivity" else 0),
         }
-        for arm, value in base.items()
+        for index, (arm, value) in enumerate(base.items())
         for setting in ("pooled", "sensitivity")
         for site in ("a", "b")
         for hour in range(4)
@@ -99,6 +107,8 @@ def _printed_report(*, losses: pl.DataFrame, tweak: str | None = None) -> str:
             value += 0.001
         if tweak == "interval" and row["label"] == "ENS":
             high += 0.001
+        if tweak == "interval_low" and row["label"] == "ENS":
+            low -= 0.001
         lines.append(f"| {by_label[row['label']]} | {value:.3f} | [{low:.3f}, {high:.3f}] |")
     lines += _contrast_section(
         heading="Planned contrasts", contrast=contrast, label="ENS", by_label=by_label, tweak=tweak
@@ -217,7 +227,9 @@ def test_a_report_the_script_reproduces_scores_and_labels_the_planned_contrast(
     assert planning == {"CAMS": "exploratory", "ENS": "planned"}
 
 
-@pytest.mark.parametrize("tweak", ["error", "interval", "contrast", "second_setting"])
+@pytest.mark.parametrize(
+    "tweak", ["error", "interval", "interval_low", "contrast", "second_setting"]
+)
 def test_one_printed_number_that_differs_stops_the_script(tmp_path: Path, tweak: str) -> None:
     with pytest.raises(ValueError, match="ens_mean_t3"):
         _score(tmp_path=tmp_path, tweak=tweak)
@@ -506,3 +518,226 @@ def test_every_row_set_lists_the_planned_contrasts_the_study_names() -> None:
     counts = {row_set.key: len(row_set.planned_contrasts) for row_set in module.ROW_SETS}
 
     assert counts == {"main": 6, "extra": 3, "ens": 2, "station": 3}
+
+
+def test_the_second_setting_is_bootstrapped_from_the_sensitivity_losses(tmp_path: Path) -> None:
+    """Each arm's `sensitivity` losses sit a different distance above its `pooled` ones (1 pp)."""
+    module = _load()
+    result = _score(tmp_path=tmp_path)
+
+    planned = result.planned.row(0, named=True)
+    assert planned["second_difference"] == pytest.approx(planned["difference"] + 1.0)
+    ens = result.contrasts.filter(pl.col("label") == "ENS").row(0, named=True)
+    assert ens["second_difference"] == pytest.approx(ens["difference"] + 1.0)
+    output = tmp_path / "solar_leaderboard"
+    module.write_outputs(results=[result], output_dir=output)
+    intervals = pl.read_parquet(output / "intervals.parquet").filter(
+        pl.col("section") == module.PLANNED_CONTRAST_SECTION, pl.col("setting") == "sensitivity"
+    )
+    assert intervals["value"].to_list() == pytest.approx([planned["second_difference"]])
+    contrast_second = pl.read_parquet(output / "intervals.parquet").filter(
+        pl.col("section") == module.CONTRAST_SECTION, pl.col("setting") == "sensitivity"
+    )
+    assert contrast_second["value"].to_list() == pytest.approx([ens["second_difference"]])
+
+
+def test_a_contrast_gets_no_second_setting_where_era5_has_no_sensitivity_losses() -> None:
+    module = _load()
+    losses = _losses().filter(
+        ~((pl.col("arm") == "era5_global") & (pl.col("setting") == "sensitivity"))
+    )
+    contrasts = pl.DataFrame({"arm": ["ens_mean_t3"], "planning": ["planned"], "near_line": [True]})
+
+    result = module._second_setting(
+        contrasts=contrasts, arms=ARMS, losses=losses, site_hours=SITE_HOURS
+    )
+
+    assert result["second_difference"].to_list() == [None]
+
+
+def test_the_report_prints_a_positive_difference_with_a_plus_sign(tmp_path: Path) -> None:
+    module = _load()
+    result = _score(tmp_path=tmp_path)
+
+    lines = module.render_report(results=[result]).splitlines()
+
+    (row,) = [line for line in lines if line.startswith("| ENS against ERA5 |")]
+    assert "| -0.2" in row
+    assert re.search(r"\+0\.8\d* \[", row)
+
+
+def test_a_second_setting_row_is_not_compared_with_a_printed_first_setting_row() -> None:
+    module = _load()
+    contrasts = pl.DataFrame(
+        {
+            "arm": "ens_mean_t3",
+            "second_difference": 0.5,
+            "second_lower_95": 0.4,
+            "second_upper_95": 0.6,
+        }
+    )
+    printed = pl.DataFrame(
+        {
+            "scope": "all",
+            "treatment": "ens_mean_t3",
+            "reference": "era5_global",
+            "n_rows": SITE_HOURS,
+            "section": "Planned contrasts",
+            "difference": 0.1,
+            "lower_95": 0.0,
+            "upper_95": 0.2,
+        }
+    )
+
+    problems = module.check_contrasts(
+        contrasts=contrasts,
+        printed=printed,
+        site_hours=SITE_HOURS,
+        scope=module.SECOND_SETTING_SCOPE,
+        column_prefix="second_",
+    )
+
+    assert problems == []
+
+
+@pytest.mark.parametrize(
+    ("lower", "upper", "near"),
+    [
+        (0.2, 1.2, True),  # the nearer bound is exactly 20% of the width from zero
+        (0.21, 1.21, False),
+        (-0.10, 0.90, True),  # near through the lower bound, which is negative
+        (-0.9, 0.1, True),  # near through the upper bound
+        (0.50, 1.50, False),
+        (-1.5, -0.5, False),
+    ],
+)
+def test_near_the_line_is_a_bound_within_a_fifth_of_the_width_from_zero(
+    lower: float, upper: float, near: bool
+) -> None:
+    module = _load()
+    frame = pl.DataFrame({"lower_95": [lower], "upper_95": [upper]})
+
+    assert frame.select(module.near_line()).item() is near
+
+
+def test_score_row_set_flags_rows_with_the_near_line_rule(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load()
+    monkeypatch.setattr(module, "near_line", lambda: pl.lit(True))
+
+    result = _score_with(module=module, tmp_path=tmp_path)
+
+    assert result.contrasts["near_line"].all()
+    assert result.planned["near_line"].all()
+
+
+def _score_with(*, module: ModuleType, tmp_path: Path) -> Any:
+    losses = _losses()
+    report_path = tmp_path / "report.md"
+    text = _printed_report(losses=losses)
+    report_path.write_text(text)
+    return module.score_row_set(
+        row_set=_row_set(module, tmp_path),
+        losses=losses,
+        report_text=text,
+        report_path=report_path,
+    )
+
+
+def test_the_report_prints_the_near_line_and_reference_flags(tmp_path: Path) -> None:
+    module = _load()
+    result = _score(tmp_path=tmp_path)
+    flagged = result._replace(
+        contrasts=result.contrasts.with_columns(near_line=pl.col("label") == "CAMS")
+    )
+
+    lines = module.render_report(results=[flagged]).splitlines()
+
+    assert any(line.startswith("| CAMS |") and "| exploratory | yes |" in line for line in lines)
+    assert any(line.startswith("| ENS |") and "| planned | no |" in line for line in lines)
+    assert any(line.startswith("| CAMS | ") and line.endswith("| yes |") for line in lines)
+    assert any(line.startswith("| ENS | ") and line.endswith("| no |") for line in lines)
+
+
+def test_every_row_set_marks_cams_and_era5_as_reference_rows() -> None:
+    module = _load()
+
+    for row_set in module.ROW_SETS:
+        flagged = {arm.arm for arm in row_set.leaderboard_arms if arm.reference}
+        assert flagged == {"cams_global", "era5_global"}, row_set.key
+
+
+def test_the_main_contrasts_hold_the_ukv_rebuilds_and_no_row_set_contrasts_era5_with_itself() -> (
+    None
+):
+    module = _load()
+
+    main_arms = {arm.arm for arm in module.ROW_SETS[0].contrast_arms}
+    assert {"ukv_trap_global", "ukv_pair_global"} <= main_arms
+    for row_set in module.ROW_SETS:
+        assert "era5_global" not in {arm.arm for arm in row_set.contrast_arms}
+
+
+def test_the_intervals_and_the_report_hold_every_row_set(tmp_path: Path) -> None:
+    module = _load()
+    first = _score(tmp_path=tmp_path)
+    second = first._replace(row_set=first.row_set._replace(key="other", label="Other rows"))
+
+    intervals = module.intervals_frame(results=[first, second])
+    report = module.render_report(results=[first, second])
+
+    assert set(intervals["row_set"].to_list()) == {"test", "other"}
+    assert "### Test rows:" in report
+    assert "### Other rows:" in report
+
+
+def _main_with(
+    *, module: ModuleType, tmp_path: Path, monkeypatch: pytest.MonkeyPatch, argv: list[str]
+) -> tuple[int, Path]:
+    """Run `main` on one synthetic row set, with the output folder under `tmp_path`."""
+    data = tmp_path / "data"
+    data.mkdir()
+    losses = _losses()
+    losses.write_parquet(data / "losses.parquet")
+    (data / "report.md").write_text(_printed_report(losses=losses))
+    output = tmp_path / "solar_leaderboard"
+    monkeypatch.setattr(module, "ROW_SETS", (_row_set(module, data),))
+    monkeypatch.setattr(module, "SOLAR_LEADERBOARD_DIR", output)
+    monkeypatch.setattr(sys, "argv", ["past_solar_leaderboard.py", *argv])
+    return module.main(), output
+
+
+def test_check_only_writes_nothing(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+    module = _load()
+
+    code, output = _main_with(
+        module=module, tmp_path=tmp_path, monkeypatch=monkeypatch, argv=["--check-only"]
+    )
+
+    assert code == 0
+    assert not output.exists()
+
+
+def test_a_full_run_writes_the_folder_and_refuses_to_run_again(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load()
+
+    code, output = _main_with(module=module, tmp_path=tmp_path, monkeypatch=monkeypatch, argv=[])
+    assert code == 0
+    assert (output / "report.md").exists()
+    second_code = module.main()
+
+    assert second_code == 1
+
+
+def test_a_full_run_refuses_an_existing_folder_before_scoring(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    module = _load()
+    (tmp_path / "solar_leaderboard").mkdir()
+
+    code, _ = _main_with(module=module, tmp_path=tmp_path, monkeypatch=monkeypatch, argv=[])
+
+    assert code == 1

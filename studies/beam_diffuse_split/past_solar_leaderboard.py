@@ -629,18 +629,16 @@ def _planned_second_setting(
     return planned.join(second, on=["arm", "reference_arm"], how="left")
 
 
-def is_near_line(*, lower_95: float, upper_95: float) -> bool:
-    """Say whether an interval has a bound within `NEAR_LINE_SHARE` of its width from zero.
-
-    Args:
-        lower_95: The interval's lower bound.
-        upper_95: The interval's upper bound.
+def near_line() -> pl.Expr:
+    """Return the expression that flags an interval with a bound near zero.
 
     Returns:
-        True where the bound nearer zero is within 20% of the interval's width of zero.
+        A boolean expression over `lower_95` and `upper_95`: True where the bound nearer zero
+        lies within `NEAR_LINE_SHARE` of the interval's width from zero.
     """
-    nearest = min(abs(lower_95), abs(upper_95))
-    return nearest <= NEAR_LINE_SHARE * (upper_95 - lower_95)
+    return pl.min_horizontal(
+        pl.col("lower_95").abs(), pl.col("upper_95").abs()
+    ) <= NEAR_LINE_SHARE * (pl.col("upper_95") - pl.col("lower_95"))
 
 
 def _second_setting(
@@ -741,8 +739,7 @@ def score_row_set(
         .when(pl.col("arm").is_in(POST_HOC_ARMS))
         .then(pl.lit("post hoc"))
         .otherwise(pl.lit("exploratory")),
-        near_line=pl.min_horizontal(pl.col("lower_95").abs(), pl.col("upper_95").abs())
-        <= NEAR_LINE_SHARE * (pl.col("upper_95") - pl.col("lower_95")),
+        near_line=near_line(),
     )
     contrasts = _second_setting(
         contrasts=contrasts, arms=contrast_arms, losses=losses, site_hours=site_hours
@@ -753,10 +750,7 @@ def score_row_set(
         setting="pooled",
         site_hours=site_hours,
         metric=METRIC,
-    ).with_columns(
-        near_line=pl.min_horizontal(pl.col("lower_95").abs(), pl.col("upper_95").abs())
-        <= NEAR_LINE_SHARE * (pl.col("upper_95") - pl.col("lower_95"))
-    )
+    ).with_columns(near_line=near_line())
     planned_rows = _planned_second_setting(
         planned=planned_rows,
         contrasts=row_set.planned_contrasts,
