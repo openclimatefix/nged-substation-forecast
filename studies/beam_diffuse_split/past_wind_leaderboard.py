@@ -203,6 +203,7 @@ ROW_SETS: Final[tuple[leaderboard.RowSet, ...]] = (
         intervals="table",
         planned_section=DECIDING_SECTION,
         second_planned_section="The same two contrasts at the second hyperparameter setting",
+        second_scope="all",
         second_section="The same two contrasts at the second hyperparameter setting",
         other_fit_sections=(
             "The same two contrasts at the second hyperparameter setting",
@@ -225,6 +226,7 @@ ROW_SETS: Final[tuple[leaderboard.RowSet, ...]] = (
         intervals="table",
         planned_section=f"{ECMWF_PLANNED_SECTION}, primary setting",
         second_planned_section=f"{ECMWF_PLANNED_SECTION}, second setting",
+        second_scope="all",
         second_section=f"{ECMWF_PLANNED_SECTION}, second setting",
         other_fit_sections=(
             f"{ECMWF_PLANNED_SECTION}, second setting",
@@ -246,6 +248,7 @@ ROW_SETS: Final[tuple[leaderboard.RowSet, ...]] = (
         intervals="table",
         planned_section=f"{STATION_PLANNED_SECTION} primary setting",
         second_planned_section=f"{STATION_PLANNED_SECTION} second setting",
+        second_scope="all",
         second_section=f"{STATION_PLANNED_SECTION} second setting",
         other_fit_sections=(f"{STATION_PLANNED_SECTION} second setting",),
         wide_contrast_tables=True,
