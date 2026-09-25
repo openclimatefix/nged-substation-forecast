@@ -59,6 +59,11 @@ error by 0.18 points even at a conservative lead.
 
 ## Key findings
 
+**Every finding below is about each product as this study reads it.** UKV, ICON-EU, and IFS 0.25°
+are single deterministic runs, read through Open-Meteo at one grid point. ENS is the mean of 51
+ensemble members, averaged over an H3 cell. A finding is therefore not a ranking of the weather
+models that produce these forecasts.
+
 - **For solar power, ENS beats UKV, ICON-EU, and GEFS at matched lead, at both XGBoost settings**
   ([solar results](#solar-does-any-product-beat-ens-at-matched-lead)).
 - **For wind power, ENS beats UKV and GEFS, and ICON-EU and IFS 0.25° cannot be separated from
@@ -96,21 +101,30 @@ ENS at 09:00 UTC, so the answer decides whether a second weather source is worth
 the incumbent. The table sets out each product that a headline contrast uses. The other products
 in the study are exploratory and appear in [Other products](#other-products-exploratory).
 
-| Product | Lead at day 1, in hours after the run starts | Grid | Covers | Archive read from | Delivery |
+| Product | Lead at day 1, in hours after the run starts | Grid | Domain (the study reads Great Britain) | Archive read from | Delivery |
 |---|---|---|---|---|---|
-| ECMWF ENS, mean of 51 members | 24 + h | 0.25° cells, averaged over each farm's H3 cell | Global | 2024-04-01 | Not measured; the study assumes the 00 UTC run is readable at 09:00 UTC |
-| NOAA GEFS, mean of 31 members | 24 + h | Nearest 0.25° cell | Global | 2020-10-01 | Not measured; the study assumes the 00 UTC run is readable at 09:00 UTC |
+| ECMWF ENS, mean of 51 members | 24 + h | About 9 km native, served on 0.25° cells; the study averages the cells overlapping each generator's H3 cell | Global | 2024-04-01 | Not measured; the study assumes the 00 UTC run is readable at 09:00 UTC |
+| NOAA GEFS, mean of 31 members | 24 + h | 0.25°; the study reads the nearest cell | Global | 2020-10-01 | Not measured; the study assumes the 00 UTC run is readable at 09:00 UTC |
 | UKV | 24 + (h mod n) | 1.5 km over the UK, served at 2 km | UK | 2024-08-06 | About 4 hours after the run starts |
-| ICON-EU | 24 + (h mod n) | 6.5 km, served at about 7 km | Great Britain | 2024-01-19 | About 3.5 hours after the run starts |
-| IFS 0.25° | 24 + (h mod n) | 0.25° | Great Britain | 2024-03-06 | Not measured |
+| ICON-EU | 24 + (h mod n) | 6.5 km, served at about 7 km | Europe | 2024-01-19 | About 3.5 hours after the run starts |
+| ICON-D2 (exploratory tables only) | 24 + (h mod n) | 2.2 km, served at about 2 km | Germany and neighbouring countries, not all of Great Britain | 2024-01-19 | About 1.5 hours after the run starts |
+| IFS 0.25° | 24 + (h mod n) | About 9 km native, served at 0.25° | Global | 2024-03-06 | Not measured |
+
+**IFS 0.25° is the open-data 0.25° version of ECMWF's single high-resolution forecast run (HRES),
+not a member of ENS.** ICON-D2 is the German weather service's 2.2 km ICON configuration for Germany
+and neighbouring countries. ICON-EU's, ICON-D2's, and ICON global's served "100 m" wind speed is
+Open-Meteo's derivation, the 120 m speed multiplied by about 0.98, and not a product of the German
+weather service. ENS at a generator is the mean of the 0.25° grid cells that overlap the generator's
+H3 resolution-5 hexagon (about 253 km²), weighted by overlap. That mean is a smoothed value, whereas
+each Previous Runs product is read at a single grid point.
 
 In the table, h is the UTC hour of the row and n is the interval between runs of a product's weather
 model. ENS and GEFS start one run per day, at 00 UTC. UKV, ICON-EU, and IFS 0.25° reach the study
 through Open-Meteo's Previous Runs archive, whose lead depends on n ([How the leads are
 matched](#how-the-leads-are-matched)). The scored rows start on 2024-12-01, so every history is long
-enough. The grids, coverage, and delivery times of UKV and ICON-EU come from [the past-wind
-study](weather-products-for-past-wind.md), which measured the delivery times for a different
-purpose. The archive start dates come from the [weather-products
+enough. The grids, coverage, and delivery times of UKV, ICON-D2, and ICON-EU come from [the
+past-wind study](weather-products-for-past-wind.md), which measured the delivery times for a
+different purpose. The archive start dates come from the [weather-products
 survey](../background/weather-products-survey.md). The study did not measure the delivery time of
 ENS, GEFS, or IFS 0.25°, and ECMWF's published dissemination schedule was not checked against the
 09:00 UTC assumption.
@@ -468,8 +482,9 @@ P4b blend has a lower error.
 ## Does blending products help?
 
 **A blend of ENS, ICON-EU, and IFS 0.25° lowers the wind error at both leads tested, and lowers the
-solar error only at the optimistic lead.** IFS 0.25° is the 0.25-degree grid version of the European
-Centre for Medium-Range Weather Forecasts's Integrated Forecasting System. Each blend gives one
+solar error only at the optimistic lead.** IFS 0.25° is the open-data 0.25° version of the
+European Centre for Medium-Range Weather Forecasts's Integrated Forecasting System, run as a single
+deterministic forecast. Each blend gives one
 XGBoost model the ENS day-1 columns plus the ICON-EU and IFS 0.25° columns. Blend P4a gives the two
 added products at their day 1 (planned). Blend P4b gives them at their day 2 (planned), which is the
 conservative contrast, because every added value then comes from a run published before the 09:00
@@ -616,7 +631,8 @@ averaging the ensemble members lowers the error (exploratory, primary setting on
 shorter lead than the control run on most hours.** The control run has a lead of 24 + h hours. UKV,
 ICON-D2, ICON-EU, ICON global, IFS 0.25°, and GFS have a lead of 24 + (h mod n) hours, and IFS 0.25°
 day 1 can come from a newer ECMWF run than the control run's 00 UTC run. Only GEFS has the control
-run's exact lead.
+run's exact lead. The table also compares products with different native grids: ICON-EU's is 6.5 km,
+ICON-D2's is 2.2 km, UKV's is 1.5 km, and the control run's is about 9 km.
 
 **For wind, ICON-EU, ICON-D2, and ICON global have no detectable difference from the single ENS
 control run, and for solar every ICON product still has a higher error.** IFS 0.25° has a lower
@@ -692,7 +708,11 @@ cycles: 33.3% at a 3-hour cycle and 16.9% at a 6-hour cycle for solar. The radia
 gave a median peak offset of -13 minutes for UKV, which is a snapshot at the label. Every other
 product measured -28 to -35 minutes, an hour-ending mean. The study rebuilds UKV's hourly radiation
 from its hourly snapshots at offsets (-60, 0) minutes, which gives a median peak of -43 minutes, an
-hour-ending mean, and the check agrees with that rebuild.
+hour-ending mean, and the check agrees with that rebuild. The rebuild is the study's own: UKV's
+solar radiation is not published as an hourly mean, so it is assembled from two snapshots, and the
+study chose the two offsets by the timestamp check alone. The study did not compare UKV's error
+under any other rebuild, so the solar gap between UKV and ENS includes the effect of this
+reconstruction.
 <!-- report: Solar / Rows; UKV radiation timestamp convention (V3) -->
 
 **UKV has day-1 values missing for a large share of rows in the last months of the data.** The UKV
@@ -761,15 +781,16 @@ one in the previous section: -0.300 points [-0.447, -0.130] for solar and -0.307
 
 ## What to use
 
-**For solar, keep the ECMWF ENS ensemble mean as the day-ahead weather input.** UKV loses to ENS
-at a matched lead by +1.242 points of capacity [+0.824, +1.689], and ICON-EU loses by +0.817
-points [+0.584, +1.069] (both planned, primary setting; ENS's own day-1 error is 8.766% of
-capacity). The sensitivity setting gives +1.236 [+0.815, +1.686] and +0.832 [+0.619, +1.060], so
-both verdicts stand. The gap a live service would see is not measured: the Previous Runs day-1
-lead is shorter than a 09:00 UTC service would get from UKV or ICON-EU for most daylight hours,
-which flatters both products. What would change the recommendation: a weather product that beats
-ENS's day-0 error, which no Previous Runs product did (the closest of them, IFS 0.25°, is +0.666
-points [+0.462, +0.852] behind, exploratory).
+**For solar, keep the ECMWF ENS ensemble mean as the day-ahead weather input.** UKV loses to ENS at
+a matched lead by +1.242 points of capacity [+0.824, +1.689], and ICON-EU loses by +0.817 points
+[+0.584, +1.069] (both planned, primary setting; ENS's own day-1 error is 8.766% of capacity). The
+sensitivity setting gives +1.236 [+0.815, +1.686] and +0.832 [+0.619, +1.060], so both verdicts
+stand. The gap a live service would see is not measured: the Previous Runs day-1 lead is probably
+shorter than a 09:00 UTC service would get from UKV or ICON-EU for most daylight hours, which would
+flatter both products. UKV's solar radiation is also the study's own reconstruction from two
+snapshots. What would change the recommendation: a weather product that beats ENS's day-0 error,
+which no Previous Runs product did (the closest of them, IFS 0.25°, is +0.666 points [+0.462,
++0.852] behind, exploratory).
 <!-- report: Solar, Planned brackets (day 1); Leaderboard, primary setting; Exploratory brackets -->
 
 **For solar, adding ICON-EU and IFS 0.25° to ENS shows no detectable gain at the conservative lead,
@@ -794,7 +815,9 @@ planned, primary setting; +1.259 [+0.927, +1.606] at the sensitivity setting). G
 **For wind, keep ENS and do not use UKV.** UKV loses to ENS at a matched lead by +0.770 points
 [+0.460, +1.057] (planned, primary setting), and by +0.697 [+0.371, +0.987] at the sensitivity
 setting. The gap a live service would see is not measured: the Previous Runs day-1 lead is
-shorter than a 09:00 UTC service would get from UKV for most hours of the day, which flatters UKV.
+probably shorter than a 09:00 UTC service would get from UKV for most hours of the day, which would
+flatter UKV. The study did not test the Met Office's ensemble, MOGREPS-UK, so this finding is about
+UKV as one deterministic run and not about the Met Office's forecasts as a whole.
 The loss is the same before and after UKV's 2026-01-21 upgrade: +0.772 points [+0.364,
 +1.145] before and +0.765 [+0.406, +1.065] after (exploratory). The gap also depends on timing:
 averaged over whole days it falls to +0.303 points [-0.119, +0.666], no longer statistically
@@ -810,9 +833,9 @@ day-0 and day-1 errors. On the hours where the two leads are exactly equal, 00 t
 wins by +0.540 points [+0.237, +0.840] (exploratory). Against a single ENS control run, which has
 no ensemble averaging, ICON-EU is -0.138 points [-0.403, +0.100] (exploratory), so the study
 cannot separate ICON-EU from one ENS run: the interval runs from an error 0.403 points lower to one
-0.100 points higher. The Previous Runs day-1 lead of ICON-EU is shorter than a 09:00 UTC service
-would get for most hours of the day, so both the equal-lead and the control-run comparisons favour
-ICON-EU.
+0.100 points higher. The Previous Runs day-1 lead of ICON-EU is probably shorter than a 09:00 UTC
+service would get for most hours of the day, so the control-run comparison favours ICON-EU. The
+interval's upper end means that ICON-EU could be up to 0.384 points worse than ENS (P2a).
 <!-- report: Wind, Planned brackets (day 1); Exploratory: ICON-EU day 1 against ENS day 1; day-1
 products against the single ENS control run -->
 
@@ -863,7 +886,10 @@ quality. The ICON-EU and IFS 0.25° results against the control run show the siz
 solar, ICON-EU is +0.517 points [+0.284, +0.778] behind the control run and IFS 0.25° is -0.264
 [-0.498, -0.033] ahead of it. Both comparisons favour the two Previous Runs products, whose leads
 are shorter than the control run's on most hours, so ICON-EU's deficit is probably larger at equal
-lead and IFS 0.25°'s advantage probably smaller.
+lead and IFS 0.25°'s advantage probably smaller. UKV, a single deterministic run, is behind the
+control run too: +0.942 points [+0.545, +1.377] for solar and +0.463 points [+0.151, +0.733] for
+wind. UKV's loss to ENS is therefore not only ensemble averaging, but the study cannot say how much
+of it is.
 <!-- report: Solar and Wind, Exploratory: ENS control against ENS mean; day-1 products against the
 single ENS control run -->
 
@@ -896,7 +922,10 @@ while running the study -->
 ## Limitations
 
 **The UKV day-1 requirement removes most of spring 2026 from the rows.** The shared rows require
-UKV's day-1 value, because UKV is a planned product. UKV's day-1 value is missing on 6.8% of the
+UKV's day-1 value, because UKV is a planned product. The study did not investigate why the value is
+missing. The gap is in the Open-Meteo Previous Runs feed the study reads, and the cause is presumed
+to be a gap in that feed and not in the Met Office's forecasts, unless shown otherwise. UKV's day-1
+value is missing on 6.8% of the
 solar candidate rows (2,659 of 39,030) and 11.1% of the wind candidate rows (4,678 of 42,144).
 The gaps fall on 38 calendar dates between April and June 2026 for solar (16 in April, 18 in May,
 and 4 in June) and 70 for wind (27, 29, and 14), plus 1 date in 2025 for solar and 2 for wind. For
@@ -964,14 +993,14 @@ less weight than a planned one.
 
 ## Scope
 
-**This study says nothing about the skill of any ensemble's spread, about leads beyond day 3, or
-about generators outside the trial area.** It scores point forecasts, made by an XGBoost model
-fitted separately for each generator, of hourly solar and wind output at 6 solar and 3 wind
-generators, at a day-ahead lead that depends on each Previous Runs product's run cycle and at an
-exact lead for ENS and GEFS. It says nothing about substation demand, about a forecast issued at any
-time other than 09:00 UTC, or about the values an Open-Meteo archive would have served live rather
-than as a Previous Runs value. It does not test any product's grid, physics, or resolution as a
-cause of a gap, and it does not test the live service.
+**This study says nothing about the skill of any ensemble's spread, about the Met Office's ensemble
+MOGREPS-UK, about leads beyond day 3, or about generators outside the trial area.** It scores point
+forecasts, made by an XGBoost model fitted separately for each generator, of hourly solar and wind
+output at 6 solar and 3 wind generators, at a day-ahead lead that depends on each Previous Runs
+product's run cycle and at an exact lead for ENS and GEFS. It says nothing about substation demand,
+about a forecast issued at any time other than 09:00 UTC, or about the values an Open-Meteo archive
+would have served live rather than as a Previous Runs value. It does not test any product's grid,
+physics, or resolution as a cause of a gap, and it does not test the live service.
 <!-- plan: The question and the products; What no contrast here can separate -->
 
 ## Reproducing this page
