@@ -44,7 +44,7 @@ every weather value already carries only the anonymised `site` label (`A`-`F`, `
 fetch scripts wrote.
 
 Run it with `uv run python studies/nwp_forecast_comparison/verify_previous_runs_leads.py
---output-dir <dir>`.
+--output-dir DIR`.
 """
 
 import argparse

@@ -42,7 +42,7 @@ read from the private roster in this script, except inside `studies.grid_samplin
 nearest-cell match), which never prints what it reads.
 
 Run it with `uv run python studies/nwp_forecast_comparison/build_forecast_inputs.py --output-dir
-<dir>`.
+DIR`.
 """
 
 import argparse
