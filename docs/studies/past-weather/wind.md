@@ -128,7 +128,7 @@ Figure 2 holds that row set's planned contrasts.
   is statistically significant at the 5% level, while ICON-EU's and ICON-D2's leads did not change
   by a margin statistically significant at the 5% level.** Each year's interval, and the interval
   for the change, resamples that year's own months. See [ERA5's deficit, year by
-  year](#era5s-deficit-year-by-year).
+  year](#ukvs-lead-over-era5-grew-from-2025-to-2026-while-icon-eus-and-icon-d2s-did-not-change-by-a-statistically-significant-margin).
 - **[ICON-DREAM-EU](https://doi.org/10.5676/dwd/icon-dream_v1), DWD's ICON-based reanalysis, does
   not beat ERA5, and trails ICON-EU, DWD's operational ICON model over Europe, by 0.34 points [0.27,
   0.41] at the primary hyperparameter setting and 0.34 points [0.28, 0.39] at the second.**
@@ -146,7 +146,7 @@ Figure 2 holds that row set's planned contrasts.
   minus UKV is +0.41 points [+0.25, +0.58], and HRES minus ERA5 is −0.27 points [−0.40, −0.12].
   Three wind farms are few independent sites, so these intervals describe these farms and this
   window only. See [How ECMWF's HRES and ENS day 0 compare with UKV and
-  ERA5](#how-ecmwfs-hres-and-ens-day-0-compare-with-ukv-and-era5).
+  ERA5](#ukv-beats-hres-and-ens-day-0-and-hress-lead-over-era5-depends-on-the-training-design).
 - **In exploratory refits added after the first results, HRES's lead over ERA5 is no longer
   statistically significant at the 5% level when the XGBoost model trains across IFS Cycle 49r1
   without being told which side of the upgrade each hour falls on, and ENS day 0 against ERA5 is
@@ -161,7 +161,7 @@ Figure 2 holds that row set's planned contrasts.
   December 2024, the first whole month after the upgrade. It changes ENS day 0 minus ERA5 by −0.16
   points [−0.27, −0.06] on the rows from 12 August 2024. Three wind farms are few independent sites,
   so these intervals describe these farms and this window only. See [How ECMWF's HRES and ENS day 0
-  compare with UKV and ERA5](#how-ecmwfs-hres-and-ens-day-0-compare-with-ukv-and-era5).
+  compare with UKV and ERA5](#ukv-beats-hres-and-ens-day-0-and-hress-lead-over-era5-depends-on-the-training-design).
 - **At three farms over 17 months (34,156 farm-hours), one nearby 10 m weather station gives a
   larger error than ERA5's 10 m wind by 0.99 points [0.59, 1.45], and adding the station to UKV
   changes UKV's error by −0.64 points [−0.81, −0.46] against a control with the same number of
@@ -633,7 +633,7 @@ rests on about 12 of the 2,000 bootstrap resamples.
 
 ## Results
 
-### The XGBoost models work
+### The XGBoost models follow measured power, and the products rank in the same order at each farm
 
 **Given either ICON-D2 or ERA5, the XGBoost model follows the shape of measured power at every
 generator, in a windy, a variable, and a calm week, except that at W3 both run too high in the
@@ -834,7 +834,7 @@ spacing is the most obvious difference between the two, though this study does n
 one of those two generators ICON global is read from a land cell further away than its nearest cell,
 which may handicap ICON global there.
 
-### ERA5's deficit, year by year
+### UKV's lead over ERA5 grew from 2025 to 2026, while ICON-EU's and ICON-D2's did not change by a statistically significant margin
 
 **In an exploratory comparison on January to September of each year, UKV's lead over ERA5 is 0.46
 points in 2025 and 0.75 points in 2026, a change of 0.30 points [0.04, 0.58] after rounding that is
@@ -1019,9 +1019,9 @@ ICON-EU, the gap was 0.416 points [0.312, 0.498] in 2025 and 0.376 points [0.309
 both statistically significant, a change of −0.041 points [−0.145, +0.080], not statistically
 significant.
 
-### How ECMWF's HRES and ENS day 0 compare with UKV and ERA5
+### UKV beats HRES and ENS day 0, and HRES's lead over ERA5 depends on the training design
 
-#### The three planned contrasts and each product's own error
+#### In the planned contrasts, UKV beats HRES and ENS day 0, and HRES beats ERA5
 
 **UKV beats HRES by 0.20 points and ENS day 0 by 0.41 points, and HRES beats ERA5 by 0.27 points, on
 43,555 farm-hours from December 2024, in the section's three planned contrasts.** A difference below
@@ -1054,7 +1054,7 @@ ERA5's to 0.06 points above it is not excluded, and the interval does not show t
 equal. The contrast is exploratory. Three wind farms are few independent sites, so this interval
 describes these farms and this window only.
 
-#### How far the results depend on the training design
+#### The planned contrasts keep their sign under other training designs, and HRES's lead over ERA5 depends on the era cut
 
 **The three planned contrasts keep their sign under five fold designs, one row subset, and the
 second hyperparameter setting, and their size depends on the training design.** Four alternative
@@ -1163,7 +1163,7 @@ describe these farms and this window only.
 changes ENS day 0's and HRES's scores against ERA5 far more than rotating the folds
 does](../assets/ens_hres_wind_reconciliation.svg)
 
-#### The step in ECMWF's wind at IFS Cycle 49r1
+#### ENS day 0's and HRES's 10 m wind speeds fall against ERA5's at IFS Cycle 49r1
 
 **The mean 10 m wind speeds of ENS day 0 and HRES fall against ERA5's between October and November
 2024, and UKV's does not fall.** ENS day 0's ratio to ERA5 is 0.97 in August and September 2024 and
@@ -1210,7 +1210,7 @@ with no interval.
 ![Figure 13: ENS's and HRES's 10 m wind speeds fall against ERA5's from October to November 2024,
 and UKV's does not](../assets/ens_hres_wind_monthly_ratio.svg)
 
-#### How the ECMWF wind was read, and what the contrasts mix
+#### The choice of ENS interpolation moves ENS day 0's error by at most 0.02 points
 
 **None of the planned contrasts isolates which difference between an ECMWF product and its
 comparator causes the gap.** Each contrast mixes served lead, step width, native and served grid,
@@ -1253,7 +1253,7 @@ moves ENS day 0's error by no more than 0.02 points from the planned combination
 contrasts. Three wind farms are few independent sites, so these intervals describe these farms and
 this window only.
 
-#### Where the gaps are largest: time of day, farm, and period
+#### ENS day 0's gap to UKV is larger in the later hours of the day, and the contrasts differ between farms and periods
 
 **ENS day 0's gap to UKV and HRES is larger in the later hours of the day, as is ERA5's gap to UKV,
 and the split cannot apportion the widening between ENS lead and time of day.** Splitting the scored
@@ -1752,7 +1752,7 @@ uv run python studies/beam_diffuse_split/ens_hres_past_wind_charts.py
 uv run python studies/beam_diffuse_split/check_page_numbers.py \
     docs/studies/past-weather/wind.md \
     data/studies/beam_diffuse_split/past_weather_v2/ens_hres_past_wind/report.md \
-    --section "### How ECMWF's HRES and ENS day 0 compare with UKV and ERA5" \
+    --section "### UKV beats HRES and ENS day 0, and HRES's lead over ERA5 depends on the training design" \
     --section "### The ECMWF arms" \
     --bullet "## Key findings" "- **On 43,555 farm-hours from December 2024" \
     --bullet "## Key findings" "- **In exploratory refits added after the first results" \
@@ -1832,5 +1832,5 @@ uv run python studies/beam_diffuse_split/past_wind_leaderboard.py
 uv run python studies/beam_diffuse_split/past_wind_leaderboard_charts.py
 ```
 
-[ecmwf-results]: #how-ecmwfs-hres-and-ens-day-0-compare-with-ukv-and-era5
+[ecmwf-results]: #ukv-beats-hres-and-ens-day-0-and-hress-lead-over-era5-depends-on-the-training-design
 [issue-868]: https://github.com/openclimatefix/nged-substation-forecast/issues/868
