@@ -1598,7 +1598,6 @@ def aifs(
         The figure.
     """
     panels = []
-    all_rows = []
     for row_set, losses in losses_by_set.items():
         primary = by_setting(losses=losses)["primary"]
         sizes = leaderboard(losses=primary, arms=["aifs_single_day1"]).row(0, named=True)
@@ -1620,7 +1619,6 @@ def aifs(
             )
         )
         contrasts = aifs_contrast_rows(losses=losses, row_set=row_set)
-        all_rows.append(contrasts)
         panels.append(
             _contrast_panel(
                 rows=contrasts,
@@ -1649,8 +1647,13 @@ def aifs(
                 f"{scope_text(losses=next(iter(losses_by_set.values())), domain=domain)} "
                 f"{CAPACITY_NOTE}"
             ),
+            (
+                "No row was planned in the study's published plan. The row marked Deciding was "
+                "named before any AIFS fit; the AIFS ENS rows are descriptive; every other row is "
+                "exploratory."
+            ),
         ],
-        figure_planning=planning(rows=all_rows),
+        figure_planning=None,
     )
 
 

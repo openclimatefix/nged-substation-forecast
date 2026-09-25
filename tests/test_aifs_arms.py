@@ -390,7 +390,7 @@ def _losses_and_frame(*, row_set: str = "single") -> tuple[pl.DataFrame, pl.Data
 
 def _check(
     *, tmp_path: Path, losses: pl.DataFrame, frame: pl.DataFrame, stamp_on_disk: dict | None
-):
+) -> None:
     stamp = {"inputs_sha256": "abc", "device": "cuda"}
     stamp_file = tmp_path / "losses.json"
     if stamp_on_disk is not None:

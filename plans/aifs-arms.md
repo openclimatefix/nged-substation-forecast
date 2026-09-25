@@ -4,7 +4,9 @@
 farms and three wind farms, and it does not mention ECMWF's machine-learned weather model, AIFS.**
 The data is now on disk under `data/studies/weather/ECMWF-AIFS/` (AIFS Single) and
 `data/studies/weather/ECMWF-AIFS-ENS/` (AIFS ENS): four runs a day, leads 0 to 360 h in 6-hour
-steps, a 3 by 3 crop of 0.25° cells. The two products are harder to compare fairly than the products
+steps, a 3 by 4 crop of 0.25° cells (12 cells: latitude
+indices 0 to 2, longitude indices 0 to 3). The extra longitude column comes from a wider re-fetch,
+because the original 3 by 3 crop held only 65% of the area of some sites' H3 hexagons. The two products are harder to compare fairly than the products
 already on the page. Each serves 6-hourly steps where ENS serves 3-hourly steps to 144 h, so a
 product with finer time steps is favoured by resolution alone. AIFS Single carries radiation and
 100 m wind only from the 2025-02-24 06 UTC run, and AIFS ENS starts on 2025-07-02, so neither
@@ -132,14 +134,14 @@ Nothing in review 2 is rejected.
 ## What the data holds (read-only checks, run while writing this plan)
 
 - **AIFS Single:** 3,629 runs from 2024-04-01 00 UTC to 2026-09-25 00 UTC, 61 leads (0 to 360 h in
-  6-hour steps), 9 cells, 549 rows per run for every 00 UTC run. Every 00 UTC run from 2025-02-26
+  6-hour steps), 12 cells, 732 rows per run for every 00 UTC run. Every 00 UTC run from 2025-02-26
   to 2026-09-25 is present. The 06, 12, and 18 UTC runs are present except 2026-09-25's, which had
   not run when the download finished. Shortwave, longwave, and 100 m wind are `NaN` (not null)
   before the 2025-02-24 06 UTC run. Shortwave and longwave are `NaN` at lead 0 in every run.
   There is no `ensemble_member` column.
 - **AIFS ENS:** 1,801 runs from 2025-07-02 00 UTC to 2026-09-25 00 UTC, 51 members (0 to 50, member
   0
-  the control), 61 leads, 9 cells, all fields present beyond radiation's lead 0. No 00 UTC run is
+  the control), 61 leads, 12 cells, all fields present beyond radiation's lead 0. No 00 UTC run is
   missing.
 - **Coverage of the published shared rows** (35,263 solar, 37,407 wind) by a 00 UTC run at the
   site's nearest 0.25° cell, at day 1: Single covers 31,769 solar and 31,315 wind rows (from init
@@ -246,10 +248,11 @@ label.
 lines. The function scans the parquet lazily (`pl.scan_parquet`, because the AIFS ENS file holds 50
 million rows), filters to 00 UTC runs from the set's first run, to leads of at most `24 *
 max(AIFS_DAYS) + 30`
-hours, and to the crop's 9 cells before collecting. It computes each site's H3 resolution-5 cell
-weights over those 9 cells with `geo.h3.compute_h3_grid_weights`, from the same H3 indices ENS
+hours, and to the crop's 12 cells before collecting. It computes each site's H3 resolution-5 cell
+weights over those 12 cells with `geo.h3.compute_h3_grid_weights`, from the same H3 indices ENS
 reads, and raises unless each site's weights sum to 1 within 1e-6 (which proves the crop covers the
-hexagon). The weighted mean of the 9 cells is the site's value. A nearest-cell variant, using
+hexagon). The weighted mean of the cells is the site's value, and the function raises if any (site, run,
+member, lead) group lacks a row for one of the site's weighted cells. A nearest-cell variant, using
 `_gefs_cell_selection`, feeds the sensitivity arm. It computes wind speed and
 the from-direction (`arctan2(-u, -v) % 360`, the expression `_gefs_members_frame` uses), casts
 `lead_time` to whole hours, drops lead 0's radiation, and sets `ensemble_member = 0` where the store
@@ -468,8 +471,9 @@ request off `main`. The `band_steps` wind-first-stamp fix is in the pull request
   filter, which must be 0.
 - **Grid orientation.** The script asserts that `_grid_cells.parquet` latitude rises strictly with
   `lat_index` and longitude with `lon_index`. For each site whose chosen cell is not the crop's
-  centre, it correlates the chosen cell's 2 m temperature anomaly (the cell's value minus the 9-cell
-  mean at the same run and lead) with GEFS's control-member anomaly at the same latitude and
+  centre of the 3 by 3 block that AIFS shares with GEFS's crop (which it asserts is indexed 0 to 2),
+  it correlates the chosen cell's 2 m temperature anomaly (the cell's value minus the mean of the 9
+  shared cells at the same run and lead) with GEFS's control-member anomaly at the same latitude and
   longitude. The script fails unless that correlation is above the correlation with the mirrored
   cell's anomaly. It prints correlations only.
 - **Operational runs.** Before the fit, check Dynamical.org's catalogue pages for both products,
@@ -540,7 +544,7 @@ No `packages/` code changes, so there are no new unit tests, and the check is th
   time, so its data cannot measure a rate of improvement." The anchors are the headings on `main`
   today (`docs/background/weather-products-survey.md`, lines 228 and 291); recheck them and the
   version dates before the page ships. The page does not merge with any placeholder in it.
-- *Limitations:* the 3 by 3 crop and three spatial representations; the 6-hourly steps; the hourly
+- *Limitations:* the 3 by 4 crop and three spatial representations; the 6-hourly steps; the hourly
   IFS 0.25° reference favouring IFS 0.25°; the version blend; the IFS Cycle 50r1 confound; the
   unmeasured AIFS ENS publication time; the short Single v2 era; the 6,220 wind rows at 10 m that
   are not scored; that every fit is on the GPU; and the fold-coverage limit on `ens`. ENS's 9 km
@@ -636,7 +640,7 @@ Per the `study` skill, the maintainer's authority is needed to merge.
 6. **Spatial representation.** ENS is the overlap-weighted mean of the 0.25° cells under each
    generator's H3 resolution-5 cell, which is what the live service reads. The AIFS arms use the
    same read: `aifs_members_frame` computes each site's H3 resolution-5 cell weights over the
-   crop's 9 cells with `geo.h3.compute_h3_grid_weights`, and raises unless the weights of each site
+   crop's 12 cells with `geo.h3.compute_h3_grid_weights`, and raises unless the weights of each site
    sum to 1 within 1e-6. A nearest-cell AIFS Single arm at day 1 (`aifs_single_nearest_day1`) is
    fitted as an exploratory sensitivity arm, so the page can say how much the read moves the result.
    IFS 0.25° stays a point read, and the page says so.

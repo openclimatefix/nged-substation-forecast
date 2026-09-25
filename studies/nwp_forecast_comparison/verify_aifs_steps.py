@@ -19,10 +19,10 @@ Before `build_forecast_inputs.py --aifs` has run, `aifs_steps.md` holds:
    6-hour mean.
 3. **Units.** AIFS temperature in degrees Celsius, wind in m/s, radiation between 0 and 1,100 W/m2.
 4. **Grid orientation.** `_grid_cells.parquet`'s latitude rises with `lat_index` and its longitude
-   with `lon_index`. For each non-central cell of the crop, the correlation of its 2 m temperature
-   anomaly (the cell's value minus the mean of the 9 cells shared with GEFS's crop at the same run and lead) with GEFS's
-   control-member anomaly at the cell's latitude and longitude must exceed the correlation of each
-   mirrored or transposed cell's anomaly with the same GEFS anomaly.
+   with `lon_index`. For each non-central cell of the block shared with GEFS's crop, the correlation
+   of its 2 m temperature anomaly (the cell's value minus the mean of the 9 shared cells at the same
+   run and lead) with GEFS's control-member anomaly at the cell's latitude and longitude must exceed
+   the correlation of each mirrored or transposed cell's anomaly with the same GEFS anomaly.
 
 `NaN` after the run filter is checked by `aifs_members_frame`, which raises.
 
