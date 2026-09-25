@@ -75,20 +75,3 @@ SVG_FIGURES: Final[dict[str, FigureKey]] = {
     "sunshine_implied_capacity": "implied_capacity",
 }
 """The figure each SVG in `docs/studies/assets/` feeds, by file stem."""
-
-SUPERSEDED_SVGS: Final[frozenset[str]] = frozenset(
-    {
-        "sunshine_all_leaderboard",
-        "ens_past_solar_leaderboard",
-        "station_past_solar_leaderboard",
-        "sunshine_headline",
-        "sunshine_all_contrasts",
-        "ens_past_solar_planned_contrasts",
-        "station_past_solar_planned_contrasts",
-        "sunshine_icon_eu_rivals",
-        "sunshine_ukv_against_era5",
-        "station_past_solar_models_work",
-    }
-)
-"""The SVGs no figure uses any more, still on disk because the past-solar page links them until
-its prose is rewritten. No chart script draws them."""
