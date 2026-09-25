@@ -53,7 +53,7 @@ set's planned contrasts. Three wind farms are few independent sites, so the inte
 farms and this window only; see [Limitations](#limitations).
 
 ![Figure 1: ICON-D2 has the lowest error on the main, ICON-DREAM-EU, and ECMWF row sets, and UKV
-plus the nearest station has the lowest on the weather-station row
+plus the nearest station has the lowest of the arms drawn on the weather-station row
 set](../assets/wind_leaderboard.svg)
 
 ![Figure 2: On the main row set UKV, ICON-D2, and ICON-EU each beat ERA5 by a margin statistically
@@ -110,25 +110,25 @@ statistically significant at the 5% level.** The lower panel of each block of Fi
 products on the same hours, which cancels the shared swing. The [Methods
 page](methods.md#bootstrap-intervals) explains the intervals.
 
-- **UKV's and ICON-D2's advantages over ERA5 are estimated larger from April to September than from
-  October to March, and from October to March only ICON-D2's advantage over ERA5 is statistically
-  significant at the 5% level.** See [UKV and ICON-D2 describe past wind best of the five products
+- **In an exploratory seasonal split, UKV's and ICON-D2's advantages over ERA5 are estimated larger
+  from April to September than from October to March, and from October to March only ICON-D2's
+  advantage over ERA5 is statistically significant at the 5% level.** See [UKV and ICON-D2 describe past wind best of the five products
   tested](#ukv-and-icon-d2-describe-past-wind-best-of-the-five-products-tested).
 - **In an exploratory comparison, ICON-D2 leads UKV across the window, and the lead is not
   statistically significant since the Met Office upgraded UKV in January 2026.** See [ICON-D2 leads
   UKV across the window, and its lead is not statistically significant since UKV's
   upgrade](#icon-d2-leads-ukv-across-the-window-and-its-lead-is-not-statistically-significant-since-ukvs-upgrade).
-- **An XGBoost model given the 80 m wind of ICON-EU, the European ICON model, beats an XGBoost model
-  given ERA5's 100 m wind.** See [ICON-EU beats ERA5 at 80 m and at 100 m, and UKV's lead over
+- **In a post hoc comparison, an XGBoost model given the 80 m wind of ICON-EU, the European ICON
+  model, beats an XGBoost model given ERA5's 100 m wind.** See [ICON-EU beats ERA5 at 80 m and at 100 m, and UKV's lead over
   ICON-EU depends on the XGBoost model's
   settings](#icon-eu-beats-era5-at-80-m-and-at-100-m-and-ukvs-lead-over-icon-eu-depends-on-the-xgboost-models-settings).
 - **UKV's lead over ICON-EU is small, 0.13 points [0.01, 0.23] (post hoc), and depends on the
   XGBoost model's settings.** See [ICON-EU beats ERA5 at 80 m and at 100 m, and UKV's lead over
   ICON-EU depends on the XGBoost model's
   settings](#icon-eu-beats-era5-at-80-m-and-at-100-m-and-ukvs-lead-over-icon-eu-depends-on-the-xgboost-models-settings).
-- **ICON global, DWD's global model, had the largest error of the five as served here, and about
-  half of its gap to ICON-EU is a pair of steps in the wind Open-Meteo's archive serves for ICON
-  global at one generator.** See [About half of ICON global's gap to ICON-EU is a pair of steps in
+- **In an exploratory analysis, ICON global, DWD's global model, had the largest error of the five as
+  served here, and about half of its gap to ICON-EU is a pair of steps in the wind Open-Meteo's
+  archive serves for ICON global at one generator.** See [About half of ICON global's gap to ICON-EU is a pair of steps in
   its served
   wind](#about-half-of-icon-globals-gap-to-icon-eu-is-a-pair-of-steps-in-its-served-wind).
 - **In an exploratory comparison on January to September of each year, UKV's lead over ERA5 is 0.46
@@ -137,8 +137,8 @@ page](methods.md#bootstrap-intervals) explains the intervals.
   by a margin statistically significant at the 5% level.** See [UKV's lead over ERA5 grew from 2025
   to 2026, while ICON-EU's and ICON-D2's did not change by a statistically significant
   margin](#ukvs-lead-over-era5-grew-from-2025-to-2026-while-icon-eus-and-icon-d2s-did-not-change-by-a-statistically-significant-margin).
-- **[ICON-DREAM-EU](https://doi.org/10.5676/dwd/icon-dream_v1), DWD's ICON-based reanalysis, does
-  not beat ERA5, and trails ICON-EU, DWD's operational ICON model over Europe, by 0.34 points [0.27,
+- **In two planned contrasts, [ICON-DREAM-EU](https://doi.org/10.5676/dwd/icon-dream_v1), DWD's
+  ICON-based reanalysis, does not beat ERA5, and trails ICON-EU, DWD's operational ICON model over Europe, by 0.34 points [0.27,
   0.41] at the primary hyperparameter setting and 0.34 points [0.28, 0.39] at the second.** See
   [ICON-DREAM-EU does not beat ERA5, and trails
   ICON-EU](#icon-dream-eu-does-not-beat-era5-and-trails-icon-eu).
@@ -152,7 +152,8 @@ page](methods.md#bootstrap-intervals) explains the intervals.
   without being told which side of the upgrade each hour falls on, and ENS day 0 against ERA5 is
   unresolved.** See [UKV beats HRES and ENS day 0, and HRES's lead over ERA5 depends on the training
   design](#ukv-beats-hres-and-ens-day-0-and-hress-lead-over-era5-depends-on-the-training-design).
-- **At three farms over 17 months (34,156 farm-hours), one nearby 10 m weather station gives a
+- **At three farms over 17 months (34,156 farm-hours), in planned contrasts, one nearby 10 m weather
+  station gives a
   larger error than ERA5's 10 m wind by 0.99 points [0.59, 1.45], and adding the station to UKV
   changes UKV's error by −0.64 points [−0.81, −0.46] against a control with the same number of
   columns.** See [One nearby 10 m weather station trails ERA5's 10 m wind on its own, and lowers
@@ -237,7 +238,9 @@ not checked Open-Meteo's ICON-family 100 m wind against a native source. Open-Me
 it scales the native 120 m speed by 0.98 to give 100 m, and no native ICON 100 m wind is on disk.
 The height scored on this page is 80 m, so this check would not cover it either. We have also not
 checked ICON-D2 wind, UKV wind, or the IFS products. Wind speeds in these products are instantaneous
-values, and radiation values are hour-ending averages.
+values, and radiation values are hour-ending averages. The ICON-EU comparison covered 10 m wind
+only, not the 80 m wind scored on this page, and ICON global's wind has not been checked either, so
+the four products not checked are ICON-D2, ICON global, UKV, and HRES.
 
 - **Hub heights.** The three wind farms' hub heights are not known. For each ICON product,
   Open-Meteo serves a 100 m wind that is the product's 120 m speed multiplied by 0.98, so an XGBoost
@@ -348,13 +351,22 @@ era, with the rows of 21 to 31 January dropped.
 | 4 | Nov 2025 to Jan 2026; Sep 2026 | Nov 2025 to Jan 2026; Aug 2026 | Aug to Sep 2025; Jun 2026 | Oct to Dec 2025 |
 
 **Covering the avoidable share moves no planned contrast on the main row set by more than 0.052
-points.** Rotating the post-upgrade era's fold numbers by 2 covers the avoidable share on every row
-set. On the main row set that rotation moves no planned contrast by more than 0.033 points at the
-primary setting and 0.052 points at the second setting. On the ICON-DREAM-EU row set it moves the
-two planned contrasts by +0.009 and −0.028 points at the primary setting, with no change of sign or
-of statistical significance. The effect on the weather-station row set is unmeasured, and the effect
-on absolute errors was not measured for any row set. The measurement is line 9 of
-`studies/era_fold_design/report.md`, on the `era-fold-design` branch at commit `fdddb065`.
+points.** Rotating the post-upgrade era's fold numbers by 2 covers the avoidable share on the main
+and ICON-DREAM-EU row sets. The ECMWF row set covers its months through its own rotation of the
+third era's fold numbers, and the weather-station row set has one era. On the main row set that
+rotation moves no planned contrast by more than 0.033 points at the primary setting and 0.052
+points at the second setting. On the ICON-DREAM-EU row set it moves the two planned contrasts by
++0.009 and −0.028 points at the primary setting, with no change of sign or of statistical
+significance. The weather-station row set has an avoidable share of 0.0%, so there is nothing for
+the rotation to cover (its unavoidable share is 42.2%).
+
+The rotation also moves the main row set's absolute errors by little. ERA5's error goes from 7.272%
+to 7.249% of capacity at the primary setting, and from 7.310% to 7.265% at the second setting, and
+the largest shift in any arm (ERA5, ICON-D2, ICON-EU, and UKV) is 0.023 points at the primary
+setting and 0.045 points at the second. The effect on absolute errors was not measured for ICON
+global or for the ICON-DREAM-EU, ECMWF, and weather-station row sets. The main row set's
+contrast figures are on line 9 of `studies/era_fold_design/report.md`, and the ICON-DREAM-EU
+figures on line 11, on the `era-fold-design` branch at commit `fdddb065`.
 
 ### The ICON-DREAM-EU arms
 
@@ -1019,18 +1031,20 @@ Generator W2 (0.225 points ahead [−0.002, +0.449], not statistically significa
 distinguishable from zero.
 
 **At Generator W2, ICON-DREAM-EU's lead over ERA5 is not statistically significant at the 5% level,
-and it is no larger than the shift every leading product shows there.** At Generator W2 every one of
-the three leading original products beats ERA5 by more than it does across all three generators on
-this section's row set: ICON-EU by 0.518 points, UKV by 0.775 points, and ICON-D2 by 0.803 points,
-each statistically significant at the 5% level, against 0.340 points [0.193, 0.479], 0.425 points
-[0.226, 0.600], and 0.579 points [0.405, 0.742] across all three generators on this section's row
-set.
+and every leading product's lead over ERA5 is also larger there than across all three generators.**
+At Generator W2 every one of the three leading original products beats ERA5 by more than it does
+across all three generators on this section's row set: ICON-EU by 0.518 points, UKV by 0.775
+points, and ICON-D2 by 0.803 points, each statistically significant at the 5% level, against 0.340
+points [0.193, 0.479], 0.425 points [0.226, 0.600], and 0.579 points [0.405, 0.742] across all
+three generators on this section's row set. The shift at Generator W2 is 0.178 points for ICON-EU,
+0.350 for UKV, and 0.224 for ICON-D2, and 0.226 points for ICON-DREAM-EU, which is larger than the
+shifts of ICON-EU and ICON-D2 and smaller than UKV's.
 
 **Neither planned contrast's size changed by a margin statistically significant at the 5% level from
 2025 to 2026, in a comparison restricted to January to August of each year so a partial 2026
 compares against the same months of 2025.** Against ERA5, ICON-DREAM-EU was 0.075 points ahead
 [−0.097, +0.273] in 2025 and 0.036 points ahead [−0.132, +0.217] in 2026 (signs flipped so ahead is
-positive), a change of +0.039 points [−0.212, +0.297], not statistically significant. Against
+positive), a change of −0.039 points [−0.297, +0.212], not statistically significant. Against
 ICON-EU, the gap was 0.416 points [0.312, 0.498] in 2025 and 0.376 points [0.309, 0.430] in 2026,
 both statistically significant, a change of −0.041 points [−0.145, +0.080], not statistically
 significant.
@@ -1089,8 +1103,10 @@ zero. The adjustment covers only these three contrasts, and each tail of these a
 rests on about 17 of the 2,000 resamples.
 
 The three designs that train on the rows from 12 August 2024 and score only the rows from December
-2024 give larger differences. HRES minus UKV runs from +0.17 to +0.39 points there, and ENS day 0
-minus UKV from +0.39 to +0.54. Across all nine designs scored on the rows from December 2024, HRES
+2024 span a wider range. The two without an era cut at IFS Cycle 49r1 give larger differences: HRES
+minus UKV is +0.33 and +0.39 points, and ENS day 0 minus UKV is +0.49 and +0.54. The third, with an
+extra era cut at 1 December 2024, gives +0.17 and +0.39 points, inside the range of the six designs
+above. Across all nine designs scored on the rows from December 2024, HRES
 minus UKV runs from +0.15 to +0.39 points, ENS day 0 minus UKV from +0.34 to +0.54, and HRES minus
 ERA5 from −0.29 to −0.06. The sign of the first two contrasts is robust, and their size depends on
 the training design. HRES minus ERA5 is not statistically significant at the 5% level in the two
@@ -1151,7 +1167,7 @@ designs.
 
 **The era cut also changes the fold layout, so its effect and the effect of the fold numbering are
 not fully separable.** The cut changes the fold layout because the first era becomes its own set of
-folds. On the main row set, the fold layout and the era coding alone move HRES minus UKV across a
+folds. On the ECMWF row set (43,555 rows), the fold layout and the era coding alone move HRES minus UKV across a
 range of +0.15 to +0.21 points and ENS day 0 minus UKV across +0.34 to +0.43, so the fold layout has
 an effect of its own.
 
@@ -1435,8 +1451,8 @@ wind starts only in August 2024. A training history that switches from ERA5 to a
 part-way through has to tell the forecasting model which product each hour comes from, as this study
 tells the XGBoost model which side of the UKV upgrade each hour falls on. Open-Meteo's ICON archives
 before August 2024 have not been screened for steps like the pair in ICON global's served wind.
-ICON-DREAM-EU reaches back to January 2010, the only product on this page besides ERA5 whose archive
-reaches before November 2022, but from August 2024 this study cannot distinguish ICON-DREAM-EU from
+ICON-DREAM-EU reaches back to January 2010, and HRES's 9 km grid file starts on 1 January 2017.
+Besides ERA5, those are the two products on this page whose archives reach before November 2022, but from August 2024 this study cannot distinguish ICON-DREAM-EU from
 ERA5, so this study gives no reason to prefer ICON-DREAM-EU for wind training history.
 ICON-DREAM-EU's extra record, from 2010 to 2022, covers years this wind study never scores, so
 whether ICON-DREAM-EU would beat ERA5 there is untested; the solar page finds ICON-DREAM-EU ahead of
@@ -1509,7 +1525,7 @@ recent months.
   cover, and the share differs by row set.** The folds are blocks of whole months, so a held-out
   calendar month can leave no training row for that calendar month. Each row set has two shares. The
   avoidable share is the share of scored farm-hours in a calendar month that occurs in two or more
-  years and has no training row in its fold, which a different fold design could avoid. The
+  years and has no training row in any other fold, which a different fold design could avoid. The
   unavoidable share is the share in a calendar month that occurs in one year only, which no fold
   design can cover. [How the comparison was made](#how-the-comparison-was-made) reports how much
   covering the avoidable share moves the planned contrasts.
@@ -1631,8 +1647,8 @@ in `packages/studies/`.
 - **Planned contrasts:** each row set's planned contrasts were recorded in the study plans in the
   repository's git history. The commits of the ECMWF and weather-station plans are named in [The
   ECMWF arms](#the-ecmwf-arms) and [The weather-station arms](#the-weather-station-arms).
-- **XGBoost:** version 3.4.1, the version in this repository's lock file (the saved losses do not
-  record the version that fitted them), with `tree_method` set to `hist`, the objective
+- **XGBoost:** version 3.4.1, the version in `uv.lock` at each commit that fitted models (`83dbbad3`,
+  `021d0852`, and `72d969b8`; the saved losses do not record the version that fitted them), with `tree_method` set to `hist`, the objective
   `reg:absoluteerror`, and 4 threads per fit. The primary setting is `max_depth` 6, `learning_rate`
   0.05, `subsample` 0.8, `min_child_weight` 20, `reg_lambda` 1, and 500 boosting rounds. The second
   setting is `max_depth` 4, `learning_rate` 0.03, `subsample` 0.8, `min_child_weight` 50,
@@ -1644,8 +1660,8 @@ in `packages/studies/`.
   shallower, more heavily regularised alternative, which shows whether an ordering belongs to the
   features or to the settings.
 - **Device:** every fit ran on the CPU. The saved wind losses carry no device column, so this
-  statement rests on the code: no wind script passes a device, and `studies.cross_validation` fits
-  on the CPU unless a script does.
+  statement rests on the code: no fit passed a device, so XGBoost's CPU default applied (the device
+  parameter was added to `studies.cross_validation` later, in `0888de1a`).
 
 ## Reproducing the figures
 
