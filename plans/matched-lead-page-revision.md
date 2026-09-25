@@ -83,6 +83,10 @@ The rule: keep the second setting for planned contrasts, for deciding contrasts 
 
 The maintainer wants ECMWF's AIFS (its machine-learning weather model), the ensemble and the single run, in the page. No AIFS data is on disk. The download coordinator is fetching it and will report the path, cadence, lead range and start date. The plan adds AIFS as new arms once that message arrives: if the archive window is shorter than the study's rows, AIFS gets its own row set with the references (ENS day 1, and the arms it is compared with) refitted on that row set; the era rule is the study's own (rows from 2024-12-01, three eras, the rotated fold offsets); planned and exploratory are labelled (no AIFS contrast was written into the plan before a result existed, so every AIFS number is exploratory and post hoc); the second setting is shown only if a result is near the 5% line. The AIFS arms go into the same runner request as the day 5 and day 14 arms.
 
+## ICON-D2 near-analysis arm (added at the coordinator's request)
+
+The maintainer asked why ICON-D2 is the best product in the past-weather studies and mid-ranking at day 1 here. The hypothesis is that the past studies serve ICON-D2 at a lead of 0 to 3 hours and this study at about 24 to 26 hours. The plan adds one exploratory arm set: ICON-D2 Previous Runs at day 0, 1, 2 and 3 (where `previous_dayN` is filled on the study span) with ICON-EU day 0 and day 1 as references, on the identical shared rows, and a split of each error by lead hour modulo 3. It is checked first that `previous_day0` matches the historical-forecast series the past studies use. The page gets a short exploratory paragraph, with absolute skill at every lead, and a Discussion note that skill from a near-analysis feed does not carry to day-ahead use. The arms join the same runner request and the same GPU rules, and are exploratory (primary setting only).
+
 ## What changes, file by file
 
 PR 1 (`study-skill-page-structure`):
