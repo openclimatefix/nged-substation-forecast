@@ -7,7 +7,8 @@ Every interval is computed here from those per-row losses, with the same functio
 uses (`difference`, `leaderboard`, `bracket` in `nwp_forecast_comparison.py`, which call
 `studies.bootstrap`), so no refit is needed and a chart cannot disagree with the report.
 
-Six charts per technology, each with its own title, subtitle, axis titles and key:
+Seven charts per technology (the seventh only with `--aifs-dir`), each with its own title, subtitle,
+axis titles and key:
 
 1. `leaderboard`: each product's own mean absolute error at every fitted lead day, one product per
    row, best day-1 error first, with climatology and day-1 smart persistence as dashed lines.
@@ -16,6 +17,9 @@ Six charts per technology, each with its own title, subtitle, axis titles and ke
 4. `by_lead_day`: error by lead day, with ENS's day-0 and day-1 intervals shaded.
 5. `blends`: the two blends against ENS alone and against their permutation controls.
 6. `per_generator`: the P1a, P2a and P4b contrasts at each generator.
+7. `aifs`: AIFS Single and AIFS ENS at days 1 and 2 on their own row sets, read from
+   `fit_aifs.py`'s saved losses: each forecast's own error on each set, then each set's paired
+   differences. The two sets never share an axis.
 
 Generators appear only as `A` to `F` and `W1` to `W3`, every error is a fraction of the
 generator's own capacity, the time axes count days of the week rather than dates, and no data mark
@@ -44,6 +48,8 @@ import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 from build_forecast_inputs import PRODUCT_SLUGS
+from fit_aifs import ROW_SETS
+from fit_aifs import contrasts as aifs_contrasts
 from nwp_forecast_comparison import (
     BLEND_ARMS,
     GENERATOR_CONTRASTS,
@@ -178,6 +184,8 @@ def arm_label(*, arm: str) -> str:
     Raises:
         ValueError: If `arm` is none of the arm kinds the study fits or scores.
     """
+    if arm in AIFS_ARM_LABELS:
+        return AIFS_ARM_LABELS[arm]
     if arm.startswith("blend_"):
         return blend_label(arm=arm)
     if arm == "climatology":
@@ -1469,6 +1477,182 @@ def blends(*, losses: pl.DataFrame, domain: DomainType, title: str) -> alt.VConc
     )
 
 
+# --- Chart 7: AIFS on its own rows ----------------------------------------------------------------
+
+AIFS_ARM_LABELS: Final[dict[str, str]] = {
+    "aifs_single_day1": "AIFS Single day 1",
+    "aifs_single_day2": "AIFS Single day 2",
+    "aifs_single_nearest_day1": "AIFS Single day 1, nearest cell",
+    "aifs_ens_mean_day1": "AIFS ENS mean day 1",
+    "aifs_ens_mean_day2": "AIFS ENS mean day 2",
+    "ens_mean6_day1": "ENS mean day 1, 6-hourly steps",
+    "ens_mean6_day2": "ENS mean day 2, 6-hourly steps",
+    "ens_control6_day1": "ENS control member day 1, 6-hourly steps",
+    "ens_control6_day2": "ENS control member day 2, 6-hourly steps",
+    "ens_mean_day1": "ENS mean day 1, 3-hourly steps",
+    "ifs025_day1": "IFS 0.25° day 1, hourly steps",
+    "aifs_single_day1_permuted": "AIFS Single day 1, shuffled",
+    "aifs_single_day1_permuted_b": "AIFS Single day 1, shuffled again",
+}
+"""Each AIFS-page arm's row label. The shuffled arms carry no weather beyond the month and hour of
+day, so their errors show what the forecasts add."""
+
+AIFS_LEADERBOARD_ARMS: Final[tuple[str, ...]] = (
+    "aifs_single_day1",
+    "aifs_ens_mean_day1",
+    "ens_control6_day1",
+    "ens_mean6_day1",
+    "ens_mean_day1",
+    "ifs025_day1",
+    "aifs_single_day1_permuted",
+)
+"""The arms whose own error the AIFS figure's top panels show, at day 1."""
+
+AIFS_SET_NAMES: Final[dict[str, str]] = {
+    "single": "Hours AIFS Single covers",
+    "ens": "Hours AIFS ENS also covers (descriptive only)",
+}
+
+
+def load_aifs(*, aifs_dir: Path, domain: DomainType) -> dict[str, pl.DataFrame]:
+    """Read one technology's AIFS losses for each row set.
+
+    Args:
+        aifs_dir: The directory `fit_aifs.py` wrote to.
+        domain: `solar` or `wind`.
+
+    Returns:
+        Each row set's per-row losses, keyed by row set, after the anonymisation check.
+    """
+    losses = {
+        row_set: pl.read_parquet(aifs_dir / f"{domain}_{row_set}_losses.parquet")
+        for row_set in ROW_SETS
+    }
+    for frame in losses.values():
+        check_anonymised(frame=frame, domain=domain)
+    return losses
+
+
+def aifs_absolute_rows(*, losses: pl.DataFrame) -> pl.DataFrame:
+    """Return the day-1 arms' own errors on one row set, best first.
+
+    Args:
+        losses: One row set's per-row losses.
+
+    Returns:
+        `label`, `family`, `value`, `lower_95` and `upper_95` in percent of capacity, with the
+        arms present in `losses` only.
+    """
+    board = leaderboard(
+        losses=by_setting(losses=losses)["primary"], arms=list(AIFS_LEADERBOARD_ARMS)
+    )
+    return (
+        board.with_columns(
+            pl.col("value", "lower_95", "upper_95") * PERCENTAGE_POINTS,
+            label=pl.col("arm").replace_strict(AIFS_ARM_LABELS, return_dtype=pl.String),
+            family=pl.lit("weather model"),
+        )
+        .sort("value")
+        .select("label", "family", "value", "lower_95", "upper_95")
+    )
+
+
+def aifs_contrast_rows(*, losses: pl.DataFrame, row_set: str) -> pl.DataFrame:
+    """Return one row set's listed contrasts at both settings, as chart rows.
+
+    Args:
+        losses: One row set's per-row losses.
+        row_set: `single` or `ens`.
+
+    Returns:
+        `contrast_rows`'s frame, with the deciding contrast planned and every other exploratory.
+    """
+    by_name = by_setting(losses=losses)
+    frames = []
+    for contrast in aifs_contrasts(row_set=row_set):
+        frame = contrast_rows(
+            losses_by_setting=by_name,
+            specs=[ContrastSpec(contrast.label, contrast.treatment, contrast.reference)],
+            planned=contrast.label == "deciding",
+        ).with_columns(
+            label=pl.lit(
+                f"{AIFS_ARM_LABELS[contrast.treatment]} minus {AIFS_ARM_LABELS[contrast.reference]}"
+            )
+        )
+        frames.append(frame)
+    return pl.concat(frames)
+
+
+def aifs(
+    *, losses_by_set: dict[str, pl.DataFrame], domain: DomainType, title: str
+) -> alt.VConcatChart:
+    """Draw AIFS's own errors and paired differences, one pair of panels per row set.
+
+    Args:
+        losses_by_set: Each row set's per-row losses.
+        domain: `solar` or `wind`.
+        title: The figure's title.
+
+    Returns:
+        The figure.
+    """
+    panels = []
+    all_rows = []
+    for row_set, losses in losses_by_set.items():
+        primary = by_setting(losses=losses)["primary"]
+        sizes = leaderboard(losses=primary, arms=["aifs_single_day1"]).row(0, named=True)
+        scope = f"{sizes['n_rows']:,} hours, {sizes['n_months']} months"
+        absolute = aifs_absolute_rows(losses=losses)
+        absolute_domain = padded_domain(
+            low=float(absolute["lower_95"].min()),  # ty: ignore[invalid-argument-type]
+            high=float(absolute["upper_95"].max()),  # ty: ignore[invalid-argument-type]
+            include_zero=False,
+        )
+        panels.append(
+            leaderboard_panel(
+                rows=absolute,
+                x_domain=absolute_domain,
+                x_title=f"{MAE_TITLE}; {scope}",
+                keys=False,
+                panel_title=f"{AIFS_SET_NAMES[row_set]}: each forecast's own error at day 1",
+                row_step_px=44,
+            )
+        )
+        contrasts = aifs_contrast_rows(losses=losses, row_set=row_set)
+        all_rows.append(contrasts)
+        panels.append(
+            _contrast_panel(
+                rows=contrasts,
+                panel_title=f"{AIFS_SET_NAMES[row_set]}: paired differences",
+                x_title=f"{DIFFERENCE_TITLE}; {scope}",
+            )
+        )
+    return figure(
+        panels=panels,
+        number=FIGURE_NUMBERS[(domain, "aifs")],
+        title=title,
+        subtitle=[
+            (
+                "Each mark is an XGBoost model's error, given one forecast product. The two row "
+                "sets hold different hours, so their axes are separate and their errors cannot be "
+                "read against each other or against the other figures. Every arm on a row set is "
+                "scored on the same hours. Points of capacity; negative means the first forecast "
+                "in a row is better."
+            ),
+            (
+                "AIFS steps every 6 hours, so the ENS references use 6-hourly steps too. "
+                "Hourly-step IFS 0.25° has a lead no longer than AIFS's and favours IFS 0.25°. "
+                f"The XGBoost models ran on a graphics processing unit. {DOTS_NOTE}"
+            ),
+            (
+                f"{scope_text(losses=next(iter(losses_by_set.values())), domain=domain)} "
+                f"{CAPACITY_NOTE}"
+            ),
+        ],
+        figure_planning=planning(rows=all_rows),
+    )
+
+
 # --- Chart 6: one generator at a time ---------------------------------------------------------
 
 GENERATOR_CONDITIONS: Final[dict[str, str]] = {
@@ -1564,6 +1748,8 @@ FIGURE_NUMBERS: Final[dict[tuple[DomainType, str], int]] = {
     ("wind", "by_lead_day"): 12,
     ("solar", "blends"): 9,
     ("wind", "blends"): 10,
+    ("solar", "aifs"): 13,
+    ("wind", "aifs"): 14,
 }
 """Each chart's figure number on the page, in the page's order: the leaderboard pair opens the page,
 then the planned contrasts."""
@@ -1609,6 +1795,14 @@ TITLES: Final[dict[tuple[DomainType, str], str]] = {
         "Wind error rises with lead day for every forecast; IFS 0.25° has a lower error than the "
         "ENS mean at days 2 and 3, at a lead shorter than ENS's on most hours"
     ),
+    ("solar", "aifs"): (
+        "AIFS Single and AIFS ENS, scored at days 1 and 2 on the hours each is available for, "
+        "against ENS on the same hours: solar power"
+    ),
+    ("wind", "aifs"): (
+        "AIFS Single and AIFS ENS, scored at days 1 and 2 on the hours each is available for, "
+        "against ENS on the same hours: wind power"
+    ),
     ("solar", "blends"): (
         "For solar power a blend of ENS, ICON-EU, and IFS 0.25° lowers the error by 0.35 "
         "percentage points at an optimistic lead, but the blend's control is itself worse than "
@@ -1621,7 +1815,8 @@ TITLES: Final[dict[tuple[DomainType, str], str]] = {
     ),
 }
 """Each chart's title, stating the finding for the products tested. Every number is in
-`report.md`."""
+`report.md`. The two AIFS titles describe the figure and are rewritten to state the finding once
+the AIFS report exists."""
 
 
 def optimise(*, path: Path) -> None:
@@ -1641,7 +1836,11 @@ def optimise(*, path: Path) -> None:
 
 
 def draw_domain(
-    *, input_dir: Path, domain: DomainType, extra_dir: Path | None = None
+    *,
+    input_dir: Path,
+    domain: DomainType,
+    extra_dir: Path | None = None,
+    aifs_dir: Path | None = None,
 ) -> tuple[dict[str, alt.VConcatChart], str | None]:
     """Draw every chart of one technology that its saved losses can support.
 
@@ -1649,6 +1848,7 @@ def draw_domain(
         input_dir: The directory `nwp_forecast_comparison.py` wrote to.
         domain: `solar` or `wind`.
         extra_dir: The directory `fit_extra_leads.py` wrote to, or None.
+        aifs_dir: The directory `fit_aifs.py` wrote to, or None to leave the AIFS chart out.
 
     Returns:
         Each chart keyed by its name, and the chosen week's month and year.
@@ -1672,6 +1872,12 @@ def draw_domain(
         losses=losses, predictions=predictions, domain=domain, title=TITLES[(domain, "models_work")]
     )
     charts["models_work"] = work
+    if aifs_dir is not None:
+        charts["aifs"] = aifs(
+            losses_by_set=load_aifs(aifs_dir=aifs_dir, domain=domain),
+            domain=domain,
+            title=TITLES[(domain, "aifs")],
+        )
     return {name: chart for name, chart in charts.items() if chart is not None}, week_month
 
 
@@ -1687,13 +1893,19 @@ def main() -> int:
     parser.add_argument(
         "--extra-dir", type=Path, default=None, help="The extra lead days' losses directory."
     )
+    parser.add_argument(
+        "--aifs-dir", type=Path, default=None, help="The AIFS arms' losses directory."
+    )
     parser.add_argument("--output-dir", type=Path, required=True, help="Where SVGs are written.")
     parser.add_argument("--no-svgo", action="store_true", help="Skip the svgo optimisation.")
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
     for domain in DOMAINS:
         charts, week_month = draw_domain(
-            input_dir=args.input_dir, domain=domain, extra_dir=args.extra_dir
+            input_dir=args.input_dir,
+            domain=domain,
+            extra_dir=args.extra_dir,
+            aifs_dir=args.aifs_dir,
         )
         for name, chart in charts.items():
             path = args.output_dir / f"nwp_forecast_{domain}_{name}.svg"

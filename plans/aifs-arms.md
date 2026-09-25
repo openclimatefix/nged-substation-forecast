@@ -22,10 +22,10 @@ ENS mean), at the same lead and the same 6-hourly steps as AIFS. The already-fit
 day-1 column is a one-sided reference, because its hourly steps and its lead both favour IFS 0.25°.
 Every reference is refitted on the AIFS rows, on the same graphics processing unit (GPU) as the AIFS
 arms, at the primary hyperparameter setting only. Folds are cut inside the AIFS version eras, whose
-edges are whole months. One contrast, `aifs_single − ens_control6` at day 1 (solar and wind), is named deciding before any
-fit, and every other AIFS number, including every AIFS ENS number, is labelled exploratory and post
-hoc. The output is a
-new write-once folder, `data/studies/nwp_forecast_comparison_aifs/`, a `report.md` that prints every
+edges are whole months. One contrast, `aifs_single − ens_control6` at day 1 (solar and wind), is
+named deciding before any fit, and every other AIFS number, including every AIFS ENS number, is
+labelled exploratory and post hoc. The output is a new write-once folder,
+`data/studies/nwp_forecast_comparison_aifs/`, a `report.md` that prints every
 number the page quotes, and one new results section on the page. Nothing under `packages/` changes,
 and no new module is added: the plan reuses `geo.h3.compute_h3_grid_weights` and the helpers named
 below, so the scope stays the one plan review 1 trimmed it to.
@@ -365,8 +365,9 @@ with a CPU fit. The Opus review of the fit code finishes before the first fit.
   verdict needs both settings to agree, and a disagreement is stated.
 
 **The contrasts are listed here before any fit.** No AIFS contrast was written into the published
-plan, so none of these is "planned" in the published page's sense. One (for each technology) is named deciding here,
-before any fit. The page may claim a difference for a deciding contrast when its interval excludes
+plan, so none of these is "planned" in the published page's sense. One (for each technology) is
+named deciding here, before any fit. The page may claim a difference for a deciding contrast when
+its interval excludes
 zero (statistically significant at the 5% level) at both settings, with the leave-one-month-out
 range and the `day_of_year`-removed refit agreeing in sign. It states that these are the only AIFS
 contrasts named before the fit, and that the spatial read and native grid remain confounds. Every
@@ -649,10 +650,9 @@ Per the `study` skill, the maintainer's authority is needed to merge.
    CPU-to-GPU floor does not bound any AIFS contrast. The page states the device in Limitations. It
    does not print that floor beside AIFS contrasts, because a reader would take it for a noise level
    those contrasts carry.
-9. **Sensitivity setting.** Fitted for the two deciding pairs (solar and wind) and every near-line result, in the
-   same invocation as the primary fits, so `report.md` is written once. The near-line rule is
-   applied
-   mechanically by the script, not by eye.
+9. **Sensitivity setting.** Fitted for the two deciding pairs (solar and wind) and every near-line
+   result, in the same invocation as the primary fits, so `report.md` is written once. The
+   near-line rule is applied mechanically by the script, not by eye.
 10. **Dynamical.org's access ends on 2026-09-30.** The AIFS inputs are on disk, and the plan reads
     nothing that cannot be re-run from disk. `README.md` in the new folder records that.
 11. **Stale row in `studies/README.md`** (not part of this issue): see "What changes, file by file".

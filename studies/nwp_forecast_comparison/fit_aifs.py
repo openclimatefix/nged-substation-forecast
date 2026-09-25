@@ -466,15 +466,15 @@ def fit_row_set(
         jobs=[(arm, PRIMARY) for arm in (*spec.arms, *no_doy)],
         workers=workers,
     )
+    second_arms = sensitivity_arms(
+        losses=primary.filter(pl.col("setting") == PRIMARY), row_set=row_set
+    )
+    if not second_arms:
+        return primary
     second = fit_jobs(
         frame=frame,
         domain=domain,
-        jobs=[
-            (arm, SENSITIVITY)
-            for arm in sensitivity_arms(
-                losses=primary.filter(pl.col("setting") == PRIMARY), row_set=row_set
-            )
-        ],
+        jobs=[(arm, SENSITIVITY) for arm in second_arms],
         workers=workers,
     )
     return pl.concat([primary, second])
