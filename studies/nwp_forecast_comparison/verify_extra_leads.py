@@ -29,7 +29,6 @@ import sys
 from pathlib import Path
 from typing import Final
 
-import numpy as np
 import polars as pl
 from contracts.settings import PROJECT_ROOT
 
@@ -53,9 +52,6 @@ MIN_MEAN_W_M2: Final[float] = 20.0
 
 MAX_RATIO_ERROR: Final[float] = 0.10
 """How far beyond-240-h mean radiation may sit from the 6-hour reading's, as a share of it."""
-
-DAY0_TOLERANCE_W_M2: Final[float] = 0.5
-"""How close the two radiation series must be on an hour to count as equal."""
 
 PRODUCTS: Final[dict[str, str]] = {"ICON-D2": "icon-d2", "ICON-EU": "icon-eu"}
 """Each product's directory under `data/studies/weather/`, and the slug in its file names."""
@@ -131,6 +127,63 @@ def gefs_window_table(*, files: list[Path]) -> pl.DataFrame:
     return pl.DataFrame(rows)
 
 
+BOUNDARY_LEADS: Final[tuple[int, ...]] = (246, 252, 258, 264, 270)
+"""The first 6-hourly leads, which day 10's band reads; each is compared with the lead 24 hours
+earlier, which has the same valid hour and a documented 6-hour window."""
+
+
+def gefs_boundary_table(*, files: list[Path]) -> pl.DataFrame:
+    """Return the mean radiation at each of the first 6-hourly leads and 24 hours before it.
+
+    Args:
+        files: The GEFS month-cache parquets.
+
+    Returns:
+        One row per lead of `BOUNDARY_LEADS`, with `lead_hours`, `mean` and `mean_day_before`
+        (the mean 24 hours earlier, a 6-hour window).
+    """
+    lead_hours = (pl.col("lead_time").dt.total_minutes() / 60).cast(pl.Int32)
+    wanted = [*BOUNDARY_LEADS, *(lead - 24 for lead in BOUNDARY_LEADS)]
+    means = (
+        pl.scan_parquet(files)
+        .filter(pl.col("init_time").dt.hour() == 0)
+        .select(lead_hours=lead_hours, value=pl.col("downward_short_wave_radiation_flux_surface"))
+        .filter(pl.col("value").is_not_nan(), pl.col("lead_hours").is_in(wanted))
+        .group_by("lead_hours")
+        .agg(mean=pl.col("value").mean())
+        .collect()
+    )
+    by_lead = dict(zip(means["lead_hours"], means["mean"], strict=True))
+    return pl.DataFrame(
+        [
+            {"lead_hours": lead, "mean": by_lead[lead], "mean_day_before": by_lead[lead - 24]}
+            for lead in BOUNDARY_LEADS
+        ]
+    )
+
+
+def gefs_boundary_verdict(*, table: pl.DataFrame) -> list[str]:
+    """List the boundary leads whose mean is not that of the same valid hour a day earlier.
+
+    Args:
+        table: `gefs_boundary_table`'s result.
+
+    Returns:
+        One line per failing lead; night-time leads (a mean under `MIN_MEAN_W_M2` a day earlier)
+        are skipped. A lead fails if its mean is more than `MAX_RATIO_ERROR` from the mean a day
+        earlier.
+    """
+    failures = []
+    for row in table.iter_rows(named=True):
+        previous = row["mean_day_before"]
+        if previous >= MIN_MEAN_W_M2 and abs(row["mean"] - previous) > MAX_RATIO_ERROR * previous:
+            failures.append(
+                f"lead {row['lead_hours']} h: mean {row['mean']:.1f} W/m2 is more than "
+                f"{MAX_RATIO_ERROR:.0%} from {previous:.1f} a day earlier"
+            )
+    return failures
+
+
 def gefs_window_verdict(*, table: pl.DataFrame) -> list[str]:
     """List the valid hours at which the beyond-240-h radiation is not the 6-hour window.
 
@@ -163,8 +216,25 @@ def gefs_window_verdict(*, table: pl.DataFrame) -> list[str]:
     return failures
 
 
-def day0_comparison(*, weather_dir: Path, product: str, slug: str) -> dict[str, float | int]:
-    """Compare a product's unsuffixed Previous Runs series with the past studies' series.
+DAY0_COLUMNS: Final[tuple[tuple[str, str, str], ...]] = (
+    ("shortwave_radiation", "beam_diffuse_{slug}.parquet", "ghi_w_m2"),
+    ("wind_speed_100m", "wind_{underscored}.parquet", "wind_speed_100m"),
+    ("wind_speed_10m", "wind_{underscored}.parquet", "wind_speed_10m"),
+    ("wind_direction_100m", "wind_{underscored}.parquet", "wind_direction_100m"),
+)
+"""Each unsuffixed Previous Runs column the build reads as day 0, the past studies' file that holds
+the same variable (with `{slug}` and `{underscored}` filled in), and its column there. Both series
+are in the same units (radiation in W/m2, speed in km/h, direction in degrees). The past studies
+hold no 2 m temperature for these products, so that column is not checked."""
+
+DAY0_TOLERANCE: Final[float] = 0.01
+"""How close the two series must be on an hour to count as equal, in each column's own unit."""
+
+
+def day0_comparison(
+    *, weather_dir: Path, product: str, slug: str
+) -> list[dict[str, str | float | int]]:
+    """Compare a product's unsuffixed Previous Runs columns with the past studies' series.
 
     Args:
         weather_dir: `data/studies/weather/`.
@@ -172,41 +242,33 @@ def day0_comparison(*, weather_dir: Path, product: str, slug: str) -> dict[str, 
         slug: The product's slug in its file names.
 
     Returns:
-        The number of shared (site, time) hours, the largest absolute radiation difference, the
-        share of hours within `DAY0_TOLERANCE_W_M2`, and the largest absolute wind-speed ratio
-        deviation from the median ratio (Previous Runs serves km/h, the past-wind file m/s).
+        One record per column of `DAY0_COLUMNS`, with `column`, the number of shared non-null
+        (site, time) hours, the largest absolute difference, and the share of those hours within
+        `DAY0_TOLERANCE`.
     """
-    combined = pl.read_parquet(
-        weather_dir / product / "previous_runs" / "combined.parquet",
-        columns=["site", "time", "shortwave_radiation", "wind_speed_100m"],
-    )
-    past_radiation = pl.read_parquet(weather_dir / product / f"beam_diffuse_{slug}.parquet").select(
-        "site", "time", "ghi_w_m2"
-    )
-    past_wind = pl.read_parquet(weather_dir / product / f"wind_{slug.replace('-', '_')}.parquet")
-    radiation = combined.join(past_radiation, on=["site", "time"], how="inner").drop_nulls(
-        ["shortwave_radiation", "ghi_w_m2"]
-    )
-    difference = (radiation["shortwave_radiation"] - radiation["ghi_w_m2"]).abs()
-    wind = (
-        combined.join(
-            past_wind.select("site", "time", "wind_speed_100m"),
-            on=["site", "time"],
-            how="inner",
-            suffix="_past",
+    combined = pl.read_parquet(weather_dir / product / "previous_runs" / "combined.parquet")
+    records: list[dict[str, str | float | int]] = []
+    for column, file_pattern, past_column in DAY0_COLUMNS:
+        past = pl.read_parquet(
+            weather_dir
+            / product
+            / file_pattern.format(slug=slug, underscored=slug.replace("-", "_"))
+        ).select("site", "time", past=past_column)
+        shared = (
+            combined.select("site", "time", column)
+            .join(past, on=["site", "time"], how="inner")
+            .drop_nulls([column, "past"])
         )
-        .drop_nulls(["wind_speed_100m", "wind_speed_100m_past"])
-        .filter(pl.col("wind_speed_100m_past") > 1.0)
-        .with_columns(ratio=pl.col("wind_speed_100m") / pl.col("wind_speed_100m_past"))
-    )
-    median_ratio = float(wind["ratio"].median())  # ty: ignore[invalid-argument-type]
-    return {
-        "hours": radiation.height,
-        "max_abs_radiation_difference": float(difference.max()),  # ty: ignore[invalid-argument-type]
-        "share_within_tolerance": float((difference <= DAY0_TOLERANCE_W_M2).mean()),  # ty: ignore[invalid-argument-type]
-        "median_wind_ratio": median_ratio,
-        "max_wind_ratio_deviation": float(np.abs(wind["ratio"].to_numpy() - median_ratio).max()),
-    }
+        difference = (shared[column] - shared["past"]).abs()
+        records.append(
+            {
+                "column": column,
+                "hours": shared.height,
+                "max_abs_difference": float(difference.max()),  # ty: ignore[invalid-argument-type]
+                "share_within_tolerance": float((difference <= DAY0_TOLERANCE).mean()),  # ty: ignore[invalid-argument-type]
+            }
+        )
+    return records
 
 
 def main() -> int:
@@ -220,8 +282,13 @@ def main() -> int:
     verification.mkdir(parents=True, exist_ok=True)
 
     cache = weather_dir / GEFS_DIR_NAME / "_month_cache"
-    table = gefs_window_table(files=sorted(cache.glob("*.parquet")))
-    failures = gefs_window_verdict(table=table)
+    cache_files = sorted(cache.glob("*.parquet"))
+    table = gefs_window_table(files=cache_files)
+    boundary = gefs_boundary_table(files=cache_files)
+    failures = [
+        *gefs_window_verdict(table=table),
+        *gefs_boundary_verdict(table=boundary),
+    ]
     lines = [
         "# GEFS radiation window beyond 240 h",
         "",
@@ -241,6 +308,18 @@ def main() -> int:
             for row in table.iter_rows(named=True)
         ),
         "",
+        (
+            "Mean radiation (W/m2) at the first 6-hourly leads, and 24 hours earlier at the same "
+            "valid hour:"
+        ),
+        "",
+        "| Lead (h) | Mean | Mean 24 h earlier |",
+        "|---|---|---|",
+        *(
+            f"| {row['lead_hours']} | {row['mean']:.1f} | {row['mean_day_before']:.1f} |"
+            for row in boundary.iter_rows(named=True)
+        ),
+        "",
         "**Verdict:** "
         + (
             "the values beyond 240 h are 6-hour window means."
@@ -254,18 +333,16 @@ def main() -> int:
         "# Day 0 of Open-Meteo's Previous Runs against the past studies' series",
         "",
         (
-            "| Product | Shared hours | Largest radiation difference (W/m2) "
-            f"| Share within {DAY0_TOLERANCE_W_M2} W/m2 | Median wind ratio (km/h over m/s) "
-            "| Largest deviation from that ratio |"
+            "| Product | Column | Shared hours | Largest absolute difference "
+            f"| Share within {DAY0_TOLERANCE} |"
         ),
-        "|---|---|---|---|---|---|",
+        "|---|---|---|---|---|",
     ]
     for product, slug in PRODUCTS.items():
-        result = day0_comparison(weather_dir=weather_dir, product=product, slug=slug)
-        day0.append(
-            f"| {product} | {result['hours']} | {result['max_abs_radiation_difference']:.3f} | "
-            f"{result['share_within_tolerance']:.4f} | {result['median_wind_ratio']:.3f} | "
-            f"{result['max_wind_ratio_deviation']:.3f} |"
+        day0.extend(
+            f"| {product} | {record['column']} | {record['hours']} "
+            f"| {record['max_abs_difference']:.4f} | {record['share_within_tolerance']:.4f} |"
+            for record in day0_comparison(weather_dir=weather_dir, product=product, slug=slug)
         )
     (verification / "day0_matches_past_series.md").write_text("\n".join(day0) + "\n")
     _LOG.info("wrote %s", verification)

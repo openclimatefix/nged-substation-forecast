@@ -14,7 +14,7 @@ import itertools
 import re
 from collections.abc import Mapping, Sequence
 from types import MappingProxyType
-from typing import Final, TypedDict
+from typing import Final, Literal, TypedDict
 
 import numpy as np
 import polars as pl
@@ -77,6 +77,10 @@ calendar month that occurs in two years into two different folds. A different ro
 month spans, so it needs `search_fold_offsets` to confirm that a candidate design leaves no
 uncovered cell.
 """
+
+
+DeviceType = Literal["cpu", "cuda"]
+"""The devices XGBoost fits on: the CPU, or an NVIDIA GPU."""
 
 
 class HyperParameters(TypedDict):
@@ -353,7 +357,7 @@ def crps(*, actual: np.ndarray, quantiles: np.ndarray) -> np.ndarray:
 
 
 def booster_parameters(
-    *, hyper_parameters: HyperParameters, seed: int, device: str = "cpu"
+    *, hyper_parameters: HyperParameters, seed: int, device: DeviceType = "cpu"
 ) -> dict[str, object]:
     """Translate the settings above into XGBoost's own parameter names.
 
@@ -407,7 +411,7 @@ def fit_one_fold(
     seed: int,
     with_quantiles: bool,
     weight: str | None = None,
-    device: str = "cpu",
+    device: DeviceType = "cpu",
 ) -> tuple[np.ndarray, np.ndarray | None]:
     """Fit one point model, optionally one quantile model, and predict the test fold.
 
@@ -457,7 +461,7 @@ def out_of_fold_losses(
     hyper_parameters: HyperParameters,
     with_quantiles: bool,
     weight: str | None = None,
-    device: str = "cpu",
+    device: DeviceType = "cpu",
 ) -> pl.DataFrame:
     """Produce out-of-fold losses for one feature set at one site, one row per (test row, seed).
 

@@ -13,6 +13,7 @@ from studies.cross_validation import (
     PRIMARY_HYPER_PARAMETERS,
     QUANTILE_LEVELS,
     SEEDS,
+    DeviceType,
     HyperParameters,
     assign_folds,
     booster_parameters,
@@ -263,7 +264,7 @@ def _run(
     *,
     site_rows: pl.DataFrame,
     offset_mw: float = 1.0,
-    device: str = "cpu",
+    device: DeviceType = "cpu",
 ) -> tuple[pl.DataFrame, _RecordingFit]:
     fit = _RecordingFit(offset_mw=offset_mw)
     monkeypatch.setattr(cross_validation, "fit_one_fold", fit)

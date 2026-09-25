@@ -495,13 +495,15 @@ def band_steps(
         raise ValueError(msg)
     values = {column: kept.select(names[column]).to_numpy() for column in columns}
     step_leads = leads.astype(np.float64)
-    widths = np.array([_step_width(int(lead), fine_step_last_lead) for lead in leads])
+    widths = np.array(
+        [_step_width(int(lead), fine_step_last_lead=fine_step_last_lead) for lead in leads]
+    )
     if six_hourly:
         step_leads, values = coarsen_to_six_hourly(
             leads=step_leads,
             values=values,
             period_means=frozenset({"ghi_w_m2"}),
-            last_three_hourly_lead=FINE_STEP_LAST_LEAD,
+            last_three_hourly_lead=fine_step_last_lead,
         )
         widths = np.full(len(step_leads), 6)
     return Steps(

@@ -44,16 +44,18 @@ from nwp_forecast_comparison import (
     fingerprint,
     leaderboard,
     losses_path,
+    predictions_from_losses,
+    predictions_path,
     rows,
 )
 from studies.bootstrap import bootstrap_absolute
-from studies.cross_validation import out_of_fold_losses
+from studies.cross_validation import DeviceType, out_of_fold_losses
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
 DOMAINS: Final[tuple[DomainType, DomainType]] = ("solar", "wind")
 
-DEVICE: Final[str] = "cuda"
+DEVICE: Final[DeviceType] = "cuda"
 """The XGBoost device every fit here uses."""
 
 SETTING: Final[str] = "primary"
@@ -199,11 +201,15 @@ def fit_arms(
     Args:
         frame: `joined_rows`'s result.
         domain: `solar` or `wind`.
-        prefixes: The arms to fit; one whose columns are absent from `frame` is skipped and logged.
+        prefixes: The arms to fit.
         workers: How many (arm, site) fits run at once.
 
     Returns:
         Every fit's per-row losses, labelled with `arm` and `setting`.
+
+    Raises:
+        ValueError: If an arm's columns are absent from `frame`, which would otherwise drop the
+            arm from the run silently.
     """
     sites = sorted(frame["site"].unique().to_list())
     outputs: list[pl.DataFrame] = []
@@ -211,9 +217,10 @@ def fit_arms(
         futures = {}
         for prefix in prefixes:
             columns = arm_columns(domain=domain, prefixes=(prefix,))
-            if not all(name in frame.columns for name in columns):
-                _LOG.warning("%s: %s has no columns in the joined rows, skipped", domain, prefix)
-                continue
+            absent = [name for name in columns if name not in frame.columns]
+            if absent:
+                msg = f"{domain}: {prefix} has no columns {absent} in the joined rows"
+                raise ValueError(msg)
             for site in sites:
                 future = pool.submit(
                     out_of_fold_losses,
@@ -292,23 +299,44 @@ def contrast_line(*, losses: pl.DataFrame, treatment: str, reference: str) -> st
     return f"| {treatment} − {reference} | {text} | {result['n_rows']} | {result['n_months']} |"
 
 
-def by_hour_modulo(*, losses: pl.DataFrame, treatment: str, reference: str) -> list[str]:
+def served_lead(*, domain: DomainType, remainder: int) -> int:
+    """Return a 3-hourly model's served lead in hours where `hour % 3 == remainder`.
+
+    Radiation is a mean over the hour before its label, so its served lead is `((h - 1) % 3) + 1`;
+    wind is an instantaneous value at its label, so its served lead is `h % 3`.
+
+    Args:
+        domain: `solar` or `wind`.
+        remainder: The hour of day modulo `HOUR_MODULO`.
+
+    Returns:
+        The served lead in hours.
+    """
+    return ((remainder - 1) % HOUR_MODULO) + 1 if domain == "solar" else remainder
+
+
+def by_hour_modulo(
+    *, domain: DomainType, losses: pl.DataFrame, treatment: str, reference: str
+) -> list[str]:
     """Format one contrast on each class of the hour of day modulo `HOUR_MODULO`.
 
     Args:
+        domain: `solar` or `wind`, which decides each class's served lead.
         losses: Per-row losses at one setting.
         treatment: The arm whose error is compared.
         reference: The arm it is compared against.
 
     Returns:
-        One table row per class that holds both arms, labelled `hour mod 3 = k`.
+        One table row per class that holds both arms, labelled with the class and its served lead.
     """
     lines = []
     for remainder in range(HOUR_MODULO):
         subset = losses.filter(pl.col("time").dt.hour() % HOUR_MODULO == remainder)
         line = contrast_line(losses=subset, treatment=treatment, reference=reference)
         if line is not None:
-            lines.append(line.replace("| ", f"| (hour mod {HOUR_MODULO} = {remainder}) ", 1))
+            lead = served_lead(domain=domain, remainder=remainder)
+            label = f"(hour mod {HOUR_MODULO} = {remainder}, lead {lead} h)"
+            lines.append(line.replace("| ", f"| {label} ", 1))
     return lines
 
 
@@ -369,13 +397,17 @@ def report_domain(
         line = contrast_line(losses=losses, treatment=treatment, reference=reference)
         if line:
             near.append(line)
-            near.extend(by_hour_modulo(losses=losses, treatment=treatment, reference=reference))
+            near.extend(
+                by_hour_modulo(
+                    domain=domain, losses=losses, treatment=treatment, reference=reference
+                )
+            )
     lines += ["", "### ICON-D2 against ICON-EU, whole and by hour of day modulo 3", *near]
     lines += [
         "",
         "### Absolute error by hour of day modulo 3, ICON-D2 and ICON-EU at day 0",
         "",
-        "| Arm | Hour of day mod 3 | Error (% of capacity) | 95% interval | Rows |",
+        "| Arm | Hour of day mod 3 (served lead) | Error (% of capacity) | 95% interval | Rows |",
         "|---|---|---|---|---|",
     ]
     for arm in ("icon_d2_day0", "icon_eu_day0"):
@@ -383,13 +415,14 @@ def report_domain(
             subset = losses.filter(pl.col("time").dt.hour() % HOUR_MODULO == remainder)
             if arm not in set(subset["arm"].unique().to_list()):
                 continue
+            lead = served_lead(domain=domain, remainder=remainder)
             result = bootstrap_absolute(losses=subset, arm=arm, metric=METRIC)
             text = error_text(
                 value=result["value"], lower=result["lower_95"], upper=result["upper_95"]
             )
             lines.append(
-                f"| {arm} | {remainder} | {text.split(' [')[0]} | [{text.split(' [')[1]} "
-                f"| {result['n_rows']} |"
+                f"| {arm} | {remainder} ({lead} h) | {text.split(' [')[0]} "
+                f"| [{text.split(' [')[1]} | {result['n_rows']} |"
             )
     noise = ["", "### Device noise floor: GPU fit minus published CPU fit, same arm", *header]
     for prefix in REFERENCE_PREFIXES:
@@ -412,6 +445,27 @@ def report_domain(
     return [*lines, *noise, ""]
 
 
+def require_arms(*, frame: pl.DataFrame, domain: DomainType) -> None:
+    """Raise unless every arm to fit has all its columns in `frame`.
+
+    Args:
+        frame: `joined_rows`'s result.
+        domain: `solar` or `wind`.
+
+    Raises:
+        ValueError: If any arm is missing columns, which a GEFS gate that returned the keys
+            unchanged would cause silently.
+    """
+    absent = [
+        prefix
+        for prefix in (*NEW_PREFIXES, *REFERENCE_PREFIXES)
+        if not all(name in frame.columns for name in arm_columns(domain=domain, prefixes=(prefix,)))
+    ]
+    if absent:
+        msg = f"{domain}: arms with no columns in the joined rows: {absent}"
+        raise ValueError(msg)
+
+
 def main() -> int:
     """Fit the arms for both technologies and write the losses and report once."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -420,6 +474,9 @@ def main() -> int:
     parser.add_argument("--published-dir", type=Path, required=True)
     parser.add_argument("--workers", type=int, default=2, help="(arm, site) fits run at once.")
     parser.add_argument("--check", action="store_true", help="Compare two GPU runs of one arm.")
+    parser.add_argument(
+        "--report-only", action="store_true", help="Write the report from the saved losses."
+    )
     args = parser.parse_args()
     if args.output_dir.resolve() == args.published_dir.resolve():
         msg = "the output folder must not be the published folder"
@@ -428,6 +485,23 @@ def main() -> int:
         agree = check_determinism(published_dir=args.published_dir, output_dir=args.output_dir)
         sys.stdout.write(f"two GPU runs agree: {agree}\n")
         return 0 if agree else 1
+    report_path = args.output_dir / "report.md"
+    if report_path.exists():
+        msg = f"{report_path} exists; the extra-lead report is write-once, move it first"
+        raise FileExistsError(msg)
+    frames = {
+        domain: joined_rows(
+            published_dir=args.published_dir, output_dir=args.output_dir, domain=domain
+        )
+        for domain in DOMAINS
+    }
+    shares = {domain: missing_shares(frame=frames[domain], domain=domain) for domain in DOMAINS}
+    for domain in DOMAINS:
+        require_arms(frame=frames[domain], domain=domain)
+        path = losses_path(output_dir=args.output_dir, domain=domain)
+        if path.exists() and not args.report_only:
+            msg = f"{path} exists; rerun with --report-only, or move it first"
+            raise FileExistsError(msg)
     report = [
         "# Extra lead days, GPU fits: report",
         "",
@@ -441,26 +515,26 @@ def main() -> int:
     ]
     for domain in DOMAINS:
         path = losses_path(output_dir=args.output_dir, domain=domain)
-        if path.exists():
-            msg = f"{path} exists; the extra-lead losses are write-once, move it first"
-            raise FileExistsError(msg)
-    for domain in DOMAINS:
-        frame = joined_rows(
-            published_dir=args.published_dir, output_dir=args.output_dir, domain=domain
-        )
-        shares = missing_shares(frame=frame, domain=domain)
-        losses = fit_arms(
-            frame=frame,
-            domain=domain,
-            prefixes=(*NEW_PREFIXES, *REFERENCE_PREFIXES),
-            workers=args.workers,
-        )
-        losses.write_parquet(losses_path(output_dir=args.output_dir, domain=domain))
+        if args.report_only:
+            losses = pl.read_parquet(path)
+        else:
+            losses = fit_arms(
+                frame=frames[domain],
+                domain=domain,
+                prefixes=(*NEW_PREFIXES, *REFERENCE_PREFIXES),
+                workers=args.workers,
+            )
+            losses.write_parquet(path)
+            predictions_from_losses(losses=losses, frame=frames[domain]).write_parquet(
+                predictions_path(output_dir=args.output_dir, domain=domain)
+            )
         published = pl.read_parquet(
             losses_path(output_dir=args.published_dir, domain=domain)
         ).filter(pl.col("setting") == SETTING)
-        report += report_domain(domain=domain, losses=losses, published=published, shares=shares)
-    (args.output_dir / "report.md").write_text("\n".join(report))
+        report += report_domain(
+            domain=domain, losses=losses, published=published, shares=shares[domain]
+        )
+    report_path.write_text("\n".join(report))
     return 0
 
 

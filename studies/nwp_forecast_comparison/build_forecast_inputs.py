@@ -34,8 +34,10 @@ One-off throwaway script for the study in
   for any earlier month does not count as covering it. After loading, every 00 UTC run the rows need
   (init dates from the rows' first date minus the largest day offset to their last date minus the
   smallest, clipped to the first cached month) must hold all 31 members at every 3-hourly lead from
-  0 to 95 h at every grid cell, or the build raises with the missing or incomplete runs listed. A
-  run still arriving therefore stops the build instead of turning into null GEFS columns.
+  0 to 95 h at every grid cell (with `--extra-leads`, at every lead `gefs_band_leads` returns:
+  3-hourly to 240 h and each band's 6-hourly leads beyond), or the build raises with the missing
+  or incomplete runs listed. A run still arriving therefore stops the build instead of turning
+  into null GEFS columns.
 
 With `--extra-leads` the script instead builds the exploratory lead columns (ENS at days 5 and 14,
 GEFS at days 5, 10 and 14, Previous Runs at day 0 for ICON-D2 and ICON-EU and at day 5 for ICON
@@ -65,6 +67,7 @@ import polars as pl
 from contracts.settings import PROJECT_ROOT
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
+from verify_extra_leads import gefs_window_table, gefs_window_verdict
 from verify_previous_runs_leads import PRODUCT_DIRS
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
@@ -138,9 +141,6 @@ baseline columns every shared row must hold, so adding them there would move the
 
 EXTRA_GEFS_DAYS: Final[tuple[int, ...]] = (5, 10, 14)
 """The GEFS bands the extra-lead build adds."""
-
-EXTRA_LEADS_DIR_NAME: Final[str] = "nwp_forecast_comparison_leads"
-"""Under `data/studies/`, where the extra-lead inputs, losses and report are written, once."""
 
 SOLAR_ONLY_PRODUCTS: Final[frozenset[str]] = frozenset({"ARPEGE Europe", "AROME France"})
 """Products the plan scores for solar only: their 100 m wind offsets are missing on most rows."""
@@ -502,9 +502,9 @@ GEFS_ENSEMBLE_SIZE: Final[int] = 31
 """How many members a GEFS run holds (ENS holds 51)."""
 
 GEFS_STEP_MEAN_MAX_LEAD_HOURS: Final[int] = 240
-"""GEFS steps 3-hourly to this lead and 6-hourly beyond it; `gefs_step_means` only applies inside
-the 3-hourly part, which comfortably covers every band this study reads (day 3's steps end at lead
-24*3+30 = 102 h)."""
+"""GEFS steps 3-hourly to this lead and 6-hourly beyond it. `gefs_step_means` inverts the
+alternating windows up to this lead; beyond it each value is already a 6-hour mean and passes
+through (`verify_extra_leads.py` checks that reading)."""
 
 GEFS_DAYS: Final[dict[DomainType, tuple[int, ...]]] = {
     "solar": (1, 2, 3),
@@ -561,7 +561,7 @@ def _gefs_step_mean_radiation(*, radiation: pl.DataFrame) -> pl.DataFrame:
     Runs `studies.resample.gefs_step_means` on each (run, member) series up to
     `GEFS_STEP_MEAN_MAX_LEAD_HOURS`, in lead order, on the whole run before any band slicing, as
     the plan requires. Beyond that lead GEFS steps every 6 hours and every value is already a plain
-    6-hour mean (`verify_gefs_radiation_window.py` checks that reading), so those leads pass through
+    6-hour mean (`verify_extra_leads.py` checks that reading), so those leads pass through
     unchanged.
 
     Args:
@@ -606,13 +606,13 @@ def _gefs_step_mean_radiation(*, radiation: pl.DataFrame) -> pl.DataFrame:
     coarse = (
         radiation.filter(pl.col("lead_hours") > GEFS_STEP_MEAN_MAX_LEAD_HOURS)
         .join(wide.select("init_time", "ensemble_member"), on=["init_time", "ensemble_member"])
-        .select(
-            "init_time",
-            "ensemble_member",
-            "lead_hours",
-            ghi_w_m2=pl.col("ghi_raw").cast(pl.Float64),
+        .select("init_time", "ensemble_member", "lead_hours", ghi_w_m2="ghi_raw")
+        .cast(
+            {
+                "ensemble_member": fine.schema["ensemble_member"],
+                "ghi_w_m2": fine.schema["ghi_w_m2"],
+            }
         )
-        .cast({"ensemble_member": fine.schema["ensemble_member"]})
     )
     return pl.concat([fine, coarse], how="vertical")
 
@@ -950,6 +950,12 @@ def build_extra_leads(
     keys = pl.read_parquet(published_dir / f"{domain}_forecast_inputs.parquet").select(
         "site", "time"
     )
+    last_month = keys.select(pl.col("time").max().dt.strftime("%Y-%m")).item()
+    cache_files = list(_gefs_months_available(last_month=last_month).values())
+    failures = gefs_window_verdict(table=gefs_window_table(files=cache_files))
+    if failures:
+        msg = f"GEFS beyond 240 h is not a 6-hour window mean: {failures}"
+        raise RuntimeError(msg)
     frame = _previous_runs_frame(keys=keys, domain=domain, day_offsets=EXTRA_PRODUCT_DAY_OFFSETS)
     frame = _ens_extra_frame(keys=frame, domain=domain)
     frame = _gefs_frame(keys=frame, domain=domain, window_dir=gefs_window_dir, days=EXTRA_GEFS_DAYS)
