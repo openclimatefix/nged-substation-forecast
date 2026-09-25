@@ -62,7 +62,8 @@ Read from `data/studies/weather/CERRA/` (the lineage notes, the parquet schemas,
   `product_type=forecast, leadtime_hour=3` (CDS has no analysis product for them), in J m⁻², so
   each value is the energy over the 3 hours ending at the label (init at `valid_time − 3 h`,
   window `(valid − 3 h, valid]`). Labels fall at 00, 03, ..., 21 UTC only (474,050 rows at each
-  hour, 190 cells × 2,495 days). Dividing by 10,800 s gives the mean flux in W m⁻². The
+  hour, 190 cells × 2,495 days). Night values are about 6e-15 rather than 0, which the
+  clear-sky mask zeroes. Dividing by 10,800 s gives the mean flux in W m⁻². The
   survey's "hourly through forecast leads 1 to 3" describes what CDS could serve, not what is on
   disk.
 - **Lead:** 0 to 3 hours after each 3-hourly analysis, so the first hours of a short forecast,
@@ -71,7 +72,8 @@ Read from `data/studies/weather/CERRA/` (the lineage notes, the parquet schemas,
   to 12 hours).
 - **Coverage:** 2019-09-01 03:00 to 2026-07-01 00:00 UTC, 190 grid cells (a cropped box around
   the roster), 5.5 km grid, no nulls, no NaNs, no duplicate keys. Every month has all 240 to 248
-  time steps, so the tail is complete. The domain is the whole of Europe, so every generator is
+  time steps (February has 224 or 232, September 2019 has 239, and the last label, 2026-07-01
+  00:00, is the window 21 to 24 UTC on 30 June), so no month is short. The domain is the whole of Europe, so every generator is
   inside it. Each generator's nearest cell is 1.0 km to 3.5 km away (pooled range only; the
   per-generator table in `generator_cells.parquet` is never printed or charted).
 - **Not provided:** hourly means (needs leads 1 and 2, not downloaded), diffuse, direct normal
@@ -82,11 +84,17 @@ Read from `data/studies/weather/CERRA/` (the lineage notes, the parquet schemas,
 
 **Hourly rebuild (the choice that needs approving).** The study scores hourly means. Options:
 
-- *Rebuild through the clear-sky index, then rescale each window to its own mean* (recommended).
-  Reuses `studies.resample.clear_sky_index_resample` and `rescale_to_step_means` unchanged, the
-  method `ens_past_solar.py` uses for ENS, which `ens_forecast_horizons` picked as its best
-  technique for 3-hourly radiation. Windows are contiguous, so the rebuild interpolates between
-  neighbouring window midpoints with no lead gap.
+- *Rebuild through the clear-sky index* (recommended). One new pure function in the script,
+  `rebuild_hourly_from_windows`, takes each site's 3-hour window means, ending at 00, 03, ..., 21
+  UTC, and returns the hour-ending-at-label means, using `studies.resample.clear_sky_index_resample`
+  and `studies.baselines.hourly_clear_sky` unchanged. That is the method `ens_past_solar.py` uses
+  for ENS's steps, which `ens_forecast_horizons` picked as its best technique for 3-hourly
+  radiation. The windows are contiguous, so the rebuild interpolates between neighbouring window
+  midpoints with no lead gap. No rescaling to the window's mean is applied: `ens_past_solar.py`
+  does not rescale either (`rescale_to_step_means` is used only by `ens_forecast_horizons.py`), and
+  the same function serves all three arms, so the matched contrast differs only in the input.
+  The script does not import `ens_past_solar`'s private `_three_hourly_rebuilt`, which averages
+  hourly data into ENS's 00 and 12 UTC run phases and cannot rebuild data that are already steps.
 - *Hold each window's mean for its three hours.* Simplest, but puts the whole window's energy at
   dawn and dusk hours.
 - *Download leads 1 and 2 for exact hourly means.* Exact, but a further CDS download of two
@@ -94,26 +102,35 @@ Read from `data/studies/weather/CERRA/` (the lineage notes, the parquet schemas,
   15 GB of scratch per chunk. Out of proportion for the first CERRA result; recorded as a
   follow-on under #841.
 
-**Positive control for the rebuild.** `era5_3h` and `cams_3h` average ERA5 and CAMS over CERRA's
-own windows (00 to 03, ..., 21 to 24 UTC) with `studies.resample.step_means` and rebuild them with
-the same code, as `ens_past_solar.py` does for ENS's steps. The gap between `era5_global` and
+**Positive control for the rebuild.** `era5_3h` and `cams_3h` average ERA5's and CAMS's hourly
+means over CERRA's own windows (the three hours ending at 00, 03, ..., 21 UTC, a plain mean where
+all three hours are present, and dropped where not) and rebuild them with the same
+`rebuild_hourly_from_windows`, so their windows have CERRA's phase, not the ENS runs' 00 and 12
+UTC phase. The 0.287-point step-width figure on the page belongs to ENS's phase and does not carry
+over to CERRA's windows: the report measures it again as `era5_global − era5_3h`. The gap between `era5_global` and
 `era5_3h` is then the price of the step width alone, and `cerra_global − era5_3h` is CERRA against
 ERA5 with the step width matched. Any conclusion about CERRA's physics rests on the matched
 contrast, not the unmatched one.
 
-**Row set.** The main (`solar_long`) frame's site-hours, cut to CERRA's last complete day
-(2026-06-30) and to hours where CERRA, ERA5 and CAMS all have a value, so every arm scores the
-same rows (the `study` skill's shared-rows rule). CERRA ends about 10 weeks before the main row
+**Row set.** The main (`solar_long`) frame's site-hours, cut to hours ending at or before the
+window end 2026-07-01 00:00 UTC (the last CERRA label, which belongs to 30 June) and to hours where
+CERRA, ERA5 and CAMS all have a value, so every arm scores the same rows (the `study` skill's
+shared-rows rule). CERRA is on disk from 2019, and the row set starts in December 2022 because the
+power data, ERA5 and CAMS limit it, about 43 months to June 2026. CERRA ends about 10 weeks before the main row
 set (2026-09-10), so this row set is a near-subset of main's rows and a shorter window; the report
 prints its row count, its first and last day, and the months dropped. The page says so in the
 block's caption, as it does for the ENS and station blocks.
 
-**Folds cover every calendar month.** `studies.cross_validation.search_fold_offsets` runs on this
-row set's own frame, and `raise_on_uncovered_months` runs before any fit, so the fits cannot
-inherit the extra block's 36.9% uncovered share. The report prints the uncovered share this row
+**Folds cover every calendar month.** The frame is folded with `studies.cross_validation.cut_eras`
+on `first_months=(UKV_UPGRADE_MONTH,)` (the one era boundary in this window; the era after it is
+five months, February to June 2026), with the offsets `search_fold_offsets` returns for this
+row set's own frame (at most five candidates, `N_FOLDS=5`, one era after the first), and
+`raise_on_uncovered_months` runs before any fit. `ens_past_solar.build_rows` ends in `with_eras`,
+which cuts main-style folds, so the new script builds its own rows and does not end there. The report prints the uncovered share this row
 set would have under the published main-row folds and under the chosen offsets (0 by
 construction), so a reader sees what the covering design changed. If `search_fold_offsets` finds
-no covering design, the script raises, and the plan is revised.
+no covering design, the script raises. The fallback is then to report the uncovered share, and the
+maintainer decides whether to proceed.
 
 **Arms.** All use `colsample_bytree=1`, the eight-column shared feature set of `ens_past_solar`
 (geometry and calendar features, `era_code`, `temp_c`) plus the arm's own irradiance columns, and
@@ -123,7 +140,8 @@ width.
 - `era5_global`, `cams_global`: refitted on this row set (reference rows).
 - `cerra_global`: CERRA's rebuilt hourly GHI, read at each generator's nearest cell.
 - `era5_3h`, `cams_3h`: the positive controls above.
-- `cerra_split`: CERRA's GHI, rebuilt direct and diffuse (global minus direct), three columns;
+- `cerra_split`: CERRA's rebuilt GHI and rebuilt direct, with diffuse as global minus direct
+  clipped at zero, three columns (the report counts the hours clipped);
   `cerra_erbs`: CERRA's GHI with Erbs separation, three columns. The same pair the page's "own
   direct beam" section scores for other products (`{product}_split`, `{product}_erbs` in
   `weather_products.py`).
@@ -147,15 +165,29 @@ four above.
 
 ## What changes, file by file
 
-- `studies/beam_diffuse_split/cerra_past_solar.py` (new): reads the two parquet files and
-  `generator_cells.parquet`, converts J m⁻² to W m⁻² (÷ 10,800), builds the frame with
-  `blend_products._solar_frame` and the ENS script's `_era5_and_cams_hourly`, `build_rows()`,
-  `jobs()`, `_fingerprint()`, `_report()`, `main()` with `--report-only`, `refuse_to_overwrite`,
+- `studies/beam_diffuse_split/cerra_past_solar.py` (new, imports what exists and copies nothing):
+  reads the two parquet files, converts J m⁻² to W m⁻² (÷ 10,800), and builds the frame with
+  `blend_products._solar_frame` and `ens_past_solar`'s public-by-import helper
+  `_era5_and_cams_hourly` (made public in the same commit if importing a private name fails the
+  linter). Pure functions of frames, so they can be tested without `data/`:
+  `windows_from_accumulation`, `rebuild_hourly_from_windows` (all three arms), `windowed_mean` (the
+  ERA5 and CAMS 3-hour means), `join_rows` (the shared-rows cut and dtype checks). Then `jobs()`,
+  `_fingerprint()`, `_report()`, `main()` with `--report-only`, `refuse_to_overwrite`,
   `check_no_missing`, and its own `OUTPUT_DIR = STUDY_DATA_DIR / "past_weather_v2" /
-  "cerra_past_solar"`. Module docstring follows `ens_past_solar.py`: data, lead, arms, planned
-  contrasts, exploratory list, the statement that the plan was committed before the first fit,
-  and "only one agent may run it at a time". The report prints pooled distance and coverage
-  ranges only, never per-generator values.
+  "cerra_past_solar"`. It asserts CERRA's time column is a naive `datetime[ns]` in UTC and casts it
+  to the study frames' UTC `datetime[us]` explicitly. Module docstring follows `ens_past_solar.py`:
+  data, lead, arms, planned contrasts, exploratory list, the statement that the plan was committed
+  before the first fit, and "only one agent may run it at a time". The report prints pooled ranges
+  and the cell count (190) only: never per-generator distances, the cell indices, the cropped
+  box's extent, or coordinates.
+- **The nearest-cell table has no recorded provenance.** No script in the repo writes
+  `generator_cells.parquet` (created 2026-09-24 by an unrecorded step), and the CERRA files hold
+  cell indices with no latitude or longitude, so its A to F labels cannot be checked against
+  `_pv_sites()`. Step 1 is a one-field CDS request (one time step of one variable, about 10 MB)
+  that fetches the grid's latitude and longitude, a `--write-grid` mode of `fetch_cerra.py` that
+  records the request in the lineage note. The script then derives each site's nearest cell from
+  `_pv_sites()` coordinates and asserts it equals `generator_cells.parquet`; a mismatch stops the
+  run. The request writes under `data/studies/weather/CERRA/`, so it needs the coordinator's slot.
 - `studies/beam_diffuse_split/past_solar_leaderboard.py`: a fifth `RowSet` for
   `cerra_past_solar` (with `CERRA_PLANNED`), and a `SOLAR_LEADERBOARD_DIR` bump to
   `solar_leaderboard_3` in `sources.py` (the write-once rule, as for `_2`); a re-run of the saved
@@ -177,8 +209,13 @@ four above.
   "downloaded for the studies, not yet scored" (line 327) link to the new subsection. The survey's
   claim of "hourly through forecast leads 1 to 3" gets the on-disk fact beside it (3-hour
   accumulations, lead 3 only).
-- `docs/studies/past-weather/methods.md` and `index.md`: only if they name the row-set count.
-- `docs/roadmap/data-sources.md`: CERRA row's status wording, only if it says "not scored".
+- `docs/studies/past-weather/methods.md`: required. It says "Five row sets" with a table (line 13)
+  and "The 14 planned contrasts" (line 85), which become six and 18. `index.md` is checked.
+- `docs/studies/past-weather/solar.md` also names `solar_leaderboard_2` under "Reproducing the
+  figures" (near line 1635), which changes to `solar_leaderboard_3`.
+- `docs/roadmap/data-sources.md`: the CERRA row (line 231, "Superseded by ERA5") gains the scored
+  result. `git grep "four row sets"` also matches the wind files, whose "four" is the wind page's
+  and stays.
 - `mkdocs.yml`: no change expected (no new page).
 
 ## Design-philosophy check
@@ -192,26 +229,31 @@ traded away.
 
 ## Tests
 
-- `packages/studies/tests/test_resample.py` gains none: `clear_sky_index_resample` and
-  `rescale_to_step_means` are reused unchanged.
-- New `tests/test_cerra_past_solar.py`, on synthetic frames, asserting what fails on `main` today
-  (the module does not exist):
-    - the J m⁻² to W m⁻² conversion (10,800,000 J m⁻² over 3 hours is 1,000 W m⁻²) and that a
-      window labelled `t` covers `(t − 3 h, t]`: a synthetic day whose window energy is known
-      rebuilds to hours whose mean over the window equals the window's mean, and whose peak falls
-      in the hour ending at solar noon ± 1 hour rather than a window boundary;
-    - `build_rows` drops every hour after 2026-06-30 and every hour where any of CERRA, ERA5 or
-      CAMS is missing, so all arms share the same rows;
-    - the four planned contrasts are exactly the four in this file (a set-equality assertion, the
-      way `test_past_leaderboard_row_set_options.py` pins the other row sets);
+- New `tests/test_cerra_past_solar.py`, on synthetic frames, importing the script's pure
+  functions. A test is worth having only if it fails when the code is wrong:
+    - the J m⁻² to W m⁻² conversion (10,800,000 J m⁻² over 3 hours is 1,000 W m⁻²) fails on a wrong
+      divisor;
+    - an asymmetric synthetic day whose window energy is known: the rebuilt hour-ending means peak
+      in the exact hour (not within ± 1 hour), a start-labelled reading of the windows moves the peak
+      by 3 hours and fails, and the rebuilt hours of a window average within a stated tolerance of
+      the window mean (no rescaling is applied, so the tolerance is stated, not zero);
+    - `join_rows` drops every hour after the window end 2026-07-01 00:00 and every hour where any of
+      CERRA, ERA5 or CAMS is missing, and raises on a time column of the wrong dtype or zone;
+    - the rebuilt direct and clipped diffuse are non-negative and the count of clipped hours is
+      returned;
+    - the four planned contrasts are exactly the four in this file (set equality, extending
+      `test_past_leaderboard_row_set_options.py`, which pins the other row sets' options);
     - `_check_column_counts` raises for a contrast whose arms differ in width;
-    - the chosen fold offsets leave no uncovered month on a synthetic frame that reproduces the
-    extra block's gap (a frame that fails with all-zero offsets).
-- `tests/test_past_solar_leaderboard.py`: the five-row-set list, `CERRA_PLANNED`, and that the
-  leaderboard refuses to write into a folder that already exists.
-- `tests/test_past_solar_leaderboard_charts.py`: the fifth block's title, its reference rows
-  (CAMS and ERA5), and the SVG width of 681 for both charts.
+    - the chosen fold offsets leave no uncovered month on a synthetic frame that fails with all-zero
+      offsets.
+- `tests/test_past_solar_leaderboard.py`: the five-row-set list, `CERRA_PLANNED`.
+- `tests/test_past_solar_leaderboard_charts.py`: the fifth block's title and its reference rows
+  (CAMS and ERA5), and that both charts have the same width (not a fixed 681, which a longer label
+  moves).
 - `tests/test_figure_numbers.py` is unchanged (17 figures) and must still pass.
+- Mechanical checks in the script on the built row set (they run in every fit, not only in
+  tests): the hour of the peak of the rebuilt CERRA clear-day composite equals ERA5's, since a
+  wrong window convention shifts the series by 3 hours without any value looking wrong.
 
 ## Docs to update
 
@@ -232,6 +274,8 @@ The green-before-push set from `implement-issue`, plus the studies gates:
   versus exploratory status of every CERRA contrast, row-set naming ("the CERRA row set"),
   the SVG titles carry their figure numbers, and a repo-wide `git grep` for stale "four row sets"
   or "14 products".
+- `git grep -n "solar_leaderboard_2"` returns only the superseded folder's own mentions, and
+  `grep -E "km|latitude|y_index|x_index"` on the report and the page shows only pooled values.
 - The data-validation skill on the CERRA files before any fit (gaps, duplicates, nulls, units,
   timestamp convention, the sun-height check of the rebuilt hours, and a correlation of daily CERRA
   and ERA5 means as a sanity check on the tail to 2026-06-30).
@@ -277,6 +321,29 @@ that the page states beside each. The page never reads CERRA's error as a limit 
 physics at hourly resolution.
 
 ## Reviews
+
+### Correctness review, and its triage
+
+Sixteen findings, all kept in the plan above except where noted:
+
+- Blocking, kept: the ENS script does not rescale windows, so one shared rebuild without rescaling
+  serves all three arms (finding 1); the rescale function cannot run on ENS's target grid and is
+  dropped from this plan (2); the ENS helper cannot rebuild step data, so a new pure function does
+  (3); folds come from `cut_eras` with `search_fold_offsets`' offsets, the era boundary and the
+  fallback are named (4); the nearest-cell table's provenance is rebuilt from the grid's
+  coordinates (5).
+- Serious, kept: February's step count and the window-end wording (6); the dtype assertion, the
+  peak-hour check and the row-set cut as a window end (7); the direct-and-diffuse rebuild and
+  clipping (8).
+- Tests, kept: the peak test asserts the exact hour, `build_rows` is split into pure functions,
+  the always-passing "refuses to overwrite" test is dropped, the width test compares the two
+  charts (9).
+- Design, kept: the shorter window's reason, the confounds of contrasts 1 and 2 (grid spacing and
+  radiation scheme as well as step width, so the page never reads the gap as CERRA's physics), the
+  six arms listed, the 0.287-point figure not carried over, the generators not six replicates
+  (10 to 12).
+- Anonymisation, kept: the report prints the cell count only (13). Missed places, kept: the
+  methods page counts, the reproduction path, the roadmap row, the extra greps (14 to 16).
 
 ### Simplicity review, and its triage
 
