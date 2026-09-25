@@ -99,7 +99,8 @@ Labels A-F only for generators; no MIDAS station names, coordinates, farm mappin
 
 ## Risks and open questions
 
-1. Redirects: no redirect plugin is installed (to be confirmed in the inventory). Recommendation: add `mkdocs-redirects` so the published URLs survive the move; the alternative is broken external links. **Decision for the maintainer.**
+1. Redirects: decided (via the coordinator): add `mkdocs-redirects`, pinned, in its own small commit, and check `uv run mkdocs build --strict` handles the redirect map. Redirects keep old page URLs working for GitHub issues and PR bodies. Anchors inside pages cannot be redirected, so every inbound anchor link is still updated.
 2. Beam/diffuse split page stays at the top of Studies rather than under Past weather. Recommendation: leave it, since it is a forecast-skill study rather than a product comparison.
 3. Wrong row set on a number (5.20 is the extra rows' CAMS, not main's 5.09); Figure 1 inviting cross-block comparison (ENS 8.267 vs ICON-EU 8.386); a qualifier deleted with a duplicate; planned status lost when charts merge; the take-home overclaiming; recomputed intervals drifting from printed ones. Each has a gate above.
 4. If the fold fix moves past-solar numbers, the refit lands first and the leaderboard is computed on the new losses; the conservation gate then compares against the post-refit old page, and the planned-contrast diff table goes in the PR body.
+5. The maintainer is considering running the second XGBoost setting only on planned or deciding contrasts and near-threshold results. The Methods page's second-setting paragraph is moved verbatim and stays unchanged until the coordinator confirms the rule; charts are not changed for it.
