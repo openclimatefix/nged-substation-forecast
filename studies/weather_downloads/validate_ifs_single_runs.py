@@ -11,12 +11,15 @@ reported), a diurnal check on radiation, and nine site labels in every month fil
 **The script prints one PASS or FAIL line per check, then every gap.** Gaps are listed rather than
 hidden. It prints no coordinate. It exits non-zero when any check fails.
 
-Run it with `uv run python studies/weather_downloads/validate_ifs_single_runs.py`.
+Run it with `uv run python studies/weather_downloads/validate_ifs_single_runs.py`. Pass
+`--as-of YYYY-MM-DD` to judge the trailing gaps as of another date; the default is the newest run
+on disk plus 2 days, so the saved dataset does not start failing as the calendar moves on.
 """
 
+import argparse
 import json
 import sys
-from datetime import UTC, date, datetime, timedelta
+from datetime import date, timedelta
 from pathlib import Path
 from typing import Final
 
@@ -45,11 +48,11 @@ MAX_DIRECTION_DEG: Final[float] = 360.0
 EXPECTED_NEGATIVE_RADIATION_W_M2: Final[float] = -1.0
 """The one negative radiation value accepted, exactly, at any lead.
 
-Checked against the full fetch (runs 2024-03-14 to 2026-09-25, nine sites): `shortwave_radiation`
-holds 244 values below zero and `direct_radiation` 64, every one exactly -1.0 W/m^2. They sit at
-leads 73 to 90 h, in init months 1, 3, 9, 11, and 12 for shortwave and 3 and 12 for direct, at all
-nine sites and never above 1400. That is where the native IFS output step coarsens from 1 h to
-3 h and Open-Meteo interpolates, so the values are an interpolation artefact, not a fetch fault.
+Checked against the full fetch (nine sites): `shortwave_radiation` holds values below zero and so
+does `direct_radiation`, every one exactly -1.0 W/m^2. They sit at leads 73 to 90 h, in init months
+1, 3, 9, 11, and 12 for shortwave and 3 and 12 for direct, at all nine sites, and nothing is above
+1400. The cause is unverified. It is probably Open-Meteo interpolating where the native IFS output
+step coarsens, although the 1 h to 3 h step change is at 90 h and the values start at 73 h.
 A study clips them to 0. Any other negative radiation value, including -1.0000001, still fails."""
 
 NIGHT_HOURS_UTC: Final[tuple[int, ...]] = (0, 1, 2, 22, 23)
@@ -85,14 +88,22 @@ def _run_days(*, frame: pl.DataFrame) -> list[date]:
     return sorted(frame["init_time"].dt.date().unique().to_list())
 
 
-def _gaps(*, days: list[date]) -> list[date]:
-    """Return every run day missing from `FIRST_RUN_DATE` to `TRAILING_DAYS_MAY_BE_INCOMPLETE` ago.
+def _gaps(*, days: list[date], as_of: date) -> list[date]:
+    """Return every run day missing from `FIRST_RUN_DATE` to the newest expected run.
+
+    Args:
+        days: The run days in the data.
+        as_of: The date the validation is judged at. The newest expected run is
+            `TRAILING_DAYS_MAY_BE_INCOMPLETE` days before it.
+
+    Returns:
+        The missing run days, sorted.
 
     The span starts at the first day the archive serves, not at the first run fetched, so days
     missing before the first run and after the last run count as gaps too.
     """
     present = set(days)
-    end = datetime.now(UTC).date() - timedelta(days=TRAILING_DAYS_MAY_BE_INCOMPLETE)
+    end = as_of - timedelta(days=TRAILING_DAYS_MAY_BE_INCOMPLETE)
     span = (end - FIRST_RUN_DATE).days
     return [
         day
@@ -215,7 +226,7 @@ def _expected_negative_radiation(*, frame: pl.DataFrame) -> tuple[str | None, st
     summary = "; ".join(counts) or "none found"
     if other_negative:
         return f"{other_negative} negative radiation values other than -1.0 ({summary})", summary
-    return None, f"only exactly -1.0 W/m^2 (interpolation artefact): {summary}"
+    return None, f"only exactly -1.0 W/m^2 (cause unverified): {summary}"
 
 
 def _check_diurnal(*, frame: pl.DataFrame) -> str | None:
@@ -305,10 +316,20 @@ def _warn_identical_series(*, frame: pl.DataFrame) -> str | None:
 
 def main() -> int:
     """Run every check, print one line each, then list every gap. Return non-zero on a failure."""
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument(
+        "--as-of",
+        type=date.fromisoformat,
+        default=None,
+        help="Judge gaps as of this date (YYYY-MM-DD). Default: the newest run on disk plus "
+        f"{TRAILING_DAYS_MAY_BE_INCOMPLETE} days, so a saved dataset keeps validating.",
+    )
+    arguments = parser.parse_args()
     path: Path = PRODUCT_DIR / COMBINED_FILENAME
     frame = pl.read_parquet(path)
     days = _run_days(frame=frame)
-    gaps = _gaps(days=days)
+    as_of = arguments.as_of or days[-1] + timedelta(days=TRAILING_DAYS_MAY_BE_INCOMPLETE)
+    gaps = _gaps(days=days, as_of=as_of)
     failures = {
         "run_spacing": _check_run_spacing(frame=frame, gaps=gaps),
         "leads_per_run_per_site": _check_leads(frame=frame),

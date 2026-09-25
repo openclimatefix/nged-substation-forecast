@@ -132,15 +132,22 @@ class FetchProgress:
 
 
 def _safe_reason(*, text: str) -> str:
-    """Return `text` with decimal numbers masked, cut to `MAX_REASON_CHARS`."""
+    """Return `text` with the API key and decimal numbers masked, cut to `MAX_REASON_CHARS`.
+
+    The key is read from the environment only to mask it and is never printed.
+    """
+    key = open_meteo_api_key()
+    if key:
+        text = text.replace(key, "<key>")
     return DECIMAL_NUMBER.sub("<number>", text)[:MAX_REASON_CHARS]
 
 
 def _read_reason(*, refusal: urllib.error.HTTPError) -> str:
     """Return the `reason` of an error response, or a note that the body was not JSON."""
-    body = refusal.read()
     try:
-        parsed = json.loads(body or b"{}")
+        parsed = json.loads(refusal.read() or b"{}")
+    except OSError:
+        return "response body could not be read"
     except ValueError:
         return "response body was not JSON"
     return str(parsed.get("reason", "no reason given")) if isinstance(parsed, dict) else "no reason"
@@ -176,8 +183,10 @@ def _get_json(*, url: str) -> Any:
                 _LOG.warning("attempt %d failed with HTTP %d, retrying", attempt + 1, refusal.code)
                 time.sleep(5.0 * (attempt + 1))
                 continue
-            shown = _safe_reason(text=reason)
-            msg = f"Open-Meteo refused the request with HTTP {refusal.code}: {shown}"
+            if refusal.code == 400:
+                msg = f"Open-Meteo refused the request with HTTP 400: {_safe_reason(text=reason)}"
+            else:
+                msg = f"Open-Meteo refused the request with HTTP {refusal.code}"
             raise RuntimeError(msg) from None
         except (urllib.error.URLError, TimeoutError, ConnectionError, ValueError) as failure:
             _LOG.warning("attempt %d failed (%s), retrying", attempt + 1, type(failure).__name__)
@@ -483,6 +492,8 @@ def _fetch_month(
                 _LOG.info("run %s not complete yet, skipping", day)
                 continue
             _count_run(progress=progress)
+            # The ledger entry is permanent: a later invocation skips this run day. A transient
+            # glitch is retried by deleting the run's entry from `_incomplete_runs.json`.
             _LOG.warning("run %s is incomplete: recorded as a gap and skipped", day)
             incomplete[day] = _safe_reason(text=str(shortfall))
             _write_ledger(ledger=incomplete, filename=INCOMPLETE_FILENAME)
@@ -558,7 +569,8 @@ def _gap_gotcha(*, unavailable: dict[date, str], incomplete: dict[date, str]) ->
         f"**Missing run days.** The API refused these run days as not available: {refused}. "
         f"These run days came back incomplete, so none of their rows were stored: {short}. "
         "`lineage.json` records the reason for each incomplete run, such as null radiation. The "
-        "validator lists every missing day as a gap."
+        "validator lists every missing day as a gap. A run recorded as incomplete is not "
+        "retried; to retry one, delete its entry from `_incomplete_runs.json` and re-run."
     )
 
 
@@ -639,13 +651,14 @@ def _write_docs(
                 "Hourly values at lead days 5, 7, and 10 are therefore not native model output."
             ),
             (
-                "**Radiation of exactly -1.0 W/m^2.** In the fetch through 2026-09-25, 244 "
-                "`shortwave_radiation` values and 64 `direct_radiation` values equal exactly -1.0 "
-                "W/m^2, at leads 73 to 90 h, at all nine sites, in init months 1, 3, 9, 11, and "
-                "12 for shortwave and 3 and 12 for direct. They sit where the native IFS output "
-                "step coarsens and Open-Meteo interpolates, so they are interpolation artefacts, "
-                "not fetch faults. A study should clip them to 0. `validate_ifs_single_runs.py` "
-                "accepts exactly -1.0 and fails on any other negative value."
+                "**Radiation of exactly -1.0 W/m^2.** Some `shortwave_radiation` and "
+                "`direct_radiation` values equal exactly -1.0 W/m^2, at leads 73 to 90 h, at all "
+                "nine sites, in init months 1, 3, 9, 11, and 12 for shortwave and 3 and 12 for "
+                "direct. The cause is unverified. The values probably come from Open-Meteo's "
+                "interpolation where the native IFS output step coarsens, although the 1 h to 3 h "
+                "step change is at 90 h and the values start at 73 h. A study should clip them to "
+                "0. `validate_ifs_single_runs.py` accepts exactly -1.0, counts it, and fails on "
+                "any other negative value."
             ),
             _gap_gotcha(unavailable=unavailable, incomplete=incomplete),
             (
@@ -655,8 +668,9 @@ def _write_docs(
             (
                 "**Cell selection.** The six PV sites use `cell_selection=nearest` and the three "
                 "wind sites use `cell_selection=land`. Two sites whose selected 9 km cell is the "
-                "same carry identical series, and are not a defect. In the fetch through "
-                "2026-09-25 the validator's WARN named sites B and D, which share a source cell."
+                "same carry identical series, and are not a defect. The validator's WARN lists "
+                "such pairs; in the fetch it named sites B and D, and that they share a source "
+                "cell is inferred from their identical series."
             ),
             (
                 "**Units.** The API's defaults: wind speeds in km/h, temperature in degC. "
