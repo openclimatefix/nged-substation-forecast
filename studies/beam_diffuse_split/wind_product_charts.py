@@ -1,4 +1,4 @@
-"""Draw the nine anonymised charts for the write-up on which weather product best describes wind.
+"""Draw the eight anonymised charts for the write-up on which weather product best describes wind.
 
 One-off throwaway script for the charts in
 <https://github.com/openclimatefix/nged-substation-forecast/issues/830>. The write-up is
@@ -6,11 +6,10 @@ One-off throwaway script for the charts in
 
 **Every number a chart shares with the page is read from the report `wind_products.py` wrote**,
 so a chart cannot disagree with the page. The step chart's fortnightly wind-speed ratios are read
-from the downloads `fetch_wind_point.py` wrote, and its period means from the report. Three charts
+from the downloads `fetch_wind_point.py` wrote, and its period means from the report. Two charts
 also draw numbers the report does not print, computed from `losses.parquet` without refitting any
-model: the leaderboard's intervals, and the two "models work" charts' out-of-fold predictions and
-per-generator errors. The ERA5-by-year chart reads the table `wind_products.py --era5-by-year`
-wrote.
+model: the two "models work" charts' out-of-fold predictions and per-generator errors.
+The ERA5-by-year chart reads the table `wind_products.py --era5-by-year` wrote.
 
 Generators appear only as `W1` to `W3`. Only the "models work" time series plots output, as a
 percentage of capacity on days 1 to 7 of a week, with no calendar date. The ratio of two products'
@@ -34,15 +33,14 @@ import plotting.ocf_theme as ocf
 import polars as pl
 from build_dataset import _wind_sites
 from fetch_wind_point import output_path_for
+from figure_numbers import WIND_FIGURE_NUMBERS, wind_figure_number, wind_figure_title
 from sources import STUDY_DATA_DIR
-from studies.bootstrap import bootstrap_absolute
 from studies.charts import (
     FAMILY_COLOURS,
     PLOT_WIDTH_PX,
     ContrastKey,
     figure,
     interval_panel,
-    leaderboard_panel,
     planning,
     report_contrasts,
     report_errors,
@@ -53,8 +51,6 @@ from weather_product_charts import (
     CAPACITY,
     DOTS,
     FAMILIES,
-    LEADERBOARD_WIDTH,
-    LEADERBOARD_X_TITLE,
     NAMES,
     X_TITLE,
     _contrast_name,
@@ -67,7 +63,7 @@ from weather_product_charts import (
     _two_places,
     era5_by_year_rows,
 )
-from weather_products import METRIC, PERCENTAGE_POINTS, _contrast_line
+from weather_products import _contrast_line
 from wind_products import (
     ERA5_BY_YEAR_DIR,
     OUTPUT_DIR_NAME,
@@ -105,8 +101,6 @@ DECIDING: Final[tuple[tuple[str, str], ...]] = (
 
 SCOPE: Final[str] = "Three wind farms in Lincolnshire, August 2024 to September 2026."
 HALVES: Final[tuple[str, str]] = ("April to September", "October to March")
-LEADERBOARD_DOMAIN: Final[tuple[float, float]] = (5.5, 9.0)
-"""The x range of the leaderboard, covering every product's 95% interval with a small margin."""
 
 
 def _wind_losses() -> pl.DataFrame:
@@ -170,58 +164,6 @@ def _deciding_label(*, treatment: str, reference: str) -> str:
     return _contrast_name(treatment=treatment, reference=reference) + suffix
 
 
-def _leaderboard(*, losses: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
-    """Draw every product's own mean absolute error, best first, with its 95% interval.
-
-    Bootstraps each product's absolute error from `losses.parquet` directly, the same
-    month-and-seed resampling `wind_products.py` uses for every contrast, because the report
-    prints only each product's point estimate, not its interval. No model is refitted.
-
-    Args:
-        losses: The pooled setting's losses, every arm.
-        errors: Each product's pooled mean absolute error, read from the report.
-
-    Returns:
-        Figure 1.
-    """
-    order = sorted(errors, key=errors.__getitem__)
-    records = []
-    for product in order:
-        arm = f"{product}_wind"
-        interval = bootstrap_absolute(losses=losses, arm=arm, metric=METRIC)
-        value = interval["value"] * PERCENTAGE_POINTS
-        if round(value, 3) != errors[product]:
-            msg = f"{product}: bootstrapped {value:.3f} but the report says {errors[product]}"
-            raise ValueError(msg)
-        records.append(
-            {
-                "label": NAMES[product],
-                "family": FAMILIES[product],
-                "value": value,
-                "lower_95": interval["lower_95"] * PERCENTAGE_POINTS,
-                "upper_95": interval["upper_95"] * PERCENTAGE_POINTS,
-            }
-        )
-    rows = pl.DataFrame(records)
-    panel = leaderboard_panel(rows=rows, x_domain=LEADERBOARD_DOMAIN, x_title=LEADERBOARD_X_TITLE)
-    return figure(
-        panels=[panel],
-        number=1,
-        figure_planning=None,
-        title=(
-            "ICON-D2 and UKV have the lowest errors of the five products tested, and ICON global "
-            "the highest"
-        ),
-        subtitle=[
-            "Each product's own mean absolute error, sorted best first.",
-            DOTS,
-            LEADERBOARD_WIDTH,
-            CAPACITY,
-            SCOPE,
-        ],
-    )
-
-
 def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConcatChart:
     """Draw every product against ERA5 above the four planned contrasts.
 
@@ -230,7 +172,7 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
         errors: Each product's mean absolute error.
 
     Returns:
-        Figure 2.
+        The `contrasts` figure of `figure_numbers.WIND_FIGURE_NUMBERS`.
     """
     order = sorted(errors, key=errors.__getitem__)
     named = {treatment for treatment, reference in DECIDING if reference == "era5_wind"}
@@ -293,7 +235,7 @@ def _headline(*, contrasts: pl.DataFrame, errors: dict[str, float]) -> alt.VConc
     )
     return figure(
         panels=[left, right],
-        number=2,
+        number=WIND_FIGURE_NUMBERS["contrasts"],
         figure_planning=figure_planning,
         title=(
             "UKV, ICON-D2, and ICON-EU each beat ERA5 by a margin statistically significant at "
@@ -319,7 +261,7 @@ def _half_years(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 6.
+        The `half_years` figure of `figure_numbers.WIND_FIGURE_NUMBERS`.
     """
     products = ("ukv", "icon_d2", "icon_eu")
     frames = [
@@ -351,7 +293,7 @@ def _half_years(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     )
     return figure(
         panels=[panel],
-        number=6,
+        number=WIND_FIGURE_NUMBERS["half_years"],
         figure_planning=figure_planning,
         title="UKV's and ICON-D2's advantage over ERA5 is larger from April to September",
         subtitle=[DOTS, f"{CAPACITY} {SCOPE}"],
@@ -365,7 +307,7 @@ def _icon_d2_against_ukv(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 8.
+        The `icon_d2_leads` figure of `figure_numbers.WIND_FIGURE_NUMBERS`.
     """
     groups = {
         "Whole window, and either side of the January 2026 UKV upgrade": [
@@ -415,7 +357,7 @@ def _icon_d2_against_ukv(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     ]
     return figure(
         panels=panels,
-        number=8,
+        number=WIND_FIGURE_NUMBERS["icon_d2_leads"],
         figure_planning=figure_planning,
         title="ICON-D2 leads UKV across the window, but not since UKV's upgrade",
         subtitle=[
@@ -560,7 +502,7 @@ def _steps(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatChart:
         report_text: The report, for the step generator's period-mean ratios.
 
     Returns:
-        Figure 9.
+        The `icon_global_steps` figure of `figure_numbers.WIND_FIGURE_NUMBERS`.
     """
     conditions = ("Not told", "Told when the steps fall")
     at_step_site = select_contrasts(
@@ -632,7 +574,7 @@ def _steps(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatChart:
             ),
             right,
         ],
-        number=9,
+        number=WIND_FIGURE_NUMBERS["icon_global_steps"],
         figure_planning=figure_planning,
         title="About half of ICON global's gap to ICON-EU is a pair of steps in its served wind at "
         "one generator",
@@ -642,7 +584,10 @@ def _steps(*, contrasts: pl.DataFrame, report_text: str) -> alt.VConcatChart:
                 "the generator with the steps and grey at the other two; 1 means the two agree."
             ),
             ("Pale bars: the mean of each period at the generator with the steps."),
-            "Bottom: error difference, added after the first run.",
+            (
+                "Bottom: error difference, added after the first run. Here a positive difference, "
+                "to the right, means ICON-EU has the lower error."
+            ),
             f"{DOTS} {CAPACITY}",
             SCOPE,
         ],
@@ -656,7 +601,7 @@ def _per_generator(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
         contrasts: Every contrast row in the report.
 
     Returns:
-        Figure 7.
+        The `per_generator` figure of `figure_numbers.WIND_FIGURE_NUMBERS`.
     """
     products = ("ukv", "icon_d2", "icon_eu")
     product_rows = [
@@ -693,11 +638,14 @@ def _per_generator(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     ]
     return figure(
         panels=panels,
-        number=7,
+        number=wind_figure_number(key="per_generator", row_set="main"),
         figure_planning=figure_planning,
-        title=(
-            "UKV's advantage over ERA5 is statistically significant at the 5% level at two of the "
-            "three generators"
+        title=wind_figure_title(
+            row_set="main",
+            title=(
+                "UKV's advantage over ERA5 is statistically significant at the 5% level at two of "
+                "the three generators"
+            ),
         ),
         subtitle=[
             f"{DOTS} The ICON-D2 rows are computed for this chart.",
@@ -715,7 +663,7 @@ def _era5_by_year() -> alt.VConcatChart:
     for an interval and is left out.
 
     Returns:
-        Figure 10.
+        The `era5_by_year` figure of `figure_numbers.WIND_FIGURE_NUMBERS`.
     """
     by_year = pl.read_parquet(ERA5_BY_YEAR_DIR / "era5_by_year.parquet")
     rows = era5_by_year_rows(
@@ -735,7 +683,7 @@ def _era5_by_year() -> alt.VConcatChart:
     )
     return figure(
         panels=[panel],
-        number=10,
+        number=WIND_FIGURE_NUMBERS["era5_by_year"],
         figure_planning=figure_planning,
         title=(
             "On January to September of each year, UKV's lead over ERA5 grew in 2026; ICON-EU's "
@@ -802,7 +750,8 @@ def _wind_models_work(
         errors: Each product's pooled mean absolute error.
 
     Returns:
-        Figures 4 and 5.
+        The `models_work_timeseries` and `models_work_error` figures of
+        `figure_numbers.WIND_FIGURE_NUMBERS`.
     """
     measured = _models_work_frame()
     order = ("Measured", *(f"XGBoost model given {NAMES[p]}" for p in MODELS_WORK_PRODUCTS))
@@ -827,10 +776,13 @@ def _wind_models_work(
         week_order=WIND_WEEK_DISPLAY_ORDER,
         order=order,
         colours=(ocf.TEXT, *(FAMILY_COLOURS[FAMILIES[p]] for p in MODELS_WORK_PRODUCTS)),
-        number=4,
-        title=(
-            "An XGBoost model given ICON-D2 follows measured power at every generator, across a "
-            "windy, a variable, and a calm week"
+        number=wind_figure_number(key="models_work_timeseries", row_set="main"),
+        title=wind_figure_title(
+            row_set="main",
+            title=(
+                "An XGBoost model given ICON-D2 follows the shape of measured power at each "
+                "generator, except in W3's windiest week, when it predicts too high"
+            ),
         ),
         subtitle=[
             "Out-of-fold power as a percentage of the generator's own capacity.",
@@ -850,14 +802,19 @@ def _wind_models_work(
         names=NAMES,
         errors={product: error for product, error in errors.items() if product != "icon_global"},
         x_domain=(5.0, 9.0),
-        number=5,
-        title=(
-            "ICON-D2, UKV, ICON-EU, and ERA5 rank in the same order at each of the three generators"
+        number=wind_figure_number(key="models_work_error", row_set="main"),
+        title=wind_figure_title(
+            row_set="main",
+            title=(
+                "ICON-D2, UKV, ICON-EU, and ERA5 rank in the same order at each of the three "
+                "generators"
+            ),
         ),
         subtitle=[
             (
                 "Each dot is one generator's mean absolute error given one product. ICON global "
-                "is left out, because its served wind steps at one generator (Figure 9)."
+                "is left out, because its served wind steps at one generator "
+                f"(Figure {WIND_FIGURE_NUMBERS['icon_global_steps']})."
             ),
             CAPACITY,
             SCOPE,
@@ -867,7 +824,7 @@ def _wind_models_work(
 
 
 def main() -> int:
-    """Read the report, compute the new numbers, and write the nine SVGs."""
+    """Read the report, compute the new numbers, and write the eight SVGs."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     argparse.ArgumentParser(description=__doc__).parse_args()
     report_path = RESULTS_DIR / "report.md"
@@ -878,7 +835,6 @@ def main() -> int:
     _reproduce(pooled=pooled, report_text=report_text)
     models_work_timeseries, models_work_error = _wind_models_work(losses=pooled, errors=errors)
     charts = {
-        "wind_leaderboard": _leaderboard(losses=pooled, errors=errors),
         "wind_headline": _headline(contrasts=contrasts, errors=errors),
         "wind_models_work_timeseries": models_work_timeseries,
         "wind_models_work_error": models_work_error,

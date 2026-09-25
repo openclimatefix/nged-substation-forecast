@@ -9,6 +9,7 @@ import pytest
 from studies.charts import (
     CONDITION_COLOURS,
     CONTENT_WIDTH_PX,
+    CONTRAST_COLUMNS_WITH_MONTHS,
     FAMILY_COLOURS,
     FAMILY_COLOURS_LIGHT,
     LABEL_WIDTH_PX,
@@ -17,6 +18,7 @@ from studies.charts import (
     PLOT_WIDTH_PX,
     POST_HOC_PLANNING_NOTE,
     POST_HOC_SUFFIX,
+    SECOND_SETTING_NOTE,
     SECOND_SETTING_SHAPE,
     BlockArm,
     ContrastKey,
@@ -673,6 +675,30 @@ def test_the_zero_label_stays_inside_the_plot(
         layer
         for layer in _layer(spec, "text")
         if layer["encoding"]["text"].get("value") == "same as ERA5"
+    ]
+
+    assert zero_text["mark"]["align"] == align
+
+
+@pytest.mark.parametrize(
+    ("zero_label", "align"),
+    [("same as ERA5", "left"), ("same as the second product", "right")],
+)
+def test_a_long_zero_label_moves_to_the_side_with_room_for_its_text(
+    zero_label: str, align: str
+) -> None:
+    # Catches the zero label of a planned-contrast panel running off the plot's right edge when the
+    # rule sits at three quarters of the axis and the label is 26 characters long.
+    spec = _panel(
+        _rows(["weather model"]),
+        x_domain=(-0.75, 0.25),
+        better_direction="negative",
+        zero_label=zero_label,
+    )
+    (zero_text,) = [
+        layer
+        for layer in _layer(spec, "text")
+        if layer["encoding"]["text"].get("value") == zero_label
     ]
 
     assert zero_text["mark"]["align"] == align
@@ -1412,3 +1438,166 @@ def _walk(node: object) -> Iterator[dict]:
     elif isinstance(node, list):
         for value in node:
             yield from _walk(value)
+
+
+WIDE_HEADER = "| " + " | ".join(CONTRAST_COLUMNS_WITH_MONTHS) + " |\n" + "|---" * 8 + "|\n"
+
+
+def test_a_contrast_table_with_a_months_column_is_read_only_when_its_header_is_passed(
+    tmp_path: Path,
+) -> None:
+    # Catches a wide table skipped without a word, and one read where the caller never asked.
+    path = tmp_path / "report.md"
+    path.write_text(
+        WIDE_HEADER
+        + "| all | a_wind − b_wind | +0.995 | [+0.585, +1.452] | **yes** | 5 of 5 | 34,156 | 17 |\n"
+    )
+
+    assert report_contrasts(report_path=path).is_empty()
+    wide = report_contrasts(report_path=path, extra_headers=(CONTRAST_COLUMNS_WITH_MONTHS,))
+    assert wide.row(0, named=True)["n_rows"] == 34156
+
+
+def test_report_contrasts_reads_a_too_few_months_row_as_not_excluding_zero(tmp_path: Path) -> None:
+    path = tmp_path / "report.md"
+    path.write_text(
+        HEADER + "| from 2026-05-12 | a_wind − b_wind | +0.3852 | [+0.1484, +0.5874] "
+        "| too few months | 4 of 4 | 8,279 |\n"
+    )
+
+    row = report_contrasts(report_path=path).row(0, named=True)
+
+    assert row["excludes_zero"] is False
+
+
+def test_assert_matches_printed_compares_at_the_decimals_it_is_given() -> None:
+    # Catches a four-decimal report compared at three decimals: 6.6671 never rounds to 6.667.
+    assert_matches_printed(name="a", recomputed=6.66714, printed=6.6671, decimals=4)
+    with pytest.raises(ValueError, match=r"bootstrapped 6\.667 but"):
+        assert_matches_printed(name="a", recomputed=6.66714, printed=6.6671)
+
+
+def test_a_block_names_its_row_unit_and_its_reference_arm_where_the_row_set_says_so() -> None:
+    # Catches wind blocks titled "site-hours" and drawn against "ERA5" when they are farm-hours
+    # contrasted with ERA5's 10 m wind.
+    _, blocks = _blocks()
+    wind = [
+        block._replace(hours_unit="farm-hours", reference_name="ERA5's 10 m wind")
+        for block in blocks
+    ]
+
+    spec = stacked_contrasts(
+        blocks=wind, number=2, title="A title", subtitle=["A subtitle."], reference_note="A note."
+    ).to_dict()
+
+    text = str(spec)
+    assert "Main rows: Jan 2025, 8 farm-hours" in text
+    assert "same as ERA5's 10 m wind" in text
+    assert _x_axis_titles(spec)[-1].startswith("Mean absolute error minus ERA5's 10 m wind (")
+    assert "A note." in text
+    assert "The lighter, hollow row is CAMS" not in text
+
+
+def test_stacked_leaderboard_takes_its_own_reference_note() -> None:
+    blocks, _ = _blocks()
+
+    spec = stacked_leaderboard(
+        blocks=blocks, number=1, title="A title", subtitle=["A."], reference_note="ERA5 repeats."
+    ).to_dict()
+
+    assert "ERA5 repeats." in str(spec)
+    assert "CAMS and ERA5, repeated" not in str(spec)
+
+
+def test_colour_by_family_keeps_a_one_family_panels_family_colour() -> None:
+    # Catches a one-family panel drawn in the two condition colours, which in a stacked figure
+    # replaced the family colours of every panel and left marks with no legend entry.
+    rows = pl.DataFrame(
+        {
+            "label": ["row"] * 2,
+            "family": ["weather model"] * 2,
+            "difference": [-1.5, -1.0],
+            "lower_95": [-2.0, -1.5],
+            "upper_95": [-1.0, -0.5],
+            "condition": ["a", "b"],
+        }
+    )
+
+    by_condition = _panel(rows, conditions=("a", "b"))
+    by_family = _panel(rows, conditions=("a", "b"), colour_by_family=True)
+
+    def shades(spec: dict) -> list[str]:
+        panel = spec["vconcat"][-1]
+        (interval,) = [
+            layer
+            for layer in panel["layer"]
+            if layer["mark"]["type"] == "rule" and "x2" in layer["encoding"]
+        ]
+        return [row["shade"] for row in _values(spec, interval)]
+
+    assert shades(by_condition) == ["a", "b"]
+    assert shades(by_family) == ["weather model", "weather model, light"]
+
+
+def test_a_stacked_contrast_figure_with_a_one_family_block_keeps_every_family_colour() -> None:
+    # Catches the one-family block's condition colours becoming the figure's shared colour scale.
+    losses = _losses()
+    one_family = block_contrast_rows(
+        losses=losses,
+        arms=[BLOCK_ARMS[2]],
+        reference_arm="era5_global",
+        setting="pooled",
+        site_hours=SITE_HOURS,
+        metric=METRIC,
+    )
+    two_families = block_contrast_rows(
+        losses=losses,
+        arms=[BLOCK_ARMS[0], BLOCK_ARMS[2]],
+        reference_arm="era5_global",
+        setting="pooled",
+        site_hours=SITE_HOURS,
+        metric=METRIC,
+    )
+    blocks = [
+        RowSetBlock("One", "Jan 2025", SITE_HOURS, one_family),
+        RowSetBlock("Two", "Jan 2025", SITE_HOURS, two_families),
+    ]
+
+    def condition_scale_drawn(*, colour_by_family: bool) -> bool:
+        spec = stacked_contrasts(
+            blocks=blocks,
+            number=2,
+            title="A title",
+            subtitle=["A subtitle."],
+            colour_by_family=colour_by_family,
+        ).to_dict()
+        return str(list(CONDITION_COLOURS)) in str(spec)
+
+    assert condition_scale_drawn(colour_by_family=False)
+    assert not condition_scale_drawn(colour_by_family=True)
+
+
+def test_stacked_contrasts_takes_its_own_second_setting_note_and_defaults_to_the_shared_one() -> (
+    None
+):
+    # Catches a wind caption stuck with the solar wording, and a default that no longer shows the
+    # shared note.
+    blocks = _blocks_with_planned(second=True)
+
+    def joined(spec: dict) -> str:
+        return " ".join(spec["title"]["subtitle"])
+
+    default = stacked_contrasts(
+        blocks=blocks, number=2, title="A title", subtitle=["A subtitle."]
+    ).to_dict()
+    custom = stacked_contrasts(
+        blocks=blocks,
+        number=2,
+        title="A title",
+        subtitle=["A subtitle."],
+        second_setting_note="A custom note.",
+    ).to_dict()
+
+    assert SECOND_SETTING_NOTE in joined(default)
+    assert "A custom note." in joined(custom)
+    assert SECOND_SETTING_NOTE not in joined(custom)

@@ -37,6 +37,7 @@ from typing import Any, Final, cast
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
+from figure_numbers import WIND_FIGURE_NUMBERS, wind_figure_number, wind_figure_title
 from station_wind_arms import OUTPUT_DIR, PLANNED_CONTRASTS
 from studies.charts import (
     CONDITION_COLOURS,
@@ -54,6 +55,12 @@ _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 SITES: Final[tuple[str, ...]] = ("W1", "W2", "W3")
 """The anonymous wind farm labels."""
 
+_MONTH_PANEL_TITLE_CHARACTERS: Final[int] = 44
+"""The characters a by-calendar-month panel's title line holds, which is set in a larger font."""
+
+_PANEL_TITLE_CHARACTERS: Final[int] = 56
+"""The characters a contrast panel's title line holds before wrapping, inside the plot's width."""
+
 SETTINGS: Final[tuple[str, str]] = ("pooled", "sensitivity")
 """The two hyperparameter settings, as `intervals.parquet` names them."""
 
@@ -67,15 +74,6 @@ DOTS: Final[str] = (
     "Dot: estimate. Line: 95% interval from resampling whole calendar months and a fitting seed."
 )
 """The subtitle line saying what a dot and a line mean."""
-
-FIGURE_HEADLINE: Final[int] = 21
-"""The headline figure's number on the page."""
-
-FIGURE_SEASON: Final[int] = 22
-"""The season figure's number on the page."""
-
-FIGURE_BY_FARM: Final[int] = 23
-"""The per-farm figure's number on the page."""
 
 LEADERBOARD_ARMS: Final[Mapping[str, str]] = {
     "station_wind": "Nearest station",
@@ -401,7 +399,7 @@ def _headline(
         months: Calendar months those rows cover.
 
     Returns:
-        Figure 21, and its title.
+        The `contrasts` figure of `figure_numbers.WIND_FIGURE_NUMBERS`, and its title.
     """
     records = []
     for arm, label in LEADERBOARD_ARMS.items():
@@ -499,7 +497,7 @@ def _headline(
     return (
         figure(
             panels=panels,
-            number=FIGURE_HEADLINE,
+            number=WIND_FIGURE_NUMBERS["contrasts"],
             figure_planning="mixed",
             title=title,
             subtitle=[
@@ -682,7 +680,11 @@ def _month_panel(*, months: pl.DataFrame, contrast: str, title: str) -> alt.Laye
         layer=[rule, filled, hollow],
         width=PLOT_WIDTH_PX,
         height=MONTH_PANEL_HEIGHT_PX,
-        title=alt.TitleParams(text=title, anchor="start", frame="group"),
+        title=alt.TitleParams(
+            text=wrapped(text=title, width=_MONTH_PANEL_TITLE_CHARACTERS),
+            anchor="start",
+            frame="group",
+        ),
     )
 
 
@@ -694,7 +696,7 @@ def _season(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
         scope: The scope sentence every chart states.
 
     Returns:
-        Figure 22, and its title.
+        The `station_season` figure of `figure_numbers.WIND_FIGURE_NUMBERS`, and its title.
 
     Raises:
         ValueError: If S1 is not positive in both halves of the year, so the title's "trails" is
@@ -718,9 +720,12 @@ def _season(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
             better_label="first-named arm better",
             conditions=SETTING_CONDITIONS,
             condition_title="XGBoost settings",
-            panel_title=(
-                f"{name}, by season: {_bracketed(name=CONTRAST_NAMES[first])} minus "
-                f"{_bracketed(name=CONTRAST_NAMES[second])}"
+            panel_title=wrapped(
+                text=(
+                    f"{name}, by season: {_bracketed(name=CONTRAST_NAMES[first])} minus "
+                    f"{_bracketed(name=CONTRAST_NAMES[second])}"
+                ),
+                width=_PANEL_TITLE_CHARACTERS,
             ),
             figure_planning="mixed",
         )
@@ -767,7 +772,7 @@ def _season(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
     return (
         figure(
             panels=panels,
-            number=FIGURE_SEASON,
+            number=WIND_FIGURE_NUMBERS["station_season"],
             figure_planning="mixed",
             title=title,
             subtitle=[
@@ -797,7 +802,7 @@ def _by_farm(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
         scope: The scope sentence every chart states.
 
     Returns:
-        Figure 23, and its title.
+        The `per_generator` figure of `figure_numbers.WIND_FIGURE_NUMBERS`, and its title.
 
     Raises:
         ValueError: If the count of farms at which a contrast is statistically significant at the
@@ -834,9 +839,12 @@ def _by_farm(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
             better_label="first-named arm better",
             conditions=SETTING_CONDITIONS,
             condition_title="XGBoost settings",
-            panel_title=(
-                f"{name}, at each farm: {_bracketed(name=CONTRAST_NAMES[first])} minus "
-                f"{_bracketed(name=CONTRAST_NAMES[second])}"
+            panel_title=wrapped(
+                text=(
+                    f"{name}, at each farm: {_bracketed(name=CONTRAST_NAMES[first])} minus "
+                    f"{_bracketed(name=CONTRAST_NAMES[second])}"
+                ),
+                width=_PANEL_TITLE_CHARACTERS,
             ),
             figure_planning="exploratory",
         )
@@ -864,9 +872,9 @@ def _by_farm(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
     return (
         figure(
             panels=panels,
-            number=FIGURE_BY_FARM,
+            number=wind_figure_number(key="per_generator", row_set="station"),
             figure_planning="exploratory",
-            title=title,
+            title=wind_figure_title(row_set="station", title=title),
             subtitle=[
                 (
                     "First-named arm's mean absolute error minus the second's, at each farm. "

@@ -118,6 +118,16 @@ CONTRAST_COLUMNS: Final[tuple[str, ...]] = (
 )
 """The header of every contrast table a study report writes, cell by cell."""
 
+CONTRAST_COLUMNS_WITH_MONTHS: Final[tuple[str, ...]] = (*CONTRAST_COLUMNS, "Months")
+"""The header of a contrast table that also counts the calendar months it rests on.
+
+`report_contrasts` reads a table with this header only where the caller passes it as an extra
+header, so a report that prints such tables and a caller that does not expect them are unaffected.
+"""
+
+TOO_FEW_MONTHS: Final[str] = "too few months"
+"""What a report's `Excludes zero?` cell says where the rows are too few months to say."""
+
 CONTENT_WIDTH_PX: Final[int] = 680
 """The width of a published docs page's text column, which every figure is drawn to fill.
 
@@ -200,11 +210,13 @@ def _contrast_row(*, cells: tuple[str, ...], section: str, line_number: int) -> 
         ValueError: If any cell does not read as the contrast table's format.
     """
     try:
-        scope, contrast, difference, interval, excludes, folds, n_rows = cells
+        scope, contrast, difference, interval, excludes, folds, n_rows, *months = cells
+        if len(months) > 1 or (months and not months[0].isdigit()):
+            raise ValueError(cells)  # noqa: TRY301 - reported with the line number below
         treatment, reference = contrast.split(" − ")
         bounds = _INTERVAL.match(interval)
         agreeing = _FOLDS.match(folds)
-        if bounds is None or agreeing is None or excludes not in ("**yes**", "no"):
+        if bounds is None or agreeing is None or excludes not in ("**yes**", "no", TOO_FEW_MONTHS):
             raise ValueError(cells)  # noqa: TRY301 - reported with the line number below
         return {
             "section": section,
@@ -224,14 +236,21 @@ def _contrast_row(*, cells: tuple[str, ...], section: str, line_number: int) -> 
         raise ValueError(msg) from error
 
 
-def report_contrasts(*, report_path: Path) -> pl.DataFrame:
+def report_contrasts(
+    *, report_path: Path, extra_headers: Sequence[tuple[str, ...]] = ()
+) -> pl.DataFrame:
     """Read every contrast table in a study report, and nothing else.
 
-    A table counts as a contrast table only when its header is `CONTRAST_COLUMNS`, so the error
-    table and the implied-capacity table are skipped.
+    A table counts as a contrast table only when its header is `CONTRAST_COLUMNS` or one of
+    `extra_headers`, so the error table and the implied-capacity table are skipped. A row of a
+    table with the `CONTRAST_COLUMNS_WITH_MONTHS` header is read the same way, and its month count
+    is dropped. A row whose `Excludes zero?` cell says `TOO_FEW_MONTHS` reads as not excluding
+    zero.
 
     Args:
         report_path: The `report.md` a study script wrote.
+        extra_headers: Further headers to read as contrast tables, such as
+            `CONTRAST_COLUMNS_WITH_MONTHS`.
 
     Returns:
         One row per contrast-table row, with `section` (the text of the nearest heading above the
@@ -249,7 +268,7 @@ def report_contrasts(*, report_path: Path) -> pl.DataFrame:
             in_contrast_table = False
             continue
         cells = _cells(line)
-        if cells == CONTRAST_COLUMNS:
+        if cells == CONTRAST_COLUMNS or cells in extra_headers:
             in_contrast_table = True
         elif in_contrast_table and not set(line) <= set("|-"):
             rows.append(_contrast_row(cells=cells, section=section, line_number=line_number))
@@ -425,10 +444,11 @@ def _reference_layers(
     )
     # The zero label sits on the side of the rule away from the better-direction label, so the
     # two collide only if the better-direction label crosses zero, unless that side holds less
-    # than a quarter of the axis, where the label would run off the plot.
+    # than a quarter of the axis or than the label's own text needs, where the label would run off
+    # the plot.
     low, high = x_domain
-    to_the_right = better_direction == "negative"
     zero_room = max(_ZERO_LABEL_ROOM, _BETTER_LABEL_CHARACTER_PX * len(zero_label) / width)
+    to_the_right = better_direction == "negative"
     if to_the_right and high / (high - low) < zero_room:
         to_the_right = False
     if not to_the_right and -low / (high - low) < zero_room:
@@ -527,6 +547,7 @@ def interval_panel(
     width: int = PLOT_WIDTH_PX,
     figure_planning: PlanningType = "mixed",
     value_labels: bool = False,
+    colour_by_family: bool = False,
 ) -> alt.LayerChart | alt.VConcatChart:
     """Draw one panel of dots and 95% interval lines beside a labelled zero rule.
 
@@ -541,7 +562,10 @@ def interval_panel(
     text column: the family key only where the panel holds more than one family, and the
     condition key where `conditions` is given. A panel of one family, with no more conditions
     than `CONDITION_COLOURS` holds, colours its conditions with those colours instead of a light
-    shade, still with a hollow point of a second shape.
+    shade, still with a hollow point of a second shape. `colour_by_family` turns that off, so a
+    panel of one family keeps its family's colour. A stacked figure needs it, because its panels
+    share one colour scale, and the one-family panel's condition colours would replace the family
+    colours in every other panel.
 
     Passing `condition_colours` overrides all of that with the colour-first encoding this
     project's charts default to: every condition gets its own solid colour, drawn filled with one
@@ -583,6 +607,8 @@ def interval_panel(
         value_labels: Whether to print each row's estimate and interval, signed and to two
             decimal places, beside the row, so an interval narrower than its own marker is still
             readable.
+        colour_by_family: Whether a panel of one family colours its rows by family, as every
+            other panel does, instead of by condition.
 
     Returns:
         The panel, under its keys where it has any.
@@ -590,7 +616,11 @@ def interval_panel(
     rows = _labelled(rows=rows, figure_planning=figure_planning)
     families = [family for family in FAMILY_COLOURS if family in set(rows["family"].to_list())]
     explicit_colours = condition_colours is not None
-    colour_conditions = 0 < len(conditions) <= len(CONDITION_COLOURS) and len(families) == 1
+    colour_conditions = (
+        0 < len(conditions) <= len(CONDITION_COLOURS)
+        and len(families) == 1
+        and not colour_by_family
+    )
     shade = pl.col("family")
     shade_scale = _shade_scale()
     if explicit_colours:
@@ -1152,6 +1182,7 @@ def figure(
     subtitle: Sequence[str],
     figure_planning: PlanningType | None,
     post_hoc: bool = False,
+    planning_note: str | None = None,
 ) -> alt.VConcatChart:
     """Stack panels, one above the other, under a "Figure N:" caption.
 
@@ -1169,12 +1200,17 @@ def figure(
             exploratory rows to describe.
         post_hoc: Whether any row ends in `POST_HOC_SUFFIX`, which swaps a `mixed` figure's line
             for `POST_HOC_PLANNING_NOTE`.
+        planning_note: A line that replaces the `PLANNING_NOTES` or `POST_HOC_PLANNING_NOTE` line
+            whenever the figure has one, for a figure whose planned rows need a definition of their
+            own.
 
     Returns:
         The figure.
     """
     note = (
-        POST_HOC_PLANNING_NOTE
+        planning_note
+        if planning_note is not None and figure_planning is not None
+        else POST_HOC_PLANNING_NOTE
         if post_hoc and figure_planning == "mixed"
         else None
         if figure_planning is None
@@ -1249,6 +1285,13 @@ class BlockArm(NamedTuple):
     planned: bool = False
 
 
+def _contrast_x_title(*, reference_name: str) -> str:
+    """Return a contrast panel's x axis title, naming the arm the contrasts are against."""
+    if reference_name == "ERA5":
+        return CONTRAST_X_TITLE
+    return f"Mean absolute error minus {reference_name} (points of capacity)"
+
+
 class RowSetBlock(NamedTuple):
     """One block of a stacked figure: the arms scored on one row set.
 
@@ -1258,6 +1301,10 @@ class RowSetBlock(NamedTuple):
     `second_difference`, the same contrast at the second hyperparameter setting, null where none
     was computed. `planned_rows` is `planned_contrast_rows`'s output for the row set's planned
     contrasts, which a contrast block draws in a lower panel; `None` draws no lower panel.
+    `hours_unit` is what a row is called in the title, and `reference_name` is what a contrast
+    block's zero rule and axis call the arm its contrasts are against, such as `ERA5` or
+    `ERA5's 10 m wind`. `planned_title` is what the lower panel's title calls its rows after the
+    block's label: a block whose planned rows include post hoc ones says so.
     """
 
     label: str
@@ -1265,14 +1312,19 @@ class RowSetBlock(NamedTuple):
     site_hours: int
     rows: pl.DataFrame
     planned_rows: pl.DataFrame | None = None
+    hours_unit: str = "site-hours"
+    reference_name: str = "ERA5"
+    planned_title: str = "planned contrasts"
 
     @property
     def title(self) -> str:
-        """The block's panel title, naming its row set, its dates, and its site-hours."""
-        return f"{self.label}: {self.dates}, {self.site_hours:,} site-hours"
+        """The block's panel title, naming its row set, its dates, and its row count."""
+        return f"{self.label}: {self.dates}, {self.site_hours:,} {self.hours_unit}"
 
 
-def assert_matches_printed(*, name: str, recomputed: float, printed: float) -> None:
+def assert_matches_printed(
+    *, name: str, recomputed: float, printed: float, decimals: int = REPORT_PRINT_DECIMALS
+) -> None:
     """Stop unless a recomputed value rounds to the number a report printed.
 
     A chart draws numbers it recomputes from `losses.parquet`, the report prints the page's
@@ -1282,17 +1334,15 @@ def assert_matches_printed(*, name: str, recomputed: float, printed: float) -> N
     Args:
         name: The product or arm the value belongs to, for the error message.
         recomputed: The value recomputed from the saved losses.
-        printed: The value the report prints, at `REPORT_PRINT_DECIMALS` places.
+        printed: The value the report prints.
+        decimals: The decimal places the report prints it at.
 
     Raises:
-        ValueError: If the recomputed value, rounded to `REPORT_PRINT_DECIMALS` places, differs
-            from `printed`.
+        ValueError: If the recomputed value, rounded to `decimals` places, differs from
+            `printed`.
     """
-    if round(recomputed, REPORT_PRINT_DECIMALS) != printed:
-        msg = (
-            f"{name}: bootstrapped {recomputed:.{REPORT_PRINT_DECIMALS}f} "
-            f"but the report says {printed}"
-        )
+    if round(recomputed, decimals) != printed:
+        msg = f"{name}: bootstrapped {recomputed:.{decimals}f} but the report says {printed}"
         raise ValueError(msg)
 
 
@@ -1336,6 +1386,7 @@ def block_leaderboard_rows(
     site_hours: int,
     metric: str,
     printed: dict[str, float] | None = None,
+    decimals: int = REPORT_PRINT_DECIMALS,
 ) -> pl.DataFrame:
     """Compute each arm's own mean absolute error and 95% interval on one row set.
 
@@ -1350,6 +1401,7 @@ def block_leaderboard_rows(
         metric: The loss column to average.
         printed: Each arm's mean absolute error as the row set's report prints it, to check the
             recomputed values against; `None` skips the check.
+        decimals: The decimal places `printed` is given at.
 
     Returns:
         One row per arm with `arm`, `label`, `family`, `reference`, `planned`, `value`, `lower_95`
@@ -1367,7 +1419,10 @@ def block_leaderboard_rows(
         value = interval["value"] * PERCENTAGE_POINTS
         if printed is not None:
             assert_matches_printed(
-                name=block_arm.arm, recomputed=value, printed=printed[block_arm.arm]
+                name=block_arm.arm,
+                recomputed=value,
+                printed=printed[block_arm.arm],
+                decimals=decimals,
             )
         records.append(
             {
@@ -1608,6 +1663,7 @@ def stacked_leaderboard(
     number: int | str,
     title: str,
     subtitle: Sequence[str],
+    reference_note: str = REFERENCE_ROW_NOTE,
 ) -> alt.VConcatChart:
     """Stack one leaderboard panel per row set, on one x range, under one caption.
 
@@ -1620,7 +1676,8 @@ def stacked_leaderboard(
             output.
         number: The figure's number on its page.
         title: The finding the figure shows.
-        subtitle: Short lines for the caption; `REFERENCE_ROW_NOTE` is added.
+        subtitle: Short lines for the caption; `reference_note` is added.
+        reference_note: The caption line saying what the hollow reference rows are.
 
     Returns:
         The figure.
@@ -1642,7 +1699,7 @@ def stacked_leaderboard(
         panels=panels,
         number=number,
         title=title,
-        subtitle=[*subtitle, REFERENCE_ROW_NOTE],
+        subtitle=[*subtitle, reference_note],
         figure_planning=None,
     )
 
@@ -1665,6 +1722,10 @@ def stacked_contrasts(
     number: int | str,
     title: str,
     subtitle: Sequence[str],
+    reference_note: str = CONTRAST_REFERENCE_ROW_NOTE,
+    colour_by_family: bool = False,
+    second_setting_note: str = SECOND_SETTING_NOTE,
+    planning_note: str | None = None,
 ) -> alt.VConcatChart:
     """Stack, per row set, a panel of contrasts against ERA5 and a panel of planned contrasts.
 
@@ -1683,8 +1744,17 @@ def stacked_contrasts(
             output, and optionally `planned_contrast_rows`'s.
         number: The figure's number on its page.
         title: The finding the figure shows.
-        subtitle: Short lines for the caption; `CONTRAST_REFERENCE_ROW_NOTE` is added, and
+        subtitle: Short lines for the caption; `reference_note` is added, and
             `SECOND_SETTING_NOTE` where any row has a second setting.
+        reference_note: The caption line saying what the hollow reference row is.
+        colour_by_family: Whether a block holding one family still colours its rows by family.
+            Leave it unset and such a block's rows take the two condition colours, which replace
+            the family colours in every panel of the figure, because the panels share one colour
+            scale.
+        second_setting_note: The caption line explaining the hollow second-setting marker, for a
+            figure whose rule for showing one differs from `SECOND_SETTING_NOTE`'s.
+        planning_note: The caption line defining planned and post hoc rows, where the default of
+            `figure` does not fit the figure.
 
     Returns:
         The figure.
@@ -1707,18 +1777,19 @@ def stacked_contrasts(
                 ),
                 x_domain=domain,
                 x_title=(
-                    CONTRAST_X_TITLE
+                    _contrast_x_title(reference_name=block.reference_name)
                     if block.planned_rows is not None or index == len(blocks) - 1
                     else ""
                 ),
-                zero_label="same as ERA5",
-                better_label="better than ERA5",
+                zero_label=f"same as {block.reference_name}",
+                better_label=f"better than {block.reference_name}",
                 conditions=conditions,
                 panel_title=block.title,
                 family_key=index == 0,
                 key_families=_block_families(blocks=blocks),
                 condition_key=False,
                 figure_planning=figure_planning,
+                colour_by_family=colour_by_family,
             )
         )
         if block.planned_rows is not None:
@@ -1730,7 +1801,7 @@ def stacked_contrasts(
                     zero_label="same as the second product",
                     better_label="first product better",
                     value_labels=True,
-                    panel_title=f"{block.label}: planned contrasts",
+                    panel_title=f"{block.label}: {block.planned_title}",
                     family_key=False,
                     condition_key=False,
                     figure_planning=figure_planning,
@@ -1740,7 +1811,7 @@ def stacked_contrasts(
         "second_difference" in frame.columns and frame["second_difference"].is_not_null().any()
         for frame in frames
     )
-    notes = [CONTRAST_REFERENCE_ROW_NOTE, *([SECOND_SETTING_NOTE] if has_second_setting else [])]
+    notes = [reference_note, *([second_setting_note] if has_second_setting else [])]
     return figure(
         panels=panels,
         number=number,
@@ -1748,4 +1819,5 @@ def stacked_contrasts(
         subtitle=[*subtitle, *notes],
         figure_planning=figure_planning,
         post_hoc=post_hoc,
+        planning_note=planning_note,
     )

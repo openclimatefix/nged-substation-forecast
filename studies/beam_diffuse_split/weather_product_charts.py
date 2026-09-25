@@ -368,7 +368,7 @@ def _models_work_timeseries(
     week_order: tuple[str, ...],
     order: tuple[str, ...],
     colours: tuple[str, ...],
-    number: int,
+    number: int | str,
     title: str,
     subtitle: list[str],
     panel_width: int = PANEL_WIDTH_PX,
@@ -420,7 +420,7 @@ def _models_work_error_chart(
     names: dict[str, str],
     errors: dict[str, float],
     x_domain: tuple[float, float],
-    number: int,
+    number: int | str,
     title: str,
     subtitle: list[str],
 ) -> alt.VConcatChart:
