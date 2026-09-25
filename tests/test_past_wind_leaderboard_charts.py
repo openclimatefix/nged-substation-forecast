@@ -18,12 +18,16 @@ from studies.charts import RowSetBlock
 
 REPO_ROOT: Final[Path] = Path(__file__).parent.parent
 SCRIPT_DIR: Final[Path] = REPO_ROOT / "studies" / "beam_diffuse_split"
-ALL_SHARES: Final[dict[str, float | None]] = {
-    "main": 16.2,
-    "icon_dream_eu": 25.1,
-    "ecmwf": 3.0,
-    "station": 42.2,
-}
+
+
+def _all_shares() -> dict:
+    module = _load()
+    return {
+        "main": module.MonthShares(uncovered=16.4, one_year_only=0.0),
+        "icon_dream_eu": module.MonthShares(uncovered=25.1, one_year_only=0.0),
+        "ecmwf": module.MonthShares(uncovered=0.0, one_year_only=9.4),
+        "station": module.MonthShares(uncovered=0.0, one_year_only=42.2),
+    }
 
 
 def _load() -> ModuleType:
@@ -87,13 +91,20 @@ def test_a_block_with_no_uncovered_month_share_stops_the_figure() -> None:
 
 def test_the_caption_states_each_blocks_uncovered_month_share() -> None:
     module = _load()
+    shares = {
+        "main": module.MonthShares(uncovered=16.4, one_year_only=0.0),
+        "icon_dream_eu": module.MonthShares(uncovered=25.1, one_year_only=0.0),
+        "ecmwf": module.MonthShares(uncovered=0.0, one_year_only=9.4),
+        "station": module.MonthShares(uncovered=0.0, one_year_only=42.2),
+    }
 
-    lines = module.uncovered_month_note(shares=ALL_SHARES)
+    lines = module.uncovered_month_note(shares=shares)
 
     assert [line.split(":")[0] for line in lines] == ["Main", "ICON-DREAM-EU", "ECMWF", "Station"]
-    assert "42.2%" in lines[3]
-    assert "not yet measured" in lines[1]
-    assert "not yet measured" not in lines[0]
+    assert "16.4% of scored rows are in a calendar month, seen in two or more years" in lines[0]
+    assert "42.2% are in a calendar month seen in one year only" in lines[3]
+    assert "+0.009 and -0.028 points" in lines[1]
+    assert "+0.009" not in lines[0]
 
 
 def test_the_contrast_figure_names_the_arm_the_station_block_is_against() -> None:
@@ -101,7 +112,7 @@ def test_the_contrast_figure_names_the_arm_the_station_block_is_against() -> Non
     module = _load()
     blocks = [_block(reference_name="ERA5"), _block(reference_name="ERA5's 10 m wind")]
 
-    figure = module.contrasts_figure(blocks=blocks, shares=ALL_SHARES).to_dict()
+    figure = module.contrasts_figure(blocks=blocks, shares=_all_shares()).to_dict()
     spec = json.dumps(figure, ensure_ascii=False)
 
     assert "same as ERA5's 10\u00a0m wind" in spec
@@ -139,8 +150,10 @@ def test_each_figure_carries_its_own_number_from_the_wind_map(
     # figure's number: the two figures' numbers are asserted apart, under the real map and under
     # a map with both numbers changed.
     module = _load()
-    leaderboard = module.leaderboard_figure(blocks=[_leaderboard_block()], shares=ALL_SHARES)
-    contrasts = module.contrasts_figure(blocks=[_block(reference_name="ERA5")], shares=ALL_SHARES)
+    leaderboard = module.leaderboard_figure(blocks=[_leaderboard_block()], shares=_all_shares())
+    contrasts = module.contrasts_figure(
+        blocks=[_block(reference_name="ERA5")], shares=_all_shares()
+    )
 
     leaderboard_title, leaderboard_spec = _title_and_cross_reference(figure=leaderboard)
     contrasts_title, _ = _title_and_cross_reference(figure=contrasts)
@@ -150,9 +163,11 @@ def test_each_figure_carries_its_own_number_from_the_wind_map(
     assert "Figure 2's paired contrasts" in leaderboard_spec
     monkeypatch.setitem(module.WIND_FIGURE_NUMBERS, "leaderboard", 7)
     monkeypatch.setitem(module.WIND_FIGURE_NUMBERS, "contrasts", 9)
-    moved_leaderboard = module.leaderboard_figure(blocks=[_leaderboard_block()], shares=ALL_SHARES)
+    moved_leaderboard = module.leaderboard_figure(
+        blocks=[_leaderboard_block()], shares=_all_shares()
+    )
     moved_contrasts = module.contrasts_figure(
-        blocks=[_block(reference_name="ERA5")], shares=ALL_SHARES
+        blocks=[_block(reference_name="ERA5")], shares=_all_shares()
     )
     moved_title, moved_spec = _title_and_cross_reference(figure=moved_leaderboard)
     assert moved_title == "Figure 7"

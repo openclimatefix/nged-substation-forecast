@@ -57,21 +57,38 @@ BLOCK_LABELS: Final[dict[str, str]] = {
 }
 """Each row set's block label, the term the page uses for the row set."""
 
-UNCOVERED_MONTH_SHARES: Final[dict[str, float | None]] = {
-    "main": 16.2,
-    "icon_dream_eu": 25.1,
-    "ecmwf": 0.0,
-    "station": 0.0,
-}
-"""Each block's share, in percent, of scored rows in a month with no training row in their fold.
 
-The shares come from the folds saved with each row set's published losses (main 8,603 of 52,996
-rows, ICON-DREAM-EU 12,570 of 50,041, ECMWF 0 of 43,555, station 0 of 34,156). They describe the
-published folds, which rotated folds would cover. `uncovered_month_note` stops on a `None`.
+class MonthShares(NamedTuple):
+    """One block's shares of scored rows, in percent, by how their calendar month is trained on."""
+
+    uncovered: float
+    """Rows in a calendar month seen in two or more years that has no training row in their fold."""
+
+    one_year_only: float
+    """Rows in a calendar month seen in one year only, which no fold design can cover."""
+
+
+UNCOVERED_MONTH_SHARES: Final[dict[str, MonthShares | None]] = {
+    "main": MonthShares(uncovered=16.4, one_year_only=0.0),
+    "icon_dream_eu": MonthShares(uncovered=25.1, one_year_only=0.0),
+    "ecmwf": MonthShares(uncovered=0.0, one_year_only=9.4),
+    "station": MonthShares(uncovered=0.0, one_year_only=42.2),
+}
+"""Each block's `MonthShares`, from the folds saved with its published per-row losses.
+
+Source: `studies/era_fold_design/README.md` at commit fdddb065 on the `era-fold-design` branch
+(main 8,326 of 50,734 rows, ICON-DREAM-EU 12,570 of 50,041; ECMWF 4,082 of 43,555 and station
+14,411 of 34,156 in months seen in one year only). `uncovered_month_note` stops on a `None`.
 """
 
-UNMEASURED_REFIT: Final[frozenset[str]] = frozenset({"icon_dream_eu"})
-"""Blocks whose fold-covering refit has not been measured, so the caption says so."""
+FOLD_COVERING_EFFECT: Final[dict[str, str]] = {
+    "icon_dream_eu": (
+        "covering those months moves its two planned contrasts by +0.009 and -0.028 points, with "
+        "no change of sign or of statistical significance; absolute errors under covering folds "
+        "are expected to be slightly lower, and were not measured for this block"
+    ),
+}
+"""Blocks whose fold-covering refit was measured, with the measured bound the caption states."""
 
 CAPACITY: Final[str] = "Capacity is each generator's 99th-percentile output."
 DOTS: Final[str] = "Dot: estimate. Line: 95% interval from resampling whole months."
@@ -94,11 +111,11 @@ STATION_SCOPE: Final[str] = (
 )
 
 
-def uncovered_month_note(*, shares: dict[str, float | None]) -> list[str]:
+def uncovered_month_note(*, shares: dict[str, MonthShares | None]) -> list[str]:
     """Say, for each block, what share of its scored rows is in a month its fold never trains on.
 
     Args:
-        shares: Each row set's key to its share in percent, or `None` where it is unset.
+        shares: Each row set's key to its `MonthShares`, or `None` where it is unset.
 
     Returns:
         One caption line per block, in the order of `ROW_SETS`.
@@ -110,18 +127,19 @@ def uncovered_month_note(*, shares: dict[str, float | None]) -> list[str]:
     if unset:
         msg = f"the uncovered-month share is not set for {unset}; read it from the fold report"
         raise ValueError(msg)
-    return [
-        (
-            f"{BLOCK_LABELS[row_set.key]}: {shares[row_set.key]:.1f}% of scored rows are in a "
-            "calendar month with no training row in their fold"
-            + (
-                "; the effect of covering those months is not yet measured."
-                if row_set.key in UNMEASURED_REFIT
-                else "."
-            )
+    lines = []
+    for row_set in ROW_SETS:
+        month_shares = shares[row_set.key]
+        assert month_shares is not None  # the `unset` check above rules this out
+        line = (
+            f"{BLOCK_LABELS[row_set.key]}: {month_shares.uncovered:.1f}% of scored rows are in a "
+            "calendar month, seen in two or more years, with no training row in their fold, and "
+            f"{month_shares.one_year_only:.1f}% are in a calendar month seen in one year only, "
+            "which no fold design can cover"
         )
-        for row_set in ROW_SETS
-    ]
+        effect = FOLD_COVERING_EFFECT.get(row_set.key)
+        lines.append(f"{line}; {effect}." if effect else f"{line}.")
+    return lines
 
 
 def block_notes() -> list[str]:
@@ -222,7 +240,7 @@ def build_blocks(
 
 
 def leaderboard_figure(
-    *, blocks: list[RowSetBlock], shares: dict[str, float | None]
+    *, blocks: list[RowSetBlock], shares: dict[str, MonthShares | None]
 ) -> alt.VConcatChart:
     """Draw Figure 1, the leaderboard of the four row sets."""
     return stacked_leaderboard(
@@ -249,7 +267,7 @@ def leaderboard_figure(
 
 
 def contrasts_figure(
-    *, blocks: list[RowSetBlock], shares: dict[str, float | None]
+    *, blocks: list[RowSetBlock], shares: dict[str, MonthShares | None]
 ) -> alt.VConcatChart:
     """Draw Figure 2, the contrasts against ERA5 with each row set's planned contrasts."""
     return stacked_contrasts(

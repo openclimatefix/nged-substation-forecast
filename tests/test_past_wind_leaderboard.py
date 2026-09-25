@@ -273,14 +273,13 @@ def test_only_the_main_block_marks_the_three_contrasts_that_use_the_80_m_icon_ar
     assert set(main.post_hoc_contrasts) <= planned
 
 
-def test_the_icon_dream_eu_block_carries_the_provisional_note() -> None:
+def test_the_icon_dream_eu_block_carries_the_post_scoring_note() -> None:
     module = _load()
 
     notes = {key: setting.note for key, setting in module.BLOCK_SETTINGS.items()}
 
     assert notes["icon_dream_eu"] == (
-        "planned contrasts were written after the five products were scored; provisional until "
-        "the fold-covering refit is measured."
+        "planned contrasts were written after the five products were scored."
     )
     assert [key for key, note in notes.items() if note] == ["icon_dream_eu"]
 
