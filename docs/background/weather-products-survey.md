@@ -397,8 +397,8 @@ it](../studies/past-weather/wind.md#one-nearby-10-m-weather-station-trails-era5s
 - **Each planned contrast reads one nearest station per farm.** The six solar farms share one
   radiation station, so the results do not say how a different station would compare.
 - **MIDAS Open's other wind datasets were not searched for the 12 hourly-weather stations with no
-  wind in the downloaded file,** so a nearer anemometer may exist. See [how nearby weather stations
-  were added](../studies/past-weather/wind.md#how-nearby-weather-stations-were-added).
+  wind in the downloaded file,** so a nearer anemometer may exist. See [the weather-station
+  arms](../studies/past-weather/wind.md#the-weather-station-arms).
 
 **The studies did not research whether a crowd-sourced observation dataset, such as a network of
 amateur weather stations, would add anything to a station arm.**
