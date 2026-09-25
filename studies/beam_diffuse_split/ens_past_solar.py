@@ -208,7 +208,8 @@ CONFOUND_HEADING: Final[str] = (
 
 FIRST_SERVABLE_HOUR_UTC: Final[int] = 9
 """The hour of day, UTC, from which a live service reading Dynamical.org's archive can read the
-00 UTC run: about 09:00 UTC (`docs/studies/forecasts/ens-horizons.md`, "Horizons and issue time")."""
+00 UTC run: about 09:00 UTC (`docs/studies/forecasts/ens-horizons.md`, "Horizons and issue
+time")."""
 
 LAST_HOUR_BEFORE_DISSEMINATION_UTC: Final[int] = 6
 """The last hour label, UTC, whose hour ends before ECMWF disseminates the 00 UTC run's steps 0 to

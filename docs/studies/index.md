@@ -29,6 +29,13 @@ climates, so a result may not hold elsewhere.
   drift says about estimating a generator's effective capacity. It reads NGED's two records of
   active network management against each other and against the telemetry, and finds the setpoint
   history the one to build on.
+
+## Past weather
+
+**Three studies score how well each weather product describes weather that has already happened.**
+The [Past-weather overview](past-weather/index.md) summarises them, and the [Methods
+page](past-weather/methods.md) states the methods they share.
+
 - [Which weather product best describes past sunshine?](past-weather/solar.md) — a
   satellite retrieval describes past sunshine far better than any weather model tested; among the
   models, ICON-D2 is best as served but its advantage shrinks within hours of each run, and ICON-EU
@@ -44,17 +51,25 @@ climates, so a result may not hold elsewhere.
 - [Does blending weather products beat the best single weather
   product?](past-weather/blending.md) — at the six solar farms and three wind farms, an XGBoost
   model given several weather products at once beats one given the best single product with its
-  neighbouring hours: by 0.13 points of capacity for solar and 0.48 for wind. The gain comes from the
+  neighbouring hours: by 0.13 points of capacity for solar and 0.48 for wind. The gain comes from
+the
   other products' weather rather than from the extra columns, a blend of UKV and ICON-EU that a live
   service could read beats UKV alone, and an XGBoost blend beats a linear stack of single-product
   predictions. An XGBoost model given CAMS's split plus SARAH-3's global irradiance, the two
   satellite retrievals the past-solar study compared, beats CAMS's split with its neighbouring hours
   by 0.18 points and plain CAMS's split by 0.20 points, on a longer row set from January 2021.
+
+## Forecasts
+
+**Two studies score power forecasts driven by weather forecasts.**
+
 - [How accurate is a power forecast driven by ECMWF ENS at each
   horizon?](forecasts/ens-horizons.md) — at the 6 solar farms and 3 wind farms, an XGBoost model
   given the ENS ensemble mean beats every forecast that reads no weather forecast to day 5 for solar
-  and day 7 for wind; from day 7 for solar and day 10 for wind it no longer beats climatology, and by
-  day 14 climatology is ahead, with the ensemble mean adding no statistically significant skill, in a
+  and day 7 for wind; from day 7 for solar and day 10 for wind it no longer beats climatology, and
+by
+  day 14 climatology is ahead, with the ensemble mean adding no statistically significant skill, in
+a
   post hoc check, over the same model given no weather at all. The ensemble mean beats the control
   member and beats training on every member, and rebuilding solar radiation through the clear-sky
   index beats the straight-line resample the live service uses today.
