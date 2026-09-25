@@ -45,9 +45,19 @@ global, IFS 0.25° and GFS) on the published inputs' own `(site, time)` keys, in
 `--output-dir`, and never writes to the published folder. The new days are separate constants
 (`EXTRA_ENS_DAYS`, `EXTRA_GEFS_DAYS`), never added to `ENS_DAYS`, so the shared rows cannot move.
 
+With `--aifs` the script instead builds the AIFS inputs (issue #923) on the published inputs' own
+`(site, time)` keys, into a new write-once `--output-dir`: ECMWF AIFS Single and AIFS ENS at days 1
+and 2, and ENS's mean and control member on the same 6-hourly steps as the AIFS reads. AIFS is read
+as ENS is: the 00 UTC run of day `D - d` for a target hour on day `D`, so the lead is `24d + h`.
+Each site's value is the H3 resolution-5 overlap-weighted mean of the crop's 0.25 degree cells, the
+read ENS's stored table has, plus (AIFS Single only) a nearest-cell arm for the spatial-read
+sensitivity. Every AIFS arm also carries its run's `init_time`, which `fit_aifs.py` checks against
+each AIFS version era.
+
 Every output row carries only the anonymised `site` label; no generator name, id or coordinate is
-read from the private roster in this script, except inside `studies.grid_sampling` (GEFS's
-nearest-cell match), which never prints what it reads.
+read from the private roster in this script, except inside `studies.grid_sampling` (GEFS's and
+AIFS's nearest-cell match) and the H3 cell lookup of `_aifs_site_weights`, which never print what
+they read.
 
 Run it with `uv run python studies/nwp_forecast_comparison/build_forecast_inputs.py --output-dir
 DIR`.
@@ -58,13 +68,15 @@ import logging
 import os
 import sys
 from collections.abc import Callable, Mapping, Sequence
-from datetime import date, timedelta
+from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Final, Literal
 
+import h3.api.basic_int as h3
 import numpy as np
 import polars as pl
 from contracts.settings import PROJECT_ROOT
+from geo.h3 import compute_h3_grid_weights
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from verify_extra_leads import (
@@ -77,7 +89,9 @@ from verify_previous_runs_leads import PRODUCT_DIRS
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
 import ens_forecast_horizons as efh
+from fetch_ens_forecast_horizons import H3_RESOLUTION
 from studies.grid_sampling import nearest_cells
+from studies.guards import refuse_to_overwrite
 from studies.hourly_means import hourly_from_snapshots
 from studies.resample import gefs_step_means
 
@@ -146,6 +160,39 @@ baseline columns every shared row must hold, so adding them there would move the
 
 EXTRA_GEFS_DAYS: Final[tuple[int, ...]] = (5, 10, 14)
 """The GEFS bands the extra-lead build adds."""
+
+AIFS_DAYS: Final[tuple[int, ...]] = (1, 2)
+"""The bands the AIFS build reads: day 1 (the day-ahead product) and day 2."""
+
+AIFS_SINGLE_DIR_NAME: Final[str] = "ECMWF-AIFS"
+AIFS_ENS_DIR_NAME: Final[str] = "ECMWF-AIFS-ENS"
+"""The two AIFS downloads' folders under `data/studies/weather/`. Each holds `<name>.parquet` and
+`_grid_cells.parquet`."""
+
+AIFS_SINGLE_FIRST_INIT: Final[datetime] = datetime(2025, 2, 26, tzinfo=UTC)
+"""The first 00 UTC AIFS Single run read: the first after v1.0 went operational (2025-02-25 06 UTC).
+The store's radiation and 100 m wind are `NaN` before the 2025-02-24 06 UTC run."""
+
+AIFS_ENS_FIRST_INIT: Final[datetime] = datetime(2025, 7, 2, tzinfo=UTC)
+"""The first 00 UTC AIFS ENS run in the store."""
+
+AIFS_CROP_DEGREES: Final[float] = 0.25
+"""The AIFS grid's cell size, as `compute_h3_grid_weights` bins by."""
+
+AIFS_WEIGHT_TOLERANCE: Final[float] = 1e-6
+"""How far a site's H3 weights over the crop may sit from summing to 1."""
+
+AIFS_VALUE_COLUMNS: Final[tuple[str, ...]] = (
+    "downward_short_wave_radiation_flux_surface",
+    "temperature_2m",
+    "wind_u_10m",
+    "wind_v_10m",
+    "wind_u_100m",
+    "wind_v_100m",
+)
+"""The store columns the AIFS extract reads."""
+
+SpatialReadType = Literal["h3", "nearest"]
 
 SOLAR_ONLY_PRODUCTS: Final[frozenset[str]] = frozenset({"ARPEGE Europe", "AROME France"})
 """Products the plan scores for solar only: their 100 m wind offsets are missing on most rows."""
@@ -317,11 +364,14 @@ def _ens_member_arms(
     arm_name: Callable[[str, int], str],
     ways: tuple[str, ...] = ("mean", "control"),
     fine_step_last_lead: int = efh.FINE_STEP_LAST_LEAD,
+    six_hourly: bool = False,
+    keep_init_time: bool = False,
 ) -> list[pl.DataFrame]:
     """Upsample, combine and reduce one ensemble's members at several bands and ways.
 
-    Shared by `_ens_frame` (ENS, both ways) and `_gefs_frame` (GEFS, mean only), whose only
-    difference is the extract they read, its ensemble size, and the arm-name prefix.
+    Shared by `_ens_frame` (ENS, both ways), `_gefs_frame` (GEFS, mean only) and `_aifs_frame`
+    (AIFS and ENS on 6-hourly steps), whose only difference is the extract they read, its ensemble
+    size, and the arm-name prefix.
 
     Args:
         extract: One row per (site, init_time, ensemble_member, lead_hours), as
@@ -333,7 +383,11 @@ def _ens_member_arms(
         arm_name: Given a way (`"mean"` or `"control"`) and a day, returns that arm's name.
         ways: Which reductions to build; ENS wants both, GEFS only the mean (no control-member arm
             is planned for GEFS).
-        fine_step_last_lead: The last lead on 3-hour steps: 144 for ENS, 240 for GEFS.
+        fine_step_last_lead: The last lead on 3-hour steps: 144 for ENS, 240 for GEFS, 0 for a
+            product with 6-hourly steps throughout (AIFS).
+        six_hourly: Whether to emulate 6-hourly steps from a 3-hourly extract (ENS at AIFS's steps).
+        keep_init_time: Whether each frame also carries the run that fed each hour, as
+            `<arm>_init_time`.
 
     Returns:
         One frame per (day, way) with `site`, `time` and that arm's own weather columns.
@@ -347,6 +401,7 @@ def _ens_member_arms(
             domain=domain,
             ensemble_size=ensemble_size,
             fine_step_last_lead=fine_step_last_lead,
+            six_hourly=six_hourly,
         )
         upsampled = efh.upsampled_fields(steps=steps, day=day, domain=domain, clear_sky=clear_sky)
         combined = efh.combine(
@@ -356,7 +411,14 @@ def _ens_member_arms(
             reduced = efh.reduce_members(
                 hourly=combined, domain=domain, way=way, ensemble_size=ensemble_size
             )
-            frames.append(efh.prefixed(frame=reduced, arm=arm_name(way, day), domain=domain))
+            arm = arm_name(way, day)
+            arm_frame = efh.prefixed(frame=reduced, arm=arm, domain=domain)
+            if keep_init_time:
+                runs = combined.select("site", "time", **{f"{arm}_init_time": "init_time"}).unique(
+                    subset=["site", "time"]
+                )
+                arm_frame = arm_frame.join(runs, on=["site", "time"], how="left")
+            frames.append(arm_frame)
     return frames
 
 
@@ -973,6 +1035,285 @@ def build_extra_leads(
     return output_path
 
 
+def _h3_crop_weights(*, site_cells: Mapping[str, int], grid_cells: pl.DataFrame) -> pl.DataFrame:
+    """Return each site's H3 area weights over the AIFS crop's grid cells.
+
+    Args:
+        site_cells: Each site to the H3 resolution-5 cell it sits in.
+        grid_cells: The crop's `lat_index`, `lon_index`, `latitude` and `longitude`.
+
+    Returns:
+        One row per (site, crop cell the site's H3 cell overlaps), with `site`, `lat_index`,
+        `lon_index` and `weight`.
+
+    Raises:
+        ValueError: If a site's weights over the crop do not sum to 1, which means the H3 cell
+            reaches beyond the crop.
+    """
+    h3_weights = compute_h3_grid_weights(
+        nwp_grid_size_degrees=AIFS_CROP_DEGREES, h3_index=sorted(set(site_cells.values()))
+    )
+    cells = grid_cells.select(
+        "lat_index",
+        "lon_index",
+        nwp_lat=pl.col("latitude").round(4),
+        nwp_lon=pl.col("longitude").round(4),
+    )
+    by_cell = h3_weights.select(
+        "h3_index",
+        "proportion",
+        nwp_lat=pl.col("nwp_lat").round(4),
+        nwp_lon=pl.col("nwp_lon").round(4),
+    ).join(cells, on=["nwp_lat", "nwp_lon"])
+    sites = pl.DataFrame(
+        {"site": list(site_cells), "h3_index": list(site_cells.values())},
+        schema={"site": pl.String, "h3_index": pl.UInt64},
+    )
+    weights = sites.join(by_cell, on="h3_index").select(
+        "site", "lat_index", "lon_index", weight=pl.col("proportion").cast(pl.Float64)
+    )
+    sums = weights.group_by("site").agg(total=pl.col("weight").sum())
+    bad = set(site_cells) - set(
+        sums.filter((pl.col("total") - 1.0).abs() <= AIFS_WEIGHT_TOLERANCE)["site"].to_list()
+    )
+    if bad:
+        msg = f"H3 weights over the AIFS crop do not sum to 1 for {len(bad)} sites"
+        raise ValueError(msg)
+    return weights
+
+
+def _aifs_site_weights(
+    *, path: Path, domain: DomainType, sites: list[str], spatial: SpatialReadType
+) -> pl.DataFrame:
+    """Return each site's cell weights over one AIFS download's crop.
+
+    Args:
+        path: The download's directory, holding `_grid_cells.parquet`.
+        domain: `solar` or `wind`.
+        sites: The sites to read.
+        spatial: `h3` for the overlap-weighted mean of the cells under the site's H3 resolution-5
+            cell (the read ENS's stored table has), or `nearest` for the one nearest cell.
+
+    Returns:
+        `site`, `lat_index`, `lon_index` and `weight`. No coordinate or cell id is printed.
+    """
+    grid_cells = pl.read_parquet(path / "_grid_cells.parquet")
+    if spatial == "nearest":
+        nearest = _gefs_cell_selection(grid_cells=grid_cells, domain=domain, sites=sites)
+        return pl.DataFrame(
+            {
+                "site": list(nearest),
+                "lat_index": [cell // 10 for cell in nearest.values()],
+                "lon_index": [cell % 10 for cell in nearest.values()],
+                "weight": [1.0] * len(nearest),
+            },
+            schema={
+                "site": pl.String,
+                "lat_index": pl.Int16,
+                "lon_index": pl.Int16,
+                "weight": pl.Float64,
+            },
+        )
+    roster = efh.site_roster(domain=domain).filter(pl.col("site").is_in(sites))
+    site_cells = {
+        site: h3.latlng_to_cell(latitude, longitude, H3_RESOLUTION)
+        for site, latitude, longitude in roster.iter_rows()
+    }
+    return _h3_crop_weights(site_cells=site_cells, grid_cells=grid_cells)
+
+
+def _aifs_members_frame(
+    *,
+    store: Path,
+    weights: pl.DataFrame,
+    ensemble: bool,
+    first_init: datetime,
+    max_lead_hours: int = 24 * max(AIFS_DAYS) + 30,
+) -> pl.DataFrame:
+    """Read one AIFS store's 00 UTC runs and reshape them to `band_steps`'s input shape.
+
+    A sibling of `_gefs_members_frame`. Each site's value is the weighted mean of the crop cells in
+    `weights`, taken on the wind components and then turned into speed and from-direction, as
+    `dynamical_data`'s H3 aggregation does. The scan is lazy because the AIFS ENS file holds 50
+    million rows.
+
+    Args:
+        store: The store's parquet.
+        weights: `_aifs_site_weights`'s result.
+        ensemble: Whether the store has an `ensemble_member` column (AIFS ENS). AIFS Single gets
+            member 0.
+        first_init: The first run kept; earlier runs hold `NaN` radiation and 100 m wind.
+        max_lead_hours: The longest lead kept.
+
+    Returns:
+        One row per (site, init_time, ensemble_member, lead_hours), with `ghi_w_m2` (null at lead
+        0), `temp_c`, `speed_100m`, `direction_100m`, `speed_10m` and `direction_10m`.
+
+    Raises:
+        ValueError: If any value the study reads is `NaN` after the run filter.
+    """
+    scan = pl.scan_parquet(store).filter(
+        pl.col("init_time").dt.hour() == 0,
+        pl.col("init_time") >= first_init.replace(tzinfo=None),
+        pl.col("lead_time") <= pl.duration(hours=max_lead_hours),
+    )
+    if not ensemble:
+        scan = scan.with_columns(ensemble_member=pl.lit(0, dtype=pl.Int8))
+    keys = ["site", "init_time", "ensemble_member", "lead_time"]
+    weighted = (
+        scan.join(weights.lazy(), on=["lat_index", "lon_index"])
+        .group_by(keys)
+        .agg(
+            ((pl.col(column) * pl.col("weight")).sum() / pl.col("weight").sum()).alias(column)
+            for column in AIFS_VALUE_COLUMNS
+        )
+        .collect()
+    )
+    lead_hours = pl.col("lead_time").dt.total_hours().cast(pl.Int32)
+    frame = weighted.select(
+        "site",
+        init_time=pl.col("init_time").dt.replace_time_zone("UTC"),
+        ensemble_member=pl.col("ensemble_member").cast(pl.Int8),
+        lead_hours=lead_hours,
+        ghi_w_m2=pl.when(lead_hours > 0)
+        .then(pl.col("downward_short_wave_radiation_flux_surface"))
+        .cast(pl.Float64),
+        temp_c=pl.col("temperature_2m").cast(pl.Float32),
+        speed_100m=(pl.col("wind_u_100m") ** 2 + pl.col("wind_v_100m") ** 2)
+        .sqrt()
+        .cast(pl.Float64),
+        direction_100m=pl.arctan2(-pl.col("wind_u_100m"), -pl.col("wind_v_100m")).degrees() % 360.0,
+        speed_10m=(pl.col("wind_u_10m") ** 2 + pl.col("wind_v_10m") ** 2).sqrt().cast(pl.Float64),
+        direction_10m=pl.arctan2(-pl.col("wind_u_10m"), -pl.col("wind_v_10m")).degrees() % 360.0,
+    )
+    not_a_number = {
+        column: int(frame[column].is_nan().sum())
+        for column in ("ghi_w_m2", "temp_c", "speed_100m", "speed_10m")
+        if frame[column].is_nan().any()
+    }
+    if not_a_number:
+        msg = f"{store.name}: NaN after the run filter: {not_a_number}"
+        raise ValueError(msg)
+    return frame
+
+
+def _aifs_frame(*, keys: pl.DataFrame, domain: DomainType, weather_dir: Path) -> pl.DataFrame:
+    """Build the AIFS arms and their like-for-like ENS references on `keys`.
+
+    Args:
+        keys: `site`, `time` for every row the study might score.
+        domain: `solar` or `wind`.
+        weather_dir: The folder holding the two AIFS downloads' directories.
+
+    Returns:
+        `keys` with `aifs_single_day<N>`, `aifs_ens_mean_day<N>`, `ens_mean6_day<N>` and
+        `ens_control6_day<N>` columns for every `N` in `AIFS_DAYS`, `aifs_single_nearest_day1`, and
+        `<arm>_init_time` for each AIFS arm, left-joined.
+
+    Raises:
+        ValueError: If a written column is not one of those.
+    """
+    sites = sorted(keys["site"].unique().to_list())
+    method = UPSAMPLING_METHODS[domain]
+    single_dir = weather_dir / AIFS_SINGLE_DIR_NAME
+    ens_dir = weather_dir / AIFS_ENS_DIR_NAME
+    arm_frames: list[pl.DataFrame] = []
+    for spatial, days, name in (
+        ("h3", AIFS_DAYS, "aifs_single"),
+        ("nearest", (1,), "aifs_single_nearest"),
+    ):
+        extract = _aifs_members_frame(
+            store=single_dir / f"{AIFS_SINGLE_DIR_NAME}.parquet",
+            weights=_aifs_site_weights(
+                path=single_dir, domain=domain, sites=sites, spatial=spatial
+            ),
+            ensemble=False,
+            first_init=AIFS_SINGLE_FIRST_INIT,
+        )
+        arm_frames += _ens_member_arms(
+            extract=extract,
+            domain=domain,
+            days=days,
+            method=method,
+            ensemble_size=1,
+            arm_name=lambda way, day, name=name: f"{name}_day{day}",
+            ways=("control",),
+            fine_step_last_lead=0,
+            keep_init_time=True,
+        )
+    ens_extract = _aifs_members_frame(
+        store=ens_dir / f"{AIFS_ENS_DIR_NAME}.parquet",
+        weights=_aifs_site_weights(path=ens_dir, domain=domain, sites=sites, spatial="h3"),
+        ensemble=True,
+        first_init=AIFS_ENS_FIRST_INIT,
+    )
+    arm_frames += _ens_member_arms(
+        extract=ens_extract,
+        domain=domain,
+        days=AIFS_DAYS,
+        method=method,
+        ensemble_size=efh.ENSEMBLE_SIZE,
+        arm_name=lambda way, day: f"aifs_ens_{way}_day{day}",
+        ways=("mean",),
+        fine_step_last_lead=0,
+        keep_init_time=True,
+    )
+    arm_frames += _ens_member_arms(
+        extract=efh.members(sites=sites),
+        domain=domain,
+        days=AIFS_DAYS,
+        method=method,
+        ensemble_size=efh.ENSEMBLE_SIZE,
+        arm_name=lambda way, day: f"ens_{way}6_day{day}",
+        six_hourly=True,
+    )
+    frame = keys
+    for arm_frame in arm_frames:
+        frame = frame.join(arm_frame, on=["site", "time"], how="left")
+    allowed = ("aifs_single_day", "aifs_single_nearest_day", "aifs_ens_mean_day", "ens_mean6_day")
+    allowed += ("ens_control6_day",)
+    unexpected = [
+        column for column in frame.columns[keys.width :] if not column.startswith(allowed)
+    ]
+    if unexpected:
+        msg = f"unexpected columns in the AIFS inputs: {unexpected}"
+        raise ValueError(msg)
+    return frame
+
+
+def build_aifs(
+    *, domain: DomainType, published_dir: Path, output_dir: Path, weather_dir: Path
+) -> Path:
+    """Build the AIFS columns on the published inputs' own `(site, time)` keys.
+
+    Args:
+        domain: `solar` or `wind`.
+        published_dir: The folder holding the published `<domain>_forecast_inputs.parquet`.
+        output_dir: The new folder to write `<domain>_aifs_inputs.parquet` into.
+        weather_dir: The folder holding the two AIFS downloads' directories.
+
+    Returns:
+        The written file's path.
+
+    Raises:
+        ValueError: If `output_dir` is `published_dir`.
+        FileExistsError: If the output file already exists.
+    """
+    if output_dir.resolve() == published_dir.resolve():
+        msg = f"the AIFS output must not be the published folder {published_dir}"
+        raise ValueError(msg)
+    output_path = output_dir / f"{domain}_aifs_inputs.parquet"
+    refuse_to_overwrite(paths=[output_path])
+    keys = pl.read_parquet(published_dir / f"{domain}_forecast_inputs.parquet").select(
+        "site", "time"
+    )
+    frame = _aifs_frame(keys=keys, domain=domain, weather_dir=weather_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    frame.write_parquet(output_path)
+    _LOG.info("%s: wrote %d rows, %d columns to %s", domain, frame.height, frame.width, output_path)
+    return output_path
+
+
 def main() -> int:
     """Build the solar and wind arm-input frames and write them under `--output-dir`."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
@@ -990,10 +1331,22 @@ def main() -> int:
         "Previous Runs day 0 and day 5) on the published inputs' keys, into a new --output-dir.",
     )
     parser.add_argument(
+        "--aifs",
+        action="store_true",
+        help="Build the AIFS Single and AIFS ENS columns and ENS's 6-hourly references on the "
+        "published inputs' keys, into a new --output-dir.",
+    )
+    parser.add_argument(
+        "--aifs-weather-dir",
+        type=Path,
+        default=_weather_dir(),
+        help="With --aifs: the folder holding the ECMWF-AIFS and ECMWF-AIFS-ENS downloads.",
+    )
+    parser.add_argument(
         "--published-dir",
         type=Path,
         default=_repo_data_dir() / "studies" / DEFAULT_OUTPUT_DIR_NAME,
-        help="With --extra-leads: the folder holding the published arm-input parquets.",
+        help="With --extra-leads or --aifs: the folder holding the published arm-input parquets.",
     )
     parser.add_argument(
         "--gefs-window-dir",
@@ -1003,6 +1356,15 @@ def main() -> int:
         "cache once it is complete.",
     )
     args = parser.parse_args()
+    if args.aifs:
+        for domain in ("solar", "wind"):
+            build_aifs(
+                domain=domain,
+                published_dir=args.published_dir,
+                output_dir=args.output_dir,
+                weather_dir=args.aifs_weather_dir,
+            )
+        return 0
     if args.extra_leads:
         for domain in ("solar", "wind"):
             build_extra_leads(
