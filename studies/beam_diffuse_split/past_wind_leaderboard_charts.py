@@ -163,6 +163,71 @@ def block_notes() -> list[str]:
     return ["Wind heights of each block's arms:", *heights, *caveats]
 
 
+def _excludes_zero(*, lower: float, upper: float) -> bool:
+    """Say whether a 95% interval excludes zero, the 5% significance test the figures use."""
+    return lower > 0 or upper < 0
+
+
+def _signed(*, value: float) -> str:
+    """Format `value` in points of capacity, to three decimal places, with its sign."""
+    return f"{value:+.3f}"
+
+
+def significance_change_notes(*, intervals: pl.DataFrame) -> list[str]:
+    """Name each contrast whose statistical significance at the 5% level differs between settings.
+
+    A contrast is significant at a setting where its 95% interval excludes zero. Only a contrast
+    with rows at both settings can change, so a contrast scored at the primary setting alone is
+    skipped. A contrast printed in more than one section is named once.
+
+    Args:
+        intervals: The write-once `intervals.parquet`.
+
+    Returns:
+        One caption line per such contrast, in the order of `ROW_SETS`, naming the row set, the
+        contrast, both intervals, and which setting the contrast is significant at.
+    """
+    notes = []
+    for row_set in ROW_SETS:
+        labels = {arm.arm: arm.label for arm in (*row_set.leaderboard_arms, *row_set.contrast_arms)}
+        seen = set()
+        frame = intervals.filter(pl.col("row_set") == row_set.key)
+        for primary in frame.filter(pl.col("setting") == "pooled").iter_rows(named=True):
+            pair = (primary["treatment"], primary["reference"])
+            if pair in seen or primary["section"] == ABSOLUTE_SECTION:
+                continue
+            seconds = frame.filter(
+                pl.col("section") == primary["section"],
+                pl.col("setting") == "sensitivity",
+                pl.col("treatment") == pair[0],
+                pl.col("reference") == pair[1],
+            )
+            if seconds.is_empty():
+                continue
+            seen.add(pair)
+            second = seconds.row(0, named=True)
+            first_significant = _excludes_zero(lower=primary["lower"], upper=primary["upper"])
+            second_significant = _excludes_zero(lower=second["lower"], upper=second["upper"])
+            if first_significant == second_significant:
+                continue
+            verdict = (
+                "statistically significant at the 5% level at the primary setting and not at the "
+                "second setting"
+                if first_significant
+                else "not statistically significant at the 5% level at the primary setting and "
+                "significant at the second setting"
+            )
+            notes.append(
+                f"{BLOCK_LABELS[row_set.key]}: {labels[pair[0]]} minus {labels[pair[1]]} is "
+                f"{_signed(value=primary['value'])} points "
+                f"[{_signed(value=primary['lower'])}, {_signed(value=primary['upper'])}] at the "
+                f"primary setting and {_signed(value=second['value'])} "
+                f"[{_signed(value=second['lower'])}, {_signed(value=second['upper'])}] at the "
+                f"second setting, so the contrast is {verdict}."
+            )
+    return notes
+
+
 class _CommonFields(NamedTuple):
     """The fields a block's leaderboard and contrast versions share."""
 
@@ -275,7 +340,10 @@ def leaderboard_figure(
 
 
 def contrasts_figure(
-    *, blocks: list[RowSetBlock], shares: dict[str, MonthShares | None]
+    *,
+    blocks: list[RowSetBlock],
+    shares: dict[str, MonthShares | None],
+    intervals: pl.DataFrame,
 ) -> alt.VConcatChart:
     """Draw Figure 2, the contrasts against ERA5 with each row set's planned contrasts."""
     return stacked_contrasts(
@@ -292,6 +360,7 @@ def contrasts_figure(
             STATION_SCOPE,
             *uncovered_month_note(shares=shares),
             *block_notes(),
+            *significance_change_notes(intervals=intervals),
             DOTS,
             CAPACITY,
             SCOPE,
@@ -312,7 +381,9 @@ def main() -> int:
         "wind_leaderboard": leaderboard_figure(
             blocks=leaderboard_blocks, shares=UNCOVERED_MONTH_SHARES
         ),
-        "wind_contrasts": contrasts_figure(blocks=contrast_blocks, shares=UNCOVERED_MONTH_SHARES),
+        "wind_contrasts": contrasts_figure(
+            blocks=contrast_blocks, shares=UNCOVERED_MONTH_SHARES, intervals=intervals
+        ),
     }
     for name, chart in charts.items():
         path = ASSETS_DIR / f"{name}.svg"

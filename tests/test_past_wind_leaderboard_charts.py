@@ -43,6 +43,37 @@ def _load() -> ModuleType:
     return module
 
 
+def _intervals(*, rows: list[dict]) -> pl.DataFrame:
+    """Return an `intervals.parquet`-shaped frame holding `rows`, each a dict of its columns."""
+    schema = {
+        "row_set": pl.String,
+        "section": pl.String,
+        "setting": pl.String,
+        "treatment": pl.String,
+        "reference": pl.String,
+        "value": pl.Float64,
+        "lower": pl.Float64,
+        "upper": pl.Float64,
+    }
+    return pl.DataFrame(rows, schema=schema)
+
+
+def _row(
+    *, setting: str, values: tuple[float, float, float], treatment: str = "icon_eu_wind"
+) -> dict:
+    value, lower, upper = values
+    return {
+        "row_set": "main",
+        "section": "Planned contrasts",
+        "setting": setting,
+        "treatment": treatment,
+        "reference": "ukv_wind",
+        "value": value,
+        "lower": lower,
+        "upper": upper,
+    }
+
+
 def _block(*, reference_name: str) -> RowSetBlock:
     rows = pl.DataFrame(
         {
@@ -127,7 +158,9 @@ def test_the_contrast_figure_names_the_arm_the_station_block_is_against() -> Non
     module = _load()
     blocks = [_block(reference_name="ERA5"), _block(reference_name="ERA5's 10 m wind")]
 
-    figure = module.contrasts_figure(blocks=blocks, shares=_all_shares()).to_dict()
+    figure = module.contrasts_figure(
+        blocks=blocks, shares=_all_shares(), intervals=_intervals(rows=[])
+    ).to_dict()
     spec = json.dumps(figure, ensure_ascii=False)
 
     assert "same as ERA5's 10\u00a0m wind" in spec
@@ -167,7 +200,7 @@ def test_each_figure_carries_its_own_number_from_the_wind_map(
     module = _load()
     leaderboard = module.leaderboard_figure(blocks=[_leaderboard_block()], shares=_all_shares())
     contrasts = module.contrasts_figure(
-        blocks=[_block(reference_name="ERA5")], shares=_all_shares()
+        blocks=[_block(reference_name="ERA5")], shares=_all_shares(), intervals=_intervals(rows=[])
     )
 
     leaderboard_title, leaderboard_spec = _title_and_cross_reference(figure=leaderboard)
@@ -182,7 +215,7 @@ def test_each_figure_carries_its_own_number_from_the_wind_map(
         blocks=[_leaderboard_block()], shares=_all_shares()
     )
     moved_contrasts = module.contrasts_figure(
-        blocks=[_block(reference_name="ERA5")], shares=_all_shares()
+        blocks=[_block(reference_name="ERA5")], shares=_all_shares(), intervals=_intervals(rows=[])
     )
     moved_title, moved_spec = _title_and_cross_reference(figure=moved_leaderboard)
     assert moved_title == "Figure 7"
@@ -219,3 +252,60 @@ def test_the_captions_state_each_blocks_wind_heights_and_the_dream_caveat() -> N
     assert "Station: 10 m station and ERA5 arm; 100 m others." in notes
     assert notes[-1].startswith("ICON-DREAM-EU: planned contrasts were written after")
     assert sum("planned contrasts were written" in note for note in notes) == 1
+
+
+def test_a_contrast_that_loses_significance_at_the_second_setting_is_named_in_the_caption() -> None:
+    # Catches a caption that omits a contrast whose interval crosses zero only at the second
+    # setting, and one that names contrasts whose significance does not change.
+    module = _load()
+    intervals = _intervals(
+        rows=[
+            _row(setting="pooled", values=(0.126, 0.009, 0.232)),
+            _row(setting="sensitivity", values=(0.082, -0.022, 0.178)),
+            _row(setting="pooled", treatment="icon_d2_wind", values=(-0.3, -0.4, -0.2)),
+            _row(setting="sensitivity", treatment="icon_d2_wind", values=(-0.2, -0.3, -0.1)),
+        ]
+    )
+
+    notes = module.significance_change_notes(intervals=intervals)
+
+    assert notes == [
+        (
+            "Main: ICON-EU minus UKV is +0.126 points [+0.009, +0.232] at the primary setting "
+            "and +0.082 [-0.022, +0.178] at the second setting, so the contrast is statistically "
+            "significant at the 5% level at the primary setting and not at the second setting."
+        )
+    ]
+
+
+def test_a_contrast_that_gains_significance_at_the_second_setting_is_named_the_other_way() -> None:
+    module = _load()
+    intervals = _intervals(
+        rows=[
+            _row(setting="pooled", values=(0.08, -0.02, 0.18)),
+            _row(setting="sensitivity", values=(0.13, 0.01, 0.23)),
+        ]
+    )
+
+    (note,) = module.significance_change_notes(intervals=intervals)
+
+    assert note.endswith(
+        "not statistically significant at the 5% level at the primary setting and significant "
+        "at the second setting."
+    )
+
+
+def test_the_contrast_figure_carries_the_significance_change_line() -> None:
+    module = _load()
+    intervals = _intervals(
+        rows=[
+            _row(setting="pooled", values=(0.126, 0.009, 0.232)),
+            _row(setting="sensitivity", values=(0.082, -0.022, 0.178)),
+        ]
+    )
+
+    figure = module.contrasts_figure(
+        blocks=[_block(reference_name="ERA5")], shares=_all_shares(), intervals=intervals
+    )
+
+    assert "ICON-EU minus UKV is +0.126 points" in json.dumps(figure.to_dict())
