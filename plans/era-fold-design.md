@@ -105,8 +105,11 @@ claim that climatology beats the mean stops being significant. On design I minus
 planned contrasts day-7 mean minus day 0 and day-7 mean minus climatology move by +0.161 and +0.194
 (intervals include zero), and the exploratory control day 0 minus ERA5 and day-0 mean minus UKV with
 ICON-EU by −0.199 [−0.346, −0.071] and −0.164 [−0.281, −0.054]. The at-most-0.10-point statement
-holds for solar only. The measurement's covered design II figures, at both settings, replace these
-provisional values once its refits land.
+holds for solar only. The measurement's final covered design II (IIr) figures, at both settings, are in
+`studies/era_fold_design/report.md`; they are wind day 0 minus ERA5 −0.026 [−0.151, +0.114], wind
+day-14 mean minus climatology +1.207 [+0.514, +1.915], solar day-7 mean minus climatology −0.868
+[−1.603, −0.188], and solar day-14 +0.186 [−0.667, +0.931]. Where they differ from the review
+refits above, the report's figures govern.
 
 **What the measurement did not cover.** The three-era design tried one of six covering wind offset
 sets (two for solar). The upsampling choice was not re-run per design. The member-by-member arm was
@@ -242,8 +245,8 @@ uncovered cells for both fold cuts.
 - **Rotation 2 is an arbitrary covering choice.** `search_fold_offsets` returns it first, and
   rotations 3 and 4 also cover. The page says so and quotes the spread across rotations; no
   interval includes the fold-assignment spread of 0.02 to 0.07 points.
-- **Second-setting and panel refits are still running.** Their results replace the provisional
-  covered design II values above before the re-run is designed.
-- **Whether the `all` and `wind_icon_dream` pages need a re-run.** The recommendation depends on the
-  queued D1 refit. The coordinator decides.
+- **Second-setting and panel refits are done.** Their results are in `studies/era_fold_design/report.md`
+  and replace the provisional covered design II values above.
+- **Whether the `all` and `wind_icon_dream` pages need a re-run.** The D1 refits moved no sign or
+  significance, so the recommendation is no re-run. The coordinator decided.
 - **Size and role wording.** "Coordinator" and "maintainer" mean the same decision-maker here.
