@@ -7,6 +7,7 @@ Each test is written to fail on the defect it names. The scripts are imported by
 import hashlib
 import importlib
 import json
+import subprocess
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -377,10 +378,10 @@ def _losses_and_frame(*, row_set: str = "single") -> tuple[pl.DataFrame, pl.Data
     spec = fa.ROW_SETS[row_set]
     arms = [*spec.arms, *(f"{arm}{fa.NO_DOY_SUFFIX}" for arm in spec.deciding or ())]
     times = [datetime(2025, 3, 1, 12), datetime(2025, 3, 1, 13)]
-    frame = pl.DataFrame({"site": ["A", "A"], "time": times})
+    frame = pl.DataFrame({"site": ["A", "A"], "time": times, "fold": [0, 0]})
     losses = pl.DataFrame(
         [
-            {"setting": fa.PRIMARY, "arm": arm, "site": "A", "time": time}
+            {"setting": fa.PRIMARY, "arm": arm, "site": "A", "time": time, "fold": 0}
             for arm in arms
             for time in times
         ]
@@ -436,7 +437,7 @@ def test_saved_losses_raise_on_other_arms(tmp_path: Path) -> None:
 
 def test_saved_losses_raise_on_other_rows(tmp_path: Path) -> None:
     losses, frame = _losses_and_frame()
-    with pytest.raises(ValueError, match="other rows"):
+    with pytest.raises(ValueError, match="other rows or folds"):
         _check(
             tmp_path=tmp_path,
             losses=losses,
@@ -445,7 +446,53 @@ def test_saved_losses_raise_on_other_rows(tmp_path: Path) -> None:
         )
 
 
-def test_build_stamp_hashes_the_inputs_file_and_names_the_device(tmp_path: Path) -> None:
+def test_saved_losses_raise_on_other_folds(tmp_path: Path) -> None:
+    losses, frame = _losses_and_frame()
+    frame = frame.with_columns(fold=pl.Series([0, 1]))
+    with pytest.raises(ValueError, match="other rows or folds"):
+        _check(
+            tmp_path=tmp_path,
+            losses=losses,
+            frame=frame,
+            stamp_on_disk={"inputs_sha256": "abc", "device": "cuda"},
+        )
+
+
+def test_build_stamp_hashes_both_inputs_and_records_settings_columns_and_device(
+    tmp_path: Path,
+) -> None:
     (tmp_path / "solar_aifs_inputs.parquet").write_bytes(b"abc")
-    stamp = fa.build_stamp(aifs_dir=tmp_path, domain="solar")
-    assert stamp == {"inputs_sha256": hashlib.sha256(b"abc").hexdigest(), "device": fa.DEVICE}
+    (tmp_path / "solar_forecast_inputs.parquet").write_bytes(b"xyz")
+    stamp = fa.build_stamp(published_dir=tmp_path, aifs_dir=tmp_path, domain="solar")
+    assert stamp["inputs_sha256"] == hashlib.sha256(b"abc").hexdigest()
+    assert stamp["published_sha256"] == hashlib.sha256(b"xyz").hexdigest()
+    assert stamp["device"] == fa.DEVICE
+    assert json.loads(stamp["settings"]) == json.loads(json.dumps(fa.SETTINGS))
+    columns = json.loads(stamp["columns"])
+    assert columns["aifs_single_day1"] == list(
+        fa.arm_features(arm="aifs_single_day1", domain="solar")
+    )
+
+
+def test_build_stamp_changes_with_the_settings(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    (tmp_path / "solar_aifs_inputs.parquet").write_bytes(b"abc")
+    (tmp_path / "solar_forecast_inputs.parquet").write_bytes(b"xyz")
+    before = fa.build_stamp(published_dir=tmp_path, aifs_dir=tmp_path, domain="solar")
+    changed = {name: {**setting, "n_estimators": 1} for name, setting in fa.SETTINGS.items()}
+    monkeypatch.setattr(fa, "SETTINGS", changed)
+    assert fa.build_stamp(published_dir=tmp_path, aifs_dir=tmp_path, domain="solar") != before
+
+
+def test_check_gpu_visible_raises_when_nvidia_smi_fails(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setattr(fa, "DEVICE", "cuda")
+    monkeypatch.setattr(
+        fa.subprocess, "run", lambda *_a, **_k: subprocess.CompletedProcess([], returncode=9)
+    )
+    with pytest.raises(RuntimeError, match="sees no GPU"):
+        fa.check_gpu_visible()
+    monkeypatch.setattr(
+        fa.subprocess, "run", lambda *_a, **_k: subprocess.CompletedProcess([], returncode=0)
+    )
+    fa.check_gpu_visible()

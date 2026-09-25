@@ -34,6 +34,7 @@ import concurrent.futures
 import hashlib
 import json
 import logging
+import subprocess
 import sys
 import time
 from dataclasses import dataclass
@@ -821,18 +822,53 @@ def check_determinism(*, published_dir: Path, aifs_dir: Path) -> bool:
     return fingerprints[0] == fingerprints[1]
 
 
-def build_stamp(*, aifs_dir: Path, domain: DomainType) -> dict[str, str]:
-    """Return the AIFS inputs' SHA-256 and the device, which a saved losses file must match.
+def build_stamp(*, published_dir: Path, aifs_dir: Path, domain: DomainType) -> dict[str, str]:
+    """Return what a saved losses file must match.
 
     Args:
+        published_dir: The folder holding the published `<domain>_forecast_inputs.parquet`.
         aifs_dir: The folder holding `<domain>_aifs_inputs.parquet`.
         domain: `solar` or `wind`.
 
     Returns:
-        `inputs_sha256` and `device`.
+        Both input files' SHA-256, the device, both hyper-parameter settings, and every arm's
+        feature columns.
     """
-    digest = hashlib.sha256((aifs_dir / f"{domain}_aifs_inputs.parquet").read_bytes()).hexdigest()
-    return {"inputs_sha256": digest, "device": DEVICE}
+
+    def sha256(path: Path) -> str:
+        return hashlib.sha256(path.read_bytes()).hexdigest()
+
+    arms = sorted(
+        {
+            arm
+            for spec in ROW_SETS.values()
+            for arm in (*spec.arms, *(f"{a}{NO_DOY_SUFFIX}" for a in spec.deciding or ()))
+        }
+    )
+    return {
+        "inputs_sha256": sha256(aifs_dir / f"{domain}_aifs_inputs.parquet"),
+        "published_sha256": sha256(published_dir / f"{domain}_forecast_inputs.parquet"),
+        "device": DEVICE,
+        "settings": json.dumps(SETTINGS, sort_keys=True),
+        "columns": json.dumps({arm: arm_features(arm=arm, domain=domain) for arm in arms}),
+    }
+
+
+def check_gpu_visible() -> None:
+    """Raise if `DEVICE` is `cuda` but `nvidia-smi` sees no GPU.
+
+    XGBoost falls back to the CPU with only a logged warning when no GPU is visible, and the stamp
+    would then name a device that fitted nothing.
+
+    Raises:
+        RuntimeError: If `nvidia-smi` exits non-zero.
+    """
+    if (
+        DEVICE == "cuda"
+        and subprocess.run(["nvidia-smi", "-L"], capture_output=True, check=False).returncode
+    ):
+        msg = "DEVICE is cuda but nvidia-smi sees no GPU, so XGBoost would fit on the CPU"
+        raise RuntimeError(msg)
 
 
 def check_saved_losses(
@@ -854,7 +890,7 @@ def check_saved_losses(
 
     Raises:
         ValueError: If the stamp is missing or differs, or the primary losses hold other arms or
-            cover other (site, time) rows than the row set.
+            cover other (site, time, fold) rows than the row set.
     """
     if not stamp_file.exists() or json.loads(stamp_file.read_text()) != stamp:
         msg = f"{stamp_file} is missing or names another build or device"
@@ -865,13 +901,11 @@ def check_saved_losses(
     if set(primary["arm"].unique().to_list()) != arms:
         msg = f"{row_set}: the saved losses hold other arms than the set's"
         raise ValueError(msg)
-    keys = frame.select("site", "time")
-    saved = primary.select("site", "time").unique()
-    if (
-        saved.join(keys, on=["site", "time"], how="anti").height
-        or keys.join(saved, on=["site", "time"], how="anti").height
-    ):
-        msg = f"{row_set}: the saved losses cover other rows than the set's"
+    on = ["site", "time", "fold"]
+    keys = frame.select(on)
+    saved = primary.select(on).unique()
+    if saved.join(keys, on=on, how="anti").height or keys.join(saved, on=on, how="anti").height:
+        msg = f"{row_set}: the saved losses cover other rows or folds than the set's"
         raise ValueError(msg)
 
 
@@ -884,6 +918,7 @@ def main() -> int:
     parser.add_argument("--workers", type=int, default=1, help="(arm, site) fits run at once.")
     parser.add_argument("--check", action="store_true", help="Compare two GPU runs of one arm.")
     args = parser.parse_args()
+    check_gpu_visible()
     if args.output_dir.resolve() == args.published_dir.resolve():
         msg = "the output folder must not be the published folder"
         raise ValueError(msg)
@@ -921,7 +956,9 @@ def main() -> int:
             predictions_file = path_for(
                 output_dir=args.output_dir, domain=domain, row_set=row_set, kind="predictions"
             )
-            stamp = build_stamp(aifs_dir=args.output_dir, domain=domain)
+            stamp = build_stamp(
+                published_dir=args.published_dir, aifs_dir=args.output_dir, domain=domain
+            )
             stamp_file = losses_file.with_suffix(".json")
             if losses_file.exists():
                 losses = pl.read_parquet(losses_file)

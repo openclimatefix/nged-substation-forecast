@@ -134,14 +134,14 @@ Nothing in review 2 is rejected.
 ## What the data holds (read-only checks, run while writing this plan)
 
 - **AIFS Single:** 3,629 runs from 2024-04-01 00 UTC to 2026-09-25 00 UTC, 61 leads (0 to 360 h in
-  6-hour steps), 12 cells, 732 rows per run for every 00 UTC run. Every 00 UTC run from 2025-02-26
+  6-hour steps). To be checked once the wide ENS store lands and both wide stores are validated: 12 cells and 732 rows per run for every 00 UTC run. Every 00 UTC run from 2025-02-26
   to 2026-09-25 is present. The 06, 12, and 18 UTC runs are present except 2026-09-25's, which had
   not run when the download finished. Shortwave, longwave, and 100 m wind are `NaN` (not null)
   before the 2025-02-24 06 UTC run. Shortwave and longwave are `NaN` at lead 0 in every run.
   There is no `ensemble_member` column.
 - **AIFS ENS:** 1,801 runs from 2025-07-02 00 UTC to 2026-09-25 00 UTC, 51 members (0 to 50, member
   0
-  the control), 61 leads, 12 cells, all fields present beyond radiation's lead 0. No 00 UTC run is
+  the control), 61 leads. To be checked once the wide ENS store lands: 12 cells (37,332 rows per 00 UTC run), all fields present beyond radiation's lead 0. No 00 UTC run is
   missing.
 - **Coverage of the published shared rows** (35,263 solar, 37,407 wind) by a 00 UTC run at the
   site's nearest 0.25° cell, at day 1: Single covers 31,769 solar and 31,315 wind rows (from init
