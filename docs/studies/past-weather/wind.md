@@ -9,33 +9,48 @@
 
 **At three wind farms in Lincolnshire, the German weather service's ICON-D2 and the Met Office's UK
 variable-resolution model (UKV) describe past wind best of the five products on the main row set.**
-ICON-D2 belongs to the German weather service's (DWD's) Icosahedral Nonhydrostatic (ICON) model
-family. For each weather product, an XGBoost model, a gradient-boosted tree, was fitted per
-generator to predict hourly output from that product's wind, and scored by its mean absolute error
-as a percentage of the generator's capacity (its 99th percentile of metered output). Each difference
-below is in percentage points of capacity, written "points", and each bracketed pair is a 95%
-interval. Across the window of this study, August 2024 to September 2026, the XGBoost model's error
-given UKV's wind is 0.44 points [0.24, 0.63] lower than given the wind of ERA5, the reanalysis of
-the European Centre for Medium-Range Weather Forecasts (ECMWF). Given ICON-D2's wind, the error is
+The main row set is the 50,734 farm-hours, from 12 August 2024 to 10 September 2026, on which all
+five products have a value, where a farm-hour is one wind farm's power in one hour. The five
+products are UKV; ERA5, the reanalysis of the European Centre for Medium-Range Weather Forecasts
+(ECMWF); and three models of the German weather service's (DWD's) Icosahedral Nonhydrostatic (ICON)
+family: ICON-D2, for Germany and neighbouring countries, ICON-EU, for Europe, and ICON global. For
+each weather product, an XGBoost model, a gradient-boosted tree, was fitted per generator to predict
+hourly output from that product's wind, and scored by its mean absolute error as a percentage of the
+generator's capacity (its 99th percentile of metered output). Each difference below is in percentage
+points of capacity, written "points", each bracketed pair is a 95% interval, and a product "beats"
+another when the 95% interval for the difference lies wholly on one side of zero. Across the window
+of this study, August 2024 to September 2026, the XGBoost model's error given UKV's wind is 0.44
+points [0.24, 0.63] lower than given the wind of ERA5. That is one of the main row set's planned
+contrasts, a comparison written down before any result existed. Given ICON-D2's wind, the error is
 0.58 points [0.40, 0.75] lower than given ERA5's, in a comparison chosen after the results were
 seen. The two gaps are 6% and 8% of ERA5's error.
 
-Two ECMWF products were scored separately, on a shorter row set from December 2024 that every
-product was refitted on. HRES is ECMWF's single high-resolution forecast. ENS day 0 is the mean of
-the 51 members of ECMWF's ensemble forecast (ENS) for the hours 00 to 23 UTC of the 00 UTC run's own
-day. On that row set, UKV's error is 0.20 points [0.06, 0.33] lower than the error given HRES's wind
-in the first planned contrast, and 0.41 points [0.25, 0.58] lower than the error given ENS day 0's
-wind in the second. In the third planned contrast HRES minus ERA5 is −0.27 points [−0.40, −0.12],
-but in exploratory refits that train across ECMWF's upgrade to Integrated Forecasting System (IFS)
-Cycle 49r1 on 12 November 2024 without telling the XGBoost model which side of the upgrade each hour
-falls on, HRES's lead over ERA5 is no longer statistically significant at the 5% level. Three wind
-farms are few independent sites, so these intervals describe these farms and this window only.
-ICON-DREAM-EU, DWD's reanalysis, was scored on its own, slightly shorter row set: it is
-statistically indistinguishable from ERA5 and trails ICON-EU by 0.34 points [0.27, 0.41]. Figure 1
-draws one block for each of four row sets, and each block scores its products on its own hours, so
-an absolute error in one block is not comparable with an error in another. [How the comparison was
-made](#how-the-comparison-was-made) tabulates the row sets. The products are also scored at
-different served leads, which [Limitations](#limitations) explains.
+The products are scored at different served leads. A weather model's value for an hour, as served,
+comes from the freshest run of that weather model that Open-Meteo's archive holds for the hour, and
+the served lead is how many hours after the run started that value was forecast. A lead of zero,
+written T+0, is the run's analysis. UKV is scored at T+0, ICON-D2 and ICON-EU at 0 to 2 hours, and
+ICON global at 0 to 5 hours, while ERA5 is an analysis at every hour, so a ranking is partly a lead
+effect, which [Limitations](#limitations) explains.
+
+Two ECMWF products were scored separately, on the ECMWF row set: the 43,555 farm-hours from 1
+December 2024 to 10 September 2026, on which every product was refitted. HRES is ECMWF's single
+high-resolution forecast. ENS day 0 is the mean of the 51 members of ECMWF's ensemble forecast (ENS)
+for the hours 00 to 23 UTC of the 00 UTC run's own day. On that row set, UKV's error is 0.20 points
+[0.06, 0.33] lower than the error given HRES's wind in the first planned contrast, and 0.41 points
+[0.25, 0.58] lower than the error given ENS day 0's wind in the second. ICON-DREAM-EU, DWD's
+reanalysis, was scored on its own row set: it is statistically indistinguishable from ERA5 and
+trails ICON-EU by 0.34 points [0.27, 0.41].
+
+Figure 1 draws one block for each of four row sets, and each block scores its products on its own
+hours, so an absolute error in one block is not comparable with an error in another. The four row
+sets are the main row set; the ICON-DREAM-EU row set, 50,041 farm-hours from 12 August 2024 to 31
+August 2026; the ECMWF row set; and the weather-station row set, 34,156 farm-hours from 12 August
+2024 to 31 December 2025, which adds the wind of the nearest Met Office weather station, 6 to 18 km
+from each farm and reading wind at 10 m. [How the comparison was made](#how-the-comparison-was-made)
+tabulates the four. Overlapping intervals in Figure 1 do not make two products equal, because Figure
+2 tests each gap on the same hours, and the lower panel of each block of Figure 2 holds that row
+set's planned contrasts. Three wind farms are few independent sites, so the intervals describe these
+farms and this window only; see [Limitations](#limitations).
 
 ![Figure 1: ICON-D2 has the lowest error on the main, ICON-DREAM-EU, and ECMWF row sets, and UKV
 plus the nearest station has the lowest on the weather-station row
@@ -45,25 +60,28 @@ set](../assets/wind_leaderboard.svg)
 significant at the 5% level. The lower panel of each block holds that row set's planned
 contrasts](../assets/wind_contrasts.svg)
 
-**At these three wind farms, the page makes the following recommendations.** Each one rests on the
-errors of XGBoost models given the named product's wind, plus the time of day, the season, and which
-side of UKV's upgrade an hour falls on. The first two bullets are for historical features and
-training history, two of the four consumers of past weather described in the
-[Introduction](#introduction). The third and fourth bullets say what the ECMWF and weather-station
-results support for those two consumers. The last bullet names the two consumers with no
-recommendation.
+**At these three wind farms, the page recommends products for two of the four consumers of past
+weather, the parts of the project that read weather that has already happened, and makes no
+recommendation for the other two.** Each recommendation rests on the errors of XGBoost models given
+the named product's wind, plus the time of day, the season, and which side of the Met Office's
+upgrade of UKV on 21 January 2026 an hour falls on.
 
-- **Historical features in the live service: UKV, with ICON-D2 an alternative where ICON-D2
-  reaches.** See [Discussion: what to use](#discussion-what-to-use).
-- **Training history: ICON-D2 where ICON-D2 covers, from November 2022, with ICON-EU or ERA5
-  elsewhere. This study scores none of them before August 2024.** See [Discussion: what to
-  use](#discussion-what-to-use).
+- **Historical features in the live service, which give the live forecasting model the weather of
+  hours already past: UKV, with ICON-D2 an alternative where ICON-D2 reaches.** ICON-D2's western
+  edge runs from about 2°W on the south coast to about 2.5°W in the Midlands, so it does not reach
+  all of Great Britain, and its lead over UKV has not been statistically significant since UKV's
+  upgrade. See [Discussion: what to use](#discussion-what-to-use).
+- **Training history, the years of past weather that pre-training a forecasting model needs: ICON-D2
+  where ICON-D2 covers, from November 2022, with ICON-EU or ERA5 elsewhere. This study scores none
+  of them before August 2024.** See [Discussion: what to use](#discussion-what-to-use).
 - **ECMWF's HRES and ENS day 0: not recommended for historical features or for training history on
   this evidence.** See [Discussion: what to use](#discussion-what-to-use).
-- **Nearby weather-station wind: worse than ERA5's 10 m wind on its own, and a smaller gain added to
-  UKV than ICON-D2's hub-height wind.** See [Discussion: what to use](#discussion-what-to-use).
-- **Capacity estimation and disaggregation: no recommendation.** See [Discussion: what to
-  use](#discussion-what-to-use).
+- **Nearby weather-station wind, from the Met Office's MIDAS Open archive: worse than ERA5's 10 m
+  wind on its own, and a smaller gain added to UKV than ICON-D2's hub-height wind.** See
+  [Discussion: what to use](#discussion-what-to-use).
+- **Capacity estimation, which infers a farm's size from how its output tracks the wind, and
+  disaggregation, which separates hidden generation from demand at a substation: no
+  recommendation.** See [Discussion: what to use](#discussion-what-to-use).
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
