@@ -183,8 +183,8 @@ them, and the page says the study did not test that. The 00 UTC AIFS run is assu
 
 **The build is a `--aifs` flag on `build_forecast_inputs.py`, beside `--extra-leads`.** `build_aifs`
 sits next to `build_extra_leads` (line 926), reads the published inputs' `(site, time)` keys only,
-and writes `<domain>_aifs_inputs.parquet` to the output folder. Like `build_extra_leads`, it refuses an output folder equal to the published folder, and calls
-`studies.guards.refuse_to_overwrite`. Every written column is checked against a schema that holds no
+and writes `<domain>_aifs_inputs.parquet` to the output folder. Like `build_extra_leads`, it refuses
+an output folder equal to the published folder, and calls `studies.guards.refuse_to_overwrite`. Every written column is checked against a schema that holds no
 coordinate, cell id, or generator name; the only site column is the `A` to `F` and `W1` to `W3`
 label.
 
