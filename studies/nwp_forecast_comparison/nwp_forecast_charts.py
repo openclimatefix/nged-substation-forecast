@@ -49,7 +49,18 @@ import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 from build_forecast_inputs import PRODUCT_SLUGS
-from fit_aifs import ROW_SETS
+from fit_aifs import (
+    BLEND_DAYS,
+    LONG_DAYS,
+    ROW_SETS,
+    Contrast,
+    blend_arm_name,
+    blend_contrasts,
+    day14_reading,
+    ens_control_prefix,
+    lead_verdict,
+    shuffled_prefix,
+)
 from fit_aifs import contrasts as aifs_contrasts
 from nwp_forecast_comparison import (
     BLEND_ARMS,
@@ -64,6 +75,7 @@ from nwp_forecast_comparison import (
     predictions_path,
 )
 from studies.anonymise import SITE_LABELS, WIND_SITE_LABELS
+from studies.bootstrap import BootstrapInterval
 from studies.charts import (
     CONTENT_WIDTH_PX,
     figure,
@@ -1859,6 +1871,438 @@ def aifs(
     )
 
 
+# --- Chart 8: AIFS at days 1, 2, 7 and 14, and blends with ENS's mean -----------------------------
+
+AIFS_LEAD_POSITIONS: Final[dict[int, int]] = {day: index for index, day in enumerate(BLEND_DAYS)}
+"""Each lead day's x position: the four fitted days sit evenly, whatever their gaps."""
+
+AIFS_LEAD_SERIES: Final[dict[str, tuple[str, str]]] = {
+    "aifs_single": ("AIFS Single", ocf.DATA_GREEN),
+    "ens_control": ("ENS control member", ocf.DATA_SKY),
+    "ens_mean": ("ENS mean", ocf.DATA_BLUE),
+    "blend_aifs_single": ("Blend of ENS mean and AIFS Single", ocf.DATA_AMBER),
+    "ifs025": ("IFS 0.25°", ocf.DATA_BURNT_ORANGE),
+    "aifs_ens_mean": ("AIFS ENS mean", ocf.DATA_GREEN),
+    "blend_aifs_ens": ("Blend of ENS mean and AIFS ENS mean", ocf.DATA_AMBER),
+}
+"""Each product's series slug to its name and colour on the AIFS lead chart. Every colour is already
+in `PRODUCT_COLOURS`, so no chromatic colour is added."""
+
+AIFS_LEAD_ROW_SETS: Final[dict[str, tuple[str, tuple[str, ...]]]] = {
+    "single": (
+        "Hours AIFS Single covers",
+        ("aifs_single", "ens_control", "ens_mean", "blend_aifs_single", "ifs025"),
+    ),
+    "ens": (
+        "Hours AIFS ENS also covers (descriptive only)",
+        ("aifs_ens_mean", "ens_mean", "blend_aifs_ens"),
+    ),
+}
+"""Each row set's panel name and the series its lead panel draws."""
+
+_AIFS_ARM: Final[re.Pattern[str]] = re.compile(
+    r"(?P<slug>blend_aifs_single|blend_aifs_ens|aifs_single|aifs_ens_mean|ens_control6|ens_control"
+    r"|ens_mean|ifs025|ifs_single)_day(?P<day>\d+)(?P<rest>.*)"
+)
+
+AIFS_ROLE_TEXT: Final[dict[str, str]] = {
+    "": "",
+    "_control": ", AIFS shuffled",
+    "_mirror": ", ENS mean shuffled",
+    "_permuted": ", shuffled",
+    "_permuted_b": ", shuffled again",
+}
+"""What follows an arm's product and day in its label, by the suffix of its name."""
+
+AIFS_PRODUCT_TEXT: Final[dict[str, str]] = {
+    "blend_aifs_single": "Blend of ENS mean and AIFS Single",
+    "blend_aifs_ens": "Blend of ENS mean and AIFS ENS mean",
+    "aifs_single": "AIFS Single",
+    "aifs_ens_mean": "AIFS ENS mean",
+    "ens_control6": "ENS control member",
+    "ens_control": "ENS control member",
+    "ens_mean": "ENS mean",
+    "ifs025": "IFS 0.25°",
+    "ifs_single": "IFS HRES 9 km",
+}
+"""Each product slug's name in a row label."""
+
+
+def aifs_lead_label(*, arm: str) -> str:
+    """Name an arm of the blends fit for a row label, such as `AIFS Single day 7, shuffled`.
+
+    Args:
+        arm: An arm's name: a product at one day, a shuffled copy of AIFS, or a blend with its
+            control (AIFS shuffled) or mirror control (ENS's mean shuffled).
+
+    Returns:
+        The label.
+
+    Raises:
+        ValueError: If `arm` is none of those.
+    """
+    match = _AIFS_ARM.fullmatch(arm)
+    if match is None or match["rest"] not in AIFS_ROLE_TEXT:
+        msg = f"aifs_lead_label: {arm!r} is not an arm of the blends fit"
+        raise ValueError(msg)
+    return f"{AIFS_PRODUCT_TEXT[match['slug']]} day {match['day']}{AIFS_ROLE_TEXT[match['rest']]}"
+
+
+def load_aifs_leads(*, blends_dir: Path, domain: DomainType) -> dict[str, pl.DataFrame]:
+    """Read one technology's blends-fit losses, every day of each row set stacked.
+
+    Args:
+        blends_dir: The directory `fit_aifs.py --blends` wrote to.
+        domain: `solar` or `wind`.
+
+    Returns:
+        Each row set's per-row losses, keyed by row set, after the anonymisation check. Arms carry
+        their day in their names, so the days stack without a clash.
+    """
+    stacked = {
+        row_set: pl.concat(
+            [
+                pl.read_parquet(blends_dir / f"{domain}_{row_set}_day{day}_losses.parquet")
+                for day in BLEND_DAYS
+            ],
+            how="diagonal_relaxed",
+        )
+        for row_set in ROW_SETS
+    }
+    for frame in stacked.values():
+        check_anonymised(frame=frame, domain=domain)
+    return stacked
+
+
+def lead_arm(*, slug: str, day: int) -> str:
+    """Return the arm one series draws at one day."""
+    if slug == "ens_control":
+        return ens_control_prefix(day=day)
+    if slug.startswith("blend_"):
+        return blend_arm_name(product=slug.removeprefix("blend_"), day=day)
+    return f"{slug}_day{day}"
+
+
+def aifs_lead_absolute_rows(*, losses: pl.DataFrame, row_set: str) -> pl.DataFrame:
+    """Return each series' own error at each lead day on one row set.
+
+    Args:
+        losses: One row set's stacked per-row losses.
+        row_set: `single` or `ens`.
+
+    Returns:
+        `series`, `product`, `day`, `value`, `lower_95` and `upper_95` in percent of capacity, with
+        the arms present in `losses` only.
+    """
+    primary = by_setting(losses=losses)["primary"]
+    records = []
+    for slug in AIFS_LEAD_ROW_SETS[row_set][1]:
+        for day in BLEND_DAYS:
+            arm = lead_arm(slug=slug, day=day)
+            if not arms_present(losses=primary, arms=(arm,)):
+                continue
+            row = leaderboard(losses=primary, arms=[arm]).row(0, named=True)
+            records.append(
+                {
+                    "series": slug,
+                    "product": AIFS_LEAD_SERIES[slug][0],
+                    "day": day,
+                    "value": row["value"] * PERCENTAGE_POINTS,
+                    "lower_95": row["lower_95"] * PERCENTAGE_POINTS,
+                    "upper_95": row["upper_95"] * PERCENTAGE_POINTS,
+                }
+            )
+    return pl.DataFrame(records)
+
+
+def aifs_lead_contrasts(*, row_set: str) -> list[tuple[Contrast, str]]:
+    """Return the contrasts the AIFS lead chart draws, each with its status.
+
+    On `single` these are the deciding contrasts H7, H14, B7 and B14 with their guards, and the
+    exploratory contrasts of the same kind: AIFS Single against ENS's mean (the smoothing reading)
+    and each blend against its mirror control. On `ens` every listed contrast is descriptive.
+
+    Args:
+        row_set: `single` or `ens`.
+
+    Returns:
+        Each contrast and `Deciding` or `Exploratory` (`Descriptive` on `ens`).
+    """
+    chosen: list[tuple[Contrast, str]] = []
+    days = BLEND_DAYS if row_set == "ens" else LONG_DAYS
+    for day in days:
+        for contrast in blend_contrasts(row_set=row_set, day=day):
+            label = contrast.label
+            if row_set == "ens":
+                chosen.append((contrast, "Descriptive"))
+            elif label.startswith("deciding"):
+                chosen.append((contrast, "Deciding"))
+            elif "smoothing" in label or "column-matched" in label:
+                chosen.append((contrast, "Exploratory"))
+    return chosen
+
+
+def aifs_lead_contrast_rows(*, losses: pl.DataFrame, row_set: str) -> pl.DataFrame:
+    """Return the chart's contrasts at each setting, as `interval_panel` rows.
+
+    Args:
+        losses: One row set's stacked per-row losses.
+        row_set: `single` or `ens`.
+
+    Returns:
+        `label`, `family`, `difference`, `lower_95`, `upper_95`, `condition` and `planned`
+        (always false: no contrast here is planned in the published page's sense), where a
+        setting's row is present only for a contrast whose arms were fitted at that setting.
+    """
+    records = []
+    for contrast, status in aifs_lead_contrasts(row_set=row_set):
+        for setting, setting_losses in by_setting(losses=losses).items():
+            if not arms_present(
+                losses=setting_losses, arms=(contrast.treatment, contrast.reference)
+            ):
+                continue
+            interval = difference(
+                losses=setting_losses, treatment=contrast.treatment, reference=contrast.reference
+            )
+            records.append(
+                {
+                    "label": (
+                        f"{status}: {aifs_lead_label(arm=contrast.treatment)} minus "
+                        f"{aifs_lead_label(arm=contrast.reference)}"
+                    ),
+                    "family": "weather model",
+                    "difference": interval["difference"] * PERCENTAGE_POINTS,
+                    "lower_95": interval["lower_95"] * PERCENTAGE_POINTS,
+                    "upper_95": interval["upper_95"] * PERCENTAGE_POINTS,
+                    "condition": SETTING_NAMES[setting],
+                    "planned": False,
+                }
+            )
+    return pl.DataFrame(
+        records,
+        schema={
+            "label": pl.String,
+            "family": pl.String,
+            "difference": pl.Float64,
+            "lower_95": pl.Float64,
+            "upper_95": pl.Float64,
+            "condition": pl.String,
+            "planned": pl.Boolean,
+        },
+    )
+
+
+def aifs_lead_panel(*, rows: pl.DataFrame, series: Sequence[str]) -> alt.LayerChart:
+    """Draw each series' error against the four lead days, with 95% intervals.
+
+    Args:
+        rows: `aifs_lead_absolute_rows`'s result.
+        series: The series to draw, in the key's order.
+
+    Returns:
+        The panel.
+    """
+    names = [AIFS_LEAD_SERIES[slug][0] for slug in series]
+    colours = [AIFS_LEAD_SERIES[slug][1] for slug in series]
+    offsets = {
+        name: (index - (len(names) - 1) / 2) * DODGE_DAYS for index, name in enumerate(names)
+    }
+    drawn = rows.with_columns(
+        x=pl.col("day").replace_strict(AIFS_LEAD_POSITIONS, return_dtype=pl.Float64)
+        + pl.col("product").replace_strict(offsets, return_dtype=pl.Float64)
+    )
+    y_domain = padded_domain(
+        low=float(drawn["lower_95"].min()),  # ty: ignore[invalid-argument-type]
+        high=float(drawn["upper_95"].max()),  # ty: ignore[invalid-argument-type]
+        include_zero=False,
+    )
+    last = len(BLEND_DAYS) - 1
+    x_scale = alt.Scale(domain=[-0.5, last + 0.5], nice=False)
+    labels = ", ".join(f"'Day {day}'" for day in BLEND_DAYS)
+    x_axis = alt.Axis(
+        values=list(range(len(BLEND_DAYS))),
+        labelExpr=f"[{labels}][datum.value]",
+        grid=False,
+        title="Lead day (the four fitted days are spaced evenly)",
+    )
+    y_scale = alt.Scale(domain=list(y_domain), nice=False)
+    colour = alt.Color("product:N", scale=alt.Scale(domain=names, range=colours), legend=None)
+    x = alt.X("x:Q", scale=x_scale, axis=x_axis)
+    y = alt.Y("value:Q", scale=y_scale, axis=alt.Axis(title=MAE_TITLE))
+    lines = (
+        alt.Chart(drawn)
+        .mark_line(strokeWidth=1.5, aria=False)
+        .encode(x=x, y=y, color=colour, detail="product:N")  # ty: ignore[unresolved-attribute]
+    )
+    rules = (
+        alt.Chart(drawn)
+        .mark_rule(strokeWidth=1.5, aria=False)
+        .encode(x=x, y=alt.Y("lower_95:Q", scale=y_scale), y2="upper_95:Q", color=colour)  # ty: ignore[unresolved-attribute]
+    )
+    points = (
+        alt.Chart(drawn)
+        .mark_point(filled=True, size=50, opacity=1, aria=False)
+        .encode(x=x, y=y, color=colour)  # ty: ignore[unresolved-attribute]
+    )
+    return alt.LayerChart(
+        layer=[lines, rules, points],
+        width=CONTENT_WIDTH_PX - 100,
+        height=LEAD_PANEL_HEIGHT_PX,
+    )
+
+
+def lead_reading(*, interval: BootstrapInterval | None) -> str:
+    """Name what a contrast's 95% interval shows, for a chart title.
+
+    Args:
+        interval: A first-minus-second contrast, or `None` if an arm is absent.
+
+    Returns:
+        `has a lower error than` or `has a higher error than` where the interval excludes zero, and
+        `cannot be told apart from` otherwise.
+    """
+    if interval is None or interval["lower_95"] <= 0.0 <= interval["upper_95"]:
+        return "cannot be told apart from"
+    return "has a lower error than" if interval["upper_95"] < 0.0 else "has a higher error than"
+
+
+def aifs_leads_title(*, losses: pl.DataFrame, domain: DomainType) -> str:
+    """State the finding of the AIFS lead chart's deciding contrasts, from the losses themselves.
+
+    Args:
+        losses: The `single` row set's stacked per-row losses.
+        domain: `solar` or `wind`.
+
+    Returns:
+        A sentence for the figure's title and its caption on the page: AIFS Single against ENS's
+        control member at days 7 and 14 (the reading at the two settings, a reading that differs
+        between them called unresolved), the blend's verdict at each, and the day-14 reading rule's
+        outcome.
+    """
+    settings = by_setting(losses=losses)
+
+    def both_settings(*, treatment: str, reference: str) -> str:
+        readings = {
+            lead_reading(
+                interval=difference(losses=frame, treatment=treatment, reference=reference)
+            )
+            for frame in settings.values()
+            if arms_present(losses=frame, arms=(treatment, reference))
+        }
+        return readings.pop() if len(readings) == 1 else "is unresolved against"
+
+    parts = []
+    verdicts = []
+    for day in LONG_DAYS:
+        reading = both_settings(
+            treatment=f"aifs_single_day{day}", reference=ens_control_prefix(day=day)
+        )
+        parts.append(f"at day {day} AIFS Single {reading} ENS's control member")
+        blend = blend_arm_name(product="aifs_single", day=day)
+        per_setting = [
+            lead_verdict(
+                day=day,
+                versus_ens=difference(
+                    losses=frame, treatment=blend, reference=f"ens_mean_day{day}"
+                ),
+                versus_control=difference(
+                    losses=frame, treatment=blend, reference=f"{blend}_control"
+                ),
+            )["verdict"]
+            for frame in settings.values()
+            if arms_present(losses=frame, arms=(blend, f"{blend}_control"))
+        ]
+        verdicts.append(
+            f"at day {day}, {per_setting[0] if len(set(per_setting)) == 1 else 'unresolved'}"
+        )
+    primary = settings["primary"]
+    shuffled = [
+        shuffled_prefix(source="aifs_single_day14"),
+        shuffled_prefix(source="aifs_single_day14", variant="_b"),
+    ]
+    rule = day14_reading(
+        aifs_single=[
+            difference(losses=primary, treatment="aifs_single_day14", reference=name)
+            for name in shuffled
+        ],
+        ens_control=[
+            difference(losses=primary, treatment="ens_control_day14", reference=name)
+            for name in shuffled
+        ],
+    )
+    return (
+        f"For {TECHNOLOGY_NAMES[domain]}, {' and '.join(parts)}. A blend of ENS's mean and AIFS "
+        f"Single: {'; '.join(verdicts)}. The day-14 reading rule says {rule}"
+    )
+
+
+def aifs_leads(
+    *, losses_by_set: dict[str, pl.DataFrame], domain: DomainType
+) -> tuple[alt.VConcatChart, str]:
+    """Draw AIFS at days 1, 2, 7 and 14 and its blends with ENS's mean.
+
+    Args:
+        losses_by_set: Each row set's stacked per-row losses.
+        domain: `solar` or `wind`.
+
+    Returns:
+        The figure, and its title, which the page uses as the caption.
+    """
+    title = aifs_leads_title(losses=losses_by_set["single"], domain=domain)
+    panels: list[alt.LayerChart | alt.VConcatChart] = []
+    for row_set, losses in losses_by_set.items():
+        name, series = AIFS_LEAD_ROW_SETS[row_set]
+        primary = by_setting(losses=losses)["primary"]
+        sized_arm = "aifs_single_day7" if row_set == "single" else "aifs_ens_mean_day7"
+        sizes = leaderboard(losses=primary, arms=[sized_arm]).row(0, named=True)
+        scope = f"{sizes['n_rows']:,} hours, {sizes['n_months']} months at day 7"
+        rows = aifs_lead_absolute_rows(losses=losses, row_set=row_set)
+        present = [slug for slug in series if slug in set(rows["series"].to_list())]
+        panels += [
+            line_key(
+                labels=[AIFS_LEAD_SERIES[slug][0] for slug in present],
+                colours=[AIFS_LEAD_SERIES[slug][1] for slug in present],
+                columns=3,
+            ),
+            aifs_lead_panel(rows=rows, series=present),
+            _contrast_panel(
+                rows=aifs_lead_contrast_rows(losses=losses, row_set=row_set),
+                panel_title=f"{name}: paired differences at each lead; {scope}",
+            ),
+        ]
+    return (
+        figure(
+            panels=panels,
+            number=FIGURE_NUMBERS[(domain, "aifs_leads")],
+            title=title,
+            subtitle=[
+                (
+                    "Each mark is an XGBoost model's error, given one forecast product or a blend "
+                    "of two. The hours differ by day: an hour whose 00 UTC run lies in an earlier "
+                    "AIFS version is dropped, so a mark is compared only with marks of the same "
+                    "day. Points of capacity; negative means the first forecast in a row is "
+                    "better."
+                ),
+                (
+                    "Deciding rows were named before any fit of this figure, but they are not "
+                    "planned in the published plan's sense: the day-1 and day-2 AIFS results and "
+                    "ENS's day-7 and day-14 results were known. Every other row is exploratory, "
+                    "and every AIFS ENS row is descriptive. AIFS Single may have the lower error "
+                    "because it is smoother, so the rows beside the deciding rows compare it with "
+                    "ENS's mean. IFS HRES 9 km, which lacks some target days, is in the report "
+                    f"only. The XGBoost models ran on a graphics processing unit. {DOTS_NOTE}"
+                ),
+                (
+                    f"{scope_text(losses=next(iter(losses_by_set.values())), domain=domain)} "
+                    f"{CAPACITY_NOTE}"
+                ),
+            ],
+            figure_planning=None,
+        ),
+        title,
+    )
+
+
 # --- Chart 6: one generator at a time ---------------------------------------------------------
 
 GENERATOR_CONDITIONS: Final[dict[str, str]] = {
@@ -1956,6 +2400,8 @@ FIGURE_NUMBERS: Final[dict[tuple[DomainType, str], int]] = {
     ("wind", "blends"): 10,
     ("solar", "aifs"): 13,
     ("wind", "aifs"): 14,
+    ("solar", "aifs_leads"): 15,
+    ("wind", "aifs_leads"): 16,
 }
 """Each chart's figure number on the page, in the page's order: the leaderboard pair opens the page,
 then the planned contrasts."""
@@ -2096,7 +2542,7 @@ def main() -> int:
     """
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--input-dir", type=Path, required=True, help="Saved losses' directory.")
+    parser.add_argument("--input-dir", type=Path, default=None, help="Saved losses' directory.")
     parser.add_argument(
         "--extra-dir",
         type=Path,
@@ -2107,10 +2553,34 @@ def main() -> int:
     parser.add_argument(
         "--aifs-dir", type=Path, default=None, help="The AIFS arms' losses directory."
     )
+    parser.add_argument(
+        "--aifs-blends-dir",
+        type=Path,
+        default=None,
+        help="The directory `fit_aifs.py --blends` wrote to. Draws only the AIFS lead chart "
+        "(`aifs_leads`), so no other SVG is rewritten, and needs no --input-dir.",
+    )
     parser.add_argument("--output-dir", type=Path, required=True, help="Where SVGs are written.")
     parser.add_argument("--no-svgo", action="store_true", help="Skip the svgo optimisation.")
     args = parser.parse_args()
     args.output_dir.mkdir(parents=True, exist_ok=True)
+    if args.aifs_blends_dir is not None:
+        for domain in DOMAINS:
+            chart, title = aifs_leads(
+                losses_by_set=load_aifs_leads(blends_dir=args.aifs_blends_dir, domain=domain),
+                domain=domain,
+            )
+            path = args.output_dir / f"nwp_forecast_{domain}_aifs_leads.svg"
+            chart.save(path)
+            if not args.no_svgo:
+                optimise(path=path)
+            _LOG.info("wrote %s", path)
+            sys.stdout.write(
+                f"{domain} caption: Figure {FIGURE_NUMBERS[(domain, 'aifs_leads')]}: {title}\n"
+            )
+        return 0
+    if args.input_dir is None:
+        parser.error("--input-dir is required unless --aifs-blends-dir is given")
     for domain in DOMAINS:
         charts, week_month = draw_domain(
             input_dir=args.input_dir,

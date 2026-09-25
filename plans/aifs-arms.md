@@ -1330,3 +1330,97 @@ checked against the code and the data before it was applied.
   (`studies.blending.simplex_weights`), which the reviewer did not recommend. It departs from the P4
   pattern and answers a different question. At most it is one exploratory line after the fits.
 - *Rejected in part:* S2's optional determinism assertion is an optional check, not a gate.
+
+## P4 second-seed control refit (planned before any fit)
+
+**The published page's blend claim rests on one shuffle of each control, and the AIFS fit found two
+seeds of one shuffle can differ significantly.** In that fit the null contrast between two seeds of
+the shuffled AIFS climatology was +0.453 [+0.223, +0.696] points for solar at the primary setting.
+A P4 guard is a contrast against one shuffled control, so a second control under another seed shows
+whether the guard's verdict depends on the seed. This section refits the published P4a and P4b
+blends with a second control, on the GPU, in the same run slot as the blends fit, and adds nothing
+to the published page's numbers.
+
+### What is refitted, and on which rows
+
+- **Arms, per technology, at both settings (primary and sensitivity):** ENS's day-1 mean
+  (`ens_mean_day1`), `blend_p4a`, `blend_p4b`, each blend's published control
+  (`blend_p4a_control`, `blend_p4b_control`), and each blend's second-seed control
+  (`blend_p4a_control_b`, `blend_p4b_control_b`). That is 7 arms.
+- **Columns:** solar 11 for each blend and control, and wind 15 (ENS's mean plus two other products,
+  three columns of calendar and sun position for wind, five for solar). ENS's day-1 mean has 7.
+- **Rows and folds:** the published run's own, from `nwp_forecast_comparison.rows` and its
+  `add_blend_guard_columns`, in the published row order (row subsampling depends on the order).
+  The published script is not modified, and the published folder is only read.
+- **Second-seed shuffle:** the published guard's rule with the seed `1000` plus the product's index
+  in place of `20260920` plus that index. A value moves only among the hours that share a site, a
+  year-month, and an hour of day, so it never crosses a fold, and a product's direction sine and
+  cosine move together. Its column names carry `_permuted_b`.
+- **One device per contrast:** every arm is refitted on the GPU. The published blends are CPU fits,
+  so no contrast here reads a published loss, and the page states the device once.
+
+### Reading rule, fixed before any fit
+
+**If the two controls disagree on the guard's verdict, the page calls the blend claim unresolved.**
+The report computes the published blend verdict (`studies.bootstrap.blend_verdict`) twice per
+setting, once with the published control as each blend's guard and once with the second-seed
+control, joins the two settings with `combine_setting_verdicts`, and then joins the two seeds with
+`seed_agreement_verdict`, which returns the shared verdict where the two agree and
+`unresolved: the two shuffle seeds disagree on the guard` where they do not. The report prints, at
+each setting, every contrast with both arms' absolute errors beside it: each blend minus ENS's
+day-1 mean, each blend minus each control, each control minus ENS's day-1 mean, and the seed-to-seed
+gap (the published control minus the second control) for P4a and P4b. Every contrast is exploratory.
+
+### Code changes
+
+- `fit_aifs.py`: a `--p4-controls` mode (`p4_frame`, `add_second_seed_guard_columns`, `fit_p4`,
+  `p4_verdicts`, `seed_agreement_verdict`, `p4_lines`, `check_p4`, `run_p4`), and `arm_prefixes` and
+  `expected_column_count` learn the P4 arm names (`blend_p4a`, `blend_p4b`, and their `_control` and
+  `_control_b`), which hold three products.
+- The output folder is new and write-once: `data/studies/nwp_forecast_comparison_p4_seeds/`. The
+  mode refuses the published folder, the day-1 and day-2 AIFS folder, the blends folder, and the
+  extra-lead folders as its output, and `report.md` refuses to be overwritten.
+- No file under `packages/` changes, no Patito contract changes, and no published script changes.
+
+### Tests, and the assertion each would fail on
+
+All are in `packages/studies/tests/test_fit_aifs_blends.py`, on small synthetic frames.
+
+| Test | Fails if |
+|---|---|
+| The refit holds ENS's day-1 mean and each blend with both controls | An arm is missing or renamed |
+| A blend and both controls hold three products' columns (11 solar, 15 wind) | `expected_column_count` or `arm_prefixes` treats a P4 blend as a two-product blend |
+| The first control's columns equal the published control's own (`jobs` in `nwp_forecast_comparison.py`) | The refit's control shows different columns from the published run's, so its fit is not a refit |
+| The second control shows the second seed's columns and no others | A second control reads the first seed's shuffled columns |
+| The second seed never crosses a site, a year-month, or an hour (solar and wind) | The shuffle groups drop `hour_of_day` or `month`, or a value leaks between sites |
+| The second seed differs from the first on at least 90% of rows and is deterministic | Both controls use one seed, or a seed depends on call order |
+| Adding the second seed leaves the published controls' columns unchanged | The second shuffle overwrites or reorders the published guard's columns |
+| A wind second seed keeps direction sine and cosine on the unit circle | The two are shuffled apart |
+| The seeds' verdicts must agree or the claim is unresolved | `seed_agreement_verdict` returns one seed's verdict |
+| Blends that beat both controls lower the error and the seeds agree | The verdict function reads the wrong control or the wrong sign |
+| A second control as good as the blend makes the seeds disagree | The second control is not used as a guard |
+| The report recomputes both guards at both settings, with errors beside each contrast | A guard, a setting, the seed-to-seed gap, or an error column is missing |
+| The stamp names the GPU and both seeds | A saved fit from another device or seed would be accepted |
+| The refit never writes beside the blends or the published folders | The output folder guard omits a folder |
+
+### Commands, in order, and the runtime of the refit
+
+```bash
+D=/home/jack/dev/nged-substation-forecast/data/studies
+uv run python studies/nwp_forecast_comparison/fit_aifs.py --p4-controls --check \
+  --published-dir $D/nwp_forecast_comparison --output-dir $D/nwp_forecast_comparison_p4_seeds
+uv run python studies/nwp_forecast_comparison/fit_aifs.py --p4-controls --workers 1 \
+  --published-dir $D/nwp_forecast_comparison --output-dir $D/nwp_forecast_comparison_p4_seeds
+```
+
+**The refit is 63 fits at each of the two settings** (7 arms at 6 solar and 3 wind sites).
+`--check` fits `blend_p4b` at one wind site twice, stops unless the two fingerprints agree, and
+prints the estimate. At about 9 s per fit at the primary setting the primary fits take about 10
+minutes, and the sensitivity fits (2.4 times the boosting rounds) take at most about 25 minutes, so
+the refit is about 35 minutes on one worker, separate from the blends fit's 2 to 3 hours.
+
+### Review chain
+
+The same chain as the rest of this plan: an Opus code review of the fit code before any fit, and
+the diff reviews the size of the change calls for. The refit reads the published inputs only, so it
+adds no download and no cost.

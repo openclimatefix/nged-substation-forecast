@@ -96,6 +96,7 @@ def test_aifs_members_frame_is_the_weighted_mean_of_the_cells(tmp_path: Path) ->
         weights=_weights([(1, 1, 0.75), (1, 2, 0.25)]),
         ensemble=False,
         first_init=datetime(2025, 3, 1, tzinfo=UTC),
+        days=(0, 1, 2),
     )
     assert frame["speed_100m"].unique().to_list() == [3.0]  # 0.75*2 + 0.25*6, cell (0, 0) unread
     assert frame.filter(pl.col("lead_hours") == 0)["ghi_w_m2"].null_count() == 2
@@ -205,7 +206,7 @@ def test_check_runs_raises_when_an_aifs_arm_lacks_its_init_time_column() -> None
         schema_overrides={"era_code": pl.Int8},
     )
     with pytest.raises(ValueError, match="init_time is missing"):
-        fa.check_runs(frame=frame, domain="wind", row_set="single")
+        fa.check_runs(frame=frame, domain="wind", row_set="single", arms=("aifs_single_day1",))
 
 
 def test_near_line() -> None:
@@ -397,7 +398,12 @@ def _check(
     if stamp_on_disk is not None:
         stamp_file.write_text(json.dumps(stamp_on_disk))
     fa.check_saved_losses(
-        losses=losses, frame=frame, row_set="single", stamp_file=stamp_file, stamp=stamp
+        losses=losses,
+        frame=frame,
+        stage="single",
+        arms=fa.old_mode_arms(row_set="single"),
+        stamp_file=stamp_file,
+        stamp=stamp,
     )
 
 
@@ -458,12 +464,15 @@ def test_saved_losses_raise_on_other_folds(tmp_path: Path) -> None:
         )
 
 
+ARMS: Final[list[str]] = ["aifs_single_day1", "ens_mean6_day1"]
+
+
 def test_build_stamp_hashes_both_inputs_and_records_settings_columns_and_device(
     tmp_path: Path,
 ) -> None:
     (tmp_path / "solar_aifs_inputs.parquet").write_bytes(b"abc")
     (tmp_path / "solar_forecast_inputs.parquet").write_bytes(b"xyz")
-    stamp = fa.build_stamp(published_dir=tmp_path, aifs_dir=tmp_path, domain="solar")
+    stamp = fa.build_stamp(published_dir=tmp_path, aifs_dir=tmp_path, domain="solar", arms=ARMS)
     assert stamp["inputs_sha256"] == hashlib.sha256(b"abc").hexdigest()
     assert stamp["published_sha256"] == hashlib.sha256(b"xyz").hexdigest()
     assert stamp["device"] == fa.DEVICE
@@ -479,10 +488,13 @@ def test_build_stamp_changes_with_the_settings(
 ) -> None:
     (tmp_path / "solar_aifs_inputs.parquet").write_bytes(b"abc")
     (tmp_path / "solar_forecast_inputs.parquet").write_bytes(b"xyz")
-    before = fa.build_stamp(published_dir=tmp_path, aifs_dir=tmp_path, domain="solar")
+    before = fa.build_stamp(published_dir=tmp_path, aifs_dir=tmp_path, domain="solar", arms=ARMS)
     changed = {name: {**setting, "n_estimators": 1} for name, setting in fa.SETTINGS.items()}
     monkeypatch.setattr(fa, "SETTINGS", changed)
-    assert fa.build_stamp(published_dir=tmp_path, aifs_dir=tmp_path, domain="solar") != before
+    assert (
+        fa.build_stamp(published_dir=tmp_path, aifs_dir=tmp_path, domain="solar", arms=ARMS)
+        != before
+    )
 
 
 def test_check_gpu_visible_raises_when_nvidia_smi_fails(monkeypatch: pytest.MonkeyPatch) -> None:

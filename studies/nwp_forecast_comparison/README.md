@@ -111,25 +111,50 @@ lead?](../../docs/studies/nwp-forecasts-at-matched-leads.md).
   earlier batches' losses read through `--context-dir` (the first and the second, and no refit).
   Each prints its row and month counts and the absolute error of both arms, and all are exploratory.
   The other arm's fold training sets contained the gap days.
-- `verify_aifs_steps.py --published-dir PUBLISHED --output-dir DIR` reads only. It checks that AIFS
-  Single's radiation is a 6-hour mean ending at the lead and its wind is instantaneous (both
-  against ERA5), the units, and the crop's grid orientation (against GEFS), and writes
-  `verification/aifs_steps.md`. With `--wiring`, after the build, it checks that the default ENS
-  path is unchanged, the 6-hourly ENS columns are wired, and the nearest-cell AIFS arm equals the
-  raw store's row at the day-1 run, and writes `verification/aifs_wiring.md`. It exits non-zero on
-  a failed check.
+- `verify_aifs_steps.py --published-dir PUBLISHED --output-dir DIR` reads only. It checks, at each
+  of days 1, 2, 7, and 14, that AIFS Single's radiation is a 6-hour mean ending at the lead and its
+  wind is instantaneous (both against ERA5), and it checks the units and the crop's grid
+  orientation (against GEFS), and writes `verification/aifs_steps.md`. With `--wiring`, after the
+  build, it checks that the default ENS path is unchanged, the 6-hourly ENS columns are wired, and
+  each built AIFS Single 100 m speed equals the raw store's weighted mean at the run and lead its
+  day names, and writes `verification/aifs_wiring.md`. It exits non-zero on a failed check.
 - `build_forecast_inputs.py --aifs --published-dir PUBLISHED --output-dir DIR` writes the AIFS
   Single and AIFS ENS columns at days 1 and 2 (the 00 UTC run of the day before, as ENS is read),
-  ENS's mean and control member on 6-hourly steps, and each AIFS arm's run time, onto the published
-  inputs' `(site, time)` keys, to a new folder. Each site reads the H3 resolution-5
+  ENS's mean and control member on 6-hourly steps, and each AIFS arm's and ENS arm's run time, onto
+  the published inputs' `(site, time)` keys, to a new folder. `--aifs-days 1 2 7 14` builds the
+  other days as well: day `N` reads the 00 UTC run `N` days before, at leads from `24 N` hours, and
+  ENS's columns at days 7 and 14 are its native 6-hourly reads. Each site reads the H3 resolution-5
   overlap-weighted mean of the crop's cells, as ENS's stored table does; AIFS Single also has a
-  nearest-cell arm. `--aifs-weather-dir` names the folder holding the two downloads.
+  nearest-cell arm at day 1. `--aifs-weather-dir` names the folder holding the two downloads. The
+  build refuses the published folder and the day-1 and day-2 AIFS folder as its output.
 - `fit_aifs.py` fits every AIFS arm and reference on a GPU, on two nested row sets (`single`, and
   `ens` where AIFS ENS also exists), with folds cut inside the AIFS version eras. One contrast is
   deciding (AIFS Single against ENS's control member at day 1); AIFS ENS contrasts are
   descriptive; all others are exploratory. `--check` fits one arm twice and prints a time
   estimate. A row set whose losses file exists is not refitted, so a rerun after a crash resumes
   where it stopped; `report.md` is always written once.
+- `fit_aifs.py --blends` fits AIFS at days 1, 2, 7, and 14 and the blends of ENS's mean with AIFS
+  Single (`single` row set) and with the AIFS ENS mean (`ens` row set), each blend with a control
+  that shuffles AIFS within site, year-month, and hour of day (seed 0, and seed 1000 for the
+  two-seed day-14 gate) and a mirror control that shuffles ENS's mean instead. Each (row set, day)
+  is a stage with its own frame, losses, predictions, and stamp; an hour whose day-`N` run lies
+  outside its AIFS version era is dropped row by row and its month kept. Four contrasts per
+  technology are deciding, named before any fit but not planned in the published page's sense: H7
+  and H14 (AIFS Single against ENS's control member) and B7 and B14 (a blend against ENS's mean
+  alone and against its control). The report prints the day-14 reading rule, the smoothing reading
+  beside H7 and H14, each forecast's weather-column spread, and every arm's columns. It reads the
+  extra-lead folders beside the published one and checks that their ENS columns equal the build's.
+  It never writes to the published folder, the day-1 and day-2 AIFS folder, or the extra-lead
+  folders.
+- `fit_aifs.py --p4-controls` refits the published P4a and P4b blends, their published control, a
+  second control (the same shuffle under seed 1000 plus the product's index), and ENS's day-1 mean
+  on a GPU, at both settings, on the published run's own rows and folds. The report gives each
+  blend's contrast with ENS and with both controls, the seed-to-seed gap between the controls, and
+  both arms' absolute errors beside every contrast. If the two controls disagree on the guard's
+  verdict, the blend claim is unresolved.
+- `nwp_forecast_charts.py --aifs-blends-dir DIR --output-dir DIR` draws only the AIFS lead chart
+  (`nwp_forecast_<domain>_aifs_leads.svg`) from the blends fit's losses, so no other chart is
+  rewritten, and prints each chart's caption, which is its title.
 - `nwp_forecast_charts.py` reads the saved losses and predictions from `--input-dir`, and the extra
   lead days' losses from `--extra-dir`, and, with `--aifs-dir`, the AIFS losses, and writes six SVG
   charts per technology (seven with the AIFS chart) to `--output-dir`, each optimised with `svgo`
@@ -163,6 +188,47 @@ lead?](../../docs/studies/nwp-forecasts-at-matched-leads.md).
   `single` or `ens`), `report.md` the absolute errors, the deciding contrast at both settings, the
   listed contrasts, and the per-era contrasts, and `verification/` the checks of
   `verify_aifs_steps.py`.
+
+- `data/studies/nwp_forecast_comparison_aifs_blends/` holds the blends fit and is write-once.
+  `<domain>_aifs_inputs.parquet` holds the AIFS columns at days 1, 2, 7, and 14,
+  `<domain>_<row_set>_day<N>_losses.parquet`, `.json`, and `_predictions.parquet` hold each stage's
+  GPU fits, the stamp that names the device, the input files' SHA-256, and the seeds, and the
+  stage's predictions, `report.md` the report, and `verification/` the checks of
+  `verify_aifs_steps.py`.
+- `data/studies/nwp_forecast_comparison_p4_seeds/` holds the P4 refit and is write-once.
+  `<domain>_p4_losses.parquet`, `.json`, and `_predictions.parquet` hold the GPU fits, their stamp,
+  and their predictions, and `report.md` the contrasts.
+
+## Running the blends fit and the P4 refit
+
+Run these in order, one job at a time, from the repository root. `D` is the shared data folder.
+
+```bash
+D=/home/jack/dev/nged-substation-forecast/data/studies
+uv run python studies/nwp_forecast_comparison/build_forecast_inputs.py --aifs \
+  --aifs-days 1 2 7 14 --published-dir $D/nwp_forecast_comparison \
+  --output-dir $D/nwp_forecast_comparison_aifs_blends
+uv run python studies/nwp_forecast_comparison/verify_aifs_steps.py \
+  --published-dir $D/nwp_forecast_comparison --output-dir $D/nwp_forecast_comparison_aifs_blends
+uv run python studies/nwp_forecast_comparison/verify_aifs_steps.py --wiring \
+  --published-dir $D/nwp_forecast_comparison --output-dir $D/nwp_forecast_comparison_aifs_blends
+uv run python studies/nwp_forecast_comparison/fit_aifs.py --blends --check \
+  --published-dir $D/nwp_forecast_comparison --output-dir $D/nwp_forecast_comparison_aifs_blends
+uv run python studies/nwp_forecast_comparison/fit_aifs.py --blends --workers 1 \
+  --published-dir $D/nwp_forecast_comparison --output-dir $D/nwp_forecast_comparison_aifs_blends
+uv run python studies/nwp_forecast_comparison/fit_aifs.py --p4-controls --check \
+  --published-dir $D/nwp_forecast_comparison --output-dir $D/nwp_forecast_comparison_p4_seeds
+uv run python studies/nwp_forecast_comparison/fit_aifs.py --p4-controls --workers 1 \
+  --published-dir $D/nwp_forecast_comparison --output-dir $D/nwp_forecast_comparison_p4_seeds
+uv run python studies/nwp_forecast_comparison/nwp_forecast_charts.py \
+  --aifs-blends-dir $D/nwp_forecast_comparison_aifs_blends --output-dir docs/studies/assets
+```
+
+Before the first command, record a SHA-256 baseline of every file in the published folder, the
+day-1 and day-2 AIFS folder, and the three extra-lead folders (`nwp_forecast_comparison_leads_day10`,
+`_day10b`, and `_day10d`), and check it after the last fit. Check CPU load with `uptime` before each
+`--check`, and run only one fit at a time. Each `--check` fits one arm at one wind site twice on
+the GPU, stops unless the two fingerprints agree, and prints the fit's runtime estimate.
 
 ## Folds
 

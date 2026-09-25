@@ -9,14 +9,15 @@ Before `build_forecast_inputs.py --aifs` has run, `aifs_steps.md` holds:
 1. **Radiation window.** AIFS Single's radiation is read as a 6-hour mean ending at the lead. For
    each candidate end offset from -6 to +6 h, the mean absolute difference between AIFS Single's
    radiation at each valid time and ERA5's mean over the six hours ending at that time plus the
-   offset, pooled over the solar sites at leads 6 to 78 h. The check fails unless the minimum is at
-   offset 0, both over every valid time and over the 06 UTC valid times alone. ERA5 is read for all
+   offset, pooled over the solar sites, separately at each of days 1, 2, 7 and 14 (leads `24 N` to
+   `24 N + 24` h). The check fails unless the minimum is at offset 0, both over every valid time and
+   over the 06 UTC valid times alone, at every day. ERA5 is read for all
    24 hours, and every offset is scored on the same rows: the valid times at which every hour any
    offset's window needs is present.
 2. **Wind is instantaneous.** For offsets from -3 to +3 h, the correlation of AIFS Single's 100 m
    speed with ERA5's 100 m speed at the valid time plus the offset, and with ERA5's 6-hour
-   mean ending at the valid time. The check fails unless offset 0 correlates best and beats the
-   6-hour mean.
+   mean ending at the valid time, at each of days 1, 2, 7 and 14. The check fails unless offset 0
+   correlates best and beats the 6-hour mean at every day.
 3. **Units.** AIFS temperature in degrees Celsius, wind in m/s, radiation between 0 and 1,100 W/m2.
 4. **Grid orientation.** `_grid_cells.parquet`'s latitude rises with `lat_index` and its longitude
    with `lon_index`. For each non-central cell of the block shared with GEFS's crop, the correlation
@@ -33,9 +34,10 @@ With `--wiring`, after the build has run, `aifs_wiring.md` holds:
 2. **The 6-hour path is wired.** For wind, ENS's control member on 6-hourly steps equals the
    published control at hours whose UTC hour is a multiple of 6 and differs at hours that are 3
    mod 6; for solar, the 6-hourly ENS mean differs from the published mean.
-3. **AIFS time and lead wiring.** At wind hours whose UTC hour is a multiple of 6, the nearest-cell
-   arm equals the speed of the raw store's row at the same cell, the init `time.date() - 1` 00 UTC
-   and the lead `24 + hour`.
+3. **AIFS time and lead wiring.** At wind hours whose UTC hour is a multiple of 6, the built 100 m
+   speed at each built day `N` equals the speed recomputed from the raw store: the weighted mean of
+   the site's cells' wind components at the init `time.date() - N` 00 UTC and the lead `24 N +
+   hour`. The H3 arm is checked at every built day, and the nearest-cell arm at day 1 when built.
 
 Only pooled statistics and the anonymised `site` label are printed; no coordinate or cell id.
 
@@ -58,6 +60,7 @@ from build_forecast_inputs import (
     GEFS_WINDOW_DIR_NAME,
     UPSAMPLING_METHODS,
     DomainType,
+    SpatialReadType,
     aifs_members_frame,
     aifs_site_weights,
     ens_member_arms,
@@ -71,8 +74,8 @@ from studies.guards import refuse_to_overwrite
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
-MAX_LEAD_HOURS: Final[int] = 24 * max(AIFS_DAYS) + 30
-"""The longest AIFS lead the arms read."""
+VERIFY_DAYS: Final[tuple[int, ...]] = (1, 2, 7, 14)
+"""The lead days the radiation-window and wind checks run at, each on its own leads."""
 
 RADIATION_OFFSETS: Final[range] = range(-6, 7)
 WIND_OFFSETS: Final[range] = range(-3, 4)
@@ -163,11 +166,16 @@ def aifs_valid_rows(*, weather_dir: Path, published_dir: Path, domain: DomainTyp
         weights=aifs_site_weights(path=path, domain=domain, sites=sites, spatial="h3"),
         ensemble=False,
         first_init=AIFS_SINGLE_FIRST_INIT,
-        max_lead_hours=MAX_LEAD_HOURS,
+        days=VERIFY_DAYS,
     )
     return extract.with_columns(
         valid_time=pl.col("init_time") + pl.duration(hours=pl.col("lead_hours"))
     )
+
+
+def leads_of_day(*, aifs: pl.DataFrame, day: int) -> pl.DataFrame:
+    """Return the rows whose lead is in day `day`'s leads, 24 `day` to 24 `day` + 24 hours."""
+    return aifs.filter(pl.col("lead_hours").is_between(24 * day, 24 * day + 24))
 
 
 def radiation_window_table(*, aifs: pl.DataFrame, era5: pl.DataFrame) -> pl.DataFrame:
@@ -428,17 +436,35 @@ def steps_report(*, published_dir: Path, weather_dir: Path) -> tuple[list[str], 
     """
     solar = aifs_valid_rows(weather_dir=weather_dir, published_dir=published_dir, domain="solar")
     wind = aifs_valid_rows(weather_dir=weather_dir, published_dir=published_dir, domain="wind")
-    radiation = radiation_window_table(
-        aifs=solar, era5=era5_column(domain="solar", sites=solar["site"].unique().to_list())
+    solar_era5 = era5_column(domain="solar", sites=solar["site"].unique().to_list())
+    wind_era5 = era5_column(domain="wind", sites=wind["site"].unique().to_list())
+    radiation_by_day = {
+        day: radiation_window_table(aifs=leads_of_day(aifs=solar, day=day), era5=solar_era5)
+        for day in VERIFY_DAYS
+    }
+    wind_by_day = {
+        day: wind_table(aifs=leads_of_day(aifs=wind, day=day), era5=wind_era5)
+        for day in VERIFY_DAYS
+    }
+    radiation = pl.concat(
+        [table.with_columns(day=pl.lit(day)) for day, table in radiation_by_day.items()]
     )
-    wind_corr = wind_table(
-        aifs=wind, era5=era5_column(domain="wind", sites=wind["site"].unique().to_list())
+    wind_corr = pl.concat(
+        [table.with_columns(day=pl.lit(day)) for day, table in wind_by_day.items()]
     )
     units, unit_failures = units_lines(solar=solar, wind=wind)
     orientation, orientation_failures = orientation_table(weather_dir=weather_dir)
     failures = [
-        *radiation_verdict(table=radiation),
-        *wind_verdict(table=wind_corr),
+        *(
+            f"day {day}: {failure}"
+            for day, table in radiation_by_day.items()
+            for failure in radiation_verdict(table=table)
+        ),
+        *(
+            f"day {day}: {failure}"
+            for day, table in wind_by_day.items()
+            for failure in wind_verdict(table=table)
+        ),
         *unit_failures,
         *orientation_failures,
     ]
@@ -447,19 +473,19 @@ def steps_report(*, published_dir: Path, weather_dir: Path) -> tuple[list[str], 
         "",
         "## Radiation: mean absolute difference from ERA5's 6-hour mean, by window end offset",
         "",
-        "| Offset (h) | Valid times | Mean absolute difference (W/m2) | Rows |",
-        "|---|---|---|---|",
+        "| Day | Offset (h) | Valid times | Mean absolute difference (W/m2) | Rows |",
+        "|---|---|---|---|---|",
         *(
-            f"| {r['offset']:+d} | {r['valid_hours']} | {r['mae']:.2f} | {r['n']} |"
+            f"| {r['day']} | {r['offset']:+d} | {r['valid_hours']} | {r['mae']:.2f} | {r['n']} |"
             for r in radiation.iter_rows(named=True)
         ),
         "",
         "## Wind: correlation of AIFS Single's 100 m speed with ERA5's 100 m speed",
         "",
-        "| ERA5 reading | Correlation | Rows |",
-        "|---|---|---|",
+        "| Day | ERA5 reading | Correlation | Rows |",
+        "|---|---|---|---|",
         *(
-            f"| {r['reading']} | {r['correlation']:.4f} | {r['n']} |"
+            f"| {r['day']} | {r['reading']} | {r['correlation']:.4f} | {r['n']} |"
             for r in wind_corr.iter_rows(named=True)
         ),
         "",
@@ -578,8 +604,13 @@ def six_hourly_check(
 
 def lead_wiring_check(
     *, aifs_dir: Path, weather_dir: Path, published_dir: Path
-) -> tuple[str, list[str]]:
-    """Check the nearest-cell arm against the raw store at the run and lead it should read.
+) -> tuple[list[str], list[str]]:
+    """Check each built AIFS Single arm against the raw store at the run and lead it should read.
+
+    For wind hours whose UTC hour is a multiple of 6, the built 100 m speed at day `N` must equal
+    the speed recomputed from the raw store: the weighted mean of the site's cells' wind
+    components at the 00 UTC run `N` days before the hour's day and the lead `24 N + hour`. The
+    H3 arm is checked at every day the build holds; the nearest-cell arm at day 1 when built.
 
     Args:
         aifs_dir: The folder holding the AIFS inputs.
@@ -587,43 +618,73 @@ def lead_wiring_check(
         published_dir: The folder holding the published inputs, whose sites are read.
 
     Returns:
-        A report line and the failures.
+        Report lines and the failures.
     """
-    column = "aifs_single_nearest_day1_speed_100m"
-    built = pl.read_parquet(aifs_dir / "wind_aifs_inputs.parquet", columns=["site", "time", column])
-    built = built.drop_nulls().filter(pl.col("time").dt.hour() % 6 == 0)
-    sites = sorted(built["site"].unique().to_list())
     path = weather_dir / AIFS_SINGLE_DIR_NAME
-    nearest = aifs_site_weights(path=path, domain="wind", sites=sites, spatial="nearest")
-    expected = (
-        pl.scan_parquet(path / f"{AIFS_SINGLE_DIR_NAME}.parquet")
-        .filter(pl.col("init_time").dt.hour() == 0)
-        .join(nearest.lazy(), on=["lat_index", "lon_index"])
-        .select(
-            "site",
-            init_date=pl.col("init_time").dt.date(),
-            lead_hours=pl.col("lead_time").dt.total_hours(),
-            expected=(
-                pl.col("wind_u_100m").cast(pl.Float64) ** 2
-                + pl.col("wind_v_100m").cast(pl.Float64) ** 2
-            ).sqrt(),
+    built_file = aifs_dir / "wind_aifs_inputs.parquet"
+    names = pl.read_parquet_schema(built_file)
+    reads: tuple[tuple[SpatialReadType, str], ...] = (
+        ("h3", "aifs_single"),
+        ("nearest", "aifs_single_nearest"),
+    )
+    checks = [
+        (spatial, f"{prefix}_day{day}", day)
+        for spatial, prefix in reads
+        for day in range(1, 31)
+        if f"{prefix}_day{day}_speed_100m" in names
+    ]
+    lines, failures = [], []
+    for spatial, prefix, day in checks:
+        column = f"{prefix}_speed_100m"
+        built = pl.read_parquet(built_file, columns=["site", "time", column])
+        built = built.drop_nulls().filter(pl.col("time").dt.hour() % 6 == 0)
+        sites = sorted(built["site"].unique().to_list())
+        weights = aifs_site_weights(path=path, domain="wind", sites=sites, spatial=spatial)
+        leads = [24 * day + hour for hour in range(0, 24, 6)]
+        expected = (
+            pl.scan_parquet(path / f"{AIFS_SINGLE_DIR_NAME}.parquet")
+            .filter(
+                pl.col("init_time").dt.hour() == 0,
+                pl.col("lead_time").dt.total_hours().is_in(leads),
+            )
+            .join(weights.lazy(), on=["lat_index", "lon_index"])
+            .group_by(
+                "site",
+                init_date=pl.col("init_time").dt.date(),
+                lead_hours=pl.col("lead_time").dt.total_hours(),
+            )
+            .agg(
+                u=(pl.col("wind_u_100m").cast(pl.Float64) * pl.col("weight")).sum()
+                / pl.col("weight").sum(),
+                v=(pl.col("wind_v_100m").cast(pl.Float64) * pl.col("weight")).sum()
+                / pl.col("weight").sum(),
+            )
+            .select(
+                "site",
+                "init_date",
+                "lead_hours",
+                expected=(pl.col("u") ** 2 + pl.col("v") ** 2).sqrt(),
+            )
+            .collect()
         )
-        .collect()
-    )
-    compared = built.with_columns(
-        init_date=pl.col("time").dt.date() - pl.duration(days=1),
-        lead_hours=(24 + pl.col("time").dt.hour()).cast(pl.Int64),
-    ).join(expected, on=["site", "init_date", "lead_hours"])
-    worst = cast(
-        "float", ((compared[column] - compared["expected"]).abs() / compared["expected"]).max()
-    )
-    failures = []
-    if compared.height < MIN_WIRING_ROWS or worst > SPEED_TOLERANCE:
-        failures.append("wind: the nearest-cell arm is not the raw store's row at the day-1 run")
-    return (
-        f"| wind | nearest-cell arm against the raw store, {compared.height} rows | {worst:.2e} |",
-        failures,
-    )
+        compared = built.with_columns(
+            init_date=pl.col("time").dt.date() - pl.duration(days=day),
+            lead_hours=(24 * day + pl.col("time").dt.hour()).cast(pl.Int64),
+        ).join(expected, on=["site", "init_date", "lead_hours"])
+        worst = cast(
+            "float", ((compared[column] - compared["expected"]).abs() / compared["expected"]).max()
+        )
+        if compared.height < MIN_WIRING_ROWS or worst > SPEED_TOLERANCE:
+            failures.append(
+                f"wind: {prefix} is not the raw store's weighted mean at the day-{day} run and lead"
+            )
+        lines.append(
+            f"| wind | {prefix} against the raw store ({spatial} weights, day {day}), "
+            f"{compared.height} rows | {worst:.2e} |"
+        )
+    if not checks:
+        failures.append("wind: the build holds no AIFS Single 100 m speed column to check")
+    return lines, failures
 
 
 def wiring_report(
@@ -650,10 +711,10 @@ def wiring_report(
         )
         rows += lines
         failures += problems
-    line, problems = lead_wiring_check(
+    lines, problems = lead_wiring_check(
         aifs_dir=aifs_dir, weather_dir=weather_dir, published_dir=published_dir
     )
-    rows.append(line)
+    rows += lines
     failures += problems
     return [
         "# AIFS inputs: wiring checks",
