@@ -465,16 +465,17 @@ class Steps:
     ensemble's steps (GEFS's 31, say) passes its own count through `band_steps`."""
 
 
-def _step_width(lead: int) -> int:
+def _step_width(lead: int, fine_step_last_lead: int = FINE_STEP_LAST_LEAD) -> int:
     """Return the width in hours of the radiation step ending at `lead`.
 
     Args:
         lead: The step's lead.
+        fine_step_last_lead: The last lead on 3-hour steps. ENS's is 144; GEFS's is 240.
 
     Returns:
-        3 to lead 144 and 6 beyond it.
+        3 to `fine_step_last_lead` and 6 beyond it.
     """
-    return 3 if lead <= FINE_STEP_LAST_LEAD else 6
+    return 3 if lead <= fine_step_last_lead else 6
 
 
 def members(*, sites: list[str], source: Path = OUTPUT_PATH) -> pl.DataFrame:
@@ -498,6 +499,7 @@ def band_steps(
     domain: DomainType,
     six_hourly: bool = False,
     ensemble_size: int = ENSEMBLE_SIZE,
+    fine_step_last_lead: int = FINE_STEP_LAST_LEAD,
 ) -> Steps:
     """Arrange one band's members as arrays over the band's native steps and a margin either side.
 
@@ -513,6 +515,7 @@ def band_steps(
         six_hourly: Whether to emulate 6-hourly steps.
         ensemble_size: How many members a run must hold to be kept. ENS's 51 by default; a caller
             building a different ensemble's steps (GEFS's 31) passes its own count.
+        fine_step_last_lead: The last lead on 3-hour steps, 144 for ENS and 240 for GEFS.
 
     Returns:
         The arrays.
@@ -554,13 +557,15 @@ def band_steps(
         raise ValueError(msg)
     values = {column: kept.select(names[column]).to_numpy() for column in columns}
     step_leads = leads.astype(np.float64)
-    widths = np.array([_step_width(int(lead)) for lead in leads])
+    widths = np.array(
+        [_step_width(int(lead), fine_step_last_lead=fine_step_last_lead) for lead in leads]
+    )
     if six_hourly:
         step_leads, values = coarsen_to_six_hourly(
             leads=step_leads,
             values=values,
             period_means=frozenset({"ghi_w_m2"}),
-            last_three_hourly_lead=FINE_STEP_LAST_LEAD,
+            last_three_hourly_lead=fine_step_last_lead,
         )
         widths = np.full(len(step_leads), 6)
     return Steps(

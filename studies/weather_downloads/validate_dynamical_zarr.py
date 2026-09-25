@@ -1,4 +1,4 @@
-"""Validate the GFS/GEFS parquets that `fetch_dynamical_zarr.py` wrote.
+"""Validate the GFS, GEFS, and ECMWF AIFS parquets that `fetch_dynamical_zarr.py` wrote.
 
 One-off throwaway script for
 <https://github.com/openclimatefix/nged-substation-forecast/issues/841>, following the
@@ -9,20 +9,30 @@ fails names the months it failed in. **The report never prints a row count, a ce
 coordinate,** because those reveal the size of the private trial-area box.
 
 Checks per month file: every `init_time` falls inside the file's month; runs are regularly spaced
-(6 hours for GFS, 24 hours for GEFS), and a month that is neither the first nor the last has every
-run of every day; the row count equals the product of the axis lengths; no duplicate key; no null;
-`NaN` only in the two radiation fields and only at lead time 0, where those fields are all `NaN`;
-each value inside a physical range; the lead-time axis starts at 0, ends at the model's last lead
-time, and changes step width at the documented lead time and not later; shortwave radiation is near
-zero for night-time valid hours, and positive at midday in April to September (which catches only a
-gross shift such as 12 hours or a timezone error, and does not verify the exact hour convention).
-On a `.partial` month, `NaN` in a value column only warns, because the newest run may still be
-being written. Checks across months: the months are contiguous, every file carries the same
-grid-cell hash, and the combined file's row count equals the sum of the files. Where a complete
-`M.parquet` and a stale `M.partial.parquet` both exist, only the complete file is validated.
+(`RUN_SPACING_HOURS`: 6 hours for GFS and both AIFS models, 24 hours for GEFS), and a month that is
+neither the first nor the last has every run of every day; the row count equals the product of the
+axis lengths; no duplicate key; no null; AIFS ENS has exactly 51 distinct `ensemble_member` values,
+0 to 50 (`ensemble_members`); `NaN` only in the two radiation fields and only at lead time 0, where
+those fields are all `NaN`; each value inside a physical range; the lead-time axis starts at 0,
+ends at the model's last lead time, and changes step width at the documented lead time and not
+later (`LEAD_AXIS_HOURS`); shortwave radiation is near zero for night-time valid hours and positive
+at midday in April to September. Night-time valid hours are 01 to 03 UTC for GFS and GEFS. For AIFS
+they are 00 and 06 UTC in November to February only, because the 6-hourly AIFS radiation windows
+ending then are dark only in winter. These two checks catch only a gross shift such as 12 hours or a
+timezone error, and do not verify the exact hour convention. For AIFS Single, shortwave and longwave
+radiation and both 100 m winds are expected `NaN` before the 2025-02-24 06 UTC run
+(`EXPECTED_NAN`): those rows must be `NaN` there (`expected_nan_absent_before_start` fails if any
+is finite) and are excluded from the `NaN` checks, and the same fields are checked as usual from
+that run on. On a `.partial` month, `NaN` in a value column only warns, because the newest run may
+still be being written. Checks across months: the months are contiguous, every file carries the
+same grid-cell hash, and the combined file's row count equals the sum of the files. Where a
+complete `M.parquet` and a stale `M.partial.parquet` both exist, only the complete file is
+validated. A check that finds no qualifying rows in a month is skipped for that month: the report
+prints SKIP if that held for every month, and `PASS (n months skipped)` otherwise.
 
 Run it with `uv run python studies/weather_downloads/validate_dynamical_zarr.py --directory
-<directory under data/studies/weather>`, for example `--directory GEFS`.
+<directory under data/studies/weather>`, for example `--directory GEFS` or `--directory
+ECMWF-AIFS-ENS`. A level shift at a model-version change is not tested.
 """
 
 import argparse
@@ -61,15 +71,49 @@ SHORTWAVE: Final[str] = AVERAGED_FIELDS[0]
 LEAD_AXIS_HOURS: Final[dict[str, tuple[int, int, int, int]]] = {
     "GFS": (1, 3, 120, 384),
     "GEFS": (3, 6, 240, 840),
+    "ECMWF-AIFS": (6, 6, 360, 360),
+    "ECMWF-AIFS-ENS": (6, 6, 360, 360),
 }
 """Per model: the fine step, the coarse step, the last lead time (hours) on the fine step, and the
 last lead time on the axis."""
 
-RUN_SPACING_HOURS: Final[dict[str, int]] = {"GFS": 6, "GEFS": 24}
-"""Per model: the gap between successive `init_time`s (4 runs a day for GFS, 1 for GEFS)."""
+RUN_SPACING_HOURS: Final[dict[str, int]] = {
+    "GFS": 6,
+    "GEFS": 24,
+    "ECMWF-AIFS": 6,
+    "ECMWF-AIFS-ENS": 6,
+}
+"""Per model: the gap between successive `init_time`s (4 runs a day for GFS and both AIFS models,
+1 for GEFS)."""
 
 NIGHT_HOURS: Final[tuple[int, ...]] = (1, 2, 3)
 """UTC valid hours whose averaging window ends before sunrise everywhere in Great Britain."""
+
+SIX_HOURLY_NIGHT_HOURS: Final[tuple[int, ...]] = (0, 6)
+SIX_HOURLY_NIGHT_MONTHS: Final[tuple[int, ...]] = (11, 12, 1, 2)
+"""The AIFS radiation window ends only at 00, 06, 12, and 18 UTC. The windows ending at 00 UTC
+(18 to 24 h) and 06 UTC (0 to 6 h) are dark everywhere in Great Britain from November to February,
+and only then; in summer they contain daylight."""
+
+EXPECTED_NAN: Final[dict[str, tuple[frozenset[str], datetime]]] = {
+    "ECMWF-AIFS": (
+        frozenset(
+            {
+                "downward_short_wave_radiation_flux_surface",
+                "downward_long_wave_radiation_flux_surface",
+                "wind_u_100m",
+                "wind_v_100m",
+            }
+        ),
+        datetime(2025, 2, 24, 6, tzinfo=UTC).replace(tzinfo=None),
+    ),
+}
+"""Per model: the variables the store lacks, and the first `init_time` that has them. Before that
+run the variable is `NaN` at every lead time and every cell, so these `NaN`s are expected and are
+not failures. Every other `NaN` is a finding."""
+
+ENSEMBLE_SIZE: Final[int] = 51
+"""AIFS ENS has the control member 0 and 50 perturbed members, so `ensemble_member` is 0 to 50."""
 
 NIGHT_MEDIAN_LIMIT_W_M2: Final[float] = 5.0
 MIDDAY_MEAN_MINIMUM_W_M2: Final[float] = 100.0
@@ -110,19 +154,35 @@ def _check_runs(
         _fail(results=results, check="runs_full_month", month=month)
 
 
-def _check_values(*, frame: pl.DataFrame, month: str, results: Results, partial: bool) -> None:
+def _check_values(
+    *, frame: pl.DataFrame, month: str, label: str, results: Results, partial: bool
+) -> None:
     """Check nulls, `NaN`s, and physical ranges of every value column."""
     # The newest run of a `.partial` month may still be being written, so `NaN` there only warns.
     nan_check = "nan_partial_month" if partial else "nan"
+    absent_variables, first_available = EXPECTED_NAN.get(
+        label,
+        (frozenset(), datetime(1970, 1, 1, tzinfo=UTC).replace(tzinfo=None)),
+    )
     for variable in VARIABLES:
         if frame[variable].null_count():
             _fail(results=results, check="nulls", month=month)
-        nan_rows = frame.filter(pl.col(variable).is_nan())
+        # Rows before `first_available` are expected to be `NaN` in the variables the store lacks.
+        checked = (
+            frame.filter(pl.col("init_time") >= first_available)
+            if variable in absent_variables
+            else frame
+        )
+        if variable in absent_variables:
+            before = frame.filter(pl.col("init_time") < first_available)
+            if before.height and not before.select(pl.col(variable).is_nan().all()).item():
+                _fail(results=results, check="expected_nan_absent_before_start", month=month)
+        nan_rows = checked.filter(pl.col(variable).is_nan())
         if variable in AVERAGED_FIELDS:
             if nan_rows.filter(pl.col("lead_time") > pl.duration(hours=0)).height:
                 _fail(results=results, check=nan_check, month=month)
-            at_zero = frame.filter(pl.col("lead_time") == pl.duration(hours=0))
-            if not at_zero.select(pl.col(variable).is_nan().all()).item():
+            at_zero = checked.filter(pl.col("lead_time") == pl.duration(hours=0))
+            if at_zero.height and not at_zero.select(pl.col(variable).is_nan().all()).item():
                 _fail(results=results, check="radiation_nan_at_lead_0", month=month)
         elif nan_rows.height:
             _fail(results=results, check=nan_check, month=month)
@@ -144,13 +204,20 @@ def _check_lead_axis(*, frame: pl.DataFrame, month: str, label: str, results: Re
         _fail(results=results, check="lead_axis", month=month)
 
 
-def _check_diurnal(*, frame: pl.DataFrame, month: str, results: Results) -> None:
+def _check_diurnal(*, frame: pl.DataFrame, month: str, label: str, results: Results) -> None:
     """Check shortwave radiation is near zero at night and positive at summer midday."""
     valid = frame.select(
         valid_time=pl.col("init_time") + pl.col("lead_time"), value=pl.col(SHORTWAVE)
     ).filter(pl.col("value").is_not_nan())
     hour = pl.col("valid_time").dt.hour()
-    night = valid.filter(hour.is_in(NIGHT_HOURS)).select(pl.col("value").median()).item()
+    if label.startswith("ECMWF-AIFS"):
+        night_rows = valid.filter(
+            hour.is_in(SIX_HOURLY_NIGHT_HOURS)
+            & pl.col("valid_time").dt.month().is_in(SIX_HOURLY_NIGHT_MONTHS)
+        )
+    else:
+        night_rows = valid.filter(hour.is_in(NIGHT_HOURS))
+    night = night_rows.select(pl.col("value").median()).item()
     midday = (
         valid.filter((hour == 12) & pl.col("valid_time").dt.month().is_in(SUMMER_MONTHS))
         .select(pl.col("value").mean())
@@ -181,10 +248,20 @@ def _validate_month(*, path: Path, month: str, label: str, edge: bool, results: 
         expected_rows *= frame[column].n_unique()
     if expected_rows != frame.height:
         _fail(results=results, check="dense", month=month)
+    if label == "ECMWF-AIFS-ENS" and set(frame["ensemble_member"].unique().to_list()) != set(
+        range(ENSEMBLE_SIZE)
+    ):
+        _fail(results=results, check="ensemble_members", month=month)
     _check_runs(frame=frame, month=month, label=label, edge=edge, results=results)
-    _check_values(frame=frame, month=month, results=results, partial=".partial." in path.name)
+    _check_values(
+        frame=frame,
+        month=month,
+        label=label,
+        results=results,
+        partial=".partial." in path.name,
+    )
     _check_lead_axis(frame=frame, month=month, label=label, results=results)
-    _check_diurnal(frame=frame, month=month, results=results)
+    _check_diurnal(frame=frame, month=month, label=label, results=results)
 
 
 def main() -> int:
@@ -193,7 +270,10 @@ def main() -> int:
     parser.add_argument("--directory", required=True, help="Product directory name.")
     arguments = parser.parse_args()
     product_dir = WEATHER_DOWNLOADS_DIR / arguments.directory
-    label = next(name for name in DATASETS.values() if arguments.directory.startswith(name))
+    # The longest matching label wins, since "ECMWF-AIFS" is a prefix of "ECMWF-AIFS-ENS".
+    label = max(
+        (name for name in DATASETS.values() if arguments.directory.startswith(name)), key=len
+    )
     by_month: dict[str, Path] = {}
     # A complete `M.parquet` wins over a stale `M.partial.parquet` of the same month.
     for path in sorted((product_dir / "_month_cache").glob("*.parquet"), reverse=True):
@@ -224,8 +304,10 @@ def main() -> int:
         elif real:
             failed += 1
             print(f"FAIL {check}: {', '.join(real)}")
+        elif len(failures) == len(months):
+            print(f"SKIP {check}: no qualifying rows in any month")
         elif failures:
-            print(f"SKIP {check}: no qualifying rows in some months")
+            print(f"PASS {check} ({len(failures)} months skipped)")
         else:
             print(f"PASS {check}")
     print("validation passed" if not failed else f"{failed} checks failed")

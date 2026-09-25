@@ -49,14 +49,28 @@ lead?](../../docs/studies/nwp-forecasts-at-matched-leads.md).
   `--fit-missing` fits only the (arm, setting) pairs the saved losses lack. `--synthetic-losses`
   fabricates losses instead of fitting, to exercise the report, and refuses to write under
   `data/studies/`.
-- `nwp_forecast_charts.py` reads the saved losses and predictions from `--input-dir` and writes five
-  SVG charts per technology to `--output-dir`, each optimised with `svgo` (skip with `--no-svgo`):
-  the planned contrasts P1a to P4b at both settings, the leaderboard of every arm's absolute error,
-  one chosen week of out-of-fold forecasts against measured output, error by lead day with ENS's
-  day-0 and day-1 intervals shaded, and the blends against ENS alone and their controls. It
-  computes every interval itself with the report's own functions and refuses any site label that is
-  not an anonymised label. It has no default output directory: charts go to `docs/studies/assets/`
-  only once a real report exists.
+- `verify_extra_leads.py` reads only, and writes two Markdown files under
+  `<output-dir>/verification/`: `gefs_radiation_window.md` checks that GEFS's radiation beyond 240 h
+  is a 6-hour window mean, and `day0_matches_past_series.md` checks that Open-Meteo's unsuffixed
+  Previous Runs series, which the extra-lead build reads as day 0 for ICON-D2 and ICON-EU, equals
+  the series the past-weather studies read.
+- `build_forecast_inputs.py --extra-leads --published-dir PUBLISHED --output-dir DIR` writes the
+  extra lead days' input columns (ENS at days 5 and 14, GEFS at days 5, 10, and 14, IFS 0.25°, GFS,
+  and ICON global at day 5, and ICON-D2 and ICON-EU at day 0) onto the published inputs' own
+  `(site, time)` keys, to a new folder.
+- `fit_extra_leads.py` fits those arms on a GPU at the primary setting only, together with the
+  published arms they are compared with, refitted on the same device. `--check` fits one arm at one
+  generator twice and stops unless the two runs agree. `--report-only` writes the report from the
+  saved losses. It never writes to the published folder.
+- `nwp_forecast_charts.py` reads the saved losses and predictions from `--input-dir`, and the extra
+  lead days' losses from `--extra-dir`, and writes six SVG charts per technology to `--output-dir`,
+  each optimised with `svgo` (skip with `--no-svgo`): the leaderboard of every product's absolute
+  error at every fitted lead day, the planned contrasts P1a to P4b at both settings, one chosen
+  week of out-of-fold forecasts against measured output, the contrasts at each generator alone,
+  the blends against ENS alone and their controls, and error by lead day with ENS's day-0 and
+  day-1 intervals shaded. It computes every interval itself with the report's own functions and
+  refuses any site label that is not an anonymised label. It has no default output directory:
+  charts go to `docs/studies/assets/` only once a real report exists.
 
 ## Outputs
 
@@ -69,6 +83,11 @@ lead?](../../docs/studies/nwp-forecasts-at-matched-leads.md).
 - `<domain>_losses.parquet` holds one row per (arm, setting, site, time, seed) with the capped
   error in megawatts and as a fraction of capacity. `<domain>_predictions.parquet` holds the
   capped prediction for the same keys.
+- `data/studies/nwp_forecast_comparison_leads/` holds the extra lead days and is write-once.
+  `<domain>_extra_lead_inputs.parquet` holds the extra columns, `<domain>_losses.parquet` and
+  `<domain>_predictions.parquet` the GPU fits in the same layout as the published files,
+  `report.md` the absolute errors, contrasts, and device noise floor, and `verification/` the two
+  checks of `verify_extra_leads.py`.
 
 ## Folds
 
