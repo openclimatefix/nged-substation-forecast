@@ -118,7 +118,8 @@ technology raises if `RESULTS_DIR` already holds that technology's losses, so `-
 run whose other technology failed. `--fit-missing` and `--fit-baselines` move the losses they
 replace, and the run's report, intervals and leaderboard, into a `RESULTS_DIR/superseded`
 subfolder first, and change nothing when no arm needs fitting. A technology with no saved
-losses that is not being refitted is left out of `--report-only`, `--fit-missing`, `--fit-baselines` and the report.
+losses that is not being refitted is left out of `--report-only`, `--fit-missing`,
+`--fit-baselines` and the report.
 """
 
 import argparse
