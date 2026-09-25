@@ -570,3 +570,98 @@ Rejected: none.
   Figures 1 and 2 stay the headline paired contrasts and the leaderboards are Figures 5 and 6. The
   page adds an Introduction with a product table, and a Key findings list, as the skill's outline
   asks.
+
+### Code review (Opus, before any fit) and mutation pass
+
+Accepted (all fixed in the commits from "Rewrite the study script's report, contrasts, baselines
+and outputs to fix the code review"):
+
+- The blend guard crashed on a duplicated `site` column, and its column names did not match the
+  jobs, so every P4 guard job was silently dropped.
+- Contrasts pooled the primary and sensitivity settings, quadrupling the paired rows; each
+  contrast now runs within one setting and the planned verdicts are combined across settings.
+- The input fingerprint depended on row order; the baselines clipped the error where the models cap
+  the prediction, wrote no seed column, and omitted climatology and smart persistence.
+- The report path printed none of the planned contrasts; per-row losses and predictions are now
+  saved, and `--report-only` and `--fit-missing` work.
+- ENS silently lost 6.7% of the solar rows and 466 wind rows to a 14-day completeness filter; ENS
+  days 0 to 3 are now built directly on the base rows.
+- `bracket_verdict` returned "beats" when both sides were significant; the blend verdict is one
+  verdict from P4a and P4b together; wind speeds are converted from km/h; UKV's exact-lead hours
+  are restricted to hour 0; the ENS control runs at day 1 only; the GEFS month gate derives the
+  last month from the rows; `gefs_step_means` checks contiguous leads; V1c also screens IFS 0.25°
+  against UKV; V1 fails when nothing is scored.
+
+Rejected: none. Item 16 (ENS solar temperature timing, and the ensemble-mean wind convention) was
+"fine", and the plan's wording was corrected instead of the code.
+
+Mutation pass: 23 mutants, 18 killed. The reviewer named a killing test for each of three
+survivors (an input array overwritten, a missing empty-input guard, `bracket_verdict` checking
+"loses" before "beats"), and two survivors were equivalent mutants. The pass ran once, because
+the later commits changed study scripts and the page, not `packages/studies/`.
+
+### First Opus science review, and its fixes
+
+Accepted: anchor the ENS reconciliation on the leaderboard table rather than the first
+matching row; print the blend controls beside the guards, and say the guard is uninformative
+where the control is itself worse than ENS; measure every Previous Runs product's radiation
+timestamp convention (V3), which agreed with the UKV rebuild, so no refit ran; block-averaged
+gaps; contrasts against the single ENS control run; UKV's missing rows per month and hour; the
+uncovered fold cells; each exploratory arm's missing share; a persistence-day-0 label; the
+band-removal check; a per-generator panel; the plan's UKV missing shares corrected to 6.8% and
+11.1%.
+
+Rejected: none recorded beyond the two departures below. The reviewer's scratch checks are
+under `.claude/worktrees/scratch/nwp-compare/review_sci1/`.
+
+### Second Opus science review, and its fixes
+
+Accepted: a sign error in the solar P4b summary; the disclosure blockquote omitting the solar
+farms; an unsourced "about 30 whole days" replaced by the printed gap dates; the roadmap sentence
+on the earlier multi-NWP figure re-sourced; block-averaged results limited to wind for the
+"timing noise" reading; a scoped title and summary; softened verdict words; leads that favour the
+Previous Runs products stated beside each contrast against the control run; the wind blend's
+inseparable attribution between ICON-EU and IFS 0.25°; the fill-with-an-older-run risk; each
+blend's coverage and delivery time; V1 and V1b outputs quoted; the capacity table's version and
+build time recorded; an Introduction and Key findings; the week-selection rule for the model-works
+figures; historical narration in Limitations rewritten.
+
+Rejected: the reviewer's request to fit the two single-product wind blends was first refused (the
+page said the study did not fit them), then accepted after the page was drafted; see the third
+departure below. No other finding was rejected.
+
+### Persona and evidence reviews
+
+Accepted, evidence check: one signed convention; the planned set defined and every exploratory
+number tagged; inconsistent shuffle and GEFS-delivery descriptions reconciled; unsupported
+statements printed into the report or dropped; source comments corrected.
+
+Accepted, builders' reviews: verdicts scoped to each product as the study reads it (a single
+deterministic run at one grid point against a 51-member H3-cell mean); the confound extended to
+UKV; UKV's two-snapshot solar rebuild stated; the product table corrected, with an ICON-D2 row;
+the ICON "100 m" derivation stated; the UKV spring-2026 gap attributed to the Open-Meteo feed
+unless known otherwise.
+
+Accepted, users' reviews: effect sizes beside ENS's own error; what a network planner still needs;
+the bracket asymmetry explained; statistical caveats and a leave-one-month-out table; a data and
+code availability section; a shorter scoped title.
+
+Rejected: no MWh or money figures were added (the study has no basis for them); "fresher runs
+would probably enlarge the gain" was deleted and replaced by "not tested".
+
+### Prose review
+
+A structural pass (duplicated passages shrunk to one owner plus a link, multi-claim paragraphs
+split under their own bolded leads, counts and product names fixed, four headings renamed) then a
+one-rule-per-pass sentence sweep over the whole page, applied in five commits. Findings were
+triaged before applying; the sweep also scoped "only GEFS" claims the page's own contrasts
+contradicted.
+
+### Further departures
+
+- The two single-product wind blends (ENS with ICON-EU, and ENS with IFS 0.25°) are post hoc:
+  they were fitted after P4b was seen, to separate which product carries the gain, and the page
+  labels them so.
+- No fold-offset re-run: the fold rotation for the third era (`{2: 3}`) differs from the past-wind
+  study's, and the study does not re-run with the other offset. The plan records why the rotation
+  differs, and the leave-one-month-out table is the only check on fold dependence.
