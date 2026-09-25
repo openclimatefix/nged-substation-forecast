@@ -758,7 +758,7 @@ def missing_planned_second_rows(
     with none printed means the report and the script disagree about which contrast is planned.
 
     Args:
-        contrasts: The scored contrasts, with `arm`, `planning` and `second_difference`.
+        contrasts: The scored contrasts, with `arm`, `planned` and `second_difference`.
         printed: `report_contrasts`'s output for the row set's report.
         reference_arm: The arm every contrast is taken against.
         second_scope: The `Scope` cell of a printed row at the second setting.
@@ -778,7 +778,7 @@ def missing_planned_second_rows(
         f"{row['arm']} - {reference_arm}: planned, but the report prints no row at scope "
         f"{second_scope}"
         for row in contrasts.iter_rows(named=True)
-        if row["planning"] == "planned"
+        if row["planned"]
         and row["second_difference"] is not None
         and row["arm"] not in printed_arms
     ]
@@ -1023,9 +1023,7 @@ def _second_setting(
     wanted_arms = {
         row["arm"]
         for row in contrasts.iter_rows(named=True)
-        if (row["planning"] == "planned" or row["near_line"])
-        and row["arm"] in saved
-        and reference_arm in saved
+        if (row["planned"] or row["near_line"]) and row["arm"] in saved and reference_arm in saved
     }
     columns = ("second_difference", "second_lower_95", "second_upper_95")
     if not wanted_arms:
@@ -1112,6 +1110,9 @@ def score_row_set(
         printed=printed_errors,
         decimals=row_set.printed_decimals,
     )
+    post_hoc_arms = [
+        first for first, second in row_set.post_hoc_contrasts if second == reference_arm
+    ]
     contrast_arms = tuple(arm._replace(planned=arm.arm in planned) for arm in row_set.contrast_arms)
     contrasts = block_contrast_rows(
         losses=losses,
@@ -1121,7 +1122,9 @@ def score_row_set(
         site_hours=site_hours,
         metric=METRIC,
     ).with_columns(
-        planning=pl.when(pl.col("planned"))
+        planning=pl.when(pl.col("arm").is_in(post_hoc_arms))
+        .then(pl.lit("post hoc"))
+        .when(pl.col("planned"))
         .then(pl.lit("planned"))
         .when(pl.col("arm").is_in(POST_HOC_ARMS))
         .then(pl.lit("post hoc"))
@@ -1372,6 +1375,11 @@ def intervals_frame(*, results: list[RowSetResult]) -> pl.DataFrame:
             "n_rows": pl.lit(result.site_hours),
         }
         contrasts = result.contrasts
+        planned_marker = (
+            pl.when(pl.col("label").str.ends_with(POST_HOC_SUFFIX))
+            .then(pl.lit("post hoc"))
+            .otherwise(pl.lit("planned"))
+        )
         section = contrast_section(reference_label=result.row_set.reference_label)
         frames += [
             result.absolute.select(
@@ -1423,7 +1431,7 @@ def intervals_frame(*, results: list[RowSetResult]) -> pl.DataFrame:
                 lower="lower_95",
                 upper="upper_95",
                 label="label",
-                planning=pl.lit("planned"),
+                planning=planned_marker,
                 near_line="near_line",
             ),
             result.exploratory.select(
@@ -1449,7 +1457,7 @@ def intervals_frame(*, results: list[RowSetResult]) -> pl.DataFrame:
                 lower="second_lower_95",
                 upper="second_upper_95",
                 label="label",
-                planning=pl.lit("planned"),
+                planning=planned_marker,
                 near_line="near_line",
             ),
         ]

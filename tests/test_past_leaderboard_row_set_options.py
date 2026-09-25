@@ -261,6 +261,41 @@ def test_a_post_hoc_planned_contrast_is_marked_in_the_report_and_the_figures(
     assert not labels[ERA5.arm].endswith(" (post hoc)")
 
 
+def test_a_post_hoc_contrast_is_marked_post_hoc_in_the_report_table_and_the_intervals(
+    tmp_path: Path,
+) -> None:
+    # Catches a post-hoc planned contrast that the figure marks but the contrast table and
+    # `intervals.parquet` still call planned, because `planning` was set from the arms alone.
+    module = _load()
+    plain = _score(tmp_path=tmp_path)
+    marked = _score(tmp_path=tmp_path, post_hoc_contrasts=((ENS.arm, REFERENCE.arm),))
+
+    def planning_of(result: Any) -> dict[str, str]:
+        return dict(zip(result.contrasts["arm"], result.contrasts["planning"], strict=True))
+
+    assert planning_of(marked)[ENS.arm] == "post hoc"
+    assert planning_of(marked)[ERA5.arm] != "post hoc"
+    assert planning_of(plain)[ENS.arm] == "planned"
+    report_rows = [
+        line
+        for line in module.render_report(results=[marked]).splitlines()
+        if line.startswith(f"| {ENS.label} ")
+    ]
+    assert report_rows
+    assert any("| post hoc |" in line for line in report_rows)
+    intervals = module.intervals_frame(results=[marked])
+    for section in (module.CONTRAST_SECTION, module.PLANNED_CONTRAST_SECTION):
+        rows = intervals.filter(pl.col("section") == section, pl.col("treatment") == ENS.arm)
+        assert rows.height > 0
+        assert set(rows["planning"]) == {"post hoc"}
+        if section == module.PLANNED_CONTRAST_SECTION:
+            assert all(label.endswith(" (post hoc)") for label in rows["label"])
+    plain_rows = module.intervals_frame(results=[plain]).filter(
+        pl.col("section") == module.PLANNED_CONTRAST_SECTION
+    )
+    assert set(plain_rows["planning"]) == {"planned"}
+
+
 def test_a_farm_hours_heading_is_read() -> None:
     # Catches a heading regex that knows only "common site-hours".
     module = _load()
