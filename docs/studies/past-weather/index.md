@@ -14,8 +14,9 @@ history, historical features, and disaggregation, and each reads one weather pro
   disaggregation — should read.
 - [Which weather product best describes past wind?](wind.md) — at the
   three metered wind farms, the Met Office's UKV and the German weather service's ICON-D2 describe
-  past hub-height wind best of the five products tested and both beat the ERA5 reanalysis, mostly
-  from April to September; ICON-EU also beats ERA5; and ICON global has the largest error of the
+  past hub-height wind best of the five products tested and both beat the ERA5 reanalysis, by
+  more from April to September in intervals estimated separately for each half of the year; ICON-EU
+  also beats ERA5; and ICON global has the largest error of the
   five, about half of its gap to ICON-EU a pair of steps in the wind Open-Meteo's archive serves for
   it at one generator.
 - [Does blending weather products beat the best single weather product?](blending.md) — at the six

@@ -45,11 +45,13 @@ set](../assets/wind_leaderboard.svg)
 significant at the 5% level. The lower panel of each block holds that row set's planned
 contrasts](../assets/wind_contrasts.svg)
 
-**At these three wind farms, the page recommends the following products for the four consumers of
-past weather.** Each recommendation rests on the errors of XGBoost models given that product's wind,
-plus the time of day, the season, and which side of UKV's upgrade an hour falls on. Historical
-features and training history are two of the four consumers, described in the
-[Introduction](#introduction).
+**At these three wind farms, the page makes the following recommendations.** Each one rests on the
+errors of XGBoost models given the named product's wind, plus the time of day, the season, and which
+side of UKV's upgrade an hour falls on. The first two bullets are for historical features and
+training history, two of the four consumers of past weather described in the
+[Introduction](#introduction). The third and fourth bullets say what the ECMWF and weather-station
+results support for those two consumers. The last bullet names the two consumers with no
+recommendation.
 
 - **Historical features in the live service: UKV, with ICON-D2 an alternative where ICON-D2
   reaches.** See [Discussion: what to use](#discussion-what-to-use).
@@ -72,13 +74,15 @@ features and training history are two of the four consumers, described in the
 
 ## Key findings
 
-**A planned comparison was written down before any result existed, a post hoc comparison is a
-planned one whose inputs changed after the first run, and every other comparison is exploratory.**
+**A planned comparison was written down before any result existed, and every other comparison is
+exploratory.** A post hoc comparison is either a planned one whose inputs changed after the first
+run, as on the main row set's ICON contrasts, or an exploratory one added after results were seen.
 The [Methods page](methods.md#planned-and-exploratory-comparisons) gives the rule, and [How the
-comparison was made](#how-the-comparison-was-made) says which contrasts of this page are post hoc.
-Where a product "beats" another, the difference is statistically significant at the 5% level. A
-farm-hour is one wind farm's power in one hour. A weather model's value for an hour, as served,
-comes from the freshest run of that weather model that Open-Meteo's archive holds for the hour.
+comparison was made](#how-the-comparison-was-made) says which planned contrasts of this page are
+post hoc. Where a product "beats" another, the difference is statistically significant at the 5%
+level. A farm-hour is one wind farm's power in one hour. A weather model's value for an hour, as
+served, comes from the freshest run of that weather model that Open-Meteo's archive holds for the
+hour.
 
 **Figure 1's intervals are wide mainly because every product's error rises and falls together from
 month to month.** Some months are harder to describe than others for every product, and resampling
@@ -1557,25 +1561,27 @@ product?](blending.md#wind-a-blend-beats-ukv-given-its-neighbouring-hours)**
 - **Some scored farm-hours fall in a calendar month that the training rows of the same fold do not
   cover, and the share differs by row set.** The folds are blocks of whole months, so a held-out
   calendar month can leave no training row for that calendar month. Each row set has two shares. The
-  first is the share of scored farm-hours in a calendar month that occurs in two or more years and
-  has no training row in its fold, which a different fold design could avoid. The second is the
-  share in a calendar month that occurs in one year only, which no fold design can cover.
-    - **Main row set:** 16.4% of the scored farm-hours (8,326 of 50,734) are in the first case, and
-      0.0% in the second.
-    - **ICON-DREAM-EU row set:** 25.1% (12,570 of 50,041) in the first case, and 0.0% in the second.
-    - **ECMWF row set:** 0.0% in the first case, and 9.4% (4,082 of 43,555) in the second, in
-      October and November 2025.
-    - **Weather-station row set:** 0.0% in the first case, and 42.2% (14,411 of 34,156) in the
-      second, in January to July, so the day-of-year column of an XGBoost model that scores one of
-      those months extrapolates.
-- **Covering the first case moves no planned contrast by more than 0.052 points.** Rotating the
-  post-upgrade era's fold numbers by 2 covers the first case. On the main row set that rotation
-  moves no planned contrast by more than 0.033 points at the primary setting and 0.052 points at the
-  second setting. On the ICON-DREAM-EU row set it moves the two planned contrasts by +0.009 and
-  −0.028 points at the primary setting, with no change of sign or of statistical significance. The
-  effect on the weather-station row set is unmeasured, and the effect on absolute errors was not
-  measured for any row set. The measurement is line 9 of `studies/era_fold_design/report.md`, on the
-  `era-fold-design` branch at commit `fdddb065`.
+  avoidable share is the share of scored farm-hours in a calendar month that occurs in two or more
+  years and has no training row in its fold, which a different fold design could avoid. The
+  unavoidable share is the share in a calendar month that occurs in one year only, which no fold
+  design can cover.
+    - **Main row set:** the avoidable share is 16.4% of the scored farm-hours (8,326 of 50,734), and
+      the unavoidable share is 0.0%.
+    - **ICON-DREAM-EU row set:** the avoidable share is 25.1% (12,570 of 50,041), and the
+      unavoidable share is 0.0%.
+    - **ECMWF row set:** the avoidable share is 0.0%, and the unavoidable share is 9.4% (4,082 of
+      43,555), in October and November 2025.
+    - **Weather-station row set:** the avoidable share is 0.0%, and the unavoidable share is 42.2%
+      (14,411 of 34,156), in January to July, so the day-of-year column of an XGBoost model that
+      scores one of those months extrapolates.
+- **Covering the avoidable share moves no planned contrast on the main row set by more than 0.052
+  points.** Rotating the post-upgrade era's fold numbers by 2 covers the avoidable share on every
+  row set. On the main row set that rotation moves no planned contrast by more than 0.033 points at
+  the primary setting and 0.052 points at the second setting. On the ICON-DREAM-EU row set it moves
+  the two planned contrasts by +0.009 and −0.028 points at the primary setting, with no change of
+  sign or of statistical significance. The effect on the weather-station row set is unmeasured, and
+  the effect on absolute errors was not measured for any row set. The measurement is line 9 of
+  `studies/era_fold_design/report.md`, on the `era-fold-design` branch at commit `fdddb065`.
 - **ICON-DREAM-EU's own row set.** [ICON-DREAM-EU does not beat ERA5, and trails
   ICON-EU](#icon-dream-eu-does-not-beat-era5-and-trails-icon-eu) refits every arm, including the
   five products above, on ICON-DREAM-EU's own, shorter row set (August 2024 to August 2026, 10 days
@@ -1648,7 +1654,8 @@ weather-station feed, the spread of ENS members, or products it does not score.*
 - **A live weather-station feed is not tested.** MIDAS Open is a yearly retrospective archive, so
   the section does not test a real-time station feed or a station as a lagged input to a live
   forecast.
-- **Products not scored are not ranked.** CAMS publishes no wind, and the [weather products
+- **Products that this page does not score are not covered.** CAMS publishes no wind, and the
+  [weather products
   survey](../../background/weather-products-survey.md#candidates-for-the-past-wind-study) lists
   candidates for the past-wind study that this page does not score.
 - **Regions other than Lincolnshire, and offshore wind, are not covered,** as
@@ -1817,7 +1824,7 @@ the current commit, so this page does not say whether a refit reproduces the sav
 `past_wind_leaderboard.py` reads every row set's saved losses without refitting anything, checks
 every number that a row set's report already prints, and writes the report that Figures 1 and 2 come
 from to `data/studies/beam_diffuse_split/past_weather_v2/wind_leaderboard_2/report.md`, together
-with `intervals.parquet`. It refuses to overwrite either file. With the losses in place:
+with `intervals.parquet`. The script refuses to overwrite either file. With the losses in place:
 
 ```bash
 uv run python studies/beam_diffuse_split/past_wind_leaderboard.py
