@@ -12,7 +12,7 @@ MODULE_PATH: Final[Path] = REPO_ROOT / "studies" / "beam_diffuse_split" / "figur
 ASSETS_DIR: Final[Path] = REPO_ROOT / "docs" / "studies" / "assets"
 SOLAR_SVG_PREFIXES: Final[tuple[str, ...]] = ("sunshine_", "ens_past_solar_", "station_past_solar_")
 WIND_SVG_PREFIXES: Final[tuple[str, ...]] = ("wind_", "ens_hres_wind_", "station_wind_")
-TITLE_NUMBER: Final[re.Pattern[str]] = re.compile(r"aria-label=\"Title text 'Figure (\d+):")
+TITLE_NUMBER: Final[re.Pattern[str]] = re.compile(r"aria-label=\"Title text 'Figure (\d+)([a-z]?):")
 STALE_TITLE_SVGS: Final[frozenset[str]] = frozenset()
 """Wind SVGs still on disk with their old title number, until the redraw of the wind page. Delete a
 stem from here when its SVG is redrawn; a test fails if the stem stays after the title is right."""
@@ -93,10 +93,16 @@ def test_the_svgs_map_to_the_figures_the_outline_names() -> None:
     assert figures["station_past_solar_controls"] == "station_controls"
 
 
-def _title_number(stem: str) -> int | None:
+def _title_label(stem: str) -> tuple[int, str] | None:
+    """Return an SVG's figure number and panel letter (empty if none), or None with no title."""
     text = (ASSETS_DIR / f"{stem}.svg").read_text()
     match = TITLE_NUMBER.search(text)
-    return int(match.group(1)) if match else None
+    return (int(match.group(1)), match.group(2)) if match else None
+
+
+def _title_number(stem: str) -> int | None:
+    label = _title_label(stem)
+    return None if label is None else label[0]
 
 
 def test_wind_figure_numbers_run_from_1_to_15_with_no_gap_or_duplicate() -> None:
@@ -193,3 +199,50 @@ def test_wind_leaderboard_svg_holds_the_four_block_titles() -> None:
     text = (ASSETS_DIR / "wind_leaderboard.svg").read_text()
 
     assert BLOCK_TITLE.findall(text) == ["Main", "ICON-DREAM-EU", "ECMWF", "Station"]
+
+
+def _svgs_by_figure(module: ModuleType) -> dict[str, list[str]]:
+    """Return each wind figure's SVG stems that are on disk, keyed by figure."""
+    by_figure: dict[str, list[str]] = {}
+    for stem, key in module.WIND_SVG_FIGURES.items():
+        if (ASSETS_DIR / f"{stem}.svg").exists():
+            by_figure.setdefault(key, []).append(stem)
+    return by_figure
+
+
+def test_a_wind_figure_drawn_by_several_svgs_letters_each_of_them() -> None:
+    # Catches Figures 4, 5 and 7 being drawn by two or three SVGs under one bare number.
+    module = _load()
+    expected = {"models_work_timeseries": "ab", "models_work_error": "ab", "per_generator": "abc"}
+    lettered = {}
+    for key, stems in _svgs_by_figure(module).items():
+        labels = [_title_label(stem) for stem in stems if stem not in STALE_TITLE_SVGS]
+        letters = "".join(sorted(label[1] for label in labels if label is not None))
+        if len(stems) > 1:
+            lettered[key] = letters
+        else:
+            assert letters == "", (key, letters)
+
+    assert lettered == expected
+
+
+def test_a_wind_figure_drawn_by_several_svgs_is_listed_with_its_row_sets() -> None:
+    # Catches a new second SVG for a figure that the letter map does not know about.
+    module = _load()
+    several = {key for key, stems in _svgs_by_figure(module).items() if len(stems) > 1}
+
+    assert several == set(module.WIND_LETTERED_ROW_SETS)
+    for key in several:
+        stems = [stem for stem, figure in module.WIND_SVG_FIGURES.items() if figure == key]
+        assert len(stems) == len(module.WIND_LETTERED_ROW_SETS[key])
+
+
+def test_wind_figure_number_gives_each_row_set_its_letter_in_order() -> None:
+    module = _load()
+
+    assert module.wind_figure_number(key="per_generator", row_set="main") == "7a"
+    assert module.wind_figure_number(key="per_generator", row_set="ecmwf") == "7b"
+    assert module.wind_figure_number(key="per_generator", row_set="station") == "7c"
+    assert module.wind_figure_number(key="models_work_timeseries", row_set="ecmwf") == "4b"
+    assert module.wind_figure_number(key="models_work_error", row_set="main") == "5a"
+    assert module.wind_figure_title(row_set="main", title="A finding") == "main rows - A finding"

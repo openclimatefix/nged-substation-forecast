@@ -35,7 +35,7 @@ import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
 from ens_hres_past_wind import OUTPUT_DIR
-from figure_numbers import WIND_FIGURE_NUMBERS
+from figure_numbers import WIND_FIGURE_NUMBERS, wind_figure_number, wind_figure_title
 from studies.charts import (
     CONTENT_WIDTH_PX,
     PLOT_WIDTH_PX,
@@ -609,8 +609,8 @@ def _models_work(*, losses: pl.DataFrame) -> tuple[alt.VConcatChart, str]:
             week_order=WIND_WEEK_DISPLAY_ORDER,
             order=order,
             colours=(ocf.TEXT, HRES_COLOUR, ENS_COLOUR),
-            number=WIND_FIGURE_NUMBERS["models_work_timeseries"],
-            title=title,
+            number=wind_figure_number(key="models_work_timeseries", row_set="ecmwf"),
+            title=wind_figure_title(row_set="ecmwf", title=title),
             panel_width=MODELS_WORK_PANEL_WIDTH_PX,
             subtitle=[
                 "Out-of-fold power as a percentage of the generator's own capacity, days 1 to 7.",
@@ -672,9 +672,9 @@ def _per_farm_error(*, source: Source) -> tuple[alt.VConcatChart, str]:
     return (
         figure(
             panels=panels,
-            number=WIND_FIGURE_NUMBERS["models_work_error"],
+            number=wind_figure_number(key="models_work_error", row_set="ecmwf"),
             figure_planning=None,
-            title=title,
+            title=wind_figure_title(row_set="ecmwf", title=title),
             subtitle=[
                 (
                     "Each product's own mean absolute error at one farm, best first. ICON global "
@@ -1410,9 +1410,9 @@ def _farm_figure(*, source: Source) -> tuple[alt.VConcatChart, str]:
     return (
         figure(
             panels=panels,
-            number=WIND_FIGURE_NUMBERS["per_generator"],
+            number=wind_figure_number(key="per_generator", row_set="ecmwf"),
             figure_planning="mixed",
-            title=title,
+            title=wind_figure_title(row_set="ecmwf", title=title),
             subtitle=[
                 (
                     "Each planned contrast pooled over the three farms, which is the planned "

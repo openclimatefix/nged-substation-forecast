@@ -37,7 +37,7 @@ from typing import Any, Final, cast
 import altair as alt
 import plotting.ocf_theme as ocf
 import polars as pl
-from figure_numbers import WIND_FIGURE_NUMBERS
+from figure_numbers import WIND_FIGURE_NUMBERS, wind_figure_number, wind_figure_title
 from station_wind_arms import OUTPUT_DIR, PLANNED_CONTRASTS
 from studies.charts import (
     CONDITION_COLOURS,
@@ -856,9 +856,9 @@ def _by_farm(*, source: Source, scope: str) -> tuple[alt.VConcatChart, str]:
     return (
         figure(
             panels=panels,
-            number=WIND_FIGURE_NUMBERS["per_generator"],
+            number=wind_figure_number(key="per_generator", row_set="station"),
             figure_planning="exploratory",
-            title=title,
+            title=wind_figure_title(row_set="station", title=title),
             subtitle=[
                 (
                     "First-named arm's mean absolute error minus the second's, at each farm. "

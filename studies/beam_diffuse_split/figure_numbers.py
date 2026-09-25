@@ -136,6 +136,7 @@ WIND_FIGURE_NUMBERS: Final[dict[WindFigureKey, int]] = {
 blocks, and `contrasts` also draws each block's planned contrasts in a lower panel. Each of
 `models_work_timeseries`, `models_work_error`, and `per_generator` is drawn by more than one chart
 script: the main row set's, the ECMWF row set's, and (for `per_generator`) the station row set's.
+Each of those SVGs carries a letter, as `WIND_LETTERED_ROW_SETS` says.
 """
 
 WIND_SVG_FIGURES: Final[dict[str, WindFigureKey]] = {
@@ -172,3 +173,42 @@ WIND_SUPERSEDED_SVGS: Final[frozenset[str]] = frozenset(
 )
 """The SVGs no past-wind figure uses any more, still on disk because the past-wind page links them
 until its prose is rewritten. The leaderboard and contrast charts replace them."""
+
+WindRowSetType = Literal["main", "ecmwf", "station"]
+"""The row sets that draw one panel each of a lettered past-wind figure."""
+
+WIND_LETTERED_ROW_SETS: Final[dict[WindFigureKey, tuple[WindRowSetType, ...]]] = {
+    "models_work_timeseries": ("main", "ecmwf"),
+    "models_work_error": ("main", "ecmwf"),
+    "per_generator": ("main", "ecmwf", "station"),
+}
+"""The figures drawn by more than one SVG, each with the row set of each SVG in letter order.
+
+The first row set is `a`, the second `b`, and the third `c`.
+"""
+
+WIND_ROW_SET_NAMES: Final[dict[WindRowSetType, str]] = {
+    "main": "main rows",
+    "ecmwf": "ECMWF rows",
+    "station": "station rows",
+}
+"""What a lettered figure's title calls each row set."""
+
+
+def wind_figure_number(*, key: WindFigureKey, row_set: WindRowSetType) -> str:
+    """Return the number of one SVG of a lettered past-wind figure, such as `7b`.
+
+    Args:
+        key: The figure, one of `WIND_LETTERED_ROW_SETS`.
+        row_set: The row set the SVG draws.
+
+    Returns:
+        The figure's number followed by the row set's letter.
+    """
+    letter = "abc"[WIND_LETTERED_ROW_SETS[key].index(row_set)]
+    return f"{WIND_FIGURE_NUMBERS[key]}{letter}"
+
+
+def wind_figure_title(*, row_set: WindRowSetType, title: str) -> str:
+    """Return `title` led by the name of the row set its SVG draws, as `main rows - title`."""
+    return f"{WIND_ROW_SET_NAMES[row_set]} - {title}"

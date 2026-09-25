@@ -33,7 +33,7 @@ import plotting.ocf_theme as ocf
 import polars as pl
 from build_dataset import _wind_sites
 from fetch_wind_point import output_path_for
-from figure_numbers import WIND_FIGURE_NUMBERS
+from figure_numbers import WIND_FIGURE_NUMBERS, wind_figure_number, wind_figure_title
 from sources import STUDY_DATA_DIR
 from studies.charts import (
     FAMILY_COLOURS,
@@ -635,11 +635,14 @@ def _per_generator(*, contrasts: pl.DataFrame) -> alt.VConcatChart:
     ]
     return figure(
         panels=panels,
-        number=WIND_FIGURE_NUMBERS["per_generator"],
+        number=wind_figure_number(key="per_generator", row_set="main"),
         figure_planning=figure_planning,
-        title=(
-            "UKV's advantage over ERA5 is statistically significant at the 5% level at two of the "
-            "three generators"
+        title=wind_figure_title(
+            row_set="main",
+            title=(
+                "UKV's advantage over ERA5 is statistically significant at the 5% level at two of "
+                "the three generators"
+            ),
         ),
         subtitle=[
             f"{DOTS} The ICON-D2 rows are computed for this chart.",
@@ -770,10 +773,13 @@ def _wind_models_work(
         week_order=WIND_WEEK_DISPLAY_ORDER,
         order=order,
         colours=(ocf.TEXT, *(FAMILY_COLOURS[FAMILIES[p]] for p in MODELS_WORK_PRODUCTS)),
-        number=WIND_FIGURE_NUMBERS["models_work_timeseries"],
-        title=(
-            "An XGBoost model given ICON-D2 follows measured power at every generator, across a "
-            "windy, a variable, and a calm week"
+        number=wind_figure_number(key="models_work_timeseries", row_set="main"),
+        title=wind_figure_title(
+            row_set="main",
+            title=(
+                "An XGBoost model given ICON-D2 follows measured power at every generator, across "
+                "a windy, a variable, and a calm week"
+            ),
         ),
         subtitle=[
             "Out-of-fold power as a percentage of the generator's own capacity.",
@@ -793,9 +799,13 @@ def _wind_models_work(
         names=NAMES,
         errors={product: error for product, error in errors.items() if product != "icon_global"},
         x_domain=(5.0, 9.0),
-        number=WIND_FIGURE_NUMBERS["models_work_error"],
-        title=(
-            "ICON-D2, UKV, ICON-EU, and ERA5 rank in the same order at each of the three generators"
+        number=wind_figure_number(key="models_work_error", row_set="main"),
+        title=wind_figure_title(
+            row_set="main",
+            title=(
+                "ICON-D2, UKV, ICON-EU, and ERA5 rank in the same order at each of the three "
+                "generators"
+            ),
         ),
         subtitle=[
             (
