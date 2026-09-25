@@ -116,8 +116,9 @@ the pinned rotation `ROW_SET_FOLD_OFFSETS`, checked for coverage before any fit.
 technology raises if `RESULTS_DIR` already holds that technology's losses, so `--refit solar` and
 `--refit wind` each work into a folder that lacks that technology's losses, and either finishes a
 run whose other technology failed. `--fit-missing` and `--fit-baselines` move the losses they
-replace into `RESULTS_DIR/superseded` first. A technology with no saved losses that is not being
-refitted is left out of `--report-only`, `--fit-missing`, `--fit-baselines` and the report.
+replace, and the run's report, intervals and leaderboard, into a `RESULTS_DIR/superseded`
+subfolder first, and change nothing when no arm needs fitting. A technology with no saved
+losses that is not being refitted is left out of `--report-only`, `--fit-missing`, `--fit-baselines` and the report.
 """
 
 import argparse
@@ -329,9 +330,18 @@ RESULTS_DIR: Final[Path] = OUTPUT_DIR / "era_covered"
 """Where every result file goes: the losses, predictions, leaderboard, intervals, and report.
 
 Each technology's `*_losses.parquet` is write-once: a refit of that technology raises if the file
-exists, and the two modes that replace losses move the old file to `superseded/` first. The input
+exists, and the two modes that replace losses move the old file, and the run's report, intervals and
+leaderboard, to a `superseded/` subfolder first. The input
 extract, `ens_members.parquet`, stays in `OUTPUT_DIR`, so the results the published page quotes in
 `OUTPUT_DIR` are never overwritten."""
+
+RUN_LEVEL_OUTPUTS: Final[tuple[str, ...]] = (
+    "report.md",
+    "intervals.parquet",
+    "leaderboard.parquet",
+)
+"""The files a whole run writes, which `--fit-missing` and `--fit-baselines` move to `superseded/`
+beside the losses they were computed from."""
 
 ROW_SET_FIRST_HOUR: Final[Mapping[DomainType, datetime | None]] = MappingProxyType(
     {"solar": None, "wind": datetime(2024, 12, 1, tzinfo=UTC)}
@@ -2413,6 +2423,9 @@ class Outputs:
     weights: pl.DataFrame
     method: MethodType
     decisions: list[Decision]
+    changed: bool = True
+    """Whether this run replaced any loss. `_fit_missing` sets it to `False` when every arm is
+    already fitted."""
     native_coverage: pl.DataFrame | None = None
     """One row per band with the native-step rows' `coverage_counts`, or `None` when no run saved
     them."""
@@ -2483,13 +2496,15 @@ def _fit_missing(*, domain: Domain) -> Outputs:
         domain: The domain.
 
     Returns:
-        The saved outputs with the missing arms' losses merged in.
+        The saved outputs with the missing arms' losses merged in, or the saved outputs with
+        `changed` set to `False` when no arm is missing.
     """
     saved = _read_saved(domain=domain.name)
     fitted = set(saved.losses["arm"].unique().to_list())
     new_jobs = [job for job in calendar_jobs(domain=domain) if job[0] not in fitted]
     if not new_jobs:
         _LOG.info("%s: every calendar arm is already fitted", domain.name)
+        saved.changed = False
         return saved
     inputs = build_inputs(domain=domain.name)
     inputs = main_frame(inputs=inputs, method=saved.method, domain=domain.name)
@@ -2570,30 +2585,37 @@ def _fit_baselines(*, domain: Domain) -> Outputs:
     )
 
 
-def _move_to_superseded(*, paths: Iterable[Path]) -> None:
-    """Move each existing output into `RESULTS_DIR/superseded`, under a timestamped name.
+def _move_to_superseded(*, paths: Iterable[Path], folder: Path) -> None:
+    """Move each existing output into `folder`, a subfolder of `RESULTS_DIR/superseded`.
 
     Args:
         paths: The outputs about to be replaced. Those that do not exist are skipped.
+        folder: The run's own subfolder, named by its timestamp and the mode that replaces the
+            outputs.
     """
-    stamp = datetime.now(tz=UTC).strftime("%Y%m%dT%H%M%SZ")
-    destination = RESULTS_DIR / "superseded"
     for path in paths:
         if path.exists():
-            destination.mkdir(parents=True, exist_ok=True)
-            target = destination / f"{stamp}_{path.name}"
+            folder.mkdir(parents=True, exist_ok=True)
+            target = folder / path.name
             refuse_to_overwrite(paths=[target])
             path.rename(target)
 
 
 def run_domain(
-    *, domain: Domain, report_only: bool, fit_missing: bool = False, fit_baselines: bool = False
+    *,
+    domain: Domain,
+    report_only: bool,
+    superseded: Path,
+    fit_missing: bool = False,
+    fit_baselines: bool = False,
 ) -> Outputs:
     """Build one technology's inputs, choose the upsampling, fit every arm, and score the baselines.
 
     Args:
         domain: The domain.
         report_only: Whether to read the saved outputs instead of fitting.
+        superseded: The folder that `fit_missing` and `fit_baselines` move the losses they replace
+            into.
         fit_missing: Whether to fit only the arms missing from the saved losses (`_fit_missing`),
             reading everything else from disk. Ignored if `report_only` is set.
         fit_baselines: Whether to re-score only the four no-weather baselines (`_fit_baselines`),
@@ -2607,12 +2629,13 @@ def run_domain(
         return _read_saved(domain=domain.name)
     if fit_missing:
         outputs = _fit_missing(domain=domain)
-        _move_to_superseded(paths=[paths["losses"]])
-        outputs.losses.write_parquet(paths["losses"])
+        if outputs.changed:
+            _move_to_superseded(paths=[paths["losses"]], folder=superseded)
+            outputs.losses.write_parquet(paths["losses"])
         return outputs
     if fit_baselines:
         outputs = _fit_baselines(domain=domain)
-        _move_to_superseded(paths=[paths["losses"], paths["weights"]])
+        _move_to_superseded(paths=[paths["losses"], paths["weights"]], folder=superseded)
         outputs.losses.write_parquet(paths["losses"])
         outputs.weights.write_parquet(paths["weights"])
         return outputs
@@ -2684,7 +2707,6 @@ def run_domain(
         "cap_mw",
         "constrained",
     ).write_parquet(paths["rows"])
-    losses.write_parquet(paths["losses"])
     native_coverage.write_parquet(paths["native_coverage"])
     summary.write_parquet(paths["member_summary"])
     weights.write_parquet(paths["weights"])
@@ -2697,6 +2719,9 @@ def run_domain(
         "power_mw",
         prediction_mw=pl.col("signed_error_capped_mw") + pl.col("power_mw"),
     ).write_parquet(paths["predictions"])
+    # Written last: the write-once guard refuses a refit once the losses exist, so their presence
+    # has to mean that every other output of this technology is complete.
+    losses.write_parquet(paths["losses"])
     return Outputs(
         frame=frame,
         losses=losses,
@@ -2795,6 +2820,11 @@ def main() -> int:
     lines = ["# ENS forecast error by horizon", ""]
     records: list[IntervalRecord] = []
     boards: list[dict[str, object]] = []
+    superseded_mode = "fit-missing" if arguments.fit_missing else "fit-baselines"
+    superseded = (
+        RESULTS_DIR / "superseded" / f"{datetime.now(tz=UTC):%Y%m%dT%H%M%SZ}-{superseded_mode}"
+    )
+    changed = False
     for domain in (SOLAR, WIND):
         refit = _refits(arguments=arguments, domain=domain)
         if not refit and not _paths(domain=domain.name)["losses"].exists():
@@ -2806,9 +2836,11 @@ def main() -> int:
         outputs = run_domain(
             domain=domain,
             report_only=not refit and not arguments.fit_missing and not arguments.fit_baselines,
+            superseded=superseded,
             fit_missing=arguments.fit_missing,
             fit_baselines=arguments.fit_baselines,
         )
+        changed = changed or outputs.changed
         best = best_baselines(losses=outputs.losses)
         domain_records = _intervals(
             losses=outputs.losses,
@@ -2838,11 +2870,19 @@ def main() -> int:
             *(_weight_lines(weights=outputs.weights) if domain.name == "wind" else []),
             *_per_site_lines(losses=outputs.losses, domain=domain.name),
         ]
+    report = "\n".join(lines) + "\n"
+    sys.stdout.write(report)
+    replaces_losses = arguments.fit_missing or arguments.fit_baselines
+    if replaces_losses and not changed:
+        _LOG.info("nothing was refitted; the saved report, intervals and leaderboard are kept")
+        return 0
+    if replaces_losses:
+        _move_to_superseded(
+            paths=[RESULTS_DIR / name for name in RUN_LEVEL_OUTPUTS], folder=superseded
+        )
     pl.DataFrame(records).write_parquet(RESULTS_DIR / "intervals.parquet")
     pl.DataFrame(boards).write_parquet(RESULTS_DIR / "leaderboard.parquet")
-    report = "\n".join(lines) + "\n"
     (RESULTS_DIR / "report.md").write_text(report)
-    sys.stdout.write(report)
     return 0
 
 
