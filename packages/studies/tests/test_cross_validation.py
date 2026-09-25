@@ -104,7 +104,21 @@ def test_the_booster_settings_translate_exactly_and_never_subsample_columns():
         "tree_method": "hist",
         "seed": 3,
         "nthread": 4,
+        "device": "cpu",
     }
+
+
+def test_the_booster_device_is_passed_through_and_defaults_to_the_cpu():
+    # A GPU fit is not bit-identical to a CPU fit, so a study that mixes the two must be able to
+    # name the device of each fit; silently falling back to the CPU would put a GPU arm in a CPU
+    # contrast.
+    assert booster_parameters(hyper_parameters=PRIMARY_HYPER_PARAMETERS, seed=0)["device"] == "cpu"
+    assert (
+        booster_parameters(hyper_parameters=PRIMARY_HYPER_PARAMETERS, seed=0, device="cuda")[
+            "device"
+        ]
+        == "cuda"
+    )
 
 
 def test_the_published_seeds_are_the_ones_fitted():
@@ -141,6 +155,35 @@ def test_each_model_is_fitted_on_its_own_objective(monkeypatch: pytest.MonkeyPat
     assert quantile["objective"] == "reg:quantileerror"
     assert np.asarray(quantile["quantile_alpha"]).tolist() == list(QUANTILE_LEVELS)
     assert point_rounds == quantile_rounds == PRIMARY_HYPER_PARAMETERS["num_boost_round"]
+    assert point["device"] == quantile["device"] == "cpu"
+
+
+def test_the_requested_device_reaches_both_boosters(monkeypatch: pytest.MonkeyPatch):
+    # A device dropped between `fit_one_fold` and `xgb.train` would fit a "GPU" arm on the CPU.
+    devices: list[object] = []
+
+    class _Booster:
+        def predict(self, matrix: object) -> np.ndarray:
+            return np.zeros((4, 9))
+
+    def _train(parameters: dict[str, object], matrix: object, num_boost_round: int) -> _Booster:
+        devices.append(parameters["device"])
+        return _Booster()
+
+    monkeypatch.setattr(cross_validation.xgb, "train", _train)
+    site_rows = _site_rows()
+    fit_one_fold(
+        train=site_rows,
+        test=site_rows.head(4),
+        features=["x"],
+        target="power_mw",
+        hyper_parameters=PRIMARY_HYPER_PARAMETERS,
+        seed=0,
+        with_quantiles=True,
+        device="cuda",
+    )
+
+    assert devices == ["cuda", "cuda"]
 
 
 def test_the_clamp_holds_a_prediction_to_its_cap_and_leaves_uncapped_rows_alone():
@@ -194,6 +237,7 @@ class _RecordingFit:
     def __init__(self, *, offset_mw: float) -> None:
         self.offset_mw = offset_mw
         self.calls: list[_Call] = []
+        self.devices: list[str] = []
 
     def __call__(
         self,
@@ -206,14 +250,20 @@ class _RecordingFit:
         seed: int,
         with_quantiles: bool,
         weight: str | None = None,
+        device: str = "cpu",
     ) -> tuple[np.ndarray, np.ndarray | None]:
         self.calls.append(_Call(train=train, test=test, features=features))
+        self.devices.append(device)
         point = test[target].to_numpy() + self.offset_mw
         return point, (np.repeat(point[:, None], 9, axis=1) if with_quantiles else None)
 
 
 def _run(
-    monkeypatch: pytest.MonkeyPatch, *, site_rows: pl.DataFrame, offset_mw: float = 1.0
+    monkeypatch: pytest.MonkeyPatch,
+    *,
+    site_rows: pl.DataFrame,
+    offset_mw: float = 1.0,
+    device: str = "cpu",
 ) -> tuple[pl.DataFrame, _RecordingFit]:
     fit = _RecordingFit(offset_mw=offset_mw)
     monkeypatch.setattr(cross_validation, "fit_one_fold", fit)
@@ -223,8 +273,19 @@ def _run(
         target="power_mw",
         hyper_parameters=PRIMARY_HYPER_PARAMETERS,
         with_quantiles=True,
+        device=device,
     )
     return losses, fit
+
+
+def test_every_fold_and_seed_is_fitted_on_the_requested_device(monkeypatch: pytest.MonkeyPatch):
+    # A device that reached only the first fit would leave the rest on the CPU, and a study would
+    # report a GPU arm that was mostly fitted on the CPU.
+    _, fit = _run(monkeypatch, site_rows=_site_rows(), device="cuda")
+    assert fit.devices
+    assert set(fit.devices) == {"cuda"}
+    _, cpu_fit = _run(monkeypatch, site_rows=_site_rows())
+    assert set(cpu_fit.devices) == {"cpu"}
 
 
 def test_no_fit_trains_on_the_fold_it_scores(monkeypatch: pytest.MonkeyPatch):

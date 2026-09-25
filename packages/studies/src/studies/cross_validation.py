@@ -352,12 +352,16 @@ def crps(*, actual: np.ndarray, quantiles: np.ndarray) -> np.ndarray:
     return 2.0 * QUANTILE_LEVEL_SPACING * pinball.sum(axis=1)
 
 
-def booster_parameters(*, hyper_parameters: HyperParameters, seed: int) -> dict[str, object]:
+def booster_parameters(
+    *, hyper_parameters: HyperParameters, seed: int, device: str = "cpu"
+) -> dict[str, object]:
     """Translate the settings above into XGBoost's own parameter names.
 
     Args:
         hyper_parameters: The settings to translate.
         seed: The XGBoost random seed.
+        device: XGBoost's device, `"cpu"` or `"cuda"`. A GPU fit is not bit-identical to a CPU fit,
+            so every arm of one contrast must use the same device.
 
     Returns:
         The parameter dictionary `xgb.train` takes, with no objective set.
@@ -371,6 +375,7 @@ def booster_parameters(*, hyper_parameters: HyperParameters, seed: int) -> dict[
         "tree_method": "hist",
         "seed": seed,
         "nthread": THREADS_PER_FIT,
+        "device": device,
     }
 
 
@@ -402,6 +407,7 @@ def fit_one_fold(
     seed: int,
     with_quantiles: bool,
     weight: str | None = None,
+    device: str = "cpu",
 ) -> tuple[np.ndarray, np.ndarray | None]:
     """Fit one point model, optionally one quantile model, and predict the test fold.
 
@@ -414,6 +420,7 @@ def fit_one_fold(
         seed: The XGBoost random seed.
         with_quantiles: Whether to fit the quantile model as well.
         weight: A column of training-row weights, or `None` to weigh every row alike.
+        device: XGBoost's device, `"cpu"` or `"cuda"`.
 
     Returns:
         The point predictions, and the quantile predictions or `None`.
@@ -424,7 +431,7 @@ def fit_one_fold(
         weight=None if weight is None else train[weight].to_numpy(),
     )
     test_matrix = xgb.DMatrix(test.select(features).to_numpy())
-    shared = booster_parameters(hyper_parameters=hyper_parameters, seed=seed)
+    shared = booster_parameters(hyper_parameters=hyper_parameters, seed=seed, device=device)
     rounds = hyper_parameters["num_boost_round"]
 
     point_model = xgb.train(
@@ -450,6 +457,7 @@ def out_of_fold_losses(
     hyper_parameters: HyperParameters,
     with_quantiles: bool,
     weight: str | None = None,
+    device: str = "cpu",
 ) -> pl.DataFrame:
     """Produce out-of-fold losses for one feature set at one site, one row per (test row, seed).
 
@@ -466,6 +474,7 @@ def out_of_fold_losses(
         hyper_parameters: The setting to fit at.
         with_quantiles: Whether to score the continuous ranked probability score too.
         weight: A column of training-row weights, or `None` to weigh every row alike.
+        device: XGBoost's device for every fit, `"cpu"` or `"cuda"`.
 
     Returns:
         One row per (time, seed) with the losses in megawatts and as a fraction of the row's own
@@ -492,6 +501,7 @@ def out_of_fold_losses(
                 seed=seed,
                 with_quantiles=with_quantiles,
                 weight=weight,
+                device=device,
             )
             outputs.append(
                 _losses(test=test, actual=actual, point=point, quantiles=quantiles, seed=seed)
