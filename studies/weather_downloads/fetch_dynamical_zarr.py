@@ -285,25 +285,39 @@ _VERSION_READ_NOT_VERIFIED: Final[str] = (
     "these fields at a version change was not tested."
 )
 
+_NO_VERSION_MARKER: Final[str] = (
+    "The Dynamical.org store carries no per-run model-version marker: its only version "
+    "attribute, `dataset_version` (0.1.0), versions the store's own layout, not the model, and "
+    "no variable or coordinate names the model version. The archive is therefore a blended "
+    "series across the versions above, and the version of a run must be assigned from its "
+    "`init_time` against that dated list. Every row keeps `init_time`, so a study can split by "
+    "version."
+)
+
 VERSION_NOTES: Final[dict[str, list[str]]] = {
     "ECMWF-AIFS": [
-        "Model versions inside this history: AIFS Single v1 became operational with the "
-        "2025-02-25 06 UTC run, v1.1 on 2025-08-27, and v2 on 2026-05-12 (the same day as IFS "
-        "Cycle 50r1). Runs before 2025-02-25 06 UTC pre-date the operational v1; which model "
-        "version produced them was not checked. " + _VERSION_READ_NOT_VERIFIED,
+        "Operational versions of AIFS Single, by first `init_time` (UTC) and identifier: "
+        "2025-02-25 06:00, AIFS Single v1.0; 2025-08-27 (hour not recorded), AIFS Single v1.1.0 "
+        "(paper: 'AIFS Single 1.1.0'); 2026-05-12 06:00, AIFS Single v2 (released jointly with "
+        "IFS Cycle 50r1). Runs before 2025-02-25 06:00 pre-date the operational v1.0; which "
+        "model version produced them was not checked. " + _VERSION_READ_NOT_VERIFIED,
+        _NO_VERSION_MARKER,
         (
             "The store starts on 2024-04-01, but `downward_short_wave_radiation_flux_surface`, "
             "`downward_long_wave_radiation_flux_surface`, `wind_u_100m` and `wind_v_100m` are "
             "`NaN` in every run before the 2025-02-24 06 UTC run: the store holds no values "
-            "for those fields before then. That is one day before the operational v1 date "
+            "for those fields before then. That is one day before the operational v1.0 date "
             "(2025-02-25 06 UTC) read from ECMWF's pages, so the store's start of these four "
             "fields does not coincide with that date. Those rows are kept as `NaN`; "
             "`validate_dynamical_zarr.py` treats exactly those `NaN`s as expected."
         ),
     ],
     "ECMWF-AIFS-ENS": [
-        "Model versions inside this history: AIFS ENS v1 became operational on 2025-07-01 (the "
-        "store starts on 2025-07-02) and v2 on 2026-05-12. " + _VERSION_READ_NOT_VERIFIED,
+        "Operational versions of AIFS ENS, by first `init_time` (UTC) and identifier: "
+        "2025-07-01 06:00, AIFS ENS v1 (the store starts on 2025-07-02 00:00, so it holds no "
+        "run before v1); 2026-05-12 06:00, AIFS ENS v2 (released jointly with IFS Cycle 50r1). "
+        + _VERSION_READ_NOT_VERIFIED,
+        _NO_VERSION_MARKER,
     ],
 }
 
@@ -319,8 +333,18 @@ SOURCE_GAP_NOTES: Final[dict[str, str]] = {
         "gap was confirmed in the Dynamical.org store itself, so it is not a crop artefact. "
         "Missing values were kept as `NaN`, not masked or dropped."
     ),
-    "ECMWF-AIFS": "Missing values were kept as `NaN`, not masked or dropped.",
-    "ECMWF-AIFS-ENS": "Missing values were kept as `NaN`, not masked or dropped.",
+    "ECMWF-AIFS": (
+        "`validate_dynamical_zarr.py` on 2026-09-25 found one `NaN` gap in the full 2024-04 to "
+        "2026-09 run beyond the expected pre-2025-02-24 fields: the 2025-01-21 06:00 UTC run is "
+        "`NaN` in every variable at four lead times (0 h, 12 h, 8 d, and 11 d 6 h), "
+        "so validation reports `FAIL nan: 2025-01`. Missing values were kept as `NaN`, not "
+        "masked or dropped."
+    ),
+    "ECMWF-AIFS-ENS": (
+        "`validate_dynamical_zarr.py` on 2026-09-25 found no `NaN` beyond lead 0 of the "
+        "averaged radiation fields in the full 2025-07 to 2026-09 run, and exactly 51 "
+        "`ensemble_member` values (0 to 50) in every month."
+    ),
     "GFS": (
         "`validate_dynamical_zarr.py` on 2026-09-25 found `NaN` in one month of the full "
         "2020-10 to 2026-09 run: 2022-11, on four init_times. The 2022-11-29 12:00 UTC run is "
