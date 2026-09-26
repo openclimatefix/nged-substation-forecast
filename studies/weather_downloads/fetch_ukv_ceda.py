@@ -27,9 +27,10 @@ count.**
 data disk (never `/tmp`, which is tmpfs). Each file is cropped to `.npy` files in a per-run cache
 directory as soon as it lands, the run is committed once every file is cached, and the cache is
 deleted after the commit. A re-run skips every file already cached and every run whose status is
-complete or missing. Pass `--retry-partial` to fetch partial runs again. A lock file stops two
-writers. The download is one stream with a delay between files and retries with backoff, and stops
-below `--min-free-gb` of free disk.
+complete or missing. Pass `--retry-partial` to fetch partial and missing runs again. A lock file
+stops two writers. The download is one stream with a delay between files, retries with backoff, and
+an HTTP Range resume of an interrupted file, and it stops below `--min-free-gb` of free disk. A day
+whose directory listing fails or is empty is skipped and never recorded, so a later run retries it.
 
 Set `CEDA_TOKEN` in the environment (a CEDA access token). The script never prints or stores it, and
 never follows a redirect: a redirect means the token was rejected. Run it with `uv run --with
@@ -78,7 +79,8 @@ PUBLICATION_LAG: Final[timedelta] = timedelta(days=4)
 MAX_STEP_HOURS: Final[int] = 54
 N_STEPS: Final[int] = MAX_STEP_HOURS + 1
 PLAIN_LAST_STEP: Final[int] = 36
-T54_STEPS: Final[tuple[int, ...]] = (*range(37, 49), 51, 54)
+HOURLY_LAST_STEP: Final[int] = 48
+T54_STEPS: Final[tuple[int, ...]] = (*range(37, HOURLY_LAST_STEP + 1), 51, 54)
 """Leads in a `T54` file: hourly to 48 hours, then 3-hourly."""
 
 SIGNIFICAND_BITS: Final[int] = 13
@@ -110,6 +112,7 @@ GRID_KEYS: Final[dict[str, float]] = {
     "DjInMetres": GRID_SPACING_M,
     "XRInMetres": 400000.0,
     "YRInMetres": -100000.0,
+    "scanningMode": 64,
 }
 """The grid keys checked in every file. Rows run north to south, though `scanningMode` says south
 to north: the grid is checked against the temperature and shortwave gradients, which put the first
@@ -120,7 +123,9 @@ MISSING_VALUE: Final[float] = 1e30
 """Passed to eccodes as `missingValue` so that a bitmap-masked cell decodes as this, not as 9999."""
 
 REQUEST_DELAY_S: Final[float] = 1.0
-MAX_ATTEMPTS: Final[int] = 5
+MAX_ATTEMPTS: Final[int] = 8
+MAX_BACKOFF_S: Final[float] = 150.0
+"""Attempt `n` waits `5 * 2**(n-1)` seconds up to this cap, so 8 attempts span about 8 minutes."""
 DOWNLOAD_CHUNK_BYTES: Final[int] = 4 * 1024 * 1024
 DEFAULT_MIN_FREE_GB: Final[float] = 100.0
 
@@ -150,6 +155,10 @@ class FieldSpec:
         units: The units as served.
         description: A one-line description for the README.
         invalid_below: Values below this are a "no value" flag and are stored as NaN, or `None`.
+        process: GRIB2 `typeOfStatisticalProcessing` that an interval-valued field must carry
+            (1 accumulation, 2 maximum), or `None` for an instantaneous field.
+        lower_limit: The probability threshold, as `scaledValueOfLowerLimit`, that a probability
+            field must carry, or `None`.
     """
 
     variable: str
@@ -165,6 +174,8 @@ class FieldSpec:
     units: str
     description: str
     invalid_below: float | None = None
+    process: int | None = None
+    lower_limit: int | None = None
 
     @property
     def key(self) -> tuple[int, ...]:
@@ -213,6 +224,8 @@ def _field(
     second: tuple[int, int] = (255, NO_SURFACE),
     template: int = 0,
     invalid_below: float | None = None,
+    process: int | None = None,
+    lower_limit: int | None = None,
 ) -> FieldSpec:
     """Build a `FieldSpec` from grouped keys, so that the table below stays one line per field."""
     return FieldSpec(
@@ -229,6 +242,8 @@ def _field(
         units=units,
         description=description,
         invalid_below=invalid_below,
+        process=process,
+        lower_limit=lower_limit,
     )
 
 
@@ -250,6 +265,7 @@ FIELDS: Final[tuple[FieldSpec, ...]] = (
         "fraction",
         "Probability that visibility is below 1000 m",
         template=5,
+        lower_limit=1000,
     ),
     _field("precipitation_rate", 1, (0, 1, 7), (_GROUND, 0), "kg m-2 s-1", "Precipitation rate"),
     _field(
@@ -260,6 +276,7 @@ FIELDS: Final[tuple[FieldSpec, ...]] = (
         "kg m-2",
         "Precipitation accumulated since the previous served step",
         template=8,
+        process=1,
     ),
     _field(
         "param_0_1_230",
@@ -369,6 +386,7 @@ FIELDS: Final[tuple[FieldSpec, ...]] = (
         "m s-1",
         "Maximum 10 m wind gust since the previous step",
         template=8,
+        process=2,
     ),
 )
 
@@ -738,11 +756,29 @@ def _write_layout(group: zarr.Group, grid: CellGrid) -> None:
         )
 
 
+class TooManyRequestsError(requests.RequestException):
+    """CEDA answered 429. `retry_after` is the seconds it asked for, or `None`."""
+
+    def __init__(self, retry_after: float | None) -> None:
+        """Record how long CEDA asked the client to wait."""
+        super().__init__("HTTP 429")
+        self.retry_after = retry_after
+
+
+def _retry_after_seconds(response: requests.Response) -> float | None:
+    """Read a `Retry-After` header given in seconds, or return `None`."""
+    try:
+        return float(response.headers["Retry-After"])
+    except KeyError, ValueError:
+        return None
+
+
 def _retry[T](operation: Callable[[], T], *, what: str) -> T:
     """Run `operation`, retrying network failures with exponential backoff.
 
     Only the exception type and the attempt number are logged, so that a URL never reaches a log.
-    `CedaAuthError` and `FileAbsentError` are not network failures and pass straight through.
+    `CedaAuthError` and `FileAbsentError` are not network failures and pass straight through. A 429
+    waits at least as long as its `Retry-After` header asked.
 
     Args:
         operation: The call to make.
@@ -761,7 +797,10 @@ def _retry[T](operation: Callable[[], T], *, what: str) -> T:
             print(f"{what}: attempt {attempt}/{MAX_ATTEMPTS} failed with {type(error).__name__}")
             if attempt == MAX_ATTEMPTS:
                 raise
-            time.sleep(2**attempt)
+            delay = min(5 * 2 ** (attempt - 1), MAX_BACKOFF_S)
+            if isinstance(error, TooManyRequestsError) and error.retry_after is not None:
+                delay = max(delay, error.retry_after)
+            time.sleep(delay)
     message = "unreachable"
     raise AssertionError(message)
 
@@ -781,6 +820,8 @@ def list_day(session: requests.Session, *, day: date) -> dict[str, int] | None:
         response = session.get(f"{BASE_URL}/{day:%Y/%m/%d}/", timeout=(30, 60))
         if response.status_code == 404:
             return None
+        if response.status_code == 429:
+            raise TooManyRequestsError(_retry_after_seconds(response))
         response.raise_for_status()
         return {name: int(size) for name, size in _LISTING_ROW.findall(response.text)}
 
@@ -790,7 +831,11 @@ def list_day(session: requests.Session, *, day: date) -> dict[str, int] | None:
 def download(
     session: requests.Session, *, token: str, day: date, name: str, size: int, destination: Path
 ) -> None:
-    """Download one file to `destination`, atomically, and check its size against the listing.
+    """Download one file to `destination`, resuming an interrupted transfer with an HTTP Range.
+
+    The bytes land in `<destination>.partial`. A retry, or a later run after a crash, asks CEDA for
+    the rest of the file with a `Range` header, and starts again if CEDA does not answer 206. The
+    file is renamed into place only when its size equals the listing's.
 
     Args:
         session: An HTTP session.
@@ -803,37 +848,52 @@ def download(
     Raises:
         CedaAuthError: If CEDA redirected the request or refused the token.
         FileAbsentError: If CEDA answered 404.
-        requests.ConnectionError: If fewer bytes than `size` arrived.
+        requests.ConnectionError: If the transfer ended with fewer bytes than `size`.
     """
+    partial = destination.with_suffix(".partial")
 
     def fetch() -> None:
-        response = session.get(
-            f"{BASE_URL}/{day:%Y/%m/%d}/{name}",
-            headers={"Authorization": f"Bearer {token}"},
-            stream=True,
-            allow_redirects=False,
-            timeout=(30, 120),
-        )
-        with response:
-            if response.status_code == 404:
-                raise FileAbsentError(name)
-            if response.is_redirect or response.status_code in (401, 403):
-                message = f"CEDA answered {response.status_code}: the token was not accepted"
-                raise CedaAuthError(message)
-            response.raise_for_status()
-            partial = destination.with_suffix(".partial")
-            received = 0
-            with partial.open("wb") as handle:
-                for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_BYTES):
-                    handle.write(chunk)
-                    received += len(chunk)
-            if received != size:
-                partial.unlink()
-                message = f"received {received} of {size} bytes"
-                raise requests.ConnectionError(message)
-            partial.rename(destination)
+        have = partial.stat().st_size if partial.exists() else 0
+        if have > size:
+            partial.unlink()
+            have = 0
+        if have < size:
+            _transfer(
+                session,
+                token=token,
+                url=f"{BASE_URL}/{day:%Y/%m/%d}/{name}",
+                partial=partial,
+                have=have,
+            )
+        if partial.stat().st_size != size:
+            message = f"received {partial.stat().st_size} of {size} bytes"
+            raise requests.ConnectionError(message)
+        partial.rename(destination)
 
     _retry(fetch, what=name)
+
+
+def _transfer(session: requests.Session, *, token: str, url: str, partial: Path, have: int) -> None:
+    """Append the rest of a file, from byte `have`, to `partial`."""
+    headers = {"Authorization": f"Bearer {token}"}
+    if have:
+        headers["Range"] = f"bytes={have}-"
+    response = session.get(
+        url, headers=headers, stream=True, allow_redirects=False, timeout=(30, 120)
+    )
+    with response:
+        if response.status_code == 404:
+            raise FileAbsentError(url.rsplit("/", 1)[-1])
+        if response.is_redirect or response.status_code in (401, 403):
+            message = f"CEDA answered {response.status_code}: the token was not accepted"
+            raise CedaAuthError(message)
+        if response.status_code == 429:
+            raise TooManyRequestsError(_retry_after_seconds(response))
+        response.raise_for_status()
+        resumed = have > 0 and response.status_code == 206
+        with partial.open("ab" if resumed else "wb") as handle:
+            for chunk in response.iter_content(chunk_size=DOWNLOAD_CHUNK_BYTES):
+                handle.write(chunk)
 
 
 def _scaled_key(handle: int, key: str) -> int:
@@ -867,6 +927,7 @@ def extract_file(path: Path, *, tag: str, grid: CellGrid) -> tuple[dict[str, np.
     specs = {spec.key: spec for spec in _SPECS_BY_TAG[tag]}
     arrays: dict[str, np.ndarray] = {}
     found: dict[str, list[int]] = {}
+    faults: list[str] = []
     with path.open("rb") as handle:
         while (message := eccodes.codes_grib_new_from_file(handle)) is not None:
             try:
@@ -890,6 +951,12 @@ def extract_file(path: Path, *, tag: str, grid: CellGrid) -> tuple[dict[str, np.
                 step = _scaled_key(message, "endStep")
                 if step > MAX_STEP_HOURS:
                     continue
+                fault = _semantic_fault(message, spec, step=step)
+                if fault is None and step in found.get(spec.variable, []):
+                    fault = f"{spec.variable} has a second message at lead {step}"
+                if fault is not None:
+                    faults.append(f"{tag}: {fault}")
+                    continue
                 eccodes.codes_set(message, "missingValue", MISSING_VALUE)
                 values = eccodes.codes_get_values(message).astype(np.float32)
                 values[values >= MISSING_VALUE / 10] = np.nan
@@ -902,11 +969,32 @@ def extract_file(path: Path, *, tag: str, grid: CellGrid) -> tuple[dict[str, np.
                 found.setdefault(spec.variable, []).append(step)
             finally:
                 eccodes.codes_release(message)
-    problems = _problems(found, tag=tag)
+    problems = _problems(found, tag=tag) + sorted(set(faults))
     return arrays, {
         "found": {var: sorted(steps) for var, steps in found.items()},
         "problems": problems,
     }
+
+
+def _semantic_fault(message: int, spec: FieldSpec, *, step: int) -> str | None:
+    """Describe how a message's statistical process, interval, or threshold differs from `spec`.
+
+    An interval-valued field must carry its statistical process (accumulation or maximum) and cover
+    the interval since the previous served lead: 1 hour up to lead 48 and 3 hours after.
+    """
+    if spec.process is not None:
+        process = _scaled_key(message, "typeOfStatisticalProcessing")
+        if process != spec.process:
+            return f"{spec.variable} has statistical process {process}, expected {spec.process}"
+        length = step - _scaled_key(message, "startStep")
+        expected = 1 if step <= HOURLY_LAST_STEP else 3
+        if length != expected:
+            return f"{spec.variable} covers {length} h at lead {step}, expected {expected}"
+    if spec.lower_limit is not None:
+        limit = _scaled_key(message, "scaledValueOfLowerLimit")
+        if limit != spec.lower_limit:
+            return f"{spec.variable} has threshold {limit}, expected {spec.lower_limit}"
+    return None
 
 
 def _check_grid(message: int) -> None:
@@ -1022,7 +1110,7 @@ def fetch_run(
     *,
     token: str,
     init_time: datetime,
-    listing: dict[str, int] | None,
+    listing: dict[str, int],
     grid: CellGrid,
     product_dir: Path,
     min_free_gb: float,
@@ -1034,7 +1122,7 @@ def fetch_run(
         http: An HTTP session.
         token: The CEDA access token.
         init_time: The run's initialisation time.
-        listing: The day's file listing, or `None` if CEDA has no directory for the day.
+        listing: The day's file listing, which holds at least one `.grib` file.
         grid: The cells to keep.
         product_dir: The product directory, which holds `_scratch/`.
         min_free_gb: Stop when less than this much disk is free.
@@ -1048,7 +1136,6 @@ def fetch_run(
     """
     run_dir = product_dir / "_scratch" / f"{init_time:%Y%m%dT%H}"
     names = {tag: _FILE_NAME_TEMPLATE.format(init=init_time, tag=tag) for tag in FILE_TAGS}
-    listing = listing or {}
     if not any(name in listing for name in names.values()):
         return RunResult(init_time, STATUS_MISSING, len(FILE_TAGS), 0, {})
     for tag, name in names.items():
@@ -1059,9 +1146,18 @@ def fetch_run(
             raise SystemExit(1)
         raw = product_dir / "_scratch" / name
         started = time.monotonic()
-        download(
-            http, token=token, day=init_time.date(), name=name, size=listing[name], destination=raw
-        )
+        try:
+            download(
+                http,
+                token=token,
+                day=init_time.date(),
+                name=name,
+                size=listing[name],
+                destination=raw,
+            )
+        except FileAbsentError:
+            print(f"{init_time:%Y-%m-%dT%HZ} {tag}: listed but CEDA answered 404")
+            continue
         timings.download_seconds += time.monotonic() - started
         timings.raw_bytes += listing[name]
         try:
@@ -1130,7 +1226,7 @@ def _archive_locked(args: argparse.Namespace, *, token: str, product_dir: Path) 
             continue
         status = _status_at(store.statuses(), init_time)
         skip = (
-            (STATUS_COMPLETE, STATUS_MISSING)
+            (STATUS_COMPLETE,)
             if args.retry_partial
             else (STATUS_COMPLETE, STATUS_MISSING, STATUS_PARTIAL)
         )
@@ -1141,14 +1237,18 @@ def _archive_locked(args: argparse.Namespace, *, token: str, product_dir: Path) 
         day = init_time.date()
         if day not in listings:
             listings.clear()
-            listings[day] = list_day(http, day=day)
+            listings[day] = _usable_listing(http, day=day)
+        listing = listings[day]
+        if listing is None:
+            print(f"{day.isoformat()}: no usable directory listing, skipping the day")
+            continue
         started = time.monotonic()
         timings = RunTimings()
         run = fetch_run(
             http,
             token=token,
             init_time=init_time,
-            listing=listings[day],
+            listing=listing,
             grid=grid,
             product_dir=product_dir,
             min_free_gb=args.min_free_gb,
@@ -1168,6 +1268,19 @@ def _archive_locked(args: argparse.Namespace, *, token: str, product_dir: Path) 
         )
     write_documents(product_dir=product_dir, store=store, grid=grid)
     return 0
+
+
+def _usable_listing(session: requests.Session, *, day: date) -> dict[str, int] | None:
+    """List a day, or return `None` if the listing failed or holds no `.grib` file.
+
+    A listing that fails, is absent, or parses to nothing is a transient fault, not evidence that
+    CEDA lacks the day's runs, so the caller records nothing and a later run tries the day again.
+    """
+    try:
+        listing = list_day(session, day=day)
+    except requests.RequestException:
+        return None
+    return listing or None
 
 
 def _status_at(statuses: np.ndarray, init_time: datetime) -> int:
@@ -1262,9 +1375,10 @@ def readme_gotchas() -> list[str]:
     return [
         (
             "Licence: CC BY-NC-SA 4.0, so non-commercial use only, and adaptations must be shared "
-            "alike. Cite as: Met Office (2016): NWP-UKV: Met Office UK Atmospheric High "
-            "Resolution Model data. Centre for Environmental Data Analysis, date of citation. "
-            f"{CATALOGUE_URL}"
+            "alike. Any commercial or production use needs the maintainer's confirmation first. "
+            "The licence file asks users to cite the data as: Met Office (2016): NWP-UKV: Met "
+            "Office UK Atmospheric High Resolution Model data. Centre for Environmental Data "
+            f"Analysis, date of citation. {CATALOGUE_URL}"
         ),
         (
             "A GRIB2 key in the column list is (discipline, parameter category, parameter number, "
@@ -1290,9 +1404,9 @@ def readme_gotchas() -> list[str]:
             "infer on the other."
         ),
         (
-            "Only the 00, 06, 12, and 18 UTC runs are archived. CEDA holds T120 files (leads 55 "
-            "to 120 hours) for the 03 and 15 UTC runs only, so no lead beyond 54 hours exists "
-            "here."
+            "Runs at 00, 06, 12, and 18 UTC reach 54 hours at most, because CEDA holds T120 "
+            "files (leads 55 to 120 hours) for the 03 and 15 UTC runs only. Only the 00, 06, 12, "
+            "and 18 UTC runs are archived, so no lead beyond 54 hours exists here."
         ),
         (
             "Leads are hourly to 48 hours and 3-hourly to 54 hours (51 and 54), so steps 49, 50, "
@@ -1305,7 +1419,10 @@ def readme_gotchas() -> list[str]:
         (
             "Precipitation amount and maximum gust are over the interval since the previous "
             "served step: 1 hour to lead 48, then 3 hours at leads 51 and 54. They have no "
-            "lead 0."
+            "lead 0. The fetch script checks every such message: precipitation must carry "
+            "statistical process 1 (accumulation), gust must carry 2 (maximum), and the "
+            "interval must be the expected length, else the run is partial and the message is "
+            "not stored."
         ),
         (
             "Screen-level fields are coded at level 1 (m) in the GRIB files, though the Met "

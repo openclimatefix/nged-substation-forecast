@@ -3,7 +3,9 @@
 One-off throwaway script for the forecast study. It opens `<product dir>/store` read-only and runs
 the checks in `CHECK_NAMES`: the run spacing of the `init_time` axis, the counts of runs by status,
 the value range of every variable, the pattern of NaN against the lead layout that each variable is
-expected to have, the diurnal cycle of downward shortwave, and the list of gaps.
+expected to have, the centroid of the daily shortwave curve against solar noon, the north-to-south
+order of the rows, that the maximum gust is not below the instantaneous gust, and the list of gaps,
+in which every run that CEDA lacks (status 3) appears.
 
 **The checks read a sample of at most `--sample` runs, spread evenly across the archive**: the
 value ranges and the shortwave cycle read complete and partial runs, and the NaN layout reads
@@ -52,6 +54,8 @@ CHECK_NAMES: Final[tuple[str, ...]] = (
     "value_ranges",
     "nan_layout",
     "shortwave_diurnal_cycle",
+    "north_south_gradient",
+    "gust_max_is_a_maximum",
     "gaps",
 )
 
@@ -96,6 +100,7 @@ values at 8 bits and serves up to 100.05 (measured in the 2026-09-20 00Z file). 
 
 NAN_ALLOWED: Final[frozenset[str]] = frozenset(
     {
+        "cloud_base_height",
         "cloud_param_0_6_26",
         "convective_cloud_top_height",
         "wind_speed_1000hpa",
@@ -107,12 +112,17 @@ NAN_ALLOWED: Final[frozenset[str]] = frozenset(
     }
 )
 """Variables whose cells may be NaN at a served lead: a bitmap masks below-ground pressure levels
-and cells with no convective cloud, so the layout check only demands that the unserved leads are
+cells with no cloud (cloud base is NaN under a clear sky), and cells with no convective cloud, so the layout check only demands that the unserved leads are
 entirely NaN."""
 
 NIGHT_MEAN_MAX_W_M2: Final[float] = 2.0
-NOON_HOURS_UTC: Final[range] = range(10, 15)
 NIGHT_HOUR_UTC: Final[int] = 0
+SOLAR_NOON_TOLERANCE_HOURS: Final[float] = 0.6
+"""How far the centroid of the daily shortwave curve may sit from solar noon. Weather that clouds
+one half of a day moves the centroid by a few tenths of an hour, and a 1 hour lead offset moves it
+by 1 hour."""
+GUST_TOLERANCE: Final[float] = 2**-12
+MAX_GUST_VIOLATION_FRACTION: Final[float] = 0.01
 
 
 def expected_leads(spec: FieldSpec) -> set[int]:
@@ -200,30 +210,84 @@ def check_nan_layout(group: zarr.Group, slots: np.ndarray) -> tuple[bool, dict[s
     return ok, {"variables_with_a_fault": sorted(bad)}
 
 
+def equation_of_time_minutes(day_of_year: int) -> float:
+    """The equation of time in minutes, to about 1 minute: apparent minus mean solar time."""
+    angle = 2 * np.pi * (day_of_year - 81) / 364
+    return float(9.87 * np.sin(2 * angle) - 7.53 * np.cos(angle) - 1.5 * np.sin(angle))
+
+
 def check_shortwave_diurnal_cycle(
     group: zarr.Group, slots: np.ndarray
 ) -> tuple[bool, dict[str, Any]]:
-    """Check that shortwave peaks near solar noon and is near zero at midnight, by valid hour."""
+    """Check that shortwave is centred on solar noon and near zero at midnight, by valid hour.
+
+    The mean daily curve of shortwave, by UTC hour of the valid time, has a centroid over the
+    daylight hours. That centroid must lie within `SOLAR_NOON_TOLERANCE_HOURS` of the solar noon
+    of the cells' mean longitude, which the equation of time corrects for the sampled days. A lead
+    offset of 1 hour or more moves the centroid outside the tolerance.
+    """
     spec = next(spec for spec in FIELDS if spec.variable == "shortwave_down")
     data = read_sample(group, spec, slots)
-    init_hours = np.array(
-        [(SLOT_EPOCH.hour + int(slot) * CYCLE_HOURS) % 24 for slot in slots], dtype=int
-    )
+    init_seconds = np.asarray(_array(group, "init_time")[:])[slots]
     sums = np.zeros(24)
     counts = np.zeros(24)
-    for run, init_hour in enumerate(init_hours):
+    equation = []
+    for run, seconds in enumerate(init_seconds):
+        init = datetime.fromtimestamp(int(seconds), tz=UTC)
+        equation.append(equation_of_time_minutes(init.timetuple().tm_yday))
         for lead in range(PLAIN_LAST_STEP + 1):
-            hour = (init_hour + lead) % 24
+            hour = (init.hour + lead) % 24
             sums[hour] += float(np.nanmean(data[run, lead]))
             counts[hour] += 1
     mean_by_hour = sums / np.maximum(counts, 1)
-    peak_hour = int(np.argmax(mean_by_hour))
+    daylight = np.arange(4, 21)
+    centroid = float(np.sum(daylight * mean_by_hour[daylight]) / np.sum(mean_by_hour[daylight]))
+    longitude = float(np.mean(np.asarray(_array(group, "cell_longitude")[:])))
+    solar_noon = 12.0 - longitude / 15.0 - float(np.mean(equation)) / 60.0
+    offset = centroid - solar_noon
     ok = (
-        peak_hour in NOON_HOURS_UTC
+        abs(offset) <= SOLAR_NOON_TOLERANCE_HOURS
         and mean_by_hour[NIGHT_HOUR_UTC] < NIGHT_MEAN_MAX_W_M2
         and bool(np.all(counts > 0))
     )
-    return ok, {"peak_hour_utc": peak_hour, "mean_w_m2_by_utc_hour": mean_by_hour.round(1).tolist()}
+    return ok, {
+        "centroid_minus_solar_noon_hours": round(offset, 2),
+        "mean_w_m2_by_utc_hour": mean_by_hour.round(1).tolist(),
+    }
+
+
+def check_north_south_gradient(group: zarr.Group, slots: np.ndarray) -> tuple[bool, dict[str, Any]]:
+    """Check that the stored grid runs north to south, and that temperature falls to the north.
+
+    Latitude must fall as the row index rises. The mean temperature over the sampled runs must
+    correlate negatively with latitude, which fails if the rows were read in the wrong order.
+    """
+    latitude = np.asarray(_array(group, "cell_latitude")[:])
+    rows = np.asarray(_array(group, "cell_row")[:])
+    rows_run_south = bool(latitude[rows == rows.min()].mean() > latitude[rows == rows.max()].mean())
+    spec = next(spec for spec in FIELDS if spec.variable == "temperature_1p5m")
+    mean_temperature = np.nanmean(
+        read_sample(group, spec, slots)[:, : PLAIN_LAST_STEP + 1], axis=(0, 1)
+    )
+    correlation = float(np.corrcoef(latitude, mean_temperature)[0, 1])
+    return rows_run_south and correlation < 0, {
+        "rows_run_north_to_south": rows_run_south,
+        "temperature_latitude_correlation": round(correlation, 2),
+    }
+
+
+def check_gust_max_is_a_maximum(
+    group: zarr.Group, slots: np.ndarray
+) -> tuple[bool, dict[str, Any]]:
+    """Check that the maximum gust is not below the instantaneous gust at the same lead.
+
+    The two are rounded to 13 significand bits, so a difference within `GUST_TOLERANCE` is equal.
+    """
+    by_name = {spec.variable: spec for spec in FIELDS}
+    maximum = read_sample(group, by_name["gust_10m_max"], slots)[:, 1 : PLAIN_LAST_STEP + 1]
+    instant = read_sample(group, by_name["gust_10m"], slots)[:, 1 : PLAIN_LAST_STEP + 1]
+    below = float(np.mean(maximum < instant * (1 - GUST_TOLERANCE) - 0.05))
+    return below < MAX_GUST_VIOLATION_FRACTION, {"fraction_max_below_instant": below}
 
 
 def check_gaps(statuses: np.ndarray) -> tuple[bool, dict[str, Any]]:
@@ -252,7 +316,12 @@ def check_gaps(statuses: np.ndarray) -> tuple[bool, dict[str, Any]]:
             start = None
     for gap in gaps:
         print(f"  gap: {gap}")
-    return never_visited == 0, {"gaps": gaps, "never_visited_in_range": never_visited}
+    missing = [f"{_slot_time(int(slot)):%Y-%m-%dT%HZ}" for slot in np.flatnonzero(statuses == 3)]
+    return never_visited == 0, {
+        "gaps": gaps,
+        "never_visited_in_range": never_visited,
+        "missing_on_ceda": missing,
+    }
 
 
 def _slot_time(slot: int) -> datetime:
@@ -286,6 +355,12 @@ def main() -> int:
         "nan_layout": check_nan_layout(group, complete_sample) if len(complete) else no_runs,
         "shortwave_diurnal_cycle": (
             check_shortwave_diurnal_cycle(group, readable_sample) if len(readable) else no_runs
+        ),
+        "north_south_gradient": (
+            check_north_south_gradient(group, readable_sample) if len(readable) else no_runs
+        ),
+        "gust_max_is_a_maximum": (
+            check_gust_max_is_a_maximum(group, complete_sample) if len(complete) else no_runs
         ),
         "gaps": check_gaps(statuses),
     }
