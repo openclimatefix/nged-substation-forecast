@@ -160,12 +160,13 @@ mean (7.68%). Interpolating the local irradiance through the clearness index (th
 irradiance to the irradiance at the top of the atmosphere) gave 8.08%, so the gap fell to 0.40
 points. Against CAMS's irradiance, the hourly mean absolute error of the local series fell from 86
 to 59 W/m², beside 54 W/m² for Open-Meteo's mean. Averaged over the local series' own 3-hour
-windows, the two series differ by 4 W/m² (53 and 49 W/m²), so the hold changes the hourly values and
-leaves the 3-hour means alone. The interpolation does not conserve the 3-hour means: the
-interpolated series departs from the held one by 6 to 11 W/m² on average over the windows of each
-step, and by 1 to 7 W/m² on signed average. Open-Meteo's own method of spreading 3-hour steps onto
-hours is not documented in the sources this study read, so the interpolation is one plausible
-method and not a copy of Open-Meteo's.
+windows, where the hold cannot matter, the local series' error is 53 W/m² against 49 W/m² for
+Open-Meteo's mean. The hold therefore accounts for most of the hourly gap in irradiance error (27
+W/m²), and 4 W/m² remains at 3-hour resolution. The interpolation does not conserve the 3-hour
+means: the interpolated series departs from the held one by 6 to 11 W/m² on average over the windows
+of each step, and by 1 to 7 W/m² on signed average. Open-Meteo's own method of spreading 3-hour
+steps onto hours is not documented in the sources this study read, so the interpolation is one
+plausible method and not a copy of Open-Meteo's.
 
 | Design | Open-Meteo ECMWF ENS mean | Local, held over each step | Local, clearness index interpolated | Local, from a run about a day older |
 |---|---|---|---|---|
@@ -173,18 +174,19 @@ method and not a copy of Open-Meteo's.
 | Wind 10 m | 5.79 | 6.00 | not built | 6.89 |
 | Wind 100 m and 10 m | 5.71 | 6.00 | not built | 6.82 |
 
-**A run about a day older raised the local error by 0.8 to 0.9 points in every design, which
-bounds what a difference in run age can explain.** The local series comes from one 00:00 UTC run a
-day, so its leads run from 3 to 24 hours (mean 14 hours). The day-old series takes the newest run at
-least 27 hours ahead, so its leads run from 27 to 48 hours (mean 38 hours), and the script checks
-that every step inside the scored window has a run exactly 24 hours older than the stored series'
-run. The rise per hour of run age is therefore about 0.04 points, if the error grows in a straight
-line, which the study did not test. Open-Meteo's ECMWF ENS product starts a run every 6 hours (the
-[Ensemble API](https://open-meteo.com/en/docs/ensemble-api) page), and the [Historical Forecast
-API](https://open-meteo.com/en/docs/historical-forecast-api) page says each run's first few hours
-are stitched into one series. If the ensemble-mean archive follows the same rule, Open-Meteo's leads
-are about 0 to 6 hours, and a lead 8 to 11 hours shorter than the local series' would account for
-0.3 to 0.4 points, which is the solar gap left after the interpolation. The page does not verify
+**A run about a day older raised the local error by 0.8 to 0.9 points in every design, which bounds
+what a difference in run age can explain.** The local series comes from one 00:00 UTC run a day, so
+its leads run from 3 to 24 hours (mean 14 hours). The day-old series takes the newest run at least
+27 hours ahead, so its leads run from 27 to 48 hours (mean 38 hours), and the script checks that
+every step inside the scored window has a run exactly 24 hours older than the stored series' run.
+The rise per hour of run age is therefore about 0.04 points, measured on the held series and assumed
+to carry over to the interpolated series. The figure also assumes that the error grows in a straight
+line with run age, which the study did not test. Open-Meteo's ECMWF ENS product starts a run every 6
+hours (the [Ensemble API](https://open-meteo.com/en/docs/ensemble-api) page), and the [Historical
+Forecast API](https://open-meteo.com/en/docs/historical-forecast-api) page says each run's first few
+hours are stitched into one series. If the ensemble-mean archive follows the same rule, Open-Meteo's
+leads are about 0 to 6 hours, and a lead 8 to 11 hours shorter than the local series' would account
+for 0.3 to 0.4 points, which is the solar gap left after the interpolation. The page does not verify
 either assumption, because the ensemble-mean series carries no run time.
 
 **The gap between the two series changes with the hour of the day in a way that fits a lead
@@ -220,10 +222,12 @@ the study did not count the members behind Open-Meteo's ECMWF ENS mean.
 ICON-D2-EPS's 0.3-point solar lead over ECMWF ENS comes from its more frequent runs.** Open-Meteo
 starts an ICON-D2-EPS run every 3 hours and an ECMWF ENS run every 6 hours, so under the
 first-few-hours rule above, the ICON-D2-EPS mean's leads would average about 1.5 hours and the ECMWF
-ENS mean's about 3 hours. At the run-age slope of the ECMWF-based series (about 0.04 points an
-hour), 1.5 hours is 0.05 points. The slope for ICON-D2 itself is steeper (see the table below), and
-at that slope 1.5 hours is at most 0.13 points. Both estimates are smaller than the 0.32-point
-difference, on assumptions the page could not check.
+ENS mean's about 3 hours. Both estimates use solar slopes only. At the slope of the ECMWF-based
+local series (about 0.04 points an hour), 1.5 hours is 0.05 points. The slope of ICON-D2's
+deterministic run is steeper (2.04 points over 24 hours, or 0.085 points an hour, from the table
+below), and at that slope 1.5 hours is 0.13 points. Both estimates are smaller than the 0.32-point
+difference, on assumptions the page could not check. The study did not estimate a wind slope for the
+ensemble means.
 
 | Deterministic model | Solar, freshest run | Solar, run 24 hours older | Wind 10 m, freshest run | Wind 10 m, run 24 hours older |
 |---|---|---|---|---|
@@ -235,22 +239,27 @@ difference, on assumptions the page could not check.
 **With the freshest run, ICON-D2 led ECMWF IFS by 0.08 points for solar and 0.04 points for wind at
 10 m, and with the run 24 hours older, ECMWF IFS led ICON-D2 by 1.0 and 0.6 points.** At hub height
 the same swap holds: ICON-D2 led by 0.56 points with the freshest run and trailed by 0.12 points
-with the older run. ICON-D2 is therefore the most sensitive to run age of the four models (solar
-error rose 2.0 points from the freshest to the older run, against 1.0 for ECMWF IFS), so a run-age
-difference between the products would favour ICON-D2-EPS. The deterministic gap at the freshest run
-(0.08 points) is smaller than the ensemble-mean gap (0.32 points), which leaves a difference that
-the ensemble averaging of ICON-D2-EPS's 20 members could produce, and this study did not test that
-explanation. The four deterministic series are single runs, so their errors differ from those of the
-ensemble means for reasons besides run age.
+with the older run. For solar, ICON-D2 has the largest rise: its error rose 2.0 points from the
+freshest to the older run, against 1.0 for ECMWF IFS, 1.1 for ICON-EU, and 1.8 for UKV. For wind at
+10 m, ICON-D2 is not the most sensitive (rises of 1.42 points for ICON-D2, 0.76 for ECMWF IFS, 1.25
+for ICON-EU, and 1.74 for UKV). A run-age difference between the products would therefore favour
+ICON-D2-EPS for solar, and the wind data do not show that it would for wind. The deterministic gap
+at the freshest run (0.08 points) is smaller than the ensemble-mean gap (0.32 points), which leaves
+a difference that the ensemble averaging of ICON-D2-EPS's 20 members could produce, and this study
+did not test that explanation. The four deterministic series are single runs, so their errors differ
+from those of the ensemble means for reasons besides run age.
 
-**Each Open-Meteo ensemble mean sits much closer to its deterministic model's freshest run than to
-the run 24 hours older, which points to short leads but is not a clean reading of run age.** The
-mean absolute distance of ECMWF ENS's mean from the IFS freshest run was 0.87 km/h for 10 m wind
-speed, against 1.74 km/h from the older run. For the local series the distances were 1.91 and 1.94
-km/h. For irradiance the local series is 67 W/m² from the IFS freshest run, because of the hold. The
-comparison mixes a mean of members with a single member and, for the local series, leads of 3 to 24
-hours, which straddle the older run's 24-hour offset. Open-Meteo's leads therefore look shorter than
-the local series', and the distances do not put a number on them.
+**The ECMWF ENS, ICON-D2-EPS, and MOGREPS-UK means sit much closer to their deterministic models'
+freshest runs than to the runs 24 hours older, and the ICON-EU-EPS mean sits much closer for
+irradiance but only slightly closer for 10 m wind. Together the distances point to short leads, and
+they are not a clean reading of run age.** For ICON-EU-EPS, the 10 m wind speed is 2.27 km/h from
+the freshest run and 2.89 km/h from the older run. The mean absolute distance of ECMWF ENS's mean
+from the IFS freshest run was 0.87 km/h for 10 m wind speed, against 1.74 km/h from the older run.
+For the local series the distances were 1.91 and 1.94 km/h. For irradiance the local series is 67
+W/m² from the IFS freshest run, because of the hold. The comparison mixes a mean of members with a
+single member and, for the local series, leads of 3 to 24 hours, which straddle the older run's
+24-hour offset. Open-Meteo's leads therefore look shorter than the local series', and the distances
+do not put a number on them.
 
 ## What Open-Meteo's source code does for the MOGREPS-UK mean
 
@@ -275,7 +284,8 @@ on 2026-09-23), read from a shallow clone.
   new value is not NaN, so each valid time keeps the newest run written for it.
 - `Sources/App/Controllers/ForecastapiController.swift` serves `ukmo_uk_ensemble_mean_2km` from the
   single domain `uk_ensemble_mean_2km`, with no mixing across domains.
-- A search of every `.swift` file in `Sources` for "lag" and "time-lag" found no match.
+- A case-insensitive, word-bounded search of every `.swift` file in `Sources` for "lag", "lagged",
+  "time-lag", and "timelag" found no match, so words such as "flag" did not count.
 
 **These points are not verified.** The page did not call the API, so it did not check that served
 values equal a 3-member mean. The code was read as of 2026-09-23 and the archive covers 2026-06-25
