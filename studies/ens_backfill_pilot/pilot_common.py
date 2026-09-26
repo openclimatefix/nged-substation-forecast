@@ -33,7 +33,9 @@ BUCKET_PREFIX: Final[str] = (
 )
 """The bucket prefix that `aws s3 ls --no-sign-request` lists."""
 
-USER_AGENT: Final[str] = "curl/8.0.1"
+USER_AGENT: Final[str] = (
+    "nged-substation-forecast-ens-pilot/0.1 (+https://github.com/openclimatefix/nged-substation-forecast)"
+)
 """The proxy answers 403 to Python's default user agent."""
 
 MembersType = Literal["control", "all"]
@@ -178,8 +180,9 @@ def get_bytes(
 
     A range request must be answered with 206 and the exact number of bytes asked for. A 200 to a
     range request means the server ignored the range and is about to send the whole file, so the
-    connection is closed unread. Connection errors, timeouts, 429, 5xx and a short body are
-    retried with exponential backoff and jitter. Any other status raises.
+    connection is closed unread. Request errors (including a connection reset part-way through a
+    body), 429, 5xx and a short body are retried with exponential backoff and jitter. Any other
+    status raises.
 
     Args:
         url: The URL to fetch.
@@ -209,7 +212,7 @@ def get_bytes(
                 if response.status_code != wanted_status:
                     raise FetchError(f"{url} {byte_range}: HTTP {response.status_code}")
                 body = response.content
-        except (requests.ConnectionError, requests.Timeout) as error:
+        except requests.RequestException as error:
             last_problem = f"{type(error).__name__}: {error}"
             continue
         if expected_length is not None and len(body) != expected_length:

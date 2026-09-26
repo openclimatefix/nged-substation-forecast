@@ -213,7 +213,7 @@ def _fetch_planned(
                 arrays["message_length"][position] = message.entry.length
                 arrays["file_name"][position] = message.file_name
         except BaseException:
-            pool.shutdown(wait=True, cancel_futures=True)
+            pool.shutdown(wait=False, cancel_futures=True)
             raise
     arrays["latitudes"] = CROP_LATITUDES
     arrays["longitudes"] = CROP_LONGITUDES
@@ -247,15 +247,18 @@ def main() -> int:
     dates = resolve_dates(override=args.dates)
     print(f"{len(dates)} dates: {', '.join(day.isoformat() for day in dates)}")
     started = time.monotonic()
-    outcomes = [
-        fetch_date(day=day, members=args.members, workers=args.workers, dry_run=args.dry_run)
-        for day in dates
-    ]
+    outcomes: list[bool] = []
+    for day in dates:
+        outcomes.append(
+            fetch_date(day=day, members=args.members, workers=args.workers, dry_run=args.dry_run)
+        )
+        if not outcomes[-1]:
+            print(f"Stopping after the first failed date, {day}", file=sys.stderr)
+            break
     messages = len(PILOT_VARIABLES) * len(members_for(members=args.members)) * len(STEPS_HOURS)
     print(
-        f"{len(dates)} dates x {messages} messages = {len(dates) * messages} requests, "
-        f"{len(dates) * messages * prefix_bytes() / 1e9:.2f} GB of range data "
-        f"(excluding sidecars); {sum(outcomes)} dates ok in {time.monotonic() - started:.0f} s"
+        f"{len(dates)} dates planned x {messages} messages; "
+        f"{sum(outcomes)} dates ok in {time.monotonic() - started:.0f} s"
     )
     return 0 if all(outcomes) else 1
 
