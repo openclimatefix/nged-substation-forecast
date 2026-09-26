@@ -699,5 +699,9 @@ or on adding nothing a product already on this page carries:**
 - **GEM Global and CMA GRAPES on Open-Meteo** — data at Lincoln, but neither grid spacing nor method
   sets them apart from the global models ranked above.
 - **MOGREPS-UK and MOGREPS-G history** — AWS holds a 30-day rolling window
-  ([MOGREPS-G](https://registry.opendata.aws/met-office-global-ensemble/)), Open-Meteo's ensemble
-  archive 3 to 4 days, and CEDA's `ukmo-nwp` archive has no MOGREPS directory.
+  ([MOGREPS-G](https://registry.opendata.aws/met-office-global-ensemble/)), and CEDA's `ukmo-nwp`
+  archive has no MOGREPS directory. On 2026-09-26, Open-Meteo's ensemble API held the MOGREPS-UK
+  members for about 3.5 days and its ensemble-mean API held the mean and spread from 2026-06-25.
+  [What we learnt about
+  MOGREPS-UK](../roadmap/data-sources.md#what-we-learnt-about-mogreps-uk-on-2026-09-26) has the
+  detail.
