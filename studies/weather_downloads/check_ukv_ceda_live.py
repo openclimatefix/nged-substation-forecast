@@ -18,8 +18,8 @@ site label the script prints the correlation, the mean bias (UKV minus ERA5), an
 square difference. A negative control repeats each comparison with the UKV cell moved 10 rows
 (20 km) south, and the check requires the mean correlation to fall. A spatial check block-averages
 UKV temperature onto the ERA5 grid cells that the UKV crop covers completely, and compares the
-spatial pattern with ERA5's. A coverage check reports whether the UKV crop contains the ERA5 cell of every
-site, and by how many kilometres. Correlations and the negative control are judged only from
+spatial pattern with ERA5's. A coverage check reports whether the UKV crop contains the ERA5 cell of
+every site, and by how many kilometres. Correlations and the negative control are judged only from
 `MIN_PAIRS_TO_JUDGE` pairs upward; below that they are printed.
 
 **The script prints only site labels, correlations, biases, and margins in kilometres.** It derives
