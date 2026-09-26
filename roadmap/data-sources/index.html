@@ -1,0 +1,4910 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../data-cleaning/">
+      
+      
+        <link rel="next" href="../delivery-tables/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Data sources - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#data-sources" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Data sources
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's network and its data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/weather-products-survey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather products surveyed for the weather-product studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/manual-heuristic-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The manual heuristic forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../background/energy-forecasting-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The state of the art in energy forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../design-philosophy/common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common incident classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learned encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/nwp-variable-conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP variable conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS data-quality issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML orchestration design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production deployment design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS running costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" >
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Studies
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Studies
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/beam-diffuse-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a weather product's beam/diffuse split help a PV forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_3" id="__nav_8_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Past weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Past weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/past-weather/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/past-weather/methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods shared by the past-weather studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/past-weather/solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past sunshine?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/past-weather/wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past wind?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/past-weather/blending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending weather products beat the best single weather product?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_4" id="__nav_8_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecasts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecasts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/forecasts/ens-horizons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How accurate is a power forecast driven by ECMWF ENS at each horizon?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/forecasts/matched-lead/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../studies/forecasts/ensemble-means/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How do Open-Meteo's ensemble-mean products compare for solar and wind power?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an ML experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Effective-capacity estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-savings metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../data-cleaning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning the trial-area telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data sources
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#data-from-nged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data from NGED
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data from NGED">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#provided-on-ngeds-aws-s3-bucket-live-updated-every-6-hours" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provided on NGED's AWS S3 bucket (live, updated every 6 hours)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-curtailment-feed-holds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the curtailment feed holds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#provided-as-reference-files-mostly-static-reference-historical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provided as reference files (mostly static reference / historical)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ngeds-published-electricity-network-model-the-long-term-development-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NGED's published electricity-network model (the Long Term Development Statement)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-quality-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data quality &amp; availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ngeds-network-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NGED's network (context)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#weather-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Weather data
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Weather data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#which-sources-carry-which-irradiance-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which sources carry which irradiance components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which feed carries a direct beam, and what asking for one would cost
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-we-learnt-about-mogreps-uk-on-2026-09-26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What we learnt about MOGREPS-UK on 2026-09-26
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-we-learnt-about-met-office-improver-on-2026-09-26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What we learnt about Met Office IMPROVER on 2026-09-26
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ecmwf-has-published-no-plan-to-open-a-direct-beam-or-hourly-ensemble-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ECMWF has published no plan to open a direct beam or hourly ensemble steps
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#two-traps-for-whoever-builds-on-ecmwfs-direct-beam" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two traps for whoever builds on ECMWF's direct beam
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#era5-which-access-route" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ERA5: which access route
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-era5-describes-past-sunshine-and-wind-worse-than-most-current-weather-products" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why ERA5 describes past sunshine and wind worse than most current weather products
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cams-use-the-point-api-not-the-gridded-product" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CAMS: use the point API, not the gridded product
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-comparing-weather-products-on-the-trial-areas-solar-farms-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What comparing weather products on the trial area's solar farms found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#met-office-weather-station-observations-midas-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Met Office weather-station observations (MIDAS Open)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ukv-assimilates-satellite-cloud-and-carries-a-fixed-aerosol-climatology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UKV assimilates satellite cloud, and carries a fixed aerosol climatology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#open-meteos-ukv-archive-is-the-t0-analysis-and-half-of-it-is-backfill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open-Meteo's UKV archive is the T+0 analysis, and half of it is backfill
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nwp-model-upgrades-since-2019" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NWP model upgrades since 2019
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How NGED assembles forecasts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service: what's left to build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics and leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-demand disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending training history with ERA5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#data-from-nged" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data from NGED
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data from NGED">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#provided-on-ngeds-aws-s3-bucket-live-updated-every-6-hours" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provided on NGED's AWS S3 bucket (live, updated every 6 hours)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-the-curtailment-feed-holds" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What the curtailment feed holds
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#provided-as-reference-files-mostly-static-reference-historical" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Provided as reference files (mostly static reference / historical)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ngeds-published-electricity-network-model-the-long-term-development-statement" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NGED's published electricity-network model (the Long Term Development Statement)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-quality-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data quality &amp; availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#ngeds-network-context" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NGED's network (context)
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#weather-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Weather data
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Weather data">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#which-sources-carry-which-irradiance-components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which sources carry which irradiance components
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Which feed carries a direct beam, and what asking for one would cost
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-we-learnt-about-mogreps-uk-on-2026-09-26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What we learnt about MOGREPS-UK on 2026-09-26
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-we-learnt-about-met-office-improver-on-2026-09-26" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What we learnt about Met Office IMPROVER on 2026-09-26
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ecmwf-has-published-no-plan-to-open-a-direct-beam-or-hourly-ensemble-steps" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ECMWF has published no plan to open a direct beam or hourly ensemble steps
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#two-traps-for-whoever-builds-on-ecmwfs-direct-beam" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Two traps for whoever builds on ECMWF's direct beam
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#era5-which-access-route" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ERA5: which access route
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#why-era5-describes-past-sunshine-and-wind-worse-than-most-current-weather-products" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why ERA5 describes past sunshine and wind worse than most current weather products
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#cams-use-the-point-api-not-the-gridded-product" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        CAMS: use the point API, not the gridded product
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#what-comparing-weather-products-on-the-trial-areas-solar-farms-found" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What comparing weather products on the trial area's solar farms found
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#met-office-weather-station-observations-midas-open" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Met Office weather-station observations (MIDAS Open)
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ukv-assimilates-satellite-cloud-and-carries-a-fixed-aerosol-climatology" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        UKV assimilates satellite cloud, and carries a fixed aerosol climatology
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#open-meteos-ukv-archive-is-the-t0-analysis-and-half-of-it-is-backfill" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Open-Meteo's UKV archive is the T+0 analysis, and half of it is backfill
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#nwp-model-upgrades-since-2019" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        NWP model upgrades since 2019
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="data-sources">Data sources</h1>
+<p>The inputs to the forecasting system: NGED's power-flow data, supporting NGED files, and weather
+data.</p>
+<blockquote>
+<p><strong>Status legend</strong> — ✅ Ingested today · 🚧 Planned ingestion · 🔬 Research. The ECMWF ENS NWP and the
+NGED time-series JSON / metadata are ✅ ingested; the supporting NGED files and the extra weather
+datasets are 🚧 planned (needed for switching-event detection and capacity estimation), and
+NGED's published electricity-network model is 🔬 research. See the
+<a href="../">roadmap index</a> for status conventions.</p>
+</blockquote>
+<hr />
+<h2 id="data-from-nged">Data from NGED</h2>
+<h3 id="provided-on-ngeds-aws-s3-bucket-live-updated-every-6-hours">Provided on NGED's AWS S3 bucket (live, updated every 6 hours)</h3>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Status</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Time-series JSON files</strong></td>
+<td>✅</td>
+<td>Half-hourly power flow + metadata per substation / customer meter in the trial area. Ingested by OCF to produce operational forecasts. Each reading is a <strong>period-ending mean</strong> — power averaged over the preceding 30 minutes, with <code>time</code> marking the end of that window, as <code>PowerTimeSeries</code> in <code>packages/contracts/src/contracts/power_schemas.py</code> records. The irradiance ingest is chosen to match, so <a href="#weather-data">Weather data</a> prefers a source that accumulates over the interval to a source that samples an instant.</td>
+</tr>
+<tr>
+<td><strong>Curtailment (active network management)</strong></td>
+<td>🚧</td>
+<td>Half-hourly megawatts lost to an active-network-management (ANM) instruction, per curtailed generator. Crucial for distinguishing deliberate ANM ramp-downs from genuine faults or capacity loss. What the feed holds, and how far back it reaches, is <a href="#what-the-curtailment-feed-holds">below</a>.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="what-the-curtailment-feed-holds">What the curtailment feed holds</h3>
+<p><strong>Curtailment reaches us two ways, and the export cap is the one to build on.</strong> The <code>curtailment/</code>
+prefix sits beside <code>timeseries/</code> on the bucket, on the same six-hour window convention, and each
+object carries a <code>data</code> list of <code>{startTime, endTime, value}</code> at half-hourly resolution under a
+header naming the generator, its substation number, its licence area, and a <code>CurtailmentType</code> such
+as <code>ANM (DANM and TANM)</code>. Its <code>value</code> is a derived volume of megawatts lost. Separately, NGED can
+export the raw active-network-management setpoint history on request, one row per change of the
+generator's export cap — the signal the derived volume is computed from. Nothing in this repository
+ingests either yet.</p>
+<p><strong>Prefer the setpoint history: it reaches further back and it is the physical quantity.</strong> For the
+one generator both cover, the setpoint history runs from February 2024 against the bucket feed's
+late April 2026, and the two disagree on the hours they share. The cap is also what a model can use
+directly, because export cannot exceed it: a generator's output is <code>min(what the weather allowed,
+the cap in force)</code>. The cap is published as a negative number, generation being negative in NGED's
+convention, and its largest magnitude is the connection limit rather than a curtailment. Reading
+the cap as a curtailment volume gets this backwards — the measurements are in <a href="../../studies/beam-diffuse-split/#one-site-is-curtailed-and-the-export-cap-is-what-makes-its-hours-scorable">the beam/diffuse
+results</a>.</p>
+<p><strong>Ask for the whole history, and expect the first request to be truncated.</strong> The first export we
+were sent for that generator began in July 2024; a second request returned an exact superset
+reaching back to February 2024, the day the generator's telemetry begins. Nothing in the first file
+said it was partial.</p>
+<p><strong>The setpoint feed reads zero for months before the scheme enforces anything, so find the go-live
+date before trusting a single reading.</strong> Across all 431 bright hours the export covers before
+6 August 2024, the cap forbids export outright — while the generator exported above 5% of capacity
+in 423 of them, at a median of 44%. An ingest that honoured those readings would label a plant
+running normally as a plant held at zero, and would do it silently. Take the scheme as live from the
+first half-hour at which the cap reaches the connection limit: a live scheme on an unconstrained
+generator rests at that limit most of the time, and the marker needs no reference to metered output.
+Eight of the 2,268 rows also carry a positive value where the rest are negative, so read the
+magnitude rather than flipping the sign.</p>
+<p><strong>One generator in the trial area is connected under active network management, and NGED has
+confirmed there are no others.</strong> Within the trial area a generator absent from the setpoint record
+therefore ran free, which is what lets an absent cap be read as evidence rather than as a gap. That
+confirmation does not extend past the trial area: at rollout the population of flexible connections
+has to be established again, and until it is, an absent record means only that NGED has not sent
+curtailment for that generator. The setpoint export is per generator, so widening it to a new set of
+sites is a fresh request each time.</p>
+<p><strong>15-minute power data may become available. We deliberately stay on half-hourly until v2.</strong> There
+is no room on the road to v1.0 to re-ingest the power feed at a finer step, so treat 15-minute data
+as a v2 item.</p>
+<p><strong>Power forecasts stay half-hourly regardless, so the change is confined to the ingest.</strong> Averaging
+each pair of 15-minute readings into the half-hour ending at <code>:00</code> or <code>:30</code> leaves the training
+grid, the metrics, and the leaderboard exactly as they are, because two period-ending 15-minute
+means average to the period-ending 30-minute mean the contract already specifies. Everything
+downstream stays correct on that basis — <code>_upsample_nwp_to_half_hourly</code>, the inference spine in
+<code>production_helpers</code>, and the row-wise forecast metrics all assume a fixed half-hourly step and
+would keep getting one. The milestone that actually wants a finer step is v2 disaggregation, which
+can read it from a separate table rather than by widening <code>PowerTimeSeries</code>.</p>
+<p><strong>Do that averaging explicitly, because today's ingest would silently keep the wrong half of each
+half-hour.</strong> <code>PowerTimeSeries.drop_implausible_rows</code> filters to readings aligned to <code>:00</code> and <code>:30</code>,
+logging a count and raising nothing. Fed a 15-minute series it would discard every <code>:15</code> and <code>:45</code>
+reading and keep the <code>:00</code>/<code>:30</code> ones — each of which covers only the <em>preceding</em> 15 minutes. The
+result is the second quarter-hour of every half-hour wearing a half-hourly label. <code>validate</code> then
+passes, because the survivors are a well-formed half-hourly series, and the Dagster asset
+materialises green, because the drop count only warns. Around sunrise and sunset, where irradiance
+ramps inside the half-hour, that bias is systematic rather than noise. Changing <code>PowerTimeSeries</code> is
+a data-contract change, so it needs sign-off under the rule in <code>packages/contracts/README.md</code>, and
+the averaging rule needs to say what happens when one reading of a pair is missing.</p>
+<h3 id="provided-as-reference-files-mostly-static-reference-historical">Provided as reference files (mostly static reference / historical)</h3>
+<table>
+<thead>
+<tr>
+<th>File</th>
+<th>Status</th>
+<th>Description</th>
+<th>Known issues</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Historical time-series JSON</td>
+<td>✅</td>
+<td>Historical outputs of substations and customer meters.</td>
+<td>See <a href="#data-quality-availability">data quality</a>.</td>
+</tr>
+<tr>
+<td><strong>Monitor Direction.csv</strong></td>
+<td>🚧</td>
+<td>Metadata for all substations: meter (analogue) type and power-flow direction.</td>
+<td>One solar park's (ID 30) substation number differs from its metadata, to be confirmed with NGED; other sources agree, so low risk.</td>
+</tr>
+<tr>
+<td><strong>Primary Substation Interconnections.csv</strong></td>
+<td>🚧</td>
+<td>List of possible connections between primary substations (not all are in the trial area).</td>
+<td>All trial-area substations have ≥ 1 connection; topology appears complete.</td>
+</tr>
+<tr>
+<td><strong>Substations.csv</strong></td>
+<td>🚧</td>
+<td>For each substation, bulk supply point (BSP) and grid supply point (GSP): which BSP &amp; GSP it connects to (names + IDs).</td>
+<td>All trial-area substations valid.</td>
+</tr>
+<tr>
+<td><strong>Switching Logs.xlsx</strong></td>
+<td>🚧</td>
+<td>History of every normally-open switching point between primaries, labelled by time-series ID. Primaries outside the trial area are labelled "Unknown".</td>
+<td><strong>Extremely valuable</strong> as the gold-standard <em>test set</em> for <a href="../switching-events/">switching-event detection</a> — lets us validate the unsupervised method on the trial area (labels do <strong>not</strong> exist at scale). Some edges "collapse" into <code>[substation ID] – unknown</code>. Two edges present in Interconnections.csv are missing: 900016 (ID 10) ↔ 900019 (ID 13), and 900022 (ID 16) ↔ unknown (910026). Logs go back to ≥ 2019.</td>
+</tr>
+<tr>
+<td><strong>MPAN to Substation Number.csv</strong></td>
+<td>🚧</td>
+<td>Associates each Embedded Capacity Register (ECR) generator to the substation it connects to.</td>
+<td>All trial-area generators present, each with two Meter Point Administration Numbers (MPANs, import + export). Three primaries appear with one MPAN each, to be confirmed with NGED.</td>
+</tr>
+<tr>
+<td><strong>Peak Loads.xlsx</strong></td>
+<td>🚧</td>
+<td>Manually selected peak demand per trial-area substation, from 2024/25 (most recent survey).</td>
+<td>Covers all 16 trial primaries. Of these, 12 have 2024/25 readings above the recorded peak. Even at the 99th percentile of observed power, 3 primaries (IDs 8, 13, and 25) show 2–4× the recorded peak. One other primary has a recorded peak above 14 MVA, but its telemetry has never exceeded 6.8 MVA. Given these discrepancies, we use the <strong>99th percentile of observed power</strong> as the substation "capacity" proxy, at least initially.</td>
+</tr>
+</tbody>
+</table>
+<h3 id="ngeds-published-electricity-network-model-the-long-term-development-statement">NGED's published electricity-network model (the Long Term Development Statement)</h3>
+<p><strong>NGED publishes a description of the electricity network itself, and that description does not
+arrive in Flexpectation's pipeline.</strong> The two tables above list what NGED sends. The Long Term
+Development Statement (LTDS) is separate. The LTDS sits on NGED's open-data portal in two forms. The
+LTDS describes the wires rather than the power flowing through them.</p>
+<table>
+<thead>
+<tr>
+<th>Dataset</th>
+<th>Status</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><a href="https://connecteddata.nationalgrid.co.uk/dataset/ltds-tabular-model">LTDS Tabular Model</a></td>
+<td>🔬</td>
+<td>Comma-separated tables covering circuits, nodes, two- and three-winding transformers, demand, fault levels, and generation, across NGED's four licence areas.</td>
+</tr>
+<tr>
+<td><a href="https://connecteddata.nationalgrid.co.uk/dataset/ltds-common-information-model">LTDS Common Information Model</a></td>
+<td>🔬</td>
+<td>The same electricity network in the Common Information Model format, as one archive per licence area, covering 132 kV grid supply points down to 11 kV or 6.6 kV primaries. A separate lookup table maps the model's substations to NGED substation numbers.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Between them, the two publications carry the per-branch impedances and thermal ratings a
+power-flow model is built from.</strong> Flexpectation holds neither anywhere else. The circuit table holds
+22,516 rows. Of those, 6,145 carry positive- and zero-sequence impedances and four seasonal thermal
+ratings, at 132, 66, 33, 11, and 6.6 kV. The rest are switching devices such as disconnectors, which
+have no impedance.</p>
+<p>Three planned pieces of work would draw on the two publications:</p>
+<ul>
+<li><a href="../cost-savings-metrics/#tier-3-full-power-flow-modelling">Tier 3 curtailment costing</a>, which is
+  out of scope today for want of exactly this model.</li>
+<li><a href="../switching-events/">Switching-event detection</a>, which reasons about which substations can
+  exchange load.</li>
+<li><a href="../capacity-estimation/">Capacity estimation</a>, which needs a firmer limit per node than the 99th
+  percentile of observed power.</li>
+</ul>
+<p><strong>No Flexpectation code reads either dataset.</strong> Two questions have to be answered first. Do the LTDS
+node names join cleanly to the <code>time_series_id</code>s Flexpectation forecasts? The Common Information
+Model's substation-number lookup is where that join would start. How far below the primary
+substations does the published model reach? Neither question has been investigated.</p>
+<hr />
+<h2 id="data-quality-availability">Data quality &amp; availability</h2>
+<p>Machine-learning models are only as good as their training data. Known characteristics of NGED's
+historical data (full detail + plots in the Milestone 1 report, Appendices A &amp; B):</p>
+<ul>
+<li>Most trial-area time series go back to <strong>late 2019</strong> (≥ 6 years). Exceptions: Wrangle primary
+  (ID 12) and ID 13 have only ~1 year.</li>
+<li>The first ~2 months of each series tend to be poor quality (meter ramp-up / calibration) and are
+  dropped during cleaning.</li>
+<li><strong>Gaps</strong>: a couple of missing points every few weeks, especially recently for generators. Solar
+  generators legitimately don't report overnight, but not all gaps are nighttime; gaps can last
+  hours to months.</li>
+<li><strong>Meter quality flags</strong>: some meters carry NGED's own quality flags ("analogue not working" or
+  "analogue suspect"), which ingestion does not yet act on.</li>
+<li><strong>False zeros</strong>: substation telemetry has occasional drop-outs to zero, visible as an excess of
+  exact zeros in the distribution vs. near-zero values.</li>
+<li><strong>Not-on assets</strong>: one trial-area generator (ID 19) has not been operating since mid-2024 —
+  motivating the <a href="../forecast-building-blocks/">building-blocks</a> delivery approach.</li>
+<li><strong>MVA / reverse flow</strong>: primary data is disaggregated from metered generation where possible, but
+  not always. The primary with ID 26, for example, has two solar meters that are not reporting, so
+  their generation cannot be subtracted. Combined with MVA metering (which reports absolute value),
+  midday solar export "bounces" off zero and looks like extra load. See also the <a href="../disaggregation/#apparent-power-mva-metering">MVA discussion in
+  Net-demand disaggregation</a>.</li>
+</ul>
+<p>These data oddities are detected and reported back to NGED as warnings (see <a href="../delivery-tables/#table-2-power_forecast_warnings">delivery tables, Table
+2</a>).</p>
+<hr />
+<h2 id="ngeds-network-context">NGED's network (context)</h2>
+<p>As of May 2026, NGED's full network (the v2 target scope) consists of:</p>
+<ul>
+<li><strong>1,161 primary substations</strong> (33/11 kV &amp; 66/11 kV)</li>
+<li><strong>271 bulk supply points (BSPs)</strong> (132/33 kV &amp; 132/66 kV)</li>
+<li><strong>52 grid supply points (GSPs)</strong> (400/132 kV &amp; 275/132 kV)</li>
+<li><strong>~1,500 generators</strong> (industrial customer generators, not domestic):<ul>
+<li>558 connect directly to GSP/BSP busbars at 33 kV or 132 kV (modelled by NGED as
+  generation-only "substations"; mostly have telemetry; curtailable via ANM; comprising 329
+  solar, 63 wind, 166 other).</li>
+<li>~1,000 are on the 11 kV network downstream of primaries; some metered, some not.</li>
+<li>Power flow from metered generators connected to primaries is <strong>already subtracted</strong> from the
+  primaries' power flow ("Disaggregated Demand").</li>
+</ul>
+</li>
+</ul>
+<p>The <strong>Embedded Capacity Register</strong> behind these figures has limits worth naming, because both
+<a href="../capacity-estimation/">capacity estimation</a> and <a href="../disaggregation/">disaggregation</a> build on the
+register. The register records generation of 50 kW and above. The capacity recorded is the export
+limit a site's connection agreement permits rather than what the site can actually generate, which
+is why Flexpectation needs to estimate <em>effective</em> capacity rather than reading nameplate capacity
+off the register. Below 50 kW the register is silent. Most of the panels sit below 50 kW, too: of
+the 22,560 MW of solar photovoltaic capacity installed in GB by the end of July 2026, 8,503 MW sits
+in arrays smaller than 50 kW. Recovering solar on that scale, with no register to check the answer
+against, is what <a href="../disaggregation/">disaggregation</a> has to do. The figures come from the
+<a href="../../background/energy-forecasting-review/#8-disaggregating-unmetered-solar-and-wind-from-a-substations-net-flow">energy-forecasting
+review</a>,
+which cites the Department for Energy Security and Net Zero's <a href="https://www.gov.uk/government/statistics/solar-photovoltaics-deployment">solar deployment
+statistics</a>.</p>
+<p>The <strong>v1 trial area</strong> is 32 of these time series — see the <a href="../">roadmap index</a> for the
+breakdown.</p>
+<hr />
+<h2 id="weather-data">Weather data</h2>
+<p>Issues: <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/142">#142</a> (CAMS solar
+radiation), <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/143">#143</a>
+(reanalysis ingestion — ERA5)</p>
+<p>The table below lists the weather products the project ingests, plans to ingest, or is researching
+as a possible source. The Status column says which, and several rows are marked uncertain,
+deprioritised, or unlikely. Products researched only for the studies are on the <a href="../../background/weather-products-survey/#the-surveyed-products">weather products
+survey</a> page.</p>
+<p><strong>ECMWF's own models, Google DeepMind's WeatherNext 3, and NOAA's GFS and GEFS reach NGED's 14-day
+forecast horizon; every regional model on this page stops at 7.5 days or less.</strong></p>
+<p><img alt="Horizontal bar chart of sixteen NWPs' longest routine forecast horizon in days, sorted longest to
+shortest. GEFS reaches 35 days on its 00 UTC cycle; GFS reaches 16 days; ECMWF ENS, AIFS-ENS, AIFS
+Single, ECMWF IFS HRES, and WeatherNext 3 all reach 15 days; ICON global reaches 7.5 days; the Met
+Office's global model reaches 7 days; MOGREPS-UK reaches 5.25 days; UKV and ICON-EU reach 5 days;
+ARPEGE reaches 4 days; the shared DMI/KNMI HARMONIE-AROME feed reaches 2.5 days; and ICON-D2 and
+AROME France both reach 2 days. A dashed line marks NGED's 14-day forecast
+horizon." src="../assets/nwp_horizons.svg" /></p>
+<p>Each bar is the model's longest routine run, taken from this page, from the <a href="../../background/weather-products-survey/#forecast-models">weather products
+survey's forecast-model table</a>, or from
+the producer's own documentation — the
+source for every bar is recorded next to its horizon in <code>studies/beam_diffuse_split/nwp_horizons.py</code>.
+Reanalyses and satellite products carry no forecast horizon and are left off.</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Status</th>
+<th>Description</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ECMWF ENS</strong> (Dynamical.org)</td>
+<td>✅</td>
+<td>Main NWP source: 51-member ensemble, distributed as live-updating Zarrs. OCF converts gridded NWP to tabular via the H3 spatial index and stores as Delta Lake, stored as <code>Float32</code> rounded to a 13-bit significand, with zstd compression (~40 GB/year for all of GB; ~1 minute to download+convert one day). <strong>The archive currently only extends back to 2024-04-01</strong>; Dynamical.org are back-filling the operational archive from MARS to 2016-03-08 (51 members, 0.25°, 00Z inits only), but at ~0.8 TB/day against ~446 TB remaining the estimate is <strong>~November 2027</strong> — after v1.0, which is why we <a href="../training-history/">extend the training history with ERA5</a> instead. Radiation: no direct component, which is what forces <a href="../disaggregation/">DP forecasting of PV</a> (v2) to find the beam/diffuse split elsewhere — see <a href="#which-sources-carry-which-irradiance-components">which sources carry which irradiance components</a>.</td>
+</tr>
+<tr>
+<td><strong>ERA5</strong> (ECMWF global reanalysis) — <em>the project's reanalysis</em></td>
+<td>🚧 (v0.5)</td>
+<td>The <strong>single reanalysis</strong> we ingest, serving both <strong>pre-training</strong> and near-real-time <strong>capacity estimation</strong>. Covers 1940 to the present — far enough back to pre-train on the long power histories that predate the ENS archive (2024-04-01). Its 31 km resolution is coarser than CERRA, which is acceptable because weather anomalies are synoptic-scale and the high-resolution <em>solar</em> irradiance comes from CAMS regardless. Carries the <a href="#which-sources-carry-which-irradiance-components">beam/diffuse split</a>, which the live ENS feed does not. Its <strong>ERA5T</strong> near-real-time stream lands ~5 days behind real time, and final ERA5 overwrites it ~2–3 months later after quality control. Shares the ECMWF <strong>IFS lineage</strong> with the ENS forecasts, so systematic biases largely cancel when the two are combined. Ingest <strong>2020 to present</strong>, including the 2024+ ENS overlap, which is not optional — see <a href="../training-history/">Extending the training history</a>. <a href="#era5-which-access-route">Which access route</a> is still open.</td>
+</tr>
+<tr>
+<td><strong>CERRA</strong> (Copernicus regional reanalysis for Europe)</td>
+<td>🔬 (deprioritised)</td>
+<td>Higher-resolution (5.5 km) European reanalysis. Per the <a href="https://cds.climate.copernicus.eu/datasets/reanalysis-cerra-single-levels">Copernicus CDS</a>, it now runs from <strong>September 1984 to the present</strong> — monthly updates, but <strong>about 3 months behind real time</strong>: on 2026-09-23 the latest data ended 2026-06-30, 12 weeks earlier. <strong>Superseded by ERA5</strong> for the active plan: that latency of about 3 months rules it out for near-real-time capacity estimation, ERA5 reaches further back for pre-training, and we prefer to ingest a single reanalysis. Kept here because its 5.5 km resolution could still earn a place for fine-scale work (e.g. wind over complex terrain) if that ever proves decisive. Its <a href="#which-sources-carry-which-irradiance-components">direct short-wave</a> is time-integrated from 3-hourly forecast cycles, so temporally coarser than SARAH-3. On past sunshine at six solar farms, an XGBoost model given CERRA's global irradiance is no better than one given ERA5 and 4.045 points of capacity behind one given CAMS (9.164% against 9.135% and 5.118%, on the CERRA row set; <a href="../../studies/past-weather/solar/#cerra-is-no-better-than-era5-and-trails-cams-by-about-4-points">results</a>). Grid, coverage, wind heights, and access are in the <a href="../../background/weather-products-survey/#reanalyses-hindcasts-and-satellite-retrievals">survey's reanalysis table</a>.</td>
+</tr>
+<tr>
+<td><strong>CM SAF</strong> (Satellite Application Facility on Climate Monitoring)</td>
+<td>🔬 (v2 comparison)</td>
+<td>SARAH-3 carries <a href="#which-sources-carry-which-irradiance-components">every irradiance component</a> on a 0.05° grid at 30 minutes from 1983. Two reasons SARAH-3 is not the first ingest. Its climate data record ends 2020-12-31 and the Interim Climate Data Record extends that record, putting a version seam inside the 2019-onward history we train on. And its 30-minute values are <strong>instantaneous snapshots</strong>, whereas CAMS accumulates over the step, which is what a period-ending meter reading measures — under broken cloud an instantaneous sample and a 30-minute mean can differ a lot. Its gridded delivery would suit the H3 pipeline better than CAMS point requests, and comparing the two resolutions is not straightforward, because the CAMS point service interpolates to the requested location rather than publishing a grid. Latency is 2–5 days (<a href="https://doi.org/10.5194/essd-16-5243-2024">Pfeifroth et al. (2024)</a>), immaterial offline. Worth a genuine head-to-head against CAMS in v2 — see <a href="../disaggregation/#correcting-satellite-irradiance-over-great-britain">Correcting satellite irradiance over Great Britain</a>.</td>
+</tr>
+<tr>
+<td><strong>CAMS solar radiation</strong> (Copernicus Atmosphere Monitoring Service)</td>
+<td>🚧 (v0.7)</td>
+<td>The satellite-derived irradiance we ingest, used to estimate <strong>solar PV</strong> capacity. Used <strong>offline only</strong> — capacity estimation runs over history, and the production serving path takes no dependency on it. The CAMS Radiation Service carries <a href="#which-sources-carry-which-irradiance-components">every irradiance component</a>, under both clear sky and observed cloud, from 2004-02, under CC-BY-4.0, at steps of 1 minute, 15 minutes, 1 hour, 1 day, or 1 month — the beam/diffuse split the <a href="../../techniques/differentiable-physics/#the-core-building-block-differentiablesolarplant">DP solar model</a> needs. Cloud information comes from Meteosat Second Generation; aerosol, ozone, and water vapour come from the CAMS global forecasting system, so aerosol optical depth is a 3-hourly analysis rather than SARAH-3's monthly climatology. Values are interpolated to the requested location rather than served on a grid. Chosen over SARAH-3 on <strong>delivery and record continuity, not on measured accuracy over Great Britain</strong> — see <a href="#cams-use-the-point-api-not-the-gridded-product">CAMS: use the point API, not the gridded product</a> for the route and its traps, and <a href="../disaggregation/#correcting-satellite-irradiance-over-great-britain">Correcting satellite irradiance over Great Britain</a> for what is known about this source's error and what v2 might do about it.</td>
+</tr>
+<tr>
+<td><strong>ICON-EU</strong> (Dynamical.org)</td>
+<td>🔬 (v0.9, uncertain)</td>
+<td>Possible additional NWP source to test whether it improves skill over ECMWF ENS: a deterministic run from DWD, Germany's national weather service, on a ~6.5 km grid, 4 runs a day out to 5 days. Already carries the <a href="#which-sources-carry-which-irradiance-components">beam/diffuse split</a> <a href="../disaggregation/#the-forward-model">the PV forward model</a> needs, and holds the earliest roadmap slot of any source that does. Starts early 2026, so it can't enter the canonical CV folds directly — assessed via ad-hoc ablation first. Archive start, latency, and access routes are in the <a href="../../background/weather-products-survey/#forecast-models">survey's forecast-model table</a>.</td>
+</tr>
+<tr>
+<td><strong>AIFS-ENS</strong> (ECMWF)</td>
+<td>🔬 (v2.1, uncertain)</td>
+<td>ECMWF's machine-learned ensemble, now operational with the same 51 members and 15-day horizon as the physics ensemble, and more accurate than it on the majority of variables and lead times (<a href="https://doi.org/10.1038/s44387-026-00073-7">Lang et al. (2026)</a>). Whether that translates into a better substation-load forecast is an open question. AIFS-ENS member <em>n</em> starts from the <a href="https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+ENS+v1">same initial conditions</a> as ECMWF ENS member <em>n</em>, so the two can be fed <a href="../xgboost-improvements/#several-nwp-sources-as-features-v21">side by side</a> rather than swapped. Unlike the physics ensemble, AIFS has <a href="#which-sources-carry-which-irradiance-components">no direct-beam field</a> to ask for at all, in either the ensemble or the deterministic AIFS Single: on the 2026-09-19 00Z run, AIFS-ENS open data carries 29 parameters and AIFS Single 30, and <code>ssrd</code> and <code>strd</code> are the only radiation fields in either. <strong>Both AIFS streams arrive on 6-hourly steps across the whole 15-day horizon — 61 steps, against the physics ensemble's 85</strong> — where the physics ensemble is <a href="../../architecture/nwp-variable-conventions/#the-forecast-step-grid">3-hourly out to 144 hours</a> and only then drops to 6-hourly. Twice the step width over days 0 to 6 costs most on irradiance, whose diurnal cycle varies faster than any other field we use: the <a href="../../architecture/nwp-variable-conventions/#period-ending-variables-are-interpolated-as-though-they-were-instantaneous">reconstructed solar day</a> lags the true one by half a step width, so 3 hours at AIFS's steps against 1.5 hours at the physics ensemble's, and the modelled clear-sky peak falls from 816 W m⁻² to 756 at 3-hourly steps and 590 at 6-hourly. Same folds problem as ICON-EU: the archive starts mid-2025, so it is an ad-hoc ablation before it is a canonical source. Archive start and access are in the <a href="../../background/weather-products-survey/#forecast-models">survey's forecast-model table</a>. The evidence on whether AIFS improves faster than the physics-based IFS, and the reason each AIFS version is scored separately, are in the survey (<a href="../../background/weather-products-survey/#aifs-has-not-been-shown-to-improve-faster-than-the-physics-based-ifs">evidence</a>, <a href="../../background/weather-products-survey/#score-each-aifs-version-separately">version eras</a>).</td>
+</tr>
+<tr>
+<td><strong>WeatherNext 3</strong> (Google DeepMind)</td>
+<td>🔬 (after v2, unlikely)</td>
+<td>Google DeepMind's machine-learned 64-member ensemble (grid, cycles, and horizons are in the <a href="../../background/weather-products-survey/#forecast-models">survey's forecast-model table</a>). 2 m temperature and dewpoint also arrive at 0.05°, from a neural-network output head trained directly on in-situ surface observations from airport stations, regional station networks, ships, and buoys (<a href="https://arxiv.org/abs/2609.03582">Rasp et al. (2026)</a>; <a href="https://developers.google.com/weathernext/guides/models">model specs</a>). Carries the <a href="#which-sources-carry-which-irradiance-components">beam/diffuse split</a> <a href="../disaggregation/#the-forward-model">the PV forward model</a> needs. The paper reports a lower <a href="../../techniques/evaluation-metrics/#crps-continuous-ranked-probability-score">continuous ranked probability score</a> than ECMWF ENS on surface solar radiation, scored on the 6-hour accumulations rather than the hourly fields. Every radiation evaluation in the paper scores against an ECMWF analysis, and none scores against a surface measurement, so any irradiance gain would have to be measured downstream on power. Two structural differences from AIFS-ENS: all 64 members start from one analysis, so the ensemble's spread comes from the model alone rather than from perturbed initial conditions, and no member pairs with an ECMWF ENS member. Access needs <a href="https://developers.google.com/weathernext/guides/access-forecast">a request form</a>, and the survey gives the licence terms. BigQuery and Earth Engine serve six summary statistics per variable (the mean, and the 10th, 25th, 50th, 75th, and 90th percentiles); the 64 members sit only in the Cloud Storage Zarr store. The folds problem is worse than ICON-EU's or AIFS-ENS's: the archive starts 2026-01-01, with 2024 and 2025 being backfilled. On current priorities we do not expect to reach this source inside the Network Innovation Allowance project. The survey lists the other AI weather models and commercial archives of AI forecasts under <a href="../../background/weather-products-survey/#ai-weather-models-beyond-aifs">AI weather models beyond AIFS</a>.</td>
+</tr>
+<tr>
+<td><strong>UKV and MOGREPS-UK</strong> (Met Office, via AWS)</td>
+<td>🔬 (uncertain)</td>
+<td>The Met Office's 2 km deterministic UK model and its 2.2 km UK ensemble. Both publish <a href="#which-sources-carry-which-irradiance-components">every irradiance component</a> as its own field, so neither needs a subtraction to give <a href="../disaggregation/#the-forward-model">the PV forward model</a> its beam/diffuse split, and both are free on AWS under British Crown copyright and CC BY-SA 4.0 (<a href="https://registry.opendata.aws/met-office-uk-deterministic/">UKV</a>, <a href="https://registry.opendata.aws/met-office-uk-ensemble/">MOGREPS-UK</a>). Verified by listing the <code>met-office-atmospheric-model-data</code> and <code>met-office-uk-ensemble-model-data</code> buckets rather than from the documentation. Neither the horizons nor the archives suit the canonical folds — MOGREPS-UK is held as a 30-day rolling window — see <a href="#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost">which feed carries a direct beam</a>. How Open-Meteo archives UKV is in the <a href="../../background/weather-products-survey/#which-archives-keep-whole-past-forecast-runs">survey</a>.</td>
+</tr>
+</tbody>
+</table>
+<p><strong>ERA6 is a future upgrade, not a current option.</strong> ECMWF began ERA6 production in March 2026, but
+the phased release runs from late 2027 (first 20 years) into 2028, so it is out of scope for the
+near-term milestones. When it lands it should drop in cleanly — same IFS family, a similar
+ERA5T-style near-real-time fast track — and at ~14 km (2× finer than ERA5) it would close most of
+the resolution gap with CERRA that motivates keeping CERRA on the list at all.</p>
+<h3 id="which-sources-carry-which-irradiance-components">Which sources carry which irradiance components</h3>
+<p><strong>The Met Office's UKV and MOGREPS-UK are the only forecast sources listed below that publish
+global, direct, and diffuse short-wave as three separate fields in a free feed.</strong> Every other free
+forecast source makes the reader recover at least one component by arithmetic. ECMWF's own direct
+beam, <code>fdir</code>, is outside ECMWF's free open-data subset for both the single 9 km forecast (formerly
+HRES; see the <a href="../../background/weather-products-survey/#terms-used-on-this-page">weather products
+survey</a>) and the ENS ensemble;
+<a href="#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost">what taking <code>fdir</code> from ECMWF directly
+involves</a> is below. Both
+reanalyses and both satellite products carry a direct component, where the free feed behind the ENS
+forecast in production does not. That is why <a href="../capacity-estimation/#irradiance-inputs">capacity
+estimation</a> plans on having the beam/diffuse split, while
+<a href="../disaggregation/#the-forward-model">forecasting</a> has no route to the split through the feed it
+uses today.</p>
+<p><strong>Four rows below, and AIFS Single in the AIFS row, are not in the catalogue above</strong>, because the
+project plans to ingest none of them: ECMWF's own ENS is the full-catalogue delivery route behind
+the free feed, the two ECMWF rows via Open-Meteo were researched only for the studies and are on the
+<a href="../../background/weather-products-survey/">weather products survey</a> page, AIFS Single has no
+catalogue row, and the Met Office's global 10 km model is the Met Office model Dynamical.org have on
+their tracker rather than one we have asked for.</p>
+<table>
+<thead>
+<tr>
+<th>Source</th>
+<th>Kind</th>
+<th>Global</th>
+<th>Direct</th>
+<th>Diffuse</th>
+<th>Where it comes from</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>ECMWF ENS</strong> via Dynamical.org</td>
+<td>Forecast</td>
+<td>✅ <code>ssrd</code></td>
+<td>❌</td>
+<td>❌</td>
+<td>Free ECMWF open data on AWS</td>
+</tr>
+<tr>
+<td><strong>ECMWF ENS</strong> from ECMWF</td>
+<td>Forecast</td>
+<td>✅ <code>ssrd</code></td>
+<td>✅ <code>fdir</code></td>
+<td>By subtraction</td>
+<td>ECMWF dissemination or MARS, not the free subset (<a href="#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost">licence and delivery below</a>)</td>
+</tr>
+<tr>
+<td><strong>ECMWF ENS 9 km Europe</strong> via Open-Meteo</td>
+<td>Forecast</td>
+<td>✅ <code>ssrd</code></td>
+<td>✅ <code>fdir</code></td>
+<td>By subtraction</td>
+<td>Open-Meteo's Ensemble API, live runs only (<a href="../../background/weather-products-survey/#forecast-models">survey</a>)</td>
+</tr>
+<tr>
+<td><strong>ECMWF IFS HRES 9 km</strong> via Open-Meteo</td>
+<td>Forecast</td>
+<td>✅ <code>ssrd</code></td>
+<td>✅ <code>fdir</code></td>
+<td>By subtraction</td>
+<td>Open-Meteo, from 2017 (<a href="../../background/weather-products-survey/#forecast-models">survey</a>)</td>
+</tr>
+<tr>
+<td><strong>ECMWF AIFS</strong>, both Single and ENS</td>
+<td>Forecast</td>
+<td>✅ <code>ssrd</code></td>
+<td>❌</td>
+<td>❌</td>
+<td>Free ECMWF open data; no direct field exists in any AIFS feed</td>
+</tr>
+<tr>
+<td><strong>ICON-EU</strong> via Dynamical.org</td>
+<td>Forecast</td>
+<td>By addition</td>
+<td>✅</td>
+<td>✅</td>
+<td>Free, already ingested by Dynamical.org</td>
+</tr>
+<tr>
+<td><strong>UKV</strong> (Met Office)</td>
+<td>Forecast</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>Free on AWS, CC BY-SA 4.0; all three components in every run the bucket's rolling two-year window still holds</td>
+</tr>
+<tr>
+<td><strong>MOGREPS-UK</strong> (Met Office)</td>
+<td>Forecast</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>Free on AWS, CC BY-SA 4.0; all three components, plus net short-wave; <strong>30-day rolling archive</strong></td>
+</tr>
+<tr>
+<td><strong>Global 10 km</strong> (Met Office)</td>
+<td>Forecast</td>
+<td>✅</td>
+<td>✅</td>
+<td>By subtraction</td>
+<td>Free on AWS, CC BY-SA 4.0; 168-hour horizon, but no global field before the 2024-11-07 12 UTC run and none at T+168 before 2026-01-21</td>
+</tr>
+<tr>
+<td><strong>WeatherNext 3</strong> (Google DeepMind)</td>
+<td>Forecast</td>
+<td>✅</td>
+<td>✅ <code>fdir</code></td>
+<td>By subtraction</td>
+<td>Access request; CC-BY-4.0 once at least 1 hour old</td>
+</tr>
+<tr>
+<td><strong>ERA5</strong></td>
+<td>Reanalysis</td>
+<td>✅ <code>ssrd</code></td>
+<td>✅ <code>fdir</code></td>
+<td>By subtraction</td>
+<td>Free from the Copernicus Climate Data Store</td>
+</tr>
+<tr>
+<td><strong>CERRA</strong></td>
+<td>Reanalysis</td>
+<td>✅</td>
+<td>✅</td>
+<td>By subtraction</td>
+<td>Free from the Copernicus Climate Data Store</td>
+</tr>
+<tr>
+<td><strong>CAMS Radiation Service</strong></td>
+<td>Satellite</td>
+<td>✅</td>
+<td>✅</td>
+<td>✅</td>
+<td>Free, CC-BY-4.0; also direct normal, and every component under clear sky</td>
+</tr>
+<tr>
+<td><strong>CM SAF SARAH-3</strong></td>
+<td>Satellite</td>
+<td>✅ SIS</td>
+<td>✅ SID</td>
+<td>By subtraction</td>
+<td>Free; also direct normal</td>
+</tr>
+</tbody>
+</table>
+<p><strong>"By subtraction" means the diffuse component is global minus direct, and "by addition" means
+global is direct plus diffuse.</strong> Both are exact inside the model, and both inherit the errors of the
+two components they combine. For ECMWF the subtraction lands on a quantity close to, but not
+identical with, what a shadow-band diffuse pyranometer measures, for the reasons under <a href="#two-traps-for-whoever-builds-on-ecmwfs-direct-beam">two traps
+for whoever builds on ECMWF's direct beam</a>. A
+source publishing all three components as their own fields, as UKV, MOGREPS-UK, and the Radiation
+Service do, needs no arithmetic at all.</p>
+<h3 id="which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost">Which feed carries a direct beam, and what asking for one would cost</h3>
+<p><strong>ECMWF's own ENS carries the direct beam. The free open-data subset does not, and the free subset
+is what Dynamical.org ingests.</strong> ECMWF's <a href="https://www.ecmwf.int/en/forecasts/datasets/set-iii">ENS
+catalogue</a> lists total-sky direct solar
+radiation at the surface (<code>fdir</code>, paramId 228021) alongside global short-wave (<code>ssrd</code>, paramId 169),
+on the same steps: hourly to T+90, 3-hourly to T+144, and 6-hourly to T+360. Reading the GRIB
+(gridded binary) index of any single step of an open-data ENS run gives 47 parameters, with <code>ssrd</code>
+among them and <code>fdir</code> not. Across all steps the union is 50 parameters, and <code>fdir</code> appears in no
+step. Dynamical.org's <a href="https://dynamical.org/catalog/ecmwf-ifs-ens-forecast-15-day-0-25-degree/">ECMWF IFS ENS
+dataset</a> names ECMWF Open
+Data on the AWS Open Data Registry as its source. So the variable Dynamical.org would have to add is
+not in the feed they read. The single 9 km forecast is in the same position: the free subset's
+<code>oper</code> index for the 2026-09-22 00 UTC run carries <code>ssrd</code> and not <code>fdir</code>. Open-Meteo serves that
+forecast's direct beam, and the 51-member ensemble's direct beam over Europe, only because
+Open-Meteo's
+<a href="https://github.com/open-meteo/open-meteo/blob/main/Sources/App/EcmwfEcpds/EcmwfEcpdsVariable.swift">downloader</a>
+fetches <code>fdir</code> from ECMWF's dissemination system.</p>
+<p><strong>ENS <code>fdir</code> reaches us through Dynamical.org by no route open today, and through Open-Meteo only
+live.</strong> Open-Meteo's <a href="https://open-meteo.com/en/docs/ensemble-api">Ensemble API</a> serves the
+51-member ensemble at 9 km over Europe with <code>fdir</code>, from the 00 and 06 UTC runs, but keeps no
+history to train or backtest on
+(<a href="../../background/weather-products-survey/#forecast-models">survey</a>). Commercial use needs a paid
+Open-Meteo plan.</p>
+<p><strong>Taking <code>fdir</code> from ECMWF directly is a delivery contract with ECMWF, not a storage decision.</strong> The
+route is ECMWF's dissemination or a MARS subscription in place of, or alongside, the free bucket.
+Since 1 October 2025 ECMWF's whole Real-time Catalogue, <code>fdir</code> included, has been licensed CC BY 4.0
+(<a href="https://www.ecmwf.int/en/about/media-centre/news/2025/ecmwf-makes-its-entire-real-time-catalogue-open-all">ECMWF</a>).
+Delivery of the full catalogue "may involve service charges". Dynamical.org's live ENS store reads
+ECMWF's free subset, although their back-fill of past ENS runs comes from MARS. The project has not
+asked Dynamical.org whether that back-fill could carry <code>fdir</code>, or whether Dynamical.org would take
+on a delivery feed for live runs. Dynamical.org already publish direct and diffuse short-wave for
+ICON-EU, which shows that a missing variable was never the obstacle — the obstacle is which ECMWF
+feed the open bucket holds, and which feed the bucket holds is ECMWF's decision rather than
+Dynamical.org's.</p>
+<p><strong>The Met Office models are the request worth making, because their free feed already carries a
+direct beam.</strong> The one open Met Office request on Dynamical.org's issue tracker is for <a href="https://github.com/dynamical-org/reformatters/issues/646">the global
+10 km deterministic model</a>, which
+publishes
+global and direct short-wave and leaves diffuse to the same subtraction ECMWF would need. UKV and
+MOGREPS-UK go further and publish diffuse as its own field, but neither appears on Dynamical.org's
+tracker, so either would have to be asked for. None of the three Met Office models needs a
+delivery feed that may carry a service charge, which is what sets them apart from <code>fdir</code> on ENS.</p>
+<p><strong>Every Met Office model brings a horizon problem, and two bring an archive problem.</strong> The global
+model reaches 168 hours, UKV reaches 120 hours on its 03 and 15 UTC runs and 54 hours on the rest,
+and MOGREPS-UK reaches 126 hours. No Met Office model covers NGED's 14-day horizon. A Met Office
+model would therefore sit alongside ECMWF ENS rather than replace the ECMWF feed, exactly as
+ICON-EU would. MOGREPS-UK is held on AWS as a 30-day rolling window, which rules out backtesting
+unless we archive the feed ourselves from the day we start. <a href="#what-we-learnt-about-mogreps-uk-on-2026-09-26">What we learnt about
+MOGREPS-UK</a> gives the size of that archive and the
+one other source of history we found.</p>
+<p><strong>A backtest on the global 10 km model starts at its 2024-11-07 12 UTC run, not at the start of its
+archive, because no earlier run carries global short-wave.</strong> Listing every 6-hourly run the bucket
+held on 2026-09-19, back to its earliest at 2024-09-19 18 UTC, shows
+<code>radiation_flux_in_shortwave_direct_downward_at_surface</code> throughout and
+<code>radiation_flux_in_shortwave_total_downward_at_surface</code> only from 2024-11-07 12 UTC onwards. That
+run carries 4,470 files against the 4,310 of the 00 UTC run the same day, the extra 160 being global
+short-wave at 78 lead times and <code>cloud_amount_on_height_levels</code> at 82. Compare runs at the same
+hour: the 06 and 18 UTC runs stop at 54 hours and carry about 2,842 files whatever their date.</p>
+<p><strong>Global short-wave then stayed one lead time short of the direct field for another 14 months, and
+the missing lead time is T+168 — the one a 7-day horizon exists for.</strong> Runs settle on 2024-11-13
+at 88 lead times against the direct field's 89, and every 00 and 12 UTC run from then until
+2026-01-21 00 UTC drops T+168. The first run carrying global short-wave at all 89 lead times is
+2026-01-21 12 UTC. A backtest that needs the full 168-hour horizon therefore starts there, 14 months
+after the field first appears.</p>
+<p><strong>UKV and MOGREPS-UK need no cut-off of either kind.</strong> Both carry global, direct, and diffuse
+short-wave at the same lead times as each model's other hourly fields — 55 for a UKV run reaching 54
+hours, 126 for a MOGREPS-UK run — with no component lagging another. That holds in the earliest UKV
+run on AWS and in the earliest complete MOGREPS-UK run, the oldest surviving run of a 30-day rolling
+window being part-deleted rather than whole.</p>
+<h3 id="what-we-learnt-about-mogreps-uk-on-2026-09-26">What we learnt about MOGREPS-UK on 2026-09-26</h3>
+<p><strong>Each MOGREPS-UK object on AWS expires 30 days after it is written, so the oldest runs are already
+partial.</strong> The anonymous bucket <code>met-office-uk-ensemble-model-data</code> holds 24 runs a day, one every
+hour, under prefixes of the form <code>uk-ensemble/YYYY/MM/DD/THHMMZ/</code>. Each run reaches 126 hours and
+has 3 members, and the realisation IDs of those members differ from run to run. One file holds a
+single variable at a single lead time for all 3 members. An uncropped run has 14,330 such files and
+about 258 GB in total, of which the archive's chosen fields are 3,744 files. Objects expire one by
+one (the <code>x-amz-expiration</code> header gives each object's date), which is why the oldest runs are
+already partial.</p>
+<p><strong>Shortwave has 126 hourly steps and looks instantaneous.</strong> Shortwave has no step 0, no
+<code>cell_methods</code>, and no time bounds, and its <code>time</code> equals the valid time. Shortwave therefore looks
+like an instantaneous value, unlike DWD's shortwave, which averages since the initialisation time.
+Cloud and height-level fields have 127 hourly steps, and screen-level temperature and 10 m wind have
+15-minute steps to 11.75 hours and hourly steps after that (163 steps). The 100 m wind field is on
+33 height levels. The grid is 970 by 1042 points in a Lambert azimuthal equal-area projection.</p>
+<p><strong>Recording one full run cropped to Great Britain takes 29 minutes and stores 1.06 GB.</strong> The run
+took 5.5 GB of downloads and 54,282 requests with 8 threads. At one run an hour, the archive grows
+by about 25 GB a day and 9 TB a year. About 40,000 of the requests fetch the 100 m wind files. Those
+files gain nothing from extra threads, because the <code>h5py</code> library holds a global lock, whereas 4
+processes gave about 4 times the throughput.</p>
+<p><strong>Open-Meteo holds the individual members for about 3.5 days and the ensemble mean and spread for
+about 93 days.</strong> We probed one Great Britain point on 2026-09-26. The <a href="https://open-meteo.com/en/docs/ensemble-api">ensemble
+API</a> serves the 3 members as <code>ukmo_uk_ensemble_2km</code>,
+hourly to 126 hours. Runs 1 to 3 days back were complete, 4 days back were half complete, and 5 or
+more days back were empty. The historical-forecast and previous-runs APIs accept the model but
+return only nulls, so Open-Meteo keeps no per-run history. The <a href="https://open-meteo.com/en/docs/ensemble-mean-api">ensemble mean
+API</a> serves the mean as
+<code>ukmo_uk_ensemble_mean_2km</code>, with spread as variables carrying a <code>_spread</code> suffix (a <code>_mean</code> suffix
+is an error). The mean series starts on 2026-06-25, and we could not tell whether that start is a
+rolling limit, because the API rejects earlier dates. The series is stitched from successive runs
+rather than held per run, and its <code>previous_dayN</code> variables are null. The mean carries
+<code>temperature_2m</code>, <code>shortwave_radiation</code>, <code>direct_radiation</code>, <code>diffuse_radiation</code>, <code>wind_speed_10m</code>,
+and <code>cloud_cover</code>, and <code>wind_speed_100m</code> is all null. The spread is null for <code>diffuse_radiation</code> and
+<code>wind_speed_100m</code>. The DWD ensemble mean <code>dwd_icon_d2_eps_ensemble_mean</code> carries 100 m wind and
+<code>dwd_icon_eu_eps_ensemble_mean</code> does not, and we did not probe how far back either goes. The
+deterministic UKV has stitched history on Open-Meteo from about 2022 to 2023, and its
+<code>previous_day1</code> variables start only in about 2025.</p>
+<p><strong>The only per-run, per-member MOGREPS-UK history we found is the archive that a recorder would
+build, tracked in issue #926.</strong> The 30-day window on AWS adds whatever runs still survive. A study
+that wants a MOGREPS-UK ensemble mean for the last 3 months can use Open-Meteo's stitched mean, but
+cannot recompute that mean from members.</p>
+<p><strong>A MOGREPS-UK run holds 3 members, and the Met Office's 18-member MOGREPS-UK ensemble is six hourly
+runs lagged together.</strong> <a href="https://doi.org/10.1002/qj.3844">Porson et al. (2020)</a> describe it as "an
+18-member ensemble ... created by running three members every hour and time-lagging these over a 6
+hr window". The global MOGREPS-G has 18 members in each run, so its members all share one run age,
+at 20 km resolution and 6-hourly updates against MOGREPS-UK's 2.2 km and hourly updates. Members
+from different lagged runs differ in age by up to 5 hours, so they are not exchangeable the way the
+members of one run are. A mean or spread built from lagged runs therefore needs three things. The
+build has to decide how to weight members of different ages. It has to keep each member's run age
+(the run's initialisation time) beside the member. It must never treat the 3 members of a single run
+as a full ensemble, because a mean of 3 members is noisy and a spread from 3 members rests on 2
+degrees of freedom. The <a href="../../studies/forecasts/ensemble-means/#what-open-meteos-source-code-does-for-the-mogreps-uk-mean">ensemble-means
+study</a>
+records what Open-Meteo's source code does.</p>
+<h3 id="what-we-learnt-about-met-office-improver-on-2026-09-26">What we learnt about Met Office IMPROVER on 2026-09-26</h3>
+<p><strong>The Met Office publishes its IMPROVER post-processing system's output on AWS as the Blended
+Probabilistic Forecast (BPF), and the UK gridded buckets carry no irradiance.</strong> The BPF is in the
+AWS Open Data programme in <code>eu-west-2</code>, as NetCDF under CC BY-SA 4.0, with a
+<a href="https://registry.opendata.aws/met-office-bpf-uk-gridded-percentiles/">percentiles bucket</a> and a
+<a href="https://registry.opendata.aws/met-office-bpf-uk-gridded-probabilities/">probabilities bucket</a> on a
+2 km UK grid. Lead times are hourly to 120 hours and then 3-hourly to 186 hours. The registry says
+the percentiles are updated "4 times each day", while the listing for 2026-09-15 held 94 blend-time
+prefixes, about one every 15 minutes. Each object expires after 30 days. In the percentiles bucket,
+the 44 variables listed by file name on 2026-09-15 include total cloud amount, low cloud amount, and
+the UV index, and no downward shortwave, direct, diffuse, or sunshine-duration field. We inferred
+the probabilities bucket's variables from the percentiles bucket's, and did not inspect the spot or
+global buckets.</p>
+<p><strong>The UK gridded buckets carry wind at 10 m only, so it cannot serve either purpose that the
+weather-product studies score.</strong> The wind fields are <code>wind_speed_at_10m</code>, <code>wind_direction_at_10m</code>,
+and the 1-hour and 3-hour maximum gust at 10 m. No 100 m wind is listed in the percentiles bucket,
+and the same caveat about the other buckets applies. Cloud cover is a weak substitute for the direct
+and diffuse shortwave that <a href="../disaggregation/#the-forward-model">the PV forward model</a> needs.</p>
+<p><strong>The BPF is a calibrated blend, so it cannot stand in for MOGREPS-UK members in the ensemble-means
+comparison.</strong> <a href="https://doi.org/10.1175/BAMS-D-21-0273.1">Roberts et al. (2023)</a> describe IMPROVER
+as blending probabilities rather than physical values, with model weights that represent each
+model's relative skill for precipitation, temperature, wind speed and direction, cloud cover, and
+visibility, and with a radar nowcast added for precipitation. The paper names no irradiance
+variable. The variable list and the file names hold percentiles and probabilities and no member
+index, so the UK gridded buckets have no raw members from which to compute a mean.</p>
+<p><strong>Recording the BPF whole would take 719 to 807 GB a day per bucket.</strong> One day (2026-09-15)
+held about 807 GB in the percentiles bucket and 719 GB in the probabilities bucket, for the whole
+grid. A useful field set (cloud, screen temperature, 10 m wind and gust, precipitation rate,
+visibility, humidity, and pressure) was 279 GB in the percentiles bucket. We estimate, from the
+bounding box, that Great Britain is about 22% of the grid, which gives about 60 GB a day cropped to
+Great Britain for that field set. Keeping one blend every 6 hours would be about 1 TB a year, also an
+estimate. The bucket holds 30 days, so a longer archive cannot be back-filled. In the searches
+behind <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/801">issue #801</a>, we
+found no archive of MOGREPS-UK, and we did not verify whether one exists for the BPF.</p>
+<p><strong>The research recommends against archiving the BPF for solar and wind.</strong> A small forward recorder is
+worth considering if a study wants the operational blend as a benchmark. See #801 for where such a
+recorder would be tracked.</p>
+<p><strong>The IMPROVER paper states that equal weights were used across time-lagged runs at the time of
+writing (2023), although the open-source code has options to weight runs by age.</strong> Roberts et al.
+say time-lagging is essential for MOGREPS-UK, which was designed as a time-lagged ensemble of
+several runs of 3 members each hour, and that IMPROVER also time-lags UKV and MOGREPS-G. They say
+options exist for applying different weights to each forecast length, "although at present, equal
+weighting is used". The paper was published in March 2023, and we have not checked whether the
+operational weights have changed since. In the code at commit
+<a href="https://github.com/metoppv/improver/tree/acf4ab6d08cff2e52359bcc62e8bfe0788958218/improver/blending"><code>acf4ab6</code></a>,
+the weights can come from four sources. A dictionary gives piecewise-linear weights along a
+coordinate such as lead time. A default linear rule runs between a start value and an end value. A
+non-linear rule sets the weight of the i-th cycle to <code>cval**i</code> and can order the cycles so that the
+newest is heaviest. A triangular rule is the fourth. The utility that merges lagged runs into one
+ensemble only pools the members, without weighting them by age, and the repository's own
+cycle-blending command line uses equal weights. The ensemble-means question of how to weight
+members of different ages therefore has a published operational answer of equal weights, as of 2023.</p>
+<h3 id="ecmwf-has-published-no-plan-to-open-a-direct-beam-or-hourly-ensemble-steps">ECMWF has published no plan to open a direct beam or hourly ensemble steps</h3>
+<p><strong>Asked in July 2025 whether the open-data parameter list would grow, ECMWF said it would not grow
+during the transition to open data.</strong> ECMWF staff
+<a href="https://forum.ecmwf.int/t/what-does-fully-open-data-status-in-2025-mean/12777">replied</a> that they
+were "not planning to expand the existing parameter dataset while we make the transition", and would
+"review the parameters themselves and potentially expand in the coming years" — naming no parameter
+and no date. Searching ECMWF's <a href="https://www.ecmwf.int/en/forecasts/datasets/open-data">open-data catalogue
+page</a>, its news archive, its user forum, and
+the <code>ecmwf/ecmwf-opendata</code> client repository turned up <code>fdir</code>, <code>cdir</code>, and <code>dsrp</code> nowhere as a
+planned addition.</p>
+<p><strong>The open-data parameter list is not frozen, though.</strong> ECMWF
+<a href="https://forum.ecmwf.int/t/open-data-transition-early-success/14478">announced</a> in December 2025
+that total cloud cover, snow depth, and snowfall had been added to the IFS open dataset, and all
+three are in the feed today. A request for a radiation parameter is therefore a request of a kind
+ECMWF granted recently, rather than one the feed's design rules out. Asking is invited, too: the
+same July 2025 reply says ECMWF are "happy to take suggestions and we keep a list of requests for
+the open data", and when a user asked for <code>fdir</code> among the AIFS outputs in June 2025, ECMWF
+<a href="https://forum.ecmwf.int/t/aifs-expanded-products/13606">replied</a> that they would pass the request
+to the AIFS developers — a request logged, not a plan.</p>
+<p><strong>The free feed's ensemble steps are 3-hourly to 144 hours, and the one dated commitment to widen
+the free feed is about grid spacing rather than steps.</strong> ECMWF's announcement of 1 October 2025,
+<a href="https://www.ecmwf.int/en/about/media-centre/news/2025/ecmwf-makes-its-entire-real-time-catalogue-open-all">opening the whole Real-time
+Catalogue</a>,
+says the free subset is published "at 25 km resolution" and that "later in 2026, the free and open
+subset will be extended to include our 9 km resolution forecasts with a 2-hour latency". The hourly
+steps the full catalogue carries out to 90 hours appear neither there nor anywhere else we
+searched. Hourly steps would be worth having for solar, because the coarser the step, the flatter
+and later the reconstructed solar day.</p>
+<p><strong>Removing the licence fee brought neither the direct beam nor a finer step to the free feed.</strong> The
+October 2025 change made ECMWF's whole Real-time Catalogue open, and the free feed has gained
+parameters since, but the open-data catalogue page, updated for IFS Cycle 50r1 on 13 May 2026, still
+lists five radiation parameters — <code>ssrd</code>, <code>strd</code>, <code>ssr</code>, <code>str</code>, and <code>ttr</code> — and the same 3-hourly
+step floor. Listing the index files of the 2026-09-19 00Z run agrees: 47
+parameters at any one ensemble step, those same five radiation fields, and no step finer than
+3 hours.</p>
+<h3 id="two-traps-for-whoever-builds-on-ecmwfs-direct-beam">Two traps for whoever builds on ECMWF's direct beam</h3>
+<p><strong><code>dsrp</code> is the more convenient field to ask ECMWF for, because <code>fdir</code> is a horizontal-plane flux
+and
+<code>dsrp</code> is already direct normal irradiance.</strong> The ENS catalogue linked above carries three direct
+fields: <code>fdir</code> (paramId 228021, total-sky direct at the surface), <code>cdir</code> (paramId 228022, the
+clear-sky equivalent), and <code>dsrp</code> (paramId 47, direct solar radiation into a plane facing the sun).
+Deriving direct normal irradiance from <code>fdir</code> means dividing by the cosine of the solar zenith
+angle, which is numerically unstable at low sun, and the sun is low over GB for much of the year.
+<code>dsrp</code> needs no division, so a request naming only <code>fdir</code> leaves behind the field that needs none.</p>
+<p><strong><code>ssrd</code> − <code>fdir</code> is close to a diffuse pyranometer reading, but not equal to that reading.</strong>
+<a href="https://www.ecmwf.int/sites/default/files/elibrary/2015/18490-radiation-quantities-ecmwf-model-and-mars.pdf">ECMWF's
+radiation
+note</a>
+records that the model treats strongly forward-scattered radiation as unscattered, and that its
+diffuse part includes the circumsolar radiation a shadow-band pyranometer excludes. The note puts
+the correction on the measurement rather than on the model output: a diffuse measurement has to be
+corrected for the shadow band before it is compared with <code>ssrd</code> − <code>fdir</code>. The note also warns
+that these fluxes are accumulated over a period across which the solar zenith angle moves.
+Converting an accumulated flux to an instantaneous pyranometer convention is therefore not
+straightforward either.</p>
+<h3 id="era5-which-access-route">ERA5: which access route</h3>
+<p><strong>The leading candidate is the CDS's own analysis-ready Zarr store, but two open questions need
+answering before we commit.</strong> Since
+<a href="https://forum.ecmwf.int/t/access-to-our-arco-era5-data-lake-zarr-store/15123">2026-06-30</a>
+Copernicus publish ERA5 single levels (and ERA5-Land) as analysis-ready Zarr, opened straight from
+<code>xarray</code> with a CDS API key and offered <strong>geo-chunked</strong> — long periods over a small area, which is
+our access pattern — as well as time-chunked. Neither of the two open questions is documented:
+whether its <strong>subset</strong> of surface and wave variables carries the radiation we need (<code>fdir</code> above
+all, since the direct component is why we prefer ERA5 to the ENS feed here; further parameters are
+added on request), and whether it serves <strong>ERA5T</strong> or only final ERA5, since near-real-time is half
+of why we chose ERA5 over CERRA. The Zarr store is also explicitly a <strong>beta</strong> service, and the CDS
+reserve the right to withdraw access to protect Data Store performance.</p>
+<p><strong>Three fallbacks, in order.</strong> <a href="https://github.com/google-research/arco-era5">ARCO-ERA5</a> is a public
+Google Cloud Zarr carrying ERA5T at about a week's lag — verify freshness via its
+<code>valid_time_stop_era5t</code> / <code>last_updated</code> metadata. <a href="https://registry.opendata.aws/earthmover-era5/">Earthmover
+Icechunk-ERA5</a> is on AWS and updates daily, but is
+paid; its free tier lags 3 months. The plain <strong>CDS API</strong> reaches about 5 days behind real time but
+is not analysis-ready. Separately, a precomputed <em>mean</em> climatology for the <a href="../xgboost-improvements/#weather-abnormality-climatology-z-score-features">weather-abnormality
+feature</a> is available from
+WeatherBench2 at <code>gs://weatherbench2/datasets/era5-hourly-climatology/</code>.</p>
+<h3 id="why-era5-describes-past-sunshine-and-wind-worse-than-most-current-weather-products">Why ERA5 describes past sunshine and wind worse than most current weather products</h3>
+<p><strong>ERA5 has four documented weaknesses: a weather model and assimilation system frozen in 2016, a 31
+km grid, hourly sunshine that is a forecast rather than an analysis, and aerosol that is prescribed
+rather than observed.</strong> Neither the solar study nor the wind study measured how much each weakness
+contributes to ERA5's error at the study farms. The weaknesses come from ECMWF's own descriptions of
+ERA5 and from published validations.</p>
+<p><strong>ERA5 runs a weather model frozen in 2016, 10 releases older than the one ERA6 is built on.</strong> A
+reanalysis re-runs one weather model over past decades and corrects each hour towards the
+observations recorded then; that correcting step is data assimilation. ECMWF numbers each release of
+its Integrated Forecasting System (IFS) as a cycle, and ERA5 is produced with cycle 41r2, the
+version ECMWF used for its operational forecasts in 2016 (<a href="https://confluence.ecmwf.int/display/CKB/ERA5%3A+data+documentation">ERA5
+documentation</a>). The freeze is
+deliberate: a reanalysis is built to be consistent over decades, so ERA5 applies the same model
+physics, grid, and assimilation to 1940 as to last week. The operational IFS then moved through 10
+cycles to cycle 49r2, the cycle ERA6 runs on (<a href="https://climate.copernicus.eu/copernicus-climates-era6-reanalysis-production-starts">Copernicus
+announcement</a>).</p>
+<p><strong>ERA5's 2016 assimilation system is unlikely to place cloud from satellite images, which CAMS and
+UKV both use.</strong> ERA5 keeps absorbing current observations, about 24 million a day by the end of 2018
+(<a href="https://www.ecmwf.int/en/newsletter/159/meteorology/global-reanalysis-goodbye-era-interim-hello-era5">ECMWF Newsletter
+159</a>),
+but only as far as the 2016 assimilation system can use them. In 2019 ECMWF reported that infrared
+radiances were not yet assimilated operationally in all-sky conditions, meaning with cloudy and
+clear scenes treated alike (<a href="https://www.ecmwf.int/en/newsletter/161/meteorology/recent-progress-all-sky-radiance-assimilation">ECMWF Newsletter
+161</a>).
+That newsletter describes instruments on polar-orbiting satellites, so the step from its statement
+to geostationary imagery is this page's inference, not ECMWF's. CAMS reads cloud from Meteosat
+images of the hour itself, and UKV assimilates satellite-derived cloud (see <a href="#ukv-assimilates-satellite-cloud-and-carries-a-fixed-aerosol-climatology">UKV assimilates
+satellite cloud</a>).</p>
+<p><strong>ERA5's 31 km grid holds cloud only as a fraction of each grid cell.</strong> A cloud smaller than a 31 km
+cell has no position inside the cell, so ERA5 cannot say which farm in the cell the cloud shades.
+Validating daily irradiance at 41 Baseline Surface Radiation Network stations worldwide and 294
+stations in Europe, <a href="https://doi.org/10.1016/j.solener.2018.02.059">Urraca et al. (2018)</a> found that
+ERA5 overestimates irradiance under cloud and slightly underestimates it under clear skies. The
+authors attribute that pattern to ERA5's poor handling of cloud, and judge ERA5's 31 km grid too
+coarse for places where surface irradiance varies strongly, such as coasts and mountains.</p>
+<p><strong>ERA5's hourly sunshine is a forecast up to 12 hours old.</strong> ERA5's hourly surface radiation is not
+an analysis: ERA5 takes it from short forecasts started at 06 and 18 UTC, at steps of 1 to 12 hours
+(<a href="https://confluence.ecmwf.int/display/CKB/ERA5%3A+data+documentation">ERA5 documentation</a>). ERA5's
+hourly wind is an analysis, so the forecast age applies to sunshine and not to wind.</p>
+<p><strong>ERA5's aerosol is prescribed, never taken from observations of that day's haze.</strong> Aerosol matters
+for sunshine because aerosol sets how much sunlight reaches the ground and how that sunlight divides
+between the direct beam and the diffuse sky. Cycle 41r2 reads tropospheric aerosol from the monthly
+climatology of <a href="https://doi.org/10.1029/97JD01864">Tegen et al. (1997)</a> (<a href="https://doi.org/10.21957/tr5rv27xu">IFS documentation, cycle
+41r2, part IV</a>). ERA5 takes its tropospheric sulphate, and the
+stratospheric sulphate that volcanic eruptions leave, from forcing data prepared for the Coupled
+Model Intercomparison Project Phase 5 (<a href="https://www.ecmwf.int/en/newsletter/159/meteorology/global-reanalysis-goodbye-era-interim-hello-era5">ECMWF Newsletter
+159</a>,
+<a href="https://www.ecmwf.int/en/newsletter/174/news/updating-land-and-aerosol-properties-improve-reanalyses-and-seasonal">ECMWF Newsletter
+174</a>).
+ERA5's aerosol therefore varies by month and from year to year, but not with the day's haze. CAMS's
+irradiance takes aerosol from CAMS's own reanalysis and global forecasting system (<a href="https://confluence.ecmwf.int/x/jOLjDw">CAMS radiation
+documentation</a>), and UKV carries a fixed climatology (see
+<a href="#ukv-assimilates-satellite-cloud-and-carries-a-fixed-aerosol-climatology">UKV assimilates satellite
+cloud</a>).</p>
+<p><strong>The published validations of ERA5's wind cited here come from sites unlike the wind study's farms,
+which are onshore in flat Lincolnshire.</strong> Offshore, ERA5 underestimates strong wind speeds. <a href="https://doi.org/10.5194/wes-9-1727-2024">Gandoin
+and Garza (2024)</a> trace the bias to ERA5's surface drag
+formulation and its dependence on sea state, worst for short fetches (wind that has crossed only a
+short stretch of open water) over shallow seas such as the North Sea. At the IJmuiden mast they
+measure an underestimate of almost 10% for the largest wind speeds. Against Doppler lidar at heights
+of 100 to 500 m, <a href="https://doi.org/10.5194/wes-10-733-2025">Cheynet et al. (2025)</a> found ERA5 and the
+3 km Norwegian hindcast NORA3 similar offshore, and NORA3 better than ERA5 at two coastal sites and
+one complex-terrain site in Norway.</p>
+<h3 id="cams-use-the-point-api-not-the-gridded-product">CAMS: use the point API, not the gridded product</h3>
+<p><strong>Two CAMS products exist, and only the point time-series product is current.</strong> The <a href="https://ads.atmosphere.copernicus.eu/datasets/cams-gridded-solar-radiation">gridded
+product</a> would suit the
+H3 pipeline — 0.1°, 15-minute, monthly netCDF — but it lags years behind, and version 4.6 (rev2) is
+the only version that reaches 2024:</p>
+<table>
+<thead>
+<tr>
+<th>Version</th>
+<th>Years available</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>4.5</td>
+<td>2005–2022</td>
+</tr>
+<tr>
+<td>4.6</td>
+<td>2005–2023</td>
+</tr>
+<tr>
+<td>4.6 (rev2)</td>
+<td>2005–2024</td>
+</tr>
+</tbody>
+</table>
+<p><strong>A grid that stops in 2024 is disqualifying for capacity estimation</strong>, because the domestic solar
+fleet the estimate has to track has kept growing since. That table was read from the Atmosphere Data
+Store catalogue API on 2026-09-09, and a <a href="https://forum.ecmwf.int/t/cams-gridded-solar-radiation-data-for-the-period-01-04-2025-to-31-03-2026/14983">user who asked for April 2025 onward in May
+2026</a>
+was given no release date and pointed at the point product instead.</p>
+<p><strong>The <a href="https://ads.atmosphere.copernicus.eu/datasets/cams-solar-radiation-timeseries">point time-series
+product</a> runs to
+yesterday</strong>, and takes one latitude and longitude per request. That is annoying rather than
+disqualifying: one request covers a location over a whole date range, so the count scales with sites
+rather than with days. The <a href="../../#scope">v1 trial area</a> needs at most 32 requests, 6 of them
+for the solar farms, against a limit of 500 requests per day. The daily cap binds long before the
+wait does, at least at the sizes tested: a 14-day request at a 15-minute step returned in 27 seconds
+on 2026-09-21. A multi-year request has not been timed. Ask for <code>observed_cloud</code> rather than
+<code>clear</code>: the all-sky response carries the clear-sky columns (<code>GHIc</code>, <code>BHIc</code>, <code>DHIc</code>, <code>BNIc</code>)
+alongside the all-sky ones, so one request returns both, and their ratio is the clear-sky index that
+conditions the capacity fit and the published estimates of CAMS's own error.</p>
+<p><strong>No intraday correction can rest on CAMS, whatever the accuracy of its irradiance.</strong> A request
+naming today is rejected outright: probing the retrieval API on 2026-09-21 returned HTTP 400 for
+that same day, and a complete set of values for 2026-09-20. The freshest value on offer is
+yesterday's last interval, which the period-ending convention below timestamps at 00:00 UTC today. A
+forecast job running at 09:00 UTC therefore gets nothing at all about the day it is forecasting. The
+most recent daylight irradiance that job can reach dates from yesterday's sunset — between roughly
+15:45 UTC midwinter and 20:35 UTC midsummer across NGED's licence areas.</p>
+<p><strong>The latency is 1 day, not the 2 days some third-party documentation still gives.</strong> The CAMS
+Radiation Service halved the latency in <a href="https://forum.ecmwf.int/t/cams-solar-radiation-timeseries-new-data-availability-and-request-limits-on-ads/14735">February
+2026</a>.
+The same change raised the daily cap to the 500 requests above. The <a href="https://cran.r-project.org/web/packages/camsRad/vignettes/CAMS_solar_data.html"><code>camsRad</code>
+vignette</a> still
+gives the coverage as "up to 2 days ago", so check any latency figure taken from outside the
+Atmosphere Data Store against the request form itself.</p>
+<p><strong>Great Britain sits inside the Meteosat Second Generation field of view</strong> that bounds the all-sky
+product, with the same low-winter-sun degradation SARAH-3 documents. Meteosat Third Generation is
+not yet in the CAMS processing chain. Depending on a service still built on the older satellite is a
+supply risk.</p>
+<p><strong>Three traps in the point API each fail silently.</strong></p>
+<ul>
+<li><strong>Set <code>time_reference</code> to <code>universal_time</code>.</strong> The request form also offers true solar time, which
+  differs from UTC by the site's longitude plus the equation of time. Across Great Britain that
+  offset runs from roughly −38 to +24 minutes, varying by site <em>and</em> by time of year, so it exceeds
+  a half-hour step at western sites in winter and looks exactly like a retrieval bias.</li>
+<li><strong>Values are irradiation in Wh/m² accumulated over the step, not irradiance in W/m².</strong> ECMWF
+  timestamp each value at the <strong>end</strong> of its integration period, matching NGED's period-ending
+  convention above.</li>
+<li><strong>CAMS recomputes each request on the fly</strong> against the latest software release and the latest
+  aerosol and cloud inputs, so the same timestamp can return a different value next year. Snapshot
+  each fetch into Delta and treat the snapshot as the source of truth, or experiments stop being
+  reproducible.</li>
+</ul>
+<h3 id="what-comparing-weather-products-on-the-trial-areas-solar-farms-found">What comparing weather products on the trial area's solar farms found</h3>
+<p><strong>The satellite retrieval beat the reanalysis by 4.29 points of mean absolute error on the six
+metered solar farms, which is the largest effect anything in that experiment varied.</strong> On the
+124,849 hours both products cover, CAMS cut an XGBoost forecast's error from 9.66% to 5.37% of P99
+output — the 99th percentile of each site's own metered output, which every figure there is
+normalised by — and a fitted five-parameter physical model's from 10.03% to 6.20%. The largest
+contrast from changing which beam/diffuse split the model saw was 0.126 points, and changing the
+model family moved 1.05. Which product feeds the model dominates both. The write-up is <a href="../../studies/beam-diffuse-split/">Does a
+weather product's beam/diffuse split help a PV forecast?</a>; the
+code sits in <code>studies/beam_diffuse_split/</code>.</p>
+<p><strong>Scoring eight products on one common set of hours puts the two satellite retrievals far ahead of
+every weather model.</strong> On 76,727 generator-hours from December 2022 to August 2026, CAMS scores
+5.09% of capacity and SARAH-3 5.49%. Among the weather models and reanalyses, the German weather
+service's ICON-D2 scores 7.76%, ICON-EU 8.39%, ICON global 8.48%, its reanalysis ICON-DREAM-EU
+8.77%, the Met Office's UKV 8.86% as Open-Meteo serves its hourly value, and ERA5 9.08%. ICON-D2's
+advantage shrinks within hours of each run, and ICON-EU no longer beats UKV once UKV's hour is
+rebuilt from its own snapshots. Four more Open-Meteo models are scored on a shorter row set from
+November 2024. The write-up, with what each offline consumer should read, is <a href="../../studies/past-weather/solar/">Which weather product
+best describes past sunshine?</a>.</p>
+<p><strong>Figures measured on different row sets do not compose into a ranking.</strong> ERA5 scores 9.08% on the
+eight-product row set and 8.87% on the shorter row set that adds four more Open-Meteo models: the
+same product and the same generators, because restricting to hours every product covers changes
+which hours are kept. Open-Meteo's hourly UKV beats ERA5 across the whole record by 0.22 points
+[0.06, 0.39], and by 0.14 points since August 2024 [−0.04, +0.35], the second of which is not
+statistically significant at the 5% level.</p>
+<p><strong>CAMS infers cloud from Meteosat at the hour in question, whereas the weather models simulate it.</strong>
+So a retrieval of an hour that has already happened starts from the cloud field the others have to
+predict.</p>
+<p><strong>Three limits bound how far that carries.</strong> UKV differs from ERA5 in aerosol treatment as well as
+in resolution, so neither ordering is a clean resolution contrast. Open-Meteo's archive stitches
+the first hours of each successive run (<a href="../../background/weather-products-survey/#which-archives-keep-whole-past-forecast-runs">the survey compares Open-Meteo's
+archives</a>), so
+a product's effective lead follows its run frequency: hourly UKV is the T+0 analysis, while 3-hourly
+ICON-D2 carries a lead of 1 to 3 hours, measured against the German weather service's own files.
+ICON-D2 therefore beats UKV while forecasting further ahead than it, and the comparison is not
+analysis against analysis. And CAMS is a retrieval rather than a model, so its lead is nil and its
+win is partly a win for observing cloud rather than simulating it. Every measurement is of these
+eight products on this fleet, and none has been shown to hold for every product at those
+resolutions.</p>
+<p><strong>ICON-D2 reaches only the eastern half of NGED's licence area, so its score is not a licence-wide
+result.</strong> Probing the Open-Meteo archive along a west-to-east line puts the model's western
+boundary near 2.5°W: Bristol, Exeter, Cardiff, Swansea, and Truro return no data, while Birmingham
+and Nottingham are covered. The whole of South West England and South Wales therefore sit outside
+it, and every metered site in this comparison sits inside it, so nothing here says how ICON-D2
+would perform in the west. <strong>A limited-area model from a neighbouring country can be a component of
+a blend over part of the licence area, and cannot be the single source feeding all of it.</strong></p>
+<p><img alt="ICON-D2 has no data west of a line running from 1.8°W at 49.9°N to 3.9°W at 57.3°N, and AROME
+France has none north of 55.4°N. The UK is drawn in dark grey, and Ireland in light grey for
+context" src="../assets/weather_product_domains.svg" /></p>
+<p><strong>Two limited-area weather models cover only part of the UK, and every other weather product this
+page names covers all of it.</strong> ICON-D2 misses South West England, Wales, the western edge of
+the Midlands and of North West England, the Isle of Man, Northern Ireland, and Scotland west of
+Edinburgh and north of about 57.5°N, including Orkney and Shetland. Météo-France's AROME France,
+listed on the <a href="../../background/weather-products-survey/">weather products survey</a>, misses
+everything north of 55.4°N: all of Scotland except its southern fringe, and the northern tip of
+Northumberland. AROME France does cover Northern Ireland, whose northernmost point is at 55.3°N.
+The ICON-D2 outline is traced from the valid-data mask of one file the German weather service
+publishes, the 2 m temperature from the 00 UTC run of 23 September 2026. That outline's western
+edge at 53.2°N sits at 2.6°W, which agrees with Open-Meteo returning no data west of about 2.5°W.
+The AROME France outline is the plain rectangle in the grid description Open-Meteo publishes, and
+Open-Meteo's API confirms the northern edge by returning data at 55.3°N and none at 55.5°N. The
+map is drawn by <code>studies/beam_diffuse_split/weather_product_domains.py</code>.</p>
+<p><strong>CAMS's own reliability flag is worth acting on, and dropping the flagged hours raises a
+P99-normalised error even though it improves the data.</strong> The service flagged 17.9% of the daylight
+hours it delivered as less than 90% reliable. Those hours are much darker than the ones kept — 33
+W m⁻² of global irradiance against 285, and 3.5% of P99 output against 36.1% — so removing them
+removes hours where every model is nearly right, and the remaining mean error rises mechanically.
+Any comparison that drops them on one source and not on another is comparing two row sets rather
+than two products; restrict to the shared hours first.</p>
+<p><strong>The beam field CAMS publishes is worth having and the one ERA5 publishes is not.</strong> On the 5 km
+retrieval, giving a model the product's own split rather than running a separation model locally cut
+error by about 1.5% relative. On the 31 km reanalysis it added nothing detectable. Whether the
+retrieval's beam field is worth paying for depends on what a supplier charges for it, which that
+experiment does not know.</p>
+<h3 id="met-office-weather-station-observations-midas-open">Met Office weather-station observations (MIDAS Open)</h3>
+<p><strong>The project ingests no weather-station observations, and the studies read the Met Office's MIDAS
+Open only to test whether a nearby station stands in for a gridded product.</strong> MIDAS Open is released
+once a year, and its current release ends on 2025-12-31. MIDAS Open can therefore feed offline work
+but not the live forecast. On sunshine, a nearby station's irradiance scored worse than CAMS and
+better than ERA5. On wind, a nearby anemometer scored worse than ERA5's 10 m wind. Adding a
+station's observations to a gridded product (CAMS on sunshine, UKV on wind) lowered that product's
+error, so neither result rules a station out as an extra input. The licence, the stations fetched,
+the variables, the results, and the limits of both studies are in the <a href="../../background/weather-products-survey/#weather-station-observations">weather products
+survey</a>.</p>
+<h3 id="ukv-assimilates-satellite-cloud-and-carries-a-fixed-aerosol-climatology">UKV assimilates satellite cloud, and carries a fixed aerosol climatology</h3>
+<p><strong>UKV's radiation scheme sees no time-varying aerosol</strong>, which matters because aerosol sets how
+sunlight divides between the direct beam and the diffuse sky. The regional configuration's radiation
+uses a fixed five-species climatology, unchanged from RAL1 through the RAL3 package that went
+operational at PS47 on 2026-01-21: <a href="https://doi.org/10.5194/gmd-13-1999-2020">Bush et al. (2020)</a>
+describes the climatology, and <a href="https://doi.org/10.5194/gmd-18-3819-2025">Bush et al. (2025)</a>
+records that no radiation parameters changed between RAL2 and RAL3. UKV's only advected aerosol
+quantity is the Murk tracer of <a href="https://doi.org/10.1002/qj.318">Clark et al. (2008)</a>, which
+diagnoses visibility and does not reach the radiation calculation. CAMS is aerosol-informed by
+construction. ERA5's aerosol is prescribed, a monthly climatology plus sulphate forcing, with
+nothing assimilated (see <a href="#why-era5-describes-past-sunshine-and-wind-worse-than-most-current-weather-products">Why ERA5 describes past sunshine and wind worse than most current weather
+products</a>). So
+any skill ERA5's split shows could come from cloud or, weakly, from prescribed aerosol that varies
+by month and year but not with the day's haze, and <strong>any skill UKV's split shows can only be
+cloud-sourced</strong>, where CAMS's could be either.</p>
+<p><strong>UKV's 4D-Var assimilates a large volume of satellite-derived cloud, so at short lead times the
+model is partly a retrieval.</strong> Satellite-derived cloud fraction was the single largest observation
+type by count in UKV's 2013 observation table, at 650,000 a day against 39,000 for SEVIRI radiances
+(<a href="https://www-cdn.eumetsat.int/files/2020-04/pdf_conf_p_s7_09_tubbs_v.pdf">Tubbs and Kelly
+(2013)</a>), entering the
+humidity field as a pseudo-observation by the mechanism of <a href="https://doi.org/10.1002/qj.980">Renshaw and Francis
+(2011)</a>. The <a href="https://www.metoffice.gov.uk/services/data/met-office-data-for-reuse/ps43_ftp">PS43 release
+notes</a> confirm the
+stream was operational and being refined in December 2019, and the PS47 notes name only latent heat
+nudging and the adaptive vertical grid as assimilation methods removed. <strong>No document from 2020
+onwards was found positively re-confirming the satellite cloud stream, and whether surface solar
+irradiance is assimilated anywhere in the Met Office's systems could not be established.</strong> A UKV
+analysis and a satellite product are therefore partly downstream of the same geostationary
+satellite, so a contrast between the two weakens at short lead and recovers as the model's own
+physics overwrites the initial cloud field.</p>
+<h3 id="open-meteos-ukv-archive-is-the-t0-analysis-and-half-of-it-is-backfill">Open-Meteo's UKV archive is the T+0 analysis, and half of it is backfill</h3>
+<p><strong>Open-Meteo mirrors UKV from the Met Office's own AWS bucket, ingesting every hourly run about four
+hours late.</strong> A later run overwrites an earlier one for the same valid time, so the archive holds
+the T+0 analysis rather than a forecast at any lead. Sampled at five instants either side of PS47,
+the nearest grid cell in the Met Office's own file agrees with the served snapshot to between 0.11
+and 0.55 W m⁻², where every other lead sits tens to hundreds of W m⁻² away. <strong>An archive of
+analyses is the right object to compare against a reanalysis or a retrieval and the wrong one to
+read as forecast skill.</strong></p>
+<p><strong>Over half the archive predates the ingest that produced the rest.</strong> Open-Meteo's UKV downloader
+was created on 2024-08-12, and the archive claims to start on 2022-03-01, so the 29 months between
+were backfilled from a source Open-Meteo does not name. The AWS bucket's rolling two-year window
+reached back only to about August 2022 on the day the downloader landed, so an AWS backfill does not
+account for the stated start either, and the window has since rolled past all of it. <strong>The era that
+can be checked against the Met Office's files is essentially the era Open-Meteo ingested live</strong>, and
+the earlier half cannot be checked against anything.</p>
+<p><strong>A Met Office upgrade moved how much UKV's published split improves the forecast, by more than
+the backfill boundary does.</strong> In the beam/diffuse split experiment, the gain from UKV's direct-beam
+share is five and a half times larger over the 8 months after Parallel Suite 47 became operational
+on 2026-01-21 than over the 47 months before. Neither other source steps over those same months:
+the satellite source's contrast moved by about a third, from −0.100 to −0.068 percentage points,
+and the reanalysis stayed null in both eras. UKV's global irradiance went the other way, sitting
+about 1 percentage point worse against the reanalysis from the same date.</p>
+<p><strong>One upgrade moved this product's value by a factor of five and a half, so a production ingest of
+UKV should score continuously rather than trust a figure measured once</strong>, and should not assume
+that one era of UKV stands in for another.</p>
+<p><strong>Three mechanical facts about the served columns, each of which fails silently if assumed wrong.</strong></p>
+<ul>
+<li><strong>Only global and direct short-wave are ingested; diffuse is served as their difference.</strong> The Met
+  Office publishes its own diffuse field and Open-Meteo does not read it, so the served diffuse
+  carries no information the other two columns lack.</li>
+<li><strong>The default hourly column is a backward-looking mean over the hour ending at its label</strong>, which
+  matches the period-ending convention used everywhere else in this project. UKV publishes radiation
+  as an instantaneous snapshot, and Open-Meteo divides that snapshot by the ratio of the
+  instantaneous cosine of the solar zenith angle to its mean over the preceding hour. Asking for the
+  <code>_instant</code> suffix multiplies the ratio back to recover the snapshot, which lands half an hour
+  later than the hour's centre.</li>
+<li><strong>That conversion is skipped where the ratio falls below 0.05</strong>, near sunrise and sunset, so the
+  round trip between the two columns does not hold at very low sun.</li>
+</ul>
+<h2 id="nwp-model-upgrades-since-2019">NWP model upgrades since 2019</h2>
+<p><strong>The weather models the project reads have changed many times since 2019, and many of those
+changes alter irradiance, cloud, or wind.</strong> ECMWF changed the IFS cycle behind ECMWF ENS seven
+times between June 2019 and May 2026. The German weather service (DWD) changed ICON in ways that
+touch cloud, radiation, or wind on 16 dates between July 2019 and September 2026, counting the
+introduction of ICON-D2. The Met Office changed UKV's physics package twice. A model trained on one
+version of a weather model and run on the next meets inputs whose relationship to power has moved.
+After the Met Office's PS47 upgrade, <a href="#open-meteos-ukv-archive-is-the-t0-analysis-and-half-of-it-is-backfill">the error reduction from giving a model UKV's published
+direct-beam share grew five and a half times
+larger</a>, comparing the 8
+months after the upgrade with the 47 months before. How the live service
+plans to handle an upgrade is in <a href="../live-service/#nwp-model-upgrades">Live service → NWP model
+upgrades</a>.</p>
+<p><strong>The full list is <a href="../assets/nwp-model-upgrades.csv"><code>nwp-model-upgrades.csv</code></a>, 98 changes under 19
+product labels, each checked against the producer's own text on 2026-09-23.</strong> The <code>verified</code> column
+reads <code>yes</code> where the check confirmed the row as written, <code>corrected</code> where the check changed it, and
+<code>unverified</code> where no producer text could be found. The <code>note</code> column says what the check found. The
+list also covers products the project neither reads nor evaluates: NOAA's GFS and GEFS,
+Météo-France's ARPEGE and AROME, KNMI's HARMONIE-AROME, MET Norway's NORA3, and CERRA's publication
+history.</p>
+<p><strong>The table below keeps only the verified changes that alter irradiance, cloud, or wind over Great
+Britain, in the weather models the project reads or is evaluating, and in the two archives the
+studies read them through.</strong> It leaves out changes confined to DWD's ICON-EPS ensemble, which the
+project does not read. ERA5 has no rows, because ECMWF froze ERA5 at IFS cycle 41r2 for the whole
+record. ERA5's near-real-time stream, ERA5T, has correction periods in which it differs from the
+final ERA5, but the check found no correction period that touches irradiance or wind. Between PS43
+and PS47 the check found no UKV physics change. UKV was still on the RAL2-M physics after PS45 in
+May 2022, PS46 in May 2025 was a move to a new supercomputer with no science change intended, and
+no date or content for PS44 could be found.</p>
+<table>
+<thead>
+<tr>
+<th>Takes effect</th>
+<th>Model</th>
+<th>What changed</th>
+<th>Source</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>2019-06-11 06 UTC</td>
+<td>ECMWF IFS 46r1</td>
+<td>Longwave scattering switched on in the radiation scheme; convection changes; new 200 m wind output</td>
+<td><a href="https://confluence.ecmwf.int/display/FCST/Implementation+of+IFS+Cycle+46r1">ECMWF</a></td>
+</tr>
+<tr>
+<td>2020-06-30 06 UTC</td>
+<td>ECMWF IFS 47r1</td>
+<td>Revised shortwave albedo of land, snow, and sea ice; updated total solar irradiance; less ocean drag at high wind speeds</td>
+<td><a href="https://confluence.ecmwf.int/display/FCST/Implementation+of+IFS+Cycle+47r1">ECMWF</a></td>
+</tr>
+<tr>
+<td>2021-05-11 06 UTC</td>
+<td>ECMWF IFS 47r2</td>
+<td>ENS vertical levels raised from 91 to 137</td>
+<td><a href="https://confluence.ecmwf.int/display/FCST/Implementation+of+IFS+Cycle+47r2">ECMWF</a></td>
+</tr>
+<tr>
+<td>2021-10-12 06 UTC</td>
+<td>ECMWF IFS 47r3</td>
+<td>New moist physics: cloud vertical overlap, sub-grid cloud, and gustiness revised; resolution unchanged</td>
+<td><a href="https://confluence.ecmwf.int/display/FCST/Implementation+of+IFS+Cycle+47r3">ECMWF</a></td>
+</tr>
+<tr>
+<td>2023-06-27 06 UTC</td>
+<td>ECMWF IFS 48r1</td>
+<td>ENS grid refined from about 18 km to about 9 km</td>
+<td><a href="https://confluence.ecmwf.int/display/FCST/Implementation+of+IFS+Cycle+48r1">ECMWF</a></td>
+</tr>
+<tr>
+<td>2024-11-12 06 UTC</td>
+<td>ECMWF IFS 49r1</td>
+<td>2 m temperature observations assimilated; the SPP stochastic scheme replaces SPPT in the ensemble; ECMWF reports better 10 m wind</td>
+<td><a href="https://www.ecmwf.int/en/about/media-centre/news/2024/forecast-upgrade-improves-wind-and-temperature-predictions">ECMWF</a></td>
+</tr>
+<tr>
+<td>2026-05-12 06 UTC</td>
+<td>ECMWF IFS 50r1</td>
+<td>SPP revised to reduce excessive 10 m wind spread; aerosol climatology updated</td>
+<td><a href="https://confluence.ecmwf.int/display/FCST/Implementation+of+IFS+Cycle+50r1">ECMWF</a></td>
+</tr>
+<tr>
+<td>2025-02-25 06 UTC</td>
+<td>ECMWF AIFS Single v1</td>
+<td>First operational AIFS Single, on a grid of about 32 km, with <code>ssrd</code>, <code>strd</code>, and 100 m wind among its outputs</td>
+<td><a href="https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+Single+v1">ECMWF</a></td>
+</tr>
+<tr>
+<td>2025-07-01 06 UTC</td>
+<td>ECMWF AIFS ENS v1</td>
+<td>First operational AIFS ENS: 51 members on a grid of about 31 km, with <code>ssrd</code> and 100 m wind among its outputs</td>
+<td><a href="https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+ENS+v1">ECMWF</a></td>
+</tr>
+<tr>
+<td>2025-08-27 06 UTC</td>
+<td>ECMWF AIFS Single v1.1</td>
+<td>Soil-moisture loss weight reduced by a factor of 100 to remove spurious point-rainfall artefacts; an earlier attempt on 2025-07-31 was reverted on 2025-08-01</td>
+<td><a href="https://confluence.ecmwf.int/display/FCST/Implementation+of+AIFS+Single+v1">ECMWF</a></td>
+</tr>
+<tr>
+<td>2026-05-12 06 UTC</td>
+<td>ECMWF AIFS Single v2</td>
+<td>New wave, snow-cover, and 10 hPa outputs; fine-tuned on operational and experimental 50r1 analyses</td>
+<td><a href="https://www.ecmwf.int/en/newsletter/187/news/implementation-aifs-v2">ECMWF</a></td>
+</tr>
+<tr>
+<td>2026-05-12 06 UTC</td>
+<td>ECMWF AIFS ENS v2</td>
+<td>Multi-scale training loss and stricter variable bounds; fine-tuned on 2018 to 2024 data plus 50r1 data</td>
+<td><a href="https://confluence.ecmwf.int/spaces/FCST/pages/620418893">ECMWF</a></td>
+</tr>
+<tr>
+<td>2019-07-30 06 UTC</td>
+<td>DWD ICON 2.5.0</td>
+<td>Revised cloud-cover scheme, aimed at better cloud and radiation forecasts</td>
+<td><a href="https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2019/pdf_icon_30_07_2019.pdf?__blob=publicationFile">DWD</a></td>
+</tr>
+<tr>
+<td>2019-10-22 06 UTC</td>
+<td>DWD ICON 2.5.1</td>
+<td>Cloud-cover scheme retuned; DWD reports global radiation error down 1–2% and daytime radiation bias down 3–4 W m⁻²</td>
+<td><a href="https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2019/pdf_icon_22_10_2019.pdf?__blob=publicationFile">DWD</a></td>
+</tr>
+<tr>
+<td>2020-05-19 09 UTC</td>
+<td>DWD ICON</td>
+<td>Aeolus satellite wind observations assimilated</td>
+<td><a href="https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2020/pdf_icon_19_05_2020.pdf?__blob=publicationFile">DWD</a></td>
+</tr>
+<tr>
+<td>2021-02-10 09 UTC</td>
+<td>DWD ICON-D2</td>
+<td>ICON-D2 replaces COSMO-D2 as DWD's convection-permitting regional model</td>
+<td><a href="https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon_d2/pdf_2021/pdf_icon_system_10_02_2021.pdf?__blob=publicationFile">DWD</a></td>
+</tr>
+<tr>
+<td>2021-04-14 06 UTC</td>
+<td>DWD ICON 2.6.2</td>
+<td>ecRad replaces RRTM as the radiation scheme, with stochastic cloud overlap, in ICON global, ICON-EU, and ICON-D2 (09 UTC)</td>
+<td><a href="https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2021/pdf_icon_14_04_2021.pdf?__blob=publicationFile">DWD</a></td>
+</tr>
+<tr>
+<td>2021-09-08</td>
+<td>DWD ICON 2.6.3</td>
+<td>Sub-grid orography scheme retuned; small improvement in northern-hemisphere winter wind</td>
+<td><a href="https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2021/pdf_icon_08_09_2021.pdf?__blob=publicationFile">DWD</a></td>
+</tr>
+<tr>
+<td>2022-11-23 06 UTC</td>
+<td>DWD ICON</td>
+<td>Vertical levels raised from 90 to 120 in ICON global and from 60 to 74 in ICON-EU; new orography; adaptive surface friction; DWD reports a smaller positive wind bias at turbine height</td>
+<td><a href="https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2022/pdf_icon_23_11_2022.pdf?__blob=publicationFile">DWD</a></td>
+</tr>
+<tr>
+<td>2023-03-15 06 UTC</td>
+<td>DWD ICON</td>
+<td>10 m wind assimilation extended; shallow convection switched off in stable boundary layers, improving stratocumulus and the solar radiation bias; ICON global and ICON-D2 (09 UTC)</td>
+<td><a href="https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2023/pdf_icon_15_03_2023.pdf?__blob=publicationFile">DWD</a></td>
+</tr>
+<tr>
+<td>2023-11-28 06 UTC</td>
+<td>DWD ICON 2.6.6</td>
+<td>Sub-grid orography and turbulence retuned for winter; the cloud-cover scheme gains an inversion diagnostic to improve stratocumulus</td>
+<td><a href="https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2023/pdf_icon_28_11_2023.pdf?__blob=publicationFile">DWD</a></td>
+</tr>
+<tr>
+<td>2024-01-24</td>
+<td>DWD ICON-D2</td>
+<td>10 m wind assimilation and adaptive surface friction extended</td>
+<td><a href="https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/nwv_aenderungen_icon_d2_gesamt.html">DWD</a></td>
+</tr>
+<tr>
+<td>2024-07-09 09 UTC</td>
+<td>DWD ICON-D2</td>
+<td>Gust parameterisation revised</td>
+<td><a href="https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon_d2/pdf_2024/pdf_icon_d2_09_07_2024.pdf?__blob=publicationFile">DWD</a></td>
+</tr>
+<tr>
+<td>2024-12-04 06 UTC</td>
+<td>DWD ICON</td>
+<td>Adaptive parameter tuning extended; snow cover revised in the surface transfer, which can shift near-surface wind; ICON global and ICON-D2 (09 UTC)</td>
+<td><a href="https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2024/pdf_icon_04_12_2024.pdf?__blob=publicationFile">DWD</a></td>
+</tr>
+<tr>
+<td>2025-07-23 06 UTC</td>
+<td>DWD ICON</td>
+<td>Dissipative heating and warm-layer ocean parameterisations added in every ICON configuration</td>
+<td><a href="https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2025/pdf_icon_23_07_2025.pdf?__blob=publicationFile">DWD</a></td>
+</tr>
+<tr>
+<td>2025-09-24 06 UTC</td>
+<td>DWD ICON</td>
+<td>Inversion-cloud scheme extended from stratocumulus to stratus, for winter fog and low cloud, and switched on in ICON-D2</td>
+<td><a href="https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2025/pdf_icon_24_09_2025.pdf?__blob=publicationFile">DWD</a></td>
+</tr>
+<tr>
+<td>2026-02-18 09 UTC</td>
+<td>DWD ICON-D2</td>
+<td>New output field for 10 m wind corrected for sub-grid orography; adaptive surface friction restricted</td>
+<td><a href="https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2026/pdf_icon_18_02_2026.pdf?__blob=publicationFile">DWD</a></td>
+</tr>
+<tr>
+<td>2026-09-02 12 UTC</td>
+<td>DWD ICON</td>
+<td>A prognostic aerosol scheme replaces the Tegen climatology for non-dust aerosol in ICON global and ICON-EU; in DWD's tests over central Europe, global radiation increases significantly</td>
+<td><a href="https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2026/pdf_icon_02_09_2026.pdf?__blob=publicationFile">DWD</a></td>
+</tr>
+<tr>
+<td>2026-10-06 06 UTC, announced</td>
+<td>DWD ICON-EU</td>
+<td>ICON-EU domain slightly enlarged, mainly to the south</td>
+<td><a href="https://www.dwd.de/DE/fachnutzer/forschung_lehre/numerische_wettervorhersage/nwv_aenderungen/_functions/DownloadBox_modellaenderungen/icon/pdf_2026/pdf_icon_06_10_2026.pdf?__blob=publicationFile">DWD</a></td>
+</tr>
+<tr>
+<td>2019-12-04</td>
+<td>Met Office PS43</td>
+<td>UKV and MOGREPS-UK move to the RAL2-M physics: mixed-phase ice cloud fraction, sub-grid turbulence, and lying snow</td>
+<td><a href="https://gmd.copernicus.org/articles/16/1713/2023/">Met Office authors, GMD 2023</a></td>
+</tr>
+<tr>
+<td>2026-01-21</td>
+<td>Met Office PS47</td>
+<td>UKV and MOGREPS-UK move to the RAL3 physics: double-moment microphysics (CASIM), a bimodal cloud scheme, and boundary-layer and land-surface updates</td>
+<td><a href="https://datahub.metoffice.gov.uk/support/changes-and-updates">Met Office</a></td>
+</tr>
+<tr>
+<td>2021-06</td>
+<td>CAMS Radiation Service v4.0</td>
+<td>APOLLO_NG cloud detection replaces APOLLO</td>
+<td><a href="https://confluence.ecmwf.int/spaces/CKB/pages/266592908/CAMS+solar+radiation+time-series+data+documentation">ECMWF</a></td>
+</tr>
+<tr>
+<td>2022-09</td>
+<td>CAMS Radiation Service v4.5</td>
+<td>New all-sky model, with the bias correction removed</td>
+<td><a href="https://confluence.ecmwf.int/spaces/CKB/pages/266592908/CAMS+solar+radiation+time-series+data+documentation">ECMWF</a></td>
+</tr>
+<tr>
+<td>2023-07</td>
+<td>CAMS Radiation Service v4.6</td>
+<td>The McClear clear-sky model reads inputs from IFS cycle 48r1 from 2023-06-27; earlier data unchanged</td>
+<td><a href="https://confluence.ecmwf.int/spaces/CKB/pages/266592908/CAMS+solar+radiation+time-series+data+documentation">ECMWF</a></td>
+</tr>
+<tr>
+<td>2023-07-04</td>
+<td>Open-Meteo v0.2.69</td>
+<td>Solar-radiation calculation improved, including direct normal irradiance</td>
+<td><a href="https://github.com/open-meteo/open-meteo/releases">Open-Meteo</a></td>
+</tr>
+<tr>
+<td>2025-10-01</td>
+<td>Open-Meteo</td>
+<td>Native 9 km IFS HRES served, with ECMWF's own direct radiation, after ECMWF opened its real-time catalogue. ECMWF's own news says the 9 km catalogue is planned for later in 2026, which conflicts with this date; the conflict is unresolved</td>
+<td><a href="https://openmeteo.substack.com/p/ecmwf-transitions-to-open-data">Open-Meteo</a></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Date an upgrade by the first run it applies to, not by the day it was announced.</strong> ECMWF brings in
+each cycle at the 06 UTC run, so the 00 UTC run of the implementation day, which is the run the
+project ingests, is still on the old cycle. DWD publishes a notice 5 to 15 days before a change
+takes effect. The effective date is in each notice's title ("Gültigkeit ab") and in the PDF's file
+name, and the dates above are effective dates. A month-only date, such as the CAMS rows', means the
+producer published no day. Open-Meteo's dates are software releases, and the hosted service may
+deploy a change on a different day.</p>
+<p><strong>A CAMS version change may rewrite history, because the Radiation Service computes each request
+afresh.</strong> The changelog says that v4.6 left data before 2023-06-27 unchanged, and says nothing either
+way about v4.0 and v4.5. A series fetched before a version change and one fetched after it may
+therefore disagree over the same hours, which is one more reason to <a href="#cams-use-the-point-api-not-the-gridded-product">snapshot each
+fetch</a>.</p>
+<p><strong>Two fields in Dynamical.org's ENS archive start part-way through it.</strong> The archive starts on
+2024-04-01, but 10 m gust starts on 2024-11-13 and total cloud cover on 2025-11-21. Neither field is
+ingested today; a feature built on either would meet nulls across the early part of the record.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../..", "features": ["content.code.copy"], "search": "../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

@@ -1,0 +1,4050 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../../past-weather/blending/">
+      
+      
+        <link rel="next" href="../matched-lead/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>How accurate is a power forecast driven by ECMWF ENS at each horizon? - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#how-accurate-is-a-power-forecast-driven-by-ecmwf-ens-at-each-horizon" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              How accurate is a power forecast driven by ECMWF ENS at each horizon?
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's network and its data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/weather-products-survey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather products surveyed for the weather-product studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/manual-heuristic-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The manual heuristic forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/energy-forecasting-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The state of the art in energy forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common incident classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learned encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nwp-variable-conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP variable conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS data-quality issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML orchestration design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production deployment design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS running costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Studies
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Studies
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beam-diffuse-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a weather product's beam/diffuse split help a PV forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_3" id="__nav_8_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Past weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Past weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../past-weather/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../past-weather/methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods shared by the past-weather studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../past-weather/solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past sunshine?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../past-weather/wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past wind?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../past-weather/blending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending weather products beat the best single weather product?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8_4" id="__nav_8_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecasts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecasts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How accurate is a power forecast driven by ECMWF ENS at each horizon?
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How accurate is a power forecast driven by ECMWF ENS at each horizon?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#key-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and methods
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data and methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-hours-scored" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The hours scored
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#horizons-and-issue-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Horizons and issue time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#turning-enss-steps-into-hourly-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Turning ENS's steps into hourly values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-forecasts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The forecasts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#folds-intervals-and-planned-contrasts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Folds, intervals, and planned contrasts
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-xgboost-models-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The XGBoost models work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#turning-enss-steps-into-hourly-values_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Turning ENS's steps into hourly values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-grows-with-horizon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error grows with horizon
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-ensemble-mean-is-the-best-of-the-three-ways-tested" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The ensemble mean is the best of the three ways tested
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-ens-stops-beating-the-no-weather-baselines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where ENS stops beating the no-weather baselines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ens-against-past-weather" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ENS against past weather
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing-the-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing the figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../matched-lead/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ensemble-means/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How do Open-Meteo's ensemble-mean products compare for solar and wind power?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an ML experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Effective-capacity estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-savings metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/data-cleaning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning the trial-area telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How NGED assembles forecasts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service: what's left to build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics and leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-demand disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending training history with ERA5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#key-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and methods
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Data and methods">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-hours-scored" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The hours scored
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#horizons-and-issue-time" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Horizons and issue time
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#turning-enss-steps-into-hourly-values" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Turning ENS's steps into hourly values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-forecasts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The forecasts
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#folds-intervals-and-planned-contrasts" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Folds, intervals, and planned contrasts
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-xgboost-models-work" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The XGBoost models work
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#turning-enss-steps-into-hourly-values_1" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Turning ENS's steps into hourly values
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#error-grows-with-horizon" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Error grows with horizon
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-ensemble-mean-is-the-best-of-the-three-ways-tested" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The ensemble mean is the best of the three ways tested
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#where-ens-stops-beating-the-no-weather-baselines" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Where ENS stops beating the no-weather baselines
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ens-against-past-weather" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        ENS against past weather
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing-the-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing the figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="how-accurate-is-a-power-forecast-driven-by-ecmwf-ens-at-each-horizon">How accurate is a power forecast driven by ECMWF ENS at each horizon?</h1>
+<blockquote>
+<p><strong>This study uses only Flexpectation's own data, and its purpose is to inform Flexpectation's
+choices.</strong> The study scores the ensemble forecast of the European Centre for Medium-Range Weather
+Forecasts (ECMWF) only at the generators in Flexpectation's trial area in Lincolnshire. The study
+does not compare results across many regions or climates, so a result on this page may not hold
+elsewhere.</p>
+</blockquote>
+<p><strong>At 6 solar farms and 3 wind farms in Lincolnshire, an XGBoost model given the ECMWF ensemble's
+mean forecast beats every forecast that reads no weather forecast out to day 5 for solar and day 7
+for wind. From day 7 for solar and from day 10 for wind it is no longer statistically significantly
+better than climatology at the main setting, and by day 14 climatology is ahead. The solar day-7 and
+day-14 results depend on the row set (see Limitations). In a post hoc check, at day 14 the ensemble
+mean adds no statistically significant skill over the same model given no weather at all.</strong> ENS is
+built to forecast a probability distribution, and this page scores only point forecasts made from
+it, so the day-14 result says nothing about the skill of ENS's spread. ENS is ECMWF's ensemble
+forecast: one control run from ECMWF's unperturbed analysis of the current weather, run at about 9
+km, and 50 runs started from perturbed initial conditions and run with stochastically perturbed
+model physics. The live service reads its 00 UTC run each day. Every error on this page is a mean
+absolute error as a percentage of each generator's capacity, taken as its 99th percentile of
+measured output rather than its nameplate rating; a difference between two errors is in percentage
+points of capacity, written "points"; and a bracketed pair after a figure is its 95% interval. At
+day 1, the day after the run, the ensemble mean gives an error of 8.80% [8.32, 9.27] for solar and
+8.23% [7.45, 9.15] for wind. The error grows with every day of horizon: by day 7 it is 14.33%
+[13.40, 15.27] for solar and 16.76% [15.18, 18.53] for wind. At day 7 the best forecast that reads
+no weather forecast is climatology, each generator's typical output for the month and hour, at
+14.50% [13.55, 15.49] for solar and 17.90% [16.09, 19.86] for wind; at days 0 to 3 for wind it is
+smart persistence. By day 14, climatology beats the ensemble mean by 0.72 points [0.15, 1.22] for
+solar and 1.24 points [0.56, 1.93] for wind. See <a href="#where-ens-stops-beating-the-no-weather-baselines">"Where ENS stops beating the no-weather
+baselines"</a> for the calendar-only check behind
+that last claim. The evidence is 50,643 generator-hours of solar from April 2024 to September 2026
+and 43,089 generator-hours of wind from December 2024 to September 2026.</p>
+<p><strong>Of three ways of using the ensemble, feeding the mean of its members to the XGBoost model does
+best at almost every horizon, as expected of an ensemble mean scored by mean absolute error.</strong> It
+beats the control member, the one run started from ECMWF's unperturbed analysis of the current
+weather, and it beats training one XGBoost model on every member and
+averaging its 51 forecasts. Every ENS input is first turned from ENS's 3- and 6-hourly steps into
+hourly values. For solar, rebuilding the radiation through the clear-sky index lowers the error by
+0.30 points [0.22, 0.40] at day 1 against the straight-line interpolation the live service uses
+today. For wind, no way of interpolating tested moves the error by more than 0.06 points to day 7.</p>
+<p><img alt="Figure 1: At these farms, an XGBoost model given the ENS ensemble mean beats every no-weather
+baseline to day 5 for solar and to day 7 for wind" src="../../assets/ens_horizons_leaderboard.svg" /></p>
+<p><strong>Figure 1 draws each forecast's own error at each horizon; Figure 2 tests each horizon against day
+0 directly.</strong> Figure 1's intervals are wide mainly because every forecast's error rises and falls
+together from month to month. Figure 2 compares two XGBoost models on the same months and the same
+fitting seed, which cancels that shared swing, so its intervals are much narrower. Two points can
+therefore overlap in Figure 1 and still differ by a margin statistically significant at the 5% level
+in Figure 2.</p>
+<p><img alt="Figure 2: Forecast error rises with horizon, fastest over the first
+week" src="../../assets/ens_horizons_against_day0.svg" /></p>
+<blockquote>
+<p><strong>How this page was made.</strong> The research question came from a human. Everything else — the code
+behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
+AI model (for this page, Claude Opus 5.5 and Claude Sonnet 5, reusing data-preparation and
+model-fitting code that Claude Opus 5 and Claude Sonnet 5 wrote for the earlier weather-product
+studies). Several independent Claude reviewers have checked the method, the evidence, and the
+prose adversarially.</p>
+</blockquote>
+<h2 id="key-findings">Key findings</h2>
+<p><strong>A difference between two errors is in percentage points of capacity, written "points". Where one
+forecast "beats" another, the difference is statistically significant at the 5% level.</strong></p>
+<ul>
+<li><strong><a href="#the-xgboost-models-work">The XGBoost models follow the measured output at every generator at day 1; at day 7 they stay
+  close to an average day.</a></strong></li>
+<li><strong><a href="#turning-enss-steps-into-hourly-values">Rebuilding solar radiation through the clear-sky index beats straight-line interpolation at
+  every horizon to day 3; for wind, the way of interpolating makes no material
+  difference to day 7.</a></strong></li>
+<li><strong><a href="#error-grows-with-horizon">Error rises with horizon: from day 0 to day 1 by 0.67 points [0.51, 0.85] for solar and 0.93
+  points [0.79, 1.08] for wind, and to day 7 by 6.20 points [5.53, 6.89] and 9.46 points [8.35,
+  10.72].</a></strong></li>
+<li><strong><a href="#the-ensemble-mean-is-the-best-of-the-three-ways-tested">The ensemble mean beats the control member, and beats training on every member and averaging
+  the forecasts, at almost every
+  horizon.</a></strong></li>
+<li><strong><a href="#where-ens-stops-beating-the-no-weather-baselines">The ensemble mean beats the best no-weather baseline to day 5 for solar and to day 7 for wind
+  (for solar, at the main setting); by day 14 climatology is ahead. In a post hoc check, part of
+  that ground is how the XGBoost model uses its calendar columns; the rest is consistent with ENS
+  adding little skill at that lead.</a></strong></li>
+<li><strong><a href="#ens-against-past-weather">At day 1 the ensemble mean is level with ERA5 for solar and loses to it for wind, and loses to
+  UKV with ICON-EU, the best of the inputs the blending page compared.</a></strong></li>
+</ul>
+<h2 id="introduction">Introduction</h2>
+<p><strong>Every weather product this project has compared so far was scored as a description of weather that
+had already happened, which is not the question the live service faces.</strong> The live service forecasts
+power days ahead, from a forecast of the weather.
+<a href="https://github.com/openclimatefix/nged-substation-forecast/issues/810">Issue #810</a> asks which
+weather model gives the best power forecast at the horizons the live service runs at. This page is
+the first, deliberately small step of that question: it measures how accurate a power forecast
+driven by
+ENS, the forecast the live service already reads, is at each horizon, before any other forecast
+product is added.</p>
+<p><strong>Three groups of forecasts are compared at each horizon, and two reference rows show how good the
+weather input could be.</strong></p>
+<ul>
+<li><strong>ENS, three ways:</strong> the control member alone; the mean of the 51 members' weather; and each
+  member through one XGBoost model, the 51 power forecasts then averaged.</li>
+<li><strong>No-weather baselines:</strong> persistence, diurnal persistence, smart persistence, and climatology,
+  defined under "Data and methods".</li>
+<li><strong>References, an analysis proxy for the weather rather than a genuine multi-day-ahead forecast:</strong>
+  ERA5, ECMWF's reanalysis of past weather, available about 5 days late; and UKV with ICON-EU,
+  each with its neighbouring hours, the best of the inputs
+  <a href="../../past-weather/blending/">the blending page</a> compared. For solar, both reference rows are
+  also given ERA5's air temperature, as on the past-weather pages, so the solar UKV-and-ICON-EU row
+  as scored could not be read until ERA5 is about 5 days late.</li>
+</ul>
+<table>
+<thead>
+<tr>
+<th>Input</th>
+<th>What it is</th>
+<th>Grid</th>
+<th>Steps</th>
+<th>When it can be read</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ENS</td>
+<td>ECMWF's 51-member ensemble forecast, 00 UTC run, from ECMWF's open data as archived by Dynamical.org</td>
+<td>run at about 9 km; the open data is served at 0.25°, averaged here over each generator's H3 cell (about 250 km²)</td>
+<td>3-hourly to 144 hours ahead, 6-hourly to 360 hours in the open data</td>
+<td>about 09:00 UTC on the run's day, from Dynamical.org's archive</td>
+</tr>
+<tr>
+<td>ERA5</td>
+<td>ECMWF reanalysis</td>
+<td>about 31 km</td>
+<td>hourly</td>
+<td>about 5 days after the hour</td>
+</tr>
+<tr>
+<td>UKV and ICON-EU</td>
+<td>Met Office model for the UK and German weather service (DWD) model for Europe, as Open-Meteo's archive serves them; for solar, with ERA5's air temperature</td>
+<td>UKV 1.5 km over the UK, coarsening to 4 km at the domain's edges, served at 2 km; ICON-EU 6.5 km, served at about 7 km</td>
+<td>hourly; UKV the T+0 analysis, ICON-EU forecasts 1 to 3 hours old</td>
+<td>within hours of the hour for UKV and ICON-EU; about 5 days for the ERA5 temperature</td>
+</tr>
+</tbody>
+</table>
+<h2 id="data-and-methods">Data and methods</h2>
+<h3 id="the-hours-scored">The hours scored</h3>
+<p><strong>Every comparison is scored at hourly resolution, on the hours the past-weather studies scored:
+every daylight hour at 6 solar farms, labelled A to F, and every hour at 3 wind farms,
+labelled W1 to W3.</strong> Hours with an exactly-zero half-hour, the commissioning ramp of one solar farm,
+and outages are dropped as on <a href="../../past-weather/solar/">the solar page</a> and <a href="../../past-weather/wind/">the wind
+page</a>. An hour is also dropped from every forecast where any
+horizon's ENS input or any baseline's input is missing, so every row of a panel is scored on the
+same hours. That leaves 50,643 of 54,791 solar hours, from 15 April 2024 to 10 September 2026, and
+43,089 of 43,555 wind hours, from 1 December 2024 to 10 September 2026. The ENS archive starts on 1
+April 2024, and day 14 needs a run 14 days before the day it forecasts. Wind starts on 1 December
+2024, three weeks after ECMWF's Cycle 49r1 upgrade of 12 November 2024, so that no wind fit trains
+on one version of the ensemble before Cycle 49r1 and is scored on another after it. Solar keeps every
+row. An era cut at Cycle 49r1 on all solar rows gives the same day-7 and day-14 results as no cut
+(see Limitations).</p>
+<h3 id="horizons-and-issue-time">Horizons and issue time</h3>
+<p><strong>A horizon is a whole UTC day after the run's own day: day d forecasts a calendar day from the 00
+UTC run d days earlier.</strong> The horizons scored are days 0, 1, 2, 3, 5, 7, 10, and 14: every day to
+day 3, then days 5, 7, and 10, which span the 3-to-10-day band <a href="../../../roadmap/xgboost-improvements/">the
+roadmap</a> names as the live service's primary band, and day 14,
+near the end of the run. The live service reads a 00 UTC run from about 09:00 UTC, so day 1, the
+day-ahead product, is 15 to 39 hours after the forecast is issued. Most of day 0 is over before the
+run can be read, so day 0 is a best case, not a product the live service can deliver.</p>
+<h3 id="turning-enss-steps-into-hourly-values">Turning ENS's steps into hourly values</h3>
+<p><strong>ENS's radiation reaches this study as a mean over each 3- or 6-hour step, and its wind as a value at
+each step, so every ENS input is first upsampled to hourly values.</strong> ECMWF publishes the radiation as
+an accumulation since the run's start, which Dynamical.org converts to step means. <a href="../../../architecture/nwp-variable-conventions/">NWP variable
+conventions</a> sets out why a straight line between steps
+misreads a period mean. Each member is upsampled before any is averaged. The techniques tested are
+straight-line interpolation of every field, which is what the live service does today; for solar
+radiation, the clear-sky-index resample that page describes, with and without scaling each step's
+hours to keep the step's mean; a shape-preserving curve for temperature; and for wind, the speed or
+the direction, or both, taken from interpolated eastward and northward components. A rule written
+before any result chose the combination every later comparison uses: starting from straight lines,
+try one change at a time, and keep it only if it lowers the ensemble-mean model's error at both day
+1 and day 7. The rule chose the clear-sky index for solar radiation, straight lines for solar
+temperature, and the components for both wind direction and wind speed.</p>
+<h3 id="the-forecasts">The forecasts</h3>
+<p><strong>Each forecast is an XGBoost model fitted per generator and per horizon, trained on the input it is
+scored with, with fixed hyperparameters (depth 6, learning rate 0.05, 500 rounds, no early stopping,
+row subsampling 0.8, no column subsampling) that were not tuned.</strong>
+A solar model is given the hour's sun position, the time of day, the day of the year, which side of
+the Met Office's January 2026 upgrade of UKV the hour falls on, and ENS's radiation and air
+temperature. A wind model is given the time of day, the day of the year, the same upgrade flag, and
+ENS's 100 m wind speed, its direction as a sine and a cosine, and its 10 m wind speed. The UKV-upgrade
+flag carries no information for ENS, which never reads UKV; every forecast gets the flag because the
+folds are cut by era to match the past-weather pages, and 8 of the 30 solar months and 8 of the 22
+wind months sit after the upgrade. The flag is a nuisance column for every ENS forecast and for
+<code>calendar_only</code>, the no-weather XGBoost model defined under <a href="#where-ens-stops-beating-the-no-weather-baselines">"Where ENS stops beating the no-weather
+baselines"</a>, so the comparison between the
+ensemble mean and <code>calendar_only</code> is like-for-like; the comparison between either of them and
+climatology, which reads no such flag, is not.</p>
+<ul>
+<li><strong>Control member:</strong> trained and scored on the control member.</li>
+<li><strong>Ensemble mean:</strong> trained and scored on the mean of the 51 members' weather. The mean wind
+  direction is the direction of the mean wind vector.</li>
+<li><strong>Member by member:</strong> one XGBoost model trained on every member's hours, each member's hour
+  weighted 1/51 so that an hour counts once, then applied to each member; the 51 power forecasts are
+  averaged. Their median is reported as well.</li>
+<li><strong>Exploratory: trained on the mean, applied to each member.</strong> An XGBoost model trained on the
+  ensemble mean, applied to each member, its 51 forecasts averaged. It breaks the rule of training
+  on the input scored.</li>
+</ul>
+<p><strong>Persistence and diurnal persistence read only the telemetry up to the forecast's issue time: 09:00
+UTC on the run's day, or the run's 00 UTC start for day 0,</strong> whose day would otherwise hand the
+baseline the morning it forecasts. The telemetry is taken as available at once, the best case for
+persistence. Climatology, and the weight smart persistence blends towards climatology, are fitted on
+the training folds, which include months after the forecast's own issue time — the same out-of-fold
+scheme every XGBoost arm on this page uses, not a live-service constraint.</p>
+<ul>
+<li><strong>Persistence:</strong> the last observed hour's output, held for every hour forecast.</li>
+<li><strong>Diurnal persistence:</strong> the output at the same time of day on the last whole day before the
+  issue.</li>
+<li><strong>Smart persistence:</strong> for solar, the clear-sky index of the last 24 observed hours times the
+  clear-sky irradiance at the hour forecast; for wind, persistence blended with climatology, the
+  weight fitted per generator and horizon on the training months.</li>
+<li><strong>Climatology:</strong> each generator's median output for the calendar month and hour of day, over the
+  training months only, falling back to the median of the two neighbouring calendar months where the
+  training folds hold no row for that generator, month, and hour, and to the generator's whole-year
+  median at that hour where even that is empty. The median, because the error is a mean absolute
+  error, which the median
+  minimises.</li>
+</ul>
+<h3 id="folds-intervals-and-planned-contrasts">Folds, intervals, and planned contrasts</h3>
+<p><strong>Each model is trained on some blocks of whole months and scored on the others, fitted three times
+from three fitting seeds.</strong> The five blocks, called folds, are cut separately before and after the
+UKV upgrade, so that the references are fitted as on the past-weather pages, and the fold
+numbers of the hours after the upgrade are then shifted (by 2 for wind and by 3 for solar). Without
+the shift, a calendar month can be held out in both eras at once and have no training row, which
+would make every model's forecast for that month an extrapolation. With the shift, every calendar
+month that occurs in two or more years has training rows whenever it is scored. The 3,783 wind
+generator-hours and 190 solar generator-hours whose calendar month occurs in one year only cannot
+be covered by any fold design, and stay scored. Hours the
+network operator curtailed are left out of training and kept for scoring, with the forecast held to
+the export cap then in force. Each error is divided by its own generator's capacity, its 99th
+percentile of output.</p>
+<p><strong>Each 95% interval comes from resampling whole calendar months, each time also drawing one of the
+three fitting seeds.</strong> A difference is statistically significant at the 5% level when its interval
+lies wholly on one side of zero. The test covers month-to-month weather and the fitting seed, not
+differences between generators.</p>
+<p><strong>Five contrasts were planned, written into the study code before any result existed:</strong> the ensemble
+mean at day 1 and at day 7, each against day 0; member by member against the ensemble mean at day 1;
+the ensemble mean against the control member at day 1; and the ensemble mean at day 7 against
+climatology. Every other figure is exploratory, and among many exploratory figures about 1 in 20
+reaches significance at the 5% level by chance. The planned contrasts are also run with a second,
+shallower XGBoost setting.</p>
+<h2 id="results">Results</h2>
+<h3 id="the-xgboost-models-work">The XGBoost models work</h3>
+<p><strong>Given the day-1 ensemble mean, the XGBoost model follows the day-to-day swings in measured output
+at every generator.</strong> Figures 3 and 4 plot out-of-fold forecasts against measured output through one
+week each, chosen from measured output alone: for solar the week, in February 2025, whose daily
+output varies most, for wind the week, in September 2025, with the largest hour-to-hour changes. At
+day 7 the solar forecast stays close to an average day, too high on dull days and too low on bright
+ones, and the wind forecast mostly misses the swings.</p>
+<p><img alt="Figure 3: Given the day-1 ensemble mean, the XGBoost model follows the day-to-day swings at every
+solar farm; the day-7 forecast stays close to an average day" src="../../assets/ens_horizons_solar_week.svg" /></p>
+<p><img alt="Figure 4: Given the day-1 ensemble mean, the XGBoost model follows the wind farms' swings; the
+day-7 forecast mostly does not" src="../../assets/ens_horizons_wind_week.svg" /></p>
+<p><strong>Every generator's error rises between day 1 and day 7</strong> (Figure 5).</p>
+<p><img alt="Figure 5: Every generator's error rises between day 1 and day
+7" src="../../assets/ens_horizons_per_generator.svg" /></p>
+<h3 id="turning-enss-steps-into-hourly-values_1">Turning ENS's steps into hourly values</h3>
+<p><strong>For solar, the clear-sky index keeps the shape of the day where a straight line between steps
+shifts it late and flattens it.</strong> Figure 6a shows one solar day, in April 2025, at day 1 and day 7.</p>
+<p><img alt="Figure 6a: The clear-sky index keeps the solar day's shape, where linear interpolation shifts it
+late" src="../../assets/ens_upsampling_days_solar.svg" /></p>
+<p><strong>For wind, every upsampling technique reproduces the day's swings almost identically.</strong> Figure 6b
+shows one wind day, in September 2025, at day 1 and day 7.</p>
+<p><img alt="Figure 6b: For wind, every upsampling technique tracks the same day almost
+identically" src="../../assets/ens_upsampling_days_wind.svg" /></p>
+<p><strong>Rebuilding solar radiation through the clear-sky index lowers the error at every horizon from day 0
+to day 3 and at day 10: by 0.30 points [0.22, 0.40] at day 1, 0.18 points [0.08, 0.30] at day 3, and
+0.12 points [0.03, 0.21] at day 10.</strong> At days 5 and 7 the gain is 0.11 points [−0.01, 0.23] and 0.09
+points [−0.05, 0.24], not statistically significant at the 5% level, and at day 14 it is nil. Keeping
+each step's mean exactly adds nothing: it raises the error by 0.03 points [0.00, 0.06] at day 1, not
+statistically significant. The shape-preserving curve for temperature moves the error by less than
+0.02 points at every horizon, and the rule did not adopt it.</p>
+<p><img alt="Figure 7: Rebuilding solar radiation through the clear-sky index lowers the error at days 0 to 3
+and at day 10" src="../../assets/ens_upsampling_solar.svg" /></p>
+<p><strong>For wind, no technique's estimate moves the error by as much as a tenth of a point at any horizon
+to day 5, and the two changes the rule adopted lower it by 0.06 points or less at day 7.</strong> Taking the
+direction from interpolated components lowers the error by 0.009 points [−0.033, +0.013] at day 1
+and 0.008 points [−0.106, +0.090] at day 7. Taking the speed from components as well moves the error
+by −0.008 points [−0.042, +0.023] at day 1 and −0.052 points [−0.132, +0.019] at day 7. The rule
+adopted both because each change happened to point the same way at days 1 and 7, not because either
+was a statistically significant gain. At day 10 the adopted combination raises the error by 0.12
+points [0.01, 0.25] against straight-line interpolation, statistically significant, and at day 14 by
+0.15 points [−0.03, 0.34], not significant. The rule tests only days 1 and 7, so the choice was not
+checked beyond day 7.</p>
+<p><img alt="Figure 8: No way of interpolating ENS's wind moves the wind error by a tenth of a point to
+day 5" src="../../assets/ens_upsampling_wind.svg" /></p>
+<p><strong>ENS scored on its own steps is a reference, not a rival, because it is scored on different rows.</strong>
+Scored on its own 3-hour steps, the day-1 ensemble mean gives 6.87% [6.36, 7.39] for solar and 8.20%
+[7.44, 9.12] for wind. A 3-hour mean of solar power is easier to forecast than one hour of it, and
+the wind rows are only the hours at ENS's stamps, so these figures cannot be set against the hourly
+ones.</p>
+<p><strong>Giving day 1 only every other step raises the error by 0.23 points [0.17, 0.28] for solar and 0.26
+points [0.16, 0.34] for wind.</strong> This emulates the 6-hour steps the open-data ENS product carries
+beyond 144 hours, so part of the rise from day 5 to day 7 may be the coarser step rather than the
+longer horizon; the coarser step's own effect at day 7 is not measured.</p>
+<h3 id="error-grows-with-horizon">Error grows with horizon</h3>
+<p><strong>The ensemble mean's error rises with every day of horizon, most steeply over the first week.</strong>
+From day 0 to day 1 it rises by 0.67 points [0.51, 0.85] for solar and 0.93 points [0.79, 1.08] for
+wind, and from day 0 to day 7 by 6.20 points [5.53, 6.89] and 9.46 points [8.35, 10.72], all four
+planned. By day 14 the solar error is 15.22% [14.21, 16.16] and the wind error 19.14% [17.25,
+21.19]. The second XGBoost setting gives the same picture.</p>
+<h3 id="the-ensemble-mean-is-the-best-of-the-three-ways-tested">The ensemble mean is the best of the three ways tested</h3>
+<p><strong>The ensemble mean beats the control member at every horizon to day 10 for solar and to day 7 for
+wind.</strong> Training on every member loses to the ensemble mean at every horizon to day 10, and to the
+control member at days 1 to 7 for solar and days 0 to 10 for wind. At day 1, the ensemble mean
+beats the control member by 0.33 points [0.23, 0.44] for solar and 0.28 points [0.16, 0.40] for
+wind, and member by member loses to the ensemble mean by 0.48 points [0.35, 0.62] and 0.86 points
+[0.57, 1.18], all planned.</p>
+<p><img alt="Figure 9: The ensemble mean beats the control member, and beats feeding each member through the
+model, at almost every horizon" src="../../assets/ens_horizons_ways.svg" /></p>
+<p><strong>Training on every member makes the XGBoost model's response to the weather flatter at day 1, which
+is why member by member loses there.</strong> This page does not establish why member by member also loses
+from day 5 to day 10, where the loss is larger for wind but not for solar. At day 1, each member's
+weather is a noisier guess at the hour than the mean, and a model trained on noisy inputs learns to
+respond less to them: regressing the measured output's own anomaly against a climatology forecast
+onto each arm's forecast anomaly gives a slope of 1.11 for member by member against 0.92 for the
+ensemble mean at day 1 for solar, and 1.20 against 0.97 for wind — member by member is the flatter
+forecast, moving less than the truth on average, where the ensemble mean moves slightly further. The
+forecast anomaly's own spread points the same way: 13.8 points against 16.8 for solar, and 17.3
+against 21.6 for wind, member by member narrower than the mean in both, and the flatter response
+holds through day 3 for solar and day 5 for wind. The loss survives turning off row subsampling,
+which drops member rows rather than hours: 0.49 points [0.36, 0.63] for solar and 0.86 points [0.56,
+1.19] for wind at day 1. By day 10 member by member responds little to differences between members'
+weather — for solar, the 51 forecasts' own standard deviation is down to 0.61 points at day 10 and
+0.36 points at day 14, while its forecast-anomaly SD stays at 10.4 points, and for wind 13.0 points —
+yet it still beats the same model given no weather at all, by a small but statistically significant
+margin: 0.10 points [0.04, 0.15] for solar and 0.52 points [0.21, 0.90] for wind at day 10, evidence
+that even a flattened response still carries some weather information. Most of the variation left at
+that lead is more likely the day-of-year noise the calendar section finds than a response to the
+weather.</p>
+<p><strong>In an exploratory check, a model trained on the ensemble mean and applied to each member does no
+worse than the ensemble mean.</strong> For solar it is ahead at every horizon to day 10, by 0.07 points
+[0.03, 0.11] at day 1 and 0.30 points [0.14, 0.46] at day 10; for wind the difference is not
+statistically significant at the 5% level to day 10, and it is ahead at day 14 by 0.59 points [0.20,
+1.00]. One way this edge may arise: at long lead, averaging the model's forecasts over the 51
+members damps a forecast that over-reacts when scored on the mean alone. At day 14 for wind and day
+10 for solar, regressing measured output's anomaly onto forecast anomaly gives a slope of 0.52 for
+the model trained on the mean and applied to each member, against 0.28 for the model trained and
+scored on the mean, for wind, and 0.53 against 0.41 for solar — the arm trained on the mean and
+applied to each member is the damped one, its slope closer to 1 and so closer to tracking the
+truth's own swings, where the arm trained and scored on the mean over-reacts more strongly, at a
+lead where both arms' response is already weak. This mechanism is possible, not tested. Training on
+the mean and applying to each member also breaks the rule of training on the input scored, so it is
+a lead rather than a result.</p>
+<h3 id="where-ens-stops-beating-the-no-weather-baselines">Where ENS stops beating the no-weather baselines</h3>
+<p><strong>The ensemble mean beats the best no-weather baseline by 1.41 points [0.98, 1.90] at day 5 for solar
+and 3.64 points [2.60, 4.79] for wind, and by day 14 climatology is ahead.</strong> For solar the best
+baseline at every horizon is climatology; for wind it is climatology or smart persistence, which are
+within 0.1 points of each
+other from day 3. At day 7, the planned contrast against climatology favours the ensemble mean by
+0.17 points [-0.23, 0.57] for solar, not statistically significant at the 5% level at the main
+setting and significant at the second (0.50 points [0.14, 0.85]), and by 1.14 points [0.32, 2.02] for
+wind (1.50 points [0.69, 2.40] at the second setting). At day 10 neither technology's difference is
+statistically significant, and at day 14 climatology is ahead by 0.72 points [0.15, 1.22] for solar
+and 1.24 points [0.56, 1.93] for wind.
+Persistence and diurnal persistence are worse than climatology at every horizon, except wind
+persistence at day 0. Solar persistence at day 0 holds the last reading before 00 UTC, which in
+Lincolnshire is always a night-time reading of about zero, so its day-0 error of 34.6% is the error
+of forecasting zero output all day.</p>
+<p><img alt="Figure 10: The ENS ensemble mean beats the best no-weather baseline by 1.4 points at day 5 for
+solar and 3.6 points for wind, and by day 14 climatology is
+ahead" src="../../assets/ens_horizons_against_baselines.svg" /></p>
+<p><strong>A post hoc check separates that crossover with climatology from ENS itself: given the same
+non-weather columns and no weather at all, the same XGBoost model still loses to the ensemble mean at
+every horizon to day 10.</strong> <code>calendar_only</code> is an XGBoost model shown exactly the columns every ENS
+arm gets besides its weather — the hour of day, the day of the year, the UKV era, and, for solar, the
+sun's position — fitted with the same folds, seeds, cap, and row set as every ENS arm. It is
+markedly worse than climatology itself: 15.40% [14.37, 16.36] for solar and 19.76% [17.42, 22.24] for
+wind, against climatology's 14.50% and 17.90%. The ensemble mean beats <code>calendar_only</code> by 1.07 points
+[0.62, 1.49] for solar and 3.00 points [1.45, 4.85] for wind at day 7, and by 0.49 points [0.20, 0.74]
+and 1.72 points [0.62, 2.96] at day 10, both statistically significant at the 5% level; by day 14 the
+gap narrows to 0.18 points [-0.08, 0.45] for solar and 0.63 points [-0.40, 1.90] for wind, neither
+statistically significant. At
+day 14, comparing the ensemble mean directly with <code>calendar_only</code> is therefore not evidence either
+way about whether ENS itself carries skill at that lead — the interval is wide enough to miss a real
+difference, not narrow enough to rule one out.</p>
+<p><img alt="Figure 11: The ensemble mean beats the same model given no weather to day 10 with a day-of-year
+calendar column, and to day 7 for solar and day 5 for wind with calendar month" src="../../assets/ens_horizons_against_calendar.svg" /></p>
+<p><strong>In a post hoc check, part of climatology's lead at day 14 comes from how the XGBoost model uses
+its calendar columns; the rest is consistent with ENS adding little skill at that lead.</strong> Given no
+weather, the model with day of year trails climatology by 0.90 points [0.29, 1.45] for solar and
+1.86 points [0.86, 3.08] for wind, both statistically significant. With calendar month instead of
+day of year, the no-weather model still trails climatology by 0.38 points [0.01, 0.76] for solar —
+statistically significant, though only just — and is level with it for wind (0.01 points [−0.30,
+0.39], not significant). The day-of-year model may do worse because it is fitted for 500 rounds with
+no early stopping on about two years of hourly data, so a day-of-year column lets it fit day-to-day
+noise that a month column, like a month-and-hour median, averages away. The page has not tested
+this. Swapping the ensemble mean's own day-of-year column for calendar month moves its error by less
+at short lead: <code>calendar_only_month</code> beats <code>calendar_only</code> by 0.52 points [0.14, 0.86] for solar and
+1.85 points [0.87, 3.08] for wind, a bigger gain than swapping the same column brings the ensemble
+mean at day 0 or day 1, though the ensemble mean gains 0.08 to 0.39 points from the swap at days 2
+to 7 for solar. For wind the swap lowers the ensemble mean's error significantly at no horizon, and
+at day 5 raises it by 0.23 points [0.05, 0.44]. Even with both arms on calendar month, the ensemble
+mean stops beating the no-weather arm after day 7 for solar and after day 5 for wind: at day 14 it
+is 0.16 points [-0.07, 0.39] behind for solar (not significant) and 1.18 points [0.68, 1.73] behind
+for wind (statistically significant: with month controlled for, adding the day-14 ensemble mean
+makes this XGBoost model's wind forecast worse, not better). Against climatology itself, the
+month-based ensemble mean is also significantly behind at day 14: by 0.54 points [0.11, 0.98] for
+solar and 1.19 points [0.57, 1.84] for wind. On this evidence, the ensemble mean carries no
+statistically significant point-forecast skill at day 14 for either technology, and for wind it is
+significantly worse than the no-weather model once the calendar feature is controlled for. Whether
+ENS's probability distribution carries skill at that lead is a question this page does not test.</p>
+<h3 id="ens-against-past-weather">ENS against past weather</h3>
+<p><strong>At day 1, the ensemble mean is 0.23 points ahead of ERA5 for solar [-0.02, 0.48], not statistically
+significant at the 5% level, and loses to it for wind by 0.89 points [0.69, 1.13].</strong> For solar,
+grid, spatial sampling, and model version may be why ENS keeps pace with ERA5 despite the longer
+lead: ENS runs ECMWF's current model at about 9 km, read here from the 0.25° open data (about 17 by
+28 km) averaged over each generator's H3 cell, where ERA5 is a reanalysis built on a 2016 model
+version (IFS Cycle 41r2) at about 31 km and read at a single grid cell. The day-0 control member,
+ENS's run from ECMWF's unperturbed analysis of the current weather, already beats ERA5 for solar by
+0.63 points [0.42, 0.85] (8.40% against 9.02%), which a forecast-lead story alone would not predict.
+For wind the day-0 ensemble mean is level with ERA5 (0.04 points ahead [-0.11, 0.18], not
+significant) and the day-0 control member is 0.13 points behind [0.00, 0.27], also not significant,
+so the wind loss opens between day 0 and day 1. Forecast lead is consistent with that result:
+ERA5's wind is an hourly analysis, which assimilates observations of the hour it describes, while
+day 0 spans leads of 0 to 23 hours and day 1 leads of 24 to 47 hours. ERA5's radiation, by
+contrast, comes from forecasts 1 to 12 hours old, so lead does not favour ERA5 for solar by enough
+to explain the day-0 gap. The past-solar page's
+<a href="../../past-weather/solar/#ecmwf-ens-beats-era5-and-trails-cams">ENS section</a>
+estimates, on its own rows at leads 5 to 20 hours, that ENS's extra 6.11 hours of mean lead over
+ERA5 raises ENS's error by about 0.16 points, so lead does favour ERA5 slightly.</p>
+<p><strong>UKV with ICON-EU, the best of the inputs the blending page
+compared, beats the day-1 ensemble mean by 1.33 points [1.09, 1.58] for solar and 2.15 points [1.91,
+2.41] for wind.</strong> UKV with ICON-EU is weather a few hours old rather than a day-ahead forecast, so
+the gap bounds from above what a higher-resolution day-1 forecast could gain; it does not measure
+that gain. The room left is what a higher-resolution input that describes the hour itself could
+gain: UKV's T+0 analysis and ICON-EU's forecasts 1 to 3 hours old, rather than a forecast issued days
+ahead. The UKV-and-ICON-EU row also reads each product's neighbouring hours, and for solar ERA5's
+temperature, which the ENS rows do not.</p>
+<h2 id="what-to-use">What to use</h2>
+<p><strong>These recommendations rest on nine farms in one part of Lincolnshire over about two years, and on
+ENS alone.</strong></p>
+<ul>
+<li><strong>Feed the power model the ensemble mean, not the control member.</strong> The mean beats the control at
+  day 1 for both technologies, in planned contrasts.</li>
+<li><strong>Upsample ENS's solar radiation through the clear-sky index before it reaches the model.</strong> It
+  beats the straight-line resample at every horizon to day 3, and at day 10. For wind the choice
+  makes no material difference to day 7.</li>
+<li><strong>Do not train on every member and average, as tested here, to make the point forecast.</strong> Whether a
+  model trained on the mean and applied to each member is better is a lead for the next step, not a
+  finding. This page does not score the members as a source of uncertainty bands.</li>
+<li><strong>From day 7 for solar and day 10 for wind, an ENS-driven point forecast from this set-up was not
+  significantly more accurate than climatology.</strong> At day 14 it adds no statistically significant
+  skill, in a post hoc check, over the same model given no weather at all, and for wind it is
+  significantly worse than that model once both use calendar month instead of day of year (one post
+  hoc contrast among many). Whether the production model should use calendar month rather than day
+  of year is a lead worth testing directly: in a post hoc check, the swap lowered the solar
+  ensemble-mean error by 0.17 to 0.39 points at days 3 to 7, inside the live service's primary band,
+  and lowered the wind error significantly at no horizon.</li>
+</ul>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li><strong>One region and about two years.</strong> A 25 km by 23 km box holds 6 solar farms and 3 wind farms,
+  from April 2024 (solar) or December 2024 (wind) to September 2026. The intervals resample months,
+  not farms.</li>
+<li><strong>One forecast product.</strong> Other forecast products join this comparison once their archives at
+  fixed leads are downloaded.</li>
+<li><strong>The H3 cell, not the farm.</strong> ENS is averaged over each generator's H3 cell of about 250 km².</li>
+<li><strong>Day 0 is a best case.</strong> Most of it passes before the live service can read the run.</li>
+<li><strong>Only point forecasts are scored.</strong> ENS is designed for probabilistic skill. This page scores the
+  control member, the ensemble mean, and the average and median of 51 member forecasts by mean
+  absolute error; no probabilistic score such as the continuous ranked probability score is computed,
+  so no statement here covers the value of ENS's spread for uncertainty bands.</li>
+<li><strong>Hourly, not half-hourly.</strong> Every error is scored on hourly means; the live service forecasts
+  half-hours, whose error will be larger.</li>
+<li><strong>No calibrated uncertainty band from the members.</strong> Fed through a point model one member at a
+  time, the 51 forecasts' 10th-to-90th-percentile range held only 29.3% of solar hours and 42.2% of
+  wind hours at day 1, falling to 1.9% and 1.5% at day 14 (report), so the member spread is not a
+  calibrated predictive interval.</li>
+<li><strong>The baselines see telemetry the moment it is measured.</strong> A live service may see it later, which
+  would make persistence worse.</li>
+<li><strong>The solar fits cross ECMWF's IFS Cycle 49r1 upgrade of 12 November 2024 with no cut, and both
+  technologies cross Cycle 50r1 of 12 May 2026,</strong> unlike the Met Office's upgrade of UKV. The wind
+  rows start on 1 December 2024, after Cycle 49r1. On the <a href="../../past-weather/wind/">past-wind page</a>,
+  an extra era cut at Cycle 50r1 moves none of the planned contrasts, nor ENS day 0 minus HRES, by
+  more than 0.04 points (its fold-design table); this page has not re-run its wind fits with that
+  cut. <strong>The solar day-7 and day-14 comparisons with climatology depend on the row set.</strong> On every
+  solar row the ensemble mean's day-7 error is 0.17 points below climatology's [−0.23, 0.57], not
+  significant; refitted on the rows from 1 December 2024 with covering folds it is 0.87 points below
+  [0.19, 1.60], significant (<code>studies/era_fold_design/report.md</code>, design IIr). On those rows the
+  day-14 comparison with climatology is +0.19 points [−0.67, 0.93], not significant. An era cut at
+  Cycle 49r1 on all solar rows (design I) leaves day 7 at 0.18 points below [not significant] and
+  day 14 at +0.59 points [0.08, 1.07], as on the main rows, so the difference comes from the shorter
+  record that climatology is fitted on, not from the Cycle 49r1 cut. <strong>The wind day-14 comparison
+  also depends on the design:</strong> climatology is ahead by 1.24 points [0.56, 1.93] here and by 0.62
+  points [−0.49, 1.60], not significant, under a three-era cut.</li>
+<li><strong>Some hours cannot be scored by a model that trained on their calendar month.</strong> The fold numbers
+  of the hours after the UKV upgrade are shifted so that every calendar month that occurs in two or
+  more years has training rows. The hours whose calendar month occurs in one year only, 3,783 wind
+  hours in 6 (generator, fold, calendar month) cells and 190 solar hours in 2 cells, are scored by
+  models that never saw that month.</li>
+<li><strong>Dropped hours.</strong> 4,148 of 54,791 solar hours (7.6%) since
+  late March 2024 and 466 of 43,555 wind hours (1.1%) since 1 December 2024, of the past-weather
+  studies' rows, are dropped from every forecast. For solar, 3,582 of them lack a baseline's input,
+  because the telemetry before the issue time has a gap, and 1,196 fall in the first three weeks of
+  the ENS archive, before day 14 has a run; the two groups overlap. Every wind hour dropped lacks a
+  baseline's input. Which way dropping an hour whose preceding telemetry has a gap moves the
+  comparison is not measured on this page.</li>
+<li><strong>The figures rest on the capacity table as rebuilt in September 2026.</strong> Each generator's capacity
+  is its 99th percentile of output from the <code>effective_capacity</code> table, so a rebuilt table would
+  move every figure.</li>
+</ul>
+<h2 id="reproducing-the-figures">Reproducing the figures</h2>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/beam_diffuse_split/fetch_ens_forecast_horizons.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/beam_diffuse_split/ens_forecast_horizons.py<span class="w"> </span>--refit<span class="w"> </span>both
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/beam_diffuse_split/ens_forecast_charts.py<span class="w"> </span>--results-dir<span class="w"> </span>data/studies/ens_forecast_horizons/era_covered
+</code></pre></div>
+<p>The report lands in <code>data/studies/ens_forecast_horizons/era_covered/report.md</code>, beside the saved
+losses and predictions. The run needs the solar, wind, and blending studies' inputs on disk, and
+takes about one and a half hours on a 32-core machine. The script writes each technology's losses
+once and refuses to overwrite them, and raises before any fit if a calendar month that occurs in two
+or more years would be held out with no training row.</p>
+<ul>
+<li><code>ens_forecast_horizons.py --report-only</code> rebuilds the report from the saved losses.</li>
+<li><code>ens_forecast_horizons.py --fit-missing</code> fits only the arms missing from the saved losses, and
+  reads every other arm from disk. The <code>calendar_only</code> and month-sensitivity arms took about nine
+  minutes.</li>
+<li><code>ens_forecast_horizons.py --fit-baselines</code> re-scores only the four no-weather baselines, with no
+  XGBoost refit, and reads every fitted arm from disk.</li>
+</ul>
+<p>Both of the last two options move the files they replace to a dated folder under
+<code>era_covered/superseded/</code> first.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

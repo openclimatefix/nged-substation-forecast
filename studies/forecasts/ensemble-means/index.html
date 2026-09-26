@@ -1,0 +1,3872 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../matched-lead/">
+      
+      
+        <link rel="next" href="../../../ml_experimentation/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>How do Open-Meteo's ensemble-mean products compare for solar and wind power? - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#how-do-open-meteos-ensemble-mean-products-compare-for-solar-and-wind-power" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              How do Open-Meteo's ensemble-mean products compare for solar and wind power?
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's network and its data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/weather-products-survey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather products surveyed for the weather-product studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/manual-heuristic-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The manual heuristic forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/energy-forecasting-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The state of the art in energy forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common incident classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learned encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nwp-variable-conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP variable conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS data-quality issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML orchestration design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production deployment design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS running costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Studies
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Studies
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beam-diffuse-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a weather product's beam/diffuse split help a PV forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_3" id="__nav_8_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Past weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Past weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../past-weather/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../past-weather/methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods shared by the past-weather studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../past-weather/solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past sunshine?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../past-weather/wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past wind?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../past-weather/blending/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending weather products beat the best single weather product?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_4" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8_4" id="__nav_8_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecasts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_4_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecasts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../ens-horizons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How accurate is a power forecast driven by ECMWF ENS at each horizon?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../matched-lead/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How do Open-Meteo's ensemble-mean products compare for solar and wind power?
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How do Open-Meteo's ensemble-mean products compare for solar and wind power?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-the-local-ecmwf-ens-series-scores-worse-than-open-meteos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why the local ECMWF ENS series scores worse than Open-Meteo's
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#whether-icon-d2-epss-lead-comes-from-updating-more-often" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Whether ICON-D2-EPS's lead comes from updating more often
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-open-meteos-source-code-does-for-the-mogreps-uk-mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Open-Meteo's source code does for the MOGREPS-UK mean
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-code-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and code availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing-the-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing the figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an ML experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Effective-capacity estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-savings metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/data-cleaning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning the trial-area telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How NGED assembles forecasts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service: what's left to build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics and leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-demand disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending training history with ERA5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#what-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#why-the-local-ecmwf-ens-series-scores-worse-than-open-meteos" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Why the local ECMWF ENS series scores worse than Open-Meteo's
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#whether-icon-d2-epss-lead-comes-from-updating-more-often" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Whether ICON-D2-EPS's lead comes from updating more often
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-open-meteos-source-code-does-for-the-mogreps-uk-mean" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What Open-Meteo's source code does for the MOGREPS-UK mean
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#scope" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Scope
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-code-availability" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and code availability
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing-the-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing the figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="how-do-open-meteos-ensemble-mean-products-compare-for-solar-and-wind-power">How do Open-Meteo's ensemble-mean products compare for solar and wind power?</h1>
+<blockquote>
+<p><strong>This study uses only Flexpectation's own data, and its purpose is to inform Flexpectation's
+choices.</strong> The study scores each weather product only at the generators in Flexpectation's trial
+area in Lincolnshire. The study does not compare results across many regions or climates, so a
+result on this page may not hold elsewhere.</p>
+</blockquote>
+<p><strong>At 6 solar farms and 3 wind farms in Lincolnshire, over 88 days from 25 June to 20 September 2026,
+an XGBoost model given ICON-D2-EPS's ensemble mean had the lowest solar power error of the four
+ensemble-mean products that Open-Meteo serves, and tied for the lowest wind power error at 10 m.</strong>
+The other three products are the ensemble means of
+MOGREPS-UK, ICON-EU-EPS, and ECMWF IFS ENS at 0.25 degrees. Every error on this page is a mean
+absolute error as a percentage of each generator's effective capacity. For solar power,
+ICON-D2-EPS's
+mean gave 7.4%, against 7.7% for ECMWF ENS's mean, 8.1% for ICON-EU-EPS's mean, and 8.7% for
+MOGREPS-UK's mean. An XGBoost model given the satellite retrieval CAMS gave 4.9%, and a model given
+no weather at all gave 12.6%. For wind power with every product's 10 m wind speed, ICON-D2-EPS's
+mean gave 5.75% and ECMWF ENS's mean 5.79%, a gap of 0.04 points that this page treats as a tie. The
+ERA5 reanalysis gave 6.28%, ICON-EU-EPS's mean 6.72%, and no weather 12.60%.</p>
+<p><strong>The comparison is descriptive.</strong> The window is one summer, the scoring uses 12 held-out weeks, and
+the page states no interval and no significance test. Each figure is the mean over the same
+generator-hours for every product, from an XGBoost model per generator, at the setting named in the
+text.</p>
+<p><strong>The products' leads are not matched, and the page does not measure them.</strong> Each ensemble mean is a
+stitched series, so each hour comes from a run of unknown age. ICON-D2-EPS starts a new run every 3
+hours and ECMWF IFS ENS less often, so ICON-D2-EPS's hours probably come from shorter leads. Equal
+leads would probably narrow ICON-D2-EPS's advantage, and the size of the narrowing is not known.</p>
+<p><img alt="Figure 1: ICON-D2-EPS's ensemble mean had the lowest solar error and tied for the lowest wind
+error
+at 10 m" src="../../assets/ensemble_means_mae.svg" /></p>
+<blockquote>
+<p><strong>How this page was made.</strong> The research question came from a human. Everything else — the code
+behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
+AI model (for this page, Claude Sonnet 5). A Claude Sonnet review of each script and a Claude
+Sonnet review of the pull request have run. No Opus scientific-validity review has run, and no
+human has reviewed the page.</p>
+</blockquote>
+<h2 id="what-to-use">What to use</h2>
+<p><strong>For a solar model that reads an ensemble mean, read ICON-D2-EPS's where ICON-D2 covers the
+generator, and ECMWF ENS's elsewhere.</strong> ICON-D2-EPS's mean scored 0.3 points better than ECMWF ENS's
+mean, in both hyperparameter settings. ICON-D2 does not cover South West England or South Wales, and
+this page cannot say how ICON-D2-EPS would score there, because every generator here is inside its
+domain. All four Open-Meteo ensemble means scored 2.3 to 3.8 points worse than CAMS across both
+settings, and 3.8 to
+5.2 points better than no weather at all. CAMS is a satellite retrieval available only after the
+hour, so it
+sets the target that a forecast of past sunshine could reach and is not a competing forecast.</p>
+<p><strong>For a wind model, the evidence favours ICON-D2-EPS's mean given its 100 m and 10 m speeds, with
+two
+caveats that stop this page recommending it without reservation.</strong> Given those speeds, ICON-D2-EPS's
+mean scored 5.08%, against 5.71% for ECMWF ENS's mean and 6.11% for ERA5, and it beat ERA5 in all 12
+held-out weeks. The first caveat is the unmatched leads described above, which probably favour
+ICON-D2-EPS. The second is that Open-Meteo's 100 m wind for ICON-D2's deterministic forecast is the
+120 m speed multiplied by 0.98, as the <a href="../../past-weather/wind/">past-wind study</a> found, and this
+study has not checked whether the ensemble mean's 100 m wind is built the same way. The 5.08% is
+therefore a score for a 100 m speed of unchecked origin. Open-Meteo serves no 100 m wind for
+MOGREPS-UK's or ICON-EU-EPS's mean (the <code>README.md</code> in each product's folder lists the field as all
+null, which the script also checks), so neither could be scored at hub height. At 10 m,
+ICON-EU-EPS's mean scored 0.45 points worse than ERA5 in both settings, and does not
+suit a wind model.</p>
+<p><strong>These verdicts would change with a longer window or a lead-resolved comparison.</strong> The window holds
+one summer, and none of its wind is from autumn or winter. The ensemble means are stitched series
+that carry no run time, so the page says nothing about which product forecasts best at a stated lead
+such as day-ahead.</p>
+<h2 id="data-and-methods">Data and methods</h2>
+<p><strong>The rows are the hours that every product covers, 6,663 solar generator-hours and 5,930 wind
+generator-hours.</strong> Solar rows are the hours with the sun above the horizon. The rows drop multi-day
+zero runs and metering spikes above 1.5 times capacity, and the solar rows also drop hours where the
+meter reads exactly zero while ERA5 reports more than 100 W/m². The wind rows drop every hour
+holding
+an exactly-zero half-hour. Solar power is the mean of the hour ending at the label and wind power is
+the mean centred on the label, the conventions of the earlier past-weather studies. Rows with the
+generator's export limit in force (49 solar rows at one generator) are scored but not trained on.</p>
+<p><strong>Each product is one stitched series.</strong> For each hour, Open-Meteo returns the mean of the ensemble
+members from the newest run that covers the hour, with no run time attached. Leads are therefore
+short and mixed. This repository's own ECMWF ENS table gives one more series, labelled "local": the
+mean of the 51 members, the newest run for each valid time from the three lead bands with 3-hourly
+steps (the script's
+<code>LOCAL_ENS_HORIZONS</code>, leads up to 69 hours), radiation held
+over its 3-hour step, and wind interpolated linearly between steps. The local series takes its
+00:00 UTC valid time from lead 24 of the previous day's run.</p>
+<p><strong>Each arm is an XGBoost model per generator given one product's values.</strong> Solar arms read five
+shared columns (solar zenith, solar azimuth, extraterrestrial irradiance, ERA5 air temperature, and
+hour of day) and one column of the product's global irradiance. Wind arms read hour of day and the
+product's wind speed at 10 m. The hub-height design reads the 100 m and the 10 m speeds, for the
+four
+products that carry a 100 m speed. Wind direction is left out, because Open-Meteo's ensemble mean of
+a direction is a naive average of member directions, which is wrong near north. Every arm of a
+design has the same number of columns. The baseline "no weather" has only the shared columns. The
+models use XGBoost 3.4.1 on the CPU at two fixed settings, with three seeds each, and the tables
+report the first setting unless they say otherwise.</p>
+<p><strong>The folds are leave-one-week-out.</strong> The 88 days form 12 blocks of 7 days, the last block holding
+the 11 final days. Every arm, generator, and setting shares the folds. Because the days beside a
+scored week stay in the training rows, the scheme measures how well a model interpolates between
+weather episodes within one summer, not how well it forecasts into a new season.</p>
+<h2 id="results">Results</h2>
+<p><strong>Each ensemble mean's error in irradiance follows its error in solar power.</strong> Against CAMS's
+irradiance, which averaged 354 W/m² on these rows, ICON-D2-EPS's mean had a mean absolute error of
+50 W/m², ECMWF ENS's 54, ICON-EU-EPS's 59, MOGREPS-UK's 71, and the local ECMWF ENS series 86. The
+power errors have the same order. MOGREPS-UK's mean reads 33 W/m² below CAMS on average.</p>
+<p><strong>Wind speed agreement with ERA5 does not follow wind power error.</strong> At 10 m, the local ECMWF ENS
+series differs from ERA5 by 2.4 km/h, ECMWF ENS's mean by 3.0, ICON-EU-EPS's by 3.0, MOGREPS-UK's by
+3.8, and ICON-D2-EPS's by 4.1. ICON-D2-EPS's mean has the largest difference and the lowest power
+error. ERA5 is a 31 km reanalysis and not a measurement, so a large difference from ERA5 does not
+show that a product is wrong.</p>
+<table>
+<thead>
+<tr>
+<th>Design and product</th>
+<th>First setting (% of capacity)</th>
+<th>Second setting (% of capacity)</th>
+<th>Held-out weeks beating the reference (first setting)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Solar, CAMS (reference)</td>
+<td>4.89</td>
+<td>5.16</td>
+<td>not applicable</td>
+</tr>
+<tr>
+<td>Solar, ICON-D2-EPS mean</td>
+<td>7.36</td>
+<td>7.42</td>
+<td>0 of 12</td>
+</tr>
+<tr>
+<td>Solar, ECMWF ENS mean (Open-Meteo)</td>
+<td>7.68</td>
+<td>7.75</td>
+<td>0 of 12</td>
+</tr>
+<tr>
+<td>Solar, ICON-EU-EPS mean</td>
+<td>8.13</td>
+<td>8.18</td>
+<td>0 of 12</td>
+</tr>
+<tr>
+<td>Solar, MOGREPS-UK mean</td>
+<td>8.69</td>
+<td>8.66</td>
+<td>0 of 12</td>
+</tr>
+<tr>
+<td>Solar, ECMWF ENS mean (local)</td>
+<td>8.89</td>
+<td>8.95</td>
+<td>0 of 12</td>
+</tr>
+<tr>
+<td>Solar, no weather</td>
+<td>12.60</td>
+<td>12.47</td>
+<td>0 of 12</td>
+</tr>
+<tr>
+<td>Wind 10 m, ICON-D2-EPS mean</td>
+<td>5.75</td>
+<td>5.83</td>
+<td>10 of 12</td>
+</tr>
+<tr>
+<td>Wind 10 m, ECMWF ENS mean (Open-Meteo)</td>
+<td>5.79</td>
+<td>5.87</td>
+<td>11 of 12</td>
+</tr>
+<tr>
+<td>Wind 10 m, ECMWF ENS mean (local)</td>
+<td>6.00</td>
+<td>6.07</td>
+<td>9 of 12</td>
+</tr>
+<tr>
+<td>Wind 10 m, MOGREPS-UK mean</td>
+<td>6.03</td>
+<td>6.06</td>
+<td>8 of 12</td>
+</tr>
+<tr>
+<td>Wind 10 m, ERA5 (reference)</td>
+<td>6.28</td>
+<td>6.30</td>
+<td>not applicable</td>
+</tr>
+<tr>
+<td>Wind 10 m, ICON-EU-EPS mean</td>
+<td>6.72</td>
+<td>6.75</td>
+<td>3 of 12</td>
+</tr>
+<tr>
+<td>Wind 10 m, no weather</td>
+<td>12.60</td>
+<td>12.60</td>
+<td>0 of 12</td>
+</tr>
+<tr>
+<td>Wind 100 m and 10 m, ICON-D2-EPS mean</td>
+<td>5.08</td>
+<td>5.04</td>
+<td>12 of 12</td>
+</tr>
+<tr>
+<td>Wind 100 m and 10 m, ECMWF ENS mean (Open-Meteo)</td>
+<td>5.71</td>
+<td>5.73</td>
+<td>9 of 12</td>
+</tr>
+<tr>
+<td>Wind 100 m and 10 m, ECMWF ENS mean (local)</td>
+<td>6.00</td>
+<td>5.95</td>
+<td>8 of 12</td>
+</tr>
+<tr>
+<td>Wind 100 m and 10 m, ERA5 (reference)</td>
+<td>6.11</td>
+<td>6.07</td>
+<td>not applicable</td>
+</tr>
+<tr>
+<td>Wind 100 m and 10 m, no weather</td>
+<td>12.60</td>
+<td>12.60</td>
+<td>0 of 12</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The two settings give the same order, with one swap.</strong> At 10 m for wind, MOGREPS-UK's and the
+local ECMWF ENS series swap places, and their gap is at most 0.04 points in both settings. The three
+seeds moved each error by less than 0.04 points, so gaps smaller than that are noise.</p>
+<p><strong>The local ECMWF ENS series scores worse than Open-Meteo's ECMWF ENS mean.</strong> The gap is 1.2 points
+for solar, 0.2 for wind at 10 m, and 0.3 for wind at 100 m. The two series come from the same
+ensemble on different grids and with different stitching and interpolation, so the gap may reflect
+the pipeline. <a href="#why-the-local-ecmwf-ens-series-scores-worse-than-open-meteos">The next section</a>
+tests some of the candidate causes.</p>
+<h2 id="why-the-local-ecmwf-ens-series-scores-worse-than-open-meteos">Why the local ECMWF ENS series scores worse than Open-Meteo's</h2>
+<p><strong>Holding each 3-hour irradiance value flat over its step accounts for about two-thirds of the solar
+gap, and the rest is consistent with the local series having older runs.</strong> The tests are
+descriptive: each is one 88-day summer, at the first hyperparameter setting, with no interval. The
+solar gap is 1.21 points of capacity between the local series (8.89%) and Open-Meteo's ECMWF ENS
+mean (7.68%). Interpolating the local irradiance through the clearness index (the ratio of
+irradiance to the irradiance at the top of the atmosphere) gave 8.08%, so the gap fell to 0.40
+points. Against CAMS's irradiance, the hourly mean absolute error of the local series fell from 86
+to 59 W/m², beside 54 W/m² for Open-Meteo's mean. Averaged over the local series' own 3-hour
+windows, where the hold cannot matter, the local series' error is 53 W/m² against 49 W/m² for
+Open-Meteo's mean. The hold therefore accounts for most of the hourly gap in irradiance error (27
+W/m²), and 4 W/m² remains at 3-hour resolution. The interpolation does not conserve the 3-hour
+means: the interpolated series departs from the held one by 6 to 11 W/m² on average over the windows
+of each step, and by 1 to 7 W/m² on signed average. Open-Meteo's own method of spreading 3-hour
+steps onto hours is not documented in the sources this study read, so the interpolation is one
+plausible method and not a copy of Open-Meteo's.</p>
+<table>
+<thead>
+<tr>
+<th>Design</th>
+<th>Open-Meteo ECMWF ENS mean</th>
+<th>Local, held over each step</th>
+<th>Local, clearness index interpolated</th>
+<th>Local, from a run about a day older</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Solar</td>
+<td>7.68</td>
+<td>8.89</td>
+<td>8.08</td>
+<td>9.74</td>
+</tr>
+<tr>
+<td>Wind 10 m</td>
+<td>5.79</td>
+<td>6.00</td>
+<td>not built</td>
+<td>6.89</td>
+</tr>
+<tr>
+<td>Wind 100 m and 10 m</td>
+<td>5.71</td>
+<td>6.00</td>
+<td>not built</td>
+<td>6.82</td>
+</tr>
+</tbody>
+</table>
+<p><strong>A run about a day older raised the local error by 0.8 to 0.9 points in every design, which bounds
+what a difference in run age can explain.</strong> The local series comes from one 00:00 UTC run a day, so
+its leads run from 3 to 24 hours (mean 14 hours). The day-old series takes the newest run at least
+27 hours ahead, so its leads run from 27 to 48 hours (mean 38 hours), and the script checks that
+every step inside the scored window has a run exactly 24 hours older than the stored series' run.
+The rise per hour of run age is therefore about 0.04 points, measured on the held series and assumed
+to carry over to the interpolated series. The figure also assumes that the error grows in a straight
+line with run age, which the study did not test. Open-Meteo's ECMWF ENS product starts a run every 6
+hours (the <a href="https://open-meteo.com/en/docs/ensemble-api">Ensemble API</a> page), and the <a href="https://open-meteo.com/en/docs/historical-forecast-api">Historical
+Forecast API</a> page says each run's first few
+hours are stitched into one series. If the ensemble-mean archive follows the same rule, Open-Meteo's
+leads are about 0 to 6 hours, and a lead 8 to 11 hours shorter than the local series' would account
+for 0.3 to 0.4 points, which is the solar gap left after the interpolation. The page does not verify
+either assumption, because the ensemble-mean series carries no run time.</p>
+<p><strong>The gap between the two series changes with the hour of the day in a way that fits a lead
+effect for wind and an irradiance effect for solar.</strong> For wind at 10 m, the local series scored
+better than Open-Meteo's mean in the two steps with the shortest local leads (0.28 and 0.08 points
+better at steps ending 03:00 and 06:00 UTC, with mean leads of 4 and 7 hours) and worse in the six
+other steps, by 0.17 to 0.57 points. Hub-height wind shows the same pattern. The hourly labels of
+the 03:00 step lie between two runs, because linear interpolation joins the last step of the
+previous day's run to the first of the new run. For solar, the gap is largest at midday, where the
+irradiance is largest, and not at the longest lead.</p>
+<table>
+<thead>
+<tr>
+<th>Step ending (UTC)</th>
+<th>Mean local lead (hours)</th>
+<th>Solar: local minus Open-Meteo, held</th>
+<th>Solar: local minus Open-Meteo, interpolated</th>
+<th>Wind 10 m: local minus Open-Meteo</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>03:00</td>
+<td>3.7</td>
+<td>no sunlit hours</td>
+<td>no sunlit hours</td>
+<td>-0.28</td>
+</tr>
+<tr>
+<td>06:00</td>
+<td>6.7</td>
+<td>-0.04</td>
+<td>0.01</td>
+<td>-0.08</td>
+</tr>
+<tr>
+<td>09:00</td>
+<td>9.7</td>
+<td>1.19</td>
+<td>0.23</td>
+<td>0.30</td>
+</tr>
+<tr>
+<td>12:00</td>
+<td>12.7</td>
+<td>1.94</td>
+<td>0.64</td>
+<td>0.17</td>
+</tr>
+<tr>
+<td>15:00</td>
+<td>15.7</td>
+<td>1.70</td>
+<td>0.71</td>
+<td>0.39</td>
+</tr>
+<tr>
+<td>18:00</td>
+<td>18.7</td>
+<td>0.84</td>
+<td>0.32</td>
+<td>0.57</td>
+</tr>
+<tr>
+<td>21:00</td>
+<td>21.7</td>
+<td>-0.06</td>
+<td>-0.09</td>
+<td>0.18</td>
+</tr>
+<tr>
+<td>00:00</td>
+<td>24.2</td>
+<td>no sunlit hours</td>
+<td>no sunlit hours</td>
+<td>0.39</td>
+</tr>
+</tbody>
+</table>
+<p><strong>The study did not test the grid or the member count, so a share of the remaining gap has no
+tested cause.</strong> The local table averages the 0.25 degree grid points that overlap each H3
+resolution-5 hexagon (weighted by overlap area), and derives wind speed from the averaged east and
+north components. Open-Meteo's source code and documentation, as read for this study, do not say how
+its 0.25 degree product picks a grid point for a location. The local mean is over 51 members, and
+the study did not count the members behind Open-Meteo's ECMWF ENS mean.</p>
+<h2 id="whether-icon-d2-epss-lead-comes-from-updating-more-often">Whether ICON-D2-EPS's lead comes from updating more often</h2>
+<p><strong>ICON-D2's advantage over ECMWF is a short-lead advantage, but the data cannot show how much of
+ICON-D2-EPS's 0.3-point solar lead over ECMWF ENS comes from its more frequent runs.</strong> Open-Meteo
+starts an ICON-D2-EPS run every 3 hours and an ECMWF ENS run every 6 hours, so under the
+first-few-hours rule above, the ICON-D2-EPS mean's leads would average about 1.5 hours and the ECMWF
+ENS mean's about 3 hours. Both estimates use solar slopes only. At the slope of the ECMWF-based
+local series (about 0.04 points an hour), 1.5 hours is 0.05 points. The slope of ICON-D2's
+deterministic run is steeper (2.04 points over 24 hours, or 0.085 points an hour, from the table
+below), and at that slope 1.5 hours is 0.13 points. Both estimates are smaller than the 0.32-point
+difference, on assumptions the page could not check. The study did not estimate a wind slope for the
+ensemble means.</p>
+<table>
+<thead>
+<tr>
+<th>Deterministic model</th>
+<th>Solar, freshest run</th>
+<th>Solar, run 24 hours older</th>
+<th>Wind 10 m, freshest run</th>
+<th>Wind 10 m, run 24 hours older</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>ICON-D2</td>
+<td>7.85</td>
+<td>9.89</td>
+<td>5.97</td>
+<td>7.39</td>
+</tr>
+<tr>
+<td>ECMWF IFS 0.25 degree</td>
+<td>7.93</td>
+<td>8.89</td>
+<td>6.01</td>
+<td>6.77</td>
+</tr>
+<tr>
+<td>ICON-EU</td>
+<td>8.29</td>
+<td>9.35</td>
+<td>6.56</td>
+<td>7.81</td>
+</tr>
+<tr>
+<td>UKV</td>
+<td>8.77</td>
+<td>10.54</td>
+<td>5.94</td>
+<td>7.68</td>
+</tr>
+</tbody>
+</table>
+<p><strong>With the freshest run, ICON-D2 led ECMWF IFS by 0.08 points for solar and 0.04 points for wind at
+10 m, and with the run 24 hours older, ECMWF IFS led ICON-D2 by 1.0 and 0.6 points.</strong> At hub height
+the same swap holds: ICON-D2 led by 0.56 points with the freshest run and trailed by 0.12 points
+with the older run. For solar, ICON-D2 has the largest rise: its error rose 2.0 points from the
+freshest to the older run, against 1.0 for ECMWF IFS, 1.1 for ICON-EU, and 1.8 for UKV. For wind at
+10 m, ICON-D2 is not the most sensitive (rises of 1.42 points for ICON-D2, 0.76 for ECMWF IFS, 1.25
+for ICON-EU, and 1.74 for UKV). A run-age difference between the products would therefore favour
+ICON-D2-EPS for solar, and the wind data do not show that it would for wind. The deterministic gap
+at the freshest run (0.08 points) is smaller than the ensemble-mean gap (0.32 points), which leaves
+a difference that the ensemble averaging of ICON-D2-EPS's 20 members could produce, and this study
+did not test that explanation. The four deterministic series are single runs, so their errors differ
+from those of the ensemble means for reasons besides run age.</p>
+<p><strong>The ECMWF ENS, ICON-D2-EPS, and MOGREPS-UK means sit much closer to their deterministic models'
+freshest runs than to the runs 24 hours older, and the ICON-EU-EPS mean sits much closer for
+irradiance but only slightly closer for 10 m wind. Together the distances point to short leads, and
+they are not a clean reading of run age.</strong> For ICON-EU-EPS, the 10 m wind speed is 2.27 km/h from
+the freshest run and 2.89 km/h from the older run. The mean absolute distance of ECMWF ENS's mean
+from the IFS freshest run was 0.87 km/h for 10 m wind speed, against 1.74 km/h from the older run.
+For the local series the distances were 1.91 and 1.94 km/h. For irradiance the local series is 67
+W/m² from the IFS freshest run, because of the hold. The comparison mixes a mean of members with a
+single member and, for the local series, leads of 3 to 24 hours, which straddle the older run's
+24-hour offset. Open-Meteo's leads therefore look shorter than the local series', and the distances
+do not put a number on them.</p>
+<h2 id="what-open-meteos-source-code-does-for-the-mogreps-uk-mean">What Open-Meteo's source code does for the MOGREPS-UK mean</h2>
+<p><strong>In the Open-Meteo source code read for this study, the MOGREPS-UK ensemble mean is an unweighted
+mean over the 3 members of one hourly run, and no code combines members of different runs.</strong> The
+Met Office's 18-member MOGREPS-UK ensemble is six hourly runs of 3 members lagged together
+(<a href="https://doi.org/10.1002/qj.3844">Porson et al. (2020)</a>). The evidence below is from the
+<code>open-meteo/open-meteo</code> repository at commit <code>cc3f4e5e956b39a56ab182faeccfd3d936ae6b4c</code> (committed
+on 2026-09-23), read from a shallow clone.</p>
+<ul>
+<li><code>Sources/App/UKMO/UkmoDomain.swift</code> gives <code>uk_ensemble_2km</code> 3 members
+  (<code>countEnsembleMember</code>), an hourly update interval, and a run delay of about 4 hours.</li>
+<li><code>Sources/App/UKMO/UkmoDownloader.swift</code> downloads one run at a time and, for each forecast step of
+  that run, writes each member of the run's file into a step writer that carries an
+  ensemble-mean calculator.</li>
+<li><code>Sources/App/Helper/OmSpatialTimestepWriter.swift</code> creates one <code>EnsembleMeanCalculator</code> per run
+  and forecast step, so a calculator never receives another run's members.</li>
+<li><code>Sources/App/Helper/OmWriter/EnsembleMeanCalculator.swift</code> keeps a running mean and a sample
+  standard deviation (divisor n - 1) with equal weight for every member it receives.</li>
+<li><code>Sources/App/Helper/OmFileSplitter.swift</code> (<code>updateFromTimeOrientedStreaming3D</code>) merges each new
+  run into the stored series by overwriting every stored value with the new run's value wherever the
+  new value is not NaN, so each valid time keeps the newest run written for it.</li>
+<li><code>Sources/App/Controllers/ForecastapiController.swift</code> serves <code>ukmo_uk_ensemble_mean_2km</code> from the
+  single domain <code>uk_ensemble_mean_2km</code>, with no mixing across domains.</li>
+<li>A case-insensitive, word-bounded search of every <code>.swift</code> file in <code>Sources</code> for "lag", "lagged",
+  "time-lag", and "timelag" found no match, so words such as "flag" did not count.</li>
+</ul>
+<p><strong>These points are not verified.</strong> The page did not call the API, so it did not check that served
+values equal a 3-member mean. The code was read as of 2026-09-23 and the archive covers 2026-06-25
+onwards, so earlier releases of the code may have behaved differently. The page did not read the
+NetCDF files Open-Meteo downloads from the Met Office, so it did not check that each file holds
+only 3 members. The finding does not show what Open-Meteo intends. It shows that the source code
+has no weighting or lagging.</p>
+<p><strong>A 3-member mean is a smaller ensemble than the MOGREPS-UK product name suggests, and it can be
+noisier than a mean over 18 lagged members.</strong> The MOGREPS-UK mean scored 8.69% for solar, behind
+every other ensemble mean here except the local ECMWF ENS series, and 0.08 points better than UKV's
+freshest deterministic run (8.77%). The result is consistent with a mean of 3 members adding little
+to a single run, but it does not show that, because the products differ in more than member count.
+<a href="../../../roadmap/data-sources/#what-we-learnt-about-mogreps-uk-on-2026-09-26">The roadmap</a> records
+why members of lagged runs need weights and run ages.</p>
+<p>The Met Office's calibrated IMPROVER blend of MOGREPS-UK holds no raw members, so the blend cannot
+stand in for MOGREPS-UK members
+(<a href="../../../roadmap/data-sources/#what-we-learnt-about-met-office-improver-on-2026-09-26">details</a>).</p>
+<h2 id="limitations">Limitations</h2>
+<p><strong>The window is short and holds one summer.</strong> The 88 days give 12 held-out weeks. The window does
+not sample autumn or winter wind, and it samples only summer cloud regimes.</p>
+<p><strong>The generators share weather.</strong> Among the 6 solar generators, MOGREPS-UK's and ICON-D2-EPS's means
+serve 5 distinct series, ICON-EU-EPS's 4, and ECMWF ENS's 2, because neighbouring generators fall in
+one grid cell. Among the 3 wind generators, ECMWF ENS's mean serves 2 distinct series and the other
+products 3. The effective sample is smaller than the number of generator-hours.</p>
+<p><strong>The scoring is interpolation.</strong> Training rows include the days on both sides of each scored week.
+A model scored on a later season would show larger errors.</p>
+<p><strong>The ensemble means are stitched series with unmatched leads.</strong> They carry no run time, so their
+leads are short, mixed, and different between products, and the page has not measured them.
+ICON-D2-EPS
+probably has the shortest leads, which probably flatters it. The page says nothing about day-ahead
+skill or about how the error grows with lead.</p>
+<p><strong>Products differ in coverage.</strong> ICON-D2 does not cover South West England or South Wales, and every
+generator here lies inside its domain. MOGREPS-UK's and ICON-EU-EPS's means have no 100 m wind, and
+the origin of ICON-D2-EPS's 100 m wind
+is unchecked.</p>
+<p><strong>The capacity denominator is the latest effective capacity per generator in
+<code>data/effective_capacity</code>
+when the study ran on 26 September 2026.</strong></p>
+<h2 id="scope">Scope</h2>
+<p><strong>The study does not cover</strong> ensemble spread or probabilistic scores, leads beyond the stitched
+series, other seasons, generators outside Lincolnshire, wind direction, other Open-Meteo ensembles,
+or the beam and diffuse split of radiation. The study does not test whether any difference is
+statistically significant at the 5% level.</p>
+<h2 id="data-and-code-availability">Data and code availability</h2>
+<p><strong>The four Open-Meteo ensemble means, CAMS, and ERA5 are public downloads, and the metered power is
+private.</strong> The Open-Meteo means are in <code>data/studies/weather/OPEN-METEO-ENSEMBLE-MEANS/</code>. The local
+ECMWF ENS series is built from <code>data/studies/weather/ENS/</code>, which reads this project's own ENS Delta
+table. NGED's power readings are private. Every output carries only the anonymised labels <code>A</code> to <code>F</code>
+and <code>W1</code> to <code>W3</code>. The code is in <code>studies/open_meteo_ensemble_means/</code> and
+<code>packages/studies/</code>, at the commit that adds this page.</p>
+<h2 id="reproducing-the-figures">Reproducing the figures</h2>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/open_meteo_ensemble_means/ensemble_means_mae.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/open_meteo_ensemble_means/ensemble_means_chart.py
+npx<span class="w"> </span>svgo@4<span class="w"> </span>--multipass<span class="w"> </span>--precision<span class="o">=</span><span class="m">1</span><span class="w"> </span>--final-newline<span class="w"> </span>docs/studies/assets/ensemble_means_mae.svg
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/open_meteo_ensemble_means/local_ens_gap.py
+</code></pre></div>
+<p>The first command writes the tables and <code>report.md</code> under <code>data/studies/open_meteo_ensemble_means/</code>
+and takes about 15 minutes on the CPU. The script refuses to overwrite, so move the existing files
+to
+a <code>superseded/</code> subfolder first. <code>--report-only</code> rebuilds the tables from the saved losses. The last
+command writes the tables of the two new sections to <code>data/studies/open_meteo_ens_gap/</code>, reads the
+saved frames of the first command, and takes about 8 minutes on the CPU.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>

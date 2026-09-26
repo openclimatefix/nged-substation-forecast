@@ -1,0 +1,4237 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+      
+        <link rel="prev" href="../wind/">
+      
+      
+        <link rel="next" href="../../forecasts/ens-horizons/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../../../assets/images/favicon.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Does blending weather products beat the best single weather product? - NGED Substation Forecast</title>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/stylesheets/main.ec1eaa64.min.css">
+      
+        
+        <link rel="stylesheet" href="../../../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../../../assets/_mkdocstrings.css">
+    
+      <link rel="stylesheet" href="../../../stylesheets/ocf.css">
+    
+    <script>__md_scope=new URL("../../..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  </head>
+  
+  
+    
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="custom" data-md-color-accent="custom">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#does-blending-weather-products-beat-the-best-single-weather-product" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../../.." title="NGED Substation Forecast" class="md-header__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            NGED Substation Forecast
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Does blending weather products beat the best single weather product?
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+    
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../../.." title="NGED Substation Forecast" class="md-nav__button md-logo" aria-label="NGED Substation Forecast" data-md-component="logo">
+      
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3 3 3 0 0 0 3 3m0 3.54C9.64 9.35 6.5 8 3 8v11c3.5 0 6.64 1.35 9 3.54 2.36-2.19 5.5-3.54 9-3.54V8c-3.5 0-6.64 1.35-9 3.54"/></svg>
+
+    </a>
+    NGED Substation Forecast
+  </label>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../.." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../getting-started/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Getting started
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../documentation-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Documentation guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Background
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Background
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/network/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED's network and its data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/weather-products-survey/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Weather products surveyed for the weather-product studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/requirements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Requirements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/manual-heuristic-forecast/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The manual heuristic forecast
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../background/energy-forecasting-review/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    The state of the art in energy forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_5" >
+        
+          
+          <label class="md-nav__link" for="__nav_5" id="__nav_5_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design philosophy
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_5_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_5">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Design philosophy
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/design-principles/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Design principles
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/engineering-hypotheses/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering hypotheses
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/inherent-stability/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Inherent stability
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../design-philosophy/common-incident-classes/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Common incident classes
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_6" >
+        
+          
+          <label class="md-nav__link" for="__nav_6" id="__nav_6_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Techniques
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_6_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_6">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Techniques
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/convex-optimisation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Convex optimisation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/differentiable-physics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Differentiable physics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/disaggregation-evaluation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluating disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/encoders/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Learned encoders
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/evaluation-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Evaluation metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../techniques/probabilistic-forecasting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Probabilistic forecasting
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_7" >
+        
+          
+          <label class="md-nav__link" for="__nav_7" id="__nav_7_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_7_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_7">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Architecture
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/overview/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/performance/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Performance and scale
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/forecast-delivery/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecast delivery
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/nwp-variable-conventions/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NWP variable conventions
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ecmwf-ens-known-issues/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Known ECMWF ENS data-quality issues
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/ml-orchestration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML orchestration design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/production-deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Production deployment design
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/aws-costs/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    AWS running costs
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/why-dagster-not-airflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Why Dagster, not Airflow?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/code-style/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Code style
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../architecture/testing/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Testing
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8" id="__nav_8_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Studies
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_8_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Studies
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../beam-diffuse-split/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does a weather product's beam/diffuse split help a PV forecast?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_3" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_8_3" id="__nav_8_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Past weather
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_3_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_8_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Past weather
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../methods/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Methods shared by the past-weather studies
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../solar/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past sunshine?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../wind/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Which weather product best describes past wind?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending weather products beat the best single weather product?
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Does blending weather products beat the best single weather product?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#key-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-xgboost-models-track-the-measured-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The XGBoost models track the measured output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#solar-a-blend-beats-cams-given-its-neighbouring-hours" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Solar: a blend beats CAMS given its neighbouring hours
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wind-a-blend-beats-ukv-given-its-neighbouring-hours" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wind: a blend beats UKV given its neighbouring hours
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-gain-comes-from-the-other-products-weather" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The gain comes from the other products' weather
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-gain-holds-at-every-generator-and-in-every-season" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The gain holds at every generator and in every season
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-wind-gain-is-spread-across-every-level-of-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The wind gain is spread across every level of output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#an-xgboost-blend-beats-a-linear-stack-and-simple-averages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An XGBoost blend beats a linear stack and simple averages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-known-small-signal-is-recovered-in-full" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A known small signal is recovered in full
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#blending-cams-with-sarah-3-beats-camss-own-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Blending CAMS with SARAH-3 beats CAMS's own split
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing-the-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing the figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_8_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_8_4" id="__nav_8_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Forecasts
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="2" aria-labelledby="__nav_8_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_8_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Forecasts
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/ens-horizons/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How accurate is a power forecast driven by ECMWF ENS at each horizon?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/matched-lead/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Do other weather forecasts beat ECMWF's ensemble at day-ahead lead?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../forecasts/ensemble-means/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How do Open-Meteo's ensemble-mean products compare for solar and wind power?
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_9" >
+        
+          
+          <label class="md-nav__link" for="__nav_9" id="__nav_9_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML experimentation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_9_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_9">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    ML experimentation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/model-configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Model configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/dagster-workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Running an ML experiment end-to-end
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../ml_experimentation/cross-validation-folds/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cross-validation folds
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_10" >
+        
+          
+          <label class="md-nav__link" for="__nav_10" id="__nav_10_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_10_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_10">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Live service
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/aws/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up the live service on AWS
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/connecting/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Connecting to the AWS control plane
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/operations/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operating the live service
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/intervention-log/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Intervention log
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/sentry/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setting up Sentry telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../live_service/setup/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_11" >
+        
+          
+          <label class="md-nav__link" for="__nav_11" id="__nav_11_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Roadmap
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_11_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_11">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Roadmap
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/capacity-estimation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Effective-capacity estimation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/cost-savings-metrics/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cost-savings metrics
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/data-cleaning/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Cleaning the trial-area telemetry
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/data-sources/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Data sources
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/delivery-tables/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delivery tables
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/engineering-health/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Engineering health
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/forecast-building-blocks/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    How NGED assembles forecasts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/handover/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Handover to NGED
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/live-service/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Live service: what's left to build
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/metrics-and-leaderboard/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Metrics and leaderboard
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/disaggregation/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Net-demand disaggregation
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/switching-events/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Switching events
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/training-history/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Extending training history with ERA5
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../roadmap/xgboost-improvements/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost improvements
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_12" >
+        
+          
+          <label class="md-nav__link" for="__nav_12" id="__nav_12_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API reference
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_12_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_12">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    API reference
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/contracts/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Contracts
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/delta_store/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Delta store
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/dynamical_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Dynamical data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/geo/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Geo
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/ml_core/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    ML core
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/nged_data/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    NGED data
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../../../api/xgboost_forecaster/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    XGBoost forecaster
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#key-findings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Key findings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#introduction" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Introduction
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#data-and-methods" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Data and methods
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#results" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Results
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Results">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#the-xgboost-models-track-the-measured-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The XGBoost models track the measured output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#solar-a-blend-beats-cams-given-its-neighbouring-hours" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Solar: a blend beats CAMS given its neighbouring hours
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#wind-a-blend-beats-ukv-given-its-neighbouring-hours" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Wind: a blend beats UKV given its neighbouring hours
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-gain-comes-from-the-other-products-weather" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The gain comes from the other products' weather
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-gain-holds-at-every-generator-and-in-every-season" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The gain holds at every generator and in every season
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#the-wind-gain-is-spread-across-every-level-of-output" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        The wind gain is spread across every level of output
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#an-xgboost-blend-beats-a-linear-stack-and-simple-averages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        An XGBoost blend beats a linear stack and simple averages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#a-known-small-signal-is-recovered-in-full" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        A known small signal is recovered in full
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#blending-cams-with-sarah-3-beats-camss-own-split" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Blending CAMS with SARAH-3 beats CAMS's own split
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#what-to-use" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        What to use
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#limitations" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Limitations
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#reproducing-the-figures" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reproducing the figures
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+
+<h1 id="does-blending-weather-products-beat-the-best-single-weather-product">Does blending weather products beat the best single weather product?</h1>
+<blockquote>
+<p><strong>This study uses only Flexpectation's own data, and its purpose is to inform Flexpectation's
+choices.</strong> The study scores each weather product and each blend only at the generators in
+Flexpectation's trial area in Lincolnshire. The study does not compare results across many regions
+or climates, so a result on this page may not hold elsewhere.</p>
+</blockquote>
+<p><strong>This study asks which weather data best describes the weather that has already happened. The study
+does not test weather forecasts.</strong> Every product is scored on hours in the past, against what each
+generator actually produced in those hours. Several of the products are numerical weather prediction
+(NWP) models: UKV, ICON-D2, ICON-EU, and ICON global. The NWP models are included because this study
+reads only the first few hours of each NWP run, at lead times of 0 to 6 hours depending on the
+model, and uses those hours as a stand-in for an analysis: the model's best estimate of the weather
+at the time the run starts. How well the same NWP models forecast hours or days ahead is a separate
+question, tracked in <a href="https://github.com/openclimatefix/nged-substation-forecast/issues/810">#810</a>.</p>
+<p><strong>At 6 solar farms and 3 wind farms in Lincolnshire, an XGBoost model given several weather products
+at once beats an XGBoost model given the best single product, even when the single product is also
+given its values for the neighbouring hours, the hours either side.</strong> Every error here is a mean
+absolute error as a percentage of each generator's capacity. A difference between two errors is in
+percentage points of capacity, written "points", and a bracketed pair after a number is its 95%
+interval. For solar, an XGBoost model given all six products has an error of 4.79% of capacity,
+against 4.92% for an XGBoost model given CAMS, the Copernicus satellite retrieval, with its
+neighbouring hours and its split of sunlight into direct beam and diffuse light: 0.13 points better
+[0.10, 0.17]. At a solar farm with 10 MW of capacity, 0.13 points is 13 kW off a mean absolute error
+of 492 kW. For wind, an XGBoost model given all five products has an error of 5.76%, against 6.24%
+for an XGBoost model given the wind of UKV, the Met Office's UK model, with its neighbouring hours:
+0.48 points better [0.40, 0.56]. A blend that a live forecasting service could read beats the best
+single product as well: UKV with ICON-EU, by 0.26 points [0.21, 0.31] for wind. On a longer row
+set from January 2021, an XGBoost model given CAMS's split and its neighbouring hours plus
+SARAH-3's global irradiance beats the same model without SARAH-3 by 0.18 points [0.16, 0.21]. All
+four comparisons above are post hoc, chosen after a first run's results, as "Data and methods"
+explains. The
+evidence is 77,616 generator-hours (one generator's output over one hour) at the 6 solar farms from
+December 2022 to September 2026, and 50,734 generator-hours at the 3 wind farms from August 2024 to
+September 2026, except the CAMS-with-SARAH-3 section: 115,594 generator-hours from January 2021.</p>
+<p><strong>The gain comes from the other products' hour-by-hour weather, not from giving the XGBoost model
+more columns.</strong> A control that keeps the extra columns but replaces their weather with other days'
+values from the same month does no better than the single product.</p>
+<p><img alt="Figure 1: An XGBoost model given several weather products has the lowest error of all the single
+products and blends tested" src="../../assets/blend_leaderboard.svg" /></p>
+<p><strong>Figure 1 ranks each single product and each blend by its own mean absolute error. Figure 2 tests
+each named blend against its best single product directly.</strong> Figure 1's intervals are wide mainly
+because every XGBoost model's error rises and falls together from month to month. Figure 2 compares
+two XGBoost models on the same months and the same fitting seed, the random start an XGBoost model
+is trained from, which cancels that shared swing, so Figure 2's intervals are much narrower. Two
+rows can therefore overlap in Figure 1 even where the difference between them, tested directly in
+Figure 2, is statistically significant at the 5% level. Figure 1 also marks the rows a live service
+anywhere in Great Britain can read. For both solar and wind the best of those rows is UKV with
+ICON-EU, each product given its neighbouring hours.</p>
+<p><img alt="Figure 2: At these nine farms, an XGBoost model given several weather products beats an XGBoost
+model given the best single product and its neighbouring hours" src="../../assets/blend_headline.svg" /></p>
+<blockquote>
+<p><strong>How this page was made.</strong> The research question came from a human. Everything else — the code
+behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
+AI model (for this page, Claude Opus 5.5). Several independent Claude reviewers have checked the
+method, the evidence, and the prose adversarially.</p>
+</blockquote>
+<h2 id="key-findings">Key findings</h2>
+<ul>
+<li><strong><a href="#the-xgboost-models-track-the-measured-output">The XGBoost models behind every comparison track the measured output at every
+  generator.</a></strong></li>
+<li><strong><a href="#solar-a-blend-beats-cams-given-its-neighbouring-hours">For solar, an XGBoost model given all six products beats an XGBoost model given CAMS alone by
+  0.13 points, and an XGBoost model given the four weather models beats an XGBoost model given
+  ICON-D2 alone by 0.34 points.</a></strong></li>
+<li><strong><a href="#wind-a-blend-beats-ukv-given-its-neighbouring-hours">For wind, an XGBoost model given all five products beats an XGBoost model given UKV alone by
+  0.48 points, and an XGBoost model given UKV and ICON-EU beats UKV alone by 0.26
+  points.</a></strong></li>
+<li><strong><a href="#the-gain-comes-from-the-other-products-weather">The gain comes from the other products' weather: a control given the same columns without their
+  weather does no better than the best single
+  product.</a></strong></li>
+<li><strong><a href="#the-gain-holds-at-every-generator-and-in-every-season">Every named blend beats its best single product at every generator and in every
+  season.</a></strong></li>
+<li><strong><a href="#the-wind-gain-is-spread-across-every-level-of-output">The wind gain is spread across every level of output. The study script's report finds that 5%
+  of hours carry 99% of the gain, which reflects hours that improve and hours that worsen netting
+  out.</a></strong></li>
+<li><strong><a href="#an-xgboost-blend-beats-a-linear-stack-and-simple-averages">An XGBoost model given every product's columns beats a linear stack of single-product
+  predictions, and averaging with CAMS makes the solar error far
+  worse.</a></strong></li>
+<li><strong><a href="#a-known-small-signal-is-recovered-in-full">A known small signal, sized to about the solar headline gain, is recovered in
+  full.</a></strong></li>
+<li><strong><a href="#blending-cams-with-sarah-3-beats-camss-own-split">SARAH-3 alone trails CAMS by 0.43 points [0.35, 0.51], but blending the two beats CAMS's split
+  with its own neighbouring hours by 0.18 points [0.16, 0.21] (post hoc) and plain CAMS's split by
+  0.20 points [0.17, 0.22] (planned), and both gains survive a climatology
+  control.</a></strong></li>
+</ul>
+<h2 id="introduction">Introduction</h2>
+<p><strong>Two earlier pages ranked weather products one at a time, and neither measured whether an XGBoost
+model given several products at once does better.</strong> <a href="../solar/">Which weather product best describes past
+sunshine?</a> found that CAMS, the Copernicus Atmosphere Monitoring
+Service's satellite retrieval, describes past sunshine far better than any weather model tested.
+<a href="../wind/">Which weather product best describes past wind?</a> found that
+ICON-D2 and UKV describe past hub-height wind best of the five products tested. Both pages scored
+each product through an XGBoost model fitted per generator to predict hourly output from that
+product alone.</p>
+<p><strong>Several parts of this project read past weather, and each could read a blend instead of one
+product.</strong> The solar page names these consumers of past weather. Training history is the years of
+past weather that pre-training a forecasting model needs. Historical features give the live
+forecasting model the weather of hours already past.
+Capacity estimation infers a generator's size from how its output tracks the weather. Disaggregation
+separates hidden generation from demand at a substation. This page asks whether an XGBoost model
+given several products beats an XGBoost model given the best single product, and says which blend,
+if any, each consumer should read.</p>
+<p><strong>The products are the same as on the two earlier pages.</strong> The solar products are CAMS; ERA5, the
+reanalysis of the European Centre for Medium-Range Weather Forecasts (ECMWF); the Met Office's UK
+variable-resolution model (UKV); and three models of the German weather service (DWD): ICON-D2,
+which covers Germany and its neighbours, ICON-EU, and ICON global. The four products other than CAMS
+and ERA5 are weather models, run every few hours. The wind products are the same, less CAMS, which
+publishes no wind. ICON-D2 does not cover South West England or South Wales. ICON-D2's western edge
+runs from about 2°W on the south coast to about 2.5°W in the Midlands.</p>
+<p><img alt="Figure 3: ICON-D2 has no data west of a line running from 1.8°W at 49.9°N to 3.9°W at 57.3°N, so a
+blend that needs ICON-D2 cannot serve the west of Great Britain. The map also draws AROME France,
+which this page does not test" src="../../../roadmap/assets/weather_product_domains.svg" /></p>
+<p><strong>Each blend reads one set of products; the last column says which consumer the set could serve:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Set</th>
+<th>Solar products</th>
+<th>Wind products</th>
+<th>Why this set</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>All products</td>
+<td>CAMS, ERA5, UKV, ICON-D2, ICON-EU, ICON global</td>
+<td>ERA5, UKV, ICON-D2, ICON-EU, ICON global</td>
+<td>the most any blend can read</td>
+</tr>
+<tr>
+<td>CAMS and ICON-D2</td>
+<td>CAMS, ICON-D2</td>
+<td>–</td>
+<td>history where ICON-D2 covers</td>
+</tr>
+<tr>
+<td>CAMS and ICON-EU</td>
+<td>CAMS, ICON-EU</td>
+<td>–</td>
+<td>history anywhere in Great Britain</td>
+</tr>
+<tr>
+<td>CAMS and ERA5</td>
+<td>CAMS, ERA5</td>
+<td>–</td>
+<td>history back to 2004</td>
+</tr>
+<tr>
+<td>ICON-D2 and UKV</td>
+<td>–</td>
+<td>ICON-D2, UKV</td>
+<td>the two leaders on the wind page</td>
+</tr>
+<tr>
+<td>UKV and ICON-EU</td>
+<td>UKV, ICON-EU</td>
+<td>UKV, ICON-EU</td>
+<td>a live service anywhere in Great Britain</td>
+</tr>
+<tr>
+<td>Four weather models</td>
+<td>UKV, ICON-D2, ICON-EU, ICON global</td>
+<td>the same</td>
+<td>a live service where ICON-D2 covers</td>
+</tr>
+</tbody>
+</table>
+<h2 id="data-and-methods">Data and methods</h2>
+<p><strong>Every comparison is scored on the two earlier studies' own hours, folds, and fitting seeds.</strong> Each
+XGBoost model is trained on some blocks of whole months and scored on the others. Each held-out
+block is called a fold, and there are five. Each XGBoost model is fitted three times, from three
+fitting seeds. The solar rows are 77,616 generator-hours at six solar farms, labelled A to F, from 1
+December 2022 to 10 September 2026. The wind rows are 50,734 generator-hours at three wind farms,
+labelled W1 to W3, from 12 August 2024 to 10 September 2026. Each hour is kept only if every product
+covers it. This study refits every single-product XGBoost model the two earlier pages published: 22
+solar and 16 wind combinations of weather columns and hyperparameter setting. Every refit reproduces
+the published per-hour errors bit for bit, which shows that the hours and the folds are unchanged.</p>
+<p><strong>Each XGBoost model is fitted per generator and given the same calendar columns as on the earlier
+pages, plus the weather columns below.</strong> The calendar columns are the time of day, the season, and
+which side of the Met Office's upgrade of UKV on 21 January 2026 the hour falls on. The solar
+XGBoost models are also given the sun's position and ERA5's air temperature. Each comparison is
+between two such XGBoost models, differing only in the weather columns:</p>
+<ul>
+<li><strong>Plain single product:</strong> the columns the earlier pages gave one product. Solar: the product's
+  global horizontal irradiance. Wind: the product's hub-height speed, that height's direction as a
+  sine and a cosine, and its 10 m speed.</li>
+<li><strong>Enriched single product:</strong> the plain columns plus the extras the solar page found improve one
+  product on its own. Solar: the irradiance in the hour before and the hour after; for CAMS, its
+  beam and diffuse irradiance as well; for UKV, the hour rebuilt as the mean of the snapshots at its
+  start and end. Wind: the hub-height speed 1 and 2 hours either side, and the 10 m speed 1 hour
+  either side.</li>
+<li><strong>Blend:</strong> every product in a set, each with its plain columns or each with its enriched columns.</li>
+</ul>
+<p><strong>The best single product of a set is the single-product XGBoost model with the lowest error among
+the set's products.</strong> The candidates are every single-product XGBoost model the earlier pages
+published and every enriched one. For every set containing CAMS the best single product is enriched
+CAMS, with an
+error of 4.92%. For the four weather models it is ICON-D2 enriched, at 7.50%. For every wind set it
+is UKV enriched, at 6.24%, ahead of ICON-D2 enriched at 6.28%. The extra columns matter on their
+own: enriching UKV lowers its wind error by 0.59 points, and enriching CAMS lowers its solar error
+by 0.18 points.</p>
+<p><strong>Each set is blended four ways:</strong></p>
+<ul>
+<li><strong>XGBoost given every product's columns</strong>, the blend this page's headline results describe.</li>
+<li><strong>XGBoost given the products' mean</strong>: the mean of the products' values, as the same number of
+  columns as one product has. The wind mean mixes ICON's 80 m speed with the 100 m speed of ERA5 and
+  UKV, which a per-generator XGBoost model can absorb.</li>
+<li><strong>A linear stack</strong>: a weighted mean of the single-product XGBoost models' predictions, with
+  weights that are not negative and sum to 1. The weights are fitted per generator, per fitting
+  seed, and per fold, on the other folds only.</li>
+<li><strong>The equal-weight mean</strong> of the single-product XGBoost models' predictions.</li>
+</ul>
+<p><strong>Each XGBoost blend has a control given the same columns without their weather.</strong> The control keeps
+the best single product's real columns. Every other product's columns are shuffled among the hours
+sharing a generator, a calendar month, and an hour of the day. The shuffle keeps each month's mean
+at each hour of the day, and removes the hour-to-hour weather. The blend minus its control measures
+what the other products' weather adds. The control minus the best single product measures what the
+extra columns add alone, with no weather in them.</p>
+<p><strong>A synthetic product shows that the comparison can detect a gain of the size found.</strong> The synthetic
+product is each hour's measured output as a fraction of capacity, plus random noise drawn once with
+a fixed seed. The noise has a standard deviation of 0.30 of capacity for solar and 0.45 for wind.
+The best single product of the all-products set is given the synthetic product as one more column,
+and a control is given the same column shuffled as above.</p>
+<p><strong>Every error is a mean absolute error as a percentage of each generator's own capacity.</strong> Capacity
+here is each generator's 99th percentile of metered output, not its registered or export capacity. A
+difference between two errors is in percentage points of capacity, written "points".</p>
+<p><strong>A bracketed pair after a number is its 95% interval, from resampling whole calendar months and one
+of the three fitting seeds.</strong> A difference whose interval excludes zero is statistically significant
+at the 5% level. That test covers month-to-month variation in the weather and the choice of fitting
+seed. It does not cover differences between generators, or between the XGBoost models trained on
+different folds. Each headline result therefore also carries a t-interval across the five folds'
+differences and the range of the difference across the generators.</p>
+<p><strong>Each comparison is planned, post hoc, or exploratory.</strong> A planned comparison is one written into
+the study plan before the run that measured it. A post hoc comparison is one chosen after the first
+run's results, and fixed before the re-run that produced the numbers on this page. Every other
+number is exploratory. The headline comparisons, of each enriched blend against the enriched best
+single product, are post hoc: the first science review saw the first run's results, found that much
+of that run's gain was available from one product given its extra columns, and the plan was fixed to
+compare enriched XGBoost models before the re-run that measured them. The plain comparisons were
+written into the plan before any result existed, and are reported as secondary.</p>
+<p><strong>If no two XGBoost models compared differed, about one exploratory interval in twenty would still
+be statistically significant at the 5% level by chance.</strong> Here 121 of the 139 exploratory intervals
+exclude zero. The intervals share hours and XGBoost models with one another, so they are not
+independent tests, and the study script's report quotes no count of how many could be chance.</p>
+<p><strong>Every planned or post hoc comparison is also rerun with a shallower, more heavily regularised set
+of XGBoost settings, to check that a result is not an accident of one choice of settings.</strong> The main
+settings are those the two earlier pages used. The shallower settings drop the maximum tree depth
+from 6 to 4, raise the regularisation strength, and run 1,200 rounds at a lower learning rate.</p>
+<p><strong>Figures 4 and 5's three weeks per generator are chosen by rule, from the weeks in which every
+generator has at least 4 scored solar hours or 12 scored wind hours on each of the seven days.</strong>
+From those weeks, each figure shows the week with the highest mean output, the week with the lowest
+mean output, and the most variable week: for solar, the week with the largest day-to-day spread in
+daily mean output; for wind, the week with the largest mean hour-to-hour change.</p>
+<h2 id="results">Results</h2>
+<h3 id="the-xgboost-models-track-the-measured-output">The XGBoost models track the measured output</h3>
+<p><strong>The XGBoost models given the best single product, and those given every product, follow the
+measured output hour by hour at every generator, in weeks chosen by rule.</strong> Figures 4 and 5 show
+three weeks at each generator: the week with the highest mean output, the most variable week, and
+the week with the lowest mean output. Each XGBoost model's prediction is out of fold, so the hours
+it predicts were held out of its training. The prediction shown is the mean over the three fitting
+seeds.</p>
+<p><img alt="Figure 4: XGBoost models given CAMS, or CAMS + ERA5 + UKV + ICON-D2 + ICON-EU + ICON global,
+track measured solar output" src="../../assets/blend_solar_weeks.svg" /></p>
+<p><img alt="Figure 5: XGBoost models given UKV, or ERA5 + UKV + ICON-D2 + ICON-EU + ICON global, track
+measured wind output" src="../../assets/blend_wind_weeks.svg" /></p>
+<p><strong>The blend's error is lower than the best single product's at every generator, for every set in
+Figure 6.</strong> The errors range from about 4% of capacity at the best solar farm to about 9% for the
+four weather models at the worst. Generator W3's output swings for months at a time against every
+product's wind, which the wind page attributes to turbine availability the feed does not record.</p>
+<p><img alt="Figure 6: Each blend's error is lower than its best single product's at every
+generator" src="../../assets/blend_per_generator.svg" /></p>
+<h3 id="solar-a-blend-beats-cams-given-its-neighbouring-hours">Solar: a blend beats CAMS given its neighbouring hours</h3>
+<p><strong>An XGBoost model given all six products beats an XGBoost model given enriched CAMS by 0.13 points
+[0.10, 0.17], 2.7% of CAMS's error, in a post hoc comparison.</strong> The t-interval across the five folds
+is [0.09, 0.18], and the gain at each generator ranges from 0.09 to 0.18 points. With the shallower
+settings the gain is 0.12 points [0.09, 0.16].</p>
+<p><strong>CAMS with ICON-EU alone gives most of that gain: 0.10 points [0.07, 0.14] over enriched CAMS, in a
+post hoc comparison.</strong> The t-interval across the folds is [0.06, 0.15], and the per-generator gain
+ranges from 0.06 to 0.13 points. In exploratory comparisons, CAMS with ICON-D2 gains 0.12 points
+[0.09, 0.15], and CAMS with ERA5 0.07 points [0.04, 0.10].</p>
+<p><strong>Among the weather models alone, an XGBoost model given all four beats an XGBoost model given
+enriched ICON-D2 by 0.34 points [0.25, 0.44], 4.5% of ICON-D2's error, in a post hoc comparison.</strong>
+The t-interval across the folds is [0.22, 0.48], and the per-generator gain ranges from 0.26 to 0.42
+points. With the shallower settings the gain is 0.30 points [0.21, 0.40]. In an exploratory
+comparison, UKV with ICON-EU beats enriched UKV by 0.50 points [0.41, 0.58].</p>
+<p><strong>The plain comparisons, planned before the first run, show larger gains because their single
+product lacks the extra columns.</strong> Against plain CAMS, an XGBoost model given all six products'
+plain columns gains 0.20 points [0.16, 0.24]. Against plain ICON-D2, an XGBoost model given the four
+weather models' plain columns gains 0.47 points [0.40, 0.55].</p>
+<h3 id="wind-a-blend-beats-ukv-given-its-neighbouring-hours">Wind: a blend beats UKV given its neighbouring hours</h3>
+<p><strong>An XGBoost model given all five products beats an XGBoost model given enriched UKV by 0.48 points
+[0.40, 0.56], 7.7% of UKV's error, in a post hoc comparison.</strong> The t-interval across the five folds
+is [0.33, 0.59], and the gain at each generator ranges from 0.41 to 0.53 points. With the shallower
+settings the gain is 0.50 points [0.43, 0.58].</p>
+<p><strong>UKV with ICON-EU beats enriched UKV by 0.26 points [0.21, 0.31], 4.2% of UKV's error, in a post
+hoc comparison.</strong> The t-interval across the folds is [0.16, 0.34], and the per-generator gain ranges
+from 0.23 to 0.32 points. With the shallower settings the gain is 0.27 points [0.23, 0.32]. In
+exploratory comparisons, the four weather models beat enriched UKV by 0.46 points [0.39, 0.54], and
+ICON-D2 with UKV by 0.39 points [0.32, 0.46].</p>
+<p><strong>The plain comparisons, planned before the first run, again show larger gains.</strong> Against plain
+ICON-D2, the best plain wind product, all five products' plain columns gain 0.82 points [0.74,
+0.90]. Against plain UKV, UKV with ICON-EU gains 0.65 points [0.59, 0.72].</p>
+<h3 id="the-gain-comes-from-the-other-products-weather">The gain comes from the other products' weather</h3>
+<p><strong>For every named blend, the blend beats its control, and the control does no better than the best
+single product.</strong> Figure 7 splits each blend's gain in two. For all six solar products, the blend
+beats its control by 0.20 points [0.17, 0.23], and the control is 0.07 points worse than enriched
+CAMS [0.05, 0.09]. For all five wind products, the blend beats its control by 0.53 points [0.46,
+0.62], and the control is 0.06 points worse than enriched UKV [0.02, 0.09]. For UKV with ICON-EU,
+the control's difference from enriched UKV is not statistically significant at the 5% level (0.02
+points worse [−0.01, +0.04]). All of these comparisons are post hoc.</p>
+<p><strong>Extra columns without weather make the XGBoost model slightly worse, so the blend's gain over its
+control is larger than its gain over the best single product.</strong> The control keeps each month's mean
+at each hour, which carries a little real information, so a blend's gain over its control is if
+anything understated.</p>
+<p><img alt="Figure 7: The gain comes from the other products' weather, not from the extra
+columns" src="../../assets/blend_decomposition.svg" /></p>
+<h3 id="the-gain-holds-at-every-generator-and-in-every-season">The gain holds at every generator and in every season</h3>
+<p><strong>Each named blend beats its best single product at each of its farms, in each of the four seasons,
+and on each side of UKV's January 2026 upgrade.</strong> The solar blends are scored at the 6 solar farms
+and the wind blends at the 3 wind farms. All 54 of these exploratory intervals are statistically
+significant at the 5% level, and so are all 54 intervals of each blend against its control. The
+splits share hours and XGBoost models with the whole-record results and with one another, so they
+are not independent tests.</p>
+<p><strong>The solar gain is smallest from June to August, and the wind gain holds in every season.</strong> An
+XGBoost model given all six products beats enriched CAMS by 0.09 points [0.03, 0.15] from June to
+August, and by 0.20 points [0.11, 0.28] from December to February. All five wind products beat
+enriched UKV by 0.39 to 0.58 points in each season. Since UKV's upgrade the solar gain is 0.07
+points [0.03, 0.12] and the wind gain 0.40 points [0.33, 0.50], each resting on 8 months.</p>
+<p><img alt="Figure 8: Each named blend beats its best single product at every generator, in every season, and
+on each side of UKV's upgrade" src="../../assets/blend_splits.svg" /></p>
+<h3 id="the-wind-gain-is-spread-across-every-level-of-output">The wind gain is spread across every level of output</h3>
+<p><strong>The wind blends beat enriched UKV in every band of measured output, and most of the net gain sits
+in hours below half of capacity.</strong> All five products gain 0.26 points in the hours below a tenth of
+capacity, which are 36% of the hours, and 0.725 to 0.828 points in each band above 0.3 of capacity.
+The three bands below half of capacity carry 19%, 33%, and 24% of the net gain, so the hours below
+0.3 of capacity carry 52%, and the hours above 0.9 carry 4%. The top
+panel of Figure 9 shows each band.</p>
+<p><strong>The study script's report states that the most-improved 5% of hours carry 99% of the gain, which
+describes gains and losses netting out, not a gain confined to a few hours.</strong> Of the hours, 56%
+improve and 44% worsen. Sorting the hours from most improved to most worsened, the running sum of
+the improvement passes the net gain after about 5% of hours, rises to 2.93 times the net gain where
+the improving hours end, and falls back as the worsening hours are added. So the other 95% of hours
+net to about 1% of the gain. For UKV with ICON-EU the most-improved 5% carry 143% of the net gain,
+and the running sum rises to 4.06 times the net gain before the other 95% of hours bring it back
+down. The bottom panel of Figure 9 shows both running sums.</p>
+<p><img alt="Figure 9: The wind blends' gain is spread across every level of output" src="../../assets/blend_wind_bands.svg" /></p>
+<h3 id="an-xgboost-blend-beats-a-linear-stack-and-simple-averages">An XGBoost blend beats a linear stack and simple averages</h3>
+<p><strong>An XGBoost model given every product's columns beats a linear stack of the single-product XGBoost
+models, by 0.07 points for solar [0.05, 0.10] and 0.10 points for wind [0.05, 0.16], in post hoc
+comparisons.</strong> For wind the t-interval across the folds, [−0.01, +0.19], includes zero, so the wind
+result rests on the month resampling alone. With the shallower settings the wind difference is 0.11
+points [0.06, 0.17], with a fold t-interval of [0.03, 0.18]. The stack still beats the best single
+product for both solar and wind: by 0.06 points [0.03, 0.10] for all six solar products, and 0.38
+points [0.32, 0.43] for all five wind products, in exploratory comparisons.</p>
+<p><strong>Averaging CAMS with the other solar products makes the error far worse, because CAMS is far better
+than every other product.</strong> For all six solar products, the XGBoost model given the products' mean
+is 1.65 points worse than enriched CAMS [1.48, 1.81], and the equal-weight mean of the predictions
+is 1.78 points worse [1.61, 1.96]. For wind, both averages of UKV and ICON-EU beat enriched UKV, by
+0.22 points each. All of these comparisons are exploratory.</p>
+<p><img alt="Figure 10: Given every product's columns, an XGBoost model has the lowest error of the four blends
+in every named set" src="../../assets/blend_methods.svg" /></p>
+<p><strong>The XGBoost blend has the lowest error of the four blends in every named set.</strong> For UKV with
+ICON-EU the XGBoost blend leads the linear stack by 0.01 points [−0.02, +0.04], which is not
+statistically significant at the 5% level (exploratory). The linear stack weights CAMS heavily for
+solar and splits the wind weight between UKV and ICON-D2. For all six solar products the stack's
+mean weight on enriched CAMS is 0.85, and no other product's exceeds 0.07. For all five wind
+products the mean weights are 0.43 on UKV, 0.37 on ICON-D2, 0.12 on ICON-EU, 0.06 on ERA5, and 0.02
+on ICON global. Across folds each weight moves by 0.031 or less on average.</p>
+<p><strong>Fitting the stack's weights on the scored fold as well would flatter the stack by at most 0.02
+points.</strong> The report prints that in-sample gap for every stack, from 0.002 to 0.020 points. Stacking
+one product's three fitting seeds, which isolates what averaging XGBoost models alone contributes,
+gains about 0.01 points.</p>
+<h3 id="a-known-small-signal-is-recovered-in-full">A known small signal is recovered in full</h3>
+<p><strong>The comparison recovers in full a synthetic gain planted at about the size of the solar headline
+gain.</strong> The noise was sized on a pilot fit. Given the synthetic product, an XGBoost model beats the
+best single product by 0.14 points for solar [0.11, 0.16] and 0.14 points for wind [0.10, 0.19],
+with all five folds agreeing, in exploratory comparisons. Against its shuffled control the gain is
+0.15 points for solar and 0.14 points for wind (exploratory). Because the noise level was chosen to
+target the headline gain's size, this comparison shows the pipeline can recover a known gain of that
+size. The comparison does not independently confirm the headline gain's magnitude. A comparison
+where a large gain is known to exist, CAMS with ICON-D2 against ICON-D2 alone, shows a gain of 2.86
+points [2.64, 3.08] (exploratory).</p>
+<p><img alt="Figure 11: A known small signal is recovered in full" src="../../assets/blend_synthetic.svg" /></p>
+<h3 id="blending-cams-with-sarah-3-beats-camss-own-split">Blending CAMS with SARAH-3 beats CAMS's own split</h3>
+<p><strong>An XGBoost model given CAMS's split plus SARAH-3's global irradiance beats an XGBoost model given
+CAMS's split with its own neighbouring hours by 0.18 points [0.16, 0.21] (post hoc), and beats plain
+CAMS's split by 0.20 points [0.17, 0.22] (planned); both gains survive a climatology control.</strong>
+<a href="../solar/#sarah-3-is-second-to-cams-under-every-satellite">Which weather product best describes past
+sunshine?</a> found
+CAMS the best single product and SARAH-3, the satellite climate data record from EUMETSAT's
+Satellite Application Facility on Climate Monitoring (CM SAF), the best of the rest, 0.43 points
+behind [0.35, 0.51] on these rows, for a reason the page could not identify. The two retrievals
+build their hourly value differently — CAMS integrates over the hour itself, while SARAH-3's hourly
+value here is this study's mean of SARAH-3's two 30-minute snapshots stamped at the start and
+middle of the hour — and apply different cloud retrievals and clear-sky models to images from the
+same Meteosat satellites (every 15-minute scan for CAMS, every 30-minute scan for SARAH-3), so
+SARAH-3's errors may be partly independent of CAMS's even though SARAH-3 is the weaker product
+alone, the same way ICON-EU added information to CAMS above despite being a weaker single product
+for solar. This section tests that independence directly.</p>
+<p><strong>The rows are the past-solar page's <a href="../solar/#how-the-comparison-was-made">record
+panel</a>: 115,594 common site-hours at
+the same 6 solar farms, labelled A to F, from 1 January 2021 to 31 August 2026, the longer row set
+that page uses for its SARAH-3 comparison.</strong> This row set is not the 77,616-row set the rest of this
+page scores: it holds four products only — CAMS, SARAH-3, ERA5, and ICON-DREAM-EU, DWD's
+reanalysis over Europe — starting in
+January 2021 rather than December 2022, so none of the numbers in this section are comparable in
+absolute terms to the headline results above. Before any blend was fitted, refits of CAMS's split,
+CAMS alone, and SARAH-3 alone were checked row for row against the past-solar page's own saved
+errors on this row set, and matched them bit for bit on all 346,782 scored rows (115,594 rows times
+three fitting seeds).</p>
+<p><strong>Every comparison reads the record panel's calendar and sun-position columns plus one set of weather
+columns.</strong> CAMS's split with SARAH-3 carries CAMS's global, direct-beam and diffuse irradiance plus
+SARAH-3's global irradiance; its climatology control carries the same columns with SARAH-3's global
+irradiance permuted within a generator, a calendar month, and an hour of day, which keeps each
+month's climatology at each hour but removes SARAH-3's hour-by-hour values. Two more comparisons
+repeat the same blend and control on CAMS's and SARAH-3's global irradiance alone, without CAMS's
+split, so the two products contribute the same kind of column: a matched comparison of like columns
+(exploratory).</p>
+<p><strong>A third, post hoc reference enriches CAMS's split with its own neighbouring hours, blended with
+SARAH-3 and tested against both that reference and its own climatology control.</strong> CAMS's split with
+its own neighbouring hours — the hour before and the hour after, read separately from CAMS's own
+download — was added after the first science review found this section's reference lacked the
+extras every other single-product reference on this page carries.</p>
+<p><strong>Two more comparisons are exploratory: a single averaged column, and two negative controls pairing
+CAMS with a noised copy of itself.</strong> An XGBoost model given the mean of CAMS's and SARAH-3's global
+irradiance as a single column is exploratory too, distinct from the linear stack and the
+equal-weight average, which are built from the single-product models' own out-of-fold predictions
+rather than from a shared column; all three are built on the two products' global irradiance only,
+since this study reads no split for SARAH-3. CM SAF does publish a direct/diffuse split for
+SARAH-3, modelled from its own global irradiance rather than retrieved independently, as <a href="../solar/#a-products-own-direct-beam-adds-little-on-the-main-row-set">the
+past-solar page
+explains</a>, so it is not
+scored here. Two negative controls pair CAMS with a noised copy of itself: one noised at 48.2 W/m2,
+the measured root-mean-square difference between CAMS's and SARAH-3's global irradiance on these
+rows, so its two columns differ from each other about as much as the two products genuinely do; the
+other noised at a fixed 5 W/m2, close to a duplicate column.</p>
+<p><strong>Two comparisons were written into the study plan before any result existed, as the git history
+shows:</strong> CAMS's split with SARAH-3 against CAMS's split alone, and against the climatology control.
+Both are refitted at a second, more heavily regularised XGBoost setting to check the result is not
+an accident of one choice of settings. CAMS's split with its own neighbouring hours plus SARAH-3,
+against that enriched reference and against its own climatology control, is post hoc, added after
+the first science review, and is refitted at the second setting too. Every other number in this
+section is exploratory.</p>
+<p><strong>Both planned comparisons are statistically significant at the 5% level, at both settings, and so
+are both post hoc comparisons against the enriched reference.</strong> Against CAMS's split with its own
+neighbouring hours, CAMS's split with its own neighbouring hours plus SARAH-3 gains 0.18 points
+[0.16, 0.21] at the main setting and 0.18 points [0.16, 0.21] at the second setting (post hoc); the
+t-interval across the five folds is [0.14, 0.22]. It beats its own climatology control by 0.20
+points [0.17, 0.22] at the main setting and 0.19 points [0.17, 0.22] at the second setting
+(t-interval [0.16, 0.23]). Against plain CAMS's split, the planned comparison gains 0.20 points
+[0.17, 0.22] at the main setting and 0.19 points [0.17, 0.22] at the second setting (t-interval
+[0.15, 0.24]), and beats the climatology control by 0.21 points [0.19, 0.24] and 0.21 points [0.18,
+0.23] (t-interval [0.17, 0.25]). Since each blend beats its own control by about as much as it beats
+its own reference, most of the gain comes from SARAH-3's hour-by-hour values rather than from the
+extra column alone.</p>
+<p><strong>Part of the gain looks like two retrievals of the same cloud images averaging out each other's
+errors, since a single averaged column already gains as much as CAMS's own split does.</strong> A single
+column averaging CAMS's and SARAH-3's global irradiance already gains 0.12 points [0.09, 0.16] over
+CAMS (exploratory), as much as CAMS's own split gives CAMS (0.12 points, exploratory). That suggests
+part of the gain may come from two retrievals of the same images averaging out each other's errors,
+or from two footprints of the same cloud field: CAMS is interpolated from satellite pixels about 5
+km across, and SARAH-3 is read from a 0.05° grid cell 0.8 to 2.8 km away from CAMS's own point, so
+the two rarely see exactly the same patch of cloud. No comparison here separates that spatial
+averaging from weather one retrieval sees and the other misses.</p>
+<p><img alt="Figure 12: CAMS's split plus its own neighbouring hours plus SARAH-3 has the lowest error of the
+single products and blends tested here" src="../../assets/satellite_blend_leaderboard.svg" /></p>
+<p><img alt="Figure 13: CAMS's split plus SARAH-3 beats CAMS's split, with and without CAMS's own neighbouring
+hours, and beats its climatology control, at both XGBoost
+settings" src="../../assets/satellite_blend_headline.svg" /></p>
+<p><strong>The gain holds at every generator, in every clearness band, and in every year since 2021, though
+its size varies.</strong> Broken down by generator, CAMS's split with SARAH-3 beats CAMS's split by 0.10 to
+0.48 points, largest at generator D, which holds 13% of the rows and 32% of this contrast's total
+gain, for a reason this study did not investigate; excluding generator D the gain is 0.15 points
+[0.13, 0.18]. Every one of these 6 breakdowns is statistically significant at the 5% level. Broken
+down by CAMS's and SARAH-3's mean clearness index (overcast: below 0.3, broken cloud: 0.3 to 0.6,
+clear: 0.6 and above), the gain is 0.15 points [0.12, 0.19] in overcast hours, 0.20 points [0.17,
+0.23] in broken cloud, and 0.24 points [0.19, 0.28] in clear hours; as a share of CAMS's split's own
+error in each band the gain sits in a narrow band throughout — 5.0% overcast, 3.7% broken cloud, 4.0%
+clear. Broken down by calendar year, restricted to January–August so a partial 2026 compares against
+the same months of every complete year, the gain ranges from 0.18 to 0.28 points and is statistically
+significant every year. These breakdowns share hours and XGBoost models with the whole-record result
+and with one another, so they are not independent tests. Resampling the six generators with
+replacement instead of the months gives a wider but still positive interval: 0.20 points [0.13, 0.31]
+for the planned comparison and 0.18 points [0.12, 0.30] against CAMS's split with its own
+neighbouring hours (both exploratory), and every one of the 68 scored months gains for both
+comparisons.</p>
+<p><strong>The gain does not grow with CAMS's own hour-to-hour ramp, which argues against a timing mismatch
+in CAMS's own hourly convention as its source; the reference already gives the XGBoost model CAMS's
+neighbouring hours, which such a mismatch would need to explain the gain.</strong> Against CAMS's split
+with its own neighbouring hours, the gain is 0.21 points [0.17, 0.25] in the calmest fifth of hours
+(CAMS's own irradiance changing least from the hour before to the hour after) and 0.16 points [0.13,
+0.20] in the steepest fifth (exploratory), the opposite of what a fix to CAMS's own timing
+convention would predict. The gain is larger where CAMS and SARAH-3 disagree most: 0.53 points
+[0.45, 0.62] in the fifth of hours where the two differ most (exploratory), though that comparison
+is close to mechanical — where SARAH-3 equals CAMS, blending it in cannot change the prediction — so
+it is weak evidence of genuine disagreement between the retrievals rather than support for it. A
+least-squares fit of SARAH-3's global irradiance on CAMS's own hour and its immediate neighbours,
+restricted to daytime hours, gives SARAH-3 ≈ 0.82·CAMS(t) + 0.12·CAMS(t−1) + 0.07·CAMS(t+1): SARAH-3
+leans towards CAMS's own hour, not towards a shifted one, which points at a genuine disagreement
+between the two retrievals rather than a timing mismatch between the two hourly values as this
+study builds them.</p>
+<p><strong>An XGBoost model given only CAMS's and SARAH-3's global irradiance beats CAMS's split by 0.12
+points, less than the 0.20 points CAMS's split with SARAH-3 gains over the same reference.</strong> CAMS
+with SARAH-3, both global, beats CAMS alone by 0.24 points [0.21, 0.27] and its own climatology
+control by 0.26 points [0.23, 0.29] (exploratory). Against CAMS's split, rather than plain CAMS, the
+all-global blend's gain is smaller: 0.12 points [0.09, 0.15] (exploratory), and adding CAMS's own
+split on top of the all-global blend gains a further 0.08 points [0.06, 0.10] (exploratory), which by
+construction sum to the 0.20-point gain the planned comparison finds directly against CAMS's split.
+Against CAMS, the mean of the two products' global irradiance gains 0.12 points [0.09, 0.16] (as
+above), the linear stack 0.18 points [0.16, 0.21], and the equal-weight average 0.13 points [0.10,
+0.17], all exploratory and all smaller than the XGBoost blend's gain.</p>
+<p><strong>Both negative controls show the pipeline does not manufacture a gain from an uninformative second
+column.</strong> CAMS paired with a copy of itself noised to match the measured CAMS/SARAH-3 gap is 0.01
+points worse than CAMS alone [0.00, 0.01], which is statistically significant but in the wrong
+direction to explain a gain. The matched comparison, CAMS plus SARAH-3's global irradiance against
+CAMS alone, gains 0.24 points [0.21, 0.27]. CAMS paired with a copy of itself noised at a fixed 5
+W/m2, close to a duplicate column, is not statistically significant at the 5% level (0.00 points
+[−0.00, +0.01]). Neither control comes close to the size or the sign of the gain SARAH-3 itself
+adds.</p>
+<p><img alt="Figure 14: The all-global blend, a simple mean and a linear stack, both negative controls, and
+further comparisons among CAMS, CAMS's split, and
+SARAH-3" src="../../assets/satellite_blend_exploratory.svg" /></p>
+<p><strong>Neither ERA5 nor ICON-DREAM-EU, the two other products on these rows, adds as much to CAMS's
+split as SARAH-3 does.</strong> ERA5 and ICON-DREAM-EU each cover the same rows as SARAH-3, so both can be
+blended with CAMS's split the same way, each with its own climatology control. CAMS's split with
+ERA5 gains 0.10 points [0.08, 0.12] over plain CAMS's split and 0.11 points [0.09, 0.13] over its
+own control; CAMS's split with ICON-DREAM-EU gains 0.10 points [0.08, 0.12] and 0.11 points [0.09,
+0.13] (all post hoc). Both gains are statistically significant at the 5% level, and each is about
+half of SARAH-3's 0.20-point gain over the same reference. A direct paired test, added for this
+review, confirms it: CAMS's split with SARAH-3 beats CAMS's split with ERA5 by 0.10 points [0.07,
+0.13] and CAMS's split with ICON-DREAM-EU by 0.10 points [0.07, 0.13] (post hoc). SARAH-3's gain
+over CAMS's split is about twice that of either weather product on the same rows. A direct paired
+test also confirms CAMS's split beats SARAH-3 alone: by 0.55 points [0.48, 0.62] (post hoc).</p>
+<p><img alt="Figure 15: Neither ERA5 nor ICON-DREAM-EU, the two other products tested here, adds as much to
+CAMS's split as SARAH-3 does" src="../../assets/satellite_blend_second_product.svg" /></p>
+<h2 id="what-to-use">What to use</h2>
+<p><strong>A blend waits for its slowest product, plus one hour (solar) or two hours (wind) for its own
+neighbouring hours. The consumer therefore decides which sets are available at all.</strong> The table
+gives each set's latency, which consumers can read it, and the first scored hour.</p>
+<table>
+<thead>
+<tr>
+<th>Solar or wind</th>
+<th>Set</th>
+<th>Available after</th>
+<th>Live anywhere in Great Britain?</th>
+<th>Includes a history-only product (CAMS, ERA5, or SARAH-3)?</th>
+<th>Needs ICON-D2's domain?</th>
+<th>Archive serves every product from</th>
+<th>Scored hours start</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Solar</td>
+<td>CAMS and ICON-D2</td>
+<td>about 1 day</td>
+<td>no</td>
+<td>yes</td>
+<td>yes</td>
+<td>December 2022</td>
+<td>1 December 2022</td>
+</tr>
+<tr>
+<td>Solar</td>
+<td>CAMS and ICON-EU</td>
+<td>about 1 day</td>
+<td>no</td>
+<td>yes</td>
+<td>no</td>
+<td>November 2022</td>
+<td>1 December 2022</td>
+</tr>
+<tr>
+<td>Solar</td>
+<td>CAMS and ERA5</td>
+<td>about 5 days</td>
+<td>no</td>
+<td>yes</td>
+<td>no</td>
+<td>January 2004</td>
+<td>1 December 2022</td>
+</tr>
+<tr>
+<td>Solar</td>
+<td>UKV and ICON-EU</td>
+<td>about 5 hours</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>November 2022</td>
+<td>1 December 2022</td>
+</tr>
+<tr>
+<td>Solar</td>
+<td>Four weather models</td>
+<td>about 5 hours</td>
+<td>no</td>
+<td>no</td>
+<td>yes</td>
+<td>December 2022</td>
+<td>1 December 2022</td>
+</tr>
+<tr>
+<td>Solar</td>
+<td>All six products</td>
+<td>about 5 days</td>
+<td>no</td>
+<td>yes</td>
+<td>yes</td>
+<td>December 2022</td>
+<td>1 December 2022</td>
+</tr>
+<tr>
+<td>Wind</td>
+<td>ICON-D2 and UKV</td>
+<td>about 6 hours</td>
+<td>no</td>
+<td>no</td>
+<td>yes</td>
+<td>August 2024</td>
+<td>12 August 2024</td>
+</tr>
+<tr>
+<td>Wind</td>
+<td>UKV and ICON-EU</td>
+<td>about 6 hours</td>
+<td>yes</td>
+<td>no</td>
+<td>no</td>
+<td>August 2024</td>
+<td>12 August 2024</td>
+</tr>
+<tr>
+<td>Wind</td>
+<td>Four weather models</td>
+<td>about 6 hours</td>
+<td>no</td>
+<td>no</td>
+<td>yes</td>
+<td>August 2024</td>
+<td>12 August 2024</td>
+</tr>
+<tr>
+<td>Wind</td>
+<td>All five products</td>
+<td>about 5.1 days</td>
+<td>no</td>
+<td>yes</td>
+<td>yes</td>
+<td>August 2024</td>
+<td>12 August 2024</td>
+</tr>
+<tr>
+<td>Solar</td>
+<td>CAMS and SARAH-3</td>
+<td>about 2 to 5 days (SARAH-3's delay, from this project's own tracking)</td>
+<td>no</td>
+<td>yes</td>
+<td>no</td>
+<td>2004 (CAMS's start; SARAH-3 from 1983, as its Climate Data Record to 2020 and its Interim Climate Data Record from January 2021)</td>
+<td>1 January 2021</td>
+</tr>
+</tbody>
+</table>
+<p><strong>These recommendations rest on 6 solar farms and 3 wind farms in one part of Lincolnshire,
+over less than 4 years for solar and 2 years for wind.</strong></p>
+<ul>
+<li><strong>Historical features in the live service: UKV with ICON-EU, anywhere in Great Britain; the four
+  weather models where ICON-D2 covers.</strong> UKV with ICON-EU beats enriched UKV by 0.26 points for wind
+  (post hoc) and 0.50 points for solar (exploratory). Inside ICON-D2's domain the four weather
+  models beat the best single weather model by 0.34 points for solar (post hoc) and 0.46 points for
+  wind (exploratory). A live blend needs every product at run time, so a blend has more products
+  that can go missing, and under this project's <a href="../../../design-philosophy/inherent-stability/">inherent stability
+  rules</a> each needs a fallback. Every result here scores
+  the archive's freshest run for each hour, and at run time the last few hours come from an older
+  run.</li>
+<li><strong>Training history: CAMS with ICON-EU for solar anywhere in Great Britain from December 2022, or
+  all products where ICON-D2 covers, is the recommendation this study's own planned comparisons
+  support; where CAMS and SARAH-3 both cover the training period, the evidence favours CAMS with
+  SARAH-3 as the stronger candidate, though that comparison is exploratory.</strong> For solar, all six
+  products beat enriched CAMS by 0.13 points, and CAMS with ICON-EU by 0.10 points, both post hoc.
+  For wind, all five products beat enriched UKV by 0.48 points (post hoc), but UKV's hub-height wind
+  starts only in August 2024, so the wind blends say nothing about training history before that.
+  CAMS with ERA5 reaches back to 2004 for a gain of 0.07 points (exploratory), measured only from
+  December 2022. CAMS with SARAH-3 also gains 0.20 points [0.17, 0.22] over plain CAMS's own split
+  (planned) and 0.18 points [0.16, 0.21] over CAMS's split with its own neighbouring hours (post
+  hoc). This gain comes from a different row set, longer but holding four products, from January
+  2021, so the two blends were not fitted on the same rows. On the 76,727 site-hours the two studies
+  share, each blend's gain over its own study's CAMS's split with its own neighbouring hours is 0.19
+  points [0.16, 0.23] for CAMS with SARAH-3, 0.13 points [0.10, 0.17] for all six products, and 0.10
+  points [0.07, 0.13] for CAMS with ICON-EU (exploratory): CAMS with SARAH-3 gave the larger gain, by
+  0.06 points [0.01, 0.10] over the six-product blend. On these shared hours this study's reference
+  model, trained on the longer row set from January 2021, has 0.16 points [0.07, 0.27] lower error
+  than the blending study's, so only each blend's own gain over its own reference compares across
+  the studies. The comparison is exploratory, and it cannot separate SARAH-3's contribution from the
+  longer training history the CAMS-with-SARAH-3 models had. Both products take their clouds from
+  satellite images rather than from a weather model, and neither ERA5 nor ICON-DREAM-EU, the two
+  other second products tested, gains as much as SARAH-3 does. Before 2021 SARAH-3 comes from its
+  Climate Data Record rather than the Interim Climate Data Record scored here, and the blend is
+  untested there. SARAH-3 is available only by a manual order from CM SAF, so a training pipeline
+  reading it cannot fetch new months automatically. No blend of CAMS and SARAH-3 with a third
+  product, such as ICON-EU, was tested.</li>
+<li><strong>Capacity estimation and disaggregation: no recommendation.</strong> Both have to read a product's
+  weather without an XGBoost model fitted to the generator's own output, and every gain here exists
+  only after an XGBoost model is fitted to that generator's output. The single-product
+  recommendations on the solar and wind pages stand.</li>
+</ul>
+<h2 id="limitations">Limitations</h2>
+<ul>
+<li><strong>Region and period.</strong> The study covers 6 solar farms inside one 25 km by 23 km box, and 3 wind
+  farms in flat country, all in Lincolnshire. The solar hours run from December 2022 (from January
+  2021 in the CAMS-with-SARAH-3 section) and the wind hours from August 2024. Nothing here speaks to
+  other regions, to terrain, or to offshore wind.</li>
+<li><strong>The intervals cover weather and fitting seeds, not generators or folds.</strong> The per-generator
+  range and the fold t-interval beside each headline show those two sources separately. With three
+  wind farms, a fourth could rank the blends differently.</li>
+<li><strong>The headline comparisons were written after the first science review.</strong> The review saw the first
+  run's results before asking for the enriched comparisons, so the choice of extras was informed by
+  results, though not by the enriched blends' own results.</li>
+<li><strong>The enriched best single product may not be the best single product possible.</strong> The extras are
+  the ones the solar page found useful. A single product given further columns, such as more
+  neighbouring hours or its neighbouring grid cells, might close part of the gap.</li>
+<li><strong>The linear stack's weights are fitted on out-of-fold predictions from XGBoost models trained on
+  the scored fold's months.</strong> This second-order leak is standard in cross-validated stacking, and
+  would favour the stack, and the XGBoost blend still matches or beats the stack. The interval
+  treats the weights as fixed.</li>
+<li><strong>The weather models and ERA5 are read from Open-Meteo's archive, at the served lead the earlier
+  pages describe; CAMS, SARAH-3, and ICON-DREAM-EU are not.</strong> CAMS is read from the Copernicus
+  Atmosphere Monitoring Service's own radiation service, SARAH-3 from CM SAF's own gridded files,
+  and ICON-DREAM-EU from DWD's own gridded files. UKV's values are its analysis (T+0); ICON-D2's and
+  ICON-EU's are forecasts made 1 to 3 hours before each hour, ICON global's 1 to 6 hours, and
+  ICON-DREAM-EU's the same as ICON-EU; ERA5's come from forecasts 1 to 12 hours old. A blend's gain
+  at the leads a live forecast uses is not measured here.</li>
+<li><strong>The results rest on the <code>effective_capacity</code> table as rebuilt in September 2026, and on version
+  3 of the power Delta table.</strong> A rebuilt capacity table would move every number.</li>
+<li><strong>Open-Meteo's UKV solar archive before 12 August 2024 is a backfill from a source Open-Meteo does
+  not name.</strong> Every set reading UKV, including UKV with ICON-EU, spans that boundary; the wind sets
+  do not, because UKV's hub-height wind on Open-Meteo starts only in August 2024.</li>
+<li><strong>The solar row set drops hours where UKV's archive holds a physically impossible sunrise value,
+  which the solar page's own <a href="../solar/#limitations">Limitations</a> section
+  describes in full.</strong> Every solar figure on this page inherits that row set, 77,616 generator-hours
+  rather than 79,384, except the CAMS-with-SARAH-3 section: its 115,594 generator-hours are the
+  past-solar page's <code>record</code> panel rows, built and filtered separately, and do not read UKV at all.</li>
+</ul>
+<h2 id="reproducing-the-figures">Reproducing the figures</h2>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/beam_diffuse_split/weather_products.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/beam_diffuse_split/wind_products.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/beam_diffuse_split/blend_products.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/beam_diffuse_split/blend_product_charts.py
+</code></pre></div>
+<p>The report lands in <code>data/studies/beam_diffuse_split/blend_products/report.md</code>, beside
+<code>reproduction.md</code>, the per-hour errors and out-of-fold predictions of every XGBoost model, the stack
+weights, and every interval as a table. <code>blend_products.py --resume</code> reuses the fits a crashed run
+left behind. The chart script checks each chart's numbers against the report before drawing.</p>
+<p>The CAMS-with-SARAH-3 section needs the past-solar page's <code>record</code> panel written first, and the
+blending study above run first too, because its report reads <code>blend_products/losses.parquet</code> for
+the reconciliation against that study's own gain, then:</p>
+<div class="highlight"><pre><span></span><code>uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/beam_diffuse_split/weather_products.py<span class="w"> </span>--panel<span class="w"> </span>record
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/beam_diffuse_split/blend_satellites.py
+uv<span class="w"> </span>run<span class="w"> </span>python<span class="w"> </span>studies/beam_diffuse_split/blend_satellites_charts.py
+</code></pre></div>
+<p>The report lands in <code>data/studies/beam_diffuse_split/satellite_blend/report.md</code>, beside
+<code>reproduction.md</code> and <code>losses.parquet</code>. <code>blend_satellites.py --resume</code> reuses the fits a crashed run
+left behind; <code>--fit-missing OLD_OUTPUT_DIR</code> reuses a previous run's published <code>losses.parquet</code>
+(moved to a <code>superseded/</code> subfolder first) for every arm it already holds, fitting only a newly
+added arm; <code>--report-only</code> rebuilds <code>report.md</code> from <code>losses.parquet</code> and <code>reproduction.md</code> already
+on disk.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "../../..", "features": ["content.code.copy"], "search": "../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": null}</script>
+    
+    
+      <script src="../../../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+        <script src="https://unpkg.com/mathjax@3/es5/tex-mml-chtml.js"></script>
+      
+    
+  </body>
+</html>
