@@ -15,6 +15,9 @@ import polars as pl
 STEP_HOURS: Final[int] = 3
 """The spacing of the ensemble table's valid times, in hours, at the leads this module reads."""
 
+MIN_EXTRATERRESTRIAL_W_M2: Final[float] = 1.0
+"""Below this mean extraterrestrial irradiance over a step, the step has no clearness index."""
+
 
 def newest_run_member_means(
     *,
@@ -127,3 +130,100 @@ def interpolate_instants_hourly(
         )
         sites.append(hourly)
     return pl.concat(sites).sort("site", "time")
+
+
+def interpolate_clearness_hourly(
+    *,
+    steps: pl.DataFrame,
+    extraterrestrial_hourly: pl.DataFrame,
+    value_column: str,
+    step_hours: int = STEP_HOURS,
+    min_extraterrestrial_w_m2: float = MIN_EXTRATERRESTRIAL_W_M2,
+) -> pl.DataFrame:
+    """Spread a step-mean irradiance onto hours by interpolating its clearness index.
+
+    `hold_backward_mean_hourly` gives every hour of a step the step's mean, so the series steps
+    sharply at each boundary and ignores the sun's motion within the step. This function divides
+    each step's mean by the mean extraterrestrial irradiance over the step (the clearness index),
+    interpolates the clearness index linearly between step centres, and multiplies each hour's
+    interpolated clearness index by that hour's extraterrestrial irradiance. A step with no
+    daylight has no clearness index, and an hour beside such a step takes its own step's value.
+
+    Args:
+        steps: One row per (site, valid time), carrying `site`, `valid_time` and `value_column`,
+            the mean over the `step_hours` hours ending at `valid_time`.
+        extraterrestrial_hourly: One row per (site, hour label), carrying `site`, `time` and
+            `extraterrestrial_horizontal_w_m2`, for every hour of every step.
+        value_column: The step-mean irradiance column to spread.
+        step_hours: The width of one step, in hours. Must be odd, so a step has a central hour.
+        min_extraterrestrial_w_m2: A step whose mean extraterrestrial irradiance is below this has
+            no clearness index.
+
+    Returns:
+        One row per (site, hour label) named `time`, carrying `value_column`.
+
+    Raises:
+        ValueError: If `step_hours` is even, or an hour of a step has no extraterrestrial value.
+    """
+    if step_hours % 2 == 0:
+        msg = f"step_hours must be odd, got {step_hours}"
+        raise ValueError(msg)
+    centre = (step_hours - 1) // 2
+    hours = (
+        steps.select("site", "valid_time", value_column)
+        .join(pl.DataFrame({"offset_hours": list(range(step_hours))}), how="cross")
+        .with_columns(time=pl.col("valid_time").dt.offset_by(pl.format("-{}h", "offset_hours")))
+        .join(extraterrestrial_hourly, on=["site", "time"], how="left")
+    )
+    if hours["extraterrestrial_horizontal_w_m2"].null_count():
+        msg = "some hours of a step have no extraterrestrial irradiance"
+        raise ValueError(msg)
+    per_step = (
+        hours.group_by("site", "valid_time")
+        .agg(
+            pl.col(value_column).first(),
+            step_extraterrestrial=pl.col("extraterrestrial_horizontal_w_m2").mean(),
+        )
+        .with_columns(
+            clearness=pl.when(pl.col("step_extraterrestrial") >= min_extraterrestrial_w_m2)
+            .then(pl.col(value_column) / pl.col("step_extraterrestrial"))
+            .otherwise(None)
+        )
+    )
+    step_width = f"{step_hours}h"
+    previous = per_step.select(
+        "site",
+        pl.col("valid_time").dt.offset_by(step_width),
+        clearness_previous=pl.col("clearness"),
+    )
+    following = per_step.select(
+        "site",
+        pl.col("valid_time").dt.offset_by(f"-{step_width}"),
+        clearness_next=pl.col("clearness"),
+    )
+    distance = (pl.col("offset_hours") - centre).abs()
+    neighbour = (
+        pl.when(pl.col("offset_hours") > centre)
+        .then(pl.col("clearness_previous"))
+        .otherwise(pl.col("clearness_next"))
+    )
+    interpolated = (
+        hours.drop(value_column)
+        .join(per_step.select("site", "valid_time", "clearness"), on=["site", "valid_time"])
+        .join(previous, on=["site", "valid_time"], how="left")
+        .join(following, on=["site", "valid_time"], how="left")
+        .with_columns(
+            clearness_hour=pl.col("clearness")
+            + (pl.coalesce(neighbour, pl.col("clearness")) - pl.col("clearness"))
+            * distance
+            / step_hours
+        )
+    )
+    return interpolated.select(
+        "site",
+        "time",
+        pl.when(pl.col("clearness_hour").is_null())
+        .then(0.0)
+        .otherwise(pl.col("clearness_hour") * pl.col("extraterrestrial_horizontal_w_m2"))
+        .alias(value_column),
+    ).sort("site", "time")
