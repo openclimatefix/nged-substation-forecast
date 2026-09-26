@@ -15,6 +15,9 @@ no interval on any difference.
   shared features, the rows, the folds, and the two wind designs. `--report-only` rebuilds the tables
   from the saved frames and losses.
 
+Fits run on the CPU. The local ECMWF ENS mean takes its 00:00 UTC valid time from lead 24 of the
+previous day's run, because the 00 UTC run's own leads start at 3 hours.
+
 ## Files written
 
 - `frame_solar.parquet`, `frame_wind.parquet`: every arm's inputs and the power target, one row per

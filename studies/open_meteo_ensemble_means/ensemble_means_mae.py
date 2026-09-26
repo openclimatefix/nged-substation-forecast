@@ -67,9 +67,9 @@ rows on which the values differ. Only anonymised site labels (`A` to `F`, `W1` t
 output; the site roster's coordinates and identifiers stay inside `build_dataset`.
 
 Run it with `uv run python studies/open_meteo_ensemble_means/ensemble_means_mae.py`. It writes to a
-new folder, `data/studies/open_meteo_ensemble_means/`, and refuses to overwrite: a re-run first
-moves the existing files to a `superseded/` subfolder. `--report-only` rebuilds the tables and
-`report.md` from the saved frames and losses.
+new folder, `data/studies/open_meteo_ensemble_means/`, and refuses to overwrite: to re-run, move
+the existing files into a `superseded/` subfolder by hand first. Fits run on the CPU.
+`--report-only` rebuilds the tables and `report.md` from the saved frames and losses.
 """
 
 import argparse
@@ -95,6 +95,8 @@ from studies.stitched_ensemble import (
 )
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
+# The underscore-named helpers below are the roster, power and geometry code the earlier studies
+# use, and reusing them keeps every convention identical. Importing private names is a one-off here.
 from build_dataset import (
     _add_solar_geometry,
     _drop_false_zeros,
@@ -118,7 +120,7 @@ WINDOW_START: Final[datetime] = datetime(2026, 6, 25, tzinfo=UTC)
 """The first hour of the Open-Meteo ensemble-mean archive, and the first day of the first fold."""
 
 OUTPUT_DIR: Final[Path] = STUDIES_DATA_DIR / "open_meteo_ensemble_means"
-"""Where this script writes, apart from a `superseded/` folder for re-runs."""
+"""Where this script writes. A re-run needs the old files moved to `superseded/` by hand."""
 
 ENSEMBLE_MEANS_DIR: Final[Path] = WEATHER_DATA_DIR / "OPEN-METEO-ENSEMBLE-MEANS"
 """One folder per Open-Meteo ensemble-mean product, each holding a parquet named for the folder."""
@@ -133,6 +135,9 @@ OPEN_METEO_PRODUCTS: Final[dict[str, str]] = {
 
 LOCAL_ENS: Final[str] = "ecmwf_ens_local_mean"
 """The arm key of the mean of this repository's own ECMWF ENS members, stitched across runs."""
+
+DESIGNS: Final[tuple[DesignType, ...]] = ("solar", "wind_10m", "wind_hub")
+"""Every design, in the order the report prints them."""
 
 SOLAR_REFERENCE: Final[str] = "cams"
 WIND_REFERENCE: Final[str] = "era5"
@@ -201,6 +206,11 @@ ANONYMITY_FORBIDDEN_COLUMNS: Final[frozenset[str]] = frozenset(
     {"latitude", "longitude", "cell_latitude", "cell_longitude", "time_series_id"}
 )
 """Columns that would identify a generator, which no saved frame may carry."""
+
+
+def _domain_of(*, design: DesignType) -> DomainType:
+    """Return the domain a design belongs to."""
+    return "solar" if design == "solar" else "wind"
 
 
 def _read_extended(*, paths: Sequence[Path], key: Sequence[str]) -> tuple[pl.DataFrame, int]:
@@ -551,13 +561,15 @@ def _check_same_rows(*, losses: pl.DataFrame) -> None:
     Raises:
         ValueError: If two arms' scored rows differ.
     """
-    keys = losses.group_by("arm", "setting").agg(
-        rows=pl.struct("site", "time", "seed").sort_by("site", "time", "seed").hash().sum(),
-        n=pl.len(),
-    )
-    if keys.select("rows", "n").n_unique() != 1:
-        msg = f"arms were scored on different rows:\n{keys}"
-        raise ValueError(msg)
+    scored = {
+        (arm, setting): rows.select("site", "time", "seed").sort("site", "time", "seed")
+        for (arm, setting), rows in losses.group_by("arm", "setting")
+    }
+    (first_key, first), *others = scored.items()
+    for key, rows in others:
+        if not rows.equals(first):
+            msg = f"{key} and {first_key} were scored on different rows"
+            raise ValueError(msg)
 
 
 def _absolute_table(
@@ -838,17 +850,10 @@ def _analyse(
             ),
             "per_site": _per_site_table(losses=design_losses),
         }
-        domain: DomainType = "solar" if design == "solar" else "wind"
-        weather_errors[design] = _weather_error_table(frame=frames[domain], design=design)
+        weather_errors[design] = _weather_error_table(
+            frame=frames[_domain_of(design=design)], design=design
+        )
     return tables, weather_errors
-
-
-def _domain_of(*, design: DesignType) -> DomainType:
-    """Return the domain a design belongs to."""
-    return "solar" if design == "solar" else "wind"
-
-
-DESIGNS: Final[tuple[DesignType, ...]] = ("solar", "wind_10m", "wind_hub")
 
 
 def _paths() -> dict[str, Path]:
@@ -860,36 +865,41 @@ def _paths() -> dict[str, Path]:
     return {name: OUTPUT_DIR / name for name in names}
 
 
-def _write_results(
+def _save_fit(
+    *, frames: dict[DomainType, pl.DataFrame], losses: dict[DesignType, pl.DataFrame]
+) -> None:
+    """Save the frames and the fitted losses, before any analysis can fail and lose them.
+
+    Args:
+        frames: Each domain's rows.
+        losses: Each design's losses.
+    """
+    paths = _paths()
+    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    for domain, frame in frames.items():
+        _check_anonymous(frame=frame)
+        frame.write_parquet(paths[f"frame_{domain}.parquet"])
+    for design, design_losses in losses.items():
+        design_losses.write_parquet(paths[f"losses_{design}.parquet"])
+
+
+def _write_tables_and_report(
     *,
     frames: dict[DomainType, pl.DataFrame],
     funnels: dict[DomainType, list[tuple[str, int]]],
     differing: dict[str, int],
     losses: dict[DesignType, pl.DataFrame],
-    only_report: bool,
 ) -> None:
-    """Write the tables and the report, and the frames and losses unless only the report is wanted.
+    """Write the tables and the report from the frames and losses.
 
     Args:
         frames: Each domain's rows.
         funnels: Each domain's row funnel.
         differing: The overlap rows that differ between an original and its refreshed download.
         losses: Each design's losses.
-        only_report: Whether the frames and losses are already saved.
     """
     paths = _paths()
-    derived = ["report.md", "mae_by_arm.parquet", "mae_by_site.parquet", "weather_error.parquet"]
-    refuse_to_overwrite(paths=[paths[name] for name in (derived if only_report else paths)])
     tables, weather_errors = _analyse(frames=frames, losses=losses)
-    OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    if not only_report:
-        facts = {"funnels": funnels, "differing": differing}
-        paths["run_facts.json"].write_text(json.dumps(facts, indent=2))
-        for domain, frame in frames.items():
-            _check_anonymous(frame=frame)
-            frame.write_parquet(paths[f"frame_{domain}.parquet"])
-        for design, design_losses in losses.items():
-            design_losses.write_parquet(paths[f"losses_{design}.parquet"])
     pl.concat([tables[design]["absolute"] for design in DESIGNS]).write_parquet(
         paths["mae_by_arm.parquet"]
     )
@@ -949,25 +959,37 @@ def main() -> int:
         facts = json.loads(paths["run_facts.json"].read_text())
         funnels: dict[DomainType, list[tuple[str, int]]] = facts["funnels"]
         differing: dict[str, int] = facts["differing"]
-        _write_results(
-            frames=frames, funnels=funnels, differing=differing, losses=saved, only_report=True
+        refuse_to_overwrite(
+            paths=[
+                paths[name]
+                for name in (
+                    "report.md",
+                    "mae_by_arm.parquet",
+                    "mae_by_site.parquet",
+                    "weather_error.parquet",
+                )
+            ]
         )
+        _write_tables_and_report(frames=frames, funnels=funnels, differing=differing, losses=saved)
         return 0
     refuse_to_overwrite(paths=paths.values())
     solar, solar_funnel, solar_differing = build_solar_frame()
     wind, wind_funnel, wind_differing = build_wind_frame()
     built: dict[DomainType, pl.DataFrame] = {"solar": solar, "wind": wind}
+    for frame in built.values():
+        _check_anonymous(frame=frame)
+    fitted = _fit(frames=built)
+    _save_fit(frames=built, losses=fitted)
     built_funnels: dict[DomainType, list[tuple[str, int]]] = {
         "solar": solar_funnel,
         "wind": wind_funnel,
     }
-    _write_results(
-        frames=built,
-        funnels=built_funnels,
-        differing=solar_differing | wind_differing,
-        losses=_fit(frames=built),
-        only_report=False,
+    differing = solar_differing | wind_differing
+    _write_tables_and_report(
+        frames=built, funnels=built_funnels, differing=differing, losses=fitted
     )
+    facts = {"funnels": built_funnels, "differing": differing}
+    paths["run_facts.json"].write_text(json.dumps(facts, indent=2))
     return 0
 
 
