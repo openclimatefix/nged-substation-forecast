@@ -682,8 +682,8 @@ or on adding nothing a product already on this page carries:**
 - **The National Solar Radiation Database (NSRDB), Meteosat Prime Meridian** — covers Europe, but
   ends in 2022 ([NSRDB](https://developer.nlr.gov/docs/solar/nsrdb/nsrdb-msg-v1-0-0-download/)).
 - **Met Office IMPROVER Blended Probabilistic Forecast on AWS** — a calibrated blend of percentiles
-  and probabilities, with total and low cloud but no irradiance, and wind at 10 m only. It holds no
-  raw MOGREPS-UK members, and the bucket keeps 30 days
+  and probabilities, with total and low cloud but no irradiance, and wind at 10 m only, in the UK
+  gridded buckets. The BPF holds no raw MOGREPS-UK members, and the buckets keep 30 days
   ([details](../roadmap/data-sources.md#what-we-learnt-about-met-office-improver-on-2026-09-26)).
 - **Open-Meteo Ensemble API as a history source** — values at Lincoln reach only 3 to 4 days back,
   and less than a day for the ECMWF 9 km Europe ensemble, although the API accepts dates 92 days
