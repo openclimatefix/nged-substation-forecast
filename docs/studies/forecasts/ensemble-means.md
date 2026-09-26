@@ -34,7 +34,7 @@ at 10 m](../assets/ensemble_means_mae.svg)
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
-> AI model (for this page, Claude Sonnet 5). A Claude Sonnet review of the script and a Claude
+> AI model (for this page, Claude Sonnet 5). A Claude Sonnet review of each script and a Claude
 > Sonnet review of the pull request have run. No Opus scientific-validity review has run, and no
 > human has reviewed the page.
 
@@ -147,7 +147,150 @@ seeds moved each error by less than 0.04 points, so gaps smaller than that are n
 **The local ECMWF ENS series scores worse than Open-Meteo's ECMWF ENS mean.** The gap is 1.2 points
 for solar, 0.2 for wind at 10 m, and 0.3 for wind at 100 m. The two series come from the same
 ensemble on different grids and with different stitching and interpolation, so the gap may reflect
-the pipeline. The study did not isolate the cause.
+the pipeline. [The next section](#why-the-local-ecmwf-ens-series-scores-worse-than-open-meteos)
+tests some of the candidate causes.
+
+## Why the local ECMWF ENS series scores worse than Open-Meteo's
+
+**Holding each 3-hour irradiance value flat over its step accounts for about two-thirds of the solar
+gap, and the rest is consistent with the local series having older runs.** The tests are
+descriptive: each is one 88-day summer, at the first hyperparameter setting, with no interval. The
+solar gap is 1.21 points of capacity between the local series (8.89%) and Open-Meteo's ECMWF ENS
+mean (7.68%). Interpolating the local irradiance through the clearness index (the ratio of
+irradiance to the irradiance at the top of the atmosphere) gave 8.08%, so the gap fell to 0.40
+points. Against CAMS's irradiance, the hourly mean absolute error of the local series fell from 86
+to 59 W/m², beside 54 W/m² for Open-Meteo's mean. Averaged over the local series' own 3-hour
+windows, the two series differ by 4 W/m² (53 and 49 W/m²), so the hold changes the hourly values and
+leaves the 3-hour means alone. The interpolation does not conserve the 3-hour means: the
+interpolated series departs from the held one by 6 to 11 W/m² on average over the windows of each
+step, and by 1 to 7 W/m² on signed average. Open-Meteo's own method of spreading 3-hour steps onto
+hours is not documented in the sources this study read, so the interpolation is one plausible
+method and not a copy of Open-Meteo's.
+
+| Design | Open-Meteo ECMWF ENS mean | Local, held over each step | Local, clearness index interpolated | Local, from a run about a day older |
+|---|---|---|---|---|
+| Solar | 7.68 | 8.89 | 8.08 | 9.74 |
+| Wind 10 m | 5.79 | 6.00 | not built | 6.89 |
+| Wind 100 m and 10 m | 5.71 | 6.00 | not built | 6.82 |
+
+**A run about a day older raised the local error by 0.8 to 0.9 points in every design, which
+bounds what a difference in run age can explain.** The local series comes from one 00:00 UTC run a
+day, so its leads run from 3 to 24 hours (mean 14 hours). The day-old series takes the newest run at
+least 27 hours ahead, so its leads run from 27 to 48 hours (mean 38 hours), and the script checks
+that every step inside the scored window has a run exactly 24 hours older than the stored series'
+run. The rise per hour of run age is therefore about 0.04 points, if the error grows in a straight
+line, which the study did not test. Open-Meteo's ECMWF ENS product starts a run every 6 hours (the
+[Ensemble API](https://open-meteo.com/en/docs/ensemble-api) page), and the [Historical Forecast
+API](https://open-meteo.com/en/docs/historical-forecast-api) page says each run's first few hours
+are stitched into one series. If the ensemble-mean archive follows the same rule, Open-Meteo's leads
+are about 0 to 6 hours, and a lead 8 to 11 hours shorter than the local series' would account for
+0.3 to 0.4 points, which is the solar gap left after the interpolation. The page does not verify
+either assumption, because the ensemble-mean series carries no run time.
+
+**The gap between the two series changes with the hour of the day in a way that fits a lead
+effect for wind and an irradiance effect for solar.** For wind at 10 m, the local series scored
+better than Open-Meteo's mean in the two steps with the shortest local leads (0.28 and 0.08 points
+better at steps ending 03:00 and 06:00 UTC, with mean leads of 4 and 7 hours) and worse in the six
+other steps, by 0.17 to 0.57 points. Hub-height wind shows the same pattern. The hourly labels of
+the 03:00 step lie between two runs, because linear interpolation joins the last step of the
+previous day's run to the first of the new run. For solar, the gap is largest at midday, where the
+irradiance is largest, and not at the longest lead.
+
+| Step ending (UTC) | Mean local lead (hours) | Solar: local minus Open-Meteo, held | Solar: local minus Open-Meteo, interpolated | Wind 10 m: local minus Open-Meteo |
+|---|---|---|---|---|
+| 03:00 | 3.7 | no sunlit hours | no sunlit hours | -0.28 |
+| 06:00 | 6.7 | -0.04 | 0.01 | -0.08 |
+| 09:00 | 9.7 | 1.19 | 0.23 | 0.30 |
+| 12:00 | 12.7 | 1.94 | 0.64 | 0.17 |
+| 15:00 | 15.7 | 1.70 | 0.71 | 0.39 |
+| 18:00 | 18.7 | 0.84 | 0.32 | 0.57 |
+| 21:00 | 21.7 | -0.06 | -0.09 | 0.18 |
+| 00:00 | 24.2 | no sunlit hours | no sunlit hours | 0.39 |
+
+**The study did not test the grid or the member count, so a share of the remaining gap has no
+tested cause.** The local table averages the 0.25 degree grid points that overlap each H3
+resolution-5 hexagon (weighted by overlap area), and derives wind speed from the averaged east and
+north components. Open-Meteo's source code and documentation, as read for this study, do not say how
+its 0.25 degree product picks a grid point for a location. The local mean is over 51 members, and
+the study did not count the members behind Open-Meteo's ECMWF ENS mean.
+
+## Whether ICON-D2-EPS's lead comes from updating more often
+
+**ICON-D2's advantage over ECMWF is a short-lead advantage, but the data cannot show how much of
+ICON-D2-EPS's 0.3-point solar lead over ECMWF ENS comes from its more frequent runs.** Open-Meteo
+starts an ICON-D2-EPS run every 3 hours and an ECMWF ENS run every 6 hours, so under the
+first-few-hours rule above, the ICON-D2-EPS mean's leads would average about 1.5 hours and the ECMWF
+ENS mean's about 3 hours. At the run-age slope of the ECMWF-based series (about 0.04 points an
+hour), 1.5 hours is 0.05 points. The slope for ICON-D2 itself is steeper (see the table below), and
+at that slope 1.5 hours is at most 0.13 points. Both estimates are smaller than the 0.32-point
+difference, on assumptions the page could not check.
+
+| Deterministic model | Solar, freshest run | Solar, run 24 hours older | Wind 10 m, freshest run | Wind 10 m, run 24 hours older |
+|---|---|---|---|---|
+| ICON-D2 | 7.85 | 9.89 | 5.97 | 7.39 |
+| ECMWF IFS 0.25 degree | 7.93 | 8.89 | 6.01 | 6.77 |
+| ICON-EU | 8.29 | 9.35 | 6.56 | 7.81 |
+| UKV | 8.77 | 10.54 | 5.94 | 7.68 |
+
+**With the freshest run, ICON-D2 led ECMWF IFS by 0.08 points for solar and 0.04 points for wind at
+10 m, and with the run 24 hours older, ECMWF IFS led ICON-D2 by 1.0 and 0.6 points.** At hub height
+the same swap holds: ICON-D2 led by 0.56 points with the freshest run and trailed by 0.12 points
+with the older run. ICON-D2 is therefore the most sensitive to run age of the four models (solar
+error rose 2.0 points from the freshest to the older run, against 1.0 for ECMWF IFS), so a run-age
+difference between the products would favour ICON-D2-EPS. The deterministic gap at the freshest run
+(0.08 points) is smaller than the ensemble-mean gap (0.32 points), which leaves a difference that
+the ensemble averaging of ICON-D2-EPS's 20 members could produce, and this study did not test that
+explanation. The four deterministic series are single runs, so their errors differ from those of the
+ensemble means for reasons besides run age.
+
+**Each Open-Meteo ensemble mean sits much closer to its deterministic model's freshest run than to
+the run 24 hours older, which points to short leads but is not a clean reading of run age.** The
+mean absolute distance of ECMWF ENS's mean from the IFS freshest run was 0.87 km/h for 10 m wind
+speed, against 1.74 km/h from the older run. For the local series the distances were 1.91 and 1.94
+km/h. For irradiance the local series is 67 W/m² from the IFS freshest run, because of the hold. The
+comparison mixes a mean of members with a single member and, for the local series, leads of 3 to 24
+hours, which straddle the older run's 24-hour offset. Open-Meteo's leads therefore look shorter than
+the local series', and the distances do not put a number on them.
+
+## What Open-Meteo's source code does for the MOGREPS-UK mean
+
+**In the Open-Meteo source code read for this study, the MOGREPS-UK ensemble mean is an unweighted
+mean over the 3 members of one hourly run, and no code combines members of different runs.** The
+Met Office's 18-member MOGREPS-UK ensemble is six hourly runs of 3 members lagged together
+([Porson et al. (2020)](https://doi.org/10.1002/qj.3844)). The evidence below is from the
+`open-meteo/open-meteo` repository at commit `cc3f4e5e956b39a56ab182faeccfd3d936ae6b4c` (committed
+on 2026-09-23), read from a shallow clone.
+
+- `Sources/App/UKMO/UkmoDomain.swift` gives `uk_ensemble_2km` 3 members
+  (`countEnsembleMember`), an hourly update interval, and a run delay of about 4 hours.
+- `Sources/App/UKMO/UkmoDownloader.swift` downloads one run at a time and, for each forecast step of
+  that run, writes each member of the run's file into a step writer that carries an
+  ensemble-mean calculator.
+- `Sources/App/Helper/OmSpatialTimestepWriter.swift` creates one `EnsembleMeanCalculator` per run
+  and forecast step, so a calculator never receives another run's members.
+- `Sources/App/Helper/OmWriter/EnsembleMeanCalculator.swift` keeps a running mean and a sample
+  standard deviation (divisor n - 1) with equal weight for every member it receives.
+- `Sources/App/Helper/OmFileSplitter.swift` (`updateFromTimeOrientedStreaming3D`) merges each new
+  run into the stored series by overwriting every stored value with the new run's value wherever the
+  new value is not NaN, so each valid time keeps the newest run written for it.
+- `Sources/App/Controllers/ForecastapiController.swift` serves `ukmo_uk_ensemble_mean_2km` from the
+  single domain `uk_ensemble_mean_2km`, with no mixing across domains.
+- A search of every `.swift` file in `Sources` for "lag" and "time-lag" found no match.
+
+**These points are not verified.** The page did not call the API, so it did not check that served
+values equal a 3-member mean. The code was read as of 2026-09-23 and the archive covers 2026-06-25
+onwards, so earlier releases of the code may have behaved differently. The page did not read the
+NetCDF files Open-Meteo downloads from the Met Office, so it did not check that each file holds
+only 3 members. The finding does not show what Open-Meteo intends. It shows that the source code
+has no weighting or lagging.
+
+**A 3-member mean is a smaller ensemble than the MOGREPS-UK product name suggests, and it can be
+noisier than a mean over 18 lagged members.** The MOGREPS-UK mean scored 8.69% for solar, behind
+every other ensemble mean here except the local ECMWF ENS series, and 0.08 points better than UKV's
+freshest deterministic run (8.77%). The result is consistent with a mean of 3 members adding little
+to a single run, but it does not show that, because the products differ in more than member count.
+[The roadmap](../../roadmap/data-sources.md#what-we-learnt-about-mogreps-uk-on-2026-09-26) records
+why members of lagged runs need weights and run ages.
 
 ## Limitations
 
@@ -199,9 +342,12 @@ and `W1` to `W3`. The code is in `studies/open_meteo_ensemble_means/` and
 uv run python studies/open_meteo_ensemble_means/ensemble_means_mae.py
 uv run python studies/open_meteo_ensemble_means/ensemble_means_chart.py
 npx svgo@4 --multipass --precision=1 --final-newline docs/studies/assets/ensemble_means_mae.svg
+uv run python studies/open_meteo_ensemble_means/local_ens_gap.py
 ```
 
 The first command writes the tables and `report.md` under `data/studies/open_meteo_ensemble_means/`
 and takes about 15 minutes on the CPU. The script refuses to overwrite, so move the existing files
 to
-a `superseded/` subfolder first. `--report-only` rebuilds the tables from the saved losses.
+a `superseded/` subfolder first. `--report-only` rebuilds the tables from the saved losses. The last
+command writes the tables of the two new sections to `data/studies/open_meteo_ens_gap/`, reads the
+saved frames of the first command, and takes about 8 minutes on the CPU.
