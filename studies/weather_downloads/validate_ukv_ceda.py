@@ -111,9 +111,9 @@ NAN_ALLOWED: Final[frozenset[str]] = frozenset(
         "geopotential_height_925hpa",
     }
 )
-"""Variables whose cells may be NaN at a served lead: a bitmap masks below-ground pressure levels
-cells with no cloud (cloud base is NaN under a clear sky), and cells with no convective cloud, so the layout check only demands that the unserved leads are
-entirely NaN."""
+"""Variables whose cells may be NaN at a served lead: a bitmap masks below-ground pressure levels,
+cells with no cloud (cloud base is NaN under a clear sky), and cells with no convective cloud. The
+layout check only demands that these variables are entirely NaN at the unserved leads."""
 
 NIGHT_MEAN_MAX_W_M2: Final[float] = 2.0
 NIGHT_HOUR_UTC: Final[int] = 0
