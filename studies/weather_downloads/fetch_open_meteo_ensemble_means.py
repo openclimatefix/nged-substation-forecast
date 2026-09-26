@@ -39,6 +39,8 @@ import json
 import logging
 import sys
 import time
+import urllib.error
+import urllib.request
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from math import ceil
@@ -88,6 +90,9 @@ WINDOW_DAYS: Final[int] = 14
 FIRST_DATE: Final[date] = date(2026, 6, 25)
 """The first date every product serves, measured on 2026-09-26 by `--probe-first-date`."""
 
+NO_DATA_HTTP_CODES: Final[frozenset[int]] = frozenset({400, 404})
+"""The HTTP codes the API answers for a date it holds no data for."""
+MAX_ATTEMPTS: Final[int] = 5
 REQUEST_SLEEP_SECONDS: Final[float] = 1.0
 CACHE_DIR_NAME: Final[str] = "_chunks"
 
@@ -177,6 +182,10 @@ def _check_block(*, block: dict[str, Any], position: int, n_blocks: int) -> None
         msg = f"response block {position} is out of order or has no location_id"
         raise RuntimeError(msg)
     units = block["hourly_units"]
+    missing = [name for name in SERIES if name not in units or name not in block["hourly"]]
+    if missing:
+        msg = f"response block {position} lacks the series {missing}"
+        raise RuntimeError(msg)
     for name in SERIES:
         unit = units[name]
         if unit == "undefined":
@@ -287,16 +296,16 @@ def _fetch_product(
         max_windows: How many missing windows to fetch, or `None` for all.
 
     Returns:
-        Whether the combined file was written.
-
-    Raises:
-        FileExistsError: If the combined file already exists, because it is never overwritten.
+        Whether the combined file was written by this call. An existing combined file is never
+        overwritten: it is skipped, and only a missing `lineage.json` is written again from it.
     """
     product_dir = OUTPUT_ROOT / product.output_dir
     combined = _combined_path(product=product)
     if combined.exists():
-        msg = f"{combined.name} already exists and is never overwritten"
-        raise FileExistsError(msg)
+        _LOG.info("%s: %s already exists, skipping", product.output_dir, combined.name)
+        if not (product_dir / "lineage.json").exists():
+            _write_docs_from_combined(product=product, combined=combined, sites=sites)
+        return False
     cache = product_dir / CACHE_DIR_NAME
     cache.mkdir(parents=True, exist_ok=True)
     fetched = 0
@@ -317,8 +326,22 @@ def _fetch_product(
         return False
     frame = pl.concat(pl.read_parquet(path) for path in paths).sort("site", "time")
     _write_atomically(frame=frame, path=combined)
-    _write_docs(product=product, frame=frame, sites=sites, first=FIRST_DATE, last=last)
+    _write_docs_from_combined(product=product, combined=combined, sites=sites)
     return True
+
+
+def _write_docs_from_combined(
+    *, product: EnsembleMeanProduct, combined: Path, sites: pl.DataFrame
+) -> None:
+    """Write the docs from the combined file on disk, so a failed docs step can be retried."""
+    frame = pl.read_parquet(combined)
+    _write_docs(
+        product=product,
+        frame=frame,
+        sites=sites,
+        first=frame.select(pl.col("time").dt.date().min()).item(),
+        last=frame.select(pl.col("time").dt.date().max()).item(),
+    )
 
 
 def _column_description(*, name: str) -> str:
@@ -400,6 +423,11 @@ def _write_docs(
             ),
             "**Wind speeds are in km/h**, as in the other Open-Meteo files, not m/s.",
             (
+                "**The ensemble mean of `wind_direction_100m` is a naive average of the member "
+                "directions**, so it is wrong near north, where 350 and 10 degrees average to "
+                "180, and its spread is not a circular spread."
+            ),
+            (
                 "**`_spread` is a standard deviation across members**, in the unit of the "
                 "variable, not a range."
             ),
@@ -416,11 +444,12 @@ def _probe_first_date() -> None:
 
     Bisects between 2020-01-01 and 8 days ago on one-day, one-variable, one-location requests,
     which is about 13 calls per product. The probe location is a public one (52.0, -1.0), never a
-    study site. Assumes the archive has no gaps after its first day.
-    """
-    import urllib.error
-    import urllib.request
+    study site. Assumes the archive has no gaps after its first day. Only HTTP 400 and 404 count
+    as "no data"; any other failure is retried with backoff and then raised.
 
+    Raises:
+        RuntimeError: If the newest probed day has no data, so the bisection has no valid bound.
+    """
     key = _require_api_key()
 
     def _hours(*, models: str, day: date) -> int:
@@ -428,14 +457,29 @@ def _probe_first_date() -> None:
             f"{ENSEMBLE_URL}?latitude=52.0&longitude=-1.0&hourly=temperature_2m&models={models}"
             f"&start_date={day}&end_date={day}&apikey={key}"
         )
-        try:
-            body = json.load(urllib.request.urlopen(url, timeout=60.0))
-        except urllib.error.HTTPError:
-            return 0
-        return sum(value is not None for value in body["hourly"]["temperature_2m"])
+        for attempt in range(MAX_ATTEMPTS):
+            try:
+                with urllib.request.urlopen(url, timeout=60.0) as response:
+                    body = json.load(response)
+            except urllib.error.HTTPError as refusal:
+                if refusal.code in NO_DATA_HTTP_CODES:
+                    return 0
+                if refusal.code < 500 and refusal.code != 429:
+                    msg = f"probe refused with HTTP {refusal.code}"
+                    raise RuntimeError(msg) from None
+            except urllib.error.URLError, TimeoutError, ConnectionError:
+                pass
+            else:
+                return sum(value is not None for value in body["hourly"]["temperature_2m"])
+            time.sleep(5.0 * (attempt + 1))
+        msg = f"probe failed after {MAX_ATTEMPTS} attempts"
+        raise RuntimeError(msg)
 
     for product in PRODUCTS.values():
         low, high = date(2020, 1, 1), datetime.now(UTC).date() - timedelta(days=8)
+        if _hours(models=product.models_parameter, day=high) < 20:
+            msg = f"{product.models_parameter} has no data on {high}"
+            raise RuntimeError(msg)
         while (high - low).days > 1:
             middle = low + (high - low) // 2
             if _hours(models=product.models_parameter, day=middle) >= 20:

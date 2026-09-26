@@ -11,11 +11,12 @@ Run it with `uv run python studies/weather_downloads/validate_open_meteo_ensembl
 
 import logging
 import sys
-from datetime import timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Final
 
 import polars as pl
 from fetch_open_meteo_ensemble_means import (
+    FIRST_DATE,
     PRODUCTS,
     SERIES,
     EnsembleMeanProduct,
@@ -41,17 +42,70 @@ RANGES: Final[dict[str, tuple[float, float]]] = {
 """Physical bounds of each mean. A value outside them is a fault, not an extreme."""
 
 
-def validate_frame(*, frame: pl.DataFrame, product: EnsembleMeanProduct) -> list[str]:
+def _window_failures(
+    *, frame: pl.DataFrame, expected_window: tuple[date, date] | None
+) -> list[str]:
+    """Return the failures of the shared-bounds and expected-window checks."""
+    bounds = frame.group_by("site").agg(
+        pl.col("time").min().alias("first"), pl.col("time").max().alias("last")
+    )
+    if bounds["first"].n_unique() != 1 or bounds["last"].n_unique() != 1:
+        return ["sites do not share the same first and last time"]
+    if expected_window is None:
+        return []
+    first = datetime.combine(expected_window[0], time(0))
+    last = datetime.combine(expected_window[1], time(23))
+    if (bounds["first"][0], bounds["last"][0]) != (first, last):
+        return [f"time range is not {first}..{last}"]
+    return []
+
+
+def warn_on_shared_series(*, frame: pl.DataFrame, product: EnsembleMeanProduct) -> list[str]:
+    """Return one sentence per constant or cross-site duplicated series. Warnings, not failures.
+
+    Two sites in one grid cell legitimately share a series, and a coarse product can be constant
+    over a short window, so neither is a failure.
+
+    Args:
+        frame: One product's combined frame.
+        product: The product, whose `always_null` series are skipped.
+
+    Returns:
+        The warnings, none of which contains a coordinate.
+    """
+    warnings = []
+    for name in SERIES:
+        if name in product.always_null:
+            continue
+        wide = frame.pivot(on="site", index="time", values=name).sort("time").drop("time")
+        constant = [site for site in wide.columns if wide[site].n_unique() <= 1]
+        if constant:
+            warnings.append(f"{name} is constant at sites {sorted(constant)}")
+        sites = wide.columns
+        warnings.extend(
+            f"{name} is identical at sites {first} and {second}"
+            for position, first in enumerate(sites)
+            for second in sites[position + 1 :]
+            if wide[first].equals(wide[second])
+        )
+    return warnings
+
+
+def validate_frame(
+    *, frame: pl.DataFrame, product: EnsembleMeanProduct, expected_window: tuple[date, date] | None
+) -> list[str]:
     """Return one sentence per failed check, empty if the frame passes.
 
     Args:
         frame: One product's combined frame, with `site`, `time`, and every entry of `SERIES`.
         product: The product the frame belongs to, for its `always_null` series.
+        expected_window: The first and last date the frame must cover (24 hours on each), or
+            `None` to check only that every site shares one first and last time.
 
     Returns:
         The failures, none of which contains a coordinate.
     """
-    failures = []
+    failures = _window_failures(frame=frame, expected_window=expected_window)
     sites = set(frame["site"].unique())
     if sites != EXPECTED_SITES:
         failures.append(f"site labels are {sorted(sites)}, expected {sorted(EXPECTED_SITES)}")
@@ -93,12 +147,15 @@ def main() -> int:
             _LOG.info("SKIP %s: %s not written yet", product.output_dir, path.name)
             continue
         frame = pl.read_parquet(path)
-        failures = validate_frame(frame=frame, product=product)
+        expected_window = (FIRST_DATE, frame.select(pl.col("time").dt.date().max()).item())
+        failures = validate_frame(frame=frame, product=product, expected_window=expected_window)
         _LOG.info(
             "%s %s (%d rows)", "FAIL" if failures else "PASS", product.output_dir, frame.height
         )
         for failure in failures:
             _LOG.info("  %s", failure)
+        for warning in warn_on_shared_series(frame=frame, product=product):
+            _LOG.info("  WARN %s", warning)
         nulls = {name: round(frame[name].null_count() / frame.height, 3) for name in SERIES}
         _LOG.info("  null fractions: %s", nulls)
         failed = failed or bool(failures)
