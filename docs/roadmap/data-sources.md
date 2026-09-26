@@ -374,30 +374,30 @@ window being part-deleted rather than whole.
 partial.** The anonymous bucket `met-office-uk-ensemble-model-data` holds 24 runs a day, one every
 hour, under prefixes of the form `uk-ensemble/YYYY/MM/DD/THHMMZ/`. Each run reaches 126 hours and
 has 3 members, and the realisation IDs of those members differ from run to run. One file holds a
-single variable at a single lead time for all 3 members. A run has about 3,744 such files, and the
-Great Britain crop of a run takes 14,330 files or about 258 GB uncropped in total. Objects expire
-one by one (the `x-amz-expiration` header gives each object's date), which is why the oldest run
-is part-deleted rather than whole.
+single variable at a single lead time for all 3 members. An uncropped run has 14,330 such files and
+about 258 GB in total, of which the archive's chosen fields are 3,744 files. Objects expire one by
+one (the `x-amz-expiration` header gives each object's date), which is why the oldest runs are
+already partial.
 
 **Shortwave has 126 hourly steps and looks instantaneous.** Shortwave has no step 0, no
-`cell_methods`, and no time bounds, and its `time` equals the valid time. It therefore looks like an
-instantaneous value, unlike DWD's shortwave, which averages since the initialisation time. Cloud and
-height-level fields have 127 hourly steps, and 2 m temperature and 10 m wind have 15-minute steps to
-11.75 hours and hourly steps after that (163 steps). The 100 m wind field is on 33 height levels.
-The grid is 970 by 1042 points in a Lambert azimuthal equal-area projection.
+`cell_methods`, and no time bounds, and its `time` equals the valid time. Shortwave therefore looks
+like an instantaneous value, unlike DWD's shortwave, which averages since the initialisation time.
+Cloud and height-level fields have 127 hourly steps, and screen-level temperature and 10 m wind have
+15-minute steps to 11.75 hours and hourly steps after that (163 steps). The 100 m wind field is on
+33 height levels. The grid is 970 by 1042 points in a Lambert azimuthal equal-area projection.
 
-**Recording one full run cropped to Great Britain takes 29 minutes and stores 1.06 GB.** The run took
-5.5 GB of downloads and 54,282 requests with 8 threads. At one run an hour, that is about 25 GB a
-day and 9 TB a year. About 40,000 of the requests fetch the 100 m wind files. Those files gain
-nothing from extra threads, because the `h5py` library holds a global lock, whereas 4 processes gave
-about 4 times the throughput.
+**Recording one full run cropped to Great Britain takes 29 minutes and stores 1.06 GB.** The run
+took 5.5 GB of downloads and 54,282 requests with 8 threads. At one run an hour, the archive grows
+by about 25 GB a day and 9 TB a year. About 40,000 of the requests fetch the 100 m wind files. Those
+files gain nothing from extra threads, because the `h5py` library holds a global lock, whereas 4
+processes gave about 4 times the throughput.
 
 **Open-Meteo holds the individual members for about 3.5 days and the ensemble mean and spread for
 about 93 days.** We probed one Great Britain point on 2026-09-26. The [ensemble
 API](https://open-meteo.com/en/docs/ensemble-api) serves the 3 members as `ukmo_uk_ensemble_2km`,
 hourly to 126 hours. Runs 1 to 3 days back were complete, 4 days back were half complete, and 5 or
-more days back were empty. The historical-forecast and previous-runs APIs accept the model but return
-only nulls, so Open-Meteo keeps no per-run history. The [ensemble mean
+more days back were empty. The historical-forecast and previous-runs APIs accept the model but
+return only nulls, so Open-Meteo keeps no per-run history. The [ensemble mean
 API](https://open-meteo.com/en/docs/ensemble-mean-api) serves the mean as
 `ukmo_uk_ensemble_mean_2km`, with spread as variables carrying a `_spread` suffix (a `_mean` suffix
 is an error). The mean series starts on 2026-06-25, and we could not tell whether that start is a
@@ -407,8 +407,8 @@ rather than held per run, and its `previous_dayN` variables are null. The mean c
 and `cloud_cover`, and `wind_speed_100m` is all null. The spread is null for `diffuse_radiation` and
 `wind_speed_100m`. The DWD ensemble mean `dwd_icon_d2_eps_ensemble_mean` carries 100 m wind and
 `dwd_icon_eu_eps_ensemble_mean` does not, and we did not probe how far back either goes. The
-deterministic UKV has stitched history on Open-Meteo from about 2022 to 2023, and its `previous_day1`
-variables start only in about 2025.
+deterministic UKV has stitched history on Open-Meteo from about 2022 to 2023, and its
+`previous_day1` variables start only in about 2025.
 
 **The only per-run, per-member MOGREPS-UK history we found is the archive that a recorder would
 build, tracked in issue #926.** The 30-day window on AWS adds whatever runs still survive. A study
