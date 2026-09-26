@@ -302,6 +302,10 @@ to a single run, but it does not show that, because the products differ in more 
 [The roadmap](../../roadmap/data-sources.md#what-we-learnt-about-mogreps-uk-on-2026-09-26) records
 why members of lagged runs need weights and run ages.
 
+The Met Office's calibrated IMPROVER blend of MOGREPS-UK holds no raw members, so the blend cannot
+stand in for MOGREPS-UK members
+([details](../../roadmap/data-sources.md#what-we-learnt-about-met-office-improver-on-2026-09-26)).
+
 ## Limitations
 
 **The window is short and holds one summer.** The 88 days give 12 held-out weeks. The window does
