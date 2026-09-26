@@ -4,6 +4,7 @@ import polars as pl
 import pytest
 from studies.stitched_ensemble import (
     hold_backward_mean_hourly,
+    interpolate_clearness_hourly,
     interpolate_instants_hourly,
     newest_run_member_means,
 )
@@ -164,3 +165,119 @@ def test_interpolation_across_a_gap_shorter_than_a_step_raises():
 
     with pytest.raises(ValueError, match="3 hours"):
         interpolate_instants_hourly(steps=steps, value_columns=["value"])
+
+
+def _hourly_extraterrestrial(*, first: datetime, values: list[float]) -> pl.DataFrame:
+    return pl.DataFrame(
+        {
+            "site": "A",
+            "time": [first + timedelta(hours=hour) for hour in range(len(values))],
+            "extraterrestrial_horizontal_w_m2": values,
+        }
+    )
+
+
+def test_clearness_interpolation_ramps_between_two_steps_and_keeps_the_sun_shape():
+    extraterrestrial = _hourly_extraterrestrial(
+        first=DAY + timedelta(hours=1), values=[100.0, 100.0, 100.0, 200.0, 200.0, 200.0]
+    )
+    steps = pl.DataFrame(
+        {
+            "site": "A",
+            "valid_time": [DAY + timedelta(hours=3), DAY + timedelta(hours=6)],
+            "ghi": [50.0, 200.0],
+        }
+    )
+
+    hourly = interpolate_clearness_hourly(
+        steps=steps, extraterrestrial_hourly=extraterrestrial, value_column="ghi"
+    )
+
+    assert hourly["ghi"].to_list() == pytest.approx(
+        [50.0, 50.0, 100.0 * (0.5 + 0.5 / 3), 200.0 * (1.0 - 0.5 / 3), 200.0, 200.0]
+    )
+
+
+def test_a_step_with_no_daylight_gives_zero_and_leaves_its_neighbour_unblended():
+    extraterrestrial = _hourly_extraterrestrial(
+        first=DAY + timedelta(hours=1), values=[0.0, 0.0, 0.0, 100.0, 100.0, 100.0]
+    )
+    steps = pl.DataFrame(
+        {
+            "site": "A",
+            "valid_time": [DAY + timedelta(hours=3), DAY + timedelta(hours=6)],
+            "ghi": [0.0, 80.0],
+        }
+    )
+
+    hourly = interpolate_clearness_hourly(
+        steps=steps, extraterrestrial_hourly=extraterrestrial, value_column="ghi"
+    )
+
+    assert hourly["ghi"].to_list() == pytest.approx([0.0, 0.0, 0.0, 80.0, 80.0, 80.0])
+
+
+def test_an_hour_with_no_extraterrestrial_value_raises():
+    extraterrestrial = _hourly_extraterrestrial(first=DAY + timedelta(hours=1), values=[1.0, 1.0])
+    steps = pl.DataFrame({"site": "A", "valid_time": [DAY + timedelta(hours=3)], "ghi": [1.0]})
+
+    with pytest.raises(ValueError, match="no extraterrestrial"):
+        interpolate_clearness_hourly(
+            steps=steps, extraterrestrial_hourly=extraterrestrial, value_column="ghi"
+        )
+
+
+def test_a_partly_lit_step_keeps_its_clearness_and_zeroes_the_dark_hours():
+    extraterrestrial = _hourly_extraterrestrial(
+        first=DAY + timedelta(hours=1), values=[0.0, 0.0, 100.0]
+    )
+    steps = pl.DataFrame({"site": "A", "valid_time": [DAY + timedelta(hours=3)], "ghi": [30.0]})
+
+    hourly = interpolate_clearness_hourly(
+        steps=steps, extraterrestrial_hourly=extraterrestrial, value_column="ghi"
+    )
+
+    assert hourly["ghi"].to_list() == pytest.approx([0.0, 0.0, 90.0])
+
+
+def test_a_clearness_index_above_the_maximum_is_clipped():
+    extraterrestrial = _hourly_extraterrestrial(
+        first=DAY + timedelta(hours=1), values=[100.0, 100.0, 100.0]
+    )
+    steps = pl.DataFrame({"site": "A", "valid_time": [DAY + timedelta(hours=3)], "ghi": [1000.0]})
+
+    hourly = interpolate_clearness_hourly(
+        steps=steps, extraterrestrial_hourly=extraterrestrial, value_column="ghi"
+    )
+
+    assert hourly["ghi"].to_list() == pytest.approx([150.0, 150.0, 150.0])
+
+
+def test_two_sites_never_borrow_each_others_neighbouring_step():
+    hours = [100.0] * 6
+    extraterrestrial = pl.concat(
+        [
+            _hourly_extraterrestrial(first=DAY + timedelta(hours=1), values=hours),
+            _hourly_extraterrestrial(first=DAY + timedelta(hours=1), values=hours).with_columns(
+                site=pl.lit("B")
+            ),
+        ]
+    )
+    steps = pl.DataFrame(
+        {
+            "site": ["A", "A", "B"],
+            "valid_time": [
+                DAY + timedelta(hours=3),
+                DAY + timedelta(hours=6),
+                DAY + timedelta(hours=3),
+            ],
+            "ghi": [50.0, 100.0, 20.0],
+        }
+    )
+
+    hourly = interpolate_clearness_hourly(
+        steps=steps, extraterrestrial_hourly=extraterrestrial, value_column="ghi"
+    )
+
+    site_b = hourly.filter(pl.col("site") == "B").filter(pl.col("time") <= DAY + timedelta(hours=3))
+    assert site_b["ghi"].to_list() == pytest.approx([20.0, 20.0, 20.0])

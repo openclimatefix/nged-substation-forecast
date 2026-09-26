@@ -14,6 +14,13 @@ no interval on any difference.
   `data/studies/open_meteo_ensemble_means/`. Its module docstring states the design: the arms, the
   shared features, the rows, the folds, and the two wind designs. `--report-only` rebuilds the tables
   from the saved frames and losses.
+- `local_ens_gap.py` is the follow-up that asks why the local ECMWF ENS mean scores worse than
+  Open-Meteo's, and what a difference in run age can explain. It reads the saved frames above,
+  adds three kinds of column (a local series with its irradiance interpolated through the clearness
+  index, a local series built from runs about a day older, and Open-Meteo's deterministic
+  `previous_day0` and `previous_day1` runs), fits the same XGBoost arms at the primary setting, and
+  writes `report.md` and its tables under `data/studies/open_meteo_ens_gap/`. Its module docstring
+  states the design.
 
 Fits run on the CPU. The local ECMWF ENS mean takes its 00:00 UTC valid time from lead 24 of the
 previous day's run, because the 00 UTC run's own leads start at 3 hours.
