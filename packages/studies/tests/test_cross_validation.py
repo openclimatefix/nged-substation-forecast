@@ -16,6 +16,7 @@ from studies.cross_validation import (
     DeviceType,
     HyperParameters,
     assign_folds,
+    assign_week_folds,
     booster_parameters,
     calendar_month_coverage,
     clamp_to_cap,
@@ -754,3 +755,71 @@ def test_a_covered_design_does_not_raise():
     cut = cut_eras(frame=_two_sites(), first_months=ERA_START, fold_offsets=ROTATED)
 
     raise_on_uncovered_months(coverage=calendar_month_coverage(frame=cut))
+
+
+WEEK_START = datetime(2026, 6, 25, tzinfo=UTC)
+
+
+def _days(*, first: int, last: int) -> pl.DataFrame:
+    return pl.DataFrame(
+        {"time": [WEEK_START + timedelta(days=day, hours=13) for day in range(first, last + 1)]}
+    )
+
+
+def test_week_folds_cut_at_seven_day_boundaries_from_the_first_day():
+    folds = assign_week_folds(dataset=_days(first=0, last=20), first_day=WEEK_START)["fold"]
+
+    assert folds.to_list() == [0] * 7 + [1] * 7 + [2] * 7
+
+
+def test_a_short_final_block_is_merged_into_the_block_before():
+    # 25 days: three whole weeks and 4 days over, and the 4 days join the third week.
+    folds = assign_week_folds(dataset=_days(first=0, last=24), first_day=WEEK_START)["fold"]
+
+    assert folds.to_list() == [0] * 7 + [1] * 7 + [2] * 11
+
+
+def test_a_row_at_seven_days_less_a_second_stays_in_the_earlier_week():
+    edge = pl.DataFrame(
+        {
+            "time": [
+                WEEK_START + timedelta(days=7) - timedelta(seconds=1),
+                WEEK_START + timedelta(days=7),
+                WEEK_START + timedelta(days=14),
+            ]
+        }
+    )
+
+    assert assign_week_folds(dataset=edge, first_day=WEEK_START)["fold"].to_list() == [0, 1, 1]
+
+
+def test_week_folds_do_not_depend_on_the_site():
+    rows = pl.concat([_days(first=0, last=20).with_columns(site=pl.lit(site)) for site in "AB"])
+
+    folds = assign_week_folds(dataset=rows, first_day=WEEK_START)
+
+    assert (
+        folds.filter(pl.col("site") == "A")["fold"].to_list()
+        == folds.filter(pl.col("site") == "B")["fold"].to_list()
+    )
+
+
+def test_week_folds_refuse_a_span_of_one_block():
+    with pytest.raises(ValueError, match="at least 2"):
+        assign_week_folds(dataset=_days(first=0, last=9), first_day=WEEK_START)
+
+
+def test_week_folds_refuse_a_row_before_the_first_day():
+    with pytest.raises(ValueError, match="before first_day"):
+        assign_week_folds(dataset=_days(first=-1, last=20), first_day=WEEK_START)
+
+
+def test_every_week_fold_is_scored_when_there_are_more_than_five(monkeypatch: pytest.MonkeyPatch):
+    site_rows = _site_rows().with_columns(
+        fold=(pl.col("time").rank(method="dense") % 8).cast(pl.Int32)
+    )
+
+    losses, _ = _run(monkeypatch, site_rows=site_rows)
+
+    assert sorted(losses["fold"].unique().to_list()) == list(range(8))
+    assert losses.height == site_rows.height * len(SEEDS)
