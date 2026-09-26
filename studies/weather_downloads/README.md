@@ -52,6 +52,10 @@ way):
 - `fetch_nora3.py` and `validate_nora3.py` — NORA3 hourly wind at 50 m and 100 m over OPeNDAP, cut
   server-side to the box, from the aggregated dataset and then MET Norway's monthly files, needs
   `uv run --with pydap`.
+- `fetch_ukv_ceda.py` and `validate_ukv_ceda.py` — the Met Office UKV 2 km archive held at CEDA
+  (four runs a day from 2019-09-01), whole GRIB files cropped to the box and written to a local
+  Icechunk store, one commit per run, needs `uv run --with icechunk --with zarr --with eccodes` and
+  the `CEDA_TOKEN` environment variable. The licence is CC BY-NC-SA 4.0.
 
 Every script resolves `data/` the way `sources.REPO_DATA_DIR` does — the main checkout's `data/`,
 shared by every worktree, not a per-worktree copy — so run each script once, from whichever worktree
