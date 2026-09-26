@@ -451,12 +451,12 @@ and the same caveat about the other buckets applies. Cloud cover is a weak subst
 and diffuse shortwave that [the PV forward model](disaggregation.md#the-forward-model) needs.
 
 **The BPF is a calibrated blend, so it cannot stand in for MOGREPS-UK members in the ensemble-means
-comparison.** The
-[Met Office's overview](https://www.metoffice.gov.uk/services/data/external-data-channels) and the
-registry describe the BPF as blended percentiles and threshold probabilities, which we have not
-verified in detail because we have not read the IMPROVER paper. The variable list and the file names
-hold percentiles and probabilities and no member index, so the UK gridded buckets have no raw
-members from which to compute a mean.
+comparison.** [Roberts et al. (2023)](https://doi.org/10.1175/BAMS-D-21-0273.1) describe IMPROVER
+as blending probabilities rather than physical values, with model weights that represent each
+model's relative skill for precipitation, temperature, wind speed and direction, cloud cover, and
+visibility, and with a radar nowcast added for precipitation. The paper names no irradiance
+variable. The variable list and the file names hold percentiles and probabilities and no member
+index, so the UK gridded buckets have no raw members from which to compute a mean.
 
 **Recording the BPF whole would take 719 to 807 GB a day per bucket.** One day (2026-09-15)
 held about 807 GB in the percentiles bucket and 719 GB in the probabilities bucket, for the whole
@@ -472,19 +472,21 @@ found no archive of MOGREPS-UK, and we did not verify whether one exists for the
 worth considering if a study wants the operational blend as a benchmark. See #801 for where such a
 recorder would be tracked.
 
-**The open-source IMPROVER code can weight lagged runs by age, but whether the operational blend
-does so is unverified.** In the code at commit
+**The IMPROVER paper states that equal weights were used across time-lagged runs at the time of
+writing (2023), although the open-source code has options to weight runs by age.** Roberts et al.
+say time-lagging is essential for MOGREPS-UK, which was designed as a time-lagged ensemble of
+several runs of 3 members each hour, and that IMPROVER also time-lags UKV and MOGREPS-G. They say
+options exist for applying different weights to each forecast length, "although at present, equal
+weighting is used". The paper was published in March 2023, and we have not checked whether the
+operational weights have changed since. In the code at commit
 [`acf4ab6`](https://github.com/metoppv/improver/tree/acf4ab6d08cff2e52359bcc62e8bfe0788958218/improver/blending),
 the weights can come from four sources. A dictionary gives piecewise-linear weights along a
 coordinate such as lead time. A default linear rule runs between a start value and an end value. A
 non-linear rule sets the weight of the i-th cycle to `cval**i` and can order the cycles so that the
 newest is heaviest. A triangular rule is the fourth. The utility that merges lagged runs into one
 ensemble only pools the members, without weighting them by age, and the repository's own
-cycle-blending command line uses equal weights. The operational number of MOGREPS-UK lagged runs and
-their weights are not in the repository, so the ensemble-means question of how to weight members of
-different ages is not answered by it. The next source to read is [Roberts et al.
-(2023)](https://doi.org/10.1175/BAMS-D-21-0273.1), which returned HTTP 403 when we tried and has not
-been read.
+cycle-blending command line uses equal weights. The ensemble-means question of how to weight
+members of different ages therefore has a published operational answer of equal weights, as of 2023.
 
 ### ECMWF has published no plan to open a direct beam or hourly ensemble steps
 
