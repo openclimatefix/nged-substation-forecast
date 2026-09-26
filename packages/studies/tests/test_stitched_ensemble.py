@@ -225,3 +225,59 @@ def test_an_hour_with_no_extraterrestrial_value_raises():
         interpolate_clearness_hourly(
             steps=steps, extraterrestrial_hourly=extraterrestrial, value_column="ghi"
         )
+
+
+def test_a_partly_lit_step_keeps_its_clearness_and_zeroes_the_dark_hours():
+    extraterrestrial = _hourly_extraterrestrial(
+        first=DAY + timedelta(hours=1), values=[0.0, 0.0, 100.0]
+    )
+    steps = pl.DataFrame({"site": "A", "valid_time": [DAY + timedelta(hours=3)], "ghi": [30.0]})
+
+    hourly = interpolate_clearness_hourly(
+        steps=steps, extraterrestrial_hourly=extraterrestrial, value_column="ghi"
+    )
+
+    assert hourly["ghi"].to_list() == pytest.approx([0.0, 0.0, 90.0])
+
+
+def test_a_clearness_index_above_the_maximum_is_clipped():
+    extraterrestrial = _hourly_extraterrestrial(
+        first=DAY + timedelta(hours=1), values=[100.0, 100.0, 100.0]
+    )
+    steps = pl.DataFrame({"site": "A", "valid_time": [DAY + timedelta(hours=3)], "ghi": [1000.0]})
+
+    hourly = interpolate_clearness_hourly(
+        steps=steps, extraterrestrial_hourly=extraterrestrial, value_column="ghi"
+    )
+
+    assert hourly["ghi"].to_list() == pytest.approx([150.0, 150.0, 150.0])
+
+
+def test_two_sites_never_borrow_each_others_neighbouring_step():
+    hours = [100.0] * 6
+    extraterrestrial = pl.concat(
+        [
+            _hourly_extraterrestrial(first=DAY + timedelta(hours=1), values=hours),
+            _hourly_extraterrestrial(first=DAY + timedelta(hours=1), values=hours).with_columns(
+                site=pl.lit("B")
+            ),
+        ]
+    )
+    steps = pl.DataFrame(
+        {
+            "site": ["A", "A", "B"],
+            "valid_time": [
+                DAY + timedelta(hours=3),
+                DAY + timedelta(hours=6),
+                DAY + timedelta(hours=3),
+            ],
+            "ghi": [50.0, 100.0, 20.0],
+        }
+    )
+
+    hourly = interpolate_clearness_hourly(
+        steps=steps, extraterrestrial_hourly=extraterrestrial, value_column="ghi"
+    )
+
+    site_b = hourly.filter(pl.col("site") == "B").filter(pl.col("time") <= DAY + timedelta(hours=3))
+    assert site_b["ghi"].to_list() == pytest.approx([20.0, 20.0, 20.0])

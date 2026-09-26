@@ -18,6 +18,10 @@ STEP_HOURS: Final[int] = 3
 MIN_EXTRATERRESTRIAL_W_M2: Final[float] = 1.0
 """Below this mean extraterrestrial irradiance over a step, the step has no clearness index."""
 
+MAX_CLEARNESS: Final[float] = 1.5
+"""The largest clearness index kept. A step mean can exceed the extraterrestrial mean when a low sun
+makes the ratio unstable, and clipping stops one such step spreading a spike across its hours."""
+
 
 def newest_run_member_means(
     *,
@@ -147,7 +151,10 @@ def interpolate_clearness_hourly(
     each step's mean by the mean extraterrestrial irradiance over the step (the clearness index),
     interpolates the clearness index linearly between step centres, and multiplies each hour's
     interpolated clearness index by that hour's extraterrestrial irradiance. A step with no
-    daylight has no clearness index, and an hour beside such a step takes its own step's value.
+    daylight has no clearness index, its hours are zero, and an hour beside such a step takes its
+    own step's clearness index. A clearness index above `MAX_CLEARNESS` is clipped. **The
+    interpolation does not conserve the step mean**: the mean of the hours can differ from the
+    step's value, and the difference is largest where the clearness index changes fast.
 
     Args:
         steps: One row per (site, valid time), carrying `site`, `valid_time` and `value_column`,
@@ -186,7 +193,11 @@ def interpolate_clearness_hourly(
         )
         .with_columns(
             clearness=pl.when(pl.col("step_extraterrestrial") >= min_extraterrestrial_w_m2)
-            .then(pl.col(value_column) / pl.col("step_extraterrestrial"))
+            .then(
+                (pl.col(value_column) / pl.col("step_extraterrestrial")).clip(
+                    upper_bound=MAX_CLEARNESS
+                )
+            )
             .otherwise(None)
         )
     )
@@ -209,7 +220,10 @@ def interpolate_clearness_hourly(
     )
     interpolated = (
         hours.drop(value_column)
-        .join(per_step.select("site", "valid_time", "clearness"), on=["site", "valid_time"])
+        .join(
+            per_step.select("site", "valid_time", "clearness", "step_extraterrestrial"),
+            on=["site", "valid_time"],
+        )
         .join(previous, on=["site", "valid_time"], how="left")
         .join(following, on=["site", "valid_time"], how="left")
         .with_columns(

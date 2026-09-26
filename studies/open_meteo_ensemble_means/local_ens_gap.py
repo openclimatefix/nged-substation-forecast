@@ -16,7 +16,7 @@ writes. It adds columns, each built for the same generator-hours:
   the hold is one candidate cause of the gap.
 - `local_dayold` (solar and wind): the local ENS mean built from the newest run that is at least 27
   hours ahead of the valid time, so each step comes from a run about a day older than the stored
-  series. The change in error is the cost of an older run, and bounds how much of the gap a
+  series. The increase in error from using an older run bounds how much of the gap a
   difference in lead can explain.
 - Deterministic Open-Meteo runs from `data/studies/weather/<model>/previous_runs/combined.parquet`
   (ICON-D2, ICON-EU, ECMWF IFS 0.25 degree, UKV) at `previous_day0`, the freshest run, and
@@ -57,9 +57,10 @@ from typing import Final
 
 import ensemble_means_mae as earlier
 import polars as pl
-from studies.cross_validation import PRIMARY_HYPER_PARAMETERS
+from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SEEDS
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.stitched_ensemble import (
+    STEP_HOURS,
     hold_backward_mean_hourly,
     interpolate_clearness_hourly,
     interpolate_instants_hourly,
@@ -80,9 +81,6 @@ LOAD_LIMIT: Final[float] = 24.0
 
 DAY_OLD_MIN_LEAD_HOURS: Final[int] = 27
 """The shortest lead the `local_dayold` series may use: three hours past a day."""
-
-STEP_HOURS: Final[int] = 3
-"""The local ENS table's step, in hours, at the leads the series read."""
 
 LOCAL_KT: Final[str] = "local_kt"
 LOCAL_DAY_OLD: Final[str] = "local_dayold"
@@ -125,8 +123,29 @@ HUB_PRODUCTS: Final[tuple[str, ...]] = (
 )
 """The wind products with a 100 m speed, for the hub-height design."""
 
+HUB_DETERMINISTIC_MODELS: Final[frozenset[str]] = frozenset(
+    product.removesuffix("_det0").removesuffix("_det1")
+    for product in HUB_PRODUCTS
+    if "_det" in product
+)
+"""The deterministic models whose 100 m speed the hub-height design reads. Other models' 100 m
+speeds are not read, so a null in one cannot shrink the rows."""
+
 COMPARED_ARMS: Final[tuple[str, ...]] = (ENS_OPEN_METEO, LOCAL, LOCAL_KT, LOCAL_DAY_OLD)
 """The arms the by-step and agreement tables show."""
+
+HOURS_PER_DAY: Final[int] = 24
+STORED_TOLERANCE_W_M2: Final[float] = 0.01
+"""The largest difference between the rebuilt and saved local series: Float32 rounding."""
+
+RESULT_TABLES: Final[tuple[str, ...]] = (
+    "mae_by_arm",
+    "mae_by_step",
+    "weather_error",
+    "agreement",
+    "sibling_distance",
+)
+"""The names of the result tables `_analyse` builds."""
 
 WITHIN_W_M2: Final[float] = 5.0
 """How close two irradiance series must be over a 3-hour window to count as agreeing."""
@@ -159,11 +178,6 @@ def _product_lists() -> dict[DesignType, list[str]]:
     }
 
 
-def _columns_of(*, design: DesignType, product: str) -> tuple[str, ...]:
-    """Return the weather columns one arm reads."""
-    return earlier._feature_columns(design=design, product=product)
-
-
 def jobs(*, design: DesignType) -> list[Job]:
     """Return one primary-setting job per arm of a design.
 
@@ -178,7 +192,7 @@ def jobs(*, design: DesignType) -> list[Job]:
     """
     shared = earlier.SOLAR_SHARED_FEATURES if design == "solar" else earlier.WIND_SHARED_FEATURES
     arms = {
-        product: (*shared, *_columns_of(design=design, product=product))
+        product: (*shared, *earlier._feature_columns(design=design, product=product))
         for product in _product_lists()[design]
     }
     if len({len(columns) for columns in arms.values()}) != 1:
@@ -200,11 +214,9 @@ def _previous_runs(*, model: str, domain: DomainType) -> pl.DataFrame:
     Returns:
         One row per (site, hour) with a column per variable and run age.
     """
-    fields = (
-        {"shortwave_radiation": "ghi"}
-        if domain == "solar"
-        else {"wind_speed_10m": "speed10", "wind_speed_100m": "speed100"}
-    )
+    fields = {"shortwave_radiation": "ghi"} if domain == "solar" else {"wind_speed_10m": "speed10"}
+    if domain == "wind" and model in HUB_DETERMINISTIC_MODELS:
+        fields["wind_speed_100m"] = "speed100"
     path = WEATHER_DATA_DIR / DETERMINISTIC_MODELS[model] / "previous_runs" / "combined.parquet"
     columns = {
         (source if age == 0 else f"{source}_previous_day{age}"): f"{name}_{model}_det{age}"
@@ -261,12 +273,20 @@ def _step_leads(*, steps: pl.DataFrame, variant: str) -> pl.DataFrame:
     )
 
 
-def _local_solar_variants() -> tuple[pl.DataFrame, pl.DataFrame]:
+def _local_solar_variants(*, frame: pl.DataFrame) -> tuple[pl.DataFrame, pl.DataFrame]:
     """Build the `local_kt` and `local_dayold` irradiance series and their lead summaries.
+
+    Args:
+        frame: The earlier study's solar rows, whose local series the rebuilt stored series must
+            equal.
 
     Returns:
         One row per (site, hour) with `ghi_local_kt` and `ghi_local_dayold`, and the lead summary
         for the stored series and the day-old series.
+
+    Raises:
+        ValueError: If the rebuilt stored series differs from the frame's, or a day-old step's run
+            is not exactly 24 hours older than the stored step's.
     """
     members = earlier._local_ens_members(
         path=earlier.ENS_DIR / "beam_diffuse_ens.parquet", value_columns=["ghi_w_m2"]
@@ -280,6 +300,9 @@ def _local_solar_variants() -> tuple[pl.DataFrame, pl.DataFrame]:
     day_old = newest_run_member_means(
         members=members.filter(pl.col("lead_hours") >= DAY_OLD_MIN_LEAD_HOURS), **settings
     )
+    _check_day_old(stored=stored, day_old=day_old)
+    rebuilt = hold_backward_mean_hourly(steps=stored, value_columns=["ghi_w_m2"])
+    _check_stored_matches(rebuilt=rebuilt, frame=frame)
     extraterrestrial = _hourly_extraterrestrial(
         first=stored.select(pl.col("valid_time").min()).item() - timedelta(hours=STEP_HOURS),
         last=stored.select(pl.col("valid_time").max()).item(),
@@ -297,6 +320,45 @@ def _local_solar_variants() -> tuple[pl.DataFrame, pl.DataFrame]:
         ]
     )
     return kt.join(held, on=["site", "time"], how="full", coalesce=True), leads
+
+
+def _check_day_old(*, stored: pl.DataFrame, day_old: pl.DataFrame) -> None:
+    """Raise unless every day-old step's run is exactly 24 hours older than the stored step's.
+
+    Args:
+        stored: The stored series' steps, with `init_time`.
+        day_old: The day-old series' steps, with `init_time`.
+
+    Raises:
+        ValueError: Naming how many steps differ from 24 hours, or lack a partner.
+    """
+    gaps = stored.join(day_old, on=["site", "valid_time"], how="left", suffix="_day_old").select(
+        gap_hours=(pl.col("init_time") - pl.col("init_time_day_old")).dt.total_hours()
+    )
+    wrong = gaps.filter(pl.col("gap_hours").is_null() | (pl.col("gap_hours") != HOURS_PER_DAY))
+    if not wrong.is_empty():
+        msg = f"{wrong.height} steps' day-old run is not exactly {HOURS_PER_DAY} hours older"
+        raise ValueError(msg)
+
+
+def _check_stored_matches(*, rebuilt: pl.DataFrame, frame: pl.DataFrame) -> None:
+    """Raise unless the rebuilt stored series equals the earlier study's local series.
+
+    Args:
+        rebuilt: The rebuilt stored series, `ghi_w_m2` per (site, hour).
+        frame: The earlier study's rows, carrying `ghi_ecmwf_ens_local_mean`.
+
+    Raises:
+        ValueError: If any row of the frame lacks a rebuilt value or differs by more than the
+            Float32 rounding of the frame's column.
+    """
+    joined = frame.select("site", "time", f"ghi_{LOCAL}").join(
+        rebuilt, on=["site", "time"], how="left"
+    )
+    difference = (pl.col(f"ghi_{LOCAL}") - pl.col("ghi_w_m2")).abs()
+    if joined.filter(difference.is_null() | (difference > STORED_TOLERANCE_W_M2)).height:
+        msg = "the rebuilt stored series differs from the earlier study's local series"
+        raise ValueError(msg)
 
 
 def _local_wind_day_old() -> pl.DataFrame:
@@ -340,6 +402,9 @@ def _with_columns_from(
     for extra in extras:
         added += [name for name in extra.columns if name not in ("site", "time")]
         joined = joined.join(extra, on=["site", "time"], how="left")
+    nulls = {name: joined[name].null_count() for name in added}
+    _LOG.info("null counts of the added columns before the drop: %s", nulls)
+    print(f"null counts of the added columns before the drop: {nulls}")
     kept = joined.filter(pl.all_horizontal(pl.col(added).is_not_null()))
     return kept, {"rows_before": joined.height, "rows_after": kept.height}
 
@@ -355,7 +420,7 @@ def build_frames() -> tuple[
     """
     solar_frame = pl.read_parquet(earlier.OUTPUT_DIR / "frame_solar.parquet")
     wind_frame = pl.read_parquet(earlier.OUTPUT_DIR / "frame_wind.parquet")
-    local_solar, leads = _local_solar_variants()
+    local_solar, leads = _local_solar_variants(frame=solar_frame)
     solar, solar_counts = _with_columns_from(
         frame=solar_frame,
         extras=[
@@ -409,7 +474,8 @@ def _fit(*, frames: dict[DomainType, pl.DataFrame]) -> dict[DesignType, pl.DataF
 
 def _step_end_hour(*, column: str = "time") -> pl.Expr:
     """Return the hour of day at which the 3-hour step holding an hour label ends."""
-    return ((pl.col(column).dt.hour() + STEP_HOURS - 1) // STEP_HOURS * STEP_HOURS).alias(
+    hour = pl.col(column).dt.hour()
+    return ((hour + STEP_HOURS - 1) // STEP_HOURS * STEP_HOURS % HOURS_PER_DAY).alias(
         "step_end_hour"
     )
 
@@ -435,7 +501,10 @@ def _mae_by_step(*, losses: dict[DesignType, pl.DataFrame]) -> pl.DataFrame:
             design_losses.filter(pl.col("arm").is_in(arms))
             .with_columns(_step_end_hour(), design=pl.lit(design))
             .group_by("design", "arm", "step_end_hour")
-            .agg(mae_pct=pl.col(earlier.METRIC).mean() * earlier.PERCENT, n_rows=pl.len() // 3)
+            .agg(
+                mae_pct=pl.col(earlier.METRIC).mean() * earlier.PERCENT,
+                n_rows=pl.len() // len(SEEDS),
+            )
             .with_columns(arm=pl.col("arm").str.split(":").list.last())
         )
     return pl.concat(parts).sort("design", "step_end_hour", "arm")
@@ -499,7 +568,8 @@ def _agreement(*, solar: pl.DataFrame) -> pl.DataFrame:
     Returns:
         One row per (series, step-ending hour): the windows' count, the mean signed difference from
         Open-Meteo's mean, the mean and median absolute difference, and the share of windows within
-        `WITHIN_W_M2`. The series are `local` and `local_kt`.
+        `WITHIN_W_M2`. The series are `local` and `local_kt` against Open-Meteo, and `local_kt`
+        against `local`, which shows how far the interpolation departs from its step means.
     """
     windows = (
         solar.with_columns(_step_end_hour(), day=pl.col("time").dt.truncate("1d"))
@@ -513,8 +583,13 @@ def _agreement(*, solar: pl.DataFrame) -> pl.DataFrame:
         .filter(pl.col("n_hours") == STEP_HOURS)
     )
     parts = []
-    for series in (LOCAL, LOCAL_KT):
-        difference = pl.col(series) - pl.col("open_meteo")
+    comparisons = {
+        LOCAL: (LOCAL, "open_meteo"),
+        LOCAL_KT: (LOCAL_KT, "open_meteo"),
+        f"{LOCAL_KT}_vs_{LOCAL}": (LOCAL_KT, LOCAL),
+    }
+    for series, (compared, baseline) in comparisons.items():
+        difference = pl.col(compared) - pl.col(baseline)
         parts.append(
             windows.group_by("step_end_hour")
             .agg(
@@ -559,15 +634,10 @@ def _sibling_distance(*, frames: dict[DomainType, pl.DataFrame]) -> pl.DataFrame
     )
 
 
-def _analyse_names() -> tuple[str, ...]:
-    """Return the names of the result tables `_analyse` builds."""
-    return ("mae_by_arm", "mae_by_step", "weather_error", "agreement", "sibling_distance")
-
-
 def _paths() -> dict[str, Path]:
     """Return every file the script writes, by name."""
     names = ["report.md", "run_facts.json", "local_leads.parquet"]
-    names += [f"{name}.parquet" for name in _analyse_names()]
+    names += [f"{name}.parquet" for name in RESULT_TABLES]
     names += [f"frame_{domain}.parquet" for domain in ("solar", "wind")]
     names += [f"losses_{design}.parquet" for design in ("solar", "wind_10m", "wind_hub")]
     return {name: OUTPUT_DIR / name for name in names}
@@ -593,7 +663,9 @@ def _report(
     by_step = tables["mae_by_step"].pivot(
         on="arm", index=["design", "step_end_hour"], values="mae_pct"
     )
-    by_step = by_step.with_columns(local_minus_open_meteo=pl.col(LOCAL) - pl.col(ENS_OPEN_METEO))
+    by_step = by_step.select(
+        column for column in by_step.columns if by_step[column].null_count() < by_step.height
+    ).with_columns(local_minus_open_meteo=pl.col(LOCAL) - pl.col(ENS_OPEN_METEO))
     lines = ["# Local ECMWF ENS against Open-Meteo's ECMWF ENS mean", "", "## Rows", ""]
     lines += [
         f"- {domain}: {c['rows_before']} rows before the drop, {c['rows_after']} after"
@@ -655,7 +727,7 @@ def main() -> int:
     paths = _paths()
     designs: tuple[DesignType, ...] = ("solar", "wind_10m", "wind_hub")
     if arguments.report_only:
-        results = ["report.md", *(f"{name}.parquet" for name in _analyse_names())]
+        results = ["report.md", *(f"{name}.parquet" for name in RESULT_TABLES)]
         refuse_to_overwrite(paths=[paths[name] for name in results])
         saved_frames: dict[DomainType, pl.DataFrame] = {
             "solar": pl.read_parquet(paths["frame_solar.parquet"]),
