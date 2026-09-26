@@ -413,8 +413,20 @@ deterministic UKV has stitched history on Open-Meteo from about 2022 to 2023, an
 **The only per-run, per-member MOGREPS-UK history we found is the archive that a recorder would
 build, tracked in issue #926.** The 30-day window on AWS adds whatever runs still survive. A study
 that wants a MOGREPS-UK ensemble mean for the last 3 months can use Open-Meteo's stitched mean, but
-cannot recompute that mean from members. MOGREPS-UK has 3 members per run, against 18 for the global
-MOGREPS-G.
+cannot recompute that mean from members.
+
+**A MOGREPS-UK run holds 3 members, and the Met Office's 18-member MOGREPS-UK ensemble is six hourly
+runs lagged together.** [Porson et al. (2020)](https://doi.org/10.1002/qj.3844) describe it as "an
+18-member ensemble ... created by running three members every hour and time-lagging these over a 6
+hr window". The global MOGREPS-G has 18 members in each run, so the two ensembles share a member
+count and nothing else. Members from different lagged runs differ in age by up to 5 hours, so they
+are not exchangeable the way the members of one run are. A mean or spread built from lagged runs
+therefore needs three things. The build has to decide how to weight members of different ages. It
+has to keep each member's run age (the run's initialisation time) beside the member. It must never
+treat the 3 members of a single run as a full ensemble, because a mean of 3 members is noisy and a
+spread from 3 members rests on 2 degrees of freedom. The [ensemble-means
+study](../studies/forecasts/ensemble-means.md#what-open-meteos-source-code-does-for-the-mogreps-uk-mean)
+records what Open-Meteo's source code does.
 
 ### ECMWF has published no plan to open a direct beam or hourly ensemble steps
 

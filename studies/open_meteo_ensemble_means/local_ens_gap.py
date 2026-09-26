@@ -300,7 +300,15 @@ def _local_solar_variants(*, frame: pl.DataFrame) -> tuple[pl.DataFrame, pl.Data
     day_old = newest_run_member_means(
         members=members.filter(pl.col("lead_hours") >= DAY_OLD_MIN_LEAD_HOURS), **settings
     )
-    _check_day_old(stored=stored, day_old=day_old)
+    window = frame.select(first=pl.col("time").min(), last=pl.col("time").max())
+    _check_day_old(
+        stored=stored.filter(
+            pl.col("valid_time").is_between(
+                window["first"][0], window["last"][0] + timedelta(hours=STEP_HOURS)
+            )
+        ),
+        day_old=day_old,
+    )
     rebuilt = hold_backward_mean_hourly(steps=stored, value_columns=["ghi_w_m2"])
     _check_stored_matches(rebuilt=rebuilt, frame=frame)
     extraterrestrial = _hourly_extraterrestrial(
@@ -326,7 +334,8 @@ def _check_day_old(*, stored: pl.DataFrame, day_old: pl.DataFrame) -> None:
     """Raise unless every day-old step's run is exactly 24 hours older than the stored step's.
 
     Args:
-        stored: The stored series' steps, with `init_time`.
+        stored: The stored series' steps inside the scored window, with `init_time`. The series
+            also runs past both ends of the window, where a day-old partner may not exist.
         day_old: The day-old series' steps, with `init_time`.
 
     Raises:
