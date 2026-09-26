@@ -36,8 +36,8 @@ one generator both cover, the setpoint history runs from February 2024 against t
 late April 2026, and the two disagree on the hours they share. The cap is also what a model can use
 directly, because export cannot exceed it: a generator's output is `min(what the weather allowed,
 the cap in force)`. The cap is published as a negative number, generation being negative in NGED's
-convention, and its largest magnitude is the connection limit rather than a curtailment. Reading the
-cap as a curtailment volume gets this backwards — the measurements are in [the beam/diffuse
+convention, and its largest magnitude is the connection limit rather than a curtailment. Reading
+the cap as a curtailment volume gets this backwards — the measurements are in [the beam/diffuse
 results](../studies/beam-diffuse-split.md#one-site-is-curtailed-and-the-export-cap-is-what-makes-its-hours-scorable).
 
 **Ask for the whole history, and expect the first request to be truncated.** The first export we
@@ -220,9 +220,9 @@ horizon.](assets/nwp_horizons.svg)
 
 Each bar is the model's longest routine run, taken from this page, from the [weather products
 survey's forecast-model table](../background/weather-products-survey.md#forecast-models), or from
-the producer's own documentation — the source for every bar is recorded next to its horizon in
-`studies/beam_diffuse_split/nwp_horizons.py`. Reanalyses and satellite products carry no forecast
-horizon and are left off.
+the producer's own documentation — the
+source for every bar is recorded next to its horizon in `studies/beam_diffuse_split/nwp_horizons.py`.
+Reanalyses and satellite products carry no forecast horizon and are left off.
 
 | Source | Status | Description |
 |---|---|---|
@@ -457,9 +457,9 @@ the free feed is about grid spacing rather than steps.** ECMWF's announcement of
 Catalogue](https://www.ecmwf.int/en/about/media-centre/news/2025/ecmwf-makes-its-entire-real-time-catalogue-open-all),
 says the free subset is published "at 25 km resolution" and that "later in 2026, the free and open
 subset will be extended to include our 9 km resolution forecasts with a 2-hour latency". The hourly
-steps the full catalogue carries out to 90 hours appear neither there nor anywhere else we searched.
-Hourly steps would be worth having for solar, because the coarser the step, the flatter and later
-the reconstructed solar day.
+steps the full catalogue carries out to 90 hours appear neither there nor anywhere else we
+searched. Hourly steps would be worth having for solar, because the coarser the step, the flatter
+and later the reconstructed solar day.
 
 **Removing the licence fee brought neither the direct beam nor a finer step to the free feed.** The
 October 2025 change made ECMWF's whole Real-time Catalogue open, and the free feed has gained
@@ -481,14 +481,16 @@ angle, which is numerically unstable at low sun, and the sun is low over GB for 
 `dsrp` needs no division, so a request naming only `fdir` leaves behind the field that needs none.
 
 **`ssrd` − `fdir` is close to a diffuse pyranometer reading, but not equal to that reading.**
-[ECMWF's radiation
+[ECMWF's
+radiation
 note](https://www.ecmwf.int/sites/default/files/elibrary/2015/18490-radiation-quantities-ecmwf-model-and-mars.pdf)
 records that the model treats strongly forward-scattered radiation as unscattered, and that its
 diffuse part includes the circumsolar radiation a shadow-band pyranometer excludes. The note puts
 the correction on the measurement rather than on the model output: a diffuse measurement has to be
-corrected for the shadow band before it is compared with `ssrd` − `fdir`. The note also warns that
-these fluxes are accumulated over a period across which the solar zenith angle moves. Converting an
-accumulated flux to an instantaneous pyranometer convention is therefore not straightforward either.
+corrected for the shadow band before it is compared with `ssrd` − `fdir`. The note also warns
+that these fluxes are accumulated over a period across which the solar zenith angle moves.
+Converting an accumulated flux to an instantaneous pyranometer convention is therefore not
+straightforward either.
 
 ### ERA5: which access route
 
@@ -684,14 +686,14 @@ So a retrieval of an hour that has already happened starts from the cloud field 
 predict.
 
 **Three limits bound how far that carries.** UKV differs from ERA5 in aerosol treatment as well as
-in resolution, so neither ordering is a clean resolution contrast. Open-Meteo's archive stitches the
-first hours of each successive run ([the survey compares Open-Meteo's
-archives](../background/weather-products-survey.md#which-archives-keep-whole-past-forecast-runs)),
-so a product's effective lead follows its run frequency: hourly UKV is the T+0 analysis, while
-3-hourly ICON-D2 carries a lead of 1 to 3 hours, measured against the German weather service's own
-files. ICON-D2 therefore beats UKV while forecasting further ahead than it, and the comparison is
-not analysis against analysis. And CAMS is a retrieval rather than a model, so its lead is nil and
-its win is partly a win for observing cloud rather than simulating it. Every measurement is of these
+in resolution, so neither ordering is a clean resolution contrast. Open-Meteo's archive stitches
+the first hours of each successive run ([the survey compares Open-Meteo's
+archives](../background/weather-products-survey.md#which-archives-keep-whole-past-forecast-runs)), so
+a product's effective lead follows its run frequency: hourly UKV is the T+0 analysis, while 3-hourly
+ICON-D2 carries a lead of 1 to 3 hours, measured against the German weather service's own files.
+ICON-D2 therefore beats UKV while forecasting further ahead than it, and the comparison is not
+analysis against analysis. And CAMS is a retrieval rather than a model, so its lead is nil and its
+win is partly a win for observing cloud rather than simulating it. Every measurement is of these
 eight products on this fleet, and none has been shown to hold for every product at those
 resolutions.
 
@@ -841,9 +843,9 @@ upgrades](live-service.md#nwp-model-upgrades).
 
 **The full list is [`nwp-model-upgrades.csv`](assets/nwp-model-upgrades.csv), 98 changes under 19
 product labels, each checked against the producer's own text on 2026-09-23.** The `verified` column
-reads `yes` where the check confirmed the row as written, `corrected` where the check changed it,
-and `unverified` where no producer text could be found. The `note` column says what the check found.
-The list also covers products the project neither reads nor evaluates: NOAA's GFS and GEFS,
+reads `yes` where the check confirmed the row as written, `corrected` where the check changed it, and
+`unverified` where no producer text could be found. The `note` column says what the check found. The
+list also covers products the project neither reads nor evaluates: NOAA's GFS and GEFS,
 Météo-France's ARPEGE and AROME, KNMI's HARMONIE-AROME, MET Norway's NORA3, and CERRA's publication
 history.
 
@@ -905,9 +907,9 @@ producer published no day. Open-Meteo's dates are software releases, and the hos
 deploy a change on a different day.
 
 **A CAMS version change may rewrite history, because the Radiation Service computes each request
-afresh.** The changelog says that v4.6 left data before 2023-06-27 unchanged, and says nothing
-either way about v4.0 and v4.5. A series fetched before a version change and one fetched after it
-may therefore disagree over the same hours, which is one more reason to [snapshot each
+afresh.** The changelog says that v4.6 left data before 2023-06-27 unchanged, and says nothing either
+way about v4.0 and v4.5. A series fetched before a version change and one fetched after it may
+therefore disagree over the same hours, which is one more reason to [snapshot each
 fetch](#cams-use-the-point-api-not-the-gridded-product).
 
 **Two fields in Dynamical.org's ENS archive start part-way through it.** The archive starts on
