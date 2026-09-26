@@ -131,8 +131,8 @@ def figure(*, absolute: pl.DataFrame) -> alt.VConcatChart:
     caption = alt.TitleParams(
         wrapped(
             text=(
-                "Figure 1: Of the ensemble means tested, ICON-D2-EPS's had the lowest error for "
-                "solar power and, by a small margin, for wind power"
+                "Figure 1: ICON-D2-EPS's ensemble mean had the lowest solar error and tied for "
+                "the lowest wind error at 10 m"
             ),
             width=72,
         ),

@@ -61,6 +61,18 @@ def test_a_lead_beyond_the_maximum_is_never_used():
     assert means["valid_time"].to_list() == [DAY + timedelta(hours=24)]
 
 
+def test_a_lead_of_exactly_the_maximum_is_used():
+    rows = _member_rows(
+        site="A", init_time=DAY, valid_time=DAY + timedelta(hours=69), values=[1.0, 3.0]
+    )
+
+    means = newest_run_member_means(
+        members=rows, value_columns=["value"], expected_members=2, max_lead_hours=69
+    )
+
+    assert means["value"].to_list() == [2.0]
+
+
 def test_a_run_missing_a_member_raises():
     rows = _member_rows(
         site="A", init_time=DAY, valid_time=DAY + timedelta(hours=3), values=[1.0, 3.0, 5.0]
@@ -139,6 +151,16 @@ def test_interpolation_never_crosses_a_site_boundary():
 
 def test_interpolation_across_a_missing_step_raises():
     steps = _steps(values=[0.0, 3.0, 6.0]).filter(pl.col("value") != 3.0)
+
+    with pytest.raises(ValueError, match="3 hours"):
+        interpolate_instants_hourly(steps=steps, value_columns=["value"])
+
+
+def test_interpolation_across_a_gap_shorter_than_a_step_raises():
+    steps = _steps(values=[0.0, 3.0, 6.0])
+    steps = steps.with_columns(
+        valid_time=pl.Series([DAY, DAY + timedelta(hours=3), DAY + timedelta(hours=5)])
+    )
 
     with pytest.raises(ValueError, match="3 hours"):
         interpolate_instants_hourly(steps=steps, value_columns=["value"])
