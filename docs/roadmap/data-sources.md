@@ -429,6 +429,56 @@ degrees of freedom. The [ensemble-means
 study](../studies/forecasts/ensemble-means.md#what-open-meteos-source-code-does-for-the-mogreps-uk-mean)
 records what Open-Meteo's source code does.
 
+### What we learnt about Met Office IMPROVER on 2026-09-26
+
+**The Met Office publishes its IMPROVER post-processing system's output on AWS as the Blended
+Probabilistic Forecast (BPF), and the BPF carries no irradiance.** The BPF is in the AWS Open Data
+programme in `eu-west-2`, as NetCDF under CC BY-SA 4.0, with a [percentiles
+bucket](https://registry.opendata.aws/met-office-bpf-uk-gridded-percentiles/) and a [probabilities
+bucket](https://registry.opendata.aws/met-office-bpf-uk-gridded-probabilities/) on a 2 km UK grid.
+Lead times are hourly to 120 hours and then 3-hourly to 186 hours. A new blend appears about every
+15 minutes, and each object expires after 30 days. In the percentiles bucket, the 44 variables
+listed by file name on 2026-09-15 include total cloud amount, low cloud amount, and the UV index,
+and no downward shortwave, direct, diffuse, or sunshine-duration field.
+
+**The BPF carries wind at 10 m only, so it cannot serve either purpose that the weather-product
+studies score.** The wind fields are `wind_speed_at_10m`, `wind_direction_at_10m`, and the 1-hour
+and 3-hour maximum gust at 10 m. No 100 m wind is listed. Cloud cover is a weak substitute for the
+direct and diffuse shortwave that [the PV forward model](disaggregation.md#the-forward-model) needs.
+
+**The BPF is a calibrated blend, so it cannot stand in for MOGREPS-UK members in the ensemble-means
+comparison.** IMPROVER post-processes and blends MOGREPS-UK with other models and reports
+percentiles and threshold probabilities. The BPF therefore holds no raw members from which to
+compute a mean.
+
+**Recording the BPF whole would take about 800 GB a day per bucket.** One day (2026-09-15)
+held about 807 GB in the percentiles bucket and 719 GB in the probabilities bucket, for the whole
+grid. A useful field set (cloud, screen temperature, 10 m wind and gust, precipitation rate,
+visibility, humidity, and pressure) was 279 GB in the percentiles bucket. We estimate, from the
+bounding box, that Great Britain is about 22% of the grid, which gives about 60 GB a day cropped to
+Great Britain for that field set. Keeping one blend every 6 hours would be about 1 TB a year, also an
+estimate. The bucket holds 30 days, so a longer archive cannot be back-filled. In the searches
+behind [issue #801](https://github.com/openclimatefix/nged-substation-forecast/issues/801), we
+found no archive of MOGREPS-UK, and we did not verify whether one exists for the BPF.
+
+**We do not plan to archive the BPF.** A small forward recorder is worth building only if a study
+wants the operational blend as a benchmark to beat. See #801 for where such a recorder would be
+tracked.
+
+**The open-source IMPROVER code can weight lagged runs by age, but whether the operational blend
+does so is unverified.** In the code at commit
+[`acf4ab6`](https://github.com/metoppv/improver/tree/acf4ab6d08cff2e52359bcc62e8bfe0788958218/improver/blending),
+the weights can come from four sources. A dictionary gives piecewise-linear weights along a
+coordinate such as lead time. A default linear rule runs between a start value and an end value. A
+non-linear rule sets the weight of the i-th cycle to `cval**i` and can order the cycles so that the
+newest is heaviest. A triangular rule is the fourth. The utility that merges lagged runs into one
+ensemble only pools the members, without weighting them by age, and the repository's own
+cycle-blending command line uses equal weights. The operational number of MOGREPS-UK lagged runs and
+their weights are not in the repository, so the ensemble-means question of how to weight members of
+different ages is not answered by it. The next source to read is [Roberts et al.
+(2023)](https://doi.org/10.1175/BAMS-D-21-0273.1), which returned HTTP 403 when we tried and has not
+been read.
+
 ### ECMWF has published no plan to open a direct beam or hourly ensemble steps
 
 **Asked in July 2025 whether the open-data parameter list would grow, ECMWF said it would not grow
