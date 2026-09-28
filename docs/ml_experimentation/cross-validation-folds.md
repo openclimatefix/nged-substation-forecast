@@ -61,13 +61,26 @@ per leaderboard epoch by the `eligible_time_series` asset.
 
 ## Target: multiple yearly folds 🚧
 
-**Once Dynamical.org has backfilled ECMWF ENS to the earlier years**, we will move to the original
-target protocol: an expanding training window with one **complete-year** validation fold per year
-(2022, 2023, 2024, 2025, …), validated on real forecast NWP throughout. Adding those folds starts a
-**new leaderboard epoch** (every experiment is re-scored against the new fold set), and is a
-`conf/cv/default.yaml` edit with no schema change. That back-fill is not expected until **~November
-2027** — after v1.0 — and covers 00Z initialisations only
-([reformatters#446](https://github.com/dynamical-org/reformatters/issues/446)).
+**Once more years of ECMWF ENS history are available, we will move to the original target
+protocol**: an expanding training window with one **complete-year** validation fold per year (2022,
+2023, 2024, 2025, …), validated on real forecast NWP throughout. Adding those folds starts a **new
+leaderboard epoch** (every experiment is re-scored against the new fold set), and is a
+`conf/cv/default.yaml` edit with no schema change.
+
+Two routes could deliver the extra history. Dynamical.org's own Zarr backfill was estimated at
+**~November 2027** as of 2026-05 — after v1.0 — and covers 00Z initialisations only
+([reformatters#446](https://github.com/dynamical-org/reformatters/issues/446)). A pilot
+([#951](https://github.com/openclimatefix/nged-substation-forecast/issues/951), merged) proved a
+nearer-term alternative: Dynamical.org's staged raw GRIB files can be decoded ourselves, filling
+2021-03 to 2024-03 — about three of the missing years — without waiting for their Zarr backfill. The
+wider fetch that would actually populate these folds is tracked in
+[#959](https://github.com/openclimatefix/nged-substation-forecast/issues/959), currently on hold
+while Dynamical.org checks whether they can materialise their own Zarr backfill over this range
+sooner than 2027 (see [Extending the training
+history](../roadmap/training-history.md#a-staged-grib-route-fills-three-of-the-missing-years-without-waiting-for-the-zarr-backfill)).
+The fold design for a rolling-origin evaluation over whichever history lands — decoupled from
+exactly how often production ends up retraining — is tracked separately in
+[#960](https://github.com/openclimatefix/nged-substation-forecast/issues/960).
 
 Because of that timescale, the plan is to **pre-train** on ERA5 reanalysis and fine-tune on ECMWF
 ENS, using the long power histories some assets have back to 2020. Pre-training is a training-time
