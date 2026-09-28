@@ -274,9 +274,10 @@ tree-search-style expansion (spend more of the budget extending the most promisi
 rest early) would out-perform a flat tournament here is untested by any of them. And none offers a
 mechanism for **deciding the most informative next experiment**, rather than the next experiment that
 is merely plausible — Co-Scientist's tournament ranks hypotheses that already exist; it does not
-choose what to generate next. Self-driving laboratories in other fields have identified that choice
-as the crucial component of an autonomous research loop, but this project has not yet reviewed that
-literature directly.
+choose what to generate next. An idea raised in internal discussion, drawn from self-driving-lab
+practice in materials science rather than from a paper this project has reviewed directly, is that
+this choice is the crucial component of an autonomous research loop — worth checking against that
+literature before relying on it.
 
 **Energy forecasting has an advantage over the fields the papers above are drawn from: a genuine,
 uncheatable check on results.** Every one of the three papers above relies on a simulated review or a
