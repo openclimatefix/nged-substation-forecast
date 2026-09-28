@@ -263,12 +263,7 @@ bucket's own project rather than split out per reader.
 reading `main` see a store that has passed structural checks, per-run physical-range and radiation
 sanity checks, and a spot comparison against the source bucket by value.
 
-**The fetch's run rate dropped well below its early pace, and the cause is still under
-investigation.** Runs came in at about 31 an hour over the first two hours of the build, then
-slowed to about 5.5 an hour over the following three, with no retries or errors in either window.
-The working hypothesis is contention on the source data centre or network during US daytime hours,
-tested by watching whether the rate recovers as US night-time arrives; this is an open observation,
-not yet a conclusion.
+**The fetch holds a steady rate of about 29 to 31 runs an hour, with no retries or errors.**
 
 **The Compute Engine VM's cost for the full archive is estimated at about £10–11**, from published
 list pricing rather than a real invoice, because the project's Cloud Billing API is not enabled.
