@@ -72,5 +72,10 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
   the sun alone.
 - `fractions_skill_score` — a timing-tolerant score, which asks whether a forecast put a threshold
   exceedance near the right hour rather than exactly on it.
+- `grib1_simple` — reading the header and a band of rows from a GRIB edition 1 message with 16-bit
+  simple packing, and decoding it without a GRIB library.
+- `ens_grib_source` — the sidecar index, the bucket listing and the pilot date draw for the staged
+  ECMWF ENS GRIB files.
+- `deaccumulation` — turning accumulated precipitation or radiation totals into per-second rates.
 - `charts` — the dot-and-interval chart panel, the figure caption, the colour of each product
   family, and the parser that reads a study report's contrast tables.
