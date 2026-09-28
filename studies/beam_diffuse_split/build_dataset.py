@@ -37,7 +37,7 @@ import numpy as np
 import polars as pl
 import pvlib
 import xarray as xr
-from era5_grid import LAST_DATE
+from era5_grid import PUBLISHED_LAST_DATE
 from sources import (
     EXTRACTED_SOURCES,
     OPEN_METEO_MODELS,
@@ -205,8 +205,8 @@ KELVIN_TO_CELSIUS_OFFSET: Final[float] = 273.15
 def read_era5(*, source: SourceType) -> pl.DataFrame:
     """Read one ERA5 download into a long frame of hourly fluxes, trimmed to the shared span.
 
-    Both sources are trimmed at `era5_grid.LAST_DATE`, because the Copernicus request is made in
-    whole months and would otherwise run a few days past where the mirror stops.
+    Both sources are trimmed at `era5_grid.PUBLISHED_LAST_DATE`, because the Copernicus request is
+    made in whole months and would otherwise run a few days past where the mirror stops.
 
     Args:
         source: Which download to read.
@@ -217,7 +217,7 @@ def read_era5(*, source: SourceType) -> pl.DataFrame:
     era5 = _read_open_meteo() if source == "open-meteo" else _read_cds_archives()
     return era5.filter(
         pl.col("time")
-        <= pl.lit(f"{LAST_DATE} 23:00:00").str.to_datetime().dt.replace_time_zone("UTC")
+        <= pl.lit(f"{PUBLISHED_LAST_DATE} 23:00:00").str.to_datetime().dt.replace_time_zone("UTC")
     )
 
 

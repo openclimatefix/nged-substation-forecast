@@ -31,7 +31,7 @@ from typing import Final
 
 import polars as pl
 from build_dataset import _wind_sites
-from era5_grid import LAST_DATE, LAST_YEAR
+from era5_grid import FIRST_DATE_OVERRIDE, LAST_DATE, LAST_YEAR, suffixed
 from fetch_open_meteo_point import fetch_point_frame
 from sources import HISTORICAL_FORECAST_URL, WEATHER_DATA_DIR
 
@@ -55,8 +55,11 @@ It is native for the ICON products, and Open-Meteo also serves it for UKV, where
 rescaling of the 100 m value. ERA5 publishes no 80 m wind.
 """
 
-FIRST_DATE: Final[str] = "2024-08-12"
-"""The first day of the window: when Open-Meteo's own UKV downloader started."""
+FIRST_DATE: Final[str] = FIRST_DATE_OVERRIDE or "2024-08-12"
+"""The first day of the window: when Open-Meteo's own UKV downloader started.
+
+`ERA5_FIRST_DATE` overrides it.
+"""
 
 PRODUCTS: Final[dict[str, tuple[str, str]]] = {
     "era5": ("era5", ARCHIVE_URL),
@@ -77,14 +80,20 @@ def output_path_for(*, product: str) -> Path:
     Returns:
         The parquet path.
     """
-    return WEATHER_DATA_DIR / product.upper().replace("_", "-") / f"wind_{product}.parquet"
+    return suffixed(
+        WEATHER_DATA_DIR / product.upper().replace("_", "-") / f"wind_{product}.parquet"
+    )
 
 
 def main() -> int:
-    """Download every product's wind at every wind generator, one year per request."""
+    """Download wind at every wind generator, one year per request.
+
+    Downloads every product, or only those named on the command line.
+    """
     sites = _wind_sites()
     first_year = int(FIRST_DATE[:4])
-    for product, (models_parameter, base_url) in PRODUCTS.items():
+    products = {name: PRODUCTS[name] for name in sys.argv[1:]} or PRODUCTS
+    for product, (models_parameter, base_url) in products.items():
         frame = pl.concat(
             fetch_point_frame(
                 sites=sites,
