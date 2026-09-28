@@ -578,10 +578,22 @@ TS-Arena pattern instead.
 #### Implementation details — final-test window (deleted when it ships)
 
 **1. Document the caveat (immediately).** A short "Selection bias" subsection in
-`docs/ml_experimentation/cross-validation-folds.md` restating the paragraphs above. This is the only
-step that can be taken now.
+`docs/ml_experimentation/cross-validation-folds.md` restating the paragraphs above.
 
-**2. Reserve a final-test window once a second, independent year of data exists — not by shrinking
+**2. Add a narrow guard now, ahead of the full reservation.** Add `FINAL_TEST_START` to the fold
+configuration in `conf/cv/default.yaml`, a single date near the end of the current archive. The
+`metrics` asset refuses to score any window reaching past `FINAL_TEST_START` unless
+`NGED_FINAL_TEST=1` is set in the environment — set only in the maintainer's own shell, never by an
+experiment or a study script. The study power reader in `packages/studies` truncates at the same
+date. With the variable unset, an ordinary training or scoring run is unaffected, so this holds
+nothing out of day-to-day use and does not conflict with the concern below about training on as much
+data as possible. What it buys immediately, ahead of Dynamical.org's backfill, is a guard against an
+experiment — especially an unsupervised autonomous research session (see [Protect the leaderboard
+scorer for autonomous
+research](https://github.com/openclimatefix/nged-substation-forecast/issues/958)) — scoring on data
+past the cutoff without the maintainer's explicit say-so.
+
+**3. Reserve a final-test window once a second, independent year of data exists — not by shrinking
 the fold that decides promotion.** (Jack's note: I'm not convinced we should do this yet. Even when
 we have several years of data, may still want to train on as much data as possible, and not to hold
 out a separate "test" year. When we have multiple folds, I think a better test of "honest
@@ -612,9 +624,12 @@ keys have the same property if fold populations differ. When adding any fold, ei
 leaderboard fold emits an identical key set, or make the parent-run aggregation record its per-key
 denominator.
 
-**Verification.** `register_experiment_job` must never create a partition for the `final_test` fold
-in any run mode (extend `tests/test_register_experiment_job.py`); and once the disjoint year lands,
-score one existing experiment against the reserved window end-to-end and confirm the rows reach
+**Verification.** For the narrow guard: the `metrics` asset raises on a window past
+`FINAL_TEST_START` with `NGED_FINAL_TEST` unset, and accepts it with the variable set; the study
+power reader returns no rows after `FINAL_TEST_START`. For the full reservation:
+`register_experiment_job` must never create a partition for the `final_test` fold in any run mode
+(extend `tests/test_register_experiment_job.py`); and once the disjoint year lands, score one
+existing experiment against the reserved window end-to-end and confirm the rows reach
 `forecast_metrics.delta` with the window label while nothing is logged to the leaderboard MLflow
 runs.
 
@@ -849,12 +864,21 @@ before/after instruments for Phases C and D.
   alongside (or within) the `effective_capacity` asset — same full-history stability rationale, same
   join shape (`time_series_id`-only). Constraint-side direction resolved per `time_series_type`;
   confirm the mapping with NGED for ambiguous types (BESS charges *and* discharges).
+- **Decide whether `historical_p99` is computed from the full observation history or from the
+  training window only.** `effective_capacity`, which `historical_p99` piggybacks on, is a
+  full-history P99 that includes the validation window, so a threshold built on it can see the same
+  outcomes a model is scored against. A training-window-only threshold avoids that leak, at the cost
+  of a threshold that shifts between folds rather than staying one fixed number per series.
 - **twCRPS:** transform members and observation with `pl.max_horizontal(col, threshold)` and reuse
   the existing fair-CRPS expression (sorted-member identity, Float64 accumulation) verbatim.
 - **Exceedance rates:** compare `y` against the already-computed empirical quantile columns for p80,
   p90, p95, p98, p99 — one boolean mean per level.
 - **Brier score:** exceedance probability = member fraction above the threshold; outcome indicator
   from `y`; squared difference, averaged.
+- **Report the event count behind every tail metric, and refuse a thin contrast.** Print the number
+  of exceedance days each tail metric is computed over, and refuse a comparison between two
+  candidates when either side's event count falls below a minimum (an implementation-time choice) —
+  a metric computed over a handful of exceedances is not a reliable ranking signal.
 - **MLflow allowlist:** extend `_MLFLOW_LOGGED_PARAMETRIC` with a small headline subset (e.g.
   `twcrps@historical_p99`, exceedance rate at p95, `brier@historical_p99`); decide the exact set at
   implementation time and keep it small — everything is in Delta regardless.
