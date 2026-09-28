@@ -151,6 +151,12 @@ def assign_folds(*, dataset: pl.DataFrame, by: Sequence[str] = ("site",)) -> pl.
     scored by models that trained on the version being scored, rather than by a last fold whose
     model saw only the earlier version.
 
+    **If the data spans a product-version boundary, call `cut_eras()` instead of this function
+    directly.** The plain `by=("site",)` default has no notion of eras, so it can silently hold a
+    calendar month out of every fold's training data in one era while leaving it covered in
+    another — the bug `cut_eras()`, `rotate_folds()` and `raise_on_uncovered_months()` exist to
+    fix (see issue #868).
+
     Args:
         dataset: Rows carrying the `by` columns and the `month` label.
         by: The columns each fold count is taken within.
