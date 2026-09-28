@@ -232,8 +232,9 @@ Zarr backfill over this same range sooner than the ~November 2027 estimate above
 replace the hand-rolled GRIB decode with a plain Zarr read. Issue
 [#959](https://github.com/openclimatefix/nged-substation-forecast/issues/959) tracks the wider
 staged-GRIB fetch and is paused pending their reply, rather than committing to a fetch effort
-estimated at 6–14 days on the workstation (control member) or up to 30 TB and $10–30 on a cloud
-machine (all 51 members) if Dynamical.org's own Zarr route lands first.
+estimated at ~4-5 hours and 530 GB for the control member alone, or up to 6-14 days on the
+workstation (or an estimated $10-30 on a cloud machine, in a few hours) for all 51 members, if
+Dynamical.org's own Zarr route lands first.
 
 Two details still worth tracking regardless of which route lands:
 

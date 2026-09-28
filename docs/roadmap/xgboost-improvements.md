@@ -1474,8 +1474,8 @@ exact zeros at night.)
 ## Explicitly deferred (not quick, or not skill)
 
 - **A two-stage weather-to-power model (Stage A frozen, Stage B calibrates) is the classical "perfect
-  prog" method, and a reviewer's conclusion is that it likely trades skill for calibration rather
-  than buying skill outright.** The idea: Stage A learns weather to power from best-estimate weather
+  prog" method, and a reviewer's conclusion is that it likely gains calibration rather than skill.**
+  The idea: Stage A learns weather to power from best-estimate weather
   only (CAMS, ERA5, analyses), then freezes; Stage B takes Stage A's output on forecast weather, plus
   raw forecast weather, lead time and lagged power, and learns to calibrate uncertainty and correct
   with lags. A model trained only on best-estimate weather learns the power response smoothed by
