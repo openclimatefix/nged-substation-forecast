@@ -37,6 +37,16 @@ way):
   ARPEGE Europe, all served the same way by Open-Meteo's historical-forecast API.
 - `fetch_open_meteo_previous_runs.py` — 11 models' Previous Runs (lead days 0 to 7) at the nine
   anonymised sites, from Open-Meteo's Previous Runs API.
+- `fetch_open_meteo_ensemble_means.py` and `validate_open_meteo_ensemble_means.py` — the ensemble mean
+  and spread of MOGREPS-UK (`ukmo_uk_ensemble_mean_2km`), ICON-D2-EPS (`dwd_icon_d2_eps_ensemble_mean`),
+  ICON-EU-EPS (`dwd_icon_eu_eps_ensemble_mean`), and ECMWF IFS ENS at 0.25 degrees
+  (`ecmwf_ifs025_ensemble_mean`), at the nine anonymised sites, from Open-Meteo's Ensemble API. All
+  four are served as one stitched series (no `init_time`) from 2026-06-25, measured on 2026-09-26
+  with `--probe-first-date`, so a later re-run may find a moved start. The plain `icon_d2_eps` and
+  `icon_eu_eps` models serve members only. The 100 m wind is all null for MOGREPS-UK and ICON-EU-EPS.
+  The Historical Forecast and Previous Runs APIs serve the MOGREPS-UK mean as all null, and every
+  Single Runs request for the mean models returned "run not available". The full fetch is about 504
+  weighted calls (4 products x 7 windows x 9 sites x 2).
 - `fetch_cerra.py` — CERRA solar radiation and wind, from the Copernicus Climate Data Store, needs
   `uv run --with cdsapi --with netCDF4`.
 - `fetch_era5_wind.py` — native ERA5 10 m and 100 m wind from the Climate Data Store at a 3 x 3 block
