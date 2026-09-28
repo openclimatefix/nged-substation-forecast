@@ -31,10 +31,10 @@ complete or missing. Pass `--retry-partial` to fetch partial and missing runs ag
 stops two writers. The download is one stream with a delay between files, retries with backoff, and
 an HTTP Range resume of an interrupted file, and it stops below `--min-free-gb` of free disk. A
 file whose retries are all exhausted by a transient CEDA-side fault (a 500, a timeout) is skipped,
-marking the run partial, rather than crashing the whole archive — the only faults that stop the
-process outright are an auth failure (`CedaAuthError`, every later request would fail the same
-way) and low disk. A day whose directory listing fails or is empty is skipped and never recorded,
-so a later run retries it.
+marking the run partial, rather than crashing the whole archive. An auth failure
+(`CedaAuthError`, every later request would fail the same way) gets one automatic token refresh
+and retry; if that retry also fails, or low disk is reached, the process stops outright. A day
+whose directory listing fails or is empty is skipped and never recorded, so a later run retries it.
 
 Set `CEDA_TOKEN` in the environment (a CEDA access token). The script never prints or stores it, and
 never follows a redirect: a redirect means the token was rejected. Run it with `uv run --with
@@ -1268,7 +1268,9 @@ def _token_expiry(token: str) -> datetime | None:
     padded = parts[1] + "=" * (-len(parts[1]) % 4)
     try:
         payload = json.loads(base64.urlsafe_b64decode(padded))
-    except ValueError, json.JSONDecodeError:
+    except ValueError:
+        return None
+    if not isinstance(payload, dict):
         return None
     exp = payload.get("exp")
     return datetime.fromtimestamp(exp, tz=UTC) if isinstance(exp, int | float) else None
