@@ -206,6 +206,7 @@ def compare_with_eccodes(
 def section_decoding(*, dates: dict[date, dict[str, np.ndarray]]) -> None:
     """Section (a) and (b): compare a sample of messages with ecCodes, and check lengths."""
     emit("## (a) Hand decode against ecCodes, and (b) message lengths")
+    emit()
     if eccodes is None:
         emit("SKIPPED: the eccodes package is not installed (use `uv run --with eccodes`).")
         return
@@ -248,6 +249,7 @@ def section_decoding(*, dates: dict[date, dict[str, np.ndarray]]) -> None:
     emit(f"Of the compared messages, 10u with a negative reference value: {sampled_negative}")
     emit()
     emit("### (b) The idx chain")
+    emit()
     for day, arrays in dates.items():
         stats = RequestStats()
         problems = 0
@@ -279,6 +281,7 @@ def section_integrity(*, dates: dict[date, dict[str, np.ndarray]]) -> None:
     import hashlib
 
     emit("## (c) Integrity: a second fetch of random ranges")
+    emit()
     rng = random.Random(CHECK_SEED + 1)
     every = [
         (day, (v, 0, s))
@@ -306,6 +309,7 @@ def section_integrity(*, dates: dict[date, dict[str, np.ndarray]]) -> None:
 def section_physics(*, dates: dict[date, dict[str, np.ndarray]]) -> None:
     """Section (d): minimum, maximum and mean of every variable, and the temperature units."""
     emit("## (d) Physical sanity")
+    emit()
     emit("| variable | min | max | mean | non-finite |")
     emit("|---|---|---|---|---|")
     means = {}
@@ -347,6 +351,7 @@ def _deaccumulate(
 def section_deaccumulation(*, dates: dict[date, dict[str, np.ndarray]]) -> None:
     """Section (e): apply Dynamical's de-accumulation and report what it clamps or invalidates."""
     emit("## (e) De-accumulation")
+    emit()
     emit("Dynamical.org expects a clamped fraction of 0.08 and an invalid fraction of 0.01.")
     emit("| date | variable | lead-0 max abs | clamped | invalid | drops in the accumulation |")
     emit("|---|---|---|---|---|---|")
@@ -394,6 +399,7 @@ def section_deaccumulation(*, dates: dict[date, dict[str, np.ndarray]]) -> None:
 def section_grid(*, dates: dict[date, dict[str, np.ndarray]]) -> None:
     """Section (f): compare the fetched rows and columns with the pipeline's grid cells."""
     emit("## (f) Grid registration")
+    emit()
     weights = pl.read_parquet(data_dir().parents[1] / "h3_grid_weights.parquet")
     latitudes = weights["nwp_lat"].unique().to_numpy().astype(np.float64)
     longitudes_east = np.mod(weights["nwp_lon"].unique().to_numpy().astype(np.float64), 360)
@@ -403,10 +409,11 @@ def section_grid(*, dates: dict[date, dict[str, np.ndarray]]) -> None:
     missing_longitudes = [v for v in longitudes_east if not np.isclose(fetched_longitudes, v).any()]
     emit(
         f"The pipeline uses {len(latitudes)} latitudes from {latitudes.min()} to "
-        f"{latitudes.max()} and "
-        f"{len(longitudes_east)} longitudes from {weights['nwp_lon'].min()} to "
-        f"{weights['nwp_lon'].max()} "
-        "degrees east on the -180 to 180 axis."
+        f"{latitudes.max()} degrees north."
+    )
+    emit(
+        f"The pipeline uses {len(longitudes_east)} longitudes from {weights['nwp_lon'].min()} to "
+        f"{weights['nwp_lon'].max()} degrees east on the -180 to 180 axis."
     )
     emit(
         f"The fetched rows run from {fetched_latitudes.max()} to "
@@ -421,6 +428,7 @@ def section_grid(*, dates: dict[date, dict[str, np.ndarray]]) -> None:
 def section_validation(*, dates: dict[date, dict[str, np.ndarray]]) -> None:
     """Section (g): gaps, duplicates, NaNs, the diurnal profile and monotonic accumulations."""
     emit("## (g) Data-validation checklist")
+    emit()
     steps_ok = sum(list(a["steps_hours"]) == list(STEPS_HOURS) for a in dates.values())
     emit(f"Dates whose step axis equals the 85 expected steps exactly: {steps_ok} of {len(dates)}")
     duplicates = sum(
@@ -474,6 +482,7 @@ def main() -> int:
     section_grid(dates=dates)
     section_validation(dates=dates)
     emit("## (h) Totals")
+    emit()
     files = sorted((data_dir() / "control").glob("*.npz"))
     emit(
         f"Checkpoint files: {len(files)}, "

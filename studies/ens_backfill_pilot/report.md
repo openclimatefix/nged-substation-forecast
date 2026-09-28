@@ -3,6 +3,7 @@
 Checkpoint files read: 23 dates, 2021-04-22 to 2024-03-31.
 
 ## (a) Hand decode against ecCodes, and (b) message lengths
+
 ecCodes version 2.49.0.
 Messages compared: 317 across 23 dates, each fetched whole.
 hand_equals_eccodes: 317 of 317 true, 0 mismatches
@@ -16,6 +17,7 @@ grid_agrees: 317 of 317 true, 0 mismatches
 Of the compared messages, 10u with a negative reference value: 62
 
 ### (b) The idx chain
+
 2021-04-22: idx gaps or overlaps 0; stored offset or length differs from idx 0
 2021-06-02: idx gaps or overlaps 0; stored offset or length differs from idx 0
 2021-06-23: idx gaps or overlaps 0; stored offset or length differs from idx 0
@@ -41,9 +43,11 @@ Of the compared messages, 10u with a negative reference value: 62
 2024-03-31: idx gaps or overlaps 0; stored offset or length differs from idx 0
 
 ## (c) Integrity: a second fetch of random ranges
+
 Ranges re-fetched: 20; SHA-256 differs from the first fetch: 0
 
 ## (d) Physical sanity
+
 | variable | min | max | mean | non-finite |
 |---|---|---|---|---|
 | 2t | 258.816 | 307.9 | 284.228 | 0 |
@@ -63,6 +67,7 @@ Ranges re-fetched: 20; SHA-256 differs from the first fetch: 0
 z500 mean 54569 m2 s-2 is 5564 m of geopotential height.
 
 ## (e) De-accumulation
+
 Dynamical.org expects a clamped fraction of 0.08 and an invalid fraction of 0.01.
 | date | variable | lead-0 max abs | clamped | invalid | drops in the accumulation |
 |---|---|---|---|---|---|
@@ -151,13 +156,16 @@ a fixed 3 h divisor. The actual-seconds rate should be continuous across the cha
 | 162 | 317.68 | 635.36 |
 
 ## (f) Grid registration
-The pipeline uses 48 latitudes from 49.5 to 61.25 and 45 longitudes from -9.0 to 2.0 degrees east on the -180 to 180 axis.
+
+The pipeline uses 48 latitudes from 49.5 to 61.25 degrees north.
+The pipeline uses 45 longitudes from -9.0 to 2.0 degrees east on the -180 to 180 axis.
 The fetched rows run from 61.25 to 49.0 degrees north.
 Pipeline latitudes missing from the fetched rows: []
 Pipeline longitudes missing from the fetched columns: []
 Section (a) checks the ecCodes latitude and longitude arrays of one message.
 
 ## (g) Data-validation checklist
+
 Dates whose step axis equals the 85 expected steps exactly: 23 of 23
 Duplicate range hashes within a date (would mean two keys read one message): 0
 NaN values in all stored arrays: 0
@@ -175,6 +183,7 @@ Mean ssrd rate (W m-2) by valid hour of day, leads 3 to 24 h (period ending):
 Largest ssrd rate at valid hours 00 and 03 UTC: 11.662 W m-2
 
 ## (h) Totals
+
 Checkpoint files: 23, 316.5 MB on disk.
 Messages stored: 23460; range bytes fetched for them: 11.15 GB.
-The check took 106 s.
+The check took 72 s.
