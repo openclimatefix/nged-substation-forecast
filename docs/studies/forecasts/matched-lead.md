@@ -1642,6 +1642,14 @@ and -0.385 points [-0.512, -0.263]. Wind: -0.305 points [-0.603, -0.099] at day 
 Blending AIFS ENS's mean with ENS's mean is descriptive only, for the fold-coverage reason above.
 <!-- report (blends): Solar and Wind, `single` and `ens`, days 1 and 2 -->
 
+**AIFS ENS's mean is close to ENS's mean at days 7 and 14 too, for both technologies (descriptive
+only).** For solar, AIFS ENS's mean minus ENS's mean is +0.066 points [-0.193, +0.360] at day 7
+(14.208% against 14.142%) and -0.287 points [-0.701, +0.097] at day 14 (15.083% against 15.370%).
+For wind, it is +0.341 points [-0.746, +1.630] at day 7 (18.104% against 17.763%) and +0.263 points
+[-1.316, +1.968] at day 14 (20.982% against 20.719%). These four contrasts carry the same
+fold-coverage limitation as the day-1 and day-2 AIFS ENS rows above, and none is a claim.
+<!-- report (blends): Solar and Wind, `ens`, days 7 and 14 -->
+
 ![AIFS Single, ENS, and their blend at days 1, 2, 7, and 14 on solar power: each forecast's own
 error and paired differences](../assets/nwp_forecast_solar_aifs_leads.svg)
 
