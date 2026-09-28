@@ -2,7 +2,9 @@
 
 One-off throwaway script for
 <https://github.com/openclimatefix/nged-substation-forecast/issues/934>, following the
-`data-validation` skill's checklist. It opens the repository read-only on `staging` (or on `main`
+`data-validation` skill's checklist. The source WeatherNext 3 store that `--compare-source` reads
+follows Google's own guide at <https://developers.google.com/weathernext/guides/gcs>. It opens the
+repository read-only on `staging` (or on `main`
 with `--branch main`), pins the branch's snapshot at the start, validates that snapshot, and prints
 one PASS, FAIL, or SKIP line per check. A run that raises is not evidence the data is right, and
 neither is a check that prints PASS: a check that fails names the runs it failed in. The report

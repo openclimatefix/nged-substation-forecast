@@ -4,9 +4,10 @@ One-off throwaway script for
 <https://github.com/openclimatefix/nged-substation-forecast/issues/934>, the WeatherNext 3 arm of
 the matched-lead comparison. The source is the Requester Pays bucket
 `weathernext3_statistics_spatial` in region US-EAST1, which holds one Zarr store per run, at 0.1
-degrees over the globe, with the ensemble mean of each variable. The archive starts on 2026-01-01
-and has a run every hour. The runs at 00, 06, 12, and 18 UTC have 360 hourly lead times, and the
-other hours only 48. This script fetches only the runs at 00, 06, 12, and 18 UTC.
+degrees over the globe, with the ensemble mean of each variable, following Google's own guide at
+<https://developers.google.com/weathernext/guides/gcs>. The archive starts on 2026-01-01 and has a
+run every hour. The runs at 00, 06, 12, and 18 UTC have 360 hourly lead times, and the other hours
+only 48. This script fetches only the runs at 00, 06, 12, and 18 UTC.
 
 **The Zarr chunks are whole-globe, so cropping to the box saves no bytes.** Each chunk holds one
 variable at one lead time over the whole globe, about 20 MB compressed. The script therefore
