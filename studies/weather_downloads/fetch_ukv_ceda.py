@@ -31,21 +31,43 @@ complete or missing. Pass `--retry-partial` to fetch partial and missing runs ag
 stops two writers. The download is one stream with a delay between files, retries with backoff, and
 an HTTP Range resume of an interrupted file, and it stops below `--min-free-gb` of free disk. A
 file whose retries are all exhausted by a transient CEDA-side fault (a 500, a timeout) is skipped,
-marking the run partial, rather than crashing the whole archive — the only faults that stop the
-process outright are an auth failure (`CedaAuthError`, every later request would fail the same
-way) and low disk. A day whose directory listing fails or is empty is skipped and never recorded,
-so a later run retries it.
+marking the run partial, rather than crashing the whole archive. An auth failure
+(`CedaAuthError`, every later request would fail the same way) gets one automatic token refresh
+and retry; if that retry also fails, or low disk is reached, the process stops outright. A day
+whose directory listing fails or is empty is skipped and never recorded, so a later run retries it.
 
 Set `CEDA_TOKEN` in the environment (a CEDA access token). The script never prints or stores it, and
 never follows a redirect: a redirect means the token was rejected. Run it with `uv run --with
 icechunk --with zarr --with eccodes python studies/weather_downloads/fetch_ukv_ceda.py --start
 2026-09-20 --end 2026-09-20 --store-dir <scratch dir>` for a one-day trial. Then check the store
 with `validate_ukv_ceda.py`.
+
+**A CEDA access token is a JWT with a fixed 3-day lifetime and no refresh-token flow** — the only
+way to a fresh one is a new call to CEDA's token API, which itself needs the account password (see
+<https://help.ceda.ac.uk/article/5100-archive-access-tokens#api>). Archiving years of history takes
+many days (see the `data-download` skill's sizing discussion), far longer than one token's life, so
+the script also reads `CEDA_USERNAME` and `CEDA_PASSWORD` from the environment and refreshes the
+token itself: before each run, if the current token is within `TOKEN_REFRESH_MARGIN` of its `exp`
+claim, and again immediately (bypassing the margin) if CEDA ever answers with `CedaAuthError`.
+**`CEDA_PASSWORD` is a stronger secret than `CEDA_TOKEN`** — a leaked token expires in three days
+and reaches only CEDA's open archive, a leaked password does not expire — so the same
+never-print/never-log/never-commit discipline applies to it with no exception, and a refreshed
+token is cached only under `TOKEN_CACHE_PATH` (`~/.cache`, outside the repository, never
+committed), the same trust boundary `~/.bashrc` already holds `CEDA_TOKEN` in. Every one of this
+script's own log lines still names only an exception type or an HTTP status, never a token or a
+password. Every process running this script shares one cache file and one file lock
+(`TOKEN_CACHE_PATH.with_suffix(".lock")`), so only one process calls the token API at a time even
+when several run in parallel (as the three UKV streams do), keeping CEDA's limit of two active
+tokens per account safe from a pile of simultaneous refreshes. If `CEDA_USERNAME`/`CEDA_PASSWORD`
+are not set, the script falls back to the old behaviour: it runs on the one `CEDA_TOKEN` until that
+expires, then exits with `CedaAuthError`, needing a human to supply a fresh token.
 """
 
 import argparse
+import base64
 import fcntl
 import json
+import os
 import re
 import shutil
 import sys
@@ -71,6 +93,15 @@ PRODUCT_NAME: Final[str] = "UKV-CEDA"
 CODE_VERSION: Final[str] = "fetch_ukv_ceda-1"
 BASE_URL: Final[str] = "https://dap.ceda.ac.uk/badc/ukmo-nwp/data/ukv-grib"
 CATALOGUE_URL: Final[str] = "https://catalogue.ceda.ac.uk/uuid/f47bc62786394626b665e23b658d385f"
+
+CEDA_TOKEN_ENDPOINT: Final[str] = "https://services.ceda.ac.uk/api/token/create/"
+TOKEN_CACHE_PATH: Final[Path] = Path.home() / ".cache" / "ceda_token_cache.json"
+"""Where a refreshed token is cached, outside the repository, shared by every process running this
+script — see the module docstring's discussion of `CEDA_PASSWORD` as a stronger secret than
+`CEDA_TOKEN`."""
+TOKEN_REFRESH_MARGIN: Final[timedelta] = timedelta(hours=6)
+"""Refresh a token this far ahead of its `exp` claim, so a run in progress never meets an expired
+token mid-run."""
 
 SLOT_EPOCH: Final[datetime] = datetime(2019, 9, 1, tzinfo=UTC)
 """The first slot of the `init_time` axis. A run's slot is its offset from here in whole cycles."""
@@ -1217,13 +1248,112 @@ def archive(args: argparse.Namespace) -> int:
 
 def _token() -> str:
     """Read the CEDA token from the environment, exiting with a message if it is unset."""
-    import os
-
     token = os.environ.get("CEDA_TOKEN")
     if not token:
         print("CEDA_TOKEN is not set")
         raise SystemExit(1)
     return token
+
+
+def _token_expiry(token: str) -> datetime | None:
+    """The token's JWT `exp` claim, or `None` if the token is not a JWT with one.
+
+    The signature is not verified: this only reads a timestamp CEDA itself put in the token to
+    decide when to ask for a new one, the same trust CEDA's own client already places in the token
+    by sending it as a bearer header.
+    """
+    parts = token.split(".")
+    if len(parts) != 3:
+        return None
+    padded = parts[1] + "=" * (-len(parts[1]) % 4)
+    try:
+        payload = json.loads(base64.urlsafe_b64decode(padded))
+    except ValueError:
+        return None
+    if not isinstance(payload, dict):
+        return None
+    exp = payload.get("exp")
+    return datetime.fromtimestamp(exp, tz=UTC) if isinstance(exp, int | float) else None
+
+
+def _request_new_token() -> str:
+    """Call the CEDA token API with `CEDA_USERNAME`/`CEDA_PASSWORD`, returning a fresh token.
+
+    Returns:
+        A newly issued CEDA access token.
+
+    Raises:
+        KeyError: If `CEDA_USERNAME` or `CEDA_PASSWORD` is not set, or the response has no
+            `access_token` field.
+        requests.RequestException: If the API call fails.
+    """
+    username = os.environ["CEDA_USERNAME"]
+    password = os.environ["CEDA_PASSWORD"]
+    credentials = base64.b64encode(f"{username}:{password}".encode()).decode()
+    response = requests.post(
+        CEDA_TOKEN_ENDPOINT, headers={"Authorization": f"Basic {credentials}"}, timeout=30
+    )
+    response.raise_for_status()
+    return response.json()["access_token"]
+
+
+def _read_cached_token() -> str | None:
+    """The token in `TOKEN_CACHE_PATH`, or `None` if the file is absent or unreadable."""
+    try:
+        return json.loads(TOKEN_CACHE_PATH.read_text())["access_token"]
+    except OSError, ValueError, KeyError:
+        return None
+
+
+def _write_cached_token(token: str) -> None:
+    """Write `token` to `TOKEN_CACHE_PATH` atomically, readable only by this user."""
+    TOKEN_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    partial = TOKEN_CACHE_PATH.with_suffix(".json.partial")
+    partial.write_text(json.dumps({"access_token": token}))
+    partial.chmod(0o600)
+    partial.rename(TOKEN_CACHE_PATH)
+
+
+def ensure_fresh_token(token: str, *, force: bool = False) -> str:
+    """Return a token good for at least `TOKEN_REFRESH_MARGIN`, refreshing via the CEDA API.
+
+    Safe to call from several processes at once: a shared cache file and file lock mean only one
+    process calls the token API when a refresh is due, and the others pick up its result. Falls
+    back to returning `token` unchanged if `CEDA_USERNAME`/`CEDA_PASSWORD` are not set, so the
+    script still runs (until the token expires) without them.
+
+    Args:
+        token: The token currently in use.
+        force: Refresh even if `token` is not yet within `TOKEN_REFRESH_MARGIN` of expiry — used
+            after CEDA has just rejected `token` outright.
+
+    Returns:
+        `token`, or a freshly issued replacement.
+    """
+    expiry = _token_expiry(token)
+    if not force and (expiry is None or expiry - datetime.now(UTC) > TOKEN_REFRESH_MARGIN):
+        return token
+    if "CEDA_USERNAME" not in os.environ or "CEDA_PASSWORD" not in os.environ:
+        return token
+    lock_path = TOKEN_CACHE_PATH.with_suffix(".lock")
+    TOKEN_CACHE_PATH.parent.mkdir(parents=True, exist_ok=True)
+    with lock_path.open("a") as lock_file:
+        fcntl.flock(lock_file, fcntl.LOCK_EX)
+        try:
+            cached = _read_cached_token()
+            if cached is not None and cached != token:
+                cached_expiry = _token_expiry(cached)
+                if (
+                    cached_expiry is not None
+                    and cached_expiry - datetime.now(UTC) > TOKEN_REFRESH_MARGIN
+                ):
+                    return cached
+            new_token = _request_new_token()
+            _write_cached_token(new_token)
+            print("CEDA token refreshed")
+            return new_token
+        finally:
+            fcntl.flock(lock_file, fcntl.LOCK_UN)
 
 
 def _archive_locked(args: argparse.Namespace, *, token: str, product_dir: Path) -> int:
@@ -1259,16 +1389,33 @@ def _archive_locked(args: argparse.Namespace, *, token: str, product_dir: Path) 
             continue
         started = time.monotonic()
         timings = RunTimings()
-        run = fetch_run(
-            http,
-            token=token,
-            init_time=init_time,
-            listing=listing,
-            grid=grid,
-            product_dir=product_dir,
-            min_free_gb=args.min_free_gb,
-            timings=timings,
-        )
+        token = ensure_fresh_token(token)
+        try:
+            run = fetch_run(
+                http,
+                token=token,
+                init_time=init_time,
+                listing=listing,
+                grid=grid,
+                product_dir=product_dir,
+                min_free_gb=args.min_free_gb,
+                timings=timings,
+            )
+        except CedaAuthError:
+            # The token was rejected outright, not just close to its own `exp` claim (a clock
+            # skew, or CEDA revoking it early) — force a refresh, bypassing `TOKEN_REFRESH_MARGIN`,
+            # and retry this one run once before giving up and letting the error propagate.
+            token = ensure_fresh_token(token, force=True)
+            run = fetch_run(
+                http,
+                token=token,
+                init_time=init_time,
+                listing=listing,
+                grid=grid,
+                product_dir=product_dir,
+                min_free_gb=args.min_free_gb,
+                timings=timings,
+            )
         before = _directory_bytes(product_dir / "store") if args.measure else 0
         store.commit_run(run)
         shutil.rmtree(product_dir / "_scratch" / f"{init_time:%Y%m%dT%H}", ignore_errors=True)
