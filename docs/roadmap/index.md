@@ -231,6 +231,77 @@ receives rendered text tables rather than structured data. And the two run-readi
 therefore costs N+1 round trips of text to parse — precisely the operation a leaderboard exists to
 perform.
 
+**The goal is the best forecasting system for grid operators, not novelty for its own sake.** An
+autonomous session here is judged on whether a finding moves the leaderboard, not on whether it is
+publishable. A result reaching production has to beat the standing champion on the honest scorer
+([#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958)); publishable results
+are a welcome side effect, never the target.
+
+**A small literature review of existing autonomous-research agents grounds some of the design
+questions below.** [Lu et al. (2024)](https://arxiv.org/abs/2408.06292)'s AI Scientist generates an
+idea, writes code, runs the experiment, writes the result up as a paper, and then runs an automated
+peer review — the review alone costs $0.25 to $0.50 in API calls per paper, and its automated
+reviewer reaches an F1 score of 0.57 against a human NeurIPS baseline of 0.49, correlating more
+closely with the average human reviewer's score than individual human reviewers correlate with each
+other. [Gottweis et al. (2025)](https://arxiv.org/abs/2502.18864)'s Co-Scientist ranks candidate
+hypotheses through an Elo-rated tournament between specialised agents (generation, reflection,
+ranking, evolution, proximity, and meta-review); across 203 research goals, hypothesis quality
+(measured by Elo rating) kept rising through more tournament rounds rather than plateauing quickly,
+evidence that spending more compute on ranking and revision continues to pay off. [Du et al.
+(2023)](https://arxiv.org/abs/2305.14325) show that a few rounds of debate between separate model
+instances beats both a single model and simple majority voting: three agents debating over two
+rounds raised arithmetic accuracy from 67.0% to 81.8%, and grade-school-math accuracy from 77.0% to
+85.0%.
+
+**Those findings bear on three open questions raised in internal discussion.** Adversarial review
+can be a large part of the answer to "is this finding real", not just a formality — the AI
+Scientist's automated reviewer already exceeds a single human reviewer's F1 score on the same task,
+and an autonomous session here has an even stronger ground truth available than a simulated paper
+review: the leaderboard's honest scorer. Cross-critique between agents (debate) measurably improves
+reasoning on tasks close to what a research session does day to day — arithmetic and word-problem
+accuracy resemble the reasoning a session does when checking its own feature-engineering logic or
+reading a metrics table — which is direct evidence for, not just an analogy to, the "how do we get
+AI agents to critique each other's work" question raised in discussion. And a tournament-style search
+over candidate hypotheses (Co-Scientist) is one concrete answer to the breadth-versus-depth question:
+breadth comes from generating many hypotheses up front, depth comes from repeated tournament rounds
+against the current top of the ranking, and the two are not a manual dial but an emergent property of
+running more rounds.
+
+**Two questions remain open, unanswered by anything reviewed so far.** None of the three papers use
+tree search as their own search strategy — the AI Scientist runs each idea once, and Co-Scientist's
+tournament is closer to an evolutionary search than a tree search — so whether a best-first
+tree-search-style expansion (spend more of the budget extending the most promising branch, prune the
+rest early) would out-perform a flat tournament here is untested by any of them. And none offers a
+mechanism for **deciding the most informative next experiment**, rather than the next experiment that
+is merely plausible — Co-Scientist's tournament ranks hypotheses that already exist; it does not
+choose what to generate next. Self-driving laboratories in other fields have identified that choice
+as the crucial component of an autonomous research loop, but this project has not yet reviewed that
+literature directly.
+
+**Energy forecasting has an advantage over the fields the papers above are drawn from: a genuine,
+uncheatable check on results.** Every one of the three papers above relies on a simulated review or a
+tournament between the system's own agents to judge whether a result is good — a check the system
+being judged had a hand in constructing. A promoted forecasting model is instead checked against
+actual future power delivery, which cannot be gamed by a session that has read the validation set,
+provided the scorer-protection work (#958) actually holds. Data is also comparatively plentiful
+(multiple full years of half-hourly data per series, once the training-history extension lands), and
+each experiment — an XGBoost training run scored against a fixed fold — is cheap and fast compared
+with a wet-lab experiment or a large model pretraining run. That combination is why an autonomous
+research session is worth building here even where the wider literature finds genuine recursive
+self-improvement still blocked in most domains ([Duan et al.,
+2026](https://arxiv.org/abs/2609.11873), surveying the obstacles across scientific discovery,
+embodied AI, and software engineering).
+
+**How a session records its own experience over time is still undecided.** The options are a
+dedicated hypothesis store — a structured record of what was tried, what was found, and why a branch
+was abandoned, richer than an MLflow run — or extending MLflow's existing experiment and run metadata
+to carry the same information. Neither has been evaluated against the other yet.
+
+**This whole section depends on
+[#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958) landing first.** An
+autonomous session is only trustworthy once it cannot edit or bypass the scorer it is judged
+against.
+
 ---
 
 ## v0.6 — Switching Events
