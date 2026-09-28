@@ -8,12 +8,14 @@ sit inside their physical ranges, no variable is all NaN or one constant, each v
 the leads its files serve and NaN at every other lead, and the `init_time` axis is a gap-free
 6-hourly grid across the range archived so far.
 
-`era5`: the UKV analysis fields against ERA5 on disk, at the ERA5 sites' nearest UKV cells. Two
-ERA5 files are used: the 2 m temperature (`temp_c`) of `beam_diffuse_open_meteo.parquet`, on the
-public 0.25 degree grid, compared at the PV sites A to F; and the native 10 m wind (`u10`, `v10`) of
-`wind_native_cds.parquet`, compared at the wind sites W1 to W3. About `--samples-per-year` runs are
-sampled per year, spread across the archived range, and the `LEADS_PER_RUN` hourly leads from lead 0
-(else from the shortest lead with data) of each are used, where ERA5 has the same valid time. Per
+`era5`: the UKV analysis and short-range forecast fields against ERA5 on disk, at the ERA5 sites'
+nearest UKV cells. Two ERA5 files are used: the 2 m temperature (`temp_c`) of
+`beam_diffuse_open_meteo.parquet`, on the public 0.25 degree grid, compared at the PV sites A to F;
+and the native 10 m wind (`u10`, `v10`) of `wind_native_cds.parquet`, compared at the wind sites W1
+to W3. About `--samples-per-year` runs are sampled per year, spread across the archived range, and
+the `LEADS_PER_RUN` hourly leads from lead 0 (else from the shortest lead with data) of each are
+used — lead 0 is the true UKV analysis, the rest of the window is UKV's own 1 to 5 hour forecast —
+where ERA5 has the same valid time. Per
 site label the script prints the correlation, the mean bias (UKV minus ERA5), and the root mean
 square difference. A negative control repeats each comparison with the UKV cell moved 10 rows
 (20 km) south, and the check requires the mean correlation to fall. A spatial check block-averages
@@ -94,10 +96,24 @@ paired times of a store holding a few days are strongly autocorrelated, so a cor
 printed but not judged (a calm 3-day window gave a correlation of 0.44 for a wind site whose bias
 and spread were right). The bias is always judged."""
 TEMPERATURE_MIN_CORRELATION: Final[float] = 0.9
+"""2 m temperature is smooth in space and slow-varying, so a healthy UKV run should track ERA5
+this closely at matching valid times; a genuinely corrupted or mis-mapped array would fall well
+short of 0.9, not just dip below it."""
 TEMPERATURE_MAX_ABS_BIAS_C: Final[float] = 2.0
+"""A model-versus-reanalysis bias of a couple of degrees is ordinary; several degrees would point
+to a unit or level mistake (e.g. a K/degC mix-up, or the wrong analysis time)."""
 WIND_MIN_CORRELATION: Final[float] = 0.7
+"""Looser than the temperature threshold because 10 m wind is noisier and more localised than
+temperature, so even a healthy comparison correlates less tightly — see `MIN_PAIRS_TO_JUDGE`'s own
+note on a calm short window giving 0.44 with an otherwise correct bias and spread."""
 WIND_MAX_ABS_BIAS_M_S: Final[float] = 2.0
+"""A couple of m/s of model-versus-reanalysis bias is ordinary; several would point to a unit
+mistake (e.g. knots left unconverted) or the wrong level."""
 SPATIAL_MIN_CORRELATION: Final[float] = 0.5
+"""The negative control (`SHIFT_ROWS`) is expected to correlate more weakly than the real cell, but
+weather is spatially smooth enough that even a cell 20 km away often still correlates somewhat;
+0.5 is loose enough not to fire on ordinary spatial smoothness, while still catching a shifted
+mapping whose real correlation with the true cell was near the temperature/wind thresholds above."""
 MIN_COVERED_ERA5_CELLS: Final[int] = 4
 BLOCK_COVERAGE_FRACTION: Final[float] = 0.9
 """A 0.25 degree ERA5 cell counts as covered when UKV has at least this fraction of the cells that
