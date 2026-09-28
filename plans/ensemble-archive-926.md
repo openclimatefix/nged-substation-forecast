@@ -144,3 +144,26 @@ Questions for Source Cooperative: whether `s3:PutObjectAcl` is needed given publ
 Adopted: the manifest split every 64 init times (without it a year of runs grows each commit to about 12 MB); each run written to the slot computed from its init time, so late `partial` commits leave the axis sorted and missing runs are NaN slots; status in its own arrays along `init_time` (the coordinate cannot carry it); one padded `step` axis per product instead of a group per step list; the wider IAM policy and the `bucket-owner-full-control` header; the repository's status arrays as the record of what is committed, with the tombstone a cache only; a grid-change stop that reports once instead of retrying; cropped `.npy` files as the local checkpoint, because raw GRIB fills 100 GB in about a day if uploads stop; the corrected chunk shape `(1, 1, steps, cells)`; `ThreadedMotoServer` in place of in-process moto; and the new tests (out-of-order commits, grid mismatch, storage error at commit, idempotency with tombstones deleted). The review showed Icechunk commits survive `kill -9` at eight points, and that building a full ICON-D2-EPS run peaks at 440 MB.
 
 Nothing from this review was rejected. The review used the lockfile's `icechunk` 2.2.0, so the dry run repeats the manifest-split measurement on the version that ships.
+
+## MOGREPS-Global extension (added 2026-09-27)
+
+The maintainer asked, outside this plan's original scope, to also archive MOGREPS-Global's fat-UK
+region to explore blending it with MOGREPS-UK. The bucket has no pre-cropped UK subset — only the
+full global 20 km grid — so `nwp-archivist` crops it to the same Great Britain box on fetch, the
+same way it already crops the other products from their native grids. The product follows the plan
+above unchanged: a fifth Icechunk repository, the same status arrays, padded step axis and
+cache-then-commit pattern, byte-range fetch from the source HDF5 files. Verified against the real
+bucket before any code was written, then a design review and two further reviews of the code (a
+design check of the cross-product backfill coordination below, and a code review of the recorder),
+following the same process as the rest of this plan but run ad hoc rather than through `plan-issue`,
+at the maintainer's request.
+
+Two decisions specific to this product: the archive keeps MOGREPS-Global's full published horizon
+(hourly to 132 h, or 54 h for the two height-level wind fields, then 3-hourly to 246 h) rather than
+trimming it to match MOGREPS-UK's 126 h, because the crop is small (a few KB per file) and the extra
+lead time is useful for exploring how far ensemble blending value extends. And since MOGREPS-UK and
+MOGREPS-Global share the same ~30-day AWS retention window, their backfills coordinate: each
+recorder writes its own oldest-unfetched-run urgency to a small shared file and skips a backfill
+slice when the other product is closer to losing a run, without merging the two recorders into one
+process. A malformed or missing urgency file is treated the same as no coordination — it never
+raises and never blocks a live run.
