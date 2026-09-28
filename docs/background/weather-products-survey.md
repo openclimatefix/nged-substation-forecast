@@ -263,6 +263,20 @@ bucket's own project rather than split out per reader.
 reading `main` see a store that has passed structural checks, per-run physical-range and radiation
 sanity checks, and a spot comparison against the source bucket by value.
 
+**The fetch's run rate dropped well below its early pace, and the cause is still under
+investigation.** Runs came in at about 31 an hour over the first two hours of the build, then
+slowed to about 5.5 an hour over the following three, with no retries or errors in either window.
+The working hypothesis is contention on the source data centre or network during US daytime hours,
+tested by watching whether the rate recovers as US night-time arrives; this is an open observation,
+not yet a conclusion.
+
+**The Compute Engine VM's cost for the full archive is estimated at about £10–11**, from published
+list pricing rather than a real invoice, because the project's Cloud Billing API is not enabled.
+Enabling that API for exact cost tracking, and deleting an unused BigQuery linked dataset left over
+from a route the project considered and did not take, were both left undone, since neither was
+judged worth the effort for a single archive build. The output bucket does not have Requester Pays
+enabled, matching the source buckets, because OCF does not split cloud costs by project internally.
+
 ### AIFS has not been shown to improve faster than the physics-based IFS
 
 **In the sources we read, we found no like-for-like evidence that AIFS improves faster than the
