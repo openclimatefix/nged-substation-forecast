@@ -13,6 +13,7 @@ not if one divides per row and the other divides a pooled megawatt difference by
 import itertools
 import re
 from collections.abc import Mapping, Sequence
+from datetime import datetime
 from types import MappingProxyType
 from typing import Final, Literal, TypedDict
 
@@ -161,6 +162,42 @@ def assign_folds(*, dataset: pl.DataFrame, by: Sequence[str] = ("site",)) -> pl.
     month_rank = pl.col("month").rank(method="dense").over(group)
     month_count = pl.col("month").n_unique().over(group)
     fold = (month_rank - 1) * N_FOLDS // month_count
+    return dataset.with_columns(fold=fold.cast(pl.Int32))
+
+
+DAYS_PER_WEEK_FOLD: Final[int] = 7
+"""The width of one `assign_week_folds` fold, in days."""
+
+
+def assign_week_folds(*, dataset: pl.DataFrame, first_day: datetime) -> pl.DataFrame:
+    """Cut the rows into contiguous blocks of 7 days, for a span too short for month blocks.
+
+    Every site and every arm gets the same folds, because a row's fold depends only on its own
+    time and on `first_day`. A final block shorter than 7 days is merged into the block before it,
+    so no fold holds only a few days. Scoring one week while training on the other weeks leaves the
+    weather of the days beside the scored week in the training rows, so this scheme measures how
+    well a model interpolates between weather episodes, not how well it forecasts a new season.
+
+    Args:
+        dataset: Rows carrying a timezone-aware `time`.
+        first_day: The start of the first block, at midnight.
+
+    Returns:
+        `dataset` with an integer `fold` column, numbered from 0.
+
+    Raises:
+        ValueError: If `dataset` holds a row before `first_day`, or spans fewer than two whole
+            blocks, which would leave one fold with nothing to train on.
+    """
+    if dataset.select(pl.col("time").min() < pl.lit(first_day)).item():
+        msg = f"a row lies before first_day {first_day}"
+        raise ValueError(msg)
+    days_in = (pl.col("time") - pl.lit(first_day)).dt.total_days()
+    n_blocks = (int(dataset.select(days_in.max()).item()) + 1) // DAYS_PER_WEEK_FOLD
+    if n_blocks < 2:
+        msg = f"the rows span {n_blocks} whole 7-day blocks; at least 2 are needed"
+        raise ValueError(msg)
+    fold = (days_in // DAYS_PER_WEEK_FOLD).clip(upper_bound=n_blocks - 1)
     return dataset.with_columns(fold=fold.cast(pl.Int32))
 
 
@@ -485,7 +522,7 @@ def out_of_fold_losses(
         capacity.
     """
     outputs: list[pl.DataFrame] = []
-    for fold in range(N_FOLDS):
+    for fold in sorted(site_rows["fold"].unique().to_list()):
         test = site_rows.filter(pl.col("fold") == fold)
         # A constrained hour is one the network operator turned down, so no irradiance product
         # could have predicted it and a model that trains on it learns to read network

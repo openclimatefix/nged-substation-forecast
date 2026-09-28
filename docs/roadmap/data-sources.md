@@ -342,7 +342,9 @@ model reaches 168 hours, UKV reaches 120 hours on its 03 and 15 UTC runs and 54 
 and MOGREPS-UK reaches 126 hours. No Met Office model covers NGED's 14-day horizon. A Met Office
 model would therefore sit alongside ECMWF ENS rather than replace the ECMWF feed, exactly as
 ICON-EU would. MOGREPS-UK is held on AWS as a 30-day rolling window, which rules out backtesting
-unless we archive the feed ourselves from the day we start.
+unless we archive the feed ourselves from the day we start. [What we learnt about
+MOGREPS-UK](#what-we-learnt-about-mogreps-uk-on-2026-09-26) gives the size of that archive and the
+one other source of history we found.
 
 **A backtest on the global 10 km model starts at its 2024-11-07 12 UTC run, not at the start of its
 archive, because no earlier run carries global short-wave.** Listing every 6-hourly run the bucket
@@ -365,6 +367,126 @@ short-wave at the same lead times as each model's other hourly fields — 55 for
 hours, 126 for a MOGREPS-UK run — with no component lagging another. That holds in the earliest UKV
 run on AWS and in the earliest complete MOGREPS-UK run, the oldest surviving run of a 30-day rolling
 window being part-deleted rather than whole.
+
+### What we learnt about MOGREPS-UK on 2026-09-26
+
+**Each MOGREPS-UK object on AWS expires 30 days after it is written, so the oldest runs are already
+partial.** The anonymous bucket `met-office-uk-ensemble-model-data` holds 24 runs a day, one every
+hour, under prefixes of the form `uk-ensemble/YYYY/MM/DD/THHMMZ/`. Each run reaches 126 hours and
+has 3 members, and the realisation IDs of those members differ from run to run. One file holds a
+single variable at a single lead time for all 3 members. An uncropped run has 14,330 such files and
+about 258 GB in total, of which the archive's chosen fields are 3,744 files. Objects expire one by
+one (the `x-amz-expiration` header gives each object's date), which is why the oldest runs are
+already partial.
+
+**Shortwave has 126 hourly steps and looks instantaneous.** Shortwave has no step 0, no
+`cell_methods`, and no time bounds, and its `time` equals the valid time. Shortwave therefore looks
+like an instantaneous value, unlike DWD's shortwave, which averages since the initialisation time.
+Cloud and height-level fields have 127 hourly steps, and screen-level temperature and 10 m wind have
+15-minute steps to 11.75 hours and hourly steps after that (163 steps). The 100 m wind field is on
+33 height levels. The grid is 970 by 1042 points in a Lambert azimuthal equal-area projection.
+
+**Recording one full run cropped to Great Britain takes 29 minutes and stores 1.06 GB.** The run
+took 5.5 GB of downloads and 54,282 requests with 8 threads. At one run an hour, the archive grows
+by about 25 GB a day and 9 TB a year. About 40,000 of the requests fetch the 100 m wind files. Those
+files gain nothing from extra threads, because the `h5py` library holds a global lock, whereas 4
+processes gave about 4 times the throughput.
+
+**Open-Meteo holds the individual members for about 3.5 days and the ensemble mean and spread for
+about 93 days.** We probed one Great Britain point on 2026-09-26. The [ensemble
+API](https://open-meteo.com/en/docs/ensemble-api) serves the 3 members as `ukmo_uk_ensemble_2km`,
+hourly to 126 hours. Runs 1 to 3 days back were complete, 4 days back were half complete, and 5 or
+more days back were empty. The historical-forecast and previous-runs APIs accept the model but
+return only nulls, so Open-Meteo keeps no per-run history. The [ensemble mean
+API](https://open-meteo.com/en/docs/ensemble-mean-api) serves the mean as
+`ukmo_uk_ensemble_mean_2km`, with spread as variables carrying a `_spread` suffix (a `_mean` suffix
+is an error). The mean series starts on 2026-06-25, and we could not tell whether that start is a
+rolling limit, because the API rejects earlier dates. The series is stitched from successive runs
+rather than held per run, and its `previous_dayN` variables are null. The mean carries
+`temperature_2m`, `shortwave_radiation`, `direct_radiation`, `diffuse_radiation`, `wind_speed_10m`,
+and `cloud_cover`, and `wind_speed_100m` is all null. The spread is null for `diffuse_radiation` and
+`wind_speed_100m`. The DWD ensemble mean `dwd_icon_d2_eps_ensemble_mean` carries 100 m wind and
+`dwd_icon_eu_eps_ensemble_mean` does not, and we did not probe how far back either goes. The
+deterministic UKV has stitched history on Open-Meteo from about 2022 to 2023, and its
+`previous_day1` variables start only in about 2025.
+
+**The only per-run, per-member MOGREPS-UK history we found is the archive that a recorder would
+build, tracked in issue #926.** The 30-day window on AWS adds whatever runs still survive. A study
+that wants a MOGREPS-UK ensemble mean for the last 3 months can use Open-Meteo's stitched mean, but
+cannot recompute that mean from members.
+
+**A MOGREPS-UK run holds 3 members, and the Met Office's 18-member MOGREPS-UK ensemble is six hourly
+runs lagged together.** [Porson et al. (2020)](https://doi.org/10.1002/qj.3844) describe it as "an
+18-member ensemble ... created by running three members every hour and time-lagging these over a 6
+hr window". The global MOGREPS-G has 18 members in each run, so its members all share one run age,
+at 20 km resolution and 6-hourly updates against MOGREPS-UK's 2.2 km and hourly updates. Members
+from different lagged runs differ in age by up to 5 hours, so they are not exchangeable the way the
+members of one run are. A mean or spread built from lagged runs therefore needs three things. The
+build has to decide how to weight members of different ages. It has to keep each member's run age
+(the run's initialisation time) beside the member. It must never treat the 3 members of a single run
+as a full ensemble, because a mean of 3 members is noisy and a spread from 3 members rests on 2
+degrees of freedom. The [ensemble-means
+study](../studies/forecasts/ensemble-means.md#what-open-meteos-source-code-does-for-the-mogreps-uk-mean)
+records what Open-Meteo's source code does.
+
+### What we learnt about Met Office IMPROVER on 2026-09-26
+
+**The Met Office publishes its IMPROVER post-processing system's output on AWS as the Blended
+Probabilistic Forecast (BPF), and the UK gridded buckets carry no irradiance.** The BPF is in the
+AWS Open Data programme in `eu-west-2`, as NetCDF under CC BY-SA 4.0, with a
+[percentiles bucket](https://registry.opendata.aws/met-office-bpf-uk-gridded-percentiles/) and a
+[probabilities bucket](https://registry.opendata.aws/met-office-bpf-uk-gridded-probabilities/) on a
+2 km UK grid. Lead times are hourly to 120 hours and then 3-hourly to 186 hours. The registry says
+the percentiles are updated "4 times each day", while the listing for 2026-09-15 held 94 blend-time
+prefixes, about one every 15 minutes. Each object expires after 30 days. In the percentiles bucket,
+the 44 variables listed by file name on 2026-09-15 include total cloud amount, low cloud amount, and
+the UV index, and no downward shortwave, direct, diffuse, or sunshine-duration field. We inferred
+the probabilities bucket's variables from the percentiles bucket's, and did not inspect the spot or
+global buckets.
+
+**The UK gridded buckets carry wind at 10 m only, so it cannot serve either purpose that the
+weather-product studies score.** The wind fields are `wind_speed_at_10m`, `wind_direction_at_10m`,
+and the 1-hour and 3-hour maximum gust at 10 m. No 100 m wind is listed in the percentiles bucket,
+and the same caveat about the other buckets applies. Cloud cover is a weak substitute for the direct
+and diffuse shortwave that [the PV forward model](disaggregation.md#the-forward-model) needs.
+
+**The BPF is a calibrated blend, so it cannot stand in for MOGREPS-UK members in the ensemble-means
+comparison.** [Roberts et al. (2023)](https://doi.org/10.1175/BAMS-D-21-0273.1) describe IMPROVER
+as blending probabilities rather than physical values, with model weights that represent each
+model's relative skill for precipitation, temperature, wind speed and direction, cloud cover, and
+visibility, and with a radar nowcast added for precipitation. The paper names no irradiance
+variable. The variable list and the file names hold percentiles and probabilities and no member
+index, so the UK gridded buckets have no raw members from which to compute a mean.
+
+**Recording the BPF whole would take 719 to 807 GB a day per bucket.** One day (2026-09-15)
+held about 807 GB in the percentiles bucket and 719 GB in the probabilities bucket, for the whole
+grid. A useful field set (cloud, screen temperature, 10 m wind and gust, precipitation rate,
+visibility, humidity, and pressure) was 279 GB in the percentiles bucket. We estimate, from the
+bounding box, that Great Britain is about 22% of the grid, which gives about 60 GB a day cropped to
+Great Britain for that field set. Keeping one blend every 6 hours would be about 1 TB a year, also an
+estimate. The bucket holds 30 days, so a longer archive cannot be back-filled. In the searches
+behind [issue #801](https://github.com/openclimatefix/nged-substation-forecast/issues/801), we
+found no archive of MOGREPS-UK, and we did not verify whether one exists for the BPF.
+
+**The research recommends against archiving the BPF for solar and wind.** A small forward recorder is
+worth considering if a study wants the operational blend as a benchmark. See #801 for where such a
+recorder would be tracked.
+
+**The IMPROVER paper states that equal weights were used across time-lagged runs at the time of
+writing (2023), although the open-source code has options to weight runs by age.** Roberts et al.
+say time-lagging is essential for MOGREPS-UK, which was designed as a time-lagged ensemble of
+several runs of 3 members each hour, and that IMPROVER also time-lags UKV and MOGREPS-G. They say
+options exist for applying different weights to each forecast length, "although at present, equal
+weighting is used". The paper was published in March 2023, and we have not checked whether the
+operational weights have changed since. In the code at commit
+[`acf4ab6`](https://github.com/metoppv/improver/tree/acf4ab6d08cff2e52359bcc62e8bfe0788958218/improver/blending),
+the weights can come from four sources. A dictionary gives piecewise-linear weights along a
+coordinate such as lead time. A default linear rule runs between a start value and an end value. A
+non-linear rule sets the weight of the i-th cycle to `cval**i` and can order the cycles so that the
+newest is heaviest. A triangular rule is the fourth. The utility that merges lagged runs into one
+ensemble only pools the members, without weighting them by age, and the repository's own
+cycle-blending command line uses equal weights. The ensemble-means question of how to weight
+members of different ages therefore has a published operational answer of equal weights, as of 2023.
 
 ### ECMWF has published no plan to open a direct beam or hourly ensemble steps
 

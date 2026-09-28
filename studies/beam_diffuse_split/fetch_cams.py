@@ -31,14 +31,14 @@ from typing import Final, NamedTuple
 import cdsapi  # ty: ignore[unresolved-import]
 import polars as pl
 from build_dataset import _pv_sites
-from era5_grid import FIRST_YEAR, LAST_DATE, LAST_YEAR, first_date_of
+from era5_grid import FIRST_YEAR, LAST_DATE, LAST_YEAR, OUTPUT_SUFFIX, first_date_of, suffixed
 from sources import WEATHER_DATA_DIR
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 _LOG: Final[logging.Logger] = logging.getLogger("fetch_cams")
 
 CAMS_DIR: Final[Path] = WEATHER_DATA_DIR / "CAMS"
-OUTPUT_PATH: Final[Path] = CAMS_DIR / "beam_diffuse_cams.parquet"
+OUTPUT_PATH: Final[Path] = suffixed(CAMS_DIR / "beam_diffuse_cams.parquet")
 
 ADS_URL: Final[str] = "https://ads.atmosphere.copernicus.eu/api"
 DATASET: Final[str] = "cams-solar-radiation-timeseries"
@@ -105,7 +105,7 @@ def _last_date_of(*, year: int) -> str:
 
 def _csv_path(*, site: str, year: int) -> Path:
     """Return where one site-year's download lands."""
-    return CAMS_DIR / f"cams_site_{site}_{year}.csv"
+    return CAMS_DIR / f"cams_site_{site}_{year}{OUTPUT_SUFFIX}.csv"
 
 
 def _fetch_one(*, job: SiteYear) -> Path:

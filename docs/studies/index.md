@@ -62,7 +62,7 @@ the
 
 ## Forecasts
 
-**Two studies score power forecasts driven by weather forecasts.**
+**Three studies score power forecasts driven by weather forecasts.**
 
 - [How accurate is a power forecast driven by ECMWF ENS at each
   horizon?](forecasts/ens-horizons.md) — at the 6 solar farms and 3 wind farms, an XGBoost model
@@ -79,3 +79,9 @@ a
   ensemble mean beats UKV, ICON-EU, and GEFS at matched lead for solar; for wind it beats UKV and
   GEFS, and ICON-EU cannot be separated from it. A blend of ENS, ICON-EU, and IFS 0.25° lowers the
   wind error but shows no detectable solar gain at a lead a 09:00 UTC service could use.
+- [How do Open-Meteo's ensemble-mean products compare for solar and wind
+  power?](forecasts/ensemble-means.md) — over 88 summer days at the 6 solar farms and 3 wind farms,
+  ICON-D2-EPS's ensemble mean gave the lowest power error of the four Open-Meteo ensemble means,
+  7.4% of capacity for solar against 7.7% for ECMWF ENS's mean, and 5.75% for wind at 10 m, level
+  with ECMWF ENS's mean. The comparison is descriptive and uses stitched series that carry no run
+  time.

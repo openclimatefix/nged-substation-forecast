@@ -29,7 +29,8 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
 
 - `cross_validation` — per-site, out-of-fold XGBoost fits and their per-row losses, with the fold
   scheme and the fixed hyperparameters they use; one model fitted on every ensemble member's rows
-  and applied to each member; and the scoring of a forecast made outside the fit loop.
+  and applied to each member; and the scoring of a forecast made outside the fit loop. The fold
+  schemes are month blocks, and 7-day blocks for a span too short for months.
 - `bootstrap` — the paired arm-to-arm difference and its interval, resampling whole months and a
   seed, within each calendar year as well as overall, and a t-interval across the folds' own
   differences.
@@ -62,11 +63,19 @@ the mapping from a coordinate to a cell. `contracts` owns every data schema, inc
 - `hourly_means` — turning a product's native time steps, running means since a forecast start or
   instantaneous snapshots, into the mean over the hour ending at each label, with SARAH-3's and
   ICON-DREAM-EU's own conventions.
+- `stitched_ensemble` — an hourly series of ensemble means built from a member table: the member
+  mean, the newest run for each valid time, and 3-hour steps spread to hours by holding a mean or
+  interpolating an instant.
 - `guards` — refusing to overwrite a study's outputs, and refusing to score an arm on rows where
   its input is missing.
 - `timestamp_checks` — which instant an irradiance series' timestamps describe, measured against
   the sun alone.
 - `fractions_skill_score` — a timing-tolerant score, which asks whether a forecast put a threshold
   exceedance near the right hour rather than exactly on it.
+- `grib1_simple` — reading the header and a band of rows from a GRIB edition 1 message with 16-bit
+  simple packing, and decoding it without a GRIB library.
+- `ens_grib_source` — the sidecar index, the bucket listing and the pilot date draw for the staged
+  ECMWF ENS GRIB files.
+- `deaccumulation` — turning accumulated precipitation or radiation totals into per-second rates.
 - `charts` — the dot-and-interval chart panel, the figure caption, the colour of each product
   family, and the parser that reads a study report's contrast tables.

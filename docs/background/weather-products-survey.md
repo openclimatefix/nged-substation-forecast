@@ -681,6 +681,10 @@ or on adding nothing a product already on this page carries:**
 - **CERRA-Land** — global irradiance only, no wind, and ends 2025-12-31.
 - **The National Solar Radiation Database (NSRDB), Meteosat Prime Meridian** — covers Europe, but
   ends in 2022 ([NSRDB](https://developer.nlr.gov/docs/solar/nsrdb/nsrdb-msg-v1-0-0-download/)).
+- **Met Office IMPROVER Blended Probabilistic Forecast on AWS** — a calibrated blend of percentiles
+  and probabilities, with total and low cloud but no irradiance, and wind at 10 m only, in the UK
+  gridded buckets. The BPF holds no raw MOGREPS-UK members, and the buckets keep 30 days
+  ([details](../roadmap/data-sources.md#what-we-learnt-about-met-office-improver-on-2026-09-26)).
 - **Open-Meteo Ensemble API as a history source** — values at Lincoln reach only 3 to 4 days back,
   and less than a day for the ECMWF 9 km Europe ensemble, although the API accepts dates 92 days
   back ([Ensemble API](https://open-meteo.com/en/docs/ensemble-api)).
@@ -699,5 +703,9 @@ or on adding nothing a product already on this page carries:**
 - **GEM Global and CMA GRAPES on Open-Meteo** — data at Lincoln, but neither grid spacing nor method
   sets them apart from the global models ranked above.
 - **MOGREPS-UK and MOGREPS-G history** — AWS holds a 30-day rolling window
-  ([MOGREPS-G](https://registry.opendata.aws/met-office-global-ensemble/)), Open-Meteo's ensemble
-  archive 3 to 4 days, and CEDA's `ukmo-nwp` archive has no MOGREPS directory.
+  ([MOGREPS-G](https://registry.opendata.aws/met-office-global-ensemble/)), and CEDA's `ukmo-nwp`
+  archive has no MOGREPS directory. On 2026-09-26, Open-Meteo's ensemble API held the MOGREPS-UK
+  members for about 3.5 days and its ensemble-mean API held the mean and spread from 2026-06-25.
+  [What we learnt about
+  MOGREPS-UK](../roadmap/data-sources.md#what-we-learnt-about-mogreps-uk-on-2026-09-26) has the
+  detail.
