@@ -29,8 +29,12 @@ directory as soon as it lands, the run is committed once every file is cached, a
 deleted after the commit. A re-run skips every file already cached and every run whose status is
 complete or missing. Pass `--retry-partial` to fetch partial and missing runs again. A lock file
 stops two writers. The download is one stream with a delay between files, retries with backoff, and
-an HTTP Range resume of an interrupted file, and it stops below `--min-free-gb` of free disk. A day
-whose directory listing fails or is empty is skipped and never recorded, so a later run retries it.
+an HTTP Range resume of an interrupted file, and it stops below `--min-free-gb` of free disk. A
+file whose retries are all exhausted by a transient CEDA-side fault (a 500, a timeout) is skipped,
+marking the run partial, rather than crashing the whole archive — the only faults that stop the
+process outright are an auth failure (`CedaAuthError`, every later request would fail the same
+way) and low disk. A day whose directory listing fails or is empty is skipped and never recorded,
+so a later run retries it.
 
 Set `CEDA_TOKEN` in the environment (a CEDA access token). The script never prints or stores it, and
 never follows a redirect: a redirect means the token was rejected. Run it with `uv run --with
@@ -1157,6 +1161,17 @@ def fetch_run(
             )
         except FileAbsentError:
             print(f"{init_time:%Y-%m-%dT%HZ} {tag}: listed but CEDA answered 404")
+            continue
+        except requests.RequestException as error:
+            # `_retry` already exhausted every attempt (`CedaAuthError` and `FileAbsentError`
+            # bypass it and are handled separately) — a transient CEDA-side fault must not take
+            # down a multi-day archive run. Skip this file only; `merge_run` marks the run
+            # partial because its cache marker was never written, the same path `FileAbsentError`
+            # takes above.
+            print(
+                f"{init_time:%Y-%m-%dT%HZ} {tag}: download failed after retries "
+                f"({type(error).__name__}), run will be marked partial"
+            )
             continue
         timings.download_seconds += time.monotonic() - started
         timings.raw_bytes += listing[name]
