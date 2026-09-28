@@ -429,6 +429,43 @@ degrees of freedom. The [ensemble-means
 study](../studies/forecasts/ensemble-means.md#what-open-meteos-source-code-does-for-the-mogreps-uk-mean)
 records what Open-Meteo's source code does.
 
+### What we learnt about MOGREPS-Global on 2026-09-27
+
+**The anonymous bucket `met-office-global-ensemble-model-data` carries only the full global grid,
+not a pre-cropped UK subset.** Every file under its `global-ensemble/YYYY/MM/DD/THHMMZ/` prefixes
+covers the whole world on a 960-by-1280-point regular latitude-longitude grid at 20 km spacing
+(confirmed from the files' own `mosg__grid_domain=global` attribute), so an archive built from this
+bucket crops to Great Britain on fetch, the same way it already crops the other archived products
+from their native grids.
+
+**A run has 18 members, one file per variable per lead time holding every member, and reaches 246
+hours.** The bucket runs 4 times a day at 00:00, 06:00, 12:00 and 18:00 UTC. Most surface fields —
+including all four shortwave fields and 10 m wind — publish hourly to 132 hours and then 3-hourly to
+246 hours (171 steps). The two height-level wind fields publish hourly only to 54 hours before
+switching to 3-hourly (119 steps), a shorter hourly window than the other fields. Each object
+expires 30 days after it is written, the same retention as MOGREPS-UK.
+
+**The bucket carries four shortwave fields and both 10 m and 100 m wind, one field further than
+MOGREPS-UK's three shortwave components.** `radiation_flux_in_shortwave_total_downward_at_surface`,
+`..._direct_downward_at_surface`, and `..._diffuse_downward_at_surface` match MOGREPS-UK's three;
+`radiation_flux_in_shortwave_net_at_surface` (its file name carries no `_downward` segment) has no
+MOGREPS-UK equivalent. `wind_speed_on_height_levels` and `wind_direction_on_height_levels` list 32
+height levels including exactly 100 m, alongside `wind_speed_at_10m` and `wind_direction_at_10m`.
+
+**The deprecated `registry.opendata.aws/mogreps/` listing is still readable, but its coverage ends
+nearly three years before NGED's power data begins, so it does not extend either archive
+backwards.** The listing points to two further anonymous buckets, `s3://mogreps-uk` and
+`s3://mogreps-g`, both still readable by anonymous S3 request despite the registry page marking the
+listing itself as deprecated. `s3://mogreps-uk` holds runs from 2013-01-01 to 2016-12-31;
+`s3://mogreps-g` holds runs from 2016-01-01 to 2016-12-31 (files at the bucket root, one per member
+per lead time, named `prods_op_mogreps-{uk,g}_YYYYMMDD_HH_00_LLL.nc`). NGED's power telemetry starts
+in late 2019, and neither current rolling bucket keeps more than about 30 days, so the gap between
+2017-01-01 and roughly 30 days ago is covered by neither the deprecated buckets nor the live ones —
+it would need a different source, such as the Met Office directly or CEDA, unverified. The
+deprecated buckets also carry a different licence, "Non-Commercial Government Licence" for research
+use, rather than the live MOGREPS-UK and MOGREPS-Global buckets' CC BY-SA 4.0, worth checking before
+any use beyond research.
+
 ### What we learnt about Met Office IMPROVER on 2026-09-26
 
 **The Met Office publishes its IMPROVER post-processing system's output on AWS as the Blended
