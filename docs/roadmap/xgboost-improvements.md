@@ -1473,6 +1473,19 @@ exact zeros at night.)
 
 ## Explicitly deferred (not quick, or not skill)
 
+- **A two-stage weather-to-power model (Stage A frozen, Stage B calibrates) is the classical "perfect
+  prog" method, and a reviewer's conclusion is that it likely trades skill for calibration rather
+  than buying skill outright.** The idea: Stage A learns weather to power from best-estimate weather
+  only (CAMS, ERA5, analyses), then freezes; Stage B takes Stage A's output on forecast weather, plus
+  raw forecast weather, lead time and lagged power, and learns to calibrate uncertainty and correct
+  with lags. A model trained only on best-estimate weather learns the power response smoothed by
+  forecast error, so a frozen Stage A is expected to be over-confident at long lead — and because
+  Stage B needs the raw forecast weather too (not just Stage A's output), it becomes ordinary
+  stacking rather than a clean two-stage split. The plausible gain is calibration and diagnosis, not
+  headline skill. If tried, test it in a short study against strong single-stage baselines (the lead-
+  time feature, ensemble statistics, training on members, warm start on ENS), scored on identical
+  rows by lead, with a kill criterion set before the study runs — see [out-of-sample
+  requirements](switching-events.md) for the shared methodology.
 - **[#176](https://github.com/openclimatefix/nged-substation-forecast/issues/176) local-time power
   lags** — a DST edge case affecting a handful of half-hours per year; the issue itself says it may
   not be worth worrying about yet. Revisit if the metrics slices ever show a DST-transition

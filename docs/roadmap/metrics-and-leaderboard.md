@@ -530,12 +530,12 @@ reported skill will grow more optimistically biased over time. Our own fold is s
 sample size rather than in row count, because consecutive half-hours are strongly correlated. The
 epoch mechanism handles *data* changes but not *adaptive selection* on a fixed fold.
 
-**The structural fix — reserving a genuinely untouched final-test window — waits on Dynamical.org's
-ECMWF ENS backfill, which is not expected until ~November 2027, after v1.0.** A second independent
-year of data is what makes that reservation possible without shrinking the fold that decides
-promotion, and that year does not exist yet ([the backfill will not arrive in
-time](training-history.md#the-ecmwf-ens-backfill-will-not-arrive-in-time)). Everything below is what
-guards the leaderboard in the meantime.
+**The structural fix — reserving a genuinely untouched final-test window — waits on a second,
+independent year of ECMWF ENS history, which does not exist yet.** Dynamical.org's own Zarr backfill
+was estimated at ~November 2027 as of 2026-05, after v1.0, but a staged-GRIB route may deliver about
+three of the missing years sooner — see [a staged-GRIB route fills three of the missing
+years](training-history.md#a-staged-grib-route-fills-three-of-the-missing-years-without-waiting-for-the-zarr-backfill).
+Everything below is what guards the leaderboard in the meantime.
 
 **We adopt the Ladder, so a new best is published only when it beats the standing best by more than
 a margin. The published score is then reported rounded to that margin.** [Blum and Hardt

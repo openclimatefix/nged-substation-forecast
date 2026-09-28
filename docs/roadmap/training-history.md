@@ -204,32 +204,50 @@ ingests carry the connection dates needed to check.
   is not contaminated by NWP system upgrades. The flipside: our ENS archive spans cycle changes, so
   some apparent drift there is the weather model changing rather than the electricity network.
 
-## The ECMWF ENS backfill will not arrive in time
+## A staged-GRIB route fills three of the missing years without waiting for the Zarr backfill
 
-Dynamical.org are backfilling the **operational** IFS ENS archive — the real forecasts as they were
-issued, not reforecasts — from ECMWF's MARS tape archive: 2016-03-08 to 2024-04-01, 51 members,
-0.25°, 00Z initialisations only
+Dynamical.org are backfilling the **operational** IFS ENS archive as a queryable Zarr store — the
+real forecasts as they were issued, not reforecasts — from ECMWF's MARS tape archive: 2016-03-08 to
+2024-04-01, 51 members, 0.25°, 00Z initialisations only
 ([dynamical-org/reformatters#446](https://github.com/dynamical-org/reformatters/issues/446)). Honest
 multi-year folds from that would be strictly better than pre-training and would make most of the
-variant grid unnecessary, but as of 2026-05 the estimate was **~November 2027**, MARS-bound at
-roughly 0.8 TB/day against ~446 TB remaining. That is well after v1.0, so we plan as though it will
-not arrive. Three details worth tracking:
+variant grid unnecessary, but as of 2026-05 the Zarr estimate was **~November 2027**, MARS-bound at
+roughly 0.8 TB/day against ~446 TB remaining — well after v1.0.
 
-- **The control member may land far sooner than the full ensemble.** Almost all the remaining volume
-  is the 50 perturbed members; the control files are a few TB of the ~446 TB. Our CV trains on the
-  control member today, so control-only completion would already be enough to found multi-year folds
-  — worth asking Dynamical.org whether control-first ordering is possible.
+**Dynamical.org also stage the same MARS files as raw GRIB1 on Source Cooperative, ahead of turning
+them into Zarr, and a pilot proved we can decode those files ourselves.** The staged bucket carries
+complete dates from 2021-03-21 to 2024-03-31 today — about three of the missing years — readable
+anonymously. The pilot ([#951](https://github.com/openclimatefix/nged-substation-forecast/issues/951),
+merged) fetched the control member for 23 dates across that range and checked the result six ways:
+317 of 317 sampled messages decoded bit-exact against ecCodes, the idx offset chain had no gaps, 20
+of 20 re-fetched byte ranges hashed identically to the first fetch, `2t` and `2d` confirmed in
+kelvin, and de-accumulation matched Dynamical.org's own clipping rule. A follow-up listing check
+confirmed every one of the 23 pilot dates also has the full 51-member surface and pressure-level
+files, not just the control member, so control-first fetching is not a separate question to raise
+with Dynamical.org — the staged bucket already orders nothing, and we can fetch either the control
+member alone or all 51 members as needed.
+
+**The wider fetch is on hold.** Dynamical.org has indicated they may be able to materialise their
+Zarr backfill over this same range sooner than the ~November 2027 estimate above, which would
+replace the hand-rolled GRIB decode with a plain Zarr read. Issue
+[#959](https://github.com/openclimatefix/nged-substation-forecast/issues/959) tracks the wider
+staged-GRIB fetch and is paused pending their reply, rather than committing to a fetch effort
+estimated at 6–14 days on the workstation (control member) or up to 30 TB and $10–30 on a cloud
+machine (all 51 members) if Dynamical.org's own Zarr route lands first.
+
+Two details still worth tracking regardless of which route lands:
 
 - **00Z only**, which runs against
   [#350](https://github.com/openclimatefix/nged-substation-forecast/issues/350)'s move to the live
   service's four daily inits.
 
-- **The backfilled span crosses two more ENS resolution upgrades** (41r2 in 2016-03, 32→18 km; 48r1
-  in 2023-06, 18→9 km), compounding the cycle-change caveat above.
+- **The backfilled span crosses further ENS resolution upgrades**: 41r2 in 2016-03 (32→18 km), 48r1
+  in 2023-06 (18→9 km, within the staged bucket's complete-date range), and 49r1 in 2024-11. Each is
+  an era boundary under the `study` skill.
 
 The **ERA5 ingest is unconditional** either way: capacity estimation, the [weather-abnormality
 climatology](xgboost-improvements.md#weather-abnormality-climatology-z-score-features), and the ERA5
-diagnostic scope all need it regardless of the backfill.
+diagnostic scope all need it regardless of which ENS backfill route lands.
 
 ## Implementation details (deleted when this ships)
 
