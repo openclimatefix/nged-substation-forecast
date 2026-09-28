@@ -584,8 +584,11 @@ TS-Arena pattern instead.
 configuration in `conf/cv/default.yaml`, a single date near the end of the current archive. The
 `metrics` asset refuses to score any window reaching past `FINAL_TEST_START` unless
 `NGED_FINAL_TEST=1` is set in the environment — set only in the maintainer's own shell, never by an
-experiment or a study script. The study power reader in `packages/studies` truncates at the same
-date. With the variable unset, an ordinary training or scoring run is unaffected, so this holds
+experiment or a study script. `packages/studies` has no shared power reader yet (every study script
+reads the Delta table directly today); create one, gated at the same date, as part of this step
+rather than assuming one already exists. A study script that still calls `scan_delta` directly
+bypasses the gate, so this guards only callers that route through the shared reader, not the data
+itself. With the variable unset, an ordinary training or scoring run is unaffected, so this holds
 nothing out of day-to-day use and does not conflict with the concern below about training on as much
 data as possible. What it buys immediately, ahead of Dynamical.org's backfill, is a guard against an
 experiment — especially an unsupervised autonomous research session (see [Protect the leaderboard
@@ -864,21 +867,22 @@ before/after instruments for Phases C and D.
   alongside (or within) the `effective_capacity` asset — same full-history stability rationale, same
   join shape (`time_series_id`-only). Constraint-side direction resolved per `time_series_type`;
   confirm the mapping with NGED for ambiguous types (BESS charges *and* discharges).
-- **Decide whether `historical_p99` is computed from the full observation history or from the
-  training window only.** `effective_capacity`, which `historical_p99` piggybacks on, is a
-  full-history P99 that includes the validation window, so a threshold built on it can see the same
-  outcomes a model is scored against. A training-window-only threshold avoids that leak, at the cost
-  of a threshold that shifts between folds rather than staying one fixed number per series.
+- **Threshold leak:** decide whether `historical_p99` is computed from the full observation history
+  or from the training window only. `effective_capacity`, which `historical_p99` piggybacks on, is a
+  full-history P99 that includes the validation window, so a threshold built on that full-history
+  value can see the same outcomes a model is scored against. A training-window-only threshold avoids
+  that leak, at the cost of a threshold that shifts between folds rather than staying one fixed
+  number per series.
 - **twCRPS:** transform members and observation with `pl.max_horizontal(col, threshold)` and reuse
   the existing fair-CRPS expression (sorted-member identity, Float64 accumulation) verbatim.
 - **Exceedance rates:** compare `y` against the already-computed empirical quantile columns for p80,
   p90, p95, p98, p99 — one boolean mean per level.
 - **Brier score:** exceedance probability = member fraction above the threshold; outcome indicator
   from `y`; squared difference, averaged.
-- **Report the event count behind every tail metric, and refuse a thin contrast.** Print the number
-  of exceedance days each tail metric is computed over, and refuse a comparison between two
-  candidates when either side's event count falls below a minimum (an implementation-time choice) —
-  a metric computed over a handful of exceedances is not a reliable ranking signal.
+- **Event counts:** print the number of exceedance days each tail metric is computed over, and
+  refuse a comparison between two candidates when either side's event count falls below a minimum
+  (an implementation-time choice) — a metric computed over a handful of exceedances is not a
+  reliable ranking signal.
 - **MLflow allowlist:** extend `_MLFLOW_LOGGED_PARAMETRIC` with a small headline subset (e.g.
   `twcrps@historical_p99`, exceedance rate at p95, `brier@historical_p99`); decide the exact set at
   implementation time and keep it small — everything is in Delta regardless.
