@@ -29,6 +29,14 @@ the nearest cells from the private site and cell coordinates in memory, and neve
 a coordinate, a cell index, or a cell count. It exits with 1 when any check fails.
 
 Run it with `uv run python studies/weather_downloads/check_ukv_ceda_live.py`.
+
+**Known issue, accepted, do not chase again:** as of 2026-09-28, `UKV-CEDA-part3`'s `recent` check
+FAILs `ranges` on `cloud_total` — one run has 221 cells at 100.046875%, just 0.047 percentage points
+over the 100% physical cap (100 + 3/64, a clean power-of-two fraction). This looks like a benign
+GRIB-packing or significand-rounding precision artifact, not corrupted data, and the maintainer has
+decided not to widen the threshold to accept it, since a wider tolerance could mask a real future
+fault. A `ranges` FAIL naming only `cloud_total`, by a few hundredths of a percentage point, on a
+single run, is this known issue recurring rather than a new problem.
 """
 
 import argparse
