@@ -164,11 +164,14 @@ class PromotableRun:
     run_id: str
     experiment_name: str
     fold_id: str
-    start_time: datetime
+    last_finished_at: datetime | None
 
 
 def list_promotable_runs() -> list[PromotableRun]:
-    """List up to 1000 fold runs (``cv_role=fold``) per MLflow experiment, newest first.
+    """List up to 1000 fold runs (``cv_role=fold``) per MLflow experiment, latest finish first.
+
+    ``last_finished_at`` is MLflow's ``end_time``: any resumed stage, including metrics,
+    updates it when the run closes. Runs without an end time sort last.
 
     A read-only convenience for the ``promotable_model_runs`` asset
     (``defs/production_assets.py``), which logs the returned list as a metadata table in the
@@ -188,13 +191,22 @@ def list_promotable_runs() -> list[PromotableRun]:
             run_id=run.info.run_id,
             experiment_name=experiment.name,
             fold_id=run.data.tags.get("fold_id", "unknown"),
-            start_time=datetime.fromtimestamp(run.info.start_time / 1000, tz=UTC),
+            last_finished_at=(
+                datetime.fromtimestamp(run.info.end_time / 1000, tz=UTC)
+                if run.info.end_time is not None
+                else None
+            ),
         )
         for experiment in client.search_experiments()
         for run in client.search_runs(
             experiment_ids=[experiment.experiment_id],
             filter_string="tags.cv_role = 'fold'",
             max_results=1000,
+            order_by=["attributes.end_time DESC"],
         )
     ]
-    return sorted(runs, key=lambda run: run.start_time, reverse=True)
+    return sorted(
+        runs,
+        key=lambda run: run.last_finished_at or datetime.min.replace(tzinfo=UTC),
+        reverse=True,
+    )
