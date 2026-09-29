@@ -103,7 +103,11 @@ def promotable_model_runs(context: AssetExecutionContext) -> None:
                 "run_id": run.run_id,
                 "experiment_name": run.experiment_name,
                 "fold_id": run.fold_id,
-                "started_at": run.start_time.strftime("%Y-%m-%d %H:%M UTC"),
+                "last_finished_at": (
+                    run.last_finished_at.strftime("%Y-%m-%d %H:%M UTC")
+                    if run.last_finished_at is not None
+                    else "Not recorded"
+                ),
             }
         )
         for run in runs

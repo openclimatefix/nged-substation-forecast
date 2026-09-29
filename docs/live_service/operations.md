@@ -44,10 +44,12 @@ is the rest.
 UI, then open its output metadata.
 
 This asset lists every MLflow fold run tagged `cv_role=fold` — i.e. every model any experiment has
-trained — as a metadata table: `run_id`, `experiment_name`, `fold_id`, `started_at`. It writes
+trained — as a metadata table: `run_id`, `experiment_name`, `fold_id`, `last_finished_at`. It writes
 nothing to disk and has no dependents; materialise it any time you want to refresh the list before
-picking a champion. The pick itself is still by eye: metrics vary per experiment, so there is no
-single sort key that could automate "which run is best" — cross-check candidates against the
+picking a champion. Runs sort by their most recent MLflow finish time, including later metrics
+writes; missing end times appear as `Not recorded` and sort last. The pick itself is still by eye:
+metrics vary per experiment, so there is no single sort key that could automate "which run is best"
+— cross-check candidates against the
 leaderboard in the MLflow UI (`uv run mlflow ui --gunicorn-opts "--workers 1"` →
 `http://localhost:5000`; see [ML Experimentation: Viewing results in the MLflow
 UI](../ml_experimentation/dagster-workflow.md#viewing-results-in-the-mlflow-ui)).
