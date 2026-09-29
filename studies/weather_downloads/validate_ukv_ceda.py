@@ -366,7 +366,7 @@ def main() -> int:
     }
     for name in CHECK_NAMES:
         print(f"{'PASS' if results[name][0] else 'FAIL'} {name}")
-    measured = {name: results[name][1] for name in CHECK_NAMES}
+    measured: dict[str, dict[str, Any] | int] = {name: results[name][1] for name in CHECK_NAMES}
     measured["sampled_complete_runs"] = len(complete_sample)
     measured["readable_runs"] = len(readable)
     (args.store_dir / "validation.json").write_text(json.dumps(measured, indent=2, default=str))
