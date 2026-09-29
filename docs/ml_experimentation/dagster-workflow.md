@@ -200,7 +200,7 @@ Experiment "xgboost_smoke_test"
 ## Inspecting a forecast — the `view_forecasts` dashboard
 
 Once forecasts exist in the `power_forecasts` Delta table, the `view_forecasts` marimo app plots a
-single forecast so you can eyeball it. It is independent of the training flow above — launch it any
+forecast run so you can eyeball it. It is independent of the training flow above — launch it any
 time there are forecasts on disk to inspect:
 
 ```bash
@@ -212,6 +212,11 @@ Pick the population with the dropdowns: the **Fold** dropdown lists every `fold_
 and an **Experiment** dropdown appears when the chosen fold holds more than one `experiment_name`.
 Then choose a **time series** (the dropdown groups the 32 series by type, so all the PV sites or all
 the primaries sit together), a **forecast date**, and one of that day's **forecast runs**.
+
+**Compare with** optionally adds a second experiment's ensemble in orange for the same fold,
+series, and forecast init time. The default is **No comparison**. If the second experiment has no
+matching rows, a warning appears and the primary forecast stays visible. The NWP panel shows the
+primary experiment's weather run.
 
 **Reload data** re-reads the tables, so a CV job that finishes while the app is open shows up
 without restarting marimo. Its new experiment appears in the **Experiment** dropdown; **Fold**,

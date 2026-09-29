@@ -354,6 +354,8 @@ def build_view_forecast_chart(
     show_forecast: bool = True,
     show_actuals: bool = True,
     lags: Sequence[timedelta] = (),
+    comparison_forecasts: pl.LazyFrame | None = None,
+    comparison_label: str = "Comparison forecast",
 ) -> alt.LayerChart:
     """Build the single-panel forecast chart for one series and one forecast run.
 
@@ -375,6 +377,8 @@ def build_view_forecast_chart(
         show_actuals: Whether to draw the thick blue observed-power line.
         lags: Power lags to plot as coloured lines (observed power shifted forward by each lag,
             using only pre-init observations — see ``_lagged_power_frame``). Empty for none.
+        comparison_forecasts: Optional second experiment for the same series, fold, and init time.
+        comparison_label: Legend label identifying the second experiment's orange ensemble.
 
     Returns:
         A layered, zoomable Altair chart in Europe/London wall time.
@@ -402,7 +406,12 @@ def build_view_forecast_chart(
     # same reason (see the module docstring).
     # Swatch opacity is pinned to 1 in the OCF theme's legend config. A per-legend
     # ``symbolOpacity`` here is overridden by the opacity Vega-Lite derives from the marks.
-    line_color_scale = alt.Scale(domain=list(_LINE_COLORS), range=list(_LINE_COLORS.values()))
+    line_colors = dict(_LINE_COLORS)
+    forecast_layers = [(_FORECAST_LABEL, forecasts)]
+    if comparison_forecasts is not None:
+        line_colors[comparison_label] = ocf_theme.BRAND_ORANGE
+        forecast_layers.append((comparison_label, comparison_forecasts))
+    line_color_scale = alt.Scale(domain=list(line_colors), range=list(line_colors.values()))
     line_legend = alt.Legend(title=None, orient="top", symbolType="stroke", symbolStrokeWidth=2)
 
     # Layers are appended in draw order: weekend bands at the back, then the forecast ensemble,
@@ -414,14 +423,14 @@ def build_view_forecast_chart(
     if shade_weekends:
         layers.append(_weekend_layer(window_start, window_end))
         subtitle_notes.append("Shaded: weekends")
-    if show_forecast:
+    for label, forecast_data in forecast_layers if show_forecast else []:
         layers.append(
-            alt.Chart(_prepare_for_plot(forecasts, "valid_time").collect())
+            alt.Chart(_prepare_for_plot(forecast_data, "valid_time").collect())
             .mark_line(strokeWidth=1, opacity=0.3)
             .encode(  # ty: ignore[unresolved-attribute]  # astral-sh/ty#2520
                 x=x,
                 y=alt.Y("power_fcst:Q", title=y_title, axis=_y_axis()),
-                color=alt.ColorDatum(_FORECAST_LABEL),
+                color=alt.ColorDatum(label),
                 detail="ensemble_member:N",
                 tooltip=["ensemble_member", "valid_time", "power_fcst"],
             )

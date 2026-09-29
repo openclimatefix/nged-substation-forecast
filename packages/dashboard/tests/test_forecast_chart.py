@@ -530,3 +530,34 @@ def test_chart_renders_to_html() -> None:
     html = _build().to_html()
     assert html.startswith("<!DOCTYPE html>")
     assert "vegaEmbed(" in html
+
+
+@pytest.mark.parametrize("show_forecast", [True, False])
+def test_comparison_members_stay_in_separate_experiment_layers(show_forecast: bool) -> None:
+    comparison = _forecasts((0, 1)).with_columns(power_fcst=pl.col("power_fcst") + 1000)
+    spec = build_view_forecast_chart(
+        forecasts=_forecasts((0, 1)),
+        actuals=_actuals(),
+        power_fcst_init_time=INIT_TIME,
+        units="MW",
+        title="Comparison",
+        subtitle="Primary experiment",
+        comparison_forecasts=comparison,
+        comparison_label="Comparison: second",
+        show_forecast=show_forecast,
+        shade_weekends=False,
+    ).to_dict()
+    ensembles = [layer for layer in spec["layer"] if "detail" in layer.get("encoding", {})]
+    assert len(ensembles) == (2 if show_forecast else 0)
+    if show_forecast:
+        primary, second = ensembles
+        assert primary["encoding"]["color"]["datum"] == "Forecast power"
+        assert second["encoding"]["color"]["datum"] == "Comparison: second"
+        assert primary["encoding"]["x"] == second["encoding"]["x"]
+        assert second["encoding"]["detail"]["field"] == "ensemble_member"
+        data = spec["datasets"][second["data"]["name"]]
+        assert min(row["power_fcst"] for row in data) == 1000
+    scale = spec["layer"][-1]["encoding"]["color"]["scale"]
+    colors = dict(zip(scale["domain"], scale["range"], strict=True))
+    assert colors["Comparison: second"] == ocf_theme.BRAND_ORANGE
+    assert colors["Forecast power"] != colors["Comparison: second"]
