@@ -142,7 +142,8 @@ def test_trained_time_series_ids_is_abstract() -> None:
             raise NotImplementedError
 
     with pytest.raises(TypeError):
-        _MissingPopulation(BaseForecasterConfig(selected_features=set()))
+        # Deliberately instantiate an abstract class to check the runtime contract.
+        _MissingPopulation(BaseForecasterConfig(selected_features=set()))  # ty: ignore[call-non-callable]
 
 
 def _metadata_for(
