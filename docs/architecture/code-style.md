@@ -316,7 +316,7 @@ failure:
   pushdown so a partition-filtered query reads the whole table.
 - **`marimo-notebooks`** — leading underscores are cell-local, imports belong in `app.setup`, and
   `ruff check --fix` must never be run over a notebook.
-- **`ty-workarounds`** — known upstream `ty` bugs on Altair and numpy, where the code is correct and
+- **`ty-workarounds`** — a known upstream `ty` bug on Altair, where the code is correct and
   the checker is not.
 
 ## Machine Learning
