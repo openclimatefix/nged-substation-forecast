@@ -9,11 +9,12 @@ from nged_substation_forecast.defs import (
     checks,
     cv_assets,
     jobs,
-    production_assets,
+    live_forecast_assets,
+    promotion_assets,
     schedules,
 )
 
-all_assets = load_assets_from_modules([assets, cv_assets, production_assets])
+all_assets = load_assets_from_modules([assets, cv_assets, live_forecast_assets, promotion_assets])
 
 # Initialise Sentry once per process. This module is imported by every Dagster process — the
 # daemon, the webserver, and each run worker — so error telemetry and the live_forecasts

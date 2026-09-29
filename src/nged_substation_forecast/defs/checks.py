@@ -90,7 +90,7 @@ from nged_data.storage import time_series_coverage
 
 from nged_substation_forecast._sentry import report_check_degradation, report_power_freshness
 from nged_substation_forecast.defs.assets import power_time_series_and_metadata
-from nged_substation_forecast.defs.production_assets import (
+from nged_substation_forecast.defs.live_forecast_assets import (
     LIVE_FORECAST_HORIZON,
     _available_nwp_init_times,
     live_forecasts,

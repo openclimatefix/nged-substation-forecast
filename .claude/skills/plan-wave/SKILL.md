@@ -128,7 +128,7 @@ A wave built on the issue's version of that would have paired it with something 
 
 `grep -rn` for the symbols the issue names, and read the function the issue proposes to change. The
 surface that matters is per-file, and for the crowded files in this repo (`defs/checks.py`,
-`defs/assets.py`, `defs/production_assets.py`) per-function as well.
+`defs/assets.py`, `defs/live_forecast_assets.py`) per-function as well.
 
 Watch for surfaces that are easy to miss:
 

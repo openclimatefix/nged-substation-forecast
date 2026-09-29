@@ -218,7 +218,7 @@ def test_tabular_feature_engineer_threads_local_timezone() -> None:
 def test_tabular_feature_engineer_default_local_timezone_is_london() -> None:
     """Calling ``engineer()`` with no ``local_timezone`` must default production to Europe/London.
 
-    Every production and CV call site (``production_assets.py``, ``cv_assets.py``) calls
+    Every production and CV call site (``live_forecast_assets.py``, ``cv_assets.py``) calls
     ``engineer()`` without passing ``local_timezone`` as of writing, so a wrong default would
     reach them silently. This test pins only the parameter's default value, not those call sites
     themselves, and it is invisible to every other test in this module, which passes

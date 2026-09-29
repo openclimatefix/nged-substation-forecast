@@ -14,7 +14,7 @@ features. Of the five helpers this module exports, ``weather_lags_lack_their_con
 the only helper that executes a read against a data table rather than against a saved model. The
 read is a bounded probe against the slot's NWP scan, and the scan is an argument, so a test can
 pass an in-memory frame. The ``live_forecasts`` and ``promoted_model`` Dagster assets
-(``src/nged_substation_forecast/defs/production_assets.py``) stay thin shells over these helpers.
+(``src/nged_substation_forecast/defs/live_forecast_assets.py``) stay thin shells over these helpers.
 """
 
 import json

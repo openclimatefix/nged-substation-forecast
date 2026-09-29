@@ -46,9 +46,9 @@ plus general cleanup.
 
 - Remove any remaining dead code/imports from the phased build-out.
 - **Split `defs/cv_assets.py`** (the largest module in `defs/`, and the complexity hotspot flagged
-  in the 2026-07 codebase review) into `cv_assets.py` / `production_assets.py` / `metric_assets.py`.
-  The [`live_forecasts` work](live-service.md#the-live_forecasts-asset) already starts
-  `production_assets.py`; move the `metrics` asset and its helpers into `metric_assets.py` here.
+  in the 2026-07 codebase review) into `cv_assets.py` / `metric_assets.py`.
+  Live inference lives in `live_forecast_assets.py`, and model promotion in `promotion_assets.py`;
+  move the `metrics` asset and its helpers into `metric_assets.py` here.
   Pure logic stays in `ml_core.cv_helpers`.
 
 **Part 3 — docs freshness pass.** The permanent-docs migration from the old `dagster_plan.md` is

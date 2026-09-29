@@ -171,7 +171,7 @@ def list_promotable_runs() -> list[PromotableRun]:
     """List up to 1000 fold runs (``cv_role=fold``) per MLflow experiment, newest first.
 
     A read-only convenience for the ``promotable_model_runs`` asset
-    (``defs/production_assets.py``), which logs the returned list as a metadata table in the
+    (``defs/promotion_assets.py``), which logs the returned list as a metadata table in the
     Dagster UI. The experiment listing takes MLflow's default page size of 1000. The
     per-experiment fold-run search passes the same 1000 explicitly. The listing therefore covers
     the first 1000 active experiments, and returns at most 1000 fold runs from each experiment. A

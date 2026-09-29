@@ -1212,13 +1212,26 @@ def test_definitions_resolve(env: Path) -> None:
 
     from nged_substation_forecast.definitions import defs
     from nged_substation_forecast.defs.assets import ecmwf_ens_partitions
-    from nged_substation_forecast.defs.production_assets import live_forecast_partitions
+    from nged_substation_forecast.defs.live_forecast_assets import live_forecast_partitions
 
     repo = defs.get_repository_def()
     asset_graph = repo.asset_graph
 
     asset_keys = {key.to_user_string() for key in asset_graph.get_all_asset_keys()}
     assert {"power_time_series_and_metadata", "h3_grid_weights", "ecmwf_ens"} <= asset_keys
+
+    for name, layer in [
+        ("live_forecasts", "production"),
+        ("promotable_model_runs", "research"),
+        ("promoted_model", "research"),
+    ]:
+        node = asset_graph.get(AssetKey(name))
+        assert node.is_materializable
+        assert node.tags["layer"] == layer
+
+    assert {
+        key.to_user_string() for key in asset_graph.get(AssetKey("live_forecasts")).parent_keys
+    } == {"ecmwf_ens", "power_time_series_and_metadata"}
 
     # A broken deps=[...] string would drop this edge (the unknown key becomes an external asset).
     ecmwf_parents = {

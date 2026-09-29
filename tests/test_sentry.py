@@ -450,7 +450,7 @@ def test_monitor_config_schedule_matches_live_partitions() -> None:
     on ``LIVE_FORECAST_MONITOR_CONFIG``). If someone changes one crontab and not the other,
     the alarm would expect heartbeats on a different cadence than the asset runs; this catches
     that."""
-    from nged_substation_forecast.defs.production_assets import live_forecast_partitions
+    from nged_substation_forecast.defs.live_forecast_assets import live_forecast_partitions
 
     assert (
         _sentry.LIVE_FORECAST_MONITOR_CONFIG["schedule"]["value"]

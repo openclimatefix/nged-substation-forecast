@@ -20,7 +20,7 @@ from contracts.power_schemas import TimeSeriesMetadata
 from dagster import DagsterInstance, RunConfig, TableMetadataValue, materialize
 from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
-from nged_substation_forecast.defs.production_assets import (
+from nged_substation_forecast.defs.promotion_assets import (
     PromotedModelConfig,
     promotable_model_runs,
     promoted_model,
