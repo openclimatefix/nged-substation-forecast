@@ -1,6 +1,6 @@
 """Loading the observed power and gridded NWP that feature engineering runs on.
 
-Shared by the research assets in ``cv_assets`` and the production asset in ``production_assets``,
+Shared by the research assets in ``cv_assets`` and the production asset in ``live_forecast_assets``,
 so it belongs to neither. The caller supplies the ``TimeSeriesMetadata`` that goes alongside,
 because the two layers get it from different places.
 """

@@ -13,8 +13,9 @@ this code can still build a config for the saved model, and can still parse that
 features. Of the five helpers this module exports, ``weather_lags_lack_their_control_member`` is
 the only helper that executes a read against a data table rather than against a saved model. The
 read is a bounded probe against the slot's NWP scan, and the scan is an argument, so a test can
-pass an in-memory frame. The ``live_forecasts`` and ``promoted_model`` Dagster assets
-(``src/nged_substation_forecast/defs/production_assets.py``) stay thin shells over these helpers.
+pass an in-memory frame. The Dagster assets ``live_forecasts`` (in
+``src/nged_substation_forecast/defs/live_forecast_assets.py``) and ``promoted_model`` (in
+``src/nged_substation_forecast/defs/promotion_assets.py``) stay thin shells over these helpers.
 """
 
 import json

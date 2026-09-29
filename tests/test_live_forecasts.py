@@ -30,9 +30,9 @@ from ml_core.base_forecaster import write_trained_metadata
 from xgboost_forecaster.forecaster import XGBoostConfig, XGBoostForecaster
 
 from nged_substation_forecast._sentry import NWP_CONTROL_MEMBER_MISSING_FINGERPRINT
-from nged_substation_forecast.defs import production_assets
+from nged_substation_forecast.defs import live_forecast_assets
 from nged_substation_forecast.defs.checks import live_forecasts_are_healthy
-from nged_substation_forecast.defs.production_assets import LiveForecastsConfig, live_forecasts
+from nged_substation_forecast.defs.live_forecast_assets import LiveForecastsConfig, live_forecasts
 
 pytestmark = pytest.mark.integration
 
@@ -195,7 +195,7 @@ def test_only_trained_time_series_are_forecast(
     ``XGBoostForecaster.predict`` also skips any series its own booster dict has nothing for.
     """
     captured: list[list[int]] = []
-    real_load_engineering_inputs = production_assets.load_engineering_inputs
+    real_load_engineering_inputs = live_forecast_assets.load_engineering_inputs
 
     def _spy_load_engineering_inputs(
         settings: Settings,
@@ -220,7 +220,9 @@ def test_only_trained_time_series_are_forecast(
             init_time_end=init_time_end,
         )
 
-    monkeypatch.setattr(production_assets, "load_engineering_inputs", _spy_load_engineering_inputs)
+    monkeypatch.setattr(
+        live_forecast_assets, "load_engineering_inputs", _spy_load_engineering_inputs
+    )
 
     assert _materialize(dagster_instance, "live").success
 
@@ -598,7 +600,7 @@ def test_live_weather_lag_survives_a_run_fresher_than_the_publication_delay(
 
     reported: list[tuple[str, BaseException, list[str] | None]] = []
     monkeypatch.setattr(
-        target=production_assets,
+        target=live_forecast_assets,
         name="report_asset_degradation",
         value=lambda asset_name, exc, fingerprint=None: reported.append(
             (asset_name, exc, fingerprint)
@@ -661,10 +663,10 @@ def test_a_failing_control_member_probe_degrades_the_slot_instead_of_failing_it(
     def _boom(*_: object, **__: object) -> bool:
         raise _FakePanic("object store down")
 
-    monkeypatch.setattr(production_assets, "weather_lags_lack_their_control_member", _boom)
+    monkeypatch.setattr(live_forecast_assets, "weather_lags_lack_their_control_member", _boom)
     reported: list[tuple[str, BaseException, list[str] | None]] = []
     monkeypatch.setattr(
-        target=production_assets,
+        target=live_forecast_assets,
         name="report_asset_degradation",
         value=lambda asset_name, exc, fingerprint=None: reported.append(
             (asset_name, exc, fingerprint)

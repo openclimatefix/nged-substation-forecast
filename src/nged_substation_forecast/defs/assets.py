@@ -94,7 +94,7 @@ def power_time_series_and_metadata(context: AssetExecutionContext) -> None:
     ``PowerTimeSeries`` Delta table, and upserts the latest substation metadata parquet. Nothing
     cleans this data further: ``eligible_time_series``, ``effective_capacity``,
     ``trained_cv_model``, and ``cv_power_forecasts`` in ``defs/cv_assets.py``, and
-    ``live_forecasts`` in ``defs/production_assets.py``, all read the Delta table this asset
+    ``live_forecasts`` in ``defs/live_forecast_assets.py``, all read the Delta table this asset
     writes directly.
 
     The stored timestamps are not always NGED's own, and an operator rebuilding this table has to
@@ -429,7 +429,7 @@ def ecmwf_ens(context: AssetExecutionContext) -> MaterializeResult:
     Polars DataFrame, and writes it to the Delta table through ``delta_store.nwp.write_nwp``
     (Float32, significand-rounded), which replaces that ``(nwp_model_id, init_time)`` partition.
     Runs daily on ``ecmwf_ens_schedule``, and depends on ``h3_grid_weights`` for the grid that
-    its aggregation maps onto. ``live_forecasts`` in ``defs/production_assets.py`` reads this
+    its aggregation maps onto. ``live_forecasts`` in ``defs/live_forecast_assets.py`` reads this
     table for production inference; ``trained_cv_model`` and ``cv_power_forecasts`` in
     ``defs/cv_assets.py`` read it for cross-validation.
 

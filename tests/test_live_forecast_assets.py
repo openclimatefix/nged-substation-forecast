@@ -1,4 +1,4 @@
-"""Unit tests for helpers in ``defs/production_assets.py`` that don't need the full
+"""Unit tests for helpers in ``defs/live_forecast_assets.py`` that don't need the full
 ``live_forecasts`` integration fixtures in ``tests/test_live_forecasts.py``.
 """
 
@@ -7,11 +7,11 @@ from datetime import UTC, datetime
 import pytest
 from contracts.settings import Settings
 
-from nged_substation_forecast.defs import production_assets
+from nged_substation_forecast.defs import live_forecast_assets
 
 
 def _patch_delta_table(monkeypatch: pytest.MonkeyPatch, raw_init_times: set[str]) -> None:
-    """Monkeypatch ``production_assets.DeltaTable`` to return canned partition values.
+    """Monkeypatch ``live_forecast_assets.DeltaTable`` to return canned partition values.
 
     Isolates ``_available_nwp_init_times``'s parsing from a real Delta table on disk — the
     function only ever reads ``DeltaTable(...).partitions()``.
@@ -27,7 +27,7 @@ def _patch_delta_table(monkeypatch: pytest.MonkeyPatch, raw_init_times: set[str]
                 for value in raw_init_times
             ]
 
-    monkeypatch.setattr(production_assets, "DeltaTable", _FakeDeltaTable)
+    monkeypatch.setattr(live_forecast_assets, "DeltaTable", _FakeDeltaTable)
 
 
 @pytest.mark.parametrize(
@@ -54,6 +54,6 @@ def test_available_nwp_init_times_parses_both_fractional_second_renderings(
     """
     _patch_delta_table(monkeypatch, {raw_value})
 
-    result = production_assets._available_nwp_init_times(Settings())
+    result = live_forecast_assets._available_nwp_init_times(Settings())
 
     assert result == [expected]
