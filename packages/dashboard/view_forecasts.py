@@ -34,6 +34,9 @@ def _():
     forecast, each computed from a slightly different weather forecast, so the spread of the grey
     lines is how uncertain the forecast is.
 
+    Optionally compare a second experiment at the same forecast init time, fold, and series.
+    Its ensemble appears in orange; the NWP panel continues to show the primary experiment.
+
     Two optional lagged-power lines overlay observed power shifted forward by 7 and by 14
     days. Shifted observed power is the raw material of the models' power-lag features.
 
@@ -159,6 +162,23 @@ def _(fold_picker, forecast_partitions):
 
 
 @app.cell
+def _(experiment_names, experiment_picker):
+    comparison_picker = mo.ui.dropdown(
+        options={
+            "No comparison": None,
+            **{
+                f"Experiment: {name}": name
+                for name in experiment_names
+                if name != experiment_picker.value
+            },
+        },
+        value="No comparison",
+        label="Compare with",
+    )
+    return (comparison_picker,)
+
+
+@app.cell
 def _(experiment_picker, fold_picker, settings):
     available_init_times = (
         pl.scan_delta(
@@ -244,6 +264,7 @@ def _():
 
 @app.cell
 def _(
+    comparison_picker,
     date_picker,
     experiment_names,
     experiment_picker,
@@ -262,7 +283,7 @@ def _(
     # live with the NWP panel itself (see the NWP chart cell), not here.
     _run_selectors = [series_picker, fold_picker]
     if len(experiment_names) > 1:
-        _run_selectors.append(experiment_picker)
+        _run_selectors.extend([experiment_picker, comparison_picker])
     _run_selectors.append(date_picker)
     if run_picker is not None:
         _run_selectors.append(run_picker)
@@ -330,8 +351,43 @@ def _(experiment_picker, fold_picker, run_picker, series_picker, settings):
 
 
 @app.cell
+def _(comparison_picker, fold_picker, init_time, series_picker, settings):
+    comparison_forecasts = None
+    comparison_message = None
+    if comparison_picker.value is not None:
+        comparison_forecasts = (
+            pl.scan_delta(
+                settings.power_forecasts_data_path,
+                storage_options=typeddict_to_dict(settings.storage_options),
+            )
+            .filter(
+                pl.col("experiment_name") == comparison_picker.value,
+                pl.col("fold_id") == fold_picker.value,
+                pl.col("time_series_id") == series_picker.value,
+                pl.col("power_fcst_init_time") == init_time,
+                pl.col("valid_time") <= init_time + PLOT_HORIZON,
+            )
+            .select("valid_time", "power_fcst", "ensemble_member")
+            .collect()
+        )
+        if comparison_forecasts.is_empty():
+            comparison_message = mo.callout(
+                mo.md(
+                    f"No forecasts for **{comparison_picker.value}** at this init time, "
+                    "fold, and series. Only the primary experiment is plotted."
+                ),
+                kind="warn",
+            )
+            comparison_forecasts = None
+    return comparison_forecasts, comparison_message
+
+
+@app.cell
 def _(
     actuals,
+    comparison_forecasts,
+    comparison_message,
+    comparison_picker,
     experiment_picker,
     fold_picker,
     forecasts,
@@ -358,6 +414,10 @@ def _(
             f"Power forecast init {init_time:%a %d %b %Y %H:%M} UTC"
             f" · experiment {experiment_picker.value} · fold {fold_picker.value}"
         ),
+        comparison_forecasts=(
+            comparison_forecasts.lazy() if comparison_forecasts is not None else None
+        ),
+        comparison_label=f"Comparison: {comparison_picker.value}",
         shade_weekends=weekend_shading.value,
         show_forecast=show_forecast.value,
         show_actuals=show_actuals.value,
@@ -373,7 +433,8 @@ def _(
     # mo.ui.altair_chart serves the ~34k data rows as a virtual file instead of inlining the rows
     # in the cell output. Inlining the rows would blow marimo's max-output-size guard. Selections
     # are disabled — the chart's own scale-bound zoom/pan is the intended interaction.
-    mo.ui.altair_chart(chart, chart_selection=False, legend_selection=False)
+    _chart = mo.ui.altair_chart(chart, chart_selection=False, legend_selection=False)
+    mo.vstack([comparison_message, _chart]) if comparison_message is not None else _chart
     return
 
 
