@@ -539,13 +539,13 @@ epoch mechanism handles *data* changes but not *adaptive selection* on a fixed f
 Jack has questioned whether to reserve that year rather than train on more history and report
 performance across multiple folds. Any alternative must address adaptive selection bias. If adopted,
 a separate final-test year needs a second, independent year of ECMWF ENS history. Dynamical.org's
-own Zarr backfill
-was estimated at ~November 2027 as of 2026-05, after v1.0, but a staged-GRIB route may deliver about
+own Zarr backfill was estimated at ~November 2027 as of 2026-05, after v1.0, but a staged-GRIB route
+may deliver about
 three of the missing years sooner — see [a staged-GRIB route fills three of the missing
 years](training-history.md#a-staged-grib-route-fills-three-of-the-missing-years-without-waiting-for-the-zarr-backfill).
-Everything below is what guards the leaderboard in the meantime.
+The interim guards below are planned work in #960; scorer enforcement is tracked in #958.
 
-**We adopt the Ladder, so a new best is published only when it beats the standing best by more than
+**The planned Ladder guard publishes a new best only when it beats the standing best by more than
 a margin. The published score is then reported rounded to that margin.** [Blum and Hardt
 (2015)](https://arxiv.org/abs/1502.04585) designed the Ladder for machine-learning competitions that
 publish a leaderboard and accept repeated submissions — the same shape of risk hundreds of
@@ -553,13 +553,15 @@ experiments create when every one of them is adjudicated on one fold. Every quer
 set leaks a little information about it back to the experimenter. The margin-plus-rounding rule caps
 how much a single query can leak.
 
-**The persistence and climatology baselines are rerun, unchanged, on every leaderboard epoch's
-evaluation window, so growth in the data is never mistaken for improvement in the method.** The
+**The plan also requires rerunning persistence and climatology baselines unchanged on every
+leaderboard epoch's evaluation window, so growth in data is not mistaken for method improvement.**
+The
 precedent is CAMEO, a structure-prediction benchmark that keeps its baseline pipelines frozen while
 the protein-structure databases behind them keep updating ([Robin et al.
 (2021)](https://doi.org/10.1002/prot.26213)).
 
-Until the structural fix lands: leaderboard metrics are selection metrics; differences smaller than
+While evaluation data is reused for selection: leaderboard metrics are selection metrics;
+differences smaller than
 fold-level noise should not drive decisions; and the number of experiments per epoch is itself a
 relevant statistic (visible as the MLflow experiment count).
 
@@ -570,8 +572,8 @@ still arriving. It also cannot be judged on less than a year, because a shorter 
 whether a model handles both ends of the annual cycle — the one-year minimum Pinheiro et al. set out
 above, and the same minimum the [cross-validation
 protocol](../ml_experimentation/cross-validation-folds.md#why-expanding-window-cross-validation)
-already builds the single fold around. That fold is read through the Ladder guard and the caveats
-already stated in this section.
+already builds the single fold around. The caveats above apply today; the planned Ladder guard
+will constrain publication once implemented.
 
 **Measuring a promoted model's performance on live data is a separate question from deciding which
 model to promote.** Every model running in production is also scored against live data as it runs
@@ -588,7 +590,8 @@ TS-Arena pattern instead.
 **1. Document the caveat (immediately).** A short "Selection bias" subsection in
 `docs/ml_experimentation/cross-validation-folds.md` restating the paragraphs above.
 
-**2. Add a narrow guard now, ahead of the full reservation.** Add `FINAL_TEST_START` to the fold
+**2. Add a narrow scoring guard independently of the reservation decision (#958).** Add
+`FINAL_TEST_START` to the fold
 configuration in `conf/cv/default.yaml`, a single date near the end of the current archive. The
 `metrics` asset refuses to score any window reaching past `FINAL_TEST_START` unless
 `NGED_FINAL_TEST=1` is set in the environment — set only in the maintainer's own shell, never by an
@@ -596,9 +599,10 @@ experiment or a study script. `packages/studies` has no shared power reader yet 
 reads the Delta table directly today); create one, gated at the same date, as part of this step
 rather than assuming one already exists. A study script that still calls `scan_delta` directly
 bypasses the gate, so this guards only callers that route through the shared reader, not the data
-itself. With the variable unset, an ordinary training or scoring run is unaffected, so this holds
-nothing out of day-to-day use and does not conflict with the concern below about training on as much
-data as possible. What it buys immediately, ahead of Dynamical.org's backfill, is a guard against an
+itself. Choose the cutoff so the full seasonal selection window remains available to ordinary
+runs, and verify that those runs still work without the override. This scoring cutoff alone does
+not reserve an independent final-test year or establish that its observations were never used for
+training. What it buys immediately, ahead of Dynamical.org's backfill, is a guard against an
 experiment — especially an unsupervised autonomous research session (see [Protect the leaderboard
 scorer for autonomous
 research](https://github.com/openclimatefix/nged-substation-forecast/issues/958)) — scoring on data
@@ -606,10 +610,11 @@ past the cutoff without the maintainer's explicit say-so.
 
 **3. If adopted in #960, reserve a final-test window once a second, independent year of data exists
 — not by shrinking the fold that decides promotion.** (Jack's note: I'm not convinced we should do
-this yet. Even when
-we have several years of data, may still want to train on as much data as possible, and not to hold
+this yet. Even when we have several years of data, may still want to train on as much data as
+possible, and not to hold
 out a separate "test" year. When we have multiple folds, I think a better test of "honest
-performance" is average performance across all folds.). That waits on Dynamical.org's backfill,
+performance" is average performance across all folds.). If adopted, the reservation waits on the
+additional history tracked in #959,
 which is also what turns the single fold into a genuine multi-fold epoch, so the `final_test` fold
 and the further leaderboard folds are founded in one new epoch in `conf/cv/default.yaml` rather than
 over two. The `final_test` fold needs a per-fold flag that keeps it out of every run mode, so no
@@ -638,7 +643,7 @@ denominator.
 
 **Verification.** For the narrow guard: the `metrics` asset raises on a window past
 `FINAL_TEST_START` with `NGED_FINAL_TEST` unset, and accepts it with the variable set; the study
-power reader returns no rows after `FINAL_TEST_START`. For the full reservation:
+power reader returns no rows after `FINAL_TEST_START`. If the full reservation is adopted:
 `register_experiment_job` must never create a partition for the `final_test` fold in any run mode
 (extend `tests/test_register_experiment_job.py`); and once the disjoint year lands, score one
 existing experiment against the reserved window end-to-end and confirm the rows reach
