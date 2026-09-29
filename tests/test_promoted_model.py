@@ -222,3 +222,8 @@ def test_promotable_model_runs_lists_fold_run_candidates(
     [row] = candidates.records
     assert row.data["run_id"] == run_id
     assert row.data["experiment_name"] == "candidates_test"
+    end_time = mlflow.get_run(run_id=run_id).info.end_time
+    assert end_time is not None
+    assert row.data["last_finished_at"] == datetime.fromtimestamp(end_time / 1000, tz=UTC).strftime(
+        "%Y-%m-%d %H:%M UTC"
+    )
