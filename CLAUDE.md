@@ -58,7 +58,7 @@ one, the mistake is already written.
 | `dataviz` | drawing any chart in this repository — this project's OCF-brand palette, chart sizing, SVG export, and generator anonymisation, on top of the bundled `dataviz` skill's general method |
 | `mkdocs-authoring` | editing markdown MkDocs renders — `docs/`, READMEs, `SKILL.md`, docstrings — especially nested lists, list items with code blocks, or wrapped links |
 | `marimo-notebooks` | creating or editing a Marimo notebook (`packages/dashboard/*.py`, `packages/notebooks/*.py`) |
-| `ty-workarounds` | acting on a `ty` error in Altair chart code or numpy `.view()` code, or adding any `# ty: ignore` |
+| `ty-workarounds` | acting on a `ty` error in Altair chart code, or adding any `# ty: ignore` |
 | `plan-wave` | choosing the next batch of issues under an epic to run in parallel (`/plan-wave <EPIC>`) |
 | `plan-issue` | deciding what to build for a GitHub issue (`/plan-issue <N>`) — sizes the issue, then writes a reviewed plan unless it is trivial, no code |
 | `simplicity-clean-room` | testing whether an existing module is more complicated than its problem requires |
