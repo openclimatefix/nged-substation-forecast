@@ -14,7 +14,8 @@ How OCF measures the skill of its forecasts and compares forecasting approaches.
 > evaluation [#225](https://github.com/openclimatefix/nged-substation-forecast/issues/225) · tail &
 > exceedance metrics [#254](https://github.com/openclimatefix/nged-substation-forecast/issues/254) ·
 > tricky-days filter [#255](https://github.com/openclimatefix/nged-substation-forecast/issues/255) ·
-> fold hygiene [#226](https://github.com/openclimatefix/nged-substation-forecast/issues/226) ·
+> fold design [#960](https://github.com/openclimatefix/nged-substation-forecast/issues/960) and scorer
+> enforcement [#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958) ·
 > calibrated manual heuristic
 > [#715](https://github.com/openclimatefix/nged-substation-forecast/issues/715).
 
@@ -516,7 +517,11 @@ alternatives we considered.
 
 ### Fold hygiene: selection bias and a final-test window 🚧
 
-Issue: [#226](https://github.com/openclimatefix/nged-substation-forecast/issues/226)
+Design and interim selection-bias guards:
+[#960](https://github.com/openclimatefix/nged-substation-forecast/issues/960). Scorer and conditional
+final-test enforcement: [#958](https://github.com/openclimatefix/nged-substation-forecast/issues/958).
+The original issue and its design-update comment are retained in
+[#226](https://github.com/openclimatefix/nged-substation-forecast/issues/226), closed as consolidated.
 
 **The single leaderboard fold (`mid_2025_to_mid_2026` in `conf/cv/default.yaml`) serves as both the
 model-selection set and the reported skill number, which the review already names as a source of
@@ -530,8 +535,10 @@ reported skill will grow more optimistically biased over time. Our own fold is s
 sample size rather than in row count, because consecutive half-hours are strongly correlated. The
 epoch mechanism handles *data* changes but not *adaptive selection* on a fixed fold.
 
-**The structural fix — reserving a genuinely untouched final-test window — waits on a second,
-independent year of ECMWF ENS history, which does not exist yet.** Dynamical.org's own Zarr backfill
+**Whether to reserve a genuinely untouched final-test year remains a design decision in #960.**
+Jack has questioned whether to reserve that year rather than train on more history and report
+performance across multiple folds. Any alternative must address adaptive selection bias. If adopted,
+a separate final-test year needs a second, independent year of ECMWF ENS history. Dynamical.org's own Zarr backfill
 was estimated at ~November 2027 as of 2026-05, after v1.0, but a staged-GRIB route may deliver about
 three of the missing years sooner — see [a staged-GRIB route fills three of the missing
 years](training-history.md#a-staged-grib-route-fills-three-of-the-missing-years-without-waiting-for-the-zarr-backfill).
@@ -596,8 +603,8 @@ scorer for autonomous
 research](https://github.com/openclimatefix/nged-substation-forecast/issues/958)) — scoring on data
 past the cutoff without the maintainer's explicit say-so.
 
-**3. Reserve a final-test window once a second, independent year of data exists — not by shrinking
-the fold that decides promotion.** (Jack's note: I'm not convinced we should do this yet. Even when
+**3. If adopted in #960, reserve a final-test window once a second, independent year of data exists
+— not by shrinking the fold that decides promotion.** (Jack's note: I'm not convinced we should do this yet. Even when
 we have several years of data, may still want to train on as much data as possible, and not to hold
 out a separate "test" year. When we have multiple folds, I think a better test of "honest
 performance" is average performance across all folds.). That waits on Dynamical.org's backfill,
