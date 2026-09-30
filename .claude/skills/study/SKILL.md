@@ -24,12 +24,22 @@ scientifically valid and says no more than its evidence supports.
 **Work autonomously: the maintainer has asked for studies to run with as little waiting on a human
 as possible.** Plan, run, review, re-run, chart, and write up without stopping to ask, and post short
 progress updates while working and a full report at the end. So a study does not stop for human
-review after `plan-issue`'s plan. Three decisions still belong to the maintainer:
+review after `plan-issue`'s plan. Two decisions still belong to the maintainer:
 
 - **Spending money.**
 - **Ordering data or accepting a data licence** in someone's name.
-- **Merging.** A study merges only if the maintainer has said so in the current session; otherwise
-  it stops at a reviewed PR, as `implement-issue` does.
+
+**A study PR may be merged without waiting for the maintainer when all three of these hold:**
+
+- **The diff is confined to studies.** It touches only `studies/`, `packages/studies/`, and
+  `docs/studies/` (with the study skill and study docs they need), and nothing else: no `src/`, no
+  other package, no Patito contract, no CI configuration, no dependency change.
+- **Every line of code has been through at least one fresh agentic review**, with the findings
+  triaged. Scripts that produce published numbers get the Opus reviews described below.
+- **The merge checks pass**: `ci` green, no closing keyword in the PR body or commit messages, no
+  `data/` or `.env` files, the branch contains `main`, and a merge commit rather than a squash.
+
+A PR that touches anything outside that list stops at a reviewed PR, as `implement-issue` does.
 
 ## Where a study's pieces live
 
@@ -77,8 +87,8 @@ page only after a committed script prints it into the report.
 7. **Diff review**, with the `implement-issue` skill.
 8. **End with a `prose-review` of the page, one rule per pass, alongside persona and evidence
    reviews** (see "Reviews").
-9. **Merge, only as the maintainer has authorised,** after checking the PR's body and commit
-   messages for closing keywords (see "GitHub hygiene").
+9. **Merge, if the three conditions at the top of this skill hold,** after checking the PR's body
+   and commit messages for closing keywords (see "GitHub hygiene").
 
 Never publish a study with fewer than two scientific-validity reviews. If the process is shortened
 anywhere, for example one plan review instead of two, say so in the PR body and in the final report,
@@ -392,8 +402,10 @@ same paragraph says what the significance test covers and what the test does not
 **Write "statistically significant at the 5% level", never "excludes zero".** A reader outside
 statistics does not know that an interval excluding zero is a significance test. Explain once per
 page what the month-resampled test covers: the month-to-month weather and the fitting seed, not
-differences between generators. Say too that, among many exploratory rows, about 1 in 20 reaches
-significance at the 5% level by chance.
+differences between generators. Say too that an exploratory row with no real effect behind it has a
+nominal 5% chance of reaching statistical significance at the 5% level, that the number of spurious
+rows is unknown because the number of rows with no real effect is unknown, that the rows' shared
+months make spurious results cluster, and whether the page corrects for multiple comparisons.
 
 **Say what the XGBoost model was given, and name its kind.** Write "an XGBoost model given
 ICON-EU's 80 m wind", never "ICON-EU shown its 80 m wind". A study page can mean a weather model,
@@ -421,6 +433,13 @@ unresolved" is a finding.
 three-line prompt pointing at it. A long inline prompt can trip an API safeguard. Use Opus for every
 review and every judgement, and Sonnet for mechanical work such as fetching documentation, checking
 where a dataset is served, or mining transcripts.
+
+**Every script, and every change to a script, gets at least one fresh review before it runs.** This
+covers fetch, build, fit, and chart scripts alike. The review of a script's code comes before its
+first run, and is separate from the review of the design and the first results in step 4 of "The
+order of work". A fit or a download run before its review cannot be un-run: it spends compute or
+quota and can leave output that later readers trust. Run nothing until the review is triaged, and
+say in the PR body which review each script had.
 
 **Each reviewer is fresh, and is told:**
 

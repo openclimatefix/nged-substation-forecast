@@ -212,6 +212,15 @@ grows on both axes at once. Bracketing 1 to 4 hours per weekly run on a single-G
 time are still open; like the inference figures above, it is a bracket to re-measure, not a
 commitment.
 
+## The ensemble archive has no AWS cost yet
+
+**No AWS bill exists for the [ensemble weather archive](ensemble-archive.md), because the archive
+sits on a workstation disk.** On 2026-09-30 the six repositories held about 616 GB, of which
+MOGREPS-UK was about 531 GB. The one derived figure is for MOGREPS-UK: a recorded run measured 1.06
+GB, and one run an hour is about 9 TB a year, which at the S3 Standard price above (£0.018/GB-month)
+would cost about £170 a month once a full year is stored. The other five products have no measured
+yearly volume, so no cost is given for them.
+
 ## See also
 
 - [Production Deployment — Design](production-deployment.md) — the architecture these costs price,

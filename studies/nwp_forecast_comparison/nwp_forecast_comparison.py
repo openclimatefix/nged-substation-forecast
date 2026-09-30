@@ -2346,8 +2346,13 @@ def write_report(
         "",
         (
             "Differences are first arm minus second, in percentage points of capacity. Planned "
-            "contrasts carry the plan's IDs; every other contrast is exploratory, and about 1 in "
-            "20 exploratory intervals reaches significance at 5% by chance."
+            "contrasts carry the plan's IDs; every other contrast is exploratory. An "
+            "exploratory interval with no real effect behind it has a nominal 5% chance of "
+            "being statistically significant at the 5% level, and a higher chance if the "
+            "intervals are too narrow. How many significant exploratory intervals are "
+            "spurious is unknown, because how many have no real effect behind them is "
+            "unknown. The intervals rest on overlapping months of weather and often share "
+            "an arm, so spurious results tend to arrive together."
         ),
         "",
     ]

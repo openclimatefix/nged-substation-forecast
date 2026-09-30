@@ -86,6 +86,7 @@ nav:
       - ML orchestration design: architecture/ml-orchestration.md
       - Production deployment design: architecture/production-deployment.md
       - AWS running costs: architecture/aws-costs.md
+      - The ensemble weather archive: architecture/ensemble-archive.md
       - "Why Dagster, not Airflow?": architecture/why-dagster-not-airflow.md
       - Code style: architecture/code-style.md
       - Testing: architecture/testing.md
@@ -97,6 +98,7 @@ nav:
           - Methods shared by the past-weather studies: studies/past-weather/methods.md
           - "Which weather product best describes past sunshine?": studies/past-weather/solar.md
           - "Which weather product best describes past wind?": studies/past-weather/wind.md
+          - "Does blending CERRA's wind heights beat one height?": studies/past-weather/cerra-wind-levels.md
           - "Does blending weather products beat the best single weather product?": studies/past-weather/blending.md
       - Forecasts:
           - "How accurate is a power forecast driven by ECMWF ENS at each horizon?": studies/forecasts/ens-horizons.md
