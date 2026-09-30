@@ -2564,14 +2564,16 @@ made the archive is not documented. This constant is the only place the date is 
 WN3_TRAINING_END_MONTH: Final[str] = f"{WN3_TRAINING_END:%Y-%m}"
 """The month of the split date, in `%Y-%m` form."""
 
-WN3_SPLITS: Final[tuple[str, ...]] = ("in-sample", "out-of-sample")
-"""The two month groups every WN3 result is reported in. Only the out-of-sample group carries a
+WN3_SPLITS: Final[tuple[str, ...]] = ("in-sample", "out-of-sample", "pooled")
+"""The three row groups every WN3 result is reported in. Only the out-of-sample group carries a
 claim: the in-sample months may overlap WN3's training data, so WN3 against a product whose
-training data ends earlier may not be a fair comparison there."""
+training data ends earlier may not be a fair comparison there. The pooled group holds every
+scored row, including the rows `wn3_dropped_rows` counts, so it mixes both."""
 
 WN3_SPLIT_MONTHS: Final[dict[str, str]] = {
     "in-sample": "February to June 2026",
     "out-of-sample": "July to September 2026",
+    "pooled": "February to September 2026",
 }
 """Each split's months, in words, for the report."""
 
@@ -2583,12 +2585,13 @@ def wn3_split(*, losses: pl.DataFrame, split: str, domain: DomainType, day: int)
     bootstrap then resamples the whole months that remain. A row is in-sample when its valid month
     is `WN3_TRAINING_END_MONTH` or earlier. A row is out-of-sample only when its valid month is
     later and the 00 UTC run it reads was issued after `WN3_TRAINING_END`, so a day-14 row that
-    verifies in July from a run issued in June belongs to neither group (`wn3_dropped_rows`).
+    verifies in July from a run issued in June belongs to neither group (`wn3_dropped_rows`). The
+    `pooled` group is every row.
 
     Args:
         losses: One lead day's per-row losses carrying `time` (UTC) and a `month` label in
             `%Y-%m` form.
-        split: `in-sample` or `out-of-sample`.
+        split: `in-sample`, `out-of-sample`, or `pooled`.
         domain: `solar` or `wind`, which sets how a row's valid time maps to its run's date.
         day: The lead day of `losses`' arms.
 
@@ -2598,7 +2601,9 @@ def wn3_split(*, losses: pl.DataFrame, split: str, domain: DomainType, day: int)
     Raises:
         ValueError: If `split` is not one of `WN3_SPLITS`, or the group holds no row.
     """
-    if split == "in-sample":
+    if split == "pooled":
+        rows = losses
+    elif split == "in-sample":
         rows = losses.filter(pl.col("month") <= WN3_TRAINING_END_MONTH)
     elif split == "out-of-sample":
         rows = losses.filter(
@@ -2717,7 +2722,7 @@ def wn3_near_line_contrasts(
         losses: The frame's primary-setting per-row losses, of every month.
         domain: `solar` or `wind`.
         day: A day of `WN3_DAYS`.
-        split: `in-sample` or `out-of-sample`.
+        split: `in-sample`, `out-of-sample`, or `pooled`.
 
     Returns:
         The contrasts of `wn3_contrasts` whose interval, on the group's rows only, is near the
@@ -2812,7 +2817,7 @@ def wn3_rows(
 def wn3_stage_lines(
     *, domain: DomainType, day: int, frame: pl.DataFrame, losses: pl.DataFrame
 ) -> list[str]:
-    """Write one (technology, day) report section of the WN3 fit, in both month groups.
+    """Write one (technology, day) report section of the WN3 fit, in every row group.
 
     Args:
         domain: `solar` or `wind`.
@@ -2822,7 +2827,7 @@ def wn3_stage_lines(
 
     Returns:
         The section's Markdown lines: the row counts and calendar-month coverage, the arms'
-        columns, then for the in-sample and the out-of-sample months in turn every arm's absolute
+        columns, then for the in-sample, out-of-sample, and pooled rows in turn every arm's absolute
         error, the listed contrasts at both settings, and the pairs also fitted at the
         sensitivity setting.
     """
@@ -2866,7 +2871,7 @@ def wn3_split_lines(*, domain: DomainType, day: int, losses: pl.DataFrame, split
         domain: `solar` or `wind`.
         day: A day of `WN3_DAYS`.
         losses: The stage's per-row losses, of every month.
-        split: `in-sample` or `out-of-sample`.
+        split: `in-sample`, `out-of-sample`, or `pooled`.
 
     Returns:
         The group's heading, every arm's absolute error, the listed contrasts at the primary
@@ -2877,12 +2882,17 @@ def wn3_split_lines(*, domain: DomainType, day: int, losses: pl.DataFrame, split
     group = wn3_split(losses=losses, split=split, domain=domain, day=day)
     primary = group.filter(pl.col("setting") == PRIMARY)
     second = group.filter(pl.col("setting") == SENSITIVITY)
-    claim = (
-        "These months carry every claim about WN3."
-        if split == "out-of-sample"
-        else "These months may overlap WN3's training data, so WN3 against a product trained on "
-        "earlier data may not be a fair comparison here; read them as descriptive only."
-    )
+    claims = {
+        "out-of-sample": "These months carry every claim about WN3.",
+        "in-sample": "These months may overlap WN3's training data, so WN3 against a product "
+        "trained on earlier data may not be a fair comparison here; read them as descriptive "
+        "only.",
+        "pooled": "This group holds every scored row from February to September 2026, including "
+        "the rows that fall in neither of the other groups. It mixes months that may lie inside "
+        "WN3's training data, so it is not a fair comparison of WN3 with AIFS or ENS, and it is "
+        "not the headline until the archive's provenance is confirmed.",
+    }
+    claim = claims[split]
     lines = [
         (
             f"#### {split.capitalize()} months ({WN3_SPLIT_MONTHS[split]}, "
@@ -3053,11 +3063,14 @@ def run_wn3(*, published_dir: Path, output_dir: Path, workers: int) -> int:
             "month occurs in one year only and no scored cell has a training row of its calendar "
             "month, and every contrast is descriptive. No contrast is deciding. WN3's production "
             "weather model is trained until 30 June 2026 and which version made the archive is "
-            "not documented, so every result is reported in two month groups: the in-sample "
+            "not documented, so every result is reported in three row groups: the in-sample "
             "months (February to June) may overlap WN3's training data, and WN3 against a "
             "product trained on earlier data may not be a fair comparison there; the "
             "out-of-sample months (July to September) carry every claim, and rest on "
-            "3 calendar months, so their intervals are wide. The folds are unchanged: each group "
+            "3 calendar months, so their intervals are wide; the pooled rows (February to "
+            "September 2026, every scored row including those in neither group) mix both, so "
+            "they are not a fair comparison and not the headline until the archive's "
+            "provenance is confirmed. The folds are unchanged: each group "
             "selects rows already scored out of fold. The planned contrast is "
             "wn3_mean_day<N> − ens_mean_day<N> at days 1, 2, 7 and 14, with its negative control "
             "(WN3's weather shuffled within site, year-month and hour of day, under two seeds) "
@@ -3536,19 +3549,14 @@ def main_wn3(*, args: argparse.Namespace) -> int:
         The process exit code.
 
     Raises:
-        ValueError: If `--lookahead-cleared` is absent: the maintainer records, after reading
-            `build_wn3_inputs.py --read-store`'s run log and the page's lookahead section, that the
-            2026 runs were issued in real time and that WN3's training data ends on 30 June 2026,
-            inside the scored period (`WN3_TRAINING_END_MONTH`). If the runs were not real-time,
-            the run stops and reports instead.
+        ValueError: If `--lookahead-cleared` is absent. The flag confirms that the run log of
+            `build_wn3_inputs.py --read-store` and the page's lookahead section have been read.
     """
     if not args.lookahead_cleared:
         msg = (
             "refusing to fit WN3 without --lookahead-cleared: read the run log that "
-            "`build_wn3_inputs.py --read-store` wrote and confirm that the runs were issued in "
-            "real time and that WN3's training data ends (30 June 2026) inside the scored "
-            "period, so every result is split into in-sample and out-of-sample months. If the "
-            "runs were not real-time, stop and report; do not fit."
+            "`build_wn3_inputs.py --read-store` wrote and the lookahead section of the page. "
+            "Every result is reported for in-sample, out-of-sample, and pooled rows."
         )
         raise ValueError(msg)
     studies_dir = args.published_dir.resolve().parent
@@ -3652,8 +3660,8 @@ def main() -> int:
     parser.add_argument(
         "--lookahead-cleared",
         action="store_true",
-        help="With --wn3: confirm that the WN3 runs were issued in real time and that WN3's "
-        "training data ends before the scored period.",
+        help="With --wn3: confirm that the run log of `build_wn3_inputs.py --read-store` and the "
+        "page's lookahead section have been read.",
     )
     parser.add_argument(
         "--p4-controls",

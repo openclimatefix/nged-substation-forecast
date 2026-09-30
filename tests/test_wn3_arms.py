@@ -274,7 +274,7 @@ def test_row_set_rows_name_the_months_and_keep_the_same_rows_ens_mean_as_ticks(
     monkeypatch.setattr(charts, "lead_board_rows", lambda *, losses: canned)
     losses = pl.DataFrame({"arm": ["wn3_mean_day1", "ens_mean_day1", "unrelated_day1"]})
     rows = charts.row_set_board_rows(marks=[charts.RowSetMarks(slug="wn3_mean", losses=losses)])
-    assert set(rows["product"]) == {"WeatherNext 3 mean (7 months)"}
+    assert set(rows["product"]) == {"WeatherNext 3 mean (7 months, out-of-sample)"}
     marks = rows.filter(pl.col("kind") == "mark")
     ticks = rows.filter(pl.col("kind") == "ens_same_rows")
     assert marks.sort("day")["value"].to_list() == [8.0, 9.5]
@@ -301,13 +301,15 @@ def test_row_set_rows_refuse_ticks_from_other_days_than_the_marks(
 
 
 def test_row_set_marks_refuse_losses_with_no_device_column(tmp_path: Path) -> None:
-    pl.DataFrame({"arm": ["wn3_mean_day1"], "site": ["A"]}).write_parquet(
-        tmp_path / "solar_wn3_day1_losses.parquet"
-    )
-    for day in (2, 7, 14):
-        pl.DataFrame({"arm": [f"wn3_mean_day{day}"], "site": ["A"]}).write_parquet(
-            tmp_path / f"solar_wn3_day{day}_losses.parquet"
-        )
+    for day in (1, 2, 7, 14):
+        pl.DataFrame(
+            {
+                "arm": [f"wn3_mean_day{day}"],
+                "site": ["A"],
+                "time": [datetime(2026, 9, 1, 12, tzinfo=UTC)],
+                "month": ["2026-09"],
+            }
+        ).write_parquet(tmp_path / f"solar_wn3_day{day}_losses.parquet")
     with pytest.raises(ValueError, match="no device column"):
         charts.load_row_set_marks(blends_dir=None, wn3_dir=tmp_path, domain="solar")
 

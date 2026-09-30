@@ -103,8 +103,8 @@ def test_a_group_with_no_scored_row_raises():
         wn3_split(losses=losses, split="out-of-sample", domain="wind", day=1)
 
 
-def test_the_two_named_splits_are_the_only_ones():
-    assert WN3_SPLITS == ("in-sample", "out-of-sample")
+def test_the_three_named_splits_are_the_only_ones():
+    assert WN3_SPLITS == ("in-sample", "out-of-sample", "pooled")
 
 
 def test_the_chart_marks_use_only_out_of_sample_months(tmp_path: Path):
@@ -126,11 +126,15 @@ def test_the_chart_marks_use_only_out_of_sample_months(tmp_path: Path):
     ]
 
 
-def _stage_losses(*, out_of_sample_gap: dict[int, float]) -> pl.DataFrame:
+def _stage_losses(
+    *, out_of_sample_gap: dict[int, float], second_control_gap: float | None = None
+) -> pl.DataFrame:
     """Every solar day-1 arm's losses: far from each other in the in-sample months.
 
     Args:
         out_of_sample_gap: The negative control's minus WN3's loss in each out-of-sample month.
+        second_control_gap: The second seed's minus WN3's loss in every month, or one point more
+            than the first seed's gap if `None`.
 
     Returns:
         WN3 is 1 point below its shuffled copy and 2 below ENS in every in-sample month, and
@@ -147,7 +151,7 @@ def _stage_losses(*, out_of_sample_gap: dict[int, float]) -> pl.DataFrame:
         ens[time] = 5.0
         gap = out_of_sample_gap.get(month, 1.0)
         control[time] = 3.0 + gap
-        control_b[time] = 3.0 + gap + 1.0
+        control_b[time] = 3.0 + (gap + 1.0 if second_control_gap is None else second_control_gap)
     values = {
         "wn3_mean_day1": wn3,
         "ens_mean_day1": ens,
@@ -190,3 +194,40 @@ def test_the_report_has_a_table_for_each_group_and_the_fair_comparison_warning()
     assert "may not be a fair comparison here" in text
     assert "0 (site, hour) rows fall in neither group" in text
     assert text.index("In-sample months") < text.index("Out-of-sample months")
+
+
+def test_the_pooled_group_holds_every_row_including_the_dropped_ones():
+    dropped = datetime(2026, 7, 5, 12, tzinfo=UTC)  # day 14 reads a June run
+    losses = _rows(arm="x", values={**_monthly(), dropped: 1.0})
+
+    pooled = wn3_split(losses=losses, split="pooled", domain="wind", day=14)
+
+    assert pooled.height == losses.height
+    assert dropped in pooled["time"].to_list()
+
+
+def test_a_pair_near_the_line_only_in_the_pooled_rows_is_refitted():
+    permuted = shuffled_prefix(source="wn3_mean_day1")
+    # The first control is 1 point above WN3 in five of the six months and 1 point below in one
+    # July month. Within the in-sample months the difference is constant, and within the
+    # out-of-sample months its interval spans 0 widely, so neither group is near the line. Over
+    # the pooled rows the interval's lower bound is close to 0.
+    losses = _stage_losses(out_of_sample_gap={7: 1.0, 8: 1.0, 9: -1.0}, second_control_gap=5.0)
+
+    chosen = wn3_sensitivity_arms(losses=losses, domain="solar", day=1)
+
+    assert permuted in chosen
+
+
+def test_the_report_has_a_pooled_table_with_its_warning():
+    losses = _stage_losses(out_of_sample_gap={})
+    frame = pl.DataFrame({"month": [f"2026-{m:02d}" for m in MONTHS], "site": ["A"] * len(MONTHS)})
+
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setattr("fit_aifs.coverage_table", lambda *, frame: pl.DataFrame({"covered": [True]}))
+        patch.setattr("fit_aifs.arm_features", lambda *, arm, domain: ("ghi",))
+        text = "\n".join(wn3_stage_lines(domain="solar", day=1, frame=frame, losses=losses))
+
+    assert "#### Pooled months (February to September 2026, 6 months)" in text
+    assert "not the headline until the archive's provenance is confirmed" in text
+    assert text.index("Out-of-sample months") < text.index("Pooled months")

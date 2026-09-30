@@ -207,7 +207,7 @@ def log_run_provenance(
         msg = (
             f"{gaps} 00 UTC runs are unwritten before the last written run and {differs} have a "
             "source_init_time different from their init_time: the runs may not be plain "
-            "real-time runs. Stop and report to the maintainer; do not fit."
+            "real-time runs. Do not fit until the difference is explained."
         )
         raise ValueError(msg)
 

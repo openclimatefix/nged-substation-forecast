@@ -651,11 +651,15 @@ in-sample months (before July) may or may not overlap its training data.** [Rasp
 2026". Their Appendix A.1.3 also lists versions trained until the start of 2025 and until the start
 of 2026, and the paper does not say which version produced the archive. Google publishes no
 statement of which version made the 2026 archive. Every WN3 result on this page is therefore
-reported twice: for the months before July (February to June), which may overlap training, and for
-the months from July (July to September), which lie after every training end the paper lists. The
-months from July carry every claim about WN3. WN3 against AIFS or ENS on the months before July may
-not be a fair comparison, because WN3's weights may have seen those months and the other products'
-had not. The folds are unchanged, and each group selects rows that were already scored out of fold.
+reported for three groups of rows: the months before July (February to June), which may overlap
+training; the months from July (July to September), which lie after every training end the paper
+lists; and a pooled group of every scored row from February to September 2026, including the rows
+that fall in neither of the first two groups. The months from July carry every claim about WN3. WN3
+against AIFS or ENS on the months before July may not be a fair comparison, because WN3's weights
+may have seen those months and the other products' had not. The pooled group mixes both kinds of
+month, so it is not a fair comparison of WN3 with AIFS or ENS, and it is not the headline until the
+archive's provenance is confirmed. The folds are unchanged, and each group selects rows that were
+already scored out of fold.
 
 **A row is out-of-sample only if its valid month is July or later and the 00 UTC run it reads was
 issued after 30 June.** A day-14 row that verifies in July from a run issued in the last two weeks
