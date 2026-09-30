@@ -202,6 +202,16 @@ lead?](../../docs/studies/forecasts/matched-lead.md).
   every interval itself with the report's own functions and refuses any site label that is not an
   anonymised label. It has no default output directory: charts go to `docs/studies/assets/` only
   once a real report exists.
+- `dot_interval_vs_ens.py` fits nothing. It reads the saved losses of the extra-lead, AIFS, and
+  WeatherNext 3 folders and draws, for each technology, one panel per lead day (0, 3, 4, and 10) of
+  each weather product's error minus the ENS mean's, as a dot with a 95% interval from resampling
+  whole months and a fitting seed. A row with fewer than 6 months gets a hollow dot and no interval.
+  Each product is subtracted from the ENS-mean arm of the same lead day in its own folder, or, where
+  that folder holds no ENS mean at the day, from `_leads_day10`'s. WeatherNext 3's wind reference is
+  `ens_meanvec`. It writes `report.md`, `intervals.parquet`, and a `README.md` naming each row's
+  reference to a new `nwp_forecast_comparison_vs_ens_dots` folder, and two SVGs to
+  `docs/studies/assets/`,
+  and it refuses to overwrite any of them.
 
 ## Outputs
 
