@@ -195,7 +195,12 @@ def main() -> int:
         "",
     ]
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    pl.concat([pl.read_parquet(SOURCE_DIR / "intervals.parquet"), records]).write_parquet(paths[1])
+    # `value`, `lower` and `upper` are the columns `studies.page_numbers` reads.
+    pl.concat([pl.read_parquet(SOURCE_DIR / "intervals.parquet"), records]).with_columns(
+        value=pl.col("difference_pp"),
+        lower=pl.col("lower_95_pp"),
+        upper=pl.col("upper_95_pp"),
+    ).write_parquet(paths[1])
     paths[0].write_text("\n".join(lines))
     _LOG.info("wrote %s", OUTPUT_DIR)
     return 0
