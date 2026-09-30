@@ -402,17 +402,20 @@ def test_a_day_with_two_baselines_has_two_blank_rows_above_its_first_product() -
 def test_the_subtitle_names_the_days_smart_persistence_was_scored() -> None:
     text = " ".join(mod.subtitle_lines(scope="Scope.", smart_days=[0, 1, 2, 3]))
 
-    assert "days 0, 1, 2, 3" in text
+    assert "days 0, 1, 2, and 3" in text
     assert "Scope." in text
 
 
-def test_every_caveat_of_the_old_caption_is_kept_for_the_page() -> None:
+def test_every_limiting_caveat_is_in_the_list_the_page_reuses() -> None:
     notes = " ".join(
         mod.caveat_notes(domain="solar", figure_numbers={"wn3_groups": 17, "headline": 3})
     )
 
     for phrase in (
-        "slightly fewer hours",
+        "Among the full-window rows, every product except IFS HRES 9 km",
+        "scored on their own, smaller row sets",
+        "(13.7% at day 7)",
+        "(14.7% at day 14)",
         "hindcast",
         "Solar day 0 omits",
         "Leads are not equal",
@@ -430,9 +433,6 @@ def test_every_caveat_of_the_old_caption_is_kept_for_the_page() -> None:
     )
     assert "drops the hour ending 00:00 UTC" in wind
     assert "mean-vector reference" in wind
-
-
-# --- Optional sources ---------------------------------------------------------------------------
 
 
 def _touch(folder: Path, *names: str) -> None:
@@ -502,7 +502,7 @@ def _grid_values(spec: dict[str, Any], layer: dict[str, Any]) -> list[float]:
     return [row["x"] for row in rows]
 
 
-def test_every_grid_line_has_the_width_the_old_leaderboard_gave_its_minor_lines(
+def test_every_grid_line_is_a_minor_line_wide_whether_or_not_it_is_labelled(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     spec = _figure(monkeypatch)
@@ -582,7 +582,7 @@ def test_the_label_column_fits_the_longest_label_and_the_plot_takes_the_rest_of_
     assert mod.plot_width_px(label_px=narrow) > width
 
 
-def test_the_figure_gives_the_plot_more_width_than_the_old_fixed_label_column_did(
+def test_the_plot_is_wider_than_one_beside_a_fixed_220_px_label_column(
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
     spec = _figure(monkeypatch)
@@ -657,3 +657,257 @@ def test_a_missing_default_file_raises_naming_it(tmp_path: Path, missing: str) -
 
     with pytest.raises(FileNotFoundError, match=Path(missing).name):
         mod.default_sources(data_dir=tmp_path, domain="wind")
+
+
+def test_the_shared_rows_claim_is_scoped_to_the_full_window_rows() -> None:
+    notes = mod.caveat_notes(domain="solar", figure_numbers={"wn3_groups": 17, "headline": 3})
+
+    assert notes[0].startswith("Among the full-window rows, every product except IFS HRES 9 km")
+    assert "exactly the same hours" in notes[0]
+    assert not notes[0].startswith("Every product")
+
+
+def test_a_list_of_days_takes_a_serial_comma_and_a_pair_does_not() -> None:
+    assert mod._join_with_serial_comma(["0", "1", "2"]) == "0, 1, and 2"
+    assert mod._join_with_serial_comma(["0", "1"]) == "0 and 1"
+    assert mod._join_with_serial_comma(["1"]) == "1"
+
+
+def _baseline_rules(panel: dict[str, Any]) -> list[dict[str, Any]]:
+    return [
+        layer
+        for layer in panel["layer"]
+        if layer["mark"]["type"] == "rule" and "strokeDash" in layer["mark"]
+    ]
+
+
+def test_each_baseline_rule_starts_below_its_own_label_row_and_reaches_the_last_row() -> None:
+    panel = mod.day_panel(
+        rows=mod.day_rows(board=_board(), day=1),
+        baselines=[
+            mod.Baseline(name="Climatology", value=14.2),
+            mod.Baseline(name="Smart persistence", value=14.0),
+        ],
+        day=1,
+        x_domain=(4.0, 20.0),
+        x_title=None,
+        label_px=150,
+    ).to_dict()
+
+    rules = _baseline_rules(panel)
+    rows_in_panel = 2 + 2  # two label rows, then Product A and Product B
+    assert [rule["encoding"]["y"]["value"] for rule in rules] == [
+        mod.ROW_STEP_PX,
+        2 * mod.ROW_STEP_PX,
+    ]
+    assert {rule["encoding"]["y2"]["value"] for rule in rules} == {rows_in_panel * mod.ROW_STEP_PX}
+
+
+def test_two_baselines_closer_than_a_third_of_a_point_get_names_in_different_rows() -> None:
+    panel = mod.day_panel(
+        rows=mod.day_rows(board=_board(), day=1),
+        baselines=[
+            mod.Baseline(name="Climatology", value=14.2),
+            mod.Baseline(name="Smart persistence", value=14.0),
+        ],
+        day=1,
+        x_domain=(4.0, 20.0),
+        x_title=None,
+        label_px=150,
+    ).to_dict()
+
+    text = next(layer for layer in panel["layer"] if layer["mark"]["type"] == "text")
+    rows = panel["datasets"][text["data"]["name"]]
+    assert len({row["label"] for row in rows}) == 2
+
+
+# --- Loading the day-5 folder and the script's wiring -------------------------------------------
+
+
+def _wn3_frame(*, day: int) -> pl.DataFrame:
+    return pl.DataFrame(
+        {
+            "arm": [f"wn3_mean_day{day}", f"ens_mean_day{day}"],
+            "setting": "primary",
+            "site": "A",
+            "time": datetime(2026, 3, 1, 12, tzinfo=UTC),
+            "month": "2026-03",
+            "device": "cuda",
+        }
+    )
+
+
+def _write_wn3(folder: Path, days: tuple[int, ...]) -> None:
+    folder.mkdir(parents=True, exist_ok=True)
+    for day in days:
+        _wn3_frame(day=day).write_parquet(folder / f"solar_wn3_day{day}_losses.parquet")
+
+
+def _canned_board(*, losses: pl.DataFrame, arms: list[str]) -> pl.DataFrame:
+    day = lambda arm: int(arm.rpartition("_day")[2])  # noqa: E731
+    return pl.DataFrame(
+        {
+            "arm": arms,
+            "value": [
+                (10.0 + day(arm) + (1.0 if arm.startswith("ens") else 0.0)) / 100 for arm in arms
+            ],
+            "lower_95": [0.05] * len(arms),
+            "upper_95": [0.2] * len(arms),
+            "n_rows": [10] * len(arms),
+            "n_months": [7] * len(arms),
+        }
+    )
+
+
+def _wn3_board(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *, more: bool) -> pl.DataFrame:
+    _write_wn3(tmp_path / "wn3", charts.WN3_DAYS)
+    _write_wn3(tmp_path / "wn3_extra", charts.WN3_EXTRA_DAYS)
+    _write_wn3(tmp_path / "day5", (5,))
+    monkeypatch.setattr(charts, "leaderboard", _canned_board)
+    marks = charts.load_row_set_marks(
+        blends_dir=None,
+        wn3_dir=tmp_path / "wn3",
+        domain="solar",
+        wn3_extra_dir=tmp_path / "wn3_extra",
+        more_wn3_folders=[charts.DayFolder(folder=tmp_path / "day5", days=(5,))] if more else (),
+    )
+    short = charts.row_set_board_rows(marks=marks)
+    return mod.board_rows(full=_full(rows=[("Product A", 5, 9.0)]), short=short)
+
+
+def test_a_weathernext_3_day_5_mark_and_its_ens_tick_come_from_the_day_5_folder(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    board = _wn3_board(monkeypatch, tmp_path, more=True)
+
+    rows = mod.day_rows(board=board, day=5)
+
+    short = rows.filter(pl.col("window") == "short")
+    assert short["label"].to_list() == ["WeatherNext 3 (7 months)"]
+    assert short["value"].to_list() == [15.0]
+    assert short["tick"].to_list() == [16.0]
+
+
+def test_without_the_day_5_folder_weathernext_3_has_no_day_5_row(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    board = _wn3_board(monkeypatch, tmp_path, more=False)
+
+    rows = mod.day_rows(board=board, day=5)
+
+    assert "short" not in rows["window"].to_list()
+
+
+class _FakeChart:
+    def save(self, path: Path) -> None:
+        Path(path).write_text("svg")
+
+
+def _run_main(monkeypatch: pytest.MonkeyPatch, tmp_path: Path, *args: str) -> dict[str, Any]:
+    """Run `main` on fake loaders, returning what it asked the loaders and the figure for."""
+    seen: dict[str, Any] = {"numbers": [], "marks": []}
+    day5 = charts.DayFolder(folder=tmp_path / "day5", days=(5,))
+
+    def sources(*, data_dir: Path, domain: str) -> mod.Sources:
+        seen["data_dir"] = data_dir
+        return mod.Sources(
+            published=tmp_path / "pub",
+            extra_dirs=[],
+            blends=tmp_path / "b",
+            blends_extra=tmp_path / "be",
+            wn3=tmp_path / "w",
+            wn3_extra=tmp_path / "we",
+            day5=day5,
+        )
+
+    def marks(**kwargs: Any) -> list[charts.RowSetMarks]:
+        seen["marks"].append(kwargs)
+        return []
+
+    def figure(*, number: int, **_: Any) -> tuple[_FakeChart, pl.DataFrame]:
+        seen["numbers"].append(number)
+        return _FakeChart(), _board()
+
+    monkeypatch.setattr(mod, "default_sources", sources)
+    monkeypatch.setattr(mod, "load", lambda **_: None)
+    monkeypatch.setattr(mod, "load_row_set_marks", marks)
+    monkeypatch.setattr(mod, "by_day_figure", figure)
+    monkeypatch.setattr(mod, "optimise", lambda *, path: None)
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "x",
+            "--data-dir",
+            str(tmp_path),
+            "--output-dir",
+            str(tmp_path / "out"),
+            "--svg-dir",
+            str(tmp_path / "svg"),
+            "--no-svgo",
+            *args,
+        ],
+    )
+    (tmp_path / "svg").mkdir(exist_ok=True)
+    assert mod.main() == 0
+    seen["day5"] = day5
+    return seen
+
+
+def test_main_reads_the_day_5_folder_for_both_aifs_and_weathernext_3(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen = _run_main(monkeypatch, tmp_path)
+
+    assert len(seen["marks"]) == 2
+    for kwargs in seen["marks"]:
+        assert kwargs["more_blends_folders"] == [seen["day5"]]
+        assert kwargs["more_wn3_folders"] == [seen["day5"]]
+    assert seen["data_dir"] == tmp_path
+
+
+def test_the_wind_figure_is_numbered_after_the_solar_figure_and_the_caveats_follow_suit(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen = _run_main(
+        monkeypatch,
+        tmp_path,
+        "--first-figure-number",
+        "5",
+        "--wn3-groups-figure-number",
+        "20",
+        "--headline-figure-number",
+        "8",
+    )
+
+    assert seen["numbers"] == [5, 6]
+    report = (tmp_path / "out" / "report.md").read_text()
+    assert "Figure 20 splits" in report
+    assert "Figure 21 splits" in report
+    assert "(Figure 8)" in report
+    assert "(Figure 9)" in report
+
+
+def test_main_refuses_to_overwrite_an_existing_svg_unless_asked(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "svg").mkdir()
+    existing = tmp_path / "svg" / "nwp_forecast_solar_leaderboard.svg"
+    existing.write_text("published")
+
+    with pytest.raises(FileExistsError, match=r"nwp_forecast_solar_leaderboard\.svg"):
+        _run_main(monkeypatch, tmp_path)
+    assert existing.read_text() == "published"
+    assert not (tmp_path / "out").exists()
+
+    _run_main(monkeypatch, tmp_path, "--replace-svgs")
+    assert existing.read_text() == "svg"
+
+
+def test_main_refuses_an_existing_output_folder_even_when_svgs_may_be_replaced(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    (tmp_path / "out").mkdir()
+
+    with pytest.raises(FileExistsError, match="out"):
+        _run_main(monkeypatch, tmp_path, "--replace-svgs")

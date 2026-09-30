@@ -26,9 +26,9 @@ cells of the full-window products), the AIFS and WeatherNext 3 fits (including
 `nwp_forecast_comparison_day5_aifs_wn3`, their day-5 cells), and it raises if a folder or file is
 missing, so a missing day cannot silently leave a blank cell.
 
-Every limiting caveat the old leaderboard's caption carried is kept in `caveat_notes`, which the
-script prints after each figure's title so the page can reuse the list; the figure's own subtitle
-carries only what a reader needs to decode the chart.
+`caveat_notes` holds every limiting caveat of the chart, and is the single source for the figure
+captions on the page. The script prints the list and writes it to `report.md`; the figure's own
+subtitle carries only what a reader needs to decode the chart.
 
 Run it with `uv run python studies/nwp_forecast_comparison/leaderboard_by_day.py
 --first-figure-number 1`. The script writes `marks.parquet`, `report.md` and each SVG once, and
@@ -56,7 +56,7 @@ from nwp_forecast_charts import (
     CAPACITY_NOTE,
     DOMAINS,
     FIGURE_NUMBERS,
-    SHARED_ROWS_NOTE,
+    SHARED_ROWS_EXCEPT_IFS_NOTE,
     TITLES,
     DayFolder,
     Loaded,
@@ -82,7 +82,7 @@ MAE_TITLE: Final[str] = "Mean absolute error (% of capacity; smaller is better)"
 """The x axis's title on the bottom panel: the quantity, its unit, and which way is better."""
 
 MARK_COLOUR: Final[str] = ocf.DATA_BLUE
-"""The colour of every dot and interval line. Colour no longer encodes the lead day, because each
+"""The colour of every dot and interval line. Colour does not encode the lead day, because each
 lead day has a panel of its own."""
 
 TICK_COLOUR: Final[str] = ocf.BLACK_1
@@ -114,8 +114,8 @@ BASELINE_NAMES: Final[dict[str, str]] = {
 """Each no-weather baseline's name on its dashed line."""
 
 GRID_WIDTH_PX: Final[float] = 1.5
-"""The stroke width of every vertical grid line, labelled or not. It is the width the old
-leaderboard gave its half-point (minor) lines, so a labelled line is no heavier than the others."""
+"""The stroke width of every vertical grid line, labelled or not, so a labelled line is no heavier
+than an unlabelled one."""
 
 MAJOR_GRID_COLOUR: Final[str] = "#C8C8C8"
 MINOR_GRID_COLOUR: Final[str] = "#DDDDDD"
@@ -230,19 +230,25 @@ def default_sources(*, data_dir: Path, domain: DomainType) -> Sources:
 WN3_DAYS_NOTES: Final[dict[DomainType, str]] = {
     "solar": (
         "At days 7 and 14 WeatherNext 3's solar error is not the lowest plotted: the ENS mean "
-        "(13.7%) and GFS native (14.7%) are lower, on more months. Against the ENS mean on the "
-        "same rows (14.7% and 16.0%) the difference is not resolved."
+        "(13.7% at day 7) and GFS native (14.7% at day 14) are lower, on more months. Against "
+        "the ENS mean on the same rows (14.7% and 16.0%) the difference is not resolved."
     ),
     "wind": (
         "At days 7 and 14, against the ENS mean on the same rows (16.7% and 18.7%), no "
-        "difference from WeatherNext 3 is resolved. At day 14 WeatherNext 3's 17.9% is not "
-        "detectably below the shuffled-weather arms (18.3% and 18.6%), so the chart does not "
-        "show that WeatherNext 3 beats the 18.5% climatology. The grey tick is the ENS mean "
-        "of wind speed, not the mean-vector reference matched to WeatherNext 3 (see the "
-        "matched-reference table)."
+        "difference from WeatherNext 3 is resolved, and the plotted ranks compare different row "
+        "sets. At day 14 WeatherNext 3's 17.9% is not detectably below the shuffled-weather "
+        "arms (18.3% and 18.6%), so the chart does not show that WeatherNext 3 beats the 18.5% "
+        "climatology. The grey tick is the ENS mean of wind speed, not the mean-vector "
+        "reference matched to WeatherNext 3, which the WeatherNext 3 results section compares."
     ),
 }
 """The sentence each technology adds about WeatherNext 3's row at days 7 and 14."""
+
+SHARED_FULL_WINDOW_NOTE: Final[str] = SHARED_ROWS_EXCEPT_IFS_NOTE.replace(
+    "Every product", "Among the full-window rows, every product", 1
+)
+"""The shared-rows claim, scoped to the full-window rows: the fewer-months rows, IFS HRES 9 km, and
+solar day 0 each score different hours."""
 
 DAY_ZERO_NOTES: Final[dict[DomainType, str]] = {
     "solar": (
@@ -269,8 +275,8 @@ def caveat_notes(*, domain: DomainType, figure_numbers: dict[str, int]) -> list[
     """
     return [
         (
-            f"{SHARED_ROWS_NOTE} IFS HRES (9 km, Open-Meteo) is scored on slightly fewer hours: "
-            "the shared hours minus the target days its archive lacks."
+            f"{SHARED_FULL_WINDOW_NOTE} The fewer-months rows are scored on their own, smaller "
+            "row sets."
         ),
         (
             "Day 0 is a hindcast, not a day-ahead forecast a service could read, because each "
@@ -676,16 +682,23 @@ def day_panel(
                 "label": blanks,
             }
         ).with_columns(pl.col("x").round(3))
-        layers.append(
-            alt.Chart(lines)
-            .mark_rule(
-                strokeDash=list(BASELINE_DASH),
-                strokeWidth=BASELINE_WIDTH_PX,
-                color=ocf.BLACK_1,
-                aria=False,
+        total_px = ROW_STEP_PX * len(labels)
+        for rank, baseline in enumerate(baselines):
+            # Each rule starts at the bottom of its own label row, so no rule crosses a name.
+            layers.append(
+                alt.Chart(pl.DataFrame({"x": [round(baseline.value, 3)]}))
+                .mark_rule(
+                    strokeDash=list(BASELINE_DASH),
+                    strokeWidth=BASELINE_WIDTH_PX,
+                    color=ocf.BLACK_1,
+                    aria=False,
+                )
+                .encode(  # ty: ignore[unresolved-attribute]
+                    x=x_shared("x"),
+                    y=alt.value(ROW_STEP_PX * (rank + 1)),
+                    y2=alt.value(total_px),
+                )
             )
-            .encode(x=x_shared("x"))  # ty: ignore[unresolved-attribute]
-        )
         layers.append(
             alt.Chart(lines)
             .mark_text(
@@ -711,6 +724,13 @@ def day_panel(
     )
 
 
+def _join_with_serial_comma(items: Sequence[str]) -> str:
+    """Join items as prose: `a`, `a and b`, or `a, b, and c`."""
+    if len(items) <= 2:
+        return " and ".join(items)
+    return f"{', '.join(items[:-1])}, and {items[-1]}"
+
+
 def subtitle_lines(*, scope: str, smart_days: Sequence[int]) -> list[str]:
     """Return the figure's subtitle: only what a reader needs to decode the chart.
 
@@ -721,7 +741,7 @@ def subtitle_lines(*, scope: str, smart_days: Sequence[int]) -> list[str]:
     Returns:
         The lines.
     """
-    smart = ", ".join(str(day) for day in smart_days)
+    smart = _join_with_serial_comma([str(day) for day in smart_days])
     return [
         (
             "One panel per lead day, day 0 at the top, all on the same x axis. Each row is one "
@@ -891,6 +911,9 @@ def optimise(*, path: Path) -> None:
 
 def repo_data_dir() -> Path:
     """Return the shared `data/` directory, resolving a linked worktree to the main checkout.
+
+    Duplicated from the other study scripts, because study scripts cannot import one another's
+    private helpers.
 
     Returns:
         The directory holding `studies/`.

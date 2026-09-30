@@ -67,37 +67,59 @@ use](#discussion-what-to-use) gives the evidence and what would change each one)
 
 Figure 1: For solar power, error rises with lead to day 10: at day 1 every weather forecast shown
 has a lower error than climatology (14.5%), but at day 14 neither the ENS mean nor the GEFS mean
-does. Among the full-window products, the ENS mean and IFS 0.25° have the lowest day-1 errors. The
-three rows below them are fitted on different, smaller row sets: WeatherNext 3 mean (7 months,
-February to September 2026, no May rows), AIFS Single (16 months), and AIFS ENS mean (11 months),
-each with a grey tick for the ENS mean on the same rows. Google has not documented which WeatherNext
-3 model version made its 2026 archive, so the February to June months may overlap WeatherNext 3's
-training data (Figure 17 splits the rows). At days 7 and 14 WeatherNext 3's solar error is not the
-lowest plotted: the ENS mean (13.7% at day 7) and GFS native (14.7% at day 14) are lower, on more
-months. Against the ENS mean on the same rows (14.7% and 16.0%) the difference is not resolved.
-The AIFS Single, AIFS ENS mean, and WeatherNext 3 rows also carry days 0, 3, 4, and 10. Day 0 is a
-hindcast: each product reads a run that started before the hour it describes. At solar day 0 every
-arm omits the hours ending 01:00 to 06:00 UTC, which precede the first 6-hourly AIFS step. The
-WeatherNext 3 row is the pooled rows (February to September 2026).
+does. Each panel is one lead day, from day 0 at the top, on one shared x axis, and each row is one
+forecast product, sorted best first. Among the full-window products, the ENS mean and IFS 0.25° have
+the lowest day-1 errors. The three rows below the heading "Fewer months" are fitted on different,
+smaller row sets: WeatherNext 3 (7 months, February to September 2026, no May rows), AIFS Single (16
+months), and AIFS ENS mean (11 months). Their dots are hollow, they are not ranked against the rows
+above, and each has a grey tick for the ENS mean on the same rows. WeatherNext 3's row holds every
+row from February to September 2026, and Google has not documented which WeatherNext 3 model version
+made that archive, so the February to June months may overlap WeatherNext 3's training data (Figure
+17 splits the rows). At days 7 and 14 WeatherNext 3's solar error is not the lowest plotted: the ENS
+mean (13.7% at day 7) and GFS native (14.7% at day 14) are lower, on more months. Against the ENS
+mean on the same rows (14.7% and 16.0%) the difference is not resolved. Among the full-window rows,
+every product except IFS HRES 9 km is scored on exactly the same hours; IFS HRES 9 km is scored
+without the target days its archive lacks. The fewer-months rows are scored on their own, smaller
+row sets. Leads are not equal: a Previous Runs product reads the freshest run at least a day old, a
+shorter lead than ENS's on most hours, which favours that product. A month counts whole in the
+resampling even where the row set holds part of it (September 2026 holds 10 days). Overlapping
+intervals can still hide a significant paired difference (Figure 3). Smart persistence, which uses
+no weather forecast, is drawn only at days 0 to 3, where it was scored. A lead day with no mark was
+not fitted, because it is beyond the product's forecast range or not in the archive we hold; nothing
+is filled in. Day 0 is a hindcast, not a day-ahead forecast a service could read, because each
+product reads a run that started before the hour it describes. Solar day 0 omits the hours ending
+01:00 to 06:00 UTC for every product, because they precede the first 6-hourly step of the AIFS arms.
+The WeatherNext 3 row is the pooled rows (February to September 2026).
 
 ![Each wind forecast product's error at each fitted lead day, with 95% intervals](../assets/nwp_forecast_wind_leaderboard.svg)
 
 Figure 2: For wind power, error rises with lead: at day 1 every weather forecast shown has a lower
-error than climatology (18.5%), but at day 14 neither the ENS mean nor the GEFS mean does. Among the
-full-window products, the ENS mean and IFS 0.25° have the lowest day-1 errors. The three rows below
-them are fitted on different, smaller row sets: WeatherNext 3 mean (7 months, February to September
-2026, no May rows), AIFS Single (16 months), and AIFS ENS mean (11 months), each with a grey tick
-for the ENS mean on the same rows. Google has not documented which WeatherNext 3 model version made
-its 2026 archive, so the February to June months may overlap WeatherNext 3's training data (Figure
+error than climatology (18.5%), but at day 14 neither the ENS mean nor the GEFS mean does. Each
+panel is one lead day, from day 0 at the top, on one shared x axis, and each row is one forecast
+product, sorted best first. Among the full-window products, the ENS mean and IFS 0.25° have the
+lowest day-1 errors. The three rows below the heading "Fewer months" are fitted on different,
+smaller row sets: WeatherNext 3 (7 months, February to September 2026, no May rows), AIFS Single (16
+months), and AIFS ENS mean (11 months). Their dots are hollow, they are not ranked against the rows
+above, and each has a grey tick for the ENS mean on the same rows. WeatherNext 3's row holds every
+row from February to September 2026, and Google has not documented which WeatherNext 3 model version
+made that archive, so the February to June months may overlap WeatherNext 3's training data (Figure
 18 splits the rows). At days 7 and 14, against the ENS mean on the same rows (16.7% and 18.7%), no
 difference from WeatherNext 3 is resolved, and the plotted ranks compare different row sets. At day
 14 WeatherNext 3's 17.9% is not detectably below the shuffled-weather arms (18.3% and 18.6%), so the
-chart does not show that WeatherNext 3 beats the 18.5% climatology. That grey tick is the ENS mean
-of wind speed, not the mean-vector reference matched to WeatherNext 3, which the WN3 results section
-compares. The AIFS Single, AIFS ENS mean, and WeatherNext 3 rows also carry days 0, 3, 4, and 10.
-Day 0 is a hindcast: each product reads a run that started before the hour it describes, and the
-WeatherNext 3 row drops the hour ending 00:00 UTC, for which the WN3 store holds no lead. The
-WeatherNext 3 row is the pooled rows (February to September 2026).
+chart does not show that WeatherNext 3 beats the 18.5% climatology. The grey tick is the ENS mean of
+wind speed, not the mean-vector reference matched to WeatherNext 3, which the WeatherNext 3 results
+section compares. Among the full-window rows, every product except IFS HRES 9 km is scored on
+exactly the same hours; IFS HRES 9 km is scored without the target days its archive lacks. The
+fewer-months rows are scored on their own, smaller row sets. Leads are not equal: a Previous Runs
+product reads the freshest run at least a day old, a shorter lead than ENS's on most hours, which
+favours that product. A month counts whole in the resampling even where the row set holds part of it
+(September 2026 holds 10 days). Overlapping intervals can still hide a significant paired difference
+(Figure 4). Smart persistence, which uses no weather forecast, is drawn only at days 0 to 3, where
+it was scored. A lead day with no mark was not fitted, because it is beyond the product's forecast
+range or not in the archive we hold; nothing is filled in. Day 0 is a hindcast, not a day-ahead
+forecast a service could read, because each product reads a run that started before the hour it
+describes. The WeatherNext 3 row drops the hour ending 00:00 UTC at day 0, for which the WN3 store
+holds no lead. The WeatherNext 3 row is the pooled rows (February to September 2026).
 
 ![Paired differences in solar error with 95% intervals, both XGBoost settings](../assets/nwp_forecast_solar_headline.svg)
 
@@ -2517,8 +2539,8 @@ uv run python $R/fit_aifs.py --wn3 --lookahead-cleared --workers 1 --published-d
 
 # Figures
 uv run python $R/nwp_forecast_charts.py --input-dir $P --extra-dir $D1 --extra-dir $D2 \
-    --extra-dir $D3 --extra-dir $D4 --aifs-dir $A --leaderboard-blends-dir $AB --wn3-dir $W \
-    --output-dir docs/studies/assets
+    --extra-dir $D3 --extra-dir $D4 --aifs-dir $A --wn3-dir $W --output-dir docs/studies/assets
+uv run python $R/leaderboard_by_day.py --replace-svgs
 uv run python $R/nwp_forecast_charts.py --aifs-blends-dir $AB --output-dir docs/studies/assets
 ```
 
