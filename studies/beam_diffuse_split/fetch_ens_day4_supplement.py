@@ -59,7 +59,8 @@ def band_leads() -> list[int]:
     """Return every hour of the day-4 band and its margin.
 
     Returns:
-        The lead hours from 24 * 4 - `MARGIN_HOURS` to 24 * 5 + `MARGIN_HOURS`, ascending.
+        The lead hours from `MARGIN_HOURS` before hour 96 (the start of day 4) to `MARGIN_HOURS`
+        after hour 120 (the start of day 5), ascending.
     """
     return list(range(24 * DAY - MARGIN_HOURS, 24 * DAY + 25 + MARGIN_HOURS))
 
