@@ -1450,8 +1450,7 @@ day 14 the July to September intervals exclude 0 at the primary setting and span
 sensitivity setting. At day 7, WN3's error (11.512%) equals its two shuffled-weather arms' (11.517%
 and 11.511%), and those arms beat the mean-vector reference (11.926%), so the day-7 contrast
 measures the reference doing worse than no weather, not WN3 skill. The July to September intervals
-resample only 3 months, so they are indicative only. Hollow squares
-are the sensitivity setting.
+resample only 3 months, so they are indicative only. Hollow squares are the sensitivity setting.
 
 **The three groups agree in sign at every day and technology except solar day 7 in July to
 September, and the pooled group is the one the leaderboards draw.** [What is known about WN3's
@@ -1883,8 +1882,11 @@ Rows, folds, and fairness -->
 
 **The extra arms rest on inputs the study could not check natively, and the AIFS rows are short.**
 
-- **Open-Meteo's processing of IFS HRES was not checked against a native archive, and sites B and D
-  share a source cell, so their series are identical.**
+- **Open-Meteo's processing of IFS HRES was not checked against a native archive.** The archive holds
+  919 of 926 run days, so seven run days are gaps, and the arms score the shared hours minus those
+  days. The hourly values at days 5 and 7 are interpolated from 3-hourly and 6-hourly steps, and
+  sites B and D share a source cell, so the two generators' series are identical ([how IFS HRES 9 km
+  is read](matched-lead-extra-products.md#the-extra-lead-days-day-0-and-the-products-added-later)).
 - **The day-0 leads of most products are estimated, and native GFS's day 0 ignores publication
   time.** Only ICON-EU's and ICON-D2's day-0 radiation leads were checked against source files,
   ICON-D2's less cleanly. Every day-0 mark is a nowcast that a live service could not read in
