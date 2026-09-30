@@ -650,8 +650,11 @@ These were chosen after the first results were seen:
 **Every arm in this section is refitted on the 34,156 farm-hours, so an error here differs from the
 same product's error above.** That includes each product's wind arm from the rest of this page.
 
-**About one of the 24 exploratory paired-difference intervals at the main setting would be
-statistically significant at the 5% level by chance alone.** The report prints all 24.
+**An exploratory paired-difference interval with no real effect behind it has a nominal 5% chance of
+being statistically significant at the 5% level, and a higher chance if the intervals are too
+narrow.** The main setting has 24 such intervals, and the report prints all 24. How many
+significant intervals are spurious is unknown, because how many have no real effect behind them is
+unknown.
 
 **The folds are five blocks of 4, 3, 4, 3, and 3 calendar months.** January to July occur once in
 the window, so an XGBoost model that scores one of them never saw that calendar month. The

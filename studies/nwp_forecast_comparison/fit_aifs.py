@@ -3011,8 +3011,13 @@ def main() -> int:
             "contrast is named deciding before any fit: aifs_single_day1 − ens_control6_day1 on "
             "`single`, for solar and for wind. The AIFS ENS contrasts on `ens` are descriptive "
             "only, because most scored `ens` cells have no training row of their calendar month. "
-            "Every other contrast is exploratory and post hoc; among that many intervals, about "
-            "1 in 20 reaches significance at the 5% level by chance."
+            "Every other contrast is exploratory and post hoc. An exploratory interval with "
+            "no real effect behind it has a nominal 5% chance of being statistically "
+            "significant at the 5% level, and a higher chance if the intervals are too "
+            "narrow. How many significant exploratory intervals are spurious is unknown, "
+            "because how many have no real effect behind them is unknown. The intervals "
+            "rest on overlapping months of weather and often share an arm, so spurious "
+            "results tend to arrive together."
         ),
         "",
     ]
