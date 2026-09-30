@@ -6,29 +6,32 @@ model per generator and scores it by mean absolute error as a percentage of the 
 capacity. The parts of this project that read past weather are capacity estimation, training
 history, historical features, and disaggregation, and each reads one weather product.
 
-- [Which weather product best describes past sunshine?](solar.md) — a satellite retrieval describes
-  past sunshine far better than any weather model tested; among the models, ICON-D2 is best as
-  served but its advantage shrinks within hours of each run, and ICON-EU no longer beats UKV once
-  UKV's hour is rebuilt from its own snapshots. The page says which product each offline consumer —
-  capacity estimation, training history, historical features, and disaggregation — should read. -
-  [Which weather product best describes past wind?](wind.md) — at the three metered wind farms, the
-  Met Office's UKV and the German weather service's ICON-D2 describe past hub-height wind best of
-  the five products tested and both beat the ERA5 reanalysis, by more from April to September in
-  intervals estimated separately for each half of the year; ICON-EU also beats ERA5; and ICON global
-  has the largest error of the five, about half of its gap to ICON-EU a pair of steps in the wind
-  Open-Meteo's archive serves for it at one generator. - [Does blending CERRA's wind heights beat
-  one height?](cerra-wind-levels.md) — at three wind farms, an XGBoost model given CERRA's 10 m and
-  100 m wind speeds has lower error than one given 100 m alone, and the pair gives most of the gain
-  of using four or five heights. CERRA is a reanalysis, so the page says nothing about forecast
-  skill. - [Does blending weather products beat the best single weather product?](blending.md) — at
-  the six solar farms and three wind farms, an XGBoost model given several weather products at once
-  beats an XGBoost model given the best single product with its neighbouring hours, by 0.13 points
-  of capacity for solar and 0.48 for wind. The gain comes from the other products' weather rather
-  than from the extra columns. A blend of UKV and ICON-EU that a live service could read beats UKV
-  alone, and an XGBoost blend beats a linear stack of single-product predictions. An XGBoost model
-  given CAMS's split plus SARAH-3's global irradiance, the two satellite retrievals the past-solar
-  study compared, beats CAMS's split with its neighbouring hours by 0.18 points and plain CAMS's
-  split by 0.20 points, on a longer row set from January 2021.
+- [Which weather product best describes past sunshine?](solar.md) — a
+  satellite retrieval describes past sunshine far better than any weather model tested; among the
+  models, ICON-D2 is best as served but its advantage shrinks within hours of each run, and ICON-EU
+  no longer beats UKV once UKV's hour is rebuilt from its own snapshots. The page says which product
+  each offline consumer — capacity estimation, training history, historical features, and
+  disaggregation — should read.
+- [Which weather product best describes past wind?](wind.md) — at the
+  three metered wind farms, the Met Office's UKV and the German weather service's ICON-D2 describe
+  past hub-height wind best of the five products tested and both beat the ERA5 reanalysis, by
+  more from April to September in intervals estimated separately for each half of the year; ICON-EU
+  also beats ERA5; and ICON global has the largest error of the
+  five, about half of its gap to ICON-EU a pair of steps in the wind Open-Meteo's archive serves for
+  it at one generator.
+- [Does blending CERRA's wind heights beat one height?](cerra-wind-levels.md) — at three wind
+  farms, an XGBoost model given CERRA's 10 m and 100 m wind speeds has lower error than one given
+  100 m alone, and the pair gives most of the gain of using four or five heights. CERRA is a
+  reanalysis, so the page says nothing about forecast skill.
+- [Does blending weather products beat the best single weather product?](blending.md) — at the six
+  solar farms and three wind farms, an XGBoost model given several weather products at once beats an
+  XGBoost model given the best single product with its neighbouring hours, by 0.13 points of
+  capacity for solar and 0.48 for wind. The gain comes from the other products' weather rather than
+  from the extra columns. A blend of UKV and ICON-EU that a live service could read beats UKV alone,
+  and an XGBoost blend beats a linear stack of single-product predictions. An XGBoost model given
+  CAMS's split plus SARAH-3's global irradiance, the two satellite retrievals the past-solar study
+  compared, beats CAMS's split with its neighbouring hours by 0.18 points and plain CAMS's split by
+  0.20 points, on a longer row set from January 2021.
 
 **The [Methods page](methods.md) states what the three studies share.** The Methods page holds the
 row sets and their site-hours, the capacity normalisation, the month-block folds, the bootstrap

@@ -178,8 +178,7 @@ shift beats the centred one by more than the seed spread.
 
 ## Results
 
-### Each XGBoost model has an error of 7.950 to 8.462 points, and on a synthetic target the models
-can use a second height
+### Each XGBoost model has an error of 7.950 to 8.462 points, and on a synthetic target the models can use a second height
 
 **The seven column sets have pooled errors between 7.950 and 8.462 points of capacity, and the
 intervals of all seven overlap.** The overlap comes from the months of weather that all seven share,
