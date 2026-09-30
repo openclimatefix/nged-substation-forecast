@@ -102,11 +102,12 @@ def _cells(*, sites: pl.DataFrame) -> pl.DataFrame:
     )
 
 
-def _members(*, cells: list[int]) -> pl.DataFrame:
+def _members(*, cells: list[int], leads: list[int] | None = None) -> pl.DataFrame:
     """Read every member of every run at the wanted cells and leads.
 
     Args:
         cells: The H3 cells to read.
+        leads: The lead hours to read; `_leads()` where `None`.
 
     Returns:
         One row per cell, run, valid time and member, with the lead and the six fields the study
@@ -118,7 +119,7 @@ def _members(*, cells: list[int]) -> pl.DataFrame:
         .with_columns(
             lead_hours=(pl.col("valid_time") - pl.col("init_time")).dt.total_hours().cast(pl.Int32)
         )
-        .filter(pl.col("lead_hours").is_in(_leads()))
+        .filter(pl.col("lead_hours").is_in(_leads() if leads is None else leads))
         .select(
             "h3_index",
             "init_time",

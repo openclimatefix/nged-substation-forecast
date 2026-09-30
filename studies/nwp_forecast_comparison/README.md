@@ -127,6 +127,43 @@ lead?](../../docs/studies/forecasts/matched-lead.md).
   overlap-weighted mean of the crop's cells, as ENS's stored table does; AIFS Single also has a
   nearest-cell arm at day 1. `--aifs-weather-dir` names the folder holding the two downloads. The
   build refuses the published folder and the day-1 and day-2 AIFS folder as its output.
+- `build_forecast_inputs.py --aifs --aifs-days 0 3 4 10` builds day 0 and days 3, 4, and 10 as
+  well. Day 0 reads the 00 UTC run of the same day as the hour, so its weather is a hindcast that
+  a service could not have read. AIFS and ENS on 6-hourly steps have no step before lead 6 hours
+  (radiation is null at lead 0), and a solar temperature is read at each hour's midpoint, so solar
+  day 0 omits the hours ending 01:00 to 06:00 UTC for every arm (AIFS Single, ENS, and WeatherNext
+  3), which keeps the rows matched. The build raises if any other scored solar hour's midpoint
+  lies before the first step. Wind day 0 is unaffected. WeatherNext 3 stores no lead for one hour
+  of each day at day 0 (00:00 UTC for wind, 01:00 UTC for solar), so the wind fit drops that hour
+  and the solar drop above already covers it.
+
+  The two fits write into two separate existing folders that hold only a `README.md`, because both
+  write `single_day0_*` files and a `report.md`, and each output is written once. The paths are
+  absolute because a worktree has no `data/` folder. Run one command at a time:
+
+  ```bash
+  D=/home/jack/dev/nged-substation-forecast/data/studies
+  P=$D/nwp_forecast_comparison
+  LEAN=$D/nwp_forecast_comparison_aifs_extra_days
+  WN3=$D/nwp_forecast_comparison_wn3_extra_days
+  uv run python studies/nwp_forecast_comparison/build_forecast_inputs.py --aifs \
+    --aifs-days 0 3 4 10 --published-dir $P --output-dir $LEAN
+  uv run python studies/nwp_forecast_comparison/fit_aifs.py --lean-leads --check \
+    --days 0 3 4 10 --published-dir $P --output-dir $LEAN
+  uv run python studies/nwp_forecast_comparison/fit_aifs.py --lean-leads \
+    --days 0 3 4 10 --workers 8 --published-dir $P --output-dir $LEAN
+  uv run python studies/nwp_forecast_comparison/build_wn3_inputs.py --build \
+    --days 0 3 4 10 --published-dir $P --output-dir $WN3
+  uv run python studies/nwp_forecast_comparison/fit_aifs.py --wn3 --check --lookahead-cleared \
+    --days 0 3 4 10 --published-dir $P --output-dir $WN3
+  uv run python studies/nwp_forecast_comparison/fit_aifs.py --wn3 --lookahead-cleared \
+    --days 0 3 4 10 --workers 8 --published-dir $P --output-dir $WN3
+  ```
+
+  `--lean-leads` fits only the AIFS Single arm and the ENS mean arm at those days, at the primary
+  setting, which is 144 (arm, site) fits. `--wn3` fits the WeatherNext 3 arms at them, which is 156
+  primary fits and the sensitivity refits on top. Each `--check` fits one arm twice, prints the
+  time and the estimated total, and fits nothing else.
 - `fit_aifs.py` fits every AIFS arm and reference on a GPU, on two nested row sets (`single`, and
   `ens` where AIFS ENS also exists), with folds cut inside the AIFS version eras. One contrast is
   deciding (AIFS Single against ENS's control member at day 1); AIFS ENS contrasts are

@@ -67,13 +67,37 @@ use](#discussion-what-to-use) gives the evidence and what would change each one)
 
 Figure 1: For solar power, error rises with lead to day 10: at day 1 every weather forecast shown
 has a lower error than climatology (14.5%), but at day 14 neither the ENS mean nor the GEFS mean
-does; the ENS mean and IFS 0.25° have the lowest day-1 errors.
+does. Among the full-window products, the ENS mean and IFS 0.25° have the lowest day-1 errors. The
+three rows below them are fitted on different, smaller row sets: WeatherNext 3 mean (7 months,
+February to September 2026, no May rows), AIFS Single (16 months), and AIFS ENS mean (11 months),
+each with a grey tick for the ENS mean on the same rows. Google has not documented which WeatherNext
+3 model version made its 2026 archive, so the February to June months may overlap WeatherNext 3's
+training data (Figure 17 splits the rows). At days 7 and 14 WeatherNext 3's solar error is not the
+lowest plotted: the ENS mean (13.7% at day 7) and GFS native (14.7% at day 14) are lower, on more
+months. Against the ENS mean on the same rows (14.7% and 16.0%) the difference is not resolved.
+The AIFS Single, AIFS ENS mean, and WeatherNext 3 rows also carry days 0, 3, 4, and 10. Day 0 is a
+hindcast: each product reads a run that started before the hour it describes. At solar day 0 every
+arm omits the hours ending 01:00 to 06:00 UTC, which precede the first 6-hourly AIFS step. The
+WeatherNext 3 row is the pooled rows (February to September 2026).
 
 ![Each wind forecast product's error at each fitted lead day, with 95% intervals](../assets/nwp_forecast_wind_leaderboard.svg)
 
 Figure 2: For wind power, error rises with lead: at day 1 every weather forecast shown has a lower
-error than climatology (18.5%), but at day 14 neither the ENS mean nor the GEFS mean does; the ENS
-mean and IFS 0.25° have the lowest day-1 errors.
+error than climatology (18.5%), but at day 14 neither the ENS mean nor the GEFS mean does. Among the
+full-window products, the ENS mean and IFS 0.25° have the lowest day-1 errors. The three rows below
+them are fitted on different, smaller row sets: WeatherNext 3 mean (7 months, February to September
+2026, no May rows), AIFS Single (16 months), and AIFS ENS mean (11 months), each with a grey tick
+for the ENS mean on the same rows. Google has not documented which WeatherNext 3 model version made
+its 2026 archive, so the February to June months may overlap WeatherNext 3's training data (Figure
+18 splits the rows). At days 7 and 14, against the ENS mean on the same rows (16.7% and 18.7%), no
+difference from WeatherNext 3 is resolved, and the plotted ranks compare different row sets. At day
+14 WeatherNext 3's 17.9% is not detectably below the shuffled-weather arms (18.3% and 18.6%), so the
+chart does not show that WeatherNext 3 beats the 18.5% climatology. That grey tick is the ENS mean
+of wind speed, not the mean-vector reference matched to WeatherNext 3, which the WN3 results section
+compares. The AIFS Single, AIFS ENS mean, and WeatherNext 3 rows also carry days 0, 3, 4, and 10.
+Day 0 is a hindcast: each product reads a run that started before the hour it describes, and the
+WeatherNext 3 row drops the hour ending 00:00 UTC, for which the WN3 store holds no lead. The
+WeatherNext 3 row is the pooled rows (February to September 2026).
 
 ![Paired differences in solar error with 95% intervals, both XGBoost settings](../assets/nwp_forecast_solar_headline.svg)
 
@@ -170,6 +194,20 @@ models that produce these forecasts.
   (13.901% against 14.297% of capacity). The wind difference is -0.274 points [-0.586, +0.064]
   (16.281% against 16.555%). At day 14 neither technology has any skill to compare, so no AIFS
   contrast is read ([AIFS at days 7 and 14](#at-day-7-a-blend-of-ens-and-aifs-single-lowers-the-solar-error-and-at-day-14-no-forecast-has-skill-to-compare)).
+- **WN3's mean has a lower point error than ENS's mean at days 1 and 2 in every group of rows, and
+  at days 7 and 14 no WN3 difference is claimable** (exploratory; each calendar month occurs in one
+  year only). Over all 7 months (February to September 2026), WN3's mean minus ENS's mean is -0.243
+  points [-0.440, -0.069] for solar at day 1 and -0.603 [-0.966, -0.306] at day 2. For wind, against
+  ENS's mean-vector reference, it is -0.601 [-0.979, -0.192] and -0.801 [-1.206, -0.321]. Google has
+  not documented which WN3 version made the archive, so the months before July may overlap WN3's
+  training data. The July to September rows lie after every training end the WN3 paper lists, but
+  their intervals resample only 3 months, so they are indicative only. The solar day-2 difference
+  there is -0.318 [-0.584, -0.064], but the two shuffled-weather arms differ by +0.321 [+0.033,
+  +0.616] in that cell, so read it as a point estimate. Against ENS's mean on the same rows, no wind
+  difference is resolved at days 7 and 14, and at wind day 14 WN3's pooled 17.9% is not detectably
+  below the shuffled-weather arms (18.3% and 18.6%), so Figure 2 does not show WN3 beating the 18.5%
+  climatology. WN3's solar error is not the lowest plotted at days 7 and 14
+  ([WN3](#wn3s-mean-has-a-lower-point-error-than-enss-mean-at-days-1-and-2-and-at-days-7-and-14-no-wn3-difference-is-claimable)).
 - **The day-1 value in Open-Meteo's Previous Runs archive (Open-Meteo is a third-party service that
   archives past weather forecasts) gives UKV, ICON-EU, and IFS 0.25° a shorter lead than ENS's on
   most hours, which flatters those three products** ([matched leads](#how-the-leads-are-matched)).
@@ -608,6 +646,89 @@ completeness. A second reading rule applies beside H7 and H14: AIFS Single havin
 than the control member but not than the ENS mean is consistent with smoothing, and is not
 described as a better weather forecast.
 <!-- report (blends): header; deciding contrasts; day-14 reading rule; smoothing reading -->
+
+### How WeatherNext 3 is read
+
+**WeatherNext 3 (WN3), Google's machine-learned ensemble weather model, is read at the same lead as
+ENS, at days 1, 2, 7, and 14, on hourly steps.** For a target hour on UTC day D, the day-`d` band
+reads the 00 UTC run of day D minus `d`, as for ENS and AIFS. The WN3 store holds 360 hourly leads
+of the ensemble mean only, on a 0.1° grid, for runs from 2026-01-01. The study copies the 00 UTC
+runs and the cells that cover the six solar farms and three wind farms, and averages the cells over
+each farm's H3 cell in the same way as for ENS and AIFS. Radiation is the accumulation over the hour
+ending at the target time, in joules per square metre, so the study divides it by 3,600 s to get
+watts per square metre. For solar, the 2 m temperature at an hour's midpoint is the mean of the two
+hourly values on either side of it, as ENS's is.
+
+**WN3's wind speed is the length of the mean wind vector, which is biased low relative to ENS's.**
+The store holds the ensemble mean of the eastward and northward wind components and no member
+values, so WN3's speed is the length of the mean vector. ENS's speed is the mean of the members'
+speeds, which is larger when the members disagree in direction. The study therefore also fits, for
+wind at every day, a matched ENS reference: ENS's mean whose speed is the length of the mean of its
+members' wind vectors. That reference, and not ENS's mean speed, is the one the wind contrasts
+against WN3 use as the like-for-like comparison. ENS's members' speed and direction at 100 m and
+10 m are on local disk for every day, so the reference needs no download. If a run lacked members,
+the build would drop that run and the fit would stop, naming the run.
+
+**The WN3 rows cover about 7 months, so every WN3 contrast is descriptive.** The row set holds
+February to April and June to 10 September 2026. September holds 10 days only, and counts as a whole
+month when the intervals resample months. Each calendar month occurs in one year only, so no scored
+month has a training row of its own calendar month. The contrast of interest is WN3's mean minus
+ENS's mean on the same rows, at days 1, 2, 7, and 14, for solar and wind, each with the sensitivity
+setting and each read as descriptive. Each is paired with a negative control that shuffles WN3's
+weather within farm, year-month, and hour of day, under two seeds. The day-14 gap minus the day-1
+gap is exploratory, and is read from the two intervals, not tested. A difference whose 95% interval
+spans 0 is reported with the interval's bounds, because a null at day 14 excludes only differences
+larger than the interval, and is never described as no difference. AIFS Single and the AIFS ENS
+mean keep the days they were fitted at (1, 2, 7, and 14), on their own row sets.
+
+### What is known about WN3's lookahead
+
+**Which WeatherNext 3 (WN3) weather-model version made the 2026 archive is not documented, so the
+in-sample months (before July) may or may not overlap its training data.** [Rasp et al.
+(2026)](https://arxiv.org/abs/2609.03582) state "For the production model, we train until June 30
+2026". Their Appendix A.1.3 also lists versions trained until the start of 2025 and until the start
+of 2026, and the paper does not say which version produced the archive. We found no statement from
+Google of which version made the 2026 archive. Every WN3 result on this page is therefore reported
+for three groups of rows: the months before July (February to June), which may overlap training; the
+months from July (July to September), which lie after every training end the paper lists; and a
+pooled group of every scored row from February to September 2026, including the rows that fall in
+neither of the first two groups. The July to September rows are the check for a version change and
+for overlap with training data, and the leaderboards draw the pooled group, whose 7 months clear the
+study's minimum of 6 months for an interval. WN3 against AIFS or ENS on the months before July may
+not be a fair comparison, because WN3's weights may have seen those months and the other products'
+had not. The pooled group mixes both kinds of month, so its lead over ENS may include such overlap,
+and the leaderboards' captions say so. The folds are unchanged, and each group selects rows that
+were already scored out of fold. The July to September group is still not fully clean: the
+out-of-fold models train on the February to June WN3 rows, which may overlap WN3's training data,
+and the direction of that effect is unknown.
+
+**Hypothesis, not documented and stated by no source we found: the archive for January to June 2026
+was made by a WN3 weather model trained on data from before 2026, and the archive from July 2026
+onwards by the production WN3 weather model, trained on data from before July 2026.** The reasoning
+behind the hypothesis is that an archive from a weather model that had seen the months it forecasts
+would overstate its skill. If the hypothesis holds, no archived forecast comes from a model that had
+seen the period it forecasts. The three groups of rows are motivated by this hypothesis. The split
+checks whether a version change at the start of July shows in the scores, and makes no claim about
+which version made any row. A difference between the groups is weak evidence either way, because
+every product's error differs between the months (see the absolute-skill paragraph in the results).
+
+**A row is out-of-sample only if its valid month is July or later and the 00 UTC run it reads was
+issued after 30 June.** A day-14 row that verifies in July from a run issued in the last two weeks
+of June sits in neither group. The report gives the count of such rows for every technology and lead
+day. The out-of-sample group holds 3 calendar months, fewer than the study's minimum of 6 for an
+interval, so its intervals give the range of the months and are indicative only.
+
+**WN3's archive is labelled real-time, and the copy cannot show when Google produced each run.**
+Google's [dissemination guide](https://developers.google.com/weathernext/guides/dissemination)
+gives a latency of 7 hours 45 minutes (Cloud Storage) to 8 hours 10 minutes (BigQuery) for the
+6-hourly runs, and the [Cloud Storage guide](https://developers.google.com/weathernext/guides/gcs)
+labels the archive "real-time operational data for 2026 to present". The store's `run_written` and
+`source_init_time` records show that the 271 runs at 00 UTC from 2026-01-01 to 2026-09-28 are all
+present, with no gap and no run whose `source_init_time` differs from its `init_time`. Our own
+download wrote those records, so they show that the copy is complete and say nothing about when
+Google produced each run. If Google produced the runs after the fact, WN3's error is optimistic.
+The `--lookahead-cleared` flag of `fit_aifs.py --wn3` stops the fit from starting until whoever runs
+it has read this section.
 
 ## Results
 
@@ -1672,6 +1793,235 @@ member and at day 14 there is no skill to compare. For a blend of ENS's mean and
 blend shows no detectable difference when both settings are read together. The day-14 reading rule
 finds no skill to compare at day 14.
 
+### WN3's mean has a lower point error than ENS's mean at days 1 and 2, and at days 7 and 14 no WN3 difference is claimable
+
+**In the pooled rows (February to September 2026), the error of an XGBoost model given WN3's mean
+is lower than the error given ENS's mean at days 1 and 2 for solar and wind, and at days 7 and 14
+every pooled interval spans 0.** The July to September rows are the check for overlap with WN3's
+training data. Their intervals resample only 3 months, fewer than the study's minimum of 6, so they
+give the range of the months and are indicative only. The lead July to September difference, solar
+day 2 at -0.318 points [-0.584, -0.064], is a point estimate: the two shuffled-weather arms differ
+by +0.321 [+0.033, +0.616] in the same cell. The wind contrast is against the matched ENS reference,
+whose speed is the length of the mean of ENS's member wind vectors, as WN3's is. Every wind number
+below is against that reference unless stated. Every difference is descriptive, because each
+calendar month occurs in one year only. Each difference is WN3's error minus the reference's, in
+points of capacity, so a negative difference means WN3 has the lower error.
+
+![WN3's mean against ENS's mean for solar power at days 1, 2, 7, and 14, in three groups of rows:
+each forecast's own error and the paired difference](../assets/nwp_forecast_solar_wn3_groups.svg)
+
+Figure 17: For the six solar farms, WN3's mean has a lower error than ENS's mean at day 1 and day 2
+in all three groups of rows. The July to September difference at day 2 is -0.318 points [-0.584,
+-0.064], but that interval resamples only 3 months and the two shuffled-weather arms differ by
++0.321 [+0.033, +0.616] in the same cell, so read it as a point estimate. At day 7 and day 14 the
+intervals span 0 in every group. At day 14 the July to September interval is narrow because the
+3 months resembled one another, not because the difference is known precisely, and at day 14 the
+second-seed shuffled arm has the lower error. Hollow squares are the sensitivity setting.
+
+![WN3's mean against ENS's mean-vector reference for wind power at days 1, 2, 7, and 14, in three
+groups of rows: each forecast's own error and the paired difference](../assets/nwp_forecast_wind_wn3_groups.svg)
+
+Figure 18: For the three wind farms, WN3's mean has a lower error than ENS's mean-vector reference
+at day 1 in July to September (-0.358 points [-1.185, -0.002]): the upper bound is -0.002, and at
+the sensitivity setting the interval is [-0.898, +0.032], which spans 0. At day 2 the July to
+September interval spans 0. At day 7 and day 14 the July to September intervals exclude 0 at the
+primary setting and span 0 at the sensitivity setting. At day 7, WN3's error (11.512%) equals its
+two shuffled-weather arms' (11.517% and 11.511%), and those arms beat the mean-vector reference
+(11.926%), so the day-7 contrast measures the reference doing worse than no weather, not WN3 skill.
+The July to September intervals resample only 3 months, so they are indicative only. Hollow squares
+are the sensitivity setting.
+
+**The three groups agree in sign at every day and technology except solar day 7 in July to
+September, and the pooled group is the one the leaderboards draw.** The groups are the months before
+July (February to June, 4 calendar months, which may overlap WN3's training data), July to September
+(3 months, after every training end the paper lists), and the pooled rows (7 months, which mix
+both). The tables give each group's error and difference, at the primary setting, with 95% intervals
+from resampling whole months. The pooled interval is the only interval of the three that rests on
+the study's minimum of 6 months. It mixes rows that may overlap training, so the leaderboards'
+captions say so, and the July to September group is the check for that overlap.
+
+| Solar power (% of capacity) | In-sample WN3 | In-sample ENS mean | July to September WN3 | July to September ENS mean | Pooled WN3 | Pooled ENS mean |
+|---|---|---|---|---|---|---|
+| Day 1 | 9.055% | 9.281% | 8.841% | 9.127% | 8.964% | 9.208% |
+| Day 2 | 10.063% | 10.919% | 9.731% | 10.049% | 9.879% | 10.482% |
+| Day 7 | 16.284% | 16.656% | 12.476% | 12.359% | 14.533% | 14.697% |
+| Day 14 | 17.437% | 17.912% | 13.669% | 13.796% | 15.679% | 16.014% |
+
+| Solar power: WN3 minus ENS mean (points) | In-sample | July to September | Pooled |
+|---|---|---|---|
+| Day 1 | -0.226 [-0.494, -0.056] | -0.286 [-0.570, +0.007] | -0.243 [-0.440, -0.069] |
+| Day 2 | -0.856 [-1.241, -0.496] | -0.318 [-0.584, -0.064] | -0.603 [-0.966, -0.306] |
+| Day 7 | -0.371 [-0.988, +0.518] | +0.117 [-0.365, +1.034] | -0.165 [-0.630, +0.343] |
+| Day 14 | -0.475 [-1.654, +0.489] | -0.127 [-0.347, +0.258] | -0.334 [-0.996, +0.194] |
+
+| Wind power (% of capacity) | In-sample WN3 | In-sample ENS reference | July to September WN3 | July to September ENS reference | Pooled WN3 | Pooled ENS reference |
+|---|---|---|---|---|---|---|
+| Day 1 | 7.861% | 8.683% | 6.348% | 6.706% | 7.129% | 7.730% |
+| Day 2 | 9.615% | 10.606% | 7.429% | 7.758% | 8.580% | 9.381% |
+| Day 7 | 20.093% | 21.462% | 11.512% | 11.926% | 16.345% | 17.395% |
+| Day 14 | 23.065% | 25.014% | 10.861% | 11.359% | 17.939% | 19.098% |
+
+| Wind power: WN3 minus ENS mean-vector reference (points) | In-sample | July to September | Pooled |
+|---|---|---|---|
+| Day 1 | -0.821 [-1.089, +0.010] | -0.358 [-1.185, -0.002] | -0.601 [-0.979, -0.192] |
+| Day 2 | -0.991 [-1.378, +0.105] | -0.329 [-1.528, +0.219] | -0.801 [-1.206, -0.321] |
+| Day 7 | -1.369 [-4.618, +2.891] | -0.413 [-0.501, -0.302] | -1.050 [-2.870, +0.917] |
+| Day 14 | -1.949 [-9.023, +1.946] | -0.498 [-0.609, -0.359] | -1.159 [-4.480, +0.829] |
+
+| Wind power, July to September: WN3 minus ENS mean speed (points) | Difference |
+|---|---|
+| Day 1 | -0.468 [-1.175, -0.099] |
+| Day 2 | -0.382 [-1.388, +0.129] |
+| Day 7 | -0.050 [-2.213, +0.849] |
+| Day 14 | -0.070 [-0.248, +0.519] |
+
+At days 7 and 14, the mean-vector reference has a higher error than ENS's mean speed, in July to
+September, by 0.36 and 0.43 points, so the wind contrasts against the reference at those days partly
+measure the reference's definition. Against ENS's mean speed, WN3's differences at days 7 and 14 are
+-0.050 and -0.070 points, and both intervals span 0.
+
+**Absolute skill falls steeply with lead, and a gap of a few tenths of a point sits beside errors of
+6 to 25% of capacity.** At solar day 1 in July to September, WN3's error is 8.841% and ENS's is
+9.127%, a gap of 3% of ENS's error. The months before July have errors 1.3 to 2.2 times those of
+July to September at days 7 and 14, for WN3 and ENS alike, so a difference between the groups'
+errors is not evidence about WN3's training data.
+
+**The negative control shows that WN3's weather carries the skill at days 1 and 2 for both
+technologies and at day 7 for solar, and carries none detectable at solar day 14 or wind day 7 in
+July to September.** In the control, WN3's weather is shuffled within farm, year-month, and hour of
+day, under two seeds. At day 1 and day 2, WN3's error minus the shuffled arm's is between -3.4 and
+-9.8 points for solar and between -4.6 and -17.6 points for wind, in every group, with intervals
+that exclude 0. At solar day 7 the July to September differences are -1.124 [-1.953, -0.317] and
+-0.759 [-1.443, -0.320]. At solar day 14, the July to September differences are +0.096 [-0.054,
++0.442] and +0.568 [+0.218, +0.781]. At wind day 7 the July to September differences are -0.005
+[-0.154, +0.113] and +0.002 [-0.297, +0.273]. At solar day 14 the XGBoost model given the
+second-seed shuffled weather has the lower error, and at wind day 7 the shuffled arms' error
+(11.517% and 11.511%) equals WN3's (11.512%) and beats the mean-vector reference's (11.926%). So
+WN3's mean adds no detectable skill at those two cells, and the wind day-7 contrast of -0.413 points
+measures the reference doing worse than no weather. The wind day-14 July to September differences,
+-0.526 [-0.711, -0.314] and -0.405 [-1.010, -0.177], favour the real weather, on 3 months. The two
+shuffle seeds also differ from each other: the interval of their difference excludes 0 in 5 of the
+24 cells of technology, day, and group, and the largest such difference is -2.240 points [-7.471,
+-0.196], for wind day 2 in the months before July. Shuffling noise is therefore not negligible next
+to the differences read here. In the pooled rows, no failure of the control is detectable at solar
+day 14 (+0.124 [-0.600, +0.598]) or at wind day 14 (-0.402 [-1.603, +0.369]), because both intervals
+span 0.
+
+**The sensitivity setting removes the exclusion of 0 from three July to September wind contrasts, at
+days 1, 7, and 14, and moves the solar day-1 interval off 0.** The sensitivity refits fire on
+contrasts whose interval lies near the 5% line. In July to September, at solar day 1 the difference
+is -0.409 [-0.700, -0.122] at the sensitivity setting, against -0.286 [-0.570, +0.007] at the
+primary setting, and at solar day 2 it is -0.300 [-0.579, -0.035]. At wind day 1 the matched
+contrast is -0.358 [-1.185, -0.002] at the primary setting and -0.303 [-0.898, +0.032] at the
+sensitivity setting. At wind day 7 the difference is -0.413 [-0.501, -0.302] at the primary setting
+and +0.011 [-0.536, +0.726] at the sensitivity setting, so the wind day-7 difference depends on the
+XGBoost setting and is not claimable. At wind day 14 the sensitivity setting gives -0.201 [-0.436,
++0.735], against -0.498 [-0.609, -0.359] at the primary setting, so the wind day-14 difference
+depends on the XGBoost setting too.
+
+**The number of rows in each group, and the rows in neither group, are in the report.** The months
+before July hold 6,335 rows for solar and 5,415 for wind at every lead day. The July to September
+group holds 5,069, 4,995, 4,602, and 4,129 solar rows at days 1, 2, 7, and 14, and 4,773, 4,701,
+4,349, and 3,863 wind rows. The pooled group holds 11,479 solar rows and 10,260 wind rows at every
+day. The rows in neither group are those whose valid month is after June but whose 00 UTC run was
+issued on or before 30 June: 75, 149, 542, and 1,015 rows for solar at days 1, 2, 7, and 14, and 72,
+144, 496, and 982 for wind. In each cell, the two groups' rows plus the rows in neither group sum to
+the pooled rows. Across the 42 solar and 21 wind (farm, fold, calendar month) cells, none has a
+training row of its own calendar month. No loss in any saved file is NaN, and the only nulls are the
+continuous ranked probability scores that a single-valued arm does not have.
+
+### WN3 and AIFS at days 0, 3, 4, and 10 (exploratory)
+
+**In the pooled rows and in the February to June rows, WN3's mean has a lower error than ENS's mean
+(for wind, ENS's mean-vector reference) at days 3 and 4 for solar and wind, with intervals that
+exclude 0, and in the July to September rows only solar days 3 and 4 and wind day 3 do the same.**
+In every group, the solar day-0 and day-10 differences span 0. At wind day 0 the difference excludes
+0 in the pooled and February to June rows and spans 0 in the July to September rows, and at wind day
+4 it spans 0 in the July to September rows. At wind day 10, WN3's error is higher than ENS's, by an
+interval that excludes 0 in the pooled and February to June rows and spans 0 in the July to
+September rows. Day 0 is a hindcast: the row of an hour reads the 00 UTC run of the hour's own day,
+a forecast no service could read. Solar day 0 omits the hours ending 01:00 to 06:00 UTC for every
+arm, because those hours precede the first 6-hourly AIFS step, and the WN3 wind day 0 drops the hour
+ending 00:00 UTC, for which the WN3 store holds no lead. Every number in this section is exploratory
+and fitted at the primary setting only. Each WN3 error below is the mean absolute error of an
+XGBoost model given WN3's mean, as a percentage of capacity. Each difference is WN3's error minus
+ENS's error on the same rows, in points of capacity, so a negative difference means WN3 has the
+lower error. The wind reference is ENS's mean-vector speed, which matches how WN3's speed is built.
+<!-- report (WN3 extra days): all three row groups, ens_mean (solar) and ens_meanvec (wind) arms -->
+
+| Row group, technology, day | WN3 error (%) | ENS error (%) | WN3 minus ENS (points) |
+|---|---|---|---|
+| Pooled, solar, day 0 | 8.796 | 8.878 | -0.082 [-0.226, +0.097] |
+| Pooled, solar, day 3 | 10.791 | 12.268 | -1.478 [-2.196, -0.831] |
+| Pooled, solar, day 4 | 12.035 | 13.120 | -1.086 [-2.059, -0.460] |
+| Pooled, solar, day 10 | 14.993 | 15.293 | -0.300 [-0.816, +0.157] |
+| Pooled, wind, day 0 | 6.416 | 6.720 | -0.305 [-0.663, -0.053] |
+| Pooled, wind, day 3 | 10.107 | 11.787 | -1.680 [-2.672, -0.574] |
+| Pooled, wind, day 4 | 11.721 | 13.370 | -1.650 [-3.162, -0.261] |
+| Pooled, wind, day 10 | 19.003 | 17.352 | +1.652 [+0.014, +3.502] |
+| February to June, solar, day 0 | 8.956 | 8.970 | -0.014 [-0.134, +0.089] |
+| February to June, solar, day 3 | 11.523 | 13.204 | -1.681 [-2.562, -1.120] |
+| February to June, solar, day 4 | 12.633 | 14.145 | -1.513 [-3.077, -0.408] |
+| February to June, solar, day 10 | 16.783 | 17.216 | -0.433 [-1.279, +0.396] |
+| February to June, wind, day 0 | 7.037 | 7.490 | -0.454 [-0.993, -0.105] |
+| February to June, wind, day 3 | 11.700 | 14.153 | -2.453 [-3.225, -0.410] |
+| February to June, wind, day 4 | 13.338 | 16.419 | -3.081 [-4.376, -1.991] |
+| February to June, wind, day 10 | 24.268 | 21.652 | +2.616 [+0.625, +5.676] |
+| July to September, solar, day 0 | 8.592 | 8.761 | -0.169 [-0.328, +0.634] |
+| July to September, solar, day 3 | 9.957 | 11.066 | -1.109 [-1.878, -0.293] |
+| July to September, solar, day 4 | 11.188 | 11.652 | -0.464 [-0.684, -0.120] |
+| July to September, solar, day 10 | 13.150 | 13.225 | -0.075 [-0.214, +0.253] |
+| July to September, wind, day 0 | 5.722 | 5.860 | -0.138 [-0.803, +0.066] |
+| July to September, wind, day 3 | 8.172 | 8.817 | -0.645 [-1.379, -0.280] |
+| July to September, wind, day 4 | 9.444 | 9.548 | -0.104 [-0.594, +0.483] |
+| July to September, wind, day 10 | 12.667 | 12.313 | +0.354 [-1.121, +2.686] |
+
+**The February to June rows cover 4 calendar months and the July to September rows 3, both fewer
+than the study's minimum of 6, so their intervals are indicative only.** The pooled rows cover 7
+months (February to April and June to September 2026). Google has not documented which WeatherNext 3
+model version made the archive, so the pooled rows may include months that overlap WN3's training
+data. The sensitivity setting was also fitted for the contrasts whose interval lies near the 5%
+line, and the report gives it.
+
+**At wind day 10, WN3's mean is not detectably better than WN3's own weather shuffled within site,
+year-month, and hour of day.** The pooled WN3 error minus the first shuffled arm's is +0.202 points
+[-0.847, +1.278], so the interval spans 0 and the XGBoost model given WN3's day-10 wind has no
+detectable skill over the shuffled control. At solar day 10 the two shuffle seeds disagree in the
+pooled rows: WN3 minus the first shuffled arm is -1.169 points [-1.910, -0.463], and minus the
+second is -0.364 points [-0.952, +0.336].
+
+**AIFS Single and the AIFS ENS mean at these days are read as point differences, because the fits
+name no contrast and give no paired interval.** The absolute intervals overlap heavily wherever they
+are given, so no AIFS difference below is claimed. Each row is on the rows of its own row set (16
+months for AIFS Single, 11 for the AIFS ENS mean), against ENS's mean on the same rows. The AIFS
+minus ENS mean column is the AIFS error minus the ENS mean error, taken from the tabulated errors,
+because no report holds those differences. <!-- report (AIFS extra days): single and ens row sets
+-->
+
+| AIFS arm, technology, day | AIFS error (%) [95% interval] | ENS mean error (%) [95% interval] | AIFS minus ENS mean (points) |
+|---|---|---|---|
+| AIFS Single, solar, day 0 | 9.318 [8.595, 9.926] | 8.707 [8.027, 9.317] | +0.611 |
+| AIFS Single, solar, day 3 | 11.005 [10.100, 11.808] | 11.319 [10.429, 12.230] | -0.314 |
+| AIFS Single, solar, day 4 | 12.262 [11.241, 13.240] | 12.290 [11.355, 13.241] | -0.028 |
+| AIFS Single, solar, day 10 | 14.850 [13.796, 16.015] | 14.698 [13.654, 15.912] | +0.152 |
+| AIFS Single, wind, day 0 | 7.600 [6.926, 8.293] | 7.014 [6.308, 7.755] | +0.586 |
+| AIFS Single, wind, day 3 | 10.864 [9.616, 12.237] | 10.896 [9.552, 12.424] | -0.032 |
+| AIFS Single, wind, day 4 | 12.623 [11.088, 14.337] | 12.708 [11.157, 14.384] | -0.085 |
+| AIFS Single, wind, day 10 | 17.568 [15.264, 19.761] | 17.484 [15.151, 19.916] | +0.084 |
+| AIFS ENS mean, solar, day 0 | 9.073 [8.025, 9.882] | 8.584 [7.613, 9.286] | +0.489 |
+| AIFS ENS mean, solar, day 3 | 10.616 [9.321, 11.834] | 11.548 [9.990, 13.129] | -0.932 |
+| AIFS ENS mean, solar, day 4 | 12.100 [10.455, 13.731] | 12.393 [10.629, 14.333] | -0.293 |
+| AIFS ENS mean, solar, day 10 | 14.536 [12.728, 16.626] | 14.641 [12.976, 16.415] | -0.105 |
+| AIFS ENS mean, wind, day 0 | 8.162 [7.178, 9.069] | 7.391 [6.434, 8.277] | +0.771 |
+| AIFS ENS mean, wind, day 3 | 11.695 [10.138, 13.197] | 12.096 [10.300, 13.939] | -0.401 |
+| AIFS ENS mean, wind, day 4 | 12.814 [10.769, 14.738] | 13.796 [11.531, 15.884] | -0.982 |
+| AIFS ENS mean, wind, day 10 | 19.715 [15.857, 23.114] | 18.915 [15.330, 22.112] | +0.800 |
+
+**At day 0, AIFS has a higher point error than ENS's mean for both technologies, by 0.5 to 0.8
+points, and at day 3 and day 4 the AIFS point error is lower in every row.** At day 10 the sign
+changes with the row set and the technology. The day-4 ENS values come from a supplementary
+extraction of ENS's leads 105, 108, and 111 hours, which the study's main ENS extract lacks.
+
 ## Discussion: what to use
 
 **Each recommendation below is about a product as this study reads it, and rests on an XGBoost model
@@ -1892,6 +2242,15 @@ while running the study -->
 
 ### What the numbers depend on
 
+**The WeatherNext 3 rows span about 7 months of 2026, each calendar month in one year only, so every
+WN3 result is descriptive: no scored month has a training row of its own calendar month.**
+September 2026 holds 10 days of rows and counts as a whole month in the month resampling. The wind
+speed WN3 gives is also the length of a mean vector, which is lower than ENS's mean of member
+speeds, so a wind difference against ENS's mean speed partly reflects that definition. The matched
+reference at every day removes that part. The WN3 rows take their capacities from the same
+`effective_capacity` table as every other row on this page (version 1, committed on 2026-09-22),
+which was committed after the last WN3 row of 10 September 2026.
+
 **The UKV day-1 requirement removes 47.8% and 50.5% of the solar rows of April and May 2026, and
 86.8% and 89.4% of the wind rows.** The shared rows require UKV's day-1 value, because UKV is a
 planned product. The study did not investigate why the value is missing. The values are missing
@@ -2079,12 +2438,12 @@ and tables do not read it.
 
 ## Reproducing this page
 
-**Every number on this page comes from one of eight `report.md` files or the `verification/` files
+**Every number on this page comes from one of nine `report.md` files or the `verification/` files
 beside them, or is derived from them, except the three the page marks in place (the GEFS store's
 missing long-lead wind, the day-by-day coverage shares in the lead-day table, and the repeat of the
-23 GPU arms), and the commands below rebuild the reports and the figures.** The eight files are the
+23 GPU arms), and the commands below rebuild the reports and the figures.** The nine files are the
 published run's, one for each of the four extra-lead batches, the day-1 and day-2 AIFS arms', the
-AIFS blends and long leads', and the P4 refit's. Run the commands
+AIFS blends and long leads', the P4 refit's, and the WN3 fit's. Run the commands
 from the repository root, in this order. The verification scripts write the `verification/`
 directories that the reports quote.
 
@@ -2097,6 +2456,7 @@ D4=data/studies/nwp_forecast_comparison_leads_day10d
 A=data/studies/nwp_forecast_comparison_aifs
 AB=data/studies/nwp_forecast_comparison_aifs_blends
 PS=data/studies/nwp_forecast_comparison_p4_seeds
+W=data/studies/nwp_forecast_comparison_wn3
 R=studies/nwp_forecast_comparison
 
 # The published run
@@ -2148,9 +2508,17 @@ uv run python $R/fit_aifs.py --blends --workers 1 --published-dir $P --output-di
 uv run python $R/fit_aifs.py --p4-controls --check --published-dir $P --output-dir $PS
 uv run python $R/fit_aifs.py --p4-controls --workers 1 --published-dir $P --output-dir $PS
 
+# WeatherNext 3: read the trial area from the store (needs Google Cloud credentials), build, verify, fit
+uv run python $R/build_wn3_inputs.py --read-store --bucket BUCKET
+uv run python $R/build_wn3_inputs.py --build --published-dir $P --output-dir $W
+uv run python $R/verify_wn3_steps.py --published-dir $P --output-dir $W
+uv run python $R/fit_aifs.py --wn3 --check --lookahead-cleared --published-dir $P --output-dir $W
+uv run python $R/fit_aifs.py --wn3 --lookahead-cleared --workers 1 --published-dir $P --output-dir $W
+
 # Figures
 uv run python $R/nwp_forecast_charts.py --input-dir $P --extra-dir $D1 --extra-dir $D2 \
-    --extra-dir $D3 --extra-dir $D4 --aifs-dir $A --output-dir docs/studies/assets
+    --extra-dir $D3 --extra-dir $D4 --aifs-dir $A --leaderboard-blends-dir $AB --wn3-dir $W \
+    --output-dir docs/studies/assets
 uv run python $R/nwp_forecast_charts.py --aifs-blends-dir $AB --output-dir docs/studies/assets
 ```
 
