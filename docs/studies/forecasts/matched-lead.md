@@ -318,8 +318,10 @@ written into the study plan before any result existed. The split between planned
 contrasts applies to the contrast tables and to the headline claims: every contrast outside the
 planned list is exploratory, and so is any number that a paragraph quotes from an exploratory table.
 Analyses added after a result was seen, such as the two single-product wind blends, are exploratory
-and also post hoc. About 1 in 20 exploratory intervals reaches significance at the 5% level by
-chance.
+and also post hoc. An exploratory interval with no real effect behind it has a 5% chance of
+reaching statistical significance at the 5% level. The exploratory intervals share the same months,
+so they are correlated, and the number of spurious significant intervals cannot be stated as a
+single figure. No correction for multiple comparisons is applied to the exploratory intervals.
 <!-- report: header -->
 
 **The bracket assumes that ENS's own error does not fall as its lead lengthens, and the study tests
@@ -1981,8 +1983,10 @@ small.** Neighbouring generators share their weather, so the sample is 21 months
 than 21 months of independent generators. An interval covers month-to-month weather and the
 fitting seed, and not differences between generators. Each interval resamples the 21 year-months as
 whole blocks, and all nine generators lie in one small area, so the intervals are probably too
-narrow. About 1 in 20 exploratory intervals reaches statistical significance at the 5% level by
-chance, so an isolated exploratory result deserves less weight than a planned one.
+narrow. An exploratory interval with no real effect behind it has a 5% chance of reaching statistical
+significance at the 5% level. The exploratory intervals share the same months, so they are
+correlated, and the number of spurious significant intervals cannot be stated as a single figure.
+An isolated exploratory result therefore deserves less weight than a planned one.
 <!-- report: header; Rows tables -->
 
 **Four statistical caveats limit how far the intervals can be trusted.**

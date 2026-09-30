@@ -213,10 +213,11 @@ of that run's gain was available from one product given its extra columns, and t
 compare enriched XGBoost models before the re-run that measured them. The plain comparisons were
 written into the plan before any result existed, and are reported as secondary.
 
-**If no two XGBoost models compared differed, about one exploratory interval in twenty would still
-be statistically significant at the 5% level by chance.** Here 121 of the 139 exploratory intervals
+**An exploratory interval between two XGBoost models that do not differ still has a 5% chance of
+being statistically significant at the 5% level.** Here 121 of the 139 exploratory intervals
 exclude zero. The intervals share hours and XGBoost models with one another, so they are not
-independent tests, and the study script's report quotes no count of how many could be chance.
+independent tests, so the number of spurious significant intervals cannot be stated as a single
+figure.
 
 **Every planned or post hoc comparison is also rerun with a shallower, more heavily regularised set
 of XGBoost settings, to check that a result is not an accident of one choice of settings.** The main

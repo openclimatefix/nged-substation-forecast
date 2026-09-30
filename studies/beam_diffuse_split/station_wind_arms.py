@@ -248,8 +248,8 @@ EXPLORATORY_SECTIONS: Final[tuple[str, ...]] = (
 )
 """The `intervals.parquet` sections holding exploratory paired-difference intervals.
 
-The report prints the count of those at the primary setting, so the page can say how many would
-exclude zero by chance.
+The report prints the count of those at the primary setting, so the page can say how many
+intervals it prints.
 """
 
 MS_PER_KNOT: Final[float] = 0.514444
@@ -2480,9 +2480,9 @@ def _report(
         (
             f"The report prints {exploratory_count} exploratory paired-difference intervals at the "
             "primary setting, in the sections "
-            f"{', '.join(f'`{section}`' for section in EXPLORATORY_SECTIONS)}. At a 5% level, "
-            f"about {exploratory_count * 0.05:.1f} of them would exclude zero by chance alone if "
-            "no difference existed."
+            f"{', '.join(f'`{section}`' for section in EXPLORATORY_SECTIONS)}. An interval with no "
+            "true difference behind it has a 5% chance of excluding zero, and the intervals are "
+            "correlated, so the number that exclude zero by chance has no single figure."
         ),
     ]
     return "\n".join(lines) + "\n"

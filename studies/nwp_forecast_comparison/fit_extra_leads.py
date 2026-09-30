@@ -1321,8 +1321,9 @@ def main() -> int:
         (
             "Every arm is exploratory and fitted at the primary setting only, on the published "
             "shared rows and folds. Differences are first arm minus second, in percentage points "
-            "of capacity; about 1 in 20 exploratory intervals reaches significance at the 5% level "
-            "by chance."
+            "of capacity; an exploratory interval with no real effect behind it has a 5% chance "
+            "of reaching statistical significance at the 5% level, and the number of spurious "
+            "significant intervals cannot be stated as a single figure."
         ),
         "",
     ]
