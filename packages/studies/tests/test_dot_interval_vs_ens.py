@@ -146,12 +146,14 @@ def test_a_folder_without_an_ens_mean_reads_the_ens_mean_of_the_leads_day10_fold
 
 D10: SourceType = "leads_day10"
 D10B: SourceType = "leads_day10b"
+D4S: SourceType = "day4_shared"
 
 EXPECTED_LEADERBOARD_ENS_SOURCE = {
     0: D10,
     1: D10,
     2: D10B,
     3: D10,
+    4: D4S,
     5: D10,
     7: D10B,
     10: D10,
@@ -228,8 +230,23 @@ EXPECTED_SOLAR_LABELS_BY_DAY = {
         "AIFS ENS mean",
         "WeatherNext 3 mean (7 months)",
     },
-    4: {"AIFS Single", "AIFS ENS mean", "WeatherNext 3 mean (7 months)"},
+    4: {
+        "ICON-EU",
+        "ICON global",
+        "GFS (Open-Meteo)",
+        "GFS (native)",
+        "IFS 0.25°",
+        "IFS HRES (9 km, Open-Meteo)",
+        "GEFS mean",
+        "ENS control member",
+        "AIFS Single",
+        "AIFS ENS mean",
+        "WeatherNext 3 mean (7 months)",
+    },
     5: {
+        "AIFS Single",
+        "AIFS ENS mean",
+        "WeatherNext 3 mean (7 months)",
         "ICON global",
         "GFS (Open-Meteo)",
         "GFS (native)",
@@ -313,6 +330,17 @@ def test_every_product_fitted_in_the_leads_folders_has_a_source_for_each_of_its_
     assert by_source[("GEFS mean", 5)] == D10
     assert by_source[("GFS (native)", 14)] == "leads_day10c"
     assert by_source[("IFS HRES (9 km, Open-Meteo)", 7)] == "leads_day10d"
+    for label in (
+        "ENS control member",
+        "GEFS mean",
+        "GFS (native)",
+        "GFS (Open-Meteo)",
+        "IFS HRES (9 km, Open-Meteo)",
+        "ICON-EU",
+        "ICON global",
+        "IFS 0.25°",
+    ):
+        assert by_source[(label, 4)] == D4S
 
 
 def test_aifs_and_wn3_read_their_own_ens_mean_from_their_own_file() -> None:
@@ -324,7 +352,7 @@ def test_aifs_and_wn3_read_their_own_ens_mean_from_their_own_file() -> None:
     for domain in ("solar", "wind"):
         for c in comparisons(domain=domain):
             if c.label in folders:
-                kind = "extra" if c.day in (0, 3, 4, 10) else "blends"
+                kind = "extra" if c.day in (0, 3, 4, 10) else "day5" if c.day == 5 else "blends"
                 assert c.treatment_source == f"{folders[c.label]}_{kind}"
                 assert c.reference_source == c.treatment_source
 
@@ -332,7 +360,7 @@ def test_aifs_and_wn3_read_their_own_ens_mean_from_their_own_file() -> None:
 def test_wind_weathernext_3_uses_the_mean_vector_reference_and_solar_the_plain_mean() -> None:
     wind = [c for c in comparisons(domain="wind") if c.treatment.startswith("wn3")]
     solar = [c for c in comparisons(domain="solar") if c.treatment.startswith("wn3")]
-    days = (0, 1, 2, 3, 4, 7, 10, 14)
+    days = (0, 1, 2, 3, 4, 5, 7, 10, 14)
 
     assert {c.reference for c in wind} == {f"ens_meanvec_day{d}" for d in days}
     assert {c.reference for c in solar} == {f"ens_mean_day{d}" for d in days}
@@ -554,7 +582,7 @@ def test_the_plan_holds_every_product_arm_the_leads_folders_hold_and_no_other(
 ) -> None:
     plan = comparisons(domain=domain)
     prefix_of = {c.label: c.treatment.rsplit("_day", 1)[0] for c in plan}
-    for source in ("leads_day10", "leads_day10b", "leads_day10c", "leads_day10d"):
+    for source in ("leads_day10", "leads_day10b", "leads_day10c", "leads_day10d", "day4_shared"):
         folder = _PAGE_DATA / SOURCES[source].folder
         held = _arm_cells(folder / f"{domain}_losses.parquet")
         planned = {(prefix_of[c.label], c.day) for c in plan if c.treatment_source == source}
@@ -622,3 +650,71 @@ def test_each_row_records_how_many_rows_each_arm_holds(tmp_path: Path) -> None:
 
     row = rows.filter((pl.col("label") == "UKV") & (pl.col("day") == 0)).row(0, named=True)
     assert row["treatment_rows"] == row["reference_rows"] == 2 * 12 * 4 * 3
+
+
+@pytest.mark.skipif(
+    not (_PAGE_DATA / SOURCES["day4_shared"].folder).exists(),
+    reason="the private study data is not in this checkout",
+)
+@pytest.mark.parametrize(
+    ("domain", "label", "day", "value", "lower", "upper"),
+    [
+        ("solar", "IFS 0.25°", 4, 0.23, -0.02, 0.47),
+        ("wind", "IFS 0.25°", 4, 0.42, 0.00, 0.88),
+        ("solar", "WeatherNext 3 mean (7 months)", 5, -0.66, -1.19, -0.14),
+        ("wind", "WeatherNext 3 mean (7 months)", 5, -2.13, -3.78, -0.86),
+    ],
+)
+def test_the_day_4_and_day_5_dots_reproduce_the_folder_reports(
+    domain: DomainType, label: str, day: int, value: float, lower: float, upper: float
+) -> None:
+    rows = _page_rows(domain)
+
+    row = rows.filter((pl.col("label") == label) & (pl.col("day") == day)).row(0, named=True)
+    assert (row["value"], row["lower"], row["upper"]) == pytest.approx(
+        (value, lower, upper), abs=0.0061
+    )
+
+
+@pytest.mark.skipif(
+    not (_PAGE_DATA / SOURCES["wn3_day5"].folder).exists(),
+    reason="the private study data is not in this checkout",
+)
+def test_wind_weathernext_3_at_day_5_against_the_plain_ens_mean_reproduces_the_report() -> None:
+    comparison = Comparison(
+        domain="wind",
+        day=5,
+        label="WeatherNext 3 mean (7 months)",
+        treatment="wn3_mean_day5",
+        treatment_source="wn3_day5",
+        reference="ens_mean_day5",
+        reference_source="wn3_day5",
+        reference_label="ENS mean",
+    )
+    arms = load_arms(
+        data_dir=_PAGE_DATA,
+        domain="wind",
+        wanted={("wn3_day5", "wn3_mean_day5"), ("wn3_day5", "ens_mean_day5")},
+    )
+
+    row = contrast_rows(arms=arms, plan=[comparison]).row(0, named=True)
+
+    assert (row["value"], row["lower"], row["upper"]) == pytest.approx(
+        (-1.39, -2.71, -0.37), abs=0.0061
+    )
+
+
+@pytest.mark.skipif(
+    not (_PAGE_DATA / SOURCES["day4_shared"].folder).exists(),
+    reason="the private study data is not in this checkout",
+)
+def test_the_arms_that_drop_their_own_null_days_hold_fewer_rows_than_their_reference() -> None:
+    solar = _page_rows("solar")
+
+    def held(label: str, day: int) -> tuple[int, int]:
+        row = solar.filter((pl.col("label") == label) & (pl.col("day") == day)).row(0, named=True)
+        return row["treatment_rows"], row["reference_rows"]
+
+    assert held("ICON global", 4)[0] < held("ICON global", 4)[1]
+    assert held("IFS HRES (9 km, Open-Meteo)", 4)[0] < held("IFS HRES (9 km, Open-Meteo)", 4)[1]
+    assert held("ICON-EU", 4)[0] == held("ICON-EU", 4)[1]
