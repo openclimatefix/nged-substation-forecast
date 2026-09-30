@@ -209,10 +209,10 @@ checkpointed downloader is likely to need.
 **Run every not-yet-executed download script through a fresh adversarial review before its first
 real run, however small the script**, like the first diff review under `implement-issue` — a second
 reader with no stake in the code finding what the author is too close to see, and with network
-access and permission to make one small real fetch, not just a static read of the diff. Three download scripts written for
-issue #841 were reviewed this way — one before its first CDS request, the other two before resuming
-an interrupted or unfinished run — and the review caught four bugs, one per script area, each of
-which would have wasted a real request or corrupted output silently:
+access and permission to make one small real fetch, not just a static read of the diff. Three
+download scripts written for issue #841 were reviewed this way — one before its first CDS request,
+the other two before resuming an interrupted or unfinished run — and the review caught four bugs,
+one per script area, each of which would have wasted a real request or corrupted output silently:
 
 - **An invalid request that the provider only rejects at submission time.** A CERRA solar request
   used `product_type=analysis`, which does not exist for either solar variable — CDS has only a
