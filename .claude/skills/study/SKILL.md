@@ -24,12 +24,22 @@ scientifically valid and says no more than its evidence supports.
 **Work autonomously: the maintainer has asked for studies to run with as little waiting on a human
 as possible.** Plan, run, review, re-run, chart, and write up without stopping to ask, and post short
 progress updates while working and a full report at the end. So a study does not stop for human
-review after `plan-issue`'s plan. Three decisions still belong to the maintainer:
+review after `plan-issue`'s plan. Two decisions still belong to the maintainer:
 
 - **Spending money.**
 - **Ordering data or accepting a data licence** in someone's name.
-- **Merging.** A study merges only if the maintainer has said so in the current session; otherwise
-  it stops at a reviewed PR, as `implement-issue` does.
+
+**A study PR may be merged without waiting for the maintainer when all three of these hold:**
+
+- **The diff is confined to studies.** It touches only `studies/`, `packages/studies/`, and
+  `docs/studies/` (with the study skill and study docs they need), and nothing else: no `src/`, no
+  other package, no Patito contract, no CI configuration, no dependency change.
+- **Every line of code has been through at least one fresh agentic review**, with the findings
+  triaged. Scripts that produce published numbers get the Opus reviews described below.
+- **The merge checks pass**: `ci` green, no closing keyword in the PR body or commit messages, no
+  `data/` or `.env` files, the branch contains `main`, and a merge commit rather than a squash.
+
+A PR that touches anything outside that list stops at a reviewed PR, as `implement-issue` does.
 
 ## Where a study's pieces live
 
@@ -77,8 +87,8 @@ page only after a committed script prints it into the report.
 7. **Diff review**, with the `implement-issue` skill.
 8. **End with a `prose-review` of the page, one rule per pass, alongside persona and evidence
    reviews** (see "Reviews").
-9. **Merge, only as the maintainer has authorised,** after checking the PR's body and commit
-   messages for closing keywords (see "GitHub hygiene").
+9. **Merge, if the three conditions at the top of this skill hold,** after checking the PR's body
+   and commit messages for closing keywords (see "GitHub hygiene").
 
 Never publish a study with fewer than two scientific-validity reviews. If the process is shortened
 anywhere, for example one plan review instead of two, say so in the PR body and in the final report,

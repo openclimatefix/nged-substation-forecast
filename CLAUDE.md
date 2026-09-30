@@ -63,7 +63,7 @@ one, the mistake is already written.
 | `plan-issue` | deciding what to build for a GitHub issue (`/plan-issue <N>`) — sizes the issue, then writes a reviewed plan unless it is trivial, no code |
 | `simplicity-clean-room` | testing whether an existing module is more complicated than its problem requires |
 | `implement-issue` | writing code for an approved plan: implement in the draft PR `plan-issue` opened, verify set, mark it ready, up to two adversarial reviews, stop |
-| `github-issue-pr-workflow` | `gh issue create`, `gh pr create`, `gh pr merge`, or ship-time triage |
+| `github-issue-pr-workflow` | `gh issue create`, `gh pr create`, `gh issue/pr comment`, `gh pr merge`, or ship-time triage |
 | `github-graphql` | any `gh api graphql` call — sub-issue attach/reorder, issue Type, project fields |
 | `long-form-prose` | drafting new prose longer than a few paragraphs of connected argument — a `docs/` page, a roadmap section, a PR description explaining a design |
 | `prose-review` | reviewing, reordering or simplifying prose that already exists — structure first, then one pass per rule |
