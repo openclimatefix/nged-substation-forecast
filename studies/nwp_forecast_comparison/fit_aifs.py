@@ -592,10 +592,9 @@ def check_wn3_runs_present(*, frame: pl.DataFrame, domain: DomainType, arms: Seq
         if not arm.startswith("wn3_") or column not in frame.columns:
             continue
         day = int(arm.rpartition("_day")[2])
-        hour_start = pl.col("time") - pl.duration(hours=1 if domain == "solar" else 0)
         missing = (
             frame.filter(pl.col(column).is_null())
-            .select(run=(hour_start.dt.date() - pl.duration(days=day)))
+            .select(run=run_date(domain=domain, day=day))
             .group_by("run")
             .len()
             .sort("run")

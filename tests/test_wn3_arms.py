@@ -12,6 +12,7 @@ from pathlib import Path
 from types import ModuleType
 from typing import Final
 
+import h3
 import numpy as np
 import polars as pl
 import pytest
@@ -47,6 +48,7 @@ w = _load(name="build_wn3_inputs")
 fa = _load(name="fit_aifs")
 vw = _load(name="verify_wn3_steps")
 charts = _load(name="nwp_forecast_charts")
+bfi = _load(name="build_forecast_inputs")
 
 
 def _dataset(*, nan_cell: tuple[int, int] | None = None) -> xr.Dataset:
@@ -416,3 +418,76 @@ def test_physical_range_rejects_temperature_left_in_kelvin() -> None:
 def test_physical_range_accepts_plausible_values() -> None:
     frame = pl.DataFrame({"wn3_mean_day1_ghi": [0.0, 800.0], "wn3_mean_day1_temp": [3.0, 25.0]})
     w.check_physical_range(built=frame, domain="solar", day=1)
+
+
+def test_the_mean_vector_reference_is_refitted_at_the_sensitivity_setting_for_wind_only() -> None:
+    """The planned reference is refitted even when no contrast is near the 5% line."""
+    times = [datetime(2026, month, 10, 12, tzinfo=UTC) for month in (2, 3, 4, 6, 7, 8, 9)]
+    for domain, expected in (("wind", True), ("solar", False)):
+        arms = fa.wn3_arms(domain=domain, day=1)
+        losses = pl.concat(
+            [
+                pl.DataFrame(
+                    {
+                        "arm": arm,
+                        "site": "A",
+                        "time": times,
+                        "month": [f"{time:%Y-%m}" for time in times],
+                        "seed": 0,
+                        "setting": "primary",
+                        fa.METRIC: 1.0 + 10.0 * position,
+                        "device": "cuda",
+                    },
+                    schema_overrides={"time": pl.Datetime("us", "UTC")},
+                )
+                for position, arm in enumerate(arms)
+            ]
+        )
+
+        refitted = fa.wn3_sensitivity_arms(losses=losses, domain=domain, day=1)
+
+        assert ("ens_meanvec_day1" in refitted) is expected
+
+
+def test_a_missing_wn3_run_stops_the_fit_and_names_its_date() -> None:
+    frame = pl.DataFrame(
+        {
+            "time": [datetime(2026, 3, 5, 12, tzinfo=UTC), datetime(2026, 3, 6, 12, tzinfo=UTC)],
+            "wn3_mean_day1_init_time": [datetime(2026, 3, 4, tzinfo=UTC), None],
+        },
+        schema_overrides={"wn3_mean_day1_init_time": pl.Datetime("us", "UTC")},
+    )
+
+    with pytest.raises(ValueError, match=r"wn3_mean_day1: .*2026-03-05"):
+        fa.check_wn3_runs_present(frame=frame, domain="wind", arms=("wn3_mean_day1",))
+
+
+def test_a_missing_solar_run_is_named_by_the_hour_start_not_the_hour_end() -> None:
+    """The hour ending 00:00 on 6 March starts on 5 March, so day 1 reads the run of 4 March."""
+    frame = pl.DataFrame(
+        {
+            "time": [datetime(2026, 3, 6, 0, tzinfo=UTC)],
+            "wn3_mean_day1_init_time": [None],
+        },
+        schema_overrides={"wn3_mean_day1_init_time": pl.Datetime("us", "UTC")},
+    )
+
+    with pytest.raises(ValueError, match="2026-03-04"):
+        fa.check_wn3_runs_present(frame=frame, domain="solar", arms=("wn3_mean_day1",))
+
+
+def test_the_crop_weights_join_a_float32_point_one_degree_grid() -> None:
+    """Float32 0.1 degree coordinates must still meet the Float64 H3 grid after rounding."""
+    cell = h3.str_to_int(h3.latlng_to_cell(53.2, -0.5, 5))
+    overlap = bfi.compute_h3_grid_weights(nwp_grid_size_degrees=0.1, h3_index=[cell])
+    cells = (
+        overlap.select(latitude=pl.col("nwp_lat"), longitude=pl.col("nwp_lon"))
+        .unique()
+        .with_row_index("lat_index")
+        .with_columns(lon_index=pl.col("lat_index"))
+        .with_columns(pl.col("latitude", "longitude").cast(pl.Float32))
+    )
+
+    weights = bfi._h3_crop_weights(site_cells={"A": cell}, grid_cells=cells, grid_degrees=0.1)
+
+    assert weights["weight"].sum() == pytest.approx(1.0)

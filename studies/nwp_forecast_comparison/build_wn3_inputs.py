@@ -368,6 +368,8 @@ def _has_value(
     *, run: np.ndarray, run_position: np.ndarray, lead_position: np.ndarray, runs: np.ndarray
 ) -> np.ndarray:
     """Return which rows have a copied run and, one lead earlier, a stored lead."""
+    # Solar also reads the lead one hour earlier, so it needs the store's second lead onward. Wind
+    # is unaffected: every band's lead is at least 24 hours, far above the bound.
     return (runs[run_position] == run) & (lead_position >= 1) & (lead_position < N_LEADS)
 
 

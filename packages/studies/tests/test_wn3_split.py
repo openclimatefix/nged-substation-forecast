@@ -89,6 +89,29 @@ def test_a_solar_hour_ending_at_midnight_reads_the_previous_days_run():
     assert wn3_dropped_rows(losses=losses, domain="wind", day=1) == 1
 
 
+def test_a_wind_row_reading_the_run_of_the_training_end_day_is_not_out_of_sample():
+    """Day 1 at 12:00 on 1 July reads the run of 30 June, which is not after the training end."""
+    on_the_end = datetime(2026, 7, 1, 12, tzinfo=UTC)
+    after_the_end = datetime(2026, 7, 2, 12, tzinfo=UTC)  # reads the run of 1 July
+    losses = _rows(arm="x", values={**_monthly(), on_the_end: 1.0, after_the_end: 1.0})
+
+    out_of_sample = wn3_split(losses=losses, split="out-of-sample", domain="wind", day=1)
+
+    assert on_the_end not in out_of_sample["time"].to_list()
+    assert after_the_end in out_of_sample["time"].to_list()
+
+
+def test_a_solar_hour_ending_at_midnight_on_2_july_is_dropped_at_day_1():
+    """The hour ending 00:00 on 2 July starts on 1 July, and day 1 reads the run of 30 June."""
+    time = datetime(2026, 7, 2, 0, tzinfo=UTC)
+    losses = _rows(arm="x", values={**_monthly(), time: 1.0})
+
+    out_of_sample = wn3_split(losses=losses, split="out-of-sample", domain="solar", day=1)
+
+    assert time not in out_of_sample["time"].to_list()
+    assert wn3_dropped_rows(losses=losses, domain="solar", day=1) == 1
+
+
 def test_an_unknown_split_raises():
     losses = _rows(arm="x", values=_monthly())
 
