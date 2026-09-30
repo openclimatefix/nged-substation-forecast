@@ -221,8 +221,8 @@ lead?](../../docs/studies/forecasts/matched-lead.md).
 - `nwp_forecast_charts.py` reads the saved losses and predictions from `--input-dir`, and the extra
   lead days' losses from `--extra-dir`, and, with `--aifs-dir`, the AIFS losses, and writes five SVG
   charts per technology (six with the AIFS chart) to `--output-dir`, each optimised with `svgo`
-  (skip with `--no-svgo`): the planned contrasts P1a to P4b at both settings, one chosen week of out-of-fold forecasts
-  against measured output, the contrasts at each generator alone, the blends against ENS alone and
+  (skip with `--no-svgo`): the planned contrasts P1a to P4b at both settings, one chosen week of
+  out-of-fold forecasts against measured output, the contrasts at each generator alone, the blends against ENS alone and
   their controls, and error by lead day with ENS's day-0 and day-1 intervals shaded. It computes
   every interval itself with the report's own functions and refuses any site label that is not an
   anonymised label. It has no default output directory: charts go to `docs/studies/assets/` only
