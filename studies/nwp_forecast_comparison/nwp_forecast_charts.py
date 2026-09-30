@@ -723,6 +723,7 @@ LEAD_ROW_PX: Final[int] = 60
 """The height of one product's row on the leaderboard, which holds one mark per fitted lead."""
 
 LEAD_TICK_HEIGHT_PX: Final[int] = 9
+"""The height of the grey tick that marks the ENS mean on a smaller row set's rows."""
 
 WN3_LEADERBOARD_NOTES: Final[dict[DomainType, str]] = {
     "solar": (
@@ -751,7 +752,6 @@ MINOR_GRID_WIDTH_PX: Final[float] = 2.5
 
 LEAD_BOTTOM_PAD_ROWS: Final[float] = 0.35
 """The space below the last product's row, in rows, so the bottom axis does not cut its marks."""
-"""The height of the grey tick that marks the ENS mean on a smaller row set's rows."""
 
 LEAD_DODGE_ROWS: Final[float] = 0.135
 """The vertical spacing between the marks of one product's lead days, in rows."""

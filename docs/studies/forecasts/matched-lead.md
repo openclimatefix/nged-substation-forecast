@@ -1933,21 +1933,21 @@ continuous ranked probability scores that a single-valued arm does not have.
 ### WN3 and AIFS at days 0, 3, 4, and 10 (exploratory)
 
 **In the pooled rows and in the February to June rows, WN3's mean has a lower error than ENS's mean
-at days 3 and 4 for solar and wind, with intervals that exclude 0, and in the July to September rows
-only solar days 3 and 4 and wind day 3 do the same.** In every group, the solar day-0 and day-10
-differences span 0. At wind day 0 the difference excludes 0 in the pooled and February to June rows
-and spans 0 in the July to September rows, and at wind day 4 it spans 0 in the July to September
-rows. At wind day 10, WN3's error is higher than ENS's, by an interval that excludes 0 in the pooled
-and February to June rows and spans 0 in the July to September rows. Day 0 is a hindcast: the row of
-an hour reads the 00 UTC run of the hour's own day, a forecast no service could read. Solar day 0
-omits the hours ending 01:00 to 06:00 UTC for every arm, because those hours precede the first
-6-hourly AIFS step, and the WN3 wind day 0 drops the hour ending 00:00 UTC, for which the WN3 store
-holds no lead. Every number in this section is exploratory and fitted at the primary setting only.
-Each WN3 error below is the mean absolute error of an XGBoost model given WN3's mean, as a
-percentage of capacity. Each difference is WN3's error minus ENS's error on the same rows, in points
-of capacity, so a negative difference means WN3 has the lower error. The wind reference is ENS's
-mean-vector speed, which matches how WN3's speed is built. <!-- report (WN3 extra days): all three
-row groups, ens_mean (solar) and ens_meanvec (wind) arms -->
+(for wind, ENS's mean-vector reference) at days 3 and 4 for solar and wind, with intervals that
+exclude 0, and in the July to September rows only solar days 3 and 4 and wind day 3 do the same.**
+In every group, the solar day-0 and day-10 differences span 0. At wind day 0 the difference excludes
+0 in the pooled and February to June rows and spans 0 in the July to September rows, and at wind day
+4 it spans 0 in the July to September rows. At wind day 10, WN3's error is higher than ENS's, by an
+interval that excludes 0 in the pooled and February to June rows and spans 0 in the July to
+September rows. Day 0 is a hindcast: the row of an hour reads the 00 UTC run of the hour's own day,
+a forecast no service could read. Solar day 0 omits the hours ending 01:00 to 06:00 UTC for every
+arm, because those hours precede the first 6-hourly AIFS step, and the WN3 wind day 0 drops the hour
+ending 00:00 UTC, for which the WN3 store holds no lead. Every number in this section is exploratory
+and fitted at the primary setting only. Each WN3 error below is the mean absolute error of an
+XGBoost model given WN3's mean, as a percentage of capacity. Each difference is WN3's error minus
+ENS's error on the same rows, in points of capacity, so a negative difference means WN3 has the
+lower error. The wind reference is ENS's mean-vector speed, which matches how WN3's speed is built.
+<!-- report (WN3 extra days): all three row groups, ens_mean (solar) and ens_meanvec (wind) arms -->
 
 | Row group, technology, day | WN3 error (%) | ENS error (%) | WN3 minus ENS (points) |
 |---|---|---|---|
