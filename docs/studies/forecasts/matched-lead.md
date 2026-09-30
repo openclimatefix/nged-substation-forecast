@@ -71,8 +71,8 @@ does. Each panel is one lead day, from day 0 at the top, on one shared x axis, a
 forecast product, sorted best first. Among the full-window products, the ENS mean and IFS 0.25° have
 the lowest day-1 errors. The three rows below the heading "Fewer months" are fitted on different,
 smaller row sets: WeatherNext 3 (7 months, February to September 2026, no May rows), AIFS Single (16
-months), and AIFS ENS mean (11 months). Their dots are hollow, they are not ranked against the rows
-above, and each has a grey tick for the ENS mean on the same rows. WeatherNext 3's row holds every
+months), and AIFS ENS mean (11 months). The fewer-months rows' dots are hollow, they are not ranked
+against the rows above, and each has a grey tick for the ENS mean on the same rows. WeatherNext 3's row holds every
 row from February to September 2026, and Google has not documented which WeatherNext 3 model version
 made that archive, so the February to June months may overlap WeatherNext 3's training data (Figure
 17 splits the rows). At days 7 and 14 WeatherNext 3's solar error is not the lowest plotted: the ENS
@@ -99,8 +99,8 @@ panel is one lead day, from day 0 at the top, on one shared x axis, and each row
 product, sorted best first. Among the full-window products, the ENS mean and IFS 0.25° have the
 lowest day-1 errors. The three rows below the heading "Fewer months" are fitted on different,
 smaller row sets: WeatherNext 3 (7 months, February to September 2026, no May rows), AIFS Single (16
-months), and AIFS ENS mean (11 months). Their dots are hollow, they are not ranked against the rows
-above, and each has a grey tick for the ENS mean on the same rows. WeatherNext 3's row holds every
+months), and AIFS ENS mean (11 months). The fewer-months rows' dots are hollow, they are not ranked
+against the rows above, and each has a grey tick for the ENS mean on the same rows. WeatherNext 3's row holds every
 row from February to September 2026, and Google has not documented which WeatherNext 3 model version
 made that archive, so the February to June months may overlap WeatherNext 3's training data (Figure
 18 splits the rows). At days 7 and 14, against the ENS mean on the same rows (16.7% and 18.7%), no
