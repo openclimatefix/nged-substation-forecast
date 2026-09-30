@@ -76,7 +76,7 @@ These come from the "Prose style" section of `CLAUDE.md`, limited to the rules t
 - Put the short, familiar part of a sentence first and the long, new material last.
 - Say what the source or the measurement found, with its scope attached, not what is always true.
 - Do not claim a set has exactly one member ("the only", "the first") unless you enumerated the set.
-- Do not commit the project to work it has not agreed to. Describe options and leave the choice to
-  the reader.
+- Do not commit the project to work it has not agreed to, without checking with the maintainer
+  first. Describe options and leave the choice to the reader.
 - Do not name individuals in prose. Name the role.
 - Do not gender-guess. Use "they" for anyone whose pronouns are unstated.
