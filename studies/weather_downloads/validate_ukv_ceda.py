@@ -9,16 +9,18 @@ in which every run that CEDA lacks (status 3) appears.
 
 **The checks read a sample of at most `--sample` runs, spread evenly across the archive**: the
 value ranges and the shortwave cycle read complete and partial runs, and the NaN layout reads
-complete runs only. The sample is small because every run holds 31 arrays of 55 steps. Pass
-`--sample 0` to read every run. A range check never loosens to pass: a failure means the store or
-the source is wrong.
+complete runs only. The sample is small because every run holds 31 arrays of 55 steps (121 for
+`--product ukv-ceda-t120`). Pass `--sample 0` to read every run. A range check never loosens to
+pass: a failure means the store or the source is wrong.
 
 **The script prints one PASS or FAIL line per check, and no cell count or coordinate,** because
 those reveal the size and place of the private trial-area box. The measured numbers go only to
 `validation.json` next to the store. The script exits non-zero when any check fails.
 
 Run it with `uv run --with icechunk --with zarr python
-studies/weather_downloads/validate_ukv_ceda.py --store-dir <product dir>`.
+studies/weather_downloads/validate_ukv_ceda.py --store-dir <product dir>`. Pass `--product
+ukv-ceda-t120` for the store of the 03 and 15 UTC runs, which changes the slot spacing, the step
+count, and the leads each variable serves.
 """
 
 import argparse
@@ -32,12 +34,9 @@ import numpy as np
 import zarr
 from fetch_ukv_ceda import (
     CODE_VERSION,
-    CYCLE_HOURS,
     FIELDS,
-    N_STEPS,
     PLAIN_LAST_STEP,
-    PRODUCT_NAME,
-    SLOT_EPOCH,
+    PROFILES,
     STATUS_COMPLETE,
     STATUS_MISSING,
     STATUS_NAMES,
@@ -45,6 +44,9 @@ from fetch_ukv_ceda import (
     FieldSpec,
     UkvStore,
     _array,
+    active_profile,
+    add_product_argument,
+    set_profile,
 )
 from paths import WEATHER_DOWNLOADS_DIR
 
@@ -126,7 +128,7 @@ MAX_GUST_VIOLATION_FRACTION: Final[float] = 0.01
 
 
 def expected_leads(spec: FieldSpec) -> set[int]:
-    """The leads, in hours, at which a variable has data: its plain and `T54` files together."""
+    """The leads, in hours, at which a variable has data: all its files in the active profile."""
     leads: set[int] = set()
     for tag in spec.tags:
         leads.update(spec.expected_steps(tag=tag))
@@ -142,9 +144,12 @@ def sample_slots(slots: np.ndarray, *, sample: int) -> np.ndarray:
 
 
 def check_run_spacing(group: zarr.Group) -> tuple[bool, dict[str, Any]]:
-    """Check that `init_time` is the fixed 6-hourly grid from the slot epoch, without a shift."""
+    """Check that `init_time` is the active profile's fixed grid from its slot epoch, unshifted."""
+    profile = active_profile()
     init_time = np.asarray(_array(group, "init_time")[:])
-    expected = int(SLOT_EPOCH.timestamp()) + np.arange(len(init_time)) * CYCLE_HOURS * 3600
+    expected = int(profile.slot_epoch.timestamp()) + np.arange(len(init_time)) * (
+        profile.cycle_hours * 3600
+    )
     return bool(np.array_equal(init_time, expected)), {"slots": len(init_time)}
 
 
@@ -194,7 +199,7 @@ def check_nan_layout(group: zarr.Group, slots: np.ndarray) -> tuple[bool, dict[s
     ok = True
     bad: dict[str, str] = {}
     for spec in FIELDS:
-        served = np.zeros(N_STEPS, dtype=bool)
+        served = np.zeros(active_profile().n_steps, dtype=bool)
         served[sorted(expected_leads(spec))] = True
         data = read_sample(group, spec, slots)
         present = np.isfinite(data)
@@ -326,7 +331,10 @@ def check_gaps(statuses: np.ndarray) -> tuple[bool, dict[str, Any]]:
 
 def _slot_time(slot: int) -> datetime:
     """The initialisation time of a slot."""
-    return datetime.fromtimestamp(int(SLOT_EPOCH.timestamp()) + slot * CYCLE_HOURS * 3600, tz=UTC)
+    profile = active_profile()
+    return datetime.fromtimestamp(
+        int(profile.slot_epoch.timestamp()) + slot * profile.cycle_hours * 3600, tz=UTC
+    )
 
 
 def main() -> int:
@@ -336,9 +344,16 @@ def main() -> int:
         0 if every check passed, else 1.
     """
     parser = argparse.ArgumentParser(description="Validate the UKV-CEDA Icechunk store.")
-    parser.add_argument("--store-dir", type=Path, default=WEATHER_DOWNLOADS_DIR / PRODUCT_NAME)
+    add_product_argument(parser)
+    parser.add_argument(
+        "--store-dir", type=Path, default=None, help="default: <weather downloads>/<product name>"
+    )
     parser.add_argument("--sample", type=int, default=200)
     args = parser.parse_args()
+    profile = PROFILES[args.product]
+    set_profile(profile)
+    if args.store_dir is None:
+        args.store_dir = WEATHER_DOWNLOADS_DIR / profile.product_name
     store = UkvStore.open(store_path=args.store_dir / "store")
     session = store.repository.readonly_session(branch="main")
     group = zarr.open_group(session.store, mode="r")

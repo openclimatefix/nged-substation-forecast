@@ -3,21 +3,28 @@
 One-off throwaway script for the forecast study. CEDA archives every Met Office UKV run as whole
 GRIB files on the 2 km Ordnance Survey national grid (548 by 704 cells): no server-side crop and
 no `.idx` files exist, so each file is downloaded whole, the trial-area box is cropped locally, and
-the raw file is deleted at once. The archive keeps four runs a day (00, 06, 12, and 18 UTC), from
-`SLOT_EPOCH` (2019-09-01), and each run needs seven files: `Wholesale1`, `Wholesale2`,
-`Wholesale3`, and `Wholesale4` (leads 0 to 36 hours) plus `Wholesale1T54`, `Wholesale2T54`, and
-`Wholesale3T54` (leads 37 to 54 hours). CEDA holds `T120` files (leads 55 to 120 hours) for the 03
-and 15 UTC runs only, so those leads never exist for the runs archived here.
+the raw file is deleted at once. CEDA holds eight runs a day, and the script archives them as two
+separate products, chosen with `--product`, each in its own store. The default, `ukv-ceda` (store
+`UKV-CEDA`), keeps the 00, 06, 12, and 18 UTC runs from 2019-09-01 00Z, and each run needs seven
+files: `Wholesale1`, `Wholesale2`, `Wholesale3`, and `Wholesale4` (leads 0 to 36 hours) plus
+`Wholesale1T54`, `Wholesale2T54`, and `Wholesale3T54` (leads 37 to 54 hours). The product
+`ukv-ceda-t120` (store `UKV-CEDA-T120`) keeps the 03 and 15 UTC runs from 2019-09-01 03Z, and each
+run needs those seven files plus `Wholesale1T120`, `Wholesale2T120`, and `Wholesale3T120` (3-hourly
+leads 57 to 120 hours). CEDA holds no `T120` file for the other runs. The `Profile` of each product
+holds its run hours, slot spacing, and longest lead, and `main` selects one profile before any
+other code runs. The module constants `SLOT_EPOCH`, `CYCLE_HOURS`, `RUN_HOURS`, `MAX_STEP_HOURS`,
+`N_STEPS`, and `FILE_TAGS` describe the default profile.
 
 **The store layout follows the ensemble archive of the Data archivist** (`nwp_archivist.store`): one
 Icechunk repository under `<product dir>/store`, one Zarr array per variable with dimensions
 `(init_time, step, cell)` and chunks `(1, n_steps, n_cells)`, and bookkeeping arrays along
 `init_time` (`status`, `files_expected`, `files_received`, `archived_at`, `code_version`) written in
-the same atomic Icechunk commit as the run's data. `init_time` is a fixed 6-hourly slot grid from
-`SLOT_EPOCH`, so a missing run is a NaN slot with status 3 and never a shifted row. `step` is
-hourly from 0 to `MAX_STEP_HOURS` hours, and a variable is NaN at every lead the source does not
-serve. The cropped cells are the bounding rectangle, on the 2D grid, of every cell inside the box,
-flattened row-major to one `cell` axis. The rectangle's `(rows, columns)` shape is an attribute of
+the same atomic Icechunk commit as the run's data. `init_time` is a fixed slot grid (6-hourly for
+`ukv-ceda`, 12-hourly for `ukv-ceda-t120`) from the profile's slot epoch, so a missing run is a
+NaN slot with status 3 and never a shifted row. `step` is hourly from 0 to the profile's longest
+lead (54 or 120 hours), and a variable is NaN at every lead the source does not serve. The cropped
+cells are the bounding rectangle, on the 2D grid, of every cell inside the box, flattened row-major
+to one `cell` axis. The rectangle's `(rows, columns)` shape is an attribute of
 the root group, and `cell_latitude`, `cell_longitude`, `cell_row`, and `cell_column` describe each
 cell. **These four arrays and `_grid_cells.parquet` reveal the private trial-area box, so they stay
 in the private store, and no log line, README, or lineage note carries a coordinate or a cell
@@ -27,19 +34,22 @@ count.**
 data disk (never `/tmp`, which is tmpfs). Each file is cropped to `.npy` files in a per-run cache
 directory as soon as it lands, the run is committed once every file is cached, and the cache is
 deleted after the commit. A re-run skips every file already cached and every run whose status is
-complete or missing. Pass `--retry-partial` to fetch partial and missing runs again. A lock file
-stops two writers. The download is one stream with a delay between files, retries with backoff, and
-an HTTP Range resume of an interrupted file, and it stops below `--min-free-gb` of free disk. A
-file whose retries are all exhausted by a transient CEDA-side fault (a 500, a timeout) is skipped,
-marking the run partial, rather than crashing the whole archive. An auth failure
-(`CedaAuthError`, every later request would fail the same way) gets one automatic token refresh
-and retry; if that retry also fails, or low disk is reached, the process stops outright. A day
-whose directory listing fails or is empty is skipped and never recorded, so a later run retries it.
+complete or missing. Pass `--retry-partial` to fetch partial and missing runs again. Pass
+`--newest-first` to work from the newest run back to `--start` instead of from the oldest run
+forward. A lock file stops two writers. The download is one stream with a delay between files,
+retries with backoff, and an HTTP Range resume of an interrupted file, and it stops below
+`--min-free-gb` of free disk. A file whose retries are all exhausted by a transient CEDA-side fault
+(a 500, a timeout) is skipped, marking the run partial, rather than crashing the whole archive. An
+auth failure (`CedaAuthError`, every later request would fail the same way) gets one automatic
+token refresh and retry; if that retry also fails, or low disk is reached, the process stops
+outright. A day whose directory listing fails or is empty is skipped and never recorded, so a later
+run retries it.
 
 Set `CEDA_TOKEN` in the environment (a CEDA access token). The script never prints or stores it, and
 never follows a redirect: a redirect means the token was rejected. Run it with `uv run --with
 icechunk --with zarr --with eccodes python studies/weather_downloads/fetch_ukv_ceda.py --start
-2026-09-20 --end 2026-09-20 --store-dir <scratch dir>` for a one-day trial. Then check the store
+2026-09-20 --end 2026-09-20 --store-dir <scratch dir>` for a one-day trial (add `--product
+ukv-ceda-t120` for the 03 and 15 UTC product). Then check the store
 with `validate_ukv_ceda.py`.
 
 **A CEDA access token is a JWT with a fixed 3-day lifetime and no refresh-token flow** — the only
@@ -76,7 +86,7 @@ from collections.abc import Callable, Iterator
 from dataclasses import dataclass
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
-from typing import Any, Final
+from typing import Any, Final, Literal
 
 import icechunk
 import numpy as np
@@ -107,7 +117,8 @@ SLOT_EPOCH: Final[datetime] = datetime(2019, 9, 1, tzinfo=UTC)
 """The first slot of the `init_time` axis. A run's slot is its offset from here in whole cycles."""
 CYCLE_HOURS: Final[int] = 6
 RUN_HOURS: Final[tuple[int, ...]] = (0, 6, 12, 18)
-"""The runs archived. CEDA holds eight runs a day, and `T120` files only for 03 and 15 UTC."""
+"""The runs the default profile archives. CEDA holds eight runs a day, and `T120` files only for
+03 and 15 UTC, which the `ukv-ceda-t120` profile archives."""
 PUBLICATION_LAG: Final[timedelta] = timedelta(days=4)
 """A run newer than this is not yet published, so it is neither fetched nor recorded."""
 
@@ -117,6 +128,76 @@ PLAIN_LAST_STEP: Final[int] = 36
 HOURLY_LAST_STEP: Final[int] = 48
 T54_STEPS: Final[tuple[int, ...]] = (*range(37, HOURLY_LAST_STEP + 1), 51, 54)
 """Leads in a `T54` file: hourly to 48 hours, then 3-hourly."""
+T120_STEPS: Final[tuple[int, ...]] = tuple(range(57, 121, 3))
+"""Leads in a `T120` file: 3-hourly, 57 to 120 hours."""
+
+
+@dataclass(frozen=True)
+class Profile:
+    """One archived product: which runs it keeps, how its slots are spaced, and how far it reaches.
+
+    Attributes:
+        product_name: The product's name, which is also its default store directory name.
+        slot_epoch: The initialisation time of slot 0 of the `init_time` axis.
+        cycle_hours: The hours between slots.
+        run_hours: The UTC hours of day at which the archived runs start.
+        max_step_hours: The longest lead archived, in hours.
+        has_t120: Whether each run also has the three `T120` files.
+    """
+
+    product_name: str
+    slot_epoch: datetime
+    cycle_hours: int
+    run_hours: tuple[int, ...]
+    max_step_hours: int
+    has_t120: bool
+
+    @property
+    def n_steps(self) -> int:
+        """The length of the `step` axis."""
+        return self.max_step_hours + 1
+
+    @property
+    def file_tags(self) -> tuple[str, ...]:
+        """The files a run needs: plain files, then `T54` files, then `T120` files."""
+        return _file_tags(has_t120=self.has_t120)
+
+
+DEFAULT_PROFILE: Final[Profile] = Profile(
+    product_name=PRODUCT_NAME,
+    slot_epoch=SLOT_EPOCH,
+    cycle_hours=CYCLE_HOURS,
+    run_hours=RUN_HOURS,
+    max_step_hours=MAX_STEP_HOURS,
+    has_t120=False,
+)
+T120_PROFILE: Final[Profile] = Profile(
+    product_name="UKV-CEDA-T120",
+    slot_epoch=datetime(2019, 9, 1, 3, tzinfo=UTC),
+    cycle_hours=12,
+    run_hours=(3, 15),
+    max_step_hours=120,
+    has_t120=True,
+)
+ProductType = Literal["ukv-ceda", "ukv-ceda-t120"]
+PROFILES: Final[dict[ProductType, Profile]] = {
+    "ukv-ceda": DEFAULT_PROFILE,
+    "ukv-ceda-t120": T120_PROFILE,
+}
+
+_active_profile: Profile = DEFAULT_PROFILE
+
+
+def set_profile(profile: Profile) -> None:
+    """Make `profile` the one every function in this module reads. `main` calls this once."""
+    global _active_profile  # noqa: PLW0603
+    _active_profile = profile
+
+
+def active_profile() -> Profile:
+    """The profile that slots, steps, file tags, and documents are read from."""
+    return _active_profile
+
 
 SIGNIFICAND_BITS: Final[int] = 13
 """The significand bits kept when rounding, the same as `delta_store.nwp.NWP_SIGNIFICAND_BITS`."""
@@ -233,12 +314,25 @@ class FieldSpec:
 
     @property
     def tags(self) -> tuple[str, ...]:
-        """The file tags that hold the field: the plain file, and the `T54` file if one exists."""
+        """The file tags of the active profile that hold the field."""
+        return self.tags_for(has_t120=active_profile().has_t120)
+
+    def tags_for(self, *, has_t120: bool) -> tuple[str, ...]:
+        """The file tags that hold the field: the plain file, its `T54` file, and its `T120` file.
+
+        Wholesale4 has only the plain file. A `T120` file counts only where `has_t120` is true.
+        """
         plain = f"Wholesale{self.wholesale}"
-        return (plain,) if self.wholesale == 4 else (plain, f"{plain}T54")
+        if self.wholesale == 4:
+            return (plain,)
+        if has_t120:
+            return (plain, f"{plain}T54", f"{plain}T120")
+        return (plain, f"{plain}T54")
 
     def expected_steps(self, *, tag: str) -> tuple[int, ...]:
         """The leads, in hours, that the file `tag` serves for this field."""
+        if tag.endswith("T120"):
+            return T120_STEPS
         if tag.endswith("T54"):
             return T54_STEPS
         first = 1 if self.interval_valued else 0
@@ -425,16 +519,26 @@ FIELDS: Final[tuple[FieldSpec, ...]] = (
     ),
 )
 
-FILE_TAGS: Final[tuple[str, ...]] = tuple(
-    sorted(
-        {tag for spec in FIELDS for tag in spec.tags}, key=lambda tag: (tag.endswith("T54"), tag)
-    )
-)
-"""The seven files a run needs: four plain files, then three `T54` files."""
 
-_SPECS_BY_TAG: Final[dict[str, tuple[FieldSpec, ...]]] = {
-    tag: tuple(spec for spec in FIELDS if tag in spec.tags) for tag in FILE_TAGS
-}
+def _tag_rank(tag: str) -> tuple[int, str]:
+    """Sort key that puts plain files first, then `T54` files, then `T120` files."""
+    tier = 2 if tag.endswith("T120") else 1 if tag.endswith("T54") else 0
+    return tier, tag
+
+
+def _file_tags(*, has_t120: bool) -> tuple[str, ...]:
+    """Every file tag that holds a kept field, in `_tag_rank` order."""
+    tags = {tag for spec in FIELDS for tag in spec.tags_for(has_t120=has_t120)}
+    return tuple(sorted(tags, key=_tag_rank))
+
+
+FILE_TAGS: Final[tuple[str, ...]] = _file_tags(has_t120=False)
+"""The seven files a run of the default profile needs: four plain files, then three `T54` files."""
+
+
+def _specs_for_tag(tag: str) -> tuple[FieldSpec, ...]:
+    """The fields the file `tag` holds, in the active profile."""
+    return tuple(spec for spec in FIELDS if tag in spec.tags)
 
 
 class CedaAuthError(RuntimeError):
@@ -553,18 +657,22 @@ def round_significand(values: np.ndarray, *, keep_bits: int = SIGNIFICAND_BITS) 
 
 
 def slot_for(init_time: datetime) -> int:
-    """The index of a run on the `init_time` axis."""
-    offset = init_time - SLOT_EPOCH
-    if offset % timedelta(hours=CYCLE_HOURS):
-        message = f"{init_time.isoformat()} is not on the {CYCLE_HOURS}-hourly slot grid"
+    """The index of a run on the active profile's `init_time` axis."""
+    profile = active_profile()
+    offset = init_time - profile.slot_epoch
+    if offset % timedelta(hours=profile.cycle_hours):
+        message = f"{init_time.isoformat()} is not on the {profile.cycle_hours}-hourly slot grid"
         raise ValueError(message)
-    return offset // timedelta(hours=CYCLE_HOURS)
+    return offset // timedelta(hours=profile.cycle_hours)
 
 
 def _init_time_seconds(slots: range) -> np.ndarray:
     """The `init_time` coordinate in seconds since 1970, for a range of slots."""
-    epoch_seconds = int(SLOT_EPOCH.timestamp())
-    return np.array([epoch_seconds + slot * CYCLE_HOURS * 3600 for slot in slots], dtype=np.int64)
+    profile = active_profile()
+    epoch_seconds = int(profile.slot_epoch.timestamp())
+    return np.array(
+        [epoch_seconds + slot * profile.cycle_hours * 3600 for slot in slots], dtype=np.int64
+    )
 
 
 def _array(group: zarr.Group, name: str) -> zarr.Array:
@@ -617,8 +725,8 @@ class RunResult:
         status: `STATUS_COMPLETE`, `STATUS_PARTIAL`, or `STATUS_MISSING`.
         files_expected: How many files the run should contain.
         files_received: How many of them arrived and were cropped.
-        blocks: For each variable found, an `(N_STEPS, n_cells)` `float32` array, NaN at the leads
-            not served.
+        blocks: For each variable found, an `(n_steps, n_cells)` `float32` array, where `n_steps` is
+            the active profile's, NaN at the leads not served.
     """
 
     init_time: datetime
@@ -672,7 +780,9 @@ class UkvStore:
         session = self.repository.writable_session(branch=_MAIN_BRANCH)
         root = zarr.open_group(session.store, mode="w")
         _write_layout(root, grid)
-        session.commit("Create the UKV-CEDA archive layout", allow_empty=True)
+        session.commit(
+            f"Create the {active_profile().product_name} archive layout", allow_empty=True
+        )
 
     def commit_run(self, run: RunResult) -> str:
         """Write one run into its slot and commit it, in a single Icechunk commit.
@@ -695,7 +805,8 @@ class UkvStore:
         _array(group, "archived_at")[slot] = int(datetime.now(UTC).timestamp())
         _array(group, "code_version")[slot] = CODE_VERSION
         message = (
-            f"{PRODUCT_NAME} {run.init_time:%Y-%m-%dT%H:%MZ} {STATUS_NAMES[run.status]} "
+            f"{active_profile().product_name} {run.init_time:%Y-%m-%dT%H:%MZ} "
+            f"{STATUS_NAMES[run.status]} "
             f"{run.files_received}/{run.files_expected} files"
         )
         return session.commit(message, allow_empty=True)
@@ -724,14 +835,16 @@ def _grow(group: zarr.Group, n_slots: int) -> None:
 
 def _write_layout(group: zarr.Group, grid: CellGrid) -> None:
     """Create every array, empty along `init_time`, and store the grid. The caller commits."""
+    profile = active_profile()
+    n_steps = profile.n_steps
     group.attrs.update(
         {
-            "product": PRODUCT_NAME,
+            "product": profile.product_name,
             "provider": "Met Office, via the CEDA archive",
             "licence": "CC BY-NC-SA 4.0 (https://creativecommons.org/licenses/by-nc-sa/4.0/)",
             "catalogue_record": CATALOGUE_URL,
-            "cycle_hours": CYCLE_HOURS,
-            "slot_epoch": SLOT_EPOCH.isoformat(),
+            "cycle_hours": profile.cycle_hours,
+            "slot_epoch": profile.slot_epoch.isoformat(),
             "rect_shape": [grid.n_rows, grid.n_cols],
             "full_grid_shape": [GRID_NJ, GRID_NI],
             "status_codes": {str(code): name for code, name in STATUS_NAMES.items()},
@@ -765,7 +878,7 @@ def _write_layout(group: zarr.Group, grid: CellGrid) -> None:
     along_init_time("files_received", "int32")
     along_init_time("archived_at", "int64", time_attrs)
     along_init_time("code_version", "str")
-    _write_static(group, "step", np.arange(N_STEPS, dtype=np.int32), dims=("step",))
+    _write_static(group, "step", np.arange(n_steps, dtype=np.int32), dims=("step",))
     _array(group, "step").attrs["units"] = "hours"
     cell_rows = grid.row_start + np.repeat(np.arange(grid.n_rows), grid.n_cols)
     cell_cols = grid.col_start + np.tile(np.arange(grid.n_cols), grid.n_rows)
@@ -776,8 +889,8 @@ def _write_layout(group: zarr.Group, grid: CellGrid) -> None:
     for spec in FIELDS:
         group.create_array(
             spec.variable,
-            shape=(0, N_STEPS, grid.n_cells),
-            chunks=(1, N_STEPS, grid.n_cells),
+            shape=(0, n_steps, grid.n_cells),
+            chunks=(1, n_steps, grid.n_cells),
             dtype="float32",
             fill_value=float("nan"),
             dimension_names=("init_time", "step", "cell"),
@@ -950,16 +1063,18 @@ def extract_file(path: Path, *, tag: str, grid: CellGrid) -> tuple[dict[str, np.
         grid: The cells to keep.
 
     Returns:
-        The arrays and a report. Each array is `(N_STEPS, n_cells)` `float32`, NaN at the leads the
-        file does not carry. The report maps `found` to each variable's list of leads and
-        `problems` to a list of one-line descriptions of what was expected but absent.
+        The arrays and a report. Each array is `(n_steps, n_cells)` `float32`, with the active
+        profile's `n_steps`, NaN at the leads the file does not carry. The report maps `found` to
+        each variable's list of leads and `problems` to a list of one-line descriptions of what was
+        expected but absent.
 
     Raises:
         RuntimeError: If the file's grid differs from `GRID_KEYS`.
     """
     import eccodes  # ty: ignore[unresolved-import]
 
-    specs = {spec.key: spec for spec in _SPECS_BY_TAG[tag]}
+    specs = {spec.key: spec for spec in _specs_for_tag(tag)}
+    profile = active_profile()
     arrays: dict[str, np.ndarray] = {}
     found: dict[str, list[int]] = {}
     faults: list[str] = []
@@ -984,7 +1099,7 @@ def extract_file(path: Path, *, tag: str, grid: CellGrid) -> tuple[dict[str, np.
                 if spec is None:
                     continue
                 step = _scaled_key(message, "endStep")
-                if step > MAX_STEP_HOURS:
+                if step > profile.max_step_hours:
                     continue
                 fault = _semantic_fault(message, spec, step=step)
                 if fault is None and step in found.get(spec.variable, []):
@@ -998,7 +1113,8 @@ def extract_file(path: Path, *, tag: str, grid: CellGrid) -> tuple[dict[str, np.
                 if spec.invalid_below is not None:
                     values[values < spec.invalid_below] = np.nan
                 block = arrays.setdefault(
-                    spec.variable, np.full((N_STEPS, grid.n_cells), np.nan, dtype=np.float32)
+                    spec.variable,
+                    np.full((profile.n_steps, grid.n_cells), np.nan, dtype=np.float32),
                 )
                 block[step] = grid.crop(values)
                 found.setdefault(spec.variable, []).append(step)
@@ -1045,7 +1161,7 @@ def _check_grid(message: int) -> None:
 def _problems(found: dict[str, list[int]], *, tag: str) -> list[str]:
     """Describe every kept field of the file `tag` that is absent, or lacks a lead."""
     problems: list[str] = []
-    for spec in _SPECS_BY_TAG[tag]:
+    for spec in _specs_for_tag(tag):
         expected = set(spec.expected_steps(tag=tag))
         seen = set(found.get(spec.variable, []))
         if not seen:
@@ -1086,7 +1202,7 @@ def merge_run(run_dir: Path, *, init_time: datetime, files_expected: int) -> Run
     blocks: dict[str, np.ndarray] = {}
     received = 0
     problems: list[str] = []
-    for tag in FILE_TAGS:
+    for tag in active_profile().file_tags:
         marker, array_path = _cache_paths(run_dir, tag)
         if not marker.exists():
             problems.append(f"{tag}: file not received")
@@ -1170,9 +1286,10 @@ def fetch_run(
         SystemExit: If free disk falls below `min_free_gb`.
     """
     run_dir = product_dir / "_scratch" / f"{init_time:%Y%m%dT%H}"
-    names = {tag: _FILE_NAME_TEMPLATE.format(init=init_time, tag=tag) for tag in FILE_TAGS}
+    file_tags = active_profile().file_tags
+    names = {tag: _FILE_NAME_TEMPLATE.format(init=init_time, tag=tag) for tag in file_tags}
     if not any(name in listing for name in names.values()):
-        return RunResult(init_time, STATUS_MISSING, len(FILE_TAGS), 0, {})
+        return RunResult(init_time, STATUS_MISSING, len(file_tags), 0, {})
     for tag, name in names.items():
         if _cache_paths(run_dir, tag)[0].exists() or name not in listing:
             continue
@@ -1212,16 +1329,29 @@ def fetch_run(
             raw.unlink()
         cache_file(run_dir, tag=tag, arrays=arrays, report=report)
         time.sleep(REQUEST_DELAY_S)
-    return merge_run(run_dir, init_time=init_time, files_expected=len(FILE_TAGS))
+    return merge_run(run_dir, init_time=init_time, files_expected=len(file_tags))
 
 
-def run_times(*, start: date, end: date) -> Iterator[datetime]:
-    """Yield every archived run from the start of `start` to the end of `end`, oldest first."""
-    day = start
-    while day <= end:
-        for hour in RUN_HOURS:
-            yield datetime(day.year, day.month, day.day, hour, tzinfo=UTC)
-        day += timedelta(days=1)
+def run_times(*, start: date, end: date, newest_first: bool = False) -> Iterator[datetime]:
+    """Yield every run of the active profile from the start of `start` to the end of `end`.
+
+    Args:
+        start: The first UTC calendar day.
+        end: The last UTC calendar day.
+        newest_first: Yield the newest run first and the oldest last, instead of the reverse.
+
+    Yields:
+        Each run's initialisation time.
+    """
+    run_hours = active_profile().run_hours
+    n_days = (end - start).days + 1
+    days = [start + timedelta(days=offset) for offset in range(max(n_days, 0))]
+    times = [
+        datetime(day.year, day.month, day.day, hour, tzinfo=UTC)
+        for day in days
+        for hour in run_hours
+    ]
+    yield from reversed(times) if newest_first else times
 
 
 def archive(args: argparse.Namespace) -> int:
@@ -1366,7 +1496,7 @@ def _archive_locked(args: argparse.Namespace, *, token: str, product_dir: Path) 
     end = args.end or newest.date()
     listings: dict[date, dict[str, int] | None] = {}
     done = 0
-    for init_time in run_times(start=args.start, end=end):
+    for init_time in run_times(start=args.start, end=end, newest_first=args.newest_first):
         if init_time > newest:
             continue
         status = _status_at(store.statuses(), init_time)
@@ -1482,8 +1612,9 @@ def write_documents(*, product_dir: Path, store: UkvStore, grid: CellGrid) -> No
         source_address=BASE_URL,
         request_description=(
             "Met Office UKV GRIB files from the CEDA archive: Wholesale1 to Wholesale4 and the "
-            "T54 files of Wholesale1 to Wholesale3, for the 00, 06, 12, and 18 UTC runs, cropped "
-            "to the private trial-area box."
+            f"{_t54_t120_text()} of Wholesale1 to Wholesale3, for the "
+            f"{_hours_text(active_profile().run_hours)} UTC runs, cropped to the private "
+            "trial-area box."
         ),
         variables=[spec.variable for spec in FIELDS],
         extra={
@@ -1494,7 +1625,10 @@ def write_documents(*, product_dir: Path, store: UkvStore, grid: CellGrid) -> No
     )
     write_readme(
         product_dir=product_dir,
-        product_name="Met Office UKV 2 km, from the CEDA archive",
+        product_name=(
+            "Met Office UKV 2 km, from the CEDA archive"
+            + (", 03 and 15 UTC runs with T120 files" if active_profile().has_t120 else "")
+        ),
         source_web_page=CATALOGUE_URL,
         script_path="studies/weather_downloads/fetch_ukv_ceda.py",
         columns=readme_columns(),
@@ -1515,11 +1649,33 @@ def write_documents(*, product_dir: Path, store: UkvStore, grid: CellGrid) -> No
     )
 
 
+def _hours_text(hours: tuple[int, ...]) -> str:
+    """Write UTC run hours as prose: `03 and 15`, or `00, 06, 12, and 18`."""
+    text = [f"{hour:02d}" for hour in hours]
+    if len(text) <= 2:
+        return " and ".join(text)
+    return f"{', '.join(text[:-1])}, and {text[-1]}"
+
+
+def _t54_t120_text() -> str:
+    """Name the extended-range files of the active profile, for prose."""
+    return "T54 and T120 files" if active_profile().has_t120 else "T54 files"
+
+
 def readme_columns() -> dict[str, str]:
     """Describe every array in the store, one line each, for the README."""
+    profile = active_profile()
+    step = (
+        "Lead time in hours, 0 to 120. Hourly to 48, then 3-hourly."
+        if profile.has_t120
+        else "Lead time in hours, 0 to 54, hourly."
+    )
     columns = {
-        "init_time": "Slot coordinate, seconds since 1970-01-01 UTC, 6-hourly from 2019-09-01 00Z.",
-        "step": "Lead time in hours, 0 to 54, hourly.",
+        "init_time": (
+            "Slot coordinate, seconds since 1970-01-01 UTC, "
+            f"{profile.cycle_hours}-hourly from {profile.slot_epoch:%Y-%m-%d %H}Z."
+        ),
+        "step": step,
         "status": "0 never archived, 1 complete, 2 partial, 3 missing on CEDA.",
         "files_expected / files_received": "Files the run should have, and files that arrived.",
         "archived_at / code_version": "When the run was committed, and by which script version.",
@@ -1532,8 +1688,53 @@ def readme_columns() -> dict[str, str]:
     return columns
 
 
+def _reach_gotchas() -> tuple[str, str, str]:
+    """The three README paragraphs that depend on the profile: run hours, leads, and intervals."""
+    if active_profile().has_t120:
+        return (
+            (
+                "Runs at 03 and 15 UTC reach 120 hours, because CEDA holds T120 files (3-hourly "
+                "leads 57 to 120 hours) for those runs only. The 00, 06, 12, and 18 UTC runs "
+                "reach 54 hours at most and are archived as the separate product UKV-CEDA."
+            ),
+            (
+                "Leads are hourly to 48 hours and 3-hourly after that (51, 54, 57, and so on to "
+                "120), so every step above 48 that is not a multiple of 3 is NaN. Wind gusts "
+                "exist to lead 36 hours only."
+            ),
+            (
+                "Precipitation amount and maximum gust are over the interval since the previous "
+                "served step: 1 hour to lead 48, then 3 hours. They have no lead 0. The fetch "
+                "script checks every such message: precipitation must carry statistical process "
+                "1 (accumulation), gust must carry 2 (maximum), and the interval must be the "
+                "expected length, else the run is partial and the message is not stored."
+            ),
+        )
+    return (
+        (
+            "Runs at 00, 06, 12, and 18 UTC reach 54 hours at most, because CEDA holds T120 "
+            "files (leads 57 to 120 hours) for the 03 and 15 UTC runs only. Those runs are "
+            "archived as the separate product UKV-CEDA-T120, so no lead beyond 54 hours exists "
+            "here."
+        ),
+        (
+            "Leads are hourly to 48 hours and 3-hourly to 54 hours (51 and 54), so steps 49, 50, "
+            "52, and 53 are NaN. Wind gusts exist to lead 36 hours only."
+        ),
+        (
+            "Precipitation amount and maximum gust are over the interval since the previous "
+            "served step: 1 hour to lead 48, then 3 hours at leads 51 and 54. They have no "
+            "lead 0. The fetch script checks every such message: precipitation must carry "
+            "statistical process 1 (accumulation), gust must carry 2 (maximum), and the "
+            "interval must be the expected length, else the run is partial and the message is "
+            "not stored."
+        ),
+    )
+
+
 def readme_gotchas() -> list[str]:
     """The traps a reader of the store would otherwise rediscover, for the README."""
+    runs, leads, intervals = _reach_gotchas()
     return [
         (
             "Licence: CC BY-NC-SA 4.0, so non-commercial use only, and adaptations must be shared "
@@ -1565,27 +1766,13 @@ def readme_gotchas() -> list[str]:
             "CEDA UKV differs statistically from the live UKV feed: do not train on one and "
             "infer on the other."
         ),
-        (
-            "Runs at 00, 06, 12, and 18 UTC reach 54 hours at most, because CEDA holds T120 "
-            "files (leads 55 to 120 hours) for the 03 and 15 UTC runs only. Only the 00, 06, 12, "
-            "and 18 UTC runs are archived, so no lead beyond 54 hours exists here."
-        ),
-        (
-            "Leads are hourly to 48 hours and 3-hourly to 54 hours (51 and 54), so steps 49, 50, "
-            "52, and 53 are NaN. Wind gusts exist to lead 36 hours only."
-        ),
+        runs,
+        leads,
         (
             "Downward shortwave and longwave flux are instantaneous values, not means since the "
             "start of the run, and lead 0 is served."
         ),
-        (
-            "Precipitation amount and maximum gust are over the interval since the previous "
-            "served step: 1 hour to lead 48, then 3 hours at leads 51 and 54. They have no "
-            "lead 0. The fetch script checks every such message: precipitation must carry "
-            "statistical process 1 (accumulation), gust must carry 2 (maximum), and the "
-            "interval must be the expected length, else the run is partial and the message is "
-            "not stored."
-        ),
+        intervals,
         (
             "Screen-level fields are coded at level 1 (m) in the GRIB files, though the Met "
             "Office documents screen level as 1.5 m."
@@ -1617,17 +1804,56 @@ def _parse_date(text: str) -> date:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    """Build the command-line parser."""
+    """Build the command-line parser. `main` fills `--start` and `--store-dir` from the profile."""
     parser = argparse.ArgumentParser(description=__doc__.split("\n")[0] if __doc__ else None)
-    parser.add_argument("--start", type=_parse_date, default=SLOT_EPOCH.date())
+    add_product_argument(parser)
+    parser.add_argument(
+        "--start", type=_parse_date, default=None, help="default: the profile's slot epoch"
+    )
     parser.add_argument("--end", type=_parse_date, default=None)
     parser.add_argument("--max-runs", type=int, default=None)
     parser.add_argument("--retry-partial", action="store_true")
+    parser.add_argument(
+        "--newest-first",
+        action="store_true",
+        help="archive from the newest run back to --start, instead of oldest first",
+    )
     parser.add_argument("--measure", action="store_true", help="print the stored bytes per run")
     parser.add_argument("--min-free-gb", type=float, default=DEFAULT_MIN_FREE_GB)
-    parser.add_argument("--store-dir", type=Path, default=WEATHER_DOWNLOADS_DIR / PRODUCT_NAME)
+    parser.add_argument(
+        "--store-dir", type=Path, default=None, help="default: <weather downloads>/<product name>"
+    )
     return parser
 
 
+def add_product_argument(parser: argparse.ArgumentParser) -> None:
+    """Add the `--product` flag that chooses the profile."""
+    parser.add_argument(
+        "--product",
+        choices=sorted(PROFILES),
+        default="ukv-ceda",
+        help="ukv-ceda: 00, 06, 12, and 18 UTC runs to 54 h. ukv-ceda-t120: 03 and 15 UTC to 120 h",
+    )
+
+
+def main(argv: list[str] | None = None) -> int:
+    """Select the profile from `--product`, fill the profile's defaults, and archive.
+
+    Args:
+        argv: The command-line arguments, or `None` to read `sys.argv`.
+
+    Returns:
+        The process exit code.
+    """
+    args = build_parser().parse_args(argv)
+    profile = PROFILES[args.product]
+    set_profile(profile)
+    if args.start is None:
+        args.start = profile.slot_epoch.date()
+    if args.store_dir is None:
+        args.store_dir = WEATHER_DOWNLOADS_DIR / profile.product_name
+    return archive(args)
+
+
 if __name__ == "__main__":
-    sys.exit(archive(build_parser().parse_args()))
+    sys.exit(main())
