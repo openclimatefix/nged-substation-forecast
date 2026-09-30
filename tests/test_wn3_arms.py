@@ -800,3 +800,38 @@ def test_ens_members_fills_the_day_4_gap_with_the_supplement(
     filled = bfi.ens_members(sites=["A"])
     assert filled.height == extract.height + 2 * len(gap)
     assert day_4_leads(filled) == [96.0, 102.0, 108.0, 114.0, 120.0, 126.0]
+
+
+@pytest.mark.parametrize("six_hourly", [False, True])
+def test_a_day_4_band_without_the_supplement_is_refused_and_with_it_accepted(
+    monkeypatch: pytest.MonkeyPatch, six_hourly: bool
+) -> None:
+    def steps(leads: list[float]) -> object:
+        return efh.Steps(
+            keys=pl.DataFrame(),
+            leads=np.array(leads),
+            widths=np.full(len(leads), 6 if six_hourly else 3),
+            values={},
+            ensemble_size=1,
+        )
+
+    step = 6 if six_hourly else 3
+    whole = [float(lead) for lead in range(96 if six_hourly else 90, 127, step)]
+    holed = [lead for lead in whole if not 104 < lead < 112]
+    bfi.check_no_step_gap(steps=steps(whole), day=4, arm_prefix="ens_mean")
+    with pytest.raises(ValueError, match="fetch_ens_day4_supplement"):
+        bfi.check_no_step_gap(steps=steps(holed), day=4, arm_prefix="ens_mean")
+
+    monkeypatch.setattr(bfi.efh, "clear_sky_table", lambda **_: pl.DataFrame())
+    monkeypatch.setattr(bfi.efh, "band_steps", lambda **_: steps(holed))
+    with pytest.raises(ValueError, match="ens_mean day 4"):
+        bfi.ens_member_arms(
+            extract=pl.DataFrame(),
+            domain="wind",
+            days=(4,),
+            method="linear",
+            ensemble_size=1,
+            arm_name=lambda way, day: f"ens_{way}_day{day}",
+            ways=("mean",),
+            six_hourly=six_hourly,
+        )

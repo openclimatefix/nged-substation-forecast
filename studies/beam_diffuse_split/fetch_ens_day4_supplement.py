@@ -23,9 +23,11 @@ import logging
 import sys
 from typing import Final
 
+import ens_forecast_horizons as efh
 import polars as pl
 from build_dataset import _pv_sites, _wind_sites
 from fetch_ens_forecast_horizons import (
+    ENSEMBLE_SIZE,
     MARGIN_HOURS,
     NWP_TABLE,
     OUTPUT_PATH,
@@ -46,6 +48,9 @@ SUPPLEMENT_DIR: Final = STUDIES_DATA_DIR / "ens_forecast_horizons_day4"
 SUPPLEMENT_PATH: Final = SUPPLEMENT_DIR / "ens_members_day4.parquet"
 """The supplement: the extract's columns, for the leads the extract lacks at day 4."""
 
+MISSING_LEADS: Final[tuple[int, ...]] = (105, 108, 111)
+"""The 3-hourly leads inside the day-4 band that the extract lacks."""
+
 KEY: Final[tuple[str, ...]] = ("site", "init_time", "valid_time", "ensemble_member")
 """What identifies one row of the extract."""
 
@@ -59,6 +64,60 @@ def band_leads() -> list[int]:
     return list(range(24 * DAY - MARGIN_HOURS, 24 * DAY + 25 + MARGIN_HOURS))
 
 
+def check_complete(*, supplement: pl.DataFrame, extract_pairs: pl.DataFrame) -> None:
+    """Raise unless the supplement holds every missing lead, whole, for every (site, run).
+
+    Args:
+        supplement: The rows about to be written.
+        extract_pairs: The (`site`, `init_time`) pairs the extract holds inside the day-4 band.
+
+    Raises:
+        ValueError: If the supplement's leads are not `MISSING_LEADS`, if a (site, run, lead) lacks
+            a member, or if a (site, run) the extract holds lacks a lead.
+    """
+    leads = sorted(supplement["lead_hours"].unique().to_list())
+    if leads != list(MISSING_LEADS):
+        msg = f"the supplement holds leads {leads}, not {list(MISSING_LEADS)}"
+        raise ValueError(msg)
+    counts = supplement.group_by("site", "init_time", "lead_hours").len()
+    short = counts.filter(pl.col("len") != ENSEMBLE_SIZE)
+    if not short.is_empty():
+        msg = f"{short.height} (site, run, lead) groups do not hold {ENSEMBLE_SIZE} members"
+        raise ValueError(msg)
+    per_pair = (
+        counts.group_by("site", "init_time").len().filter(pl.col("len") == len(MISSING_LEADS))
+    )
+    lacking = extract_pairs.join(per_pair, on=["site", "init_time"], how="anti")
+    if not lacking.is_empty():
+        msg = (
+            f"{lacking.height} (site, run) pairs in the extract lack one of leads "
+            f"{list(MISSING_LEADS)} in the table"
+        )
+        raise ValueError(msg)
+
+
+def log_surviving_runs(*, extract_band: pl.DataFrame, supplement: pl.DataFrame) -> None:
+    """Log how many (site, run) pairs `band_steps` keeps at day 4, against those the extract holds.
+
+    Args:
+        extract_band: The extract's rows at the day-4 band's leads, for every site.
+        supplement: The rows about to be written.
+    """
+    for domain, roster in (("solar", _pv_sites()), ("wind", _wind_sites())):
+        members = pl.concat([extract_band, supplement.select(extract_band.columns)]).filter(
+            pl.col("site").is_in(roster["site"])
+        )
+        steps = efh.band_steps(members=members, day=DAY, domain=domain, ensemble_size=ENSEMBLE_SIZE)
+        kept = steps.keys.select("site", "init_time").unique().height
+        held = members.select("site", "init_time").unique().height
+        _LOG.info(
+            "%s day 4: band_steps keeps %d of the %d (site, run) pairs the extract holds",
+            domain,
+            kept,
+            held,
+        )
+
+
 def main() -> int:
     """Write the supplement after checking it against the extract.
 
@@ -68,7 +127,8 @@ def main() -> int:
     Raises:
         FileNotFoundError: If the extract or the NWP table is not on disk.
         ValueError: If the table lacks a lead of the band, has no lead in the band that the extract
-            lacks, or disagrees with the extract on a lead both hold.
+            lacks, disagrees with the extract on a lead both hold, or would give a supplement that
+            lacks any of `MISSING_LEADS` for any (site, run) the extract holds.
     """
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     refuse_to_overwrite(paths=[SUPPLEMENT_PATH])
@@ -119,6 +179,13 @@ def main() -> int:
         )
         raise ValueError(msg)
     _LOG.info("the table agrees with the extract on %d rows at leads %s", ours.height, shared)
+
+    extract_band = extract.filter(pl.col("lead_hours").is_in(band_leads())).collect()
+    check_complete(
+        supplement=supplement,
+        extract_pairs=extract_band.select("site", "init_time").unique(),
+    )
+    log_surviving_runs(extract_band=extract_band, supplement=supplement)
 
     SUPPLEMENT_DIR.mkdir(parents=True, exist_ok=True)
     supplement.select(theirs.columns).write_parquet(SUPPLEMENT_PATH)

@@ -500,8 +500,8 @@ def ens_members(*, sites: list[str]) -> pl.DataFrame:
 
     The extract holds a lead band for each of days 0, 1, 2, 3, 5, 7, 10, and 14, so it lacks the
     leads 105, 108, and 111 that a day-4 band needs. `fetch_ens_day4_supplement.py` writes those
-    leads to a separate file. Where that file does not exist, the extract is returned alone, and a
-    day-4 band then raises because it finds no step for some hours.
+    leads to a separate file. Where that file does not exist, the extract is returned alone, and
+    `check_no_step_gap` then raises for a day-4 band.
 
     Args:
         sites: The generator labels.
@@ -515,6 +515,32 @@ def ens_members(*, sites: list[str]) -> pl.DataFrame:
     return pl.concat(
         [extract, efh.members(sites=sites, source=ENS_DAY4_SUPPLEMENT_PATH)], how="vertical"
     )
+
+
+def check_no_step_gap(*, steps: efh.Steps, day: int, arm_prefix: str) -> None:
+    """Raise if any step of a band is missing between its first and last step.
+
+    `band_steps` keeps whichever leads the extract holds, so a lead missing from the middle of a
+    band leaves two steps further apart than the width of the later one. The upsampling would then
+    interpolate across the hole, or fail with no explanation.
+
+    Args:
+        steps: The band's steps.
+        day: The band's day.
+        arm_prefix: The arm's name without its day, for the message.
+
+    Raises:
+        ValueError: If a step lies more than its own width after the step before it.
+    """
+    gaps = np.flatnonzero(np.diff(steps.leads) > steps.widths[1:])
+    if gaps.size:
+        first = int(gaps[0])
+        msg = (
+            f"{arm_prefix} day {day}: no step between leads {steps.leads[first]:g} h and "
+            f"{steps.leads[first + 1]:g} h, so the extract lacks a lead there. For ENS at day 4, "
+            "write the supplement with fetch_ens_day4_supplement.py first"
+        )
+        raise ValueError(msg)
 
 
 def ens_member_arms(
@@ -556,7 +582,8 @@ def ens_member_arms(
         One frame per (day, way) with `site`, `time` and that arm's own weather columns.
 
     Raises:
-        ValueError: If a solar band on 6-hourly steps scores an hour before its first step.
+        ValueError: If a band lacks a step between its first and last, or a solar band on 6-hourly
+            steps scores an hour before its first step.
     """
     clear_sky = efh.clear_sky_table(domain=domain)
     frames: list[pl.DataFrame] = []
@@ -568,6 +595,9 @@ def ens_member_arms(
             ensemble_size=ensemble_size,
             fine_step_last_lead=fine_step_last_lead,
             six_hourly=six_hourly,
+        )
+        check_no_step_gap(
+            steps=steps, day=day, arm_prefix=arm_name("mean", day).rsplit("_day", 1)[0]
         )
         if six_hourly or fine_step_last_lead == 0:
             check_first_step_reaches_targets(
