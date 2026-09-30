@@ -668,7 +668,8 @@ def build_domain(
     Raises:
         ValueError: If `output_dir` is `published_dir`, `days` holds 5 and `output_dir` is not
             named `DAY5_OUTPUT_DIR_NAME`, `days` is empty or holds a day below 0, an
-            identity check fails, the ENS mean at day 5 differs from the extra-lead folder's, or a built column is null on every row.
+            identity check fails, the ENS mean at day 5 differs from the extra-lead folder's, or a
+            built column is null on every row.
         FileExistsError: If the output file already exists.
     """
     if output_dir.resolve() == published_dir.resolve():

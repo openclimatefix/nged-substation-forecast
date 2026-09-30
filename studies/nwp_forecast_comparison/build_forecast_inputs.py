@@ -338,7 +338,8 @@ DAY4_OUTPUT_DIR_NAME: Final[str] = "nwp_forecast_comparison_day4_shared"
 """Under `data/studies/`, the only folder the fifth extra-lead batch builds into and fits in."""
 
 WN3_EXTRA_DAYS_DIR_NAME: Final[str] = "nwp_forecast_comparison_wn3_extra_days"
-"""Under `data/studies/`, the folder whose same-rows ENS mean at day 4 the fifth batch's must equal."""
+"""Under `data/studies/`, the folder whose same-rows ENS mean at day 4 the fifth batch's ENS mean
+must equal."""
 
 DAY5_OUTPUT_DIR_NAME: Final[str] = "nwp_forecast_comparison_day5_aifs_wn3"
 """Under `data/studies/`, the only folder the day-5 AIFS and WeatherNext 3 inputs and fits go in."""
@@ -1818,15 +1819,18 @@ def build_extra_leads(
 
     Raises:
         ValueError: If `output_dir` is `published_dir`, or `batch` is `fifth` and `output_dir` is
-            not named `DAY4_OUTPUT_DIR_NAME`, or the fifth batch's ENS mean at day 4 differs from the
-            WeatherNext 3 folder's.
+            not named `DAY4_OUTPUT_DIR_NAME`, or the fifth batch's ENS mean at day 4 differs from
+            the WeatherNext 3 folder's.
         FileExistsError: If the output file already exists.
     """
     if output_dir.resolve() == published_dir.resolve():
         msg = f"the extra-lead output must not be the published folder {published_dir}"
         raise ValueError(msg)
     if batch == "fifth" and output_dir.name != DAY4_OUTPUT_DIR_NAME:
-        msg = f"the fifth batch builds only into a folder named {DAY4_OUTPUT_DIR_NAME}, not {output_dir}"
+        msg = (
+            f"the fifth batch builds only into a folder named {DAY4_OUTPUT_DIR_NAME}, "
+            f"not {output_dir}"
+        )
         raise ValueError(msg)
     output_path = output_dir / f"{domain}_extra_lead_inputs.parquet"
     if output_path.exists():
