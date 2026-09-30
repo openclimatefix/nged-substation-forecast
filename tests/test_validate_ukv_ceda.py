@@ -77,6 +77,14 @@ def test_north_south_gradient_skips_below_the_minimum_runs() -> None:
     assert outcome is None
 
 
+def test_north_south_gradient_minimum_is_exactly_20_runs() -> None:
+    assert validate.MIN_RUNS_FOR_GRADIENT == 20
+    skipped, _ = validate.check_north_south_gradient(zarr.group(), np.arange(19))
+    assert skipped is None
+    with pytest.raises(KeyError):  # an empty group has no cell_latitude, so the check ran
+        validate.check_north_south_gradient(zarr.group(), np.arange(20))
+
+
 def test_adjacent_runs_differ_skips_with_no_pairs() -> None:
     outcome, _ = validate.check_adjacent_runs_differ(zarr.group(), np.array([], dtype=int))
     assert outcome is None
@@ -106,3 +114,47 @@ def test_main_fails_for_a_store_of_the_wrong_product(
     )
     assert validate.main() == 1
     assert "FAIL product" in capsys.readouterr().out
+
+
+def test_main_returns_zero_when_every_check_skips(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, capsys: pytest.CaptureFixture[str]
+) -> None:
+    store = fetch.UkvStore.open(store_path=tmp_path / "store")
+    store.initialise(
+        fetch.CellGrid(
+            row_start=0,
+            col_start=0,
+            n_rows=1,
+            n_cols=2,
+            latitude=np.array([52.0, 52.0]),
+            longitude=np.array([-1.0, -0.98]),
+        )
+    )
+    init_time = fetch.active_profile().slot_epoch
+    store.commit_run(
+        fetch.RunResult(
+            init_time=init_time,
+            status=fetch.STATUS_COMPLETE,
+            files_expected=7,
+            files_received=7,
+            blocks={},
+        )
+    )
+    for name in (
+        "check_run_spacing",
+        "check_status_counts",
+        "check_value_ranges",
+        "check_nan_layout",
+        "check_shortwave_diurnal_cycle",
+        "check_north_south_gradient",
+        "check_gust_max_is_a_maximum",
+        "check_gaps",
+    ):
+        monkeypatch.setattr(validate, name, lambda *args, **kwargs: (None, {}))
+    monkeypatch.setattr(
+        sys, "argv", ["validate", "--product", "ukv-ceda", "--store-dir", str(tmp_path)]
+    )
+    assert validate.main() == 0
+    output = capsys.readouterr().out
+    assert "SKIP run_spacing" in output
+    assert "FAIL" not in output
