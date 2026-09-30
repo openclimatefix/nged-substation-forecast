@@ -17,11 +17,12 @@ direction as a sine and a cosine, the 10 m speed, and the shared hour of day, da
 `era_code`. There are no columns for neighbouring hours. Every fit uses `colsample_bytree=1`, the
 CPU, and `run_experiment.MAX_CONCURRENT_FITS` fits at once.
 
-**Which direction columns an arm has depends on which files exist, and never on another product.**
-CERRA's direction files are separate downloads. If any of them is missing, the CERRA block drops the
-direction pair from every arm and every reference, so the widths stay equal. It never borrows
-ERA5's direction. The report says which input set was used. NORA3 needs its 10 m file, and raises
-if the file is absent.
+**Whether the arms carry direction is decided by a constant, never by which files exist.**
+`CERRA_WITH_DIRECTION` is set before any fit. When True, the CERRA block needs the 100 m direction
+file and raises if it is missing. An exploratory height (75 m or 150 m) whose direction file is
+missing is omitted, and the report names it, so the planned arms' inputs never change. When False,
+the block drops the direction pair from every arm and every reference, so the widths stay equal.
+No arm borrows ERA5's direction. NORA3 needs its 10 m file, and raises if the file is absent.
 
 **Folds.** `cerra_past_solar.with_covering_folds` picks the fold rotation that leaves no calendar
 month without a training row, and cuts the folds inside each era. Intervals resample whole calendar
@@ -61,7 +62,11 @@ from cerra_past_solar import check_column_counts, uncovered_share, with_covering
 from ens_past_solar import _absolute_table_lines, _arm_columns_lines, _fingerprint
 from run_experiment import MAX_CONCURRENT_FITS, Job, _add_time_features, run_all
 from sources import STUDY_DATA_DIR, WEATHER_DATA_DIR
-from studies.cross_validation import PRIMARY_HYPER_PARAMETERS, SENSITIVITY_HYPER_PARAMETERS
+from studies.cross_validation import (
+    PRIMARY_HYPER_PARAMETERS,
+    SENSITIVITY_HYPER_PARAMETERS,
+    calendar_month_coverage,
+)
 from studies.guards import check_no_missing, refuse_to_overwrite
 from studies.reanalysis_wind import (
     CERRA_DIRECTION_FILES,
@@ -81,8 +86,6 @@ from wind_products import (
     joined,
 )
 
-_LOG: Final[logging.Logger] = logging.getLogger("reanalysis_past_wind")
-
 CERRA_DIR: Final[Path] = WEATHER_DATA_DIR / "CERRA"
 CERRA_GRID_PATH: Final[Path] = CERRA_DIR / "cerra_grid.parquet"
 NORA3_PATH: Final[Path] = WEATHER_DATA_DIR / "NORA3" / "NORA3_wind.parquet"
@@ -96,6 +99,13 @@ LEADING_MAIN_PRODUCT: Final[str] = "icon_d2"
 
 HUB_HEIGHT_M: Final[int] = 100
 """The height at which each reanalysis is scored."""
+
+CERRA_WITH_DIRECTION: Final[bool] = True
+"""Whether the CERRA block's arms carry the wind direction as a sine and a cosine.
+
+Decided before any fit, because the direction files are being downloaded. When False, every arm
+and reference in the CERRA block drops the direction pair. NORA3 always carries direction.
+"""
 
 
 class ProductSpec(NamedTuple):
@@ -175,13 +185,13 @@ PLANNED_CONTRASTS: Final[Mapping[str, tuple[tuple[str, str], ...]]] = MappingPro
 
 
 def exploratory_contrasts(
-    *, spec: ProductSpec, include_exploratory_arms: bool
+    *, spec: ProductSpec, extra_heights_m: Sequence[int]
 ) -> tuple[tuple[str, str], ...]:
     """Return every contrast that is not planned, as (treatment, reference) pairs.
 
     Args:
         spec: The product.
-        include_exploratory_arms: Whether the block holds the exploratory-height arms.
+        extra_heights_m: The exploratory heights the block holds.
 
     Returns:
         The new product against each main product it is not planned against, ICON-D2 against ERA5,
@@ -195,29 +205,62 @@ def exploratory_contrasts(
         if arm_name(key=product) not in planned
     ]
     pairs.append((arm_name(key=LEADING_MAIN_PRODUCT), arm_name(key="era5")))
-    if include_exploratory_arms:
-        pairs += [
-            (arm_name(key=height_key(spec=spec, height_m=height)), new)
-            for height in spec.extra_heights_m
-        ]
+    pairs += [
+        (arm_name(key=height_key(spec=spec, height_m=height)), new) for height in extra_heights_m
+    ]
     return tuple(pairs)
 
 
-def cerra_has_direction(*, directory: Path, heights: Sequence[int]) -> bool:
-    """Say whether every direction file the CERRA block needs has been downloaded.
+def with_direction_for(*, spec: ProductSpec) -> bool:
+    """Say whether the product's arms carry direction, as decided by `CERRA_WITH_DIRECTION`.
 
     Args:
-        directory: The folder holding CERRA's parquet files.
-        heights: The heights whose direction files the arms need.
+        spec: The product.
 
     Returns:
-        True only if every file exists, so that a block never mixes arms with and without direction.
+        `CERRA_WITH_DIRECTION` for CERRA, and True for NORA3, whose direction is in its main file.
     """
-    return all((directory / CERRA_DIRECTION_FILES[height]).exists() for height in heights)
+    return CERRA_WITH_DIRECTION if spec.key == "cerra" else True
+
+
+def plan_extra_heights(
+    *, spec: ProductSpec, directory: Path, with_direction: bool
+) -> tuple[tuple[int, ...], tuple[int, ...]]:
+    """Split the exploratory heights into those the block can score and those it must omit.
+
+    Only CERRA's direction files are separate downloads. The planned height's direction file is
+    required, and an exploratory height whose file is missing is omitted, so the planned arms'
+    inputs never depend on the exploratory files.
+
+    Args:
+        spec: The product.
+        directory: The folder holding CERRA's parquet files.
+        with_direction: Whether the block's arms carry direction.
+
+    Returns:
+        The exploratory heights to include and the exploratory heights omitted, in metres.
+
+    Raises:
+        FileNotFoundError: If `with_direction` is True and CERRA's 100 m direction file is missing.
+    """
+    if spec.key != "cerra" or not with_direction:
+        return spec.extra_heights_m, ()
+    planned = directory / CERRA_DIRECTION_FILES[HUB_HEIGHT_M]
+    if not planned.exists():
+        msg = (
+            f"CERRA_WITH_DIRECTION is True but the {HUB_HEIGHT_M} m direction file {planned.name} "
+            "has not been downloaded; download it, or set the constant to False before any fit"
+        )
+        raise FileNotFoundError(msg)
+    present = tuple(
+        h for h in spec.extra_heights_m if (directory / CERRA_DIRECTION_FILES[h]).exists()
+    )
+    omitted = tuple(h for h in spec.extra_heights_m if h not in present)
+    return present, omitted
 
 
 def arm_features(
-    *, spec: ProductSpec, with_direction: bool, include_exploratory_arms: bool
+    *, spec: ProductSpec, with_direction: bool, extra_heights_m: Sequence[int]
 ) -> dict[str, tuple[str, ...]]:
     """Return every arm's feature columns, from one place, in the order the model sees them.
 
@@ -225,14 +268,13 @@ def arm_features(
         spec: The product.
         with_direction: Whether the arms carry the direction sine and cosine. When False, every arm
             in the block drops the pair, so the widths stay equal.
-        include_exploratory_arms: Whether to add the exploratory-height arms.
+        extra_heights_m: The exploratory heights to add an arm for.
 
     Returns:
         Arm name to feature columns.
     """
     keys = [*MAIN_PRODUCTS, spec.key]
-    if include_exploratory_arms:
-        keys += [height_key(spec=spec, height_m=height) for height in spec.extra_heights_m]
+    keys += [height_key(spec=spec, height_m=height) for height in extra_heights_m]
     features: dict[str, tuple[str, ...]] = {}
     for key in keys:
         speed, sine, cosine, surface = _wind_columns(product=key)
@@ -276,7 +318,7 @@ def jobs(*, features: Mapping[str, tuple[str, ...]]) -> list[Job]:
 
 
 def product_wind_columns(
-    *, raw: pl.DataFrame, spec: ProductSpec, with_direction: bool, include_exploratory_arms: bool
+    *, raw: pl.DataFrame, spec: ProductSpec, with_direction: bool, extra_heights_m: Sequence[int]
 ) -> pl.DataFrame:
     """Rename a reanalysis's wind to the main study's column names, one column set per arm.
 
@@ -285,15 +327,14 @@ def product_wind_columns(
             and, when `with_direction`, `wind_direction_{h}m`.
         spec: The product.
         with_direction: Whether `raw` holds direction columns.
-        include_exploratory_arms: Whether to build the exploratory heights' columns.
+        extra_heights_m: The exploratory heights to build columns for.
 
     Returns:
         `site`, `time`, and the four `wind_products._wind_columns` per arm (two without direction),
         with the direction as a sine and a cosine.
     """
     heights = {spec.key: HUB_HEIGHT_M}
-    if include_exploratory_arms:
-        heights |= {height_key(spec=spec, height_m=h): h for h in spec.extra_heights_m}
+    heights |= {height_key(spec=spec, height_m=h): h for h in extra_heights_m}
     columns = [pl.col("site"), pl.col("time")]
     for key, height in heights.items():
         speed, sine, cosine, surface = _wind_columns(product=key)
@@ -347,12 +388,19 @@ class AssembledRows(NamedTuple):
         fold_offsets: The rotation of each era's folds.
         uncovered_main_folds: The share of rows in calendar months with no training row under the
             main study's fold recipe applied to these rows.
+        uncovered_fitted: The share of rows in a calendar month seen in two or more years that has
+            no training row, under the folds the block is fitted on (the wind page's avoidable
+            share).
+        one_year_only_fitted: The share of rows in a calendar month seen in one year only, which no
+            fold design can cover, under the folds the block is fitted on.
     """
 
     frame: pl.DataFrame
     main_rows: int
     fold_offsets: Mapping[int, int]
     uncovered_main_folds: float
+    uncovered_fitted: float
+    one_year_only_fitted: float
 
 
 def assemble_rows(
@@ -384,41 +432,49 @@ def assemble_rows(
         frame=frame,
         columns=["power_mw", *(column for columns in features.values() for column in columns)],
     )
+    coverage = calendar_month_coverage(frame=frame)
+    one_year_rows = coverage.filter(pl.col("n_years") == 1)["n_scored"].sum()
     return AssembledRows(
         frame=frame,
         main_rows=base.height,
         fold_offsets=offsets,
         uncovered_main_folds=uncovered_main,
+        uncovered_fitted=uncovered_share(frame=frame),
+        one_year_only_fitted=float(one_year_rows) / frame.height,
     )
 
 
 def read_product(
-    *, spec: ProductSpec, sites: pl.DataFrame, include_exploratory_arms: bool
-) -> tuple[pl.DataFrame, bool, pl.DataFrame]:
+    *, spec: ProductSpec, sites: pl.DataFrame
+) -> tuple[pl.DataFrame, bool, pl.DataFrame, tuple[int, ...], tuple[int, ...]]:
     """Read the product's wind at each site's nearest cell.
 
     Args:
         spec: The product.
         sites: The wind roster.
-        include_exploratory_arms: Whether the exploratory heights are needed.
 
     Returns:
-        The raw wind, whether it carries direction, and the nearest cells' `distance_km`.
+        The raw wind, whether it carries direction, the nearest cells' `distance_km`, the
+        exploratory heights read, and the exploratory heights omitted.
 
     Raises:
-        FileNotFoundError: If NORA3's 10 m file has not been downloaded.
+        FileNotFoundError: If NORA3's 10 m file, or CERRA's 100 m direction file while
+            `CERRA_WITH_DIRECTION` is True, has not been downloaded.
     """
-    heights = [HUB_HEIGHT_M, *(spec.extra_heights_m if include_exploratory_arms else ())]
+    with_direction = with_direction_for(spec=spec)
+    extra, omitted = plan_extra_heights(
+        spec=spec, directory=CERRA_DIR, with_direction=with_direction
+    )
+    heights = [HUB_HEIGHT_M, *extra]
     if spec.key == "cerra":
         cells = derive_nearest_cells(grid=pl.read_parquet(CERRA_GRID_PATH), sites=sites)
         raw = read_cerra_wind(directory=CERRA_DIR, cells=cells)
-        with_direction = cerra_has_direction(directory=CERRA_DIR, heights=heights)
         if with_direction:
             direction = read_cerra_direction(directory=CERRA_DIR, cells=cells, heights=heights)
             raw = raw.join(direction, on=["site", "time"], how="left")
-        return raw, with_direction, cells
+        return raw, with_direction, cells, extra, omitted
     cells = derive_nearest_nora3_cells(sites=sites)
-    return read_nora3(cells=cells, heights=heights), True, cells
+    return read_nora3(cells=cells, heights=heights), with_direction, cells, extra, omitted
 
 
 def read_nora3(
@@ -438,7 +494,8 @@ def read_nora3(
 
     Returns:
         `site`, `time`, and `wind_speed_{h}m` and `wind_direction_{h}m` for each height, and
-        `wind_speed_10m`, on the hours all three levels cover.
+        `wind_speed_10m`, on the main file's hours. An hour the 10 m file lacks holds a null, which
+        `assemble_rows` rejects.
 
     Raises:
         FileNotFoundError: If the 10 m file does not exist, because every arm is shown the 10 m
@@ -454,7 +511,7 @@ def read_nora3(
     surface = read_nora3_wind(path=path_10m, cells=cells, heights=[NORA3_SURFACE_HEIGHT_M]).select(
         "site", "time", "wind_speed_10m"
     )
-    return main.join(surface, on=["site", "time"], how="inner")
+    return main.join(surface, on=["site", "time"], how="left")
 
 
 class Built(NamedTuple):
@@ -465,39 +522,32 @@ class Built(NamedTuple):
         features: Arm name to feature columns.
         with_direction: Whether the arms carry the direction pair.
         distance_range_km: The pooled range of the nearest cells' distances.
+        extra_heights_m: The exploratory heights the block holds.
+        omitted_arms: The exploratory arms left out because their direction file is missing.
     """
 
     assembled: AssembledRows
     features: dict[str, tuple[str, ...]]
     with_direction: bool
     distance_range_km: tuple[float, float]
+    extra_heights_m: tuple[int, ...]
+    omitted_arms: tuple[str, ...]
 
 
-def build_rows(*, spec: ProductSpec, sites: pl.DataFrame, include_exploratory_arms: bool) -> Built:
+def build_rows(*, spec: ProductSpec, sites: pl.DataFrame) -> Built:
     """Build the block's row set from the main rows and the reanalysis files.
 
     Args:
         spec: The product.
         sites: The wind roster.
-        include_exploratory_arms: Whether to include the exploratory-height arms.
 
     Returns:
         The rows, the arms' columns, and the counts the report prints.
     """
-    raw, with_direction, cells = read_product(
-        spec=spec, sites=sites, include_exploratory_arms=include_exploratory_arms
-    )
-    features = arm_features(
-        spec=spec,
-        with_direction=with_direction,
-        include_exploratory_arms=include_exploratory_arms,
-    )
-    check_block_widths(features=features)
+    raw, with_direction, cells, extra, omitted = read_product(spec=spec, sites=sites)
+    features = arm_features(spec=spec, with_direction=with_direction, extra_heights_m=extra)
     wind = product_wind_columns(
-        raw=raw,
-        spec=spec,
-        with_direction=with_direction,
-        include_exploratory_arms=include_exploratory_arms,
+        raw=raw, spec=spec, with_direction=with_direction, extra_heights_m=extra
     )
     base = _add_time_features(dataset=common_rows(frame=joined(sites=sites)))
     assembled = assemble_rows(base=base, wind=wind, spec=spec, features=features)
@@ -508,6 +558,10 @@ def build_rows(*, spec: ProductSpec, sites: pl.DataFrame, include_exploratory_ar
         distance_range_km=(
             float(cells.select(pl.col("distance_km").min()).item()),
             float(cells.select(pl.col("distance_km").max()).item()),
+        ),
+        extra_heights_m=extra,
+        omitted_arms=tuple(
+            arm_name(key=height_key(spec=spec, height_m=height)) for height in omitted
         ),
     )
 
@@ -592,9 +646,9 @@ def _row_lines(*, spec: ProductSpec, built: Built) -> list[str]:
         "each arm's hub-level direction as a sine and a cosine"
         if built.with_direction
         else (
-            f"**no direction columns in any arm of this block**, because a {spec.label} "
-            "direction file had not been downloaded; the direction pair is absent from every "
-            "arm and reference, and no arm borrows ERA5's direction"
+            "**no direction columns in any arm of this block**, because "
+            f"`CERRA_WITH_DIRECTION` is False; the direction pair is absent from every "
+            f"{spec.label} arm and reference, and no arm borrows ERA5's direction"
         )
     )
     return [
@@ -610,10 +664,22 @@ def _row_lines(*, spec: ProductSpec, built: Built) -> list[str]:
         f"- Distinct values of `hour_of_day`: {frame['hour_of_day'].n_unique()}.",
         f"- Nearest-cell distance, pooled: {low:.1f} km to {high:.1f} km.",
         f"- Input set: {spec.label} at {HUB_HEIGHT_M} m, with {direction}.",
+        (f"- Fold rotation by era: {dict(assembled.fold_offsets)}."),
         (
-            f"- Fold rotation by era: {dict(assembled.fold_offsets)}; share of rows in a calendar "
-            "month with no training row under the main study's fold recipe: "
+            "- Under the folds this block is fitted on, the share of rows in a calendar month seen "
+            "in two or more years that has no training row (avoidable): "
+            f"{assembled.uncovered_fitted:.1%}; the share in a calendar month seen in one year "
+            f"only, which no fold design can cover: {assembled.one_year_only_fitted:.1%}."
+        ),
+        (
+            "- Extra, for comparison only: the share of rows in a calendar month with no training "
+            "row under the main study's published fold recipe applied to these rows: "
             f"{assembled.uncovered_main_folds:.1%}."
+        ),
+        (
+            "- Exploratory arms omitted because their direction file is missing: "
+            + (", ".join(f"`{arm}`" for arm in built.omitted_arms) or "none")
+            + "."
         ),
         f"- Fits: CPU, `colsample_bytree` absent (1), {MAX_CONCURRENT_FITS} fits at once.",
     ]
@@ -648,7 +714,6 @@ def _report(
     losses: pl.DataFrame,
     sites: pl.DataFrame,
     job_list: list[Job],
-    include_exploratory_arms: bool,
 ) -> str:
     """Assemble the markdown report.
 
@@ -658,7 +723,6 @@ def _report(
         losses: Every arm's losses at both settings.
         sites: The wind roster, for the geometry lines.
         job_list: Every job, for the feature-column section.
-        include_exploratory_arms: Whether the block holds the exploratory-height arms.
 
     Returns:
         The report.
@@ -666,9 +730,7 @@ def _report(
     pooled = losses.filter(pl.col("setting") == "pooled")
     sensitivity = losses.filter(pl.col("setting") == "sensitivity")
     planned = PLANNED_CONTRASTS[spec.key]
-    exploratory = exploratory_contrasts(
-        spec=spec, include_exploratory_arms=include_exploratory_arms
-    )
+    exploratory = exploratory_contrasts(spec=spec, extra_heights_m=built.extra_heights_m)
     lines = [
         (
             f"### {spec.label} at {HUB_HEIGHT_M} m against the main-study products, on "
@@ -691,6 +753,10 @@ def _report(
         "#### Planned contrasts",
         "",
         *_contrast_table(losses=pooled, pairs=planned, label="all"),
+        "",
+        "#### Absolute error at the second hyperparameter setting",
+        "",
+        *_absolute_table_lines(pooled=sensitivity, arms=tuple(built.features)),
         "",
         "#### Planned contrasts at the second hyperparameter setting",
         "",
@@ -740,11 +806,6 @@ def main() -> int:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--product", choices=sorted(SPECS), required=True)
-    parser.add_argument(
-        "--no-exploratory-arms",
-        action="store_true",
-        help="Leave out the exploratory-height arms; every run and its --report-only must agree.",
-    )
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument(
         "--check-only",
@@ -758,10 +819,9 @@ def main() -> int:
     )
     arguments = parser.parse_args()
     spec = SPECS[arguments.product]
-    include_exploratory_arms = not arguments.no_exploratory_arms
 
     sites = _wind_sites()
-    built = build_rows(spec=spec, sites=sites, include_exploratory_arms=include_exploratory_arms)
+    built = build_rows(spec=spec, sites=sites)
     frame = built.assembled.frame
     paths = output_paths(spec=spec)
     job_list = jobs(features=built.features)
@@ -787,14 +847,7 @@ def main() -> int:
     else:
         losses = fit_and_save(frame=frame, job_list=job_list, fingerprint=fingerprint, paths=paths)
 
-    report = _report(
-        spec=spec,
-        built=built,
-        losses=losses,
-        sites=sites,
-        job_list=job_list,
-        include_exploratory_arms=include_exploratory_arms,
-    )
+    report = _report(spec=spec, built=built, losses=losses, sites=sites, job_list=job_list)
     paths.report.write_text(report)
     sys.stdout.write(report)
     return 0
