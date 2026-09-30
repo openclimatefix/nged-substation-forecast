@@ -1,3 +1,4 @@
+import re
 import sys
 from collections.abc import Mapping, Sequence
 from functools import cache
@@ -12,7 +13,9 @@ sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
 
 from dot_interval_vs_ens import (  # noqa: E402
     SOURCES,
+    Comparison,
     SourceType,
+    _check_same_keys,
     chart_rows,
     comparisons,
     compute,
@@ -390,12 +393,16 @@ def test_a_site_label_that_is_not_anonymised_raises(tmp_path: Path) -> None:
         load_arms(data_dir=tmp_path, domain="solar", wanted={("leads_day10", "ukv_day0")})
 
 
+IFS = "IFS HRES (9 km, Open-Meteo)"
+
+
 def test_a_row_with_fewer_than_six_months_has_a_dot_and_no_interval(tmp_path: Path) -> None:
-    _full_solar_fixture(tmp_path, short_months={"ukv_day0": 5})
+    # IFS HRES 9 km is the one product allowed to lack keys the ENS mean holds.
+    _full_solar_fixture(tmp_path, short_months={"ifs_single_day0": 5})
 
     rows = compute(data_dir=tmp_path, domain="solar")
-    short = rows.filter((pl.col("label") == "UKV") & (pl.col("day") == 0))
-    shaped = chart_rows(rows=rows, day=0, with_conditions=True).filter(pl.col("label") == "UKV")
+    short = rows.filter((pl.col("label") == IFS) & (pl.col("day") == 0))
+    shaped = chart_rows(rows=rows, day=0, with_conditions=True).filter(pl.col("label") == IFS)
 
     assert short["n_months"].to_list() == [5]
     assert short["has_interval"].to_list() == [False]
@@ -408,14 +415,14 @@ def test_a_row_with_fewer_than_six_months_has_a_dot_and_no_interval(tmp_path: Pa
 def test_six_months_is_enough_for_an_interval_and_the_hollow_mark_is_in_the_chart(
     tmp_path: Path,
 ) -> None:
-    _full_solar_fixture(tmp_path, short_months={"ukv_day0": 6, "icon_d2_day0": 5})
+    _full_solar_fixture(tmp_path, short_months={"ifs_single_day0": 6, "ifs_single_day1": 5})
 
     rows = compute(data_dir=tmp_path, domain="solar")
 
-    assert rows.filter((pl.col("label") == "UKV") & (pl.col("day") == 0))[
+    assert rows.filter((pl.col("label") == IFS) & (pl.col("day") == 0))[
         "has_interval"
     ].to_list() == [True]
-    assert rows.filter((pl.col("label") == "ICON-D2") & (pl.col("day") == 0))[
+    assert rows.filter((pl.col("label") == IFS) & (pl.col("day") == 1))[
         "has_interval"
     ].to_list() == [False]
     spec = str(draw(rows=rows, domain="solar", number=19).to_dict())
@@ -524,3 +531,94 @@ def test_the_dots_reproduce_the_contrasts_the_page_states(
     assert (row["value"], row["lower"], row["upper"]) == pytest.approx(
         (value, lower, upper), abs=0.0006
     )
+
+
+def _arm_cells(path: Path) -> set[tuple[str, int]]:
+    """Return the (product prefix, lead day) of every product arm a losses file holds."""
+    not_products = {"ens_mean", "persistence", "diurnal_persistence", "smart_persistence"}
+    cells = set()
+    for arm in pl.read_parquet(path, columns=["arm"])["arm"].unique().to_list():
+        match = re.fullmatch(r"(.+)_day(\d+)", arm)
+        if match and match[1] not in not_products and not match[1].startswith("blend_"):
+            cells.add((match[1], int(match[2])))
+    return cells
+
+
+@pytest.mark.skipif(
+    not (_PAGE_DATA / SOURCES["leads_day10"].folder).exists(),
+    reason="the private study data is not in this checkout",
+)
+@pytest.mark.parametrize("domain", ["solar", "wind"])
+def test_the_plan_holds_every_product_arm_the_leads_folders_hold_and_no_other(
+    domain: DomainType,
+) -> None:
+    plan = comparisons(domain=domain)
+    prefix_of = {c.label: c.treatment.rsplit("_day", 1)[0] for c in plan}
+    for source in ("leads_day10", "leads_day10b", "leads_day10c", "leads_day10d"):
+        folder = _PAGE_DATA / SOURCES[source].folder
+        held = _arm_cells(folder / f"{domain}_losses.parquet")
+        planned = {(prefix_of[c.label], c.day) for c in plan if c.treatment_source == source}
+        assert planned == held, f"{source}: plan and saved arms differ"
+    published = _arm_cells(_PAGE_DATA / "nwp_forecast_comparison" / f"{domain}_losses.parquet")
+    assert published <= {(prefix_of[c.label], c.day) for c in plan}
+
+
+def _keyed(arm: str, *, months: int = 12, skip_month: int | None = None) -> pl.DataFrame:
+    frame = _arm(arm, error=0.1, months=months)
+    return frame if skip_month is None else frame.filter(pl.col("month") != skip_month)
+
+
+def _comparison(prefix: str) -> Comparison:
+    return Comparison(
+        domain="solar",
+        day=0,
+        label=prefix,
+        treatment=f"{prefix}_day0",
+        treatment_source="leads_day10",
+        reference="ens_mean_day0",
+        reference_source="leads_day10",
+        reference_label="ENS mean",
+    )
+
+
+def test_a_product_with_keys_the_reference_lacks_raises() -> None:
+    comparison = _comparison("ukv")
+
+    with pytest.raises(ValueError, match="only in ukv_day0"):
+        _check_same_keys(
+            comparison=comparison,
+            treatment=_keyed("ukv_day0"),
+            reference=_keyed("ens_mean_day0", skip_month=3),
+        )
+
+
+def test_a_product_lacking_keys_the_reference_holds_raises_unless_it_is_ifs_single() -> None:
+    with pytest.raises(ValueError, match="only in ens_mean_day0"):
+        _check_same_keys(
+            comparison=_comparison("ukv"),
+            treatment=_keyed("ukv_day0", skip_month=3),
+            reference=_keyed("ens_mean_day0"),
+        )
+    _check_same_keys(
+        comparison=_comparison("ifs_single"),
+        treatment=_keyed("ifs_single_day0", skip_month=3),
+        reference=_keyed("ens_mean_day0"),
+    )
+
+
+def test_ifs_single_keys_the_treatment_lacks_still_raise_the_other_way() -> None:
+    with pytest.raises(ValueError, match="only in ifs_single_day0"):
+        _check_same_keys(
+            comparison=_comparison("ifs_single"),
+            treatment=_keyed("ifs_single_day0"),
+            reference=_keyed("ens_mean_day0", skip_month=3),
+        )
+
+
+def test_each_row_records_how_many_rows_each_arm_holds(tmp_path: Path) -> None:
+    _full_solar_fixture(tmp_path)
+
+    rows = compute(data_dir=tmp_path, domain="solar")
+
+    row = rows.filter((pl.col("label") == "UKV") & (pl.col("day") == 0)).row(0, named=True)
+    assert row["treatment_rows"] == row["reference_rows"] == 2 * 12 * 4 * 3

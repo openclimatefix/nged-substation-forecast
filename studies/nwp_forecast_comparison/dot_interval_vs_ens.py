@@ -17,7 +17,10 @@ same lead day:
 - The products in `_leads_day10`, `_leads_day10b`, `_leads_day10c`, and `_leads_day10d` are
   subtracted from the ENS mean of `LEADERBOARD_ENS_SOURCES`: `_leads_day10b` at days 2 and 7 and
   `_leads_day10` at every other day. The folders hold the same `(site, time, seed)` keys, so the
-  pair joins across folders.
+  pair joins across folders. The one exception is IFS HRES 9 km (`_leads_day10d`), which lacks
+  1,197 to 1,536 of the ENS mean's rows at each day (in 2025-08 and 2026-06, where its archive has
+  no run). Its paired difference drops those rows, and `contrast_rows` raises for any other
+  product whose keys differ from its reference's.
 - AIFS Single, the AIFS ENS mean, and WeatherNext 3 (WN3) each sit in a folder with an ENS mean
   fitted on the same rows, which is the reference. For wind, WN3's reference is `ens_meanvec`, the
   ENS mean built from the mean-vector speed, which matches how WN3's speed is built.
@@ -98,16 +101,26 @@ _AIFS_EXTRA: Final[str] = "nwp_forecast_comparison_aifs_extra_days"
 _PER_DAY: Final[str] = "{{domain}}_{name}_day{{day}}_losses.parquet"
 
 SOURCES: Final[dict[SourceType, Source]] = {
-    "leads_day10": Source("nwp_forecast_comparison_leads_day10", "{domain}_losses.parquet"),
-    "leads_day10b": Source("nwp_forecast_comparison_leads_day10b", "{domain}_losses.parquet"),
-    "leads_day10c": Source("nwp_forecast_comparison_leads_day10c", "{domain}_losses.parquet"),
-    "leads_day10d": Source("nwp_forecast_comparison_leads_day10d", "{domain}_losses.parquet"),
-    "aifs_single_blends": Source(_AIFS_BLENDS, _PER_DAY.format(name="single")),
-    "aifs_ens_blends": Source(_AIFS_BLENDS, _PER_DAY.format(name="ens")),
-    "aifs_single_extra": Source(_AIFS_EXTRA, _PER_DAY.format(name="single")),
-    "aifs_ens_extra": Source(_AIFS_EXTRA, _PER_DAY.format(name="ens")),
-    "wn3_blends": Source("nwp_forecast_comparison_wn3", _PER_DAY.format(name="wn3")),
-    "wn3_extra": Source("nwp_forecast_comparison_wn3_extra_days", _PER_DAY.format(name="wn3")),
+    "leads_day10": Source(
+        folder="nwp_forecast_comparison_leads_day10", pattern="{domain}_losses.parquet"
+    ),
+    "leads_day10b": Source(
+        folder="nwp_forecast_comparison_leads_day10b", pattern="{domain}_losses.parquet"
+    ),
+    "leads_day10c": Source(
+        folder="nwp_forecast_comparison_leads_day10c", pattern="{domain}_losses.parquet"
+    ),
+    "leads_day10d": Source(
+        folder="nwp_forecast_comparison_leads_day10d", pattern="{domain}_losses.parquet"
+    ),
+    "aifs_single_blends": Source(folder=_AIFS_BLENDS, pattern=_PER_DAY.format(name="single")),
+    "aifs_ens_blends": Source(folder=_AIFS_BLENDS, pattern=_PER_DAY.format(name="ens")),
+    "aifs_single_extra": Source(folder=_AIFS_EXTRA, pattern=_PER_DAY.format(name="single")),
+    "aifs_ens_extra": Source(folder=_AIFS_EXTRA, pattern=_PER_DAY.format(name="ens")),
+    "wn3_blends": Source(folder="nwp_forecast_comparison_wn3", pattern=_PER_DAY.format(name="wn3")),
+    "wn3_extra": Source(
+        folder="nwp_forecast_comparison_wn3_extra_days", pattern=_PER_DAY.format(name="wn3")
+    ),
 }
 """Each source's folder under `data/studies/`, and its losses file's name. A `{day}` in the name
 means one file per lead day. The `_blends` folders hold days 1, 2, 7, and 14 and the `_extra`
@@ -125,7 +138,7 @@ WN3_LABEL: Final[str] = "WeatherNext 3 mean (7 months)"
 
 
 def _sources(
-    days: tuple[int, ...], default: SourceType, overrides: Mapping[int, SourceType] | None = None
+    *, days: tuple[int, ...], default: SourceType, overrides: Mapping[int, SourceType] | None = None
 ) -> dict[int, SourceType]:
     """Map each lead day to its source: `default`, except for the days in `overrides`."""
     return {day: (overrides or {}).get(day, default) for day in days}
@@ -149,58 +162,106 @@ AIFS_DAYS: Final[tuple[int, ...]] = (0, 1, 2, 3, 4, 7, 10, 14)
 """The lead days of AIFS Single, the AIFS ENS mean, and WN3: every day but 5."""
 
 LEADERBOARD_ENS_SOURCES: Final[dict[int, SourceType]] = _sources(
-    LEADERBOARD_DAYS, "leads_day10", {2: "leads_day10b", 7: "leads_day10b"}
+    days=LEADERBOARD_DAYS, default="leads_day10", overrides={2: "leads_day10b", 7: "leads_day10b"}
 )
 """The folder of the ENS-mean arm the leaderboards draw at each lead day. The published folder
-holds ENS-mean arms at days 0 to 3 too, but the leaderboards read the GPU refit that each of these
-folders holds, which `load`'s `prefer_extras` picks."""
+holds ENS-mean arms at days 0 to 3 too, but the leaderboards read the GPU refit that the
+`leads_day10` and `leads_day10b` folders hold, because `nwp_forecast_charts.load` prefers an arm
+from an extra-lead folder to the published folder's copy."""
 
 EXTRA_DAYS: Final[tuple[int, ...]] = (0, 3, 4, 10)
 """The AIFS and WN3 lead days that sit in the `_extra` folders."""
 
-_B: Final[SourceType] = "leads_day10b"
+_D10B: Final[SourceType] = "leads_day10b"
 _LEADS_TO_3: Final[tuple[int, ...]] = (0, 1, 2, 3)
 _LEADS_TO_7: Final[tuple[int, ...]] = (0, 1, 2, 3, 5, 7)
 
 
 def _leaderboard_row(
+    *,
     prefix: str,
     sources: Mapping[int, SourceType],
     domains: tuple[DomainType, ...] = DOMAINS,
 ) -> ProductRow:
     """Return a product whose reference is the leaderboard's ENS mean at each of its days."""
-    return ProductRow(prefix, sources, reference_sources=LEADERBOARD_ENS_SOURCES, domains=domains)
+    return ProductRow(
+        prefix=prefix,
+        sources=sources,
+        reference_sources=LEADERBOARD_ENS_SOURCES,
+        domains=domains,
+    )
 
 
 PRODUCTS: Final[tuple[ProductRow, ...]] = (
-    _leaderboard_row("ukv", _sources((0, 1), "leads_day10")),
-    _leaderboard_row("icon_d2", _sources((0, 1), "leads_day10")),
-    _leaderboard_row("icon_eu", _sources(_LEADS_TO_3, "leads_day10", {2: _B, 3: _B})),
-    _leaderboard_row("icon_global", _sources((0, 1, 2, 3, 5), "leads_day10", {2: _B})),
-    _leaderboard_row("gfs", _sources(_LEADS_TO_7, "leads_day10", {2: _B})),
-    _leaderboard_row("gfs_native", _sources(LEADERBOARD_DAYS, "leads_day10c")),
-    _leaderboard_row("ifs025", _sources(_LEADS_TO_7, "leads_day10", {2: _B})),
-    _leaderboard_row("ifs_single", _sources(_LEADS_TO_7, "leads_day10d")),
-    _leaderboard_row("arpege", _sources(_LEADS_TO_3, "leads_day10", {2: _B, 3: _B}), ("solar",)),
-    _leaderboard_row("arome", _sources((0, 1), "leads_day10"), ("solar",)),
-    _leaderboard_row("dmi_harmonie", _sources((0, 1), "leads_day10")),
-    _leaderboard_row("knmi_harmonie", _sources((0, 1), "leads_day10")),
-    _leaderboard_row("gefs_mean", _sources(LEADERBOARD_DAYS, "leads_day10", {2: _B, 7: _B})),
+    _leaderboard_row(prefix="ukv", sources=_sources(days=(0, 1), default="leads_day10")),
+    _leaderboard_row(prefix="icon_d2", sources=_sources(days=(0, 1), default="leads_day10")),
     _leaderboard_row(
-        "ens_control",
-        _sources(LEADERBOARD_DAYS, _B, {0: "leads_day10", 1: "leads_day10"}),
+        prefix="icon_eu",
+        sources=_sources(days=_LEADS_TO_3, default="leads_day10", overrides={2: _D10B, 3: _D10B}),
+    ),
+    _leaderboard_row(
+        prefix="icon_global",
+        sources=_sources(days=(0, 1, 2, 3, 5), default="leads_day10", overrides={2: _D10B}),
+    ),
+    _leaderboard_row(
+        prefix="gfs",
+        sources=_sources(days=_LEADS_TO_7, default="leads_day10", overrides={2: _D10B}),
+    ),
+    _leaderboard_row(
+        prefix="gfs_native", sources=_sources(days=LEADERBOARD_DAYS, default="leads_day10c")
+    ),
+    _leaderboard_row(
+        prefix="ifs025",
+        sources=_sources(days=_LEADS_TO_7, default="leads_day10", overrides={2: _D10B}),
+    ),
+    _leaderboard_row(
+        prefix="ifs_single", sources=_sources(days=_LEADS_TO_7, default="leads_day10d")
+    ),
+    _leaderboard_row(
+        prefix="arpege",
+        sources=_sources(days=_LEADS_TO_3, default="leads_day10", overrides={2: _D10B, 3: _D10B}),
+        domains=("solar",),
+    ),
+    _leaderboard_row(
+        prefix="arome", sources=_sources(days=(0, 1), default="leads_day10"), domains=("solar",)
+    ),
+    _leaderboard_row(prefix="dmi_harmonie", sources=_sources(days=(0, 1), default="leads_day10")),
+    _leaderboard_row(prefix="knmi_harmonie", sources=_sources(days=(0, 1), default="leads_day10")),
+    _leaderboard_row(
+        prefix="gefs_mean",
+        sources=_sources(
+            days=LEADERBOARD_DAYS, default="leads_day10", overrides={2: _D10B, 7: _D10B}
+        ),
+    ),
+    _leaderboard_row(
+        prefix="ens_control",
+        sources=_sources(
+            days=LEADERBOARD_DAYS,
+            default=_D10B,
+            overrides={0: "leads_day10", 1: "leads_day10"},
+        ),
     ),
     ProductRow(
-        "aifs_single",
-        _sources(AIFS_DAYS, "aifs_single_blends", dict.fromkeys(EXTRA_DAYS, "aifs_single_extra")),
+        prefix="aifs_single",
+        sources=_sources(
+            days=AIFS_DAYS,
+            default="aifs_single_blends",
+            overrides=dict.fromkeys(EXTRA_DAYS, "aifs_single_extra"),
+        ),
     ),
     ProductRow(
-        "aifs_ens_mean",
-        _sources(AIFS_DAYS, "aifs_ens_blends", dict.fromkeys(EXTRA_DAYS, "aifs_ens_extra")),
+        prefix="aifs_ens_mean",
+        sources=_sources(
+            days=AIFS_DAYS,
+            default="aifs_ens_blends",
+            overrides=dict.fromkeys(EXTRA_DAYS, "aifs_ens_extra"),
+        ),
     ),
     ProductRow(
-        "wn3_mean",
-        _sources(AIFS_DAYS, "wn3_blends", dict.fromkeys(EXTRA_DAYS, "wn3_extra")),
+        prefix="wn3_mean",
+        sources=_sources(
+            days=AIFS_DAYS, default="wn3_blends", overrides=dict.fromkeys(EXTRA_DAYS, "wn3_extra")
+        ),
         wind_reference="ens_meanvec",
         label=WN3_LABEL,
     ),
@@ -326,6 +387,42 @@ def load_arms(
     return output
 
 
+GAPPED_PREFIXES: Final[tuple[str, ...]] = ("ifs_single_",)
+"""The products whose archive lacks whole target days, so the ENS mean holds rows they do not."""
+
+
+def _check_same_keys(
+    *, comparison: Comparison, treatment: pl.DataFrame, reference: pl.DataFrame
+) -> None:
+    """Raise unless a product and its reference score the same `(site, time, seed)` keys.
+
+    A paired difference inner-joins the two arms, so keys in only one of them drop out silently.
+    The products in `GAPPED_PREFIXES` may lack keys the reference holds, and nothing else may.
+
+    Args:
+        comparison: The dot being computed.
+        treatment: The product's rows.
+        reference: The reference's rows.
+
+    Raises:
+        ValueError: If the arms' keys differ beyond what `GAPPED_PREFIXES` allows.
+    """
+    only_treatment = treatment.select(KEY_COLUMNS).join(
+        reference.select(KEY_COLUMNS), on=list(KEY_COLUMNS), how="anti"
+    )
+    only_reference = reference.select(KEY_COLUMNS).join(
+        treatment.select(KEY_COLUMNS), on=list(KEY_COLUMNS), how="anti"
+    )
+    gapped = comparison.treatment.startswith(GAPPED_PREFIXES)
+    if only_treatment.height or (only_reference.height and not gapped):
+        msg = (
+            f"{comparison.domain} day {comparison.day} {comparison.label}: "
+            f"{only_treatment.height} keys only in {comparison.treatment} and "
+            f"{only_reference.height} only in {comparison.reference}"
+        )
+        raise ValueError(msg)
+
+
 def contrast_rows(
     *, arms: Mapping[tuple[SourceType, str], pl.DataFrame], plan: Sequence[Comparison]
 ) -> pl.DataFrame:
@@ -337,13 +434,15 @@ def contrast_rows(
 
     Returns:
         One row per comparison: its fields, `value`, `lower`, `upper`, `seed_spread` (points),
-        `n_rows` (rows per seed), `n_months`, and `has_interval`, whether the row rests on at
-        least `MIN_MONTHS_FOR_INTERVAL` months.
+        `n_rows` (rows per seed), `treatment_rows` and `reference_rows` (every row of each arm),
+        `n_months`, and `has_interval`, whether the row rests on at least
+        `MIN_MONTHS_FOR_INTERVAL` months.
     """
     records = []
     for comparison in plan:
         treatment = arms[(comparison.treatment_source, comparison.treatment)]
         reference = arms[(comparison.reference_source, comparison.reference)]
+        _check_same_keys(comparison=comparison, treatment=treatment, reference=reference)
         result = bootstrap_difference(
             losses=pl.concat([treatment, reference]),
             treatment=comparison.treatment,
@@ -358,6 +457,8 @@ def contrast_rows(
                 "upper": result["upper_95"] * PERCENTAGE_POINTS,
                 "seed_spread": result["seed_spread"] * PERCENTAGE_POINTS,
                 "n_rows": result["n_rows"],
+                "treatment_rows": treatment.height,
+                "reference_rows": reference.height,
                 "n_months": result["n_months"],
                 "has_interval": result["n_months"] >= MIN_MONTHS_FOR_INTERVAL,
             }
@@ -475,6 +576,11 @@ def subtitle_lines(*, domain: DomainType, has_short_rows: bool) -> list[str]:
         ),
         CAPACITY_NOTE,
     ]
+    lines.append(
+        "For AIFS Single, AIFS ENS mean, and WeatherNext 3, zero is an ENS mean refitted on "
+        "their own rows (16, 11, and 7 months). Every other product is compared with the "
+        "leaderboard's 21-month ENS mean."
+    )
     if domain == "wind":
         lines.append(
             "WeatherNext 3's reference is the ENS mean built from the mean-vector speed, as "
@@ -610,7 +716,9 @@ def readme_text(*, rows: Mapping[DomainType, pl.DataFrame]) -> str:
         (
             "- `intervals.parquet` holds one row per dot: `domain`, `day`, `label`, `treatment`, "
             "`reference`, the two sources, `value`, `lower`, and `upper` in points of capacity, "
-            "`seed_spread`, `n_rows` (per fitting seed), `n_months`, and `has_interval`."
+            "`seed_spread`, `n_rows` (per fitting seed, rows both arms score), "
+            "`treatment_rows` and `reference_rows` (every row of each arm), `n_months`, and "
+            "`has_interval`."
         ),
         "",
         (
@@ -618,7 +726,10 @@ def readme_text(*, rows: Mapping[DomainType, pl.DataFrame]) -> str:
             "fit and a later GPU refit is read from the GPU refit. The reference is the "
             "leaderboard's ENS-mean arm of the same lead day. The `leads_day10*` folders hold "
             "the same `(site, time, seed)` keys, so a product in one folder pairs with the ENS "
-            "mean of another. AIFS Single, the AIFS ENS mean, and WeatherNext 3 use the ENS mean "
+            "mean of another. The exception is IFS HRES 9 km, which lacks 1,197 to 1,536 of the "
+            "ENS mean's rows at each day (in 2025-08 and 2026-06, where its archive has no run), "
+            "so its paired difference drops those rows; compare `treatment_rows` with "
+            "`reference_rows`. AIFS Single, the AIFS ENS mean, and WeatherNext 3 use the ENS mean "
             "fitted on their own rows, in their own file. Wind WeatherNext 3 rows use the "
             "`ens_meanvec` arm. Each line below names a product's source folder and its "
             "reference's, for the days listed:"

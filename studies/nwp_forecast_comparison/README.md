@@ -210,7 +210,9 @@ lead?](../../docs/studies/forecasts/matched-lead.md).
   fewer than 6 months gets a hollow dot and no interval. Each product is subtracted from the
   ENS-mean arm the leaderboard draws at the same day (`_leads_day10b` at days 2 and 7 and
   `_leads_day10` elsewhere for the `leads_day10*` products, and the ENS mean in the product's own
-  file for AIFS and WeatherNext 3). WeatherNext 3's wind reference is `ens_meanvec`. It writes
+  file for AIFS and WeatherNext 3). WeatherNext 3's wind reference is `ens_meanvec`. IFS HRES 9 km
+  lacks 1,197 to 1,536 of the ENS mean's rows at each day, so its paired difference drops them; any
+  other product whose rows differ from its reference's makes the script raise. It writes
   `report.md`, `intervals.parquet`, and a `README.md` naming each row's reference to a new
   `nwp_forecast_comparison_vs_ens_dots_all_days` folder, and two SVGs to `docs/studies/assets/`. It
   checks that none of the five outputs exists before it writes any, and refuses to overwrite them.
