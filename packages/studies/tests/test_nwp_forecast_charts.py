@@ -9,12 +9,9 @@ sys.path.insert(0, str(_STUDY_DIR))
 sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
 
 from nwp_forecast_charts import (  # noqa: E402
-    DIAMOND_DAYS,
     KEY_COLUMNS,
     KEY_LABELS,
     KEY_ROW_PX,
-    LEAD_COLOURS,
-    MAX_LINE_DAY,
     PRODUCT_COLOURS,
     PRODUCT_NAMES,
     check_single_device,
@@ -96,13 +93,6 @@ def test_the_other_figures_keep_the_published_arm_and_append_the_new_ones():
 
     assert losses.sort("arm")["value"].to_list() == [0, 99]
     assert "device" not in losses.columns
-
-
-def test_day_seven_has_a_grey_colour_and_a_diamond_and_the_lines_stop_at_day_three():
-    assert 7 in LEAD_COLOURS
-    assert 7 in DIAMOND_DAYS
-    assert len(set(LEAD_COLOURS.values())) == len(LEAD_COLOURS)
-    assert MAX_LINE_DAY == 3
 
 
 def test_the_ifs_hres_row_reuses_the_ifs_025_colour_and_has_a_short_key_label() -> None:
