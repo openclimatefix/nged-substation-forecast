@@ -393,9 +393,9 @@ same paragraph says what the significance test covers and what the test does not
 statistics does not know that an interval excluding zero is a significance test. Explain once per
 page what the month-resampled test covers: the month-to-month weather and the fitting seed, not
 differences between generators. Say too that an exploratory row with no real effect behind it has a
-5% chance of reaching statistical significance at the 5% level, that the rows are correlated when
-they share hours or resampled months (so the number of spurious significant rows has no single
-figure), and whether the page corrects for multiple comparisons.
+nominal 5% chance of reaching statistical significance at the 5% level, that the number of spurious
+rows is unknown because the number of rows with no real effect is unknown, that the rows' shared
+months make spurious results cluster, and whether the page corrects for multiple comparisons.
 
 **Say what the XGBoost model was given, and name its kind.** Write "an XGBoost model given
 ICON-EU's 80 m wind", never "ICON-EU shown its 80 m wind". A study page can mean a weather model,

@@ -1321,9 +1321,12 @@ def main() -> int:
         (
             "Every arm is exploratory and fitted at the primary setting only, on the published "
             "shared rows and folds. Differences are first arm minus second, in percentage points "
-            "of capacity; an exploratory interval with no real effect behind it has a 5% chance "
-            "of reaching statistical significance at the 5% level, and the number of spurious "
-            "significant intervals cannot be stated as a single figure."
+            "of capacity; an exploratory interval with no real effect behind it has a "
+            "nominal 5% chance of being statistically significant at the 5% level, and a "
+            "higher chance if the intervals are too narrow. How many significant "
+            "exploratory intervals are spurious is unknown, because how many have no real "
+            "effect behind them is unknown. The intervals rest on overlapping months of "
+            "weather and often share an arm, so spurious results tend to arrive together."
         ),
         "",
     ]

@@ -52,8 +52,8 @@ that differ only in their random seed. This page calls a difference statisticall
 5% level when its 95% interval from resampling whole months lies wholly on one side of zero, and not
 statistically significant at the 5% level when the interval includes zero. The test covers
 month-to-month variation in the weather and the fitting seed only, not variation between generators.
-The intervals are not corrected for the number of comparisons, so an exploratory row can reach
-significance without a real effect behind it.
+The intervals are not corrected for the number of comparisons, so among the many exploratory rows
+some will reach significance by chance.
 
 **The folds are cut by `studies.cross_validation` and the intervals computed by `studies.bootstrap`,
 both covered by tests.**
@@ -62,11 +62,10 @@ both covered by tests.**
 
 A contrast is the difference between two products' errors on the same hours. A comparison is planned
 when it was written down before any result existed; every other figure is exploratory, chosen or
-added after results were seen. The distinction matters because an exploratory row with no real
-effect behind it has a 5% chance of reaching statistical significance at the 5% level, and the
-number of spurious significant rows cannot be stated as a single figure. An exploratory result is
-therefore a lead to follow up rather than a finding. A chart holding both kinds marks each planned
-row "(planned)". A chart whose rows are all one kind says so once, in its subtitle.
+added after results were seen. The distinction matters because with many comparisons, about 1 in 20
+exploratory rows reaches significance at the 5% level by chance, so an exploratory result is a lead
+to follow up rather than a finding. A chart holding both kinds marks each planned row "(planned)". A
+chart whose rows are all one kind says so once, in its subtitle.
 
 The ranking rests on four planned contrasts: CAMS against ICON-D2, ICON-EU against ICON-D2, ICON-EU
 against UKV, and ICON global against ICON-EU. Two more were written before SARAH-3 and ICON-DREAM-EU

@@ -229,10 +229,12 @@ differences between generators.
 **Five contrasts were planned, written into the study code before any result existed:** the ensemble
 mean at day 1 and at day 7, each against day 0; member by member against the ensemble mean at day 1;
 the ensemble mean against the control member at day 1; and the ensemble mean at day 7 against
-climatology. Every other figure is exploratory. An exploratory figure with no real effect behind it has
-a 5% chance of reaching statistical significance at the 5% level, and the number of spurious
-significant figures cannot be stated as a single figure. The planned contrasts are also run with a second,
-shallower XGBoost setting.
+climatology. Every other result is exploratory. An exploratory result with no real effect behind it
+has a nominal 5% chance of being statistically significant at the 5% level. How many significant
+exploratory results are spurious is unknown, because how many have no real effect behind them is
+unknown. The results rest on overlapping months of weather and often share an arm, so spurious
+results tend to arrive together. The planned contrasts are also run with a second, shallower
+XGBoost setting.
 
 ## Results
 

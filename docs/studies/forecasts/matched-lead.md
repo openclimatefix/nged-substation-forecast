@@ -318,10 +318,12 @@ written into the study plan before any result existed. The split between planned
 contrasts applies to the contrast tables and to the headline claims: every contrast outside the
 planned list is exploratory, and so is any number that a paragraph quotes from an exploratory table.
 Analyses added after a result was seen, such as the two single-product wind blends, are exploratory
-and also post hoc. An exploratory interval with no real effect behind it has a 5% chance of
-reaching statistical significance at the 5% level. The exploratory intervals share the same months,
-so they are correlated, and the number of spurious significant intervals cannot be stated as a
-single figure. No correction for multiple comparisons is applied to the exploratory intervals.
+and also post hoc. An exploratory interval with no real effect behind it has a nominal 5% chance of
+being statistically significant at the 5% level, and a higher chance if the intervals are too
+narrow. How many significant exploratory intervals are spurious is unknown, because how many have no
+real effect behind them is unknown. The intervals rest on overlapping months of weather and often
+share an arm, so spurious results tend to arrive together. No correction for multiple comparisons
+is applied to the exploratory intervals.
 <!-- report: header -->
 
 **The bracket assumes that ENS's own error does not fall as its lead lengthens, and the study tests
@@ -1980,13 +1982,15 @@ Rows, folds, and fairness -->
 
 **The rows cover 21 months at 6 solar and 3 wind generators in one trial area, so the sample is
 small.** Neighbouring generators share their weather, so the sample is 21 months of weather rather
-than 21 months of independent generators. An interval covers month-to-month weather and the
-fitting seed, and not differences between generators. Each interval resamples the 21 year-months as
-whole blocks, and all nine generators lie in one small area, so the intervals are probably too
-narrow. An exploratory interval with no real effect behind it has a 5% chance of reaching statistical
-significance at the 5% level. The exploratory intervals share the same months, so they are
-correlated, and the number of spurious significant intervals cannot be stated as a single figure.
-An isolated exploratory result therefore deserves less weight than a planned one.
+than 21 months of independent generators. An interval covers month-to-month weather and the fitting
+seed, and not differences between generators. Each interval resamples the 21 year-months as whole
+blocks, and all nine generators lie in one small area, so the intervals are probably too narrow. An
+exploratory interval with no real effect behind it has a nominal 5% chance of being statistically
+significant at the 5% level, and a higher chance if the intervals are too narrow. How many
+significant exploratory intervals are spurious is unknown, because how many have no real effect
+behind them is unknown. The intervals rest on overlapping months of weather and often share an arm,
+so spurious results tend to arrive together. An isolated exploratory result therefore deserves less
+weight than a planned one.
 <!-- report: header; Rows tables -->
 
 **Four statistical caveats limit how far the intervals can be trusted.**
@@ -1996,7 +2000,8 @@ An isolated exploratory result therefore deserves less weight than a planned one
   Bonferroni interval, the eight deciding contrasts of the AIFS blends and days 7 and 14 (four per
   technology, printed at a 99.375% Bonferroni interval beside the 95% one), and many exploratory
   contrasts, among them which product carries the wind blend gain, the 00-05 UTC subset, and the
-  result at wind generator W3. No interval is adjusted for the number of comparisons.
+  result at wind generator W3. Apart from the Bonferroni intervals named above, no interval is adjusted
+  for the number of comparisons.
 - **The sensitivity setting is not independent confirmation.** It changes the XGBoost
   hyperparameters and keeps the same rows, folds, and weather. Agreement between the two settings
   shows only that a verdict does not depend on the hyperparameters.

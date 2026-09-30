@@ -650,9 +650,11 @@ These were chosen after the first results were seen:
 **Every arm in this section is refitted on the 34,156 farm-hours, so an error here differs from the
 same product's error above.** That includes each product's wind arm from the rest of this page.
 
-**An exploratory paired-difference interval with no true difference behind it has a 5% chance of
-being statistically significant at the 5% level.** The main setting has 24 such intervals, and the
-report prints all 24.
+**An exploratory paired-difference interval with no real effect behind it has a nominal 5% chance of
+being statistically significant at the 5% level, and a higher chance if the intervals are too
+narrow.** The main setting has 24 such intervals, and the report prints all 24. How many
+significant intervals are spurious is unknown, because how many have no real effect behind them is
+unknown.
 
 **The folds are five blocks of 4, 3, 4, 3, and 3 calendar months.** January to July occur once in
 the window, so an XGBoost model that scores one of them never saw that calendar month. The
@@ -1520,10 +1522,9 @@ recent months.
 - **The intervals rest on 17 to 26 resampled calendar months and 3 fitting seeds, and are not
   corrected for the number of exploratory contrasts.** The main row set resamples 26 calendar
   months, the ICON-DREAM-EU row set 25, the ECMWF row set 22, and the weather-station row set 17.
-  A contrast with no true difference has a 5% chance of reaching statistical significance at the
-  5% level. The contrasts are correlated, so the number of spurious significant contrasts cannot be
-  stated as a single figure, and contrasts that reach significance together are not independent
-  evidence.
+  About 1 in 20 contrasts with no true difference would reach statistical significance at the 5%
+  level by chance, and the contrasts are correlated, so contrasts that reach significance together
+  are not independent evidence.
 - **Some scored farm-hours fall in a calendar month that the training rows of the same fold do not
   cover, and the share differs by row set.** The folds are blocks of whole months, so a held-out
   calendar month can leave no training row for that calendar month. Each row set has two shares. The

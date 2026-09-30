@@ -126,7 +126,8 @@ HEADLINE_CONTRAST: Final[tuple[str, str]] = ("C_era5_split", "B_erbs")
 """The one contrast named before the experiment ran, so it cannot be picked after the fact.
 
 Every other contrast below is exploratory. The distinction matters because this script computes
-dozens of nominally-95% intervals, and a handful of those will exclude zero by chance alone.
+dozens of nominally-95% intervals, and a handful of those with no real effect behind them will
+exclude zero by chance alone.
 """
 
 CONTRASTS: Final[tuple[tuple[str, str], ...]] = (

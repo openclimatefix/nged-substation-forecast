@@ -157,10 +157,9 @@ PLANNING_NOTE: Final[str] = (
 )
 """The caption line defining planned and post hoc rows, with the ICON-DREAM-EU block's plan."""
 CHANCE_NOTE: Final[str] = (
-    "No correction is made for the number of exploratory contrasts. A contrast with no "
-    "true difference has a 5% chance of reaching statistical significance at the 5% level. The "
-    "contrasts are correlated, so the number of spurious significant contrasts cannot be stated "
-    "as a single figure. Each interval rests on 17 to 26 resampled calendar months, "
+    "No correction is made for the number of exploratory contrasts. About 1 in 20 contrasts with "
+    "no true difference would reach statistical significance at the 5% level by chance, and the "
+    "contrasts are correlated. Each interval rests on 17 to 26 resampled calendar months, "
     "depending on the block, so the intervals are likely somewhat narrow."
 )
 LEAD_NOTE: Final[str] = (
