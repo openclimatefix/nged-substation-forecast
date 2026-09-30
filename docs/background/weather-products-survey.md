@@ -209,7 +209,7 @@ ERA5 and ICON-DREAM-EU, both already scored, do.**
 | **KNMI HARMONIE-AROME Europe** | Not on the roadmap | [sunshine](../studies/past-weather/solar.md#row-set-of-the-four-extra-open-meteo-models) only, on a shorter window | The Royal Netherlands Meteorological Institute (KNMI) for UWC-West | 5.5 km, as KNMI publishes the grid | Yes (39.7–62.6°N, 25.2°W–38.8°E) | Global irradiance 2024-06-26; 100 m wind 2024-10-09 | Global; direct and diffuse by separation | 10 to 300 m, including 80 and 100 m | Hourly; 2.5 days | 2.6 h (Open-Meteo, 06 UTC run) | Previous Runs from 2024-06-27 | Open-Meteo | CC BY 4.0 | [Open-Meteo](https://open-meteo.com/en/docs/knmi-api), [domain](https://api.open-meteo.com/data/knmi_harmonie_arome_europe/static/meta.json) |
 | **Met Office global 10 km** (`ukmo_global_deterministic_10km`) | Not on the roadmap ([why no request has been made](../roadmap/data-sources.md#which-feed-carries-a-direct-beam-and-what-asking-for-one-would-cost)) | Not scored | Met Office Unified Model, global | ~10 km (0.09° served) | Yes (global) | Direct and 10 m wind 2022-03-01; global irradiance from 2025-01-02 | Global; direct native; diffuse = global − direct | 10 m only | 4 a day; 7 days (Open-Meteo) | 8.4 h (Open-Meteo) | Previous Runs from 2025-01-03 | Open-Meteo; AWS | CC BY-SA 4.0 (AWS) | [Open-Meteo](https://open-meteo.com/en/docs/ukmo-api) |
 | **Google WeatherNext 3** | [🔬 Research (after v2, unlikely)](../roadmap/data-sources.md#weather-data) | Not scored | Google DeepMind, machine-learned 64-member ensemble | 0.1° | Yes (global) | 2026-01-01, no back-fill before it (confirmed against the bucket 2026-09-28) | Global; direct native (`fdir`); diffuse = global − direct | 10, 100 m | 4 a day to 15 days, plus hourly interim runs to 48 h; hourly | Not established | Not established | Access request; members only in the Cloud Storage Zarr store | CC BY 4.0 once at least 1 h old; real-time data under Google DeepMind's experimental terms | [model specs](https://developers.google.com/weathernext/guides/models), [access](https://developers.google.com/weathernext/guides/access-forecast) |
-| **WeatherNext 3 statistics (ensemble mean)** | [🔬 Research (study input; production unlikely before v2)](../roadmap/data-sources.md#weather-data) | [Matched-lead study](../studies/forecasts/matched-lead.md), once the fetched archive is validated | Google DeepMind, the same 64-member ensemble; OCF fetches the precomputed ensemble-mean statistic, not the members | 0.1° (about 11 km) | Yes (OCF's own crop, 49.0–61.5°N, 10.0°W–3.5°E) | 2026-01-01, no back-fill before it (confirmed against the bucket 2026-09-28) | Global; direct native (`total_sky_direct_solar_radiation_at_surface_1hr_mean`), not by subtraction | 10, 100 m | 4 a day (00, 06, 12, 18 UTC); 360 h; hourly throughout, no step widening | Not established | Whole runs, in OCF's own Icechunk store | Icechunk (Zarr), `ocf-weathernext3-uk` (OCF's crop); source in Google's `weathernext3_statistics_spatial` bucket, no Requester Pays | CC BY 4.0 once at least 1 hour old, plus [DeepMind's access terms](https://developers.google.com/weathernext/guides/access-forecast) | [Google's GCS guide](https://developers.google.com/weathernext/guides/gcs) |
+| **WeatherNext 3 statistics (ensemble mean)** | [🔬 Research (study input; production unlikely before v2)](../roadmap/data-sources.md#weather-data) | [Matched-lead study](../studies/forecasts/matched-lead.md), once the fetched archive is validated | Google DeepMind, the same 64-member ensemble; OCF fetches the precomputed ensemble-mean statistic only, although the bucket also holds p10, p25, p50, p75, and p90 percentiles | 0.1° (about 11 km) | Yes (OCF's own crop, 49.0–61.5°N, 10.0°W–3.5°E) | 2026-01-01, no back-fill before it (confirmed against the bucket 2026-09-28) | Global; direct native (`total_sky_direct_solar_radiation_at_surface_1hr_mean`), not by subtraction | 10, 100 m | 4 a day (00, 06, 12, 18 UTC); 360 h; hourly throughout, no step widening | Not established | Whole runs, in OCF's own Icechunk store | Icechunk (Zarr), `ocf-weathernext3-uk` (OCF's crop); source in Google's `weathernext3_statistics_spatial` bucket, which is not Requester Pays (the 64 members are in the separate Requester Pays `weathernext3_spatial` bucket) | CC BY 4.0 once at least 1 hour old, plus [DeepMind's access terms](https://developers.google.com/weathernext/guides/access-forecast) | [Google's GCS guide](https://developers.google.com/weathernext/guides/gcs) |
 | **Google WeatherNext 2** | Not on the roadmap (the catalogue's Google row is WeatherNext 3) | Not scored | Google DeepMind, machine-learned 64-member ensemble; Google marks the data experimental, "not intended, validated, or approved for real world use" | 0.25° | Yes (global) | 2022-01-01 to 2026-09-22 in the Earth Engine catalogue | None | 10, 100 m | 4 a day; 15 days; 6-hourly | About 7.5 h (Google's dissemination schedule) | Whole runs | Earth Engine, BigQuery, Cloud Storage Zarr; all need an access request | CC BY 4.0 for data over 48 h old; real-time data under Google DeepMind's experimental terms | [Earth Engine](https://developers.google.com/earth-engine/datasets/catalog/projects_gcp-public-data-weathernext_assets_weathernext_2_0_0) |
 | **CEDA NWP-UKV** (the UK's Centre for Environmental Data Analysis) | Not on the roadmap (the catalogue's UKV row is the Met Office's AWS feed: 🔬 Research (uncertain)) | Not scored (the studies score Open-Meteo's UKV) | Met Office UKV as archived at CEDA; statistically different from the UKV served live on AWS and Open-Meteo, so not interchangeable with it for training and inference | ~0.018° (CEDA's figure) | Yes | 2016-03-16 to present | Not listed on the catalogue record | Surface and pressure levels | Up to 8 a day; 120 h | Archive, ongoing | Whole runs | CEDA, by application | Met Office licence via CEDA | [CEDA](https://catalogue.ceda.ac.uk/uuid/78f23c539d304591b137cf986b69a525/) |
 | **CEDA Met Office global** (`global-grib`) | Not on the roadmap | Not scored | Met Office global model, raw output | Not established | Yes (global) | Directories from 2016-03 to 2026-09 | Not established; the README needs a login | Not established | Not established | Archive | Not established | CEDA, by application | Not established | [CEDA](https://data.ceda.ac.uk/badc/ukmo-nwp/data/) |
@@ -228,13 +228,23 @@ has not been checked against DMI's own files.
 
 ### What we learnt about WeatherNext's precomputed statistics store
 
-**The statistics bucket has no Requester Pays billing, unlike the assumption that first justified
-fetching it from a Compute Engine VM.** Checking the bucket's own metadata directly, rather than
-inferring it from the access-request process, showed no `billing` field at all — egress from
-`weathernext3_statistics_spatial` is billed to Google's project, not to whichever project reads it.
-The VM stayed the right choice regardless: the study needs the whole 2026-to-present archive at
-four runs a day, and that volume is too much for a domestic internet connection irrespective of who
-pays for it, while a Compute Engine machine in the same region as the bucket reads it far faster.
+**The statistics bucket is not Requester Pays, and the raw ensemble bucket is.** [Google's
+guide](https://developers.google.com/weathernext/guides/gcs) marks `weathernext3_statistics_spatial`
+as Requester Pays "OFF", and `weathernext3_spatial`, which holds the 64 members, as Requester Pays
+"ON". Reading the statistics bucket therefore needs no billing project. The guide does not say
+whether the statistics bucket can be read without credentials, and an anonymous listing of it
+returned 401, so the fetch script authenticates with Google application default credentials. The
+guide also does not say who bears egress from the statistics bucket, and that is unverified. The
+study reads from a Compute Engine machine in the same region as the bucket regardless, because it
+needs the whole 2026-to-present archive at four runs a day, which is too much for a domestic
+internet connection, while a machine in the same region reads it far faster.
+
+**The bucket holds five percentiles that OCF has not fetched, and documents no standard deviation.**
+Google's guide lists the precomputed statistics `_mean`, `_p10`, `_p25`, `_p50`, `_p75`, and `_p90`
+for every 0.1° and 0.05° surface variable, with no pressure levels. The study fetched the mean only.
+The variable names and units of the percentile variables have not been checked against the bucket.
+The guide documents no standard deviation, minimum, or maximum. If the percentile variables are laid
+out like the mean, each extra variable per run would be about 7 GB (inferred, not measured).
 
 **The archive carries no back-fill before 2026-01-01.** The bucket's `zarr/` prefix holds only
 `2026_to_present`, with no earlier date-range prefix, confirmed by listing the bucket directly on
@@ -256,8 +266,8 @@ run, and about 53 TB for the whole archive at four runs a day. The fetch crops e
 tests that preceded the VM build, a single run's read cost about £4.50 from outside `us-east1` and
 took about 21 minutes; the same run, read from inside `us-east1` on the VM, took about 2 minutes 47
 seconds. Reading the
-whole cropped store from outside Google Cloud is a one-off egress cost of a few pounds, borne by the
-bucket's own project rather than split out per reader.
+whole cropped store from outside Google Cloud would cost a few pounds of egress at list price;
+who bears that egress is unverified.
 
 **Each run lands on a `staging` branch and only reaches `main` once validated**, so colleagues
 reading `main` see a store that has passed structural checks, per-run physical-range and radiation
@@ -270,7 +280,7 @@ list pricing rather than a real invoice, because the project's Cloud Billing API
 Enabling that API for exact cost tracking, and deleting an unused BigQuery linked dataset left over
 from a route the project considered and did not take, were both left undone, since neither was
 judged worth the effort for a single archive build. The output bucket does not have Requester Pays
-enabled, matching the source buckets, because OCF does not split cloud costs by project internally.
+enabled, because OCF does not split cloud costs by project internally.
 
 ### AIFS has not been shown to improve faster than the physics-based IFS
 
