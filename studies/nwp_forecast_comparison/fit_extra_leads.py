@@ -11,9 +11,14 @@ than refitting, and refuses to overwrite `report.md`.
 
 The arms:
 
-Four batches run into four folders (`--batch first` to `--batch fourth`). The second, third, and
-fourth batches take one `--context-dir` for each earlier batch's folder whose arms their contrast
-tables name.
+Five batches run into five folders (`--batch first` to `--batch fifth`). The second to fifth
+batches take one `--context-dir` for each earlier batch's folder whose arms their contrast tables
+name.
+
+The fifth batch fits day 4 of nine products on the shared rows (`FIFTH_NEW_PREFIXES`) and refits no
+reference, into the one folder `FIFTH_OUTPUT_DIR_NAME`. Like the fourth batch, it scores each arm
+without the rows where the arm's own columns are null, and computes every contrast on the rows both
+arms score.
 
 The fourth batch fits six IFS HRES (9 km, Open-Meteo) arms (`FOURTH_NEW_PREFIXES`) and refits no
 reference. Each arm is scored on the shared rows minus the target days whose serving run the
@@ -58,9 +63,11 @@ from typing import Final, NamedTuple
 
 import polars as pl
 from build_forecast_inputs import (
+    DAY4_OUTPUT_DIR_NAME,
     GFS_NATIVE_DAYS,
     IFS_SINGLE_DAYS,
     PRODUCT_SLUGS,
+    SHARED_DAY4,
     SOLAR_ONLY_PRODUCTS,
     ExtraBatchType,
     gfs_native_arm,
@@ -378,6 +385,57 @@ FOURTH_ICON_EU_CONTRASTS: Final[tuple[tuple[str, str], ...]] = tuple(
 """Each IFS HRES (9 km, Open-Meteo) arm against ICON-EU's arm at the same day, where the archive
 holds it."""
 
+SHARED_DAY4_PRODUCT_SLUGS: Final[tuple[str, ...]] = (
+    "ens_mean",
+    "ens_control",
+    "gefs_mean",
+    "icon_eu",
+    "icon_global",
+    "ifs025",
+    "gfs",
+    "gfs_native",
+    "ifs_single",
+)
+"""The products the fifth batch fits at day 4 on the shared rows, by arm-name stem: ENS mean and
+control member, GEFS mean, ICON-EU, ICON global, IFS 0.25 degree, Open-Meteo's GFS, native GFS,
+and IFS HRES (9 km, Open-Meteo)."""
+
+FIFTH_NEW_PREFIXES: Final[tuple[str, ...]] = tuple(
+    f"{stem}_day{day}" for day in SHARED_DAY4 for stem in SHARED_DAY4_PRODUCT_SLUGS
+)
+"""The fifth batch's arms, which `build_forecast_inputs.py --extra-leads --batch fifth` builds."""
+
+FIFTH_REFERENCE_PREFIXES: Final[tuple[str, ...]] = ()
+"""The fifth batch refits no reference: every arm it is compared with is a GPU fit of an earlier
+batch, read through `--context-dir`."""
+
+FIFTH_SAME_PRODUCT_CONTRASTS: Final[tuple[tuple[str, str], ...]] = tuple(
+    (f"{stem}_day{day}", f"{stem}_day{day - 1}")
+    for day in SHARED_DAY4
+    for stem in SHARED_DAY4_PRODUCT_SLUGS
+)
+"""Each day-4 arm against the same product at day 3, as (treatment, reference). Every day-3 arm is
+a GPU fit: ENS mean, GEFS mean, IFS 0.25 degree, and ICON global in the first batch, ENS control
+member and ICON-EU in the second, native GFS in the third, and IFS HRES in the fourth."""
+
+FIFTH_ENSEMBLE_CONTRASTS: Final[tuple[tuple[str, str], ...]] = tuple(
+    (f"{stem}_day{day}", f"ens_mean_day{day}")
+    for day in SHARED_DAY4
+    for stem in SHARED_DAY4_PRODUCT_SLUGS
+    if stem != "ens_mean"
+)
+"""Each other day-4 arm against the ENS mean at day 4, the reference every day-4 contrast needs."""
+
+FIFTH_ENSEMBLE_TITLE: Final[str] = (
+    "Other products against the ENS mean at day 4 (ENS, GEFS, native GFS, and IFS HRES read a 00 "
+    "UTC run's leads from 96 hours, the same lead; the ICON-EU, ICON global, IFS 0.25 degree, and "
+    "GFS Previous Runs arms serve the freshest run at least 4 days old, a shorter lead)"
+)
+"""The heading of the fifth batch's contrasts against ENS."""
+
+FIFTH_OUTPUT_DIR_NAME: Final[str] = DAY4_OUTPUT_DIR_NAME
+"""Under `data/studies/`, the only folder the fifth batch writes to."""
+
 ENSEMBLE_TITLE: Final[str] = (
     "Other products against ENS at the same day (Previous Runs day-0 rows mix "
     "weather models and leads; GEFS and the ENS control member share ENS's lead)"
@@ -467,6 +525,21 @@ FOURTH_BATCH_NOTE: Final[str] = (
 """The paragraph the fourth batch's report opens with: what each arm reads and how it is scored."""
 
 
+FIFTH_BATCH_NOTE: Final[str] = (
+    "Every arm here is a day-4 arm on the published shared rows and folds, fitted at the primary "
+    "setting with no negative control, as the earlier extra-lead batches' arms are. Day 4 reads "
+    "leads 96 to 119 hours for wind and 97 to 120 for solar. ENS's extract holds no lead of 105, "
+    "108, or 111 hours, which `fetch_ens_day4_supplement.py` fills in; the build raises on any "
+    "remaining gap in a band. The ICON-EU, ICON global, and IFS 0.25 degree arms read Open-Meteo's "
+    "`previous_day4` series, which serves the freshest run at least 4 days old, and ICON-EU's "
+    "archive ends at day 4. Each arm is scored on the shared rows minus the target days where its "
+    "own weather columns are null (gaps, never filled from another run), and every contrast is "
+    "computed on the rows both arms score, from the existing out-of-fold losses with no refit of "
+    "the other arm. All are exploratory."
+)
+"""The paragraph the fifth batch's report opens with."""
+
+
 class ArmBatch(NamedTuple):
     """One fit batch's arms and the contrasts its report tabulates."""
 
@@ -485,6 +558,12 @@ class ArmBatch(NamedTuple):
     drop_gap_rows: bool = False
     """Whether each arm is fitted and scored without the rows where its own weather columns are
     null, and every contrast is computed on the rows both arms score."""
+    row_set_gap_arm: str = "ifs_single_day1"
+    """The arm whose gap rows the row-set diagnostic drops, where `drop_gap_rows` is set."""
+    row_set_reference_arm: str = "ens_mean_day1"
+    """The gap-free arm the row-set diagnostic scores on all rows and without the gap rows."""
+    output_dir_name: str | None = None
+    """The one folder name the batch may write to, or `None` for any folder but the published."""
 
 
 BATCHES: Final[dict[ExtraBatchType, ArmBatch]] = {
@@ -533,8 +612,23 @@ BATCHES: Final[dict[ExtraBatchType, ArmBatch]] = {
         icon_eu_contrasts=FOURTH_ICON_EU_CONTRASTS,
         drop_gap_rows=True,
     ),
+    "fifth": ArmBatch(
+        new_prefixes=FIFTH_NEW_PREFIXES,
+        reference_prefixes=FIFTH_REFERENCE_PREFIXES,
+        same_product_contrasts=FIFTH_SAME_PRODUCT_CONTRASTS,
+        ensemble_contrasts=FIFTH_ENSEMBLE_CONTRASTS,
+        near_analysis_contrasts=(),
+        elsewhere_contrasts=(),
+        climatology_contrasts=(),
+        note=FIFTH_BATCH_NOTE,
+        ensemble_title=FIFTH_ENSEMBLE_TITLE,
+        drop_gap_rows=True,
+        row_set_gap_arm="ifs_single_day4",
+        row_set_reference_arm="ens_mean_day4",
+        output_dir_name=FIFTH_OUTPUT_DIR_NAME,
+    ),
 }
-"""The four fit batches, by the name `--batch` takes."""
+"""The five fit batches, by the name `--batch` takes."""
 
 
 def batch_prefixes(*, batch: ArmBatch, domain: DomainType) -> tuple[str, ...]:
@@ -858,10 +952,13 @@ def intersection_contrast_line(
 
 
 ROW_SET_REFERENCE_ARM: Final[str] = "ens_mean_day1"
-"""The arm the row-set diagnostic scores on all shared rows and on the rows without a gap."""
+"""The fourth batch's gap-free arm, which the row-set diagnostic scores on all shared rows and on
+the rows without a gap."""
 
 
-def row_set_diagnostic(*, losses: pl.DataFrame, gap_arm: str) -> str | None:
+def row_set_diagnostic(
+    *, losses: pl.DataFrame, gap_arm: str, reference_arm: str = ROW_SET_REFERENCE_ARM
+) -> str | None:
     """Format how far dropping an arm's gap rows moves a reference arm's absolute error.
 
     The leaderboard mark of an arm scored without its gap rows averages over different hours from
@@ -869,36 +966,39 @@ def row_set_diagnostic(*, losses: pl.DataFrame, gap_arm: str) -> str | None:
     scored on every shared row and on the rows `gap_arm` also holds.
 
     Args:
-        losses: Per-row losses at one setting, carrying `ROW_SET_REFERENCE_ARM` and `gap_arm`.
+        losses: Per-row losses at one setting, carrying `reference_arm` and `gap_arm`.
         gap_arm: An arm scored without its gap rows.
+        reference_arm: The arm that has no gap.
 
     Returns:
         `| reference | error on all rows | error without the gap rows | difference | rows | rows |`,
         in percent of capacity and percentage points, or None if either arm is absent.
     """
     present = set(losses["arm"].unique().to_list())
-    if ROW_SET_REFERENCE_ARM not in present or gap_arm not in present:
+    if reference_arm not in present or gap_arm not in present:
         return None
-    every_row = bootstrap_absolute(losses=losses, arm=ROW_SET_REFERENCE_ARM, metric=METRIC)
-    kept = shared_rows(losses=losses, treatment=ROW_SET_REFERENCE_ARM, reference=gap_arm)
-    without_gap = bootstrap_absolute(losses=kept, arm=ROW_SET_REFERENCE_ARM, metric=METRIC)
+    every_row = bootstrap_absolute(losses=losses, arm=reference_arm, metric=METRIC)
+    kept = shared_rows(losses=losses, treatment=reference_arm, reference=gap_arm)
+    without_gap = bootstrap_absolute(losses=kept, arm=reference_arm, metric=METRIC)
     moved = (without_gap["value"] - every_row["value"]) * PERCENTAGE_POINTS
     return (
-        f"| {ROW_SET_REFERENCE_ARM} | {every_row['value'] * PERCENTAGE_POINTS:.3f} "
+        f"| {reference_arm} | {every_row['value'] * PERCENTAGE_POINTS:.3f} "
         f"| {without_gap['value'] * PERCENTAGE_POINTS:.3f} | {moved:+.3f} "
         f"| {every_row['n_rows']} | {without_gap['n_rows']} |"
     )
 
 
-def row_set_diagnostic_lines(*, losses: pl.DataFrame, gap_arm: str) -> list[str]:
+def row_set_diagnostic_lines(
+    *, losses: pl.DataFrame, gap_arm: str, reference_arm: str = ROW_SET_REFERENCE_ARM
+) -> list[str]:
     """Write the row-set diagnostic's report section, or nothing if an arm is absent."""
-    diagnostic = row_set_diagnostic(losses=losses, gap_arm=gap_arm)
+    diagnostic = row_set_diagnostic(losses=losses, gap_arm=gap_arm, reference_arm=reference_arm)
     if diagnostic is None:
         return []
     return [
         "",
         (
-            f"### Row-set diagnostic: {ROW_SET_REFERENCE_ARM} on all shared rows and without the "
+            f"### Row-set diagnostic: {reference_arm} on all shared rows and without the "
             f"gap days of {gap_arm}"
         ),
         "",
@@ -1095,7 +1195,9 @@ def report_domain(
         for arm in batch.climatology_contrasts
     ]
     if batch.drop_gap_rows:
-        lines += row_set_diagnostic_lines(losses=pooled, gap_arm=ifs_single_arm(day=1))
+        lines += row_set_diagnostic_lines(
+            losses=pooled, gap_arm=batch.row_set_gap_arm, reference_arm=batch.row_set_reference_arm
+        )
     if any(elsewhere):
         lines += [
             "",
@@ -1208,6 +1310,22 @@ def check_context_arms(
         raise ValueError(msg)
 
 
+def check_output_dir_name(*, output_dir: Path, batch: ArmBatch) -> None:
+    """Raise unless `output_dir` is the one folder the batch may write to, where it names one.
+
+    Args:
+        output_dir: Where the fit would write.
+        batch: The batch being fitted.
+
+    Raises:
+        ValueError: If the batch names a folder and `output_dir` has another name, which would
+            write the batch's outputs into a folder that holds an earlier fit.
+    """
+    if batch.output_dir_name is not None and output_dir.name != batch.output_dir_name:
+        msg = f"this batch writes only to a folder named {batch.output_dir_name}, not {output_dir}"
+        raise ValueError(msg)
+
+
 def check_context_dirs(*, args: argparse.Namespace, batch: ArmBatch) -> None:
     """Raise unless `--context-dir` names finished earlier batches that complete the contrasts.
 
@@ -1262,17 +1380,19 @@ def main() -> int:
         help="Which fit batch: the first (the day-0 to day-14 arms), the second (ENS mean at "
         "day 7, the ENS control member, GEFS mean at day 7, and GPU refits of the arms the first "
         "batch left on the CPU), the third (native GFS at days 0, 1, 2, 3, 5, 7, 10, and 14), or "
-        "the fourth (IFS HRES (9 km, Open-Meteo) at days 0, 1, 2, 3, 5, and 7).",
+        "the fourth (IFS HRES (9 km, Open-Meteo) at days 0, 1, 2, 3, 5, and 7), or the fifth "
+        "(day 4 of ENS mean and control, GEFS mean, ICON-EU, ICON global, IFS 0.25 degree, "
+        "Open-Meteo GFS, native GFS, and IFS HRES (9 km, Open-Meteo)).",
     )
     parser.add_argument(
         "--context-dir",
         type=Path,
         action="append",
         default=[],
-        help="With --batch second, third, or fourth: an earlier batch's folder, whose losses the "
+        help="With --batch second to fifth: an earlier batch's folder, whose losses the "
         "contrast tables read for arms only that batch fitted. Repeat it for each earlier batch "
         "the contrasts name (the third batch needs the first and the second, and so does the "
-        "fourth).",
+        "fourth; the fifth needs all four earlier batches).",
     )
     parser.add_argument("--check", action="store_true", help="Compare two GPU runs of one arm.")
     parser.add_argument(
@@ -1283,6 +1403,7 @@ def main() -> int:
     if args.output_dir.resolve() == args.published_dir.resolve():
         msg = "the output folder must not be the published folder"
         raise ValueError(msg)
+    check_output_dir_name(output_dir=args.output_dir, batch=batch)
     check_context_dirs(args=args, batch=batch)
     if args.check:
         for domain in DOMAINS:
