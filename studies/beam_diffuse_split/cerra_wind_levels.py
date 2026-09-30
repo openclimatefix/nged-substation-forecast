@@ -507,19 +507,19 @@ def read_wind(*, sites: pl.DataFrame) -> pl.DataFrame:
     return read_cerra_wind(directory=CERRA_DIR, cells=cells)
 
 
-def _largest_step(*, values: np.ndarray, months: list[str]) -> tuple[float, float, str]:
-    """Find the month with the largest step in a deseasonalised monthly series.
+def monthly_steps(*, values: np.ndarray, months: list[str]) -> tuple[dict[str, float], float]:
+    """Compute the step at every month of a deseasonalised monthly series.
 
     Each value has its calendar month's mean removed. A month's step is the mean of the next
-    `ERA_WINDOW_MONTHS` residuals minus the mean of the previous `ERA_WINDOW_MONTHS`, divided by
-    the standard error that independent months would give.
+    `ERA_WINDOW_MONTHS` residuals minus the mean of the previous `ERA_WINDOW_MONTHS`.
 
     Args:
         values: One value per month, in month order.
         months: The `YYYY-MM` label of each value.
 
     Returns:
-        The largest step, its z-score, and its month.
+        Each month's step, for the months with a full window either side, and the standard error
+        that independent months would give a step.
     """
     calendar = np.array([int(month[5:]) for month in months])
     residual = values.copy()
@@ -533,6 +533,20 @@ def _largest_step(*, values: np.ndarray, months: list[str]) -> tuple[float, floa
         )
         for index in range(ERA_WINDOW_MONTHS, len(residual) - ERA_WINDOW_MONTHS + 1)
     }
+    return steps, standard_error
+
+
+def _largest_step(*, values: np.ndarray, months: list[str]) -> tuple[float, float, str]:
+    """Find the month with the largest step in a deseasonalised monthly series.
+
+    Args:
+        values: One value per month, in month order.
+        months: The `YYYY-MM` label of each value.
+
+    Returns:
+        The largest step, its z-score, and its month.
+    """
+    steps, standard_error = monthly_steps(values=values, months=months)
     month = max(steps, key=lambda key: abs(steps[key]))
     return steps[month], steps[month] / standard_error, month
 
