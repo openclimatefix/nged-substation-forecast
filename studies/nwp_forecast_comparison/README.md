@@ -4,7 +4,9 @@ Study for [issue #810](https://github.com/openclimatefix/nged-substation-forecas
 question is which forecast product, or which blend of products, gives the most accurate power
 forecast at the day-ahead lead the live service delivers, and at the two days after it. The design
 and the results are on the published page, [Which weather forecast is best at day-ahead
-lead?](../../docs/studies/forecasts/matched-lead.md).
+lead?](../../docs/studies/forecasts/matched-lead.md). How the extra products (AIFS, WeatherNext 3,
+the extra lead days, and day 0) are read, and their figureless results, are on its [companion
+page](../../docs/studies/forecasts/matched-lead-extra-products.md).
 
 ## Scripts
 

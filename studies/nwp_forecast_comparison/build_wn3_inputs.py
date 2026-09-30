@@ -168,11 +168,13 @@ def log_run_provenance(
 ) -> None:
     """Log each 00 UTC run's `run_written` flag beside its `init_time` and `source_init_time`.
 
-    LOOKAHEAD RECORD STEP. The page's lookahead section says the publication latency of a run is
-    not stated in Google's documentation. Once the store may be read, this output is the evidence
-    that the runs were written in real time: a run whose `source_init_time` differs from its
-    `init_time`, or that is not written, is not a plain real-time 00 UTC run. Read the log before
-    any fit, and copy what it shows into the page's lookahead section.
+    LOOKAHEAD RECORD STEP. The lookahead section of the matched-lead study's companion page
+    (https://openclimatefix.github.io/nged-substation-forecast/studies/forecasts/matched-lead-extra-products/#what-is-known-about-wn3s-lookahead)
+    says the publication latency of a run is not stated in Google's documentation. Once the store
+    may be read, this output is the evidence that the runs were written in real time: a run whose
+    `source_init_time` differs from its `init_time`, or that is not written, is not a plain
+    real-time 00 UTC run. Read the log before
+    any fit, and copy what it shows into the companion page's lookahead section.
 
     Args:
         init_hours: The store's `init_time`, in integer hours since the epoch.

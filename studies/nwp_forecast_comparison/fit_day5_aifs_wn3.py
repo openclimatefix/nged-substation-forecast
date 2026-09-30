@@ -133,8 +133,8 @@ def main() -> int:
     parser.add_argument(
         "--lookahead-cleared",
         action="store_true",
-        help="Confirm that the run log of `build_wn3_inputs.py --read-store` and the page's "
-        "lookahead section have been read.",
+        help="Confirm that the run log of `build_wn3_inputs.py --read-store` and the "
+        "lookahead section of the companion page have been read.",
     )
     args = parser.parse_args()
     check_output_dir(output_dir=args.output_dir, published_dir=args.published_dir)
