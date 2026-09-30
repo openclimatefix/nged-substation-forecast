@@ -1174,7 +1174,7 @@ def leaderboard_figure(
                 "names; the full-window rows are ordered by day-1 error, the rows below them keep "
                 "a fixed order and are not ranked against each other, and a grey tick "
                 "beside a mark is the ENS mean fitted on the same rows. WeatherNext 3's marks "
-                "use only July to September 2026, the months after every training end that its paper "
+                "use only July to September 2026, the months after every training end its paper "
                 "lists. "
                 "A month counts whole "
                 "in the resampling even where the row set holds part of it (September 2026 holds "
