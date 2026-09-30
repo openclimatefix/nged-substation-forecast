@@ -70,6 +70,9 @@ _LOG: Final[logging.Logger] = logging.getLogger("dot_interval_vs_ens")
 
 PROJECT_ROOT: Final[Path] = Path(__file__).resolve().parents[2]
 
+FIRST_FIGURE_NUMBER: Final[int] = 1
+"""The solar figure's number on the page; the wind figure follows it."""
+
 DOMAINS: Final[tuple[DomainType, DomainType]] = ("solar", "wind")
 
 DAYS: Final[tuple[int, ...]] = (0, 1, 2, 3, 4, 5, 7, 10, 14)
@@ -1127,7 +1130,7 @@ def main() -> int:
     parser.add_argument(
         "--first-figure-number",
         type=int,
-        default=19,
+        default=FIRST_FIGURE_NUMBER,
         help="The solar figure's number on the page; the wind figure follows it.",
     )
     parser.add_argument("--no-svgo", action="store_true", help="Skip the svgo optimisation.")
