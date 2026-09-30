@@ -111,8 +111,8 @@ from studies.cross_validation import (
     search_fold_offsets,
     uncovered_months,
 )
-from studies.grid_sampling import nearest_cells
 from studies.guards import check_no_missing, refuse_to_overwrite
+from studies.reanalysis_wind import derive_nearest_cells
 from studies.resample import DEFAULT_DAYLIGHT_FLOOR_W_M2, clear_sky_index_resample
 from weather_products import CONTRAST_HEADER, _contrast_line, geometry_lines
 
@@ -287,26 +287,6 @@ class Built(NamedTuple):
     window_gaps: dict[str, pl.Series]
     grid_cells: int
     distance_range_km: tuple[float, float]
-
-
-def derive_nearest_cells(*, grid: pl.DataFrame, sites: pl.DataFrame) -> pl.DataFrame:
-    """Find each generator's nearest CERRA cell from the grid's latitude and longitude.
-
-    Args:
-        grid: One row per cell, with `y_index`, `x_index`, `latitude` and `longitude` in degrees.
-            A longitude on 0 to 360 degrees is wrapped to -180 to 180.
-        sites: The roster, with `site`, `latitude` and `longitude`.
-
-    Returns:
-        One row per generator with `site`, `y_index`, `x_index` and `distance_km`.
-    """
-    cells = grid.with_row_index("cell_id").with_columns(
-        longitude=(pl.col("longitude") + 180.0) % 360.0 - 180.0
-    )
-    nearest = nearest_cells(sites=sites, cells=cells)
-    return nearest.join(
-        cells.select("cell_id", "y_index", "x_index"), on="cell_id", how="left"
-    ).select("site", "y_index", "x_index", "distance_km")
 
 
 def check_cells_match(*, derived: pl.DataFrame, saved: pl.DataFrame) -> None:
