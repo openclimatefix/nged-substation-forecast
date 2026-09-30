@@ -4,8 +4,9 @@ description: >-
   The checklist for creating a GitHub issue or PR in openclimatefix/nged-substation-forecast —
   the fields `gh issue create` / `gh pr create` cannot set (labels, org issue Type, OCF project 33
   and its Status/Project/Area fields, sub-issue attachment and ordering, the JackKelly assignee) —
-  plus the fresh-sub-agent review of every body and comment before posting, the never-hard-wrap rule for anything posted to GitHub, the never-squash-merge rule and
-  ship-time triage. Load before running `gh issue create`, `gh pr create`, `gh pr comment`,
+  plus the fresh-sub-agent review of every body and comment before posting, the never-hard-wrap
+  rule for anything posted to GitHub, the never-squash-merge rule and ship-time triage. Load before running
+  `gh issue create`, `gh pr create`, `gh pr comment`,
   `gh issue comment` or `gh pr merge`, before writing any issue/PR body or comment, or when a PR
   completes a roadmap item.
 ---
@@ -111,7 +112,8 @@ sentence survives when nobody checks it against the data.
 - **Triage the findings against the source before applying them**, on the same terms as a diff
   review, and post the corrected text.
 - **A Sonnet reviewer is enough for a short body.** Use Opus for a long design description.
-- **State the review in your message to the maintainer**, in one line, so the maintainer knows the text was checked.
+- **State the review in your message to the maintainer**, in one line, so the maintainer knows the
+  text was checked.
 
 ## Never hard-wrap a GitHub body or comment
 
