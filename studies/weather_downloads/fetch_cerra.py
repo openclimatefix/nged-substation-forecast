@@ -61,6 +61,7 @@ flux in W/m².
 
 import argparse
 import calendar
+import json
 import sys
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -92,6 +93,9 @@ variable — see `WIND_10M_VARIABLE`. Fetched in this order, 100 m first, so the
 lands first."""
 
 WIND_10M_VARIABLE: Final[str] = "10m_wind_speed"
+"""A true 10 m near-surface wind speed on `reanalysis-cerra-single-levels`, an `analysis` product
+distinct from the `height_level` fields above — added so a study can compare CERRA's near-surface
+height, the height most other wind products report, against a turbine-hub-height forecast."""
 WIND_DIRECTION_VARIABLE: Final[str] = "wind_direction"
 WIND_10M_DIRECTION_VARIABLE: Final[str] = "10m_wind_direction"
 SINGLE_LEVELS_ANALYSIS_VARIABLES: Final[tuple[str, ...]] = (
@@ -100,10 +104,6 @@ SINGLE_LEVELS_ANALYSIS_VARIABLES: Final[tuple[str, ...]] = (
 )
 """The `reanalysis-cerra-single-levels` variables fetched as an `analysis` product, whose
 `valid_time` is the instant itself, unlike the solar variables' forecast accumulations."""
-"""A true 10 m near-surface wind speed on `reanalysis-cerra-single-levels`, an `analysis` product
-distinct from the `height_level` fields above — added so a study can compare CERRA's near-surface
-height, the height most other wind products report, against a turbine-hub-height forecast."""
-
 SOLAR_LEADTIME_HOURS: Final[int] = 3
 """The single value both `_build_request`'s `leadtime_hour` and `crop_one_chunk`'s
 `window_start_offset_hours` must agree on for the solar case — one named constant, so changing the
@@ -533,9 +533,13 @@ def main() -> int:
         )
         for height_level in HEIGHT_LEVELS
     )
-    written = [summary for summary in summaries if summary is not None]
+    lineage_paths = sorted(
+        path for path in output_dir.glob("lineage_*.json") if path.name != "lineage_cerra_grid.json"
+    )
     missing_chunk_labels = [
-        str(summary["label"]) for summary in written if summary["chunks_missing"]
+        path.stem.removeprefix("lineage_")
+        for path in lineage_paths
+        if json.loads(path.read_text())["chunks_missing"]
     ]
     if missing_chunk_labels:
         missing_value_convention = (
@@ -552,11 +556,7 @@ def main() -> int:
             "`n_rows_written` field for the exact row count and `chunks_requested`/"
             "`chunks_cached` to confirm no chunk is missing."
         )
-    lineage_filenames = sorted(
-        path.name
-        for path in output_dir.glob("lineage_*.json")
-        if path.name != "lineage_cerra_grid.json"
-    )
+    lineage_filenames = [path.name for path in lineage_paths]
 
     write_readme(
         product_dir=output_dir,
@@ -567,8 +567,8 @@ def main() -> int:
         columns={
             "valid_time": "Timezone-naive (implicitly UTC). For the two solar files, marks the "
             "END of a 3-hour forecast accumulation (leadtime_hour=3), NOT the instant itself — "
-            "see gotchas. For the wind files (height_level != surface), it is the instant itself "
-            "(an analysis product).",
+            "see gotchas. For the wind files (speed and direction, at every height including "
+            "10 m), it is the instant itself (an analysis product).",
             "y_index": "Row index into CERRA's native Lambert-conformal grid — not a coordinate.",
             "x_index": "Column index into CERRA's native Lambert-conformal grid — not a "
             "coordinate.",
@@ -590,7 +590,9 @@ def main() -> int:
             "wind_direction_deg": "Meteorological wind direction, degrees, the direction the wind "
             "blows FROM, an analysis value at 10 m and each height level, in the "
             "`wind_direction_*` and `10m_wind_direction_surface` files. Fetched with "
-            "`--wind-direction`.",
+            "`--wind-direction`. The range is 0 to 360 inclusive: rounding to 13 significand bits "
+            "stores a value just below 360 as exactly 360.0, so 0 and 360 are the same "
+            "direction. Average direction as vectors, never as degrees.",
         },
         missing_value_convention=missing_value_convention,
         gotchas=[
