@@ -2,7 +2,7 @@
 
 **The problem.** CERRA, the Copernicus regional reanalysis for Europe, is on disk at five wind heights (10 m, 50 m, 75 m, 100 m, and 150 m) at 190 grid cells around the trial area, every 3 hours from 2019-09-01 to 2026-06-30. Nobody has tested which of those heights an XGBoost model should be given to predict metered wind power. The maintainer also asked how much skill 100 m wind adds over 10 m wind in a simple XGBoost model.
 
-**The plan.** Fit one XGBoost model per wind farm per arm, where an arm is one choice of CERRA wind columns, on the same 3-hourly farm-hours for every arm, with column subsampling off and every arm padded to the same column count. Four contrasts are written down here before any fit: 100 m against 10 m, a mean of the near-100 m levels against 100 m, all four heights of 50 m to 150 m as separate columns against 100 m, and all five heights against 100 m. The result is a new study page, `docs/studies/past-weather/cerra-wind-levels.md`, so the page `docs/studies/past-weather/wind.md` that #968 is editing stays untouched.
+**The plan.** Fit one XGBoost model per wind farm per arm, where an arm is one choice of CERRA wind columns, on the same 3-hourly farm-hours for every arm, with column subsampling off and every arm padded to the same column count. Four contrasts are written down here before any fit: 100 m against 10 m, a mean of the near-100 m levels against 100 m, all four heights of 50 m to 150 m as separate columns against 100 m, and all five heights against 100 m. The shared loader for CERRA wind is owned by #968 and lands first, so implementation starts only after that loader's pull request has merged, and this pull request stays plan-only until then. The result is a new study page, `docs/studies/past-weather/cerra-wind-levels.md`, so the page `docs/studies/past-weather/wind.md` that #968 is editing stays untouched.
 
 ## Verdict, size and departures
 
@@ -29,18 +29,21 @@ One trigger is enough, and two fire. The issue therefore gets the full routine: 
 - **CERRA's wind files hold speed only, with no direction.** Every arm therefore carries speed columns and no direction, unlike the wind page's arms, which carry a direction as sine and cosine. Contrasts on this page are not comparable in level with the wind page's errors, and the page says so.
 - **The values are 3-hourly analyses (00, 03, ..., 21 UTC), instantaneous at their label.** The row set therefore has one hour in three, at most 8 per farm-day. Power for the hour labelled T is built from the half-hours ending at T and T + 30 minutes, as `wind_products._hourly_power` does with `centred=True`. The power-hour offset is scanned for CERRA before the first fit, as the `study` skill requires for every product.
 - **Timestamps are timezone-naive UTC** (`validation_wind.json`, `lineage_*.json`).
-- **The whole-domain grid is 5.5 km, read at each farm's nearest cell.** The nearest cell can be coastal or influenced by the sea in Lincolnshire, which the wind page handled with a land-cell rule for Open-Meteo. The plan reads the distance and a land-sea flag for each farm's cell from `cerra_grid.parquet` and `generator_cells.parquet`, and the report prints only pooled ranges, never a coordinate or a cell index.
-- **A source change inside the record is not yet ruled out.** The yearly means are stable at every height (`validation_wind.json`), but the plan reads the CDS dataset documentation for production-stream changes (the record joins a back-extension to a later production stream) before the first fit, and cuts folds by era if a change is found.
+- **The grid is 5.5 km, read at each farm's nearest cell, and the wind farms' cells are not yet derived.** `generator_cells.parquet` holds 6 rows, for the solar farms only, so the wind farms' cells come from the loader (owned by #968), which derives them from `cerra_grid.parquet` (columns `y_index`, `x_index`, `latitude`, `longitude`). The implementation asserts that each farm's cell lies strictly inside the 190-cell crop, not on its edge, so a farm outside the crop cannot silently read an edge cell. The report prints only pooled distance ranges, never a coordinate or a cell index.
+- **`cerra_grid.parquet` has no land-sea flag**, so the plan makes no claim about whether a cell is land or sea. A nearest cell near the coast could be influenced by the sea, as the wind page found for ICON global. Checking that needs CERRA's land-sea mask, a small download that the Data DOWNLOAD COORDINATOR owns; the plan asks the maintainer before any fetch, and the page states the gap as a limitation if no mask is fetched.
+- **The 10 m level is a different CERRA product from the other four.** The 10 m speed comes from `reanalysis-cerra-single-levels`, a surface diagnostic, and the 50 m to 150 m speeds come from `reanalysis-cerra-height-levels`, which reads model levels. Planned contrast 1 therefore compares a diagnostic with a model-level value as well as two heights, and the page says so wherever it quotes that contrast.
+- **`hour_of_day` takes only 8 values (0, 3, ..., 21 UTC) on the 3-hourly rows.** The page states this in "Data and methods".
+- **An era check is a gate before the first fit.** The CDS record may join two production streams (likely around 2021). Before any fit, the implementation reads the CDS dataset documentation and computes each height's monthly means at the farms' cells, and looks for a step at any candidate date. If a join exists, the folds are cut inside each era (`assign_folds(by=("site", "era"))`), every arm gets an era column (its width counted in the padding), and the part-month at the join is dropped. The yearly means in `validation_wind.json` show no jump, which is why the plan calls this a gate rather than a finding.
 
 ## What changes, file by file
 
 All new files. Nothing under `packages/`, `src/`, or `docs/studies/past-weather/wind.md` is edited.
 
 - **`studies/beam_diffuse_split/cerra_wind_levels.py`** (new). The fit script, in the style of `wind_products.py` and `cerra_past_solar.py`:
-  - `cerra_wind_frame()` reads the five parquet files at the three farms' cells, pivots the heights into columns, and joins the centred hourly power from the private power Delta table and each farm's `effective_capacity_mw`. Farms are relabelled W1 to W3 with `studies.anonymise.site_labels_for` before anything is written.
+  - It imports the shared CERRA wind loader from `packages/studies/`, which #968 adds with tests. The loader reads the five parquet files, derives the wind farms' nearest cells, pivots the heights into columns, and builds the centred power hour. This script writes no loader of its own. It joins each farm's `effective_capacity_mw`, and relabels farms W1 to W3 with `studies.anonymise.site_labels_for` before anything is written. If the loader's interface differs from what this plan assumes, the plan is updated after that pull request merges.
   - `common_rows()` reuses the rules of `wind_products.common_rows` (drop hours holding an exact-zero half-hour), applied to the target only, so every arm scores exactly the same rows. It drops no hours by any CERRA value.
   - `arm_columns()` returns one fixed-length tuple per arm from one function, and the report prints every arm's column list (the "silently lost column" rule). A `check_column_counts` raises if any two arms of a planned contrast differ in width.
-  - `jobs()` builds the arm list for `run_experiment.run_all`, with `colsample_bytree=1` (checked by an assertion on the hyperparameter dict), at `PRIMARY_HYPER_PARAMETERS` for all arms and `SENSITIVITY_HYPER_PARAMETERS` for every planned contrast and any result near the 5% line.
+  - `jobs()` builds the arm list for `run_experiment.run_all`, with `colsample_bytree=1` and `device="cpu"` (both checked by assertions), for every arm and control, and the report records the device. At `PRIMARY_HYPER_PARAMETERS` for all arms and `SENSITIVITY_HYPER_PARAMETERS` for every planned contrast and any result near the 5% line.
   - The report, `report.md` under `data/studies/beam_diffuse_split/`, prints every table the page quotes: each arm's absolute error, each contrast with its interval from `studies.bootstrap`, the arms' column lists, the row counts per farm and year, the power-hour offset scan, and the controls.
 - **`studies/beam_diffuse_split/cerra_wind_levels_charts.py`** (new). Figure 1 is a leaderboard of each arm's own error (`studies.charts.leaderboard_panel`), Figure 2 the paired contrasts (planned rows labelled per `studies.charts.planning`), then the "method working" figures for W1 to W3. The SVGs go through `svgo` before commit.
 - **`docs/studies/past-weather/cerra-wind-levels.md`** (new). The page, in the `study` skill's section order, with the disclaimer, a Summary with the headline figure, Key findings, Introduction, Data and methods, Results, Discussion, Limitations, Scope, Data and code availability, and Reproducing the figures.
@@ -52,7 +55,7 @@ All new files. Nothing under `packages/`, `src/`, or `docs/studies/past-weather/
 - **`docs/studies/past-weather/wind.md` is untouched by this PR**, so the two branches cannot conflict there. A one-line "see also" link from `wind.md` to the new page is a follow-up commit made only after #968 has merged, and only if the maintainer wants it.
 - **`docs/studies/past-weather/methods.md` is untouched too.** The new page states its own row set and planned contrasts and links the shared methods page for the folds, the normalisation, and the intervals. If #968 adds a wind row-set table to `methods.md` and merges first, a follow-up adds one row for this page.
 - **The one file both branches may touch is `mkdocs.yml`.** #968 may add nothing there (it adds row sets to an existing page); if it does, the conflict is one nav line.
-- **The CERRA wind loader is the shared risk.** #968's CERRA row-set script will also read the same five parquet files. The plan puts the reader in `cerra_wind_levels.py` and asks the #968 session, in the PR, whether it wants to import it or hold its own. The two must agree on the nearest-cell rule and the power-hour rule, or the pages' numbers will differ for no scientific reason.
+- **The CERRA wind loader is owned by #968.** The maintainer has decided that the shared loader (reading the files, deriving the nearest cells, pivoting the heights, building the centred power hour) goes into `packages/studies/` with tests, is owned by #968 (which needs it for CERRA and NORA3), and merges first. This plan imports it, so both pages share one nearest-cell rule and one power-hour rule.
 - **`data/studies/` writes go to a new directory** (`data/studies/cerra_wind_levels/`), so no published output is overwritten. Only one agent may run study scripts at a time, so the run needs the runner slot from the Study MAIN COORDINATOR.
 
 ## Study design
@@ -71,28 +74,28 @@ All new files. Nothing under `packages/`, `src/`, or `docs/studies/past-weather/
 
 | Arm | Wind columns (real) | Padding to five |
 |---|---|---|
-| `speed_10m` | 10 m | 10 m squared, cubed, and two more monotone transforms |
-| `speed_100m` | 100 m | the same padding on 100 m |
-| `speed_10m_100m` | 10 m and 100 m | monotone transforms of 100 m |
-| `mean_near_100m` | mean of 75 m, 100 m, 150 m | monotone transforms of the mean |
-| `levels_50_to_150` | 50 m, 75 m, 100 m, 150 m | one transform of 100 m |
+| `speed_10m` | 10 m | four monotone transforms of 10 m |
+| `speed_100m` | 100 m | four monotone transforms of 100 m |
+| `speed_10m_100m` | 10 m and 100 m | three monotone transforms of 100 m |
+| `mean_near_100m` | mean of 75 m, 100 m, 150 m | four monotone transforms of the mean |
+| `levels_50_to_150` | 50 m, 75 m, 100 m, 150 m | one monotone transform of 100 m |
 | `levels_all` | all five | none |
 
-A monotone transform of a column adds no information a tree can use, so the padding is deterministic and carries nothing new; the padded copies double as a negative control (see below).
+A monotone transform of a column adds no information a tree can use, so the padding is deterministic and carries nothing new. That also means a padded arm cannot show whether width alone moves the error, which the negative control below measures directly.
 
 Planned contrasts (each labelled "(planned)" on the page, each also run at the second hyperparameter setting):
 
 1. `speed_100m` minus `speed_10m`: what 100 m wind adds over 10 m wind.
 2. `mean_near_100m` minus `speed_100m`: does a simple mean of the near-100 m levels beat 100 m alone.
 3. `levels_50_to_150` minus `speed_100m`: does a learned combination of four hub-region heights beat 100 m alone.
-4. `levels_all` minus `speed_100m`: does adding the 10 m level to those heights change the answer.
+4. `levels_all` minus `levels_50_to_150`: does adding the 10 m level to the four higher heights change the answer.
 
 Every other contrast, including `speed_10m_100m` against `speed_100m` and any per-farm or per-season split, is exploratory, and any analysis added after the first run is labelled post hoc.
 
 **Controls.**
 
-- **Negative control:** `speed_100m` against itself with a different padding (five columns each, different deterministic transforms). The difference shows the size the pipeline produces from nothing, and colsample of 1 should make it near zero.
-- **Positive control:** a synthetic target built from a fixed power curve applied to CERRA's 150 m speed plus noise, with the same folds. `levels_50_to_150` must beat `speed_100m` on it by a margin the interval excludes, or a null result on the real target cannot be read as "no effect".
+- **Negative control:** `speed_100m` (100 m plus four monotone transforms of it) against `speed_100m_noise`, which is 100 m plus four information-free columns: the other levels shuffled by month block, so each column keeps a realistic distribution and carries no information about the hour it sits on. The difference shows the size a change in width produces from nothing. Monotone-transform padding alone would be inert at `colsample_bytree=1` and would show nothing.
+- **Positive control:** a synthetic target built from a fixed power curve applied to a log-height interpolation of CERRA's speeds to 120 m (linear in log-height between the 100 m and 150 m levels), plus noise, with the same folds. A target built from the 150 m speed alone would be trivial, since one arm column would reproduce it. On the interpolated target, `levels_50_to_150` must beat `speed_100m` by a margin the interval excludes, because the model has to learn the blend; otherwise a null result on the real target cannot be read as "no effect".
 
 **A null result is stated with its bound**, as in "an effect as large as X points is not excluded".
 
@@ -110,7 +113,7 @@ Study scripts carry no unit tests, per the `study` skill: the check is the scrip
 - A row-set check fails if any two arms are scored on different (farm, time) keys.
 - An assertion fails if any fit uses `colsample_bytree` other than 1.
 - The positive control fails the run if the blend does not beat 100 m on the synthetic target.
-- The nearest-cell derivation is compared against `generator_cells.parquet`, as `cerra_past_solar.py` does with `check_cells_match`.
+- An assertion fails if any wind farm's nearest cell lies on the edge of the 190-cell crop. The loader's own tests, in `packages/studies/`, cover the derivation.
 
 If a reusable helper is promoted into `packages/studies/` during implementation, it comes with tests and a mutation pass, and the PR body says so.
 
@@ -130,14 +133,27 @@ uv run pymarkdown scan -r docs README.md CLAUDE.md packages/*/README.md
 uv run mkdocs build --strict
 ```
 
-The run itself is `uv run python studies/beam_diffuse_split/cerra_wind_levels.py`, then the charts script, after the runner slot is granted. Memory says the CI has steps the skill's set omits (pydoclint, the docs link checker), so the implementer runs every step in `.github/workflows` locally. Before the run: `nvidia-smi` and a CPU load check, and `device="cuda"` if a GPU is present, with one arm refit on the other device as a noise floor.
+The run itself is `uv run python studies/beam_diffuse_split/cerra_wind_levels.py`, then the charts script, after the runner slot is granted. Memory says the CI has steps the skill's set omits (pydoclint, the docs link checker), so the implementer runs every step in `.github/workflows` locally. Before the run, a CPU load check. Every fit, control included, uses `device="cpu"`, set explicitly and recorded in the report and on the page; the 3-hourly rows are few enough that a GPU adds nothing worth the device-mixing risk.
 
 ## Risks and open questions
+
+**Findings from the plan review that were taken into the plan** (each checked against the code and the data):
+
+- **Contrast 4 mixed two changes.** Confirmed by reading the arm table: `levels_all` adds the 10 m level and the 50, 75 and 150 m levels at once. Contrast 4 is now `levels_all` minus `levels_50_to_150`.
+- **Contrast 1 compares two CERRA products.** Confirmed: `lineage_10m_wind_speed_surface.json` names `reanalysis-cerra-single-levels`, and the other four name `reanalysis-cerra-height-levels`. The plan and the page now say so.
+- **The wind farms are not in `generator_cells.parquet`.** Confirmed: the file has 6 rows (`site`, `y_index`, `x_index`, `distance_km`), for the solar farms. The cells are derived from `cerra_grid.parquet`, asserted strictly inside the crop.
+- **`cerra_grid.parquet` has no land-sea flag.** Confirmed: its columns are `y_index`, `x_index`, `latitude`, and `longitude`. The plan drops the claim and asks the maintainer before any mask download.
+- **The negative control was inert at `colsample_bytree=1`.** Accepted: it now pads with information-free shuffled columns.
+- **The 150 m positive control was trivial.** Accepted: it now uses a 120 m log-height interpolation.
+- **Device.** Accepted: CPU explicitly for every fit, recorded.
+- **The era check.** Accepted as a gate before the first fit. `hour_of_day` taking 8 values is stated on the page.
+- **Reviewer findings rejected:** none.
+- **The shared loader (decided by the maintainer, not a review finding).** #968 owns it, and #957's implementation starts only after the loader's pull request has merged. This pull request stays plan-only until then.
 
 1. **How to pad the narrower arms to equal column count.** The plan uses monotone transforms of an existing column, which a tree cannot exploit. Recommendation: keep this, with the negative control showing it is inert; the alternative is unequal widths at `colsample_bytree=1`, which the skill says still favours the wider arm by about 0.4% of mean absolute error on synthetic data.
 2. **Definition of "a blend".** The plan tests a plain mean and a learned combination. A hub-height-interpolated speed (linear in log-height between the levels either side of each farm's hub height) is a third defensible blend, but it needs each farm's hub height, which is farm-identifying private data. Recommendation: leave interpolation to a follow-up unless the maintainer supplies the heights as a range.
 3. **The row set is one hour in three.** This cuts the row count by about two-thirds against the wind page's hourly rows and widens every interval. Recommendation: accept it; rebuilding hourly wind by interpolating CERRA's 3-hourly analyses would make every hourly value a model, as `cerra_past_solar.py` had to do for solar.
 4. **No direction.** Wind power depends on direction through wake and terrain effects that speed alone cannot see. Recommendation: state this in Limitations; direction is not in the download and #969 is closed.
 5. **Possible source change inside CERRA's record.** To be checked against the dataset documentation before the first fit. Recommendation: cut folds by era and add an era column to every arm if a change is found.
-6. **The CERRA wind loader shared with #968.** Recommendation: whichever session merges first owns the loader, and the other imports it.
+6. **Dependency on #968's loader.** Implementation is blocked until that pull request merges; if the loader's interface differs from this plan's assumptions, revise the plan then.
 7. **Whether the second Opus science review is needed.** The study skill requires two before publishing, so the plan assumes both; the brief says a second only if the result is scientifically important, which the skill's floor overrides.
