@@ -97,12 +97,6 @@ SOURCES: Final[dict[SourceType, Source]] = {
 """Each source's folder under `data/studies/`, and its losses file's name. A `{day}` in the name
 means one file per lead day."""
 
-ENS_MEAN_REFERENCES: Final[dict[DomainType, str]] = {"solar": "ens_mean", "wind": "ens_mean"}
-"""The arm prefix each technology's rows are compared with, unless a row names its own."""
-
-WN3_REFERENCES: Final[dict[DomainType, str]] = {"solar": "ens_mean", "wind": "ens_meanvec"}
-"""WN3's speed is a mean-vector speed, so its wind reference is the ENS mean-vector arm."""
-
 REFERENCE_NAMES: Final[dict[str, str]] = {
     "ens_mean": "ENS mean",
     "ens_meanvec": "ENS mean (mean-vector speed)",
@@ -121,7 +115,7 @@ class ProductRow(NamedTuple):
     days: tuple[int, ...]
     reference_source: SourceType | None = None
     domains: tuple[DomainType, ...] = DOMAINS
-    references: Mapping[DomainType, str] = ENS_MEAN_REFERENCES
+    wind_reference: str = "ens_mean"
     label: str | None = None
 
 
@@ -145,7 +139,7 @@ PRODUCTS: Final[tuple[ProductRow, ...]] = (
     ProductRow("ens_control", "leads_day10b", (3, 10), reference_source="leads_day10"),
     ProductRow("aifs_single", "aifs_single", DAYS),
     ProductRow("aifs_ens_mean", "aifs_ens", DAYS),
-    ProductRow("wn3_mean", "wn3", DAYS, references=WN3_REFERENCES, label=WN3_LABEL),
+    ProductRow("wn3_mean", "wn3", DAYS, wind_reference="ens_meanvec", label=WN3_LABEL),
 )
 """Every row the figures draw. A product at a lead day no row names is not in the archive or not
 fitted. Day 4 holds only ENS, AIFS, and WN3, and day 10 only ENS, its control member, GEFS, native
@@ -178,7 +172,7 @@ def comparisons(*, domain: DomainType) -> list[Comparison]:
     for product in PRODUCTS:
         if domain not in product.domains:
             continue
-        reference_prefix = product.references[domain]
+        reference_prefix = product.wind_reference if domain == "wind" else "ens_mean"
         output.extend(
             Comparison(
                 domain=domain,
@@ -407,7 +401,9 @@ def subtitle_lines(*, domain: DomainType, has_short_rows: bool) -> list[str]:
         DOTS_NOTE + (" A hollow dot has too few months for an interval." if has_short_rows else ""),
         (
             "Each row is scored on the hours its product and its ENS mean share. "
-            "Day 0 is not a lead a live service could use."
+            "Day 0 is not a lead a live service could use, and it favours the Previous Runs "
+            "products: they read the freshest run, a lead of a few hours, while ENS reads the "
+            "00 UTC run of the day, a lead of 0 to 23 hours."
         ),
         CAPACITY_NOTE,
     ]
@@ -645,13 +641,23 @@ def main() -> int:
     parser.add_argument("--no-svgo", action="store_true", help="Skip the svgo optimisation.")
     args = parser.parse_args()
     rows = {domain: compute(data_dir=args.data_dir, domain=domain) for domain in DOMAINS}
+    files = ("report.md", "intervals.parquet", "README.md")
+    svgs = {domain: args.svg_dir / f"nwp_forecast_{domain}_dots_vs_ens.svg" for domain in DOMAINS}
+    taken = [args.output_dir, *(args.output_dir / name for name in files), *svgs.values()]
+    existing = [path for path in taken if path.exists()]
+    if existing:
+        msg = f"{existing} exist; this script writes each output once"
+        raise FileExistsError(msg)
+    charts = {
+        domain: draw(rows=rows[domain], domain=domain, number=args.first_figure_number + index)
+        for index, domain in enumerate(DOMAINS)
+    }
+    args.output_dir.mkdir(parents=True, exist_ok=False)
     write_once(path=args.output_dir / "report.md", write=report_text(rows=rows))
     write_once(path=args.output_dir / "intervals.parquet", write=pl.concat(rows.values()))
     write_once(path=args.output_dir / "README.md", write=readme_text(rows=rows))
-    for index, domain in enumerate(DOMAINS):
-        path = args.svg_dir / f"nwp_forecast_{domain}_dots_vs_ens.svg"
-        chart = draw(rows=rows[domain], domain=domain, number=args.first_figure_number + index)
-        write_once(path=path, write=chart)
+    for domain, path in svgs.items():
+        write_once(path=path, write=charts[domain])
         if not args.no_svgo:
             optimise(path=path)
         _LOG.info("wrote %s", path)

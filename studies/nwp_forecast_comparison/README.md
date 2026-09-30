@@ -210,8 +210,8 @@ lead?](../../docs/studies/forecasts/matched-lead.md).
   that folder holds no ENS mean at the day, from `_leads_day10`'s. WeatherNext 3's wind reference is
   `ens_meanvec`. It writes `report.md`, `intervals.parquet`, and a `README.md` naming each row's
   reference to a new `nwp_forecast_comparison_vs_ens_dots` folder, and two SVGs to
-  `docs/studies/assets/`,
-  and it refuses to overwrite any of them.
+  `docs/studies/assets/`. It checks that none of the five outputs exists before it writes any, and
+  it refuses to overwrite them.
 
 ## Outputs
 
