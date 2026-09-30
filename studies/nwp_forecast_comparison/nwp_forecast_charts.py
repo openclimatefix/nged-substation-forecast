@@ -744,10 +744,10 @@ WN3_LEADERBOARD_NOTES: Final[dict[DomainType, str]] = {
 
 MAJOR_GRID_COLOUR: Final[str] = "#C8C8C8"
 MINOR_GRID_COLOUR: Final[str] = "#DDDDDD"
-"""The leaderboard's vertical grid: the major lines are darker, and the minor lines are thicker."""
+"""The leaderboard's vertical grid: the major lines are darker and thicker than the minor ones."""
 
-MAJOR_GRID_WIDTH_PX: Final[float] = 1.0
-MINOR_GRID_WIDTH_PX: Final[float] = 2.5
+MAJOR_GRID_WIDTH_PX: Final[float] = 2.5
+MINOR_GRID_WIDTH_PX: Final[float] = 1.5
 """The stroke widths of the major (integer) and minor (half-point) grid lines."""
 
 LEAD_BOTTOM_PAD_ROWS: Final[float] = 0.35
