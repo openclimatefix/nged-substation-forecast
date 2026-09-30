@@ -51,12 +51,14 @@ import polars as pl
 from build_forecast_inputs import PRODUCT_SLUGS
 from fit_aifs import (
     BLEND_DAYS,
+    LEAN_DAYS,
     LONG_DAYS,
     NO_DETECTABLE_DIFFERENCE,
     NO_DOY_SUFFIX,
     NO_SKILL,
     ROW_SETS,
     WN3_DAYS,
+    WN3_EXTRA_DAYS,
     WN3_SPLIT_MONTHS,
     WN3_SPLITS,
     Contrast,
@@ -694,7 +696,8 @@ def lead_board_x_domain(
         longest_name: The number of characters in the longest product name.
 
     Returns:
-        The x range, and the tick values whose grid lines fall to the right of the product names.
+        The x range, and the tick values whose grid lines fall to the right of the product names:
+        every whole number of points in that stretch.
     """
     high = math.ceil((highest + 0.05) * 2) / 2
     need = longest_name * LEAD_NAME_PX_PER_CHARACTER + LEAD_NAME_GAP_PX
@@ -703,7 +706,8 @@ def lead_board_x_domain(
         / 10
     )
     first_visible = low + need * (high - low) / LEAD_PLOT_WIDTH_PX
-    return (low, high), ticks(x_domain=(first_visible, high))
+    integers = [float(value) for value in range(math.ceil(first_visible), math.floor(high) + 1)]
+    return (low, high), integers if len(integers) >= 2 else ticks(x_domain=(first_visible, high))
 
 
 DIAMOND_DAYS: Final[frozenset[int]] = frozenset({0, 7})
@@ -806,7 +810,12 @@ ROW_SET_PRODUCTS: Final[dict[str, str]] = {
 
 
 def load_row_set_marks(
-    *, blends_dir: Path | None, wn3_dir: Path | None, domain: DomainType
+    *,
+    blends_dir: Path | None,
+    wn3_dir: Path | None,
+    domain: DomainType,
+    blends_extra_dir: Path | None = None,
+    wn3_extra_dir: Path | None = None,
 ) -> list[RowSetMarks]:
     """Read the losses of the products that are fitted on a smaller row set than the published one.
 
@@ -815,6 +824,10 @@ def load_row_set_marks(
             and the AIFS ENS mean.
         wn3_dir: The directory `fit_aifs.py --wn3` wrote to, or None to leave out WeatherNext 3.
         domain: `solar` or `wind`.
+        blends_extra_dir: The directory `fit_aifs.py --lean-leads` wrote to, whose days
+            (`LEAN_DAYS`) join the blends fit's, or None.
+        wn3_extra_dir: The directory `fit_aifs.py --wn3 --days ...` wrote to for `WN3_EXTRA_DAYS`,
+            whose days join `wn3_dir`'s, or None.
 
     Returns:
         One `RowSetMarks` per product, in the order AIFS Single, AIFS ENS mean, WeatherNext 3
@@ -826,19 +839,21 @@ def load_row_set_marks(
     """
     frames: dict[str, pl.DataFrame] = {}
     if blends_dir is not None:
-        frames |= load_aifs_leads(blends_dir=blends_dir, domain=domain)
+        frames |= load_aifs_leads(blends_dir=blends_dir, domain=domain, extra_dir=blends_extra_dir)
     if wn3_dir is not None:
         # The leaderboards draw every WN3 row (February to September 2026, 7 months); the split
         # into in-sample and out-of-sample rows is drawn in the three-group figures.
         frames["wn3"] = pl.concat(
             [
                 wn3_split(
-                    losses=pl.read_parquet(wn3_dir / f"{domain}_wn3_day{day}_losses.parquet"),
+                    losses=pl.read_parquet(folder / f"{domain}_wn3_day{day}_losses.parquet"),
                     split="pooled",
                     domain=domain,
                     day=day,
                 )
-                for day in WN3_DAYS
+                for folder, days in ((wn3_dir, WN3_DAYS), (wn3_extra_dir, WN3_EXTRA_DAYS))
+                if folder is not None
+                for day in days
             ],
             how="diagonal_relaxed",
         )
@@ -1027,6 +1042,7 @@ def leaderboard_figure(
     )
     x_scale = alt.Scale(domain=list(x_domain), nice=False, zero=False)
     x_axis = alt.Axis(values=x_ticks, format=".2~f", grid=False)
+    top_axis = alt.Axis(values=x_ticks, format=".2~f", grid=False, orient="top", title=None)
     y_scale = alt.Scale(domain=[len(products) - 0.5, -LEAD_LABEL_ROWS], nice=False)
     y_axis = alt.Axis(labels=False, ticks=False, domain=False, grid=False, title=None)
     colour = alt.Color(
@@ -1057,7 +1073,7 @@ def leaderboard_figure(
         alt.Chart(pl.DataFrame({"x": x_ticks, "y_start": -0.5, "y_end": len(products) - 0.5}))
         .mark_rule(color=MAJOR_GRID_COLOUR, strokeWidth=1.5, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("x:Q", scale=x_scale, axis=x_axis, title=x_title),
+            x=alt.X("x:Q", scale=x_scale, axis=None),
             y=alt.Y("y_start:Q", scale=y_scale, axis=y_axis),
             y2="y_end:Q",
         )
@@ -1067,9 +1083,17 @@ def leaderboard_figure(
         alt.Chart(pl.DataFrame({"x": minor, "y_start": -0.5, "y_end": len(products) - 0.5}))
         .mark_rule(color=MINOR_GRID_COLOUR, strokeWidth=1, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("x:Q", scale=x_scale, axis=x_axis, title=x_title),
+            x=alt.X("x:Q", scale=x_scale, axis=None),
             y=alt.Y("y_start:Q", scale=y_scale, axis=y_axis),
             y2="y_end:Q",
+        )
+    )
+    top_labels = (
+        alt.Chart(pl.DataFrame({"x": x_domain[0], "y": -LEAD_LABEL_ROWS}))
+        .mark_point(opacity=0, aria=False)
+        .encode(  # ty: ignore[unresolved-attribute]
+            x=alt.X("x:Q", scale=x_scale, axis=top_axis),
+            y=alt.Y("y:Q", scale=y_scale, axis=y_axis),
         )
     )
     same_rows_ticks = (
@@ -1078,7 +1102,7 @@ def leaderboard_figure(
             color=ocf.BLACK_1, opacity=0.45, thickness=2, size=LEAD_TICK_HEIGHT_PX, aria=False
         )
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("value:Q", scale=x_scale, axis=x_axis, title=x_title),
+            x=alt.X("value:Q", scale=x_scale, axis=None),
             y=alt.Y("y:Q", scale=y_scale, axis=y_axis),
         )
     )
@@ -1097,7 +1121,7 @@ def leaderboard_figure(
             aria=False,
         )
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("x:Q", scale=x_scale, axis=x_axis, title=x_title),
+            x=alt.X("x:Q", scale=x_scale, axis=None),
             y=alt.Y("y:Q", scale=y_scale, axis=y_axis),
             text="text:N",
         )
@@ -1106,7 +1130,7 @@ def leaderboard_figure(
         alt.Chart(data)
         .mark_rule(strokeWidth=2, clip=True, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("lower_95:Q", scale=x_scale, axis=x_axis, title=x_title),
+            x=alt.X("lower_95:Q", scale=x_scale, axis=None),
             x2="upper_95:Q",
             y=alt.Y("y:Q", scale=y_scale, axis=y_axis),
             color=colour,
@@ -1116,7 +1140,7 @@ def leaderboard_figure(
         alt.Chart(data)
         .mark_point(filled=True, size=LEAD_POINT_SIZE, opacity=1, clip=True, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("value:Q", scale=x_scale, axis=x_axis, title=x_title),
+            x=alt.X("value:Q", scale=x_scale, axis=None),
             y=alt.Y("y:Q", scale=y_scale, axis=y_axis),
             color=colour,
             shape=alt.Shape(
@@ -1142,7 +1166,7 @@ def leaderboard_figure(
         alt.Chart(reference)
         .mark_rule(strokeDash=[5, 3], strokeWidth=1.5, color=ocf.BLACK_1, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("value:Q", scale=x_scale, axis=x_axis, title=x_title),
+            x=alt.X("value:Q", scale=x_scale, axis=None),
             y=alt.Y("line_start:Q", scale=y_scale, axis=y_axis),
             y2="line_end:Q",
         )
@@ -1151,7 +1175,7 @@ def leaderboard_figure(
         alt.Chart(reference)
         .mark_text(align="right", dx=-5, baseline="middle", fontSize=LEAD_NAME_FONT_PX, aria=False)
         .encode(  # ty: ignore[unresolved-attribute]
-            x=alt.X("value:Q", scale=x_scale, axis=x_axis, title=x_title),
+            x=alt.X("value:Q", scale=x_scale, axis=None),
             y=alt.Y("name_y:Q", scale=y_scale, axis=y_axis),
             text="text:N",
             color=alt.value(ocf.BLACK_1),
@@ -1161,6 +1185,7 @@ def leaderboard_figure(
         layer=[
             grid,
             minor_grid,
+            top_labels,
             rules,
             reference_rules,
             same_rows_ticks,
@@ -1171,7 +1196,7 @@ def leaderboard_figure(
         ],
         width=LEAD_PLOT_WIDTH_PX,
         height=LEAD_ROW_PX * (len(products) + LEAD_LABEL_ROWS - 0.5),
-    )
+    ).resolve_axis(x="independent")
     return figure(
         panels=[
             line_key(
@@ -2199,12 +2224,16 @@ def aifs_lead_label(*, arm: str) -> str:
     return f"{AIFS_PRODUCT_TEXT[match['slug']]} day {match['day']}{AIFS_ROLE_TEXT[match['rest']]}"
 
 
-def load_aifs_leads(*, blends_dir: Path, domain: DomainType) -> dict[str, pl.DataFrame]:
+def load_aifs_leads(
+    *, blends_dir: Path, domain: DomainType, extra_dir: Path | None = None
+) -> dict[str, pl.DataFrame]:
     """Read one technology's blends-fit losses, every day of each row set stacked.
 
     Args:
         blends_dir: The directory `fit_aifs.py --blends` wrote to.
         domain: `solar` or `wind`.
+        extra_dir: The directory `fit_aifs.py --lean-leads` wrote to, whose days (`LEAN_DAYS`) are
+            stacked after the blends fit's, or None.
 
     Returns:
         Each row set's per-row losses, keyed by row set, after the anonymisation check. Arms carry
@@ -2213,8 +2242,10 @@ def load_aifs_leads(*, blends_dir: Path, domain: DomainType) -> dict[str, pl.Dat
     stacked = {
         row_set: pl.concat(
             [
-                pl.read_parquet(blends_dir / f"{domain}_{row_set}_day{day}_losses.parquet")
-                for day in BLEND_DAYS
+                pl.read_parquet(folder / f"{domain}_{row_set}_day{day}_losses.parquet")
+                for folder, days in ((blends_dir, BLEND_DAYS), (extra_dir, LEAN_DAYS))
+                if folder is not None
+                for day in days
             ],
             how="diagonal_relaxed",
         )
@@ -3054,6 +3085,8 @@ def draw_domain(
     aifs_dir: Path | None = None,
     blends_dir: Path | None = None,
     wn3_dir: Path | None = None,
+    blends_extra_dir: Path | None = None,
+    wn3_extra_dir: Path | None = None,
 ) -> tuple[dict[str, alt.VConcatChart], str | None]:
     """Draw every chart of one technology that its saved losses can support.
 
@@ -3066,6 +3099,8 @@ def draw_domain(
             the AIFS ENS mean off the leaderboard.
         wn3_dir: The directory `fit_aifs.py --wn3` wrote to, or None to leave WeatherNext 3 off the
             leaderboard.
+        blends_extra_dir: The directory `fit_aifs.py --lean-leads` wrote to, or None.
+        wn3_extra_dir: The directory `fit_aifs.py --wn3 --days ...` wrote to, or None.
 
     Returns:
         Each chart keyed by its name, and the chosen week's month and year.
@@ -3079,7 +3114,13 @@ def draw_domain(
             loaded=loaded,
             domain=domain,
             title=TITLES[(domain, "leaderboard")],
-            row_set_marks=load_row_set_marks(blends_dir=blends_dir, wn3_dir=wn3_dir, domain=domain),
+            row_set_marks=load_row_set_marks(
+                blends_dir=blends_dir,
+                wn3_dir=wn3_dir,
+                domain=domain,
+                blends_extra_dir=blends_extra_dir,
+                wn3_extra_dir=wn3_extra_dir,
+            ),
         ),
         "by_lead_day": by_lead_day(
             losses=losses, domain=domain, title=TITLES[(domain, "by_lead_day")]
@@ -3143,6 +3184,20 @@ def main() -> int:
         default=None,
         help="The directory `fit_aifs.py --wn3` wrote to; adds WeatherNext 3 to the leaderboards.",
     )
+    parser.add_argument(
+        "--leaderboard-blends-extra-dir",
+        type=Path,
+        default=None,
+        help="The directory `fit_aifs.py --lean-leads` wrote to; adds AIFS at days 0, 3, 4 and 10 "
+        "to the leaderboards.",
+    )
+    parser.add_argument(
+        "--wn3-extra-dir",
+        type=Path,
+        default=None,
+        help="The directory `fit_aifs.py --wn3 --days 0 3 4 10` wrote to; adds WeatherNext 3 at "
+        "those days to the leaderboards.",
+    )
     parser.add_argument("--output-dir", type=Path, required=True, help="Where SVGs are written.")
     parser.add_argument("--no-svgo", action="store_true", help="Skip the svgo optimisation.")
     args = parser.parse_args()
@@ -3172,6 +3227,8 @@ def main() -> int:
             aifs_dir=args.aifs_dir,
             blends_dir=args.leaderboard_blends_dir,
             wn3_dir=args.wn3_dir,
+            blends_extra_dir=args.leaderboard_blends_extra_dir,
+            wn3_extra_dir=args.wn3_extra_dir,
         )
         for name, chart in charts.items():
             path = args.output_dir / f"nwp_forecast_{domain}_{name}.svg"

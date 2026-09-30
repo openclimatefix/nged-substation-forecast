@@ -23,7 +23,7 @@ published inputs' own `(site, time)` keys:
   lead. Each site's value is the H3 resolution-5 overlap-weighted mean of the crop's 0.1 degree
   cells, taken on the eastward and northward components and turned into speed and direction after
   that.
-- `ens_mean_day<N>_*` at days 7 and 14, the same-rows ENS reference, built by
+- `ens_mean_day<N>_*` at days 4, 7, 10 and 14, the same-rows ENS reference, built by
   `build_forecast_inputs._ens_extra_frame` as the published extra-lead inputs are.
 - Wind only, `ens_meanvec_day<N>_*` at every built day, the matched ENS reference whose speed is
   the length of the mean of the members' wind vectors, as WN3's is. The store holds only the
@@ -116,8 +116,9 @@ N_LEADS: Final[int] = 360
 WN3_DAYS: Final[tuple[int, ...]] = (1, 2, 7, 14)
 """The lead days built unless `--days` names others."""
 
-ENS_EXTRA_DAYS: Final[tuple[int, ...]] = (7, 14)
-"""The days whose same-rows ENS mean `_ens_extra_frame` builds beside the WN3 arms."""
+ENS_EXTRA_DAYS: Final[tuple[int, ...]] = (4, 7, 10, 14)
+"""The days whose same-rows ENS mean `_ens_extra_frame` builds beside the WN3 arms. Days 0 to 3 are
+in the published inputs already."""
 
 PHYSICAL_RANGES: Final[dict[str, tuple[float, float]]] = {
     "ghi": (0.0, 1400.0),
@@ -368,8 +369,9 @@ def _has_value(
     *, run: np.ndarray, run_position: np.ndarray, lead_position: np.ndarray, runs: np.ndarray
 ) -> np.ndarray:
     """Return which rows have a copied run and, one lead earlier, a stored lead."""
-    # Solar also reads the lead one hour earlier, so it needs the store's second lead onward. Wind
-    # is unaffected: every band's lead is at least 24 hours, far above the bound.
+    # Solar also reads the lead one hour earlier, so it needs the store's second lead onward. From
+    # day 1 every band's lead is at least 24 hours, far above the bound. A day-0 row at the run's
+    # first hour (wind at 00:00, solar at 01:00 UTC) has no stored lead, so it is left null.
     return (runs[run_position] == run) & (lead_position >= 1) & (lead_position < N_LEADS)
 
 
@@ -612,15 +614,15 @@ def build_domain(
         The built frame.
 
     Raises:
-        ValueError: If `output_dir` is `published_dir`, `days` is empty or holds a day below 1, an
+        ValueError: If `output_dir` is `published_dir`, `days` is empty or holds a day below 0, an
             identity check fails, or a built column is null on every row.
         FileExistsError: If the output file already exists.
     """
     if output_dir.resolve() == published_dir.resolve():
         msg = f"the WN3 output must not be the published folder {published_dir}"
         raise ValueError(msg)
-    if not days or min(days) < 1:
-        msg = f"days must be a non-empty tuple of days from 1, got {days}"
+    if not days or min(days) < 0:
+        msg = f"days must be a non-empty tuple of days from 0, got {days}"
         raise ValueError(msg)
     output_path = output_dir / f"{domain}_wn3_inputs.parquet"
     refuse_to_overwrite(paths=[output_path])

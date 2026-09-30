@@ -87,6 +87,7 @@ from nwp_forecast_comparison import (
 )
 from studies.blending import climatology_permutation
 from studies.bootstrap import (
+    MIN_MONTHS_FOR_INTERVAL,
     NO_DETECTABLE_DIFFERENCE,
     BlendVerdict,
     BootstrapInterval,
@@ -618,6 +619,7 @@ def aifs_rows(
     day: int | None,
     shuffles: Mapping[str, Sequence[str]],
     nullable: Sequence[str] = (),
+    drop: pl.Expr | None = None,
 ) -> pl.DataFrame:
     """Return one set's rows: the published shared rows inside the set's eras, with AIFS joined on.
 
@@ -631,6 +633,8 @@ def aifs_rows(
             months. With a day, hours whose run of that day lies outside their era are dropped.
         shuffles: Each prefix to shuffle to the variant suffixes to build for it.
         nullable: Prefixes whose columns may hold nulls on purpose.
+        drop: Rows to remove before the eras are cut, or `None` to keep every row. `wn3_rows` uses
+            it for the hour a day-0 run has no stored lead for.
 
     Returns:
         The rows with `month`, `era_code`, `era` and `fold` recut inside the AIFS eras, and the
@@ -654,6 +658,8 @@ def aifs_rows(
     )
     if day is not None:
         kept = drop_runs_outside_era(frame=kept, domain=domain, row_set=row_set, day=day)
+    if drop is not None:
+        kept = kept.filter(~drop)
     found = search_fold_offsets(frame=kept, first_months=spec.era_start_months)
     if spec.fold_offsets not in [dict(offsets) for offsets in found]:
         msg = f"{domain}/{row_set}: {spec.fold_offsets} no longer covers every calendar month"
@@ -2553,7 +2559,23 @@ def run_blends(
 # --- The WeatherNext 3 fit: WN3's ensemble mean at days 1, 2, 7 and 14 -------------------------
 
 WN3_DAYS: Final[tuple[int, ...]] = (1, 2, 7, 14)
-"""The lead days the WN3 fit scores, each on a frame of its own."""
+"""The lead days the WN3 fit scores unless `--days` names others, each on a frame of its own."""
+
+WN3_EXTRA_DAYS: Final[tuple[int, ...]] = (0, 3, 4, 10)
+"""The lead days the second WN3 fit adds, into a folder of its own, for the leaderboards."""
+
+WN3_NO_LEAD_HOUR: Final[dict[DomainType, int]] = {"solar": 1, "wind": 0}
+"""The hour of the UTC day at which a day-0 row has no stored lead. The store's leads start at 1
+hour. A wind row at 00:00 reads lead 0. A solar row at 01:00 (an hour labelled by its end) reads
+the accumulation from lead 0 to 1 and the mean of the temperatures at leads 0 and 1."""
+
+
+def wn3_day0_drop(*, domain: DomainType, day: int) -> pl.Expr | None:
+    """Return which rows a WN3 day has no stored lead for, or `None` at every day but day 0."""
+    if day != 0:
+        return None
+    return pl.col("time").dt.hour() == WN3_NO_LEAD_HOUR[domain]
+
 
 WN3_TRAINING_END: Final[date] = date(2026, 6, 30)
 """The split date: the WN3 paper states that the production weather model is trained until 30 June
@@ -2564,10 +2586,11 @@ WN3_TRAINING_END_MONTH: Final[str] = f"{WN3_TRAINING_END:%Y-%m}"
 """The month of the split date, in `%Y-%m` form."""
 
 WN3_SPLITS: Final[tuple[str, ...]] = ("in-sample", "out-of-sample", "pooled")
-"""The three row groups every WN3 result is reported in. Only the out-of-sample group carries a
-claim: the in-sample months may overlap WN3's training data, so WN3 against a product whose
-training data ends earlier may not be a fair comparison there. The pooled group holds every
-scored row, including the rows `wn3_dropped_rows` counts, so it mixes both."""
+"""The three row groups every WN3 result is reported in. The in-sample months may overlap WN3's
+training data, so WN3 against a product whose training data ends earlier may not be a fair
+comparison there. The out-of-sample months check whether a change of model version at the split
+shows in the scores. The pooled group holds every scored row and is the row set of the
+leaderboards."""
 
 WN3_SPLIT_MONTHS: Final[dict[str, str]] = {
     "in-sample": "February to June 2026",
@@ -2810,6 +2833,7 @@ def wn3_rows(
         arms=wn3_arms(domain=domain, day=day),
         day=day,
         shuffles=wn3_shuffles(day=day),
+        drop=wn3_day0_drop(domain=domain, day=day),
     )
 
 
@@ -2882,14 +2906,16 @@ def wn3_split_lines(*, domain: DomainType, day: int, losses: pl.DataFrame, split
     primary = group.filter(pl.col("setting") == PRIMARY)
     second = group.filter(pl.col("setting") == SENSITIVITY)
     claims = {
-        "out-of-sample": "These months carry every claim about WN3.",
+        "out-of-sample": "These months rest on 3 calendar months, fewer than "
+        f"{MIN_MONTHS_FOR_INTERVAL}, so their intervals are indicative only. They check whether a "
+        "change of model version at the start of July shows in the scores.",
         "in-sample": "These months may overlap WN3's training data, so WN3 against a product "
         "trained on earlier data may not be a fair comparison here; read them as descriptive "
         "only.",
         "pooled": "This group holds every scored row from February to September 2026, including "
-        "the rows that fall in neither of the other groups. It mixes months that may lie inside "
-        "WN3's training data, so it is not a fair comparison of WN3 with AIFS or ENS, and it is "
-        "not the headline until the archive's provenance is confirmed.",
+        "the rows that fall in neither of the other groups, and is the row set of the "
+        "leaderboards. It mixes months that may lie inside WN3's training data, and which "
+        "version made the archive is not documented.",
     }
     claim = claims[split]
     lines = [
@@ -2998,14 +3024,17 @@ def check_wn3(*, published_dir: Path, wn3_dir: Path) -> bool:
     return agree
 
 
-def run_wn3(*, published_dir: Path, output_dir: Path, workers: int) -> int:
+def run_wn3(
+    *, published_dir: Path, output_dir: Path, workers: int, days: Sequence[int] = WN3_DAYS
+) -> int:
     """Fit every stage of the WN3 fit and write its outputs once.
 
     Args:
         published_dir: The folder holding the published inputs.
         output_dir: The new folder holding `<domain>_wn3_inputs.parquet` from `build_wn3_inputs.py
-            --build`, which receives every output.
+            --build --days ...`, which receives every output.
         workers: How many (arm, site) fits run at once.
+        days: The lead days to fit, each built into the inputs.
 
     Returns:
         0.
@@ -3013,10 +3042,11 @@ def run_wn3(*, published_dir: Path, output_dir: Path, workers: int) -> int:
     report_path = output_dir / "report.md"
     refuse_to_overwrite(paths=[report_path])
     sections: list[str] = []
+    day_list = ", ".join(f"{day}" for day in days)
     for domain in DOMAINS:
         inputs = pl.read_parquet(output_dir / f"{domain}_wn3_inputs.parquet")
         sections += [f"## {domain.capitalize()}, row set `{WN3_ROW_SET}`", ""]
-        for day in WN3_DAYS:
+        for day in days:
             frame = wn3_rows(published_dir=published_dir, inputs=inputs, domain=domain, day=day)
             stage = f"{WN3_ROW_SET}_day{day}"
             losses_file = path_for(
@@ -3053,7 +3083,7 @@ def run_wn3(*, published_dir: Path, output_dir: Path, workers: int) -> int:
                 predictions_from_losses(losses=losses, frame=frame).write_parquet(predictions_file)
             sections += wn3_stage_lines(domain=domain, day=day, frame=frame, losses=losses)
     header = [
-        "# WeatherNext 3 at days 1, 2, 7 and 14, beside ENS's mean on the same rows: report",
+        f"# WeatherNext 3 at days {day_list}, beside ENS's mean on the same rows: report",
         "",
         (
             "Every fit is on the GPU. Differences are first arm minus second, in percentage points "
@@ -3065,19 +3095,21 @@ def run_wn3(*, published_dir: Path, output_dir: Path, workers: int) -> int:
             "not documented, so every result is reported in three row groups: the in-sample "
             "months (February to June) may overlap WN3's training data, and WN3 against a "
             "product trained on earlier data may not be a fair comparison there; the "
-            "out-of-sample months (July to September) carry every claim, and rest on "
-            "3 calendar months, so their intervals are wide; the pooled rows (February to "
-            "September 2026, every scored row including those in neither group) mix both, so "
-            "they are not a fair comparison and not the headline until the archive's "
-            "provenance is confirmed. The folds are unchanged: each group "
-            "selects rows already scored out of fold. The planned contrast is "
-            "wn3_mean_day<N> − ens_mean_day<N> at days 1, 2, 7 and 14, with its negative control "
+            "out-of-sample months (July to September) check whether a change of model version "
+            "shows in the scores, and rest on 3 calendar months, fewer than "
+            f"{MIN_MONTHS_FOR_INTERVAL}, so their intervals are indicative only; the pooled rows "
+            "(February to September 2026, every scored row including those in neither group) mix "
+            "both and are the row set of the leaderboards. The folds are unchanged: each group "
+            "selects rows already scored out of fold, and the fold models train on February to "
+            "June WN3 rows that may overlap WN3's training data. The planned contrast is "
+            f"wn3_mean_day<N> − ens_mean_day<N> at days {day_list}, with its negative control "
             "(WN3's weather shuffled within site, year-month and hour of day, under two seeds) "
             "and the sensitivity setting. Wind at every day also contrasts with "
             "ens_meanvec_day<N>, whose speed is the length of the mean of ENS's member wind "
             "vectors, as WN3's is, because the WN3 store holds only the ensemble-mean wind "
-            "components; that contrast is the matched one for wind. The day-14 gap minus the "
-            "day-1 gap is exploratory and is read from the two intervals, not tested. A "
+            "components; that contrast is the matched one for wind. A day-0 row reads the 00 UTC "
+            "run of its own day, a forecast no service could read, and the hour with no stored "
+            "lead is dropped (wind at 00:00, solar at 01:00 UTC). A "
             "difference whose interval spans 0 is reported with the interval's bounds, never as "
             "no difference."
         ),
@@ -3085,6 +3117,185 @@ def run_wn3(*, published_dir: Path, output_dir: Path, workers: int) -> int:
     ]
     report_path.write_text("\n".join([*header, *sections]))
     return 0
+
+
+# --- The lean AIFS fit: AIFS alone at the leaderboard's extra lead days -----------------------
+
+LEAN_DAYS: Final[tuple[int, ...]] = (0, 3, 4, 10)
+"""The lead days the lean fit scores. Each stage fits AIFS's own arm and ENS's mean on the same
+rows, which are the tick and the mark the leaderboards draw, and nothing else: no blend, no
+control, no second setting."""
+
+LEAN_ENS_BUILT_DAYS: Final[tuple[int, ...]] = (4, 10)
+"""The lean days at which the published inputs hold no ENS mean, so the AIFS build's
+`ens_mean6_day<N>` columns become `ens_mean_day<N>`. Days 0 and 3 read the published columns."""
+
+LEAN_DAY10_FOLDER: Final[str] = "leads_day10"
+"""The `EXTRA_FOLDERS` folder whose ENS mean at day 10 the AIFS build's must equal."""
+
+
+def lean_arms(*, row_set: str, day: int) -> tuple[str, ...]:
+    """Return the arms of one lean stage: AIFS's own arm, then ENS's mean on the same rows."""
+    product = "aifs_ens_mean" if row_set == "ens" else "aifs_single"
+    return (f"{product}_day{day}", f"ens_mean_day{day}")
+
+
+def lean_inputs(*, aifs_dir: Path, leads_day10_dir: Path, domain: DomainType) -> pl.DataFrame:
+    """Return the AIFS build's columns with its ENS mean at days 4 and 10 under the published name.
+
+    Args:
+        aifs_dir: The folder holding `<domain>_aifs_inputs.parquet`, built with
+            `build_forecast_inputs.py --aifs --aifs-days 0 3 4 10`.
+        leads_day10_dir: The extra-lead folder holding the ENS mean at day 10, which the build's
+            must equal.
+        domain: `solar` or `wind`.
+
+    Returns:
+        The columns, keyed by `site` and `time`.
+
+    Raises:
+        ValueError: If the build's ENS mean at day 10 differs from the extra-lead folder's on any
+            row.
+    """
+    aifs = pl.read_parquet(aifs_dir / f"{domain}_aifs_inputs.parquet")
+    aifs = aifs.rename(
+        {
+            column: column.replace(f"ens_mean6_day{day}_", f"ens_mean_day{day}_", 1)
+            for column in aifs.columns
+            for day in LEAN_ENS_BUILT_DAYS
+            if column.startswith(f"ens_mean6_day{day}_")
+        }
+    )
+    reference = pl.read_parquet(leads_day10_dir / f"{domain}_extra_lead_inputs.parquet")
+    columns = [
+        column
+        for column in aifs.columns
+        if column.startswith("ens_mean_day10_") and not column.endswith("_init_time")
+    ]
+    check_columns_equal(
+        built=aifs, reference=reference, columns=columns, label=f"{domain}/{LEAN_DAY10_FOLDER}"
+    )
+    return aifs
+
+
+def run_lean(
+    *,
+    published_dir: Path,
+    output_dir: Path,
+    leads_day10_dir: Path,
+    workers: int,
+    days: Sequence[int] = LEAN_DAYS,
+) -> int:
+    """Fit AIFS Single and the AIFS ENS mean at the lean days, and write the outputs once.
+
+    Args:
+        published_dir: The folder holding the published inputs.
+        output_dir: The new folder holding `<domain>_aifs_inputs.parquet`, which receives every
+            output.
+        leads_day10_dir: The extra-lead folder that holds the ENS mean at day 10.
+        workers: How many (arm, site) fits run at once.
+        days: The lead days to fit.
+
+    Returns:
+        0.
+    """
+    report_path = output_dir / "report.md"
+    refuse_to_overwrite(paths=[report_path])
+    sections: list[str] = []
+    for domain in DOMAINS:
+        inputs = lean_inputs(aifs_dir=output_dir, leads_day10_dir=leads_day10_dir, domain=domain)
+        for row_set in ROW_SETS:
+            for day in days:
+                arms = lean_arms(row_set=row_set, day=day)
+                frame = aifs_rows(
+                    published_dir=published_dir,
+                    aifs=inputs,
+                    domain=domain,
+                    row_set=row_set,
+                    arms=arms,
+                    day=day,
+                    shuffles={},
+                )
+                stage = f"{row_set}_day{day}"
+                losses_file = path_for(
+                    output_dir=output_dir, domain=domain, row_set=stage, kind="losses"
+                )
+                predictions_file = path_for(
+                    output_dir=output_dir, domain=domain, row_set=stage, kind="predictions"
+                )
+                stamp_file = losses_file.with_suffix(".json")
+                stamp = build_stamp(
+                    published_dir=published_dir,
+                    aifs_dir=output_dir,
+                    domain=domain,
+                    arms=arms,
+                )
+                if losses_file.exists():
+                    losses = pl.read_parquet(losses_file)
+                    check_saved_losses(
+                        losses=losses,
+                        frame=frame,
+                        stage=f"{domain}/{stage}",
+                        arms=arms,
+                        stamp_file=stamp_file,
+                        stamp=stamp,
+                    )
+                else:
+                    refuse_to_overwrite(paths=[predictions_file, stamp_file])
+                    losses = fit_jobs(
+                        frame=frame,
+                        domain=domain,
+                        jobs=[(arm, PRIMARY) for arm in arms],
+                        workers=workers,
+                    ).with_columns(device=pl.lit(DEVICE))
+                    losses.write_parquet(losses_file)
+                    stamp_file.write_text(json.dumps(stamp))
+                if not predictions_file.exists():
+                    predictions_from_losses(losses=losses, frame=frame).write_parquet(
+                        predictions_file
+                    )
+                sections += lean_stage_lines(
+                    domain=domain, row_set=row_set, day=day, frame=frame, losses=losses
+                )
+    day_list = ", ".join(f"{day}" for day in days)
+    header = [
+        f"# AIFS Single and the AIFS ENS mean at days {day_list}, beside ENS's mean: report",
+        "",
+        (
+            "Every fit is on the GPU, at the primary setting only, and every result is "
+            "descriptive: this fit names no contrast. Each stage fits AIFS's own arm and ENS's "
+            "mean on the same rows, for the leaderboards. Day 0 reads the 00 UTC run of the row's "
+            "own day, a forecast no service could read."
+        ),
+        "",
+    ]
+    report_path.write_text("\n".join([*header, *sections]))
+    return 0
+
+
+def lean_stage_lines(
+    *, domain: DomainType, row_set: str, day: int, frame: pl.DataFrame, losses: pl.DataFrame
+) -> list[str]:
+    """Write one (technology, row set, day) section of the lean fit's report."""
+    arms = lean_arms(row_set=row_set, day=day)
+    lines = [
+        f"## {domain.capitalize()}, `{row_set}`, day {day}",
+        "",
+        (
+            f"{frame.height} rows over {frame['month'].n_unique()} months at "
+            f"{frame['site'].n_unique()} sites."
+        ),
+        "",
+        "| Arm | Error (% of capacity) | 95% interval | Rows | Months |",
+        "|---|---|---|---|---|",
+    ]
+    for row in leaderboard(losses=losses, arms=list(arms)).iter_rows(named=True):
+        text = error_text(value=row["value"], lower=row["lower_95"], upper=row["upper_95"])
+        lines.append(
+            f"| {row['arm']} | {text.split(' [')[0]} | [{text.split(' [')[1]} "
+            f"| {row['n_rows']} | {row['n_months']} |"
+        )
+    return [*lines, ""]
 
 
 # --- The P4 second-seed control refit -----------------------------------------------------------
@@ -3573,7 +3784,31 @@ def main_wn3(*, args: argparse.Namespace) -> int:
         sys.stdout.write(f"two GPU runs agree: {agree}\n")
         return 0 if agree else 1
     return run_wn3(
-        published_dir=args.published_dir, output_dir=args.output_dir, workers=args.workers
+        published_dir=args.published_dir,
+        output_dir=args.output_dir,
+        workers=args.workers,
+        days=tuple(args.days) if args.days else WN3_DAYS,
+    )
+
+
+def main_lean(*, args: argparse.Namespace) -> int:
+    """Run `--lean-leads` after refusing every folder the mode must not write to."""
+    studies_dir = args.published_dir.resolve().parent
+    refuse_read_only_folders(
+        output_dir=args.output_dir,
+        read_only=[
+            args.published_dir,
+            studies_dir / EXISTING_AIFS_DIR_NAME,
+            studies_dir / BLENDS_DIR_NAME,
+            *(studies_dir / folder for folder in EXTRA_FOLDERS.values()),
+        ],
+    )
+    return run_lean(
+        published_dir=args.published_dir,
+        output_dir=args.output_dir,
+        leads_day10_dir=studies_dir / EXTRA_FOLDERS[LEAN_DAY10_FOLDER],
+        workers=args.workers,
+        days=tuple(args.days) if args.days else LEAN_DAYS,
     )
 
 
@@ -3604,8 +3839,8 @@ def run_extra_mode(*, args: argparse.Namespace) -> int | None:
         return run_p4(
             published_dir=args.published_dir, output_dir=args.output_dir, workers=args.workers
         )
-    if args.wn3:
-        return main_wn3(args=args)
+    if args.wn3 or args.lean_leads:
+        return (main_wn3 if args.wn3 else main_lean)(args=args)
     if args.blends:
         studies_dir = args.published_dir.resolve().parent
         extra_dirs = {name: studies_dir / folder for name, folder in EXTRA_FOLDERS.items()}
@@ -3655,6 +3890,20 @@ def main() -> int:
         action="store_true",
         help="Fit WeatherNext 3's ensemble mean at days 1, 2, 7 and 14 beside ENS's mean, from "
         "the inputs `build_wn3_inputs.py --build` wrote to --output-dir.",
+    )
+    parser.add_argument(
+        "--lean-leads",
+        action="store_true",
+        help="Fit AIFS Single and the AIFS ENS mean, each beside ENS's mean, at days 0, 3, 4 and "
+        "10, from the inputs `build_forecast_inputs.py --aifs --aifs-days 0 3 4 10` wrote to "
+        "--output-dir.",
+    )
+    parser.add_argument(
+        "--days",
+        type=int,
+        nargs="+",
+        default=None,
+        help="With --wn3 or --lean-leads: the lead days to fit, instead of the mode's default.",
     )
     parser.add_argument(
         "--lookahead-cleared",

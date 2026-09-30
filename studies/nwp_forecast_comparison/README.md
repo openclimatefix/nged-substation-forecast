@@ -127,6 +127,13 @@ lead?](../../docs/studies/forecasts/matched-lead.md).
   overlap-weighted mean of the crop's cells, as ENS's stored table does; AIFS Single also has a
   nearest-cell arm at day 1. `--aifs-weather-dir` names the folder holding the two downloads. The
   build refuses the published folder and the day-1 and day-2 AIFS folder as its output.
+- `build_forecast_inputs.py --aifs --aifs-days 0 3 4 10` builds day 0 and days 3, 4, and 10 as well.
+  Day 0 reads the 00 UTC run of the same day as the hour, so its weather is a hindcast that a
+  service could not have read. AIFS reports no downward solar radiation at lead 0, so the build
+  stops if a solar hour needs it. `fit_aifs.py --lean-leads --days 0 3 4 10` fits only the AIFS
+  Single arm and the ENS mean arm at those days, at the primary setting, and `fit_aifs.py --wn3
+  --days 0 3 4 10` fits the WeatherNext 3 arms at them. WeatherNext 3 stores no lead for one hour of
+  each day at day 0 (00:00 UTC for wind, 01:00 UTC for solar), so the fit drops that hour.
 - `fit_aifs.py` fits every AIFS arm and reference on a GPU, on two nested row sets (`single`, and
   `ens` where AIFS ENS also exists), with folds cut inside the AIFS version eras. One contrast is
   deciding (AIFS Single against ENS's control member at day 1); AIFS ENS contrasts are

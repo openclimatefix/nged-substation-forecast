@@ -12,8 +12,10 @@ sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
 from fit_aifs import (  # noqa: E402
     WN3_DAYS,
     WN3_SPLITS,
+    lean_arms,
     shuffled_prefix,
     wn3_arms,
+    wn3_day0_drop,
     wn3_dropped_rows,
     wn3_sensitivity_arms,
     wn3_split,
@@ -239,7 +241,7 @@ def test_a_pair_near_the_line_only_in_the_pooled_rows_is_refitted():
     assert permuted in chosen
 
 
-def test_the_report_has_a_pooled_table_with_its_warning():
+def test_the_report_names_the_pooled_group_as_the_leaderboard_row_set():
     losses = _stage_losses(out_of_sample_gap={})
     frame = pl.DataFrame({"month": [f"2026-{m:02d}" for m in MONTHS], "site": ["A"] * len(MONTHS)})
 
@@ -249,5 +251,23 @@ def test_the_report_has_a_pooled_table_with_its_warning():
         text = "\n".join(wn3_stage_lines(domain="solar", day=1, frame=frame, losses=losses))
 
     assert "#### Pooled months (February to September 2026, 6 months)" in text
-    assert "not the headline until the archive's provenance is confirmed" in text
+    assert "is the row set of the leaderboards" in text
+    assert "indicative only" in text
     assert text.index("Out-of-sample months") < text.index("Pooled months")
+
+
+def test_day_0_drops_the_hour_with_no_stored_lead_and_no_other_day_does() -> None:
+    hours = pl.DataFrame({"time": [datetime(2026, 7, 2, hour, tzinfo=UTC) for hour in range(24)]})
+    wind = wn3_day0_drop(domain="wind", day=0)
+    solar = wn3_day0_drop(domain="solar", day=0)
+    assert wind is not None
+    assert solar is not None
+    assert hours.filter(wind)["time"].dt.hour().to_list() == [0]
+    assert hours.filter(solar)["time"].dt.hour().to_list() == [1]
+    assert wn3_day0_drop(domain="wind", day=1) is None
+    assert wn3_day0_drop(domain="solar", day=10) is None
+
+
+def test_lean_arms_name_the_product_and_the_ens_mean_at_the_same_day() -> None:
+    assert lean_arms(row_set="single", day=0) == ("aifs_single_day0", "ens_mean_day0")
+    assert lean_arms(row_set="ens", day=10) == ("aifs_ens_mean_day10", "ens_mean_day10")

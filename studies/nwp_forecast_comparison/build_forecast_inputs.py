@@ -1989,7 +1989,7 @@ def build_aifs(
 
     Raises:
         ValueError: If `output_dir` is `published_dir` or the folder of the day-1 and day-2 AIFS
-            fit, or `days` is empty or holds a day below 1.
+            fit, or `days` is empty or holds a day below 0.
         FileExistsError: If the output file already exists.
     """
     if output_dir.resolve() == published_dir.resolve():
@@ -1998,8 +1998,8 @@ def build_aifs(
     if output_dir.resolve() == published_dir.resolve().parent / EXISTING_AIFS_DIR_NAME:
         msg = f"the AIFS output must not be the existing AIFS folder {output_dir}"
         raise ValueError(msg)
-    if not days or min(days) < 1:
-        msg = f"days must be a non-empty tuple of days from 1, got {days}"
+    if not days or min(days) < 0:
+        msg = f"days must be a non-empty tuple of days from 0, got {days}"
         raise ValueError(msg)
     output_path = output_dir / f"{domain}_aifs_inputs.parquet"
     refuse_to_overwrite(paths=[output_path])
