@@ -30,7 +30,6 @@ the plan or the diff.
 
 - Report a review as a short bullet list of what the reviewer found, one line per finding.
 - Say what you accepted and what you rejected, one line each. Give a reason only for a rejection.
-- Do not describe the reviewer's method, persona, or how many rounds ran.
 
 ## Links
 
