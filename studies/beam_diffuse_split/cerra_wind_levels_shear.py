@@ -4,16 +4,17 @@ One-off throwaway script for the write-up of
 <https://github.com/openclimatefix/nged-substation-forecast/issues/957>. The science review of
 `cerra_wind_levels.py`'s results found that its planned contrast 3 (four heights against 100 m
 alone) mixes two effects, a second height and further heights. Every number here is **exploratory
-and post hoc**: the two contrasts below were chosen after the results were seen, so they carry no
+and post hoc**: the contrasts below were chosen after the results were seen, so they carry no
 Bonferroni interval.
 
-**Contrasts.** `levels_50_to_150` minus `speed_10m_100m`, and `levels_all` minus
-`speed_10m_100m`, each at both hyperparameter settings, and the first also at each farm. Both are
-computed from `cerra_wind_levels.py`'s saved `losses.parquet`, so this script fits nothing.
+**Contrasts.** `levels_50_to_150` minus `speed_10m_100m`, `levels_all` minus `speed_10m_100m`,
+`speed_10m_100m` minus `speed_10m`, and `levels_50_to_150` minus `mean_near_100m`, each at both
+hyperparameter settings and, at the primary setting, at each farm. All are computed from
+`cerra_wind_levels.py`'s saved `losses.parquet`, so this script fits nothing.
 
 **Share of the gain.** For each of `speed_10m_100m`, `levels_50_to_150` and `levels_all`, the fall
 in mean absolute error against `speed_100m`, and `speed_10m_100m`'s fall as a share of each of the
-other two.
+other two. The share is a ratio of point estimates and has no interval.
 
 **Era check at one month.** The height-level product's documentation does not give the dates
 where its production streams join, so the script reports the step statistic of
@@ -22,7 +23,7 @@ for each height's ratio to 100 m and its own level.
 
 Run it with `uv run python studies/beam_diffuse_split/cerra_wind_levels_shear.py`, after
 `cerra_wind_levels.py`. It writes `report.md` and `intervals.parquet` to its own folder,
-`cerra_wind_levels_shear`, and stops while either exists. `report.md` there holds
+`cerra_wind_levels_post_hoc`, and stops while either exists. `report.md` there holds
 `cerra_wind_levels.py`'s report followed by the post hoc sections, and `intervals.parquet` holds
 both scripts' intervals, so `check_page_numbers.py` can check the whole write-up against one report.
 """
@@ -53,7 +54,7 @@ from weather_products import _mae
 
 _LOG: Final[logging.Logger] = logging.getLogger(__name__)
 
-OUTPUT_DIR: Final = STUDIES_DATA_DIR / "cerra_wind_levels_shear"
+OUTPUT_DIR: Final = STUDIES_DATA_DIR / "cerra_wind_levels_post_hoc"
 """Where this script writes, separate from `cerra_wind_levels.py`'s folder."""
 
 TWO_HEIGHTS: Final[str] = "speed_10m_100m"
@@ -62,8 +63,10 @@ TWO_HEIGHTS: Final[str] = "speed_10m_100m"
 SHEAR_CONTRASTS: Final[tuple[Contrast, ...]] = (
     Contrast("levels_50_to_150", TWO_HEIGHTS, "four heights against two", False),
     Contrast("levels_all", TWO_HEIGHTS, "five heights against two", False),
+    Contrast(TWO_HEIGHTS, "speed_10m", "two heights against the 10 m speed alone", False),
+    Contrast("levels_50_to_150", "mean_near_100m", "four heights against their mean", False),
 )
-"""The two post hoc contrasts."""
+"""The post hoc contrasts."""
 
 ONE_HEIGHT: Final[str] = "speed_100m"
 """The arm with the 100 m speed alone."""
@@ -177,11 +180,11 @@ def main() -> int:
             "Bonferroni interval."
         ),
         "",
-        "#### Contrasts against the two-height arm, all farms",
+        "#### Post hoc contrasts, all farms",
         "",
         *_contrast_lines(records=records.filter(pl.col("scope") == "all")),
         "",
-        "#### The same contrasts, per farm (primary setting)",
+        "#### Post hoc contrasts, per farm (primary setting)",
         "",
         *_contrast_lines(records=records.filter(pl.col("scope") != "all")),
         "",
