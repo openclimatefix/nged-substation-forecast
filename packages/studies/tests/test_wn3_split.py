@@ -304,3 +304,20 @@ def test_the_check_modes_count_the_primary_fits_of_the_days_they_are_given() -> 
     days = (0, 3, 4, 10)
     assert lean_primary_fit_count(days=days) == 144
     assert wn3_primary_fit_count(days=days) == 156
+
+
+def test_the_published_wn3_arm_lists_are_unchanged_by_the_product_blends():
+    # `check_saved_losses` refuses a saved folder whose arms differ, so these lists are pinned.
+    assert wn3_arms(domain="solar", day=1) == (
+        "wn3_mean_day1",
+        "ens_mean_day1",
+        "wn3_mean_day1_permuted",
+        "wn3_mean_day1_permuted_b",
+    )
+    assert wn3_arms(domain="wind", day=7) == (
+        "wn3_mean_day7",
+        "ens_mean_day7",
+        "wn3_mean_day7_permuted",
+        "wn3_mean_day7_permuted_b",
+        "ens_meanvec_day7",
+    )

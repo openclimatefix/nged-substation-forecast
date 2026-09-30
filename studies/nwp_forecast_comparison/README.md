@@ -245,6 +245,22 @@ lead?](../../docs/studies/forecasts/matched-lead.md).
   and a `README.md` naming each row's reference to a new
   `nwp_forecast_comparison_vs_ens_dots_final` folder, and two SVGs to `docs/studies/assets/`. It
   checks that none of the five outputs exists before it writes any, and refuses to overwrite them.
+  With `--blends` (and its own `--output-dir`) it draws, in place of the single products, each
+  blend of ENS's mean with one product at days 1, 2, 7, and 14 where the blend exists, minus the
+  ENS mean alone, at the primary setting, and adds `rankings.parquet` and a report section for
+  comparison C5, the AIFS Single blend minus each ICON-EU blend. The AIFS Single blends are read
+  from `nwp_forecast_comparison_aifs_blends`, and the ICON-EU, UKV, and WeatherNext 3 blends from
+  `nwp_forecast_comparison_product_blends`.
+- `fit_product_blends.py` fits ENS plus one product for ICON-EU (optimistic and conservative lead,
+  days 1 and 2), UKV (day 1), and WeatherNext 3 (days 1, 2, 7, and 14 on the 7 WeatherNext 3
+  months), each with a control that shuffles the product's columns. It reuses the AIFS Single
+  blends of `nwp_forecast_comparison_aifs_blends`, refits only the (arm, setting) pairs that folder
+  lacks, and raises unless its build stamp equals that folder's and every new arm holds the saved
+  ENS mean's `(site, time, seed, fold)` keys. It calls `fit_aifs.product_blend_arms`, which leaves
+  `blend_arms`, `stage_arms_fitted`, and `wn3_arms` unchanged, and writes only to a folder named
+  `nwp_forecast_comparison_product_blends`. `--dry-run` lists the fits without fitting, and
+  `--check` fits one arm twice on the GPU. Its `report.md` holds every arm's columns and the
+  contrasts C1 to C5 at both settings.
 
 ## Outputs
 
@@ -350,6 +366,26 @@ uv run python studies/nwp_forecast_comparison/fit_day5_aifs_wn3.py --lookahead-c
 
 Before the first command, record a SHA-256 baseline of every file in the published folder and in
 each earlier extra-lead, AIFS, and WeatherNext 3 folder, and check it after the last fit.
+
+## Running the product blends fit
+
+Run it after `uptime` shows the CPU is idle and `nvidia-smi` shows the GPU is free. `--dry-run`
+builds every frame, checks the build stamp against `nwp_forecast_comparison_aifs_blends`, and lists
+the fits without fitting.
+
+```bash
+D=/home/jack/dev/nged-substation-forecast/data/studies
+P=$D/nwp_forecast_comparison
+OUT=$D/nwp_forecast_comparison_product_blends
+uv run python studies/nwp_forecast_comparison/fit_product_blends.py --dry-run --lookahead-cleared \
+  --published-dir $P --output-dir $OUT
+uv run python studies/nwp_forecast_comparison/fit_product_blends.py --check --lookahead-cleared \
+  --published-dir $P --output-dir $OUT
+uv run python studies/nwp_forecast_comparison/fit_product_blends.py --lookahead-cleared \
+  --workers 4 --published-dir $P --output-dir $OUT
+uv run python studies/nwp_forecast_comparison/dot_interval_vs_ens.py --blends \
+  --output-dir $D/nwp_forecast_comparison_blends_vs_ens_dots
+```
 
 ## Folds
 

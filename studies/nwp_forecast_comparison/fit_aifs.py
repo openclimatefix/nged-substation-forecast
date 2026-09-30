@@ -305,8 +305,13 @@ BLEND_PREFIX: Final[str] = "blend_"
 BLEND_AIFS_PREFIXES: Final[dict[str, str]] = {
     "aifs_single": "aifs_single_day{day}",
     "aifs_ens": "aifs_ens_mean_day{day}",
+    "icon_eu": "icon_eu_day{day}",
+    "icon_eu_conservative": "icon_eu_day{next_day}",
+    "ukv": "ukv_day{day}",
+    "wn3": "wn3_mean_day{day}",
 }
-"""Each blend's AIFS product, to the weather-column prefix of that product at one day."""
+"""Each blend's second product, to the weather-column prefix of that product at one day. The
+conservative ICON-EU blend reads the product one day older than ENS's mean (published blend P4b)."""
 
 BlendRoleType = Literal["", "_control", "_mirror"]
 """A blend arm's role: the blend itself, its control (AIFS shuffled), or its mirror control (ENS
@@ -331,7 +336,8 @@ def arm_prefixes(*, arm: str) -> tuple[str, ...]:
 
     Args:
         arm: An arm's name; `NO_DOY_SUFFIX` marks the refit without `day_of_year`. A blend arm is
-            `blend_<aifs_single or aifs_ens>_day<N>` with an optional `_control` or `_mirror`.
+            `blend_<product>_day<N>`, where the product is a key of `BLEND_AIFS_PREFIXES`, with an
+            optional `_control` or `_mirror`.
             Any other arm is its own prefix.
 
     Returns:
@@ -350,7 +356,7 @@ def arm_prefixes(*, arm: str) -> tuple[str, ...]:
     if match is None:
         return (name,)
     product, day, role = match.groups()
-    aifs = BLEND_AIFS_PREFIXES[product].format(day=day)
+    aifs = BLEND_AIFS_PREFIXES[product].format(day=day, next_day=int(day) + 1)
     ens = f"ens_mean_day{day}"
     if role == "_control":
         aifs = shuffled_prefix(source=aifs)
@@ -1453,6 +1459,54 @@ def stage_arms_fitted(*, row_set: str, day: int) -> list[str]:
         *blend_arms(row_set=row_set, day=day),
         *stage_no_day_of_year_arms(row_set=row_set, day=day),
     ]
+
+
+PRODUCT_BLEND_DAYS: Final[dict[str, tuple[int, ...]]] = {
+    "icon_eu": (1, 2),
+    "icon_eu_conservative": (1, 2),
+    "ukv": (1,),
+}
+"""The products `product_blend_arms` blends with ENS's mean on the `single` rows, and the lead days
+each reaches. The published inputs hold ICON-EU at days 1 to 3 (the conservative blend at day 2
+reads day 3) and UKV live at day 1 only."""
+
+
+def product_blend_arms(*, row_set: str, day: int) -> tuple[str, ...]:
+    """Return the product-blend arms fitted on one (row set, day).
+
+    `blend_arms`, `stage_arms_fitted` and `wn3_arms` keep their lists, because `check_saved_losses`
+    refuses a saved folder whose arms differ. Only `fit_product_blends.py` calls this function.
+
+    Args:
+        row_set: `single` or `wn3`.
+        day: A lead day.
+
+    Returns:
+        On `single`: each product of `PRODUCT_BLEND_DAYS` that reaches `day`, as a blend and its
+        control (the product's columns shuffled). On `wn3`: ENS's mean, and the WN3 blend with its
+        control, all on the 7-month WN3 rows.
+    """
+    if row_set == WN3_ROW_SET:
+        return (
+            f"ens_mean_day{day}",
+            blend_arm_name(product="wn3", day=day),
+            blend_arm_name(product="wn3", day=day, role="_control"),
+        )
+    return tuple(
+        blend_arm_name(product=product, day=day, role=role)
+        for product, days in PRODUCT_BLEND_DAYS.items()
+        if day in days
+        for role in ("", "_control")
+    )
+
+
+def control_shuffles(*, arms: Sequence[str]) -> dict[str, tuple[str, ...]]:
+    """Return the prefixes to shuffle, under the first seed, for every control arm in `arms`."""
+    return {
+        arm_prefixes(arm=arm)[1].removesuffix(PERMUTED): ("",)
+        for arm in arms
+        if arm.endswith("_control")
+    }
 
 
 def blend_contrasts(*, row_set: str, day: int) -> list[Contrast]:
