@@ -58,9 +58,9 @@ Every other number is exploratory and labelled so: the days 3, 5, and 7 rows, th
 
 **Stage 2 tests two-product blends, and only after stage 1's results are read.** The pairs are fixed by a rule, not by eye: the two products with the lowest single-add error per technology at day 1 and day 2 on `single`, plus the existing ENS, ICON-EU, and IFS 0.25° pair (P4) for continuity. The one contrast is (pair blend minus the best single add), and the page labels the stage exploratory.
 
-**Days: 1, 2, 3, 5, and 7, where a product reaches them.** ICON-EU reaches days 1 to 3 at most on Previous Runs and ends at day 4, UKV live reaches day 1, and AIFS Single and WN3 reach all five. The first step prints which (product, day) columns exist on disk (`--dry-run`), and adds only the missing ones to `build_forecast_inputs.py`. Day 0 is excluded because a day-0 value could come from a run that a live service cannot read. Days 10 and 14 are excluded, on the page's own evidence that the ENS mean is no better than climatology from day 10 and that the day-14 AIFS blend had no skill to compare. The published day-14 AIFS blend rows stay on the matched-lead page.
+**Days: 1, 2, 3, 5, and 7, where a product reaches them.** ICON-EU's 120 h run reaches days 1 to 4 on Previous Runs, UKV live reaches day 1, and AIFS Single and WN3 reach all five. The first step prints which (product, day) columns exist on disk (`--dry-run`), and adds only the missing ones to `build_forecast_inputs.py`. Day 0 is excluded because a day-0 value could come from a run that a live service cannot read. Days 10 and 14 are excluded, on the page's own evidence that the ENS mean is no better than climatology from day 10 and that the day-14 AIFS blend had no skill to compare. The published day-14 AIFS blend rows stay on the matched-lead page.
 
-**Cost.** Fits per product, day, domain, blend, and control take about 20 to 60 s on the A6000. Stage 1 is about 4 products, 5 days at most, 2 domains, and 2 fits (blend and control) per row set, plus the ENS-alone references: on the order of 150 to 250 fits, or 1 to 4 GPU hours. Stage 2 adds under 100. No data is fetched, so the £30 fetch cap is not touched.
+**Cost.** Fits per product, day, domain, blend, and control take about 20 to 60 s on the A6000. Stage 1 is 4 products, 5 days at most, 2 domains, and 2 fits (blend and control) per row set, plus the ENS-alone references: on the order of 150 to 250 fits, or 1 to 4 GPU hours. Stage 2 adds under 100. No data is fetched, so the £30 fetch cap is not touched.
 
 ## What changes, file by file
 
@@ -76,7 +76,6 @@ Every other number is exploratory and labelled so: the days 3, 5, and 7 rows, th
 
 The study scripts are not unit-tested, so their check is their own `report.md`, from which every page number is taken. Any helper moved into `packages/studies/` gets tests that each fail on `main` today because the function is absent or lacks the behaviour:
 
-- **Blend arm naming round-trip:** parsing `blend_aifs_single_day7_control` returns the product, day, and role. Fails on `main` only if the new naming changes; otherwise the test is omitted (a test that passes before and after tests nothing).
 - **Same-keys check on a paired difference:** a difference of two losses tables whose `(site, time, seed)` keys differ raises `ValueError` naming the extra keys. Fails on `main`, where the function does not exist. A fixture has unequal generator capacities.
 - **Job list completeness:** every blend in the job list has a control of the same column count, and building a blend whose control columns are missing raises. This mirrors `nwp_forecast_comparison.py`'s existing check and fails on `main` for the new helper.
 
