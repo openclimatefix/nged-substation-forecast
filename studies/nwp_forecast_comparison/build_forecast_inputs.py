@@ -1704,17 +1704,19 @@ def _h3_crop_weights(
     h3_weights = compute_h3_grid_weights(
         nwp_grid_size_degrees=grid_degrees, h3_index=sorted(set(site_cells.values()))
     )
+    # Cast to Float64 first: a Float32 0.1 degree coordinate and its Float64 twin differ after
+    # rounding, so the join would silently miss cells.
     cells = grid_cells.select(
         "lat_index",
         "lon_index",
-        nwp_lat=pl.col("latitude").round(4),
-        nwp_lon=pl.col("longitude").round(4),
+        nwp_lat=pl.col("latitude").cast(pl.Float64).round(4),
+        nwp_lon=pl.col("longitude").cast(pl.Float64).round(4),
     )
     by_cell = h3_weights.select(
         "h3_index",
         "proportion",
-        nwp_lat=pl.col("nwp_lat").round(4),
-        nwp_lon=pl.col("nwp_lon").round(4),
+        nwp_lat=pl.col("nwp_lat").cast(pl.Float64).round(4),
+        nwp_lon=pl.col("nwp_lon").cast(pl.Float64).round(4),
     ).join(cells, on=["nwp_lat", "nwp_lon"])
     sites = pl.DataFrame(
         {"site": list(site_cells), "h3_index": list(site_cells.values())},
