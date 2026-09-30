@@ -434,6 +434,12 @@ three-line prompt pointing at it. A long inline prompt can trip an API safeguard
 review and every judgement, and Sonnet for mechanical work such as fetching documentation, checking
 where a dataset is served, or mining transcripts.
 
+**Every script, and every change to a script, gets at least one fresh review before it runs.** This
+covers fetch, build, fit, and chart scripts alike, and a re-run of an edited script. A fit or a
+download run before its review cannot be un-run: it spends compute or quota and can leave output
+that later readers trust. Run nothing until the review is triaged, and say in the PR body which
+review each script had.
+
 **Each reviewer is fresh, and is told:**
 
 - which files to read, and that the results are read-only;

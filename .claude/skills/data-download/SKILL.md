@@ -6,7 +6,8 @@ description: >-
   one chunk, not the whole run: checkpoint every chunk to disk as soon as it is fetched, resume by
   skipping whatever is already cached, measure one chunk before committing to the rest, look up a
   provider's real parameter names before submitting a request, size each chunk to the provider's own
-  constraints, and get a fresh adversarial review before the script's first real run. Run the
+  constraints, and get a fresh adversarial review before the script's first real run. Merge its PR
+  once the download has started and its first chunk is checked. Run the
   `data-validation` skill's checklist once the fetch completes — a clean run is not evidence the
   data is right — and write a generated README alongside the lineage note, for a human reader
   picking up the directory cold. Load before writing or resuming any bulk-download script (e.g.
@@ -206,9 +207,9 @@ checkpointed downloader is likely to need.
 ## Get an adversarial review before a download script's first real run
 
 **Run every not-yet-executed download script through a fresh adversarial review before its first
-real run**, like the first diff review under `implement-issue` — a second reader with no stake in
-the code finding what the author is too close to see, and with network access and permission to make
-one small real fetch, not just a static read of the diff. Three download scripts written for
+real run, however small the script**, like the first diff review under `implement-issue` — a second
+reader with no stake in the code finding what the author is too close to see, and with network
+access and permission to make one small real fetch, not just a static read of the diff. Three download scripts written for
 issue #841 were reviewed this way — one before its first CDS request, the other two before resuming
 an interrupted or unfinished run — and the review caught four bugs, one per script area, each of
 which would have wasted a real request or corrupted output silently:
@@ -245,6 +246,17 @@ respectively, comparing a measured field count against an expectation, a small r
 returned values inspected for physical plausibility, and a local repro of ambiguous library behaviour
 — the same techniques the "Measure one chunk" and "Look up the provider's real parameter names"
 sections above already recommend, applied by a reader with no reason to assume the request is right.
+
+## Merge a download PR once the download has started, and leave the issue open
+
+**Merge the PR when three conditions hold: a fresh reviewer has reviewed the script, the script has
+started running, and the first chunk of data has passed the `data-validation` checklist.** Do not
+hold the PR open for the days a bulk download takes. A bug found after more data has arrived is
+fixed in a follow-on PR.
+
+**The issue that tracks the download stays open, with Status "In progress", until the whole
+download has finished and been validated.** Keep closing keywords out of the PR body, so the merge
+does not close that issue.
 
 ## Write a README alongside the lineage note, for the human reader the JSON isn't for
 
