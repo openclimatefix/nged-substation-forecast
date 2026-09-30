@@ -5,18 +5,19 @@ delete within days to a month. The recorder crops each forecast run to Great Bri
 surrounding seas, and stores it in one Icechunk repository per product. The archive is not yet
 published. The recorder is a separate program in the
 [`nwp-archivist` repository](https://github.com/openclimatefix/nwp-archivist), and this page
-describes what it does today.
+describes what the recorder does today.
 
 ## Why the archive exists
 
-**Nobody else keeps these forecasts, so a later study could not otherwise score them.** The German
-weather service (DWD) keeps only the last 4 runs of ICON-EU-EPS and the last 8 runs of ICON-D2-EPS,
-which is about 24 hours. The Met Office deletes each MOGREPS file about 30 days after writing it.
-The study that compares the mean of an ensemble with deterministic products (UKV, ICON-EU, ICON-D2,
-and ECMWF ENS) needs whole past runs and every ensemble member. The survey found no other source of
-per-run, per-member history for these products: see [What we learnt about
+**We found no other public archive of these forecasts, so a later study could not otherwise score
+them.** The German weather service (DWD) keeps only the last 4 runs of ICON-EU-EPS and the last 8
+runs of ICON-D2-EPS, which is about 24 hours. The Met Office deletes each MOGREPS file about 30 days
+after writing it. The study that compares the mean of an ensemble with deterministic products (UKV,
+ICON-EU, ICON-D2, and ECMWF ENS) needs whole past runs and every ensemble member. The survey found
+no other source of per-run, per-member history for these products: see [What we learnt about
 MOGREPS-UK](../roadmap/data-sources.md#what-we-learnt-about-mogreps-uk-on-2026-09-26) and the
-[survey of whole-run archives](../background/weather-products-survey.md#which-archives-keep-whole-past-forecast-runs).
+[survey of whole-run
+archives](../background/weather-products-survey.md#which-archives-keep-whole-past-forecast-runs).
 
 **A day without the recorder is lost for good for the DWD products.** DWD's deletion is the reason
 the recorder polls every 15 minutes and commits each run once it is complete or its deadline has
@@ -26,8 +27,9 @@ passed.
 
 **The archive holds six products, each cropped to 49.0 to 61.5 °N and 10.0 °W to 3.5 °E.** The box
 reaches offshore wind farms. It covers Northern Ireland, the Irish Sea, the Celtic Sea off Cornwall,
-the seas west of the Hebrides, Shetland, and the North Sea out to the Dutch and Belgian coasts.
-The recorder keeps native grid cells whose centre lies inside the box, and does not interpolate.
+the seas west of the Hebrides, Shetland, and the North Sea out to the Dutch and Belgian coasts. For
+DWD, the recorder keeps the native grid cells whose centre lies inside the box. For MOGREPS, it
+keeps the smallest rectangle of cells that contains the box. It does not interpolate.
 
 | Product | Provider | Members | Runs a day | Horizon | Licence |
 |---|---|---|---|---|---|
@@ -39,8 +41,8 @@ The recorder keeps native grid cells whose centre lies inside the box, and does 
 | MOGREPS-Global | Met Office | 18 | 4 | 246 hours | CC BY-SA 4.0 |
 
 **Every product keeps every member and its full published horizon.** The recorder does not thin the
-ensembles. MOGREPS-Global keeps its whole 246-hour horizon, although MOGREPS-UK stops at 126 hours,
-because the extra lead times cost little to store.
+ensembles or trim lead times: MOGREPS-Global keeps its 246-hour horizon, and MOGREPS-UK keeps its
+126-hour horizon. The extra lead times cost little to store.
 
 **Every variable is stored as delivered, so the meaning of each field depends on its provider.**
 DWD's shortwave radiation (`ASWDIR_S`, `ASWDIFD_S`) is an average since the start of the run. The
@@ -57,13 +59,13 @@ root attributes of each repository repeat this. The variables are:
 - **MOGREPS-UK:** total, direct, and diffuse downward shortwave, screen-level temperature, 10 m
   wind speed and direction, total cloud amount, and wind speed and direction at 100 m.
 - **MOGREPS-Global:** the same wind fields and the same three shortwave fields as MOGREPS-UK, plus
-  net shortwave. It has no temperature or cloud field.
+  net shortwave. MOGREPS-Global has no temperature or cloud field.
 
-## Where it runs
+## Where the recorder runs
 
 **Three systemd user timers on one workstation run the recorder, and nothing runs in the cloud.**
 One timer starts the DWD recorder every 15 minutes. The other two start the MOGREPS-UK recorder and
-the MOGREPS-Global recorder, each one minute after its previous cycle exits, so that each keeps
+the MOGREPS-Global recorder, each 1 minute after its previous cycle exits, so that each keeps
 backfilling older runs between the arrival of new ones. Each of the three has its own cache
 directory. The archive itself is on a local disk.
 
@@ -89,18 +91,20 @@ initialisation time gives.** The first slot is 2026-01-01 00:00 UTC, and each sl
 later. A run committed late, such as a `partial` run at its deadline, therefore lands in order. A
 run committed twice lands in the same slot, and a run that never appeared is a slot of `NaN`.
 
-**Status arrays along `init_time` say what each slot holds.** They are `status` (0 for not
-archived, 1 for `complete`, 2 for `partial`, 3 for `missing`), `files_expected`, `files_received`,
+**Status arrays along `init_time` say what each slot holds.** They are `status` (0 for not archived,
+1 for `complete`, 2 for `partial`, 3 for `missing`), `files_expected`, `files_received`,
 `archived_at`, `generating_process` (the version of the provider's model, where the file carries
 it), and `code_version` (the recorder's version and git commit). The MOGREPS products add a
-`realization` array, because the Met Office's number for each member changes from run to run. The
-status arrays, not any local file, are the record of what is committed.
+`realization` array, because the Met Office's number for each member is recorded per run, and for
+MOGREPS-UK it changes from run to run. The status arrays, not any local file, are the record of what
+is committed.
 
-**Storage settings keep each commit small.** Values are rounded to 13 significand bits and written
-with Zstandard compression and a CRC32C checksum. Manifest splitting starts a new chunk-reference
-manifest every 64 init times, so that a commit writes about the same amount whether the repository
-holds one week of runs or one year. The root attributes of each repository hold `layout_version`.
-A recorder that finds a different layout version stops committing that product.
+**Rounding and compression shrink the stored values, and manifest splitting keeps each commit
+small.** Values are rounded to 13 significand bits and written with Zstandard compression and a
+CRC32C checksum. Manifest splitting starts a new chunk-reference manifest every 64 init times, so
+that a commit writes about the same amount whether the repository holds one week of runs or one
+year. The root attributes of each repository hold `layout_version`. A recorder that finds a
+different layout version stops committing that product.
 
 **The recorder builds each run from a local cache, and then commits once.** Each fetched file is
 decoded, cropped, and saved to the cache directory as a small file. The recorder counts a file as
@@ -114,11 +118,11 @@ rebuilt cache never causes a run to be committed twice, because the recorder che
 
 **Each cycle checks every run that should exist and fetches the files that are missing.** The
 recorder computes the run times in a lookback window, and lists each run's expected files from a
-single table of products. It starts a run a fixed delay after initialisation, which is set from
-when the provider's files usually appear: 30 minutes for ICON-D2 and ICON-D2-EPS, 2 hours for
-ICON-EU-EPS and ICON-ART-EU, 1.75 hours for MOGREPS-UK, and 6.5 hours for MOGREPS-Global. A 404 or
-a truncated, undecodable, or mismatched file means only "not yet". The recorder tries that file
-again in the next cycle.
+single table of products. The recorder starts a run a fixed delay after initialisation, which is set
+from when the provider's files usually appear: 30 minutes for ICON-D2 and ICON-D2-EPS, 2 hours for
+ICON-EU-EPS and ICON-ART-EU, 1.75 hours for MOGREPS-UK, and 6.5 hours for MOGREPS-Global. A 404 or a
+truncated, undecodable, or mismatched file means only "not yet". The recorder tries that file again
+in the next cycle.
 
 **A run is `waiting` until it is complete or past its deadline, and nothing is committed part-way
 through.** The states are:
@@ -148,24 +152,24 @@ person decides what to do. It commits nothing until the file is deleted.
 
 **The recorder looks back as far as the provider keeps files.** For DWD the lookback is 27 hours.
 For the Met Office it is 30 days. A cycle that starts late therefore still fetches what the
-provider holds, and it makes one fetch pass before it evaluates a deadline.
+provider holds, and the recorder makes one fetch pass before it evaluates a deadline.
 
 ## Backfill and the MOGREPS worker pool
 
-**Each cycle handles live runs first and then spends a time budget on older runs, oldest first.**
-For MOGREPS-UK a run is live for 6 hours, and for MOGREPS-Global for 24 hours. Older runs still in
-the bucket are the backfill, and the provider deletes the oldest first. The recorder therefore
-starts with the oldest run, and puts the runs at 00, 06, 12, and 18 UTC before the other hours. The
-MOGREPS services allow 10 minutes of backfill a cycle. A run that the time budget cuts short
-resumes in the next cycle.
+**For the MOGREPS products, each cycle handles live runs first and then spends a time budget on
+older runs, oldest first.** For MOGREPS-UK a run is live for 6 hours, and for MOGREPS-Global for 24
+hours. Older runs still in the bucket are the backfill, and the provider deletes the oldest first.
+The recorder therefore backfills the runs at 00, 06, 12, and 18 UTC first, oldest first, and then
+the other hours. The MOGREPS services allow 10 minutes of backfill a cycle. A run that the time
+budget cuts short resumes in the next cycle.
 
 **MOGREPS files are read by byte range in a pool of worker processes.** A file holds all members of
 one variable at one lead time, in HDF5 chunks. The recorder downloads only the chunks that overlap
 the crop box. The `h5py` library holds a global lock while it reads a chunk index, so threads do not
-speed the reads up, and the recorder uses 4 worker processes instead. A worker only writes cropped
-files to the local cache. The main process alone opens the repository, commits, and reports faults.
-If a worker crashes or the pool times out, the run is not committed, because its files are in an
-unknown state.
+speed the reads up, and the recorder uses four worker processes instead. A worker only writes
+cropped files to the local cache. The main process alone opens the repository, commits, and reports
+faults. If a worker crashes or the pool times out, the run is not committed, because its files are
+in an unknown state.
 
 **Two MOGREPS recorders are designed to share one urgency file, and MOGREPS-UK does not yet take
 part.** MOGREPS-UK and MOGREPS-Global have the same 30-day retention, and each runs as its own
@@ -178,8 +182,7 @@ no urgency coordination.
 
 ## Reading the archive
 
-**Open a repository with `icechunk` and `xarray`.** The archive's own README shows the same
-example.
+**Open a repository with `icechunk` and `xarray`.**
 
 ```python
 import icechunk
@@ -200,5 +203,5 @@ The `step` coordinate is in minutes. Select `status == 1` first to keep only com
   products this archive records.
 - [The weather-products survey](../background/weather-products-survey.md), which compares the
   archives that keep whole past runs.
-- [AWS running costs](aws-costs.md#the-ensemble-archives-storage-is-not-yet-costed), for the
+- [AWS running costs](aws-costs.md#the-ensemble-archive-has-no-aws-cost-yet), for the
   archive's storage size.

@@ -758,4 +758,4 @@ or on adding nothing a product already on this page carries:**
   MOGREPS-UK](../roadmap/data-sources.md#what-we-learnt-about-mogreps-uk-on-2026-09-26) and [what we
   learnt about MOGREPS-Global](../roadmap/data-sources.md#what-we-learnt-about-mogreps-global-on-2026-09-27)
   have the detail. [The ensemble weather archive](../architecture/ensemble-archive.md) records both
-  products from now on.
+  products.
