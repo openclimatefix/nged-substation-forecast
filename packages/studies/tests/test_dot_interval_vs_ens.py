@@ -25,6 +25,7 @@ from dot_interval_vs_ens import (  # noqa: E402
     footnotes_for,
     load_arms,
     repo_data_dir,
+    report_text,
     subtitle_lines,
     write_once,
 )
@@ -103,8 +104,13 @@ OWN_FILE_ENS_ERROR = 0.07
 LEADERBOARD_ENS_ERROR = 0.05
 
 
-def _full_solar_fixture(data_dir: Path, *, short_months: Mapping[str, int] | None = None) -> None:
-    """Write every arm the solar plan reads; each product gets a distinct constant error.
+def _full_fixture(
+    data_dir: Path,
+    *,
+    domain: DomainType = "solar",
+    short_months: Mapping[str, int] | None = None,
+) -> None:
+    """Write every arm one technology's plan reads; each product gets a distinct constant error.
 
     The ENS mean of an AIFS or WN3 file scores `OWN_FILE_ENS_ERROR`, and the leaderboard's ENS
     mean `LEADERBOARD_ENS_ERROR`, so a second mark that read the wrong one would differ by 2
@@ -112,11 +118,12 @@ def _full_solar_fixture(data_dir: Path, *, short_months: Mapping[str, int] | Non
 
     Args:
         data_dir: Where the fake `data/studies` goes.
+        domain: `solar` or `wind`.
         short_months: Arms to write with fewer months than the default.
     """
     short_months = short_months or {}
     written: set[tuple[str, str]] = set()
-    for index, comparison in enumerate(comparisons(domain="solar")):
+    for index, comparison in enumerate(comparisons(domain=domain)):
         arms = [
             (comparison.treatment, comparison.treatment_source, 0.10 + 0.001 * index),
             (
@@ -139,10 +146,15 @@ def _full_solar_fixture(data_dir: Path, *, short_months: Mapping[str, int] | Non
             written.add((source, arm))
             default = 7 if source.startswith("wn3") else 11 if source.startswith("aifs_ens") else 12
             _write(
-                _arm(arm, error=error, months=short_months.get(arm, default)),
+                _arm(
+                    arm,
+                    error=error,
+                    months=short_months.get(arm, default),
+                    sites=("W1", "W2") if domain == "wind" else SITES,
+                ),
                 data_dir=data_dir,
                 source=source,
-                domain="solar",
+                domain=domain,
                 day=comparison.day,
             )
 
@@ -150,7 +162,7 @@ def _full_solar_fixture(data_dir: Path, *, short_months: Mapping[str, int] | Non
 def test_a_folder_without_an_ens_mean_reads_the_ens_mean_of_the_leads_day10_folder(
     tmp_path: Path,
 ) -> None:
-    _full_solar_fixture(tmp_path)
+    _full_fixture(tmp_path)
     # Decoy: the folder of ICON-EU day 3 holds an ENS mean at day 3 that must not be used.
     _write(
         _arm("ens_mean_day3", error=0.99),
@@ -456,7 +468,7 @@ def _row(rows: pl.DataFrame, label: str, day: int) -> dict:
 
 def test_a_row_with_fewer_than_six_months_has_a_hollow_dot_and_no_interval(tmp_path: Path) -> None:
     # IFS HRES 9 km is the one product allowed to lack keys the ENS mean holds.
-    _full_solar_fixture(tmp_path, short_months={"ifs_single_day0": 5})
+    _full_fixture(tmp_path, short_months={"ifs_single_day0": 5})
 
     rows = compute(data_dir=tmp_path, domain="solar")
     shaped = chart_rows(rows=rows, day=0, domain="solar").filter(pl.col("label") == IFS)
@@ -470,7 +482,7 @@ def test_a_row_with_fewer_than_six_months_has_a_hollow_dot_and_no_interval(tmp_p
 
 
 def test_six_months_is_enough_for_an_interval_and_five_is_not(tmp_path: Path) -> None:
-    _full_solar_fixture(tmp_path, short_months={"ifs_single_day0": 6, "ifs_single_day1": 5})
+    _full_fixture(tmp_path, short_months={"ifs_single_day0": 6, "ifs_single_day1": 5})
 
     rows = compute(data_dir=tmp_path, domain="solar")
 
@@ -484,7 +496,7 @@ def test_six_months_is_enough_for_an_interval_and_five_is_not(tmp_path: Path) ->
 def test_the_three_fewer_month_products_have_a_second_mark_against_the_leaderboard_ens_mean(
     tmp_path: Path,
 ) -> None:
-    _full_solar_fixture(tmp_path)
+    _full_fixture(tmp_path)
     rows = compute(data_dir=tmp_path, domain="solar")
 
     for label in (AIFS_SINGLE, AIFS_ENS, WN3):
@@ -503,7 +515,7 @@ def test_the_three_fewer_month_products_have_a_second_mark_against_the_leaderboa
 def test_the_second_mark_is_drawn_as_a_hollow_diamond_with_its_own_interval(
     tmp_path: Path,
 ) -> None:
-    _full_solar_fixture(tmp_path)
+    _full_fixture(tmp_path)
     rows = compute(data_dir=tmp_path, domain="solar")
 
     shaped = chart_rows(rows=rows, day=3, domain="solar")
@@ -553,7 +565,7 @@ def test_the_second_mark_reads_the_leaderboards_ens_mean_arm_for_every_day() -> 
 
 
 def test_an_interval_from_fewer_than_twelve_months_is_dashed(tmp_path: Path) -> None:
-    _full_solar_fixture(tmp_path)
+    _full_fixture(tmp_path)
     rows = compute(data_dir=tmp_path, domain="solar")
 
     assert _row(rows, AIFS_SINGLE, 3)["dashed"] is False
@@ -565,24 +577,61 @@ def test_an_interval_from_fewer_than_twelve_months_is_dashed(tmp_path: Path) -> 
 
 
 def test_the_wind_wn3_day_10_row_is_footnoted_with_the_reports_numbers(tmp_path: Path) -> None:
-    _full_solar_fixture(tmp_path)
-    rows = compute(data_dir=tmp_path, domain="solar")  # labels and days only matter here
+    _full_fixture(tmp_path, domain="solar")
+    _full_fixture(tmp_path, domain="wind")
+    wind = compute(data_dir=tmp_path, domain="wind")
+    solar = compute(data_dir=tmp_path, domain="solar")
 
-    notes = footnotes_for(domain="wind", rows=rows)
-    wind_lines = subtitle_lines(domain="wind", rows=rows)
-    hollow = chart_rows(rows=rows, day=10, domain="wind").filter(pl.col("label") == WN3)
+    notes = footnotes_for(domain="wind", rows=wind)
+    wind_text = " ".join(subtitle_lines(domain="wind", rows=wind))
+    hollow = chart_rows(rows=wind, day=10, domain="wind").filter(pl.col("label") == WN3)
 
     assert [(n.label, n.day) for n in notes] == [(WN3, 10)]
-    assert "19.00% against 18.80% and 18.94%" in " ".join(wind_lines)
-    assert "not evidence that WeatherNext 3 loses skill" in " ".join(wind_lines)
+    assert "19.00% against 18.80% and 18.94%" in wind_text
+    assert "hollow circle in place of the filled dot" in wind_text
+    assert "not evidence that WeatherNext 3 loses skill" in wind_text
     assert hollow["hollow"].to_list() == [True]
-    assert footnotes_for(domain="solar", rows=rows) == []
-    assert "19.00%" not in " ".join(subtitle_lines(domain="solar", rows=rows))
-    assert chart_rows(rows=rows, day=10, domain="solar")["hollow"].to_list() == [False] * 6
+    assert chart_rows(rows=wind, day=7, domain="wind")["hollow"].to_list() == [False] * 9
+    assert footnotes_for(domain="solar", rows=solar) == []
+    assert "19.00%" not in " ".join(subtitle_lines(domain="solar", rows=solar))
+    assert chart_rows(rows=solar, day=10, domain="solar")["hollow"].to_list() == [False] * 6
+
+
+def test_the_gap_between_the_two_references_is_computed_for_each_short_history_row(
+    tmp_path: Path,
+) -> None:
+    _full_fixture(tmp_path, domain="solar")
+    _full_fixture(tmp_path, domain="wind")
+    gap = (OWN_FILE_ENS_ERROR - LEADERBOARD_ENS_ERROR) * 100
+
+    for domain in ("solar", "wind"):
+        rows = compute(data_dir=tmp_path, domain=domain)
+        for label in (AIFS_SINGLE, AIFS_ENS, WN3):
+            row = _row(rows, label, 4)
+            assert row["reference_gap_value"] == pytest.approx(gap)
+            assert row["reference_gap_lower"] <= row["reference_gap_value"] + 1e-9
+            assert row["reference_gap_upper"] >= row["reference_gap_value"] - 1e-9
+            assert row["reference_gap_n_months"] == row["n_months"]
+        assert _row(rows, "UKV", 0)["reference_gap_value"] is None
+
+
+def test_the_report_marks_dashed_cells_and_prints_the_footnotes(tmp_path: Path) -> None:
+    _full_fixture(tmp_path, domain="solar")
+    _full_fixture(tmp_path, domain="wind")
+    rows: dict[DomainType, pl.DataFrame] = {
+        "solar": compute(data_dir=tmp_path, domain="solar"),
+        "wind": compute(data_dir=tmp_path, domain="wind"),
+    }
+
+    report = report_text(rows=rows)
+
+    assert "(dashed)" in report
+    assert report.count("Caveat (hollow circle in place of the filled dot)") == 1
+    assert "Own-file ENS mean minus the 21-month ENS mean" in report
 
 
 def test_chart_rows_are_sorted_best_first_and_hold_one_day(tmp_path: Path) -> None:
-    _full_solar_fixture(tmp_path)
+    _full_fixture(tmp_path)
     rows = compute(data_dir=tmp_path, domain="solar")
 
     shaped = chart_rows(rows=rows, day=0, domain="solar")
@@ -592,7 +641,7 @@ def test_chart_rows_are_sorted_best_first_and_hold_one_day(tmp_path: Path) -> No
 
 
 def test_the_figure_draws_with_its_number(tmp_path: Path) -> None:
-    _full_solar_fixture(tmp_path)
+    _full_fixture(tmp_path)
     rows = compute(data_dir=tmp_path, domain="solar")
 
     assert "Figure 19:" in str(draw(rows=rows, domain="solar", number=19).to_dict())
@@ -605,7 +654,7 @@ def test_the_titles_name_the_quantity_and_count_no_rows(tmp_path: Path) -> None:
     assert figure_title(domain="wind") == (
         "For wind power, each weather product's error minus the ENS mean's error, by lead day"
     )
-    _full_solar_fixture(tmp_path)
+    _full_fixture(tmp_path)
     rows = compute(data_dir=tmp_path, domain="solar")
     text = str(draw(rows=rows, domain="solar", number=19).to_dict())
     assert "product-and-lead rows" not in text
@@ -616,7 +665,7 @@ def test_the_titles_name_the_quantity_and_count_no_rows(tmp_path: Path) -> None:
 def test_the_subtitle_says_which_products_read_a_shorter_lead_and_what_that_means(
     tmp_path: Path,
 ) -> None:
-    _full_solar_fixture(tmp_path)
+    _full_fixture(tmp_path)
     rows = compute(data_dir=tmp_path, domain="solar")
 
     text = " ".join(subtitle_lines(domain="solar", rows=rows))
@@ -628,7 +677,7 @@ def test_the_subtitle_says_which_products_read_a_shorter_lead_and_what_that_mean
 
 
 def test_the_figure_draws_no_accessibility_text_on_its_marks(tmp_path: Path) -> None:
-    _full_solar_fixture(tmp_path)
+    _full_fixture(tmp_path)
     rows = compute(data_dir=tmp_path, domain="solar")
 
     spec = str(draw(rows=rows, domain="solar", number=19).to_dict())
@@ -798,7 +847,7 @@ def test_ifs_single_keys_the_treatment_lacks_still_raise_the_other_way() -> None
 
 
 def test_each_row_records_how_many_rows_each_arm_holds(tmp_path: Path) -> None:
-    _full_solar_fixture(tmp_path)
+    _full_fixture(tmp_path)
 
     rows = compute(data_dir=tmp_path, domain="solar")
 

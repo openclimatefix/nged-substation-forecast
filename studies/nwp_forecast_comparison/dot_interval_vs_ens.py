@@ -465,6 +465,25 @@ SECOND_COLUMNS: Final[tuple[str, ...]] = tuple(
 """The columns of a row's second mark, against the leaderboard's ENS mean; null for a product
 that has none."""
 
+GAP_COLUMNS: Final[tuple[str, ...]] = tuple(
+    f"reference_gap_{name}"
+    for name in (
+        "value",
+        "lower",
+        "upper",
+        "seed_spread",
+        "n_rows",
+        "treatment_rows",
+        "reference_rows",
+        "n_months",
+        "has_interval",
+        "dashed",
+    )
+)
+"""The columns of the gap between a short-history product's two references: its own-file ENS mean
+minus the leaderboard's ENS mean, on the `(site, time, seed)` keys the two share, in points; null
+for a product with one reference."""
+
 GAPPED_ARMS: Final[dict[DomainType, re.Pattern[str]]] = {
     "solar": re.compile(r"ifs_single_day\d+|icon_global_day4"),
     "wind": re.compile(r"ifs_single_day\d+"),
@@ -566,7 +585,8 @@ def contrast_rows(
         `n_months`, `has_interval` (at least `MIN_MONTHS_FOR_INTERVAL` months), and `dashed` (fewer
         than `MIN_MONTHS_FOR_SOLID_INTERVAL`). A comparison with a `leaderboard_reference` also
         carries the same columns prefixed `second_`, for the product against that ENS mean on the
-        `(site, time, seed)` keys the two share, and null otherwise.
+        `(site, time, seed)` keys the two share, and the `reference_gap_` columns (`GAP_COLUMNS`),
+        and null otherwise.
     """
     records = []
     for comparison in plan:
@@ -582,7 +602,7 @@ def contrast_rows(
                 reference_arm=comparison.reference,
             ),
         }
-        second: dict[str, float | int | bool | None] = dict.fromkeys(SECOND_COLUMNS)
+        second: dict[str, float | int | bool | None] = dict.fromkeys(SECOND_COLUMNS + GAP_COLUMNS)
         if (
             comparison.leaderboard_reference is not None
             and comparison.leaderboard_reference_source is not None
@@ -590,12 +610,22 @@ def contrast_rows(
             leaderboard = arms[
                 (comparison.leaderboard_reference_source, comparison.leaderboard_reference)
             ]
-            _check_same_keys(
-                comparison=comparison,
-                treatment=treatment,
-                reference=leaderboard,
-                reference_may_hold_more=True,
-            )
+            for product in (treatment, reference):
+                _check_same_keys(
+                    comparison=comparison,
+                    treatment=product,
+                    reference=leaderboard,
+                    reference_may_hold_more=True,
+                )
+            second |= {
+                f"reference_gap_{name}": value
+                for name, value in _bootstrap_record(
+                    treatment=reference.with_columns(arm=pl.lit("own_file_ens_mean")),
+                    reference=leaderboard.with_columns(arm=pl.lit("leaderboard_ens_mean")),
+                    treatment_arm="own_file_ens_mean",
+                    reference_arm="leaderboard_ens_mean",
+                ).items()
+            }
             second |= {
                 f"second_{name}": value
                 for name, value in _bootstrap_record(
@@ -658,9 +688,10 @@ FOOTNOTES: Final[tuple[Footnote, ...]] = (
         label=WN3_LABEL,
         day=10,
         text=(
-            "Caveat (hollow circle): WeatherNext 3's day-10 weather scored no better than "
-            "shuffled weather in this fit (19.00% against 18.80% and 18.94%); the cause is not "
-            "established and this is not evidence that WeatherNext 3 loses skill."
+            "Caveat (hollow circle in place of the filled dot): WeatherNext 3's day-10 weather "
+            "scored no better than shuffled weather in this fit (19.00% against 18.80% and "
+            "18.94%); the cause is not established and this is not evidence that WeatherNext 3 "
+            "loses skill."
         ),
     ),
 )
@@ -758,8 +789,8 @@ def subtitle_lines(*, domain: DomainType, rows: pl.DataFrame) -> list[str]:
         ),
         DOTS_NOTE,
         (
-            "Dashed line: a month-block bootstrap over fewer than 12 months tends to give "
-            "intervals that are too narrow."
+            "Dashed line: an interval from fewer than 12 months, which a month-block bootstrap "
+            "tends to draw too narrow."
         ),
         (
             "AIFS Single, AIFS ENS mean, and WeatherNext 3 have two marks. Filled dot: against "
@@ -854,7 +885,8 @@ def _cell(*, row: Mapping[str, object], prefix: str = "") -> str:
     value = f"{row[f'{prefix}value']:+.3f}"
     if not row[f"{prefix}has_interval"]:
         return f"{value} (no interval)"
-    return f"{value} [{row[f'{prefix}lower']:+.3f}, {row[f'{prefix}upper']:+.3f}]"
+    dashed = " (dashed)" if row[f"{prefix}dashed"] else ""
+    return f"{value} [{row[f'{prefix}lower']:+.3f}, {row[f'{prefix}upper']:+.3f}]{dashed}"
 
 
 def report_text(*, rows: Mapping[DomainType, pl.DataFrame]) -> str:
@@ -875,7 +907,10 @@ def report_text(*, rows: Mapping[DomainType, pl.DataFrame]) -> str:
             f"A row with fewer than {MIN_MONTHS_FOR_INTERVAL} months prints no interval. "
             "`Rows` is the rows per fitting seed that both arms score. AIFS Single, the AIFS ENS "
             "mean, and WeatherNext 3 have a second column: the same product against the "
-            "leaderboard's 21-month ENS mean, on the `(site, time, seed)` keys the two share."
+            "leaderboard's 21-month ENS mean, on the `(site, time, seed)` keys the two share, "
+            "and a last column gives the gap between the two references, the product's "
+            "own-file ENS mean minus the leaderboard's. A dashed interval rests on fewer than "
+            "12 months."
         ),
         "",
     ]
@@ -885,17 +920,24 @@ def report_text(*, rows: Mapping[DomainType, pl.DataFrame]) -> str:
             "",
             (
                 "| Day | Product | Reference arm | Difference (points) | Months | Rows | "
-                "Against the 21-month ENS mean (points) | Months | Rows |"
+                "Against the 21-month ENS mean (points) | Months | Rows | "
+                "Own-file ENS mean minus the 21-month ENS mean (points) |"
             ),
-            "|---|---|---|---|---|---|---|---|---|",
+            "|---|---|---|---|---|---|---|---|---|---|",
         ]
         ordered = frame.sort("day", "value")
         lines += [
             f"| {row['day']} | {row['label']} | {row['reference']} ({row['reference_source']}) | "
             f"{_cell(row=row)} | {row['n_months']} | {row['n_rows']} | "
             f"{_cell(row=row, prefix='second_')} | {row['second_n_months'] or '-'} | "
-            f"{row['second_n_rows'] or '-'} |"
+            f"{row['second_n_rows'] or '-'} | "
+            f"{_cell(row=row, prefix='reference_gap_')} |"
             for row in ordered.iter_rows(named=True)
+        ]
+        lines.append("")
+        lines += [
+            f"{note.label}, day {note.day}: {note.text}"
+            for note in footnotes_for(domain=domain, rows=frame)
         ]
         lines.append("")
     return "\n".join(lines)
@@ -941,7 +983,9 @@ def readme_text(*, rows: Mapping[DomainType, pl.DataFrame]) -> str:
             "`treatment_rows` and `reference_rows` (every row of each arm), `n_months`, "
             "`has_interval`, and `dashed` (fewer than 12 months). AIFS Single, the AIFS ENS "
             "mean, and WeatherNext 3 also carry `leaderboard_reference` and its source, and the "
-            "same statistics for the second mark, prefixed `second_`."
+            "same statistics for the second mark, prefixed `second_`, and for the gap between "
+            "the two references (own-file ENS mean minus leaderboard ENS mean, on the shared "
+            "keys), prefixed `reference_gap_`."
         ),
         "",
         (
@@ -1090,10 +1134,7 @@ def main() -> int:
     args = parser.parse_args()
     rows = {domain: compute(data_dir=args.data_dir, domain=domain) for domain in DOMAINS}
     files = ("report.md", "intervals.parquet", "README.md")
-    svgs = {
-        domain: args.svg_dir / f"nwp_forecast_{domain}_dots_vs_ens_all_days.svg"
-        for domain in DOMAINS
-    }
+    svgs = {domain: args.svg_dir / f"nwp_forecast_{domain}_dots_vs_ens.svg" for domain in DOMAINS}
     taken = [args.output_dir, *(args.output_dir / name for name in files), *svgs.values()]
     existing = [path for path in taken if path.exists()]
     if existing:

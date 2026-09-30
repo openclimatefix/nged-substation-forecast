@@ -1660,3 +1660,15 @@ def test_a_second_mark_is_a_hollow_diamond_with_its_own_interval_above_the_first
     assert diamonds[0]["yOffset"] > 0
     assert any(m.get("yOffset", 0) < 0 for m in points)
     assert [m for m in rules if m.get("yOffset", 0) > 0 and "strokeDash" in m]
+
+
+def test_every_point_is_filled_when_condition_colours_are_given() -> None:
+    rows = _rows(["weather model", "weather model"]).with_columns(condition=pl.Series(["a", "b"]))
+
+    spec = _panel(
+        rows, conditions=("a", "b"), condition_colours=("#FF4901", "#306BFF"), condition_key=False
+    )
+
+    points = _mark_dicts(spec, "point")
+    assert points
+    assert all(m["filled"] is True for m in points)

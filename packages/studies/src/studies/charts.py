@@ -104,7 +104,7 @@ CONDITION_SHAPES: Final[tuple[str, ...]] = ("circle", "diamond", "square")
 DASH: Final[tuple[int, int]] = (4, 3)
 """The dash pattern of an interval drawn from too few months to be trusted as a solid line."""
 
-_OTHER_OFFSET_PX: Final[int] = 5
+_OTHER_OFFSET_PX: Final[int] = 8
 
 SECOND_SETTING_SHAPE: Final[str] = "triangle-up"
 """The hollow shape that marks a contrast at the second hyperparameter setting.
@@ -750,7 +750,9 @@ def _data_layers(
         )
         points += _dot_layers(
             frame=frame,
-            filled=first & ~_flag(frame, "hollow", "true"),
+            filled=~_flag(frame, "hollow", "true")
+            if explicit_colours
+            else first & ~_flag(frame, "hollow", "true"),
             x_spec=x_spec,
             encodings=no_shape if explicit_colours else encodings,
             split=not explicit_colours,
