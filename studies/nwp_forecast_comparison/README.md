@@ -370,8 +370,8 @@ each earlier extra-lead, AIFS, and WeatherNext 3 folder, and check it after the 
 ## Running the product blends fit
 
 Run it after `uptime` shows the CPU is idle and `nvidia-smi` shows the GPU is free. The saved
-AIFS blend fits took about 8 to 10 s each, so the 315 (arm, site) fits take about 1 hour, and up to
-2 hours with the second setting's refits, with 2 workers. `--dry-run`
+AIFS blend fits took about 8 to 10 s each, so the 315 (arm, site) fits take about 1 hour with 2
+workers. `--dry-run`
 builds every frame, checks the build stamp against `nwp_forecast_comparison_aifs_blends`, and lists
 the fits without fitting.
 
