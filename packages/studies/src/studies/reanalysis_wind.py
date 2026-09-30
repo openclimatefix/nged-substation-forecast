@@ -2,9 +2,10 @@
 
 **CERRA's 10 m wind speed comes from the single-levels product, and its 50, 75, 100 and 150 m wind
 speeds come from the height-levels product.** The two products are separate downloads, one parquet
-file per height. CERRA is a 3-hourly instantaneous analysis (00, 03, ..., 21 UTC) with no wind
-direction. NORA3 is an hourly instantaneous product on a 3 km Lambert grid, at 50 m and 100 m only,
-with a wind direction at each height and no 10 m wind.
+file per height, and its wind direction is a separate set of files with the same keys. CERRA is a
+3-hourly instantaneous analysis (00, 03, ..., 21 UTC). NORA3 is an hourly instantaneous product on a
+3 km Lambert grid. Its main file holds 50 m and 100 m, each with a speed and a direction, and its
+10 m level is a separate file.
 
 **Each farm's nearest cell must lie strictly inside the downloaded crop.** A crop's edge row and
 column have no neighbours beyond them in the file, and the download never fetched a cell outside the
@@ -42,8 +43,21 @@ CERRA_FILES: Final[Mapping[int, str]] = {
 """CERRA's parquet file per height in metres: 10 m from the single-levels product, the rest from the
 height-levels product."""
 
+CERRA_DIRECTION_FILES: Final[Mapping[int, str]] = {
+    10: "10m_wind_direction_surface.parquet",
+    50: "wind_direction_50_m.parquet",
+    75: "wind_direction_75_m.parquet",
+    100: "wind_direction_100_m.parquet",
+    150: "wind_direction_150_m.parquet",
+}
+"""CERRA's wind direction parquet file per height in metres, with the same keys as the speed files
+and the value in `wind_direction_deg`."""
+
 NORA3_HEIGHTS_M: Final[tuple[int, ...]] = (50, 100)
-"""The heights NORA3's file holds."""
+"""The heights NORA3's main file holds."""
+
+NORA3_SURFACE_HEIGHT_M: Final[int] = 10
+"""The height of NORA3's separate 10 m file."""
 
 NORA3_LAMBERT_PROJ4: Final[str] = (
     "+proj=lcc +lat_1=66.3 +lat_2=66.3 +lat_0=66.3 +lon_0=-42.0 +R=6371000 +units=m +no_defs"
@@ -233,21 +247,63 @@ def read_cerra_wind(*, directory: Path, cells: pl.DataFrame) -> pl.DataFrame:
     return _join_heights(per_height=per_height)
 
 
-def read_nora3_wind(*, path: Path, cells: pl.DataFrame) -> pl.DataFrame:
+def read_cerra_direction(
+    *, directory: Path, cells: pl.DataFrame, heights: Sequence[int]
+) -> pl.DataFrame:
+    """Read CERRA's wind direction at each site's cell, one column per height.
+
+    Args:
+        directory: The folder holding the files in `CERRA_DIRECTION_FILES`.
+        cells: One row per site, with `site`, `y_index` and `x_index`, from `derive_nearest_cells`.
+        heights: The heights in metres to read, keys of `CERRA_DIRECTION_FILES`.
+
+    Returns:
+        One row per (site, time) with `time` a UTC timestamp on the 3-hourly analysis hours and
+        `wind_direction_{h}m` for each height `h`, in degrees clockwise from north, the direction
+        the wind blows from.
+
+    Raises:
+        FileNotFoundError: If a height's file has not been downloaded.
+        ValueError: If a site's cell is not strictly inside a file's crop.
+    """
+    per_height = []
+    for height_m in heights:
+        path = directory / CERRA_DIRECTION_FILES[height_m]
+        if not path.exists():
+            msg = f"CERRA's {height_m} m wind direction file {path.name} has not been downloaded"
+            raise FileNotFoundError(msg)
+        check_strictly_inside(cells=cells, crop=_crop_cells(path=path))
+        per_height.append(
+            _site_rows(lazy=pl.scan_parquet(path), cells=cells)
+            .select(
+                SITE_COLUMN,
+                _utc(column="valid_time"),
+                pl.col("wind_direction_deg").alias(f"wind_direction_{height_m}m"),
+            )
+            .collect()
+        )
+    return _join_heights(per_height=per_height)
+
+
+def read_nora3_wind(
+    *, path: Path, cells: pl.DataFrame, heights: Sequence[int] = NORA3_HEIGHTS_M
+) -> pl.DataFrame:
     """Read NORA3's wind speed and direction at each site's cell, one column pair per height.
 
     Args:
-        path: The NORA3 wind parquet file.
+        path: A NORA3 wind parquet file: the main file for 50 m and 100 m, or the 10 m file.
         cells: One row per site, with `site`, `y_index` and `x_index`, from
             `derive_nearest_nora3_cells`.
+        heights: The heights in metres to read, each of which the file must hold.
 
     Returns:
-        One row per (site, time) with `time` a UTC hourly timestamp, and `wind_speed_50m`,
-        `wind_direction_50m`, `wind_speed_100m` and `wind_direction_100m`. Speeds are in metres per
-        second and directions are degrees clockwise from north, the direction the wind blows from.
+        One row per (site, time) with `time` a UTC hourly timestamp, and `wind_speed_{h}m` and
+        `wind_direction_{h}m` for each height `h`. Speeds are in metres per second and directions
+        are degrees clockwise from north, the direction the wind blows from.
 
     Raises:
-        ValueError: If a site's cell is not strictly inside the file's crop.
+        ValueError: If a site's cell is not strictly inside the file's crop, or the file holds no
+            row at one of the heights.
     """
     check_strictly_inside(cells=cells, crop=_crop_cells(path=path))
     rows = _site_rows(lazy=pl.scan_parquet(path), cells=cells)
@@ -260,8 +316,14 @@ def read_nora3_wind(*, path: Path, cells: pl.DataFrame) -> pl.DataFrame:
             pl.col("wind_direction_deg").alias(f"wind_direction_{height_m}m"),
         )
         .collect()
-        for height_m in NORA3_HEIGHTS_M
+        for height_m in heights
     ]
+    empty = [
+        height_m for height_m, frame in zip(heights, per_height, strict=True) if frame.is_empty()
+    ]
+    if empty:
+        msg = f"{path.name} holds no row at heights {empty} m"
+        raise ValueError(msg)
     return _join_heights(per_height=per_height)
 
 

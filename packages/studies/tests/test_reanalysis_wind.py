@@ -5,6 +5,7 @@ import polars as pl
 import pytest
 from pyproj import Transformer
 from studies.reanalysis_wind import (
+    CERRA_DIRECTION_FILES,
     CERRA_FILES,
     NORA3_GRID_SPACING_M,
     NORA3_GRID_X0_M,
@@ -15,6 +16,7 @@ from studies.reanalysis_wind import (
     derive_nearest_cells,
     derive_nearest_nora3_cells,
     join_centred_power,
+    read_cerra_direction,
     read_cerra_wind,
     read_nora3_wind,
 )
@@ -67,7 +69,31 @@ def _write_cerra(*, directory: Path, hours: list[int]) -> None:
         ).write_parquet(directory / name)
 
 
-def _write_nora3(*, path: Path, hours: list[int]) -> None:
+def _write_cerra_direction(*, directory: Path, hours: list[int], heights: list[int]) -> None:
+    # A cell's direction is ten times its height in metres plus its column index.
+    for height_m in heights:
+        pl.DataFrame(
+            [
+                {
+                    "valid_time": DAY + timedelta(hours=hour),
+                    "y_index": y,
+                    "x_index": x,
+                    "wind_direction_deg": float(10 * (height_m + x)),
+                }
+                for hour in hours
+                for y in CROP_Y
+                for x in CROP_X
+            ],
+            schema={
+                "valid_time": pl.Datetime("ns"),
+                "y_index": pl.Int64,
+                "x_index": pl.Int64,
+                "wind_direction_deg": pl.Float32,
+            },
+        ).write_parquet(directory / CERRA_DIRECTION_FILES[height_m])
+
+
+def _write_nora3(*, path: Path, hours: list[int], heights: tuple[int, ...] = (50, 100)) -> None:
     # A cell's speed is its height in metres plus its column index, and its direction is ten times
     # that, so a value names its height and its column.
     pl.DataFrame(
@@ -81,7 +107,7 @@ def _write_nora3(*, path: Path, hours: list[int]) -> None:
                 "wind_direction_deg": float(10 * (height_m + x)),
             }
             for hour in hours
-            for height_m in (50, 100)
+            for height_m in heights
             for y in CROP_Y
             for x in CROP_X
         ],
@@ -192,6 +218,29 @@ def test_cerra_pivot_keeps_the_right_speed_per_height(tmp_path: Path):
     assert wind["time"].dtype == pl.Datetime("us", "UTC")
 
 
+def test_cerra_direction_keeps_the_right_direction_per_height(tmp_path: Path):
+    _write_cerra_direction(directory=tmp_path, hours=[0, 3], heights=[10, 100])
+    cells = _cells(rows={"W1": (11, 21), "W2": (12, 22)})
+
+    direction = read_cerra_direction(directory=tmp_path, cells=cells, heights=[100, 10]).sort(
+        "site", "time"
+    )
+
+    assert direction.columns == ["site", "time", "wind_direction_100m", "wind_direction_10m"]
+    assert direction["wind_direction_100m"].to_list() == [1210.0, 1210.0, 1220.0, 1220.0]
+    assert direction["wind_direction_10m"].to_list() == [310.0, 310.0, 320.0, 320.0]
+    assert direction["time"].dtype == pl.Datetime("us", "UTC")
+
+
+def test_cerra_direction_raises_for_a_height_whose_file_is_missing(tmp_path: Path):
+    _write_cerra_direction(directory=tmp_path, hours=[0], heights=[100])
+
+    with pytest.raises(FileNotFoundError, match="150 m wind direction"):
+        read_cerra_direction(
+            directory=tmp_path, cells=_cells(rows={"W1": (11, 21)}), heights=[100, 150]
+        )
+
+
 def test_cerra_reading_raises_when_a_cell_is_on_the_crop_edge(tmp_path: Path):
     _write_cerra(directory=tmp_path, hours=[0])
 
@@ -215,6 +264,24 @@ def test_nora3_pivot_keeps_the_right_speed_and_direction_per_height(tmp_path: Pa
         "wind_speed_100m": 121.0,
         "wind_direction_100m": 1210.0,
     }
+
+
+def test_nora3_reads_only_the_requested_heights(tmp_path: Path):
+    path = tmp_path / "nora3_10m.parquet"
+    _write_nora3(path=path, hours=[0], heights=(10,))
+
+    wind = read_nora3_wind(path=path, cells=_cells(rows={"W1": (11, 21)}), heights=[10])
+
+    assert wind.columns == ["site", "time", "wind_speed_10m", "wind_direction_10m"]
+    assert wind["wind_speed_10m"].to_list() == [31.0]
+
+
+def test_nora3_raises_when_the_file_lacks_a_requested_height(tmp_path: Path):
+    path = tmp_path / "nora3.parquet"
+    _write_nora3(path=path, hours=[0])
+
+    with pytest.raises(ValueError, match=r"holds no row at heights \[10\] m"):
+        read_nora3_wind(path=path, cells=_cells(rows={"W1": (11, 21)}), heights=[100, 10])
 
 
 def test_nora3_reading_raises_when_a_cell_is_outside_the_crop(tmp_path: Path):
