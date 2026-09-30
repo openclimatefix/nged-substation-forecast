@@ -12,6 +12,7 @@ sys.path.insert(0, str(_STUDY_DIR.parent / "beam_diffuse_split"))
 from build_forecast_inputs import EXTRA_LEAD_BUILDS, ExtraBatchType, extra_ens_ways  # noqa: E402
 from fit_extra_leads import (  # noqa: E402
     BATCHES,
+    FIFTH_OUTPUT_DIR_NAME,
     NEW_PREFIXES,
     REFERENCE_PREFIXES,
     ROW_SET_REFERENCE_ARM,
@@ -20,6 +21,7 @@ from fit_extra_leads import (  # noqa: E402
     arm_rows,
     batch_prefixes,
     check_context_arms,
+    check_output_dir_name,
     check_saved_losses_hold_arms,
     contrast_arms,
     domain_prefixes,
@@ -395,8 +397,8 @@ def test_a_fit_that_keeps_gap_rows_hands_the_model_the_null_row(
     assert [rows.height for rows in recorded.rows] == [3]
 
 
-def test_only_the_gap_dropping_batch_asks_for_dropped_rows() -> None:
-    assert [name for name, batch in BATCHES.items() if batch.drop_gap_rows] == ["fourth"]
+def test_only_the_fourth_and_fifth_batches_ask_for_dropped_rows() -> None:
+    assert [name for name, batch in BATCHES.items() if batch.drop_gap_rows] == ["fourth", "fifth"]
 
 
 def test_the_row_set_diagnostic_measures_the_reference_arm_on_both_row_sets() -> None:
@@ -421,3 +423,187 @@ def test_the_row_set_diagnostic_is_none_without_the_gap_arm() -> None:
     losses = _losses(rows={ROW_SET_REFERENCE_ARM: [0, 1]}, errors={ROW_SET_REFERENCE_ARM: 0.1})
 
     assert row_set_diagnostic(losses=losses, gap_arm="ifs_single_day1") is None
+
+
+DAY4_STEMS = ("ens_mean", "ens_control", "gefs_mean", "icon_eu", "icon_global", "ifs025")
+DAY4_STEMS += ("gfs", "gfs_native", "ifs_single")
+
+
+@pytest.mark.parametrize("domain", ["solar", "wind"])
+def test_the_fifth_batch_fits_nine_products_at_day_4_and_nothing_else(domain: DomainType) -> None:
+    arms = batch_prefixes(batch=BATCHES["fifth"], domain=domain)
+
+    assert set(arms) == {f"{stem}_day4" for stem in DAY4_STEMS}
+    assert len(arms) == len(DAY4_STEMS)
+    assert not BATCHES["fifth"].reference_prefixes
+
+
+def test_the_fifth_build_reads_day_4_only_and_the_three_previous_runs_products_at_previous_day_4():
+    build = EXTRA_LEAD_BUILDS["fifth"]
+
+    assert build.product_day_offsets == {
+        "ICON-EU": (4,),
+        "ICON global": (4,),
+        "IFS 0.25°": (4,),
+        "GFS": (4,),
+    }
+    assert build.ens_mean_days == build.ens_control_days == build.gefs_days == (4,)
+    assert build.gfs_native_days == build.ifs_single_days == (4,)
+    assert extra_ens_ways(
+        day=4, mean_days=build.ens_mean_days, control_days=build.ens_control_days
+    ) == ("mean", "control")
+
+
+@pytest.mark.parametrize("domain", ["solar", "wind"])
+def test_every_fifth_batch_arm_reads_only_its_own_day_4_weather_columns(
+    domain: DomainType,
+) -> None:
+    calendar = set(arm_columns(domain=domain, prefixes=()))
+    for prefix in batch_prefixes(batch=BATCHES["fifth"], domain=domain):
+        weather = [c for c in arm_columns(domain=domain, prefixes=(prefix,)) if c not in calendar]
+
+        assert weather
+        assert all(column.startswith(f"{prefix}_") and "_day4_" in column for column in weather)
+
+
+def test_the_fifth_batch_contrasts_each_arm_with_its_day_3_self_and_each_other_arm_with_ens():
+    batch = BATCHES["fifth"]
+
+    assert batch.same_product_contrasts == tuple(
+        (f"{stem}_day4", f"{stem}_day3") for stem in DAY4_STEMS
+    )
+    assert batch.ensemble_contrasts == tuple(
+        (f"{stem}_day4", "ens_mean_day4") for stem in DAY4_STEMS if stem != "ens_mean"
+    )
+    assert batch.row_set_gap_arm in batch.new_prefixes
+    assert batch.row_set_reference_arm in batch.new_prefixes
+    assert batch.drop_gap_rows
+
+
+@pytest.mark.parametrize("domain", ["solar", "wind"])
+def test_the_first_four_batches_complete_the_fifth_batch_contrasts(domain: DomainType) -> None:
+    check_context_arms(
+        domain=domain,
+        context_arms=[
+            set(batch_prefixes(batch=BATCHES[name], domain=domain))
+            for name in ("first", "second", "third", "fourth")
+        ],
+        batch=BATCHES["fifth"],
+    )
+
+
+def test_the_fifth_batch_needs_the_second_batch_for_icon_eu_and_the_control_member_at_day_3():
+    with pytest.raises(ValueError, match="icon_eu_day3"):
+        check_context_arms(
+            domain="solar",
+            context_arms=[
+                set(batch_prefixes(batch=BATCHES[name], domain="solar"))
+                for name in ("first", "third", "fourth")
+            ],
+            batch=BATCHES["fifth"],
+        )
+
+
+def test_the_fifth_batch_writes_only_to_its_own_folder(tmp_path: Path) -> None:
+    batch = BATCHES["fifth"]
+
+    check_output_dir_name(output_dir=tmp_path / FIFTH_OUTPUT_DIR_NAME, batch=batch)
+    with pytest.raises(ValueError, match=FIFTH_OUTPUT_DIR_NAME):
+        check_output_dir_name(
+            output_dir=tmp_path / "nwp_forecast_comparison_leads_day10", batch=batch
+        )
+    # The earlier batches name no folder, so they keep writing wherever they are told.
+    check_output_dir_name(output_dir=tmp_path / "any", batch=BATCHES["fourth"])
+
+
+def test_the_row_set_diagnostic_names_the_fifth_batchs_own_arms():
+    losses = _losses(
+        rows={"ens_mean_day4": list(range(48)), "ifs_single_day4": list(range(24, 72))},
+        errors={"ens_mean_day4": 0.10, "ifs_single_day4": 0.20},
+    )
+
+    batch = BATCHES["fifth"]
+    line = row_set_diagnostic(
+        losses=losses, gap_arm=batch.row_set_gap_arm, reference_arm=batch.row_set_reference_arm
+    )
+
+    assert line is not None
+    assert line.split("|")[1].strip() == "ens_mean_day4"
+    # The default reference is the fourth batch's day-1 arm, which this frame lacks.
+    assert row_set_diagnostic(losses=losses, gap_arm=batch.row_set_gap_arm) is None
+
+
+def test_the_fifth_build_refuses_any_output_folder_but_its_own(tmp_path: Path) -> None:
+    from build_forecast_inputs import build_extra_leads
+
+    assert FIFTH_OUTPUT_DIR_NAME == "nwp_forecast_comparison_day4_shared"
+    published = tmp_path / "nwp_forecast_comparison"
+    with pytest.raises(ValueError, match="nwp_forecast_comparison_day4_shared"):
+        build_extra_leads(
+            domain="solar",
+            published_dir=published,
+            output_dir=tmp_path / "nwp_forecast_comparison_leads_day10",
+            gefs_window_dir=None,
+            batch="fifth",
+        )
+
+
+def _patch_fifth_build(*, monkeypatch: pytest.MonkeyPatch, tmp_path: Path, ens: float) -> Path:
+    """Stub every column builder of the fifth batch but the ENS one, and write both references."""
+    import build_forecast_inputs as bfi
+
+    published = tmp_path / "nwp_forecast_comparison"
+    published.mkdir()
+    keys = pl.DataFrame({"site": ["A"], "time": [datetime(2026, 3, 6, 12, tzinfo=UTC)]})
+    keys.write_parquet(published / "solar_forecast_inputs.parquet")
+    wn3 = tmp_path / "nwp_forecast_comparison_wn3_extra_days"
+    wn3.mkdir()
+    keys.with_columns(ens_mean_day4_ghi=pl.lit(7.0)).write_parquet(wn3 / "solar_wn3_inputs.parquet")
+    monkeypatch.setattr(bfi, "_previous_runs_frame", lambda *, keys, **_: keys)
+    monkeypatch.setattr(bfi, "_gefs_frame", lambda *, keys, **_: keys)
+    monkeypatch.setattr(bfi, "_gfs_native_frame", lambda *, keys, **_: keys)
+    monkeypatch.setattr(bfi, "_ifs_single_frame", lambda *, keys, **_: keys)
+    monkeypatch.setattr(
+        bfi,
+        "_ens_extra_frame",
+        lambda *, keys, **_: keys.with_columns(ens_mean_day4_ghi=pl.lit(ens)),
+    )
+    return published
+
+
+def test_the_fifth_build_stops_when_its_ens_mean_differs_from_the_wn3_folders(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from build_forecast_inputs import build_extra_leads
+
+    published = _patch_fifth_build(monkeypatch=monkeypatch, tmp_path=tmp_path, ens=8.0)
+    output = tmp_path / "nwp_forecast_comparison_day4_shared"
+
+    with pytest.raises(ValueError, match="ens_mean_day4"):
+        build_extra_leads(
+            domain="solar",
+            published_dir=published,
+            output_dir=output,
+            gefs_window_dir=None,
+            batch="fifth",
+        )
+    assert not (output / "solar_extra_lead_inputs.parquet").exists()
+
+
+def test_the_fifth_build_writes_its_inputs_when_its_ens_mean_equals_the_wn3_folders(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from build_forecast_inputs import build_extra_leads
+
+    published = _patch_fifth_build(monkeypatch=monkeypatch, tmp_path=tmp_path, ens=7.0)
+    output = tmp_path / "nwp_forecast_comparison_day4_shared"
+
+    path = build_extra_leads(
+        domain="solar",
+        published_dir=published,
+        output_dir=output,
+        gefs_window_dir=None,
+        batch="fifth",
+    )
+
+    assert pl.read_parquet(path)["ens_mean_day4_ghi"][0] == 7.0

@@ -69,7 +69,11 @@ from typing import Final, Literal, NamedTuple
 import numpy as np
 import polars as pl
 import xgboost
-from build_forecast_inputs import SOLAR_DAY0_FIRST_SCORED_LEAD, _ens_extra_frame
+from build_forecast_inputs import (
+    SOLAR_DAY0_FIRST_SCORED_LEAD,
+    _ens_extra_frame,
+    check_columns_equal,
+)
 from fit_extra_leads import error_text, interval_text
 from nwp_forecast_comparison import (
     BLEND_ARMS,
@@ -1350,10 +1354,6 @@ ENS_STAMPED: Final[frozenset[str]] = frozenset(
 )
 """The ENS prefixes that must carry a run stamp, so `check_runs` checks their run dates."""
 
-EQUAL_TOLERANCE: Final[float] = 1e-6
-"""The relative and absolute difference between the AIFS build's ENS columns and the extra-lead
-folders' that Float32 storage allows."""
-
 
 def ens_control_prefix(*, day: int) -> str:
     """Return the ENS control member's prefix at a day: 6-hourly at days 1 and 2, native beyond."""
@@ -1616,49 +1616,6 @@ def fit_blend_stage(
         workers=workers,
     )
     return pl.concat([primary, second]).with_columns(device=pl.lit(DEVICE))
-
-
-def check_columns_equal(
-    *, built: pl.DataFrame, reference: pl.DataFrame, columns: Sequence[str], label: str
-) -> None:
-    """Raise unless `built` and `reference` hold the same values in `columns` on every row.
-
-    Args:
-        built: Rows keyed by `site` and `time`.
-        reference: Rows keyed the same way, from another build.
-        columns: The columns both frames hold.
-        label: What `reference` is, for the message.
-
-    Raises:
-        ValueError: If a key of `built` is absent from `reference`, or a column's values differ by
-            more than `EQUAL_TOLERANCE`, or are null in one frame and not in the other.
-    """
-    keys = ["site", "time"]
-    if built.select(keys).join(reference.select(keys), on=keys, how="anti").height:
-        msg = f"{label}: rows of the AIFS build are missing from it"
-        raise ValueError(msg)
-    joined = built.select(*keys, *columns).join(
-        reference.select(*keys, *columns), on=keys, how="left", suffix="_reference"
-    )
-    unequal = {}
-    for column in columns:
-        ours = pl.col(column).cast(pl.Float64)
-        theirs = pl.col(f"{column}_reference").cast(pl.Float64)
-        bad = joined.select(
-            (
-                (ours.is_null() != theirs.is_null())
-                | (
-                    ours.is_not_null()
-                    & theirs.is_not_null()
-                    & ((ours - theirs).abs() > EQUAL_TOLERANCE + EQUAL_TOLERANCE * theirs.abs())
-                )
-            ).sum()
-        ).item()
-        if bad:
-            unequal[column] = int(bad)
-    if unequal:
-        msg = f"{label}: columns differ from the AIFS build's on some rows: {unequal}"
-        raise ValueError(msg)
 
 
 def check_equal_to_existing(*, built: pl.DataFrame, existing_dir: Path, domain: DomainType) -> None:
@@ -3115,7 +3072,12 @@ def check_lean(
 
 
 def run_wn3(
-    *, published_dir: Path, output_dir: Path, workers: int, days: Sequence[int] = WN3_DAYS
+    *,
+    published_dir: Path,
+    output_dir: Path,
+    workers: int,
+    days: Sequence[int] = WN3_DAYS,
+    report_name: str = "report.md",
 ) -> int:
     """Fit every stage of the WN3 fit and write its outputs once.
 
@@ -3125,11 +3087,13 @@ def run_wn3(
             --build --days ...`, which receives every output.
         workers: How many (arm, site) fits run at once.
         days: The lead days to fit, each built into the inputs.
+        report_name: The report's file name in `output_dir`, which a driver that writes two fits'
+            reports into one folder sets apart.
 
     Returns:
         0.
     """
-    report_path = output_dir / "report.md"
+    report_path = output_dir / report_name
     refuse_to_overwrite(paths=[report_path])
     sections: list[str] = []
     day_list = ", ".join(f"{day}" for day in days)
@@ -3225,14 +3189,21 @@ LEAN_ENS_BUILT_DAYS: Final[tuple[int, ...]] = (10,)
 """The lean days at which the published inputs hold no ENS mean and ENS has only its 6-hourly step
 (beyond 144 hours), so the AIFS build's `ens_mean6_day<N>` columns become `ens_mean_day<N>`."""
 
-LEAN_ENS_NATIVE_DAYS: Final[tuple[int, ...]] = (4,)
+LEAN_ENS_NATIVE_DAYS: Final[tuple[int, ...]] = (4, 5)
 """The lean days at which the published inputs hold no ENS mean and ENS still has 3-hourly steps
-(day 4 reads leads 96 to 120 hours), so the AIFS build's 6-hourly emulation is not ENS's mean. The
-ENS mean is built from ENS's native steps, exactly as the WeatherNext 3 build builds it. Days 0
-and 3 read the published columns."""
+(day 4 scores leads 96 to 120 hours and day 5 scores leads 120 to 144 hours, and ENS steps 3-hourly
+to lead 144 and 6-hourly after it, so day 5's band reads a 6-hourly step beyond its last scored
+lead), so the AIFS build's 6-hourly emulation is not ENS's mean. The ENS mean is built from ENS's
+native steps, exactly as the WeatherNext 3 build builds it. Days 0 and 3 read the published
+columns."""
+
+LEAN_ENS_CHECKED_DAYS: Final[tuple[int, ...]] = (5, 10)
+"""The lean days whose ENS mean the `leads_day10` extra-lead folder also holds, on the same rows,
+and which the lean inputs must equal: day 5 (built from ENS's native steps) and day 10 (the AIFS
+build's 6-hourly read)."""
 
 LEAN_DAY10_FOLDER: Final[str] = "leads_day10"
-"""The `EXTRA_FOLDERS` folder whose ENS mean at day 10 the AIFS build's must equal."""
+"""The `EXTRA_FOLDERS` folder whose ENS mean at days 5 and 10 the lean inputs' must equal."""
 
 
 def lean_arms(*, row_set: str, day: int) -> tuple[str, ...]:
@@ -3242,24 +3213,25 @@ def lean_arms(*, row_set: str, day: int) -> tuple[str, ...]:
 
 
 def lean_inputs(*, aifs_dir: Path, leads_day10_dir: Path, domain: DomainType) -> pl.DataFrame:
-    """Return the AIFS build's columns with ENS's mean at days 4 and 10 under the published name.
+    """Return the AIFS build's columns with ENS's mean at days 4, 5, and 10 added.
 
-    Day 4's ENS mean is built from ENS's native steps and day 10's is the AIFS build's 6-hourly
-    read, which is ENS's native read at that lead.
+    Days 4 and 5's ENS mean is built from ENS's native steps and day 10's is the AIFS build's
+    6-hourly read, which is ENS's native read at that lead.
 
     Args:
         aifs_dir: The folder holding `<domain>_aifs_inputs.parquet`, built with
-            `build_forecast_inputs.py --aifs --aifs-days 0 3 4 10`.
-        leads_day10_dir: The extra-lead folder holding the ENS mean at day 10, which the build's
-            must equal.
+            `build_forecast_inputs.py --aifs --aifs-days` for the days to fit.
+        leads_day10_dir: The extra-lead folder holding the ENS mean at days 5 and 10, which the
+            lean inputs' must equal.
         domain: `solar` or `wind`.
 
     Returns:
         The columns, keyed by `site` and `time`.
 
     Raises:
-        ValueError: If the build's ENS mean at day 10 differs from the extra-lead folder's on any
-            row.
+        ValueError: If the lean inputs' ENS mean at day 5 or 10 differs from the extra-lead
+            folder's on any row. Day 10 is checked only where the AIFS build holds it; day 5 is
+            always built here, from ENS's native steps.
     """
     aifs = pl.read_parquet(aifs_dir / f"{domain}_aifs_inputs.parquet")
     native = _ens_extra_frame(
@@ -3279,14 +3251,20 @@ def lean_inputs(*, aifs_dir: Path, leads_day10_dir: Path, domain: DomainType) ->
         }
     )
     reference = pl.read_parquet(leads_day10_dir / f"{domain}_extra_lead_inputs.parquet")
-    columns = [
-        column
-        for column in aifs.columns
-        if column.startswith("ens_mean_day10_") and not column.endswith("_init_time")
-    ]
-    check_columns_equal(
-        built=aifs, reference=reference, columns=columns, label=f"{domain}/{LEAN_DAY10_FOLDER}"
-    )
+    for day in LEAN_ENS_CHECKED_DAYS:
+        columns = [
+            column
+            for column in aifs.columns
+            if column.startswith(f"ens_mean_day{day}_") and not column.endswith("_init_time")
+        ]
+        if not columns:
+            continue
+        check_columns_equal(
+            built=aifs,
+            reference=reference,
+            columns=columns,
+            label=f"{domain}/{LEAN_DAY10_FOLDER} ens_mean_day{day}",
+        )
     return aifs
 
 
@@ -3297,6 +3275,7 @@ def run_lean(
     leads_day10_dir: Path,
     workers: int,
     days: Sequence[int] = LEAN_DAYS,
+    report_name: str = "report.md",
 ) -> int:
     """Fit AIFS Single and the AIFS ENS mean at the lean days, and write the outputs once.
 
@@ -3307,11 +3286,13 @@ def run_lean(
         leads_day10_dir: The extra-lead folder that holds the ENS mean at day 10.
         workers: How many (arm, site) fits run at once.
         days: The lead days to fit.
+        report_name: The report's file name in `output_dir`, which a driver that writes two fits'
+            reports into one folder sets apart.
 
     Returns:
         0.
     """
-    report_path = output_dir / "report.md"
+    report_path = output_dir / report_name
     refuse_to_overwrite(paths=[report_path])
     sections: list[str] = []
     for domain in DOMAINS:
@@ -3863,6 +3844,25 @@ def run_p4(*, published_dir: Path, output_dir: Path, workers: int) -> int:
     return 0
 
 
+def require_lookahead_cleared(*, cleared: bool) -> None:
+    """Raise unless the `--lookahead-cleared` flag was given.
+
+    Args:
+        cleared: Whether the flag was given. The flag confirms that the run log of
+            `build_wn3_inputs.py --read-store` and the page's lookahead section have been read.
+
+    Raises:
+        ValueError: If `cleared` is false.
+    """
+    if not cleared:
+        msg = (
+            "refusing to fit WN3 without --lookahead-cleared: read the run log that "
+            "`build_wn3_inputs.py --read-store` wrote and the lookahead section of the page. "
+            "Every result is reported for in-sample, out-of-sample, and pooled rows."
+        )
+        raise ValueError(msg)
+
+
 def main_wn3(*, args: argparse.Namespace) -> int:
     """Run `--wn3`, or its `--check`, after refusing every folder the mode must not write to.
 
@@ -3876,13 +3876,7 @@ def main_wn3(*, args: argparse.Namespace) -> int:
         ValueError: If `--lookahead-cleared` is absent. The flag confirms that the run log of
             `build_wn3_inputs.py --read-store` and the page's lookahead section have been read.
     """
-    if not args.lookahead_cleared:
-        msg = (
-            "refusing to fit WN3 without --lookahead-cleared: read the run log that "
-            "`build_wn3_inputs.py --read-store` wrote and the lookahead section of the page. "
-            "Every result is reported for in-sample, out-of-sample, and pooled rows."
-        )
-        raise ValueError(msg)
+    require_lookahead_cleared(cleared=args.lookahead_cleared)
     studies_dir = args.published_dir.resolve().parent
     refuse_read_only_folders(
         output_dir=args.output_dir,
