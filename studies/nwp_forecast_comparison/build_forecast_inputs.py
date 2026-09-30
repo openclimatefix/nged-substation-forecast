@@ -453,10 +453,11 @@ def _previous_runs_frame(
     return frame
 
 
-SOLAR_DAY0_FIRST_SCORED_LEAD: Final[int] = 6
+SOLAR_DAY0_FIRST_SCORED_LEAD: Final[int] = 7
 """The lead of the first solar hour scored at day 0. AIFS and ENS on 6-hourly steps have no step
-before lead 6 hours, so the hours ending at leads 1 to 5 (01:00 to 05:00 UTC) are not scored, for
-any arm."""
+before lead 6 hours, and a solar temperature is read at each hour's midpoint, so the hour ending at
+lead 6 (midpoint 5.5) would still be a half-hour extrapolation. The hours ending at leads 1 to 6
+(01:00 to 06:00 UTC) are therefore not scored, for any arm."""
 
 
 def check_first_step_reaches_targets(
@@ -465,7 +466,8 @@ def check_first_step_reaches_targets(
     """Refuse a solar band that scores an hour before its first stored step.
 
     The hours a band scores are the end of every hour of its day, except that day 0 starts at
-    `SOLAR_DAY0_FIRST_SCORED_LEAD`. Where the first scored hour's lead is before the first step, the
+    `SOLAR_DAY0_FIRST_SCORED_LEAD`. A solar temperature is read at each hour's midpoint, half an
+    hour before its end. Where the first scored hour's midpoint is before the first step, the
     upsampling would hold that step's value flat across the earlier hours, which is an extrapolation
     and not an upsampling.
 
@@ -483,11 +485,11 @@ def check_first_step_reaches_targets(
     first_scored = float(efh.target_leads(day=day, domain=domain)[0])
     if day == 0:
         first_scored = max(first_scored, float(SOLAR_DAY0_FIRST_SCORED_LEAD))
-    if steps.leads[0] > first_scored:
+    if steps.leads[0] > first_scored - 0.5:
         msg = (
             f"{arm_prefix} day {day}: the first stored step is at lead {steps.leads[0]:g} h, after "
-            f"the first scored solar hour at lead {first_scored:g} h, so that hour would be an "
-            "extrapolation"
+            f"the midpoint of the first scored solar hour at lead {first_scored - 0.5:g} h, so "
+            "that hour would be an extrapolation"
         )
         raise ValueError(msg)
 

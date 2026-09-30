@@ -626,7 +626,7 @@ def test_run_lean_fits_each_row_set_at_each_day_and_stamps_the_outputs(
     }
     assert set(fitted) == expected
     assert len(fitted) == len(expected)
-    # Only solar day 0 drops rows (hours 1 to 5 UTC), so the arms are scored on the same rows.
+    # Only solar day 0 drops rows (hours 1 to 6 UTC), so the arms are scored on the same rows.
     assert {key for key, value in dropped.items() if value} == {("solar", 0)}
 
 
@@ -651,15 +651,22 @@ def _steps(*, first_lead: float) -> object:
 
 
 def test_a_solar_band_scoring_hours_before_its_first_step_is_refused() -> None:
-    # Day 0 scores from lead 6, so a first step at lead 12 leaves leads 6 to 11 unread.
+    assert bfi.SOLAR_DAY0_FIRST_SCORED_LEAD == 7
+    # Day 0 scores from the hour ending at lead 7, whose midpoint is 6.5, so a first step at lead 12
+    # leaves the hours ending at leads 7 to 11 unread.
     with pytest.raises(ValueError, match="extrapolation"):
         bfi.check_first_step_reaches_targets(
             steps=_steps(first_lead=12.0), day=0, domain="solar", arm_prefix="aifs_single"
         )
-    # A first step at lead 6 reaches the first scored day-0 hour, which ends at lead 6.
+    # A first step at lead 6 reaches the midpoint (6.5) of the first scored day-0 hour.
     bfi.check_first_step_reaches_targets(
         steps=_steps(first_lead=6.0), day=0, domain="solar", arm_prefix="aifs_single"
     )
+    # A first step at lead 7 is after that midpoint.
+    with pytest.raises(ValueError, match="extrapolation"):
+        bfi.check_first_step_reaches_targets(
+            steps=_steps(first_lead=7.0), day=0, domain="solar", arm_prefix="aifs_single"
+        )
     # Day 1's first hour ends at lead 25, after a step at lead 24.
     bfi.check_first_step_reaches_targets(
         steps=_steps(first_lead=24.0), day=1, domain="solar", arm_prefix="aifs_single"
@@ -690,6 +697,45 @@ def test_ens_member_arms_refuses_a_solar_day_0_band_whose_first_step_is_after_th
             ways=("control",),
             fine_step_last_lead=0,
         )
+
+
+def test_ens_member_arms_checks_six_hourly_steps_even_where_the_fine_steps_last_a_while(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    # ENS emulated on 6-hourly steps has fine_step_last_lead 144, so only `six_hourly` triggers it.
+    monkeypatch.setattr(bfi.efh, "clear_sky_table", lambda **_: pl.DataFrame())
+    monkeypatch.setattr(bfi.efh, "band_steps", lambda **_: _steps(first_lead=12.0))
+    with pytest.raises(ValueError, match="ens_mean day 0"):
+        bfi.ens_member_arms(
+            extract=pl.DataFrame(),
+            domain="solar",
+            days=(0,),
+            method="linear",
+            ensemble_size=1,
+            arm_name=lambda way, day: f"ens_{way}_day{day}",
+            ways=("mean",),
+            fine_step_last_lead=144,
+            six_hourly=True,
+        )
+
+
+def test_wn3_rows_passes_the_day_0_drop_to_aifs_rows(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    seen: dict[tuple[str, int], pl.Expr | None] = {}
+
+    def rows(*, domain: str, day: int, drop: pl.Expr | None = None, **_: object) -> pl.DataFrame:
+        seen[domain, day] = drop
+        return pl.DataFrame()
+
+    monkeypatch.setattr(fa, "aifs_rows", rows)
+    for domain in fa.DOMAINS:
+        for day in (0, 1):
+            fa.wn3_rows(published_dir=tmp_path, inputs=pl.DataFrame(), domain=domain, day=day)
+    assert {key for key, value in seen.items() if value is not None} == {
+        ("solar", 0),
+        ("wind", 0),
+    }
 
 
 def test_the_leaderboard_ticks_are_whole_numbers_up_to_the_highest_whole_number() -> None:

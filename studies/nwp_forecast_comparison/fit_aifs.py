@@ -2567,9 +2567,9 @@ WN3_EXTRA_DAYS: Final[tuple[int, ...]] = (0, 3, 4, 10)
 
 SOLAR_DAY0_DROPPED_HOURS: Final[tuple[int, ...]] = tuple(range(1, SOLAR_DAY0_FIRST_SCORED_LEAD))
 """The hours of the UTC day, labelled by their end, that solar day 0 does not score for any arm.
-AIFS and ENS on 6-hourly steps have no step before lead 6 hours, so these hours (01:00 to 05:00 UTC)
-would be extrapolations. The hour ending 01:00 is also the one hour WeatherNext 3 stores no lead
-for."""
+AIFS and ENS on 6-hourly steps have no step before lead 6 hours, and a solar temperature is read at
+each hour's midpoint, so these hours (01:00 to 06:00 UTC) would be extrapolations. The hour ending
+01:00 is also the one hour WeatherNext 3 stores no lead for."""
 
 WN3_WIND_NO_LEAD_HOUR: Final[int] = 0
 """The hour of the UTC day at which a wind day-0 row has no WeatherNext 3 lead: the store's leads
@@ -3017,32 +3017,99 @@ def null_reading_lines(*, losses: pl.DataFrame, contrasts: Sequence[Contrast]) -
     return lines
 
 
-def check_wn3(*, published_dir: Path, wn3_dir: Path) -> bool:
-    """Fit `wn3_mean_day1` at one wind site twice on the GPU, and print a time estimate.
+def wn3_primary_fit_count(*, days: Sequence[int]) -> int:
+    """Return how many (arm, site) fits the WN3 fit runs at the primary setting on `days`."""
+    return sum(
+        len(wn3_arms(domain=domain, day=day)) * N_SITES[domain]
+        for domain in DOMAINS
+        for day in days
+    )
+
+
+def lean_primary_fit_count(*, days: Sequence[int]) -> int:
+    """Return how many (arm, site) fits the lean fit runs on `days`, at the primary setting."""
+    return sum(
+        len(lean_arms(row_set=row_set, day=day)) * N_SITES[domain]
+        for domain in DOMAINS
+        for row_set in ROW_SETS
+        for day in days
+    )
+
+
+def _fit_estimate_text(*, seconds: float, n_fits: int, refits: str) -> str:
+    """Return the line the two `--check` modes print: one fit's time and the whole fit's."""
+    return (
+        f"one arm at one site: {seconds:.0f} s; {n_fits} primary (arm, site) fits are about "
+        f"{n_fits * seconds / 3600:.1f} h on one worker ({refits})\n"
+    )
+
+
+def check_wn3(*, published_dir: Path, wn3_dir: Path, days: Sequence[int] = WN3_DAYS) -> bool:
+    """Fit the first day's WN3 arm at one wind site twice on the GPU, and print a time estimate.
 
     Args:
         published_dir: The folder holding the published inputs.
-        wn3_dir: The folder holding `<domain>_wn3_inputs.parquet`.
+        wn3_dir: The folder holding `<domain>_wn3_inputs.parquet`, built for `days`.
+        days: The lead days the fit would score; the first one is timed.
 
     Returns:
         Whether the two fingerprints agree.
     """
+    day = days[0]
     frame = wn3_rows(
         published_dir=published_dir,
         inputs=pl.read_parquet(wn3_dir / "wind_wn3_inputs.parquet"),
         domain="wind",
-        day=1,
+        day=day,
     )
-    agree, seconds = time_two_fits(frame=frame, arm="wn3_mean_day1", domain="wind")
-    n_fits = (
-        sum(len(wn3_arms(domain=domain, day=day)) for domain in DOMAINS for day in WN3_DAYS)
-        * sum(N_SITES.values())
-        // len(DOMAINS)
-    )
+    agree, seconds = time_two_fits(frame=frame, arm=f"wn3_mean_day{day}", domain="wind")
     sys.stdout.write(
-        f"one arm at one site: {seconds:.0f} s; about {n_fits} primary (arm, site) fits are about "
-        f"{n_fits * seconds / 3600:.1f} h on one worker (the sensitivity and near-line refits add "
-        "about a fifth)\n"
+        _fit_estimate_text(
+            seconds=seconds,
+            n_fits=wn3_primary_fit_count(days=days),
+            refits="the sensitivity and near-line refits add about a fifth",
+        )
+    )
+    return agree
+
+
+def check_lean(
+    *,
+    published_dir: Path,
+    lean_dir: Path,
+    leads_day10_dir: Path,
+    days: Sequence[int],
+) -> bool:
+    """Fit the first day's AIFS Single arm at one wind site twice, and print a time estimate.
+
+    Args:
+        published_dir: The folder holding the published inputs.
+        lean_dir: The folder holding `<domain>_aifs_inputs.parquet`, built for `days`.
+        leads_day10_dir: The extra-lead folder that holds the ENS mean at day 10.
+        days: The lead days the fit would score; the first one is timed.
+
+    Returns:
+        Whether the two fingerprints agree.
+    """
+    day = days[0]
+    arms = lean_arms(row_set="single", day=day)
+    frame = aifs_rows(
+        published_dir=published_dir,
+        aifs=lean_inputs(aifs_dir=lean_dir, leads_day10_dir=leads_day10_dir, domain="wind"),
+        domain="wind",
+        row_set="single",
+        arms=arms,
+        day=day,
+        shuffles={},
+        drop=day0_drop(domain="wind", day=day, wn3=False),
+    )
+    agree, seconds = time_two_fits(frame=frame, arm=arms[0], domain="wind")
+    sys.stdout.write(
+        _fit_estimate_text(
+            seconds=seconds,
+            n_fits=lean_primary_fit_count(days=days),
+            refits="the lean fit has no sensitivity refits",
+        )
     )
     return agree
 
@@ -3132,7 +3199,8 @@ def run_wn3(
             "vectors, as WN3's is, because the WN3 store holds only the ensemble-mean wind "
             "components; that contrast is the matched one for wind. A day-0 row reads the 00 UTC "
             "run of its own day, a forecast no service could read, and the hour with no stored "
-            "lead is dropped (wind at 00:00, solar at 01:00 UTC). A "
+            "lead is dropped (wind at 00:00 UTC), and solar day 0 omits the hours ending 01:00 to "
+            "06:00 UTC for every arm. A "
             "difference whose interval spans 0 is reported with the interval's bounds, never as "
             "no difference."
         ),
@@ -3311,7 +3379,7 @@ def run_lean(
             "descriptive: this fit names no contrast. Each stage fits AIFS's own arm and ENS's "
             "mean on the same rows, for the leaderboards. Day 0 reads the 00 UTC run of the row's "
             "own day, a forecast no service could read, and at solar day 0 every arm omits the "
-            "hours ending 01:00 to 05:00 UTC, which precede the first 6-hourly step."
+            "hours ending 01:00 to 06:00 UTC, which precede the first 6-hourly step."
         ),
         "",
     ]
@@ -3826,7 +3894,11 @@ def main_wn3(*, args: argparse.Namespace) -> int:
         ],
     )
     if args.check:
-        agree = check_wn3(published_dir=args.published_dir, wn3_dir=args.output_dir)
+        agree = check_wn3(
+            published_dir=args.published_dir,
+            wn3_dir=args.output_dir,
+            days=tuple(args.days) if args.days else WN3_DAYS,
+        )
         sys.stdout.write(f"two GPU runs agree: {agree}\n")
         return 0 if agree else 1
     return run_wn3(
@@ -3849,10 +3921,20 @@ def main_lean(*, args: argparse.Namespace) -> int:
             *(studies_dir / folder for folder in EXTRA_FOLDERS.values()),
         ],
     )
+    leads_day10_dir = studies_dir / EXTRA_FOLDERS[LEAN_DAY10_FOLDER]
+    if args.check:
+        agree = check_lean(
+            published_dir=args.published_dir,
+            lean_dir=args.output_dir,
+            leads_day10_dir=leads_day10_dir,
+            days=tuple(args.days) if args.days else LEAN_DAYS,
+        )
+        sys.stdout.write(f"two GPU runs agree: {agree}\n")
+        return 0 if agree else 1
     return run_lean(
         published_dir=args.published_dir,
         output_dir=args.output_dir,
-        leads_day10_dir=studies_dir / EXTRA_FOLDERS[LEAN_DAY10_FOLDER],
+        leads_day10_dir=leads_day10_dir,
         workers=args.workers,
         days=tuple(args.days) if args.days else LEAN_DAYS,
     )
