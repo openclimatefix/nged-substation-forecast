@@ -17,63 +17,71 @@ reanalysis, so every number describes how well CERRA's wind explains power that 
 generated, and none describes forecast skill.
 
 **Most of that gain comes from having a second height, and the study does not show that more heights
-beat two.** The 10 m and 100 m pair gives 76% to 83% of the fall in error that the four heights and
-the five heights give, at the two XGBoost settings. Four heights differ from the pair by -0.074
-points [-0.097, -0.051], and five heights by -0.104 points [-0.121, -0.086], but both comparisons
-were chosen after the results were seen, so each is a lead to follow up rather than a finding. The
-10 m speed alone is not statistically distinguishable from the 100 m speed alone: the planned
-comparison of the two gives 0.050 points [-0.123, +0.025], and its interval, widened to allow for
-the four planned comparisons, does not rule out a 0.145 point difference in either direction of the
-sign. The page draws no conclusion about wind direction, because CERRA's files hold speed only.
+beat two.** The 10 m and 100 m pair gives 76% to 83% of the fall in error that four heights give and
+76% to 78% of the fall that five heights give, at the two XGBoost settings. That share is a ratio of
+point estimates and has no interval. Four heights differ from the pair by -0.074 points [-0.097,
+-0.051], and five heights by -0.104 points [-0.121, -0.086], but both comparisons were chosen after
+the results were seen, so each is a lead to follow up rather than a finding. The 10 m and 100 m
+pair also differs from the 10 m speed alone by -0.370 points [-0.411, -0.332], another post hoc
+comparison. The planned comparison of the 10 m speed with the 100 m speed gives -0.050 points
+[-0.123, +0.025], which is not statistically significant at the 5% level. Its Bonferroni-adjusted
+interval, [-0.145, +0.046], does not rule out the 100 m speed having an error up to 0.145 points
+lower than the 10 m speed. The page draws no conclusion about wind direction, because the study
+downloaded CERRA's speed only.
 
-![Figure 1: Every set of CERRA wind columns has a similar pooled error, because months of weather
-dominate each interval](../assets/cerra_wind_levels_leaderboard.svg)
+![Figure 1: The seven sets of CERRA wind columns span 0.5 points of pooled error, and the intervals
+overlap because months of weather dominate them](../assets/cerra_wind_levels_leaderboard.svg)
 
 ![Figure 2: A second height gives most of the gain from using more CERRA wind heights. The planned
 rows come first, then the exploratory and post hoc
 rows](../assets/cerra_wind_levels_contrasts.svg)
 
-**The Summary makes three scoped recommendations, each resting on the evidence below.**
+**Three scoped recommendations follow from the evidence below.**
 
 - **To describe past wind at these three farms from CERRA, read at least two heights.** The 10 m and
-  100 m speeds together lower the error more than either alone. The evidence does not say which
-  second height is best, because the pair tested always held the 10 m speed.
+  100 m speeds together have a lower error than either alone (-0.319 points against 100 m and
+  -0.370 points against 10 m, both exploratory). The evidence does not say which second height is
+  best, because the pair tested always held the 10 m speed.
 - **Do not read a mean of near-100 m heights as a substitute for separate heights.** The planned
-  mean of the 75, 100, and 150 m speeds changes the error by -0.050 points [-0.070, -0.032], a small
-  fraction of the 0.394 points the same heights give as separate columns.
+  mean of the 75, 100, and 150 m speeds changes the error by -0.050 points [-0.070, -0.032], and
+  the 50, 75, 100, and 150 m speeds as separate columns differ from that mean by -0.344 points
+  [-0.393, -0.294] (exploratory).
 - **Do not read the page as a statement about forecasting.** CERRA is an analysis of the past, so
   the page says nothing about forecast skill, and it says nothing about wind direction.
 
 > **How this page was made.** The research question came from a human. Everything else — the code
 > behind every result, the analysis, the figures, and the text — was written by Claude, Anthropic's
-> AI model (for this page, Claude Sonnet, reusing the shared study code that earlier Claude
-> models wrote). Several independent Claude reviewers have
-> checked the method, the evidence, and the prose adversarially.
+> AI model. This page and its study scripts were written by Claude Sonnet 5.5, reusing shared study
+> code written by Claude Opus 5.5, Claude Opus 5, and Claude Sonnet 5. Two independent reviews by
+> Claude Opus checked the method, the results, and the prose adversarially.
 
 ## Key findings
 
-- **Four CERRA heights lower the error by 0.394 points against the 100 m speed alone, a planned
+- **Four CERRA heights change the error by -0.394 points against the 100 m speed alone, a planned
   comparison.** See [A second height gives most of the gain from using several
-  heights](#a-second-height-gives-most-of-the-gain-from-using-several-heights). - **The 10 m and 100
-  m speeds together give 76% to 83% of that fall, an exploratory finding.** See the same section. -
-  **The 10 m speed against the 100 m speed is a null result, with a difference of up to 0.145 points
+  heights](#a-second-height-gives-most-of-the-gain-from-using-several-heights).
+- **The 10 m and 100 m speeds together give 76% to 83% of that fall, an exploratory finding.** See
+  the same section.
+- **The 10 m speed against the 100 m speed is a null result, with a difference of up to 0.145 points
   not ruled out.** See [The planned comparison of 100 m with 10 m is
-  null](#the-planned-comparison-of-100-m-with-10-m-is-null). - **The mean of three heights and the
-  fifth height each lower the error by a small amount.** See [The mean of three heights and the
-  fifth height add little](#the-mean-of-three-heights-and-the-fifth-height-add-little). - **Four
-  shuffled columns raise the error by 0.089 points, and a synthetic target shows that the XGBoost
-  models can use a second height.** See [The negative and positive
-  controls](#the-negative-and-positive-controls). - **The checks made before the fits found no step
-  in the CERRA record and no better power-hour offset than the centred hour.** See [The checks
-  before the fits](#the-checks-before-the-fits).
+  null](#the-planned-comparison-of-100-m-with-10-m-is-null).
+- **The mean of three heights and the fifth height each change the error by a small amount.** See
+  [The mean of three heights and the fifth height add
+  little](#the-mean-of-three-heights-and-the-fifth-height-add-little).
+- **Four shuffled columns raise the error by 0.089 points, and a synthetic target shows that the
+  XGBoost models can use a second height.** See [The negative and positive
+  controls](#the-negative-and-positive-controls).
+- **The checks made before the fits found no step in the CERRA record and no better power-hour
+  offset than the centred hour.** See [The checks before the fits](#the-checks-before-the-fits).
 
 ## Introduction
 
 **The question is which of CERRA's wind heights an XGBoost model should be given to describe a wind
 farm's past power, and whether blending the heights beats reading 100 m alone.** CERRA is the
-Copernicus regional reanalysis for Europe, run by the European Centre for Medium-Range Weather
-Forecasts for the Copernicus Climate Change Service. A reanalysis re-runs a weather model over past
-years with the observations of each period, so every value is an analysis of a past hour and no
+Copernicus regional reanalysis for Europe, produced by a consortium led by the Swedish
+Meteorological and Hydrological Institute for the Copernicus Climate Change Service, which the
+European Centre for Medium-Range Weather Forecasts implements. A reanalysis re-runs a weather model
+over past years with the observations of each period, so every value is an analysis of a past hour and no
 value is a forecast. The Copernicus Climate Data Store serves CERRA's wind at 10 m from one dataset,
 [`reanalysis-cerra-single-levels`](https://cds.climate.copernicus.eu/datasets/reanalysis-cerra-single-levels),
 and at 50, 75, 100, and 150 m from another,
@@ -92,12 +100,12 @@ XGBoost model.
 | Property | CERRA's wind |
 |---|---|
 | Heights | 10, 50, 75, 100, and 150 m |
-| Quantity | Wind speed, with no direction in the files read |
+| Quantity | Wind speed; the study downloaded no direction |
 | Time step | Every 3 hours (00, 03, ..., 21 UTC), an analysis |
 | Grid | 5,500 m, read at each farm's nearest cell |
 | History used | 1 September 2019 to 30 June 2026 |
 | Source of the 10 m speed | `reanalysis-cerra-single-levels`, a surface diagnostic |
-| Source of the other four speeds | `reanalysis-cerra-height-levels`, values on model levels |
+| Source of the other four speeds | `reanalysis-cerra-height-levels`, values interpolated to fixed heights above ground |
 
 ## Data and methods
 
@@ -107,13 +115,15 @@ farm-hours between 17 September 2019 and 30 June 2026, and each of the three far
 the CERRA time, and any hour holding a half-hour of exactly zero is dropped, from the target alone,
 so that every column set is scored on the same rows. The wind farms appear only as W1 to W3. Each
 farm reads CERRA at its nearest grid cell, and the loader stops if that cell sits on the edge of the
-downloaded crop. The 3-hourly rows mean `hour_of_day` takes only 8 values.
+downloaded crop. The 3-hourly rows mean `hour_of_day` takes only 8 values. Each farm's capacity is
+the `effective_capacity_mw` column of the roster metadata (`NGED/metadata.parquet`, last written on
+5 September 2026), one 99th-percentile value per farm over its whole observed history.
 
 **Each XGBoost model is fitted per wind farm, on two shared features plus five wind columns.** The
 two shared features are `hour_of_day` and `day_of_year`. Every column set has 7 columns in total, so
 that width does not decide a comparison: a set with fewer than five real wind columns is padded with
 monotone transforms of one of its real columns (the square, the square root, the log of one plus the
-speed, and the cube), which a tree can not use to learn anything new. The wind columns of each
+speed, and the cube), which a tree cannot use to learn anything new. The wind columns of each
 column set are:
 
 | Column set | Real wind columns | Padding |
@@ -134,7 +144,7 @@ primary setting is `max_depth` 6, and the second setting is a shallower, more he
 one. Every planned comparison was also fitted at the second setting.
 
 **"Planned" and "exploratory" have one meaning each on this page.** A comparison is planned when it
-was written into the study plan before any fit, and every other comparison is exploratory. Two
+was written into the study plan before any fit, and every other comparison is exploratory. Four
 exploratory comparisons were added after the results were seen, so the page calls them post hoc.
 The four planned comparisons are:
 
@@ -144,8 +154,9 @@ The four planned comparisons are:
 4. `levels_all` minus `levels_50_to_150`.
 
 Each difference is the error of the first column set minus the error of the second, so a negative
-difference means the first column set has the lower error. The two post hoc comparisons are
-`levels_50_to_150` minus `speed_10m_100m` and `levels_all` minus `speed_10m_100m`. The plan is in
+difference means the first column set has the lower error. The four post hoc comparisons are
+`levels_50_to_150` minus `speed_10m_100m`, `levels_all` minus `speed_10m_100m`, `speed_10m_100m`
+minus `speed_10m`, and `levels_50_to_150` minus `mean_near_100m`. The plan is in
 the repository's git history (commits `cdc79928` and `5e90f63c`).
 
 **The test covers the month-to-month weather and the fitting seed, and not differences between wind
@@ -172,9 +183,11 @@ whether CERRA's record steps at some month, because the record was produced in s
 each height's ratio to the 100 m speed and for each height's own monthly mean speed, the check
 removes the mean of each calendar month, then compares the mean of the next 12 months with the mean
 of the previous 12 months, and divides by the standard error that independent months would give. The
-run stops if any such z-score exceeds 5. The power-hour scan refits the `speed_100m` column set with
-the power hour shifted by -1 to 3 half-hours, on the rows every shift shares, and stops if another
-shift beats the centred one by more than the seed spread.
+run stops if any such z-score exceeds 5. The check has two limits: a 12-month window cannot test the
+first or the last 12 months of the record, and the standard error assumes that months are
+independent of one another. The power-hour scan refits the `speed_100m` column set with the power
+hour shifted by -1 to 3 half-hours, on the rows every shift shares, and stops if another shift beats
+the centred one by more than the seed spread.
 
 ## Results
 
@@ -210,9 +223,10 @@ second table.
 1.707 points [1.613, 1.805] for `speed_100m`, a difference of -0.951 points [-1.043, -0.861], in
 all 5 folds.** The synthetic target needs the speed at 120 m, which is a blend of the 100 m and 150
 m speeds, so the result shows that the XGBoost models can learn a blend of heights when the target
-needs one. The result says nothing about whether the real wind farms' power needs one. The page does
-not plot the models' out-of-fold predictions against the measured power, so no chart shows the
-models' predictions directly.
+needs one. The result says nothing about whether the real wind farms' power needs one. Figure 3
+shows the estimates of the four-height XGBoost model on the real target.
+
+![Figure 3: The four-height XGBoost model's estimates follow measured power at each farm](../assets/cerra_wind_levels_predictions.svg)
 
 ### A second height gives most of the gain from using several heights
 
@@ -243,13 +257,16 @@ column set, with two heights, changes the error by -0.319 points [-0.374, -0.270
 | second | `levels_50_to_150` | 0.345 | 83% |
 | second | `levels_all` | 0.365 | 78% |
 
-**The two post hoc comparisons against the two-height column set are small, and neither is a
-finding.** `levels_50_to_150` minus `speed_10m_100m` is -0.074 points [-0.097, -0.051], with the
-same sign in all 5 folds, and -0.060 points [-0.076, -0.043] at the second setting. `levels_all`
-minus `speed_10m_100m` is -0.104 points [-0.121, -0.086], and -0.080 points [-0.092, -0.068] at the
-second setting. These are two comparisons added after the results were seen, with no correction for
-that. The per-farm table below shows that the comparison varies between farms, and the page draws no
-conclusion from the split, because each farm's interval is unadjusted and three farms are few.
+**The post hoc comparisons against the two-height column set are small, and none is a finding.**
+`levels_50_to_150` minus `speed_10m_100m` is -0.074 points [-0.097, -0.051], with the same sign in
+all 5 folds, and -0.060 points [-0.076, -0.043] at the second setting. `levels_all` minus
+`speed_10m_100m` is -0.104 points [-0.121, -0.086], and -0.080 points [-0.092, -0.068] at the second
+setting. These comparisons were added after the results were seen, with no correction for that. Two
+further post hoc comparisons are the two-height set minus `speed_10m`, -0.370 points [-0.411,
+-0.332], and four heights minus the mean of three heights, -0.344 points [-0.393, -0.294], both in
+all 5 folds. The per-farm table below lists the estimates for the first two comparisons. The page
+draws no conclusion from the split, because each farm's interval is unadjusted and three farms are
+few.
 
 | Comparison | W1 | W2 | W3 |
 |---|---|---|---|
@@ -266,10 +283,10 @@ error up to 0.145 points lower than one given the 10 m speed, and does not rule 
 98.75% interval of [-0.126, +0.051]. Four of the five folds have the negative sign.
 
 **The 10 m and 100 m speeds come from two CERRA products, so the comparison is between a surface
-diagnostic and a model-level value as well as between two heights.** The 10 m speed comes from
-`reanalysis-cerra-single-levels` and the 100 m speed from `reanalysis-cerra-height-levels`. A
-difference between the two could therefore come from how each product derives its speed, and the
-study has no way to separate that from the height.
+diagnostic and a value interpolated to a fixed height as well as between two heights.** The 10 m
+speed comes from `reanalysis-cerra-single-levels` and the 100 m speed from
+`reanalysis-cerra-height-levels`. A difference between the two could therefore come from how each
+product derives its speed, and the study has no way to separate that from the height.
 
 ### The mean of three heights and the fifth height add little
 
@@ -278,10 +295,9 @@ study has no way to separate that from the height.
 -0.016].**
 Both are statistically significant at the 5% level after the Bonferroni correction, with 98.75%
 intervals of [-0.075, -0.029] and [-0.046, -0.013], and both have the same sign in all 5 folds. Both
-are small. The mean's gain is 0.050 of the 0.394 points that the same heights give as separate
-columns, and the fifth height's gain is under 1% of the error of the four-height set. The fifth
-height's gain is not significant at W2, where the difference is +0.005 points [-0.014, +0.025], an
-unadjusted exploratory interval. At the second setting the two differences are -0.052 points
+are small. The four heights as separate columns differ from the mean of three of them by -0.344 points
+[-0.393, -0.294], a post hoc comparison. The fifth height's gain is under 1% of the error of the
+four-height set. At the second setting the two differences are -0.052 points
 [-0.066, -0.038] and -0.020 points [-0.029, -0.011].
 
 ### The negative and positive controls
@@ -306,16 +322,12 @@ half-hours, and the centred hour is shift 1.
 
 ### The CERRA documentation does not give the stream boundary dates
 
-**The CERRA documentation confirms that the record has several production streams, and the study did
-not find the dates where the streams join.** [Ridal et al.
-(2024)](https://doi.org/10.1002/qj.4764) describe CERRA's production in 13 streams, each with a
-one-year spin-up, between March 2020 and September 2021. ECMWF's [product user
-guide](https://confluence.ecmwf.int/x/WFQ7E) says the production was suspended after June 2021 until
-a contract for near-real-time updates was in place, so the record after June 2021 comes from a
-later extension. Neither source, in the parts read, gives the stream boundary dates, and the study
-did not find them in the [dataset page](https://doi.org/10.24381/cds.38b394e6). The era check
-therefore rests on the data alone, and a join too small for a 12-month window to detect would not
-have stopped the run.
+**The study did not find the dates where CERRA's production streams join.** The [product user
+guide](https://confluence.ecmwf.int/x/WFQ7E) says the production was suspended after June 2021
+until a contract for near-real-time updates was in place, so the record after June 2021 comes from
+a later extension. The [dataset page](https://doi.org/10.24381/cds.38b394e6) does not give the
+stream boundary dates in the parts read. The era check therefore rests on the data alone, and a
+join too small for a 12-month window to detect would not have stopped the run.
 
 ### The step statistic at July 2021
 
@@ -327,14 +339,15 @@ are -0.04 at 10 m, +0.03 at 50 m, +0.11 at 75 m, +0.18 at 100 m, and +0.32 at 15
 ## Discussion: what to use
 
 **To describe past wind at these three farms from CERRA, an XGBoost model should be given at least
-two heights, and the evidence supports the 10 m and 100 m pair and four heights from 50 to 150 m
-equally well as a starting point.** The two-height pair gives most of the gain, and the study did
-not test other pairs. What would change the recommendation is a result on a pair that leaves out the
-10 m speed, or on a farm where the wind's change with height differs from these three.
+two heights.** The planned tests do not separate the 10 m and 100 m pair from four heights. A post
+hoc comparison favours four heights by -0.074 points [-0.097, -0.051], with the same sign in all 5
+folds and at both settings. The study did not test other pairs. What would change the recommendation
+is a result on a pair that leaves out the 10 m speed, or on a farm where the wind's change with
+height differs from these three.
 
-**A mean of near-100 m heights is not a substitute for separate heights.** The mean gives a small
-fraction of the gain of the same heights given separately, so a model given a blend by averaging
-loses most of what the separate heights carry.
+**A mean of near-100 m heights is not a substitute for separate heights.** The mean changes the
+error by -0.050 points against the 100 m speed, and four heights given separately differ from the
+mean by -0.344 points [-0.393, -0.294], a post hoc comparison.
 
 **The page recommends nothing about forecasting.** CERRA is an analysis of past hours, so a result
 about how well it explains past power does not carry to a forecast at any lead.
@@ -346,18 +359,19 @@ only.** The farms share their weather, so the intervals resample months and seed
 
 - **The gap between the 10 m and 100 m speeds mixes height and product.** The 10 m speed is a
   surface diagnostic from one CERRA product, and the other four speeds come from another.
-- **CERRA's files hold speed only, so no column set holds direction.** The wind page's XGBoost
+- **The study downloaded speed only, so no column set holds direction.** The wind page's XGBoost
   models carry direction as sine and cosine, so the errors here are not comparable in level with the
   errors there.
 - **The 3-hourly rows hold 8 values of `hour_of_day`,** and the rows are one hour in three, so the
   XGBoost models see fewer rows than an hourly study would give them.
 - **No land-sea mask was read.** A nearest cell near the coast could be influenced by the sea, and
-  the study has not checked whether either farm's cell is.
-- **The era check has the limits stated above.** The documentation did not give the stream
-  boundary dates in the parts read.
-- **The two post hoc comparisons were chosen after the results were seen,** and no exploratory row
+  the study has not checked whether any of the three farms' cells is.
+- **The era check has the limits stated in the methods,** and the documentation did not give the
+  stream boundary dates in the parts read.
+- **The four post hoc comparisons were chosen after the results were seen,** and no exploratory row
   is corrected for multiple comparisons.
-- **The page does not plot the XGBoost models' predictions against measured power.**
+- **Each farm's capacity is one value from the roster metadata,** computed over the farm's whole
+  history, including the months a fold holds out.
 
 ## Scope
 
@@ -365,7 +379,7 @@ only.** The farms share their weather, so the intervals resample months and seed
 the five CERRA serves, or regions other than Lincolnshire.**
 
 - **Forecasting is not covered.** CERRA is a reanalysis.
-- **Direction is not covered.** The files read hold speed only.
+- **Direction is not covered.** The study downloaded speed only.
 - **Other weather products are not covered.** The [wind page](wind.md) compares products.
 - **Offshore wind and other regions are not covered.**
 
@@ -379,23 +393,27 @@ the code is in the repository at the commit that merged this page.** The code is
 - **Public inputs:** CERRA's wind speed from the Copernicus Climate Data Store, at 10 m from
   [`reanalysis-cerra-single-levels`](https://cds.climate.copernicus.eu/datasets/reanalysis-cerra-single-levels)
   and at 50, 75, 100, and 150 m from
-  [`reanalysis-cerra-height-levels`](https://doi.org/10.24381/cds.38b394e6). - **Private inputs:**
-  the three farms' metered output and coordinates, and the capacity table. The farms appear only as
-  W1 to W3. - **Planned comparisons:** recorded in the study plan, in the repository's git history
-  at commits `cdc79928` and `5e90f63c`. - **XGBoost:** version 3.4.1, with `tree_method` `hist`, the
-  objective `reg:absoluteerror`, and 4 threads per fit, two fits at a time. The primary setting is
-  `max_depth` 6, `learning_rate` 0.05, `subsample` 0.8, `min_child_weight` 20, `reg_lambda` 1, and
-  500 boosting rounds. The second setting is `max_depth` 4, `learning_rate` 0.03, `subsample` 0.8,
-  `min_child_weight` 50, `reg_lambda` 5, and 1,200 rounds. Neither setting subsamples columns or
-  uses early stopping, and each fit is repeated with the seeds 0, 1, and 2. - **Device:** every fit
-  ran on the CPU.
+  [`reanalysis-cerra-height-levels`](https://doi.org/10.24381/cds.38b394e6).
+- **Private inputs:** the three farms' metered output and coordinates, and the capacity table. The
+  farms appear only as W1 to W3.
+- **Planned comparisons:** recorded in the study plan, in the repository's git history at commits
+  `cdc79928` and `5e90f63c`.
+- **XGBoost:** version 3.4.1, with `tree_method` `hist`, the objective `reg:absoluteerror`, and 4
+  threads per fit, two fits at a time. The primary setting is `max_depth` 6, `learning_rate` 0.05,
+  `subsample` 0.8, `min_child_weight` 20, `reg_lambda` 1, and 500 boosting rounds. The second
+  setting is `max_depth` 4, `learning_rate` 0.03, `subsample` 0.8, `min_child_weight` 50,
+  `reg_lambda` 5, and 1,200 rounds. Neither setting subsamples columns or uses early stopping, and
+  each fit is repeated with the seeds 0, 1, and 2.
+- **Device:** every fit ran on the CPU.
 
 ## Reproducing the figures
 
 **Run the commands below in order.** The fit script writes its report and saved losses under
 `data/studies/cerra_wind_levels/`, and the second script reads those losses and writes its report
-under `data/studies/cerra_wind_levels_shear/`. That report holds the first report followed by the
-post hoc sections, and `check_page_numbers.py` checks the page against it.
+under `data/studies/cerra_wind_levels_post_hoc/`. That report holds the first report followed by the
+post hoc sections, and `check_page_numbers.py` checks the page against it. The command checks every
+results section and the Key findings. The Summary was checked the same way, on a copy of the page
+without its disclaimer, because the disclaimer's model version numbers are not in the report.
 
 ```bash
 uv run python studies/beam_diffuse_split/cerra_wind_levels.py
@@ -404,8 +422,7 @@ uv run python studies/beam_diffuse_split/cerra_wind_levels_charts.py
 npx svgo@4 --multipass --precision=1 --final-newline docs/studies/assets/cerra_wind_levels_*.svg
 uv run python studies/beam_diffuse_split/check_page_numbers.py \
     docs/studies/past-weather/cerra-wind-levels.md \
-    data/studies/cerra_wind_levels_shear/report.md \
-    --section "## Summary" \
+    data/studies/cerra_wind_levels_post_hoc/report.md \
     --section "## Key findings" \
     --section "### Each XGBoost model has an error of 7.950 to 8.462 points, and on a synthetic target the models can use a second height" \
     --section "### A second height gives most of the gain from using several heights" \
