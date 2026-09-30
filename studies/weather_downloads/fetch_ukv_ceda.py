@@ -1406,7 +1406,8 @@ class PartialStreak:
     """Counts consecutive committed runs that are partial with an identical set of extract problems.
 
     An extract problem is an absent field, missing leads, or a semantic fault. A file CEDA did not
-    serve is not one, so runs missing only files never build a streak.
+    serve is not one. A run whose only problems are files not received is neutral: it leaves the
+    count and the remembered problem set unchanged, so it neither builds nor breaks a streak.
 
     Attributes:
         problems: The problem set the current streak shares, or an empty set outside a streak.
@@ -1420,8 +1421,9 @@ class PartialStreak:
         """Count a committed run, and return whether the streak has reached the abort length.
 
         Args:
-            run: The run just committed. A complete run, a run whose only problems are files not
-                received, or a partial run with different problems, resets the streak.
+            run: The run just committed. A run whose only problems are files not
+                received leaves the streak unchanged. A complete run, or a partial run with
+                different problems, resets the streak.
 
         Returns:
             `True` once `MAX_IDENTICAL_PARTIAL_RUNS` runs in a row were partial with the same
@@ -1430,7 +1432,9 @@ class PartialStreak:
         found = frozenset(
             problem for problem in run.problems if not problem.endswith(FILE_NOT_RECEIVED)
         )
-        if run.status != STATUS_PARTIAL or not found:
+        if run.status == STATUS_PARTIAL and not found:
+            return False
+        if run.status != STATUS_PARTIAL:
             self.problems, self.length = frozenset(), 0
         elif found == self.problems:
             self.length += 1

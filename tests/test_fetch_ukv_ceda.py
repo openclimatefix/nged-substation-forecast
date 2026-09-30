@@ -292,3 +292,26 @@ def test_partial_streak_ignores_files_not_received() -> None:
     assert not any(streak.record(missing) for _ in range(20))
     real = _run_with(fetch.STATUS_PARTIAL, ("a: x absent", f"b{fetch.FILE_NOT_RECEIVED}"))
     assert [streak.record(real) for _ in range(5)] == [False] * 4 + [True]
+
+
+def test_partial_streak_is_neutral_on_missing_only_runs() -> None:
+    streak = fetch.PartialStreak()
+    missing = _run_with(fetch.STATUS_PARTIAL, (f"Wholesale1T120{fetch.FILE_NOT_RECEIVED}",))
+    real = _run_with(fetch.STATUS_PARTIAL, ("a: x absent",))
+    results = []
+    for _ in range(5):
+        results.append(streak.record(real))
+        results.append(streak.record(missing))
+    assert results == [False] * 8 + [True, False]
+    assert streak.length == 5
+
+
+def test_partial_streak_survives_missing_only_runs_between_identical_problems() -> None:
+    streak = fetch.PartialStreak()
+    missing = _run_with(fetch.STATUS_PARTIAL, (f"Wholesale1T120{fetch.FILE_NOT_RECEIVED}",))
+    real = _run_with(fetch.STATUS_PARTIAL, ("a: x absent",))
+    streak.record(real)
+    streak.record(real)
+    streak.record(missing)
+    assert streak.length == 2
+    assert streak.problems == frozenset({"a: x absent"})
