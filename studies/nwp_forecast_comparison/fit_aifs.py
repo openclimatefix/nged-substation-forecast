@@ -69,6 +69,7 @@ from typing import Final, Literal, NamedTuple
 import numpy as np
 import polars as pl
 import xgboost
+from build_forecast_inputs import _ens_extra_frame
 from fit_extra_leads import error_text, interval_text
 from nwp_forecast_comparison import (
     BLEND_ARMS,
@@ -3121,14 +3122,24 @@ def run_wn3(
 
 # --- The lean AIFS fit: AIFS alone at the leaderboard's extra lead days -----------------------
 
+MAX_WORKERS: Final[int] = 8
+"""The most (arm, site) fits `--workers` may run at once; more would oversubscribe the CPU cores
+and the GPU."""
+
 LEAN_DAYS: Final[tuple[int, ...]] = (0, 3, 4, 10)
 """The lead days the lean fit scores. Each stage fits AIFS's own arm and ENS's mean on the same
 rows, which are the tick and the mark the leaderboards draw, and nothing else: no blend, no
 control, no second setting."""
 
-LEAN_ENS_BUILT_DAYS: Final[tuple[int, ...]] = (4, 10)
-"""The lean days at which the published inputs hold no ENS mean, so the AIFS build's
-`ens_mean6_day<N>` columns become `ens_mean_day<N>`. Days 0 and 3 read the published columns."""
+LEAN_ENS_BUILT_DAYS: Final[tuple[int, ...]] = (10,)
+"""The lean days at which the published inputs hold no ENS mean and ENS has only its 6-hourly step
+(beyond 144 hours), so the AIFS build's `ens_mean6_day<N>` columns become `ens_mean_day<N>`."""
+
+LEAN_ENS_NATIVE_DAYS: Final[tuple[int, ...]] = (4,)
+"""The lean days at which the published inputs hold no ENS mean and ENS still has 3-hourly steps
+(day 4 reads leads 96 to 120 hours), so the AIFS build's 6-hourly emulation is not ENS's mean. The
+ENS mean is built from ENS's native steps, exactly as the WeatherNext 3 build builds it. Days 0
+and 3 read the published columns."""
 
 LEAN_DAY10_FOLDER: Final[str] = "leads_day10"
 """The `EXTRA_FOLDERS` folder whose ENS mean at day 10 the AIFS build's must equal."""
@@ -3141,7 +3152,10 @@ def lean_arms(*, row_set: str, day: int) -> tuple[str, ...]:
 
 
 def lean_inputs(*, aifs_dir: Path, leads_day10_dir: Path, domain: DomainType) -> pl.DataFrame:
-    """Return the AIFS build's columns with its ENS mean at days 4 and 10 under the published name.
+    """Return the AIFS build's columns with ENS's mean at days 4 and 10 under the published name.
+
+    Day 4's ENS mean is built from ENS's native steps and day 10's is the AIFS build's 6-hourly
+    read, which is ENS's native read at that lead.
 
     Args:
         aifs_dir: The folder holding `<domain>_aifs_inputs.parquet`, built with
@@ -3158,6 +3172,13 @@ def lean_inputs(*, aifs_dir: Path, leads_day10_dir: Path, domain: DomainType) ->
             row.
     """
     aifs = pl.read_parquet(aifs_dir / f"{domain}_aifs_inputs.parquet")
+    native = _ens_extra_frame(
+        keys=aifs.select("site", "time"),
+        domain=domain,
+        mean_days=LEAN_ENS_NATIVE_DAYS,
+        control_days=(),
+    )
+    aifs = aifs.join(native, on=["site", "time"], how="left")
     aifs = aifs.rename(
         {
             column: column.replace(f"ens_mean6_day{day}_", f"ens_mean_day{day}_", 1)
@@ -3871,13 +3892,40 @@ def run_extra_mode(*, args: argparse.Namespace) -> int | None:
     return None
 
 
+def workers_argument(text: str) -> int:
+    """Parse `--workers`, refusing a count outside 1 to `MAX_WORKERS`.
+
+    Args:
+        text: The command-line value.
+
+    Returns:
+        The worker count.
+
+    Raises:
+        argparse.ArgumentTypeError: If the value is not an integer from 1 to `MAX_WORKERS`.
+    """
+    try:
+        workers = int(text)
+    except ValueError:
+        workers = 0
+    if not 1 <= workers <= MAX_WORKERS:
+        msg = f"--workers must be an integer from 1 to {MAX_WORKERS}, not {text!r}"
+        raise argparse.ArgumentTypeError(msg)
+    return workers
+
+
 def main() -> int:
     """Fit every arm on both row sets and both technologies, and write the outputs once."""
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output-dir", type=Path, required=True)
     parser.add_argument("--published-dir", type=Path, required=True)
-    parser.add_argument("--workers", type=int, default=1, help="(arm, site) fits run at once.")
+    parser.add_argument(
+        "--workers",
+        type=workers_argument,
+        default=1,
+        help=f"(arm, site) fits run at once, at most {MAX_WORKERS}.",
+    )
     parser.add_argument("--check", action="store_true", help="Compare two GPU runs of one arm.")
     parser.add_argument(
         "--blends",

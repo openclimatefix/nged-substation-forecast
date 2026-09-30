@@ -366,13 +366,22 @@ def _row_positions(
 
 
 def _has_value(
-    *, run: np.ndarray, run_position: np.ndarray, lead_position: np.ndarray, runs: np.ndarray
+    *,
+    run: np.ndarray,
+    run_position: np.ndarray,
+    lead_position: np.ndarray,
+    runs: np.ndarray,
+    domain: DomainType,
 ) -> np.ndarray:
-    """Return which rows have a copied run and, one lead earlier, a stored lead."""
-    # Solar also reads the lead one hour earlier, so it needs the store's second lead onward. From
-    # day 1 every band's lead is at least 24 hours, far above the bound. A day-0 row at the run's
-    # first hour (wind at 00:00, solar at 01:00 UTC) has no stored lead, so it is left null.
-    return (runs[run_position] == run) & (lead_position >= 1) & (lead_position < N_LEADS)
+    """Return which rows have a copied run and every stored lead the domain reads."""
+    # Solar also reads the lead one hour earlier (for the temperature), so it needs the store's
+    # second lead onward, and wind needs the first. From day 1 every band's lead is at least 24
+    # hours, far above the bound. A day-0 row at the run's first hour (wind at 00:00, solar at
+    # 01:00 UTC) has no stored lead, so it is left null.
+    first_position = 1 if domain == "solar" else 0
+    return (
+        (runs[run_position] == run) & (lead_position >= first_position) & (lead_position < N_LEADS)
+    )
 
 
 def _masked(*, values: np.ndarray, present: np.ndarray) -> pl.Series:
@@ -406,7 +415,9 @@ def wn3_arm_frame(
     run, run_position, lead_position, site_position = _row_positions(
         keys=keys, sites=sites, runs=runs, domain=domain, day=day
     )
-    present = _has_value(run=run, run_position=run_position, lead_position=lead_position, runs=runs)
+    present = _has_value(
+        run=run, run_position=run_position, lead_position=lead_position, runs=runs, domain=domain
+    )
     arm = f"wn3_mean_day{day}"
 
     def at(name: str, *, lead_shift: int = 0) -> np.ndarray:

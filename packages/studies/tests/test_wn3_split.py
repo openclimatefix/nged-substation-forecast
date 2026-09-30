@@ -264,6 +264,7 @@ def test_day_0_drops_the_hour_with_no_stored_lead_and_no_other_day_does() -> Non
     assert solar is not None
     assert hours.filter(wind)["time"].dt.hour().to_list() == [0]
     assert hours.filter(solar)["time"].dt.hour().to_list() == [1]
+    # The drop is the hour the build leaves null: solar 01:00 and wind 00:00, and no other hour.
     assert wn3_day0_drop(domain="wind", day=1) is None
     assert wn3_day0_drop(domain="solar", day=10) is None
 
@@ -271,3 +272,8 @@ def test_day_0_drops_the_hour_with_no_stored_lead_and_no_other_day_does() -> Non
 def test_lean_arms_name_the_product_and_the_ens_mean_at_the_same_day() -> None:
     assert lean_arms(row_set="single", day=0) == ("aifs_single_day0", "ens_mean_day0")
     assert lean_arms(row_set="ens", day=10) == ("aifs_ens_mean_day10", "ens_mean_day10")
+
+
+def test_lean_arms_at_days_3_and_4_read_the_ens_mean_of_that_day() -> None:
+    assert lean_arms(row_set="single", day=3) == ("aifs_single_day3", "ens_mean_day3")
+    assert lean_arms(row_set="ens", day=4) == ("aifs_ens_mean_day4", "ens_mean_day4")

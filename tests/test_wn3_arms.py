@@ -491,3 +491,176 @@ def test_the_crop_weights_join_a_float32_point_one_degree_grid() -> None:
     weights = bfi._h3_crop_weights(site_cells={"A": cell}, grid_cells=cells, grid_degrees=0.1)
 
     assert weights["weight"].sum() == pytest.approx(1.0)
+
+
+def _day0_frame(*, domain: str, hours: list[int]) -> pl.DataFrame:
+    dataset = _dataset()
+    return w.wn3_arm_frame(
+        cubes=_cubes(dataset=dataset),
+        runs=dataset[w.fetch.INIT_TIME].to_numpy().astype("datetime64[h]"),
+        sites=["A"],
+        keys=_keys(times=[datetime(2026, 3, 2, hour) for hour in hours]),
+        domain=domain,
+        day=0,
+    )
+
+
+def test_wind_day_0_has_no_value_at_00_utc_and_reads_lead_1_at_01_utc() -> None:
+    frame = _day0_frame(domain="wind", hours=[0, 1])
+    assert frame["wn3_mean_day0_speed_100m"][0] is None
+    assert frame["wn3_mean_day0_init_time"][0] is None
+    assert frame["wn3_mean_day0_speed_100m"][1] == pytest.approx(5.0)
+    assert frame["wn3_mean_day0_init_time"][1] == datetime(2026, 3, 2, tzinfo=UTC)
+
+
+def test_solar_day_0_has_no_value_at_01_utc_and_reads_lead_2_at_02_utc() -> None:
+    frame = _day0_frame(domain="solar", hours=[1, 2])
+    assert frame["wn3_mean_day0_ghi"][0] is None
+    assert frame["wn3_mean_day0_temp"][0] is None
+    assert frame["wn3_mean_day0_init_time"][0] is None
+    # The hour ending 02:00 reads lead 2 of the run of its own day (run 1 of the copy).
+    assert frame["wn3_mean_day0_ghi"][1] == pytest.approx(RUN_STRIDE + 2, rel=1e-5)
+    assert frame["wn3_mean_day0_temp"][1] == pytest.approx(RUN_STRIDE + 1.5, rel=1e-5)
+
+
+def test_lean_inputs_reads_ens_at_day_4_from_its_native_steps_not_the_6_hourly_emulation(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    keys = {"site": ["A"], "time": [datetime(2026, 3, 5, 12, tzinfo=UTC)]}
+    pl.DataFrame(
+        {
+            **keys,
+            "ens_mean6_day4_ghi": [111.0],
+            "ens_mean6_day10_ghi": [10.0],
+            "aifs_single_day4_ghi": [5.0],
+        }
+    ).write_parquet(tmp_path / "solar_aifs_inputs.parquet")
+    pl.DataFrame({**keys, "ens_mean_day10_ghi": [10.0]}).write_parquet(
+        tmp_path / "solar_extra_lead_inputs.parquet"
+    )
+    seen: dict[str, object] = {}
+
+    def native(
+        *,
+        keys: pl.DataFrame,
+        domain: str,
+        mean_days: tuple[int, ...],
+        control_days: tuple[int, ...],
+    ) -> pl.DataFrame:
+        seen.update(mean_days=mean_days, control_days=control_days)
+        return keys.with_columns(ens_mean_day4_ghi=pl.lit(222.0))
+
+    monkeypatch.setattr(fa, "_ens_extra_frame", native)
+    frame = fa.lean_inputs(aifs_dir=tmp_path, leads_day10_dir=tmp_path, domain="solar")
+    assert seen == {"mean_days": (4,), "control_days": ()}
+    assert frame["ens_mean_day4_ghi"][0] == 222.0
+    assert frame["ens_mean_day10_ghi"][0] == 10.0
+
+
+def test_lean_inputs_stops_when_the_day_10_ens_read_differs_from_the_extra_lead_folder(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    keys = {"site": ["A"], "time": [datetime(2026, 3, 5, 12, tzinfo=UTC)]}
+    pl.DataFrame({**keys, "ens_mean6_day10_ghi": [10.0]}).write_parquet(
+        tmp_path / "solar_aifs_inputs.parquet"
+    )
+    pl.DataFrame({**keys, "ens_mean_day10_ghi": [11.0]}).write_parquet(
+        tmp_path / "solar_extra_lead_inputs.parquet"
+    )
+    monkeypatch.setattr(fa, "_ens_extra_frame", lambda *, keys, **_: keys)
+    with pytest.raises(ValueError, match="differ"):
+        fa.lean_inputs(aifs_dir=tmp_path, leads_day10_dir=tmp_path, domain="solar")
+
+
+def test_every_lean_day_has_exactly_one_source_of_its_ens_mean() -> None:
+    for day in fa.LEAN_DAYS:
+        sources = [
+            day in bfi.ENS_DAYS,
+            day in fa.LEAN_ENS_NATIVE_DAYS,
+            day in fa.LEAN_ENS_BUILT_DAYS,
+        ]
+        assert sum(sources) == 1, day
+
+
+def test_run_lean_fits_each_row_set_at_each_day_and_stamps_the_outputs(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    fitted: list[tuple[str, str, int, tuple[str, ...]]] = []
+    monkeypatch.setattr(fa, "lean_inputs", lambda **_: pl.DataFrame({"site": ["A"]}))
+
+    def rows(
+        *, domain: str, row_set: str, arms: tuple[str, ...], day: int, **_: object
+    ) -> pl.DataFrame:
+        fitted.append((domain, row_set, day, arms))
+        return pl.DataFrame({"site": ["A"], "month": ["2026-03"]})
+
+    monkeypatch.setattr(fa, "aifs_rows", rows)
+    monkeypatch.setattr(fa, "build_stamp", lambda **_: {})
+    monkeypatch.setattr(
+        fa, "fit_jobs", lambda *, jobs, **_: pl.DataFrame({"arm": [arm for arm, _ in jobs]})
+    )
+    monkeypatch.setattr(fa, "predictions_from_losses", lambda **_: pl.DataFrame({"a": [1]}))
+    monkeypatch.setattr(fa, "lean_stage_lines", lambda **_: [])
+    assert (
+        fa.run_lean(
+            published_dir=tmp_path, output_dir=tmp_path, leads_day10_dir=tmp_path, workers=1
+        )
+        == 0
+    )
+    expected = {
+        (domain, row_set, day, fa.lean_arms(row_set=row_set, day=day))
+        for domain in fa.DOMAINS
+        for row_set in fa.ROW_SETS
+        for day in fa.LEAN_DAYS
+    }
+    assert set(fitted) == expected
+    assert len(fitted) == len(expected)
+
+
+def test_workers_argument_accepts_one_to_the_cap_and_refuses_the_rest() -> None:
+    import argparse
+
+    assert fa.workers_argument("1") == 1
+    assert fa.workers_argument(str(fa.MAX_WORKERS)) == fa.MAX_WORKERS
+    for bad in ("0", str(fa.MAX_WORKERS + 1), "-1", "two"):
+        with pytest.raises(argparse.ArgumentTypeError):
+            fa.workers_argument(bad)
+
+
+def test_a_solar_band_scoring_hours_before_its_first_step_is_refused() -> None:
+    def steps(*, first_lead: float) -> object:
+        return efh.Steps(
+            keys=pl.DataFrame(),
+            leads=np.array([first_lead, first_lead + 6.0]),
+            widths=np.array([6, 6]),
+            values={},
+            ensemble_size=1,
+        )
+
+    with pytest.raises(ValueError, match="extrapolation"):
+        bfi.check_first_step_reaches_targets(
+            steps=steps(first_lead=6.0), day=0, domain="solar", arm_prefix="aifs_single"
+        )
+    # Day 1's first hour ends at lead 25, well after a step at lead 6 or 24.
+    bfi.check_first_step_reaches_targets(
+        steps=steps(first_lead=24.0), day=1, domain="solar", arm_prefix="aifs_single"
+    )
+    # Wind reads at each hour's start, so a day-0 wind band is not checked here.
+    bfi.check_first_step_reaches_targets(
+        steps=steps(first_lead=6.0), day=0, domain="wind", arm_prefix="aifs_single"
+    )
+
+
+def test_the_leaderboard_ticks_are_whole_numbers_up_to_the_highest_whole_number() -> None:
+    (low, high), ticks = charts.lead_board_x_domain(lowest=8.0, highest=12.0, longest_name=20)
+    assert ticks == [float(value) for value in range(int(ticks[0]), 13)]
+    assert ticks[-1] == 12.0
+    assert ticks[0] >= low
+    assert high == 12.5
+
+
+def test_the_leaderboard_ticks_fall_back_where_under_two_whole_numbers_fit() -> None:
+    (low, high), ticks = charts.lead_board_x_domain(lowest=6.0, highest=6.2, longest_name=20)
+    need = 20 * charts.LEAD_NAME_PX_PER_CHARACTER + charts.LEAD_NAME_GAP_PX
+    first_visible = low + need * (high - low) / charts.LEAD_PLOT_WIDTH_PX
+    assert ticks == charts.ticks(x_domain=(first_visible, high))

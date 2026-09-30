@@ -453,6 +453,36 @@ def _previous_runs_frame(
     return frame
 
 
+def check_first_step_reaches_targets(
+    *, steps: efh.Steps, day: int, domain: DomainType, arm_prefix: str
+) -> None:
+    """Refuse a solar band whose first scored hours lie before the first stored step.
+
+    A solar hour's temperature is read at its midpoint, so a band that scores hour `24 N + 1` needs
+    a step at or before lead `24 N + 0.5`. Where the first step is later, the upsampling holds that
+    step's value flat across the earlier hours, which is an extrapolation and not an upsampling.
+
+    Args:
+        steps: The band's steps.
+        day: The band's day.
+        domain: `solar` or `wind`; wind reads at each hour's start and is not checked here.
+        arm_prefix: The arm family's name, for the message.
+
+    Raises:
+        ValueError: If a solar band's first target midpoint is before its first step.
+    """
+    if domain != "solar":
+        return
+    first_midpoint = float(efh.target_leads(day=day, domain=domain)[0]) - 0.5
+    if steps.leads[0] > first_midpoint:
+        msg = (
+            f"{arm_prefix} day {day}: the first stored step is at lead {steps.leads[0]:g} h, after "
+            f"the first scored solar hour's midpoint at lead {first_midpoint:g} h, so that hour "
+            "would be an extrapolation"
+        )
+        raise ValueError(msg)
+
+
 def ens_member_arms(
     *,
     extract: pl.DataFrame,
@@ -490,6 +520,10 @@ def ens_member_arms(
 
     Returns:
         One frame per (day, way) with `site`, `time` and that arm's own weather columns.
+
+    Raises:
+        ValueError: If a solar band on 6-hourly steps scores an hour before its first step, as
+            day 0 does.
     """
     clear_sky = efh.clear_sky_table(domain=domain)
     frames: list[pl.DataFrame] = []
@@ -502,6 +536,13 @@ def ens_member_arms(
             fine_step_last_lead=fine_step_last_lead,
             six_hourly=six_hourly,
         )
+        if six_hourly or fine_step_last_lead == 0:
+            check_first_step_reaches_targets(
+                steps=steps,
+                day=day,
+                domain=domain,
+                arm_prefix=arm_name("mean", day).rsplit("_day", 1)[0],
+            )
         upsampled = efh.upsampled_fields(steps=steps, day=day, domain=domain, clear_sky=clear_sky)
         combined = efh.combine(
             steps=steps, upsampled=upsampled, day=day, domain=domain, method=method

@@ -725,13 +725,16 @@ LEAD_TICK_HEIGHT_PX: Final[int] = 9
 WN3_LEADERBOARD_NOTES: Final[dict[DomainType, str]] = {
     "solar": (
         "At days 7 and 14 WeatherNext 3's solar error is not the lowest plotted: the ENS mean "
-        "(13.7%) and GFS native (14.7%) are lower, on more months."
+        "(13.7%) and GFS native (14.7%) are lower, on more months. Against the ENS mean on the "
+        "same rows (14.7% and 16.0%) the difference is not resolved."
     ),
     "wind": (
-        "At days 7 and 14 WeatherNext 3 has the lowest plotted wind error, on a different and "
-        "smaller row set; against the ENS mean on the same rows the gap is not resolved, and "
-        "the grey tick is the ENS mean of wind speed, not the mean-vector reference matched to "
-        "WeatherNext 3 (see the matched-reference table)."
+        "At days 7 and 14, against the ENS mean on the same rows (16.7% and 18.7%), no "
+        "difference from WeatherNext 3 is resolved. At day 14 WeatherNext 3's 17.9% is not "
+        "detectably below the shuffled-weather arms (18.3% and 18.6%), so the chart does not "
+        "show that WeatherNext 3 beats the 18.5% climatology. The grey tick is the ENS mean "
+        "of wind speed, not the mean-vector reference matched to WeatherNext 3 (see the "
+        "matched-reference table)."
     ),
 }
 """The sentence each leaderboard adds about WeatherNext 3's row at days 7 and 14."""
@@ -1220,7 +1223,7 @@ def leaderboard_figure(
                 "beside a mark is the ENS mean fitted on the same rows. WeatherNext 3's row "
                 "holds every row from February to September 2026, and Google has not documented "
                 "which WeatherNext 3 model version made that archive, so the February to June "
-                "months may overlap its training data (Figure "
+                "months may overlap WeatherNext 3's training data (Figure "
                 f"{FIGURE_NUMBERS[(domain, 'wn3_groups')]} splits the rows). "
                 f"{WN3_LEADERBOARD_NOTES[domain]} "
                 "A month counts whole "
@@ -2631,9 +2634,9 @@ SENSITIVITY_SHIFT_DAYS: Final[float] = 0.03
 """How far right of its primary mark a sensitivity-setting mark sits, in days."""
 
 WN3_GROUP_NAMES: Final[dict[str, str]] = {
-    "in-sample": "Before July (may overlap WN3's training data)",
-    "out-of-sample": "July to September (after every training end)",
-    "pooled": "All rows, February to September (mixes both)",
+    "in-sample": "Before July (4 months, no May rows; may overlap WN3's training data)",
+    "out-of-sample": "July to September (3 months; after every training end)",
+    "pooled": "All rows, February to September (7 months, no May rows; mixes both)",
 }
 """Each WN3 row group's name in the key."""
 
@@ -2872,11 +2875,12 @@ def wn3_groups(*, wn3_dir: Path, domain: DomainType) -> tuple[alt.VConcatChart, 
                 ),
                 (
                     "The three colours are three groups of the same out-of-fold rows: "
-                    f"{WN3_SPLIT_MONTHS['in-sample']} (4 calendar months), "
+                    f"{WN3_SPLIT_MONTHS['in-sample']} (4 calendar months, no May rows), "
                     f"{WN3_SPLIT_MONTHS['out-of-sample']} (3 months), and every row from "
-                    "February to September 2026 (7 months). Only the second group is certain to "
-                    "lie after WeatherNext 3's training data, so it checks whether a change of "
-                    "model version at the start of July shows in the scores; "
+                    "February to September 2026 (7 months, no May rows). The second group is the "
+                    "only group after every training end the WeatherNext 3 paper lists, "
+                    "so it checks whether a change of model version at the start of July shows in "
+                    "the scores; "
                     "the third group, which mixes both, is the leaderboards' WeatherNext 3 row. "
                     "The second group's intervals resample only 3 months, fewer than the "
                     f"{MIN_MONTHS_FOR_INTERVAL} that support an interval, so they show the "
