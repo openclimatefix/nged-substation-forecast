@@ -1942,7 +1942,6 @@ while running the study -->
 WN3 result is descriptive: no scored month has a training row of its own calendar month.**
 The wind speed WN3 gives is also the length of a mean vector, which is lower than ENS's mean of
 member speeds, so a wind difference against ENS partly reflects that definition.
-definition.
 
 **The UKV day-1 requirement removes 47.8% and 50.5% of the solar rows of April and May 2026, and
 86.8% and 89.4% of the wind rows.** The shared rows require UKV's day-1 value, because UKV is a
