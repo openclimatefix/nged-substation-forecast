@@ -15,12 +15,13 @@ Fetches `data_type=reanalysis` (deterministic) only, never `ensemble_members`.
 
 Two datasets: `reanalysis-cerra-single-levels` for the solar candidate
 (`surface_solar_radiation_downwards`,
-`time_integrated_surface_direct_short_wave_radiation_flux`) and `reanalysis-cerra-height-levels`
-for wind (`wind_speed` at every height in `HEIGHT_LEVELS`). The height band is deliberately
-generous — the roster's onshore wind generators span a range of hub heights, and the cropped
-output is cheap regardless of how many heights are kept (see the `data-download` skill's sizing
-discussion) — so a later study has more than one vertical level to compare, the same choice
-`fetch_icon_dream.py` makes for `WS`.
+`time_integrated_surface_direct_short_wave_radiation_flux`) and true 10 m wind
+(`10m_wind_speed`), and `reanalysis-cerra-height-levels` for wind above 10 m (`wind_speed` at
+every height in `HEIGHT_LEVELS`; that dataset has no 10 m level, only 15 m and above). The height
+band is deliberately generous — the roster's onshore wind generators span a range of hub heights,
+and the cropped output is cheap regardless of how many heights are kept (see the `data-download`
+skill's sizing discussion) — so a later study has more than one vertical level to compare, the
+same choice `fetch_icon_dream.py` makes for `WS`.
 
 Requests are chunked to six months, matching `studies/beam_diffuse_split/fetch_era5.py`: the
 Climate Data Store prices a request by field count (`variable x time x height`) and queues one job
@@ -83,8 +84,25 @@ SOLAR_VARIABLES: Final[tuple[str, ...]] = (
 WIND_VARIABLE: Final[str] = "wind_speed"
 HEIGHT_LEVELS: Final[tuple[str, ...]] = ("100_m", "75_m", "50_m", "150_m")
 """A generous band bracketing GB onshore turbine hub heights, not just the issue's original 75/100
-m — see the module docstring. Fetched in this order, 100 m first, so the most useful height lands
-first."""
+m — see the module docstring. `reanalysis-cerra-height-levels` has no 10 m level (confirmed
+against the dataset's own process description: the `height_level` enum is 15_m, 30_m, 50_m, 75_m,
+100_m, 150_m, 200_m, 250_m, 300_m, 400_m, 500_m); the near-surface height most other wind products
+report is fetched instead from `reanalysis-cerra-single-levels`'s genuine `10m_wind_speed`
+variable — see `WIND_10M_VARIABLE`. Fetched in this order, 100 m first, so the most useful height
+lands first."""
+
+WIND_10M_VARIABLE: Final[str] = "10m_wind_speed"
+WIND_DIRECTION_VARIABLE: Final[str] = "wind_direction"
+WIND_10M_DIRECTION_VARIABLE: Final[str] = "10m_wind_direction"
+SINGLE_LEVELS_ANALYSIS_VARIABLES: Final[tuple[str, ...]] = (
+    WIND_10M_VARIABLE,
+    WIND_10M_DIRECTION_VARIABLE,
+)
+"""The `reanalysis-cerra-single-levels` variables fetched as an `analysis` product, whose
+`valid_time` is the instant itself, unlike the solar variables' forecast accumulations."""
+"""A true 10 m near-surface wind speed on `reanalysis-cerra-single-levels`, an `analysis` product
+distinct from the `height_level` fields above — added so a study can compare CERRA's near-surface
+height, the height most other wind products report, against a turbine-hub-height forecast."""
 
 SOLAR_LEADTIME_HOURS: Final[int] = 3
 """The single value both `_build_request`'s `leadtime_hour` and `crop_one_chunk`'s
@@ -175,7 +193,7 @@ def _years_months_days(*, start_date: str, end_date: str) -> tuple[list[str], li
 def _build_request(
     *, variable: str, height_level: str | None, start_date: str, end_date: str
 ) -> dict[str, object]:
-    """Build one CDS request for a solar (`height_level is None`) or wind chunk."""
+    """Build one CDS request for a solar, 10 m wind, or height-level wind chunk."""
     years, months, days = _years_months_days(start_date=start_date, end_date=end_date)
     request: dict[str, object] = {
         "variable": [variable],
@@ -187,8 +205,14 @@ def _build_request(
         "data_format": "netcdf",
     }
     if height_level is not None:
-        # Wind: an analysis product on height_level, no level_type field on this dataset's form.
+        # Height-level wind: an analysis product on height_level, no level_type field on this
+        # dataset's form.
         request["height_level"] = [height_level]
+        request["product_type"] = ["analysis"]
+    elif variable in SINGLE_LEVELS_ANALYSIS_VARIABLES:
+        # 10 m wind: a genuine analysis product on reanalysis-cerra-single-levels, valid_time is
+        # the instant itself — unlike the solar variables below.
+        request["level_type"] = ["surface_or_atmosphere"]
         request["product_type"] = ["analysis"]
     else:
         # Solar: no analysis product on CDS for either solar variable (see the module docstring),
@@ -402,10 +426,15 @@ def _run_variable(
             f"CERRA {dataset} {variable}"
             + (f" at height_level={height_level}, product_type=analysis" if height_level else "")
             + (
+                " (surface), product_type=analysis — valid_time is the instant itself"
+                if not height_level and variable in SINGLE_LEVELS_ANALYSIS_VARIABLES
+                else ""
+            )
+            + (
                 " (surface), product_type=forecast, leadtime_hour=3 — values are a 3-hour "
                 "accumulation (e.g. J/m2), not an instantaneous flux, because CDS has no "
                 "analysis product for this variable"
-                if not height_level
+                if not height_level and variable not in SINGLE_LEVELS_ANALYSIS_VARIABLES
                 else ""
             )
             + ", data_type=reanalysis (deterministic, never ensemble_members). Whole-domain "
@@ -435,11 +464,35 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--start-date", required=True)
     parser.add_argument("--end-date", required=True)
+    parser.add_argument(
+        "--wind-direction",
+        action="store_true",
+        help="Fetch only wind direction (10 m and every height level), not solar or wind speed.",
+    )
     arguments = parser.parse_args()
 
     chunks = _six_month_chunks(start_date=arguments.start_date, end_date=arguments.end_date)
     output_dir = WEATHER_DOWNLOADS_DIR / "CERRA"
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    if arguments.wind_direction:
+        speed_or_direction = "direction"
+        wind_10m_variable, wind_height_variable = (
+            WIND_10M_DIRECTION_VARIABLE,
+            WIND_DIRECTION_VARIABLE,
+        )
+        wind_unit_column = "wind_direction_deg"
+        solar_variables: tuple[str, ...] = ()
+    else:
+        speed_or_direction = "speed"
+        wind_10m_variable, wind_height_variable = WIND_10M_VARIABLE, WIND_VARIABLE
+        wind_unit_column = "wind_speed_m_s"
+        solar_variables = SOLAR_VARIABLES
+    print(
+        f"Fetching CERRA wind {speed_or_direction}"
+        if arguments.wind_direction
+        else "Fetching CERRA"
+    )
 
     summaries = [
         _run_variable(
@@ -453,14 +506,26 @@ def main() -> int:
             # start — see crop_one_chunk's docstring.
             window_start_offset_hours=SOLAR_LEADTIME_HOURS,
         )
-        for variable in SOLAR_VARIABLES
+        for variable in solar_variables
     ]
+    summaries.append(
+        _run_variable(
+            dataset=SINGLE_LEVELS_DATASET,
+            variable=wind_10m_variable,
+            height_level=None,
+            unit_column=wind_unit_column,
+            chunks=chunks,
+            output_dir=output_dir,
+            # 10 m wind is an analysis product: valid_time is the instant itself.
+            window_start_offset_hours=0,
+        )
+    )
     summaries.extend(
         _run_variable(
             dataset=HEIGHT_LEVELS_DATASET,
-            variable=WIND_VARIABLE,
+            variable=wind_height_variable,
             height_level=height_level,
-            unit_column="wind_speed_m_s",
+            unit_column=wind_unit_column,
             chunks=chunks,
             output_dir=output_dir,
             # Wind is an analysis product: valid_time is the instant itself.
@@ -487,7 +552,11 @@ def main() -> int:
             "`n_rows_written` field for the exact row count and `chunks_requested`/"
             "`chunks_cached` to confirm no chunk is missing."
         )
-    lineage_filenames = [f"lineage_{summary['label']}.json" for summary in written]
+    lineage_filenames = sorted(
+        path.name
+        for path in output_dir.glob("lineage_*.json")
+        if path.name != "lineage_cerra_grid.json"
+    )
 
     write_readme(
         product_dir=output_dir,
@@ -513,8 +582,15 @@ def main() -> int:
             "Present only in the "
             "`time_integrated_surface_direct_short_wave_radiation_flux_surface.parquet` file.",
             "wind_speed_m_s": "Wind speed, m/s, an analysis value at each of "
-            f"{', '.join(HEIGHT_LEVELS)} above ground (one file per height, named in the "
-            "filename and in lineage_wind_speed_<height>.json).",
+            f"10_m, {', '.join(HEIGHT_LEVELS)} above ground (one file per height, named in the "
+            "filename and in lineage_<variable>_<height>.json). The 10 m file "
+            "(`10m_wind_speed_surface.parquet`) is a genuine 10 m field from "
+            "`reanalysis-cerra-single-levels`, not a height-levels product — "
+            "`reanalysis-cerra-height-levels` has no 10 m level, only 15 m and above.",
+            "wind_direction_deg": "Meteorological wind direction, degrees, the direction the wind "
+            "blows FROM, an analysis value at 10 m and each height level, in the "
+            "`wind_direction_*` and `10m_wind_direction_surface` files. Fetched with "
+            "`--wind-direction`.",
         },
         missing_value_convention=missing_value_convention,
         gotchas=[
@@ -523,8 +599,8 @@ def main() -> int:
                 "`time_integrated_surface_direct_short_wave_radiation_flux`) have no CDS "
                 "`analysis` product — they are fetched as a `forecast` product at the "
                 "shortest lead CDS serves (`leadtime_hour=3`), so `valid_time` marks the end "
-                "of a 3-hour accumulation window, not an instant. Wind (`wind_speed`) IS an "
-                "analysis product."
+                "of a 3-hour accumulation window, not an instant. Wind (`wind_speed`, "
+                "`10m_wind_speed`) IS an analysis product."
             ),
             (
                 "Only the deterministic reanalysis is fetched (`data_type=reanalysis`), "
@@ -536,9 +612,11 @@ def main() -> int:
                 "after download and the whole-domain file deleted — see the module docstring "
                 "for why."
             ),
-            "Wind heights kept are a generous band ("
+            "Wind heights kept are a generous band (10_m, "
             + ", ".join(HEIGHT_LEVELS)
-            + ") bracketing GB onshore turbine hub heights, not narrowed to a single height.",
+            + ") bracketing GB onshore turbine hub heights, not narrowed to a single height; "
+            "10 m comes from a different dataset (`reanalysis-cerra-single-levels`) than the "
+            "rest (`reanalysis-cerra-height-levels`), see the wind_speed_m_s column note.",
         ],
         external_docs={
             "CERRA single-levels dataset": (
