@@ -57,6 +57,7 @@ from build_forecast_inputs import (
     _ens_extra_frame,
     _repo_data_dir,
     aifs_site_weights,
+    ens_members,
 )
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "weather_downloads"))
@@ -676,7 +677,7 @@ def build_domain(
     )
     frame = frame.join(extra, on=["site", "time"], how="left")
     if domain == "wind":
-        extract = efh.members(sites=sites)
+        extract = ens_members(sites=sites)
         for day in days:
             frame = frame.join(
                 ens_vector_mean_frame(extract=extract, day=day), on=["site", "time"], how="left"

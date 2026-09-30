@@ -98,6 +98,7 @@ from verify_previous_runs_leads import PRODUCT_DIRS
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "beam_diffuse_split"))
 import ens_forecast_horizons as efh
+from fetch_ens_day4_supplement import SUPPLEMENT_PATH as ENS_DAY4_SUPPLEMENT_PATH
 from fetch_ens_forecast_horizons import H3_RESOLUTION
 from studies.gfs_native import (
     HOURLY_SERVED_LAST_DAY,
@@ -494,6 +495,28 @@ def check_first_step_reaches_targets(
         raise ValueError(msg)
 
 
+def ens_members(*, sites: list[str]) -> pl.DataFrame:
+    """Read ENS's per-member extract for some generators, with the day-4 supplement added.
+
+    The extract holds a lead band for each of days 0, 1, 2, 3, 5, 7, 10, and 14, so it lacks the
+    leads 105, 108, and 111 that a day-4 band needs. `fetch_ens_day4_supplement.py` writes those
+    leads to a separate file. Where that file does not exist, the extract is returned alone, and a
+    day-4 band then raises because it finds no step for some hours.
+
+    Args:
+        sites: The generator labels.
+
+    Returns:
+        One row per generator, run, valid time, and member, with the supplement's rows appended.
+    """
+    extract = efh.members(sites=sites)
+    if not ENS_DAY4_SUPPLEMENT_PATH.exists():
+        return extract
+    return pl.concat(
+        [extract, efh.members(sites=sites, source=ENS_DAY4_SUPPLEMENT_PATH)], how="vertical"
+    )
+
+
 def ens_member_arms(
     *,
     extract: pl.DataFrame,
@@ -595,7 +618,7 @@ def _ens_frame(*, keys: pl.DataFrame, domain: DomainType) -> pl.DataFrame:
     """
     baselined = efh.with_baselines(frame=efh.base_frame(domain=domain), domain=domain)
     sites = sorted(baselined["site"].unique().to_list())
-    extract = efh.members(sites=sites)
+    extract = ens_members(sites=sites)
     arms = ens_member_arms(
         extract=extract,
         domain=domain,
@@ -1612,7 +1635,7 @@ def _ens_extra_frame(
     if not (mean_days or control_days):
         return keys
     sites = sorted(keys["site"].unique().to_list())
-    extract = efh.members(sites=sites)
+    extract = ens_members(sites=sites)
     arms: list[pl.DataFrame] = []
     for day in sorted({*mean_days, *control_days}):
         arms += ens_member_arms(
@@ -1999,7 +2022,7 @@ def _aifs_frame(
         keep_init_time=True,
     )
     arm_frames += ens_member_arms(
-        extract=efh.members(sites=sites),
+        extract=ens_members(sites=sites),
         domain=domain,
         days=days,
         method=method,

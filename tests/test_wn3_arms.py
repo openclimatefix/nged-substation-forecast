@@ -753,3 +753,50 @@ def test_the_leaderboard_ticks_fall_back_where_under_two_whole_numbers_fit() -> 
     need = 20 * charts.LEAD_NAME_PX_PER_CHARACTER + charts.LEAD_NAME_GAP_PX
     first_visible = low + need * (high - low) / charts.LEAD_PLOT_WIDTH_PX
     assert ticks == charts.ticks(x_domain=(first_visible, high))
+
+
+def test_ens_members_fills_the_day_4_gap_with_the_supplement(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    def rows(leads: list[int]) -> pl.DataFrame:
+        init = datetime(2026, 1, 1, tzinfo=UTC)
+        return pl.DataFrame(
+            [
+                {
+                    "site": "A",
+                    "init_time": init,
+                    "valid_time": init + timedelta(hours=lead),
+                    "lead_hours": lead,
+                    "ensemble_member": member,
+                    "ghi_w_m2": 100.0,
+                    "temp_c": 10.0,
+                }
+                for lead in leads
+                for member in range(2)
+            ]
+        ).with_columns(pl.col("lead_hours").cast(pl.Int32))
+
+    gap = {105, 108, 111}
+    supplement = tmp_path / "supplement.parquet"
+    rows(sorted(gap)).write_parquet(supplement)
+    extract = rows([lead for lead in range(90, 127, 3) if lead not in gap])
+    monkeypatch.setattr(
+        bfi.efh,
+        "members",
+        lambda *, sites, source=None: (
+            pl.read_parquet(source) if source is not None else extract
+        ).filter(pl.col("site").is_in(sites)),
+    )
+
+    def day_4_leads(members: pl.DataFrame) -> list[float]:
+        steps = bfi.efh.band_steps(
+            members=members, day=4, domain="solar", ensemble_size=2, six_hourly=True
+        )
+        return steps.leads.tolist()
+
+    monkeypatch.setattr(bfi, "ENS_DAY4_SUPPLEMENT_PATH", tmp_path / "absent.parquet")
+    assert day_4_leads(bfi.ens_members(sites=["A"])) == [96.0, 102.0, 120.0, 126.0]
+    monkeypatch.setattr(bfi, "ENS_DAY4_SUPPLEMENT_PATH", supplement)
+    filled = bfi.ens_members(sites=["A"])
+    assert filled.height == extract.height + 2 * len(gap)
+    assert day_4_leads(filled) == [96.0, 102.0, 108.0, 114.0, 120.0, 126.0]
