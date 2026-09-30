@@ -2557,17 +2557,17 @@ WN3_DAYS: Final[tuple[int, ...]] = (1, 2, 7, 14)
 """The lead days the WN3 fit scores, each on a frame of its own."""
 
 WN3_TRAINING_END: Final[date] = date(2026, 6, 30)
-"""The last day of WN3's production training window. The WN3 paper states that the production
-weather model is trained until 30 June 2026. The wording on the page about this date may change, so
-this constant is the only place the date is written in code."""
+"""The split date: the WN3 paper states that the production weather model is trained until 30 June
+2026. The paper's Appendix A.1.3 also lists versions trained until earlier dates, and which version
+made the archive is not documented. This constant is the only place the date is written in code."""
 
 WN3_TRAINING_END_MONTH: Final[str] = f"{WN3_TRAINING_END:%Y-%m}"
-"""The last month that starts inside the training window, in `%Y-%m` form."""
+"""The month of the split date, in `%Y-%m` form."""
 
 WN3_SPLITS: Final[tuple[str, ...]] = ("in-sample", "out-of-sample")
 """The two month groups every WN3 result is reported in. Only the out-of-sample group carries a
-claim: the in-sample months lie inside WN3's training window, so WN3 against a product whose
-training data ends earlier is not a fair comparison there."""
+claim: the in-sample months may overlap WN3's training data, so WN3 against a product whose
+training data ends earlier may not be a fair comparison there."""
 
 WN3_SPLIT_MONTHS: Final[dict[str, str]] = {
     "in-sample": "February to June 2026",
@@ -2850,7 +2850,7 @@ def wn3_stage_lines(
         (
             f"{dropped} (site, hour) rows fall in neither group: their valid month is after "
             f"{WN3_TRAINING_END_MONTH}, but the 00 UTC run they read was issued on or before "
-            f"{WN3_TRAINING_END:%Y-%m-%d}, inside WN3's training window."
+            f"{WN3_TRAINING_END:%Y-%m-%d}, which may overlap WN3's training data."
         ),
         "",
     ]
@@ -2880,8 +2880,8 @@ def wn3_split_lines(*, domain: DomainType, day: int, losses: pl.DataFrame, split
     claim = (
         "These months carry every claim about WN3."
         if split == "out-of-sample"
-        else "These months lie inside WN3's training window, so WN3 against a product trained on "
-        "earlier data is not a fair comparison here; read them as descriptive only."
+        else "These months may overlap WN3's training data, so WN3 against a product trained on "
+        "earlier data may not be a fair comparison here; read them as descriptive only."
     )
     lines = [
         (
@@ -3052,10 +3052,11 @@ def run_wn3(*, published_dir: Path, output_dir: Path, workers: int) -> int:
             "row set holds February to April and June to 10 September 2026, so each calendar "
             "month occurs in one year only and no scored cell has a training row of its calendar "
             "month, and every contrast is descriptive. No contrast is deciding. WN3's production "
-            "weather model is trained until 30 June 2026, so every result is reported in two "
-            "month groups: the in-sample months (February to June) lie inside WN3's training "
-            "window, and WN3 against a product trained on earlier data is not a fair comparison "
-            "there; the out-of-sample months (July to September) carry every claim, and rest on "
+            "weather model is trained until 30 June 2026 and which version made the archive is "
+            "not documented, so every result is reported in two month groups: the in-sample "
+            "months (February to June) may overlap WN3's training data, and WN3 against a "
+            "product trained on earlier data may not be a fair comparison there; the "
+            "out-of-sample months (July to September) carry every claim, and rest on "
             "3 calendar months, so their intervals are wide. The folds are unchanged: each group "
             "selects rows already scored out of fold. The planned contrast is "
             "wn3_mean_day<N> − ens_mean_day<N> at days 1, 2, 7 and 14, with its negative control "

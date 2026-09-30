@@ -187,6 +187,6 @@ def test_the_report_has_a_table_for_each_group_and_the_fair_comparison_warning()
 
     assert "#### In-sample months (February to June 2026, 3 months)" in text
     assert "#### Out-of-sample months (July to September 2026, 3 months)" in text
-    assert "not a fair comparison here" in text
+    assert "may not be a fair comparison here" in text
     assert "0 (site, hour) rows fall in neither group" in text
     assert text.index("In-sample months") < text.index("Out-of-sample months")
